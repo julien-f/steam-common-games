@@ -106,27 +106,36 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
   }
 });
 
+const _detailsInFlight = new Map();
+
 app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
   const appid = Number(req.params.appid);
   if (!Number.isInteger(appid) || appid <= 0) {
     return res.status(400).json({ error: 'Invalid appid' });
   }
 
-  const hit = getCached(`details:${appid}`, DETAILS_CACHE_TTL_MS);
+  const cacheKey = `details:${appid}`;
+  const hit = getCached(cacheKey, DETAILS_CACHE_TTL_MS);
   if (hit) return res.json(hit);
 
   const name = (req.query.name || '').trim();
-  const [ratingRes, hltbRes] = await Promise.allSettled([
-    getGameRating(appid),
-    getHLTB(name),
-  ]);
 
-  const result = {
-    rating: ratingRes.status === 'fulfilled' ? ratingRes.value : null,
-    hltb: hltbRes.status === 'fulfilled' ? hltbRes.value : null,
-  };
-  setCache(`details:${appid}`, result);
-  res.json(result);
+  if (!_detailsInFlight.has(cacheKey)) {
+    const p = Promise.allSettled([
+      getGameRating(appid),
+      getHLTB(name),
+    ]).then(([ratingRes, hltbRes]) => {
+      const result = {
+        rating: ratingRes.status === 'fulfilled' ? ratingRes.value : null,
+        hltb: hltbRes.status === 'fulfilled' ? hltbRes.value : null,
+      };
+      setCache(cacheKey, result);
+      return result;
+    }).finally(() => _detailsInFlight.delete(cacheKey));
+    _detailsInFlight.set(cacheKey, p);
+  }
+
+  res.json(await _detailsInFlight.get(cacheKey));
 });
 
 app.listen(PORT, HOST, () => {
