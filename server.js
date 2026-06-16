@@ -16,10 +16,12 @@ const HOST = process.env.HOST || '127.0.0.1';
 const PORT = process.env.PORT || 3000;
 const DETAILS_CACHE_TTL_MS = Number(process.env.DETAILS_CACHE_TTL_MINUTES || 10080) * 60 * 1000;
 const MAX_USERS = Number(process.env.MAX_USERS || 10);
+const TRUST_PROXY = process.env.TRUST_PROXY;
 
 setMaxAge(DETAILS_CACHE_TTL_MS);
 
 const app = express();
+if (TRUST_PROXY !== undefined) app.set('trust proxy', TRUST_PROXY);
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
