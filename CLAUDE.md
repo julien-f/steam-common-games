@@ -55,3 +55,7 @@ Delete `cache.json` to force a full refresh.
 ### URL / sharing
 
 The compared users are encoded as `?u=alice&u=bob` query params. Opening such a URL auto-fills the inputs and triggers the search. `history.pushState` is used for explicit searches; `replaceState`-equivalent (`pushState: false`) is used when restoring from URL on load or back/forward navigation to avoid polluting history.
+
+## Changelog
+
+Always update `CHANGELOG.md` before committing any code change. Add entries under `## [Unreleased]` (create the section if it doesn't exist) using [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format (Added / Changed / Fixed / Removed).
