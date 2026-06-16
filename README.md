@@ -8,6 +8,8 @@ For each shared game it shows:
 
 Results are grouped by who shares each game (e.g. all 3 players, or just 2 of 3), so you can see the full picture when libraries partially overlap.
 
+**Steam Family sharing** is supported: click `+` next to any player to add a family member — their libraries are merged before the comparison so shared games show up correctly.
+
 ## Setup
 
 ```bash

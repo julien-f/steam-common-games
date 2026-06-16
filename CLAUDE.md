@@ -22,8 +22,8 @@ The server binds to `http://127.0.0.1:3000` by default. All settings live in `.e
 
 ### Request flow
 
-1. Frontend POSTs `{ users: [...] }` to `/api/common-games`.
-2. Server resolves each identifier to a Steam64 ID, fetches all libraries in parallel, groups games by exact set of owners, returns `{ groups, players }`.
+1. Frontend POSTs `{ slots: [["alice", "bob_family"], ["charlie"]] }` to `/api/common-games`. Each slot is a logical player — multiple accounts in a slot have their libraries unioned before comparison (Steam Family simulation). Legacy `{ users: [...] }` is also accepted and treated as single-account slots.
+2. Server resolves every identifier to a Steam64 ID, deduplicates within each slot, fetches all libraries in one parallel pass, unions libraries per slot, groups games by exact set of slot owners, returns `{ groups, slots }`.
 3. Frontend renders groups immediately (one table per owner set, from most owners to fewest), then fires up to 5 concurrent requests to `/api/game-details/:appid?name=...` to load rating and HLTB data progressively.
 
 ### Ratings — Wilson score
@@ -54,7 +54,7 @@ Delete `cache.json` to force a full refresh.
 
 ### URL / sharing
 
-The compared users are encoded as `?u=alice&u=bob` query params. Opening such a URL auto-fills the inputs and triggers the search. `history.pushState` is used for explicit searches; `replaceState`-equivalent (`pushState: false`) is used when restoring from URL on load or back/forward navigation to avoid polluting history.
+Players are encoded as `?u=` query params. A single-account player is `?u=alice`; a multi-account slot (Steam Family) is `?u=alice,bob_family` (comma-joined). Old single-account URLs are fully compatible. Members within each slot and slots themselves are sorted alphabetically so the same comparison always produces the same URL. `history.pushState` is used for explicit searches; `pushState: false` is used when restoring from URL on load or back/forward navigation to avoid polluting history.
 
 ## Changelog
 

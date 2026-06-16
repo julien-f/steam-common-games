@@ -54,27 +54,53 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
     });
   }
 
-  const { users } = req.body;
-  if (!Array.isArray(users) || users.length < 2) {
-    return res.status(400).json({ error: 'Provide at least 2 Steam users' });
+  // Accept { slots: [["alice", "bob"], ["charlie"]] }
+  // or legacy { users: ["alice", "charlie"] } (each user becomes a single-member slot)
+  let rawSlots = req.body.slots;
+  if (!rawSlots && Array.isArray(req.body.users)) {
+    rawSlots = req.body.users.map(u => [u]);
   }
-  if (users.length > MAX_USERS) {
+
+  if (!Array.isArray(rawSlots) || rawSlots.length < 2 || !rawSlots.every(s => Array.isArray(s) && s.length > 0)) {
+    return res.status(400).json({ error: 'Provide at least 2 players' });
+  }
+  if (rawSlots.reduce((n, s) => n + s.length, 0) > MAX_USERS) {
     return res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
   }
 
   try {
-    const steamIds = [...new Set(await Promise.all(users.map(resolveSteamId)))];
-    if (steamIds.length < 2) {
-      return res.status(400).json({ error: 'All provided users resolve to the same Steam account' });
-    }
-    const [libraries, players] = await Promise.all([
-      Promise.all(steamIds.map(getOwnedGames)),
-      getPlayerSummaries(steamIds),
+    // Resolve all users; deduplicate within each slot
+    const resolvedSlots = await Promise.all(
+      rawSlots.map(async slot => [...new Set(await Promise.all(slot.map(resolveSteamId)))])
+    );
+
+    // Fetch all unique Steam IDs in one pass
+    const uniqueIds = [...new Set(resolvedSlots.flat())];
+    const [playerList, libraryList] = await Promise.all([
+      getPlayerSummaries(uniqueIds),
+      Promise.all(uniqueIds.map(getOwnedGames)),
     ]);
 
-    const groups = groupByOwnership(libraries);
+    const libraryById = new Map(uniqueIds.map((id, i) => [id, libraryList[i]]));
+    const playerById = new Map(playerList.map(p => [p.steamid, p]));
 
-    res.json({ groups, players });
+    // Union libraries within each slot, group player summaries by slot
+    const slotLibraries = resolvedSlots.map(ids => {
+      const merged = new Map();
+      for (const id of ids) {
+        for (const game of libraryById.get(id) || []) {
+          if (!merged.has(game.appid)) merged.set(game.appid, game);
+        }
+      }
+      return [...merged.values()];
+    });
+
+    const playerSlots = resolvedSlots.map(ids =>
+      ids.map(id => playerById.get(id) || { steamid: id, personaname: id, profileurl: '' })
+    );
+
+    const groups = groupByOwnership(slotLibraries);
+    res.json({ groups, slots: playerSlots });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

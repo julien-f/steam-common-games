@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - `TRUST_PROXY` env var to configure Express `trust proxy` (needed for correct rate-limit IPs behind a reverse proxy)
+- Steam Family support: click `+` next to any player to add a family member whose library is merged (unioned) into that slot before computing common games
+- URL encoding updated to support multi-account slots (`?u=alice,bob_family&u=charlie`); old single-account URLs remain fully compatible
+- URL is now canonical: slot members and slots themselves are sorted alphabetically, so the same comparison always produces the same shareable URL
 
 ## [0.1.0] - 2026-06-16
 

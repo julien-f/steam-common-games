@@ -253,6 +253,24 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   vertical-align: middle;
   margin-right: 7px;
 }
+
+/* Family member sub-rows */
+.player-slot { display: flex; flex-direction: column; gap: 6px; }
+.family-row { display: flex; gap: 8px; align-items: center; padding-left: 40px; }
+.btn-add-family {
+  flex-shrink: 0;
+  width: 32px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 17px;
+  line-height: 30px;
+  text-align: center;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.btn-add-family:hover { background: rgba(26,159,255,0.12); border-color: var(--accent); color: var(--accent); }
 </style>
 </head>
 <body>
@@ -267,7 +285,7 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
     <h2>Steam Users</h2>
     <div id="user-inputs"></div>
     <div class="actions">
-      <button class="btn btn-ghost" id="add-btn">+ Add user</button>
+      <button class="btn btn-ghost" id="add-btn">+ Add player</button>
       <button class="btn btn-primary" id="search-btn">Find Common Games</button>
     </div>
   </div>
@@ -281,7 +299,7 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
 
 let games = [];     // flat: { appid, name, groupKey, loading, details }
 let groups = [];    // [{ userIndices, games }] — ordered, from server
-let players = [];
+let slots = [];     // [[{steamid, personaname, profileurl}, ...], ...] — one entry per logical player
 let sortCol = 'score';
 let sortDir = -1;
 let runId = 0;      // increments on each search to cancel stale updates
@@ -289,7 +307,7 @@ let runId = 0;      // increments on each search to cancel stale updates
 // ── Init ───────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('add-btn').addEventListener('click', () => addUserRow());
+  document.getElementById('add-btn').addEventListener('click', () => addPlayerSlot());
   document.getElementById('search-btn').addEventListener('click', findCommonGames);
 
   fetch('/api/health').then(r => r.json()).then(d => {
@@ -309,28 +327,69 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('popstate', loadFromUrl);
 
 function loadFromUrl() {
-  const urlUsers = new URLSearchParams(location.search).getAll('u');
+  // Each u= param is a comma-joined list of accounts for one logical player slot.
+  // Old single-account URLs (?u=alice&u=bob) parse naturally as single-member slots.
+  const urlSlots = new URLSearchParams(location.search).getAll('u')
+    .map(s => s.split(',').map(v => v.trim()).filter(Boolean));
   const container = document.getElementById('user-inputs');
   container.innerHTML = '';
-  if (urlUsers.length >= 2) {
-    urlUsers.forEach(u => addUserRow(u));
+  if (urlSlots.length >= 2 && urlSlots.every(s => s.length > 0)) {
+    urlSlots.forEach(accounts => addPlayerSlot(accounts));
     findCommonGames({ pushState: false });
   } else {
-    addUserRow();
-    addUserRow();
+    addPlayerSlot();
+    addPlayerSlot();
     games = [];
-    players = [];
+    slots = [];
     document.getElementById('results').innerHTML = '';
     document.title = 'Steam Common Games';
   }
 }
 
-// ── User input rows ────────────────────────────────────────────────────────
+// ── Player slot input rows ─────────────────────────────────────────────────
 
-function addUserRow(value = '') {
+function addPlayerSlot(accounts = ['']) {
   const container = document.getElementById('user-inputs');
+  const slot = document.createElement('div');
+  slot.className = 'player-slot';
+
+  const primaryRow = document.createElement('div');
+  primaryRow.className = 'user-row';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Steam username, profile URL, or 64-bit ID';
+  input.value = accounts[0] || '';
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') findCommonGames(); });
+
+  const addFamilyBtn = document.createElement('button');
+  addFamilyBtn.className = 'btn-add-family';
+  addFamilyBtn.title = 'Add a family member who shares their library with this player';
+  addFamilyBtn.textContent = '+';
+  addFamilyBtn.addEventListener('click', () => addFamilyMember(slot));
+
+  const removeSlotBtn = document.createElement('button');
+  removeSlotBtn.className = 'btn-remove';
+  removeSlotBtn.title = 'Remove player';
+  removeSlotBtn.textContent = '×';
+  removeSlotBtn.addEventListener('click', () => {
+    if (document.querySelectorAll('.player-slot').length > 2) slot.remove();
+  });
+
+  primaryRow.appendChild(input);
+  primaryRow.appendChild(addFamilyBtn);
+  primaryRow.appendChild(removeSlotBtn);
+  slot.appendChild(primaryRow);
+
+  for (let i = 1; i < accounts.length; i++) addFamilyMember(slot, accounts[i]);
+
+  container.appendChild(slot);
+  if (!accounts[0]) input.focus();
+}
+
+function addFamilyMember(slot, value = '') {
   const row = document.createElement('div');
-  row.className = 'user-row';
+  row.className = 'family-row';
 
   const input = document.createElement('input');
   input.type = 'text';
@@ -340,22 +399,22 @@ function addUserRow(value = '') {
 
   const rm = document.createElement('button');
   rm.className = 'btn-remove';
-  rm.title = 'Remove';
-  rm.textContent = '×';
-  rm.addEventListener('click', () => {
-    if (container.children.length > 2) row.remove();
-  });
+  rm.title = 'Remove family member';
+  rm.textContent = '−';
+  rm.addEventListener('click', () => row.remove());
 
   row.appendChild(input);
   row.appendChild(rm);
-  container.appendChild(row);
+  slot.appendChild(row);
   if (!value) input.focus();
 }
 
-function getUsers() {
-  return [...document.querySelectorAll('#user-inputs input')]
-    .map(i => normalizeInput(i.value.trim()))
-    .filter(Boolean);
+function getSlots() {
+  return [...document.querySelectorAll('.player-slot')].map(slot =>
+    [...slot.querySelectorAll('input')]
+      .map(i => normalizeInput(i.value.trim()))
+      .filter(Boolean)
+  ).filter(s => s.length > 0);
 }
 
 // Extract username/ID from a pasted Steam profile URL
@@ -383,14 +442,18 @@ function showAlert(msg, type = 'error') {
 // ── Main search flow ───────────────────────────────────────────────────────
 
 async function findCommonGames({ pushState = true } = {}) {
-  const users = getUsers();
-  if (users.length < 2) { showAlert('Enter at least 2 Steam users.'); return; }
+  const inputSlots = getSlots();
+  if (inputSlots.length < 2) { showAlert('Enter at least 2 Steam users.'); return; }
 
   clearAlerts();
 
   if (pushState) {
     const params = new URLSearchParams();
-    [...users].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })).forEach(u => params.append('u', u));
+    const cmp = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+    [...inputSlots]
+      .map(slot => [...slot].sort(cmp))           // sort members within each slot
+      .sort((a, b) => cmp(a[0], b[0]))            // sort slots by their first member
+      .forEach(slot => params.append('u', slot.join(',')));
     history.pushState(null, '', `?${params}`);
   }
 
@@ -403,7 +466,7 @@ async function findCommonGames({ pushState = true } = {}) {
     const res = await fetch('/api/common-games', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ users }),
+      body: JSON.stringify({ slots: inputSlots }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
@@ -414,7 +477,7 @@ async function findCommonGames({ pushState = true } = {}) {
       const key = g.userIndices.join(',');
       return g.games.map(game => ({ ...game, groupKey: key, loading: true, details: null }));
     });
-    players = data.players || [];
+    slots = data.slots || [];
 
     renderPage();
     await loadAllDetails(thisRun);
@@ -474,40 +537,39 @@ async function fetchDetails(idx, thisRun) {
 
 // ── Rendering ──────────────────────────────────────────────────────────────
 
-function groupUsersHtml(userIndices) {
-  const sorted = [...userIndices].sort((a, b) => {
-    const na = (players[a]?.personaname || '').toLowerCase();
-    const nb = (players[b]?.personaname || '').toLowerCase();
-    return na.localeCompare(nb);
-  });
-  return sorted.map(i => {
-    const p = players[i];
-    const name = esc(p?.personaname || `Player ${i + 1}`);
-    return p?.profileurl
+function slotDisplayName(i) {
+  return (slots[i] || []).map((p, j) => p.personaname || `Player ${i + 1}.${j + 1}`).join(' + ');
+}
+
+function slotHtml(i) {
+  return (slots[i] || []).map((p, j) => {
+    const name = esc(p.personaname || `Player ${i + 1}.${j + 1}`);
+    return p.profileurl
       ? `<a href="${esc(p.profileurl)}" target="_blank" rel="noopener" style="color:var(--accent2);text-decoration:none">${name}</a>`
       : name;
-  }).join(', ');
+  }).join(' + ');
+}
+
+function groupSlotsHtml(slotIndices) {
+  return [...slotIndices]
+    .sort((a, b) => slotDisplayName(a).toLowerCase().localeCompare(slotDisplayName(b).toLowerCase()))
+    .map(i => slotHtml(i))
+    .join(', ');
 }
 
 function renderPage() {
-  const sortedPlayers = [...players].sort((a, b) =>
-    (a.personaname || '').toLowerCase().localeCompare((b.personaname || '').toLowerCase())
+  const sortedSlotIndices = [...slots.keys()].sort((a, b) =>
+    slotDisplayName(a).toLowerCase().localeCompare(slotDisplayName(b).toLowerCase())
   );
-  const playerList = sortedPlayers.length
-    ? sortedPlayers.map(p =>
-        p.profileurl
-          ? `<a href="${esc(p.profileurl)}" target="_blank" rel="noopener" style="color:var(--accent2);text-decoration:none">${esc(p.personaname)}</a>`
-          : esc(p.personaname)
-      ).join(', ')
-    : '';
+  const playerList = sortedSlotIndices.map(i => slotHtml(i)).join(', ');
 
-  if (players.length) {
-    document.title = sortedPlayers.map(p => p.personaname).join(', ') + ' — Steam Common Games';
+  if (slots.length) {
+    document.title = sortedSlotIndices.map(i => slotDisplayName(i)).join(', ') + ' — Steam Common Games';
   }
 
   const groupSections = groups.map(group => {
     const key = group.userIndices.join(',');
-    const usersHtml = groupUsersHtml(group.userIndices);
+    const usersHtml = groupSlotsHtml(group.userIndices);
     const count = group.games.length;
     return `
       <div class="game-group">
