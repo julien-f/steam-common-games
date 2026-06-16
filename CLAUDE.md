@@ -1,0 +1,57 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Running the app
+
+```bash
+cp .env.example .env   # first time only — then fill in STEAM_API_KEY
+npm install            # first time only
+npm start              # or: npm run dev  (restarts on file changes)
+```
+
+The server binds to `http://127.0.0.1:3000` by default. All settings live in `.env` (gitignored); see `.env.example` for the full list with comments.
+
+## Architecture
+
+- **`server.js`** — Express setup and route handlers only.
+- **`lib/cache.js`** — Persistent cache (`getCached`, `setCache`), disk I/O, process exit hooks.
+- **`lib/steam.js`** — Steam API calls (`resolveSteamId`, `getOwnedGames`, `getPlayerSummaries`, `getGameRating`).
+- **`lib/hltb.js`** — HLTB auth + search (`getHLTB`), plus exported `stringSimilarity` and `levenshtein` for unit testing.
+- **`public/index.html`** — Single-page frontend (vanilla JS, no framework). All CSS and JS are inline.
+
+### Request flow
+
+1. Frontend POSTs `{ users: [...] }` to `/api/common-games`.
+2. Server resolves each identifier to a Steam64 ID, fetches all libraries in parallel, groups games by exact set of owners, returns `{ groups, players }`.
+3. Frontend renders groups immediately (one table per owner set, from most owners to fewest), then fires up to 5 concurrent requests to `/api/game-details/:appid?name=...` to load rating and HLTB data progressively.
+
+### Ratings — Wilson score
+
+The score shown is the **Wilson score lower bound** at 95% confidence, computed from Steam's own review counts (`store.steampowered.com/appreviews/:appid`). This is the same formula SteamDB uses. Do not replace it with a simple positive/total ratio.
+
+### HLTB — no npm package
+
+The `howlongtobeat` npm package was removed (it pulled in a vulnerable `axios`). HLTB is called directly with a two-step auth flow:
+
+1. `GET https://howlongtobeat.com/api/bleed/init?t={ms}` → returns `{ token, hpKey, hpVal }`
+2. `POST https://howlongtobeat.com/api/bleed` with `X-Auth-Token`, `X-Hp-Key`, `X-Hp-Val` headers and `{ [hpKey]: hpVal, ...payload }` in the body
+
+The token is cached in memory for 5 minutes (not on disk — it's session-bound). A 401/403 from the search endpoint clears the cache so the next call re-fetches. Match quality is checked via Levenshtein similarity; results below 0.4 are discarded.
+
+If HLTB breaks again, recent npm packages (e.g. `howlongtobeat-ts`) tend to reverse-engineer the new flow quickly and are a good first place to look.
+
+### Cache
+
+The cache is an in-memory `Map` backed by `cache.json` (written with a 5 s debounce, flushed synchronously on exit). Two TTLs apply:
+
+| Key prefix | TTL env var | Default | Reason |
+|---|---|---|---|
+| `resolve:`, `details:` | `DETAILS_CACHE_TTL_MINUTES` | 7 days | Stable data |
+| `games:`, `players:` | `CACHE_TTL_MINUTES` | 60 min | Changes when users buy games |
+
+Delete `cache.json` to force a full refresh.
+
+### URL / sharing
+
+The compared users are encoded as `?u=alice&u=bob` query params. Opening such a URL auto-fills the inputs and triggers the search. `history.pushState` is used for explicit searches; `replaceState`-equivalent (`pushState: false`) is used when restoring from URL on load or back/forward navigation to avoid polluting history.

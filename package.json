@@ -1,0 +1,19 @@
+{
+  "name": "steam-common-games",
+  "version": "1.0.0",
+  "description": "Find games common to multiple Steam libraries",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.5.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
