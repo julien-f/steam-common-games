@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Unit tests for `resolveSteamId`, `getOwnedGames`, and `getPlayerSummaries` in `test/steam.test.js`, covering Steam64 bypass, API fetch, cache hits, upstream errors, private library, and order-independent cache key
 - Unit tests for `cache.js`: TTL checking, eager expiry deletion, entry overwrite, and no-`ttlMs` fallback behaviour (`test/cache.test.js`)
 - `TRUST_PROXY` env var to configure Express `trust proxy` (needed for correct rate-limit IPs behind a reverse proxy)
 - Steam Family support: click `+` next to any player to add a family member whose library is merged (unioned) into that slot before computing common games

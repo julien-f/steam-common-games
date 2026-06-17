@@ -2,7 +2,8 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { getGameRating } = require('../lib/steam');
+const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating } = require('../lib/steam');
+const { _reset } = require('../lib/cache');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
   return {
@@ -78,4 +79,172 @@ test('getGameRating: more reviews tightens the confidence interval', async (t) =
     manyReviews.score > fewReviews.score,
     `expected larger sample score ${manyReviews.score} > small sample score ${fewReviews.score}`
   );
+});
+
+// ── resolveSteamId ────────────────────────────────────────────────────────────
+
+test('resolveSteamId: returns Steam64 ID directly without fetching', async (t) => {
+  _reset();
+  let fetchCalled = false;
+  t.mock.method(globalThis, 'fetch', async () => { fetchCalled = true; });
+
+  const result = await resolveSteamId('76561198000000001');
+  assert.equal(result, '76561198000000001');
+  assert.equal(fetchCalled, false);
+});
+
+test('resolveSteamId: resolves vanity URL via Steam API', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ response: { success: 1, steamid: '76561198000000001' } }),
+  }));
+
+  const result = await resolveSteamId('gaben');
+  assert.equal(result, '76561198000000001');
+});
+
+test('resolveSteamId: caches resolved ID — second call skips fetch', async (t) => {
+  _reset();
+  let fetchCount = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    fetchCount++;
+    return { ok: true, json: async () => ({ response: { success: 1, steamid: '76561198000000001' } }) };
+  });
+
+  await resolveSteamId('gaben2');
+  await resolveSteamId('gaben2');
+  assert.equal(fetchCount, 1, 'second call should be served from cache');
+});
+
+test('resolveSteamId: throws with isUpstream when Steam API returns non-ok', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+
+  await assert.rejects(
+    () => resolveSteamId('gaben3'),
+    err => err.isUpstream === true && /503/.test(err.message)
+  );
+});
+
+test('resolveSteamId: throws user error when account is not found', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ response: { success: 42 } }),
+  }));
+
+  await assert.rejects(
+    () => resolveSteamId('nobody'),
+    err => !err.isUpstream && /Cannot find Steam account/.test(err.message)
+  );
+});
+
+// ── getOwnedGames ─────────────────────────────────────────────────────────────
+
+test('getOwnedGames: fetches and returns game list', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ response: { games: [{ appid: 400, name: 'Portal' }] } }),
+  }));
+
+  const games = await getOwnedGames('76561198000000001');
+  assert.equal(games.length, 1);
+  assert.equal(games[0].appid, 400);
+});
+
+test('getOwnedGames: caches result — second call skips fetch', async (t) => {
+  _reset();
+  let fetchCount = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    fetchCount++;
+    return { ok: true, json: async () => ({ response: { games: [] } }) };
+  });
+
+  await getOwnedGames('76561198000000002');
+  await getOwnedGames('76561198000000002');
+  assert.equal(fetchCount, 1, 'second call should be served from cache');
+});
+
+test('getOwnedGames: throws with isUpstream when Steam API returns non-ok', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+
+  await assert.rejects(
+    () => getOwnedGames('76561198000000003'),
+    err => err.isUpstream === true
+  );
+});
+
+test('getOwnedGames: throws user error when library is private', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ response: {} }),  // no `games` field
+  }));
+
+  await assert.rejects(
+    () => getOwnedGames('76561198000000004'),
+    err => !err.isUpstream && /private/.test(err.message)
+  );
+});
+
+// ── getPlayerSummaries ────────────────────────────────────────────────────────
+
+test('getPlayerSummaries: fetches and returns player list', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ response: { players: [{ steamid: '76561198000000001', personaname: 'Alice' }] } }),
+  }));
+
+  const players = await getPlayerSummaries(['76561198000000001']);
+  assert.equal(players.length, 1);
+  assert.equal(players[0].personaname, 'Alice');
+});
+
+test('getPlayerSummaries: caches result — second call skips fetch', async (t) => {
+  _reset();
+  let fetchCount = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    fetchCount++;
+    return { ok: true, json: async () => ({ response: { players: [] } }) };
+  });
+
+  await getPlayerSummaries(['76561198000000005']);
+  await getPlayerSummaries(['76561198000000005']);
+  assert.equal(fetchCount, 1, 'second call should be served from cache');
+});
+
+test('getPlayerSummaries: returns placeholder players when API fails, does not cache', async (t) => {
+  _reset();
+  let fetchCount = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    fetchCount++;
+    return { ok: false, status: 503 };
+  });
+
+  const ids = ['76561198000000006'];
+  const result = await getPlayerSummaries(ids);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].steamid, ids[0]);
+  assert.equal(result[0].personaname, ids[0]);
+
+  // Since failure result wasn't cached, next call hits the API again
+  await getPlayerSummaries(ids);
+  assert.equal(fetchCount, 2, 'fallback result must not be cached');
+});
+
+test('getPlayerSummaries: cache key is order-independent', async (t) => {
+  _reset();
+  let fetchCount = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    fetchCount++;
+    return { ok: true, json: async () => ({ response: { players: [] } }) };
+  });
+
+  await getPlayerSummaries(['76561198000000008', '76561198000000007']);
+  await getPlayerSummaries(['76561198000000007', '76561198000000008']); // reversed order
+  assert.equal(fetchCount, 1, 'reversed order should hit same cache entry');
 });
