@@ -125,7 +125,7 @@ test('getHLTB: strips trademark symbols from query', async (t) => {
   assert.deepEqual(capturedBody.searchTerms, ['Hades']);
 });
 
-test('getHLTB: returns null when best match is below 0.4 similarity', async (t) => {
+test('getHLTB: returns null when best match is below 0.35 similarity', async (t) => {
   _resetAuth();
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('bleed/init')) return makeInitResponse();
