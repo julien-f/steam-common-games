@@ -191,6 +191,23 @@ test('getHLTB: returns null when init fails', async (t) => {
   assert.equal(result, null);
 });
 
+test('getHLTB: skips init retry within 30s cooldown after failed init', async (t) => {
+  _resetAuth();
+  let initCalls = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('bleed/init')) { initCalls++; return { ok: false, status: 503 }; }
+    return makeSearchResponse([]);
+  });
+
+  await getHLTB('Portal');
+  assert.equal(initCalls, 1);
+
+  // Second call is within the 30s window — init must not be retried
+  await getHLTB('Portal');
+  assert.equal(initCalls, 1, 'init should not be retried within cooldown window');
+  _resetAuth();
+});
+
 test('getHLTB: picks the best match by similarity, not first result', async (t) => {
   _resetAuth();
   t.mock.method(globalThis, 'fetch', async (url) => {
