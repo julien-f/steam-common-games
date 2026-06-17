@@ -163,6 +163,22 @@ test('getHLTB: returns null when no results', async (t) => {
   assert.equal(result, null);
 });
 
+test('getHLTB: 401 does not set retry cooldown — init is retried immediately', async (t) => {
+  _resetAuth();
+  let initCalls = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('bleed/init')) { initCalls++; return makeInitResponse(); }
+    return { ok: false, status: 401 };
+  });
+
+  await getHLTB('Portal');
+  assert.equal(initCalls, 1);
+
+  // 401 clears the token but must not set the failure cooldown — init must be called again
+  await getHLTB('Portal');
+  assert.equal(initCalls, 2, 'init should be retried immediately after a 401, no cooldown');
+});
+
 test('getHLTB: returns null and clears auth on 401', async (t) => {
   _resetAuth();
   let initCalls = 0;
