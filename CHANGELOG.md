@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `slotHtml` now validates that `profileurl` starts with `http://` or `https://` before injecting it into an `href` attribute; previously `esc()` did not strip dangerous URL schemes, so a `javascript:` URL would have passed through unchanged and executed on click
 - `sortedGames` HLTB sort now uses `?? Infinity` instead of `|| Infinity`; the `||` form incorrectly treated a `0`-hour value as unknown and sorted it to the bottom, because `0` is falsy
 
+### Added
+
+- `normalizeInput`, `scoreColor`, `fmtH`, and `esc` extracted from the inline script into `public/utils.js`, loaded via `<script src>` and testable in Node without a browser (`if (typeof module !== 'undefined') module.exports = ...`); unit tests added in `test/frontend-utils.test.js` (23 new tests, 115 total)
+
 - `server.js` now exports `{ app }` and guards `app.listen` with `require.main === module` so the app can be imported by tests without binding a port; `STEAM_API_KEY` is now read at request time (not module load) so it can be toggled per-test, and rate limiters are skipped when `NODE_ENV=test`
 - TTL constants (`CACHE_TTL_MS`, `DETAILS_CACHE_TTL_MS`) extracted to `lib/config.js`; previously the `DETAILS_CACHE_TTL_MS` formula was copy-pasted in both `steam.js` and `server.js` with two independent default values that could silently diverge
 - The `name` query parameter on `/api/game-details/:appid` is now capped at 200 characters before being forwarded to HLTB, preventing oversized strings from inflating outbound request payloads
