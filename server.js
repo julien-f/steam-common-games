@@ -128,7 +128,9 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
 
   const cacheKey = `details:${appid}`;
   const hit = getCached(cacheKey, DETAILS_CACHE_TTL_MS);
-  if (hit) return res.json(hit);
+  // Only use cache hits that include meta — entries written before meta was
+  // added have meta: undefined and must be re-fetched to populate the filter panel.
+  if (hit && hit.meta !== undefined) return res.json(hit);
 
   const name = (req.query.name || '').trim().slice(0, 200);
   const result = await dedupDetails(cacheKey, () =>

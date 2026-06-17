@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Steam Store API is now requested with `&l=english` so genres and categories are always returned in English instead of the server's IP-geolocated locale
+- `/api/game-details` no longer serves cached entries that predate the `meta` field; those entries have `meta: undefined` and are re-fetched transparently so the filter panel populates correctly after upgrading; entries written since the change have `meta: null` (explicit) on Store API failure and are still served from cache normally
+
 - `slotHtml` now validates that `profileurl` starts with `http://` or `https://` before injecting it into an `href` attribute; previously `esc()` did not strip dangerous URL schemes, so a `javascript:` URL would have passed through unchanged and executed on click
 - `sortedGames` HLTB sort now uses `?? Infinity` instead of `|| Infinity`; the `||` form incorrectly treated a `0`-hour value as unknown and sorted it to the bottom, because `0` is falsy
 
