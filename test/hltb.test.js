@@ -81,6 +81,10 @@ test('buildSearchTerms: strips punctuation from individual tokens', () => {
   assert.deepEqual(buildSearchTerms('Batman: Arkham Asylum'), ['Batman', 'Arkham', 'Asylum']);
 });
 
+test('buildSearchTerms: falls back to all tokens when every word is an edition word', () => {
+  assert.deepEqual(buildSearchTerms('Definitive Edition'), ['Definitive', 'Edition']);
+});
+
 // ── getHLTB ───────────────────────────────────────────────────────────────
 
 function makeInitResponse(token = 'tok', hpKey = 'k', hpVal = 'v') {
