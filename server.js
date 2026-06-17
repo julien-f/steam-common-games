@@ -60,7 +60,11 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
     rawSlots = req.body.users.map(u => [u]);
   }
 
-  if (!Array.isArray(rawSlots) || rawSlots.length < 2 || !rawSlots.every(s => Array.isArray(s) && s.length > 0)) {
+  if (
+    !Array.isArray(rawSlots) ||
+    rawSlots.length < 2 ||
+    !rawSlots.every(s => Array.isArray(s) && s.length > 0 && s.every(u => typeof u === 'string' && u.trim().length > 0))
+  ) {
     return res.status(400).json({ error: 'Provide at least 2 players' });
   }
   if (rawSlots.reduce((n, s) => n + s.length, 0) > MAX_USERS) {
