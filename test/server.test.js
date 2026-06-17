@@ -52,11 +52,12 @@ function makeDetailsFetch({ ratingOk = true } = {}) {
 
 // ── GET /api/health ───────────────────────────────────────────────────────────
 
-test('GET /api/health: 200 with ok=true and configured=true', async () => {
+test('GET /api/health: 200 with ok=true, configured=true, and cache stats', async () => {
   const res = await api.get('/api/health');
   assert.equal(res.status, 200);
   assert.equal(res.body.ok, true);
   assert.equal(res.body.configured, true);
+  assert.equal(typeof res.body.cache?.entries, 'number');
 });
 
 test('GET /api/health: configured=false when STEAM_API_KEY is absent', async (t) => {

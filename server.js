@@ -11,7 +11,7 @@ const morgan = require('morgan');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 
-const { getCached, setCache } = require('./lib/cache');
+const { getCached, setCache, getCacheStats } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
 const { DETAILS_CACHE_TTL_MS } = require('./lib/config');
 const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating } = require('./lib/steam');
@@ -50,7 +50,7 @@ const detailsLimit = rateLimit({
 });
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, configured: !!process.env.STEAM_API_KEY });
+  res.json({ ok: true, configured: !!process.env.STEAM_API_KEY, cache: getCacheStats() });
 });
 
 app.post('/api/common-games', searchLimit, async (req, res) => {
