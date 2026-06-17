@@ -2,6 +2,10 @@
 
 require('dotenv').config();
 
+process.on('unhandledRejection', (err) => {
+  console.error('[unhandled rejection]', err);
+});
+
 const express = require('express');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
