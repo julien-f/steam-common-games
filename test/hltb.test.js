@@ -87,6 +87,16 @@ test('getHLTB: returns null for empty name', async () => {
   assert.equal(result, null);
 });
 
+test('getHLTB: returns null without fetching when name is only stripped symbols', async (t) => {
+  _resetAuth();
+  let fetchCalled = false;
+  t.mock.method(globalThis, 'fetch', async () => { fetchCalled = true; });
+
+  const result = await getHLTB('™®©');
+  assert.equal(result, null);
+  assert.equal(fetchCalled, false);
+});
+
 test('getHLTB: returns main and extra hours on match', async (t) => {
   _resetAuth();
   t.mock.method(globalThis, 'fetch', async (url) => {

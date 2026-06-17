@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Extracted in-flight dedup helper to `lib/dedup.js` (`createDedup`) and replaced the duplicate `_detailsInFlight` block in `server.js` with a call to it, eliminating two independent copies of the same pattern
 - HLTB auth init now backs off for 30 s after a failed init request instead of retrying on every queued search
+- `getHLTB` now returns null immediately when the game name reduces to an empty string after stripping trademark symbols, avoiding a pointless API round-trip
 - HLTB auth thundering herd: concurrent calls that find the token expired now share a single in-flight init request instead of each firing their own
 - Steam API cache stampede: concurrent requests for the same vanity URL, library, or player summaries now share a single in-flight fetch instead of each issuing a duplicate API call
 - Game-details cache stampede: concurrent requests for the same appid now share a single in-flight fetch (Steam reviews + HLTB) instead of queuing duplicate work through the HLTB concurrency cap
