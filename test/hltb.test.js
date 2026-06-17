@@ -171,15 +171,15 @@ test('getHLTB: 401 does not set retry cooldown — init is retried immediately',
     return { ok: false, status: 401 };
   });
 
-  await getHLTB('Portal');
+  await assert.rejects(() => getHLTB('Portal'));
   assert.equal(initCalls, 1);
 
   // 401 clears the token but must not set the failure cooldown — init must be called again
-  await getHLTB('Portal');
+  await assert.rejects(() => getHLTB('Portal'));
   assert.equal(initCalls, 2, 'init should be retried immediately after a 401, no cooldown');
 });
 
-test('getHLTB: returns null and clears auth on 401', async (t) => {
+test('getHLTB: throws and clears auth on 401', async (t) => {
   _resetAuth();
   let initCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
@@ -187,8 +187,7 @@ test('getHLTB: returns null and clears auth on 401', async (t) => {
     return { ok: false, status: 401 };
   });
 
-  const result = await getHLTB('Portal');
-  assert.equal(result, null);
+  await assert.rejects(() => getHLTB('Portal'));
 
   // On the next call, auth should have been cleared so init is called again
   t.mock.method(globalThis, 'fetch', async (url) => {
@@ -199,12 +198,11 @@ test('getHLTB: returns null and clears auth on 401', async (t) => {
   assert.equal(initCalls, 2, 'expected init to be called again after 401');
 });
 
-test('getHLTB: returns null when init fails', async (t) => {
+test('getHLTB: throws when init fails', async (t) => {
   _resetAuth();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
 
-  const result = await getHLTB('Portal');
-  assert.equal(result, null);
+  await assert.rejects(() => getHLTB('Portal'), err => /auth unavailable/i.test(err.message));
 });
 
 test('getHLTB: skips init retry within 30s cooldown after failed init', async (t) => {
@@ -215,11 +213,11 @@ test('getHLTB: skips init retry within 30s cooldown after failed init', async (t
     return makeSearchResponse([]);
   });
 
-  await getHLTB('Portal');
+  await assert.rejects(() => getHLTB('Portal'));
   assert.equal(initCalls, 1);
 
   // Second call is within the 30s window — init must not be retried
-  await getHLTB('Portal');
+  await assert.rejects(() => getHLTB('Portal'));
   assert.equal(initCalls, 1, 'init should not be retried within cooldown window');
   _resetAuth();
 });

@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- `details:${appid}` cache entry split into three independent entries — `rating:${appid}`, `hltb:${appid}`, `meta:${appid}` — so each source can be cached and retried independently; only fulfilled fetches are cached (rejections are not), so a transient API failure is retried on the next request without discarding successfully-fetched data
+- `getCached` now returns `undefined` for a cache miss instead of `null`, allowing `null` to be stored as a valid "no data" result (e.g. a game with no reviews, no HLTB entry, or not on the Steam Store)
+- `getGameRating` and `getAppDetails` now throw on non-ok HTTP responses instead of returning `null`, so `Promise.allSettled` can distinguish fetch failures from legitimate "no data" results
+- `getHLTB` now throws on auth unavailability, 401/403, and non-ok responses instead of returning `null`; auth is checked before acquiring the concurrency semaphore so a failed auth does not block the queue
+
 - Cache TTL is now resolved from config by key prefix (`getTtlForKey`) rather than being stored in each entry or passed on every read; `getCached` and `setCache` no longer accept a `ttlMs` argument
 
 ### Fixed

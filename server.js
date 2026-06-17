@@ -125,23 +125,35 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
     return res.status(400).json({ error: 'Invalid appid' });
   }
 
-  const cacheKey = `details:${appid}`;
-  const hit = getCached(cacheKey);
-  if (hit) return res.json(hit);
+  const ratingKey = `rating:${appid}`;
+  const hltbKey   = `hltb:${appid}`;
+  const metaKey   = `meta:${appid}`;
+
+  const cachedRating = getCached(ratingKey);
+  const cachedHltb   = getCached(hltbKey);
+  const cachedMeta   = getCached(metaKey);
+
+  if (cachedRating !== undefined && cachedHltb !== undefined && cachedMeta !== undefined) {
+    return res.json({ rating: cachedRating, hltb: cachedHltb, meta: cachedMeta });
+  }
 
   const name = (req.query.name || '').trim().slice(0, 200);
-  const result = await dedupDetails(cacheKey, () =>
-    Promise.allSettled([getGameRating(appid), getHLTB(name), getAppDetails(appid)]).then(([ratingRes, hltbRes, metaRes]) => {
+  const result = await dedupDetails(`details:${appid}`, () =>
+    Promise.allSettled([
+      cachedRating !== undefined ? Promise.resolve(cachedRating) : getGameRating(appid),
+      cachedHltb   !== undefined ? Promise.resolve(cachedHltb)   : getHLTB(name),
+      cachedMeta   !== undefined ? Promise.resolve(cachedMeta)   : getAppDetails(appid),
+    ]).then(([ratingRes, hltbRes, metaRes]) => {
       if (ratingRes.status === 'rejected') console.warn('[game-details] rating:', ratingRes.reason?.message);
-      if (hltbRes.status  === 'rejected') console.warn('[game-details] hltb:',   hltbRes.reason?.message);
-      if (metaRes.status  === 'rejected') console.warn('[game-details] meta:',   metaRes.reason?.message);
-      const r = {
-        rating: ratingRes.status === 'fulfilled' ? ratingRes.value : null,
-        hltb:   hltbRes.status   === 'fulfilled' ? hltbRes.value   : null,
-        meta:   metaRes.status   === 'fulfilled' ? metaRes.value   : null,
-      };
-      setCache(cacheKey, r);
-      return r;
+      if (hltbRes.status   === 'rejected') console.warn('[game-details] hltb:',   hltbRes.reason?.message);
+      if (metaRes.status   === 'rejected') console.warn('[game-details] meta:',   metaRes.reason?.message);
+      const rating = ratingRes.status === 'fulfilled' ? ratingRes.value : null;
+      const hltb   = hltbRes.status   === 'fulfilled' ? hltbRes.value   : null;
+      const meta   = metaRes.status   === 'fulfilled' ? metaRes.value   : null;
+      if (ratingRes.status === 'fulfilled') setCache(ratingKey, rating);
+      if (hltbRes.status   === 'fulfilled') setCache(hltbKey, hltb);
+      if (metaRes.status   === 'fulfilled') setCache(metaKey, meta);
+      return { rating, hltb, meta };
     })
   );
   res.json(result);

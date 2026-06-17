@@ -10,7 +10,6 @@ const supertest = require('supertest');
 const { app } = require('../server');
 const { _reset, setCache } = require('../lib/cache');
 const { _resetAuth } = require('../lib/hltb');
-const { DETAILS_CACHE_TTL_MS } = require('../lib/config');
 
 const api = supertest(app);
 
@@ -201,15 +200,19 @@ test('GET /api/game-details/-1: 400 for negative appid', async () => {
 
 test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) => {
   _reset();
-  const cached = { rating: { score: 88, desc: 'Very Positive', positive: 900, total: 1000 }, hltb: { main: 10, extra: 15 }, meta: { genres: ['Action'], categories: ['Co-op'], developers: ['Valve'], publishers: ['Valve'] } };
-  setCache('details:400', cached, DETAILS_CACHE_TTL_MS);
+  const rating = { score: 88, desc: 'Very Positive', positive: 900, total: 1000 };
+  const hltb   = { main: 10, extra: 15 };
+  const meta   = { genres: ['Action'], categories: ['Co-op'], developers: ['Valve'], publishers: ['Valve'] };
+  setCache('rating:400', rating);
+  setCache('hltb:400', hltb);
+  setCache('meta:400', meta);
 
   let fetchCalled = false;
   t.mock.method(globalThis, 'fetch', async () => { fetchCalled = true; });
 
   const res = await api.get('/api/game-details/400');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, cached);
+  assert.deepEqual(res.body, { rating, hltb, meta });
   assert.equal(fetchCalled, false);
 });
 
@@ -247,4 +250,53 @@ test('GET /api/game-details/:appid: 200 with null meta when appdetails fetch fai
   assert.equal(res.status, 200);
   assert.equal(typeof res.body.rating?.score, 'number');
   assert.equal(res.body.meta, null);
+});
+
+test('GET /api/game-details/:appid: only fetches sources not already cached', async (t) => {
+  _reset();
+  _resetAuth();
+  const rating = { score: 88, desc: 'Very Positive', positive: 900, total: 1000 };
+  const meta   = { genres: ['Action'], categories: ['Co-op'], developers: ['Valve'], publishers: ['Valve'] };
+  setCache('rating:405', rating);
+  setCache('meta:405', meta);
+
+  let fetchedUrls = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    fetchedUrls.push(url);
+    if (url.includes('bleed/init')) return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
+    if (url.includes('bleed'))      return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  const res = await api.get('/api/game-details/405?name=Portal');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.rating, rating);
+  assert.deepEqual(res.body.meta, meta);
+  assert.equal(res.body.hltb?.main, 10);
+  assert.ok(!fetchedUrls.some(u => u.includes('appreviews')), 'rating should not be re-fetched');
+  assert.ok(!fetchedUrls.some(u => u.includes('appdetails')), 'meta should not be re-fetched');
+});
+
+test('GET /api/game-details/:appid: failed fetch is not cached, retried on next request', async (t) => {
+  _reset();
+  _resetAuth();
+  let hltbCalls = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('appreviews')) return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
+    if (url.includes('appdetails')) {
+      const appid = url.match(/appids=(\d+)/)?.[1];
+      return { ok: true, json: async () => ({ [appid]: { success: true, data: { genres: [], categories: [], developers: [], publishers: [] } } }) };
+    }
+    if (url.includes('bleed/init')) return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
+    if (url.includes('bleed')) { hltbCalls++; return { ok: false, status: 503 }; }
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  const res1 = await api.get('/api/game-details/406?name=Portal');
+  assert.equal(res1.status, 200);
+  assert.equal(res1.body.hltb, null);
+
+  const res2 = await api.get('/api/game-details/406?name=Portal');
+  assert.equal(res2.status, 200);
+  assert.equal(hltbCalls, 2, 'HLTB should be retried — failed fetch must not be cached');
 });

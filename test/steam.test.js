@@ -14,10 +14,9 @@ function makeReviewResponse(total, positive, desc = 'Very Positive') {
   };
 }
 
-test('getGameRating: returns null when fetch fails', async (t) => {
+test('getGameRating: throws when fetch fails', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
-  const result = await getGameRating(400);
-  assert.equal(result, null);
+  await assert.rejects(() => getGameRating(400), err => err.isUpstream === true);
 });
 
 test('getGameRating: returns null when there are no reviews', async (t) => {
@@ -261,9 +260,9 @@ function makeAppDetailsResponse(appid, data = null) {
   return { ok: true, json: async () => ({ [String(appid)]: entry }) };
 }
 
-test('getAppDetails: returns null when fetch fails', async (t) => {
+test('getAppDetails: throws when fetch fails', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 429 }));
-  assert.equal(await getAppDetails(400), null);
+  await assert.rejects(() => getAppDetails(400), err => err.isUpstream === true);
 });
 
 test('getAppDetails: returns null when success is false', async (t) => {
