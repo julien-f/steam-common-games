@@ -48,7 +48,7 @@ The cache is an in-memory `Map` backed by `cache.json` (written with a 5 s debou
 | Key prefix | TTL env var | Default | Reason |
 |---|---|---|---|
 | `resolve:`, `details:` | `DETAILS_CACHE_TTL_MINUTES` | 7 days | Stable data |
-| `games:`, `players:` | `CACHE_TTL_MINUTES` | 60 min | Changes when users buy games |
+| `games:`, `player:` | `CACHE_TTL_MINUTES` | 60 min | Changes when users buy games |
 
 Delete `cache.json` to force a full refresh.
 

@@ -209,7 +209,7 @@ test('getPlayerSummaries: caches result — second call skips fetch', async (t) 
   let fetchCount = 0;
   t.mock.method(globalThis, 'fetch', async () => {
     fetchCount++;
-    return { ok: true, json: async () => ({ response: { players: [] } }) };
+    return { ok: true, json: async () => ({ response: { players: [{ steamid: '76561198000000005', personaname: 'User5', profileurl: '' }] } }) };
   });
 
   await getPlayerSummaries(['76561198000000005']);
@@ -241,10 +241,13 @@ test('getPlayerSummaries: cache key is order-independent', async (t) => {
   let fetchCount = 0;
   t.mock.method(globalThis, 'fetch', async () => {
     fetchCount++;
-    return { ok: true, json: async () => ({ response: { players: [] } }) };
+    return { ok: true, json: async () => ({ response: { players: [
+      { steamid: '76561198000000007', personaname: 'User7', profileurl: '' },
+      { steamid: '76561198000000008', personaname: 'User8', profileurl: '' },
+    ] } }) };
   });
 
   await getPlayerSummaries(['76561198000000008', '76561198000000007']);
   await getPlayerSummaries(['76561198000000007', '76561198000000008']); // reversed order
-  assert.equal(fetchCount, 1, 'reversed order should hit same cache entry');
+  assert.equal(fetchCount, 1, 'reversed order should hit same cache entries');
 });
