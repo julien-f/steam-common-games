@@ -130,7 +130,7 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
   const hit = getCached(cacheKey, DETAILS_CACHE_TTL_MS);
   if (hit) return res.json(hit);
 
-  const name = (req.query.name || '').trim();
+  const name = (req.query.name || '').trim().slice(0, 200);
   const result = await dedupDetails(cacheKey, () =>
     Promise.allSettled([getGameRating(appid), getHLTB(name)]).then(([ratingRes, hltbRes]) => {
       if (ratingRes.status === 'rejected') console.warn('[game-details] rating:', ratingRes.reason?.message);
