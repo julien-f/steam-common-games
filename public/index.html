@@ -701,13 +701,13 @@ function sortedGames(groupKey) {
         return sortDir * (av - bv);
       }
       case 'main': {
-        const av = a.details?.hltb?.main || Infinity;
-        const bv = b.details?.hltb?.main || Infinity;
+        const av = a.details?.hltb?.main ?? Infinity;
+        const bv = b.details?.hltb?.main ?? Infinity;
         return sortDir * (av - bv);
       }
       case 'extra': {
-        const av = a.details?.hltb?.extra || Infinity;
-        const bv = b.details?.hltb?.extra || Infinity;
+        const av = a.details?.hltb?.extra ?? Infinity;
+        const bv = b.details?.hltb?.extra ?? Infinity;
         return sortDir * (av - bv);
       }
       default:
