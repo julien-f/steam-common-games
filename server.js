@@ -7,6 +7,7 @@ const path = require('path');
 const rateLimit = require('express-rate-limit');
 
 const { getCached, setCache, setMaxAge } = require('./lib/cache');
+const { createDedup } = require('./lib/dedup');
 const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
@@ -106,7 +107,7 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
   }
 });
 
-const _detailsInFlight = new Map();
+const dedupDetails = createDedup();
 
 app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
   const appid = Number(req.params.appid);
@@ -119,23 +120,17 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
   if (hit) return res.json(hit);
 
   const name = (req.query.name || '').trim();
-
-  if (!_detailsInFlight.has(cacheKey)) {
-    const p = Promise.allSettled([
-      getGameRating(appid),
-      getHLTB(name),
-    ]).then(([ratingRes, hltbRes]) => {
-      const result = {
+  const result = await dedupDetails(cacheKey, () =>
+    Promise.allSettled([getGameRating(appid), getHLTB(name)]).then(([ratingRes, hltbRes]) => {
+      const r = {
         rating: ratingRes.status === 'fulfilled' ? ratingRes.value : null,
         hltb: hltbRes.status === 'fulfilled' ? hltbRes.value : null,
       };
-      setCache(cacheKey, result);
-      return result;
-    }).finally(() => _detailsInFlight.delete(cacheKey));
-    _detailsInFlight.set(cacheKey, p);
-  }
-
-  res.json(await _detailsInFlight.get(cacheKey));
+      setCache(cacheKey, r);
+      return r;
+    })
+  );
+  res.json(result);
 });
 
 app.listen(PORT, HOST, () => {
