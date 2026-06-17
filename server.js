@@ -105,7 +105,8 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
     const groups = groupByOwnership(slotLibraries);
     res.json({ groups, slots: playerSlots });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    const status = err.isUpstream ? 502 : err.name === 'TimeoutError' ? 504 : 400;
+    res.status(status).json({ error: err.message });
   }
 });
 
