@@ -563,7 +563,7 @@ async function findCommonGames({ pushState = true, restoreFilters = null } = {})
 async function loadAllDetails(thisRun) {
   if (!games.length) return;
 
-  const CONCURRENCY = 5;
+  const CONCURRENCY = 2;
   const queue = games.map((_, i) => i);
   let loaded = 0;
   let inFlight = 0;

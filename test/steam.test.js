@@ -260,9 +260,46 @@ function makeAppDetailsResponse(appid, data = null) {
   return { ok: true, json: async () => ({ [String(appid)]: entry }) };
 }
 
+// Simulate a 429 response with a near-zero Retry-After so retries complete instantly in tests.
+function make429Response() {
+  return { ok: false, status: 429, headers: { get: h => h === 'retry-after' ? '0.001' : null } };
+}
+
 test('getAppDetails: throws when fetch fails', async (t) => {
-  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 429 }));
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
   await assert.rejects(() => getAppDetails(400), err => err.isUpstream === true);
+});
+
+test('getGameRating: retries on 429 and succeeds on third attempt', async (t) => {
+  let callCount = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    callCount++;
+    return callCount < 3 ? make429Response() : makeReviewResponse(1000, 900, 'Very Positive');
+  });
+  const result = await getGameRating(400);
+  assert.equal(callCount, 3);
+  assert.equal(result.total, 1000);
+});
+
+test('getGameRating: throws isUpstream after exhausting 429 retries', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => make429Response());
+  await assert.rejects(
+    () => getGameRating(400),
+    err => err.isUpstream === true && /rate limited/.test(err.message)
+  );
+});
+
+test('getAppDetails: retries on 429 and succeeds on third attempt', async (t) => {
+  let callCount = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    callCount++;
+    return callCount < 3
+      ? make429Response()
+      : makeAppDetailsResponse(400, { genres: [{ id: '1', description: 'Action' }], categories: [], developers: [], publishers: [] });
+  });
+  const result = await getAppDetails(400);
+  assert.equal(callCount, 3);
+  assert.deepEqual(result.genres, ['Action']);
 });
 
 test('getAppDetails: returns null when success is false', async (t) => {

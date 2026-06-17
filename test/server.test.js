@@ -40,7 +40,7 @@ function makeDetailsFetch({ ratingOk = true, metaOk = true } = {}) {
       return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
     }
     if (url.includes('appdetails')) {
-      if (!metaOk) return { ok: false, status: 429 };
+      if (!metaOk) return { ok: false, status: 503 };
       const appid = url.match(/appids=(\d+)/)?.[1];
       return { ok: true, json: async () => ({ [appid]: { success: true, data: { genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] } } }) };
     }

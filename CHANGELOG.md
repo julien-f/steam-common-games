@@ -6,7 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Steam store API calls (`getGameRating`, `getAppDetails`) now go through a semaphore (max 2 concurrent) and retry up to twice on 429 responses, with `Retry-After`-aware delay or exponential backoff
+
 ### Changed
+
+- Frontend detail-loading concurrency reduced from 5 to 2 to reduce the peak number of outbound Steam store requests
 
 - `details:${appid}` cache entry split into three independent entries — `rating:${appid}`, `hltb:${appid}`, `meta:${appid}` — so each source can be cached and retried independently; only fulfilled fetches are cached (rejections are not), so a transient API failure is retried on the next request without discarding successfully-fetched data
 - `getCached` now returns `undefined` for a cache miss instead of `null`, allowing `null` to be stored as a valid "no data" result (e.g. a game with no reviews, no HLTB entry, or not on the Steam Store)
