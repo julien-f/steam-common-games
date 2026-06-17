@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - Steam store API calls (`getGameRating`, `getAppDetails`) now go through a semaphore (max 2 concurrent) and retry up to twice on 429 responses, with `Retry-After`-aware delay or exponential backoff
+- `getAppDetails` calls are coalesced into batched `?appids=a,b,c` requests (up to 25 per batch, 20 ms window) so loading N games produces roughly N/2 metadata requests instead of N
 
 ### Changed
 

@@ -10,6 +10,9 @@ const supertest = require('supertest');
 const { app } = require('../server');
 const { _reset, setCache } = require('../lib/cache');
 const { _resetAuth } = require('../lib/hltb');
+const { _setCoalescerDelay } = require('../lib/steam');
+
+_setCoalescerDelay(0);
 
 const api = supertest(app);
 
