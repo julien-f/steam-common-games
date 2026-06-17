@@ -7,6 +7,7 @@ process.on('unhandledRejection', (err) => {
 });
 
 const express = require('express');
+const morgan = require('morgan');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 
@@ -24,6 +25,7 @@ const TRUST_PROXY = process.env.TRUST_PROXY;
 
 const app = express();
 if (TRUST_PROXY !== undefined) app.set('trust proxy', TRUST_PROXY);
+if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -110,6 +112,7 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
     const groups = groupByOwnership(slotLibraries);
     res.json({ groups, slots: playerSlots });
   } catch (err) {
+    if (err.isUpstream || err.name === 'TimeoutError') console.error('[upstream]', err.message);
     const status = err.isUpstream ? 502 : err.name === 'TimeoutError' ? 504 : 400;
     res.status(status).json({ error: err.message });
   }
@@ -130,6 +133,8 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
   const name = (req.query.name || '').trim();
   const result = await dedupDetails(cacheKey, () =>
     Promise.allSettled([getGameRating(appid), getHLTB(name)]).then(([ratingRes, hltbRes]) => {
+      if (ratingRes.status === 'rejected') console.warn('[game-details] rating:', ratingRes.reason?.message);
+      if (hltbRes.status  === 'rejected') console.warn('[game-details] hltb:',   hltbRes.reason?.message);
       const r = {
         rating: ratingRes.status === 'fulfilled' ? ratingRes.value : null,
         hltb: hltbRes.status === 'fulfilled' ? hltbRes.value : null,

@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - `server.js` now exports `{ app }` and guards `app.listen` with `require.main === module` so the app can be imported by tests without binding a port; `STEAM_API_KEY` is now read at request time (not module load) so it can be toggled per-test, and rate limiters are skipped when `NODE_ENV=test`
 - TTL constants (`CACHE_TTL_MS`, `DETAILS_CACHE_TTL_MS`) extracted to `lib/config.js`; previously the `DETAILS_CACHE_TTL_MS` formula was copy-pasted in both `steam.js` and `server.js` with two independent default values that could silently diverge
+- Added `morgan('dev')` access logging (skipped in `NODE_ENV=test`) and server-side logging for upstream errors in `/api/common-games` and for rejected `Promise.allSettled` settlements in `/api/game-details`
 - `getPlayerSummaries` now caches each player individually under `player:${steamid}` instead of the entire batch under a combined key, so overlapping searches (e.g. [A,B] then [A,B,C]) reuse already-fetched summaries instead of making a redundant API call
 - Fixed CLAUDE.md: HLTB similarity threshold was documented as 0.4 but the code uses 0.35 (lowered intentionally to catch edition-suffix mismatches)
 - Added `process.on('unhandledRejection')` handler to log and survive promise rejections that escape the try/catch blocks; without it, Node ≥15 crashes the process silently
