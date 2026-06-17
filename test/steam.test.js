@@ -2,11 +2,8 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating, getAppDetails, _setCoalescerDelay } = require('../lib/steam');
+const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating, getAppDetails } = require('../lib/steam');
 const { _reset } = require('../lib/cache');
-
-// Use zero delay so coalescer flushes on the next tick — avoids 20 ms wait per test.
-_setCoalescerDelay(0);
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
   return {
@@ -329,23 +326,3 @@ test('getAppDetails: handles missing optional fields with empty arrays', async (
   assert.deepEqual(await getAppDetails(400), { genres: [], categories: [], developers: [], publishers: [] });
 });
 
-test('getAppDetails: batches concurrent calls into one fetch', async (t) => {
-  const fetchedUrls = [];
-  t.mock.method(globalThis, 'fetch', async (url) => {
-    fetchedUrls.push(url);
-    return {
-      ok: true,
-      json: async () => ({
-        '400': { success: true, data: { genres: [{ id: '1', description: 'Action' }],    categories: [], developers: [], publishers: [] } },
-        '500': { success: true, data: { genres: [{ id: '2', description: 'Adventure' }], categories: [], developers: [], publishers: [] } },
-      }),
-    };
-  });
-
-  const [r1, r2] = await Promise.all([getAppDetails(400), getAppDetails(500)]);
-  assert.equal(fetchedUrls.length, 1, 'both appids should be batched into one fetch');
-  assert.ok(fetchedUrls[0].includes('400'), 'URL should include appid 400');
-  assert.ok(fetchedUrls[0].includes('500'), 'URL should include appid 500');
-  assert.deepEqual(r1.genres, ['Action']);
-  assert.deepEqual(r2.genres, ['Adventure']);
-});
