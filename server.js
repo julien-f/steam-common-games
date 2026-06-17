@@ -13,7 +13,6 @@ const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating } = req
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 
-const STEAM_KEY = process.env.STEAM_API_KEY;
 const HOST = process.env.HOST || '127.0.0.1';
 const PORT = process.env.PORT || 3000;
 const MAX_USERS = Number(process.env.MAX_USERS || 10);
@@ -31,6 +30,7 @@ const searchLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many searches. Please wait a minute and try again.' },
+  skip: () => process.env.NODE_ENV === 'test',
 });
 
 // Generous limit for details — responses are almost always served from cache
@@ -40,14 +40,15 @@ const detailsLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Please wait a minute and try again.' },
+  skip: () => process.env.NODE_ENV === 'test',
 });
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, configured: !!STEAM_KEY });
+  res.json({ ok: true, configured: !!process.env.STEAM_API_KEY });
 });
 
 app.post('/api/common-games', searchLimit, async (req, res) => {
-  if (!STEAM_KEY) {
+  if (!process.env.STEAM_API_KEY) {
     return res.status(503).json({
       error: 'STEAM_API_KEY is not configured. Restart: STEAM_API_KEY=yourkey node server.js',
     });
@@ -136,11 +137,15 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
   res.json(result);
 });
 
-app.listen(PORT, HOST, () => {
-  console.log(`\nSteam Common Games → http://${HOST}:${PORT}\n`);
-  if (!STEAM_KEY) {
-    console.warn('  ⚠  STEAM_API_KEY is not set!');
-    console.warn('  Get your key: https://steamcommunity.com/dev/apikey');
-    console.warn('  Then run: STEAM_API_KEY=yourkey node server.js\n');
-  }
-});
+if (require.main === module) {
+  app.listen(PORT, HOST, () => {
+    console.log(`\nSteam Common Games → http://${HOST}:${PORT}\n`);
+    if (!process.env.STEAM_API_KEY) {
+      console.warn('  ⚠  STEAM_API_KEY is not set!');
+      console.warn('  Get your key: https://steamcommunity.com/dev/apikey');
+      console.warn('  Then run: STEAM_API_KEY=yourkey node server.js\n');
+    }
+  });
+}
+
+module.exports = { app };
