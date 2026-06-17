@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Filter panel: each dimension (Genre, Category, Developer, Publisher) now has a live search box to narrow down long option lists
 - Steam store API calls (`getGameRating`, `getAppDetails`) now go through a semaphore (max 2 concurrent) and retry up to twice on 429 responses, with `Retry-After`-aware delay or exponential backoff
 
 ### Changed

@@ -323,6 +323,18 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   user-select: none;
 }
 .filter-opt input[type="checkbox"] { cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
+.filter-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  margin-bottom: 6px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text0);
+  font-size: 12px;
+}
+.filter-search:focus { outline: none; border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -361,6 +373,7 @@ let runId = 0;      // increments on each search to cancel stale updates
 // Filter state — reset on each new search
 const activeFilters = { genres: new Set(), categories: new Set(), developers: new Set(), publishers: new Set() };
 const allOpts       = { genres: new Set(), categories: new Set(), developers: new Set(), publishers: new Set() };
+const filterSearch  = { genres: '', categories: '', developers: '', publishers: '' };
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
@@ -408,6 +421,7 @@ function loadFromUrl() {
     slots = [];
     for (const s of Object.values(activeFilters)) s.clear();
     for (const s of Object.values(allOpts)) s.clear();
+    for (const k of Object.keys(filterSearch)) filterSearch[k] = '';
     document.getElementById('filter-panel').innerHTML = '';
     document.getElementById('results').innerHTML = '';
     document.title = 'Steam Common Games';
@@ -519,6 +533,7 @@ async function findCommonGames({ pushState = true, restoreFilters = null } = {})
   const thisRun = ++runId;
   for (const s of Object.values(activeFilters)) s.clear();
   for (const s of Object.values(allOpts)) s.clear();
+  for (const k of Object.keys(filterSearch)) filterSearch[k] = '';
   if (restoreFilters) {
     for (const [k, vals] of Object.entries(restoreFilters)) {
       for (const v of vals) activeFilters[k].add(v);
@@ -836,6 +851,16 @@ function updateFilterOptions(meta) {
   if (changed) renderFilterPanel();
 }
 
+function applySearch(dim, query) {
+  const q = query.toLowerCase();
+  const inp = document.querySelector(`input[data-search-dim="${dim}"]`);
+  if (!inp) return;
+  inp.closest('.filter-dim').querySelectorAll('.filter-opt').forEach(label => {
+    const val = label.querySelector('input')?.value ?? '';
+    label.style.display = !q || val.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
 function renderFilterPanel() {
   const DIMS = [
     { key: 'genres',     label: 'Genre' },
@@ -859,6 +884,7 @@ function renderFilterPanel() {
         ${activeDims.map(d => `
           <div class="filter-dim">
             <div class="filter-dim-title">${d.label}</div>
+            <input class="filter-search" type="search" placeholder="Search…" data-search-dim="${d.key}" value="${esc(filterSearch[d.key])}">
             <div class="filter-opts">
               ${[...allOpts[d.key]].sort().map(v => `
                 <label class="filter-opt">
@@ -879,6 +905,15 @@ function renderFilterPanel() {
       refreshTable();
       updateFilterUrl();
       renderFilterPanel();
+    });
+  });
+
+  document.getElementById('filter-panel').querySelectorAll('input[data-search-dim]').forEach(inp => {
+    const dim = inp.dataset.searchDim;
+    applySearch(dim, filterSearch[dim]);
+    inp.addEventListener('input', () => {
+      filterSearch[dim] = inp.value;
+      applySearch(dim, inp.value);
     });
   });
 
