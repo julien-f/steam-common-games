@@ -387,18 +387,28 @@ window.addEventListener('popstate', loadFromUrl);
 function loadFromUrl() {
   // Each u= param is a comma-joined list of accounts for one logical player slot.
   // Old single-account URLs (?u=alice&u=bob) parse naturally as single-member slots.
-  const urlSlots = new URLSearchParams(location.search).getAll('u')
+  const params = new URLSearchParams(location.search);
+  const urlSlots = params.getAll('u')
     .map(s => s.split(',').map(v => v.trim()).filter(Boolean));
   const container = document.getElementById('user-inputs');
   container.innerHTML = '';
   if (urlSlots.length >= 2 && urlSlots.every(s => s.length > 0)) {
     urlSlots.forEach(accounts => addPlayerSlot(accounts));
-    findCommonGames({ pushState: false });
+    const restoreFilters = {
+      genres:     params.getAll('genre'),
+      categories: params.getAll('cat'),
+      developers: params.getAll('dev'),
+      publishers: params.getAll('pub'),
+    };
+    findCommonGames({ pushState: false, restoreFilters });
   } else {
     addPlayerSlot();
     addPlayerSlot();
     games = [];
     slots = [];
+    for (const s of Object.values(activeFilters)) s.clear();
+    for (const s of Object.values(allOpts)) s.clear();
+    document.getElementById('filter-panel').innerHTML = '';
     document.getElementById('results').innerHTML = '';
     document.title = 'Steam Common Games';
   }
@@ -490,7 +500,7 @@ function showAlert(msg, type = 'error') {
 
 // ── Main search flow ───────────────────────────────────────────────────────
 
-async function findCommonGames({ pushState = true } = {}) {
+async function findCommonGames({ pushState = true, restoreFilters = null } = {}) {
   const inputSlots = getSlots();
   if (inputSlots.length < 2) { showAlert('Enter at least 2 Steam users.'); return; }
 
@@ -509,6 +519,11 @@ async function findCommonGames({ pushState = true } = {}) {
   const thisRun = ++runId;
   for (const s of Object.values(activeFilters)) s.clear();
   for (const s of Object.values(allOpts)) s.clear();
+  if (restoreFilters) {
+    for (const [k, vals] of Object.entries(restoreFilters)) {
+      for (const v of vals) activeFilters[k].add(v);
+    }
+  }
   document.getElementById('filter-panel').innerHTML = '';
   document.getElementById('search-btn').disabled = true;
   document.getElementById('results').innerHTML =
@@ -784,6 +799,18 @@ function sortedGames(groupKey) {
 
 // ── Filtering ──────────────────────────────────────────────────────────────
 
+function updateFilterUrl() {
+  const cmp = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+  const params = new URLSearchParams();
+  // Preserve current player slots as-is — already canonical from the last pushState
+  new URLSearchParams(location.search).getAll('u').forEach(u => params.append('u', u));
+  // Append filter values in fixed dimension order, each sorted alphabetically
+  for (const [param, key] of [['genre','genres'],['cat','categories'],['dev','developers'],['pub','publishers']]) {
+    [...activeFilters[key]].sort(cmp).forEach(v => params.append(param, v));
+  }
+  history.replaceState(null, '', `?${params}`);
+}
+
 function hasActiveFilters() {
   return ['genres', 'categories', 'developers', 'publishers'].some(k => activeFilters[k].size > 0);
 }
@@ -849,6 +876,7 @@ function renderFilterPanel() {
       if (cb.checked) activeFilters[dim].add(cb.value);
       else activeFilters[dim].delete(cb.value);
       refreshTable();
+      updateFilterUrl();
       renderFilterPanel();
     });
   });
@@ -858,6 +886,7 @@ function renderFilterPanel() {
     clearBtn.addEventListener('click', () => {
       for (const s of Object.values(activeFilters)) s.clear();
       refreshTable();
+      updateFilterUrl();
       renderFilterPanel();
     });
   }
