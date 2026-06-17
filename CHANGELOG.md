@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Integration tests for all route handlers via supertest (`test/server.test.js`): health configured flag, all `POST /api/common-games` validation cases (missing slots, empty slot, null/empty values, too many users, missing API key), happy-path grouping, legacy `users` array, 502 on upstream failure, 400 on private library, `GET /api/game-details` appid validation, cache-hit path, fresh rating+HLTB fetch, and partial failure (null rating) via `Promise.allSettled`
 - Unit tests for `createDedup` in `test/dedup.test.js`, covering basic resolution, concurrent-call deduplication, post-resolve retry, post-reject retry, and independent keys
 - Unit tests for `resolveSteamId`, `getOwnedGames`, and `getPlayerSummaries` in `test/steam.test.js`, covering Steam64 bypass, API fetch, cache hits, upstream errors, private library, and order-independent cache key
 - Unit tests for `cache.js`: TTL checking, eager expiry deletion, entry overwrite, and no-`ttlMs` fallback behaviour (`test/cache.test.js`)
