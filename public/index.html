@@ -817,8 +817,9 @@ function hasActiveFilters() {
 
 function gameMatchesFilters(game) {
   if (!hasActiveFilters()) return true;
+  if (game.loading) return true; // skeleton row — details not yet fetched, show until we know
   const meta = game.details?.meta;
-  if (!meta) return true; // still loading or meta unavailable — don't hide
+  if (!meta) return false; // details loaded but Store API failed — can't confirm a match, exclude
   return (!activeFilters.genres.size     || meta.genres.some(v     => activeFilters.genres.has(v)))
       && (!activeFilters.categories.size || meta.categories.some(v => activeFilters.categories.has(v)))
       && (!activeFilters.developers.size || meta.developers.some(v => activeFilters.developers.has(v)))

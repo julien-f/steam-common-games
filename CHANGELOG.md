@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Filter no longer shows games whose Store API metadata fetch failed (null meta): previously `gameMatchesFilters` returned `true` for any falsy meta, conflating "still loading" with "fetch failed"; now only `game.loading === true` bypasses filtering — games with `meta: null` are correctly excluded when any filter is active
+
 - Steam Store API is now requested with `&l=english` so genres and categories are always returned in English instead of the server's IP-geolocated locale
 - `/api/game-details` no longer serves cached entries that predate the `meta` field; those entries have `meta: undefined` and are re-fetched transparently so the filter panel populates correctly after upgrading; entries written since the change have `meta: null` (explicit) on Store API failure and are still served from cache normally
 
