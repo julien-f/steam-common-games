@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- TTL constants (`CACHE_TTL_MS`, `DETAILS_CACHE_TTL_MS`) extracted to `lib/config.js`; previously the `DETAILS_CACHE_TTL_MS` formula was copy-pasted in both `steam.js` and `server.js` with two independent default values that could silently diverge
 - `/api/common-games` now returns 502 when the Steam API itself returns an error, and 504 on request timeout, instead of incorrectly returning 400 (Bad Request) for upstream failures; user errors (unknown account, private library) still return 400
 - `/api/common-games` now validates that slot values are non-empty strings, returning a clean 400 instead of leaking an internal TypeError when a slot contains `null`, a number, or an empty string
 - `getCached` now deletes expired entries on read instead of leaving them in the Map until the next save cycle, freeing memory sooner (especially relevant for large game-library entries)

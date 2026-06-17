@@ -8,6 +8,7 @@ const rateLimit = require('express-rate-limit');
 
 const { getCached, setCache } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
+const { DETAILS_CACHE_TTL_MS } = require('./lib/config');
 const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
@@ -15,7 +16,6 @@ const { groupByOwnership } = require('./lib/groupGames');
 const STEAM_KEY = process.env.STEAM_API_KEY;
 const HOST = process.env.HOST || '127.0.0.1';
 const PORT = process.env.PORT || 3000;
-const DETAILS_CACHE_TTL_MS = Number(process.env.DETAILS_CACHE_TTL_MINUTES || 10080) * 60 * 1000;
 const MAX_USERS = Number(process.env.MAX_USERS || 10);
 const TRUST_PROXY = process.env.TRUST_PROXY;
 
