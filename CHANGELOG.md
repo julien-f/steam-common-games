@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Cache TTL is now resolved from config by key prefix (`getTtlForKey`) rather than being stored in each entry or passed on every read; `getCached` and `setCache` no longer accept a `ttlMs` argument
+
 ### Fixed
 
 - Filter no longer shows games whose Store API metadata fetch failed (null meta): previously `gameMatchesFilters` returned `true` for any falsy meta, conflating "still loading" with "fetch failed"; now only `game.loading === true` bypasses filtering — games with `meta: null` are correctly excluded when any filter is active

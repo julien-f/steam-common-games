@@ -13,7 +13,6 @@ const rateLimit = require('express-rate-limit');
 
 const { getCached, setCache, getCacheStats } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
-const { DETAILS_CACHE_TTL_MS } = require('./lib/config');
 const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating, getAppDetails } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
@@ -127,7 +126,7 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
   }
 
   const cacheKey = `details:${appid}`;
-  const hit = getCached(cacheKey, DETAILS_CACHE_TTL_MS);
+  const hit = getCached(cacheKey);
   // Only use cache hits that include meta — entries written before meta was
   // added have meta: undefined and must be re-fetched to populate the filter panel.
   if (hit && hit.meta !== undefined) return res.json(hit);
@@ -143,7 +142,7 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
         hltb:   hltbRes.status   === 'fulfilled' ? hltbRes.value   : null,
         meta:   metaRes.status   === 'fulfilled' ? metaRes.value   : null,
       };
-      setCache(cacheKey, r, DETAILS_CACHE_TTL_MS);
+      setCache(cacheKey, r);
       return r;
     })
   );
