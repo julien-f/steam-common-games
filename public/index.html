@@ -544,8 +544,9 @@ function slotDisplayName(i) {
 function slotHtml(i) {
   return (slots[i] || []).map((p, j) => {
     const name = esc(p.personaname || `Player ${i + 1}.${j + 1}`);
-    return p.profileurl
-      ? `<a href="${esc(p.profileurl)}" target="_blank" rel="noopener" style="color:var(--accent2);text-decoration:none">${name}</a>`
+    const safeUrl = /^https?:\/\//i.test(p.profileurl) ? p.profileurl : '';
+    return safeUrl
+      ? `<a href="${esc(safeUrl)}" target="_blank" rel="noopener" style="color:var(--accent2);text-decoration:none">${name}</a>`
       : name;
   }).join(' + ');
 }
