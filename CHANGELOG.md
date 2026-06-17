@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - `getCached` now deletes expired entries on read instead of leaving them in the Map until the next save cycle, freeing memory sooner (especially relevant for large game-library entries)
 - Cache save timer is now unref'd so a naturally-exiting process is not held alive for 5 s waiting for the debounce to fire (the `process.on('exit')` handler already flushes synchronously)
+- `evictExpired` now uses the TTL stored with each entry instead of a single global max-age, so short-lived `games:` and `players:` entries (60 min) are evicted promptly rather than accumulating for 7 days; `setCache` accepts the TTL as a third argument and all callers have been updated
 
 - Extracted in-flight dedup helper to `lib/dedup.js` (`createDedup`) and replaced the duplicate `_detailsInFlight` block in `server.js` with a call to it, eliminating two independent copies of the same pattern
 - HLTB auth init now backs off for 30 s after a failed init request instead of retrying on every queued search

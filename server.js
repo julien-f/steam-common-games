@@ -6,7 +6,7 @@ const express = require('express');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 
-const { getCached, setCache, setMaxAge } = require('./lib/cache');
+const { getCached, setCache } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
 const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
@@ -18,8 +18,6 @@ const PORT = process.env.PORT || 3000;
 const DETAILS_CACHE_TTL_MS = Number(process.env.DETAILS_CACHE_TTL_MINUTES || 10080) * 60 * 1000;
 const MAX_USERS = Number(process.env.MAX_USERS || 10);
 const TRUST_PROXY = process.env.TRUST_PROXY;
-
-setMaxAge(DETAILS_CACHE_TTL_MS);
 
 const app = express();
 if (TRUST_PROXY !== undefined) app.set('trust proxy', TRUST_PROXY);
@@ -126,7 +124,7 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
         rating: ratingRes.status === 'fulfilled' ? ratingRes.value : null,
         hltb: hltbRes.status === 'fulfilled' ? hltbRes.value : null,
       };
-      setCache(cacheKey, r);
+      setCache(cacheKey, r, DETAILS_CACHE_TTL_MS);
       return r;
     })
   );
