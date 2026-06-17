@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { levenshtein, stringSimilarity, getHLTB, _resetAuth } = require('../lib/hltb');
+const { levenshtein, stringSimilarity, getHLTB, buildSearchTerms, _resetAuth } = require('../lib/hltb');
 
 // ── levenshtein ───────────────────────────────────────────────────────────
 
@@ -69,6 +69,16 @@ test('stringSimilarity: uses longer string as denominator', () => {
   const s1 = stringSimilarity('ab', 'abcde');
   const s2 = stringSimilarity('abcde', 'ab');
   assert.equal(s1, s2);
+});
+
+// ── buildSearchTerms ──────────────────────────────────────────────────────
+
+test('buildSearchTerms: strips edition words from terms', () => {
+  assert.deepEqual(buildSearchTerms('Portal 2: Definitive Edition'), ['Portal', '2']);
+});
+
+test('buildSearchTerms: strips punctuation from individual tokens', () => {
+  assert.deepEqual(buildSearchTerms('Batman: Arkham Asylum'), ['Batman', 'Arkham', 'Asylum']);
 });
 
 // ── getHLTB ───────────────────────────────────────────────────────────────
