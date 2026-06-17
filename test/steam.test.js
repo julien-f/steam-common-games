@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating } = require('../lib/steam');
+const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating, getAppDetails } = require('../lib/steam');
 const { _reset } = require('../lib/cache');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
@@ -250,4 +250,42 @@ test('getPlayerSummaries: cache key is order-independent', async (t) => {
   await getPlayerSummaries(['76561198000000008', '76561198000000007']);
   await getPlayerSummaries(['76561198000000007', '76561198000000008']); // reversed order
   assert.equal(fetchCount, 1, 'reversed order should hit same cache entries');
+});
+
+// ── getAppDetails ─────────────────────────────────────────────────────────────
+
+function makeAppDetailsResponse(appid, data = null) {
+  const entry = data
+    ? { success: true, data }
+    : { success: false };
+  return { ok: true, json: async () => ({ [String(appid)]: entry }) };
+}
+
+test('getAppDetails: returns null when fetch fails', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 429 }));
+  assert.equal(await getAppDetails(400), null);
+});
+
+test('getAppDetails: returns null when success is false', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, null));
+  assert.equal(await getAppDetails(400), null);
+});
+
+test('getAppDetails: returns genres, categories, developers and publishers', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {
+    genres:     [{ id: '1', description: 'Action' }, { id: '25', description: 'Adventure' }],
+    categories: [{ id: '9', description: 'Co-op' }],
+    developers: ['Valve'],
+    publishers: ['Valve'],
+  }));
+  const result = await getAppDetails(400);
+  assert.deepEqual(result.genres,     ['Action', 'Adventure']);
+  assert.deepEqual(result.categories, ['Co-op']);
+  assert.deepEqual(result.developers, ['Valve']);
+  assert.deepEqual(result.publishers, ['Valve']);
+});
+
+test('getAppDetails: handles missing optional fields with empty arrays', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
+  assert.deepEqual(await getAppDetails(400), { genres: [], categories: [], developers: [], publishers: [] });
 });

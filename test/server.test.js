@@ -34,11 +34,16 @@ function makeLibraryFetch(games1 = [], games2 = []) {
   };
 }
 
-function makeDetailsFetch({ ratingOk = true } = {}) {
+function makeDetailsFetch({ ratingOk = true, metaOk = true } = {}) {
   return async (url) => {
     if (url.includes('appreviews')) {
       if (!ratingOk) return { ok: false, status: 503 };
       return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
+    }
+    if (url.includes('appdetails')) {
+      if (!metaOk) return { ok: false, status: 429 };
+      const appid = url.match(/appids=(\d+)/)?.[1];
+      return { ok: true, json: async () => ({ [appid]: { success: true, data: { genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] } } }) };
     }
     if (url.includes('bleed/init')) {
       return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
@@ -196,7 +201,7 @@ test('GET /api/game-details/-1: 400 for negative appid', async () => {
 
 test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) => {
   _reset();
-  const cached = { rating: { score: 88, desc: 'Very Positive', positive: 900, total: 1000 }, hltb: { main: 10, extra: 15 } };
+  const cached = { rating: { score: 88, desc: 'Very Positive', positive: 900, total: 1000 }, hltb: { main: 10, extra: 15 }, meta: { genres: ['Action'], categories: ['Co-op'], developers: ['Valve'], publishers: ['Valve'] } };
   setCache('details:400', cached, DETAILS_CACHE_TTL_MS);
 
   let fetchCalled = false;
@@ -208,7 +213,7 @@ test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) 
   assert.equal(fetchCalled, false);
 });
 
-test('GET /api/game-details/:appid: 200 fetching fresh rating and HLTB data', async (t) => {
+test('GET /api/game-details/:appid: 200 fetching fresh rating, HLTB and meta', async (t) => {
   _reset();
   _resetAuth();
   t.mock.method(globalThis, 'fetch', makeDetailsFetch());
@@ -217,6 +222,8 @@ test('GET /api/game-details/:appid: 200 fetching fresh rating and HLTB data', as
   assert.equal(res.status, 200);
   assert.equal(typeof res.body.rating?.score, 'number');
   assert.equal(res.body.hltb?.main, 10);
+  assert.deepEqual(res.body.meta?.genres, ['Action']);
+  assert.deepEqual(res.body.meta?.categories, ['Co-op']);
 });
 
 test('GET /api/game-details/:appid: 200 with null rating when reviews fetch fails', async (t) => {
@@ -228,4 +235,16 @@ test('GET /api/game-details/:appid: 200 with null rating when reviews fetch fail
   assert.equal(res.status, 200);
   assert.equal(res.body.rating, null);
   assert.equal(res.body.hltb?.main, 10);
+  assert.ok(res.body.meta !== undefined, 'meta should still be present');
+});
+
+test('GET /api/game-details/:appid: 200 with null meta when appdetails fetch fails', async (t) => {
+  _reset();
+  _resetAuth();
+  t.mock.method(globalThis, 'fetch', makeDetailsFetch({ metaOk: false }));
+
+  const res = await api.get('/api/game-details/403?name=Portal');
+  assert.equal(res.status, 200);
+  assert.equal(typeof res.body.rating?.score, 'number');
+  assert.equal(res.body.meta, null);
 });

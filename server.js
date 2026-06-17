@@ -14,7 +14,7 @@ const rateLimit = require('express-rate-limit');
 const { getCached, setCache, getCacheStats } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
 const { DETAILS_CACHE_TTL_MS } = require('./lib/config');
-const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating } = require('./lib/steam');
+const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating, getAppDetails } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 
@@ -132,12 +132,14 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
 
   const name = (req.query.name || '').trim().slice(0, 200);
   const result = await dedupDetails(cacheKey, () =>
-    Promise.allSettled([getGameRating(appid), getHLTB(name)]).then(([ratingRes, hltbRes]) => {
+    Promise.allSettled([getGameRating(appid), getHLTB(name), getAppDetails(appid)]).then(([ratingRes, hltbRes, metaRes]) => {
       if (ratingRes.status === 'rejected') console.warn('[game-details] rating:', ratingRes.reason?.message);
       if (hltbRes.status  === 'rejected') console.warn('[game-details] hltb:',   hltbRes.reason?.message);
+      if (metaRes.status  === 'rejected') console.warn('[game-details] meta:',   metaRes.reason?.message);
       const r = {
         rating: ratingRes.status === 'fulfilled' ? ratingRes.value : null,
-        hltb: hltbRes.status === 'fulfilled' ? hltbRes.value : null,
+        hltb:   hltbRes.status   === 'fulfilled' ? hltbRes.value   : null,
+        meta:   metaRes.status   === 'fulfilled' ? metaRes.value   : null,
       };
       setCache(cacheKey, r, DETAILS_CACHE_TTL_MS);
       return r;
