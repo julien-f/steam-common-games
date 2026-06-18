@@ -394,6 +394,10 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 }
 .game-panel.open { transform: translateX(0); box-shadow: -8px 0 32px rgba(0,0,0,0.4); }
 
+@media (min-width: 1400px) {
+  .game-panel { width: min(480px, 30vw); }
+}
+
 .panel-close {
   position: absolute;
   top: 10px;
