@@ -22,6 +22,12 @@ function fmtH(h) {
   return h % 1 === 0 ? `${h}h` : `${h.toFixed(1)}h`;
 }
 
+// Format Steam playtime (minutes) as a compact string, e.g. "47m" or "12h". Returns '' for 0.
+function fmtPlaytime(mins) {
+  if (!mins) return '';
+  return mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`;
+}
+
 function esc(s) {
   return String(s)
     .replace(/&/g, '&amp;')
@@ -30,4 +36,4 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
-if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, fmtH, esc };
+if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, fmtH, fmtPlaytime, esc };

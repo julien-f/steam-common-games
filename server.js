@@ -125,7 +125,19 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
     );
 
     const groups = groupByOwnership(slotLibraries);
-    res.json({ groups, slots: playerSlots });
+
+    // Build per-account playtime for common games only
+    const groupAppIds = new Set(groups.flatMap(g => g.games.map(game => game.appid)));
+    const playtime = {};
+    for (const [steamId, games] of libraryById) {
+      for (const game of games) {
+        if (!groupAppIds.has(game.appid)) continue;
+        if (!playtime[game.appid]) playtime[game.appid] = {};
+        playtime[game.appid][steamId] = game.playtime_forever || 0;
+      }
+    }
+
+    res.json({ groups, slots: playerSlots, playtime });
   } catch (err) {
     if (err.isUpstream || err.name === 'TimeoutError') console.error('[upstream]', err.message);
     const status = err.isUpstream ? 502 : err.name === 'TimeoutError' ? 504 : 400;

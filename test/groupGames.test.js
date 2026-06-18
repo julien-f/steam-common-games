@@ -102,3 +102,4 @@ test('groupByOwnership: preserves appid in output', () => {
   const groups = groupByOwnership(libraries);
   assert.equal(groups[0].games[0].appid, 42);
 });
+
