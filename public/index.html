@@ -1037,6 +1037,10 @@ function renderPanel() {
           <div class="panel-hltb-label">Main + Extra</div>
           <div class="panel-hltb-val">${fmtH(h.extra)}</div>
         </div>
+        ${h.completionist ? `<div class="panel-hltb-item">
+          <div class="panel-hltb-label">Completionist</div>
+          <div class="panel-hltb-val">${fmtH(h.completionist)}</div>
+        </div>` : ''}
       </div>
     </div>`;
   }
