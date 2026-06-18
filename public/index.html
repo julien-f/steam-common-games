@@ -640,7 +640,12 @@ function loadFromUrl() {
       developers: params.getAll('dev'),
       publishers: params.getAll('pub'),
     };
-    findCommonGames({ pushState: false, restoreFilters });
+    const sortParam = params.get('sort');
+    const restoreSort = sortParam ? {
+      col: sortParam.startsWith('-') ? sortParam.slice(1) : sortParam,
+      dir: sortParam.startsWith('-') ? -1 : 1,
+    } : null;
+    findCommonGames({ pushState: false, restoreFilters, restoreSort });
   } else {
     addPlayerSlot();
     addPlayerSlot();
@@ -741,11 +746,16 @@ function showAlert(msg, type = 'error') {
 
 // ── Main search flow ───────────────────────────────────────────────────────
 
-async function findCommonGames({ pushState = true, restoreFilters = null } = {}) {
+async function findCommonGames({ pushState = true, restoreFilters = null, restoreSort = null } = {}) {
   const inputSlots = getSlots();
   if (inputSlots.length < 2) { showAlert('Enter at least 2 Steam users.'); return; }
 
   clearAlerts();
+
+  if (restoreSort) {
+    sortCol = restoreSort.col;
+    sortDir = restoreSort.dir;
+  }
 
   if (pushState) {
     const params = new URLSearchParams();
@@ -754,6 +764,7 @@ async function findCommonGames({ pushState = true, restoreFilters = null } = {})
       .map(slot => [...slot].sort(cmp))           // sort members within each slot
       .sort((a, b) => cmp(a[0], b[0]))            // sort slots by their first member
       .forEach(slot => params.append('u', slot.join(',')));
+    params.set('sort', (sortDir < 0 ? '-' : '') + sortCol);
     history.pushState(null, '', `?${params}`);
   }
 
@@ -949,6 +960,7 @@ function renderPage() {
       if (sortCol === col) sortDir = -sortDir;
       else { sortCol = col; sortDir = col === 'name' ? 1 : -1; }
       refreshTable();
+      updateFilterUrl();
     });
   });
 }
@@ -1301,6 +1313,7 @@ function updateFilterUrl() {
   // Preserve current player slots as-is — already canonical from the last pushState
   const prev = new URLSearchParams(location.search);
   prev.getAll('u').forEach(u => params.append('u', u));
+  params.set('sort', (sortDir < 0 ? '-' : '') + sortCol);
   if (prev.has('game')) params.set('game', prev.get('game'));
   // Append filter values in fixed dimension order, each sorted alphabetically
   for (const [param, key] of [['genre','genres'],['cat','categories'],['dev','developers'],['pub','publishers']]) {
