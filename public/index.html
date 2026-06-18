@@ -491,6 +491,12 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   padding: 3px 8px;
   border-radius: 3px;
 }
+.panel-tag-btn {
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.panel-tag-btn:hover { border-color: var(--accent); color: var(--accent2); }
+.panel-tag-btn.active { background: rgba(26,159,255,0.15); border-color: rgba(26,159,255,0.4); color: var(--accent); }
 
 .panel-links { display: flex; gap: 8px; flex-wrap: wrap; }
 .panel-link {
@@ -570,6 +576,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('panel-backdrop').addEventListener('click', closePanel);
   document.getElementById('panel-close').addEventListener('click', closePanel);
+  document.getElementById('game-panel').addEventListener('click', e => {
+    const btn = e.target.closest('.panel-tag-btn');
+    if (!btn) return;
+    const { dim, val } = btn.dataset;
+    if (activeFilters[dim].has(val)) activeFilters[dim].delete(val);
+    else activeFilters[dim].add(val);
+    refreshTable();
+    updateFilterUrl();
+    renderFilterPanel();
+    renderPanel();
+  });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { closePanel(); return; }
     if (!panelGame || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
@@ -1070,17 +1087,23 @@ function renderPanel() {
     </div>`;
   }
 
-  const tagSection = (title, items) => items?.length ? `
+  const tagSection = (title, items, dim) => items?.length ? `
     <div class="panel-section">
       <div class="panel-section-title">${title}</div>
-      <div class="panel-tags">${[...items].sort((a, b) => a.localeCompare(b)).map(v => `<span class="panel-tag">${esc(v)}</span>`).join('')}</div>
+      <div class="panel-tags">${[...items].sort((a, b) => a.localeCompare(b)).map(v => {
+        if (dim) {
+          const active = activeFilters[dim].has(v) ? ' active' : '';
+          return `<button class="panel-tag panel-tag-btn${active}" data-dim="${dim}" data-val="${esc(v)}">${esc(v)}</button>`;
+        }
+        return `<span class="panel-tag">${esc(v)}</span>`;
+      }).join('')}</div>
     </div>` : '';
 
   const metaHtml = g.loading ? '' : [
-    tagSection('Genres', meta?.genres),
-    tagSection('Categories', meta?.categories),
-    tagSection('Developer', meta?.developers),
-    tagSection('Publisher', meta?.publishers),
+    tagSection('Genres', meta?.genres, 'genres'),
+    tagSection('Categories', meta?.categories, 'categories'),
+    tagSection('Developer', meta?.developers, 'developers'),
+    tagSection('Publisher', meta?.publishers, 'publishers'),
   ].join('');
 
   document.getElementById('panel-body').innerHTML = `

@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Side panel: release date and short description from the Steam Store API shown below the game title
 - Side panel: "Owned by" section listing the player slots that own the selected game
 - Side panel: widens to `min(480px, 30vw)` on screens ≥ 1400 px wide
+- Side panel: genre, category, developer, and publisher tags are now clickable filter toggles; active filters are highlighted in blue
 
 - Side panel drawer: clicking a game row (outside the Steam link) slides in a detail panel showing the Steam header image, score with review counts, HLTB playtime (with a direct ↗ link to the HowLongToBeat entry), genres, categories, developer, publisher sorted alphabetically, and links to Steam Store / SteamDB / ProtonDB; close with the × button, backdrop click, or Escape
 
