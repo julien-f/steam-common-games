@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating, getAppDetails } = require('../lib/steam');
+const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags } = require('../lib/steam');
 const { _reset } = require('../lib/cache');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
@@ -324,5 +324,57 @@ test('getAppDetails: returns genres, categories, developers and publishers', asy
 test('getAppDetails: handles missing optional fields with empty arrays', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
   assert.deepEqual(await getAppDetails(400), { genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null });
+});
+
+// ── getSteamSpyTags ───────────────────────────────────────────────────────────
+
+test('getSteamSpyTags: returns top 10 tags sorted by vote count descending', async (t) => {
+  const rawTags = Object.fromEntries(
+    Array.from({ length: 15 }, (_, i) => [`Tag${i}`, (15 - i) * 100])
+  );
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ tags: rawTags }),
+  }));
+
+  const result = await getSteamSpyTags(400);
+  assert.equal(result.length, 10);
+  assert.equal(result[0], 'Tag0');   // highest votes first
+  assert.equal(result[9], 'Tag9');
+});
+
+test('getSteamSpyTags: returns correct tag names in vote-count order', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ tags: { 'RPG': 500, 'Action': 9000, 'Indie': 3000 } }),
+  }));
+
+  const result = await getSteamSpyTags(400);
+  assert.deepEqual(result, ['Action', 'Indie', 'RPG']);
+});
+
+test('getSteamSpyTags: returns empty array when tags field is missing', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ appid: 400, name: 'Portal' }),
+  }));
+
+  const result = await getSteamSpyTags(400);
+  assert.deepEqual(result, []);
+});
+
+test('getSteamSpyTags: returns empty array when tags is empty object', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ tags: {} }),
+  }));
+
+  const result = await getSteamSpyTags(400);
+  assert.deepEqual(result, []);
+});
+
+test('getSteamSpyTags: throws isUpstream when fetch fails', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+  await assert.rejects(() => getSteamSpyTags(400), err => err.isUpstream === true);
 });
 

@@ -13,7 +13,7 @@ const rateLimit = require('express-rate-limit');
 
 const { getCached, setCache, getCacheStats } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
-const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating, getAppDetails } = require('./lib/steam');
+const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 
@@ -60,7 +60,8 @@ const detailsLimit = rateLimit({
     if (!Number.isInteger(appid) || appid <= 0) return false;
     return getCached(`rating:${appid}`) !== undefined
         && getCached(`hltb:${appid}`)   !== undefined
-        && getCached(`meta:${appid}`)   !== undefined;
+        && getCached(`meta:${appid}`)   !== undefined
+        && getCached(`tags:${appid}`)   !== undefined;
   },
 });
 
@@ -151,13 +152,15 @@ function fetchGameDetails(appid, name) {
   const ratingKey = `rating:${appid}`;
   const hltbKey   = `hltb:${appid}`;
   const metaKey   = `meta:${appid}`;
+  const tagsKey   = `tags:${appid}`;
 
   const cachedRating = getCached(ratingKey);
   const cachedHltb   = getCached(hltbKey);
   const cachedMeta   = getCached(metaKey);
+  const cachedTags   = getCached(tagsKey);
 
-  if (cachedRating !== undefined && cachedHltb !== undefined && cachedMeta !== undefined) {
-    return Promise.resolve({ rating: cachedRating, hltb: cachedHltb, meta: cachedMeta });
+  if (cachedRating !== undefined && cachedHltb !== undefined && cachedMeta !== undefined && cachedTags !== undefined) {
+    return Promise.resolve({ rating: cachedRating, hltb: cachedHltb, meta: cachedMeta, tags: cachedTags });
   }
 
   return dedupDetails(`details:${appid}`, () =>
@@ -165,17 +168,21 @@ function fetchGameDetails(appid, name) {
       cachedRating !== undefined ? Promise.resolve(cachedRating) : getGameRating(appid),
       cachedHltb   !== undefined ? Promise.resolve(cachedHltb)   : getHLTB(name),
       cachedMeta   !== undefined ? Promise.resolve(cachedMeta)   : getAppDetails(appid),
-    ]).then(([ratingRes, hltbRes, metaRes]) => {
+      cachedTags   !== undefined ? Promise.resolve(cachedTags)   : getSteamSpyTags(appid),
+    ]).then(([ratingRes, hltbRes, metaRes, tagsRes]) => {
       if (ratingRes.status === 'rejected') console.warn('[game-details] rating:', ratingRes.reason?.message);
       if (hltbRes.status   === 'rejected') console.warn('[game-details] hltb:',   hltbRes.reason?.message);
       if (metaRes.status   === 'rejected') console.warn('[game-details] meta:',   metaRes.reason?.message);
+      if (tagsRes.status   === 'rejected') console.warn('[game-details] tags:',   tagsRes.reason?.message);
       const rating = ratingRes.status === 'fulfilled' ? ratingRes.value : null;
       const hltb   = hltbRes.status   === 'fulfilled' ? hltbRes.value   : null;
       const meta   = metaRes.status   === 'fulfilled' ? metaRes.value   : null;
+      const tags   = tagsRes.status   === 'fulfilled' ? tagsRes.value   : null;
       if (ratingRes.status === 'fulfilled') setCache(ratingKey, rating);
       if (hltbRes.status   === 'fulfilled') setCache(hltbKey, hltb);
       if (metaRes.status   === 'fulfilled') setCache(metaKey, meta);
-      return { rating, hltb, meta };
+      if (tagsRes.status   === 'fulfilled') setCache(tagsKey, tags);
+      return { rating, hltb, meta, tags };
     })
   );
 }
@@ -222,7 +229,7 @@ app.post('/api/game-details/stream', async (req, res) => {
       const result = await fetchGameDetails(appid, name);
       send({ appid, ...result });
     } catch {
-      send({ appid, rating: null, hltb: null, meta: null });
+      send({ appid, rating: null, hltb: null, meta: null, tags: null });
     }
   }));
 

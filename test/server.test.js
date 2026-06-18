@@ -34,11 +34,15 @@ function makeLibraryFetch(games1 = [], games2 = []) {
   };
 }
 
-function makeDetailsFetch({ ratingOk = true, metaOk = true } = {}) {
+function makeDetailsFetch({ ratingOk = true, metaOk = true, tagsOk = true } = {}) {
   return async (url) => {
     if (url.includes('appreviews')) {
       if (!ratingOk) return { ok: false, status: 503 };
       return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
+    }
+    if (url.includes('steamspy.com')) {
+      if (!tagsOk) return { ok: false, status: 503 };
+      return { ok: true, json: async () => ({ tags: { 'Action': 9054, 'Co-op': 4532 } }) };
     }
     if (url.includes('appdetails')) {
       if (!metaOk) return { ok: false, status: 503 };
@@ -204,20 +208,22 @@ test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) 
   const rating = { score: 88, desc: 'Very Positive', positive: 900, total: 1000 };
   const hltb   = { main: 10, extra: 15 };
   const meta   = { genres: ['Action'], categories: ['Co-op'], developers: ['Valve'], publishers: ['Valve'] };
+  const tags   = ['Action', 'Co-op'];
   setCache('rating:400', rating);
   setCache('hltb:400', hltb);
   setCache('meta:400', meta);
+  setCache('tags:400', tags);
 
   let fetchCalled = false;
   t.mock.method(globalThis, 'fetch', async () => { fetchCalled = true; });
 
   const res = await api.get('/api/game-details/400');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, { rating, hltb, meta });
+  assert.deepEqual(res.body, { rating, hltb, meta, tags });
   assert.equal(fetchCalled, false);
 });
 
-test('GET /api/game-details/:appid: 200 fetching fresh rating, HLTB and meta', async (t) => {
+test('GET /api/game-details/:appid: 200 fetching fresh rating, HLTB, meta and tags', async (t) => {
   _reset();
   _resetAuth();
   t.mock.method(globalThis, 'fetch', makeDetailsFetch());
@@ -228,6 +234,8 @@ test('GET /api/game-details/:appid: 200 fetching fresh rating, HLTB and meta', a
   assert.equal(res.body.hltb?.main, 10);
   assert.deepEqual(res.body.meta?.genres, ['Action']);
   assert.deepEqual(res.body.meta?.categories, ['Co-op']);
+  assert.ok(Array.isArray(res.body.tags), 'tags should be an array');
+  assert.ok(res.body.tags.includes('Action'));
 });
 
 test('GET /api/game-details/:appid: 200 with null rating when reviews fetch fails', async (t) => {
@@ -253,6 +261,18 @@ test('GET /api/game-details/:appid: 200 with null meta when appdetails fetch fai
   assert.equal(res.body.meta, null);
 });
 
+test('GET /api/game-details/:appid: 200 with null tags when SteamSpy fetch fails', async (t) => {
+  _reset();
+  _resetAuth();
+  t.mock.method(globalThis, 'fetch', makeDetailsFetch({ tagsOk: false }));
+
+  const res = await api.get('/api/game-details/404?name=Portal');
+  assert.equal(res.status, 200);
+  assert.equal(typeof res.body.rating?.score, 'number');
+  assert.ok(res.body.meta !== undefined, 'meta should still be present');
+  assert.equal(res.body.tags, null);
+});
+
 test('GET /api/game-details/:appid: only fetches sources not already cached', async (t) => {
   _reset();
   _resetAuth();
@@ -264,8 +284,9 @@ test('GET /api/game-details/:appid: only fetches sources not already cached', as
   let fetchedUrls = [];
   t.mock.method(globalThis, 'fetch', async (url) => {
     fetchedUrls.push(url);
-    if (url.includes('bleed/init')) return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
-    if (url.includes('bleed'))      return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
+    if (url.includes('steamspy.com')) return { ok: true, json: async () => ({ tags: { 'Action': 9054 } }) };
+    if (url.includes('bleed/init'))   return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
+    if (url.includes('bleed'))        return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
     throw new Error(`Unexpected fetch: ${url}`);
   });
 
@@ -274,8 +295,9 @@ test('GET /api/game-details/:appid: only fetches sources not already cached', as
   assert.deepEqual(res.body.rating, rating);
   assert.deepEqual(res.body.meta, meta);
   assert.equal(res.body.hltb?.main, 10);
+  assert.ok(Array.isArray(res.body.tags));
   assert.ok(!fetchedUrls.some(u => u.includes('appreviews')), 'rating should not be re-fetched');
-  assert.ok(!fetchedUrls.some(u => u.includes('appdetails')), 'meta should not be re-fetched');
+  assert.ok(!fetchedUrls.some(u => u.includes('steampowered.com') && u.includes('appdetails')), 'meta should not be re-fetched');
 });
 
 // ── GET /api/game-details/:appid — "fast refresh" cache / dedup ──────────────
@@ -289,6 +311,10 @@ function makeCountingDetailsFetch(counts, { delayMs = 0 } = {}) {
     if (url.includes('appreviews')) {
       counts.rating++;
       return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
+    }
+    if (url.includes('steamspy.com')) {
+      counts.tags++;
+      return { ok: true, json: async () => ({ tags: { 'Action': 9054 } }) };
     }
     if (url.includes('appdetails')) {
       counts.meta++;
@@ -311,7 +337,7 @@ function makeCountingDetailsFetch(counts, { delayMs = 0 } = {}) {
 test('GET /api/game-details/:appid: a repeated request is served from cache, no re-fetch', async (t) => {
   _reset();
   _resetAuth();
-  const counts = { rating: 0, hltb: 0, hltbInit: 0, meta: 0 };
+  const counts = { rating: 0, hltb: 0, hltbInit: 0, meta: 0, tags: 0 };
   t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts));
 
   const res1 = await api.get('/api/game-details/500?name=Portal');
@@ -319,6 +345,7 @@ test('GET /api/game-details/:appid: a repeated request is served from cache, no 
   assert.equal(counts.rating, 1);
   assert.equal(counts.hltb, 1);
   assert.equal(counts.meta, 1);
+  assert.equal(counts.tags, 1);
 
   // Simulates the page being refreshed: same appid requested again.
   const res2 = await api.get('/api/game-details/500?name=Portal');
@@ -327,6 +354,7 @@ test('GET /api/game-details/:appid: a repeated request is served from cache, no 
   assert.equal(counts.rating, 1, 'rating must not be re-fetched on refresh');
   assert.equal(counts.hltb, 1, 'HLTB must not be re-fetched on refresh');
   assert.equal(counts.meta, 1, 'meta must not be re-fetched on refresh');
+  assert.equal(counts.tags, 1, 'tags must not be re-fetched on refresh');
 });
 
 // #2 — concurrent refresh: overlapping in-flight requests for the same appid
@@ -334,7 +362,7 @@ test('GET /api/game-details/:appid: a repeated request is served from cache, no 
 test('GET /api/game-details/:appid: concurrent requests for the same appid dedup to one fetch', async (t) => {
   _reset();
   _resetAuth();
-  const counts = { rating: 0, hltb: 0, hltbInit: 0, meta: 0 };
+  const counts = { rating: 0, hltb: 0, hltbInit: 0, meta: 0, tags: 0 };
   t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts, { delayMs: 50 }));
 
   // Fire both without awaiting the first — they overlap in flight.
@@ -349,6 +377,7 @@ test('GET /api/game-details/:appid: concurrent requests for the same appid dedup
   assert.equal(counts.rating, 1, 'rating fetched once for two concurrent requests');
   assert.equal(counts.hltb, 1, 'HLTB fetched once for two concurrent requests');
   assert.equal(counts.meta, 1, 'meta fetched once for two concurrent requests');
+  assert.equal(counts.tags, 1, 'tags fetched once for two concurrent requests');
 });
 
 // #3 — real browser-abort on fast refresh. supertest awaits the full response,
@@ -367,7 +396,7 @@ function abortedGet(port, path, abortAfterMs) {
 test('GET /api/game-details/:appid: a request aborted mid-flight still caches, so refresh does not re-fetch', async (t) => {
   _reset();
   _resetAuth();
-  const counts = { rating: 0, hltb: 0, hltbInit: 0, meta: 0 };
+  const counts = { rating: 0, hltb: 0, hltbInit: 0, meta: 0, tags: 0 };
   t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts, { delayMs: 100 }));
 
   const server = app.listen(0);
@@ -388,6 +417,7 @@ test('GET /api/game-details/:appid: a request aborted mid-flight still caches, s
   assert.equal(counts.rating, 1, 'aborted request should have completed and cached the rating — refresh must not re-fetch');
   assert.equal(counts.hltb, 1, 'aborted request should have completed and cached HLTB');
   assert.equal(counts.meta, 1, 'aborted request should have completed and cached meta');
+  assert.equal(counts.tags, 1, 'aborted request should have completed and cached tags');
 });
 
 test('GET /api/game-details/:appid: failed fetch is not cached, retried on next request', async (t) => {
@@ -453,12 +483,15 @@ test('POST /api/game-details/stream: streams one event per game plus a done even
   const rating = { score: 88, desc: 'Very Positive', positive: 900, total: 1000 };
   const hltb   = { main: 10, extra: 15 };
   const meta   = { genres: ['Action'], categories: ['Co-op'], developers: ['Valve'], publishers: ['Valve'] };
+  const tags   = ['Action', 'Co-op'];
   setCache('rating:400', rating);
   setCache('hltb:400', hltb);
   setCache('meta:400', meta);
+  setCache('tags:400', tags);
   setCache('rating:401', rating);
   setCache('hltb:401', hltb);
   setCache('meta:401', meta);
+  setCache('tags:401', tags);
 
   const server = app.listen(0);
   t.after(() => new Promise(r => server.close(r)));

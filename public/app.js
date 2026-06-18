@@ -14,6 +14,7 @@ let refreshDebounceTimer = null;
 let panelGame = null;
 
 const FILTER_DIMS = [
+  { key: 'tags',       label: 'Tag',       param: 'tag'   },
   { key: 'genres',     label: 'Genre',     param: 'genre' },
   { key: 'categories', label: 'Category',  param: 'cat'   },
   { key: 'developers', label: 'Developer', param: 'dev'   },
@@ -320,11 +321,11 @@ async function loadAllDetails(thisRun) {
         const idx = idxByAppid.get(data.appid);
         if (idx === undefined) continue;
 
-        games[idx].details = { rating: data.rating, hltb: data.hltb, meta: data.meta };
+        games[idx].details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags };
         games[idx].loading = false;
         loaded++;
         updateProgress(loaded, games.length);
-        if (games[idx].details?.meta) updateFilterOptions(games[idx].details.meta);
+        if (games[idx].details?.meta || games[idx].details?.tags) updateFilterOptions(games[idx].details.meta, games[idx].details.tags);
         if (panelGame?.appid === games[idx].appid) renderPanel();
         const tr = document.querySelector(`tr.game-row[data-appid="${data.appid}"]`);
         if (tr) syncRow(tr, games[idx]);
@@ -578,7 +579,9 @@ function renderPanel() {
       }).join('')}</div>
     </div>` : '';
 
+  const tags = g.details?.tags;
   const metaHtml = g.loading ? '' : [
+    tagSection('Tags', tags, 'tags'),
     tagSection('Genres', meta?.genres, 'genres'),
     tagSection('Categories', meta?.categories, 'categories'),
     tagSection('Developer', meta?.developers, 'developers'),
@@ -734,19 +737,21 @@ function hasActiveFilters() {
 
 function gameMatchesFilters(game, filtersActive = hasActiveFilters()) {
   if (!filtersActive) return true;
-  if (game.loading) return false; // details not yet fetched — exclude until we know
-  const meta = game.details?.meta;
-  if (!meta) return false; // details loaded but Store API failed — can't confirm a match, exclude
-  return FILTER_DIMS.every(({ key }) =>
-    !activeFilters[key].size || (meta[key] || []).some(v => activeFilters[key].has(v))
-  );
+  if (game.loading) return false;
+  return FILTER_DIMS.every(({ key }) => {
+    if (!activeFilters[key].size) return true;
+    const vals = key === 'tags' ? game.details?.tags : game.details?.meta?.[key];
+    if (!vals) return false;
+    return vals.some(v => activeFilters[key].has(v));
+  });
 }
 
-function updateFilterOptions(meta) {
+function updateFilterOptions(meta, tags) {
   const KEYS = FILTER_DIMS.map(d => d.key);
   const newByKey = Object.fromEntries(KEYS.map(k => [k, []]));
   for (const key of KEYS) {
-    for (const v of (meta[key] || [])) {
+    const vals = key === 'tags' ? (tags || []) : (meta?.[key] || []);
+    for (const v of vals) {
       if (!allOpts[key].has(v)) { allOpts[key].add(v); newByKey[key].push(v); }
     }
   }

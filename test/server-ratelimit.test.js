@@ -20,10 +20,13 @@ const api = supertest(app);
 
 function workingDetailsFetch(fetchedAppids) {
   return async (url) => {
-    const appid = url.match(/appids=(\d+)/)?.[1] || url.match(/appreviews\/(\d+)/)?.[1];
+    const appid = url.match(/appids=(\d+)/)?.[1] || url.match(/appreviews\/(\d+)/)?.[1] || url.match(/appid=(\d+)/)?.[1];
     if (appid) fetchedAppids.add(appid);
     if (url.includes('appreviews')) {
       return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
+    }
+    if (url.includes('steamspy.com')) {
+      return { ok: true, json: async () => ({ tags: { 'Action': 9054 } }) };
     }
     if (url.includes('appdetails')) {
       return { ok: true, json: async () => ({ [appid]: { success: true, data: { genres: [], categories: [], developers: [], publishers: [] } } }) };
@@ -47,6 +50,7 @@ test('details limiter: counts cache misses but never counts cache hits', async (
   setCache('rating:800', { score: 88, desc: 'Very Positive', positive: 900, total: 1000 });
   setCache('hltb:800', { main: 10, extra: 15 });
   setCache('meta:800', { genres: [], categories: [], developers: [], publishers: [] });
+  setCache('tags:800', ['Action']);
 
   // Three uncached appids consume the budget (max = 3).
   for (const appid of [801, 802, 803]) {
