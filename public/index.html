@@ -358,6 +358,125 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   font-size: 12px;
 }
 .filter-search:focus { outline: none; border-color: var(--accent); }
+
+/* Clickable rows */
+tbody tr.game-row { cursor: pointer; }
+tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
+
+/* Side panel backdrop */
+.panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.panel-backdrop.open { opacity: 1; pointer-events: auto; }
+
+/* Side panel drawer */
+.game-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  max-width: 100vw;
+  background: var(--bg1);
+  border-left: 1px solid var(--border);
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  overflow: hidden;
+}
+.game-panel.open { transform: translateX(0); box-shadow: -8px 0 32px rgba(0,0,0,0.4); }
+
+.panel-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px; height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.5);
+  color: var(--text0);
+  font-size: 18px;
+  line-height: 28px;
+  text-align: center;
+  cursor: pointer;
+  z-index: 1;
+  padding: 0;
+}
+.panel-close:hover { background: rgba(0,0,0,0.75); }
+
+.panel-img {
+  width: 100%;
+  aspect-ratio: 460 / 215;
+  object-fit: cover;
+  background: var(--bg3);
+  display: block;
+  flex-shrink: 0;
+}
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px 28px;
+}
+
+.panel-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text0);
+  margin-bottom: 18px;
+  line-height: 1.35;
+}
+
+.panel-section { margin-bottom: 18px; }
+.panel-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text2);
+  margin-bottom: 7px;
+}
+
+.panel-score-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.panel-score-num { font-size: 32px; font-weight: 700; line-height: 1; }
+.panel-score-desc { font-size: 13px; color: var(--text1); }
+.panel-reviews { font-size: 12px; color: var(--text1); }
+
+.panel-hltb { display: flex; gap: 24px; }
+.panel-hltb-label { font-size: 11px; color: var(--text2); margin-bottom: 3px; }
+.panel-hltb-val { font-size: 20px; font-weight: 600; color: var(--text0); }
+
+.panel-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.panel-tag {
+  background: rgba(61,80,104,0.5);
+  border: 1px solid var(--border);
+  color: var(--text1);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 3px;
+}
+
+.panel-links { display: flex; gap: 8px; flex-wrap: wrap; }
+.panel-link {
+  display: inline-block;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--bg2);
+  color: var(--text1);
+  font-size: 12px;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
+}
+.panel-link:hover { border-color: var(--accent); color: var(--accent2); }
 </style>
 </head>
 <body>
@@ -382,6 +501,14 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   <div id="results"></div>
 
 </div>
+
+<div id="panel-backdrop" class="panel-backdrop"></div>
+<div id="game-panel" class="game-panel" role="dialog" aria-modal="true">
+  <button id="panel-close" class="panel-close" aria-label="Close">×</button>
+  <img id="panel-img" class="panel-img" src="" alt="">
+  <div id="panel-body" class="panel-body"></div>
+</div>
+
 <script src="/utils.js"></script>
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
@@ -392,6 +519,7 @@ let slots = [];     // [[{steamid, personaname, profileurl}, ...], ...] — one 
 let sortCol = 'score';
 let sortDir = -1;
 let runId = 0;      // increments on each search to cancel stale updates
+let panelGame = null;
 
 // Filter state — reset on each new search
 const activeFilters = { genres: new Set(), categories: new Set(), developers: new Set(), publishers: new Set() };
@@ -403,6 +531,18 @@ const filterSearch  = { genres: '', categories: '', developers: '', publishers: 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('add-btn').addEventListener('click', () => addPlayerSlot());
   document.getElementById('search-btn').addEventListener('click', findCommonGames);
+
+  document.getElementById('results').addEventListener('click', e => {
+    const row = e.target.closest('tr.game-row');
+    if (!row || e.target.closest('a')) return;
+    const appid = Number(row.dataset.appid);
+    const game = games.find(g => g.appid === appid);
+    if (game) openPanel(game);
+  });
+
+  document.getElementById('panel-backdrop').addEventListener('click', closePanel);
+  document.getElementById('panel-close').addEventListener('click', closePanel);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
 
   fetch('/api/health').then(r => r.json()).then(d => {
     if (!d.configured) {
@@ -554,6 +694,7 @@ async function findCommonGames({ pushState = true, restoreFilters = null } = {})
   }
 
   const thisRun = ++runId;
+  closePanel();
   for (const s of Object.values(activeFilters)) s.clear();
   for (const s of Object.values(allOpts)) s.clear();
   for (const k of Object.keys(filterSearch)) filterSearch[k] = '';
@@ -763,8 +904,9 @@ function rowHtml(game) {
     extraCell = h ? fmtH(h.extra) : '<span class="dim">—</span>';
   }
 
-  return `<tr data-appid="${game.appid}">
-    <td class="td-name"><a href="${storeUrl}" target="_blank" rel="noopener">${esc(game.name)}</a></td>
+  const active = panelGame?.appid === game.appid ? ' active' : '';
+  return `<tr class="game-row${active}" data-appid="${game.appid}">
+    <td class="td-name"><a href="${storeUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(game.name)}</a></td>
     <td class="td-score">${scoreCell}</td>
     <td class="td-hltb">${mainCell}</td>
     <td class="td-hltb">${extraCell}</td>
@@ -773,7 +915,8 @@ function rowHtml(game) {
 
 function updateRow(idx) {
   const game = games[idx];
-  const row = document.querySelector(`tr[data-appid="${game.appid}"]`);
+  if (panelGame?.appid === game.appid) { panelGame = game; renderPanel(); }
+  const row = document.querySelector(`tr.game-row[data-appid="${game.appid}"]`);
   if (row) {
     const r = game.details?.rating;
     const h = game.details?.hltb;
@@ -803,6 +946,107 @@ function updateProgress(loaded, total) {
   }
 }
 
+// ── Side panel ─────────────────────────────────────────────────────────────
+
+function openPanel(game) {
+  panelGame = game;
+  const img = document.getElementById('panel-img');
+  img.style.display = '';
+  img.src = `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`;
+  img.onerror = () => { img.style.display = 'none'; };
+  renderPanel();
+  document.getElementById('game-panel').classList.add('open');
+  document.getElementById('panel-backdrop').classList.add('open');
+  refreshTable(); // re-render rows so the active highlight appears
+}
+
+function closePanel() {
+  if (!panelGame) return;
+  panelGame = null;
+  document.getElementById('game-panel').classList.remove('open');
+  document.getElementById('panel-backdrop').classList.remove('open');
+  refreshTable(); // remove active highlight
+}
+
+function renderPanel() {
+  if (!panelGame) return;
+  const g = panelGame;
+  const r = g.details?.rating;
+  const h = g.details?.hltb;
+  const meta = g.details?.meta;
+
+  const storeUrl = `https://store.steampowered.com/app/${g.appid}`;
+  const steamdbUrl = `https://www.steamdb.info/app/${g.appid}/`;
+  const protondbUrl = `https://www.protondb.com/app/${g.appid}`;
+
+  let scoreHtml = '';
+  if (g.loading) {
+    scoreHtml = `<div class="panel-section">
+      <div class="panel-section-title">Score</div>
+      <span class="sk" style="width:64px;height:32px;border-radius:4px"></span>
+    </div>`;
+  } else if (r) {
+    const pct = r.total ? Math.round(r.positive / r.total * 100) : 0;
+    scoreHtml = `<div class="panel-section">
+      <div class="panel-section-title">Score</div>
+      <div class="panel-score-row">
+        <div class="panel-score-num" style="color:${scoreColor(r.score)}">${r.score}</div>
+        <div class="panel-score-desc">${esc(r.desc)}</div>
+      </div>
+      <div class="panel-reviews">${r.positive.toLocaleString()} of ${r.total.toLocaleString()} reviews positive (${pct}%)</div>
+    </div>`;
+  }
+
+  let hltbHtml = '';
+  if (g.loading) {
+    hltbHtml = `<div class="panel-section">
+      <div class="panel-section-title">How Long To Beat</div>
+      <span class="sk" style="width:140px"></span>
+    </div>`;
+  } else if (h) {
+    hltbHtml = `<div class="panel-section">
+      <div class="panel-section-title">How Long To Beat</div>
+      <div class="panel-hltb">
+        <div class="panel-hltb-item">
+          <div class="panel-hltb-label">Main Story</div>
+          <div class="panel-hltb-val">${fmtH(h.main)}</div>
+        </div>
+        <div class="panel-hltb-item">
+          <div class="panel-hltb-label">Main + Extra</div>
+          <div class="panel-hltb-val">${fmtH(h.extra)}</div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const tagSection = (title, items) => items?.length ? `
+    <div class="panel-section">
+      <div class="panel-section-title">${title}</div>
+      <div class="panel-tags">${items.map(v => `<span class="panel-tag">${esc(v)}</span>`).join('')}</div>
+    </div>` : '';
+
+  const metaHtml = g.loading ? '' : [
+    tagSection('Genres', meta?.genres),
+    tagSection('Categories', meta?.categories),
+    tagSection('Developer', meta?.developers),
+    tagSection('Publisher', meta?.publishers),
+  ].join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    <div class="panel-title">${esc(g.name)}</div>
+    ${scoreHtml}
+    ${hltbHtml}
+    ${metaHtml}
+    <div class="panel-section">
+      <div class="panel-section-title">Links</div>
+      <div class="panel-links">
+        <a class="panel-link" href="${esc(storeUrl)}" target="_blank" rel="noopener">Steam Store</a>
+        <a class="panel-link" href="${esc(steamdbUrl)}" target="_blank" rel="noopener">SteamDB</a>
+        <a class="panel-link" href="${esc(protondbUrl)}" target="_blank" rel="noopener">ProtonDB</a>
+      </div>
+    </div>`;
+}
+
 function refreshTable() {
   document.querySelectorAll('thead th[data-col]').forEach(th => {
     const col = th.dataset.col;
@@ -821,6 +1065,11 @@ function refreshTable() {
       if (groupEl) groupEl.style.display = rows.length === 0 ? 'none' : '';
     }
   }
+  if (panelGame) {
+    const fresh = games.find(g => g.appid === panelGame.appid);
+    if (fresh && fresh !== panelGame) { panelGame = fresh; renderPanel(); }
+  }
+
   const countEl = document.getElementById('results-count');
   if (countEl) {
     const filtered = games.filter(gameMatchesFilters).length;
