@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- HLTB search now normalizes Unicode (e.g. `Ö` → `O`) before building search terms and computing similarity, so games with diacritics in their title (e.g. "Öoo") match the correct HLTB entry instead of a spurious one
+
 - Filters and sort order are now applied immediately as each game's details load: loading games are excluded from active filters (previously shown as matching), and each completed detail fetch triggers a full `refreshTable()` re-sort/re-filter instead of an in-place cell patch
 
 - Filter search inputs and checkboxes no longer lose focus while game details are loading progressively: `updateRow` now updates only the three data cells in-place (score, main, extra) instead of replacing the entire `<tr>`, and `updateFilterOptions` appends new options surgically without rebuilding the filter panel HTML; a full panel rebuild is still done when a new dimension first appears, but focus is saved and restored around it
