@@ -561,6 +561,7 @@ let sortCol = 'score';
 let sortDir = -1;
 let runId = 0;           // increments on each search to cancel stale updates
 let streamController = null; // AbortController for the active detail stream
+let refreshDebounceTimer = null;
 let panelGame = null;
 
 // Filter state — reset on each new search
@@ -863,6 +864,8 @@ async function loadAllDetails(thisRun) {
         if (panelGame?.appid === games[idx].appid) renderPanel();
         const tr = document.querySelector(`tr.game-row[data-appid="${data.appid}"]`);
         if (tr) syncRow(tr, games[idx]);
+        clearTimeout(refreshDebounceTimer);
+        refreshDebounceTimer = setTimeout(refreshTable, 150);
       }
     }
   } catch {

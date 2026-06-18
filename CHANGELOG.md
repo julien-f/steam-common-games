@@ -20,7 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
-- Page no longer freezes while SSE detail events arrive: each event now updates only the affected row's cells instead of re-reconciling every row in every table
+- Page no longer freezes while SSE detail events arrive: each event now updates only the affected row's cells instead of re-reconciling every row in every table; sort order and active filters still catch up via a 150 ms debounced `refreshTable`
 
 - `CACHE_FILE` env var controls the cache file path; set to an empty string to disable disk persistence (used by the test script to prevent tests from overwriting `cache.json`)
 
