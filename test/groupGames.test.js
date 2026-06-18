@@ -94,6 +94,14 @@ test('groupByOwnership: empty libraries', () => {
   assert.deepEqual(groupByOwnership([[], []]), []);
 });
 
+test('groupByOwnership: single library returns all games as one group', () => {
+  const libraries = [lib([1, 'Portal'], [2, 'Skyrim'])];
+  const groups = groupByOwnership(libraries);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].userIndices, [0]);
+  assert.equal(groups[0].games.length, 2);
+});
+
 test('groupByOwnership: preserves appid in output', () => {
   const libraries = [
     lib([42, 'Portal']),

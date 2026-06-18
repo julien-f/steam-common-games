@@ -85,10 +85,10 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
 
   if (
     !Array.isArray(rawSlots) ||
-    rawSlots.length < 2 ||
+    rawSlots.length < 1 ||
     !rawSlots.every(s => Array.isArray(s) && s.length > 0 && s.every(u => typeof u === 'string' && u.trim().length > 0))
   ) {
-    return res.status(400).json({ error: 'Provide at least 2 players' });
+    return res.status(400).json({ error: 'Provide at least 1 player' });
   }
   if (rawSlots.reduce((n, s) => n + s.length, 0) > MAX_USERS) {
     return res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });

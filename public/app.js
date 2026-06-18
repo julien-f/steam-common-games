@@ -89,7 +89,7 @@ function loadFromUrl() {
     .map(s => s.split(',').map(v => v.trim()).filter(Boolean));
   const container = document.getElementById('user-inputs');
   container.innerHTML = '';
-  if (urlSlots.length >= 2 && urlSlots.every(s => s.length > 0)) {
+  if (urlSlots.length >= 1 && urlSlots.every(s => s.length > 0)) {
     urlSlots.forEach(accounts => addPlayerSlot(accounts));
     const restoreFilters = Object.fromEntries(
       FILTER_DIMS.map(d => [d.key, params.getAll(d.param)])
@@ -141,7 +141,7 @@ function addPlayerSlot(accounts = ['']) {
   removeSlotBtn.title = 'Remove player';
   removeSlotBtn.textContent = '×';
   removeSlotBtn.addEventListener('click', () => {
-    if (document.querySelectorAll('.player-slot').length > 2) slot.remove();
+    if (document.querySelectorAll('.player-slot').length > 1) slot.remove();
   });
 
   primaryRow.appendChild(input);
@@ -202,7 +202,7 @@ function showAlert(msg, type = 'error') {
 
 async function findCommonGames({ pushState = true, restoreFilters = null, restoreSort = null } = {}) {
   const inputSlots = getSlots();
-  if (inputSlots.length < 2) { showAlert('Enter at least 2 Steam users.'); return; }
+  if (inputSlots.length < 1) { showAlert('Enter at least 1 Steam user.'); return; }
 
   clearAlerts();
 
@@ -399,8 +399,8 @@ function renderPage() {
 
   document.getElementById('results').innerHTML = `
     <div class="results-header">
-      <h2 id="results-count">${games.length} shared games</h2>
-      ${playerList ? `<div class="results-meta">across ${playerList}</div>` : ''}
+      <h2 id="results-count">${games.length} ${slots.length === 1 ? 'games' : 'shared games'}</h2>
+      ${playerList ? `<div class="results-meta">${slots.length === 1 ? 'library of' : 'across'} ${playerList}</div>` : ''}
     </div>
     <div class="progress-wrap">
       <div class="progress-text" id="prog-text">Loading details… 0 / ${games.length}</div>
@@ -627,9 +627,10 @@ function refreshTable() {
   const countEl = document.getElementById('results-count');
   if (countEl) {
     const filtered = filtersActive ? games.filter(g => gameMatchesFilters(g, filtersActive)).length : games.length;
+    const gameLabel = slots.length === 1 ? 'games' : 'shared games';
     countEl.textContent = filtersActive
-      ? `${filtered} / ${games.length} shared games`
-      : `${games.length} shared games`;
+      ? `${filtered} / ${games.length} ${gameLabel}`
+      : `${games.length} ${gameLabel}`;
   }
 }
 

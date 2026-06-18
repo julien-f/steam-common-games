@@ -86,9 +86,16 @@ test('POST /api/common-games: 400 when body has no slots field', async () => {
   assert.equal(res.status, 400);
 });
 
-test('POST /api/common-games: 400 when only one slot is provided', async () => {
+test('POST /api/common-games: 200 with full library when only one slot is provided', async (t) => {
+  _reset();
+  const GAME = { appid: 400, name: 'Portal' };
+  t.mock.method(globalThis, 'fetch', makeLibraryFetch([GAME], []));
+
   const res = await api.post('/api/common-games').send({ slots: [[ID1]] });
-  assert.equal(res.status, 400);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.groups.length, 1);
+  assert.equal(res.body.groups[0].games[0].appid, 400);
+  assert.equal(res.body.slots.length, 1);
 });
 
 test('POST /api/common-games: 400 when a slot is an empty array', async () => {
