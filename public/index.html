@@ -771,7 +771,18 @@ function rowHtml(game) {
 function updateRow(idx) {
   const game = games[idx];
   const row = document.querySelector(`tr[data-appid="${game.appid}"]`);
-  if (row) row.outerHTML = rowHtml(game);
+  if (row) {
+    const r = game.details?.rating;
+    const h = game.details?.hltb;
+    const cells = row.cells;
+    if (r) {
+      cells[1].innerHTML = `<div class="score-num" style="color:${scoreColor(r.score)}">${r.score}</div><div class="score-label">${esc(r.desc)}</div>`;
+    } else {
+      cells[1].innerHTML = '<span class="dim">—</span>';
+    }
+    cells[2].innerHTML = h ? fmtH(h.main)  : '<span class="dim">—</span>';
+    cells[3].innerHTML = h ? fmtH(h.extra) : '<span class="dim">—</span>';
+  }
   if (game.details?.meta) updateFilterOptions(game.details.meta);
 }
 
@@ -874,13 +885,72 @@ function gameMatchesFilters(game) {
 }
 
 function updateFilterOptions(meta) {
-  let changed = false;
-  for (const key of ['genres', 'categories', 'developers', 'publishers']) {
+  const KEYS = ['genres', 'categories', 'developers', 'publishers'];
+  const newByKey = Object.fromEntries(KEYS.map(k => [k, []]));
+  for (const key of KEYS) {
     for (const v of (meta[key] || [])) {
-      if (!allOpts[key].has(v)) { allOpts[key].add(v); changed = true; }
+      if (!allOpts[key].has(v)) { allOpts[key].add(v); newByKey[key].push(v); }
     }
   }
-  if (changed) renderFilterPanel();
+  if (KEYS.every(k => !newByKey[k].length)) return;
+
+  const panelEl = document.getElementById('filter-panel');
+  const needsNewDim = KEYS.some(k =>
+    newByKey[k].length > 0 && !panelEl.querySelector(`input[data-search-dim="${k}"]`)
+  );
+
+  if (needsNewDim || !panelEl.querySelector('.card')) {
+    // Full rebuild needed — preserve focus in search inputs
+    const focused = document.activeElement;
+    const focusedDim = focused?.dataset?.searchDim;
+    const selStart = focused?.selectionStart;
+    const selEnd = focused?.selectionEnd;
+    renderFilterPanel();
+    if (focusedDim) {
+      const el = panelEl.querySelector(`input[data-search-dim="${focusedDim}"]`);
+      if (el) { el.focus(); try { el.setSelectionRange(selStart, selEnd); } catch {} }
+    }
+    return;
+  }
+
+  // Surgical: append new options into existing dimension containers
+  for (const key of KEYS) {
+    if (!newByKey[key].length) continue;
+    const optsContainer = panelEl
+      .querySelector(`input[data-search-dim="${key}"]`)
+      ?.closest('.filter-dim')
+      ?.querySelector('.filter-opts');
+    if (!optsContainer) continue;
+
+    for (const v of newByKey[key]) {
+      const label = document.createElement('label');
+      label.className = 'filter-opt';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.dataset.dim = key;
+      cb.value = v;
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(' ' + v));
+
+      if (filterSearch[key] && !v.toLowerCase().includes(filterSearch[key].toLowerCase())) {
+        label.style.display = 'none';
+      }
+
+      // Insert in sorted position
+      const existing = [...optsContainer.querySelectorAll('.filter-opt')];
+      const after = existing.find(el => (el.querySelector('input')?.value ?? '').localeCompare(v) > 0);
+      if (after) optsContainer.insertBefore(label, after);
+      else optsContainer.appendChild(label);
+
+      cb.addEventListener('change', () => {
+        if (cb.checked) activeFilters[key].add(v);
+        else activeFilters[key].delete(v);
+        refreshTable();
+        updateFilterUrl();
+        renderFilterPanel();
+      });
+    }
+  }
 }
 
 function applySearch(dim, query) {

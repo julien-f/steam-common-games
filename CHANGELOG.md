@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Filter search inputs and checkboxes no longer lose focus while game details are loading progressively: `updateRow` now updates only the three data cells in-place (score, main, extra) instead of replacing the entire `<tr>`, and `updateFilterOptions` appends new options surgically without rebuilding the filter panel HTML; a full panel rebuild is still done when a new dimension first appears, but focus is saved and restored around it
+
 - Game-details rate limiter no longer counts cache hits. The limit exists to throttle upstream Steam/HLTB calls, but it previously counted every request equally — so refreshing an already-loaded comparison (all cache hits) could exhaust the budget and `429` itself, leaving rows blank. Cache hits now bypass the limiter entirely
 - Game-details loading now retries once after a `429`, waiting out the rate-limit window (honoring `Retry-After`), so first-time loads of very large shared libraries recover instead of leaving rows blank
 - Game-details loading now checks the HTTP response status before parsing; a `502` error body is no longer stored as game details, which previously left rows rendered blank (no rating/HLTB) instead of falling back gracefully
