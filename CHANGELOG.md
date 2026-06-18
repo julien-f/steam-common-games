@@ -6,7 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `POST /api/game-details/stream` endpoint: streams per-game detail events over SSE so the frontend opens one connection per search instead of N individual requests
+
 ### Changed
+
+- Frontend loads game details via a single SSE stream (`ReadableStream` + `fetch`) instead of a pool of concurrent `GET /api/game-details/:appid` requests; the old endpoint is unchanged and still used by direct API consumers
 
 - `CACHE_FILE` env var controls the cache file path; set to an empty string to disable disk persistence (used by the test script to prevent tests from overwriting `cache.json`)
 

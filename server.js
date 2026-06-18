@@ -135,12 +135,7 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
 
 const dedupDetails = createDedup();
 
-app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
-  const appid = Number(req.params.appid);
-  if (!Number.isInteger(appid) || appid <= 0) {
-    return res.status(400).json({ error: 'Invalid appid' });
-  }
-
+function fetchGameDetails(appid, name) {
   const ratingKey = `rating:${appid}`;
   const hltbKey   = `hltb:${appid}`;
   const metaKey   = `meta:${appid}`;
@@ -150,11 +145,10 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
   const cachedMeta   = getCached(metaKey);
 
   if (cachedRating !== undefined && cachedHltb !== undefined && cachedMeta !== undefined) {
-    return res.json({ rating: cachedRating, hltb: cachedHltb, meta: cachedMeta });
+    return Promise.resolve({ rating: cachedRating, hltb: cachedHltb, meta: cachedMeta });
   }
 
-  const name = (req.query.name || '').trim().slice(0, 200);
-  const result = await dedupDetails(`details:${appid}`, () =>
+  return dedupDetails(`details:${appid}`, () =>
     Promise.allSettled([
       cachedRating !== undefined ? Promise.resolve(cachedRating) : getGameRating(appid),
       cachedHltb   !== undefined ? Promise.resolve(cachedHltb)   : getHLTB(name),
@@ -172,7 +166,56 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
       return { rating, hltb, meta };
     })
   );
-  res.json(result);
+}
+
+app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
+  const appid = Number(req.params.appid);
+  if (!Number.isInteger(appid) || appid <= 0) {
+    return res.status(400).json({ error: 'Invalid appid' });
+  }
+  const name = (req.query.name || '').trim().slice(0, 200);
+  res.json(await fetchGameDetails(appid, name));
+});
+
+app.post('/api/game-details/stream', async (req, res) => {
+  const { games: gameList } = req.body;
+  if (!Array.isArray(gameList) || gameList.length === 0) {
+    return res.status(400).json({ error: 'Provide at least one game' });
+  }
+
+  const validated = [];
+  for (const g of gameList) {
+    const appid = Number(g.appid);
+    if (!Number.isInteger(appid) || appid <= 0) {
+      return res.status(400).json({ error: 'Invalid appid' });
+    }
+    validated.push({ appid, name: String(g.name || '').trim().slice(0, 200) });
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  let closed = false;
+  res.on('close', () => { closed = true; });
+
+  const send = (data) => {
+    if (!closed && !res.writableEnded) res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  await Promise.allSettled(validated.map(async ({ appid, name }) => {
+    if (closed) return;
+    try {
+      const result = await fetchGameDetails(appid, name);
+      send({ appid, ...result });
+    } catch {
+      send({ appid, rating: null, hltb: null, meta: null });
+    }
+  }));
+
+  send({ done: true });
+  if (!res.writableEnded) res.end();
 });
 
 if (require.main === module) {

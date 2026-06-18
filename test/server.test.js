@@ -413,3 +413,88 @@ test('GET /api/game-details/:appid: failed fetch is not cached, retried on next 
   assert.equal(res2.status, 200);
   assert.equal(hltbCalls, 2, 'HLTB should be retried — failed fetch must not be cached');
 });
+
+// ── POST /api/game-details/stream ────────────────────────────────────────────
+
+function parseSseEvents(body) {
+  return body.split('\n\n').filter(c => c.startsWith('data: ')).map(c => JSON.parse(c.slice(6)));
+}
+
+function ssePost(port, path, body) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(body);
+    const req = http.request(
+      { host: '127.0.0.1', port, path, method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } },
+      (res) => {
+        let data = '';
+        res.on('data', c => { data += c; });
+        res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: data }));
+      }
+    );
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+test('POST /api/game-details/stream: 400 for empty games list', async () => {
+  const res = await api.post('/api/game-details/stream').send({ games: [] });
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/game-details/stream: 400 for invalid appid in list', async () => {
+  const res = await api.post('/api/game-details/stream').send({ games: [{ appid: 'abc', name: 'Portal' }] });
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/game-details/stream: streams one event per game plus a done event from cache', async (t) => {
+  _reset();
+  const rating = { score: 88, desc: 'Very Positive', positive: 900, total: 1000 };
+  const hltb   = { main: 10, extra: 15 };
+  const meta   = { genres: ['Action'], categories: ['Co-op'], developers: ['Valve'], publishers: ['Valve'] };
+  setCache('rating:400', rating);
+  setCache('hltb:400', hltb);
+  setCache('meta:400', meta);
+  setCache('rating:401', rating);
+  setCache('hltb:401', hltb);
+  setCache('meta:401', meta);
+
+  const server = app.listen(0);
+  t.after(() => new Promise(r => server.close(r)));
+  await new Promise(r => server.once('listening', r));
+
+  const res = await ssePost(server.address().port, '/api/game-details/stream',
+    { games: [{ appid: 400, name: 'Portal' }, { appid: 401, name: 'Portal 2' }] });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.headers['content-type'], 'text/event-stream');
+  const events = parseSseEvents(res.body);
+  const gameEvents = events.filter(e => !e.done);
+  const doneEvent  = events.find(e => e.done);
+  assert.equal(gameEvents.length, 2);
+  assert.ok(gameEvents.some(e => e.appid === 400));
+  assert.ok(gameEvents.some(e => e.appid === 401));
+  assert.ok(doneEvent, 'must end with a done event');
+});
+
+test('POST /api/game-details/stream: fetches fresh details and streams them', async (t) => {
+  _reset();
+  _resetAuth();
+  t.mock.method(globalThis, 'fetch', makeDetailsFetch());
+
+  const server = app.listen(0);
+  t.after(() => new Promise(r => server.close(r)));
+  await new Promise(r => server.once('listening', r));
+
+  const res = await ssePost(server.address().port, '/api/game-details/stream',
+    { games: [{ appid: 700, name: 'Portal' }] });
+
+  assert.equal(res.status, 200);
+  const events = parseSseEvents(res.body);
+  const gameEvent = events.find(e => e.appid === 700);
+  assert.ok(gameEvent, 'must emit an event for the requested appid');
+  assert.equal(typeof gameEvent.rating?.score, 'number');
+  assert.equal(gameEvent.hltb?.main, 10);
+  assert.deepEqual(gameEvent.meta?.genres, ['Action']);
+});
