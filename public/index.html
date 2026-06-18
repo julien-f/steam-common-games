@@ -358,6 +358,53 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   font-size: 12px;
 }
 .filter-search:focus { outline: none; border-color: var(--accent); }
+
+/* Expandable rows */
+.game-row { cursor: pointer; }
+.game-row > td:first-child { padding-left: 28px; position: relative; }
+.row-toggle {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 9px;
+  opacity: 0.4;
+  transition: transform 0.15s;
+  pointer-events: none;
+}
+.game-row.expanded .row-toggle { transform: translateY(-50%) rotate(90deg); opacity: 0.8; }
+.game-row.expanded { background: rgba(42,71,94,0.35); }
+.detail-row > td {
+  padding: 0 !important;
+  background: var(--bg3);
+  border-bottom: 2px solid var(--border);
+}
+.detail-panel {
+  padding: 14px 20px;
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  border-top: 1px solid rgba(61,80,104,0.6);
+}
+.detail-section { min-width: 100px; }
+.detail-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text2);
+  margin-bottom: 5px;
+}
+.detail-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.detail-tag {
+  background: rgba(61,80,104,0.5);
+  border: 1px solid var(--border);
+  color: var(--text1);
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+.detail-reviews { font-size: 12px; color: var(--text1); }
 </style>
 </head>
 <body>
@@ -392,6 +439,7 @@ let slots = [];     // [[{steamid, personaname, profileurl}, ...], ...] — one 
 let sortCol = 'score';
 let sortDir = -1;
 let runId = 0;      // increments on each search to cancel stale updates
+const expandedRows = new Set();
 
 // Filter state — reset on each new search
 const activeFilters = { genres: new Set(), categories: new Set(), developers: new Set(), publishers: new Set() };
@@ -403,6 +451,15 @@ const filterSearch  = { genres: '', categories: '', developers: '', publishers: 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('add-btn').addEventListener('click', () => addPlayerSlot());
   document.getElementById('search-btn').addEventListener('click', findCommonGames);
+
+  document.getElementById('results').addEventListener('click', e => {
+    const row = e.target.closest('tr.game-row');
+    if (!row || e.target.closest('a')) return;
+    const appid = Number(row.dataset.appid);
+    if (expandedRows.has(appid)) expandedRows.delete(appid);
+    else expandedRows.add(appid);
+    refreshTable();
+  });
 
   fetch('/api/health').then(r => r.json()).then(d => {
     if (!d.configured) {
@@ -554,6 +611,7 @@ async function findCommonGames({ pushState = true, restoreFilters = null } = {})
   }
 
   const thisRun = ++runId;
+  expandedRows.clear();
   for (const s of Object.values(activeFilters)) s.clear();
   for (const s of Object.values(allOpts)) s.clear();
   for (const k of Object.keys(filterSearch)) filterSearch[k] = '';
@@ -742,6 +800,7 @@ function thHtml(col, label) {
 
 function rowHtml(game) {
   const storeUrl = `https://store.steampowered.com/app/${game.appid}`;
+  const expanded = expandedRows.has(game.appid);
   let scoreCell, mainCell, extraCell;
 
   if (game.loading) {
@@ -763,17 +822,70 @@ function rowHtml(game) {
     extraCell = h ? fmtH(h.extra) : '<span class="dim">—</span>';
   }
 
-  return `<tr data-appid="${game.appid}">
-    <td class="td-name"><a href="${storeUrl}" target="_blank" rel="noopener">${esc(game.name)}</a></td>
+  const mainRow = `<tr class="game-row${expanded ? ' expanded' : ''}" data-appid="${game.appid}">
+    <td class="td-name"><span class="row-toggle">▶</span><a href="${storeUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(game.name)}</a></td>
     <td class="td-score">${scoreCell}</td>
     <td class="td-hltb">${mainCell}</td>
     <td class="td-hltb">${extraCell}</td>
   </tr>`;
+  return expanded ? mainRow + detailRowHtml(game) : mainRow;
+}
+
+function detailRowHtml(game) {
+  if (game.loading) {
+    return `<tr class="detail-row"><td colspan="4"><div class="detail-panel"><span class="sk" style="width:240px"></span></div></td></tr>`;
+  }
+
+  const r = game.details?.rating;
+  const meta = game.details?.meta;
+  const sections = [];
+
+  if (r) {
+    const pct = r.total ? Math.round(r.positive / r.total * 100) : 0;
+    sections.push(`<div class="detail-section">
+      <div class="detail-section-title">Reviews</div>
+      <div class="detail-reviews">${r.positive.toLocaleString()} positive / ${r.total.toLocaleString()} total (${pct}%)</div>
+    </div>`);
+  }
+
+  if (meta?.genres?.length) {
+    sections.push(`<div class="detail-section">
+      <div class="detail-section-title">Genres</div>
+      <div class="detail-tags">${meta.genres.map(v => `<span class="detail-tag">${esc(v)}</span>`).join('')}</div>
+    </div>`);
+  }
+
+  if (meta?.categories?.length) {
+    sections.push(`<div class="detail-section">
+      <div class="detail-section-title">Categories</div>
+      <div class="detail-tags">${meta.categories.map(v => `<span class="detail-tag">${esc(v)}</span>`).join('')}</div>
+    </div>`);
+  }
+
+  if (meta?.developers?.length) {
+    sections.push(`<div class="detail-section">
+      <div class="detail-section-title">Developer</div>
+      <div class="detail-tags">${meta.developers.map(v => `<span class="detail-tag">${esc(v)}</span>`).join('')}</div>
+    </div>`);
+  }
+
+  if (meta?.publishers?.length) {
+    sections.push(`<div class="detail-section">
+      <div class="detail-section-title">Publisher</div>
+      <div class="detail-tags">${meta.publishers.map(v => `<span class="detail-tag">${esc(v)}</span>`).join('')}</div>
+    </div>`);
+  }
+
+  const body = sections.length
+    ? sections.join('')
+    : '<span class="dim" style="font-size:12px">No additional details available.</span>';
+
+  return `<tr class="detail-row"><td colspan="4"><div class="detail-panel">${body}</div></td></tr>`;
 }
 
 function updateRow(idx) {
   const game = games[idx];
-  const row = document.querySelector(`tr[data-appid="${game.appid}"]`);
+  const row = document.querySelector(`tr.game-row[data-appid="${game.appid}"]`);
   if (row) {
     const r = game.details?.rating;
     const h = game.details?.hltb;
@@ -785,6 +897,7 @@ function updateRow(idx) {
     }
     cells[2].innerHTML = h ? fmtH(h.main)  : '<span class="dim">—</span>';
     cells[3].innerHTML = h ? fmtH(h.extra) : '<span class="dim">—</span>';
+
   }
   if (game.details?.meta) updateFilterOptions(game.details.meta);
 }

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Expandable game rows: clicking any row (outside the Steam link) toggles an inline detail strip showing review counts (positive/total with percentage), genres, categories, developer, and publisher
+
 ### Fixed
 
 - Filters and sort order are now applied immediately as each game's details load: loading games are excluded from active filters (previously shown as matching), and each completed detail fetch triggers a full `refreshTable()` re-sort/re-filter instead of an in-place cell patch
