@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Filters and sort order are now applied immediately as each game's details load: loading games are excluded from active filters (previously shown as matching), and each completed detail fetch triggers a full `refreshTable()` re-sort/re-filter instead of an in-place cell patch
+
 - Filter search inputs and checkboxes no longer lose focus while game details are loading progressively: `updateRow` now updates only the three data cells in-place (score, main, extra) instead of replacing the entire `<tr>`, and `updateFilterOptions` appends new options surgically without rebuilding the filter panel HTML; a full panel rebuild is still done when a new dimension first appears, but focus is saved and restored around it
 
 - Game-details rate limiter no longer counts cache hits. The limit exists to throttle upstream Steam/HLTB calls, but it previously counted every request equally — so refreshing an already-loaded comparison (all cache hits) could exhaust the budget and `429` itself, leaving rows blank. Cache hits now bypass the limiter entirely

@@ -646,7 +646,10 @@ async function fetchDetails(idx, thisRun) {
     games[idx].details = { rating: null, hltb: null, meta: null };
   }
   games[idx].loading = false;
-  if (thisRun === runId) updateRow(idx);
+  if (thisRun === runId) {
+    if (games[idx].details?.meta) updateFilterOptions(games[idx].details.meta);
+    refreshTable();
+  }
 }
 
 // ── Rendering ──────────────────────────────────────────────────────────────
@@ -875,7 +878,7 @@ function hasActiveFilters() {
 
 function gameMatchesFilters(game) {
   if (!hasActiveFilters()) return true;
-  if (game.loading) return true; // skeleton row — details not yet fetched, show until we know
+  if (game.loading) return false; // details not yet fetched — exclude until we know
   const meta = game.details?.meta;
   if (!meta) return false; // details loaded but Store API failed — can't confirm a match, exclude
   return (!activeFilters.genres.size     || meta.genres.some(v     => activeFilters.genres.has(v)))
