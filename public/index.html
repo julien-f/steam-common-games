@@ -443,7 +443,17 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   letter-spacing: 0.5px;
   color: var(--text2);
   margin-bottom: 7px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
+.panel-section-title a {
+  font-size: 10px;
+  color: var(--text2);
+  text-decoration: none;
+  opacity: 0.7;
+}
+.panel-section-title a:hover { color: var(--accent2); opacity: 1; }
 
 .panel-score-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
 .panel-score-num { font-size: 32px; font-weight: 700; line-height: 1; }
@@ -1004,8 +1014,9 @@ function renderPanel() {
       <span class="sk" style="width:140px"></span>
     </div>`;
   } else if (h) {
+    const hltbUrl = h.id ? `https://howlongtobeat.com/game/${h.id}` : null;
     hltbHtml = `<div class="panel-section">
-      <div class="panel-section-title">How Long To Beat</div>
+      <div class="panel-section-title">How Long To Beat${hltbUrl ? ` <a href="${esc(hltbUrl)}" target="_blank" rel="noopener">↗</a>` : ''}</div>
       <div class="panel-hltb">
         <div class="panel-hltb-item">
           <div class="panel-hltb-label">Main Story</div>
@@ -1022,7 +1033,7 @@ function renderPanel() {
   const tagSection = (title, items) => items?.length ? `
     <div class="panel-section">
       <div class="panel-section-title">${title}</div>
-      <div class="panel-tags">${items.map(v => `<span class="panel-tag">${esc(v)}</span>`).join('')}</div>
+      <div class="panel-tags">${[...items].sort((a, b) => a.localeCompare(b)).map(v => `<span class="panel-tag">${esc(v)}</span>`).join('')}</div>
     </div>` : '';
 
   const metaHtml = g.loading ? '' : [

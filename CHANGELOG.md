@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- Side panel drawer: clicking a game row (outside the Steam link) slides in a detail panel showing the Steam header image, score with review counts, HLTB playtime, genres, categories, developer, publisher, and links to Steam Store / SteamDB / ProtonDB; close with the × button, backdrop click, or Escape
+- Side panel drawer: clicking a game row (outside the Steam link) slides in a detail panel showing the Steam header image, score with review counts, HLTB playtime (with a direct ↗ link to the HowLongToBeat entry), genres, categories, developer, publisher sorted alphabetically, and links to Steam Store / SteamDB / ProtonDB; close with the × button, backdrop click, or Escape
 
 ### Fixed
 
