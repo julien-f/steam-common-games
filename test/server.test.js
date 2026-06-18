@@ -6,6 +6,7 @@ process.env.NODE_ENV = 'test';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const http = require('node:http');
 const supertest = require('supertest');
 const { app } = require('../server');
 const { _reset, setCache } = require('../lib/cache');
@@ -275,6 +276,118 @@ test('GET /api/game-details/:appid: only fetches sources not already cached', as
   assert.equal(res.body.hltb?.main, 10);
   assert.ok(!fetchedUrls.some(u => u.includes('appreviews')), 'rating should not be re-fetched');
   assert.ok(!fetchedUrls.some(u => u.includes('appdetails')), 'meta should not be re-fetched');
+});
+
+// ── GET /api/game-details/:appid — "fast refresh" cache / dedup ──────────────
+// A browser refresh fires the same /api/game-details/:appid requests again.
+// These tests verify the server does NOT re-fetch upstream when it shouldn't.
+
+// fetch mock that tallies how many times each upstream source is hit.
+function makeCountingDetailsFetch(counts, { delayMs = 0 } = {}) {
+  return async (url) => {
+    if (delayMs) await new Promise(r => setTimeout(r, delayMs));
+    if (url.includes('appreviews')) {
+      counts.rating++;
+      return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
+    }
+    if (url.includes('appdetails')) {
+      counts.meta++;
+      const appid = url.match(/appids=(\d+)/)?.[1];
+      return { ok: true, json: async () => ({ [appid]: { success: true, data: { genres: [], categories: [], developers: [], publishers: [] } } }) };
+    }
+    if (url.includes('bleed/init')) {
+      counts.hltbInit++;
+      return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
+    }
+    if (url.includes('bleed')) {
+      counts.hltb++;
+      return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+}
+
+// #1 — sequential refresh: second request must be served entirely from cache.
+test('GET /api/game-details/:appid: a repeated request is served from cache, no re-fetch', async (t) => {
+  _reset();
+  _resetAuth();
+  const counts = { rating: 0, hltb: 0, hltbInit: 0, meta: 0 };
+  t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts));
+
+  const res1 = await api.get('/api/game-details/500?name=Portal');
+  assert.equal(res1.status, 200);
+  assert.equal(counts.rating, 1);
+  assert.equal(counts.hltb, 1);
+  assert.equal(counts.meta, 1);
+
+  // Simulates the page being refreshed: same appid requested again.
+  const res2 = await api.get('/api/game-details/500?name=Portal');
+  assert.equal(res2.status, 200);
+  assert.deepEqual(res2.body, res1.body);
+  assert.equal(counts.rating, 1, 'rating must not be re-fetched on refresh');
+  assert.equal(counts.hltb, 1, 'HLTB must not be re-fetched on refresh');
+  assert.equal(counts.meta, 1, 'meta must not be re-fetched on refresh');
+});
+
+// #2 — concurrent refresh: overlapping in-flight requests for the same appid
+// must collapse onto a single upstream fetch via dedup.
+test('GET /api/game-details/:appid: concurrent requests for the same appid dedup to one fetch', async (t) => {
+  _reset();
+  _resetAuth();
+  const counts = { rating: 0, hltb: 0, hltbInit: 0, meta: 0 };
+  t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts, { delayMs: 50 }));
+
+  // Fire both without awaiting the first — they overlap in flight.
+  const [res1, res2] = await Promise.all([
+    api.get('/api/game-details/501?name=Portal'),
+    api.get('/api/game-details/501?name=Portal'),
+  ]);
+
+  assert.equal(res1.status, 200);
+  assert.equal(res2.status, 200);
+  assert.deepEqual(res1.body, res2.body);
+  assert.equal(counts.rating, 1, 'rating fetched once for two concurrent requests');
+  assert.equal(counts.hltb, 1, 'HLTB fetched once for two concurrent requests');
+  assert.equal(counts.meta, 1, 'meta fetched once for two concurrent requests');
+});
+
+// #3 — real browser-abort on fast refresh. supertest awaits the full response,
+// so this uses a raw http request destroyed mid-flight against app.listen().
+// Question: when the client disconnects before setCache runs, does the server
+// still complete the upstream work and cache it (so the refresh is a cache hit),
+// or is the work stranded (forcing the refresh to re-fetch)?
+function abortedGet(port, path, abortAfterMs) {
+  return new Promise((resolve) => {
+    const req = http.get({ host: '127.0.0.1', port, path }, (res) => res.resume());
+    req.on('error', () => {}); // destroy() surfaces ECONNRESET — expected, ignore
+    setTimeout(() => { req.destroy(); resolve(); }, abortAfterMs);
+  });
+}
+
+test('GET /api/game-details/:appid: a request aborted mid-flight still caches, so refresh does not re-fetch', async (t) => {
+  _reset();
+  _resetAuth();
+  const counts = { rating: 0, hltb: 0, hltbInit: 0, meta: 0 };
+  t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts, { delayMs: 100 }));
+
+  const server = app.listen(0);
+  t.after(() => new Promise(r => server.close(r)));
+  await new Promise(r => server.once('listening', r));
+  const port = server.address().port;
+
+  // Fire and kill the socket after 20ms — the handler has started upstream
+  // fetches (~100ms each) but no response has been sent yet.
+  await abortedGet(port, '/api/game-details/600?name=Portal', 20);
+
+  // Give the stranded handler time to finish its upstream work and setCache.
+  await new Promise(r => setTimeout(r, 300));
+
+  // The refresh: same appid requested again.
+  const res = await api.get('/api/game-details/600?name=Portal');
+  assert.equal(res.status, 200);
+  assert.equal(counts.rating, 1, 'aborted request should have completed and cached the rating — refresh must not re-fetch');
+  assert.equal(counts.hltb, 1, 'aborted request should have completed and cached HLTB');
+  assert.equal(counts.meta, 1, 'aborted request should have completed and cached meta');
 });
 
 test('GET /api/game-details/:appid: failed fetch is not cached, retried on next request', async (t) => {
