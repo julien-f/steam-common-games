@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- `CACHE_FILE` env var controls the cache file path; set to an empty string to disable disk persistence (used by the test script to prevent tests from overwriting `cache.json`)
+
 ### Fixed
 
 - `refreshTable` now reconciles the DOM instead of replacing `tbody.innerHTML`: existing `<tr>` nodes are moved/updated in place, new ones are inserted, and removed ones are discarded. This means row identity is stable across re-renders — clicks, active highlights, and filters all work correctly while details are still loading and the sort order updates live
