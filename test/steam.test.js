@@ -323,6 +323,6 @@ test('getAppDetails: returns genres, categories, developers and publishers', asy
 
 test('getAppDetails: handles missing optional fields with empty arrays', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
-  assert.deepEqual(await getAppDetails(400), { genres: [], categories: [], developers: [], publishers: [] });
+  assert.deepEqual(await getAppDetails(400), { genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null });
 });
 

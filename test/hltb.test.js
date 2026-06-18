@@ -116,12 +116,12 @@ test('getHLTB: returns main and extra hours on match', async (t) => {
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('bleed/init')) return makeInitResponse();
     return makeSearchResponse([
-      { game_name: 'Portal 2', comp_main: 25200, comp_plus: 36000 }, // 7h, 10h
+      { game_id: 42, game_name: 'Portal 2', comp_main: 25200, comp_plus: 36000 }, // 7h, 10h
     ]);
   });
 
   const result = await getHLTB('Portal 2');
-  assert.deepEqual(result, { main: 7, extra: 10 });
+  assert.deepEqual(result, { id: 42, main: 7, extra: 10, completionist: null });
 });
 
 test('getHLTB: strips trademark symbols from query', async (t) => {
@@ -227,11 +227,11 @@ test('getHLTB: picks the best match by similarity, not first result', async (t) 
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('bleed/init')) return makeInitResponse();
     return makeSearchResponse([
-      { game_name: 'Portal Stories: Mel', comp_main: 18000, comp_plus: 21600 }, // weaker match
-      { game_name: 'Portal',             comp_main:  7200, comp_plus: 14400 }, // exact match
+      { game_id: 1, game_name: 'Portal Stories: Mel', comp_main: 18000, comp_plus: 21600 }, // weaker match
+      { game_id: 2, game_name: 'Portal',              comp_main:  7200, comp_plus: 14400 }, // exact match
     ]);
   });
 
   const result = await getHLTB('Portal');
-  assert.deepEqual(result, { main: 2, extra: 4 }); // Portal's times, not Portal Stories
+  assert.deepEqual(result, { id: 2, main: 2, extra: 4, completionist: null }); // Portal's times, not Portal Stories
 });
