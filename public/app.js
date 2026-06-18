@@ -558,6 +558,12 @@ function renderPanel() {
         </div>` : ''}
       </div>
     </div>`;
+  } else if (g.details) {
+    const searchUrl = `https://howlongtobeat.com/?q=${encodeURIComponent(g.name)}`;
+    hltbHtml = `<div class="panel-section">
+      <div class="panel-section-title">How Long To Beat</div>
+      <div class="panel-no-data"><a href="${esc(searchUrl)}" target="_blank" rel="noopener">Search on HowLongToBeat ↗</a></div>
+    </div>`;
   }
 
   const tagSection = (title, items, dim) => items?.length ? `

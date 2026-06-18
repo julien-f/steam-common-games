@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Side panel: games with no HLTB match now show a "Search on HowLongToBeat ↗" link instead of a blank section
+
 ### Changed
 
 - Split `index.html` into `public/style.css` and `public/app.js` for better caching and editor tooling
