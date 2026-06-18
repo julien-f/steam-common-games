@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - Side panel "Owned by" section now shows each account's playtime (e.g. "12h") next to their name; multi-account (Steam Family) slots list each member's playtime individually
+- Side panel header image shows a shimmer skeleton while loading to prevent layout shift
 
 - `POST /api/game-details/stream` endpoint: streams per-game detail events over SSE so the frontend opens one connection per search instead of N individual requests
 
