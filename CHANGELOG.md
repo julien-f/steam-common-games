@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Side panel: ArrowUp/ArrowDown keys navigate to the previous/next game in the current group while the panel is open (skipped when focus is in a text input)
 - Side panel: Completionist playtime (HLTB `comp_100`) shown as a third HLTB column when available
 - Side panel: release date and short description from the Steam Store API shown below the game title
+- Side panel: "Owned by" section listing the player slots that own the selected game
 
 - Side panel drawer: clicking a game row (outside the Steam link) slides in a detail panel showing the Steam header image, score with review counts, HLTB playtime (with a direct ↗ link to the HowLongToBeat entry), genres, categories, developer, publisher sorted alphabetically, and links to Steam Store / SteamDB / ProtonDB; close with the × button, backdrop click, or Escape
 

@@ -1015,6 +1015,12 @@ function renderPanel() {
   const releaseDate = g.details?.meta?.releaseDate;
   const description = g.details?.meta?.description;
 
+  const ownerIndices = g.groupKey.split(',').map(Number);
+  const ownersHtml = `<div class="panel-section">
+    <div class="panel-section-title">Owned by</div>
+    <div class="panel-tags">${ownerIndices.map(i => `<span class="panel-tag">${esc(slotDisplayName(i))}</span>`).join('')}</div>
+  </div>`;
+
   let scoreHtml = '';
   if (g.loading) {
     scoreHtml = `<div class="panel-section">
@@ -1076,6 +1082,7 @@ function renderPanel() {
   document.getElementById('panel-body').innerHTML = `
     <div class="panel-title">${esc(g.name)}</div>
     ${releaseDate ? `<div class="panel-release">${esc(releaseDate)}</div>` : ''}
+    ${ownersHtml}
     ${description ? `<div class="panel-desc">${esc(description)}</div>` : ''}
     ${scoreHtml}
     ${hltbHtml}
