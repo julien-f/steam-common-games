@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Game name filter: a text search input at the top of the filter panel lets users narrow results by game title substring; the filter value is persisted in the URL (`?name=…`)
 - Single-slot mode: entering one player now shows their full library instead of requiring at least two players
 - Fetch top-10 Steam user tags per game from SteamSpy; display them in the side panel and add a Tag filter dimension (filterable/clickable like Genres and Categories)
 - Side panel: games with no HLTB match now show a "Search on HowLongToBeat ↗" link instead of a blank section

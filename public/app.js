@@ -25,6 +25,7 @@ const FILTER_DIMS = [
 const activeFilters = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set()]));
 const allOpts       = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set()]));
 const filterSearch  = Object.fromEntries(FILTER_DIMS.map(d => [d.key, '']));
+let nameFilter = '';
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
@@ -99,7 +100,8 @@ function loadFromUrl() {
       col: sortParam.startsWith('-') ? sortParam.slice(1) : sortParam,
       dir: sortParam.startsWith('-') ? -1 : 1,
     } : null;
-    findCommonGames({ pushState: false, restoreFilters, restoreSort });
+    const restoreNameFilter = params.get('name') ?? '';
+    findCommonGames({ pushState: false, restoreFilters, restoreSort, restoreNameFilter });
   } else {
     addPlayerSlot();
     addPlayerSlot();
@@ -108,6 +110,7 @@ function loadFromUrl() {
     for (const s of Object.values(activeFilters)) s.clear();
     for (const s of Object.values(allOpts)) s.clear();
     for (const k of Object.keys(filterSearch)) filterSearch[k] = '';
+    nameFilter = '';
     document.getElementById('filter-panel').innerHTML = '';
     document.getElementById('results').innerHTML = '';
     document.title = 'Steam Common Games';
@@ -200,7 +203,7 @@ function showAlert(msg, type = 'error') {
 
 // ── Main search flow ───────────────────────────────────────────────────────
 
-async function findCommonGames({ pushState = true, restoreFilters = null, restoreSort = null } = {}) {
+async function findCommonGames({ pushState = true, restoreFilters = null, restoreSort = null, restoreNameFilter = '' } = {}) {
   const inputSlots = getSlots();
   if (inputSlots.length < 1) { showAlert('Enter at least 1 Steam user.'); return; }
 
@@ -227,6 +230,7 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
   for (const s of Object.values(activeFilters)) s.clear();
   for (const s of Object.values(allOpts)) s.clear();
   for (const k of Object.keys(filterSearch)) filterSearch[k] = '';
+  nameFilter = restoreNameFilter;
   if (restoreFilters) {
     for (const [k, vals] of Object.entries(restoreFilters)) {
       for (const v of vals) activeFilters[k].add(v);
@@ -725,6 +729,7 @@ function updateFilterUrl() {
   prev.getAll('u').forEach(u => params.append('u', u));
   params.set('sort', (sortDir < 0 ? '-' : '') + sortCol);
   if (prev.has('game')) params.set('game', prev.get('game'));
+  if (nameFilter) params.set('name', nameFilter);
   // Append filter values in fixed dimension order, each sorted alphabetically
   for (const { key, param } of FILTER_DIMS) {
     [...activeFilters[key]].sort(cmp).forEach(v => params.append(param, v));
@@ -733,11 +738,13 @@ function updateFilterUrl() {
 }
 
 function hasActiveFilters() {
-  return FILTER_DIMS.some(d => activeFilters[d.key].size > 0);
+  return nameFilter !== '' || FILTER_DIMS.some(d => activeFilters[d.key].size > 0);
 }
 
 function gameMatchesFilters(game, filtersActive = hasActiveFilters()) {
   if (!filtersActive) return true;
+  if (nameFilter && !game.name.toLowerCase().includes(nameFilter.toLowerCase())) return false;
+  if (!FILTER_DIMS.some(d => activeFilters[d.key].size > 0)) return true;
   if (game.loading) return false;
   return FILTER_DIMS.every(({ key }) => {
     if (!activeFilters[key].size) return true;
@@ -831,7 +838,7 @@ function renderFilterPanel() {
   const activeDims = FILTER_DIMS.filter(d => allOpts[d.key].size > 0);
   if (!activeDims.length) return;
 
-  const totalActive = FILTER_DIMS.reduce((n, d) => n + activeFilters[d.key].size, 0);
+  const totalActive = FILTER_DIMS.reduce((n, d) => n + activeFilters[d.key].size, 0) + (nameFilter ? 1 : 0);
 
   const chips = FILTER_DIMS.flatMap(d =>
     [...activeFilters[d.key]].sort().map(v => `
@@ -848,6 +855,9 @@ function renderFilterPanel() {
         ${totalActive ? '<button class="btn btn-ghost btn-sm" id="clear-filters-btn">Clear all</button>' : ''}
       </div>
       ${chips ? `<div class="filter-chips">${chips}</div>` : ''}
+      <div class="filter-name-row">
+        <input class="filter-search filter-name-input" type="search" id="name-filter-input" placeholder="Search by name…" value="${esc(nameFilter)}">
+      </div>
       <div class="filter-dims">
         ${activeDims.map(d => `
           <div class="filter-dim">
@@ -864,6 +874,15 @@ function renderFilterPanel() {
           </div>`).join('')}
       </div>
     </div>`;
+
+  const nameInput = document.getElementById('name-filter-input');
+  if (nameInput) {
+    nameInput.addEventListener('input', () => {
+      nameFilter = nameInput.value;
+      refreshTable();
+      updateFilterUrl();
+    });
+  }
 
   document.getElementById('filter-panel').querySelectorAll('input[data-dim]').forEach(cb => {
     cb.addEventListener('change', () => {
@@ -898,6 +917,7 @@ function renderFilterPanel() {
   if (clearBtn) {
     clearBtn.addEventListener('click', () => {
       for (const s of Object.values(activeFilters)) s.clear();
+      nameFilter = '';
       refreshTable();
       updateFilterUrl();
       renderFilterPanel();

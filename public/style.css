@@ -352,6 +352,8 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   font-size: 12px;
 }
 .filter-search:focus { outline: none; border-color: var(--accent); }
+.filter-name-row { margin-bottom: 12px; }
+.filter-name-input { font-size: 14px; padding: 6px 10px; }
 
 /* Clickable rows */
 tbody tr.game-row { cursor: pointer; }
