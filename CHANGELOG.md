@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Frontend loads game details via a single SSE stream (`ReadableStream` + `fetch`) instead of a pool of concurrent `GET /api/game-details/:appid` requests; the old endpoint is unchanged and still used by direct API consumers
 
+### Fixed
+
+- Page no longer freezes while SSE detail events arrive: each event now updates only the affected row's cells instead of re-reconciling every row in every table
+
 - `CACHE_FILE` env var controls the cache file path; set to an empty string to disable disk persistence (used by the test script to prevent tests from overwriting `cache.json`)
 
 ### Fixed

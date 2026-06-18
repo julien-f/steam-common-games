@@ -861,7 +861,8 @@ async function loadAllDetails(thisRun) {
         updateProgress(loaded, games.length);
         if (games[idx].details?.meta) updateFilterOptions(games[idx].details.meta);
         if (panelGame?.appid === games[idx].appid) renderPanel();
-        refreshTable();
+        const tr = document.querySelector(`tr.game-row[data-appid="${data.appid}"]`);
+        if (tr) syncRow(tr, games[idx]);
       }
     }
   } catch {
