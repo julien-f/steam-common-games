@@ -36,4 +36,24 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
-if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, fmtH, fmtPlaytime, esc };
+function renderScoreCell(game) {
+  if (game.loading) return '<span class="sk"></span>';
+  const r = game.details?.rating;
+  return r
+    ? `<div class="score-num" style="color:${scoreColor(r.score)}">${r.score}</div><div class="score-label">${esc(r.desc)}</div>`
+    : '<span class="dim">—</span>';
+}
+
+function renderMainCell(game) {
+  if (game.loading) return '<span class="sk sm"></span>';
+  const h = game.details?.hltb;
+  return h ? fmtH(h.main) : '<span class="dim">—</span>';
+}
+
+function renderExtraCell(game) {
+  if (game.loading) return '<span class="sk sm"></span>';
+  const h = game.details?.hltb;
+  return h ? fmtH(h.extra) : '<span class="dim">—</span>';
+}
+
+if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, fmtH, fmtPlaytime, esc, renderScoreCell, renderMainCell, renderExtraCell };

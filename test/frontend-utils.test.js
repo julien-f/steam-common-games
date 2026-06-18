@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeInput, scoreColor, fmtH, esc } = require('../public/utils');
+const { normalizeInput, scoreColor, fmtH, fmtPlaytime, esc, renderScoreCell, renderMainCell, renderExtraCell } = require('../public/utils');
 
 // ── normalizeInput ────────────────────────────────────────────────────────────
 
@@ -108,4 +108,77 @@ test('esc: handles multiple special chars in one string', () => {
 
 test('esc: coerces non-string input via String()', () => {
   assert.equal(esc(42), '42');
+});
+
+// ── fmtPlaytime ───────────────────────────────────────────────────────────────
+
+test('fmtPlaytime: returns empty string for 0', () => {
+  assert.equal(fmtPlaytime(0), '');
+});
+
+test('fmtPlaytime: returns empty string for null/undefined', () => {
+  assert.equal(fmtPlaytime(null), '');
+  assert.equal(fmtPlaytime(undefined), '');
+});
+
+test('fmtPlaytime: formats minutes under an hour', () => {
+  assert.equal(fmtPlaytime(47), '47m');
+  assert.equal(fmtPlaytime(1), '1m');
+});
+
+test('fmtPlaytime: formats exactly 60 minutes as 1h', () => {
+  assert.equal(fmtPlaytime(60), '1h');
+});
+
+test('fmtPlaytime: rounds to nearest hour above 60 minutes', () => {
+  assert.equal(fmtPlaytime(90), '2h');
+  assert.equal(fmtPlaytime(120), '2h');
+});
+
+// ── renderScoreCell ───────────────────────────────────────────────────────────
+
+test('renderScoreCell: returns skeleton for loading game', () => {
+  assert.equal(renderScoreCell({ loading: true }), '<span class="sk"></span>');
+});
+
+test('renderScoreCell: returns dim dash when loaded but no rating', () => {
+  assert.equal(renderScoreCell({ loading: false, details: {} }), '<span class="dim">—</span>');
+  assert.equal(renderScoreCell({ loading: false, details: null }), '<span class="dim">—</span>');
+});
+
+test('renderScoreCell: renders score and description when rating present', () => {
+  const game = { loading: false, details: { rating: { score: 85, desc: 'Very Positive' } } };
+  const html = renderScoreCell(game);
+  assert.ok(html.includes('85'));
+  assert.ok(html.includes('Very Positive'));
+  assert.ok(html.includes('score-num'));
+  assert.ok(html.includes('#57cbde')); // score 85 → blue tier
+});
+
+// ── renderMainCell ────────────────────────────────────────────────────────────
+
+test('renderMainCell: returns small skeleton for loading game', () => {
+  assert.equal(renderMainCell({ loading: true }), '<span class="sk sm"></span>');
+});
+
+test('renderMainCell: returns dim dash when loaded but no hltb', () => {
+  assert.equal(renderMainCell({ loading: false, details: {} }), '<span class="dim">—</span>');
+});
+
+test('renderMainCell: formats main story hours', () => {
+  assert.equal(renderMainCell({ loading: false, details: { hltb: { main: 12, extra: 20 } } }), '12h');
+});
+
+// ── renderExtraCell ───────────────────────────────────────────────────────────
+
+test('renderExtraCell: returns small skeleton for loading game', () => {
+  assert.equal(renderExtraCell({ loading: true }), '<span class="sk sm"></span>');
+});
+
+test('renderExtraCell: returns dim dash when loaded but no hltb', () => {
+  assert.equal(renderExtraCell({ loading: false, details: {} }), '<span class="dim">—</span>');
+});
+
+test('renderExtraCell: formats main + extra hours', () => {
+  assert.equal(renderExtraCell({ loading: false, details: { hltb: { main: 12, extra: 25.5 } } }), '25.5h');
 });

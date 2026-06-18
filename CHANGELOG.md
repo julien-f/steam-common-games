@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Split `index.html` into `public/style.css` and `public/app.js` for better caching and editor tooling
+- Extracted `renderScoreCell`/`renderMainCell`/`renderExtraCell` helpers in `app.js` to eliminate the three-way cell-rendering duplication; simplified `rowHtml` to a one-liner wrapper over `rowCells`
+- Introduced top-level `FILTER_DIMS` constant in `app.js` to replace five separate hardcodings of the filter dimension keys, labels, and URL param names
+- `refreshTable` now computes `hasActiveFilters()` once and threads the result through `sortedGames` and `gameMatchesFilters` instead of recomputing it per game
+- Moved the player profile link style out of inline JS and into a `.slot-link` CSS class
+
 ### Added
 
 - Sort column and direction are now persisted in the URL (`sort=-score`, `sort=name`, etc.) and restored when sharing or navigating back
