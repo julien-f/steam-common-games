@@ -608,6 +608,15 @@ async function fetchDetails(idx, thisRun) {
   const g = games[idx];
   try {
     const res = await fetch(`/api/game-details/${g.appid}?name=${encodeURIComponent(g.name)}`);
+    if (res.status === 429) {
+      // Rate limited (large cold library). Wait out the window and retry once.
+      if (thisRun !== runId) return;
+      const wait = (Number(res.headers.get('retry-after')) || 30) * 1000;
+      await new Promise(r => setTimeout(r, wait));
+      if (thisRun !== runId) return;
+      return fetchDetails(idx, thisRun);
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`); // e.g. 502 — body is an error, not details
     const data = await res.json();
     games[idx].details = data;
   } catch {
