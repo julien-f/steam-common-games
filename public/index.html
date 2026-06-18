@@ -970,25 +970,6 @@ function rowHtml(game) {
   </tr>`;
 }
 
-function updateRow(idx) {
-  const game = games[idx];
-  if (panelGame?.appid === game.appid) { panelGame = game; renderPanel(); }
-  const row = document.querySelector(`tr.game-row[data-appid="${game.appid}"]`);
-  if (row) {
-    const r = game.details?.rating;
-    const h = game.details?.hltb;
-    const cells = row.cells;
-    if (r) {
-      cells[1].innerHTML = `<div class="score-num" style="color:${scoreColor(r.score)}">${r.score}</div><div class="score-label">${esc(r.desc)}</div>`;
-    } else {
-      cells[1].innerHTML = '<span class="dim">—</span>';
-    }
-    cells[2].innerHTML = h ? fmtH(h.main)  : '<span class="dim">—</span>';
-    cells[3].innerHTML = h ? fmtH(h.extra) : '<span class="dim">—</span>';
-  }
-  if (game.details?.meta) updateFilterOptions(game.details.meta);
-}
-
 function updateProgress(loaded, total) {
   const bar = document.getElementById('prog-bar');
   const txt = document.getElementById('prog-text');
@@ -1156,12 +1137,10 @@ function refreshTable() {
   for (const group of groups) {
     const key = group.userIndices.join(',');
     const tbody = document.getElementById(`tbody-${key}`);
-    if (tbody) {
-      const rows = sortedGames(key);
-      tbody.innerHTML = rows.map(rowHtml).join('');
-      const groupEl = document.getElementById(`group-${key}`);
-      if (groupEl) groupEl.style.display = rows.length === 0 ? 'none' : '';
-    }
+    if (!tbody) continue;
+    reconcileTbody(tbody, sortedGames(key));
+    const groupEl = document.getElementById(`group-${key}`);
+    if (groupEl) groupEl.style.display = tbody.childElementCount === 0 ? 'none' : '';
   }
 
   const countEl = document.getElementById('results-count');
@@ -1171,6 +1150,85 @@ function refreshTable() {
       ? `${filtered} / ${games.length} shared games`
       : `${games.length} shared games`;
   }
+}
+
+// Reconcile a tbody's rows against a desired ordered game list.
+// Reuses existing <tr> nodes (moves/updates them) rather than replacing innerHTML,
+// so in-flight click events always target a live DOM node.
+function reconcileTbody(tbody, desired) {
+  // Index existing rows by appid for O(1) lookup.
+  const existing = new Map();
+  for (const tr of tbody.querySelectorAll('tr.game-row')) {
+    existing.set(Number(tr.dataset.appid), tr);
+  }
+
+  // Insert/move rows into the correct order.
+  for (let i = 0; i < desired.length; i++) {
+    const game = desired[i];
+    let tr = existing.get(game.appid);
+    if (!tr) {
+      tr = document.createElement('tr');
+      tr.className = 'game-row';
+      tr.dataset.appid = game.appid;
+    }
+    syncRow(tr, game); // always sync content and active state
+    // Move to the correct position if needed (insertBefore is a no-op when the
+    // node is already in the right place in the same parent).
+    const current = tbody.children[i];
+    if (current !== tr) tbody.insertBefore(tr, current ?? null);
+    existing.delete(game.appid);
+  }
+
+  // Remove rows that are no longer in the desired list.
+  for (const tr of existing.values()) tr.remove();
+}
+
+// Update an existing <tr>'s cells and active state in place.
+function syncRow(tr, game) {
+  const active = panelGame?.appid === game.appid;
+  tr.classList.toggle('active', active);
+  const cells = tr.cells;
+  if (!cells.length) { tr.innerHTML = rowCells(game); return; }
+
+  const storeUrl = `https://store.steampowered.com/app/${game.appid}`;
+  cells[0].innerHTML = `<a href="${storeUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(game.name)}</a>`;
+
+  if (game.loading) {
+    cells[1].innerHTML = '<span class="sk"></span>';
+    cells[2].innerHTML = '<span class="sk sm"></span>';
+    cells[3].innerHTML = '<span class="sk sm"></span>';
+  } else {
+    const r = game.details?.rating;
+    const h = game.details?.hltb;
+    cells[1].innerHTML = r
+      ? `<div class="score-num" style="color:${scoreColor(r.score)}">${r.score}</div><div class="score-label">${esc(r.desc)}</div>`
+      : '<span class="dim">—</span>';
+    cells[2].innerHTML = h ? fmtH(h.main)  : '<span class="dim">—</span>';
+    cells[3].innerHTML = h ? fmtH(h.extra) : '<span class="dim">—</span>';
+  }
+}
+
+// Render the four <td> cells for a new <tr> (active class is set by syncRow).
+function rowCells(game) {
+  const storeUrl = `https://store.steampowered.com/app/${game.appid}`;
+  let scoreCell, mainCell, extraCell;
+  if (game.loading) {
+    scoreCell = '<span class="sk"></span>';
+    mainCell  = '<span class="sk sm"></span>';
+    extraCell = '<span class="sk sm"></span>';
+  } else {
+    const r = game.details?.rating;
+    const h = game.details?.hltb;
+    scoreCell = r
+      ? `<div class="score-num" style="color:${scoreColor(r.score)}">${r.score}</div><div class="score-label">${esc(r.desc)}</div>`
+      : '<span class="dim">—</span>';
+    mainCell  = h ? fmtH(h.main)  : '<span class="dim">—</span>';
+    extraCell = h ? fmtH(h.extra) : '<span class="dim">—</span>';
+  }
+  return `<td class="td-name"><a href="${storeUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(game.name)}</a></td>
+    <td class="td-score">${scoreCell}</td>
+    <td class="td-hltb">${mainCell}</td>
+    <td class="td-hltb">${extraCell}</td>`;
 }
 
 // ── Sorting ────────────────────────────────────────────────────────────────
