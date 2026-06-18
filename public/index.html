@@ -448,12 +448,13 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   gap: 6px;
 }
 .panel-section-title a {
-  font-size: 10px;
-  color: var(--text2);
+  font-size: inherit;
+  color: inherit;
   text-decoration: none;
-  opacity: 0.7;
+  border-bottom: 1px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
 }
-.panel-section-title a:hover { color: var(--accent2); opacity: 1; }
+.panel-section-title a:hover { color: var(--accent2); border-bottom-color: var(--accent2); }
 
 .panel-score-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
 .panel-score-num { font-size: 32px; font-weight: 700; line-height: 1; }
@@ -552,7 +553,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('panel-backdrop').addEventListener('click', closePanel);
   document.getElementById('panel-close').addEventListener('click', closePanel);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closePanel(); return; }
+    if (!panelGame || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    e.preventDefault();
+    const list = sortedGames(panelGame.groupKey);
+    const idx = list.findIndex(g => g.appid === panelGame.appid);
+    const next = e.key === 'ArrowDown' ? idx + 1 : idx - 1;
+    if (next >= 0 && next < list.length) openPanel(list[next]);
+  });
 
   fetch('/api/health').then(r => r.json()).then(d => {
     if (!d.configured) {
@@ -1016,7 +1027,7 @@ function renderPanel() {
   } else if (h) {
     const hltbUrl = h.id ? `https://howlongtobeat.com/game/${h.id}` : null;
     hltbHtml = `<div class="panel-section">
-      <div class="panel-section-title">How Long To Beat${hltbUrl ? ` <a href="${esc(hltbUrl)}" target="_blank" rel="noopener">↗</a>` : ''}</div>
+      <div class="panel-section-title">${hltbUrl ? `<a href="${esc(hltbUrl)}" target="_blank" rel="noopener">How Long To Beat ↗</a>` : 'How Long To Beat'}</div>
       <div class="panel-hltb">
         <div class="panel-hltb-item">
           <div class="panel-hltb-label">Main Story</div>
