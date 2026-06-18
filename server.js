@@ -21,6 +21,13 @@ const HOST = process.env.HOST || '127.0.0.1';
 const PORT = process.env.PORT || 3000;
 const MAX_USERS = Number(process.env.MAX_USERS || 10);
 const TRUST_PROXY = process.env.TRUST_PROXY;
+const SEARCH_RATE_LIMIT_MAX = Number(process.env.SEARCH_RATE_LIMIT_MAX || 10);
+const DETAILS_RATE_LIMIT_MAX = Number(process.env.DETAILS_RATE_LIMIT_MAX || 300);
+
+// Rate limiting is bypassed under NODE_ENV=test so the suite isn't throttled,
+// unless a test opts in with RATE_LIMIT_ENABLED=true to exercise the limiter.
+const rateLimitBypassed = () =>
+  process.env.NODE_ENV === 'test' && process.env.RATE_LIMIT_ENABLED !== 'true';
 
 const app = express();
 if (TRUST_PROXY !== undefined) app.set('trust proxy', TRUST_PROXY);
@@ -31,21 +38,30 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Stricter limit for searches — each uncached user triggers Steam API calls
 const searchLimit = rateLimit({
   windowMs: 60 * 1000,
-  max: 10,
+  max: SEARCH_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many searches. Please wait a minute and try again.' },
-  skip: () => process.env.NODE_ENV === 'test',
+  skip: () => rateLimitBypassed(),
 });
 
-// Generous limit for details — responses are almost always served from cache
+// The details limit exists to throttle upstream Steam/HLTB calls. Cache hits make
+// no upstream calls, so they must not count — otherwise a refresh of an already
+// loaded comparison (all cache hits) burns the budget and 429s itself.
 const detailsLimit = rateLimit({
   windowMs: 60 * 1000,
-  max: 300,
+  max: DETAILS_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Please wait a minute and try again.' },
-  skip: () => process.env.NODE_ENV === 'test',
+  skip: (req) => {
+    if (rateLimitBypassed()) return true;
+    const appid = Number(req.params.appid);
+    if (!Number.isInteger(appid) || appid <= 0) return false;
+    return getCached(`rating:${appid}`) !== undefined
+        && getCached(`hltb:${appid}`)   !== undefined
+        && getCached(`meta:${appid}`)   !== undefined;
+  },
 });
 
 app.get('/api/health', (_req, res) => {

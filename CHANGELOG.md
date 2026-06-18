@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Game-details rate limiter no longer counts cache hits. The limit exists to throttle upstream Steam/HLTB calls, but it previously counted every request equally — so refreshing an already-loaded comparison (all cache hits) could exhaust the budget and `429` itself, leaving rows blank. Cache hits now bypass the limiter entirely
 - Cache loader now distinguishes `ENOENT` (expected on first run) from other errors (JSON parse failure, I/O error); non-ENOENT errors are logged as warnings instead of silently discarded, preventing a corrupted `cache.json` from resetting the cache without any indication
 - Cache loader now falls back to `cache.json.tmp` if `cache.json` fails to load, recovering entries from the last in-progress write
 
@@ -15,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Filter panel: each dimension (Genre, Category, Developer, Publisher) now has a live search box to narrow down long option lists
 - Steam store API calls (`getGameRating`, `getAppDetails`) now go through a semaphore (max 2 concurrent) and retry up to twice on 429 responses, with `Retry-After`-aware delay or exponential backoff
+- Per-IP rate limits are now configurable via `SEARCH_RATE_LIMIT_MAX` (default 10/min) and `DETAILS_RATE_LIMIT_MAX` (default 300/min)
 
 ### Changed
 
