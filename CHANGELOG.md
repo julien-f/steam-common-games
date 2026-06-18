@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Filter panel: active filters are shown as removable chips (e.g. "Genre: Action ×") between the header and the dimension columns, making the active set immediately scannable without hunting through checkboxes
 - Filter panel: each dimension (Genre, Category, Developer, Publisher) now has a live search box to narrow down long option lists
 - Steam store API calls (`getGameRating`, `getAppDetails`) now go through a semaphore (max 2 concurrent) and retry up to twice on 429 responses, with `Retry-After`-aware delay or exponential backoff
 - Per-IP rate limits are now configurable via `SEARCH_RATE_LIMIT_MAX` (default 10/min) and `DETAILS_RATE_LIMIT_MAX` (default 300/min)
