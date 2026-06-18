@@ -431,8 +431,21 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   font-size: 17px;
   font-weight: 700;
   color: var(--text0);
-  margin-bottom: 18px;
+  margin-bottom: 4px;
   line-height: 1.35;
+}
+
+.panel-release {
+  font-size: 12px;
+  color: var(--text2);
+  margin-bottom: 10px;
+}
+
+.panel-desc {
+  font-size: 12px;
+  color: var(--text1);
+  line-height: 1.5;
+  margin-bottom: 18px;
 }
 
 .panel-section { margin-bottom: 18px; }
@@ -996,9 +1009,11 @@ function renderPanel() {
   const h = g.details?.hltb;
   const meta = g.details?.meta;
 
-  const storeUrl = `https://store.steampowered.com/app/${g.appid}`;
+  const storeUrl   = `https://store.steampowered.com/app/${g.appid}`;
   const steamdbUrl = `https://www.steamdb.info/app/${g.appid}/`;
   const protondbUrl = `https://www.protondb.com/app/${g.appid}`;
+  const releaseDate = g.details?.meta?.releaseDate;
+  const description = g.details?.meta?.description;
 
   let scoreHtml = '';
   if (g.loading) {
@@ -1060,6 +1075,8 @@ function renderPanel() {
 
   document.getElementById('panel-body').innerHTML = `
     <div class="panel-title">${esc(g.name)}</div>
+    ${releaseDate ? `<div class="panel-release">${esc(releaseDate)}</div>` : ''}
+    ${description ? `<div class="panel-desc">${esc(description)}</div>` : ''}
     ${scoreHtml}
     ${hltbHtml}
     ${metaHtml}
