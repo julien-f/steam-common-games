@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Side panel: open state is reflected in the URL as `?game=<appid>`; sharing or reloading the URL restores the panel for that game automatically
 - Side panel: ArrowUp/ArrowDown keys navigate to the previous/next game in the current group while the panel is open (skipped when focus is in a text input)
 - Side panel: Completionist playtime (HLTB `comp_100`) shown as a third HLTB column when available
 - Side panel: release date and short description from the Steam Store API shown below the game title
@@ -19,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Side panel no longer stays stuck on skeleton/loading state after game details finish loading: `fetchDetails` now calls `renderPanel()` directly when the loaded game is the currently-open one; filter tag buttons in the panel are no longer replaced mid-click by a concurrent detail load
 - HLTB search now normalizes Unicode (e.g. `Ö` → `O`) before building search terms and computing similarity, so games with diacritics in their title (e.g. "Öoo") match the correct HLTB entry instead of a spurious one
 
 - Filters and sort order are now applied immediately as each game's details load: loading games are excluded from active filters (previously shown as matching), and each completed detail fetch triggers a full `refreshTable()` re-sort/re-filter instead of an in-place cell patch

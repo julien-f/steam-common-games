@@ -781,8 +781,9 @@ async function findCommonGames({ pushState = true, restoreFilters = null } = {})
     slots = data.slots || [];
 
     renderPage();
+    restorePanelFromUrl();
     await loadAllDetails(thisRun);
-    if (thisRun === runId) refreshTable();
+    if (thisRun === runId) { refreshTable(); restorePanelFromUrl(); }
   } catch (err) {
     if (thisRun !== runId) return;
     showAlert(err.message);
@@ -844,6 +845,7 @@ async function fetchDetails(idx, thisRun) {
   games[idx].loading = false;
   if (thisRun === runId) {
     if (games[idx].details?.meta) updateFilterOptions(games[idx].details.meta);
+    if (panelGame?.appid === games[idx].appid) renderPanel();
     refreshTable();
   }
 }
@@ -1013,6 +1015,7 @@ function openPanel(game) {
   document.getElementById('game-panel').classList.add('open');
   document.getElementById('panel-backdrop').classList.add('open');
   refreshTable(); // re-render rows so the active highlight appears
+  setPanelParam(game.appid);
 }
 
 function closePanel() {
@@ -1021,6 +1024,24 @@ function closePanel() {
   document.getElementById('game-panel').classList.remove('open');
   document.getElementById('panel-backdrop').classList.remove('open');
   refreshTable(); // remove active highlight
+  setPanelParam(null);
+}
+
+function setPanelParam(appid) {
+  const params = new URLSearchParams(location.search);
+  if (appid == null) {
+    params.delete('game');
+  } else {
+    params.set('game', appid);
+  }
+  history.replaceState(null, '', `?${params}`);
+}
+
+function restorePanelFromUrl() {
+  const appid = Number(new URLSearchParams(location.search).get('game'));
+  if (!appid) return;
+  const game = games.find(g => g.appid === appid);
+  if (game && panelGame?.appid !== appid) openPanel(game);
 }
 
 function renderPanel() {
@@ -1142,10 +1163,6 @@ function refreshTable() {
       if (groupEl) groupEl.style.display = rows.length === 0 ? 'none' : '';
     }
   }
-  if (panelGame) {
-    const fresh = games.find(g => g.appid === panelGame.appid);
-    if (fresh && fresh !== panelGame) { panelGame = fresh; renderPanel(); }
-  }
 
   const countEl = document.getElementById('results-count');
   if (countEl) {
@@ -1190,7 +1207,9 @@ function updateFilterUrl() {
   const cmp = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
   const params = new URLSearchParams();
   // Preserve current player slots as-is — already canonical from the last pushState
-  new URLSearchParams(location.search).getAll('u').forEach(u => params.append('u', u));
+  const prev = new URLSearchParams(location.search);
+  prev.getAll('u').forEach(u => params.append('u', u));
+  if (prev.has('game')) params.set('game', prev.get('game'));
   // Append filter values in fixed dimension order, each sorted alphabetically
   for (const [param, key] of [['genre','genres'],['cat','categories'],['dev','developers'],['pub','publishers']]) {
     [...activeFilters[key]].sort(cmp).forEach(v => params.append(param, v));
