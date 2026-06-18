@@ -1007,6 +1007,7 @@ function updateProgress(loaded, total) {
 
 function openPanel(game) {
   panelGame = game;
+  document.getElementById('panel-body').scrollTop = 0;
   const img = document.getElementById('panel-img');
   img.style.display = '';
   img.classList.add('loading');
