@@ -499,8 +499,8 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   height: 100%;
   object-fit: cover;
   display: block;
+  cursor: zoom-in;
 }
-.panel-hero-img--shot { cursor: zoom-in; }
 .panel-hero-img.loading {
   background: linear-gradient(90deg, var(--bg1) 25%, #3a5870 50%, var(--bg1) 75%);
   background-size: 600px 100%;

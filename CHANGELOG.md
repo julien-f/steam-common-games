@@ -22,7 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Mobile: lightbox screenshot fills the full viewport (100vw × 100vh) with no padding or rounded corners — swipe navigation replaces the need for margin around the nav buttons
 - Lightbox: requests the Fullscreen API on open (hides browser chrome for more screen real estate); exits fullscreen on close and when the user dismisses fullscreen via browser controls
-- Side panel: hero image area becomes a carousel — banner first, then screenshots; a thumbnail filmstrip below the hero makes all images immediately visible and clickable; prev/next overlay buttons (visible on hover) remain for sequential navigation; clicking a screenshot in the hero opens the fullscreen lightbox
+- Side panel: hero image area becomes a carousel — banner first, then screenshots; a thumbnail filmstrip below the hero makes all images immediately visible and clickable; prev/next overlay buttons (visible on hover) remain for sequential navigation; clicking any image in the hero (banner or screenshot) opens the fullscreen lightbox
 - Mobile: swipe left/right on the hero image to navigate screenshots; swipe left/right in the lightbox to navigate, swipe down to close
 - Side panel: Metacritic score shown below the Wilson score, with a link to the Metacritic page; separated by a divider when both scores are present
 - Mobile layout: `@media (max-width: 768px)` breakpoint with reduced container padding, smaller header, tighter card padding, 44px touch targets for remove/nav/close buttons, reduced table column min-widths, halved family-row indent, full-width side panel drawer, wrapped player row (Steam Family button moves below the input line), and 16px input font-size to prevent iOS Safari auto-zoom

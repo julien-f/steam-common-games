@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (thumb) { heroIdx = Number(thumb.dataset.idx); renderPanelHero(); return; }
     if (e.target.closest('.panel-hero-prev')) { heroIdx = Math.max(0, heroIdx - 1); renderPanelHero(); return; }
     if (e.target.closest('.panel-hero-next')) { heroIdx++; renderPanelHero(); return; }
-    if (e.target.closest('.panel-hero-img') && heroIdx > 0) openLightbox(heroIdx - 1);
+    if (e.target.closest('.panel-hero-img')) openLightbox(heroIdx);
   });
 
   document.getElementById('game-panel').addEventListener('click', e => {
@@ -534,8 +534,9 @@ function getLightbox() {
 }
 
 function openLightbox(idx) {
-  lightboxShots = panelGame?.details?.meta?.screenshots || [];
-  if (!lightboxShots.length) return;
+  const bannerUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${panelGame.appid}/header.jpg`;
+  const shots = panelGame?.details?.meta?.screenshots || [];
+  lightboxShots = [{ full: bannerUrl }, ...shots];
   lightboxIdx = idx;
   renderLightbox();
   const lb = getLightbox();
