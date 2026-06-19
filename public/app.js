@@ -67,9 +67,18 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { if (lightboxShots.length) { closeLightbox(); return; } closePanel(); return; }
-    if (!panelGame || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    if (!panelGame) return;
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !lightboxShots.length) {
+      const total = (panelGame.details?.meta?.screenshots?.length || 0) + 1;
+      if (total <= 1) return;
+      e.preventDefault();
+      heroIdx = (heroIdx + (e.key === 'ArrowRight' ? 1 : -1) + total) % total;
+      renderPanelHero();
+      return;
+    }
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
     e.preventDefault();
     const list = sortedGames(panelGame.groupKey);
     const idx = list.findIndex(g => g.appid === panelGame.appid);

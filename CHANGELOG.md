@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - Side panel: "Owned by" now shows individual Steam accounts as separate chips instead of merging all accounts in a slot into one
+- Side panel: left/right arrow keys now scroll through screenshots in the hero carousel (when the lightbox is closed); up/down continue to navigate between games
 
 ### Added
 
