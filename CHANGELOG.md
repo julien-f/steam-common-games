@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Lightbox: screenshots now expand to fill up to 96 vw × 92 vh instead of being capped at 1280 px wide
+
 ### Added
 
 - Side panel: mousewheel scrolling on the thumbnails filmstrip now scrolls horizontally

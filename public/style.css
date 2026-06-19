@@ -727,8 +727,8 @@ body.lb-open { overflow: hidden; }
 }
 .lb-img {
   position: relative;
-  max-width: min(1280px, 92vw);
-  max-height: 85vh;
+  max-width: 96vw;
+  max-height: 92vh;
   width: auto;
   height: auto;
   object-fit: contain;
@@ -738,8 +738,8 @@ body.lb-open { overflow: hidden; }
 }
 .lb-video {
   position: relative;
-  max-width: min(1280px, 92vw);
-  max-height: 85vh;
+  max-width: 96vw;
+  max-height: 92vh;
   border-radius: 4px;
   box-shadow: 0 8px 40px rgba(0,0,0,0.6);
   display: none;
