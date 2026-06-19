@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Mobile layout: `@media (max-width: 768px)` breakpoint with reduced container padding, smaller header, tighter card padding, 44px touch targets for remove/nav/close buttons, reduced table column min-widths, halved family-row indent, full-width side panel drawer, wrapped player row (Steam Family button moves below the input line), and 16px input font-size to prevent iOS Safari auto-zoom
+
 ### Fixed
 
 - Tags in the side panel now appear in SteamSpy popularity order instead of alphabetically, so the most representative tags appear first

@@ -55,6 +55,7 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
 .user-row { display: flex; gap: 8px; align-items: center; }
 .user-row input {
   flex: 1;
+  min-width: 0;
   padding: 9px 12px;
   background: var(--bg0);
   border: 1px solid var(--border);
@@ -437,6 +438,29 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 
 @media (min-width: 1400px) {
   .game-panel { width: min(480px, 30vw); }
+}
+
+@media (max-width: 768px) {
+  .container { padding: 18px 14px 40px; }
+  header { margin-bottom: 20px; }
+  header h1 { font-size: 20px; }
+  .card { padding: 14px 16px; }
+  .game-group { margin-bottom: 20px; }
+  .btn-remove { width: 44px; height: 44px; line-height: 42px; }
+  .panel-nav-btn { width: 44px; height: 44px; }
+  .panel-close { width: 36px; height: 36px; line-height: 36px; font-size: 20px; }
+  .td-name { min-width: 140px; }
+  .td-score { min-width: 70px; }
+  .td-hltb { min-width: 60px; }
+  .family-row { padding-left: 20px; }
+  .family-hint { padding-left: 20px; }
+  .game-panel { width: 100vw; }
+  /* Prevent iOS Safari from zooming on input focus */
+  .user-row input, .filter-search, .filter-name-input { font-size: 16px; }
+  /* Move the Steam Family button below the input+remove row */
+  .user-row { flex-wrap: wrap; }
+  .user-row .btn-remove { order: 1; }
+  .user-row .btn-add-family { order: 2; flex-basis: 100%; }
 }
 
 .panel-close {
