@@ -583,8 +583,12 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 .panel-no-data a:hover { color: var(--accent2); border-bottom-color: var(--accent2); }
 
 .panel-score-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.panel-score-row--mc { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 .panel-score-num { font-size: 32px; font-weight: 700; line-height: 1; }
+.panel-score-num--mc { color: var(--text0); }
 .panel-score-desc { font-size: 13px; color: var(--text1); }
+.panel-score-desc a { color: var(--text1); text-decoration: none; border-bottom: 1px solid transparent; transition: color 0.15s, border-color 0.15s; }
+.panel-score-desc a:hover { color: var(--accent2); border-bottom-color: var(--accent2); }
 .panel-reviews { font-size: 12px; color: var(--text1); }
 
 .panel-hltb { display: flex; gap: 24px; }

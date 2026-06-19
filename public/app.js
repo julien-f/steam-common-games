@@ -614,21 +614,30 @@ function renderPanel() {
     }).join('')}</div>
   </div>`;
 
+  const mc = meta?.metacritic;
   let scoreHtml = '';
   if (g.loading) {
     scoreHtml = `<div class="panel-section">
       <div class="panel-section-title">Score</div>
       <span class="sk" style="width:64px;height:32px;border-radius:4px"></span>
     </div>`;
-  } else if (r) {
-    const pct = r.total ? Math.round(r.positive / r.total * 100) : 0;
-    scoreHtml = `<div class="panel-section">
-      <div class="panel-section-title">Score</div>
+  } else if (r || mc) {
+    const pct = r?.total ? Math.round(r.positive / r.total * 100) : 0;
+    const wilsonHtml = r ? `
       <div class="panel-score-row">
         <div class="panel-score-num" style="color:${scoreColor(r.score)}">${r.score}</div>
         <div class="panel-score-desc">${esc(r.desc)}</div>
       </div>
-      <div class="panel-reviews">${r.positive.toLocaleString()} of ${r.total.toLocaleString()} reviews positive (${pct}%)</div>
+      <div class="panel-reviews">${r.positive.toLocaleString()} of ${r.total.toLocaleString()} reviews positive (${pct}%)</div>` : '';
+    const mcHtml = mc ? `
+      <div class="panel-score-row panel-score-row--mc">
+        <div class="panel-score-num panel-score-num--mc">${mc.score}</div>
+        <div class="panel-score-desc">${mc.url ? `<a href="${esc(mc.url)}" target="_blank" rel="noopener">Metacritic ↗</a>` : 'Metacritic'}</div>
+      </div>` : '';
+    scoreHtml = `<div class="panel-section">
+      <div class="panel-section-title">Score</div>
+      ${wilsonHtml}
+      ${mcHtml}
     </div>`;
   }
 
