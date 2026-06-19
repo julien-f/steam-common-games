@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 
 - `getAppDetails` was missing `metacritic` and `screenshots` fields from the return value when called with an empty data object (pre-existing test bug)
+- Steam store API circuit breaker: 2 consecutive 403 responses now block all further store API calls (ratings and metadata) for 5 minutes; a single 403 is still allowed through to avoid false-positives on per-game blocks (removed/region-locked titles)
 
 ### Added
 
