@@ -8,8 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- "How it works" explainer card shown on initial load (no URL params), with three numbered steps explaining players, repeating for each person, and Steam Family merging; hidden once a search runs and restored when navigating back to the empty state
-- Player slot card: subtitle explains that each row is one player's library; "+" button now reads "+ Steam Family" with a tooltip describing the merge; a contextual hint ("Their library will be merged into this slot before comparing.") appears below the slot when a family member row is added
+- "How it works" explainer card shown on initial load (no URL params), with three numbered steps explaining players, the single-vs-multi mode, and Steam Family merging; hidden once a search runs and restored when navigating back to the empty state
+- Player slot card: subtitle ("One player: browse their full library. Multiple players: find games everyone owns.") makes the two modes explicit; "+" button now reads "+ Steam Family" with a tooltip describing the merge; a contextual hint appears below the slot when a family member row is added
+- Search button label is now dynamic: "Show Library" with one slot, "Find Common Games" with two or more; updates live as players are added or removed
 
 ### Changed
 

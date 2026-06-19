@@ -120,6 +120,11 @@ function loadFromUrl() {
 
 // ── Player slot input rows ─────────────────────────────────────────────────
 
+function updateSearchBtn() {
+  const multi = document.querySelectorAll('.player-slot').length > 1;
+  document.getElementById('search-btn').textContent = multi ? 'Find Common Games' : 'Show Library';
+}
+
 function addPlayerSlot(accounts = ['']) {
   const container = document.getElementById('user-inputs');
   const slot = document.createElement('div');
@@ -145,7 +150,7 @@ function addPlayerSlot(accounts = ['']) {
   removeSlotBtn.title = 'Remove player';
   removeSlotBtn.textContent = '×';
   removeSlotBtn.addEventListener('click', () => {
-    if (document.querySelectorAll('.player-slot').length > 1) slot.remove();
+    if (document.querySelectorAll('.player-slot').length > 1) { slot.remove(); updateSearchBtn(); }
   });
 
   primaryRow.appendChild(input);
@@ -161,6 +166,7 @@ function addPlayerSlot(accounts = ['']) {
   for (let i = 1; i < accounts.length; i++) addFamilyMember(slot, accounts[i]);
 
   container.appendChild(slot);
+  updateSearchBtn();
   if (!accounts[0]) input.focus();
 }
 
