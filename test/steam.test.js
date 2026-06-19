@@ -15,17 +15,20 @@ function makeReviewResponse(total, positive, desc = 'Very Positive') {
 }
 
 test('getGameRating: throws when fetch fails', async (t) => {
+  _reset();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
   await assert.rejects(() => getGameRating(400), err => err.isUpstream === true);
 });
 
 test('getGameRating: returns null when there are no reviews', async (t) => {
+  _reset();
   t.mock.method(globalThis, 'fetch', async () => makeReviewResponse(0, 0));
   const result = await getGameRating(400);
   assert.equal(result, null);
 });
 
 test('getGameRating: returns correct shape', async (t) => {
+  _reset();
   t.mock.method(globalThis, 'fetch', async () => makeReviewResponse(1000, 900, 'Very Positive'));
   const result = await getGameRating(400);
   assert.equal(typeof result.score, 'number');
@@ -36,6 +39,7 @@ test('getGameRating: returns correct shape', async (t) => {
 
 test('getGameRating: Wilson score is lower than raw ratio', async (t) => {
   // Wilson score accounts for uncertainty, so it's always below pos/total
+  _reset();
   t.mock.method(globalThis, 'fetch', async () => makeReviewResponse(1000, 900, 'Very Positive'));
   const result = await getGameRating(400);
   const rawRatio = Math.round((900 / 1000) * 100); // 90
@@ -43,12 +47,14 @@ test('getGameRating: Wilson score is lower than raw ratio', async (t) => {
 });
 
 test('getGameRating: score is within valid range', async (t) => {
+  _reset();
   t.mock.method(globalThis, 'fetch', async () => makeReviewResponse(1000, 900, 'Very Positive'));
   const result = await getGameRating(400);
   assert.ok(result.score >= 0 && result.score <= 100, `score out of range: ${result.score}`);
 });
 
 test('getGameRating: higher positive ratio yields higher score', async (t) => {
+  _reset();
   let callCount = 0;
   t.mock.method(globalThis, 'fetch', async () => {
     callCount++;
@@ -64,6 +70,7 @@ test('getGameRating: higher positive ratio yields higher score', async (t) => {
 
 test('getGameRating: more reviews tightens the confidence interval', async (t) => {
   // Same 80% ratio but 10 vs 10000 reviews — larger sample → score closer to raw ratio
+  _reset();
   let callCount = 0;
   t.mock.method(globalThis, 'fetch', async () => {
     callCount++;
@@ -266,11 +273,13 @@ function make429Response() {
 }
 
 test('getAppDetails: throws when fetch fails', async (t) => {
+  _reset();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
   await assert.rejects(() => getAppDetails(400), err => err.isUpstream === true);
 });
 
 test('getGameRating: retries on 429 and succeeds on third attempt', async (t) => {
+  _reset();
   let callCount = 0;
   t.mock.method(globalThis, 'fetch', async () => {
     callCount++;
@@ -282,6 +291,7 @@ test('getGameRating: retries on 429 and succeeds on third attempt', async (t) =>
 });
 
 test('getGameRating: throws isUpstream after exhausting 429 retries', async (t) => {
+  _reset();
   t.mock.method(globalThis, 'fetch', async () => make429Response());
   await assert.rejects(
     () => getGameRating(400),
@@ -290,6 +300,7 @@ test('getGameRating: throws isUpstream after exhausting 429 retries', async (t) 
 });
 
 test('getAppDetails: retries on 429 and succeeds on third attempt', async (t) => {
+  _reset();
   let callCount = 0;
   t.mock.method(globalThis, 'fetch', async () => {
     callCount++;
@@ -303,11 +314,13 @@ test('getAppDetails: retries on 429 and succeeds on third attempt', async (t) =>
 });
 
 test('getAppDetails: returns null when success is false', async (t) => {
+  _reset();
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, null));
   assert.equal(await getAppDetails(400), null);
 });
 
 test('getAppDetails: returns genres, categories, developers and publishers', async (t) => {
+  _reset();
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {
     genres:     [{ id: '1', description: 'Action' }, { id: '25', description: 'Adventure' }],
     categories: [{ id: '9', description: 'Co-op' }],
@@ -322,13 +335,15 @@ test('getAppDetails: returns genres, categories, developers and publishers', asy
 });
 
 test('getAppDetails: handles missing optional fields with empty arrays', async (t) => {
+  _reset();
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
-  assert.deepEqual(await getAppDetails(400), { genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null });
+  assert.deepEqual(await getAppDetails(400), { genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, metacritic: null, screenshots: [] });
 });
 
 // ── getSteamSpyTags ───────────────────────────────────────────────────────────
 
 test('getSteamSpyTags: returns top 10 tags sorted by vote count descending', async (t) => {
+  _reset();
   const rawTags = Object.fromEntries(
     Array.from({ length: 15 }, (_, i) => [`Tag${i}`, (15 - i) * 100])
   );
@@ -344,6 +359,7 @@ test('getSteamSpyTags: returns top 10 tags sorted by vote count descending', asy
 });
 
 test('getSteamSpyTags: returns correct tag names in vote-count order', async (t) => {
+  _reset();
   t.mock.method(globalThis, 'fetch', async () => ({
     ok: true,
     json: async () => ({ tags: { 'RPG': 500, 'Action': 9000, 'Indie': 3000 } }),
@@ -354,6 +370,7 @@ test('getSteamSpyTags: returns correct tag names in vote-count order', async (t)
 });
 
 test('getSteamSpyTags: returns empty array when tags field is missing', async (t) => {
+  _reset();
   t.mock.method(globalThis, 'fetch', async () => ({
     ok: true,
     json: async () => ({ appid: 400, name: 'Portal' }),
@@ -364,6 +381,7 @@ test('getSteamSpyTags: returns empty array when tags field is missing', async (t
 });
 
 test('getSteamSpyTags: returns empty array when tags is empty object', async (t) => {
+  _reset();
   t.mock.method(globalThis, 'fetch', async () => ({
     ok: true,
     json: async () => ({ tags: {} }),
@@ -374,6 +392,7 @@ test('getSteamSpyTags: returns empty array when tags is empty object', async (t)
 });
 
 test('getSteamSpyTags: throws isUpstream when fetch fails', async (t) => {
+  _reset();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
   await assert.rejects(() => getSteamSpyTags(400), err => err.isUpstream === true);
 });

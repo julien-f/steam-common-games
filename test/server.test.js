@@ -212,21 +212,21 @@ test('GET /api/game-details/-1: 400 for negative appid', async () => {
 
 test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) => {
   _reset();
-  const rating = { score: 88, desc: 'Very Positive', positive: 900, total: 1000 };
-  const hltb   = { main: 10, extra: 15 };
-  const meta   = { genres: ['Action'], categories: ['Co-op'], developers: ['Valve'], publishers: ['Valve'] };
-  const tags   = ['Action', 'Co-op'];
-  setCache('rating:400', rating);
-  setCache('hltb:400', hltb);
-  setCache('meta:400', meta);
-  setCache('tags:400', tags);
+  setCache('rating:400', { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
+  setCache('hltb:400',   [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
+  setCache('meta:400',   { genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] });
+  setCache('tags:400',   { 'Action': 9054, 'Co-op': 4532 });
 
   let fetchCalled = false;
   t.mock.method(globalThis, 'fetch', async () => { fetchCalled = true; });
 
-  const res = await api.get('/api/game-details/400');
+  const res = await api.get('/api/game-details/400?name=Portal');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, { rating, hltb, meta, tags });
+  assert.equal(res.body.rating?.total, 1000);
+  assert.equal(res.body.rating?.desc, 'Very Positive');
+  assert.equal(res.body.hltb?.main, 10);
+  assert.deepEqual(res.body.meta?.genres, ['Action']);
+  assert.deepEqual(res.body.tags, ['Action', 'Co-op']);
   assert.equal(fetchCalled, false);
 });
 
@@ -283,10 +283,8 @@ test('GET /api/game-details/:appid: 200 with null tags when SteamSpy fetch fails
 test('GET /api/game-details/:appid: only fetches sources not already cached', async (t) => {
   _reset();
   _resetAuth();
-  const rating = { score: 88, desc: 'Very Positive', positive: 900, total: 1000 };
-  const meta   = { genres: ['Action'], categories: ['Co-op'], developers: ['Valve'], publishers: ['Valve'] };
-  setCache('rating:405', rating);
-  setCache('meta:405', meta);
+  setCache('rating:405', { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
+  setCache('meta:405',   { genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] });
 
   let fetchedUrls = [];
   t.mock.method(globalThis, 'fetch', async (url) => {
@@ -299,8 +297,8 @@ test('GET /api/game-details/:appid: only fetches sources not already cached', as
 
   const res = await api.get('/api/game-details/405?name=Portal');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body.rating, rating);
-  assert.deepEqual(res.body.meta, meta);
+  assert.equal(res.body.rating?.total, 1000);
+  assert.deepEqual(res.body.meta?.genres, ['Action']);
   assert.equal(res.body.hltb?.main, 10);
   assert.ok(Array.isArray(res.body.tags));
   assert.ok(!fetchedUrls.some(u => u.includes('appreviews')), 'rating should not be re-fetched');
@@ -487,18 +485,18 @@ test('POST /api/game-details/stream: 400 for invalid appid in list', async () =>
 
 test('POST /api/game-details/stream: streams one event per game plus a done event from cache', async (t) => {
   _reset();
-  const rating = { score: 88, desc: 'Very Positive', positive: 900, total: 1000 };
-  const hltb   = { main: 10, extra: 15 };
-  const meta   = { genres: ['Action'], categories: ['Co-op'], developers: ['Valve'], publishers: ['Valve'] };
-  const tags   = ['Action', 'Co-op'];
-  setCache('rating:400', rating);
-  setCache('hltb:400', hltb);
-  setCache('meta:400', meta);
-  setCache('tags:400', tags);
-  setCache('rating:401', rating);
-  setCache('hltb:401', hltb);
-  setCache('meta:401', meta);
-  setCache('tags:401', tags);
+  const rawRating = { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' };
+  const rawHltb   = [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }];
+  const rawMeta   = { genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] };
+  const rawTags   = { 'Action': 9054, 'Co-op': 4532 };
+  setCache('rating:400', rawRating);
+  setCache('hltb:400',   rawHltb);
+  setCache('meta:400',   rawMeta);
+  setCache('tags:400',   rawTags);
+  setCache('rating:401', rawRating);
+  setCache('hltb:401',   rawHltb);
+  setCache('meta:401',   rawMeta);
+  setCache('tags:401',   rawTags);
 
   const server = app.listen(0);
   t.after(() => new Promise(r => server.close(r)));

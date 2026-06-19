@@ -47,10 +47,10 @@ test('details limiter: counts cache misses but never counts cache hits', async (
   t.mock.method(globalThis, 'fetch', workingDetailsFetch(fetchedAppids));
 
   // Pre-cache appid 800 fully — this one should always be served.
-  setCache('rating:800', { score: 88, desc: 'Very Positive', positive: 900, total: 1000 });
-  setCache('hltb:800', { main: 10, extra: 15 });
-  setCache('meta:800', { genres: [], categories: [], developers: [], publishers: [] });
-  setCache('tags:800', ['Action']);
+  setCache('rating:800', { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
+  setCache('hltb:800',   [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
+  setCache('meta:800',   { genres: [], categories: [], developers: [], publishers: [] });
+  setCache('tags:800',   { 'Action': 9054 });
 
   // Three uncached appids consume the budget (max = 3).
   for (const appid of [801, 802, 803]) {

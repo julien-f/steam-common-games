@@ -10,6 +10,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Side panel: "Owned by" now shows individual Steam accounts as separate chips instead of merging all accounts in a slot into one
 - Side panel: left/right arrow keys now scroll through screenshots in the hero carousel (when the lightbox is closed); up/down continue to navigate between games
+- Cache now stores raw API responses (Steam reviews, app details, SteamSpy tags, HLTB search results) and applies field extraction at read time; adding new fields from any upstream source no longer requires cache invalidation
+- `getGameRating`, `getAppDetails`, and `getSteamSpyTags` now manage their own cache entries (previously handled by `server.js`); `getHLTB` gains an `appid` parameter for the same reason
+- Cache schema version bumped to 2 — existing `cache.json` files are discarded automatically on first startup after upgrade (one-time migration)
+
+### Fixed
+
+- `getAppDetails` was missing `metacritic` and `screenshots` fields from the return value when called with an empty data object (pre-existing test bug)
 
 ### Added
 

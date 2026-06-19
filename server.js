@@ -11,7 +11,7 @@ const morgan = require('morgan');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 
-const { getCached, setCache, getCacheStats } = require('./lib/cache');
+const { getCached, getCacheStats } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
 const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
@@ -149,40 +149,23 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
 const dedupDetails = createDedup();
 
 function fetchGameDetails(appid, name) {
-  const ratingKey = `rating:${appid}`;
-  const hltbKey   = `hltb:${appid}`;
-  const metaKey   = `meta:${appid}`;
-  const tagsKey   = `tags:${appid}`;
-
-  const cachedRating = getCached(ratingKey);
-  const cachedHltb   = getCached(hltbKey);
-  const cachedMeta   = getCached(metaKey);
-  const cachedTags   = getCached(tagsKey);
-
-  if (cachedRating !== undefined && cachedHltb !== undefined && cachedMeta !== undefined && cachedTags !== undefined) {
-    return Promise.resolve({ rating: cachedRating, hltb: cachedHltb, meta: cachedMeta, tags: cachedTags });
-  }
-
   return dedupDetails(`details:${appid}`, () =>
     Promise.allSettled([
-      cachedRating !== undefined ? Promise.resolve(cachedRating) : getGameRating(appid),
-      cachedHltb   !== undefined ? Promise.resolve(cachedHltb)   : getHLTB(name),
-      cachedMeta   !== undefined ? Promise.resolve(cachedMeta)   : getAppDetails(appid),
-      cachedTags   !== undefined ? Promise.resolve(cachedTags)   : getSteamSpyTags(appid),
+      getGameRating(appid),
+      getHLTB(appid, name),
+      getAppDetails(appid),
+      getSteamSpyTags(appid),
     ]).then(([ratingRes, hltbRes, metaRes, tagsRes]) => {
       if (ratingRes.status === 'rejected') console.warn('[game-details] rating:', ratingRes.reason?.message);
       if (hltbRes.status   === 'rejected') console.warn('[game-details] hltb:',   hltbRes.reason?.message);
       if (metaRes.status   === 'rejected') console.warn('[game-details] meta:',   metaRes.reason?.message);
       if (tagsRes.status   === 'rejected') console.warn('[game-details] tags:',   tagsRes.reason?.message);
-      const rating = ratingRes.status === 'fulfilled' ? ratingRes.value : null;
-      const hltb   = hltbRes.status   === 'fulfilled' ? hltbRes.value   : null;
-      const meta   = metaRes.status   === 'fulfilled' ? metaRes.value   : null;
-      const tags   = tagsRes.status   === 'fulfilled' ? tagsRes.value   : null;
-      if (ratingRes.status === 'fulfilled') setCache(ratingKey, rating);
-      if (hltbRes.status   === 'fulfilled') setCache(hltbKey, hltb);
-      if (metaRes.status   === 'fulfilled') setCache(metaKey, meta);
-      if (tagsRes.status   === 'fulfilled') setCache(tagsKey, tags);
-      return { rating, hltb, meta, tags };
+      return {
+        rating: ratingRes.status === 'fulfilled' ? ratingRes.value : null,
+        hltb:   hltbRes.status   === 'fulfilled' ? hltbRes.value   : null,
+        meta:   metaRes.status   === 'fulfilled' ? metaRes.value   : null,
+        tags:   tagsRes.status   === 'fulfilled' ? tagsRes.value   : null,
+      };
     })
   );
 }

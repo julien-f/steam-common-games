@@ -3,6 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { levenshtein, stringSimilarity, getHLTB, buildSearchTerms, _resetAuth } = require('../lib/hltb');
+const { _reset } = require('../lib/cache');
 
 // ── levenshtein ───────────────────────────────────────────────────────────
 
@@ -96,23 +97,23 @@ function makeSearchResponse(results) {
 }
 
 test('getHLTB: returns null for empty name', async () => {
-  _resetAuth();
-  const result = await getHLTB('');
+  _reset(); _resetAuth();
+  const result = await getHLTB(1, '');
   assert.equal(result, null);
 });
 
 test('getHLTB: returns null without fetching when name is only stripped symbols', async (t) => {
-  _resetAuth();
+  _reset(); _resetAuth();
   let fetchCalled = false;
   t.mock.method(globalThis, 'fetch', async () => { fetchCalled = true; });
 
-  const result = await getHLTB('™®©');
+  const result = await getHLTB(1, '™®©');
   assert.equal(result, null);
   assert.equal(fetchCalled, false);
 });
 
 test('getHLTB: returns main and extra hours on match', async (t) => {
-  _resetAuth();
+  _reset(); _resetAuth();
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('bleed/init')) return makeInitResponse();
     return makeSearchResponse([
@@ -120,12 +121,12 @@ test('getHLTB: returns main and extra hours on match', async (t) => {
     ]);
   });
 
-  const result = await getHLTB('Portal 2');
+  const result = await getHLTB(1, 'Portal 2');
   assert.deepEqual(result, { id: 42, main: 7, extra: 10, completionist: null });
 });
 
 test('getHLTB: strips trademark symbols from query', async (t) => {
-  _resetAuth();
+  _reset(); _resetAuth();
   let capturedBody;
   t.mock.method(globalThis, 'fetch', async (url, opts) => {
     if (url.includes('bleed/init')) return makeInitResponse();
@@ -135,12 +136,12 @@ test('getHLTB: strips trademark symbols from query', async (t) => {
     ]);
   });
 
-  await getHLTB('Hades™');
+  await getHLTB(1, 'Hades™');
   assert.deepEqual(capturedBody.searchTerms, ['Hades']);
 });
 
 test('getHLTB: returns null when best match is below 0.35 similarity', async (t) => {
-  _resetAuth();
+  _reset(); _resetAuth();
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('bleed/init')) return makeInitResponse();
     return makeSearchResponse([
@@ -148,82 +149,82 @@ test('getHLTB: returns null when best match is below 0.35 similarity', async (t)
     ]);
   });
 
-  const result = await getHLTB('Portal');
+  const result = await getHLTB(1, 'Portal');
   assert.equal(result, null);
 });
 
 test('getHLTB: returns null when no results', async (t) => {
-  _resetAuth();
+  _reset(); _resetAuth();
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('bleed/init')) return makeInitResponse();
     return makeSearchResponse([]);
   });
 
-  const result = await getHLTB('Portal');
+  const result = await getHLTB(1, 'Portal');
   assert.equal(result, null);
 });
 
 test('getHLTB: 401 does not set retry cooldown — init is retried immediately', async (t) => {
-  _resetAuth();
+  _reset(); _resetAuth();
   let initCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('bleed/init')) { initCalls++; return makeInitResponse(); }
     return { ok: false, status: 401 };
   });
 
-  await assert.rejects(() => getHLTB('Portal'));
+  await assert.rejects(() => getHLTB(1, 'Portal'));
   assert.equal(initCalls, 1);
 
   // 401 clears the token but must not set the failure cooldown — init must be called again
-  await assert.rejects(() => getHLTB('Portal'));
+  await assert.rejects(() => getHLTB(1, 'Portal'));
   assert.equal(initCalls, 2, 'init should be retried immediately after a 401, no cooldown');
 });
 
 test('getHLTB: throws and clears auth on 401', async (t) => {
-  _resetAuth();
+  _reset(); _resetAuth();
   let initCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('bleed/init')) { initCalls++; return makeInitResponse(); }
     return { ok: false, status: 401 };
   });
 
-  await assert.rejects(() => getHLTB('Portal'));
+  await assert.rejects(() => getHLTB(1, 'Portal'));
 
   // On the next call, auth should have been cleared so init is called again
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('bleed/init')) { initCalls++; return makeInitResponse(); }
     return makeSearchResponse([{ game_name: 'Portal', comp_main: 7200, comp_plus: 18000 }]);
   });
-  await getHLTB('Portal');
+  await getHLTB(1, 'Portal');
   assert.equal(initCalls, 2, 'expected init to be called again after 401');
 });
 
 test('getHLTB: throws when init fails', async (t) => {
-  _resetAuth();
+  _reset(); _resetAuth();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
 
-  await assert.rejects(() => getHLTB('Portal'), err => /auth unavailable/i.test(err.message));
+  await assert.rejects(() => getHLTB(1, 'Portal'), err => /auth unavailable/i.test(err.message));
 });
 
 test('getHLTB: skips init retry within 30s cooldown after failed init', async (t) => {
-  _resetAuth();
+  _reset(); _resetAuth();
   let initCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('bleed/init')) { initCalls++; return { ok: false, status: 503 }; }
     return makeSearchResponse([]);
   });
 
-  await assert.rejects(() => getHLTB('Portal'));
+  await assert.rejects(() => getHLTB(1, 'Portal'));
   assert.equal(initCalls, 1);
 
   // Second call is within the 30s window — init must not be retried
-  await assert.rejects(() => getHLTB('Portal'));
+  await assert.rejects(() => getHLTB(1, 'Portal'));
   assert.equal(initCalls, 1, 'init should not be retried within cooldown window');
   _resetAuth();
 });
 
 test('getHLTB: picks the best match by similarity, not first result', async (t) => {
-  _resetAuth();
+  _reset(); _resetAuth();
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('bleed/init')) return makeInitResponse();
     return makeSearchResponse([
@@ -232,6 +233,6 @@ test('getHLTB: picks the best match by similarity, not first result', async (t) 
     ]);
   });
 
-  const result = await getHLTB('Portal');
+  const result = await getHLTB(1, 'Portal');
   assert.deepEqual(result, { id: 2, main: 2, extra: 4, completionist: null }); // Portal's times, not Portal Stories
 });
