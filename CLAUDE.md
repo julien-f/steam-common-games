@@ -16,15 +16,21 @@ The server binds to `http://127.0.0.1:3000` by default. All settings live in `.e
 
 - **`server.js`** — Express setup and route handlers only.
 - **`lib/cache.js`** — Persistent cache (`getCached`, `setCache`), disk I/O, process exit hooks.
-- **`lib/steam.js`** — Steam API calls (`resolveSteamId`, `getOwnedGames`, `getPlayerSummaries`, `getGameRating`).
+- **`lib/config.js`** — TTL constants (`CACHE_TTL_MS`, `DETAILS_CACHE_TTL_MS`) shared across modules.
+- **`lib/dedup.js`** — In-flight request deduplicator (`createDedup`): concurrent calls for the same key share one promise.
+- **`lib/steam.js`** — Steam API calls (`resolveSteamId`, `getOwnedGames`, `getPlayerSummaries`, `getGameRating`, `getAppDetails`, `getSteamSpyTags`).
 - **`lib/hltb.js`** — HLTB auth + search (`getHLTB`), plus exported `stringSimilarity` and `levenshtein` for unit testing.
-- **`public/index.html`** — Single-page frontend (vanilla JS, no framework). All CSS and JS are inline.
+- **`lib/groupGames.js`** — Groups slot libraries by exact ownership set (`groupByOwnership`).
+- **`public/index.html`** — Single-page frontend shell (vanilla JS, no framework).
+- **`public/app.js`** — Main frontend JS (split from `index.html`).
+- **`public/utils.js`** — Shared utilities (`normalizeInput`, `scoreColor`, `fmtH`, `esc`); also exported for Node unit tests.
+- **`public/style.css`** — All page styles (split from `index.html`).
 
 ### Request flow
 
 1. Frontend POSTs `{ slots: [["alice", "bob_family"], ["charlie"]] }` to `/api/common-games`. Each slot is a logical player — multiple accounts in a slot have their libraries unioned before comparison (Steam Family simulation). Legacy `{ users: [...] }` is also accepted and treated as single-account slots.
 2. Server resolves every identifier to a Steam64 ID, deduplicates within each slot, fetches all libraries in one parallel pass, unions libraries per slot, groups games by exact set of slot owners, returns `{ groups, slots }`.
-3. Frontend renders groups immediately (one table per owner set, from most owners to fewest), then fires up to 5 concurrent requests to `/api/game-details/:appid?name=...` to load rating and HLTB data progressively.
+3. Frontend renders groups immediately (one table per owner set, from most owners to fewest), then POSTs the full game list to `POST /api/game-details/stream` (SSE endpoint) to load rating, HLTB, store metadata, and tags progressively in a single connection. The legacy `GET /api/game-details/:appid` endpoint still exists for direct API consumers.
 
 ### Ratings — Wilson score
 
@@ -47,7 +53,7 @@ The cache is an in-memory `Map` backed by `cache.json` (written with a 5 s debou
 
 | Key prefix | TTL env var | Default | Reason |
 |---|---|---|---|
-| `resolve:`, `details:` | `DETAILS_CACHE_TTL_MINUTES` | 7 days | Stable data |
+| `resolve:`, `rating:`, `hltb:`, `meta:`, `tags:` | `DETAILS_CACHE_TTL_MINUTES` | 7 days | Stable data |
 | `games:`, `player:` | `CACHE_TTL_MINUTES` | 60 min | Changes when users buy games |
 
 Delete `cache.json` to force a full refresh.

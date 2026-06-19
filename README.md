@@ -45,7 +45,12 @@ Cache is stored in `cache.json` (gitignored). Delete it to force a full refresh.
 
 - **`server.js`** — Express routes
 - **`lib/cache.js`** — Disk-persistent cache with TTL
+- **`lib/config.js`** — Shared TTL constants
+- **`lib/dedup.js`** — In-flight request deduplicator
 - **`lib/steam.js`** — Steam API + Wilson score rating
 - **`lib/hltb.js`** — HowLongToBeat search (direct API, no npm package)
 - **`lib/groupGames.js`** — Groups libraries by owner set
-- **`public/index.html`** — Single-file frontend (vanilla JS, no framework)
+- **`public/index.html`** — Frontend shell (vanilla JS, no framework)
+- **`public/app.js`** — Main frontend logic
+- **`public/utils.js`** — Shared utilities (also unit-tested in Node)
+- **`public/style.css`** — Page styles
