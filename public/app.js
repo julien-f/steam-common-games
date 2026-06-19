@@ -92,6 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       heroIdx = (heroIdx + (e.key === 'ArrowRight' ? 1 : -1) + total) % total;
       renderPanelHero();
+      document.getElementById('panel-hero').querySelector('.panel-hero-img')?.focus();
       return;
     }
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
@@ -99,7 +100,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const list = sortedGames(panelGame.groupKey);
     const idx = list.findIndex(g => g.appid === panelGame.appid);
     const next = (idx + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
+    const lightboxWasOpen = lightboxShots.length > 0;
     openPanel(list[next]);
+    if (lightboxWasOpen) openLightbox(0);
   });
 
   fetch('/api/health').then(r => r.json()).then(d => {
