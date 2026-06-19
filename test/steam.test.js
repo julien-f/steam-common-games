@@ -337,7 +337,31 @@ test('getAppDetails: returns genres, categories, developers and publishers', asy
 test('getAppDetails: handles missing optional fields with empty arrays', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
-  assert.deepEqual(await getAppDetails(400), { genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, metacritic: null, screenshots: [] });
+  assert.deepEqual(await getAppDetails(400), { genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, metacritic: null, movies: [], screenshots: [] });
+});
+
+test('getAppDetails: extracts movies with hls field', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {
+    movies: [
+      { id: 1, name: 'Trailer', thumbnail: 'https://example.com/thumb.jpg', hls_h264: 'https://example.com/vid.m3u8', highlight: true },
+      { id: 2, name: 'Gameplay', thumbnail: 'https://example.com/thumb2.jpg', highlight: false },
+    ],
+  }));
+  const result = await getAppDetails(400);
+  assert.equal(result.movies.length, 2);
+  assert.equal(result.movies[0].thumbnail, 'https://example.com/thumb.jpg');
+  assert.equal(result.movies[0].hls, 'https://example.com/vid.m3u8');
+  assert.equal(result.movies[1].hls, null);
+});
+
+test('getAppDetails: caps movies at 5', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {
+    movies: Array.from({ length: 8 }, (_, i) => ({ id: i, name: `T${i}`, thumbnail: '', hls_h264: `https://example.com/${i}.m3u8` })),
+  }));
+  const result = await getAppDetails(400);
+  assert.equal(result.movies.length, 5);
 });
 
 // ── getSteamSpyTags ───────────────────────────────────────────────────────────

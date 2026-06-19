@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('panel-backdrop').addEventListener('click', closePanel);
   document.getElementById('panel-close').addEventListener('click', closePanel);
   document.getElementById('panel-hero').addEventListener('click', e => {
-    const thumb = e.target.closest('.panel-film-thumb');
+    const thumb = e.target.closest('.panel-film-item');
     if (thumb) { heroIdx = Number(thumb.dataset.idx); renderPanelHero(); return; }
     if (e.target.closest('.panel-hero-prev')) { heroIdx = Math.max(0, heroIdx - 1); renderPanelHero(); return; }
     if (e.target.closest('.panel-hero-next')) { heroIdx++; renderPanelHero(); return; }
@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !lightboxShots.length) {
-      const total = (panelGame.details?.meta?.screenshots?.length || 0) + 1;
+      const total = 1 + (panelGame.details?.meta?.movies?.length || 0) + (panelGame.details?.meta?.screenshots?.length || 0);
       if (total <= 1) return;
       e.preventDefault();
       heroIdx = (heroIdx + (e.key === 'ArrowRight' ? 1 : -1) + total) % total;
@@ -491,6 +491,30 @@ function updateProgress(loaded, total) {
   }
 }
 
+// ── Video playback (HLS) ───────────────────────────────────────────────────
+
+function playHls(videoEl, src) {
+  if (!src) return;
+  if (videoEl._hls) { videoEl._hls.destroy(); videoEl._hls = null; }
+  if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+    videoEl.src = src;
+    videoEl.play().catch(() => {});
+  } else if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+    const hls = new Hls({ autoStartLoad: true, startLevel: -1 });
+    hls.loadSource(src);
+    hls.attachMedia(videoEl);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => videoEl.play().catch(() => {}));
+    videoEl._hls = hls;
+  }
+}
+
+function stopHls(videoEl) {
+  if (!videoEl) return;
+  videoEl.pause();
+  if (videoEl._hls) { videoEl._hls.destroy(); videoEl._hls = null; }
+  videoEl.removeAttribute('src');
+}
+
 // ── Screenshot lightbox ────────────────────────────────────────────────────
 
 function getLightbox() {
@@ -502,6 +526,7 @@ function getLightbox() {
     <div class="lb-backdrop"></div>
     <button class="lb-btn lb-prev" aria-label="Previous screenshot">&#8249;</button>
     <img class="lb-img" src="" alt="Screenshot">
+    <video class="lb-video" controls playsinline></video>
     <button class="lb-btn lb-next" aria-label="Next screenshot">&#8250;</button>
     <button class="lb-close" aria-label="Close lightbox">&#215;</button>
     <div class="lb-counter"></div>`;
@@ -536,7 +561,12 @@ function getLightbox() {
 function openLightbox(idx) {
   const bannerUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${panelGame.appid}/header.jpg`;
   const shots = panelGame?.details?.meta?.screenshots || [];
-  lightboxShots = [{ full: bannerUrl }, ...shots];
+  const movies = panelGame?.details?.meta?.movies || [];
+  lightboxShots = [
+    { type: 'image', main: bannerUrl },
+    ...movies.map(m => ({ type: 'video', hls: m.hls })),
+    ...shots.map(s => ({ type: 'image', main: s.full })),
+  ];
   lightboxIdx = idx;
   renderLightbox();
   const lb = getLightbox();
@@ -547,6 +577,7 @@ function openLightbox(idx) {
 
 function closeLightbox() {
   lightboxShots = [];
+  stopHls(document.querySelector('#screenshot-lightbox .lb-video'));
   getLightbox().classList.remove('open');
   document.body.classList.remove('lb-open');
   if (document.fullscreenElement || document.webkitFullscreenElement) {
@@ -562,7 +593,18 @@ function stepLightbox(dir) {
 function renderLightbox() {
   const lb = getLightbox();
   const shot = lightboxShots[lightboxIdx];
-  lb.querySelector('.lb-img').src = shot.full;
+  const img = lb.querySelector('.lb-img');
+  const vid = lb.querySelector('.lb-video');
+  if (shot.type === 'video') {
+    img.style.display = 'none';
+    vid.style.display = 'block';
+    playHls(vid, shot.hls);
+  } else {
+    stopHls(vid);
+    vid.style.display = 'none';
+    img.style.display = 'block';
+    img.src = shot.main;
+  }
   lb.querySelector('.lb-counter').textContent = `${lightboxIdx + 1} / ${lightboxShots.length}`;
   lb.querySelector('.lb-prev').disabled = lightboxShots.length <= 1;
   lb.querySelector('.lb-next').disabled = lightboxShots.length <= 1;
@@ -573,37 +615,51 @@ function renderLightbox() {
 function renderPanelHero() {
   if (!panelGame) return;
   const hero = document.getElementById('panel-hero');
+  stopHls(hero.querySelector('video'));
   const bannerUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${panelGame.appid}/header.jpg`;
   const shots = panelGame.details?.meta?.screenshots || [];
-  const images = [
-    { main: bannerUrl, thumb: bannerUrl },
-    ...shots.map(s => ({ main: s.full, thumb: s.thumbnail })),
+  const movies = panelGame.details?.meta?.movies || [];
+  const items = [
+    { type: 'image', main: bannerUrl, thumb: bannerUrl },
+    ...movies.map(m => ({ type: 'video', hls: m.hls, thumb: m.thumbnail })),
+    ...shots.map(s => ({ type: 'image', main: s.full, thumb: s.thumbnail })),
   ];
-  heroIdx = Math.max(0, Math.min(heroIdx, images.length - 1));
-  const { main: src } = images[heroIdx];
-  const hasMany = images.length > 1;
+  heroIdx = Math.max(0, Math.min(heroIdx, items.length - 1));
+  const current = items[heroIdx];
+  const hasMany = items.length > 1;
   const isShot = heroIdx > 0;
+  const cls = `panel-hero-img${isShot ? ' panel-hero-img--shot' : ''}`;
+
+  const mainHtml = current.type === 'video'
+    ? `<video class="${cls}" muted loop playsinline></video>`
+    : `<img class="${cls}" src="${esc(current.main)}" alt="${esc(panelGame.name)}">`;
 
   hero.innerHTML = `
     <div class="panel-hero-main">
-      <img class="panel-hero-img${isShot ? ' panel-hero-img--shot' : ''}" src="${esc(src)}" alt="${esc(panelGame.name)}">
+      ${mainHtml}
       ${hasMany ? `
         <button class="panel-hero-btn panel-hero-prev"${heroIdx <= 0 ? ' disabled' : ''} aria-label="Previous">&#8249;</button>
-        <button class="panel-hero-btn panel-hero-next"${heroIdx >= images.length - 1 ? ' disabled' : ''} aria-label="Next">&#8250;</button>
+        <button class="panel-hero-btn panel-hero-next"${heroIdx >= items.length - 1 ? ' disabled' : ''} aria-label="Next">&#8250;</button>
       ` : ''}
     </div>
     ${hasMany ? `
-      <div class="panel-filmstrip">${images.map((img, i) =>
-        `<img class="panel-film-thumb${i === heroIdx ? ' active' : ''}" src="${esc(img.thumb)}" data-idx="${i}" alt="${i === 0 ? esc(panelGame.name) : `Screenshot ${i}`}" loading="lazy">`
+      <div class="panel-filmstrip">${items.map((item, i) =>
+        `<span class="panel-film-item${i === heroIdx ? ' active' : ''}${item.type === 'video' ? ' is-video' : ''}" data-idx="${i}">` +
+        `<img class="panel-film-thumb" src="${esc(item.thumb)}" alt="${i === 0 ? esc(panelGame.name) : (item.type === 'video' ? `Video ${i}` : `Screenshot ${i}`)}" loading="lazy">` +
+        `</span>`
       ).join('')}</div>
     ` : ''}`;
 
-  const mainImg = hero.querySelector('.panel-hero-img');
-  mainImg.classList.add('loading');
-  mainImg.onload  = () => mainImg.classList.remove('loading');
-  mainImg.onerror = () => { hero.style.display = 'none'; };
+  const heroEl = hero.querySelector('.panel-hero-img');
+  if (current.type === 'video') {
+    playHls(heroEl, current.hls);
+  } else {
+    heroEl.classList.add('loading');
+    heroEl.onload  = () => heroEl.classList.remove('loading');
+    heroEl.onerror = () => { hero.style.display = 'none'; };
+  }
 
-  hero.querySelector('.panel-film-thumb.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  hero.querySelector('.panel-film-item.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
 }
 
 function openPanel(game) {

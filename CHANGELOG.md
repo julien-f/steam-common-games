@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Side panel and lightbox now show Steam trailer videos (from the store API `movies` field) between the banner and screenshots; videos autoplay muted in the carousel and play with sound/controls in the lightbox; filmstrip thumbnails for videos show a ▶ play icon overlay
+
 ### Changed
 
 - Side panel: "Owned by" now shows individual Steam accounts as separate chips instead of merging all accounts in a slot into one
