@@ -47,10 +47,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('panel-backdrop').addEventListener('click', closePanel);
   document.getElementById('panel-close').addEventListener('click', closePanel);
   document.getElementById('panel-hero').addEventListener('click', e => {
+    const thumb = e.target.closest('.panel-film-thumb');
+    if (thumb) { heroIdx = Number(thumb.dataset.idx); renderPanelHero(); return; }
     if (e.target.closest('.panel-hero-prev')) { heroIdx = Math.max(0, heroIdx - 1); renderPanelHero(); return; }
     if (e.target.closest('.panel-hero-next')) { heroIdx++; renderPanelHero(); return; }
-    const dot = e.target.closest('.panel-hero-dot');
-    if (dot) { heroIdx = [...dot.parentElement.children].indexOf(dot); renderPanelHero(); return; }
     if (e.target.closest('.panel-hero-img') && heroIdx > 0) openLightbox(heroIdx - 1);
   });
 
@@ -537,26 +537,35 @@ function renderPanelHero() {
   const hero = document.getElementById('panel-hero');
   const bannerUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${panelGame.appid}/header.jpg`;
   const shots = panelGame.details?.meta?.screenshots || [];
-  const images = [bannerUrl, ...shots.map(s => s.full)];
+  const images = [
+    { main: bannerUrl, thumb: bannerUrl },
+    ...shots.map(s => ({ main: s.full, thumb: s.thumbnail })),
+  ];
   heroIdx = Math.max(0, Math.min(heroIdx, images.length - 1));
-  const src = images[heroIdx];
+  const { main: src } = images[heroIdx];
   const hasMany = images.length > 1;
   const isShot = heroIdx > 0;
 
   hero.innerHTML = `
-    <img class="panel-hero-img${isShot ? ' panel-hero-img--shot' : ''}" src="${esc(src)}" alt="${esc(panelGame.name)}">
+    <div class="panel-hero-main">
+      <img class="panel-hero-img${isShot ? ' panel-hero-img--shot' : ''}" src="${esc(src)}" alt="${esc(panelGame.name)}">
+      ${hasMany ? `
+        <button class="panel-hero-btn panel-hero-prev"${heroIdx <= 0 ? ' disabled' : ''} aria-label="Previous">&#8249;</button>
+        <button class="panel-hero-btn panel-hero-next"${heroIdx >= images.length - 1 ? ' disabled' : ''} aria-label="Next">&#8250;</button>
+      ` : ''}
+    </div>
     ${hasMany ? `
-      <button class="panel-hero-btn panel-hero-prev"${heroIdx <= 0 ? ' disabled' : ''} aria-label="Previous">&#8249;</button>
-      <button class="panel-hero-btn panel-hero-next"${heroIdx >= images.length - 1 ? ' disabled' : ''} aria-label="Next">&#8250;</button>
-      <div class="panel-hero-dots">${images.map((_, i) =>
-        `<span class="panel-hero-dot${i === heroIdx ? ' active' : ''}"></span>`
+      <div class="panel-filmstrip">${images.map((img, i) =>
+        `<img class="panel-film-thumb${i === heroIdx ? ' active' : ''}" src="${esc(img.thumb)}" data-idx="${i}" alt="${i === 0 ? esc(panelGame.name) : `Screenshot ${i}`}" loading="lazy">`
       ).join('')}</div>
     ` : ''}`;
 
-  const img = hero.querySelector('.panel-hero-img');
-  img.classList.add('loading');
-  img.onload  = () => img.classList.remove('loading');
-  img.onerror = () => { hero.style.display = 'none'; };
+  const mainImg = hero.querySelector('.panel-hero-img');
+  mainImg.classList.add('loading');
+  mainImg.onload  = () => mainImg.classList.remove('loading');
+  mainImg.onerror = () => { hero.style.display = 'none'; };
+
+  hero.querySelector('.panel-film-thumb.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
 }
 
 function openPanel(game) {
