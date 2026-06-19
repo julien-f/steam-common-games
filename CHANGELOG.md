@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Side panel: focus now lands on the hero image when the panel opens, instead of the close button
+
 ### Added
 
 - Game table: show a small capsule thumbnail per game, lazy-loaded as rows scroll into view

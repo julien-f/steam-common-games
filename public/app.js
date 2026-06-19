@@ -727,7 +727,7 @@ function openPanel(game) {
   document.getElementById('game-panel').classList.add('open');
   document.getElementById('panel-backdrop').classList.add('open');
   document.querySelector('.container').inert = true;
-  document.getElementById('panel-close').focus();
+  (document.getElementById('panel-hero').querySelector('.panel-hero-img') ?? document.getElementById('panel-close')).focus();
   refreshTable(); // re-render rows so the active highlight appears
   document.getElementById(`tbody-${game.groupKey}`)?.querySelector(`tr.game-row[data-appid="${game.appid}"]`)?.scrollIntoView({ block: 'nearest' });
   setPanelParam(game.appid);
