@@ -56,6 +56,12 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('panel-hero').addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.closest('.panel-hero-img')) { e.preventDefault(); openLightbox(heroIdx); }
   });
+  document.getElementById('panel-hero').addEventListener('wheel', e => {
+    const strip = e.target.closest('.panel-filmstrip');
+    if (!strip) return;
+    e.preventDefault();
+    strip.scrollLeft += e.deltaY || e.deltaX;
+  }, { passive: false });
 
   document.getElementById('game-panel').addEventListener('click', e => {
     const btn = e.target.closest('.panel-tag-btn');
