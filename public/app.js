@@ -113,6 +113,7 @@ function loadFromUrl() {
     nameFilter = '';
     document.getElementById('filter-panel').innerHTML = '';
     document.getElementById('results').innerHTML = '';
+    document.getElementById('how-it-works').hidden = false;
     document.title = 'Steam Common Games';
   }
 }
@@ -135,8 +136,8 @@ function addPlayerSlot(accounts = ['']) {
 
   const addFamilyBtn = document.createElement('button');
   addFamilyBtn.className = 'btn-add-family';
-  addFamilyBtn.title = 'Add a family member who shares their library with this player';
-  addFamilyBtn.textContent = '+';
+  addFamilyBtn.title = 'Add a Steam Family Sharing account — their library will be merged into this player\'s slot';
+  addFamilyBtn.textContent = '+ Steam Family';
   addFamilyBtn.addEventListener('click', () => addFamilyMember(slot));
 
   const removeSlotBtn = document.createElement('button');
@@ -151,6 +152,11 @@ function addPlayerSlot(accounts = ['']) {
   primaryRow.appendChild(addFamilyBtn);
   primaryRow.appendChild(removeSlotBtn);
   slot.appendChild(primaryRow);
+
+  const familyHint = document.createElement('p');
+  familyHint.className = 'family-hint';
+  familyHint.textContent = 'Their library will be merged into this slot before comparing.';
+  slot.appendChild(familyHint);
 
   for (let i = 1; i < accounts.length; i++) addFamilyMember(slot, accounts[i]);
 
@@ -236,6 +242,7 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
       for (const v of vals) activeFilters[k].add(v);
     }
   }
+  document.getElementById('how-it-works').hidden = true;
   document.getElementById('filter-panel').innerHTML = '';
   document.getElementById('search-btn').disabled = true;
   document.getElementById('results').innerHTML =
