@@ -750,6 +750,24 @@ body.lb-open { overflow: hidden; }
 .lb-btn:disabled { opacity: 0.25; cursor: default; }
 .lb-prev { left: 12px; }
 .lb-next { right: 12px; }
+.lb-fullscreen {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #fff;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.lb-fullscreen:hover { background: rgba(26,159,255,0.5); }
 .lb-close {
   position: absolute;
   top: 12px;

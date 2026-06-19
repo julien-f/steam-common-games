@@ -66,7 +66,14 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPanel();
   });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { if (lightboxShots.length) { closeLightbox(); return; } closePanel(); return; }
+    if (e.key === 'Escape') {
+      if (lightboxShots.length) {
+        if (document.fullscreenElement || document.webkitFullscreenElement) return; // browser exits FS; keep lightbox open
+        closeLightbox();
+        return;
+      }
+      closePanel(); return;
+    }
     if (!panelGame) return;
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
@@ -98,13 +105,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   initPanelSwipe();
   initHeroSwipe();
-  // Close the lightbox when the user exits fullscreen via browser controls (back button, Esc)
-  document.addEventListener('fullscreenchange', () => {
-    if (!document.fullscreenElement && lightboxShots.length) closeLightbox();
-  });
-  document.addEventListener('webkitfullscreenchange', () => {
-    if (!document.webkitFullscreenElement && lightboxShots.length) closeLightbox();
-  });
+  document.addEventListener('fullscreenchange', syncLightboxFullscreenBtn);
+  document.addEventListener('webkitfullscreenchange', syncLightboxFullscreenBtn);
   loadFromUrl();
 });
 
@@ -491,6 +493,17 @@ function updateProgress(loaded, total) {
   }
 }
 
+const LB_FS_ENTER = `<svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" aria-hidden="true"><polyline points="4,1 1,1 1,4"/><polyline points="8,1 11,1 11,4"/><polyline points="1,8 1,11 4,11"/><polyline points="11,8 11,11 8,11"/></svg>`;
+const LB_FS_EXIT  = `<svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" aria-hidden="true"><polyline points="1,4 1,1 4,1"/><polyline points="11,4 11,1 8,1"/><polyline points="4,11 1,11 1,8"/><polyline points="8,11 11,11 11,8"/></svg>`;
+
+function syncLightboxFullscreenBtn() {
+  const btn = document.querySelector('#screenshot-lightbox .lb-fullscreen');
+  if (!btn) return;
+  const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  btn.innerHTML = isFs ? LB_FS_EXIT : LB_FS_ENTER;
+  btn.setAttribute('aria-label', isFs ? 'Exit fullscreen' : 'Enter fullscreen');
+}
+
 // ── Video playback (HLS) ───────────────────────────────────────────────────
 
 function playHls(videoEl, src) {
@@ -528,6 +541,7 @@ function getLightbox() {
     <img class="lb-img" src="" alt="Screenshot">
     <video class="lb-video" controls playsinline></video>
     <button class="lb-btn lb-next" aria-label="Next screenshot">&#8250;</button>
+    <button class="lb-fullscreen" aria-label="Enter fullscreen">${LB_FS_ENTER}</button>
     <button class="lb-close" aria-label="Close lightbox">&#215;</button>
     <div class="lb-counter"></div>`;
   document.body.appendChild(lb);
@@ -535,6 +549,13 @@ function getLightbox() {
   lb.querySelector('.lb-close').addEventListener('click', closeLightbox);
   lb.querySelector('.lb-prev').addEventListener('click', () => stepLightbox(-1));
   lb.querySelector('.lb-next').addEventListener('click', () => stepLightbox(1));
+  lb.querySelector('.lb-fullscreen').addEventListener('click', () => {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen?.() ?? document.webkitExitFullscreen?.())?.catch?.(() => {});
+    } else {
+      (lb.requestFullscreen?.() ?? lb.webkitRequestFullscreen?.())?.catch?.(() => {});
+    }
+  });
   document.addEventListener('keydown', e => {
     if (!lightboxShots.length) return;
     if (e.key === 'ArrowLeft')  { e.preventDefault(); stepLightbox(-1); }
@@ -569,10 +590,8 @@ function openLightbox(idx) {
   ];
   lightboxIdx = idx;
   renderLightbox();
-  const lb = getLightbox();
-  lb.classList.add('open');
+  getLightbox().classList.add('open');
   document.body.classList.add('lb-open');
-  (lb.requestFullscreen?.() ?? lb.webkitRequestFullscreen?.())?.catch?.(() => {});
 }
 
 function closeLightbox() {
