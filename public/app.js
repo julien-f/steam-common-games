@@ -765,14 +765,12 @@ function renderPanel() {
   const gamePt = playtime[g.appid] || {};
   const ownersHtml = `<div class="panel-section">
     <div class="panel-section-title">Owned by</div>
-    <div class="panel-tags">${ownerIndices.map(slotIdx => {
-      const accounts = slots[slotIdx] || [];
-      const parts = accounts.map(p => {
+    <div class="panel-tags">${ownerIndices.flatMap(slotIdx =>
+      (slots[slotIdx] || []).filter(p => p.steamid in gamePt).map(p => {
         const pt = fmtPlaytime(gamePt[p.steamid]);
-        return esc(p.personaname || '?') + (pt ? `<span class="panel-tag-playtime"> · ${esc(pt)}</span>` : '');
-      });
-      return `<span class="panel-tag">${parts.join(' + ')}</span>`;
-    }).join('')}</div>
+        return `<span class="panel-tag">${esc(p.personaname || '?')}${pt ? `<span class="panel-tag-playtime"> · ${pt}</span>` : ''}</span>`;
+      })
+    ).join('')}</div>
   </div>`;
 
   const mc = meta?.metacritic;

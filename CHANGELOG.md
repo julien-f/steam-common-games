@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Side panel: "Owned by" now shows individual Steam accounts as separate chips instead of merging all accounts in a slot into one
+
 ### Added
 
 - Mobile: lightbox screenshot fills the full viewport (100vw × 100vh) with no padding or rounded corners — swipe navigation replaces the need for margin around the nav buttons
