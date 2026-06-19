@@ -89,8 +89,8 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     const list = sortedGames(panelGame.groupKey);
     const idx = list.findIndex(g => g.appid === panelGame.appid);
-    const next = e.key === 'ArrowDown' ? idx + 1 : idx - 1;
-    if (next >= 0 && next < list.length) openPanel(list[next]);
+    const next = (idx + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
+    openPanel(list[next]);
   });
 
   fetch('/api/health').then(r => r.json()).then(d => {
