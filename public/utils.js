@@ -28,6 +28,10 @@ function fmtPlaytime(mins) {
   return mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`;
 }
 
+function foldStr(s) {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
 function esc(s) {
   return String(s)
     .replace(/&/g, '&amp;')
@@ -56,4 +60,4 @@ function renderExtraCell(game) {
   return h ? fmtH(h.extra) : '<span class="dim">—</span>';
 }
 
-if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, fmtH, fmtPlaytime, esc, renderScoreCell, renderMainCell, renderExtraCell };
+if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, fmtH, fmtPlaytime, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell };

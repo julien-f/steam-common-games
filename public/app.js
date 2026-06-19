@@ -1136,7 +1136,7 @@ function hasActiveFilters() {
 
 function gameMatchesFilters(game, filtersActive = hasActiveFilters()) {
   if (!filtersActive) return true;
-  if (nameFilter && !game.name.toLowerCase().includes(nameFilter.toLowerCase())) return false;
+  if (nameFilter && !foldStr(game.name).includes(foldStr(nameFilter))) return false;
   if (!FILTER_DIMS.some(d => activeFilters[d.key].size > 0)) return true;
   if (game.loading) return false;
   return FILTER_DIMS.every(({ key }) => {
@@ -1196,7 +1196,7 @@ function updateFilterOptions(meta, tags) {
       label.appendChild(cb);
       label.appendChild(document.createTextNode(' ' + v));
 
-      if (filterSearch[key] && !v.toLowerCase().includes(filterSearch[key].toLowerCase())) {
+      if (filterSearch[key] && !foldStr(v).includes(foldStr(filterSearch[key]))) {
         label.style.display = 'none';
       }
 
@@ -1218,12 +1218,12 @@ function updateFilterOptions(meta, tags) {
 }
 
 function applySearch(dim, query) {
-  const q = query.toLowerCase();
+  const q = foldStr(query);
   const inp = document.querySelector(`input[data-search-dim="${dim}"]`);
   if (!inp) return;
   inp.closest('.filter-dim').querySelectorAll('.filter-opt').forEach(label => {
     const val = label.querySelector('input')?.value ?? '';
-    label.style.display = !q || val.toLowerCase().includes(q) ? '' : 'none';
+    label.style.display = !q || foldStr(val).includes(q) ? '' : 'none';
   });
 }
 

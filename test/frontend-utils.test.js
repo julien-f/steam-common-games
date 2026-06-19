@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeInput, scoreColor, fmtH, fmtPlaytime, esc, renderScoreCell, renderMainCell, renderExtraCell } = require('../public/utils');
+const { normalizeInput, scoreColor, fmtH, fmtPlaytime, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell } = require('../public/utils');
 
 // ── normalizeInput ────────────────────────────────────────────────────────────
 
@@ -167,6 +167,28 @@ test('renderMainCell: returns dim dash when loaded but no hltb', () => {
 
 test('renderMainCell: formats main story hours', () => {
   assert.equal(renderMainCell({ loading: false, details: { hltb: { main: 12, extra: 20 } } }), '12h');
+});
+
+// ── foldStr ───────────────────────────────────────────────────────────────────
+
+test('foldStr: lowercases ASCII', () => {
+  assert.equal(foldStr('Hello'), 'hello');
+});
+
+test('foldStr: strips acute accent', () => {
+  assert.equal(foldStr('é'), 'e');
+});
+
+test('foldStr: strips umlaut', () => {
+  assert.equal(foldStr('Ö'), 'o');
+});
+
+test('foldStr: strips mixed diacritics', () => {
+  assert.equal(foldStr('Ångström'), 'angstrom');
+});
+
+test('foldStr: plain ASCII is unchanged (modulo case)', () => {
+  assert.equal(foldStr('abc123'), 'abc123');
 });
 
 // ── renderExtraCell ───────────────────────────────────────────────────────────
