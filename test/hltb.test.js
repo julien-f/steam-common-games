@@ -86,6 +86,18 @@ test('buildSearchTerms: falls back to all tokens when every word is an edition w
   assert.deepEqual(buildSearchTerms('Definitive Edition'), ['Definitive', 'Edition']);
 });
 
+test('buildSearchTerms: splits hyphenated tokens so HLTB AND search can match each part', () => {
+  assert.deepEqual(buildSearchTerms('Bang-On Balls: Chronicles'), ['Bang', 'On', 'Balls', 'Chronicles']);
+});
+
+test('buildSearchTerms: splits dot-separated tokens (e.g. BIT.TRIP)', () => {
+  assert.deepEqual(buildSearchTerms('BIT.TRIP RUNNER'), ['BIT', 'TRIP', 'RUNNER']);
+});
+
+test('buildSearchTerms: splits comma-separated numbers (e.g. 40,000)', () => {
+  assert.deepEqual(buildSearchTerms('Warhammer 40,000: Gladius - Relics of War'), ['Warhammer', '40', '000', 'Gladius', 'Relics', 'of', 'War']);
+});
+
 // ── getHLTB ───────────────────────────────────────────────────────────────
 
 function makeInitResponse(token = 'tok', hpKey = 'k', hpVal = 'v') {

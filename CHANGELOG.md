@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- HLTB: search terms now split on punctuation within tokens (e.g. `Bang-On` → `Bang On`, `BIT.TRIP` → `BIT TRIP`) so HLTB's AND matching can find titles it previously missed
 - Lightbox: ArrowUp/ArrowDown now navigates to the next/previous game and refreshes the lightbox content (previously the game changed but the lightbox stayed on the old game's media)
 - Side panel: ArrowLeft/ArrowRight hero navigation now focuses the hero image so Enter immediately opens the lightbox
 - Side panel: filmstrip no longer rebuilds its DOM on hero navigation; only the main image area is updated, preserving scroll position naturally
