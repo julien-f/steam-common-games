@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Tags in the side panel now appear in SteamSpy popularity order instead of alphabetically, so the most representative tags appear first
+
+### Added
+
+- Side panel: prev/next navigation buttons (`↑ N / total ↓`) between the header image and the game details; position counter stays accurate when sort or filters change
+- Side panel: swipe right to close on touch devices; drag follows the finger with a snap-back animation if the swipe falls short of the threshold
+
 ### Added
 
 - "How it works" explainer card shown on initial load (no URL params), with three numbered steps explaining players, the single-vs-multi mode, and Steam Family merging; hidden once a search runs and restored when navigating back to the empty state
@@ -14,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- Game names in the results table are no longer links; use the side panel to open the Steam Store page
 - Search card heading renamed from "Steam Users" to "Players"
 
 - Game name filter: a text search input at the top of the filter panel lets users narrow results by game title substring; the filter value is persisted in the URL (`?name=…`)

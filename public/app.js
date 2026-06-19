@@ -76,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }).catch(() => {});
 
+  initPanelSwipe();
   loadFromUrl();
 });
 
@@ -485,6 +486,7 @@ function closePanel() {
   panelGame = null;
   document.getElementById('game-panel').classList.remove('open');
   document.getElementById('panel-backdrop').classList.remove('open');
+  document.getElementById('panel-nav').innerHTML = '';
   refreshTable(); // remove active highlight
   setPanelParam(null);
 }
@@ -506,8 +508,87 @@ function restorePanelFromUrl() {
   if (game && panelGame?.appid !== appid) openPanel(game);
 }
 
+function renderPanelNav() {
+  const nav = document.getElementById('panel-nav');
+  if (!nav || !panelGame) return;
+  const list = sortedGames(panelGame.groupKey);
+  const idx = list.findIndex(g => g.appid === panelGame.appid);
+  nav.innerHTML = `
+    <button class="panel-nav-btn" id="panel-prev"${idx <= 0 ? ' disabled' : ''} aria-label="Previous game">↑</button>
+    <span class="panel-nav-pos">${idx + 1} / ${list.length}</span>
+    <button class="panel-nav-btn" id="panel-next"${idx >= list.length - 1 ? ' disabled' : ''} aria-label="Next game">↓</button>
+  `;
+  document.getElementById('panel-prev').addEventListener('click', () => {
+    if (idx > 0) openPanel(list[idx - 1]);
+  });
+  document.getElementById('panel-next').addEventListener('click', () => {
+    if (idx < list.length - 1) openPanel(list[idx + 1]);
+  });
+}
+
+function initPanelSwipe() {
+  const panel = document.getElementById('game-panel');
+  let startX = 0, startY = 0, tracking = false, decided = false, horiz = false;
+
+  panel.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+    decided = false;
+    horiz = false;
+    panel.style.transition = 'none';
+  }, { passive: true });
+
+  panel.addEventListener('touchmove', e => {
+    if (!tracking || e.touches.length !== 1) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (!decided) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      horiz = Math.abs(dx) > Math.abs(dy) * 1.2;
+      decided = true;
+    }
+    if (!horiz || dx <= 0) return;
+    e.preventDefault();
+    panel.style.transform = `translateX(${dx}px)`;
+  }, { passive: false });
+
+  function finish(clientX) {
+    if (!tracking) return;
+    tracking = false;
+    const dx = clientX - startX;
+    if (horiz && dx > 80) {
+      panel.style.transition = 'transform 0.2s ease';
+      panel.style.transform = 'translateX(100%)';
+      setTimeout(() => {
+        closePanel();
+        panel.style.transition = '';
+        panel.style.transform = '';
+      }, 200);
+    } else {
+      if (panel.style.transform) {
+        panel.style.transition = 'transform 0.25s ease';
+        panel.style.transform = '';
+        setTimeout(() => { panel.style.transition = ''; }, 250);
+      } else {
+        panel.style.transition = '';
+      }
+    }
+  }
+
+  panel.addEventListener('touchend', e => finish(e.changedTouches[0].clientX), { passive: true });
+  panel.addEventListener('touchcancel', () => {
+    tracking = false;
+    panel.style.transition = 'transform 0.25s ease';
+    panel.style.transform = '';
+    setTimeout(() => { panel.style.transition = ''; }, 250);
+  }, { passive: true });
+}
+
 function renderPanel() {
   if (!panelGame) return;
+  renderPanelNav();
   const g = panelGame;
   const r = g.details?.rating;
   const h = g.details?.hltb;
@@ -587,7 +668,7 @@ function renderPanel() {
   const tagSection = (title, items, dim) => items?.length ? `
     <div class="panel-section">
       <div class="panel-section-title">${title}</div>
-      <div class="panel-tags">${[...items].sort((a, b) => a.localeCompare(b)).map(v => {
+      <div class="panel-tags">${(dim === 'tags' ? [...items] : [...items].sort((a, b) => a.localeCompare(b))).map(v => {
         if (dim) {
           const active = activeFilters[dim].has(v) ? ' active' : '';
           return `<button class="panel-tag panel-tag-btn${active}" data-dim="${dim}" data-val="${esc(v)}">${esc(v)}</button>`;
@@ -649,6 +730,7 @@ function refreshTable() {
       ? `${filtered} / ${games.length} ${gameLabel}`
       : `${games.length} ${gameLabel}`;
   }
+  if (panelGame) renderPanelNav();
 }
 
 // Reconcile a tbody's rows against a desired ordered game list.
@@ -684,8 +766,7 @@ function reconcileTbody(tbody, desired) {
 
 // Render the four <td> cells for a new <tr> (active class is set by syncRow).
 function rowCells(game) {
-  const storeUrl = `https://store.steampowered.com/app/${game.appid}`;
-  return `<td class="td-name"><a href="${storeUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(game.name)}</a></td>
+  return `<td class="td-name">${esc(game.name)}</td>
     <td class="td-score">${renderScoreCell(game)}</td>
     <td class="td-hltb">${renderMainCell(game)}</td>
     <td class="td-hltb">${renderExtraCell(game)}</td>`;
@@ -697,8 +778,7 @@ function syncRow(tr, game) {
   const cells = tr.cells;
   if (!cells.length) { tr.innerHTML = rowCells(game); return; }
 
-  const storeUrl = `https://store.steampowered.com/app/${game.appid}`;
-  cells[0].innerHTML = `<a href="${storeUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(game.name)}</a>`;
+  cells[0].innerHTML = esc(game.name);
   cells[1].innerHTML = renderScoreCell(game);
   cells[2].innerHTML = renderMainCell(game);
   cells[3].innerHTML = renderExtraCell(game);
