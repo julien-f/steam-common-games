@@ -12,10 +12,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Side panel: focus is now trapped inside the panel while it is open (page content marked `inert`); focus returns to the previously active element on close
 - Side panel: ArrowUp/ArrowDown navigation now wraps around (last game → first, first → last)
 - Side panel: page now scrolls to keep the selected game row visible when navigating between games
-- Side panel and lightbox now show Steam trailer videos (from the store API `movies` field) between the banner and screenshots; videos autoplay muted in the carousel and play with sound/controls in the lightbox; filmstrip thumbnails for videos show a ▶ play icon overlay
-- Lightbox: replaced automatic fullscreen on open with an explicit fullscreen toggle button (top-left corner); Escape exits fullscreen if active without closing the lightbox, then closes on a second press
+- Side panel and lightbox now show Steam trailer videos (from the store API `movies` field) between the banner and screenshots; filmstrip thumbnails for videos show a ▶ play icon overlay
 
 ### Changed
+
+- Side panel: video items in the hero now display as a thumbnail with a ▶ overlay instead of autoplaying; clicking opens the video in the lightbox
+- Lightbox: replaced automatic fullscreen on open with an explicit fullscreen toggle button (top-left corner); Escape exits fullscreen if active without closing the lightbox, then closes on a second press
 
 - Side panel: "Owned by" now shows individual Steam accounts as separate chips instead of merging all accounts in a slot into one
 - Side panel: left/right arrow keys now scroll through screenshots in the hero carousel (when the lightbox is closed); up/down continue to navigate between games

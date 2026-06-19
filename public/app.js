@@ -637,7 +637,6 @@ function renderLightbox() {
 function renderPanelHero() {
   if (!panelGame) return;
   const hero = document.getElementById('panel-hero');
-  stopHls(hero.querySelector('video'));
   const bannerUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${panelGame.appid}/header.jpg`;
   const shots = panelGame.details?.meta?.screenshots || [];
   const movies = panelGame.details?.meta?.movies || [];
@@ -652,12 +651,10 @@ function renderPanelHero() {
   const isShot = heroIdx > 0;
   const cls = `panel-hero-img${isShot ? ' panel-hero-img--shot' : ''}`;
 
-  const mainHtml = current.type === 'video'
-    ? `<video class="${cls}" tabindex="0" role="button" aria-label="Open in lightbox" muted loop playsinline></video>`
-    : `<img class="${cls}" tabindex="0" role="button" aria-label="Open in lightbox" src="${esc(current.main)}" alt="${esc(panelGame.name)}">`;
+  const mainHtml = `<img class="${cls}" tabindex="0" role="button" aria-label="Open in lightbox" src="${esc(current.type === 'video' ? current.thumb : current.main)}" alt="${esc(panelGame.name)}">`;
 
   hero.innerHTML = `
-    <div class="panel-hero-main">
+    <div class="panel-hero-main${current.type === 'video' ? ' is-video' : ''}">
       ${mainHtml}
       ${hasMany ? `
         <button class="panel-hero-btn panel-hero-prev"${heroIdx <= 0 ? ' disabled' : ''} aria-label="Previous">&#8249;</button>
@@ -673,13 +670,9 @@ function renderPanelHero() {
     ` : ''}`;
 
   const heroEl = hero.querySelector('.panel-hero-img');
-  if (current.type === 'video') {
-    playHls(heroEl, current.hls);
-  } else {
-    heroEl.classList.add('loading');
-    heroEl.onload  = () => heroEl.classList.remove('loading');
-    heroEl.onerror = () => { hero.style.display = 'none'; };
-  }
+  heroEl.classList.add('loading');
+  heroEl.onload  = () => heroEl.classList.remove('loading');
+  heroEl.onerror = () => { hero.style.display = 'none'; };
 
   hero.querySelector('.panel-film-item.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
 }

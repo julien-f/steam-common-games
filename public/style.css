@@ -534,6 +534,19 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 .panel-hero-btn:disabled { opacity: 0 !important; }
 .panel-hero-prev { left: 0; border-radius: 0 4px 4px 0; }
 .panel-hero-next { right: 0; border-radius: 4px 0 0 4px; }
+.panel-hero-main.is-video::before {
+  content: '▶';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.85);
+  pointer-events: none;
+  z-index: 1;
+}
 
 /* Filmstrip */
 .panel-filmstrip {
