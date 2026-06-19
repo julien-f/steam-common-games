@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Side panel: focus is now trapped inside the panel while it is open (page content marked `inert`); focus returns to the previously active element on close
 - Side panel: ArrowUp/ArrowDown navigation now wraps around (last game → first, first → last)
 - Side panel: page now scrolls to keep the selected game row visible when navigating between games
 - Side panel and lightbox now show Steam trailer videos (from the store API `movies` field) between the banner and screenshots; videos autoplay muted in the carousel and play with sound/controls in the lightbox; filmstrip thumbnails for videos show a ▶ play icon overlay
