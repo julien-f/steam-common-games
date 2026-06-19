@@ -690,6 +690,7 @@ function openPanel(game) {
   document.getElementById('game-panel').classList.add('open');
   document.getElementById('panel-backdrop').classList.add('open');
   refreshTable(); // re-render rows so the active highlight appears
+  document.getElementById(`tbody-${game.groupKey}`)?.querySelector(`tr.game-row[data-appid="${game.appid}"]`)?.scrollIntoView({ block: 'nearest' });
   setPanelParam(game.appid);
 }
 
