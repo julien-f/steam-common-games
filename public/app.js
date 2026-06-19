@@ -640,33 +640,26 @@ function renderLightbox() {
 
 // ── Side panel ─────────────────────────────────────────────────────────────
 
-function renderPanelHero() {
-  if (!panelGame) return;
-  const hero = document.getElementById('panel-hero');
+function getPanelItems() {
   const bannerUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${panelGame.appid}/header.jpg`;
   const shots = panelGame.details?.meta?.screenshots || [];
   const movies = panelGame.details?.meta?.movies || [];
-  const items = [
+  return [
     { type: 'image', main: bannerUrl, thumb: bannerUrl },
     ...movies.map(m => ({ type: 'video', hls: m.hls, thumb: m.thumbnail })),
     ...shots.map(s => ({ type: 'image', main: s.full, thumb: s.thumbnail })),
   ];
-  heroIdx = Math.max(0, Math.min(heroIdx, items.length - 1));
-  const current = items[heroIdx];
-  const hasMany = items.length > 1;
-  const isShot = heroIdx > 0;
-  const cls = `panel-hero-img${isShot ? ' panel-hero-img--shot' : ''}`;
+}
 
-  const mainHtml = `<img class="${cls}" tabindex="0" role="button" aria-label="Open in lightbox" src="${esc(current.type === 'video' ? current.thumb : current.main)}" alt="${esc(panelGame.name)}">`;
+function buildPanelHero() {
+  if (!panelGame) return;
+  const hero = document.getElementById('panel-hero');
+  const items = getPanelItems();
+  heroIdx = Math.max(0, Math.min(heroIdx, items.length - 1));
+  const hasMany = items.length > 1;
 
   hero.innerHTML = `
-    <div class="panel-hero-main${current.type === 'video' ? ' is-video' : ''}">
-      ${mainHtml}
-      ${hasMany ? `
-        <button class="panel-hero-btn panel-hero-prev"${heroIdx <= 0 ? ' disabled' : ''} aria-label="Previous">&#8249;</button>
-        <button class="panel-hero-btn panel-hero-next"${heroIdx >= items.length - 1 ? ' disabled' : ''} aria-label="Next">&#8250;</button>
-      ` : ''}
-    </div>
+    ${renderHeroMain(items)}
     ${hasMany ? `
       <div class="panel-filmstrip">${items.map((item, i) =>
         `<span class="panel-film-item${i === heroIdx ? ' active' : ''}${item.type === 'video' ? ' is-video' : ''}" data-idx="${i}">` +
@@ -675,12 +668,47 @@ function renderPanelHero() {
       ).join('')}</div>
     ` : ''}`;
 
+  setupHeroImg(hero);
+  hero.querySelector('.panel-film-item.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+}
+
+function renderPanelHero(scrollActive = true) {
+  if (!panelGame) return;
+  const hero = document.getElementById('panel-hero');
+  const items = getPanelItems();
+  heroIdx = Math.max(0, Math.min(heroIdx, items.length - 1));
+
+  const main = hero.querySelector('.panel-hero-main');
+  if (!main) { buildPanelHero(); return; }
+
+  main.outerHTML = renderHeroMain(items);
+  setupHeroImg(hero);
+
+  hero.querySelectorAll('.panel-film-item').forEach((el, i) =>
+    el.classList.toggle('active', i === heroIdx)
+  );
+
+  if (scrollActive) hero.querySelector('.panel-film-item.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+}
+
+function renderHeroMain(items) {
+  const current = items[heroIdx];
+  const isShot = heroIdx > 0;
+  const hasMany = items.length > 1;
+  return `<div class="panel-hero-main${current.type === 'video' ? ' is-video' : ''}">` +
+    `<img class="panel-hero-img${isShot ? ' panel-hero-img--shot' : ''}" tabindex="0" role="button" aria-label="Open in lightbox" src="${esc(current.type === 'video' ? current.thumb : current.main)}" alt="${esc(panelGame.name)}">` +
+    (hasMany
+      ? `<button class="panel-hero-btn panel-hero-prev"${heroIdx <= 0 ? ' disabled' : ''} aria-label="Previous">&#8249;</button>` +
+        `<button class="panel-hero-btn panel-hero-next"${heroIdx >= items.length - 1 ? ' disabled' : ''} aria-label="Next">&#8250;</button>`
+      : '') +
+    `</div>`;
+}
+
+function setupHeroImg(hero) {
   const heroEl = hero.querySelector('.panel-hero-img');
   heroEl.classList.add('loading');
   heroEl.onload  = () => heroEl.classList.remove('loading');
   heroEl.onerror = () => { hero.style.display = 'none'; };
-
-  hero.querySelector('.panel-film-item.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
 }
 
 let panelPrevFocus = null;
@@ -690,7 +718,7 @@ function openPanel(game) {
   heroIdx = 0;
   panelPrevFocus = document.activeElement;
   document.getElementById('panel-body').scrollTop = 0;
-  renderPanelHero();
+  buildPanelHero();
   renderPanel();
   document.getElementById('game-panel').classList.add('open');
   document.getElementById('panel-backdrop').classList.add('open');
@@ -970,7 +998,7 @@ function renderPanel() {
       </div>
     </div>`;
 
-  renderPanelHero();
+  buildPanelHero();
 }
 
 function refreshTable() {
