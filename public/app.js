@@ -810,6 +810,7 @@ function renderPanel() {
   }
 
   let hltbHtml = '';
+  let hltbSearchUrl = '';
   if (g.loading) {
     hltbHtml = `<div class="panel-section">
       <div class="panel-section-title">How Long To Beat</div>
@@ -835,15 +836,11 @@ function renderPanel() {
       </div>
     </div>`;
   } else if (g.details) {
-    const searchUrl = `https://howlongtobeat.com/?q=${encodeURIComponent(g.name)}`;
-    hltbHtml = `<div class="panel-section">
-      <div class="panel-section-title">How Long To Beat</div>
-      <div class="panel-no-data"><a href="${esc(searchUrl)}" target="_blank" rel="noopener">Search on HowLongToBeat ↗</a></div>
-    </div>`;
+    hltbSearchUrl = `https://howlongtobeat.com/?q=${encodeURIComponent(g.name)}`;
   }
 
   const tagSection = (title, items, dim) => items?.length ? `
-    <div class="panel-section">
+    <div class="panel-section panel-section--meta">
       <div class="panel-section-title">${title}</div>
       <div class="panel-tags">${(dim === 'tags' ? [...items] : [...items].sort((a, b) => a.localeCompare(b))).map(v => {
         if (dim) {
@@ -855,28 +852,34 @@ function renderPanel() {
     </div>` : '';
 
   const tags = g.details?.tags;
+  // Merge developer and publisher when identical
+  const devs = meta?.developers || [];
+  const pubs = meta?.publishers || [];
+  const sameDevPub = devs.length > 0 && devs.length === pubs.length && devs.every((d, i) => d === pubs[i]);
   const metaHtml = g.loading ? '' : [
     tagSection('Tags', tags, 'tags'),
     tagSection('Genres', meta?.genres, 'genres'),
     tagSection('Categories', meta?.categories, 'categories'),
-    tagSection('Developer', meta?.developers, 'developers'),
-    tagSection('Publisher', meta?.publishers, 'publishers'),
+    sameDevPub
+      ? tagSection('Developer / Publisher', devs, 'developers')
+      : [tagSection('Developer', devs, 'developers'), tagSection('Publisher', pubs, 'publishers')].join(''),
   ].join('');
 
   document.getElementById('panel-body').innerHTML = `
     <div class="panel-title">${esc(g.name)}</div>
     ${releaseDate ? `<div class="panel-release">${esc(releaseDate)}</div>` : ''}
-    ${ownersHtml}
     ${description ? `<div class="panel-desc">${description}</div>` : ''}
     ${scoreHtml}
     ${hltbHtml}
+    ${ownersHtml}
     ${metaHtml}
-    <div class="panel-section">
+    <div class="panel-section panel-section--meta">
       <div class="panel-section-title">Links</div>
       <div class="panel-links">
         <a class="panel-link" href="${esc(storeUrl)}" target="_blank" rel="noopener">Steam Store</a>
         <a class="panel-link" href="${esc(steamdbUrl)}" target="_blank" rel="noopener">SteamDB</a>
         <a class="panel-link" href="${esc(protondbUrl)}" target="_blank" rel="noopener">ProtonDB</a>
+        ${hltbSearchUrl ? `<a class="panel-link" href="${esc(hltbSearchUrl)}" target="_blank" rel="noopener">HowLongToBeat</a>` : ''}
       </div>
     </div>`;
 

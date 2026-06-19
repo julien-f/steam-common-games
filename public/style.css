@@ -619,6 +619,7 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 }
 
 .panel-section { margin-bottom: 18px; }
+.panel-section--meta { margin-bottom: 12px; }
 .panel-section-title {
   font-size: 10px;
   font-weight: 600;
@@ -630,6 +631,7 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   align-items: center;
   gap: 6px;
 }
+.panel-section--meta .panel-section-title { margin-bottom: 5px; }
 .panel-section-title a {
   font-size: inherit;
   color: inherit;
