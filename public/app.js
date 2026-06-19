@@ -12,6 +12,9 @@ let runId = 0;           // increments on each search to cancel stale updates
 let streamController = null; // AbortController for the active detail stream
 let refreshDebounceTimer = null;
 let panelGame = null;
+let heroIdx = 0;          // current carousel position in the panel hero
+let lightboxShots = [];   // screenshots array for the currently open lightbox
+let lightboxIdx   = 0;
 
 const FILTER_DIMS = [
   { key: 'tags',       label: 'Tag',       param: 'tag'   },
@@ -43,6 +46,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('panel-backdrop').addEventListener('click', closePanel);
   document.getElementById('panel-close').addEventListener('click', closePanel);
+  document.getElementById('panel-hero').addEventListener('click', e => {
+    if (e.target.closest('.panel-hero-prev')) { heroIdx = Math.max(0, heroIdx - 1); renderPanelHero(); return; }
+    if (e.target.closest('.panel-hero-next')) { heroIdx++; renderPanelHero(); return; }
+    const dot = e.target.closest('.panel-hero-dot');
+    if (dot) { heroIdx = [...dot.parentElement.children].indexOf(dot); renderPanelHero(); return; }
+    if (e.target.closest('.panel-hero-img') && heroIdx > 0) openLightbox(heroIdx - 1);
+  });
+
   document.getElementById('game-panel').addEventListener('click', e => {
     const btn = e.target.closest('.panel-tag-btn');
     if (!btn) return;
@@ -55,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPanel();
   });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { closePanel(); return; }
+    if (e.key === 'Escape') { if (lightboxShots.length) { closeLightbox(); return; } closePanel(); return; }
     if (!panelGame || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
@@ -463,17 +474,96 @@ function updateProgress(loaded, total) {
   }
 }
 
+// ── Screenshot lightbox ────────────────────────────────────────────────────
+
+function getLightbox() {
+  let lb = document.getElementById('screenshot-lightbox');
+  if (lb) return lb;
+  lb = document.createElement('div');
+  lb.id = 'screenshot-lightbox';
+  lb.innerHTML = `
+    <div class="lb-backdrop"></div>
+    <button class="lb-btn lb-prev" aria-label="Previous screenshot">&#8249;</button>
+    <img class="lb-img" src="" alt="Screenshot">
+    <button class="lb-btn lb-next" aria-label="Next screenshot">&#8250;</button>
+    <button class="lb-close" aria-label="Close lightbox">&#215;</button>
+    <div class="lb-counter"></div>`;
+  document.body.appendChild(lb);
+  lb.querySelector('.lb-backdrop').addEventListener('click', closeLightbox);
+  lb.querySelector('.lb-close').addEventListener('click', closeLightbox);
+  lb.querySelector('.lb-prev').addEventListener('click', () => stepLightbox(-1));
+  lb.querySelector('.lb-next').addEventListener('click', () => stepLightbox(1));
+  document.addEventListener('keydown', e => {
+    if (!lightboxShots.length) return;
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); stepLightbox(-1); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); stepLightbox(1); }
+  });
+  return lb;
+}
+
+function openLightbox(idx) {
+  lightboxShots = panelGame?.details?.meta?.screenshots || [];
+  if (!lightboxShots.length) return;
+  lightboxIdx = idx;
+  renderLightbox();
+  getLightbox().classList.add('open');
+  document.body.classList.add('lb-open');
+}
+
+function closeLightbox() {
+  lightboxShots = [];
+  getLightbox().classList.remove('open');
+  document.body.classList.remove('lb-open');
+}
+
+function stepLightbox(dir) {
+  lightboxIdx = (lightboxIdx + dir + lightboxShots.length) % lightboxShots.length;
+  renderLightbox();
+}
+
+function renderLightbox() {
+  const lb = getLightbox();
+  const shot = lightboxShots[lightboxIdx];
+  lb.querySelector('.lb-img').src = shot.full;
+  lb.querySelector('.lb-counter').textContent = `${lightboxIdx + 1} / ${lightboxShots.length}`;
+  lb.querySelector('.lb-prev').disabled = lightboxShots.length <= 1;
+  lb.querySelector('.lb-next').disabled = lightboxShots.length <= 1;
+}
+
 // ── Side panel ─────────────────────────────────────────────────────────────
+
+function renderPanelHero() {
+  if (!panelGame) return;
+  const hero = document.getElementById('panel-hero');
+  const bannerUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${panelGame.appid}/header.jpg`;
+  const shots = panelGame.details?.meta?.screenshots || [];
+  const images = [bannerUrl, ...shots.map(s => s.full)];
+  heroIdx = Math.max(0, Math.min(heroIdx, images.length - 1));
+  const src = images[heroIdx];
+  const hasMany = images.length > 1;
+  const isShot = heroIdx > 0;
+
+  hero.innerHTML = `
+    <img class="panel-hero-img${isShot ? ' panel-hero-img--shot' : ''}" src="${esc(src)}" alt="${esc(panelGame.name)}">
+    ${hasMany ? `
+      <button class="panel-hero-btn panel-hero-prev"${heroIdx <= 0 ? ' disabled' : ''} aria-label="Previous">&#8249;</button>
+      <button class="panel-hero-btn panel-hero-next"${heroIdx >= images.length - 1 ? ' disabled' : ''} aria-label="Next">&#8250;</button>
+      <div class="panel-hero-dots">${images.map((_, i) =>
+        `<span class="panel-hero-dot${i === heroIdx ? ' active' : ''}"></span>`
+      ).join('')}</div>
+    ` : ''}`;
+
+  const img = hero.querySelector('.panel-hero-img');
+  img.classList.add('loading');
+  img.onload  = () => img.classList.remove('loading');
+  img.onerror = () => { hero.style.display = 'none'; };
+}
 
 function openPanel(game) {
   panelGame = game;
+  heroIdx = 0;
   document.getElementById('panel-body').scrollTop = 0;
-  const img = document.getElementById('panel-img');
-  img.style.display = '';
-  img.classList.add('loading');
-  img.onload  = () => img.classList.remove('loading');
-  img.onerror = () => { img.classList.remove('loading'); img.style.display = 'none'; };
-  img.src = `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`;
+  renderPanelHero();
   renderPanel();
   document.getElementById('game-panel').classList.add('open');
   document.getElementById('panel-backdrop').classList.add('open');
@@ -711,6 +801,8 @@ function renderPanel() {
         <a class="panel-link" href="${esc(protondbUrl)}" target="_blank" rel="noopener">ProtonDB</a>
       </div>
     </div>`;
+
+  renderPanelHero();
 }
 
 function refreshTable() {
