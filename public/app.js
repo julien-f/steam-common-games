@@ -882,9 +882,10 @@ function renderPanel() {
   const h = g.details?.hltb;
   const meta = g.details?.meta;
 
-  const storeUrl   = `https://store.steampowered.com/app/${g.appid}`;
-  const steamdbUrl = `https://www.steamdb.info/app/${g.appid}/`;
+  const storeUrl    = `https://store.steampowered.com/app/${g.appid}`;
+  const steamdbUrl  = `https://www.steamdb.info/app/${g.appid}/`;
   const protondbUrl = `https://www.protondb.com/app/${g.appid}`;
+  const itadUrl     = `https://isthereanydeal.com/steam/app/${g.appid}`;
   const releaseDate = g.details?.meta?.releaseDate;
   const description = g.details?.meta?.description;
 
@@ -997,6 +998,7 @@ function renderPanel() {
         <a class="panel-link" href="${esc(storeUrl)}" target="_blank" rel="noopener">Steam Store</a>
         <a class="panel-link" href="${esc(steamdbUrl)}" target="_blank" rel="noopener">SteamDB</a>
         <a class="panel-link" href="${esc(protondbUrl)}" target="_blank" rel="noopener">ProtonDB</a>
+        <a class="panel-link" href="${esc(itadUrl)}" target="_blank" rel="noopener">IsThereAnyDeal</a>
         ${hltbSearchUrl ? `<a class="panel-link" href="${esc(hltbSearchUrl)}" target="_blank" rel="noopener">HowLongToBeat</a>` : ''}
       </div>
     </div>`;

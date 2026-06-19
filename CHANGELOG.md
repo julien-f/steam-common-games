@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Side panel: added IsThereAnyDeal link in the Links section
+
 ### Fixed
 
 - Name filter now matches accented/diacritic characters (e.g. typing `o` matches `Ö`)
