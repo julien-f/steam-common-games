@@ -29,6 +29,10 @@ const activeFilters = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set()]
 const allOpts       = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set()]));
 const filterSearch  = Object.fromEntries(FILTER_DIMS.map(d => [d.key, '']));
 let nameFilter = '';
+let filterYearMin = null; // inclusive lower year bound
+let filterYearMax = null; // inclusive upper year bound
+let availYearMin  = null; // min year seen in loaded games
+let availYearMax  = null; // max year seen in loaded games
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
@@ -130,7 +134,9 @@ function loadFromUrl() {
       dir: sortParam.startsWith('-') ? -1 : 1,
     } : null;
     const restoreNameFilter = params.get('name') ?? '';
-    findCommonGames({ pushState: false, restoreFilters, restoreSort, restoreNameFilter });
+    const restoreYearMin = params.has('ymin') ? parseInt(params.get('ymin')) : null;
+    const restoreYearMax = params.has('ymax') ? parseInt(params.get('ymax')) : null;
+    findCommonGames({ pushState: false, restoreFilters, restoreYearMin, restoreYearMax, restoreSort, restoreNameFilter });
   } else {
     addPlayerSlot();
     addPlayerSlot();
@@ -138,6 +144,7 @@ function loadFromUrl() {
     slots = [];
     for (const s of Object.values(activeFilters)) s.clear();
     for (const s of Object.values(allOpts)) s.clear();
+    filterYearMin = filterYearMax = availYearMin = availYearMax = null;
     for (const k of Object.keys(filterSearch)) filterSearch[k] = '';
     nameFilter = '';
     document.getElementById('filter-panel').innerHTML = '';
@@ -244,7 +251,7 @@ function showAlert(msg, type = 'error') {
 
 // ── Main search flow ───────────────────────────────────────────────────────
 
-async function findCommonGames({ pushState = true, restoreFilters = null, restoreSort = null, restoreNameFilter = '' } = {}) {
+async function findCommonGames({ pushState = true, restoreFilters = null, restoreYearMin = null, restoreYearMax = null, restoreSort = null, restoreNameFilter = '' } = {}) {
   const inputSlots = getSlots();
   if (inputSlots.length < 1) { showAlert('Enter at least 1 Steam user.'); return; }
 
@@ -270,6 +277,7 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
   closePanel();
   for (const s of Object.values(activeFilters)) s.clear();
   for (const s of Object.values(allOpts)) s.clear();
+  filterYearMin = filterYearMax = availYearMin = availYearMax = null;
   for (const k of Object.keys(filterSearch)) filterSearch[k] = '';
   nameFilter = restoreNameFilter;
   if (restoreFilters) {
@@ -277,6 +285,8 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
       for (const v of vals) activeFilters[k].add(v);
     }
   }
+  filterYearMin = restoreYearMin;
+  filterYearMax = restoreYearMax;
   document.getElementById('how-it-works').hidden = true;
   document.getElementById('filter-panel').innerHTML = '';
   document.getElementById('search-btn').disabled = true;
@@ -993,6 +1003,11 @@ function sortedGames(groupKey, filtersActive = hasActiveFilters()) {
 
 // ── Filtering ──────────────────────────────────────────────────────────────
 
+function parseYear(releaseDate) {
+  const m = releaseDate?.match(/\d{4}/);
+  return m ? parseInt(m[0]) : null;
+}
+
 function updateFilterUrl() {
   const cmp = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
   const params = new URLSearchParams();
@@ -1002,6 +1017,8 @@ function updateFilterUrl() {
   params.set('sort', (sortDir < 0 ? '-' : '') + sortCol);
   if (prev.has('game')) params.set('game', prev.get('game'));
   if (nameFilter) params.set('name', nameFilter);
+  if (filterYearMin !== null) params.set('ymin', filterYearMin);
+  if (filterYearMax !== null) params.set('ymax', filterYearMax);
   // Append filter values in fixed dimension order, each sorted alphabetically
   for (const { key, param } of FILTER_DIMS) {
     [...activeFilters[key]].sort(cmp).forEach(v => params.append(param, v));
@@ -1010,12 +1027,20 @@ function updateFilterUrl() {
 }
 
 function hasActiveFilters() {
-  return nameFilter !== '' || FILTER_DIMS.some(d => activeFilters[d.key].size > 0);
+  return nameFilter !== '' || filterYearMin !== null || filterYearMax !== null
+    || FILTER_DIMS.some(d => activeFilters[d.key].size > 0);
 }
 
 function gameMatchesFilters(game, filtersActive = hasActiveFilters()) {
   if (!filtersActive) return true;
   if (nameFilter && !game.name.toLowerCase().includes(nameFilter.toLowerCase())) return false;
+  if (filterYearMin !== null || filterYearMax !== null) {
+    if (game.loading) return false;
+    const yr = parseYear(game.details?.meta?.releaseDate);
+    if (yr === null) return false;
+    if (filterYearMin !== null && yr < filterYearMin) return false;
+    if (filterYearMax !== null && yr > filterYearMax) return false;
+  }
   if (!FILTER_DIMS.some(d => activeFilters[d.key].size > 0)) return true;
   if (game.loading) return false;
   return FILTER_DIMS.every(({ key }) => {
@@ -1035,6 +1060,20 @@ function updateFilterOptions(meta, tags) {
       if (!allOpts[key].has(v)) { allOpts[key].add(v); newByKey[key].push(v); }
     }
   }
+  // Track available year range and update placeholders live
+  const yr = parseYear(meta?.releaseDate);
+  if (yr) {
+    const changed = yr < (availYearMin ?? Infinity) || yr > (availYearMax ?? -Infinity);
+    if (yr < (availYearMin ?? Infinity)) availYearMin = yr;
+    if (yr > (availYearMax ?? -Infinity)) availYearMax = yr;
+    if (changed) {
+      const minInp = document.getElementById('filter-year-min');
+      const maxInp = document.getElementById('filter-year-max');
+      if (minInp) minInp.placeholder = availYearMin;
+      if (maxInp) maxInp.placeholder = availYearMax;
+    }
+  }
+
   if (KEYS.every(k => !newByKey[k].length)) return;
 
   const panelEl = document.getElementById('filter-panel');
@@ -1108,17 +1147,26 @@ function applySearch(dim, query) {
 
 function renderFilterPanel() {
   const activeDims = FILTER_DIMS.filter(d => allOpts[d.key].size > 0);
-  if (!activeDims.length) return;
+  if (!activeDims.length && availYearMin === null) return;
 
-  const totalActive = FILTER_DIMS.reduce((n, d) => n + activeFilters[d.key].size, 0) + (nameFilter ? 1 : 0);
+  const yearActive = filterYearMin !== null || filterYearMax !== null;
+  const totalActive = FILTER_DIMS.reduce((n, d) => n + activeFilters[d.key].size, 0) + (nameFilter ? 1 : 0) + (yearActive ? 1 : 0);
 
-  const chips = FILTER_DIMS.flatMap(d =>
-    [...activeFilters[d.key]].sort().map(v => `
-      <span class="filter-chip" data-chip-dim="${d.key}" data-chip-val="${esc(v)}">
-        <span class="filter-chip-label">${esc(d.label)}: ${esc(v)}</span>
+  const yearChipLabel = filterYearMin && filterYearMax ? `${filterYearMin}–${filterYearMax}`
+    : filterYearMin ? `from ${filterYearMin}` : `until ${filterYearMax}`;
+  const chips = [
+    ...FILTER_DIMS.flatMap(d =>
+      [...activeFilters[d.key]].sort().map(v => `
+        <span class="filter-chip" data-chip-dim="${d.key}" data-chip-val="${esc(v)}">
+          <span class="filter-chip-label">${esc(d.label)}: ${esc(v)}</span>
+          <span class="filter-chip-x">×</span>
+        </span>`)),
+    ...(yearActive ? [`
+      <span class="filter-chip" data-chip-year="1">
+        <span class="filter-chip-label">Year: ${yearChipLabel}</span>
         <span class="filter-chip-x">×</span>
-      </span>`)
-  ).join('');
+      </span>`] : []),
+  ].join('');
 
   document.getElementById('filter-panel').innerHTML = `
     <div class="card">
@@ -1130,6 +1178,13 @@ function renderFilterPanel() {
       <div class="filter-name-row">
         <input class="filter-search filter-name-input" type="search" id="name-filter-input" placeholder="Search by name…" value="${esc(nameFilter)}">
       </div>
+      ${availYearMin !== null ? `
+      <div class="filter-year-row">
+        <span class="filter-year-label">Released</span>
+        <input class="filter-year-input" type="number" id="filter-year-min" placeholder="${availYearMin}" value="${filterYearMin ?? ''}" min="${availYearMin}" max="${availYearMax}">
+        <span class="filter-year-sep">–</span>
+        <input class="filter-year-input" type="number" id="filter-year-max" placeholder="${availYearMax}" value="${filterYearMax ?? ''}" min="${availYearMin}" max="${availYearMax}">
+      </div>` : ''}
       <div class="filter-dims">
         ${activeDims.map(d => `
           <div class="filter-dim">
@@ -1178,17 +1233,42 @@ function renderFilterPanel() {
 
   document.getElementById('filter-panel').querySelectorAll('.filter-chip').forEach(chip => {
     chip.addEventListener('click', () => {
-      activeFilters[chip.dataset.chipDim].delete(chip.dataset.chipVal);
+      if (chip.dataset.chipYear) {
+        filterYearMin = filterYearMax = null;
+      } else {
+        const { chipDim, chipVal } = chip.dataset;
+        activeFilters[chipDim].delete(chipVal);
+      }
       refreshTable();
       updateFilterUrl();
       renderFilterPanel();
     });
   });
 
+  const yearMinInp = document.getElementById('filter-year-min');
+  const yearMaxInp = document.getElementById('filter-year-max');
+  if (yearMinInp) {
+    yearMinInp.addEventListener('input', () => {
+      filterYearMin = yearMinInp.value ? parseInt(yearMinInp.value) : null;
+      refreshTable();
+      updateFilterUrl();
+    });
+    yearMinInp.addEventListener('blur', renderFilterPanel);
+  }
+  if (yearMaxInp) {
+    yearMaxInp.addEventListener('input', () => {
+      filterYearMax = yearMaxInp.value ? parseInt(yearMaxInp.value) : null;
+      refreshTable();
+      updateFilterUrl();
+    });
+    yearMaxInp.addEventListener('blur', renderFilterPanel);
+  }
+
   const clearBtn = document.getElementById('clear-filters-btn');
   if (clearBtn) {
     clearBtn.addEventListener('click', () => {
       for (const s of Object.values(activeFilters)) s.clear();
+      filterYearMin = filterYearMax = null;
       nameFilter = '';
       refreshTable();
       updateFilterUrl();

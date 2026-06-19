@@ -399,6 +399,19 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
 }
 .filter-search:focus { outline: none; border-color: var(--accent); }
 .filter-name-row { margin-bottom: 12px; }
+.filter-year-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.filter-year-label { font-size: 13px; color: var(--text1); white-space: nowrap; }
+.filter-year-sep { color: var(--text2); font-size: 13px; }
+.filter-year-input {
+  width: 70px;
+  padding: 4px 6px;
+  font-size: 13px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text0);
+}
+.filter-year-input:focus { outline: none; border-color: var(--accent); }
 .filter-name-input { font-size: 14px; padding: 6px 10px; }
 
 /* Clickable rows */
