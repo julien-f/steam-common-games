@@ -354,15 +354,24 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   overflow-y: auto;
 }
 .filter-opt {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+  display: block;
+  width: 100%;
   font-size: 13px;
   cursor: pointer;
   line-height: 1.4;
   user-select: none;
+  background: none;
+  border: none;
+  color: var(--text1);
+  text-align: left;
+  padding: 2px 4px;
+  border-radius: 3px;
 }
-.filter-opt input[type="checkbox"] { cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
+.filter-opt:hover { background: rgba(255,255,255,0.06); }
+.filter-opt[data-state="include"] { color: var(--accent); }
+.filter-opt[data-state="include"]::before { content: '✓ '; }
+.filter-opt[data-state="exclude"] { color: #f87171; }
+.filter-opt[data-state="exclude"]::before { content: '✕ '; }
 .filter-chips {
   display: flex;
   flex-wrap: wrap;
@@ -385,6 +394,8 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   white-space: nowrap;
 }
 .filter-chip:hover { background: rgba(26,159,255,0.28); }
+.filter-chip--exclude { background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.4); color: #f87171; }
+.filter-chip--exclude:hover { background: rgba(248,113,113,0.25); }
 .filter-chip-x { font-size: 14px; line-height: 1; opacity: 0.7; }
 .filter-search {
   width: 100%;
@@ -669,7 +680,8 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 .panel-tag-btn:hover { border-color: var(--accent); color: var(--accent2); }
-.panel-tag-btn.active { background: rgba(26,159,255,0.15); border-color: rgba(26,159,255,0.4); color: var(--accent); }
+.panel-tag-btn[data-state="include"] { background: rgba(26,159,255,0.15); border-color: rgba(26,159,255,0.4); color: var(--accent); }
+.panel-tag-btn[data-state="exclude"] { background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.4); color: #f87171; }
 .panel-tag-playtime { color: var(--text2); }
 
 /* Screenshot lightbox */

@@ -25,9 +25,10 @@ const FILTER_DIMS = [
 ];
 
 // Filter state — reset on each new search
-const activeFilters = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set()]));
-const allOpts       = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set()]));
-const filterSearch  = Object.fromEntries(FILTER_DIMS.map(d => [d.key, '']));
+const activeFilters  = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set()]));
+const excludeFilters = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set()]));
+const allOpts        = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set()]));
+const filterSearch   = Object.fromEntries(FILTER_DIMS.map(d => [d.key, '']));
 let nameFilter = '';
 
 // ── Init ───────────────────────────────────────────────────────────────────
@@ -58,7 +59,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const btn = e.target.closest('.panel-tag-btn');
     if (!btn) return;
     const { dim, val } = btn.dataset;
-    if (activeFilters[dim].has(val)) activeFilters[dim].delete(val);
+    if (activeFilters[dim].has(val)) { activeFilters[dim].delete(val); excludeFilters[dim].add(val); }
+    else if (excludeFilters[dim].has(val)) { excludeFilters[dim].delete(val); }
     else activeFilters[dim].add(val);
     refreshTable();
     updateFilterUrl();
@@ -122,7 +124,10 @@ function loadFromUrl() {
   if (urlSlots.length >= 1 && urlSlots.every(s => s.length > 0)) {
     urlSlots.forEach(accounts => addPlayerSlot(accounts));
     const restoreFilters = Object.fromEntries(
-      FILTER_DIMS.map(d => [d.key, params.getAll(d.param)])
+      FILTER_DIMS.map(d => [d.key, params.getAll(d.param).filter(v => !v.startsWith('!'))])
+    );
+    const restoreExcludeFilters = Object.fromEntries(
+      FILTER_DIMS.map(d => [d.key, params.getAll(d.param).filter(v => v.startsWith('!')).map(v => v.slice(1))])
     );
     const sortParam = params.get('sort');
     const restoreSort = sortParam ? {
@@ -130,13 +135,14 @@ function loadFromUrl() {
       dir: sortParam.startsWith('-') ? -1 : 1,
     } : null;
     const restoreNameFilter = params.get('name') ?? '';
-    findCommonGames({ pushState: false, restoreFilters, restoreSort, restoreNameFilter });
+    findCommonGames({ pushState: false, restoreFilters, restoreExcludeFilters, restoreSort, restoreNameFilter });
   } else {
     addPlayerSlot();
     addPlayerSlot();
     games = [];
     slots = [];
     for (const s of Object.values(activeFilters)) s.clear();
+    for (const s of Object.values(excludeFilters)) s.clear();
     for (const s of Object.values(allOpts)) s.clear();
     for (const k of Object.keys(filterSearch)) filterSearch[k] = '';
     nameFilter = '';
@@ -244,7 +250,7 @@ function showAlert(msg, type = 'error') {
 
 // ── Main search flow ───────────────────────────────────────────────────────
 
-async function findCommonGames({ pushState = true, restoreFilters = null, restoreSort = null, restoreNameFilter = '' } = {}) {
+async function findCommonGames({ pushState = true, restoreFilters = null, restoreExcludeFilters = null, restoreSort = null, restoreNameFilter = '' } = {}) {
   const inputSlots = getSlots();
   if (inputSlots.length < 1) { showAlert('Enter at least 1 Steam user.'); return; }
 
@@ -269,12 +275,18 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
   const thisRun = ++runId;
   closePanel();
   for (const s of Object.values(activeFilters)) s.clear();
+  for (const s of Object.values(excludeFilters)) s.clear();
   for (const s of Object.values(allOpts)) s.clear();
   for (const k of Object.keys(filterSearch)) filterSearch[k] = '';
   nameFilter = restoreNameFilter;
   if (restoreFilters) {
     for (const [k, vals] of Object.entries(restoreFilters)) {
       for (const v of vals) activeFilters[k].add(v);
+    }
+  }
+  if (restoreExcludeFilters) {
+    for (const [k, vals] of Object.entries(restoreExcludeFilters)) {
+      for (const v of vals) excludeFilters[k].add(v);
     }
   }
   document.getElementById('how-it-works').hidden = true;
@@ -847,8 +859,8 @@ function renderPanel() {
       <div class="panel-section-title">${title}</div>
       <div class="panel-tags">${(dim === 'tags' ? [...items] : [...items].sort((a, b) => a.localeCompare(b))).map(v => {
         if (dim) {
-          const active = activeFilters[dim].has(v) ? ' active' : '';
-          return `<button class="panel-tag panel-tag-btn${active}" data-dim="${dim}" data-val="${esc(v)}">${esc(v)}</button>`;
+          const state = activeFilters[dim].has(v) ? 'include' : excludeFilters[dim].has(v) ? 'exclude' : 'none';
+          return `<button class="panel-tag panel-tag-btn" data-state="${state}" data-dim="${dim}" data-val="${esc(v)}">${esc(v)}</button>`;
         }
         return `<span class="panel-tag">${esc(v)}</span>`;
       }).join('')}</div>
@@ -1005,19 +1017,30 @@ function updateFilterUrl() {
   // Append filter values in fixed dimension order, each sorted alphabetically
   for (const { key, param } of FILTER_DIMS) {
     [...activeFilters[key]].sort(cmp).forEach(v => params.append(param, v));
+    [...excludeFilters[key]].sort(cmp).forEach(v => params.append(param, '!' + v));
   }
   history.replaceState(null, '', `?${params}`);
 }
 
 function hasActiveFilters() {
-  return nameFilter !== '' || FILTER_DIMS.some(d => activeFilters[d.key].size > 0);
+  return nameFilter !== '' || FILTER_DIMS.some(d => activeFilters[d.key].size > 0 || excludeFilters[d.key].size > 0);
 }
 
 function gameMatchesFilters(game, filtersActive = hasActiveFilters()) {
   if (!filtersActive) return true;
   if (nameFilter && !game.name.toLowerCase().includes(nameFilter.toLowerCase())) return false;
-  if (!FILTER_DIMS.some(d => activeFilters[d.key].size > 0)) return true;
+  const hasInclude = FILTER_DIMS.some(d => activeFilters[d.key].size > 0);
+  const hasExclude = FILTER_DIMS.some(d => excludeFilters[d.key].size > 0);
+  if (!hasInclude && !hasExclude) return true;
   if (game.loading) return false;
+  if (hasExclude) {
+    for (const { key } of FILTER_DIMS) {
+      if (!excludeFilters[key].size) continue;
+      const vals = key === 'tags' ? game.details?.tags : game.details?.meta?.[key];
+      if (vals?.some(v => excludeFilters[key].has(v))) return false;
+    }
+  }
+  if (!hasInclude) return true;
   return FILTER_DIMS.every(({ key }) => {
     if (!activeFilters[key].size) return true;
     const vals = key === 'tags' ? game.details?.tags : game.details?.meta?.[key];
@@ -1066,28 +1089,28 @@ function updateFilterOptions(meta, tags) {
     if (!optsContainer) continue;
 
     for (const v of newByKey[key]) {
-      const label = document.createElement('label');
-      label.className = 'filter-opt';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.dataset.dim = key;
-      cb.value = v;
-      label.appendChild(cb);
-      label.appendChild(document.createTextNode(' ' + v));
+      const btn = document.createElement('button');
+      btn.className = 'filter-opt';
+      btn.dataset.dim = key;
+      btn.dataset.val = v;
+      btn.dataset.state = 'none';
+      btn.textContent = v;
 
       if (filterSearch[key] && !v.toLowerCase().includes(filterSearch[key].toLowerCase())) {
-        label.style.display = 'none';
+        btn.style.display = 'none';
       }
 
       // Insert in sorted position
       const existing = [...optsContainer.querySelectorAll('.filter-opt')];
-      const after = existing.find(el => (el.querySelector('input')?.value ?? '').localeCompare(v) > 0);
-      if (after) optsContainer.insertBefore(label, after);
-      else optsContainer.appendChild(label);
+      const after = existing.find(el => (el.dataset.val ?? '').localeCompare(v) > 0);
+      if (after) optsContainer.insertBefore(btn, after);
+      else optsContainer.appendChild(btn);
 
-      cb.addEventListener('change', () => {
-        if (cb.checked) activeFilters[key].add(v);
-        else activeFilters[key].delete(v);
+      btn.addEventListener('click', () => {
+        const { dim, val } = btn.dataset;
+        if (btn.dataset.state === 'none') { activeFilters[dim].add(val); }
+        else if (btn.dataset.state === 'include') { activeFilters[dim].delete(val); excludeFilters[dim].add(val); }
+        else { excludeFilters[dim].delete(val); }
         refreshTable();
         updateFilterUrl();
         renderFilterPanel();
@@ -1100,9 +1123,9 @@ function applySearch(dim, query) {
   const q = query.toLowerCase();
   const inp = document.querySelector(`input[data-search-dim="${dim}"]`);
   if (!inp) return;
-  inp.closest('.filter-dim').querySelectorAll('.filter-opt').forEach(label => {
-    const val = label.querySelector('input')?.value ?? '';
-    label.style.display = !q || val.toLowerCase().includes(q) ? '' : 'none';
+  inp.closest('.filter-dim').querySelectorAll('.filter-opt').forEach(el => {
+    const val = el.dataset.val ?? '';
+    el.style.display = !q || val.toLowerCase().includes(q) ? '' : 'none';
   });
 }
 
@@ -1110,15 +1133,22 @@ function renderFilterPanel() {
   const activeDims = FILTER_DIMS.filter(d => allOpts[d.key].size > 0);
   if (!activeDims.length) return;
 
-  const totalActive = FILTER_DIMS.reduce((n, d) => n + activeFilters[d.key].size, 0) + (nameFilter ? 1 : 0);
+  const totalActive = FILTER_DIMS.reduce((n, d) => n + activeFilters[d.key].size + excludeFilters[d.key].size, 0) + (nameFilter ? 1 : 0);
 
-  const chips = FILTER_DIMS.flatMap(d =>
-    [...activeFilters[d.key]].sort().map(v => `
-      <span class="filter-chip" data-chip-dim="${d.key}" data-chip-val="${esc(v)}">
-        <span class="filter-chip-label">${esc(d.label)}: ${esc(v)}</span>
-        <span class="filter-chip-x">×</span>
-      </span>`)
-  ).join('');
+  const chips = [
+    ...FILTER_DIMS.flatMap(d =>
+      [...activeFilters[d.key]].sort().map(v => `
+        <span class="filter-chip" data-chip-dim="${d.key}" data-chip-val="${esc(v)}">
+          <span class="filter-chip-label">${esc(d.label)}: ${esc(v)}</span>
+          <span class="filter-chip-x">×</span>
+        </span>`)),
+    ...FILTER_DIMS.flatMap(d =>
+      [...excludeFilters[d.key]].sort().map(v => `
+        <span class="filter-chip filter-chip--exclude" data-chip-dim="${d.key}" data-chip-val="${esc(v)}" data-chip-exclude="1">
+          <span class="filter-chip-label">not ${esc(d.label)}: ${esc(v)}</span>
+          <span class="filter-chip-x">×</span>
+        </span>`)),
+  ].join('');
 
   document.getElementById('filter-panel').innerHTML = `
     <div class="card">
@@ -1136,12 +1166,10 @@ function renderFilterPanel() {
             <div class="filter-dim-title">${d.label}</div>
             <input class="filter-search" type="search" placeholder="Search…" data-search-dim="${d.key}" value="${esc(filterSearch[d.key])}">
             <div class="filter-opts">
-              ${[...allOpts[d.key]].sort().map(v => `
-                <label class="filter-opt">
-                  <input type="checkbox" data-dim="${d.key}" value="${esc(v)}"${activeFilters[d.key].has(v) ? ' checked' : ''}>
-                  ${esc(v)}
-                </label>
-              `).join('')}
+              ${[...allOpts[d.key]].sort().map(v => {
+                const state = excludeFilters[d.key].has(v) ? 'exclude' : activeFilters[d.key].has(v) ? 'include' : 'none';
+                return `<button class="filter-opt" data-dim="${d.key}" data-val="${esc(v)}" data-state="${state}">${esc(v)}</button>`;
+              }).join('')}
             </div>
           </div>`).join('')}
       </div>
@@ -1156,11 +1184,12 @@ function renderFilterPanel() {
     });
   }
 
-  document.getElementById('filter-panel').querySelectorAll('input[data-dim]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const dim = cb.dataset.dim;
-      if (cb.checked) activeFilters[dim].add(cb.value);
-      else activeFilters[dim].delete(cb.value);
+  document.getElementById('filter-panel').querySelectorAll('button.filter-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const { dim, val } = btn.dataset;
+      if (btn.dataset.state === 'none') { activeFilters[dim].add(val); }
+      else if (btn.dataset.state === 'include') { activeFilters[dim].delete(val); excludeFilters[dim].add(val); }
+      else { excludeFilters[dim].delete(val); }
       refreshTable();
       updateFilterUrl();
       renderFilterPanel();
@@ -1178,7 +1207,8 @@ function renderFilterPanel() {
 
   document.getElementById('filter-panel').querySelectorAll('.filter-chip').forEach(chip => {
     chip.addEventListener('click', () => {
-      activeFilters[chip.dataset.chipDim].delete(chip.dataset.chipVal);
+      const { chipDim, chipVal, chipExclude } = chip.dataset;
+      (chipExclude ? excludeFilters : activeFilters)[chipDim].delete(chipVal);
       refreshTable();
       updateFilterUrl();
       renderFilterPanel();
@@ -1189,6 +1219,7 @@ function renderFilterPanel() {
   if (clearBtn) {
     clearBtn.addEventListener('click', () => {
       for (const s of Object.values(activeFilters)) s.clear();
+      for (const s of Object.values(excludeFilters)) s.clear();
       nameFilter = '';
       refreshTable();
       updateFilterUrl();

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Filters: each option now cycles through three states — include (✓, blue), exclude (✕, red), and off — so you can hide games with a specific tag, genre, category, developer, or publisher; excluded filters appear as red "not Tag: …" chips and are preserved in the URL (e.g. `?tag=!Horror`)
+
 ### Changed
 
 - Side panel: "Owned by" now shows individual Steam accounts as separate chips instead of merging all accounts in a slot into one
