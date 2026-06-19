@@ -89,6 +89,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   initPanelSwipe();
   initHeroSwipe();
+  // Close the lightbox when the user exits fullscreen via browser controls (back button, Esc)
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && lightboxShots.length) closeLightbox();
+  });
+  document.addEventListener('webkitfullscreenchange', () => {
+    if (!document.webkitFullscreenElement && lightboxShots.length) closeLightbox();
+  });
   loadFromUrl();
 });
 
@@ -522,14 +529,19 @@ function openLightbox(idx) {
   if (!lightboxShots.length) return;
   lightboxIdx = idx;
   renderLightbox();
-  getLightbox().classList.add('open');
+  const lb = getLightbox();
+  lb.classList.add('open');
   document.body.classList.add('lb-open');
+  (lb.requestFullscreen?.() ?? lb.webkitRequestFullscreen?.())?.catch?.(() => {});
 }
 
 function closeLightbox() {
   lightboxShots = [];
   getLightbox().classList.remove('open');
   document.body.classList.remove('lb-open');
+  if (document.fullscreenElement || document.webkitFullscreenElement) {
+    (document.exitFullscreen?.() ?? document.webkitExitFullscreen?.())?.catch?.(() => {});
+  }
 }
 
 function stepLightbox(dir) {
