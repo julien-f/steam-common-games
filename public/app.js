@@ -53,6 +53,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.closest('.panel-hero-next')) { heroIdx++; renderPanelHero(); return; }
     if (e.target.closest('.panel-hero-img')) openLightbox(heroIdx);
   });
+  document.getElementById('panel-hero').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.closest('.panel-hero-img')) { e.preventDefault(); openLightbox(heroIdx); }
+  });
 
   document.getElementById('game-panel').addEventListener('click', e => {
     const btn = e.target.closest('.panel-tag-btn');
@@ -650,8 +653,8 @@ function renderPanelHero() {
   const cls = `panel-hero-img${isShot ? ' panel-hero-img--shot' : ''}`;
 
   const mainHtml = current.type === 'video'
-    ? `<video class="${cls}" muted loop playsinline></video>`
-    : `<img class="${cls}" src="${esc(current.main)}" alt="${esc(panelGame.name)}">`;
+    ? `<video class="${cls}" tabindex="0" role="button" aria-label="Open in lightbox" muted loop playsinline></video>`
+    : `<img class="${cls}" tabindex="0" role="button" aria-label="Open in lightbox" src="${esc(current.main)}" alt="${esc(panelGame.name)}">`;
 
   hero.innerHTML = `
     <div class="panel-hero-main">
