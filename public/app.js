@@ -88,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }).catch(() => {});
 
   initPanelSwipe();
+  initHeroSwipe();
   loadFromUrl();
 });
 
@@ -498,6 +499,21 @@ function getLightbox() {
     if (e.key === 'ArrowLeft')  { e.preventDefault(); stepLightbox(-1); }
     if (e.key === 'ArrowRight') { e.preventDefault(); stepLightbox(1); }
   });
+  // Swipe left/right to navigate, swipe down to close
+  let lbX = 0, lbY = 0, lbActive = false;
+  lb.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    lbX = e.touches[0].clientX; lbY = e.touches[0].clientY; lbActive = true;
+  }, { passive: true });
+  lb.addEventListener('touchend', e => {
+    if (!lbActive) return;
+    lbActive = false;
+    const dx = e.changedTouches[0].clientX - lbX;
+    const dy = e.changedTouches[0].clientY - lbY;
+    if (Math.abs(dx) > Math.abs(dy) * 1.2 && Math.abs(dx) > 50) stepLightbox(dx < 0 ? 1 : -1);
+    else if (dy > 80 && Math.abs(dy) > Math.abs(dx)) closeLightbox();
+  }, { passive: true });
+  lb.addEventListener('touchcancel', () => { lbActive = false; }, { passive: true });
   return lb;
 }
 
@@ -623,6 +639,40 @@ function renderPanelNav() {
   document.getElementById('panel-next').addEventListener('click', () => {
     if (idx < list.length - 1) openPanel(list[idx + 1]);
   });
+}
+
+function initHeroSwipe() {
+  const hero = document.getElementById('panel-hero');
+  let startX = 0, startY = 0, tracking = false, decided = false, isHoriz = false;
+
+  hero.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1 || e.target.closest('.panel-filmstrip')) return;
+    startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+    tracking = true; decided = false; isHoriz = false;
+  }, { passive: true });
+
+  hero.addEventListener('touchmove', e => {
+    if (!tracking || e.touches.length !== 1) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (!decided) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      isHoriz = Math.abs(dx) > Math.abs(dy) * 1.2;
+      decided = true;
+    }
+    if (isHoriz) e.stopPropagation(); // don't let panel-close swipe fire
+  }, { passive: true });
+
+  hero.addEventListener('touchend', e => {
+    if (!tracking || !isHoriz) { tracking = false; return; }
+    tracking = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) < 40) return;
+    heroIdx += dx < 0 ? 1 : -1;
+    renderPanelHero();
+  }, { passive: true });
+
+  hero.addEventListener('touchcancel', () => { tracking = false; }, { passive: true });
 }
 
 function initPanelSwipe() {
