@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Game table: show a small capsule thumbnail per game, lazy-loaded as rows scroll into view
 - Side panel: added IsThereAnyDeal link in the Links section
 
 ### Fixed

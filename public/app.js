@@ -444,6 +444,7 @@ function renderPage() {
         <div class="table-wrap">
           <table>
             <thead><tr>
+              <th class="td-thumb"></th>
               ${thHtml('name', 'Game')}
               ${thHtml('score', 'Score')}
               ${thHtml('main', 'Main Story')}
@@ -1066,9 +1067,11 @@ function reconcileTbody(tbody, desired) {
   for (const tr of existing.values()) tr.remove();
 }
 
-// Render the four <td> cells for a new <tr> (active class is set by syncRow).
+// Render the five <td> cells for a new <tr> (active class is set by syncRow).
 function rowCells(game) {
-  return `<td class="td-name">${esc(game.name)}</td>
+  const thumb = game.details?.meta?.capsule ?? '';
+  return `<td class="td-thumb"><img class="game-thumb" src="${esc(thumb)}" alt="" loading="lazy" width="120" height="45" onerror="this.style.visibility='hidden'"></td>
+    <td class="td-name">${esc(game.name)}</td>
     <td class="td-score">${renderScoreCell(game)}</td>
     <td class="td-hltb">${renderMainCell(game)}</td>
     <td class="td-hltb">${renderExtraCell(game)}</td>`;
@@ -1080,10 +1083,12 @@ function syncRow(tr, game) {
   const cells = tr.cells;
   if (!cells.length) { tr.innerHTML = rowCells(game); return; }
 
-  cells[0].innerHTML = esc(game.name);
-  cells[1].innerHTML = renderScoreCell(game);
-  cells[2].innerHTML = renderMainCell(game);
-  cells[3].innerHTML = renderExtraCell(game);
+  const capsule = game.details?.meta?.capsule;
+  if (capsule) { const img = cells[0].querySelector('img'); if (img && img.src !== capsule) { img.src = capsule; img.style.visibility = ''; } }
+  cells[1].innerHTML = esc(game.name);
+  cells[2].innerHTML = renderScoreCell(game);
+  cells[3].innerHTML = renderMainCell(game);
+  cells[4].innerHTML = renderExtraCell(game);
 }
 
 // ── Sorting ────────────────────────────────────────────────────────────────

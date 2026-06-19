@@ -337,7 +337,33 @@ test('getAppDetails: returns genres, categories, developers and publishers', asy
 test('getAppDetails: handles missing optional fields with empty arrays', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
-  assert.deepEqual(await getAppDetails(400), { genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, metacritic: null, movies: [], screenshots: [] });
+  assert.deepEqual(await getAppDetails(400), { genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, metacritic: null, capsule: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg', movies: [], screenshots: [] });
+});
+
+test('getAppDetails: uses capsule_imagev5 when present', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {
+    capsule_imagev5: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_231x87.jpg',
+    capsule_image:   'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg',
+  }));
+  const result = await getAppDetails(400);
+  assert.equal(result.capsule, 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_231x87.jpg');
+});
+
+test('getAppDetails: falls back to capsule_image when capsule_imagev5 is absent', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {
+    capsule_image: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg',
+  }));
+  const result = await getAppDetails(400);
+  assert.equal(result.capsule, 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg');
+});
+
+test('getAppDetails: falls back to constructed sm_120 URL when no capsule fields present', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
+  const result = await getAppDetails(400);
+  assert.equal(result.capsule, 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg');
 });
 
 test('getAppDetails: extracts movies with hls field', async (t) => {

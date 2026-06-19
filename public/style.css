@@ -189,6 +189,10 @@ tbody tr:hover { background: rgba(42,71,94,0.45); }
 
 tbody td { padding: 9px 14px; vertical-align: middle; }
 
+/* Thumbnail cell */
+.td-thumb { width: 128px; padding: 0; }
+.game-thumb { display: block; width: 120px; height: 45px; object-fit: cover; border-radius: 2px; }
+
 /* Game name cell */
 .td-name { min-width: 200px; }
 .td-name a { color: var(--text0); text-decoration: none; font-weight: 500; }
