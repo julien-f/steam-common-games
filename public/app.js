@@ -709,11 +709,12 @@ function renderHeroMain(items) {
 }
 
 function setupHeroImg(hero) {
-  hero.style.display = '';
+  const main = hero.querySelector('.panel-hero-main');
+  if (main) main.style.display = '';
   const heroEl = hero.querySelector('.panel-hero-img');
   heroEl.classList.add('loading');
   heroEl.onload  = () => heroEl.classList.remove('loading');
-  heroEl.onerror = () => { hero.style.display = 'none'; };
+  heroEl.onerror = () => { heroEl.closest('.panel-hero-main').style.display = 'none'; };
 }
 
 let panelPrevFocus = null;

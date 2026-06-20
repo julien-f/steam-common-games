@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
-- Side panel: hero banner and filmstrip could stay hidden after navigating away from a game whose header image failed to load
+- Side panel: a failed hero image now only hides the main image area, not the whole section including the filmstrip; the filmstrip also no longer stays hidden after navigating to a new game
 
 ### Fixed
 
