@@ -769,15 +769,15 @@ function renderPanelNav() {
   const list = sortedGames(panelGame.groupKey);
   const idx = list.findIndex(g => g.appid === panelGame.appid);
   nav.innerHTML = `
-    <button class="panel-nav-btn" id="panel-prev"${idx <= 0 ? ' disabled' : ''} aria-label="Previous game">↑</button>
+    <button class="panel-nav-btn" id="panel-prev" aria-label="Previous game">↑</button>
     <span class="panel-nav-pos">${idx + 1} / ${list.length}</span>
-    <button class="panel-nav-btn" id="panel-next"${idx >= list.length - 1 ? ' disabled' : ''} aria-label="Next game">↓</button>
+    <button class="panel-nav-btn" id="panel-next" aria-label="Next game">↓</button>
   `;
   document.getElementById('panel-prev').addEventListener('click', () => {
-    if (idx > 0) openPanel(list[idx - 1]);
+    openPanel(list[(idx - 1 + list.length) % list.length]);
   });
   document.getElementById('panel-next').addEventListener('click', () => {
-    if (idx < list.length - 1) openPanel(list[idx + 1]);
+    openPanel(list[(idx + 1) % list.length]);
   });
 }
 

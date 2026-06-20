@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Side panel: ↑/↓ navigation buttons now roll over (last game wraps to first, and vice versa)
+
 ### Fixed
 
 - Side panel: focus now lands on the hero image when the panel opens, instead of the close button
