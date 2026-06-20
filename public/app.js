@@ -709,6 +709,7 @@ function renderHeroMain(items) {
 }
 
 function setupHeroImg(hero) {
+  hero.style.display = '';
   const heroEl = hero.querySelector('.panel-hero-img');
   heroEl.classList.add('loading');
   heroEl.onload  = () => heroEl.classList.remove('loading');

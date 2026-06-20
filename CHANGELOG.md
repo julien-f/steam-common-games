@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Side panel: hero banner and filmstrip could stay hidden after navigating away from a game whose header image failed to load
+
+### Fixed
+
 - Side panel: focus now lands on the hero image when the panel opens, instead of the close button
 
 ### Added
