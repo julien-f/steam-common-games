@@ -567,7 +567,11 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   flex-shrink: 0;
   cursor: pointer;
   display: inline-flex;
+  border: none;
+  padding: 0;
+  background: none;
 }
+.panel-film-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 2px; }
 .panel-film-item.is-video::after {
   content: '▶';
   position: absolute;
@@ -739,6 +743,9 @@ body.lb-open { overflow: hidden; }
   border-radius: 4px;
   box-shadow: 0 8px 40px rgba(0,0,0,0.6);
   display: block;
+  transition: opacity 0.18s;
+  transform-origin: center center;
+  user-select: none;
 }
 .lb-video {
   position: relative;
@@ -789,6 +796,24 @@ body.lb-open { overflow: hidden; }
   transition: background 0.15s;
 }
 .lb-fullscreen:hover { background: rgba(26,159,255,0.5); }
+.lb-share {
+  position: absolute;
+  top: 12px;
+  left: 62px;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #fff;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.lb-share:hover { background: rgba(26,159,255,0.5); }
 .lb-close {
   position: absolute;
   top: 12px;

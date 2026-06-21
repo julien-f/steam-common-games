@@ -6,8 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Lightbox: screenshots and videos are now directly linkable — the URL gains `?shot=banner|v<id>|s<id>` whenever the lightbox is open and is restored on page load; a share button (🔗) in the lightbox copies the current URL to clipboard
+- Lightbox: scroll wheel (or pinch on touch) zooms images up to 4×; drag or single-finger pan when zoomed; zoom resets on navigation
+- Lightbox: `F` key toggles fullscreen (mirrors the existing fullscreen button)
+- Lightbox: video items now show their thumbnail as a poster frame while the stream initialises
+
 ### Changed
 
+- Lightbox: images fade in on navigation instead of appearing abruptly
+- Side panel filmstrip: items are now `<button>` elements — keyboard-focusable and Tab-navigable, with a visible focus ring
 - Side panel: ↑/↓ navigation buttons now roll over (last game wraps to first, and vice versa)
 
 ### Fixed
