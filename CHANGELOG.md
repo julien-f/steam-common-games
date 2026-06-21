@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- Lightbox: media now fills the full viewport (removed `max-width: 96vw` / `max-height: 92vh` margins and rounded corners)
 - Extracted `buildMediaItems`/`resolveShotIndex` into `public/mediaItems.js` and `FILTER_DIMS`/`parseUrlState` into `public/urlState.js`; both modules are covered by unit tests
 - Lightbox: images fade in on navigation instead of appearing abruptly
 - Side panel filmstrip: items are now `<button>` elements — keyboard-focusable and Tab-navigable, with a visible focus ring
