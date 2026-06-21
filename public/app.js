@@ -16,6 +16,8 @@ let heroIdx = 0;          // current carousel position in the panel hero
 let lightboxShots = [];   // screenshots array for the currently open lightbox
 let lightboxIdx   = 0;
 let lbZoom = 1, lbPanX = 0, lbPanY = 0;
+const randomQueues = new Map(); // groupKey → remaining shuffled games
+let randomGroupKey = null;      // groupKey of the active random session, or null
 
 
 // Filter state — reset on each new search
@@ -31,6 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('search-btn').addEventListener('click', findCommonGames);
 
   document.getElementById('results').addEventListener('click', e => {
+    const randomBtn = e.target.closest('.group-random-btn');
+    if (randomBtn) { pickRandom(randomBtn.dataset.group); return; }
     const row = e.target.closest('tr.game-row');
     if (!row || e.target.closest('a')) return;
     const appid = Number(row.dataset.appid);
@@ -87,6 +91,11 @@ document.addEventListener('DOMContentLoaded', () => {
       heroIdx = (heroIdx + (e.key === 'ArrowRight' ? 1 : -1) + total) % total;
       renderPanelHero();
       document.getElementById('panel-hero').querySelector('.panel-hero-img')?.focus();
+      return;
+    }
+    if ((e.key === 'r' || e.key === 'R') && !lightboxShots.length) {
+      e.preventDefault();
+      pickRandom(panelGame.groupKey);
       return;
     }
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
@@ -423,6 +432,7 @@ function renderPage() {
         <div class="group-header">
           <span class="group-title">${usersHtml}</span>
           <span class="group-meta">${count} game${count !== 1 ? 's' : ''}</span>
+          <button type="button" class="group-random-btn" data-group="${key}" aria-label="Pick a random game from this group" title="Pick a random game">🎲</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -806,7 +816,39 @@ function setupHeroImg(hero) {
 
 let panelPrevFocus = null;
 
-function openPanel(game) {
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function pickRandom(groupKey) {
+  const filtered = sortedGames(groupKey);
+  if (!filtered.length) return;
+
+  let queue = randomQueues.get(groupKey) || [];
+  // Rebuild queue if exhausted or the filtered set changed (different set of appids)
+  const filteredIds = new Set(filtered.map(g => g.appid));
+  const queueValid = queue.length > 0 && queue.every(g => filteredIds.has(g.appid));
+  if (!queueValid) {
+    const remaining = shuffle(filtered).filter(g => g.appid !== panelGame?.appid);
+    queue = remaining.length ? remaining : shuffle(filtered);
+  }
+
+  const pick = queue.shift();
+  randomQueues.set(groupKey, queue);
+  randomGroupKey = groupKey;
+  openPanel(pick, { isRandom: true });
+}
+
+function openPanel(game, { isRandom = false } = {}) {
+  if (!isRandom) {
+    randomGroupKey = null;
+    randomQueues.clear();
+  }
   panelGame = game;
   heroIdx = 0;
   panelPrevFocus = document.activeElement;
@@ -825,6 +867,7 @@ function openPanel(game) {
 function closePanel({ updateUrl = true } = {}) {
   if (!panelGame) return;
   panelGame = null;
+  randomGroupKey = null;
   document.getElementById('game-panel').classList.remove('open');
   document.getElementById('panel-backdrop').classList.remove('open');
   document.querySelector('.container').inert = false;
@@ -877,12 +920,16 @@ function renderPanelNav() {
     <button class="panel-nav-btn" id="panel-prev" aria-label="Previous game">↑</button>
     <span class="panel-nav-pos">${idx + 1} / ${list.length}</span>
     <button class="panel-nav-btn" id="panel-next" aria-label="Next game">↓</button>
+    <button class="panel-nav-btn panel-nav-reroll" id="panel-reroll" aria-label="Pick a random game" title="Pick a random game">🎲</button>
   `;
   document.getElementById('panel-prev').addEventListener('click', () => {
     openPanel(list[(idx - 1 + list.length) % list.length]);
   });
   document.getElementById('panel-next').addEventListener('click', () => {
     openPanel(list[(idx + 1) % list.length]);
+  });
+  document.getElementById('panel-reroll').addEventListener('click', () => {
+    pickRandom(panelGame.groupKey);
   });
 }
 
