@@ -792,10 +792,26 @@ body.lb-open { overflow: hidden; }
 .lb-btn:disabled { opacity: 0.25; cursor: default; }
 .lb-prev { left: 12px; }
 .lb-next { right: 12px; }
-.lb-fullscreen {
+.lb-toolbar {
   position: absolute;
-  top: 12px;
-  left: 12px;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  z-index: 1;
+  pointer-events: none;
+}
+.lb-toolbar-left,
+.lb-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+.lb-toolbar button {
   background: rgba(0,0,0,0.55);
   border: 1px solid rgba(255,255,255,0.15);
   color: #fff;
@@ -803,61 +819,22 @@ body.lb-open { overflow: hidden; }
   height: 40px;
   border-radius: 50%;
   cursor: pointer;
-  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: background 0.15s;
-}
-.lb-fullscreen:hover { background: rgba(26,159,255,0.5); }
-.lb-share {
-  position: absolute;
-  top: 12px;
-  left: 62px;
-  background: rgba(0,0,0,0.55);
-  border: 1px solid rgba(255,255,255,0.15);
-  color: #fff;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  cursor: pointer;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s;
-}
-.lb-share:hover { background: rgba(26,159,255,0.5); }
-.lb-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: rgba(0,0,0,0.55);
-  border: 1px solid rgba(255,255,255,0.15);
-  color: #fff;
   font-size: 22px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  cursor: pointer;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s;
 }
+.lb-fullscreen:hover,
+.lb-share:hover { background: rgba(26,159,255,0.5); }
 .lb-close:hover { background: rgba(200,60,60,0.7); }
 .lb-counter {
-  position: absolute;
-  bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%);
   color: rgba(255,255,255,0.7);
   font-size: 13px;
   background: rgba(0,0,0,0.5);
   padding: 3px 10px;
   border-radius: 10px;
-  z-index: 1;
+  pointer-events: none;
 }
 
 .panel-links { display: flex; gap: 8px; flex-wrap: wrap; }

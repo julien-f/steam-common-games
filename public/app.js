@@ -568,10 +568,16 @@ function getLightbox() {
     <img class="lb-img" src="" alt="Screenshot">
     <video class="lb-video" controls playsinline></video>
     <button class="lb-btn lb-next" aria-label="Next screenshot">&#8250;</button>
-    <button class="lb-fullscreen" aria-label="Enter fullscreen">${LB_FS_ENTER}</button>
-    <button class="lb-share" aria-label="Copy link to this screenshot">${LB_LINK_ICON}</button>
-    <button class="lb-close" aria-label="Close lightbox">&#215;</button>
-    <div class="lb-counter"></div>`;
+    <div class="lb-toolbar">
+      <div class="lb-toolbar-left">
+        <button class="lb-fullscreen" aria-label="Enter fullscreen">${LB_FS_ENTER}</button>
+        <button class="lb-share" aria-label="Copy link to this screenshot">${LB_LINK_ICON}</button>
+      </div>
+      <div class="lb-counter"></div>
+      <div class="lb-toolbar-right">
+        <button class="lb-close" aria-label="Close lightbox">&#215;</button>
+      </div>
+    </div>`;
   document.body.appendChild(lb);
   lb.querySelector('.lb-backdrop').addEventListener('click', closeLightbox);
   lb.querySelector('.lb-close').addEventListener('click', closeLightbox);
@@ -636,6 +642,21 @@ function getLightbox() {
     if (!lbDragging) return;
     lbDragging = false;
     lbImg.style.cursor = lbZoom > 1 ? 'grab' : '';
+  });
+  lbImg.addEventListener('dblclick', e => {
+    if (lbZoom > 1) {
+      resetLbZoom();
+    } else {
+      // zoom 2× towards the clicked point
+      const rect = lbImg.getBoundingClientRect();
+      const cx = e.clientX - rect.left - rect.width  / 2;
+      const cy = e.clientY - rect.top  - rect.height / 2;
+      lbZoom = 2;
+      lbPanX = -cx;
+      lbPanY = -cy;
+      applyLbTransform();
+      lbImg.style.cursor = 'grab';
+    }
   });
   // Touch: swipe to navigate/close; pinch to zoom; single-finger pan when zoomed
   let lbX = 0, lbY = 0, lbActive = false;
@@ -744,6 +765,26 @@ function renderLightbox() {
   lb.querySelector('.lb-counter').textContent = `${lightboxIdx + 1} / ${lightboxShots.length}`;
   lb.querySelector('.lb-prev').disabled = lightboxShots.length <= 1;
   lb.querySelector('.lb-next').disabled = lightboxShots.length <= 1;
+  // Preload prev and next images so navigation feels instant
+  for (const offset of [-1, 1]) {
+    const adjacent = lightboxShots[(lightboxIdx + offset + lightboxShots.length) % lightboxShots.length];
+    if (adjacent && adjacent.type !== 'video' && adjacent.main !== shot.main) {
+      let pre = lb.querySelector(`.lb-preload[data-src="${CSS.escape(adjacent.main)}"]`);
+      if (!pre) {
+        pre = document.createElement('img');
+        pre.className = 'lb-preload';
+        pre.dataset.src = adjacent.main;
+        pre.src = adjacent.main;
+        pre.style.cssText = 'position:absolute;width:0;height:0;opacity:0;pointer-events:none';
+        lb.appendChild(pre);
+      }
+    }
+  }
+  // Drop stale preloads (keep only prev/next)
+  const keep = new Set(
+    [-1, 1].map(o => lightboxShots[(lightboxIdx + o + lightboxShots.length) % lightboxShots.length]?.main)
+  );
+  lb.querySelectorAll('.lb-preload').forEach(el => { if (!keep.has(el.dataset.src)) el.remove(); });
 }
 
 // ── Side panel ─────────────────────────────────────────────────────────────

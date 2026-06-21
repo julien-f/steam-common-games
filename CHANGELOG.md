@@ -17,6 +17,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - Lightbox: media now fills the full viewport (removed `max-width: 96vw` / `max-height: 92vh` margins and rounded corners)
+- Lightbox: double-click image to zoom 2× towards the clicked point; double-click again to reset
+- Lightbox: adjacent images are preloaded in hidden elements so prev/next navigation is instant
+- Lightbox: counter moved to top-centre (was bottom-centre, now overlapped the image at 100vh)
+- Lightbox: top-bar controls consolidated into a single `.lb-toolbar` flex row (left: fullscreen + share, centre: counter, right: close) replacing four independently absolute-positioned elements
 - Extracted `buildMediaItems`/`resolveShotIndex` into `public/mediaItems.js` and `FILTER_DIMS`/`parseUrlState` into `public/urlState.js`; both modules are covered by unit tests
 - Lightbox: images fade in on navigation instead of appearing abruptly
 - Side panel filmstrip: items are now `<button>` elements — keyboard-focusable and Tab-navigable, with a visible focus ring
