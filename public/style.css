@@ -850,3 +850,108 @@ body.lb-open { overflow: hidden; }
   transition: border-color 0.15s, color 0.15s;
 }
 .panel-link:hover { border-color: var(--accent); color: var(--accent2); }
+
+/* Site footer */
+.site-footer {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text2);
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.site-footer kbd {
+  font-family: inherit;
+  font-size: 11px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--text1);
+}
+
+/* Keyboard shortcuts modal */
+kbd {
+  font-family: inherit;
+  font-size: 11px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 2px 6px;
+  color: var(--text0);
+  white-space: nowrap;
+}
+.shortcuts-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.shortcuts-backdrop.open { opacity: 1; pointer-events: auto; }
+.shortcuts-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -48%);
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  z-index: 201;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.shortcuts-modal.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+}
+.shortcuts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.shortcuts-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text0);
+  letter-spacing: 0.2px;
+}
+.shortcuts-close {
+  background: none;
+  border: none;
+  color: var(--text1);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.shortcuts-close:hover { color: var(--text0); }
+.shortcuts-body { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 16px; }
+.shortcuts-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text2);
+  margin-bottom: 8px;
+}
+.shortcuts-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--text1);
+}
+.shortcuts-row:last-child { margin-bottom: 0; }
+.shortcuts-row span { margin-left: 4px; }

@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Keyboard shortcuts modal: press `?` anywhere (outside an input) to open a cheatsheet of all keyboard shortcuts; `Esc` dismisses it; a subtle hint in the page footer points users to it
 - Pick Random Game: each group header has a 🎲 button that opens the side panel with a random game from that group (respecting active filters); the side panel nav always shows a 🎲 re-roll button (also `R` key) to pick another game from the same group, avoiding repeats until the whole group has been seen
 - Lightbox: screenshots and videos are now directly linkable — the URL gains `?shot=banner|v<id>|s<id>` whenever the lightbox is open and is restored on page load; a share button (🔗) in the lightbox copies the current URL to clipboard
 - Lightbox: scroll wheel (or pinch on touch) zooms images up to 4×; drag or single-finger pan when zoomed; zoom resets on navigation

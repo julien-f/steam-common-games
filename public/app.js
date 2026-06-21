@@ -44,6 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('panel-backdrop').addEventListener('click', closePanel);
   document.getElementById('panel-close').addEventListener('click', closePanel);
+  document.getElementById('shortcuts-backdrop').addEventListener('click', closeShortcuts);
+  document.querySelector('.shortcuts-close').addEventListener('click', closeShortcuts);
   document.getElementById('panel-hero').addEventListener('click', e => {
     const thumb = e.target.closest('.panel-film-item');
     if (thumb) { heroIdx = Number(thumb.dataset.idx); renderPanelHero(); return; }
@@ -79,11 +81,13 @@ document.addEventListener('DOMContentLoaded', () => {
         closeLightbox();
         return;
       }
+      if (document.getElementById('shortcuts-modal').classList.contains('open')) { closeShortcuts(); return; }
       closePanel(); return;
     }
-    if (!panelGame) return;
+    if (e.key === '?') { e.preventDefault(); toggleShortcuts(); return; }
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (!panelGame) return;
     if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !lightboxShots.length) {
       const total = 1 + (panelGame.details?.meta?.movies?.length || 0) + (panelGame.details?.meta?.screenshots?.length || 0);
       if (total <= 1) return;
@@ -917,6 +921,21 @@ function closePanel({ updateUrl = true } = {}) {
   panelPrevFocus = null;
   refreshTable(); // remove active highlight
   if (updateUrl) setPanelParam(null);
+}
+
+function openShortcuts() {
+  document.getElementById('shortcuts-modal').classList.add('open');
+  document.getElementById('shortcuts-backdrop').classList.add('open');
+}
+
+function closeShortcuts() {
+  document.getElementById('shortcuts-modal').classList.remove('open');
+  document.getElementById('shortcuts-backdrop').classList.remove('open');
+}
+
+function toggleShortcuts() {
+  if (document.getElementById('shortcuts-modal').classList.contains('open')) closeShortcuts();
+  else openShortcuts();
 }
 
 function setPanelParam(appid) {
