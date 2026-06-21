@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- Extracted `buildMediaItems`/`resolveShotIndex` into `public/mediaItems.js` and `FILTER_DIMS`/`parseUrlState` into `public/urlState.js`; both modules are covered by unit tests
 - Lightbox: images fade in on navigation instead of appearing abruptly
 - Side panel filmstrip: items are now `<button>` elements — keyboard-focusable and Tab-navigable, with a visible focus ring
 - Side panel: ↑/↓ navigation buttons now roll over (last game wraps to first, and vice versa)

@@ -17,13 +17,6 @@ let lightboxShots = [];   // screenshots array for the currently open lightbox
 let lightboxIdx   = 0;
 let lbZoom = 1, lbPanX = 0, lbPanY = 0;
 
-const FILTER_DIMS = [
-  { key: 'tags',       label: 'Tag',       param: 'tag'   },
-  { key: 'genres',     label: 'Genre',     param: 'genre' },
-  { key: 'categories', label: 'Category',  param: 'cat'   },
-  { key: 'developers', label: 'Developer', param: 'dev'   },
-  { key: 'publishers', label: 'Publisher', param: 'pub'   },
-];
 
 // Filter state — reset on each new search
 const activeFilters = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set()]));
@@ -129,23 +122,11 @@ window.addEventListener('popstate', loadFromUrl);
 function loadFromUrl() {
   // Each u= param is a comma-joined list of accounts for one logical player slot.
   // Old single-account URLs (?u=alice&u=bob) parse naturally as single-member slots.
-  const params = new URLSearchParams(location.search);
-  const urlSlots = params.getAll('u')
-    .map(s => s.split(',').map(v => v.trim()).filter(Boolean));
+  const { slots, sort: restoreSort, filters: restoreFilters, nameFilter: restoreNameFilter, shot: restoreShot } = parseUrlState(location.search);
   const container = document.getElementById('user-inputs');
   container.innerHTML = '';
-  if (urlSlots.length >= 1 && urlSlots.every(s => s.length > 0)) {
-    urlSlots.forEach(accounts => addPlayerSlot(accounts));
-    const restoreFilters = Object.fromEntries(
-      FILTER_DIMS.map(d => [d.key, params.getAll(d.param)])
-    );
-    const sortParam = params.get('sort');
-    const restoreSort = sortParam ? {
-      col: sortParam.startsWith('-') ? sortParam.slice(1) : sortParam,
-      dir: sortParam.startsWith('-') ? -1 : 1,
-    } : null;
-    const restoreNameFilter = params.get('name') ?? '';
-    const restoreShot = params.get('shot');
+  if (slots.length >= 1 && slots.every(s => s.length > 0)) {
+    slots.forEach(accounts => addPlayerSlot(accounts));
     findCommonGames({ pushState: false, restoreFilters, restoreSort, restoreNameFilter, restoreShot });
   } else {
     addPlayerSlot();
@@ -704,20 +685,8 @@ function getLightbox() {
 }
 
 function openLightbox(idxOrShotId) {
-  const bannerUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${panelGame.appid}/header.jpg`;
-  const shots = panelGame?.details?.meta?.screenshots || [];
-  const movies = panelGame?.details?.meta?.movies || [];
-  lightboxShots = [
-    { type: 'image', main: bannerUrl, shotId: 'banner' },
-    ...movies.map(m => ({ type: 'video', hls: m.hls, thumb: m.thumbnail, shotId: `v${m.id}` })),
-    ...shots.map(s => ({ type: 'image', main: s.full, shotId: `s${s.id}` })),
-  ];
-  if (typeof idxOrShotId === 'string') {
-    const found = lightboxShots.findIndex(s => s.shotId === idxOrShotId);
-    lightboxIdx = found >= 0 ? found : 0;
-  } else {
-    lightboxIdx = Math.max(0, Math.min(idxOrShotId, lightboxShots.length - 1));
-  }
+  lightboxShots = buildMediaItems(panelGame.appid, panelGame.details?.meta);
+  lightboxIdx = resolveShotIndex(lightboxShots, idxOrShotId);
   renderLightbox();
   getLightbox().classList.add('open');
   document.body.classList.add('lb-open');
@@ -770,14 +739,7 @@ function renderLightbox() {
 // ── Side panel ─────────────────────────────────────────────────────────────
 
 function getPanelItems() {
-  const bannerUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${panelGame.appid}/header.jpg`;
-  const shots = panelGame.details?.meta?.screenshots || [];
-  const movies = panelGame.details?.meta?.movies || [];
-  return [
-    { type: 'image', main: bannerUrl, thumb: bannerUrl },
-    ...movies.map(m => ({ type: 'video', hls: m.hls, thumb: m.thumbnail })),
-    ...shots.map(s => ({ type: 'image', main: s.full, thumb: s.thumbnail })),
-  ];
+  return buildMediaItems(panelGame.appid, panelGame.details?.meta);
 }
 
 function buildPanelHero() {
