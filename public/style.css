@@ -834,8 +834,18 @@ body.lb-open { overflow: hidden; }
   background: rgba(0,0,0,0.5);
   padding: 3px 10px;
   border-radius: 10px;
-  pointer-events: none;
 }
+
+@keyframes lb-enter-right {
+  from { transform: translateX(40px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes lb-enter-left {
+  from { transform: translateX(-40px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+.lb-img.lb-anim-right { animation: lb-enter-right 0.18s ease-out forwards; }
+.lb-img.lb-anim-left  { animation: lb-enter-left  0.18s ease-out forwards; }
 
 .panel-links { display: flex; gap: 8px; flex-wrap: wrap; }
 .panel-link {

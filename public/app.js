@@ -15,7 +15,7 @@ let panelGame = null;
 let heroIdx = 0;          // current carousel position in the panel hero
 let lightboxShots = [];   // screenshots array for the currently open lightbox
 let lightboxIdx   = 0;
-let lbZoom = 1, lbPanX = 0, lbPanY = 0;
+let lbZoom = 1, lbPanX = 0, lbPanY = 0, lbLastDir = 0;
 const randomQueues = new Map(); // groupKey → remaining shuffled games
 let randomGroupKey = null;      // groupKey of the active random session, or null
 
@@ -546,9 +546,14 @@ function applyLbTransform() {
   const img = document.querySelector('#screenshot-lightbox .lb-img');
   if (!img) return;
   if (lbZoom === 1) {
+    lbPanX = 0; lbPanY = 0;
     img.style.transform = '';
     img.style.cursor = '';
   } else {
+    const maxX = img.offsetWidth  * (lbZoom - 1) / 2;
+    const maxY = img.offsetHeight * (lbZoom - 1) / 2;
+    lbPanX = Math.max(-maxX, Math.min(maxX, lbPanX));
+    lbPanY = Math.max(-maxY, Math.min(maxY, lbPanY));
     img.style.transform = `scale(${lbZoom}) translate(${lbPanX / lbZoom}px, ${lbPanY / lbZoom}px)`;
     img.style.cursor = 'grab';
   }
@@ -740,6 +745,7 @@ function closeLightbox() {
 }
 
 function stepLightbox(dir) {
+  lbLastDir = dir;
   lightboxIdx = (lightboxIdx + dir + lightboxShots.length) % lightboxShots.length;
   renderLightbox();
   setLightboxParam(lightboxShots[lightboxIdx].shotId);
@@ -750,6 +756,8 @@ function renderLightbox() {
   const shot = lightboxShots[lightboxIdx];
   const img = lb.querySelector('.lb-img');
   const vid = lb.querySelector('.lb-video');
+  const dir = lbLastDir;
+  lbLastDir = 0;
   resetLbZoom();
   if (shot.type === 'video') {
     img.style.display = 'none';
@@ -760,11 +768,20 @@ function renderLightbox() {
     stopHls(vid);
     vid.style.display = 'none';
     img.style.display = 'block';
-    img.style.opacity = '0';
-    img.onload  = () => { img.style.opacity = '1'; };
-    img.onerror = () => { img.style.opacity = '1'; };
-    img.src = shot.main;
-    if (img.complete) { img.onload = null; img.style.opacity = '1'; }
+    if (dir !== 0) {
+      img.onload = null;
+      img.style.opacity = '';
+      img.src = shot.main;
+      img.className = `lb-img lb-anim-${dir > 0 ? 'right' : 'left'}`;
+      img.addEventListener('animationend', () => { img.className = 'lb-img'; }, { once: true });
+    } else {
+      img.className = 'lb-img';
+      img.style.opacity = '0';
+      img.onload  = () => { img.style.opacity = '1'; };
+      img.onerror = () => { img.style.opacity = '1'; };
+      img.src = shot.main;
+      if (img.complete) { img.onload = null; img.style.opacity = '1'; }
+    }
   }
   lb.querySelector('.lb-counter').textContent = `${lightboxIdx + 1} / ${lightboxShots.length}`;
   lb.querySelector('.lb-prev').disabled = lightboxShots.length <= 1;
