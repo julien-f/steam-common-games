@@ -578,7 +578,7 @@ function fmtTime(s) {
 
 function showLbVc() {
   const vc = document.querySelector('#screenshot-lightbox .lb-vctrls');
-  if (!vc || vc.hidden) return;
+  if (!vc || vc.style.display === 'none') return;
   vc.classList.remove('lb-vctrls--hidden');
   clearTimeout(lbVcTimer);
 }
@@ -586,7 +586,7 @@ function showLbVc() {
 function schedHideLbVc() {
   const vc  = document.querySelector('#screenshot-lightbox .lb-vctrls');
   const vid = document.querySelector('#screenshot-lightbox .lb-video');
-  if (!vc || vc.hidden) return;
+  if (!vc || vc.style.display === 'none') return;
   clearTimeout(lbVcTimer);
   if (vid && !vid.paused) lbVcTimer = setTimeout(() => vc.classList.add('lb-vctrls--hidden'), 3000);
 }
@@ -602,7 +602,7 @@ function getLightbox() {
     <img class="lb-img" src="" alt="Screenshot">
     <video class="lb-video" playsinline></video>
     <button class="lb-btn lb-next" aria-label="Next screenshot">&#8250;</button>
-    <div class="lb-vctrls" hidden>
+    <div class="lb-vctrls" style="display:none">
       <button class="lb-vc-btn lb-vc-play" aria-label="Play">${LB_PLAY_ICON}</button>
       <span class="lb-vc-time">0:00</span>
       <input class="lb-vc-scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek">
@@ -656,7 +656,7 @@ function getLightbox() {
       }
     }
     const vc = lb.querySelector('.lb-vctrls');
-    if (vc && !vc.hidden) {
+    if (vc && vc.style.display !== 'none') {
       const vid = lb.querySelector('.lb-video');
       if (e.key === ' ' && !onScrub) { e.preventDefault(); vid.paused ? vid.play().catch(() => {}) : vid.pause(); }
       if (e.key === 'm' || e.key === 'M') { vid.muted = !vid.muted; }
@@ -817,9 +817,9 @@ function getLightbox() {
 
   vid2.addEventListener('click', () => { vid2.paused ? vid2.play().catch(() => {}) : vid2.pause(); });
 
-  lb.addEventListener('mousemove', () => { if (!vc2.hidden) { showLbVc(); schedHideLbVc(); } });
-  lb.addEventListener('mouseleave', () => { if (!vc2.hidden) schedHideLbVc(); });
-  lb.addEventListener('touchstart', () => { if (!vc2.hidden) { showLbVc(); schedHideLbVc(); } }, { passive: true });
+  lb.addEventListener('mousemove', () => { if (vc2.style.display !== 'none') { showLbVc(); schedHideLbVc(); } });
+  lb.addEventListener('mouseleave', () => { if (vc2.style.display !== 'none') schedHideLbVc(); });
+  lb.addEventListener('touchstart', () => { if (vc2.style.display !== 'none') { showLbVc(); schedHideLbVc(); } }, { passive: true });
 
   return lb;
 }
@@ -865,13 +865,13 @@ function renderLightbox() {
     img.style.display = 'none';
     vid.style.display = 'block';
     vid.poster = shot.thumb || '';
-    vc.hidden = false;
+    vc.style.display = '';
     vc.classList.remove('lb-vctrls--hidden');
     playHls(vid, shot.hls);
     schedHideLbVc();
   } else {
     stopHls(vid);
-    vc.hidden = true;
+    vc.style.display = 'none';
     clearTimeout(lbVcTimer);
     vid.style.display = 'none';
     img.style.display = 'block';

@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Lightbox: video now always fills the available viewport in both windowed and fullscreen modes (`object-fit: contain` + explicit `100vw`/`100vh` sizing, matching image behaviour)
 - Lightbox: pan is now clamped so the image cannot be dragged completely off-screen when zoomed
 
 ### Changed
