@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Refactor: extracted lightbox into `public/lightbox.js` (icons, HLS helpers, zoom/pan, video controls, DOM creation, open/close/step/render); `app.js` shrunk from 1 662 to 1 246 lines; `openLightbox` now takes `game` as an explicit first argument instead of reading the `panelGame` global; `isLightboxOpen()` replaces raw `lightboxShots.length` checks
+
 ### Added
 
 - Lightbox: custom video controls replacing the browser's native bar — play/pause button, scrubber with seek, timestamps, mute toggle; controls auto-hide after 3 s of playback inactivity and reappear on mouse move, touch, or pause; `Space` toggles play/pause, `M` toggles mute; arrow keys navigate between media as usual (scrubber focus is handled correctly)
