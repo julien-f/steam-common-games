@@ -18,6 +18,7 @@ let lightboxIdx   = 0;
 let lbZoom = 1, lbPanX = 0, lbPanY = 0, lbLastDir = 0, lbVcTimer = null;
 
 let _onLightboxParamChange = null;
+let _lbPrevFocus = null;
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
@@ -112,13 +113,29 @@ function schedHideLbVc() {
   if (vid && !vid.paused) lbVcTimer = setTimeout(() => vc.classList.add('lb-vctrls--hidden'), 3000);
 }
 
-// ── DOM creation + event wiring ────────────────────────────────────────────
+// ── Focus helpers ──────────────────────────────────────────────────────────
 
-function getLightbox() {
-  let lb = document.getElementById('screenshot-lightbox');
-  if (lb) return lb;
-  lb = document.createElement('div');
+// Returns all focusable elements that are not inside a display:none ancestor.
+function getFocusable(lb) {
+  return [...lb.querySelectorAll('button:not([disabled]), input[type="range"]')]
+    .filter(el => {
+      let node = el;
+      while (node && node !== lb) {
+        if (node.style.display === 'none') return false;
+        node = node.parentElement;
+      }
+      return true;
+    });
+}
+
+// ── DOM creation ───────────────────────────────────────────────────────────
+
+function createLightboxDom() {
+  const lb = document.createElement('div');
   lb.id = 'screenshot-lightbox';
+  lb.setAttribute('role', 'dialog');
+  lb.setAttribute('aria-modal', 'true');
+  lb.setAttribute('aria-label', 'Screenshot viewer');
   lb.innerHTML = `
     <div class="lb-backdrop"></div>
     <button class="lb-btn lb-prev" aria-label="Previous screenshot">&#8249;</button>
@@ -142,7 +159,12 @@ function getLightbox() {
         <button class="lb-close" aria-label="Close lightbox">&#215;</button>
       </div>
     </div>`;
-  document.body.appendChild(lb);
+  return lb;
+}
+
+// ── Event wiring ───────────────────────────────────────────────────────────
+
+function wireButtons(lb) {
   lb.querySelector('.lb-backdrop').addEventListener('click', closeLightbox);
   lb.querySelector('.lb-close').addEventListener('click', closeLightbox);
   lb.querySelector('.lb-share').addEventListener('click', async () => {
@@ -164,9 +186,27 @@ function getLightbox() {
       (lb.requestFullscreen?.() ?? lb.webkitRequestFullscreen?.())?.catch?.(() => {});
     }
   });
+}
+
+function wireKeyboard(lb) {
   document.addEventListener('keydown', e => {
     if (!lightboxShots.length) return;
     const onScrub = e.target.classList.contains('lb-vc-scrub');
+
+    // Focus trap
+    if (e.key === 'Tab') {
+      const focusable = getFocusable(lb);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last  = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
+      }
+      return;
+    }
+
     if (!onScrub) {
       if (e.key === 'ArrowLeft')  { e.preventDefault(); stepLightbox(-1); }
       if (e.key === 'ArrowRight') { e.preventDefault(); stepLightbox(1); }
@@ -185,7 +225,9 @@ function getLightbox() {
       if (e.key === 'm' || e.key === 'M') { vid.muted = !vid.muted; }
     }
   });
-  // Scroll to zoom image
+}
+
+function wireMouseHandlers(lb) {
   lb.addEventListener('wheel', e => {
     if (lb.querySelector('.lb-img').style.display === 'none') return;
     e.preventDefault();
@@ -194,7 +236,7 @@ function getLightbox() {
     if (lbZoom === 1) { lbPanX = 0; lbPanY = 0; }
     applyLbTransform();
   }, { passive: false });
-  // Mouse drag to pan when zoomed
+
   const lbImg = lb.querySelector('.lb-img');
   let lbDragging = false, lbDragStartX = 0, lbDragStartY = 0, lbPanStartX = 0, lbPanStartY = 0;
   lbImg.addEventListener('mousedown', e => {
@@ -231,10 +273,13 @@ function getLightbox() {
       lbImg.style.cursor = 'grab';
     }
   });
-  // Touch: swipe to navigate/close; pinch to zoom; single-finger pan when zoomed
+}
+
+function wireTouchHandlers(lb) {
   let lbX = 0, lbY = 0, lbActive = false;
   let pinchStartDist = 0, pinchStartZoom = 1;
   let touchPanning = false, touchPanStartX = 0, touchPanStartY = 0, touchPanOriginX = 0, touchPanOriginY = 0;
+
   lb.addEventListener('touchstart', e => {
     if (e.touches.length === 2) {
       if (lb.querySelector('.lb-img').style.display === 'none') return;
@@ -256,6 +301,7 @@ function getLightbox() {
       }
     }
   }, { passive: false });
+
   lb.addEventListener('touchmove', e => {
     if (e.touches.length === 2) {
       if (lb.querySelector('.lb-img').style.display === 'none') return;
@@ -274,6 +320,7 @@ function getLightbox() {
       e.preventDefault();
     }
   }, { passive: false });
+
   lb.addEventListener('touchend', e => {
     if (e.touches.length < 2) touchPanning = false;
     if (!lbActive) return;
@@ -284,14 +331,16 @@ function getLightbox() {
     if (Math.abs(dx) > Math.abs(dy) * 1.2 && Math.abs(dx) > 50) stepLightbox(dx < 0 ? 1 : -1);
     else if (dy > 80 && Math.abs(dy) > Math.abs(dx)) closeLightbox();
   }, { passive: true });
-  lb.addEventListener('touchcancel', () => { lbActive = false; touchPanning = false; }, { passive: true });
 
-  // ── Custom video controls ──────────────────────────────────────────────────
-  const vid2   = lb.querySelector('.lb-video');
-  const vc2    = lb.querySelector('.lb-vctrls');
-  const scrub  = vc2.querySelector('.lb-vc-scrub');
-  const timEl  = vc2.querySelector('.lb-vc-time');
-  const durEl  = vc2.querySelector('.lb-vc-dur');
+  lb.addEventListener('touchcancel', () => { lbActive = false; touchPanning = false; }, { passive: true });
+}
+
+function wireVideoControls(lb) {
+  const vid2    = lb.querySelector('.lb-video');
+  const vc2     = lb.querySelector('.lb-vctrls');
+  const scrub   = vc2.querySelector('.lb-vc-scrub');
+  const timEl   = vc2.querySelector('.lb-vc-time');
+  const durEl   = vc2.querySelector('.lb-vc-dur');
   const playBtn = vc2.querySelector('.lb-vc-play');
   const muteBtn = vc2.querySelector('.lb-vc-mute');
 
@@ -340,34 +389,53 @@ function getLightbox() {
 
   vid2.addEventListener('click', () => { vid2.paused ? vid2.play().catch(() => {}) : vid2.pause(); });
 
-  lb.addEventListener('mousemove', () => { if (vc2.style.display !== 'none') { showLbVc(); schedHideLbVc(); } });
+  lb.addEventListener('mousemove',  () => { if (vc2.style.display !== 'none') { showLbVc(); schedHideLbVc(); } });
   lb.addEventListener('mouseleave', () => { if (vc2.style.display !== 'none') schedHideLbVc(); });
   lb.addEventListener('touchstart', () => { if (vc2.style.display !== 'none') { showLbVc(); schedHideLbVc(); } }, { passive: true });
+}
 
+// ── Singleton getter ────────────────────────────────────────────────────────
+
+function getLightbox() {
+  let lb = document.getElementById('screenshot-lightbox');
+  if (lb) return lb;
+  lb = createLightboxDom();
+  document.body.appendChild(lb);
+  wireButtons(lb);
+  wireKeyboard(lb);
+  wireMouseHandlers(lb);
+  wireTouchHandlers(lb);
+  wireVideoControls(lb);
   return lb;
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
 function openLightbox(game, idxOrShotId) {
+  _lbPrevFocus = document.activeElement;
   lightboxShots = buildMediaItems(game.appid, game.details?.meta);
   lightboxIdx = resolveShotIndex(lightboxShots, idxOrShotId);
   renderLightbox();
-  getLightbox().classList.add('open');
+  const lb = getLightbox();
+  lb.classList.add('open');
   document.body.classList.add('lb-open');
+  lb.querySelector('.lb-close').focus();
   _onLightboxParamChange?.(lightboxShots[lightboxIdx].shotId);
 }
 
 function closeLightbox() {
   lightboxShots = [];
   clearTimeout(lbVcTimer);
-  stopHls(document.querySelector('#screenshot-lightbox .lb-video'));
-  getLightbox().classList.remove('open');
+  const lb = getLightbox();
+  stopHls(lb.querySelector('.lb-video'));
+  lb.classList.remove('open', 'lb--loading');
   document.body.classList.remove('lb-open');
   if (document.fullscreenElement || document.webkitFullscreenElement) {
     (document.exitFullscreen?.() ?? document.webkitExitFullscreen?.())?.catch?.(() => {});
   }
   _onLightboxParamChange?.(null);
+  _lbPrevFocus?.focus();
+  _lbPrevFocus = null;
 }
 
 function stepLightbox(dir) {
@@ -388,6 +456,7 @@ function renderLightbox() {
   resetLbZoom();
   if (shot.type === 'video') {
     img.style.display = 'none';
+    lb.classList.remove('lb--loading');
     vid.style.display = 'block';
     vid.poster = shot.thumb || '';
     vc.style.display = '';
@@ -409,10 +478,11 @@ function renderLightbox() {
     } else {
       img.className = 'lb-img';
       img.style.opacity = '0';
-      img.onload  = () => { img.style.opacity = '1'; };
-      img.onerror = () => { img.style.opacity = '1'; };
+      lb.classList.add('lb--loading');
+      img.onload  = () => { img.style.opacity = '1'; lb.classList.remove('lb--loading'); };
+      img.onerror = () => { img.style.opacity = '1'; lb.classList.remove('lb--loading'); };
       img.src = shot.main;
-      if (img.complete) { img.onload = null; img.style.opacity = '1'; }
+      if (img.complete) { img.onload = null; img.style.opacity = '1'; lb.classList.remove('lb--loading'); }
     }
   }
   lb.querySelector('.lb-counter').textContent = `${lightboxIdx + 1} / ${lightboxShots.length}`;

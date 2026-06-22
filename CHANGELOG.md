@@ -6,8 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Lightbox: spinner shown while the first image of a newly opened lightbox is loading; cleared on load, error, or close
+- Lightbox: `role="dialog"`, `aria-modal="true"`, `aria-label` on the lightbox element; focus moves to the close button on open and returns to the previously focused element on close; Tab/Shift+Tab are trapped within the lightbox while it is open
+
 ### Changed
 
+- Refactor: split `getLightbox()` into `createLightboxDom`, `wireButtons`, `wireKeyboard`, `wireMouseHandlers`, `wireTouchHandlers`, `wireVideoControls`
 - Refactor: extracted lightbox into `public/lightbox.js` (icons, HLS helpers, zoom/pan, video controls, DOM creation, open/close/step/render); `app.js` shrunk from 1 662 to 1 246 lines; `openLightbox` now takes `game` as an explicit first argument instead of reading the `panelGame` global; `isLightboxOpen()` replaces raw `lightboxShots.length` checks
 
 ### Added

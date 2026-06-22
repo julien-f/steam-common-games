@@ -909,6 +909,18 @@ body.lb-open { overflow: hidden; }
 }
 .lb-img.lb-anim-right { animation: lb-enter-right 0.18s ease-out forwards; }
 .lb-img.lb-anim-left  { animation: lb-enter-left  0.18s ease-out forwards; }
+#screenshot-lightbox.lb--loading::after {
+  content: '';
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255,255,255,0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+  z-index: 2;
+  pointer-events: none;
+}
 
 .panel-links { display: flex; gap: 8px; flex-wrap: wrap; }
 .panel-link {
