@@ -15,7 +15,7 @@ let panelGame = null;
 let heroIdx = 0;          // current carousel position in the panel hero
 let lightboxShots = [];   // screenshots array for the currently open lightbox
 let lightboxIdx   = 0;
-let lbZoom = 1, lbPanX = 0, lbPanY = 0, lbLastDir = 0;
+let lbZoom = 1, lbPanX = 0, lbPanY = 0, lbLastDir = 0, lbVcTimer = null;
 const randomQueues = new Map(); // groupKey → remaining shuffled games
 let randomGroupKey = null;      // groupKey of the active random session, or null
 
@@ -506,7 +506,11 @@ function updateProgress(loaded, total) {
 const LB_FS_ENTER  = `<svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" aria-hidden="true"><polyline points="4,1 1,1 1,4"/><polyline points="8,1 11,1 11,4"/><polyline points="1,8 1,11 4,11"/><polyline points="11,8 11,11 8,11"/></svg>`;
 const LB_LINK_ICON = `<svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M5.5 8.5a3 3 0 0 0 4.24 0l1.42-1.42a3 3 0 0 0-4.24-4.24l-.71.71"/><path d="M8.5 5.5a3 3 0 0 0-4.24 0L2.84 6.92a3 3 0 0 0 4.24 4.24l.71-.71"/></svg>`;
 const LB_CHECK_ICON = `<svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,7 5.5,11 12,3"/></svg>`;
-const LB_FS_EXIT  = `<svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" aria-hidden="true"><polyline points="1,4 1,1 4,1"/><polyline points="11,4 11,1 8,1"/><polyline points="4,11 1,11 1,8"/><polyline points="8,11 11,11 11,8"/></svg>`;
+const LB_FS_EXIT   = `<svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" aria-hidden="true"><polyline points="1,4 1,1 4,1"/><polyline points="11,4 11,1 8,1"/><polyline points="4,11 1,11 1,8"/><polyline points="8,11 11,11 11,8"/></svg>`;
+const LB_PLAY_ICON  = `<svg viewBox="0 0 12 12" width="16" height="16" fill="currentColor" aria-hidden="true"><polygon points="2,1 11,6 2,11"/></svg>`;
+const LB_PAUSE_ICON = `<svg viewBox="0 0 12 12" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="1" y="1" width="4" height="10" rx="0.5"/><rect x="7" y="1" width="4" height="10" rx="0.5"/></svg>`;
+const LB_VOL_ICON   = `<svg viewBox="0 0 14 12" width="16" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><polygon points="1,4 5,4 8,1 8,11 5,8 1,8" fill="currentColor" stroke="none"/><path d="M10 3.5c1 .9 1.5 1.7 1.5 2.5S11 8.1 10 9" stroke-linecap="round"/></svg>`;
+const LB_MUTE_ICON  = `<svg viewBox="0 0 14 12" width="16" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><polygon points="1,4 5,4 8,1 8,11 5,8 1,8" fill="currentColor" stroke="none"/><line x1="10.5" y1="4" x2="13.5" y2="8" stroke-linecap="round"/><line x1="13.5" y1="4" x2="10.5" y2="8" stroke-linecap="round"/></svg>`;
 
 function syncLightboxFullscreenBtn() {
   const btn = document.querySelector('#screenshot-lightbox .lb-fullscreen');
@@ -566,6 +570,27 @@ function resetLbZoom() {
 
 // ── Screenshot lightbox ────────────────────────────────────────────────────
 
+function fmtTime(s) {
+  if (!isFinite(s) || s < 0) return '0:00';
+  const m = Math.floor(s / 60);
+  return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+}
+
+function showLbVc() {
+  const vc = document.querySelector('#screenshot-lightbox .lb-vctrls');
+  if (!vc || vc.hidden) return;
+  vc.classList.remove('lb-vctrls--hidden');
+  clearTimeout(lbVcTimer);
+}
+
+function schedHideLbVc() {
+  const vc  = document.querySelector('#screenshot-lightbox .lb-vctrls');
+  const vid = document.querySelector('#screenshot-lightbox .lb-video');
+  if (!vc || vc.hidden) return;
+  clearTimeout(lbVcTimer);
+  if (vid && !vid.paused) lbVcTimer = setTimeout(() => vc.classList.add('lb-vctrls--hidden'), 3000);
+}
+
 function getLightbox() {
   let lb = document.getElementById('screenshot-lightbox');
   if (lb) return lb;
@@ -575,8 +600,15 @@ function getLightbox() {
     <div class="lb-backdrop"></div>
     <button class="lb-btn lb-prev" aria-label="Previous screenshot">&#8249;</button>
     <img class="lb-img" src="" alt="Screenshot">
-    <video class="lb-video" controls playsinline></video>
+    <video class="lb-video" playsinline></video>
     <button class="lb-btn lb-next" aria-label="Next screenshot">&#8250;</button>
+    <div class="lb-vctrls" hidden>
+      <button class="lb-vc-btn lb-vc-play" aria-label="Play">${LB_PLAY_ICON}</button>
+      <span class="lb-vc-time">0:00</span>
+      <input class="lb-vc-scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek">
+      <span class="lb-vc-dur">0:00</span>
+      <button class="lb-vc-btn lb-vc-mute" aria-label="Mute">${LB_VOL_ICON}</button>
+    </div>
     <div class="lb-toolbar">
       <div class="lb-toolbar-left">
         <button class="lb-fullscreen" aria-label="Enter fullscreen">${LB_FS_ENTER}</button>
@@ -611,14 +643,23 @@ function getLightbox() {
   });
   document.addEventListener('keydown', e => {
     if (!lightboxShots.length) return;
-    if (e.key === 'ArrowLeft')  { e.preventDefault(); stepLightbox(-1); }
-    if (e.key === 'ArrowRight') { e.preventDefault(); stepLightbox(1); }
+    const onScrub = e.target.classList.contains('lb-vc-scrub');
+    if (!onScrub) {
+      if (e.key === 'ArrowLeft')  { e.preventDefault(); stepLightbox(-1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); stepLightbox(1); }
+    }
     if (e.key === 'f' || e.key === 'F') {
       if (document.fullscreenElement || document.webkitFullscreenElement) {
         (document.exitFullscreen?.() ?? document.webkitExitFullscreen?.())?.catch?.(() => {});
       } else {
         (lb.requestFullscreen?.() ?? lb.webkitRequestFullscreen?.())?.catch?.(() => {});
       }
+    }
+    const vc = lb.querySelector('.lb-vctrls');
+    if (vc && !vc.hidden) {
+      const vid = lb.querySelector('.lb-video');
+      if (e.key === ' ' && !onScrub) { e.preventDefault(); vid.paused ? vid.play().catch(() => {}) : vid.pause(); }
+      if (e.key === 'm' || e.key === 'M') { vid.muted = !vid.muted; }
     }
   });
   // Scroll to zoom image
@@ -721,6 +762,65 @@ function getLightbox() {
     else if (dy > 80 && Math.abs(dy) > Math.abs(dx)) closeLightbox();
   }, { passive: true });
   lb.addEventListener('touchcancel', () => { lbActive = false; touchPanning = false; }, { passive: true });
+
+  // ── Custom video controls ──────────────────────────────────────────────────
+  const vid2   = lb.querySelector('.lb-video');
+  const vc2    = lb.querySelector('.lb-vctrls');
+  const scrub  = vc2.querySelector('.lb-vc-scrub');
+  const timEl  = vc2.querySelector('.lb-vc-time');
+  const durEl  = vc2.querySelector('.lb-vc-dur');
+  const playBtn = vc2.querySelector('.lb-vc-play');
+  const muteBtn = vc2.querySelector('.lb-vc-mute');
+
+  const updateScrubBg = () => {
+    const pct = scrub.value * 100;
+    scrub.style.backgroundImage =
+      `linear-gradient(to right, var(--accent) ${pct}%, rgba(255,255,255,0.25) ${pct}%)`;
+  };
+
+  vid2.addEventListener('timeupdate', () => {
+    if (!vid2.duration) return;
+    scrub.value = vid2.currentTime / vid2.duration;
+    timEl.textContent = fmtTime(vid2.currentTime);
+    updateScrubBg();
+  });
+  vid2.addEventListener('durationchange', () => { durEl.textContent = fmtTime(vid2.duration); });
+  vid2.addEventListener('play',  () => {
+    playBtn.innerHTML = LB_PAUSE_ICON;
+    playBtn.setAttribute('aria-label', 'Pause');
+    schedHideLbVc();
+  });
+  vid2.addEventListener('pause', () => {
+    playBtn.innerHTML = LB_PLAY_ICON;
+    playBtn.setAttribute('aria-label', 'Play');
+    showLbVc();
+  });
+  vid2.addEventListener('ended', () => {
+    playBtn.innerHTML = LB_PLAY_ICON;
+    playBtn.setAttribute('aria-label', 'Play');
+    showLbVc();
+  });
+  vid2.addEventListener('volumechange', () => {
+    muteBtn.innerHTML = vid2.muted ? LB_MUTE_ICON : LB_VOL_ICON;
+    muteBtn.setAttribute('aria-label', vid2.muted ? 'Unmute' : 'Mute');
+  });
+
+  scrub.addEventListener('input', () => {
+    if (vid2.duration) vid2.currentTime = scrub.value * vid2.duration;
+    updateScrubBg();
+  });
+  scrub.addEventListener('mousedown', () => clearTimeout(lbVcTimer));
+  scrub.addEventListener('mouseup',   () => schedHideLbVc());
+
+  playBtn.addEventListener('click', () => { vid2.paused ? vid2.play().catch(() => {}) : vid2.pause(); });
+  muteBtn.addEventListener('click', () => { vid2.muted = !vid2.muted; });
+
+  vid2.addEventListener('click', () => { vid2.paused ? vid2.play().catch(() => {}) : vid2.pause(); });
+
+  lb.addEventListener('mousemove', () => { if (!vc2.hidden) { showLbVc(); schedHideLbVc(); } });
+  lb.addEventListener('mouseleave', () => { if (!vc2.hidden) schedHideLbVc(); });
+  lb.addEventListener('touchstart', () => { if (!vc2.hidden) { showLbVc(); schedHideLbVc(); } }, { passive: true });
+
   return lb;
 }
 
@@ -735,6 +835,7 @@ function openLightbox(idxOrShotId) {
 
 function closeLightbox() {
   lightboxShots = [];
+  clearTimeout(lbVcTimer);
   stopHls(document.querySelector('#screenshot-lightbox .lb-video'));
   getLightbox().classList.remove('open');
   document.body.classList.remove('lb-open');
@@ -754,18 +855,24 @@ function stepLightbox(dir) {
 function renderLightbox() {
   const lb = getLightbox();
   const shot = lightboxShots[lightboxIdx];
-  const img = lb.querySelector('.lb-img');
-  const vid = lb.querySelector('.lb-video');
-  const dir = lbLastDir;
+  const img  = lb.querySelector('.lb-img');
+  const vid  = lb.querySelector('.lb-video');
+  const vc   = lb.querySelector('.lb-vctrls');
+  const dir  = lbLastDir;
   lbLastDir = 0;
   resetLbZoom();
   if (shot.type === 'video') {
     img.style.display = 'none';
     vid.style.display = 'block';
     vid.poster = shot.thumb || '';
+    vc.hidden = false;
+    vc.classList.remove('lb-vctrls--hidden');
     playHls(vid, shot.hls);
+    schedHideLbVc();
   } else {
     stopHls(vid);
+    vc.hidden = true;
+    clearTimeout(lbVcTimer);
     vid.style.display = 'none';
     img.style.display = 'block';
     if (dir !== 0) {

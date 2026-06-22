@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Lightbox: custom video controls replacing the browser's native bar — play/pause button, scrubber with seek, timestamps, mute toggle; controls auto-hide after 3 s of playback inactivity and reappear on mouse move, touch, or pause; `Space` toggles play/pause, `M` toggles mute; arrow keys navigate between media as usual (scrubber focus is handled correctly)
 - Lightbox: smooth slide-in transition when navigating between screenshots (new image enters from the direction of travel)
 - Keyboard shortcuts modal: press `?` anywhere (outside an input) to open a cheatsheet of all keyboard shortcuts; `Esc` dismisses it; a subtle hint in the page footer points users to it
 - Pick Random Game: each group header has a 🎲 button that opens the side panel with a random game from that group (respecting active filters); the side panel nav always shows a 🎲 re-roll button (also `R` key) to pick another game from the same group, avoiding repeats until the whole group has been seen
