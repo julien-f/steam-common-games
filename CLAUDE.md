@@ -22,9 +22,12 @@ The server binds to `http://127.0.0.1:3000` by default. All settings live in `.e
 - **`lib/hltb.js`** — HLTB auth + search (`getHLTB`), plus exported `stringSimilarity` and `levenshtein` for unit testing.
 - **`lib/groupGames.js`** — Groups slot libraries by exact ownership set (`groupByOwnership`).
 - **`public/index.html`** — Single-page frontend shell (vanilla JS, no framework).
-- **`public/app.js`** — Main frontend JS (split from `index.html`).
-- **`public/utils.js`** — Shared utilities (`normalizeInput`, `scoreColor`, `fmtH`, `esc`); also exported for Node unit tests.
-- **`public/style.css`** — All page styles (split from `index.html`).
+- **`public/app.js`** — Main frontend JS: search flow, SSE streaming, rendering, panel, filtering/sorting, URL state.
+- **`public/lightbox.js`** — Screenshot/video lightbox: `initLightbox({ onParamChange })`, `openLightbox(game, idxOrShotId)`, `closeLightbox()`, `stepLightbox(dir)`, `isLightboxOpen()`. Manages its own DOM (lazy singleton), HLS playback, zoom/pan, touch/swipe, focus trap, and loading indicator. Depends on `buildMediaItems`/`resolveShotIndex` from `mediaItems.js`.
+- **`public/mediaItems.js`** — Builds the ordered media item list for a game (`buildMediaItems(appid, meta)`) and resolves a shot identifier to an index (`resolveShotIndex(shots, idxOrShotId)`). Exported for Node unit tests.
+- **`public/urlState.js`** — Parses the URL search string into structured state (`parseUrlState(search)`) and exports `FILTER_DIMS`. Exported for Node unit tests.
+- **`public/utils.js`** — Shared rendering utilities (`normalizeInput`, `scoreColor`, `fmtH`, `fmtPlaytime`, `foldStr`, `esc`, `renderScoreCell`, `renderMainCell`, `renderExtraCell`); exported for Node unit tests.
+- **`public/style.css`** — All page styles.
 
 ### Request flow
 
