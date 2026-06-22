@@ -84,6 +84,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === '?') { e.preventDefault(); toggleShortcuts(); return; }
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (e.key === '/') {
+      e.preventDefault();
+      document.querySelector('#user-inputs input[type="text"]')?.focus();
+      return;
+    }
+    if (e.key === 'Enter') {
+      const row = document.activeElement?.closest('tr.game-row');
+      if (row) {
+        const game = games.find(g => g.appid === Number(row.dataset.appid));
+        if (game) { openPanel(game); return; }
+      }
+    }
     if (!panelGame) return;
     if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !isLightboxOpen()) {
       const total = 1 + (panelGame.details?.meta?.movies?.length || 0) + (panelGame.details?.meta?.screenshots?.length || 0);
@@ -482,7 +494,7 @@ function thHtml(col, label) {
 }
 
 function rowHtml(game) {
-  return `<tr class="game-row" data-appid="${game.appid}">${rowCells(game)}</tr>`;
+  return `<tr class="game-row" tabindex="0" data-appid="${game.appid}">${rowCells(game)}</tr>`;
 }
 
 function updateProgress(loaded, total) {

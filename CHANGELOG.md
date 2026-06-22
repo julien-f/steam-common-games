@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Keyboard: `/` focuses the first search input from anywhere on the page
+- Keyboard: `Enter` on a focused game row opens the game panel
+- Keyboard: `Space` (play/pause) and `M` (mute/unmute) documented in the shortcuts modal (were already functional)
+- Keyboard: `Enter` on the panel hero image documented in the shortcuts modal (was already functional)
+- Game rows now have `tabindex="0"` so they are keyboard-navigable without first opening the panel
+
 - Lightbox: spinner shown while the first image of a newly opened lightbox is loading; cleared on load, error, or close
 - Lightbox: `role="dialog"`, `aria-modal="true"`, `aria-label` on the lightbox element; focus moves to the close button on open and returns to the previously focused element on close; Tab/Shift+Tab are trapped within the lightbox while it is open
 
