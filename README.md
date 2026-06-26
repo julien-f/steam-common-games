@@ -30,7 +30,9 @@ All settings are in `.env` (see `.env.example` for the full list with comments):
 | `HOST` | `127.0.0.1` | Interface to bind to. Use `0.0.0.0` to expose on the network. |
 | `PORT` | `3000` | HTTP port. |
 | `CACHE_TTL_MINUTES` | `60` | TTL for libraries and player profiles. |
-| `DETAILS_CACHE_TTL_MINUTES` | `10080` | TTL for ratings and HLTB data (7 days). |
+| `RESOLVE_CACHE_TTL_MINUTES` | `10080` | TTL for Steam ID resolution (7 days). |
+| `RATING_CACHE_TTL_MINUTES`  | `20160` | TTL for Steam review scores (14 days). |
+| `META_CACHE_TTL_MINUTES`    | `43200` | TTL for store metadata, HLTB, tags (30 days). |
 
 ## Development
 

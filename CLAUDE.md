@@ -16,7 +16,7 @@ The server binds to `http://127.0.0.1:3000` by default. All settings live in `.e
 
 - **`server.js`** — Express setup and route handlers only.
 - **`lib/cache.js`** — Persistent cache (`getCached`, `setCache`), disk I/O, process exit hooks.
-- **`lib/config.js`** — TTL constants (`CACHE_TTL_MS`, `DETAILS_CACHE_TTL_MS`) shared across modules.
+- **`lib/config.js`** — TTL constants (`CACHE_TTL_MS`, `RESOLVE_CACHE_TTL_MS`, `RATING_CACHE_TTL_MS`, `META_CACHE_TTL_MS`) shared across modules.
 - **`lib/dedup.js`** — In-flight request deduplicator (`createDedup`): concurrent calls for the same key share one promise.
 - **`lib/steam.js`** — Steam API calls (`resolveSteamId`, `getOwnedGames`, `getPlayerSummaries`, `getGameRating`, `getAppDetails`, `getSteamSpyTags`).
 - **`lib/hltb.js`** — HLTB auth + search (`getHLTB`), plus exported `stringSimilarity` and `levenshtein` for unit testing.
@@ -56,7 +56,9 @@ The cache is an in-memory `Map` backed by `cache.json` (written with a 5 s debou
 
 | Key prefix | TTL env var | Default | Reason |
 |---|---|---|---|
-| `resolve:`, `rating:`, `hltb:`, `meta:`, `tags:` | `DETAILS_CACHE_TTL_MINUTES` | 7 days | Stable data |
+| `resolve:` | `RESOLVE_CACHE_TTL_MINUTES` | 7 days | Steam ID resolution |
+| `rating:` | `RATING_CACHE_TTL_MINUTES` | 14 days | Steam review scores |
+| `hltb:`, `meta:`, `tags:` | `META_CACHE_TTL_MINUTES` | 30 days | Store metadata, HLTB, tags |
 | `games:`, `player:` | `CACHE_TTL_MINUTES` | 60 min | Changes when users buy games |
 
 Delete `cache.json` to force a full refresh.

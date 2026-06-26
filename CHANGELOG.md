@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Cache: split `DETAILS_CACHE_TTL_MINUTES` into three per-prefix TTLs: `RESOLVE_CACHE_TTL_MINUTES` (7 days), `RATING_CACHE_TTL_MINUTES` (14 days), `META_CACHE_TTL_MINUTES` (30 days for store metadata, HLTB, and tags); the longer defaults reduce external API calls for data that rarely changes
+
 ### Added
 
 - Keyboard: `/` focuses the first search input from anywhere on the page
