@@ -37,7 +37,7 @@ npm run dev    # restarts on file changes
 npm test       # run unit tests
 ```
 
-Cache is stored in `cache.db` (gitignored). Delete it to force a full refresh.
+Application data is stored in `db.sqlite` (gitignored); currently this is all cache tables. Run `npm run cache:clear` to wipe the cache entries without deleting the database file itself.
 
 ## Architecture
 

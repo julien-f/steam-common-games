@@ -3,6 +3,6 @@ node_modules/
 !.env.example
 cache.json
 cache.json.tmp
-cache.db
-cache.db-wal
-cache.db-shm
+db.sqlite
+db.sqlite-wal
+db.sqlite-shm

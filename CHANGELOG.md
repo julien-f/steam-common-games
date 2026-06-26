@@ -6,13 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Docs: clarified that `db.sqlite` is the application database (not purely a cache store) in README, `default.env`, and CLAUDE.md
+
 ### Added
 
+- Cache: `npm run cache:clear` wipes all cache entries without deleting the database file, preparing the database for future non-cache tables
 - Config: `default.env` (committed to repo) replaces `.env.example` and is loaded automatically as vendor defaults; create `.env` with only the values you want to override — `STEAM_API_KEY` is the only required one
 - Config: the server now exits immediately at startup with a clear error message when `STEAM_API_KEY` is missing, instead of warning after the port opens or returning 503 at request time
 
 ### Changed
 
+- Cache: renamed default database file from `cache.db` to `db.sqlite` and env var from `CACHE_FILE` to `DB_FILE` to reflect that the database will hold more than just cache data
 - Cache: replaced in-memory `Map` + `cache.json` with a SQLite database (`cache.db`) via the built-in `node:sqlite` module; WAL mode enabled; no more debounced JSON flush or process exit hooks — every write is immediately durable; set `CACHE_FILE=` for in-memory mode (used by tests); one table per TTL group (`cache_library`, `cache_resolve`, `cache_rating`, `cache_meta`) so eviction is a single `DELETE … WHERE ts < cutoff` per table and TTL changes take effect on next restart
 - Cache: renamed `CACHE_TTL_MINUTES` / `CACHE_TTL_MS` to `LIBRARY_CACHE_TTL_MINUTES` / `LIBRARY_CACHE_TTL_MS` to match the naming pattern of the other TTL env vars
 - Cache: split `DETAILS_CACHE_TTL_MINUTES` into three per-prefix TTLs: `RESOLVE_CACHE_TTL_MINUTES` (7 days), `RATING_CACHE_TTL_MINUTES` (14 days), `META_CACHE_TTL_MINUTES` (30 days for store metadata, HLTB, and tags); the longer defaults reduce external API calls for data that rarely changes

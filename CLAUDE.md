@@ -50,9 +50,9 @@ The token is cached in memory for 5 minutes (not on disk — it's session-bound)
 
 If HLTB breaks again, recent npm packages (e.g. `howlongtobeat-ts`) tend to reverse-engineer the new flow quickly and are a good first place to look.
 
-### Cache
+### Database (`db.sqlite`)
 
-The cache is a SQLite database (`cache.db`) opened via the built-in `node:sqlite` module (`DatabaseSync`). WAL mode is enabled for better concurrent write throughput. Entries are evicted at startup and lazily on read. No debounced flush or exit hooks — every write goes directly to SQLite. Set `CACHE_FILE=` (empty) in `.env` to use an in-memory database. Three TTLs apply:
+`db.sqlite` is the application database, opened via the built-in `node:sqlite` module (`DatabaseSync`). It currently holds only cache tables, but is intentionally named `db.sqlite` (not `cache.db`) to accommodate non-cache data in the future. WAL mode is enabled for better concurrent write throughput. Cache entries are evicted at startup and lazily on read; every write goes directly to SQLite (no debounced flush). Set `DB_FILE=` (empty) in `.env` to use an in-memory database. Cache TTLs:
 
 | Key prefix | TTL env var | Default | Reason |
 |---|---|---|---|
@@ -61,7 +61,7 @@ The cache is a SQLite database (`cache.db`) opened via the built-in `node:sqlite
 | `hltb:`, `meta:`, `tags:` | `META_CACHE_TTL_MINUTES` | 30 days | Store metadata, HLTB, tags |
 | `games:`, `player:` | `LIBRARY_CACHE_TTL_MINUTES` | 60 min | Changes when users buy games |
 
-Delete `cache.db` to force a full refresh.
+Run `npm run cache:clear` to wipe all cache entries without deleting the database file.
 
 ### URL / sharing
 
