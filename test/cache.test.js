@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { getCached, setCache, _reset } = require('../lib/cache');
-const { CACHE_TTL_MS } = require('../lib/config');
+const { LIBRARY_CACHE_TTL_MS } = require('../lib/config');
 
 // ── getCached ─────────────────────────────────────────────────────────────────
 
@@ -19,23 +19,23 @@ test('getCached: returns value within TTL', () => {
 });
 
 test('getCached: returns undefined when entry is expired', () => {
-  _reset([['games:k', { value: 'stale', ts: Date.now() - CACHE_TTL_MS - 1 }]]);
+  _reset([['games:k', { value: 'stale', ts: Date.now() - LIBRARY_CACHE_TTL_MS - 1 }]]);
   assert.equal(getCached('games:k'), undefined);
 });
 
 test('getCached: deletes expired entry from the cache', () => {
-  _reset([['games:k', { value: 'stale', ts: Date.now() - CACHE_TTL_MS - 1 }]]);
+  _reset([['games:k', { value: 'stale', ts: Date.now() - LIBRARY_CACHE_TTL_MS - 1 }]]);
   getCached('games:k');
   assert.equal(getCached('games:k'), undefined);
 });
 
 test('getCached: returns undefined for entry just past TTL boundary', () => {
-  _reset([['games:k', { value: 'v', ts: Date.now() - CACHE_TTL_MS - 1 }]]);
+  _reset([['games:k', { value: 'v', ts: Date.now() - LIBRARY_CACHE_TTL_MS - 1 }]]);
   assert.equal(getCached('games:k'), undefined);
 });
 
 test('getCached: returns value for entry just within TTL boundary', () => {
-  _reset([['games:k', { value: 'v', ts: Date.now() - CACHE_TTL_MS + 5_000 }]]);
+  _reset([['games:k', { value: 'v', ts: Date.now() - LIBRARY_CACHE_TTL_MS + 5_000 }]]);
   assert.equal(getCached('games:k'), 'v');
 });
 

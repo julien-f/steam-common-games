@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- Cache: replaced in-memory `Map` + `cache.json` with a SQLite database (`cache.db`) via the built-in `node:sqlite` module; WAL mode enabled; no more debounced JSON flush or process exit hooks — every write is immediately durable; set `CACHE_FILE=` for in-memory mode (used by tests); one table per TTL group (`cache_library`, `cache_resolve`, `cache_rating`, `cache_meta`) so eviction is a single `DELETE … WHERE ts < cutoff` per table and TTL changes take effect on next restart
+- Cache: renamed `CACHE_TTL_MINUTES` / `CACHE_TTL_MS` to `LIBRARY_CACHE_TTL_MINUTES` / `LIBRARY_CACHE_TTL_MS` to match the naming pattern of the other TTL env vars
 - Cache: split `DETAILS_CACHE_TTL_MINUTES` into three per-prefix TTLs: `RESOLVE_CACHE_TTL_MINUTES` (7 days), `RATING_CACHE_TTL_MINUTES` (14 days), `META_CACHE_TTL_MINUTES` (30 days for store metadata, HLTB, and tags); the longer defaults reduce external API calls for data that rarely changes
 
 ### Added

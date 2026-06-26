@@ -16,7 +16,7 @@ The server binds to `http://127.0.0.1:3000` by default. All settings live in `.e
 
 - **`server.js`** — Express setup and route handlers only.
 - **`lib/cache.js`** — Persistent cache (`getCached`, `setCache`), disk I/O, process exit hooks.
-- **`lib/config.js`** — TTL constants (`CACHE_TTL_MS`, `RESOLVE_CACHE_TTL_MS`, `RATING_CACHE_TTL_MS`, `META_CACHE_TTL_MS`) shared across modules.
+- **`lib/config.js`** — TTL constants (`LIBRARY_CACHE_TTL_MS`, `RESOLVE_CACHE_TTL_MS`, `RATING_CACHE_TTL_MS`, `META_CACHE_TTL_MS`) shared across modules.
 - **`lib/dedup.js`** — In-flight request deduplicator (`createDedup`): concurrent calls for the same key share one promise.
 - **`lib/steam.js`** — Steam API calls (`resolveSteamId`, `getOwnedGames`, `getPlayerSummaries`, `getGameRating`, `getAppDetails`, `getSteamSpyTags`).
 - **`lib/hltb.js`** — HLTB auth + search (`getHLTB`), plus exported `stringSimilarity` and `levenshtein` for unit testing.
@@ -52,14 +52,14 @@ If HLTB breaks again, recent npm packages (e.g. `howlongtobeat-ts`) tend to reve
 
 ### Cache
 
-The cache is an in-memory `Map` backed by `cache.json` (written with a 5 s debounce, flushed synchronously on exit). Two TTLs apply:
+The cache is a SQLite database (`cache.db`) opened via the built-in `node:sqlite` module (`DatabaseSync`). WAL mode is enabled for better concurrent write throughput. Entries are evicted at startup and lazily on read. No debounced flush or exit hooks — every write goes directly to SQLite. Set `CACHE_FILE=` to use an in-memory database (tests do this). Three TTLs apply:
 
 | Key prefix | TTL env var | Default | Reason |
 |---|---|---|---|
 | `resolve:` | `RESOLVE_CACHE_TTL_MINUTES` | 7 days | Steam ID resolution |
 | `rating:` | `RATING_CACHE_TTL_MINUTES` | 14 days | Steam review scores |
 | `hltb:`, `meta:`, `tags:` | `META_CACHE_TTL_MINUTES` | 30 days | Store metadata, HLTB, tags |
-| `games:`, `player:` | `CACHE_TTL_MINUTES` | 60 min | Changes when users buy games |
+| `games:`, `player:` | `LIBRARY_CACHE_TTL_MINUTES` | 60 min | Changes when users buy games |
 
 Delete `cache.json` to force a full refresh.
 
