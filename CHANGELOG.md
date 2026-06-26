@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Config: `default.env` (committed to repo) replaces `.env.example` and is loaded automatically as vendor defaults; create `.env` with only the values you want to override — `STEAM_API_KEY` is the only required one
+- Config: the server now exits immediately at startup with a clear error message when `STEAM_API_KEY` is missing, instead of warning after the port opens or returning 503 at request time
+
 ### Changed
 
 - Cache: replaced in-memory `Map` + `cache.json` with a SQLite database (`cache.db`) via the built-in `node:sqlite` module; WAL mode enabled; no more debounced JSON flush or process exit hooks — every write is immediately durable; set `CACHE_FILE=` for in-memory mode (used by tests); one table per TTL group (`cache_library`, `cache_resolve`, `cache_rating`, `cache_meta`) so eviction is a single `DELETE … WHERE ts < cutoff` per table and TTL changes take effect on next restart

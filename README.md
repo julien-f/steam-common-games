@@ -13,7 +13,7 @@ Results are grouped by who shares each game (e.g. all 3 players, or just 2 of 3)
 ## Setup
 
 ```bash
-cp .env.example .env   # then add your Steam API key
+echo "STEAM_API_KEY=your_key_here" > .env   # only required setting
 npm install
 npm start              # http://127.0.0.1:3000
 ```
@@ -22,17 +22,13 @@ Get a Steam API key at <https://steamcommunity.com/dev/apikey>.
 
 ## Configuration
 
-All settings are in `.env` (see `.env.example` for the full list with comments):
+`default.env` (committed to the repo) contains all settings with their defaults and documentation. Create a `.env` file with only the values you want to override — `STEAM_API_KEY` is the only required one:
 
-| Variable | Default | Description |
-|---|---|---|
-| `STEAM_API_KEY` | — | Required. Your Steam Web API key. |
-| `HOST` | `127.0.0.1` | Interface to bind to. Use `0.0.0.0` to expose on the network. |
-| `PORT` | `3000` | HTTP port. |
-| `LIBRARY_CACHE_TTL_MINUTES` | `60` | TTL for libraries and player profiles. |
-| `RESOLVE_CACHE_TTL_MINUTES` | `10080` | TTL for Steam ID resolution (7 days). |
-| `RATING_CACHE_TTL_MINUTES`  | `20160` | TTL for Steam review scores (14 days). |
-| `META_CACHE_TTL_MINUTES`    | `43200` | TTL for store metadata, HLTB, tags (30 days). |
+```
+STEAM_API_KEY=your_key_here
+```
+
+The full list of available settings is in `default.env`.
 
 ## Development
 
@@ -41,7 +37,7 @@ npm run dev    # restarts on file changes
 npm test       # run unit tests
 ```
 
-Cache is stored in `cache.json` (gitignored). Delete it to force a full refresh.
+Cache is stored in `cache.db` (gitignored). Delete it to force a full refresh.
 
 ## Architecture
 

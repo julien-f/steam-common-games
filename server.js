@@ -1,7 +1,5 @@
 'use strict';
 
-require('dotenv').config();
-
 process.on('unhandledRejection', (err) => {
   console.error('[unhandled rejection]', err);
 });
@@ -17,12 +15,12 @@ const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating, getApp
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 
-const HOST = process.env.HOST || '127.0.0.1';
-const PORT = process.env.PORT || 3000;
-const MAX_USERS = Number(process.env.MAX_USERS || 10);
+const HOST = process.env.HOST;
+const PORT = process.env.PORT;
+const MAX_USERS = Number(process.env.MAX_USERS);
 const TRUST_PROXY = process.env.TRUST_PROXY;
-const SEARCH_RATE_LIMIT_MAX = Number(process.env.SEARCH_RATE_LIMIT_MAX || 10);
-const DETAILS_RATE_LIMIT_MAX = Number(process.env.DETAILS_RATE_LIMIT_MAX || 300);
+const SEARCH_RATE_LIMIT_MAX = Number(process.env.SEARCH_RATE_LIMIT_MAX);
+const DETAILS_RATE_LIMIT_MAX = Number(process.env.DETAILS_RATE_LIMIT_MAX);
 
 // Rate limiting is bypassed under NODE_ENV=test so the suite isn't throttled,
 // unless a test opts in with RATE_LIMIT_ENABLED=true to exercise the limiter.
@@ -30,7 +28,7 @@ const rateLimitBypassed = () =>
   process.env.NODE_ENV === 'test' && process.env.RATE_LIMIT_ENABLED !== 'true';
 
 const app = express();
-if (TRUST_PROXY !== undefined) app.set('trust proxy', TRUST_PROXY);
+if (TRUST_PROXY) app.set('trust proxy', TRUST_PROXY);
 if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -70,12 +68,6 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.post('/api/common-games', searchLimit, async (req, res) => {
-  if (!process.env.STEAM_API_KEY) {
-    return res.status(503).json({
-      error: 'STEAM_API_KEY is not configured. Restart: STEAM_API_KEY=yourkey node server.js',
-    });
-  }
-
   // Accept { slots: [["alice", "bob"], ["charlie"]] }
   // or legacy { users: ["alice", "charlie"] } (each user becomes a single-member slot)
   let rawSlots = req.body.slots;
@@ -221,13 +213,14 @@ app.post('/api/game-details/stream', async (req, res) => {
 });
 
 if (require.main === module) {
+  if (!process.env.STEAM_API_KEY) {
+    console.error('Error: STEAM_API_KEY is not set.');
+    console.error('Add it to your .env file: STEAM_API_KEY=yourkey');
+    console.error('Get a key at: https://steamcommunity.com/dev/apikey');
+    process.exit(1);
+  }
   app.listen(PORT, HOST, () => {
     console.log(`\nSteam Common Games → http://${HOST}:${PORT}\n`);
-    if (!process.env.STEAM_API_KEY) {
-      console.warn('  ⚠  STEAM_API_KEY is not set!');
-      console.warn('  Get your key: https://steamcommunity.com/dev/apikey');
-      console.warn('  Then run: STEAM_API_KEY=yourkey node server.js\n');
-    }
   });
 }
 

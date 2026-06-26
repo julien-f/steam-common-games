@@ -121,15 +121,6 @@ test('POST /api/common-games: 400 when total users exceeds MAX_USERS', async () 
   assert.match(res.body.error, /Too many users/);
 });
 
-test('POST /api/common-games: 503 when STEAM_API_KEY is absent', async (t) => {
-  const saved = process.env.STEAM_API_KEY;
-  delete process.env.STEAM_API_KEY;
-  t.after(() => { process.env.STEAM_API_KEY = saved; });
-
-  const res = await api.post('/api/common-games').send({ slots: [[ID1], [ID2]] });
-  assert.equal(res.status, 503);
-});
-
 // ── POST /api/common-games — happy path ──────────────────────────────────────
 
 test('POST /api/common-games: 200 with groups and slots', async (t) => {

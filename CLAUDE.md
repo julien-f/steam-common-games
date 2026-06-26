@@ -5,12 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Running the app
 
 ```bash
-cp .env.example .env   # first time only — then fill in STEAM_API_KEY
-npm install            # first time only
-npm start              # or: npm run dev  (restarts on file changes)
+echo "STEAM_API_KEY=your_key_here" > .env   # first time only — only required setting
+npm install                                  # first time only
+npm start                                    # or: npm run dev  (restarts on file changes)
 ```
 
-The server binds to `http://127.0.0.1:3000` by default. All settings live in `.env` (gitignored); see `.env.example` for the full list with comments.
+The server binds to `http://127.0.0.1:3000` by default. `default.env` (committed to the repo) holds all settings with their defaults and documentation. Create `.env` (gitignored) with only the values you want to override — `STEAM_API_KEY` is the only required one. The server exits immediately at startup with a clear error message if it is missing.
 
 ## Architecture
 
@@ -52,7 +52,7 @@ If HLTB breaks again, recent npm packages (e.g. `howlongtobeat-ts`) tend to reve
 
 ### Cache
 
-The cache is a SQLite database (`cache.db`) opened via the built-in `node:sqlite` module (`DatabaseSync`). WAL mode is enabled for better concurrent write throughput. Entries are evicted at startup and lazily on read. No debounced flush or exit hooks — every write goes directly to SQLite. Set `CACHE_FILE=` to use an in-memory database (tests do this). Three TTLs apply:
+The cache is a SQLite database (`cache.db`) opened via the built-in `node:sqlite` module (`DatabaseSync`). WAL mode is enabled for better concurrent write throughput. Entries are evicted at startup and lazily on read. No debounced flush or exit hooks — every write goes directly to SQLite. Set `CACHE_FILE=` (empty) in `.env` to use an in-memory database. Three TTLs apply:
 
 | Key prefix | TTL env var | Default | Reason |
 |---|---|---|---|
@@ -61,7 +61,7 @@ The cache is a SQLite database (`cache.db`) opened via the built-in `node:sqlite
 | `hltb:`, `meta:`, `tags:` | `META_CACHE_TTL_MINUTES` | 30 days | Store metadata, HLTB, tags |
 | `games:`, `player:` | `LIBRARY_CACHE_TTL_MINUTES` | 60 min | Changes when users buy games |
 
-Delete `cache.json` to force a full refresh.
+Delete `cache.db` to force a full refresh.
 
 ### URL / sharing
 
