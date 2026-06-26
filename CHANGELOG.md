@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Steam store rate limiting (403): the store semaphore now enforces a 500 ms cooldown per slot after each request completes, capping sustained throughput at ~4 req/s instead of hammering Steam as fast as concurrency allows
+
 ### Changed
 
 - Docs: clarified that `db.sqlite` is the application database (not purely a cache store) in README, `default.env`, and CLAUDE.md
