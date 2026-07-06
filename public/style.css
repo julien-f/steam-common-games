@@ -954,6 +954,8 @@ body.lb-open { overflow: hidden; }
   padding: 1px 5px;
   color: var(--text1);
 }
+.footer-link { color: var(--text2); text-decoration: none; }
+.footer-link:hover { color: var(--accent2); }
 
 /* Keyboard shortcuts modal */
 kbd {

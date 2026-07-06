@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Library Explorer — Steam Common Games</title>
+<script type="importmap">
+{
+  "imports": {
+    "@vates/flexi-table-core": "/vendor/flexi-table-core/index.js",
+    "@vates/flexi-table-core/locales": "/vendor/flexi-table-core/locales.js",
+    "@vates/flexi-table-vanilla": "/vendor/flexi-table-vanilla.js"
+  }
+}
+</script>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .lib-page { max-width: 1600px; margin: 0 auto; padding: 24px 20px 60px; }
+  .lib-header { display: flex; align-items: baseline; gap: 20px; margin-bottom: 24px; }
+  .lib-header h1 { font-size: 22px; font-weight: 600; color: var(--accent2); }
+  .lib-back { color: var(--text1); text-decoration: none; font-size: 13px; }
+  .lib-back:hover { color: var(--accent2); }
+  .lib-form { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+  .lib-form input {
+    flex: 1; max-width: 440px;
+    padding: 9px 12px;
+    background: var(--bg3); color: var(--text0);
+    border: 1px solid var(--border); border-radius: var(--r);
+    font-size: 14px;
+  }
+  .lib-form input:focus { outline: none; border-color: var(--accent); }
+  .lib-form input::placeholder { color: var(--text2); }
+  .lib-status { font-size: 13px; color: var(--text1); margin-bottom: 12px; min-height: 18px; }
+
+  /*
+   * Override flexi-table colors to match the Steam dark theme.
+   * Variables are set on #table-container (not :root) so they win over the
+   * flexi-table's own :root defaults, which are injected into <head> after this
+   * stylesheet and would otherwise override any :root rules we define here.
+   */
+  #table-container {
+    --color-background-primary:   #17212b;
+    --color-background-secondary: #2a475e;
+    --color-text-primary:         #c6d4df;
+    --color-text-secondary:       #8f98a0;
+    --color-text-tertiary:        #4c6b8a;
+    --color-border-secondary:     #3d5068;
+    --color-border-tertiary:      #2a3f57;
+    --color-background-info:      #0d2640;
+    --color-text-info:            #66c0f4;
+    --color-border-info:          #1a4070;
+    --color-background-warning:   #2a1900;
+    --color-text-warning:         #e8a040;
+    --color-border-warning:       #4a2c00;
+  }
+
+  /* Darker header bar so it reads clearly above the data rows */
+  #table-container .ft-th { background: #0f1923 !important; }
+</style>
+</head>
+<body>
+<div class="lib-page">
+  <div class="lib-header">
+    <a class="lib-back" href="/">← Comparison tool</a>
+    <h1>Library Explorer</h1>
+  </div>
+
+  <div class="lib-form">
+    <input id="player-input" type="text"
+      placeholder="Steam ID, vanity URL, or username (comma-separated for Steam Family)">
+    <button class="btn btn-primary" id="load-btn">Load Library</button>
+  </div>
+
+  <div id="status" class="lib-status"></div>
+  <div id="table-container"></div>
+</div>
+<script type="module" src="/library.js"></script>
+</body>
+</html>

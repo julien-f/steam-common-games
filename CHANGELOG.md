@@ -6,12 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Library Explorer page (`/library.html`): browse a single player's full Steam library in a sortable/filterable/groupable table powered by `@vates/flexi-table-vanilla`. Shows score, HLTB times, playtime, Metacritic, release date, genres, developers, publishers, tags, categories, and review description. Details stream progressively via SSE as on the main page. Linked from the main page footer.
+
 ### Fixed
 
 - Steam store rate limiting (403): the store semaphore now enforces a 500 ms cooldown per slot after each request completes, capping sustained throughput at ~4 req/s instead of hammering Steam as fast as concurrency allows
 
 ### Changed
 
+- Vendored `@vates/flexi-table-core` and `@vates/flexi-table-vanilla` built JS into `public/vendor/` instead of installing from local `file:` paths; removes the local-clone prerequisite and makes the app deployable anywhere with a plain `npm install`.
 - Docs: clarified that `db.sqlite` is the application database (not purely a cache store) in README, `default.env`, and CLAUDE.md
 
 ### Added
