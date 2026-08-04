@@ -1,6 +1,6 @@
 'use strict';
 
-import { createDataTable, syncViewToUrl, createScoreBar } from '@vates/data-table-vanilla';
+import { createDataTable, syncViewToUrl, resetView, createScoreBar } from '@vates/data-table-vanilla';
 import { processData, searchData, DEFAULT_LABELS } from '@vates/data-table-core';
 
 const fmt = {
@@ -50,6 +50,7 @@ const playerInput = document.getElementById('player-input');
 const loadBtn     = document.getElementById('load-btn');
 const statusEl    = document.getElementById('status');
 const tableContainer = document.getElementById('table-container');
+const resetViewBtn = document.getElementById('reset-view-btn');
 
 let table       = null;
 let unsyncView  = null;
@@ -171,6 +172,7 @@ async function loadLibrary(playerStr) {
   if (table) { table.destroy(); table = null; }
   rows = []; rowMap = new Map(); total = 0; loaded = 0;
   tableContainer.innerHTML = '';
+  resetViewBtn.hidden = true;
 
   let result;
   try {
@@ -230,6 +232,7 @@ async function loadLibrary(playerStr) {
     onRowClick: row => openGame(row),
   });
   unsyncView = syncViewToUrl(table);
+  resetViewBtn.hidden = false;
 
   updateStatus();
 
@@ -298,6 +301,8 @@ loadBtn.addEventListener('click', () => {
   const val = playerInput.value.trim();
   if (val) loadLibrary(val);
 });
+
+resetViewBtn.addEventListener('click', () => resetView(table));
 
 playerInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') {

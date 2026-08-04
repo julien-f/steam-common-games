@@ -30,7 +30,8 @@
   }
   .lib-form input:focus { outline: none; border-color: var(--accent); }
   .lib-form input::placeholder { color: var(--text2); }
-  .lib-status { font-size: 13px; color: var(--text1); margin-bottom: 12px; min-height: 18px; }
+  .lib-status { font-size: 13px; color: var(--text1); min-height: 18px; }
+  .lib-status-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 
   /*
    * Override data-table colors to match the Steam dark theme.
@@ -71,7 +72,10 @@
     <button class="btn btn-primary" id="load-btn">Load Library</button>
   </div>
 
-  <div id="status" class="lib-status"></div>
+  <div class="lib-status-row">
+    <div id="status" class="lib-status"></div>
+    <button class="btn btn-ghost btn-sm" id="reset-view-btn" hidden>Reset view</button>
+  </div>
   <div id="table-container"></div>
 </div>
 

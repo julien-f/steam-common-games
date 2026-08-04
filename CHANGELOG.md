@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Library Explorer: every column except Name is now groupable, and Released is filterable.
 - Library Explorer: Score and Metacritic render as colored bars (`createScoreBar`, using the same color thresholds as the comparison page); Released now filters through a Year › Month › Day tree instead of a flat date checklist.
 - Library Explorer: clicking a row opens the same game detail side panel as the comparison page (hero screenshot/video carousel, score, HLTB, tags, store links), including ↑/↓/🎲 prev/next/random navigation and the ←/→/Esc keyboard shortcuts. The panel rendering itself is shared code (`public/panel.js`); the comparison page's owner list and tag-click filtering are omitted here since this page has neither multi-owner groups nor a table filter to drive. Prev/next/random walk the table's current search/filter/sort order (recomputed via `@vates/data-table-core`'s `searchData`/`processData`), not just insertion order, and cover every matching row rather than only the current page.
+- Library Explorer: "Reset view" button (next to the status line, shown once a library is loaded) clears sort/filter/group/page state back to defaults and removes the `?view=` URL param, via the new `resetView()` helper from `@vates/data-table-vanilla`.
 
 ### Fixed
 
@@ -24,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - `@vates/data-table-core` and `@vates/data-table-vanilla` are installed as regular npm dependencies; `server.js` serves their `dist/` folders under `/vendor/`, so the frontend importmap resolves them without a bundler.
 - Bumped `@vates/data-table-core`/`@vates/data-table-vanilla` to 0.2.0: filter dropdown redesigned as a searchable master-detail panel with per-value row counts (replacing the old single stacked checklist), column drag-and-drop reordering, and shift-click range selection in filter checklists and the date tree.
+- Bumped `@vates/data-table-vanilla` to 0.3.0: rows and group headers are keyboard-navigable (arrows, Home/End, Space to select, Enter to open a row/toggle a group) when `onRowClick` or `selectable` is set.
 - Extracted the game detail side panel (hero carousel, score/HLTB/tags/links, swipe gestures) from `app.js` into a new shared `public/panel.js`, used by both the comparison page and the Library Explorer. The random-pick "shuffle bag" logic moved there too, generalized to work off any list + queue key instead of just owner groups.
 - Docs: clarified that `db.sqlite` is the application database (not purely a cache store) in README, `default.env`, and CLAUDE.md
 
