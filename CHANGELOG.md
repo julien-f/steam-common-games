@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- About page (`/about.html`): explains the project, credits its data sources (Steam Web API, SteamSpy, HowLongToBeat), and summarizes what's cached and for how long. Linked from the footer of both the comparison page and Library Explorer, which also links to it now.
 - Library Explorer page (`/library.html`): browse a single player's full Steam library in a sortable/filterable/groupable table powered by `@vates/data-table-vanilla`. Shows score, HLTB times, playtime, Metacritic, release date, genres, developers, publishers, tags, categories, and review description. Details stream progressively via SSE as on the main page. Table sort/filter/group/page state is synced to the `?view=` URL param, so a copied link reproduces the same view. Linked from the main page footer.
 - Library Explorer: genres, developers, publishers, tags, and categories are multi-value columns — filtering by one of these lists individual values in the checklist instead of matching the whole joined string, and grouping by genre/developer/publisher fans a game out into every group it belongs to.
 - Library Explorer: every column except Name is now groupable, and Released is filterable.
