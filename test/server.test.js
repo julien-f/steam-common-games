@@ -182,6 +182,94 @@ test('POST /api/common-games: 400 when a library is private', async (t) => {
   assert.match(res.body.error, /private/);
 });
 
+// ── POST /api/wishlist — input validation ─────────────────────────────────────
+
+test('POST /api/wishlist: 400 when body has no members field', async () => {
+  const res = await api.post('/api/wishlist').send({});
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/wishlist: 400 when members is an empty array', async () => {
+  const res = await api.post('/api/wishlist').send({ members: [] });
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/wishlist: 400 when a member value is an empty string', async () => {
+  const res = await api.post('/api/wishlist').send({ members: [''] });
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/wishlist: 400 when members exceeds MAX_USERS', async () => {
+  // Default MAX_USERS is 10.
+  const members = Array.from({ length: 11 }, (_, i) => `7656119800000000${i}`);
+  const res = await api.post('/api/wishlist').send({ members });
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /Too many users/);
+});
+
+// ── POST /api/wishlist — happy path ───────────────────────────────────────────
+
+function makeWishlistFetch(items1 = [], items2 = []) {
+  return async (url) => {
+    if (url.includes('GetWishlist') && url.includes(ID1)) {
+      return { ok: true, json: async () => ({ response: { items: items1 } }) };
+    }
+    if (url.includes('GetWishlist') && url.includes(ID2)) {
+      return { ok: true, json: async () => ({ response: { items: items2 } }) };
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+}
+
+test('POST /api/wishlist: 200 with items for a single account', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeWishlistFetch([{ appid: 400, priority: 1, date_added: 1433965886 }]));
+
+  const res = await api.post('/api/wishlist').send({ members: [ID1] });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.items.length, 1);
+  assert.equal(res.body.items[0].appid, 400);
+  assert.equal(res.body.items[0].priority, 1);
+  assert.equal(res.body.items[0].dateAdded, '2015-06-10');
+});
+
+test('POST /api/wishlist: unions two accounts, dedupes shared appid keeping first-seen', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeWishlistFetch(
+    [{ appid: 400, priority: 1, date_added: 1433965886 }],
+    [{ appid: 400, priority: 5, date_added: 1500000000 }, { appid: 440, priority: 2, date_added: 1500000000 }],
+  ));
+
+  const res = await api.post('/api/wishlist').send({ members: [ID1, ID2] });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.items.length, 2);
+  const shared = res.body.items.find(i => i.appid === 400);
+  assert.equal(shared.priority, 1, 'first-seen account wins for a shared appid');
+  assert.ok(res.body.items.some(i => i.appid === 440));
+});
+
+test('POST /api/wishlist: an account with no items field contributes nothing', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes(ID1)) return { ok: true, json: async () => ({ response: {} }) }; // private/empty
+    if (url.includes(ID2)) return { ok: true, json: async () => ({ response: { items: [{ appid: 400, priority: 1, date_added: 1433965886 }] } }) };
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  const res = await api.post('/api/wishlist').send({ members: [ID1, ID2] });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.items.length, 1);
+  assert.equal(res.body.items[0].appid, 400);
+});
+
+test('POST /api/wishlist: 502 when Steam API returns a server error', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+
+  const res = await api.post('/api/wishlist').send({ members: [ID1] });
+  assert.equal(res.status, 502);
+});
+
 // ── GET /api/game-details/:appid — input validation ──────────────────────────
 
 test('GET /api/game-details/abc: 400 for non-numeric appid', async () => {
@@ -526,4 +614,49 @@ test('POST /api/game-details/stream: fetches fresh details and streams them', as
   assert.equal(typeof gameEvent.rating?.score, 'number');
   assert.equal(gameEvent.hltb?.main, 10);
   assert.deepEqual(gameEvent.meta?.genres, ['Action']);
+});
+
+// Wishlist rows have no name of their own (GetWishlist returns only appid/priority/
+// date_added) — the client sends name: '' for them, and fetchGameDetails must resolve
+// a name from store metadata before searching HLTB, instead of short-circuiting on the
+// empty name like it normally would (getHLTB returns null immediately when !name).
+test('POST /api/game-details/stream: resolves HLTB name from store metadata when name is empty', async (t) => {
+  _reset();
+  _resetAuth();
+  let hltbSearchCalls = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('appreviews')) {
+      return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
+    }
+    if (url.includes('steamspy.com')) {
+      return { ok: true, json: async () => ({ tags: { Action: 9054 } }) };
+    }
+    if (url.includes('appdetails')) {
+      const appid = url.match(/appids=(\d+)/)?.[1];
+      return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] } } }) };
+    }
+    if (url.includes('bleed/init')) {
+      return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
+    }
+    if (url.includes('bleed')) {
+      hltbSearchCalls++;
+      return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }] }) };
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  const server = app.listen(0);
+  t.after(() => new Promise(r => server.close(r)));
+  await new Promise(r => server.once('listening', r));
+
+  const res = await ssePost(server.address().port, '/api/game-details/stream',
+    { games: [{ appid: 701, name: '' }] });
+
+  assert.equal(res.status, 200);
+  const events = parseSseEvents(res.body);
+  const gameEvent = events.find(e => e.appid === 701);
+  assert.ok(gameEvent, 'must emit an event for the requested appid');
+  assert.equal(gameEvent.meta?.name, 'Portal');
+  assert.equal(hltbSearchCalls, 1, 'HLTB should have been searched using the name resolved from store metadata');
+  assert.equal(gameEvent.hltb?.main, 10, 'HLTB result should be present, not short-circuited to null');
 });

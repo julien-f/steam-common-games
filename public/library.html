@@ -20,6 +20,14 @@
   .lib-header h1 { font-size: 22px; font-weight: 600; color: var(--accent2); }
   .lib-back { color: var(--text1); text-decoration: none; font-size: 13px; }
   .lib-back:hover { color: var(--accent2); }
+  .lib-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+  .lib-tab {
+    padding: 7px 16px; font-size: 13px; font-weight: 500; cursor: pointer;
+    background: var(--bg3); color: var(--text2);
+    border: 1px solid var(--border); border-radius: var(--r);
+  }
+  .lib-tab[aria-selected="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .lib-tab:not([aria-selected="true"]):hover { color: var(--text0); }
   .lib-form { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
   .lib-form input {
     flex: 1; max-width: 440px;
@@ -64,6 +72,11 @@
   <div class="lib-header">
     <a class="lib-back" href="/">← Comparison tool</a>
     <h1>Library Explorer</h1>
+  </div>
+
+  <div class="lib-tabs" role="tablist">
+    <button class="lib-tab" id="tab-library" role="tab" aria-selected="true">Library</button>
+    <button class="lib-tab" id="tab-wishlist" role="tab" aria-selected="false">Wishlist</button>
   </div>
 
   <div class="lib-form">

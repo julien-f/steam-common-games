@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Library Explorer: "Reset view" button (next to the status line, shown once a library is loaded) clears sort/filter/group/page state back to defaults and removes the `?view=` URL param, via the new `resetView()` helper from `@vates/data-table-vanilla`.
 - Library Explorer: added the `?` keyboard-shortcuts dialog and `/`-to-focus-input shortcut, matching the comparison page.
 - Library Explorer: added a leftmost thumbnail column showing the store capsule image, matching the comparison page. Excluded from sort/filter/group and from full-text search (its column value is forced to `null` so the raw image URL can't match a search query — `@vates/data-table-vanilla`'s `searchData` has no per-column opt-out yet, see [vatesfr/data-table#11](https://github.com/vatesfr/data-table/issues/11)).
+- Library Explorer: added a Library/Wishlist tab toggle. The Wishlist tab shows the same table (minus playtime, plus wishlist rank and date added) for the currently loaded player(s)' Steam wishlist, unioned across accounts the same way the Library tab already unions Steam Family libraries. Read-only for now — Steam has no key-based way to mutate a wishlist, only session-authenticated calls as the logged-in user, which this app doesn't support yet. Each tab keeps independent sort/filter/group view state (`?view=` / `?wview=`) and random-pick history; switching tabs auto-fetches for whichever player(s) are loaded.
 
 ### Fixed
 

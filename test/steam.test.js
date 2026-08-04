@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags } = require('../lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags } = require('../lib/steam');
 const { _reset } = require('../lib/cache');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
@@ -196,6 +196,57 @@ test('getOwnedGames: throws user error when library is private', async (t) => {
   );
 });
 
+// ── getWishlist ───────────────────────────────────────────────────────────────
+
+test('getWishlist: fetches and returns wishlist items', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ response: { items: [{ appid: 400, priority: 1, date_added: 1433965886 }] } }),
+  }));
+
+  const items = await getWishlist('76561198000000001');
+  assert.equal(items.length, 1);
+  assert.equal(items[0].appid, 400);
+});
+
+test('getWishlist: caches result — second call skips fetch', async (t) => {
+  _reset();
+  let fetchCount = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    fetchCount++;
+    return { ok: true, json: async () => ({ response: { items: [] } }) };
+  });
+
+  await getWishlist('76561198000000002');
+  await getWishlist('76561198000000002');
+  assert.equal(fetchCount, 1, 'second call should be served from cache');
+});
+
+test('getWishlist: throws with isUpstream when Steam API returns non-ok', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+
+  await assert.rejects(
+    () => getWishlist('76561198000000003'),
+    err => err.isUpstream === true
+  );
+});
+
+test('getWishlist: returns empty array (does not throw) when response has no items field', async (t) => {
+  // Private wishlist, private profile, and a genuinely empty wishlist are all
+  // indistinguishable — all return `{"response":{}}`. Unlike getOwnedGames,
+  // getWishlist must not throw here, since there's no way to tell them apart.
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ response: {} }),
+  }));
+
+  const items = await getWishlist('76561198000000004');
+  assert.deepEqual(items, []);
+});
+
 // ── getPlayerSummaries ────────────────────────────────────────────────────────
 
 test('getPlayerSummaries: fetches and returns player list', async (t) => {
@@ -337,7 +388,14 @@ test('getAppDetails: returns genres, categories, developers and publishers', asy
 test('getAppDetails: handles missing optional fields with empty arrays', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
-  assert.deepEqual(await getAppDetails(400), { genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, metacritic: null, capsule: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg', movies: [], screenshots: [] });
+  assert.deepEqual(await getAppDetails(400), { name: null, genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, metacritic: null, capsule: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg', movies: [], screenshots: [] });
+});
+
+test('getAppDetails: extracts name field', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, { name: 'Portal' }));
+  const result = await getAppDetails(400);
+  assert.equal(result.name, 'Portal');
 });
 
 test('getAppDetails: uses capsule_imagev5 when present', async (t) => {

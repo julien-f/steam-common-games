@@ -18,7 +18,7 @@ The server binds to `http://127.0.0.1:3000` by default. `default.env` (committed
 - **`lib/cache.js`** — Persistent cache (`getCached`, `setCache`), disk I/O, process exit hooks.
 - **`lib/config.js`** — TTL constants (`LIBRARY_CACHE_TTL_MS`, `RESOLVE_CACHE_TTL_MS`, `RATING_CACHE_TTL_MS`, `META_CACHE_TTL_MS`) shared across modules.
 - **`lib/dedup.js`** — In-flight request deduplicator (`createDedup`): concurrent calls for the same key share one promise.
-- **`lib/steam.js`** — Steam API calls (`resolveSteamId`, `getOwnedGames`, `getPlayerSummaries`, `getGameRating`, `getAppDetails`, `getSteamSpyTags`).
+- **`lib/steam.js`** — Steam API calls (`resolveSteamId`, `getOwnedGames`, `getWishlist`, `getPlayerSummaries`, `getGameRating`, `getAppDetails`, `getSteamSpyTags`).
 - **`lib/hltb.js`** — HLTB auth + search (`getHLTB`), plus exported `stringSimilarity` and `levenshtein` for unit testing.
 - **`lib/groupGames.js`** — Groups slot libraries by exact ownership set (`groupByOwnership`).
 - **`public/index.html`** — Single-page frontend shell (vanilla JS, no framework).
@@ -28,7 +28,7 @@ The server binds to `http://127.0.0.1:3000` by default. `default.env` (committed
 - **`public/mediaItems.js`** — Builds the ordered media item list for a game (`buildMediaItems(appid, meta)`) and resolves a shot identifier to an index (`resolveShotIndex(shots, idxOrShotId)`). Exported for Node unit tests.
 - **`public/urlState.js`** — Parses the URL search string into structured state (`parseUrlState(search)`) and exports `FILTER_DIMS`. Exported for Node unit tests.
 - **`public/utils.js`** — Shared rendering utilities (`normalizeInput`, `scoreColor`, `fmtH`, `fmtPlaytime`, `foldStr`, `esc`, `renderScoreCell`, `renderMainCell`, `renderExtraCell`); exported for Node unit tests.
-- **`public/library.html`** / **`public/library.js`** — Library Explorer: browse one player's full Steam library in a sortable/filterable/groupable table (`@vates/data-table-vanilla`, an npm dependency; `server.js` serves its `dist/` files straight from `node_modules`, resolved via an import map in `library.html`). Reuses `panel.js`/`lightbox.js`/`mediaItems.js`/`utils.js` for the same row-click side panel as the comparison page, minus the owner list and tag-click filtering.
+- **`public/library.html`** / **`public/library.js`** — Library Explorer: browse one player's full Steam library, or their wishlist, in a sortable/filterable/groupable table (`@vates/data-table-vanilla`, an npm dependency; `server.js` serves its `dist/` files straight from `node_modules`, resolved via an import map in `library.html`). A Library/Wishlist tab toggle switches between the two; each keeps independent table view state (`?view=`/`?wview=` URL params) and random-pick history. The wishlist is read-only — Steam has no key-based way to mutate it, only session-authenticated calls as the logged-in user, which this app doesn't support. Reuses `panel.js`/`lightbox.js`/`mediaItems.js`/`utils.js` for the same row-click side panel as the comparison page, minus the owner list and tag-click filtering.
 - **`public/style.css`** — All page styles.
 
 ### Request flow
@@ -54,6 +54,10 @@ If HLTB breaks again, recent npm packages (e.g. `howlongtobeat-ts`) tend to reve
 
 **Compliance note:** `/api/bleed` is an undocumented, internal HLTB endpoint reached with spoofed browser `User-Agent`/`Referer` headers — this is not a published public API and isn't guaranteed to be sanctioned by HLTB's terms of service. Usage here is low-volume and non-commercial, but treat it as liable to break or be blocked without notice, and don't scale up request volume without revisiting this.
 
+### Wishlist — undocumented endpoint
+
+`getWishlist` calls `https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid={id}`, which is not listed in Valve's published Web API docs (same unofficial-endpoint situation as HLTB above, though no spoofed headers are needed here — it works with a plain request). A private wishlist, a private profile, and a genuinely empty wishlist are all indistinguishable: each returns `200 OK` with `{"response":{}}` (no `items` key). The app treats a missing `items` key as an empty wishlist rather than surfacing an error, since there's no way to tell those cases apart.
+
 ### Database (`db.sqlite`)
 
 `db.sqlite` is the application database, opened via the built-in `node:sqlite` module (`DatabaseSync`). It currently holds only cache tables, but is intentionally named `db.sqlite` (not `cache.db`) to accommodate non-cache data in the future. WAL mode is enabled for better concurrent write throughput. Cache entries are evicted at startup and lazily on read; every write goes directly to SQLite (no debounced flush). Set `DB_FILE=` (empty) in `.env` to use an in-memory database. Cache TTLs:
@@ -63,7 +67,7 @@ If HLTB breaks again, recent npm packages (e.g. `howlongtobeat-ts`) tend to reve
 | `resolve:` | `RESOLVE_CACHE_TTL_MINUTES` | 7 days | Steam ID resolution |
 | `rating:` | `RATING_CACHE_TTL_MINUTES` | 14 days | Steam review scores |
 | `hltb:`, `meta:`, `tags:` | `META_CACHE_TTL_MINUTES` | 30 days | Store metadata, HLTB, tags |
-| `games:`, `player:` | `LIBRARY_CACHE_TTL_MINUTES` | 60 min | Changes when users buy games |
+| `games:`, `player:`, `wishlist:` | `LIBRARY_CACHE_TTL_MINUTES` | 60 min | Changes when users buy games / edit their wishlist |
 
 Run `npm run cache:clear` to wipe all cache entries without deleting the database file.
 

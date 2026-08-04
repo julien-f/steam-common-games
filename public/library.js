@@ -62,21 +62,43 @@ const DEFAULT_VISIBLE = [
   'metacritic', 'releaseDate', 'genres', 'developers', 'tags',
 ];
 
-const playerInput = document.getElementById('player-input');
-const loadBtn     = document.getElementById('load-btn');
-const statusEl    = document.getElementById('status');
+// Same as COLUMNS minus playtime (wishlist games aren't owned, so there's no
+// playtime to show), plus two wishlist-specific columns. Unlike owned games —
+// whose name is known upfront from Steam's library API — a wishlist row's name
+// only arrives once its store metadata streams in, so it needs a loading state.
+const WISHLIST_COLUMNS = [
+  ...COLUMNS.filter(c => c.key !== 'playtime').map(c => (c.key === 'name' ? { ...c, format: fmt.str } : c)),
+  { key: 'priority',  label: 'Wishlist Rank', type: 'number', groupable: false, format: fmt.num },
+  { key: 'dateAdded', label: 'Added',         type: 'date',   groupable: true,  format: fmt.str },
+];
+
+const WISHLIST_DEFAULT_VISIBLE = [
+  'capsule', 'name', 'priority', 'dateAdded', 'score', 'reviewDesc',
+  'hltbMain', 'hltbExtra', 'metacritic', 'releaseDate', 'genres', 'developers', 'tags',
+];
+
+const playerInput   = document.getElementById('player-input');
+const loadBtn       = document.getElementById('load-btn');
+const statusEl      = document.getElementById('status');
 const tableContainer = document.getElementById('table-container');
-const resetViewBtn = document.getElementById('reset-view-btn');
+const resetViewBtn  = document.getElementById('reset-view-btn');
+const tabLibraryBtn  = document.getElementById('tab-library');
+const tabWishlistBtn = document.getElementById('tab-wishlist');
 
-let table       = null;
-let unsyncView  = null;
-let rows        = [];
-let rowMap      = new Map();
-let total       = 0;
-let loaded      = 0;
-let flushTimer  = null;
+let table         = null;
+let unsyncView    = null;
+let rows          = [];
+let rowMap        = new Map();
+let total         = 0;
+let loaded        = 0;
+let flushTimer    = null;
+let activeColumns = COLUMNS;   // COLUMNS or WISHLIST_COLUMNS, whichever tab is active
+let activeTab     = 'library'; // 'library' | 'wishlist'
+let currentPlayerStr = '';     // last player string actually loaded (not just typed)
 
-const RANDOM_QUEUE_KEY = 'library'; // single fixed key — this page only ever has one list
+// Separate shuffle history per tab, so picking randomly in one doesn't affect the other.
+const randomQueueKey = () => activeTab;
+const viewParamName  = () => (activeTab === 'wishlist' ? 'wview' : 'view');
 
 initPanel({ inertSelector: '.lib-page' });
 initLightbox();
@@ -110,8 +132,8 @@ function getGameList() {
   const filters = Object.fromEntries(
     Object.entries(view.filters ?? {}).map(([key, values]) => [key, new Set(values)])
   );
-  const searched = searchData(rows, view.searchQuery ?? '', COLUMNS);
-  return processData(searched, filters, view.rangeFilters ?? {}, view.sorts ?? [], COLUMNS, DEFAULT_LABELS.emptyValue);
+  const searched = searchData(rows, view.searchQuery ?? '', activeColumns);
+  return processData(searched, filters, view.rangeFilters ?? {}, view.sorts ?? [], activeColumns, DEFAULT_LABELS.emptyValue);
 }
 
 function renderPanelNav(game) {
@@ -134,13 +156,13 @@ function renderPanelNav(game) {
 }
 
 function openGame(game, { isRandom = false } = {}) {
-  if (!isRandom) clearRandomQueue(RANDOM_QUEUE_KEY);
+  if (!isRandom) clearRandomQueue(randomQueueKey());
   panelOpen(game);
   renderPanelNav(game);
 }
 
 function pickRandomGame() {
-  const pick = pickRandomFrom(getGameList(), RANDOM_QUEUE_KEY, getPanelGame()?.appid);
+  const pick = pickRandomFrom(getGameList(), randomQueueKey(), getPanelGame()?.appid);
   if (pick) openGame(pick, { isRandom: true });
 }
 
@@ -199,21 +221,105 @@ function updateStatus() {
   }
 }
 
-async function loadLibrary(playerStr) {
+function updateUrlParams(patch) {
   const url = new URL(location.href);
-  url.searchParams.set('u', playerStr);
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null || value === '') url.searchParams.delete(key);
+    else url.searchParams.set(key, value);
+  }
   history.pushState(null, '', url);
+}
 
-  const members = playerStr.split(',').map(s => s.trim()).filter(Boolean);
+// Applies one SSE details event (rating/hltb/meta/tags) to its row. `name` is only
+// backfilled from store metadata when the row didn't already have one — owned-game
+// rows always do (from Steam's library API); wishlist rows don't, since GetWishlist
+// returns no name at all.
+function applyDetailsEvent(row, event) {
+  row.capsule           = event.meta?.capsule ?? null;
+  if (!row.name) row.name = event.meta?.name || '';
+  row.score             = event.rating?.score ?? null;
+  row.reviewDesc        = event.rating?.desc  ?? null;
+  row.reviewsTotal      = event.rating?.total ?? null;
+  row.hltbMain          = event.hltb?.main           ?? null;
+  row.hltbExtra         = event.hltb?.extra          ?? null;
+  row.hltbCompletionist = event.hltb?.completionist  ?? null;
+  row.metacritic        = event.meta?.metacritic?.score ?? null;
+  row.releaseDate       = event.meta?.releaseDate    ?? null;
+  row.genres            = event.meta?.genres     ?? [];
+  row.developers        = event.meta?.developers ?? [];
+  row.publishers        = event.meta?.publishers ?? [];
+  row.categories        = event.meta?.categories ?? [];
+  row.tags              = event.tags ?? [];
+  row.loading           = false;
+  row.details           = { rating: event.rating, hltb: event.hltb, meta: event.meta, tags: event.tags };
+}
 
-  statusEl.textContent = 'Fetching library…';
+// Streams rating/hltb/meta/tags for `games` ({appid, name}[]) over SSE and applies
+// each event to its row in `rowMap` as it arrives. Shared by loadLibrary and loadWishlist.
+async function streamGameDetails(games) {
+  let detailsResp;
+  try {
+    detailsResp = await fetch('/api/game-details/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ games }),
+    });
+  } catch (err) {
+    statusEl.textContent = `Details stream failed: ${err.message}`;
+    return;
+  }
+
+  const reader  = detailsResp.body.getReader();
+  const decoder = new TextDecoder();
+  let   buffer  = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop();
+    for (const part of parts) {
+      const line = part.trim();
+      if (!line.startsWith('data: ')) continue;
+      let event;
+      try { event = JSON.parse(line.slice(6)); } catch { continue; }
+      if (event.done) continue;
+
+      const row = rowMap.get(event.appid);
+      if (!row) continue;
+
+      applyDetailsEvent(row, event);
+      if (isPanelOpen() && getPanelGame().appid === row.appid) { renderPanelBody(row); renderPanelNav(row); }
+
+      loaded++;
+      scheduleFlush();
+    }
+  }
+
+  if (flushTimer !== null) { clearTimeout(flushTimer); flushTimer = null; }
+  if (table) table.setData([...rows]);
+  updateStatus();
+}
+
+function resetTableState() {
   if (isPanelOpen()) panelClose();
-  clearRandomQueue(RANDOM_QUEUE_KEY);
+  clearRandomQueue(randomQueueKey());
   if (unsyncView) { unsyncView(); unsyncView = null; }
   if (table) { table.destroy(); table = null; }
   rows = []; rowMap = new Map(); total = 0; loaded = 0;
   tableContainer.innerHTML = '';
   resetViewBtn.hidden = true;
+}
+
+async function loadLibrary(playerStr) {
+  updateUrlParams({ u: playerStr });
+  currentPlayerStr = playerStr;
+
+  const members = playerStr.split(',').map(s => s.trim()).filter(Boolean);
+
+  statusEl.textContent = 'Fetching library…';
+  resetTableState();
 
   let result;
   try {
@@ -264,6 +370,7 @@ async function loadLibrary(playerStr) {
 
   rowMap = new Map(rows.map(r => [r.appid, r]));
   total = rows.length;
+  activeColumns = COLUMNS;
 
   table = createDataTable(tableContainer, {
     data: rows,
@@ -278,84 +385,115 @@ async function loadLibrary(playerStr) {
 
   updateStatus();
 
-  // Stream details over SSE
-  let detailsResp;
+  await streamGameDetails(allGames);
+}
+
+async function loadWishlist(playerStr) {
+  updateUrlParams({ u: playerStr });
+  currentPlayerStr = playerStr;
+
+  const members = playerStr.split(',').map(s => s.trim()).filter(Boolean);
+
+  statusEl.textContent = 'Fetching wishlist…';
+  resetTableState();
+
+  let result;
   try {
-    detailsResp = await fetch('/api/game-details/stream', {
+    const resp = await fetch('/api/wishlist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ games: allGames }),
+      body: JSON.stringify({ members }),
     });
+    if (!resp.ok) {
+      const { error } = await resp.json();
+      statusEl.textContent = `Error: ${error}`;
+      return;
+    }
+    result = await resp.json();
   } catch (err) {
-    statusEl.textContent = `Details stream failed: ${err.message}`;
+    statusEl.textContent = `Error: ${err.message}`;
     return;
   }
 
-  const reader  = detailsResp.body.getReader();
-  const decoder = new TextDecoder();
-  let   buffer  = '';
+  rows = result.items.map(item => ({
+    appid:              item.appid,
+    name:               undefined, // unknown until store metadata streams in
+    priority:           item.priority,
+    dateAdded:          item.dateAdded,
+    capsule:            undefined,
+    score:              undefined,
+    reviewDesc:         undefined,
+    reviewsTotal:       undefined,
+    hltbMain:           undefined,
+    hltbExtra:          undefined,
+    hltbCompletionist:  undefined,
+    metacritic:         undefined,
+    releaseDate:        undefined,
+    genres:             undefined,
+    developers:         undefined,
+    publishers:         undefined,
+    tags:               undefined,
+    categories:         undefined,
+    loading:            true,
+    details:            null,
+  }));
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const parts = buffer.split('\n\n');
-    buffer = parts.pop();
-    for (const part of parts) {
-      const line = part.trim();
-      if (!line.startsWith('data: ')) continue;
-      let event;
-      try { event = JSON.parse(line.slice(6)); } catch { continue; }
-      if (event.done) continue;
+  rowMap = new Map(rows.map(r => [r.appid, r]));
+  total = rows.length;
+  activeColumns = WISHLIST_COLUMNS;
 
-      const row = rowMap.get(event.appid);
-      if (!row) continue;
+  table = createDataTable(tableContainer, {
+    data: rows,
+    columns: WISHLIST_COLUMNS,
+    rowKey: 'appid',
+    defaultPageSize: 50,
+    defaultVisibleColumns: WISHLIST_DEFAULT_VISIBLE,
+    onRowClick: row => openGame(row),
+  });
+  unsyncView = syncViewToUrl(table, { paramName: 'wview' });
+  resetViewBtn.hidden = false;
 
-      row.capsule           = event.meta?.capsule ?? null;
-      row.score             = event.rating?.score ?? null;
-      row.reviewDesc        = event.rating?.desc  ?? null;
-      row.reviewsTotal      = event.rating?.total ?? null;
-      row.hltbMain          = event.hltb?.main           ?? null;
-      row.hltbExtra         = event.hltb?.extra          ?? null;
-      row.hltbCompletionist = event.hltb?.completionist  ?? null;
-      row.metacritic        = event.meta?.metacritic?.score ?? null;
-      row.releaseDate       = event.meta?.releaseDate    ?? null;
-      row.genres            = event.meta?.genres     ?? [];
-      row.developers        = event.meta?.developers ?? [];
-      row.publishers        = event.meta?.publishers ?? [];
-      row.categories        = event.meta?.categories ?? [];
-      row.tags              = event.tags ?? [];
-      row.loading           = false;
-      row.details           = { rating: event.rating, hltb: event.hltb, meta: event.meta, tags: event.tags };
-
-      if (isPanelOpen() && getPanelGame().appid === row.appid) { renderPanelBody(row); renderPanelNav(row); }
-
-      loaded++;
-      scheduleFlush();
-    }
-  }
-
-  if (flushTimer !== null) { clearTimeout(flushTimer); flushTimer = null; }
-  if (table) table.setData([...rows]);
   updateStatus();
+
+  await streamGameDetails(result.items.map(item => ({ appid: item.appid, name: '' })));
 }
+
+function loadCurrentTab(playerStr) {
+  return activeTab === 'wishlist' ? loadWishlist(playerStr) : loadLibrary(playerStr);
+}
+
+function setActiveTab(tab, { fetch: shouldFetch = true } = {}) {
+  if (tab === activeTab) return;
+  activeTab = tab;
+  tabLibraryBtn.setAttribute('aria-selected', String(tab === 'library'));
+  tabWishlistBtn.setAttribute('aria-selected', String(tab === 'wishlist'));
+  loadBtn.textContent = tab === 'wishlist' ? 'Load Wishlist' : 'Load Library';
+  updateUrlParams({ tab: tab === 'wishlist' ? 'wishlist' : null });
+  if (shouldFetch && currentPlayerStr) loadCurrentTab(currentPlayerStr);
+}
+
+tabLibraryBtn.addEventListener('click', () => setActiveTab('library'));
+tabWishlistBtn.addEventListener('click', () => setActiveTab('wishlist'));
 
 loadBtn.addEventListener('click', () => {
   const val = playerInput.value.trim();
-  if (val) loadLibrary(val);
+  if (val) loadCurrentTab(val);
 });
 
-resetViewBtn.addEventListener('click', () => resetView(table));
+resetViewBtn.addEventListener('click', () => resetView(table, { paramName: viewParamName() }));
 
 playerInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     const val = playerInput.value.trim();
-    if (val) loadLibrary(val);
+    if (val) loadCurrentTab(val);
   }
 });
 
-const initPlayer = new URLSearchParams(location.search).get('u');
+const initParams = new URLSearchParams(location.search);
+const initPlayer = initParams.get('u');
+if (initParams.get('tab') === 'wishlist') setActiveTab('wishlist', { fetch: false });
 if (initPlayer) {
   playerInput.value = initPlayer;
-  loadLibrary(initPlayer);
+  currentPlayerStr = initPlayer;
+  loadCurrentTab(initPlayer);
 }

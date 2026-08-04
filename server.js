@@ -11,7 +11,7 @@ const rateLimit = require('express-rate-limit');
 
 const { getCached, getCacheStats } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
-const { resolveSteamId, getOwnedGames, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags } = require('./lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 
@@ -140,14 +140,66 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
   }
 });
 
+// Wishlist has no "family" concept in Steam itself — this just unions the
+// wishlists of whichever accounts the Library Explorer page has loaded,
+// same as it unions their owned-game libraries.
+app.post('/api/wishlist', searchLimit, async (req, res) => {
+  const members = req.body.members;
+
+  if (
+    !Array.isArray(members) ||
+    members.length < 1 ||
+    !members.every(u => typeof u === 'string' && u.trim().length > 0)
+  ) {
+    return res.status(400).json({ error: 'Provide at least 1 player' });
+  }
+  if (members.length > MAX_USERS) {
+    return res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
+  }
+
+  try {
+    const ids = [...new Set(await Promise.all(members.map(resolveSteamId)))];
+    const lists = await Promise.all(ids.map(getWishlist));
+
+    // Union across accounts — first-seen wins, same rule /api/common-games uses for libraries.
+    const merged = new Map();
+    for (const list of lists) {
+      for (const item of list) {
+        if (!merged.has(item.appid)) merged.set(item.appid, item);
+      }
+    }
+
+    const items = [...merged.values()].map(item => ({
+      appid: item.appid,
+      priority: item.priority,
+      dateAdded: item.date_added ? new Date(item.date_added * 1000).toISOString().slice(0, 10) : null,
+    }));
+
+    res.json({ items });
+  } catch (err) {
+    if (err.isUpstream || err.name === 'TimeoutError') console.error('[upstream]', err.message);
+    const status = err.isUpstream ? 502 : err.name === 'TimeoutError' ? 504 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
+
 const dedupDetails = createDedup();
 
 function fetchGameDetails(appid, name) {
-  return dedupDetails(`details:${appid}`, () =>
-    Promise.allSettled([
+  return dedupDetails(`details:${appid}`, () => {
+    const metaPromise = getAppDetails(appid);
+    // Owned games always come with a name (from Steam's library API), so HLTB can
+    // search in parallel with everything else. Wishlist items have no name at all
+    // (GetWishlist returns only appid/priority/date_added) — for those, wait for
+    // store metadata and search HLTB using its `name` field instead.
+    const hltbPromise = name
+      ? getHLTB(appid, name)
+      : metaPromise.then(meta => getHLTB(appid, meta?.name || ''), () => null);
+
+    return Promise.allSettled([
       getGameRating(appid),
-      getHLTB(appid, name),
-      getAppDetails(appid),
+      hltbPromise,
+      metaPromise,
       getSteamSpyTags(appid),
     ]).then(([ratingRes, hltbRes, metaRes, tagsRes]) => {
       if (ratingRes.status === 'rejected') console.warn('[game-details] rating:', ratingRes.reason?.message);
@@ -160,8 +212,8 @@ function fetchGameDetails(appid, name) {
         meta:   metaRes.status   === 'fulfilled' ? metaRes.value   : null,
         tags:   tagsRes.status   === 'fulfilled' ? tagsRes.value   : null,
       };
-    })
-  );
+    });
+  });
 }
 
 app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
