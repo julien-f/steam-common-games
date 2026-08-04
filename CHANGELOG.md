@@ -15,11 +15,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Library Explorer: Score and Metacritic render as colored bars (`createScoreBar`, using the same color thresholds as the comparison page); Released now filters through a Year › Month › Day tree instead of a flat date checklist.
 - Library Explorer: clicking a row opens the same game detail side panel as the comparison page (hero screenshot/video carousel, score, HLTB, tags, store links), including ↑/↓/🎲 prev/next/random navigation and the ←/→/Esc keyboard shortcuts. The panel rendering itself is shared code (`public/panel.js`); the comparison page's owner list and tag-click filtering are omitted here since this page has neither multi-owner groups nor a table filter to drive. Prev/next/random walk the table's current search/filter/sort order (recomputed via `@vates/data-table-core`'s `searchData`/`processData`), not just insertion order, and cover every matching row rather than only the current page.
 - Library Explorer: "Reset view" button (next to the status line, shown once a library is loaded) clears sort/filter/group/page state back to defaults and removes the `?view=` URL param, via the new `resetView()` helper from `@vates/data-table-vanilla`.
+- Library Explorer: added the `?` keyboard-shortcuts dialog and `/`-to-focus-input shortcut, matching the comparison page.
+- Library Explorer: added a leftmost thumbnail column showing the store capsule image, matching the comparison page. Excluded from sort/filter/group and from full-text search (its column value is forced to `null` so the raw image URL can't match a search query — `@vates/data-table-vanilla`'s `searchData` has no per-column opt-out yet, see [vatesfr/data-table#11](https://github.com/vatesfr/data-table/issues/11)).
 
 ### Fixed
 
 - Steam store rate limiting (403): the store semaphore now enforces a 500 ms cooldown per slot after each request completes, capping sustained throughput at ~4 req/s instead of hammering Steam as fast as concurrency allows
 - Comparison page: loading the site with no `?u=` param (a fresh visit, or clearing all players) threw `TypeError: Assignment to constant variable` in `loadFromUrl` — a destructured `const slots` shadowed the outer player-slots state variable it was trying to reset
+- Library Explorer: `package.json` still pinned `@vates/data-table-core` to `^0.2.0` after `@vates/data-table-vanilla` was bumped to `^0.3.0` (which requires core `^0.3.0`), so the vendored core bundle served under `/vendor/` was missing an export (`isGroupCollapsed`) the vanilla bundle needs — the page's module script threw on load and the table never rendered. Bumped the pin to `^0.3.0`.
 
 ### Changed
 

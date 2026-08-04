@@ -22,7 +22,23 @@ function renderScoreBar(v) {
   return createScoreBar(v, { thresholds: SCORE_THRESHOLDS });
 }
 
+// Ignores `value` and reads `row.capsule` directly — `value` is forced to null on this column
+// (see COLUMNS below) so the raw image URL never surfaces in full-text search matches.
+function renderThumb(_, row) {
+  const img = document.createElement('img');
+  img.className = 'game-thumb';
+  img.alt = '';
+  img.loading = 'lazy';
+  img.width = 120;
+  img.height = 45;
+  if (row.capsule) img.src = row.capsule;
+  img.addEventListener('error', () => { img.style.visibility = 'hidden'; });
+  return img;
+}
+
 const COLUMNS = [
+  { key: 'capsule', label: '', width: 128, sortable: false, filterable: false, groupable: false,
+    value: () => null, render: renderThumb },
   { key: 'name',             label: 'Name',         filterable: false },
   { key: 'score',            label: 'Score',        type: 'number', groupable: true, format: fmt.num, render: renderScoreBar },
   { key: 'reviewDesc',       label: 'Reviews',      groupable: true, filterable: true, format: fmt.str },
@@ -42,7 +58,7 @@ const COLUMNS = [
 ];
 
 const DEFAULT_VISIBLE = [
-  'name', 'score', 'reviewDesc', 'hltbMain', 'hltbExtra', 'playtime',
+  'capsule', 'name', 'score', 'reviewDesc', 'hltbMain', 'hltbExtra', 'playtime',
   'metacritic', 'releaseDate', 'genres', 'developers', 'tags',
 ];
 
@@ -64,6 +80,24 @@ const RANDOM_QUEUE_KEY = 'library'; // single fixed key — this page only ever 
 
 initPanel({ inertSelector: '.lib-page' });
 initLightbox();
+
+document.getElementById('shortcuts-backdrop').addEventListener('click', closeShortcuts);
+document.querySelector('.shortcuts-close').addEventListener('click', closeShortcuts);
+
+function openShortcuts() {
+  document.getElementById('shortcuts-modal').classList.add('open');
+  document.getElementById('shortcuts-backdrop').classList.add('open');
+}
+
+function closeShortcuts() {
+  document.getElementById('shortcuts-modal').classList.remove('open');
+  document.getElementById('shortcuts-backdrop').classList.remove('open');
+}
+
+function toggleShortcuts() {
+  if (document.getElementById('shortcuts-modal').classList.contains('open')) closeShortcuts();
+  else openShortcuts();
+}
 
 // Stable order for prev/next nav — independent of the table's own live
 // sort/filter/group state, which isn't exposed by @vates/data-table-vanilla.
@@ -117,11 +151,18 @@ document.addEventListener('keydown', e => {
       closeLightbox();
       return;
     }
+    if (document.getElementById('shortcuts-modal').classList.contains('open')) { closeShortcuts(); return; }
     panelClose();
     return;
   }
+  if (e.key === '?') { e.preventDefault(); toggleShortcuts(); return; }
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (e.key === '/') {
+    e.preventDefault();
+    playerInput.focus();
+    return;
+  }
   if (!isPanelOpen()) return;
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !isLightboxOpen()) {
     if (panelStepHero(e.key === 'ArrowRight' ? 1 : -1, { wrap: true })) e.preventDefault();
@@ -202,6 +243,7 @@ async function loadLibrary(playerStr) {
       appid:              game.appid,
       name:               game.name,
       playtime:           totalMin / 60,
+      capsule:            undefined,
       score:              undefined,
       reviewDesc:         undefined,
       reviewsTotal:       undefined,
@@ -269,6 +311,7 @@ async function loadLibrary(playerStr) {
       const row = rowMap.get(event.appid);
       if (!row) continue;
 
+      row.capsule           = event.meta?.capsule ?? null;
       row.score             = event.rating?.score ?? null;
       row.reviewDesc        = event.rating?.desc  ?? null;
       row.reviewsTotal      = event.rating?.total ?? null;
