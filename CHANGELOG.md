@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Steam store rate limiting (403): the store semaphore now enforces a 500 ms cooldown per slot after each request completes, capping sustained throughput at ~4 req/s instead of hammering Steam as fast as concurrency allows
 - Comparison page: loading the site with no `?u=` param (a fresh visit, or clearing all players) threw `TypeError: Assignment to constant variable` in `loadFromUrl` — a destructured `const slots` shadowed the outer player-slots state variable it was trying to reset
 - Library Explorer: `package.json` still pinned `@vates/data-table-core` to `^0.2.0` after `@vates/data-table-vanilla` was bumped to `^0.3.0` (which requires core `^0.3.0`), so the vendored core bundle served under `/vendor/` was missing an export (`isGroupCollapsed`) the vanilla bundle needs — the page's module script threw on load and the table never rendered. Bumped the pin to `^0.3.0`.
+- Library Explorer: sorting by a secondary column had no visible effect within groups when grouped by a multi-value column (e.g. group by Tags, sort by Tags then Score) — `@vates/data-table-core` sorted rows globally before fanning them into per-value groups, using each row's full joined tag list as the sort key rather than the group's individual value, so within-group order bore no relation to the secondary sort ([vatesfr/data-table#12](https://github.com/vatesfr/data-table/issues/12)). Bumped `@vates/data-table-core`/`@vates/data-table-vanilla` to 0.4.0, which fixes this upstream.
 
 ### Changed
 
