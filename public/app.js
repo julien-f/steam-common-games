@@ -11,10 +11,8 @@ let sortDir = -1;
 let runId = 0;           // increments on each search to cancel stale updates
 let streamController = null; // AbortController for the active detail stream
 let refreshDebounceTimer = null;
-let panelGame = null;
-let heroIdx = 0;          // current carousel position in the panel hero
-const randomQueues = new Map(); // groupKey → remaining shuffled games
-let randomGroupKey = null;      // groupKey of the active random session, or null
+let activeGame = null;
+let randomGroupKey = null;      // groupKey of the active random session, or null (queues themselves live in panel.js)
 
 
 // Filter state — reset on each new search
@@ -39,38 +37,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (game) openPanel(game);
   });
 
-  document.getElementById('panel-backdrop').addEventListener('click', closePanel);
-  document.getElementById('panel-close').addEventListener('click', closePanel);
   document.getElementById('shortcuts-backdrop').addEventListener('click', closeShortcuts);
   document.querySelector('.shortcuts-close').addEventListener('click', closeShortcuts);
-  document.getElementById('panel-hero').addEventListener('click', e => {
-    const thumb = e.target.closest('.panel-film-item');
-    if (thumb) { heroIdx = Number(thumb.dataset.idx); renderPanelHero(); return; }
-    if (e.target.closest('.panel-hero-prev')) { heroIdx = Math.max(0, heroIdx - 1); renderPanelHero(); return; }
-    if (e.target.closest('.panel-hero-next')) { heroIdx++; renderPanelHero(); return; }
-    if (e.target.closest('.panel-hero-img')) openLightbox(panelGame, heroIdx);
-  });
-  document.getElementById('panel-hero').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.target.closest('.panel-hero-img')) { e.preventDefault(); openLightbox(panelGame, heroIdx); }
-  });
-  document.getElementById('panel-hero').addEventListener('wheel', e => {
-    const strip = e.target.closest('.panel-filmstrip');
-    if (!strip) return;
-    e.preventDefault();
-    strip.scrollLeft += e.deltaY || e.deltaX;
-  }, { passive: false });
 
-  document.getElementById('game-panel').addEventListener('click', e => {
-    const btn = e.target.closest('.panel-tag-btn');
-    if (!btn) return;
-    const { dim, val } = btn.dataset;
-    if (activeFilters[dim].has(val)) activeFilters[dim].delete(val);
-    else activeFilters[dim].add(val);
-    refreshTable();
-    updateFilterUrl();
-    renderFilterPanel();
-    renderPanel();
+  initPanel({
+    inertSelector: '.container',
+    enableTagFilters: true,
+    getOwnersHtml: buildOwnersHtml,
+    isTagActive: (dim, val) => activeFilters[dim].has(val),
+    onTagClick: (dim, val) => {
+      if (activeFilters[dim].has(val)) activeFilters[dim].delete(val);
+      else activeFilters[dim].add(val);
+      refreshTable();
+      updateFilterUrl();
+      renderFilterPanel();
+      renderPanel();
+    },
   });
+
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       if (isLightboxOpen()) {
@@ -96,29 +80,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (game) { openPanel(game); return; }
       }
     }
-    if (!panelGame) return;
+    if (!activeGame) return;
     if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !isLightboxOpen()) {
-      const total = 1 + (panelGame.details?.meta?.movies?.length || 0) + (panelGame.details?.meta?.screenshots?.length || 0);
-      if (total <= 1) return;
-      e.preventDefault();
-      heroIdx = (heroIdx + (e.key === 'ArrowRight' ? 1 : -1) + total) % total;
-      renderPanelHero();
-      document.getElementById('panel-hero').querySelector('.panel-hero-img')?.focus();
+      if (panelStepHero(e.key === 'ArrowRight' ? 1 : -1, { wrap: true })) e.preventDefault();
       return;
     }
     if ((e.key === 'r' || e.key === 'R') && !isLightboxOpen()) {
       e.preventDefault();
-      pickRandom(panelGame.groupKey);
+      pickRandom(activeGame.groupKey);
       return;
     }
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
     e.preventDefault();
-    const list = sortedGames(panelGame.groupKey);
-    const idx = list.findIndex(g => g.appid === panelGame.appid);
+    const list = sortedGames(activeGame.groupKey);
+    const idx = list.findIndex(g => g.appid === activeGame.appid);
     const next = (idx + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
     const lightboxWasOpen = isLightboxOpen();
     openPanel(list[next]);
-    if (lightboxWasOpen) openLightbox(panelGame, 0);
+    if (lightboxWasOpen) openLightbox(activeGame, 0);
   });
 
   fetch('/api/health').then(r => r.json()).then(d => {
@@ -131,8 +110,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }).catch(() => {});
 
-  initPanelSwipe();
-  initHeroSwipe();
   initLightbox({ onParamChange: setLightboxParam });
   loadFromUrl();
 });
@@ -143,11 +120,11 @@ window.addEventListener('popstate', loadFromUrl);
 function loadFromUrl() {
   // Each u= param is a comma-joined list of accounts for one logical player slot.
   // Old single-account URLs (?u=alice&u=bob) parse naturally as single-member slots.
-  const { slots, sort: restoreSort, filters: restoreFilters, nameFilter: restoreNameFilter, shot: restoreShot } = parseUrlState(location.search);
+  const { slots: urlSlots, sort: restoreSort, filters: restoreFilters, nameFilter: restoreNameFilter, shot: restoreShot } = parseUrlState(location.search);
   const container = document.getElementById('user-inputs');
   container.innerHTML = '';
-  if (slots.length >= 1 && slots.every(s => s.length > 0)) {
-    slots.forEach(accounts => addPlayerSlot(accounts));
+  if (urlSlots.length >= 1 && urlSlots.every(s => s.length > 0)) {
+    urlSlots.forEach(accounts => addPlayerSlot(accounts));
     findCommonGames({ pushState: false, restoreFilters, restoreSort, restoreNameFilter, restoreShot });
   } else {
     addPlayerSlot();
@@ -390,7 +367,7 @@ async function loadAllDetails(thisRun) {
         loaded++;
         updateProgress(loaded, games.length);
         if (games[idx].details?.meta || games[idx].details?.tags) updateFilterOptions(games[idx].details.meta, games[idx].details.tags);
-        if (panelGame?.appid === games[idx].appid) renderPanel();
+        if (activeGame?.appid === games[idx].appid) renderPanel();
         const tr = document.querySelector(`tr.game-row[data-appid="${data.appid}"]`);
         if (tr) syncRow(tr, games[idx]);
         clearTimeout(refreshDebounceTimer);
@@ -512,99 +489,27 @@ function updateProgress(loaded, total) {
 }
 
 // ── Side panel ─────────────────────────────────────────────────────────────
+// Rendering/hero/swipe logic lives in the shared panel.js; these wrappers add
+// the group-navigation, random-pick, table-highlight, and URL-state behavior
+// that's specific to this page.
 
-function getPanelItems() {
-  return buildMediaItems(panelGame.appid, panelGame.details?.meta);
-}
-
-function buildPanelHero() {
-  if (!panelGame) return;
-  const hero = document.getElementById('panel-hero');
-  const items = getPanelItems();
-  heroIdx = Math.max(0, Math.min(heroIdx, items.length - 1));
-  const hasMany = items.length > 1;
-
-  hero.innerHTML = `
-    ${renderHeroMain(items)}
-    ${hasMany ? `
-      <div class="panel-filmstrip">${items.map((item, i) =>
-        `<button type="button" class="panel-film-item${i === heroIdx ? ' active' : ''}${item.type === 'video' ? ' is-video' : ''}" data-idx="${i}" aria-label="${i === 0 ? esc(panelGame.name) : (item.type === 'video' ? `Video ${i}` : `Screenshot ${i}`)}">` +
-        `<img class="panel-film-thumb" src="${esc(item.thumb)}" alt="" loading="lazy">` +
-        `</button>`
-      ).join('')}</div>
-    ` : ''}`;
-
-  setupHeroImg(hero);
-  hero.querySelector('.panel-film-item.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
-}
-
-function renderPanelHero(scrollActive = true) {
-  if (!panelGame) return;
-  const hero = document.getElementById('panel-hero');
-  const items = getPanelItems();
-  heroIdx = Math.max(0, Math.min(heroIdx, items.length - 1));
-
-  const main = hero.querySelector('.panel-hero-main');
-  if (!main) { buildPanelHero(); return; }
-
-  main.outerHTML = renderHeroMain(items);
-  setupHeroImg(hero);
-
-  hero.querySelectorAll('.panel-film-item').forEach((el, i) =>
-    el.classList.toggle('active', i === heroIdx)
-  );
-
-  if (scrollActive) hero.querySelector('.panel-film-item.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
-}
-
-function renderHeroMain(items) {
-  const current = items[heroIdx];
-  const isShot = heroIdx > 0;
-  const hasMany = items.length > 1;
-  return `<div class="panel-hero-main${current.type === 'video' ? ' is-video' : ''}">` +
-    `<img class="panel-hero-img${isShot ? ' panel-hero-img--shot' : ''}" tabindex="0" role="button" aria-label="Open in lightbox" src="${esc(current.type === 'video' ? current.thumb : current.main)}" alt="${esc(panelGame.name)}">` +
-    (hasMany
-      ? `<button class="panel-hero-btn panel-hero-prev"${heroIdx <= 0 ? ' disabled' : ''} aria-label="Previous">&#8249;</button>` +
-        `<button class="panel-hero-btn panel-hero-next"${heroIdx >= items.length - 1 ? ' disabled' : ''} aria-label="Next">&#8250;</button>`
-      : '') +
-    `</div>`;
-}
-
-function setupHeroImg(hero) {
-  const main = hero.querySelector('.panel-hero-main');
-  if (main) main.style.display = '';
-  const heroEl = hero.querySelector('.panel-hero-img');
-  heroEl.classList.add('loading');
-  heroEl.onload  = () => heroEl.classList.remove('loading');
-  heroEl.onerror = () => { heroEl.closest('.panel-hero-main').style.display = 'none'; };
-}
-
-let panelPrevFocus = null;
-
-function shuffle(arr) {
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
+function buildOwnersHtml(g) {
+  const ownerIndices = g.groupKey.split(',').map(Number);
+  const gamePt = playtime[g.appid] || {};
+  return `<div class="panel-section">
+    <div class="panel-section-title">Owned by</div>
+    <div class="panel-tags">${ownerIndices.flatMap(slotIdx =>
+      (slots[slotIdx] || []).filter(p => p.steamid in gamePt).map(p => {
+        const pt = fmtPlaytime(gamePt[p.steamid]);
+        return `<span class="panel-tag">${esc(p.personaname || '?')}${pt ? `<span class="panel-tag-playtime"> · ${pt}</span>` : ''}</span>`;
+      })
+    ).join('')}</div>
+  </div>`;
 }
 
 function pickRandom(groupKey) {
-  const filtered = sortedGames(groupKey);
-  if (!filtered.length) return;
-
-  let queue = randomQueues.get(groupKey) || [];
-  // Rebuild queue if exhausted or the filtered set changed (different set of appids)
-  const filteredIds = new Set(filtered.map(g => g.appid));
-  const queueValid = queue.length > 0 && queue.every(g => filteredIds.has(g.appid));
-  if (!queueValid) {
-    const remaining = shuffle(filtered).filter(g => g.appid !== panelGame?.appid);
-    queue = remaining.length ? remaining : shuffle(filtered);
-  }
-
-  const pick = queue.shift();
-  randomQueues.set(groupKey, queue);
+  const pick = pickRandomFrom(sortedGames(groupKey), groupKey, activeGame?.appid);
+  if (!pick) return;
   randomGroupKey = groupKey;
   openPanel(pick, { isRandom: true });
 }
@@ -612,33 +517,21 @@ function pickRandom(groupKey) {
 function openPanel(game, { isRandom = false } = {}) {
   if (!isRandom) {
     randomGroupKey = null;
-    randomQueues.clear();
+    clearAllRandomQueues();
   }
-  panelGame = game;
-  heroIdx = 0;
-  panelPrevFocus = document.activeElement;
-  document.getElementById('panel-body').scrollTop = 0;
-  buildPanelHero();
-  renderPanel();
-  document.getElementById('game-panel').classList.add('open');
-  document.getElementById('panel-backdrop').classList.add('open');
-  document.querySelector('.container').inert = true;
-  (document.getElementById('panel-hero').querySelector('.panel-hero-img') ?? document.getElementById('panel-close')).focus();
+  activeGame = game;
+  panelOpen(game); // shared: renders hero+body, opens the panel, focuses it
+  renderPanelNav();
   refreshTable(); // re-render rows so the active highlight appears
   document.getElementById(`tbody-${game.groupKey}`)?.querySelector(`tr.game-row[data-appid="${game.appid}"]`)?.scrollIntoView({ block: 'nearest' });
   setPanelParam(game.appid);
 }
 
 function closePanel({ updateUrl = true } = {}) {
-  if (!panelGame) return;
-  panelGame = null;
+  if (!activeGame) return;
+  activeGame = null;
   randomGroupKey = null;
-  document.getElementById('game-panel').classList.remove('open');
-  document.getElementById('panel-backdrop').classList.remove('open');
-  document.querySelector('.container').inert = false;
-  document.getElementById('panel-nav').innerHTML = '';
-  panelPrevFocus?.focus();
-  panelPrevFocus = null;
+  panelClose(); // shared: hides the panel, restores focus
   refreshTable(); // remove active highlight
   if (updateUrl) setPanelParam(null);
 }
@@ -684,18 +577,18 @@ function restorePanelFromUrl(restoreShot = null) {
   const appid = Number(params.get('game'));
   if (!appid) return;
   const game = games.find(g => g.appid === appid);
-  if (game && panelGame?.appid !== appid) openPanel(game);
+  if (game && activeGame?.appid !== appid) openPanel(game);
   const shotParam = restoreShot ?? params.get('shot');
-  if (shotParam !== null && panelGame && !panelGame.loading) {
-    openLightbox(panelGame, shotParam);
+  if (shotParam !== null && activeGame && !activeGame.loading) {
+    openLightbox(activeGame, shotParam);
   }
 }
 
 function renderPanelNav() {
   const nav = document.getElementById('panel-nav');
-  if (!nav || !panelGame) return;
-  const list = sortedGames(panelGame.groupKey);
-  const idx = list.findIndex(g => g.appid === panelGame.appid);
+  if (!nav || !activeGame) return;
+  const list = sortedGames(activeGame.groupKey);
+  const idx = list.findIndex(g => g.appid === activeGame.appid);
   nav.innerHTML = `
     <button class="panel-nav-btn" id="panel-prev" aria-label="Previous game">↑</button>
     <span class="panel-nav-pos">${idx + 1} / ${list.length}</span>
@@ -709,234 +602,14 @@ function renderPanelNav() {
     openPanel(list[(idx + 1) % list.length]);
   });
   document.getElementById('panel-reroll').addEventListener('click', () => {
-    pickRandom(panelGame.groupKey);
+    pickRandom(activeGame.groupKey);
   });
 }
 
-function initHeroSwipe() {
-  const hero = document.getElementById('panel-hero');
-  let startX = 0, startY = 0, tracking = false, decided = false, isHoriz = false;
-
-  hero.addEventListener('touchstart', e => {
-    if (e.touches.length !== 1 || e.target.closest('.panel-filmstrip')) return;
-    startX = e.touches[0].clientX; startY = e.touches[0].clientY;
-    tracking = true; decided = false; isHoriz = false;
-  }, { passive: true });
-
-  hero.addEventListener('touchmove', e => {
-    if (!tracking || e.touches.length !== 1) return;
-    const dx = e.touches[0].clientX - startX;
-    const dy = e.touches[0].clientY - startY;
-    if (!decided) {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      isHoriz = Math.abs(dx) > Math.abs(dy) * 1.2;
-      decided = true;
-    }
-    if (isHoriz) e.stopPropagation(); // don't let panel-close swipe fire
-  }, { passive: true });
-
-  hero.addEventListener('touchend', e => {
-    if (!tracking || !isHoriz) { tracking = false; return; }
-    tracking = false;
-    const dx = e.changedTouches[0].clientX - startX;
-    if (Math.abs(dx) < 40) return;
-    heroIdx += dx < 0 ? 1 : -1;
-    renderPanelHero();
-  }, { passive: true });
-
-  hero.addEventListener('touchcancel', () => { tracking = false; }, { passive: true });
-}
-
-function initPanelSwipe() {
-  const panel = document.getElementById('game-panel');
-  let startX = 0, startY = 0, tracking = false, decided = false, horiz = false;
-
-  panel.addEventListener('touchstart', e => {
-    if (e.touches.length !== 1) return;
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    tracking = true;
-    decided = false;
-    horiz = false;
-    panel.style.transition = 'none';
-  }, { passive: true });
-
-  panel.addEventListener('touchmove', e => {
-    if (!tracking || e.touches.length !== 1) return;
-    const dx = e.touches[0].clientX - startX;
-    const dy = e.touches[0].clientY - startY;
-    if (!decided) {
-      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-      horiz = Math.abs(dx) > Math.abs(dy) * 1.2;
-      decided = true;
-    }
-    if (!horiz || dx <= 0) return;
-    e.preventDefault();
-    panel.style.transform = `translateX(${dx}px)`;
-  }, { passive: false });
-
-  function finish(clientX) {
-    if (!tracking) return;
-    tracking = false;
-    const dx = clientX - startX;
-    if (horiz && dx > 80) {
-      panel.style.transition = 'transform 0.2s ease';
-      panel.style.transform = 'translateX(100%)';
-      setTimeout(() => {
-        closePanel();
-        panel.style.transition = '';
-        panel.style.transform = '';
-      }, 200);
-    } else {
-      if (panel.style.transform) {
-        panel.style.transition = 'transform 0.25s ease';
-        panel.style.transform = '';
-        setTimeout(() => { panel.style.transition = ''; }, 250);
-      } else {
-        panel.style.transition = '';
-      }
-    }
-  }
-
-  panel.addEventListener('touchend', e => finish(e.changedTouches[0].clientX), { passive: true });
-  panel.addEventListener('touchcancel', () => {
-    tracking = false;
-    panel.style.transition = 'transform 0.25s ease';
-    panel.style.transform = '';
-    setTimeout(() => { panel.style.transition = ''; }, 250);
-  }, { passive: true });
-}
-
 function renderPanel() {
-  if (!panelGame) return;
+  if (!activeGame) return;
   renderPanelNav();
-  const g = panelGame;
-  const r = g.details?.rating;
-  const h = g.details?.hltb;
-  const meta = g.details?.meta;
-
-  const storeUrl    = `https://store.steampowered.com/app/${g.appid}`;
-  const steamdbUrl  = `https://www.steamdb.info/app/${g.appid}/`;
-  const protondbUrl = `https://www.protondb.com/app/${g.appid}`;
-  const itadUrl     = `https://isthereanydeal.com/steam/app/${g.appid}`;
-  const releaseDate = g.details?.meta?.releaseDate;
-  const description = g.details?.meta?.description;
-
-  const ownerIndices = g.groupKey.split(',').map(Number);
-  const gamePt = playtime[g.appid] || {};
-  const ownersHtml = `<div class="panel-section">
-    <div class="panel-section-title">Owned by</div>
-    <div class="panel-tags">${ownerIndices.flatMap(slotIdx =>
-      (slots[slotIdx] || []).filter(p => p.steamid in gamePt).map(p => {
-        const pt = fmtPlaytime(gamePt[p.steamid]);
-        return `<span class="panel-tag">${esc(p.personaname || '?')}${pt ? `<span class="panel-tag-playtime"> · ${pt}</span>` : ''}</span>`;
-      })
-    ).join('')}</div>
-  </div>`;
-
-  const mc = meta?.metacritic;
-  let scoreHtml = '';
-  if (g.loading) {
-    scoreHtml = `<div class="panel-section">
-      <div class="panel-section-title">Score</div>
-      <span class="sk" style="width:64px;height:32px;border-radius:4px"></span>
-    </div>`;
-  } else if (r || mc) {
-    const pct = r?.total ? Math.round(r.positive / r.total * 100) : 0;
-    const wilsonHtml = r ? `
-      <div class="panel-score-row">
-        <div class="panel-score-num" style="color:${scoreColor(r.score)}">${r.score}</div>
-        <div class="panel-score-desc">${esc(r.desc)}</div>
-      </div>
-      <div class="panel-reviews">${r.positive.toLocaleString()} of ${r.total.toLocaleString()} reviews positive (${pct}%)</div>` : '';
-    const mcHtml = mc ? `
-      <div class="panel-score-row panel-score-row--mc">
-        <div class="panel-score-num panel-score-num--mc">${mc.score}</div>
-        <div class="panel-score-desc">${mc.url ? `<a href="${esc(mc.url)}" target="_blank" rel="noopener">Metacritic ↗</a>` : 'Metacritic'}</div>
-      </div>` : '';
-    scoreHtml = `<div class="panel-section">
-      <div class="panel-section-title">Score</div>
-      ${wilsonHtml}
-      ${mcHtml}
-    </div>`;
-  }
-
-  let hltbHtml = '';
-  let hltbSearchUrl = '';
-  if (g.loading) {
-    hltbHtml = `<div class="panel-section">
-      <div class="panel-section-title">How Long To Beat</div>
-      <span class="sk" style="width:140px"></span>
-    </div>`;
-  } else if (h) {
-    const hltbUrl = h.id ? `https://howlongtobeat.com/game/${h.id}` : null;
-    hltbHtml = `<div class="panel-section">
-      <div class="panel-section-title">${hltbUrl ? `<a href="${esc(hltbUrl)}" target="_blank" rel="noopener">How Long To Beat ↗</a>` : 'How Long To Beat'}</div>
-      <div class="panel-hltb">
-        <div class="panel-hltb-item">
-          <div class="panel-hltb-label">Main Story</div>
-          <div class="panel-hltb-val">${fmtH(h.main)}</div>
-        </div>
-        <div class="panel-hltb-item">
-          <div class="panel-hltb-label">Main + Extra</div>
-          <div class="panel-hltb-val">${fmtH(h.extra)}</div>
-        </div>
-        ${h.completionist ? `<div class="panel-hltb-item">
-          <div class="panel-hltb-label">Completionist</div>
-          <div class="panel-hltb-val">${fmtH(h.completionist)}</div>
-        </div>` : ''}
-      </div>
-    </div>`;
-  } else if (g.details) {
-    hltbSearchUrl = `https://howlongtobeat.com/?q=${encodeURIComponent(g.name)}`;
-  }
-
-  const tagSection = (title, items, dim) => items?.length ? `
-    <div class="panel-section panel-section--meta">
-      <div class="panel-section-title">${title}</div>
-      <div class="panel-tags">${(dim === 'tags' ? [...items] : [...items].sort((a, b) => a.localeCompare(b))).map(v => {
-        if (dim) {
-          const active = activeFilters[dim].has(v) ? ' active' : '';
-          return `<button class="panel-tag panel-tag-btn${active}" data-dim="${dim}" data-val="${esc(v)}">${esc(v)}</button>`;
-        }
-        return `<span class="panel-tag">${esc(v)}</span>`;
-      }).join('')}</div>
-    </div>` : '';
-
-  const tags = g.details?.tags;
-  // Merge developer and publisher when identical
-  const devs = meta?.developers || [];
-  const pubs = meta?.publishers || [];
-  const sameDevPub = devs.length > 0 && devs.length === pubs.length && devs.every((d, i) => d === pubs[i]);
-  const metaHtml = g.loading ? '' : [
-    tagSection('Tags', tags, 'tags'),
-    tagSection('Genres', meta?.genres, 'genres'),
-    tagSection('Categories', meta?.categories, 'categories'),
-    sameDevPub
-      ? tagSection('Developer / Publisher', devs, 'developers')
-      : [tagSection('Developer', devs, 'developers'), tagSection('Publisher', pubs, 'publishers')].join(''),
-  ].join('');
-
-  document.getElementById('panel-body').innerHTML = `
-    <div class="panel-title">${esc(g.name)}</div>
-    ${releaseDate ? `<div class="panel-release">${esc(releaseDate)}</div>` : ''}
-    ${description ? `<div class="panel-desc">${description}</div>` : ''}
-    ${scoreHtml}
-    ${hltbHtml}
-    ${ownersHtml}
-    ${metaHtml}
-    <div class="panel-section panel-section--meta">
-      <div class="panel-section-title">Links</div>
-      <div class="panel-links">
-        <a class="panel-link" href="${esc(storeUrl)}" target="_blank" rel="noopener">Steam Store</a>
-        <a class="panel-link" href="${esc(steamdbUrl)}" target="_blank" rel="noopener">SteamDB</a>
-        <a class="panel-link" href="${esc(protondbUrl)}" target="_blank" rel="noopener">ProtonDB</a>
-        <a class="panel-link" href="${esc(itadUrl)}" target="_blank" rel="noopener">IsThereAnyDeal</a>
-        ${hltbSearchUrl ? `<a class="panel-link" href="${esc(hltbSearchUrl)}" target="_blank" rel="noopener">HowLongToBeat</a>` : ''}
-      </div>
-    </div>`;
-
-  buildPanelHero();
+  renderPanelBody(activeGame); // shared: rebuilds hero + body from panel.js
 }
 
 function refreshTable() {
@@ -965,7 +638,7 @@ function refreshTable() {
       ? `${filtered} / ${games.length} ${gameLabel}`
       : `${games.length} ${gameLabel}`;
   }
-  if (panelGame) renderPanelNav();
+  if (activeGame) renderPanelNav();
 }
 
 // Reconcile a tbody's rows against a desired ordered game list.
@@ -1011,7 +684,7 @@ function rowCells(game) {
 
 // Update an existing <tr>'s cells and active state in place.
 function syncRow(tr, game) {
-  tr.classList.toggle('active', panelGame?.appid === game.appid);
+  tr.classList.toggle('active', activeGame?.appid === game.appid);
   const cells = tr.cells;
   if (!cells.length) { tr.innerHTML = rowCells(game); return; }
 

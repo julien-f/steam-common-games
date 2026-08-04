@@ -7,9 +7,9 @@
 <script type="importmap">
 {
   "imports": {
-    "@vates/flexi-table-core": "/vendor/flexi-table-core/index.js",
-    "@vates/flexi-table-core/locales": "/vendor/flexi-table-core/locales.js",
-    "@vates/flexi-table-vanilla": "/vendor/flexi-table-vanilla.js"
+    "@vates/data-table-core": "/vendor/data-table-core/index.js",
+    "@vates/data-table-core/locales": "/vendor/data-table-core/locales.js",
+    "@vates/data-table-vanilla": "/vendor/data-table-vanilla/data-table-vanilla.js"
   }
 }
 </script>
@@ -33,9 +33,9 @@
   .lib-status { font-size: 13px; color: var(--text1); margin-bottom: 12px; min-height: 18px; }
 
   /*
-   * Override flexi-table colors to match the Steam dark theme.
+   * Override data-table colors to match the Steam dark theme.
    * Variables are set on #table-container (not :root) so they win over the
-   * flexi-table's own :root defaults, which are injected into <head> after this
+   * data-table's own :root defaults, which are injected into <head> after this
    * stylesheet and would otherwise override any :root rules we define here.
    */
   #table-container {
@@ -55,7 +55,7 @@
   }
 
   /* Darker header bar so it reads clearly above the data rows */
-  #table-container .ft-th { background: #0f1923 !important; }
+  #table-container .dt-th { background: #0f1923 !important; }
 </style>
 </head>
 <body>
@@ -74,6 +74,20 @@
   <div id="status" class="lib-status"></div>
   <div id="table-container"></div>
 </div>
+
+<div id="panel-backdrop" class="panel-backdrop"></div>
+<div id="game-panel" class="game-panel" role="dialog" aria-modal="true">
+  <button id="panel-close" class="panel-close" aria-label="Close">×</button>
+  <div id="panel-hero" class="panel-hero"></div>
+  <div id="panel-nav" class="panel-nav"></div>
+  <div id="panel-body" class="panel-body"></div>
+</div>
+
+<script src="/hls.min.js"></script>
+<script src="/mediaItems.js"></script>
+<script src="/utils.js"></script>
+<script src="/lightbox.js"></script>
+<script src="/panel.js"></script>
 <script type="module" src="/library.js"></script>
 </body>
 </html>

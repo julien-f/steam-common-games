@@ -8,15 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- Library Explorer page (`/library.html`): browse a single player's full Steam library in a sortable/filterable/groupable table powered by `@vates/flexi-table-vanilla`. Shows score, HLTB times, playtime, Metacritic, release date, genres, developers, publishers, tags, categories, and review description. Details stream progressively via SSE as on the main page. Linked from the main page footer.
+- Library Explorer page (`/library.html`): browse a single player's full Steam library in a sortable/filterable/groupable table powered by `@vates/data-table-vanilla`. Shows score, HLTB times, playtime, Metacritic, release date, genres, developers, publishers, tags, categories, and review description. Details stream progressively via SSE as on the main page. Table sort/filter/group/page state is synced to the `?view=` URL param, so a copied link reproduces the same view. Linked from the main page footer.
+- Library Explorer: genres, developers, publishers, tags, and categories are multi-value columns — filtering by one of these lists individual values in the checklist instead of matching the whole joined string, and grouping by genre/developer/publisher fans a game out into every group it belongs to.
+- Library Explorer: every column except Name is now groupable, and Released is filterable.
+- Library Explorer: Score and Metacritic render as colored bars (`createScoreBar`, using the same color thresholds as the comparison page); Released now filters through a Year › Month › Day tree instead of a flat date checklist.
+- Library Explorer: clicking a row opens the same game detail side panel as the comparison page (hero screenshot/video carousel, score, HLTB, tags, store links), including ↑/↓/🎲 prev/next/random navigation and the ←/→/Esc keyboard shortcuts. The panel rendering itself is shared code (`public/panel.js`); the comparison page's owner list and tag-click filtering are omitted here since this page has neither multi-owner groups nor a table filter to drive. Prev/next/random walk the table's current search/filter/sort order (recomputed via `@vates/data-table-core`'s `searchData`/`processData`), not just insertion order, and cover every matching row rather than only the current page.
 
 ### Fixed
 
 - Steam store rate limiting (403): the store semaphore now enforces a 500 ms cooldown per slot after each request completes, capping sustained throughput at ~4 req/s instead of hammering Steam as fast as concurrency allows
+- Comparison page: loading the site with no `?u=` param (a fresh visit, or clearing all players) threw `TypeError: Assignment to constant variable` in `loadFromUrl` — a destructured `const slots` shadowed the outer player-slots state variable it was trying to reset
 
 ### Changed
 
-- Vendored `@vates/flexi-table-core` and `@vates/flexi-table-vanilla` built JS into `public/vendor/` instead of installing from local `file:` paths; removes the local-clone prerequisite and makes the app deployable anywhere with a plain `npm install`.
+- `@vates/data-table-core` and `@vates/data-table-vanilla` are installed as regular npm dependencies; `server.js` serves their `dist/` folders under `/vendor/`, so the frontend importmap resolves them without a bundler.
+- Bumped `@vates/data-table-core`/`@vates/data-table-vanilla` to 0.2.0: filter dropdown redesigned as a searchable master-detail panel with per-value row counts (replacing the old single stacked checklist), column drag-and-drop reordering, and shift-click range selection in filter checklists and the date tree.
+- Extracted the game detail side panel (hero carousel, score/HLTB/tags/links, swipe gestures) from `app.js` into a new shared `public/panel.js`, used by both the comparison page and the Library Explorer. The random-pick "shuffle bag" logic moved there too, generalized to work off any list + queue key instead of just owner groups.
 - Docs: clarified that `db.sqlite` is the application database (not purely a cache store) in README, `default.env`, and CLAUDE.md
 
 ### Added

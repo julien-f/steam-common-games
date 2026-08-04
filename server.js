@@ -32,6 +32,8 @@ if (TRUST_PROXY) app.set('trust proxy', TRUST_PROXY);
 if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/vendor/data-table-core', express.static(path.join(__dirname, 'node_modules/@vates/data-table-core/dist')));
+app.use('/vendor/data-table-vanilla', express.static(path.join(__dirname, 'node_modules/@vates/data-table-vanilla/dist')));
 
 // Stricter limit for searches — each uncached user triggers Steam API calls
 const searchLimit = rateLimit({

@@ -22,11 +22,13 @@ The server binds to `http://127.0.0.1:3000` by default. `default.env` (committed
 - **`lib/hltb.js`** — HLTB auth + search (`getHLTB`), plus exported `stringSimilarity` and `levenshtein` for unit testing.
 - **`lib/groupGames.js`** — Groups slot libraries by exact ownership set (`groupByOwnership`).
 - **`public/index.html`** — Single-page frontend shell (vanilla JS, no framework).
-- **`public/app.js`** — Main frontend JS: search flow, SSE streaming, rendering, panel, filtering/sorting, URL state.
+- **`public/app.js`** — Main frontend JS: search flow, SSE streaming, rendering, filtering/sorting, URL state, and the page-specific parts of the side panel (owner list, tag-click filtering, prev/next/random nav bar) built on top of `panel.js`.
+- **`public/panel.js`** — Shared game detail side panel: `initPanel(options)`, `panelOpen(game)`, `panelClose()`, `isPanelOpen()`, `getPanelGame()`, `panelStepHero(dir, { wrap })`, `pickRandomFrom(list, queueKey, currentAppid)`/`clearRandomQueue`/`clearAllRandomQueues`. Renders the hero carousel, score/HLTB/tags/links body, and handles swipe gestures; used by both `app.js` and `library.js`. Page-specific bits (owner list, tag-click filtering, nav bar) are supplied via `options` or layered on by the host page wrapping `panelOpen`/`panelClose`.
 - **`public/lightbox.js`** — Screenshot/video lightbox: `initLightbox({ onParamChange })`, `openLightbox(game, idxOrShotId)`, `closeLightbox()`, `stepLightbox(dir)`, `isLightboxOpen()`. Manages its own DOM (lazy singleton), HLS playback, zoom/pan, touch/swipe, focus trap, and loading indicator. Depends on `buildMediaItems`/`resolveShotIndex` from `mediaItems.js`.
 - **`public/mediaItems.js`** — Builds the ordered media item list for a game (`buildMediaItems(appid, meta)`) and resolves a shot identifier to an index (`resolveShotIndex(shots, idxOrShotId)`). Exported for Node unit tests.
 - **`public/urlState.js`** — Parses the URL search string into structured state (`parseUrlState(search)`) and exports `FILTER_DIMS`. Exported for Node unit tests.
 - **`public/utils.js`** — Shared rendering utilities (`normalizeInput`, `scoreColor`, `fmtH`, `fmtPlaytime`, `foldStr`, `esc`, `renderScoreCell`, `renderMainCell`, `renderExtraCell`); exported for Node unit tests.
+- **`public/library.html`** / **`public/library.js`** — Library Explorer: browse one player's full Steam library in a sortable/filterable/groupable table (`@vates/data-table-vanilla`, an npm dependency; `server.js` serves its `dist/` files straight from `node_modules`, resolved via an import map in `library.html`). Reuses `panel.js`/`lightbox.js`/`mediaItems.js`/`utils.js` for the same row-click side panel as the comparison page, minus the owner list and tag-click filtering.
 - **`public/style.css`** — All page styles.
 
 ### Request flow
