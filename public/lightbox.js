@@ -98,19 +98,24 @@ function fmtTime(s) {
 
 // ── Video controls visibility ──────────────────────────────────────────────
 
+// Idle state hides ALL lightbox chrome (video controls, prev/next, toolbar)
+// and the mouse cursor — not just the video controls bar — while a video
+// plays unattended.
 function showLbVc() {
-  const vc = document.querySelector('#screenshot-lightbox .lb-vctrls');
+  const lb = document.getElementById('screenshot-lightbox');
+  const vc = lb?.querySelector('.lb-vctrls');
   if (!vc || vc.style.display === 'none') return;
-  vc.classList.remove('lb-vctrls--hidden');
+  lb.classList.remove('lb-idle');
   clearTimeout(lbVcTimer);
 }
 
 function schedHideLbVc() {
-  const vc  = document.querySelector('#screenshot-lightbox .lb-vctrls');
-  const vid = document.querySelector('#screenshot-lightbox .lb-video');
+  const lb  = document.getElementById('screenshot-lightbox');
+  const vc  = lb?.querySelector('.lb-vctrls');
+  const vid = lb?.querySelector('.lb-video');
   if (!vc || vc.style.display === 'none') return;
   clearTimeout(lbVcTimer);
-  if (vid && !vid.paused) lbVcTimer = setTimeout(() => vc.classList.add('lb-vctrls--hidden'), 3000);
+  if (vid && !vid.paused) lbVcTimer = setTimeout(() => lb.classList.add('lb-idle'), 3000);
 }
 
 // ── Focus helpers ──────────────────────────────────────────────────────────
@@ -428,7 +433,7 @@ function closeLightbox() {
   clearTimeout(lbVcTimer);
   const lb = getLightbox();
   stopHls(lb.querySelector('.lb-video'));
-  lb.classList.remove('open', 'lb--loading');
+  lb.classList.remove('open', 'lb--loading', 'lb-idle');
   document.body.classList.remove('lb-open');
   if (document.fullscreenElement || document.webkitFullscreenElement) {
     (document.exitFullscreen?.() ?? document.webkitExitFullscreen?.())?.catch?.(() => {});
@@ -454,13 +459,13 @@ function renderLightbox() {
   const dir  = lbLastDir;
   lbLastDir = 0;
   resetLbZoom();
+  lb.classList.remove('lb-idle');
   if (shot.type === 'video') {
     img.style.display = 'none';
     lb.classList.remove('lb--loading');
     vid.style.display = 'block';
     vid.poster = shot.thumb || '';
     vc.style.display = '';
-    vc.classList.remove('lb-vctrls--hidden');
     playHls(vid, shot.hls);
     schedHideLbVc();
   } else {
