@@ -27,7 +27,7 @@ The server binds to `http://127.0.0.1:3000` by default. `default.env` (committed
 - **`public/lightbox.js`** — Screenshot/video lightbox: `initLightbox({ onParamChange })`, `openLightbox(game, idxOrShotId)`, `closeLightbox()`, `stepLightbox(dir)`, `isLightboxOpen()`. Manages its own DOM (lazy singleton), HLS playback, zoom/pan, touch/swipe, focus trap, and loading indicator. Depends on `buildMediaItems`/`resolveShotIndex` from `mediaItems.js`.
 - **`public/mediaItems.js`** — Builds the ordered media item list for a game (`buildMediaItems(appid, meta)`) and resolves a shot identifier to an index (`resolveShotIndex(shots, idxOrShotId)`). Exported for Node unit tests.
 - **`public/urlState.js`** — Parses the URL search string into structured state (`parseUrlState(search)`) and exports `FILTER_DIMS`. Exported for Node unit tests.
-- **`public/utils.js`** — Shared rendering utilities (`normalizeInput`, `scoreColor`, `fmtH`, `fmtPlaytime`, `foldStr`, `esc`, `renderScoreCell`, `renderMainCell`, `renderExtraCell`); exported for Node unit tests.
+- **`public/utils.js`** — Shared rendering utilities (`normalizeInput`, `scoreColor`, `fmtH`, `fmtPlaytime`, `foldStr`, `esc`, `renderScoreCell`, `renderMainCell`, `renderExtraCell`, `computeSteamdbRating`); exported for Node unit tests.
 - **`public/library.html`** / **`public/library.js`** — Library Explorer: browse one player's full Steam library, or their wishlist, in a sortable/filterable/groupable table (`@vates/data-table-vanilla`, an npm dependency; `server.js` serves its `dist/` files straight from `node_modules`, resolved via an import map in `library.html`). A Library/Wishlist tab toggle switches between the two; each keeps independent table view state (`?view=`/`?wview=` URL params) and random-pick history. The wishlist is read-only — Steam has no key-based way to mutate it, only session-authenticated calls as the logged-in user, which this app doesn't support. Reuses `panel.js`/`lightbox.js`/`mediaItems.js`/`utils.js` for the same row-click side panel as the comparison page, minus the owner list and tag-click filtering.
 - **`public/style.css`** — All page styles.
 
@@ -37,9 +37,16 @@ The server binds to `http://127.0.0.1:3000` by default. `default.env` (committed
 2. Server resolves every identifier to a Steam64 ID, deduplicates within each slot, fetches all libraries in one parallel pass, unions libraries per slot, groups games by exact set of slot owners, returns `{ groups, slots }`.
 3. Frontend renders groups immediately (one table per owner set, from most owners to fewest), then POSTs the full game list to `POST /api/game-details/stream` (SSE endpoint) to load rating, HLTB, store metadata, and tags progressively in a single connection. The legacy `GET /api/game-details/:appid` endpoint still exists for direct API consumers.
 
-### Ratings — Wilson score
+### Ratings — Wilson score vs. SteamDB Rating
 
-The score shown is the **Wilson score lower bound** at 95% confidence, computed from Steam's own review counts (`store.steampowered.com/appreviews/:appid`). This is the same formula SteamDB uses. Do not replace it with a simple positive/total ratio.
+The comparison page's own table cell (and the "Wilson Score" column in the Library Explorer) show the **Wilson score lower bound** at 95% confidence, computed server-side in `getGameRating`/`computeRating` from Steam's own review counts (`store.steampowered.com/appreviews/:appid`). Do not replace it with a simple positive/total ratio — that's exactly the naive approach the Wilson bound is meant to avoid, since it lets a game with 2 positive reviews outrank one with 50,000 mostly-positive reviews. (SteamDB itself used to use this same formula but has since switched to a different one — see below — so don't assume parity with what SteamDB currently shows.)
+
+Client-side, from the same `rating.positive`/`.total` numbers already delivered to the frontend (no extra backend calls), `computeSteamdbRating(positive, total)` in `public/utils.js` computes SteamDB's current formula instead: `p − (p − 0.5) × 2^(−log₁₀(n + 1))` where `p = positive/total` and `n = total reviews`. A Bayesian shrinkage toward a neutral 50% prior that fades as review volume grows (e.g. 90% positive over 100 reviews lands at 80%). SteamDB moved to this from the Wilson interval specifically because it's easier to explain to users; see [steamdb.info-issues#793](https://github.com/SteamDatabase/steamdb.info-issues/issues/793). It returns the **raw, unrounded** value — round only for display; the Library Explorer's SteamDB Rating column sorts on the unrounded number so otherwise-tied displayed integers still order deterministically, and isn't groupable (grouping keys off the raw value, which would otherwise split into a near-useless one-row-per-group table).
+
+This one function backs two different, intentionally-asymmetric surfaces:
+
+- **Library Explorer table** — "SteamDB Rating" is the default-visible, default-sorted score column; "Wilson Score" and "Steam %" (the raw, unadjusted ratio) both exist too, hidden by default.
+- **Game detail side panel** (`public/panel.js`, shared by both pages) — shows only the SteamDB Rating (labeled just "SteamDB", linking to the game's SteamDB page — same treatment as the "Metacritic" link right below it) plus a compact reviews line (e.g. "99% positive of 465k reviews"), no Wilson score and no Steam review-summary text tier (e.g. "Very Positive"). This means the comparison page's own table cell (Wilson score) and its side panel (SteamDB Rating) intentionally show two different numbers for the same game — expected, not a bug.
 
 ### HLTB — no npm package
 
@@ -49,6 +56,8 @@ The `howlongtobeat` npm package was removed (it pulled in a vulnerable `axios`).
 2. `POST https://howlongtobeat.com/api/bleed` with `X-Auth-Token`, `X-Hp-Key`, `X-Hp-Val` headers and `{ [hpKey]: hpVal, ...payload }` in the body
 
 The token is cached in memory for 5 minutes (not on disk — it's session-bound). A 401/403 from the search endpoint clears the cache so the next call re-fetches. Match quality is checked via Levenshtein similarity; results below 0.35 are discarded.
+
+`pickBestMatch` extracts four times from the matched entry's raw fields (all in seconds, converted to rounded hours): `main` (`comp_main`), `extra` (`comp_plus`), `completionist` (`comp_100`), and `all` (`comp_all`) — HLTB's "All PlayStyles" figure. `all` is **not** an average of the other three — it's the average of every individual completion-time submission pooled together regardless of category, weighted by how many people submitted each one (`comp_all_count` equals `comp_main_count + comp_plus_count + comp_100_count`). Since far more players report a Main Story time than a Completionist one, it usually lands much closer to Main Story than to the simple midpoint of all three. It's the default-displayed HLTB column in the Library Explorer (`hltbAll`, "All (h)") and shown first (leftmost) in the side panel's How Long To Beat section as "All PlayStyles", precisely because it's a single representative number rather than one specific playstyle.
 
 If HLTB breaks again, recent npm packages (e.g. `howlongtobeat-ts`) tend to reverse-engineer the new flow quickly and are a good first place to look.
 

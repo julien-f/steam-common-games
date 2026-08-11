@@ -220,6 +220,13 @@ function setupHeroImg(hero) {
   heroEl.onerror = () => { heroEl.closest('.panel-hero-main').style.display = 'none'; };
 }
 
+// Compact review-count suffix for the reviews line, e.g. 465234 -> "465k", 2100000 -> "2.1m".
+function fmtCompactCount(n) {
+  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}m`;
+  if (n >= 1_000) return `${Math.round(n / 1000)}k`;
+  return String(n);
+}
+
 function tagSection(title, items, dim) {
   if (!items?.length) return '';
   const values = dim === 'tags' ? [...items] : [...items].sort((a, b) => a.localeCompare(b));
@@ -258,21 +265,27 @@ function renderPanelBody(game) {
       <span class="sk" style="width:64px;height:32px;border-radius:4px"></span>
     </div>`;
   } else if (r || mc) {
+    // SteamDB's rating formula (see computeSteamdbRating in utils.js) rather than the Wilson
+    // score lower bound — same number now shown by default in the Library Explorer table, more
+    // recognizable than a raw confidence bound. No review-summary text tier (e.g. "Very
+    // Positive") here; the reviews line below gives the same read without needing Steam's
+    // wording. Label links to the game's SteamDB page, like Metacritic links to its own page.
     const pct = r?.total ? Math.round(r.positive / r.total * 100) : 0;
-    const wilsonHtml = r ? `
+    const steamdbRating = r ? Math.round(computeSteamdbRating(r.positive, r.total)) : null;
+    const steamdbHtml = r ? `
       <div class="panel-score-row">
-        <div class="panel-score-num" style="color:${scoreColor(r.score)}">${r.score}</div>
-        <div class="panel-score-desc">${esc(r.desc)}</div>
+        <div class="panel-score-num" style="color:${scoreColor(steamdbRating)}">${steamdbRating}</div>
+        <div class="panel-score-desc"><a href="${esc(steamdbUrl)}" target="_blank" rel="noopener">SteamDB ↗</a></div>
       </div>
-      <div class="panel-reviews">${r.positive.toLocaleString()} of ${r.total.toLocaleString()} reviews positive (${pct}%)</div>` : '';
+      <div class="panel-reviews">${pct}% positive of ${fmtCompactCount(r.total)} reviews</div>` : '';
     const mcHtml = mc ? `
       <div class="panel-score-row panel-score-row--mc">
-        <div class="panel-score-num panel-score-num--mc">${mc.score}</div>
+        <div class="panel-score-num" style="color:${scoreColor(mc.score)}">${mc.score}</div>
         <div class="panel-score-desc">${mc.url ? `<a href="${esc(mc.url)}" target="_blank" rel="noopener">Metacritic ↗</a>` : 'Metacritic'}</div>
       </div>` : '';
     scoreHtml = `<div class="panel-section">
       <div class="panel-section-title">Score</div>
-      ${wilsonHtml}
+      ${steamdbHtml}
       ${mcHtml}
     </div>`;
   }
@@ -289,6 +302,10 @@ function renderPanelBody(game) {
     hltbHtml = `<div class="panel-section">
       <div class="panel-section-title">${hltbUrl ? `<a href="${esc(hltbUrl)}" target="_blank" rel="noopener">How Long To Beat ↗</a>` : 'How Long To Beat'}</div>
       <div class="panel-hltb">
+        ${h.all ? `<div class="panel-hltb-item">
+          <div class="panel-hltb-label">All PlayStyles</div>
+          <div class="panel-hltb-val">${fmtH(h.all)}</div>
+        </div>` : ''}
         <div class="panel-hltb-item">
           <div class="panel-hltb-label">Main Story</div>
           <div class="panel-hltb-val">${fmtH(h.main)}</div>

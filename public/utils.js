@@ -9,6 +9,21 @@ function normalizeInput(raw) {
   return raw;
 }
 
+// SteamDB's current rating formula — they moved away from the Wilson score interval to this
+// Bayesian shrinkage, specifically because Wilson's confidence-bound framing was hard to explain
+// to users. It starts every game at a neutral 50% prior and lets the observed positive ratio
+// pull it away as review volume grows — e.g. 90% positive over 100 reviews lands at 80%, not
+// 90%, because 100 reviews still isn't much evidence. See
+// https://github.com/SteamDatabase/steamdb.info-issues/issues/793.
+// Returns the raw, unrounded value (0-100) — round only for display; sorting/grouping should
+// use the full precision so games with the same rounded score still order deterministically.
+function computeSteamdbRating(positive, total) {
+  if (!total) return null;
+  const p = positive / total;
+  const weight = 2 ** -Math.log10(total + 1);
+  return (p - (p - 0.5) * weight) * 100;
+}
+
 function scoreColor(n) {
   if (n == null) return 'var(--text1)';
   if (n >= 80) return '#57cbde';
@@ -60,4 +75,4 @@ function renderExtraCell(game) {
   return h ? fmtH(h.extra) : '<span class="dim">—</span>';
 }
 
-if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, fmtH, fmtPlaytime, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell };
+if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, fmtH, fmtPlaytime, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating };

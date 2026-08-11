@@ -134,7 +134,21 @@ test('getHLTB: returns main and extra hours on match', async (t) => {
   });
 
   const result = await getHLTB(1, 'Portal 2');
-  assert.deepEqual(result, { id: 42, main: 7, extra: 10, completionist: null });
+  assert.deepEqual(result, { id: 42, main: 7, extra: 10, completionist: null, all: null });
+});
+
+test('getHLTB: returns completionist and all-playstyles hours when present', async (t) => {
+  _reset(); _resetAuth();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('bleed/init')) return makeInitResponse();
+    return makeSearchResponse([
+      // 8.5h main, 13.7h extra, 22.6h completionist, 10.6h all-playstyles (Portal 2's real HLTB figures)
+      { game_id: 7231, game_name: 'Portal 2', comp_main: 30726, comp_plus: 49475, comp_100: 81374, comp_all: 38161 },
+    ]);
+  });
+
+  const result = await getHLTB(1, 'Portal 2');
+  assert.deepEqual(result, { id: 7231, main: 9, extra: 14, completionist: 23, all: 11 });
 });
 
 test('getHLTB: strips trademark symbols from query', async (t) => {
@@ -246,5 +260,5 @@ test('getHLTB: picks the best match by similarity, not first result', async (t) 
   });
 
   const result = await getHLTB(1, 'Portal');
-  assert.deepEqual(result, { id: 2, main: 2, extra: 4, completionist: null }); // Portal's times, not Portal Stories
+  assert.deepEqual(result, { id: 2, main: 2, extra: 4, completionist: null, all: null }); // Portal's times, not Portal Stories
 });

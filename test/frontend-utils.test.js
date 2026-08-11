@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeInput, scoreColor, fmtH, fmtPlaytime, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell } = require('../public/utils');
+const { normalizeInput, scoreColor, fmtH, fmtPlaytime, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating } = require('../public/utils');
 
 // ── normalizeInput ────────────────────────────────────────────────────────────
 
@@ -203,4 +203,30 @@ test('renderExtraCell: returns dim dash when loaded but no hltb', () => {
 
 test('renderExtraCell: formats main + extra hours', () => {
   assert.equal(renderExtraCell({ loading: false, details: { hltb: { main: 12, extra: 25.5 } } }), '25.5h');
+});
+
+// ── computeSteamdbRating ───────────────────────────────────────────────────────
+
+test('computeSteamdbRating: returns null with no reviews', () => {
+  assert.equal(computeSteamdbRating(0, 0), null);
+});
+
+test('computeSteamdbRating: matches the published worked example (90/100 -> 80)', () => {
+  assert.equal(Math.round(computeSteamdbRating(90, 100)), 80);
+});
+
+test('computeSteamdbRating: pulls a tiny 100%-positive sample well below 100', () => {
+  assert.ok(computeSteamdbRating(2, 2) < 70);
+});
+
+test('computeSteamdbRating: a large sample stays much closer to the raw ratio than a small one', () => {
+  const raw = 97;
+  const smallSampleDiff = Math.abs(computeSteamdbRating(97, 100) - raw);
+  const largeSampleDiff = Math.abs(computeSteamdbRating(48500, 50000) - raw);
+  assert.ok(largeSampleDiff < smallSampleDiff);
+});
+
+test('computeSteamdbRating: returns unrounded precision, not an integer', () => {
+  const rating = computeSteamdbRating(9123, 10000);
+  assert.notEqual(rating, Math.round(rating));
 });

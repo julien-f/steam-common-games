@@ -1,25 +1,35 @@
 'use strict';
 
-import { createDataTable, syncViewToUrl, resetView, createScoreBar } from '@vates/data-table-vanilla';
+import { createDataTable, syncViewToUrl, resetView } from '@vates/data-table-vanilla';
 import { processData, searchData, DEFAULT_LABELS } from '@vates/data-table-core';
 
 const fmt = {
   loading: v => v === undefined ? '…' : v,
   num:  v => v === undefined ? '…' : v === null ? '—' : String(v),
+  numRound: v => v === undefined ? '…' : v === null ? '—' : String(Math.round(v)),
   dec1: v => v === undefined ? '…' : v === null ? '—' : Number(v).toFixed(1),
   str:  v => v === undefined ? '…' : v || '—',
   ct:   v => v === undefined ? '…' : v === null ? '—' : Number(v).toLocaleString(),
   arr:  v => v === undefined ? '…' : Array.isArray(v) ? (v.length ? v.join(', ') : '—') : (v || '—'),
 };
 
-// Same palette as scoreColor() in utils.js, kept in sync so a score reads the same
-// color on the comparison page and here.
-const SCORE_THRESHOLDS = [[80, '#57cbde'], [65, '#a3cf4e'], [50, '#e4a82e'], [0, '#cc5050']];
-
-function renderScoreBar(v) {
+// Bare colored number rather than a progress bar — a bar's fill color carries the same
+// good/bad signal the number's color already does, and with up to four score-ish columns
+// (SteamDB Rating, Wilson Score, Steam %, Metacritic Score) visible at once, bars add visual
+// weight without adding information. Uses the global `scoreColor()` from utils.js so the
+// color scale matches the side panel's score display exactly, instead of a second copy of
+// the same thresholds.
+// `computeSteamdbRating` returns unrounded precision (0-100) so sort/group operate on the full
+// number rather than the display-rounded integer — round only where displayed (here, and in
+// `fmt.numRound`/`applyDetailsEvent` below).
+function renderScoreNum(v) {
   if (v === undefined) return document.createTextNode('…');
   if (v === null) return document.createTextNode('—');
-  return createScoreBar(v, { thresholds: SCORE_THRESHOLDS });
+  const rounded = Math.round(v);
+  const span = document.createElement('span');
+  span.style.color = scoreColor(rounded);
+  span.textContent = String(rounded);
+  return span;
 }
 
 // Ignores `value` and reads `row.capsule` directly — `value` is forced to null on this column
@@ -39,16 +49,36 @@ function renderThumb(_, row) {
 const COLUMNS = [
   { key: 'capsule', label: '', width: 128, sortable: false, filterable: false, groupable: false,
     value: () => null, render: renderThumb },
-  { key: 'name',             label: 'Name',         filterable: false },
-  { key: 'score',            label: 'Score',        type: 'number', groupable: true, format: fmt.num, render: renderScoreBar },
-  { key: 'reviewDesc',       label: 'Reviews',      groupable: true, filterable: true, format: fmt.str },
-  { key: 'reviewsTotal',     label: 'Reviews #',    type: 'number', groupable: true, format: fmt.ct },
-  { key: 'hltbMain',         label: 'Main (h)',     type: 'number', groupable: true, format: fmt.dec1 },
-  { key: 'hltbExtra',        label: '+Extra (h)',   type: 'number', groupable: true, format: fmt.dec1 },
-  { key: 'hltbCompletionist',label: '100% (h)',     type: 'number', groupable: true, format: fmt.dec1 },
-  { key: 'playtime',         label: 'Played (h)',   type: 'number', groupable: true,
+  { key: 'name',             label: 'Name',            filterable: false },
+  // The default-visible score: SteamDB's current formula (see computeSteamdbRating in utils.js)
+  // — shown first because it's the number most people recognize from SteamDB itself. Stored
+  // unrounded so sort/default-sort operate on full precision (two games both displaying "97"
+  // still order deterministically); not groupable for the same reason — grouping keys off the
+  // raw value, and a near-unique float per game would produce a useless one-row-per-group split.
+  { key: 'steamdbRating',    label: 'SteamDB Rating',  type: 'number', groupable: false, format: fmt.numRound, render: renderScoreNum },
+  // Wilson score lower bound — statistically rigorous but harder to explain than SteamDB's
+  // current formula (which is why it isn't the default-visible score anymore); kept available
+  // for anyone who wants the more conservative, confidence-bound number instead.
+  { key: 'score',            label: 'Wilson Score',    type: 'number', groupable: true, format: fmt.num, render: renderScoreNum },
+  // Raw positive/total ratio — the plain percentage Steam's own store page shows, as opposed to
+  // the two adjusted scores above. No "%" in the cell (the column header already says so) —
+  // same bare colored number treatment as the other three score columns for consistency.
+  { key: 'positivePct',      label: 'Steam %',         type: 'number', groupable: true, format: fmt.num, render: renderScoreNum },
+  // Grouped with the other user-review scores above rather than off near HLTB/playtime — it's a
+  // critic (not player) score, but it's still one of the four "how good is this game" numbers,
+  // and keeping all of them contiguous makes them easier to compare at a glance.
+  { key: 'metacritic',       label: 'Metacritic Score',type: 'number', groupable: true, format: fmt.num, render: renderScoreNum },
+  { key: 'reviewsTotal',     label: 'Review Count',    type: 'number', groupable: true, format: fmt.ct },
+  // "All PlayStyles" listed first among the HLTB columns — same convention as the side panel,
+  // which shows it leftmost precisely because it's a single representative number rather than
+  // one specific playstyle (see the comment on `all` in lib/hltb.js). Keeping it first here too
+  // means toggling on Main/+Extra/100% doesn't push it out of its default-visible position.
+  { key: 'hltbAll',          label: 'All (h)',         type: 'number', groupable: true, format: fmt.dec1 },
+  { key: 'hltbMain',         label: 'Main (h)',        type: 'number', groupable: true, format: fmt.dec1 },
+  { key: 'hltbExtra',        label: '+Extra (h)',      type: 'number', groupable: true, format: fmt.dec1 },
+  { key: 'hltbCompletionist',label: '100% (h)',        type: 'number', groupable: true, format: fmt.dec1 },
+  { key: 'playtime',         label: 'Played (h)',      type: 'number', groupable: true,
     format: v => v > 0 ? Number(v).toFixed(1) : '—' },
-  { key: 'metacritic',       label: 'Metacritic',   type: 'number', groupable: true, format: fmt.num, render: renderScoreBar },
   { key: 'releaseDate',      label: 'Released',     type: 'date', groupable: true, format: fmt.str },
   { key: 'genres',           label: 'Genres',       groupable: true, format: fmt.arr },
   { key: 'developers',       label: 'Developer',    groupable: true, format: fmt.arr },
@@ -58,9 +88,12 @@ const COLUMNS = [
 ];
 
 const DEFAULT_VISIBLE = [
-  'capsule', 'name', 'score', 'reviewDesc', 'hltbMain', 'hltbExtra', 'playtime',
-  'metacritic', 'releaseDate', 'genres', 'developers', 'tags',
+  'capsule', 'name', 'steamdbRating', 'hltbAll', 'playtime', 'releaseDate', 'genres',
 ];
+
+// Applied via setViewState() after table creation and after "Reset view" — there's no
+// construction-time default-sort option, only defaultVisibleColumns (see README).
+const DEFAULT_SORT = [{ key: 'steamdbRating', dir: 'desc' }];
 
 // Same as COLUMNS minus playtime (wishlist games aren't owned, so there's no
 // playtime to show), plus two wishlist-specific columns. Unlike owned games —
@@ -73,8 +106,7 @@ const WISHLIST_COLUMNS = [
 ];
 
 const WISHLIST_DEFAULT_VISIBLE = [
-  'capsule', 'name', 'priority', 'dateAdded', 'score', 'reviewDesc',
-  'hltbMain', 'hltbExtra', 'metacritic', 'releaseDate', 'genres', 'developers', 'tags',
+  'capsule', 'name', 'priority', 'dateAdded', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres',
 ];
 
 const playerInput   = document.getElementById('player-input');
@@ -252,11 +284,14 @@ function applyDetailsEvent(row, event) {
   row.capsule           = event.meta?.capsule ?? null;
   if (!row.name) row.name = event.meta?.name || '';
   row.score             = event.rating?.score ?? null;
-  row.reviewDesc        = event.rating?.desc  ?? null;
+  row.positivePct       = (event.rating?.positive != null && event.rating?.total)
+    ? Math.round((event.rating.positive / event.rating.total) * 100) : null;
+  row.steamdbRating     = computeSteamdbRating(event.rating?.positive, event.rating?.total);
   row.reviewsTotal      = event.rating?.total ?? null;
   row.hltbMain          = event.hltb?.main           ?? null;
   row.hltbExtra         = event.hltb?.extra          ?? null;
   row.hltbCompletionist = event.hltb?.completionist  ?? null;
+  row.hltbAll           = event.hltb?.all            ?? null;
   row.metacritic        = event.meta?.metacritic?.score ?? null;
   row.releaseDate       = event.meta?.releaseDate    ?? null;
   row.genres            = event.meta?.genres     ?? [];
@@ -366,11 +401,13 @@ async function loadLibrary(playerStr, { refresh = false } = {}) {
       playtime:           totalMin / 60,
       capsule:            undefined,
       score:              undefined,
-      reviewDesc:         undefined,
+      positivePct:        undefined,
+      steamdbRating:      undefined,
       reviewsTotal:       undefined,
       hltbMain:           undefined,
       hltbExtra:          undefined,
       hltbCompletionist:  undefined,
+      hltbAll:            undefined,
       metacritic:         undefined,
       releaseDate:        undefined,
       genres:             undefined,
@@ -395,6 +432,7 @@ async function loadLibrary(playerStr, { refresh = false } = {}) {
     defaultVisibleColumns: DEFAULT_VISIBLE,
     onRowClick: row => openGame(row),
   });
+  table.setViewState({ sorts: DEFAULT_SORT });
   unsyncView = syncViewToUrl(table);
   resetViewBtn.hidden = false;
   refreshBtn.hidden = false;
@@ -438,11 +476,13 @@ async function loadWishlist(playerStr, { refresh = false } = {}) {
     dateAdded:          item.dateAdded,
     capsule:            undefined,
     score:              undefined,
-    reviewDesc:         undefined,
+    positivePct:        undefined,
+    steamdbRating:      undefined,
     reviewsTotal:       undefined,
     hltbMain:           undefined,
     hltbExtra:          undefined,
     hltbCompletionist:  undefined,
+    hltbAll:            undefined,
     metacritic:         undefined,
     releaseDate:        undefined,
     genres:             undefined,
@@ -466,6 +506,7 @@ async function loadWishlist(playerStr, { refresh = false } = {}) {
     defaultVisibleColumns: WISHLIST_DEFAULT_VISIBLE,
     onRowClick: row => openGame(row),
   });
+  table.setViewState({ sorts: DEFAULT_SORT });
   unsyncView = syncViewToUrl(table, { paramName: 'wview' });
   resetViewBtn.hidden = false;
   refreshBtn.hidden = false;
@@ -501,7 +542,12 @@ refreshBtn.addEventListener('click', () => {
   if (currentPlayerStr) loadCurrentTab(currentPlayerStr, { refresh: true });
 });
 
-resetViewBtn.addEventListener('click', () => resetView(table, { paramName: viewParamName() }));
+resetViewBtn.addEventListener('click', () => {
+  resetView(table, { paramName: viewParamName() });
+  // resetView() clears sorts to none along with everything else — reapply our own default
+  // sort on top, since there's no construction-time option for it (see DEFAULT_SORT above).
+  table.setViewState({ sorts: DEFAULT_SORT });
+});
 
 playerInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
