@@ -15,6 +15,7 @@ let panelOptions = {};
 let panelGame = null;
 let heroIdx = 0;
 let panelPrevFocus = null;
+let panelRefreshing = false; // true while the host's onRefresh() is in flight
 
 function panelShuffle(arr) {
   const a = arr.slice();
@@ -77,6 +78,7 @@ function initPanel(options = {}) {
   }, { passive: false });
 
   document.getElementById('game-panel').addEventListener('click', e => {
+    if (e.target.closest('.panel-refresh-btn')) { handlePanelRefresh(); return; }
     const btn = e.target.closest('.panel-tag-btn');
     if (!btn || !panelOptions.onTagClick) return;
     panelOptions.onTagClick(btn.dataset.dim, btn.dataset.val);
@@ -88,6 +90,23 @@ function initPanel(options = {}) {
 
 function isPanelOpen() { return panelGame != null; }
 function getPanelGame() { return panelGame; }
+
+// Forces a fresh rating/HLTB/store-metadata/tags fetch for the open game, bypassing
+// its cache TTL. The actual fetch + state update is host-specific (app.js updates its
+// `games` array and table row; library.js updates its data-table row) — panelOptions.onRefresh
+// does that and panel.js only owns the button's disabled/spinning state and re-render.
+async function handlePanelRefresh() {
+  if (!panelGame || panelRefreshing || !panelOptions.onRefresh) return;
+  const game = panelGame;
+  panelRefreshing = true;
+  renderPanelBody(game);
+  try {
+    await panelOptions.onRefresh(game);
+  } finally {
+    panelRefreshing = false;
+    if (panelGame === game) renderPanelBody(game); // no-op if the panel moved on mid-fetch
+  }
+}
 
 // dir: -1 (previous) or 1 (next). wrap: true for keyboard arrow navigation
 // (cycles through all media), false for the hero prev/next buttons (clamps
@@ -303,8 +322,15 @@ function renderPanelBody(game) {
       : [tagSection('Developer', devs, tagDim('developers')), tagSection('Publisher', pubs, tagDim('publishers'))].join(''),
   ].join('');
 
+  const refreshBtn = (panelOptions.onRefresh && !g.loading) ? `
+    <button type="button" class="panel-refresh-btn${panelRefreshing ? ' is-refreshing' : ''}"${panelRefreshing ? ' disabled' : ''}
+      title="Refresh rating, HLTB &amp; store details for this game" aria-label="Refresh details">↻</button>` : '';
+
   document.getElementById('panel-body').innerHTML = `
-    <div class="panel-title">${esc(g.name)}</div>
+    <div class="panel-title-row">
+      <div class="panel-title">${esc(g.name)}</div>
+      ${refreshBtn}
+    </div>
     ${releaseDate ? `<div class="panel-release">${esc(releaseDate)}</div>` : ''}
     ${description ? `<div class="panel-desc">${description}</div>` : ''}
     ${scoreHtml}

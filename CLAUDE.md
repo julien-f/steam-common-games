@@ -64,12 +64,19 @@ If HLTB breaks again, recent npm packages (e.g. `howlongtobeat-ts`) tend to reve
 
 | Key prefix | TTL env var | Default | Reason |
 |---|---|---|---|
-| `resolve:` | `RESOLVE_CACHE_TTL_MINUTES` | 7 days | Steam ID resolution |
-| `rating:` | `RATING_CACHE_TTL_MINUTES` | 14 days | Steam review scores |
-| `hltb:`, `meta:`, `tags:` | `META_CACHE_TTL_MINUTES` | 30 days | Store metadata, HLTB, tags |
-| `games:`, `player:`, `wishlist:` | `LIBRARY_CACHE_TTL_MINUTES` | 60 min | Changes when users buy games / edit their wishlist |
+| `resolve:` | `RESOLVE_CACHE_TTL_MINUTES` | 90 days | Steam ID resolution — essentially permanent |
+| `rating:` | `RATING_CACHE_TTL_MINUTES` | 30 days | Steam review scores — drifts slowly |
+| `hltb:`, `meta:`, `tags:` | `META_CACHE_TTL_MINUTES` | 60 days | Store metadata, HLTB, tags — rarely changes for an existing game |
+| `games:`, `player:`, `wishlist:` | `LIBRARY_CACHE_TTL_MINUTES` | 6 hours | Changes when users buy games / edit their wishlist |
 
 Run `npm run cache:clear` to wipe all cache entries without deleting the database file.
+
+These TTLs are generous because both `getCached` and every `lib/steam.js`/`lib/hltb.js` fetch function accept `{ force: true }` to bypass the cache read for one call (the fetch still writes fresh data back to the cache). This backs two user-facing "↻ Refresh" affordances rather than being needed for background freshness:
+
+- The **search bar's Refresh button** (comparison page and Library Explorer) re-POSTs `/api/common-games`/`/api/wishlist` with `refresh: true`, forcing fresh owned-games/player/wishlist data for that search only.
+- The **side panel's Refresh button** re-fetches `GET /api/game-details/:appid?refresh=1`, forcing fresh rating/HLTB/store metadata/tags for that one game only. This request always counts against `DETAILS_RATE_LIMIT_MAX` (the rate limiter's cache-hit skip is disabled for `refresh=1`, since a forced call never is a cache hit).
+
+Neither refresh path touches `resolve:` — a vanity-URL mapping isn't expected to change, so there's no user-facing reason to force it.
 
 ### URL / sharing
 

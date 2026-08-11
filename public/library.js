@@ -79,6 +79,7 @@ const WISHLIST_DEFAULT_VISIBLE = [
 
 const playerInput   = document.getElementById('player-input');
 const loadBtn       = document.getElementById('load-btn');
+const refreshBtn    = document.getElementById('refresh-btn');
 const statusEl      = document.getElementById('status');
 const tableContainer = document.getElementById('table-container');
 const resetViewBtn  = document.getElementById('reset-view-btn');
@@ -100,7 +101,20 @@ let currentPlayerStr = '';     // last player string actually loaded (not just t
 const randomQueueKey = () => activeTab;
 const viewParamName  = () => (activeTab === 'wishlist' ? 'wview' : 'view');
 
-initPanel({ inertSelector: '.lib-page' });
+initPanel({
+  inertSelector: '.lib-page',
+  onRefresh: async (row) => {
+    try {
+      const res = await fetch(`/api/game-details/${row.appid}?name=${encodeURIComponent(row.name || '')}&refresh=1`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Refresh failed');
+      applyDetailsEvent(row, data);
+      if (table) table.setData([...rows]);
+    } catch (err) {
+      statusEl.textContent = `Refresh failed: ${err.message}`;
+    }
+  },
+});
 initLightbox();
 
 document.getElementById('shortcuts-backdrop').addEventListener('click', closeShortcuts);
@@ -310,15 +324,16 @@ function resetTableState() {
   rows = []; rowMap = new Map(); total = 0; loaded = 0;
   tableContainer.innerHTML = '';
   resetViewBtn.hidden = true;
+  refreshBtn.hidden = true;
 }
 
-async function loadLibrary(playerStr) {
+async function loadLibrary(playerStr, { refresh = false } = {}) {
   updateUrlParams({ u: playerStr });
   currentPlayerStr = playerStr;
 
   const members = playerStr.split(',').map(s => s.trim()).filter(Boolean);
 
-  statusEl.textContent = 'Fetching library…';
+  statusEl.textContent = refresh ? 'Refreshing library…' : 'Fetching library…';
   resetTableState();
 
   let result;
@@ -326,7 +341,7 @@ async function loadLibrary(playerStr) {
     const resp = await fetch('/api/common-games', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slots: [members] }),
+      body: JSON.stringify({ slots: [members], refresh }),
     });
     if (!resp.ok) {
       const { error } = await resp.json();
@@ -382,19 +397,20 @@ async function loadLibrary(playerStr) {
   });
   unsyncView = syncViewToUrl(table);
   resetViewBtn.hidden = false;
+  refreshBtn.hidden = false;
 
   updateStatus();
 
   await streamGameDetails(allGames);
 }
 
-async function loadWishlist(playerStr) {
+async function loadWishlist(playerStr, { refresh = false } = {}) {
   updateUrlParams({ u: playerStr });
   currentPlayerStr = playerStr;
 
   const members = playerStr.split(',').map(s => s.trim()).filter(Boolean);
 
-  statusEl.textContent = 'Fetching wishlist…';
+  statusEl.textContent = refresh ? 'Refreshing wishlist…' : 'Fetching wishlist…';
   resetTableState();
 
   let result;
@@ -402,7 +418,7 @@ async function loadWishlist(playerStr) {
     const resp = await fetch('/api/wishlist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ members }),
+      body: JSON.stringify({ members, refresh }),
     });
     if (!resp.ok) {
       const { error } = await resp.json();
@@ -452,14 +468,15 @@ async function loadWishlist(playerStr) {
   });
   unsyncView = syncViewToUrl(table, { paramName: 'wview' });
   resetViewBtn.hidden = false;
+  refreshBtn.hidden = false;
 
   updateStatus();
 
   await streamGameDetails(result.items.map(item => ({ appid: item.appid, name: '' })));
 }
 
-function loadCurrentTab(playerStr) {
-  return activeTab === 'wishlist' ? loadWishlist(playerStr) : loadLibrary(playerStr);
+function loadCurrentTab(playerStr, opts) {
+  return activeTab === 'wishlist' ? loadWishlist(playerStr, opts) : loadLibrary(playerStr, opts);
 }
 
 function setActiveTab(tab, { fetch: shouldFetch = true } = {}) {
@@ -478,6 +495,10 @@ tabWishlistBtn.addEventListener('click', () => setActiveTab('wishlist'));
 loadBtn.addEventListener('click', () => {
   const val = playerInput.value.trim();
   if (val) loadCurrentTab(val);
+});
+
+refreshBtn.addEventListener('click', () => {
+  if (currentPlayerStr) loadCurrentTab(currentPlayerStr, { refresh: true });
 });
 
 resetViewBtn.addEventListener('click', () => resetView(table, { paramName: viewParamName() }));

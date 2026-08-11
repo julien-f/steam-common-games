@@ -26,6 +26,17 @@ let nameFilter = '';
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('add-btn').addEventListener('click', () => addPlayerSlot());
   document.getElementById('search-btn').addEventListener('click', findCommonGames);
+  document.getElementById('refresh-btn').addEventListener('click', () => {
+    // Re-run the current search bypassing the library cache, but keep the URL,
+    // sort, filters, and open panel exactly as they are — this isn't a new search.
+    findCommonGames({
+      pushState: false,
+      refresh: true,
+      restoreFilters: Object.fromEntries(Object.entries(activeFilters).map(([k, s]) => [k, [...s]])),
+      restoreSort: { col: sortCol, dir: sortDir },
+      restoreNameFilter: nameFilter,
+    });
+  });
 
   document.getElementById('results').addEventListener('click', e => {
     const randomBtn = e.target.closest('.group-random-btn');
@@ -53,6 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
       renderFilterPanel();
       renderPanel();
     },
+    onRefresh: refreshGameDetails,
   });
 
   document.addEventListener('keydown', e => {
@@ -138,6 +150,7 @@ function loadFromUrl() {
     document.getElementById('filter-panel').innerHTML = '';
     document.getElementById('results').innerHTML = '';
     document.getElementById('how-it-works').hidden = false;
+    document.getElementById('refresh-btn').hidden = true;
     document.title = 'Steam Common Games';
   }
 }
@@ -239,7 +252,7 @@ function showAlert(msg, type = 'error') {
 
 // ── Main search flow ───────────────────────────────────────────────────────
 
-async function findCommonGames({ pushState = true, restoreFilters = null, restoreSort = null, restoreNameFilter = '', restoreShot = null } = {}) {
+async function findCommonGames({ pushState = true, restoreFilters = null, restoreSort = null, restoreNameFilter = '', restoreShot = null, refresh = false } = {}) {
   const inputSlots = getSlots();
   if (inputSlots.length < 1) { showAlert('Enter at least 1 Steam user.'); return; }
 
@@ -275,14 +288,15 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
   document.getElementById('how-it-works').hidden = true;
   document.getElementById('filter-panel').innerHTML = '';
   document.getElementById('search-btn').disabled = true;
+  document.getElementById('refresh-btn').disabled = true;
   document.getElementById('results').innerHTML =
-    '<div style="padding:16px 0;color:var(--text1)"><span class="spinner"></span>Fetching Steam libraries…</div>';
+    `<div style="padding:16px 0;color:var(--text1)"><span class="spinner"></span>${refresh ? 'Refreshing' : 'Fetching'} Steam libraries…</div>`;
 
   try {
     const res = await fetch('/api/common-games', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slots: inputSlots }),
+      body: JSON.stringify({ slots: inputSlots, refresh }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
@@ -297,6 +311,7 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
     playtime = data.playtime || {};
 
     renderPage();
+    document.getElementById('refresh-btn').hidden = false;
     restorePanelFromUrl(restoreShot);
     await loadAllDetails(thisRun);
     if (thisRun === runId) { refreshTable(); restorePanelFromUrl(restoreShot); }
@@ -304,8 +319,27 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
     if (thisRun !== runId) return;
     showAlert(err.message);
     document.getElementById('results').innerHTML = '';
+    document.getElementById('refresh-btn').hidden = true;
   } finally {
     document.getElementById('search-btn').disabled = false;
+    document.getElementById('refresh-btn').disabled = false;
+  }
+}
+
+// Forces a fresh rating/HLTB/store-metadata/tags fetch for one game, bypassing its
+// cache TTL — used by the side panel's "↻ Refresh" button (panel.js's onRefresh).
+async function refreshGameDetails(game) {
+  try {
+    const res = await fetch(`/api/game-details/${game.appid}?name=${encodeURIComponent(game.name)}&refresh=1`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Refresh failed');
+    game.details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags };
+    if (game.details.meta || game.details.tags) updateFilterOptions(game.details.meta, game.details.tags);
+    const tr = document.querySelector(`tr.game-row[data-appid="${game.appid}"]`);
+    if (tr) syncRow(tr, game);
+    refreshTable();
+  } catch (err) {
+    showAlert(err.message);
   }
 }
 

@@ -27,6 +27,8 @@ const DETAILS_RATE_LIMIT_MAX = Number(process.env.DETAILS_RATE_LIMIT_MAX);
 const rateLimitBypassed = () =>
   process.env.NODE_ENV === 'test' && process.env.RATE_LIMIT_ENABLED !== 'true';
 
+const isForceRefresh = (req) => req.query.refresh === '1' || req.query.refresh === 'true';
+
 const app = express();
 if (TRUST_PROXY) app.set('trust proxy', TRUST_PROXY);
 if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
@@ -56,6 +58,7 @@ const detailsLimit = rateLimit({
   message: { error: 'Too many requests. Please wait a minute and try again.' },
   skip: (req) => {
     if (rateLimitBypassed()) return true;
+    if (isForceRefresh(req)) return false; // force-refresh always re-fetches, so it must always count
     const appid = Number(req.params.appid);
     if (!Number.isInteger(appid) || appid <= 0) return false;
     return getCached(`rating:${appid}`) !== undefined
@@ -88,6 +91,11 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
     return res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
   }
 
+  // Explicit refresh (a user-clicked "↻ Refresh", not a normal search) bypasses the
+  // library-tier cache (owned games + player summaries) so a just-bought game or a
+  // changed display name shows up immediately, without waiting out the TTL.
+  const refresh = req.body.refresh === true;
+
   try {
     // Resolve all users; deduplicate within each slot
     const resolvedSlots = await Promise.all(
@@ -97,8 +105,8 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
     // Fetch all unique Steam IDs in one pass
     const uniqueIds = [...new Set(resolvedSlots.flat())];
     const [playerList, libraryList] = await Promise.all([
-      getPlayerSummaries(uniqueIds),
-      Promise.all(uniqueIds.map(getOwnedGames)),
+      getPlayerSummaries(uniqueIds, { force: refresh }),
+      Promise.all(uniqueIds.map(id => getOwnedGames(id, { force: refresh }))),
     ]);
 
     const libraryById = new Map(uniqueIds.map((id, i) => [id, libraryList[i]]));
@@ -157,9 +165,11 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
     return res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
   }
 
+  const refresh = req.body.refresh === true;
+
   try {
     const ids = [...new Set(await Promise.all(members.map(resolveSteamId)))];
-    const lists = await Promise.all(ids.map(getWishlist));
+    const lists = await Promise.all(ids.map(id => getWishlist(id, { force: refresh })));
 
     // Union across accounts — first-seen wins, same rule /api/common-games uses for libraries.
     const merged = new Map();
@@ -185,22 +195,25 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
 
 const dedupDetails = createDedup();
 
-function fetchGameDetails(appid, name) {
-  return dedupDetails(`details:${appid}`, () => {
-    const metaPromise = getAppDetails(appid);
+function fetchGameDetails(appid, name, { force = false } = {}) {
+  // Force-refresh gets its own dedup lane so it never joins an already in-flight
+  // non-forced fetch that started before the cache was known to be bypassed.
+  const dedupKey = force ? `details:force:${appid}` : `details:${appid}`;
+  return dedupDetails(dedupKey, () => {
+    const metaPromise = getAppDetails(appid, { force });
     // Owned games always come with a name (from Steam's library API), so HLTB can
     // search in parallel with everything else. Wishlist items have no name at all
     // (GetWishlist returns only appid/priority/date_added) — for those, wait for
     // store metadata and search HLTB using its `name` field instead.
     const hltbPromise = name
-      ? getHLTB(appid, name)
-      : metaPromise.then(meta => getHLTB(appid, meta?.name || ''), () => null);
+      ? getHLTB(appid, name, { force })
+      : metaPromise.then(meta => getHLTB(appid, meta?.name || '', { force }), () => null);
 
     return Promise.allSettled([
-      getGameRating(appid),
+      getGameRating(appid, { force }),
       hltbPromise,
       metaPromise,
-      getSteamSpyTags(appid),
+      getSteamSpyTags(appid, { force }),
     ]).then(([ratingRes, hltbRes, metaRes, tagsRes]) => {
       if (ratingRes.status === 'rejected') console.warn('[game-details] rating:', ratingRes.reason?.message);
       if (hltbRes.status   === 'rejected') console.warn('[game-details] hltb:',   hltbRes.reason?.message);
@@ -222,7 +235,7 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
     return res.status(400).json({ error: 'Invalid appid' });
   }
   const name = (req.query.name || '').trim().slice(0, 200);
-  res.json(await fetchGameDetails(appid, name));
+  res.json(await fetchGameDetails(appid, name, { force: isForceRefresh(req) }));
 });
 
 app.post('/api/game-details/stream', async (req, res) => {

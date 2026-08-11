@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Explicit cache refresh: both the comparison page and the Library Explorer now have a "↻ Refresh" button next to the search bar that bypasses the library-tier cache (owned games, player profiles, wishlist) for that search only, forcing fresh data instead of waiting out the TTL — for when you just bought a game or edited your wishlist. It re-fetches without resetting sort/filters/the open panel. The game detail side panel also got its own "↻" button (next to the game title) that force-refreshes just that game's rating/HLTB/store metadata/tags. `getCached()` and every Steam/HLTB fetch function in `lib/steam.js`/`lib/hltb.js` now accept `{ force: true }` to power this.
 - About page (`/about.html`): explains the project, credits its data sources (Steam Web API, SteamSpy, HowLongToBeat), and summarizes what's cached and for how long. Linked from the footer of both the comparison page and Library Explorer, which also links to it now.
 - Library Explorer page (`/library.html`): browse a single player's full Steam library in a sortable/filterable/groupable table powered by `@vates/data-table-vanilla`. Shows score, HLTB times, playtime, Metacritic, release date, genres, developers, publishers, tags, categories, and review description. Details stream progressively via SSE as on the main page. Table sort/filter/group/page state is synced to the `?view=` URL param, so a copied link reproduces the same view. Linked from the main page footer.
 - Library Explorer: genres, developers, publishers, tags, and categories are multi-value columns — filtering by one of these lists individual values in the checklist instead of matching the whole joined string, and grouping by genre/developer/publisher fans a game out into every group it belongs to.
@@ -29,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- Cache TTLs raised now that explicit refresh (see Added) covers the "I need this fresher right now" case: library data (owned games/player/wishlist) 60 min → 6 hours; Steam ID resolution 7 days → 90 days; review scores 14 days → 30 days; store metadata/HLTB/tags 30 days → 60 days.
 - `@vates/data-table-core` and `@vates/data-table-vanilla` are installed as regular npm dependencies; `server.js` serves their `dist/` folders under `/vendor/`, so the frontend importmap resolves them without a bundler.
 - Bumped `@vates/data-table-core`/`@vates/data-table-vanilla` to 0.2.0: filter dropdown redesigned as a searchable master-detail panel with per-value row counts (replacing the old single stacked checklist), column drag-and-drop reordering, and shift-click range selection in filter checklists and the date tree.
 - Bumped `@vates/data-table-vanilla` to 0.3.0: rows and group headers are keyboard-navigable (arrows, Home/End, Space to select, Enter to open a row/toggle a group) when `onRowClick` or `selectable` is set.
