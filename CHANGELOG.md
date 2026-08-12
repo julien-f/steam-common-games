@@ -336,6 +336,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - URL encoding updated to support multi-account slots (`?u=alice,bob_family&u=charlie`); old single-account URLs remain fully compatible
 - URL is now canonical: slot members and slots themselves are sorted alphabetically, so the same comparison always produces the same shareable URL
 
+### Fixed
+
+- `package.json`'s `engines.node` claimed `>=18.0.0`, but `lib/cache.js`/`scripts/cache-clear.js` use `node:sqlite`'s `DatabaseSync`, which doesn't exist before Node 22.5.0 and required the `--experimental-sqlite` flag until 22.13.0/23.4.0. Corrected to `>=22.13.0`, the actual minimum that runs this app unflagged.
+- Ran `npm audit fix` to pick up patched transitive versions already allowed by existing semver ranges: `body-parser` (via `express`) to 1.20.6, fixing a DoS where an invalid `limit` value silently disabled request-size enforcement; `ip-address` (via `express-rate-limit`) to 10.5.0, fixing SSRF/trust-boundary bypasses from octal/CIDR/IPv4-mapped address misparsing. No `package.json` changes needed — the lockfile just hadn't picked up the fixed patch versions.
+- Bumped `express-rate-limit` to `^8.6.2` (from `^8.5.2`), the latest patch release.
+
 ## [0.1.0] - 2026-06-16
 
 ### Added
