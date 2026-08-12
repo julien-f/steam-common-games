@@ -148,7 +148,7 @@ initPanel({
     }
   },
 });
-initLightbox();
+initLightbox({ onParamChange: setLightboxParam });
 
 document.getElementById('shortcuts-backdrop').addEventListener('click', closeShortcuts);
 document.querySelector('.shortcuts-close').addEventListener('click', closeShortcuts);
@@ -206,11 +206,63 @@ function openGame(game, { isRandom = false } = {}) {
   if (!isRandom) clearRandomQueue(randomQueueKey());
   panelOpen(game);
   renderPanelNav(game);
+  setPanelParam(game.appid);
+}
+
+// Wraps the shared panelClose() with the URL-state cleanup — mirrors app.js's own
+// closePanel() wrapper. Only reached from the Escape-key shortcut below; the panel's own
+// backdrop-click/close-button/swipe-to-close paths call panel.js's panelClose() directly
+// (same pre-existing gap as on the comparison page — see app.js).
+function closePanel() {
+  panelClose();
+  setPanelParam(null);
 }
 
 function pickRandomGame() {
   const pick = pickRandomFrom(getGameList(), randomQueueKey(), getPanelGame()?.appid);
   if (pick) openGame(pick, { isRandom: true });
+}
+
+// ── URL state — deep link to an open game panel (`?game=`) and, within it, a
+// specific lightbox screenshot/video (`?shot=`). Mirrors app.js's setPanelParam/
+// setLightboxParam/restorePanelFromUrl for the comparison page; see public/urlState.js
+// for the equivalent parsing there (library.js has no analogous shared parser since its
+// only other URL params — `u`, `tab`, `view`/`wview` — are handled by updateUrlParams/
+// syncViewToUrl already).
+function setPanelParam(appid) {
+  const params = new URLSearchParams(location.search);
+  params.delete('shot');
+  if (appid == null) params.delete('game');
+  else params.set('game', appid);
+  history.replaceState(null, '', `?${params}`);
+}
+
+function setLightboxParam(idx) {
+  const params = new URLSearchParams(location.search);
+  if (idx == null) params.delete('shot');
+  else params.set('shot', idx);
+  history.replaceState(null, '', `?${params}`);
+}
+
+// Reopens the panel (and, if present, the lightbox) from the current `?game=`/`?shot=`
+// URL params. Only called on the initial page load (see the bottom of this file) —
+// a genuine new Load/refresh/tab-switch explicitly clears those params instead (see
+// loadLibrary/loadWishlist) since a game left open from a previous player/tab may not
+// even exist in the new list.
+//
+// `restoreShot` must be threaded through from the page-load URL rather than re-read from
+// location.search on the second (post-stream) call: opening the panel on the first call
+// calls setPanelParam(), which deletes `shot` from the live URL (a fresh panel open always
+// resets to the hero) — by the time the row's details are in, `shot` would already be gone.
+function restorePanelFromUrl(restoreShot = null) {
+  const params = new URLSearchParams(location.search);
+  const appid = Number(params.get('game'));
+  if (!appid) return;
+  const row = rowMap.get(appid);
+  if (!row) return;
+  if (getPanelGame()?.appid !== appid) openGame(row);
+  const shotParam = restoreShot ?? params.get('shot');
+  if (shotParam !== null && !row.loading) openLightbox(row, shotParam);
 }
 
 document.addEventListener('keydown', e => {
@@ -221,7 +273,7 @@ document.addEventListener('keydown', e => {
       return;
     }
     if (document.getElementById('shortcuts-modal').classList.contains('open')) { closeShortcuts(); return; }
-    panelClose();
+    closePanel();
     return;
   }
   if (e.key === '?') { e.preventDefault(); toggleShortcuts(); return; }
@@ -383,8 +435,11 @@ function resetTableState() {
   accountsBarEl.innerHTML = '';
 }
 
-async function loadLibrary(playerStr, { refreshIds } = {}) {
-  updateUrlParams({ u: playerStr });
+async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, restoreShot = null } = {}) {
+  // A genuine new load drops any `game`/`shot` left in the URL from a previous player/tab —
+  // it may not even exist in the new list. The initial page-load path (bottom of this file)
+  // passes preserveGameParam so it can restore the deep link once the new data is in.
+  updateUrlParams(preserveGameParam ? { u: playerStr } : { u: playerStr, game: null, shot: null });
   currentPlayerStr = playerStr;
 
   const members = playerStr.split(',').map(s => s.trim()).filter(Boolean);
@@ -461,12 +516,14 @@ async function loadLibrary(playerStr, { refreshIds } = {}) {
   resetViewBtn.hidden = false;
 
   updateStatus();
+  if (preserveGameParam) restorePanelFromUrl(restoreShot); // early attempt — lightbox needs details, tried again below
 
   await streamGameDetails(allGames);
+  if (preserveGameParam) restorePanelFromUrl(restoreShot);
 }
 
-async function loadWishlist(playerStr, { refreshIds } = {}) {
-  updateUrlParams({ u: playerStr });
+async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, restoreShot = null } = {}) {
+  updateUrlParams(preserveGameParam ? { u: playerStr } : { u: playerStr, game: null, shot: null });
   currentPlayerStr = playerStr;
 
   const members = playerStr.split(',').map(s => s.trim()).filter(Boolean);
@@ -538,8 +595,10 @@ async function loadWishlist(playerStr, { refreshIds } = {}) {
   resetViewBtn.hidden = false;
 
   updateStatus();
+  if (preserveGameParam) restorePanelFromUrl(restoreShot); // early attempt — lightbox needs details, tried again below
 
   await streamGameDetails(result.items.map(item => ({ appid: item.appid, name: '' })));
+  if (preserveGameParam) restorePanelFromUrl(restoreShot);
 }
 
 function loadCurrentTab(playerStr, opts) {
@@ -584,5 +643,9 @@ if (initParams.get('tab') === 'wishlist') setActiveTab('wishlist', { fetch: fals
 if (initPlayer) {
   playerInput.value = initPlayer;
   currentPlayerStr = initPlayer;
-  loadCurrentTab(initPlayer);
+  // preserveGameParam: a `?game=<appid>` (and `&shot=<idx>`) present in the URL on page
+  // load should reopen that game/media once its row is in — see restorePanelFromUrl().
+  // `shot` is captured here (not re-read later) since opening the panel deletes it from
+  // the live URL — see the comment on restorePanelFromUrl().
+  loadCurrentTab(initPlayer, { preserveGameParam: true, restoreShot: initParams.get('shot') });
 }

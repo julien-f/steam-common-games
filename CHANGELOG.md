@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Library Explorer: opening a game's side panel now writes `?game=<appid>` to the URL, and opening the lightbox on top of it adds `&shot=<idx>`, mirroring the comparison page. A copied link reopens the same game/media once the page's data has loaded. A genuine new Load/refresh/tab-switch clears these params instead, since a game left open from a previous player/tab may not exist in the new list.
+
 ### Fixed
 
 - Lightbox: the video scrubber/timestamp no longer briefly show the previous video's playhead position when switching to a new video — they're now reset to 0:00 immediately on load instead of waiting for the new `<video>`'s own `timeupdate`/`durationchange` events to catch up.
