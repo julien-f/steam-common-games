@@ -297,6 +297,77 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
 }
 .player-slot:has(.family-row) .family-hint { display: block; }
 
+/*
+ * Accounts bar / recent searches — shared by the comparison page and Library
+ * Explorer (rendering logic lives in public/accountsBar.js). One chip per
+ * resolved Steam account: avatar, persona name, online/in-game status dot,
+ * a per-account count, an optional private-profile badge, and a refresh icon.
+ */
+.accounts-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+/* Comparison page only — clusters a slot's account chip(s) under a "Player N" label,
+   since (unlike the Library Explorer) a search can compare several separate slots. */
+.slot-accounts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.slot-label { font-size: 12px; color: var(--text2); }
+.account-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 6px 5px 5px;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 999px;
+  color: var(--text0);
+}
+.account-identity {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--text0); text-decoration: none;
+}
+a.account-identity:hover .account-name { color: var(--accent2); }
+.account-refresh-btn {
+  flex-shrink: 0; width: 20px; height: 20px; padding: 0;
+  background: transparent; border: 1px solid var(--border); border-radius: 50%;
+  color: var(--text2); font-size: 11px; line-height: 1; cursor: pointer;
+}
+.account-refresh-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.account-refresh-btn:disabled { cursor: default; opacity: 0.6; }
+.account-avatar-wrap { position: relative; flex-shrink: 0; width: 28px; height: 28px; }
+.account-avatar { width: 28px; height: 28px; border-radius: 50%; display: block; }
+.account-status {
+  position: absolute; right: -1px; bottom: -1px; width: 9px; height: 9px;
+  border-radius: 50%; border: 2px solid var(--bg3);
+}
+.account-status-offline { background: var(--text2); }
+.account-status-online  { background: #57cbde; }
+.account-status-ingame  { background: #a3cf4e; }
+.account-meta { display: flex; flex-direction: column; line-height: 1.25; }
+.account-name { font-size: 13px; font-weight: 500; }
+.account-count { font-size: 11px; color: var(--text2); }
+.account-private {
+  font-size: 11px; font-weight: 500;
+  padding: 2px 7px; border-radius: 999px;
+  background: rgba(228,168,46,0.1); border: 1px solid rgba(228,168,46,0.3); color: #e4c46e;
+}
+
+/* Recent searches bar — locally-remembered past searches, shown above the accounts bar */
+.recents-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.recents-label { font-size: 12px; color: var(--text2); }
+.recent-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 4px 3px 4px;
+  background: transparent; border: 1px solid var(--border); border-radius: 999px;
+}
+.recent-chip-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: transparent; border: none; padding: 0 2px; cursor: pointer;
+  color: var(--text1); font-size: 12px;
+}
+.recent-chip-btn:hover { color: var(--accent2); }
+.recent-chip-avatar { width: 18px; height: 18px; border-radius: 50%; display: block; }
+.recent-chip-remove {
+  flex-shrink: 0; width: 16px; height: 16px; padding: 0;
+  background: transparent; border: none; border-radius: 50%;
+  color: var(--text2); font-size: 12px; line-height: 1; cursor: pointer;
+}
+.recent-chip-remove:hover { color: #cc5050; }
+.recents-clear { font-size: 12px; color: var(--text2); background: none; border: none; cursor: pointer; padding: 0; }
+.recents-clear:hover { color: var(--accent2); }
+
 /* How it works */
 .how-it-works { margin-bottom: 18px; }
 .how-steps {

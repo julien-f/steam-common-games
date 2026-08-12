@@ -83,8 +83,11 @@
     <input id="player-input" type="text"
       placeholder="Steam ID, vanity URL, or username (comma-separated for Steam Family)">
     <button class="btn btn-primary" id="load-btn">Load Library</button>
-    <button class="btn btn-ghost" id="refresh-btn" title="Bypass the cache and re-fetch now" hidden>↻ Refresh</button>
   </div>
+
+  <div id="recents-bar" class="recents-bar" hidden></div>
+
+  <div id="accounts-bar" class="accounts-bar" hidden></div>
 
   <div class="lib-status-row">
     <div id="status" class="lib-status"></div>
@@ -136,6 +139,7 @@
 <script src="/hls.min.js"></script>
 <script src="/mediaItems.js"></script>
 <script src="/utils.js"></script>
+<script src="/accountsBar.js"></script>
 <script src="/lightbox.js"></script>
 <script src="/panel.js"></script>
 <script type="module" src="/library.js"></script>

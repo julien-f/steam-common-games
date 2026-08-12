@@ -134,6 +134,7 @@ test('POST /api/common-games: 200 with groups and slots', async (t) => {
   assert.ok(Array.isArray(res.body.slots));
   assert.equal(res.body.groups[0].games[0].appid, 400);
   assert.equal(res.body.slots.length, 2);
+  assert.equal(res.body.slots[0][0].gameCount, 1, 'gameCount reflects that account\'s own library size');
 });
 
 test('POST /api/common-games: 200 accepts legacy users array', async (t) => {
@@ -155,6 +156,35 @@ test('POST /api/common-games: groups contains only games shared by both players'
   assert.equal(res.body.groups.length, 1);
   assert.equal(res.body.groups[0].games.length, 1);
   assert.equal(res.body.groups[0].games[0].appid, 400);
+});
+
+test('POST /api/common-games: refreshIds re-fetches only the listed account, not the whole slot', async (t) => {
+  _reset();
+  let gamesFetchCount1 = 0, gamesFetchCount2 = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('GetOwnedGames') && url.includes(ID1)) {
+      gamesFetchCount1++;
+      return { ok: true, json: async () => ({ response: { games: [{ appid: 400, name: 'Portal' }] } }) };
+    }
+    if (url.includes('GetOwnedGames') && url.includes(ID2)) {
+      gamesFetchCount2++;
+      return { ok: true, json: async () => ({ response: { games: [{ appid: 400, name: 'Portal' }] } }) };
+    }
+    if (url.includes('GetPlayerSummaries')) {
+      const players = [ID1, ID2].map(id => ({ steamid: id, personaname: id, profileurl: '' }));
+      return { ok: true, json: async () => ({ response: { players } }) };
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  await api.post('/api/common-games').send({ slots: [[ID1], [ID2]] }); // primes the cache
+  assert.equal(gamesFetchCount1, 1);
+  assert.equal(gamesFetchCount2, 1);
+
+  const res = await api.post('/api/common-games').send({ slots: [[ID1], [ID2]], refreshIds: [ID2] });
+  assert.equal(res.status, 200);
+  assert.equal(gamesFetchCount1, 1, 'ID1 was not in refreshIds — served from cache');
+  assert.equal(gamesFetchCount2, 2, 'ID2 was in refreshIds — re-fetched');
 });
 
 // ── POST /api/common-games — upstream / user errors ──────────────────────────
@@ -217,6 +247,10 @@ function makeWishlistFetch(items1 = [], items2 = []) {
     if (url.includes('GetWishlist') && url.includes(ID2)) {
       return { ok: true, json: async () => ({ response: { items: items2 } }) };
     }
+    if (url.includes('GetPlayerSummaries')) {
+      const players = [ID1, ID2].map(id => ({ steamid: id, personaname: id, profileurl: '' }));
+      return { ok: true, json: async () => ({ response: { players } }) };
+    }
     throw new Error(`Unexpected fetch: ${url}`);
   };
 }
@@ -231,6 +265,8 @@ test('POST /api/wishlist: 200 with items for a single account', async (t) => {
   assert.equal(res.body.items[0].appid, 400);
   assert.equal(res.body.items[0].priority, 1);
   assert.equal(res.body.items[0].dateAdded, '2015-06-10');
+  assert.equal(res.body.players.length, 1);
+  assert.equal(res.body.players[0].itemCount, 1);
 });
 
 test('POST /api/wishlist: unions two accounts, dedupes shared appid keeping first-seen', async (t) => {
@@ -251,6 +287,7 @@ test('POST /api/wishlist: unions two accounts, dedupes shared appid keeping firs
 test('POST /api/wishlist: an account with no items field contributes nothing', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('GetPlayerSummaries')) return { ok: true, json: async () => ({ response: { players: [] } }) };
     if (url.includes(ID1)) return { ok: true, json: async () => ({ response: {} }) }; // private/empty
     if (url.includes(ID2)) return { ok: true, json: async () => ({ response: { items: [{ appid: 400, priority: 1, date_added: 1433965886 }] } }) };
     throw new Error(`Unexpected fetch: ${url}`);

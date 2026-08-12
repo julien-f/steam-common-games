@@ -14,6 +14,8 @@ let refreshDebounceTimer = null;
 let activeGame = null;
 let randomGroupKey = null;      // groupKey of the active random session, or null (queues themselves live in panel.js)
 
+const RECENTS_KEY = 'comparison:recent-searches'; // see public/accountsBar.js
+
 
 // Filter state — reset on each new search
 const activeFilters = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set()]));
@@ -26,17 +28,28 @@ let nameFilter = '';
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('add-btn').addEventListener('click', () => addPlayerSlot());
   document.getElementById('search-btn').addEventListener('click', findCommonGames);
-  document.getElementById('refresh-btn').addEventListener('click', () => {
-    // Re-run the current search bypassing the library cache, but keep the URL,
-    // sort, filters, and open panel exactly as they are — this isn't a new search.
+
+  // Per-account refresh (accounts bar) and recent-searches (see public/accountsBar.js,
+  // shared with the Library Explorer) — re-run the current search bypassing the cache for
+  // just one account, or replaying a remembered slot combo, while keeping the URL, sort,
+  // filters, and open panel exactly as they are for the refresh case (not a new search).
+  bindAccountRefresh(document.getElementById('accounts-bar'), steamid => {
     findCommonGames({
       pushState: false,
-      refresh: true,
+      refreshIds: [steamid],
       restoreFilters: Object.fromEntries(Object.entries(activeFilters).map(([k, s]) => [k, [...s]])),
       restoreSort: { col: sortCol, dir: sortDir },
       restoreNameFilter: nameFilter,
     });
   });
+
+  bindRecentsBar(document.getElementById('recents-bar'), RECENTS_KEY, inputSlots => {
+    const container = document.getElementById('user-inputs');
+    container.innerHTML = '';
+    inputSlots.forEach(accounts => addPlayerSlot(accounts));
+    findCommonGames();
+  });
+  renderRecentsBar(document.getElementById('recents-bar'), RECENTS_KEY);
 
   document.getElementById('results').addEventListener('click', e => {
     const randomBtn = e.target.closest('.group-random-btn');
@@ -150,9 +163,22 @@ function loadFromUrl() {
     document.getElementById('filter-panel').innerHTML = '';
     document.getElementById('results').innerHTML = '';
     document.getElementById('how-it-works').hidden = false;
-    document.getElementById('refresh-btn').hidden = true;
+    const accountsBarEl = document.getElementById('accounts-bar');
+    accountsBarEl.hidden = true;
+    accountsBarEl.innerHTML = '';
     document.title = 'Steam Common Games';
   }
+}
+
+// Sorts members within each slot, then sorts slots by their first member — the
+// canonical order used both for building a shareable/reproducible `?u=` URL and for
+// deduping recent searches (so "alice+bob vs. charlie" and "bob+alice vs. charlie" are
+// treated as the same search).
+function normalizedSlots(inputSlots) {
+  const cmp = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+  return [...inputSlots]
+    .map(slot => [...slot].sort(cmp))
+    .sort((a, b) => cmp(a[0], b[0]));
 }
 
 // ── Player slot input rows ─────────────────────────────────────────────────
@@ -252,7 +278,7 @@ function showAlert(msg, type = 'error') {
 
 // ── Main search flow ───────────────────────────────────────────────────────
 
-async function findCommonGames({ pushState = true, restoreFilters = null, restoreSort = null, restoreNameFilter = '', restoreShot = null, refresh = false } = {}) {
+async function findCommonGames({ pushState = true, restoreFilters = null, restoreSort = null, restoreNameFilter = '', restoreShot = null, refreshIds = null } = {}) {
   const inputSlots = getSlots();
   if (inputSlots.length < 1) { showAlert('Enter at least 1 Steam user.'); return; }
 
@@ -265,11 +291,7 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
 
   if (pushState) {
     const params = new URLSearchParams();
-    const cmp = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
-    [...inputSlots]
-      .map(slot => [...slot].sort(cmp))           // sort members within each slot
-      .sort((a, b) => cmp(a[0], b[0]))            // sort slots by their first member
-      .forEach(slot => params.append('u', slot.join(',')));
+    normalizedSlots(inputSlots).forEach(slot => params.append('u', slot.join(',')));
     params.set('sort', (sortDir < 0 ? '-' : '') + sortCol);
     history.pushState(null, '', `?${params}`);
   }
@@ -285,18 +307,20 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
       for (const v of vals) activeFilters[k].add(v);
     }
   }
+  const accountsBarEl = document.getElementById('accounts-bar');
+  accountsBarEl.hidden = true;
+  accountsBarEl.innerHTML = '';
   document.getElementById('how-it-works').hidden = true;
   document.getElementById('filter-panel').innerHTML = '';
   document.getElementById('search-btn').disabled = true;
-  document.getElementById('refresh-btn').disabled = true;
   document.getElementById('results').innerHTML =
-    `<div style="padding:16px 0;color:var(--text1)"><span class="spinner"></span>${refresh ? 'Refreshing' : 'Fetching'} Steam libraries…</div>`;
+    `<div style="padding:16px 0;color:var(--text1)"><span class="spinner"></span>${refreshIds ? 'Refreshing' : 'Fetching'} Steam libraries…</div>`;
 
   try {
     const res = await fetch('/api/common-games', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slots: inputSlots, refresh }),
+      body: JSON.stringify({ slots: inputSlots, refreshIds }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
@@ -311,7 +335,15 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
     playtime = data.playtime || {};
 
     renderPage();
-    document.getElementById('refresh-btn').hidden = false;
+    // One labelled cluster of chips per slot — the label is only useful once there's
+    // more than one slot to tell apart (a single-slot search is just "the library").
+    renderAccountChipsGrouped(accountsBarEl, slots.map((players, i) => ({
+      label: slots.length > 1 ? `Player ${i + 1}` : null,
+      players,
+    })), 'games');
+    const normalized = normalizedSlots(inputSlots);
+    addRecent(RECENTS_KEY, normalized.map(s => s.join(',')).join('|'), slots.flat(), normalized);
+    renderRecentsBar(document.getElementById('recents-bar'), RECENTS_KEY);
     restorePanelFromUrl(restoreShot);
     await loadAllDetails(thisRun);
     if (thisRun === runId) { refreshTable(); restorePanelFromUrl(restoreShot); }
@@ -319,10 +351,8 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
     if (thisRun !== runId) return;
     showAlert(err.message);
     document.getElementById('results').innerHTML = '';
-    document.getElementById('refresh-btn').hidden = true;
   } finally {
     document.getElementById('search-btn').disabled = false;
-    document.getElementById('refresh-btn').disabled = false;
   }
 }
 

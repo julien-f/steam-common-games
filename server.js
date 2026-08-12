@@ -95,6 +95,9 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
   // library-tier cache (owned games + player summaries) so a just-bought game or a
   // changed display name shows up immediately, without waiting out the TTL.
   const refresh = req.body.refresh === true;
+  // Per-account refresh (the accounts bar's own "↻" on one chip) — bypasses the cache for
+  // just these already-resolved Steam64 IDs instead of every account in the search.
+  const refreshIds = new Set(Array.isArray(req.body.refreshIds) ? req.body.refreshIds : []);
 
   try {
     // Resolve all users; deduplicate within each slot
@@ -105,8 +108,8 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
     // Fetch all unique Steam IDs in one pass
     const uniqueIds = [...new Set(resolvedSlots.flat())];
     const [playerList, libraryList] = await Promise.all([
-      getPlayerSummaries(uniqueIds, { force: refresh }),
-      Promise.all(uniqueIds.map(id => getOwnedGames(id, { force: refresh }))),
+      getPlayerSummaries(uniqueIds, { force: refresh, forceIds: refreshIds }),
+      Promise.all(uniqueIds.map(id => getOwnedGames(id, { force: refresh || refreshIds.has(id) }))),
     ]);
 
     const libraryById = new Map(uniqueIds.map((id, i) => [id, libraryList[i]]));
@@ -123,8 +126,14 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
       return [...merged.values()];
     });
 
+    // `gameCount` rides along on each player object so the frontend can show it next to an
+    // account's avatar (e.g. in the Library Explorer's accounts bar) without a second request —
+    // it's just the length of the per-account library already fetched above.
     const playerSlots = resolvedSlots.map(ids =>
-      ids.map(id => playerById.get(id) || { steamid: id, personaname: id, profileurl: '' })
+      ids.map(id => ({
+        ...(playerById.get(id) || { steamid: id, personaname: id, profileurl: '' }),
+        gameCount: (libraryById.get(id) || []).length,
+      }))
     );
 
     const groups = groupByOwnership(slotLibraries);
@@ -166,10 +175,14 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
   }
 
   const refresh = req.body.refresh === true;
+  const refreshIds = new Set(Array.isArray(req.body.refreshIds) ? req.body.refreshIds : []);
 
   try {
     const ids = [...new Set(await Promise.all(members.map(resolveSteamId)))];
-    const lists = await Promise.all(ids.map(id => getWishlist(id, { force: refresh })));
+    const [playerList, lists] = await Promise.all([
+      getPlayerSummaries(ids, { force: refresh, forceIds: refreshIds }),
+      Promise.all(ids.map(id => getWishlist(id, { force: refresh || refreshIds.has(id) }))),
+    ]);
 
     // Union across accounts — first-seen wins, same rule /api/common-games uses for libraries.
     const merged = new Map();
@@ -185,7 +198,15 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
       dateAdded: item.date_added ? new Date(item.date_added * 1000).toISOString().slice(0, 10) : null,
     }));
 
-    res.json({ items });
+    // Player summaries + per-account wishlist size, same shape/purpose as /api/common-games'
+    // `slots` — lets the frontend show an accounts bar on the Wishlist tab too.
+    const playerById = new Map(playerList.map(p => [p.steamid, p]));
+    const players = ids.map((id, i) => ({
+      ...(playerById.get(id) || { steamid: id, personaname: id, profileurl: '' }),
+      itemCount: lists[i].length,
+    }));
+
+    res.json({ items, players });
   } catch (err) {
     if (err.isUpstream || err.name === 'TimeoutError') console.error('[upstream]', err.message);
     const status = err.isUpstream ? 502 : err.name === 'TimeoutError' ? 504 : 400;

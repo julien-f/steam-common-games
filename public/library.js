@@ -111,8 +111,9 @@ const WISHLIST_DEFAULT_VISIBLE = [
 
 const playerInput   = document.getElementById('player-input');
 const loadBtn       = document.getElementById('load-btn');
-const refreshBtn    = document.getElementById('refresh-btn');
 const statusEl      = document.getElementById('status');
+const accountsBarEl = document.getElementById('accounts-bar');
+const recentsBarEl  = document.getElementById('recents-bar');
 const tableContainer = document.getElementById('table-container');
 const resetViewBtn  = document.getElementById('reset-view-btn');
 const tabLibraryBtn  = document.getElementById('tab-library');
@@ -267,6 +268,25 @@ function updateStatus() {
   }
 }
 
+// Rendering, refresh-icon delegation, and localStorage recents all live in the shared
+// public/accountsBar.js (also used by the comparison page's app.js).
+const RECENTS_KEY = 'library-explorer:recent-players';
+
+function renderAccountsBar(players, countLabel) {
+  renderAccountChips(accountsBarEl, players, countLabel);
+}
+
+bindAccountRefresh(accountsBarEl, steamid => {
+  loadCurrentTab(currentPlayerStr, { refreshIds: [steamid] });
+});
+
+bindRecentsBar(recentsBarEl, RECENTS_KEY, playerStr => {
+  playerInput.value = playerStr;
+  loadCurrentTab(playerStr);
+});
+
+renderRecentsBar(recentsBarEl, RECENTS_KEY);
+
 function updateUrlParams(patch) {
   const url = new URL(location.href);
   for (const [key, value] of Object.entries(patch)) {
@@ -359,16 +379,17 @@ function resetTableState() {
   rows = []; rowMap = new Map(); total = 0; loaded = 0;
   tableContainer.innerHTML = '';
   resetViewBtn.hidden = true;
-  refreshBtn.hidden = true;
+  accountsBarEl.hidden = true;
+  accountsBarEl.innerHTML = '';
 }
 
-async function loadLibrary(playerStr, { refresh = false } = {}) {
+async function loadLibrary(playerStr, { refreshIds } = {}) {
   updateUrlParams({ u: playerStr });
   currentPlayerStr = playerStr;
 
   const members = playerStr.split(',').map(s => s.trim()).filter(Boolean);
 
-  statusEl.textContent = refresh ? 'Refreshing library…' : 'Fetching library…';
+  statusEl.textContent = refreshIds ? 'Refreshing account…' : 'Fetching library…';
   resetTableState();
 
   let result;
@@ -376,7 +397,7 @@ async function loadLibrary(playerStr, { refresh = false } = {}) {
     const resp = await fetch('/api/common-games', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slots: [members], refresh }),
+      body: JSON.stringify({ slots: [members], refreshIds }),
     });
     if (!resp.ok) {
       const { error } = await resp.json();
@@ -391,6 +412,9 @@ async function loadLibrary(playerStr, { refresh = false } = {}) {
 
   const allGames = result.groups.flatMap(g => g.games);
   const slotSteamIds = result.slots[0].map(p => p.steamid);
+  renderAccountsBar(result.slots[0], 'games');
+  addRecent(RECENTS_KEY, playerStr, result.slots[0], playerStr);
+  renderRecentsBar(recentsBarEl, RECENTS_KEY);
 
   rows = allGames.map(game => {
     const ptByAccount = (result.playtime && result.playtime[game.appid]) || {};
@@ -435,20 +459,19 @@ async function loadLibrary(playerStr, { refresh = false } = {}) {
   table.setViewState({ sorts: DEFAULT_SORT });
   unsyncView = syncViewToUrl(table);
   resetViewBtn.hidden = false;
-  refreshBtn.hidden = false;
 
   updateStatus();
 
   await streamGameDetails(allGames);
 }
 
-async function loadWishlist(playerStr, { refresh = false } = {}) {
+async function loadWishlist(playerStr, { refreshIds } = {}) {
   updateUrlParams({ u: playerStr });
   currentPlayerStr = playerStr;
 
   const members = playerStr.split(',').map(s => s.trim()).filter(Boolean);
 
-  statusEl.textContent = refresh ? 'Refreshing wishlist…' : 'Fetching wishlist…';
+  statusEl.textContent = refreshIds ? 'Refreshing account…' : 'Fetching wishlist…';
   resetTableState();
 
   let result;
@@ -456,7 +479,7 @@ async function loadWishlist(playerStr, { refresh = false } = {}) {
     const resp = await fetch('/api/wishlist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ members, refresh }),
+      body: JSON.stringify({ members, refreshIds }),
     });
     if (!resp.ok) {
       const { error } = await resp.json();
@@ -468,6 +491,10 @@ async function loadWishlist(playerStr, { refresh = false } = {}) {
     statusEl.textContent = `Error: ${err.message}`;
     return;
   }
+
+  renderAccountsBar(result.players, 'wishlisted');
+  addRecent(RECENTS_KEY, playerStr, result.players, playerStr);
+  renderRecentsBar(recentsBarEl, RECENTS_KEY);
 
   rows = result.items.map(item => ({
     appid:              item.appid,
@@ -509,7 +536,6 @@ async function loadWishlist(playerStr, { refresh = false } = {}) {
   table.setViewState({ sorts: DEFAULT_SORT });
   unsyncView = syncViewToUrl(table, { paramName: 'wview' });
   resetViewBtn.hidden = false;
-  refreshBtn.hidden = false;
 
   updateStatus();
 
@@ -536,10 +562,6 @@ tabWishlistBtn.addEventListener('click', () => setActiveTab('wishlist'));
 loadBtn.addEventListener('click', () => {
   const val = playerInput.value.trim();
   if (val) loadCurrentTab(val);
-});
-
-refreshBtn.addEventListener('click', () => {
-  if (currentPlayerStr) loadCurrentTab(currentPlayerStr, { refresh: true });
 });
 
 resetViewBtn.addEventListener('click', () => {

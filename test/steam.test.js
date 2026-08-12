@@ -309,6 +309,30 @@ test('getPlayerSummaries: cache key is order-independent', async (t) => {
   assert.equal(fetchCount, 1, 'reversed order should hit same cache entries');
 });
 
+test('getPlayerSummaries: forceIds bypasses the cache for only the listed accounts', async (t) => {
+  _reset();
+  const ID_A = '76561198000000009';
+  const ID_B = '76561198000000010';
+  let fetchCount = 0;
+  // Each call returns a fresh personaname for whichever IDs were actually requested,
+  // so we can tell from the result which accounts were re-fetched vs. served from cache.
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    fetchCount++;
+    const requested = new URL(url).searchParams.get('steamids').split(',');
+    return { ok: true, json: async () => ({ response: { players:
+      requested.map(id => ({ steamid: id, personaname: `fetch${fetchCount}-${id}`, profileurl: '' })),
+    } }) };
+  });
+
+  await getPlayerSummaries([ID_A, ID_B]); // primes the cache for both
+  assert.equal(fetchCount, 1);
+
+  const result = await getPlayerSummaries([ID_A, ID_B], { forceIds: new Set([ID_A]) });
+  assert.equal(fetchCount, 2, 'only the forced account should trigger a re-fetch');
+  assert.equal(result.find(p => p.steamid === ID_A).personaname, `fetch2-${ID_A}`, 'forced account gets fresh data');
+  assert.equal(result.find(p => p.steamid === ID_B).personaname, `fetch1-${ID_B}`, 'non-forced account is still served from cache');
+});
+
 // ── getAppDetails ─────────────────────────────────────────────────────────────
 
 function makeAppDetailsResponse(appid, data = null) {
