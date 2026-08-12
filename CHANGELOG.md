@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-12
+
 ### Added
 
 - Accounts bar (both the comparison page and the Library Explorer, shared code in the new `public/accountsBar.js`): one chip per resolved account behind the current search — avatar, persona name (linking to their Steam profile), an online/in-game status dot, a per-account count (games/wishlisted items on the Library Explorer, games on the comparison page), and a "🔒 Private" badge when the profile's visibility isn't public. The private badge closes a real gap: a private profile previously produced a silent empty/failed result indistinguishable from an account that's just genuinely empty. The status dot's tooltip reads "(as of this search)" rather than implying live presence — `personastate`/`gameextrainfo` ride on the same 6h library cache tier as everything else on the chip (see `LIBRARY_CACHE_TTL_MINUTES`), so it's a snapshot, not real-time. On the comparison page, chips are clustered per slot under a "Player N" label once there's more than one slot to tell apart. `POST /api/common-games`'s `slots` and the new `POST /api/wishlist`'s `players` field now carry a `gameCount`/`itemCount` alongside the existing player summary fields to support this — no extra request needed, since the data was already being fetched.
