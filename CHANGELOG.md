@@ -43,6 +43,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Test suite: `test/server.test.js` and `test/steam.test.js` now force `DB_FILE=''` (in-memory DB) in-process before requiring `lib/cache`, instead of relying solely on the shell-level `DB_FILE=` prefix in `npm test`'s script. Running either file directly (`node --test test/steam.test.js`, an IDE test runner) previously fell through to `default.env`'s `DB_FILE=db.sqlite` and let the tests' many `_reset()` calls wipe the real, persistent cache.
 - Lightbox: during video playback, only the video controls bar auto-hid on idle — the prev/next buttons, toolbar (fullscreen/share/close), and mouse cursor stayed put. The idle timer now toggles a single `lb-idle` class on the lightbox root and CSS hides all of that chrome (plus sets `cursor: none`) together.
 - Steam store rate limiting (403): the store semaphore now enforces a 500 ms cooldown per slot after each request completes, capping sustained throughput at ~4 req/s instead of hammering Steam as fast as concurrency allows
 - Comparison page: loading the site with no `?u=` param (a fresh visit, or clearing all players) threw `TypeError: Assignment to constant variable` in `loadFromUrl` — a destructured `const slots` shadowed the outer player-slots state variable it was trying to reset

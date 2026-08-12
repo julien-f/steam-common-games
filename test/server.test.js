@@ -3,6 +3,12 @@
 // Set env before requiring the app so module-level reads see test values.
 process.env.STEAM_API_KEY = 'test-key';
 process.env.NODE_ENV = 'test';
+// Force the in-memory DB regardless of how this file is invoked — `npm test`
+// already does this via a shell-level `DB_FILE=`, but running this file
+// directly (e.g. `node --test test/server.test.js`, an IDE test runner) would
+// otherwise fall through to default.env's DB_FILE=db.sqlite and let _reset()
+// wipe the real cache.
+process.env.DB_FILE = '';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');

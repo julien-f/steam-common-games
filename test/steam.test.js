@@ -1,5 +1,12 @@
 'use strict';
 
+// Force the in-memory DB regardless of how this file is invoked — `npm test`
+// already does this via a shell-level `DB_FILE=`, but running this file
+// directly (e.g. `node --test test/steam.test.js`, an IDE test runner) would
+// otherwise fall through to default.env's DB_FILE=db.sqlite and let _reset()
+// wipe the real cache. Must be set before requiring lib/cache.
+process.env.DB_FILE = '';
+
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags } = require('../lib/steam');
