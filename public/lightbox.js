@@ -17,6 +17,8 @@ let lightboxShots = [];
 let lightboxIdx   = 0;
 let lbZoom = 1, lbPanX = 0, lbPanY = 0, lbLastDir = 0, lbVcTimer = null;
 
+const LB_SEEK_SECONDS = 5;
+
 let _onLightboxParamChange = null;
 let _lbPrevFocus = null;
 
@@ -94,6 +96,21 @@ function fmtTime(s) {
   if (!isFinite(s) || s < 0) return '0:00';
   const m = Math.floor(s / 60);
   return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+}
+
+function lbScrubGradient(pct) {
+  return `linear-gradient(to right, var(--accent) ${pct}%, rgba(255,255,255,0.25) ${pct}%)`;
+}
+
+// Zeroes out the scrubber/time labels immediately so a newly-loaded video
+// doesn't briefly show the previous video's playhead position — the video
+// element's own 'timeupdate'/'durationchange' events lag behind the src swap.
+function resetLbVc(vc) {
+  const scrub = vc.querySelector('.lb-vc-scrub');
+  scrub.value = 0;
+  scrub.style.backgroundImage = lbScrubGradient(0);
+  vc.querySelector('.lb-vc-time').textContent = '0:00';
+  vc.querySelector('.lb-vc-dur').textContent = '0:00';
 }
 
 // ── Video controls visibility ──────────────────────────────────────────────
@@ -212,9 +229,22 @@ function wireKeyboard(lb) {
       return;
     }
 
-    if (!onScrub) {
-      if (e.key === 'ArrowLeft')  { e.preventDefault(); stepLightbox(-1); }
-      if (e.key === 'ArrowRight') { e.preventDefault(); stepLightbox(1); }
+    const vc = lb.querySelector('.lb-vctrls');
+    const vid = vc && vc.style.display !== 'none' ? lb.querySelector('.lb-video') : null;
+
+    if (!onScrub && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      e.preventDefault();
+      const dir = e.key === 'ArrowRight' ? 1 : -1;
+      // While a video is playing, bare arrows seek it in place so the user
+      // isn't yanked to the next screenshot mid-scrub; Shift+arrow always
+      // forces media navigation instead, as an explicit escape hatch.
+      if (vid && !e.shiftKey) {
+        vid.currentTime = Math.max(0, Math.min(vid.duration || Infinity, vid.currentTime + dir * LB_SEEK_SECONDS));
+        showLbVc();
+        schedHideLbVc();
+      } else {
+        stepLightbox(dir);
+      }
     }
     if (e.key === 'f' || e.key === 'F') {
       if (document.fullscreenElement || document.webkitFullscreenElement) {
@@ -223,9 +253,7 @@ function wireKeyboard(lb) {
         (lb.requestFullscreen?.() ?? lb.webkitRequestFullscreen?.())?.catch?.(() => {});
       }
     }
-    const vc = lb.querySelector('.lb-vctrls');
-    if (vc && vc.style.display !== 'none') {
-      const vid = lb.querySelector('.lb-video');
+    if (vid) {
       if (e.key === ' ' && !onScrub) { e.preventDefault(); vid.paused ? vid.play().catch(() => {}) : vid.pause(); }
       if (e.key === 'm' || e.key === 'M') { vid.muted = !vid.muted; }
     }
@@ -349,11 +377,7 @@ function wireVideoControls(lb) {
   const playBtn = vc2.querySelector('.lb-vc-play');
   const muteBtn = vc2.querySelector('.lb-vc-mute');
 
-  const updateScrubBg = () => {
-    const pct = scrub.value * 100;
-    scrub.style.backgroundImage =
-      `linear-gradient(to right, var(--accent) ${pct}%, rgba(255,255,255,0.25) ${pct}%)`;
-  };
+  const updateScrubBg = () => { scrub.style.backgroundImage = lbScrubGradient(scrub.value * 100); };
 
   vid2.addEventListener('timeupdate', () => {
     if (!vid2.duration) return;
@@ -466,6 +490,7 @@ function renderLightbox() {
     vid.style.display = 'block';
     vid.poster = shot.thumb || '';
     vc.style.display = '';
+    resetLbVc(vc);
     playHls(vid, shot.hls);
     schedHideLbVc();
   } else {

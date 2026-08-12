@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Lightbox: the video scrubber/timestamp no longer briefly show the previous video's playhead position when switching to a new video — they're now reset to 0:00 immediately on load instead of waiting for the new `<video>`'s own `timeupdate`/`durationchange` events to catch up.
+
+### Changed
+
+- Lightbox: while a video is playing, bare `←`/`→` now seek it ±5s in place instead of jumping to the previous/next screenshot, so scrubbing through a clip no longer accidentally navigates away from it. `Shift+←`/`Shift+→` still forces media navigation during playback. Behavior for images is unchanged. Shortcut legends on both pages updated to match.
+
 ## [0.2.0] - 2026-08-12
 
 ### Added
