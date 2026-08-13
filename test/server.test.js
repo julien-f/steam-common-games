@@ -703,3 +703,53 @@ test('POST /api/game-details/stream: resolves HLTB name from store metadata when
   assert.equal(hltbSearchCalls, 1, 'HLTB should have been searched using the name resolved from store metadata');
   assert.equal(gameEvent.hltb?.main, 10, 'HLTB result should be present, not short-circuited to null');
 });
+
+// ── GET /api/search-games ─────────────────────────────────────────────────────
+
+test('GET /api/search-games: empty results (no fetch) when q is missing', async (t) => {
+  _reset();
+  let fetchCalled = false;
+  t.mock.method(globalThis, 'fetch', async () => { fetchCalled = true; });
+  const res = await api.get('/api/search-games');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { results: [] });
+  assert.equal(fetchCalled, false);
+});
+
+test('GET /api/search-games: empty results (no fetch) when q is below the minimum length', async (t) => {
+  _reset();
+  let fetchCalled = false;
+  t.mock.method(globalThis, 'fetch', async () => { fetchCalled = true; });
+  const res = await api.get('/api/search-games?q=a');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { results: [] });
+  assert.equal(fetchCalled, false);
+});
+
+test('GET /api/search-games: 200 with results shaped for the frontend dropdown', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    assert.match(url, /storesearch/);
+    return { ok: true, json: async () => ({ items: [{ id: 400, name: 'Portal', tiny_image: 'https://example.com/400.jpg' }] }) };
+  });
+  const res = await api.get('/api/search-games?q=portal');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { results: [{ appid: 400, name: 'Portal', tinyImage: 'https://example.com/400.jpg' }] });
+});
+
+test('GET /api/search-games: a repeated query is served from cache, no re-fetch', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true, json: async () => ({ items: [{ id: 400, name: 'Portal' }] }),
+  }));
+  await api.get('/api/search-games?q=portal');
+  await api.get('/api/search-games?q=portal');
+  assert.equal(fetchMock.mock.callCount(), 1);
+});
+
+test('GET /api/search-games: 502 when the store search endpoint errors', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+  const res = await api.get('/api/search-games?q=portal');
+  assert.equal(res.status, 502);
+});

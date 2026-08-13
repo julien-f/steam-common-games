@@ -8,6 +8,7 @@ process.env.STEAM_API_KEY = 'test-key';
 process.env.NODE_ENV = 'test';
 process.env.RATE_LIMIT_ENABLED = 'true';
 process.env.DETAILS_RATE_LIMIT_MAX = '3';
+process.env.GAME_SEARCH_RATE_LIMIT_MAX = '2';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -68,4 +69,29 @@ test('details limiter: counts cache misses but never counts cache hits', async (
   assert.equal(cached.status, 200, 'a cache hit must bypass the limiter');
   assert.equal(cached.body.rating.score, 88);
   assert.ok(!fetchedAppids.has('800'), 'cache hit must not fetch upstream');
+});
+
+// Same "cache hits never count" rule as above, applied to the game-search limiter.
+test('game search limiter: counts cache misses but never counts cache hits', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true, json: async () => ({ items: [{ id: 400, name: 'Portal' }] }),
+  }));
+
+  setCache('search:cached term', [{ appid: 900, name: 'Pre-cached', tinyImage: null }]);
+
+  // Two uncached terms consume the budget (max = 2).
+  for (const term of ['term one', 'term two']) {
+    const res = await api.get(`/api/search-games?q=${encodeURIComponent(term)}`);
+    assert.equal(res.status, 200, `miss "${term}" should succeed within budget`);
+  }
+
+  // A third cache miss is over budget → 429.
+  const over = await api.get('/api/search-games?q=term three');
+  assert.equal(over.status, 429, 'a cache miss past the budget should be rate limited');
+
+  // The cached term is still served even though the budget is exhausted.
+  const cached = await api.get('/api/search-games?q=cached term');
+  assert.equal(cached.status, 200, 'a cache hit must bypass the limiter');
+  assert.deepEqual(cached.body.results, [{ appid: 900, name: 'Pre-cached', tinyImage: null }]);
 });

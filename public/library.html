@@ -40,6 +40,9 @@
   .lib-form input::placeholder { color: var(--text2); }
   .lib-status { font-size: 13px; color: var(--text1); min-height: 18px; }
   .lib-status-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .lib-lookup { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .lib-lookup-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
+  .lib-lookup .game-search-wrap { flex: 1; max-width: 440px; }
 
   /*
    * Override data-table colors to match the Steam dark theme.
@@ -65,6 +68,17 @@
 
   /* Darker header bar so it reads clearly above the data rows */
   #table-container .dt-th { background: #0f1923 !important; }
+
+  /*
+   * The filter dropdown's value checklist (.dt-filter-list) gets a fixed
+   * pixel height from the library regardless of how tall the panel actually
+   * renders, so a dimension with few values (e.g. Genres) leaves blank space
+   * below its checklist whenever the panel is stretched taller by the column
+   * list on the left (e.g. many filterable dimensions). Make it flex to fill
+   * the panel's real height instead.
+   */
+  #table-container .dt-filter-detail { display: flex; flex-direction: column; }
+  #table-container .dt-filter-list { height: auto !important; flex: 1; min-height: 0; }
 </style>
 </head>
 <body>
@@ -83,6 +97,14 @@
     <input id="player-input" type="text"
       placeholder="Steam ID, vanity URL, or username (comma-separated for Steam Family)">
     <button class="btn btn-primary" id="load-btn">Load Library</button>
+  </div>
+
+  <div class="lib-lookup">
+    <span class="lib-lookup-label">Look up any game:</span>
+    <div class="game-search-wrap">
+      <input id="game-lookup-input" type="text" placeholder="Game name, appid, or store URL… (not just this library)" autocomplete="off">
+      <div id="game-lookup-results" class="game-search-results" hidden></div>
+    </div>
   </div>
 
   <div id="recents-bar" class="recents-bar" hidden></div>
@@ -141,6 +163,7 @@
 <script src="/mediaItems.js"></script>
 <script src="/utils.js"></script>
 <script src="/accountsBar.js"></script>
+<script src="/gameSearch.js"></script>
 <script src="/lightbox.js"></script>
 <script src="/panel.js"></script>
 <script type="module" src="/library.js"></script>

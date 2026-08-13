@@ -150,6 +150,12 @@ initPanel({
 });
 initLightbox({ onParamChange: setLightboxParam });
 
+initGameSearch({
+  inputEl: document.getElementById('game-lookup-input'),
+  resultsEl: document.getElementById('game-lookup-results'),
+  onSelect: ({ appid, name }) => openStandaloneLookup(appid, name),
+});
+
 document.getElementById('shortcuts-backdrop').addEventListener('click', closeShortcuts);
 document.querySelector('.shortcuts-close').addEventListener('click', closeShortcuts);
 
@@ -185,6 +191,10 @@ function getGameList() {
 
 function renderPanelNav(game) {
   const nav = document.getElementById('panel-nav');
+  // A standalone lookup (see openStandaloneLookup below) isn't part of the loaded
+  // library/wishlist table — with no table yet (a bare lookup with no player loaded) or no
+  // natural list to page through, there's no nav to show.
+  if (!table || game.standalone) { nav.innerHTML = ''; return; }
   const list = getGameList();
   const idx = list.findIndex(g => g.appid === game.appid);
   nav.innerHTML = `
@@ -206,7 +216,7 @@ function openGame(game, { isRandom = false } = {}) {
   if (!isRandom) clearRandomQueue(randomQueueKey());
   panelOpen(game);
   renderPanelNav(game);
-  setPanelParam(game.appid);
+  setPanelParam(game.appid, game.standalone ? game.name : null);
 }
 
 // Wraps the shared panelClose() with the URL-state cleanup — mirrors app.js's own
@@ -219,21 +229,56 @@ function closePanel() {
 }
 
 function pickRandomGame() {
+  if (!table || getPanelGame()?.standalone) return; // see renderPanelNav
   const pick = pickRandomFrom(getGameList(), randomQueueKey(), getPanelGame()?.appid);
   if (pick) openGame(pick, { isRandom: true });
 }
 
-// ── URL state — deep link to an open game panel (`?game=`) and, within it, a
-// specific lightbox screenshot/video (`?shot=`). Mirrors app.js's setPanelParam/
-// setLightboxParam/restorePanelFromUrl for the comparison page; see public/urlState.js
-// for the equivalent parsing there (library.js has no analogous shared parser since its
-// only other URL params — `u`, `tab`, `view`/`wview` — are handled by updateUrlParams/
-// syncViewToUrl already).
-function setPanelParam(appid) {
+// Opens the panel for a game from the "look up any game" search box (public/gameSearch.js)
+// rather than a table row — works with or without a player/library currently loaded. `name`
+// is '' when the user typed a raw appid/store URL instead of picking a search result; the
+// server derives it from store metadata instead (same fallback as a nameless wishlist row).
+// If the appid turns out to already be a loaded row (the looked-up game is actually owned/
+// wishlisted by the current player), open that row instead — full nav, playtime, etc. rather
+// than a lesser standalone view of data already sitting in `rows`.
+function openStandaloneLookup(appid, name) {
+  const existing = rowMap.get(appid);
+  if (existing) { openGame(existing); return; }
+  const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true };
+  openGame(game);
+  fetchStandaloneDetails(game, name);
+}
+
+async function fetchStandaloneDetails(game, name) {
+  try {
+    const res = await fetch(`/api/game-details/${game.appid}?name=${encodeURIComponent(name || '')}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Lookup failed');
+    game.details = data;
+    game.loading = false;
+    if (!name && data.meta?.name) game.name = data.meta.name;
+    if (getPanelGame() === game) { renderPanelBody(game); setPanelParam(game.appid, game.name); }
+  } catch (err) {
+    if (getPanelGame() === game) statusEl.textContent = `Lookup failed: ${err.message}`;
+  }
+}
+
+// ── URL state — deep link to an open game panel (`?game=`, plus `?gname=` for a standalone
+// lookup not backed by any loaded row — see openStandaloneLookup) and, within it, a specific
+// lightbox screenshot/video (`?shot=`). Mirrors app.js's setPanelParam/setLightboxParam/
+// restorePanelFromUrl for the comparison page; see public/urlState.js for the equivalent
+// parsing there (library.js has no analogous shared parser since its only other URL params —
+// `u`, `tab`, `view`/`wview` — are handled by updateUrlParams/syncViewToUrl already).
+function setPanelParam(appid, name = null) {
   const params = new URLSearchParams(location.search);
   params.delete('shot');
-  if (appid == null) params.delete('game');
-  else params.set('game', appid);
+  if (appid == null) {
+    params.delete('game');
+    params.delete('gname');
+  } else {
+    params.set('game', appid);
+    if (name) params.set('gname', name); else params.delete('gname');
+  }
   history.replaceState(null, '', `?${params}`);
 }
 
@@ -259,10 +304,16 @@ function restorePanelFromUrl(restoreShot = null) {
   const appid = Number(params.get('game'));
   if (!appid) return;
   const row = rowMap.get(appid);
-  if (!row) return;
-  if (getPanelGame()?.appid !== appid) openGame(row);
-  const shotParam = restoreShot ?? params.get('shot');
-  if (shotParam !== null && !row.loading) openLightbox(row, shotParam);
+  if (row) {
+    if (getPanelGame()?.appid !== appid) openGame(row);
+    const shotParam = restoreShot ?? params.get('shot');
+    if (shotParam !== null && !row.loading) openLightbox(row, shotParam);
+    return;
+  }
+  // Not (yet) in the loaded library/wishlist rows — e.g. a game nobody in it owns/wishlists,
+  // or no player loaded at all. Fetch it directly instead of silently giving up.
+  if (getPanelGame()?.appid === appid) return; // already open / fetch already in flight
+  openStandaloneLookup(appid, params.get('gname') || '');
 }
 
 document.addEventListener('keydown', e => {
@@ -295,6 +346,7 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+  if (!table || getPanelGame()?.standalone) return; // see renderPanelNav — no list to page through
   e.preventDefault();
   const list = getGameList();
   const idx = list.findIndex(g => g.appid === getPanelGame().appid);
@@ -439,10 +491,10 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
   // A genuine new load drops any `game`/`shot` left in the URL from a previous player/tab —
   // it may not even exist in the new list. The initial page-load path (bottom of this file)
   // passes preserveGameParam so it can restore the deep link once the new data is in.
-  updateUrlParams(preserveGameParam ? { u: playerStr } : { u: playerStr, game: null, shot: null });
+  updateUrlParams(preserveGameParam ? { u: playerStr } : { u: playerStr, game: null, gname: null, shot: null });
   currentPlayerStr = playerStr;
 
-  const members = playerStr.split(',').map(s => s.trim()).filter(Boolean);
+  const members = playerStr.split(',').map(s => normalizeInput(s.trim())).filter(Boolean);
 
   statusEl.textContent = refreshIds ? 'Refreshing account…' : 'Fetching library…';
   resetTableState();
@@ -523,10 +575,10 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
 }
 
 async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, restoreShot = null } = {}) {
-  updateUrlParams(preserveGameParam ? { u: playerStr } : { u: playerStr, game: null, shot: null });
+  updateUrlParams(preserveGameParam ? { u: playerStr } : { u: playerStr, game: null, gname: null, shot: null });
   currentPlayerStr = playerStr;
 
-  const members = playerStr.split(',').map(s => s.trim()).filter(Boolean);
+  const members = playerStr.split(',').map(s => normalizeInput(s.trim())).filter(Boolean);
 
   statusEl.textContent = refreshIds ? 'Refreshing account…' : 'Fetching wishlist…';
   resetTableState();
@@ -648,4 +700,8 @@ if (initPlayer) {
   // `shot` is captured here (not re-read later) since opening the panel deletes it from
   // the live URL — see the comment on restorePanelFromUrl().
   loadCurrentTab(initPlayer, { preserveGameParam: true, restoreShot: initParams.get('shot') });
+} else {
+  // No player loaded at all — still honor a bare `?game=&gname=` standalone-lookup deep link
+  // (loadLibrary/loadWishlist would otherwise be the only callers of restorePanelFromUrl).
+  restorePanelFromUrl(initParams.get('shot'));
 }

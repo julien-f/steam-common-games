@@ -368,6 +368,41 @@ a.account-identity:hover .account-name { color: var(--accent2); }
 .recents-clear { font-size: 12px; color: var(--text2); background: none; border: none; cursor: pointer; padding: 0; }
 .recents-clear:hover { color: var(--accent2); }
 
+/*
+ * "Look up any game" widget — shared by the comparison page and Library Explorer
+ * (public/gameSearch.js). A text input plus a dropdown of name-search matches; picking one
+ * opens the shared side panel (panel.js) for that game regardless of library/wishlist status.
+ */
+.game-search-wrap { position: relative; }
+.game-search-wrap > input {
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text0);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.game-search-wrap > input:focus { border-color: var(--accent); }
+.game-search-wrap > input::placeholder { color: var(--text2); }
+.game-search-results {
+  position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; right: 0;
+  max-height: 280px; overflow-y: auto;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+.game-search-result {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 7px 10px; background: transparent; border: none; cursor: pointer;
+  color: var(--text0); font-size: 13px; text-align: left;
+}
+.game-search-result:hover, .game-search-result:focus-visible { background: var(--bg1); }
+.game-search-thumb { width: 46px; height: 22px; object-fit: cover; border-radius: 3px; flex-shrink: 0; }
+.game-search-thumb--empty { background: var(--bg0); }
+.game-search-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* How it works */
 .how-it-works { margin-bottom: 18px; }
 .how-steps {

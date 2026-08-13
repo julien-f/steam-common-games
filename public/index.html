@@ -26,6 +26,15 @@
     <div id="accounts-bar" class="accounts-bar" hidden></div>
   </div>
 
+  <div class="card">
+    <h2>Look up a game</h2>
+    <p class="card-subtitle">Preview any Steam game's score, HLTB, tags &amp; screenshots — even one nobody above owns or has wishlisted.</p>
+    <div class="game-search-wrap">
+      <input id="game-lookup-input" type="text" placeholder="Game name, appid, or store URL…" autocomplete="off">
+      <div id="game-lookup-results" class="game-search-results" hidden></div>
+    </div>
+  </div>
+
   <div id="how-it-works" class="card how-it-works">
     <h2>How it works</h2>
     <ol class="how-steps">
@@ -92,6 +101,7 @@
 <script src="/urlState.js"></script>
 <script src="/utils.js"></script>
 <script src="/accountsBar.js"></script>
+<script src="/gameSearch.js"></script>
 <script src="/lightbox.js"></script>
 <script src="/panel.js"></script>
 <script src="/app.js"></script>

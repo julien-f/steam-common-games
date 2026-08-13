@@ -80,6 +80,12 @@ document.addEventListener('DOMContentLoaded', () => {
     onRefresh: refreshGameDetails,
   });
 
+  initGameSearch({
+    inputEl: document.getElementById('game-lookup-input'),
+    resultsEl: document.getElementById('game-lookup-results'),
+    onSelect: ({ appid, name }) => openStandaloneGame(appid, name),
+  });
+
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       if (isLightboxOpen()) {
@@ -110,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (panelStepHero(e.key === 'ArrowRight' ? 1 : -1, { wrap: true })) e.preventDefault();
       return;
     }
+    if (activeGame.standalone) return; // no group to page through or randomize within — see renderPanelNav
     if ((e.key === 'r' || e.key === 'R') && !isLightboxOpen()) {
       e.preventDefault();
       pickRandom(activeGame.groupKey);
@@ -557,7 +564,38 @@ function updateProgress(loaded, total) {
 // the group-navigation, random-pick, table-highlight, and URL-state behavior
 // that's specific to this page.
 
+// Opens the panel for a game from the "look up any game" search box (public/gameSearch.js)
+// rather than from a table row — it has no `groupKey` (nobody in this comparison necessarily
+// owns it), which the rest of this section treats as "not part of any group": no owners
+// section, no group nav/random-pick, no table row to highlight. `name` is '' when the user
+// typed a raw appid/store URL instead of picking a search result — same as a wishlist row,
+// the panel just shows a loading name until store metadata streams in and backfills it.
+// If the appid is actually part of the current comparison, open its real row instead — full
+// owners/nav/highlight rather than a lesser standalone view of data already in `games`.
+function openStandaloneGame(appid, name) {
+  const existing = games.find(g => g.appid === appid);
+  if (existing) { openPanel(existing); return; }
+  const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true };
+  openPanel(game);
+  fetchStandaloneDetails(game, name);
+}
+
+async function fetchStandaloneDetails(game, name) {
+  try {
+    const res = await fetch(`/api/game-details/${game.appid}?name=${encodeURIComponent(name || '')}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Lookup failed');
+    game.details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags };
+    game.loading = false;
+    if (!name && game.details.meta?.name) game.name = game.details.meta.name;
+    if (activeGame === game) renderPanelBody(game); // no-op if the user moved on mid-fetch
+  } catch (err) {
+    if (activeGame === game) showAlert(err.message);
+  }
+}
+
 function buildOwnersHtml(g) {
+  if (!g.groupKey) return ''; // standalone lookup — not part of any comparison group
   const ownerIndices = g.groupKey.split(',').map(Number);
   const gamePt = playtime[g.appid] || {};
   return `<div class="panel-section">
@@ -588,7 +626,10 @@ function openPanel(game, { isRandom = false } = {}) {
   renderPanelNav();
   refreshTable(); // re-render rows so the active highlight appears
   document.getElementById(`tbody-${game.groupKey}`)?.querySelector(`tr.game-row[data-appid="${game.appid}"]`)?.scrollIntoView({ block: 'nearest' });
-  setPanelParam(game.appid);
+  // A standalone lookup's URL isn't restorable on reload (restorePanelFromUrl only looks
+  // through `games`, this page's loaded comparison) — skip setting `?game=` so the address
+  // bar doesn't imply a link that wouldn't actually reopen it.
+  if (!game.standalone) setPanelParam(game.appid);
 }
 
 function closePanel({ updateUrl = true } = {}) {
@@ -651,6 +692,9 @@ function restorePanelFromUrl(restoreShot = null) {
 function renderPanelNav() {
   const nav = document.getElementById('panel-nav');
   if (!nav || !activeGame) return;
+  // A standalone lookup (see openStandaloneGame above) isn't part of any group — there's no
+  // natural "next game" to page through, so there's no nav to show.
+  if (activeGame.standalone) { nav.innerHTML = ''; return; }
   const list = sortedGames(activeGame.groupKey);
   const idx = list.findIndex(g => g.appid === activeGame.appid);
   nav.innerHTML = `

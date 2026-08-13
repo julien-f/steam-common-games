@@ -9,7 +9,7 @@ process.env.DB_FILE = '';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags } = require('../lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames } = require('../lib/steam');
 const { _reset } = require('../lib/cache');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
@@ -534,5 +534,59 @@ test('getSteamSpyTags: throws isUpstream when fetch fails', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
   await assert.rejects(() => getSteamSpyTags(400), err => err.isUpstream === true);
+});
+
+// ── searchStoreGames ──────────────────────────────────────────────────────────
+
+test('searchStoreGames: extracts appid, name and tinyImage, capped at 8', async (t) => {
+  _reset();
+  const items = Array.from({ length: 12 }, (_, i) => ({
+    id: 400 + i, name: `Game ${i}`, tiny_image: `https://example.com/${i}.jpg`,
+  }));
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({ items }) }));
+
+  const result = await searchStoreGames('portal');
+  assert.equal(result.length, 8);
+  assert.deepEqual(result[0], { appid: 400, name: 'Game 0', tinyImage: 'https://example.com/0.jpg' });
+});
+
+test('searchStoreGames: returns empty array when items field is missing', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({}) }));
+  assert.deepEqual(await searchStoreGames('xyz'), []);
+});
+
+test('searchStoreGames: tinyImage is null when absent', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true, json: async () => ({ items: [{ id: 400, name: 'Portal' }] }),
+  }));
+  assert.deepEqual(await searchStoreGames('portal'), [{ appid: 400, name: 'Portal', tinyImage: null }]);
+});
+
+test('searchStoreGames: caches result — second call skips fetch', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true, json: async () => ({ items: [{ id: 400, name: 'Portal' }] }),
+  }));
+  await searchStoreGames('portal');
+  await searchStoreGames('portal');
+  assert.equal(fetchMock.mock.callCount(), 1);
+});
+
+test('searchStoreGames: cache key is case-insensitive', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true, json: async () => ({ items: [{ id: 400, name: 'Portal' }] }),
+  }));
+  await searchStoreGames('Portal');
+  await searchStoreGames('PORTAL');
+  assert.equal(fetchMock.mock.callCount(), 1);
+});
+
+test('searchStoreGames: throws isUpstream when fetch fails', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+  await assert.rejects(() => searchStoreGames('portal'), err => err.isUpstream === true);
 });
 

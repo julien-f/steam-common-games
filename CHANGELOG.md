@@ -8,11 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- "Look up any game" search box on both pages (new shared `public/gameSearch.js`, new `GET /api/search-games` wrapping Steam's undocumented store search endpoint): type a name to pick from a dropdown of matches, or paste a bare appid/store URL directly, and preview it in the existing side panel — score, HLTB, tags, screenshots, links — regardless of whether anyone in the current search owns or has wishlisted it. `GET /api/game-details/:appid` already had no ownership check, so this only needed a way to turn a typed name into an appid. On the Library Explorer, the `?game=<appid>` deep link (see below) now also falls back to fetching an unmatched appid directly (carrying its name in a new `?gname=` param) instead of silently doing nothing, including with no player loaded at all.
 - Library Explorer: opening a game's side panel now writes `?game=<appid>` to the URL, and opening the lightbox on top of it adds `&shot=<idx>`, mirroring the comparison page. A copied link reopens the same game/media once the page's data has loaded. A genuine new Load/refresh/tab-switch clears these params instead, since a game left open from a previous player/tab may not exist in the new list.
 
 ### Fixed
 
+- Library Explorer: pasting a full profile URL (e.g. `https://steamcommunity.com/id/name` or `.../profiles/7656...`) into the player input now resolves correctly, matching the comparison page. `library.js` was passing the raw comma-split input straight to `/api/common-games`/`/api/wishlist` instead of running each member through `normalizeInput()` (shared `public/utils.js`, already loaded on the page) to strip a pasted URL down to the vanity name or Steam64 ID first.
 - Lightbox: the video scrubber/timestamp no longer briefly show the previous video's playhead position when switching to a new video — they're now reset to 0:00 immediately on load instead of waiting for the new `<video>`'s own `timeupdate`/`durationchange` events to catch up.
+- Library Explorer: the filter dropdown's value checklist (e.g. Genres) no longer leaves blank space below it when the panel is stretched taller by the dimension list on the left — `@vates/data-table-vanilla` gives that checklist a fixed pixel height regardless of the panel's actual rendered height, so `library.html` now overrides it to flex and fill the available space instead.
 
 ### Changed
 

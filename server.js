@@ -11,7 +11,7 @@ const rateLimit = require('express-rate-limit');
 
 const { getCached, getCacheStats } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags } = require('./lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 
@@ -21,6 +21,7 @@ const MAX_USERS = Number(process.env.MAX_USERS);
 const TRUST_PROXY = process.env.TRUST_PROXY;
 const SEARCH_RATE_LIMIT_MAX = Number(process.env.SEARCH_RATE_LIMIT_MAX);
 const DETAILS_RATE_LIMIT_MAX = Number(process.env.DETAILS_RATE_LIMIT_MAX);
+const GAME_SEARCH_RATE_LIMIT_MAX = Number(process.env.GAME_SEARCH_RATE_LIMIT_MAX);
 
 // Rate limiting is bypassed under NODE_ENV=test so the suite isn't throttled,
 // unless a test opts in with RATE_LIMIT_ENABLED=true to exercise the limiter.
@@ -65,6 +66,27 @@ const detailsLimit = rateLimit({
         && getCached(`hltb:${appid}`)   !== undefined
         && getCached(`meta:${appid}`)   !== undefined
         && getCached(`tags:${appid}`)   !== undefined;
+  },
+});
+
+// Shared by the /api/search-games route and its rate limiter below.
+const normalizeSearchTerm = (raw) => (raw || '').trim().slice(0, 100).toLowerCase();
+
+// Name→appid lookups for the "look up any game" search box. Debounced client-side, and each
+// distinct search term only ever costs one upstream call (subsequent requests for the same
+// term hit the cache), so this can be looser than searchLimit — it never fans out into the
+// dozens of Steam calls a library search does.
+const gameSearchLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: GAME_SEARCH_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many searches. Please wait a minute and try again.' },
+  skip: (req) => {
+    if (rateLimitBypassed()) return true;
+    const term = normalizeSearchTerm(req.query.q);
+    if (term.length < 2) return true; // no upstream call happens below this length
+    return getCached(`search:${term}`) !== undefined;
   },
 });
 
@@ -249,6 +271,22 @@ function fetchGameDetails(appid, name, { force = false } = {}) {
     });
   });
 }
+
+// Backs the "look up any game" search box (both pages) — resolves a typed name to a short
+// list of candidate appids, independent of anyone's library/wishlist. See lib/steam.js's
+// searchStoreGames for the upstream endpoint and CLAUDE.md for its compliance note.
+app.get('/api/search-games', gameSearchLimit, async (req, res) => {
+  const term = normalizeSearchTerm(req.query.q);
+  if (term.length < 2) return res.json({ results: [] });
+  try {
+    const results = await searchStoreGames(term, { force: isForceRefresh(req) });
+    res.json({ results });
+  } catch (err) {
+    if (err.isUpstream || err.name === 'TimeoutError') console.error('[upstream]', err.message);
+    const status = err.isUpstream ? 502 : err.name === 'TimeoutError' ? 504 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
 
 app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
   const appid = Number(req.params.appid);
