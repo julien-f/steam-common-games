@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - Lightbox: while a video is playing, bare `←`/`→` now seek it ±5s in place instead of jumping to the previous/next screenshot, so scrubbing through a clip no longer accidentally navigates away from it. `Shift+←`/`Shift+→` still forces media navigation during playback. Behavior for images is unchanged. Shortcut legends on both pages updated to match.
+- Library Explorer: rows no longer appear in the table before their details (score, HLTB, genres, etc.) have streamed in — previously every row showed up immediately with '…' placeholders in most columns and filled in progressively as `/api/game-details/stream` delivered each game. Rows now stay out of the table entirely until loaded, then pop in already fully populated; the "`X` / `Y` games loaded…" status text still tracks progress in the meantime. Prev/next panel navigation and random-pick now also only consider loaded rows, matching what's visible.
 
 ## [0.2.0] - 2026-08-12
 

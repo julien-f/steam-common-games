@@ -142,7 +142,7 @@ initPanel({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Refresh failed');
       applyDetailsEvent(row, data);
-      if (table) table.setData([...rows]);
+      if (table) table.setData(visibleRows());
     } catch (err) {
       statusEl.textContent = `Refresh failed: ${err.message}`;
     }
@@ -174,6 +174,12 @@ function toggleShortcuts() {
   else openShortcuts();
 }
 
+// Rows whose details have streamed in — what's actually shown in the table (see
+// visibleRows() below for why unloaded rows are withheld rather than shown as '…' placeholders).
+function visibleRows() {
+  return rows.filter(r => !r.loading);
+}
+
 // Stable order for prev/next nav — independent of the table's own live
 // sort/filter/group state, which isn't exposed by @vates/data-table-vanilla.
 // The table's current search/filter/sort order — same pipeline @vates/data-table-vanilla
@@ -185,7 +191,7 @@ function getGameList() {
   const filters = Object.fromEntries(
     Object.entries(view.filters ?? {}).map(([key, values]) => [key, new Set(values)])
   );
-  const searched = searchData(rows, view.searchQuery ?? '', activeColumns);
+  const searched = searchData(visibleRows(), view.searchQuery ?? '', activeColumns);
   return processData(searched, filters, view.rangeFilters ?? {}, view.sorts ?? [], activeColumns, DEFAULT_LABELS.emptyValue);
 }
 
@@ -358,7 +364,7 @@ function scheduleFlush() {
   if (flushTimer !== null) return;
   flushTimer = setTimeout(() => {
     flushTimer = null;
-    if (table) table.setData([...rows]);
+    if (table) table.setData(visibleRows());
     updateStatus();
   }, 150);
 }
@@ -471,7 +477,7 @@ async function streamGameDetails(games) {
   }
 
   if (flushTimer !== null) { clearTimeout(flushTimer); flushTimer = null; }
-  if (table) table.setData([...rows]);
+  if (table) table.setData(visibleRows());
   updateStatus();
 }
 
@@ -556,7 +562,7 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
   activeColumns = COLUMNS;
 
   table = createDataTable(tableContainer, {
-    data: rows,
+    data: visibleRows(), // empty at this point — every row starts out loading:true, see below
     columns: COLUMNS,
     rowKey: 'appid',
     defaultPageSize: 50,
@@ -635,7 +641,7 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
   activeColumns = WISHLIST_COLUMNS;
 
   table = createDataTable(tableContainer, {
-    data: rows,
+    data: visibleRows(), // empty at this point — every row starts out loading:true, see below
     columns: WISHLIST_COLUMNS,
     rowKey: 'appid',
     defaultPageSize: 50,
