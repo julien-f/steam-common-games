@@ -68,17 +68,6 @@
 
   /* Darker header bar so it reads clearly above the data rows */
   #table-container .dt-th { background: #0f1923 !important; }
-
-  /*
-   * The filter dropdown's value checklist (.dt-filter-list) gets a fixed
-   * pixel height from the library regardless of how tall the panel actually
-   * renders, so a dimension with few values (e.g. Genres) leaves blank space
-   * below its checklist whenever the panel is stretched taller by the column
-   * list on the left (e.g. many filterable dimensions). Make it flex to fill
-   * the panel's real height instead.
-   */
-  #table-container .dt-filter-detail { display: flex; flex-direction: column; }
-  #table-container .dt-filter-list { height: auto !important; flex: 1; min-height: 0; }
 </style>
 </head>
 <body>
