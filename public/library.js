@@ -138,7 +138,7 @@ initPanel({
   inertSelector: '.lib-page',
   onRefresh: async (row) => {
     try {
-      const res = await fetch(`/api/game-details/${row.appid}?name=${encodeURIComponent(row.name || '')}&refresh=1`);
+      const res = await fetch(`/api/game-details/${row.appid}?refresh=1`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Refresh failed');
       applyDetailsEvent(row, data);
@@ -222,7 +222,7 @@ function openGame(game, { isRandom = false } = {}) {
   if (!isRandom) clearRandomQueue(randomQueueKey());
   panelOpen(game);
   renderPanelNav(game);
-  setPanelParam(game.appid, game.standalone ? game.name : null);
+  setPanelParam(game.appid);
 }
 
 // Wraps the shared panelClose() with the URL-state cleanup — mirrors app.js's own
@@ -242,49 +242,48 @@ function pickRandomGame() {
 
 // Opens the panel for a game from the "look up any game" search box (public/gameSearch.js)
 // rather than a table row — works with or without a player/library currently loaded. `name`
-// is '' when the user typed a raw appid/store URL instead of picking a search result; the
-// server derives it from store metadata instead (same fallback as a nameless wishlist row).
-// If the appid turns out to already be a loaded row (the looked-up game is actually owned/
-// wishlisted by the current player), open that row instead — full nav, playtime, etc. rather
-// than a lesser standalone view of data already sitting in `rows`.
+// is known client-side (picked from the search dropdown) and used only to avoid a title flash
+// while the panel's own fetch is in flight — it's never sent to the server or the URL; the
+// server always resolves the real name itself from store metadata, keyed on the appid, same
+// as it does for a nameless wishlist row. If the appid turns out to already be a loaded row
+// (the looked-up game is actually owned/wishlisted by the current player), open that row
+// instead — full nav, playtime, etc. rather than a lesser standalone view of data already
+// sitting in `rows`.
 function openStandaloneLookup(appid, name) {
   const existing = rowMap.get(appid);
   if (existing) { openGame(existing); return; }
   const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true };
   openGame(game);
-  fetchStandaloneDetails(game, name);
+  fetchStandaloneDetails(game);
 }
 
-async function fetchStandaloneDetails(game, name) {
+async function fetchStandaloneDetails(game) {
   try {
-    const res = await fetch(`/api/game-details/${game.appid}?name=${encodeURIComponent(name || '')}`);
+    const res = await fetch(`/api/game-details/${game.appid}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Lookup failed');
     game.details = data;
     game.loading = false;
-    if (!name && data.meta?.name) game.name = data.meta.name;
-    if (getPanelGame() === game) { renderPanelBody(game); setPanelParam(game.appid, game.name); }
+    if (data.meta?.name) game.name = data.meta.name;
+    if (getPanelGame() === game) { renderPanelBody(game); setPanelParam(game.appid); }
   } catch (err) {
     if (getPanelGame() === game) statusEl.textContent = `Lookup failed: ${err.message}`;
   }
 }
 
-// ── URL state — deep link to an open game panel (`?game=`, plus `?gname=` for a standalone
-// lookup not backed by any loaded row — see openStandaloneLookup) and, within it, a specific
-// lightbox screenshot/video (`?shot=`). Mirrors app.js's setPanelParam/setLightboxParam/
+// ── URL state — deep link to an open game panel (`?game=`, restored via openStandaloneLookup
+// above when the appid isn't backed by any loaded row) and, within it, a specific lightbox
+// screenshot/video (`?shot=`). Mirrors app.js's setPanelParam/setLightboxParam/
 // restorePanelFromUrl for the comparison page; see public/urlState.js for the equivalent
 // parsing there (library.js has no analogous shared parser since its only other URL params —
-// `u`, `tab`, `view`/`wview` — are handled by updateUrlParams/syncViewToUrl already).
-function setPanelParam(appid, name = null) {
+// `u`, `tab`, `view`/`wview` — are handled by updateUrlParams/syncViewToUrl already). The name
+// deliberately never rides along in this URL (see openStandaloneLookup) — only the appid is
+// trusted, and the panel just shows a placeholder title until the fetch resolves it.
+function setPanelParam(appid) {
   const params = new URLSearchParams(location.search);
   params.delete('shot');
-  if (appid == null) {
-    params.delete('game');
-    params.delete('gname');
-  } else {
-    params.set('game', appid);
-    if (name) params.set('gname', name); else params.delete('gname');
-  }
+  if (appid == null) params.delete('game');
+  else params.set('game', appid);
   history.replaceState(null, '', `?${params}`);
 }
 
@@ -317,9 +316,11 @@ function restorePanelFromUrl(restoreShot = null) {
     return;
   }
   // Not (yet) in the loaded library/wishlist rows — e.g. a game nobody in it owns/wishlists,
-  // or no player loaded at all. Fetch it directly instead of silently giving up.
+  // or no player loaded at all. Fetch it directly instead of silently giving up. Its name
+  // isn't known yet (see openStandaloneLookup) — the panel opens with a placeholder title
+  // until the fetch resolves it.
   if (getPanelGame()?.appid === appid) return; // already open / fetch already in flight
-  openStandaloneLookup(appid, params.get('gname') || '');
+  openStandaloneLookup(appid);
 }
 
 document.addEventListener('keydown', e => {
@@ -433,15 +434,17 @@ function applyDetailsEvent(row, event) {
   row.details           = { rating: event.rating, hltb: event.hltb, meta: event.meta, tags: event.tags };
 }
 
-// Streams rating/hltb/meta/tags for `games` ({appid, name}[]) over SSE and applies
-// each event to its row in `rowMap` as it arrives. Shared by loadLibrary and loadWishlist.
+// Streams rating/hltb/meta/tags for `games` ({appid, name}[]) over SSE and applies each
+// event to its row in `rowMap` as it arrives. Shared by loadLibrary and loadWishlist. Only
+// `appid` is actually sent — the server always resolves the game's name itself rather than
+// trusting a client-supplied one (see CLAUDE.md's "Looking up an arbitrary game" section).
 async function streamGameDetails(games) {
   let detailsResp;
   try {
     detailsResp = await fetch('/api/game-details/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ games }),
+      body: JSON.stringify({ games: games.map(g => ({ appid: g.appid })) }),
     });
   } catch (err) {
     statusEl.textContent = `Details stream failed: ${err.message}`;
@@ -497,7 +500,7 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
   // A genuine new load drops any `game`/`shot` left in the URL from a previous player/tab —
   // it may not even exist in the new list. The initial page-load path (bottom of this file)
   // passes preserveGameParam so it can restore the deep link once the new data is in.
-  updateUrlParams(preserveGameParam ? { u: playerStr } : { u: playerStr, game: null, gname: null, shot: null });
+  updateUrlParams(preserveGameParam ? { u: playerStr } : { u: playerStr, game: null, shot: null });
   currentPlayerStr = playerStr;
 
   const members = playerStr.split(',').map(s => normalizeInput(s.trim())).filter(Boolean);
@@ -581,7 +584,7 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
 }
 
 async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, restoreShot = null } = {}) {
-  updateUrlParams(preserveGameParam ? { u: playerStr } : { u: playerStr, game: null, gname: null, shot: null });
+  updateUrlParams(preserveGameParam ? { u: playerStr } : { u: playerStr, game: null, shot: null });
   currentPlayerStr = playerStr;
 
   const members = playerStr.split(',').map(s => normalizeInput(s.trim())).filter(Boolean);
@@ -655,7 +658,7 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
   updateStatus();
   if (preserveGameParam) restorePanelFromUrl(restoreShot); // early attempt — lightbox needs details, tried again below
 
-  await streamGameDetails(result.items.map(item => ({ appid: item.appid, name: '' })));
+  await streamGameDetails(result.items);
   if (preserveGameParam) restorePanelFromUrl(restoreShot);
 }
 
@@ -707,7 +710,7 @@ if (initPlayer) {
   // the live URL — see the comment on restorePanelFromUrl().
   loadCurrentTab(initPlayer, { preserveGameParam: true, restoreShot: initParams.get('shot') });
 } else {
-  // No player loaded at all — still honor a bare `?game=&gname=` standalone-lookup deep link
+  // No player loaded at all — still honor a bare `?game=` standalone-lookup deep link
   // (loadLibrary/loadWishlist would otherwise be the only callers of restorePanelFromUrl).
   restorePanelFromUrl(initParams.get('shot'));
 }

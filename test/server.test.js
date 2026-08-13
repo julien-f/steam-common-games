@@ -53,7 +53,7 @@ function makeDetailsFetch({ ratingOk = true, metaOk = true, tagsOk = true } = {}
     if (url.includes('appdetails')) {
       if (!metaOk) return { ok: false, status: 503 };
       const appid = url.match(/appids=(\d+)/)?.[1];
-      return { ok: true, json: async () => ({ [appid]: { success: true, data: { genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] } } }) };
+      return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: 'Portal', genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] } } }) };
     }
     if (url.includes('bleed/init')) {
       return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
@@ -336,13 +336,13 @@ test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) 
   _reset();
   setCache('rating:400', { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
   setCache('hltb:400',   [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
-  setCache('meta:400',   { genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] });
+  setCache('meta:400',   { name: 'Portal', genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] });
   setCache('tags:400',   { 'Action': 9054, 'Co-op': 4532 });
 
   let fetchCalled = false;
   t.mock.method(globalThis, 'fetch', async () => { fetchCalled = true; });
 
-  const res = await api.get('/api/game-details/400?name=Portal');
+  const res = await api.get('/api/game-details/400');
   assert.equal(res.status, 200);
   assert.equal(res.body.rating?.total, 1000);
   assert.equal(res.body.rating?.desc, 'Very Positive');
@@ -357,7 +357,7 @@ test('GET /api/game-details/:appid: 200 fetching fresh rating, HLTB, meta and ta
   _resetAuth();
   t.mock.method(globalThis, 'fetch', makeDetailsFetch());
 
-  const res = await api.get('/api/game-details/401?name=Portal');
+  const res = await api.get('/api/game-details/401');
   assert.equal(res.status, 200);
   assert.equal(typeof res.body.rating?.score, 'number');
   assert.equal(res.body.hltb?.main, 10);
@@ -372,7 +372,7 @@ test('GET /api/game-details/:appid: 200 with null rating when reviews fetch fail
   _resetAuth();
   t.mock.method(globalThis, 'fetch', makeDetailsFetch({ ratingOk: false }));
 
-  const res = await api.get('/api/game-details/402?name=Portal');
+  const res = await api.get('/api/game-details/402');
   assert.equal(res.status, 200);
   assert.equal(res.body.rating, null);
   assert.equal(res.body.hltb?.main, 10);
@@ -384,7 +384,7 @@ test('GET /api/game-details/:appid: 200 with null meta when appdetails fetch fai
   _resetAuth();
   t.mock.method(globalThis, 'fetch', makeDetailsFetch({ metaOk: false }));
 
-  const res = await api.get('/api/game-details/403?name=Portal');
+  const res = await api.get('/api/game-details/403');
   assert.equal(res.status, 200);
   assert.equal(typeof res.body.rating?.score, 'number');
   assert.equal(res.body.meta, null);
@@ -395,7 +395,7 @@ test('GET /api/game-details/:appid: 200 with null tags when SteamSpy fetch fails
   _resetAuth();
   t.mock.method(globalThis, 'fetch', makeDetailsFetch({ tagsOk: false }));
 
-  const res = await api.get('/api/game-details/404?name=Portal');
+  const res = await api.get('/api/game-details/404');
   assert.equal(res.status, 200);
   assert.equal(typeof res.body.rating?.score, 'number');
   assert.ok(res.body.meta !== undefined, 'meta should still be present');
@@ -406,7 +406,7 @@ test('GET /api/game-details/:appid: only fetches sources not already cached', as
   _reset();
   _resetAuth();
   setCache('rating:405', { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
-  setCache('meta:405',   { genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] });
+  setCache('meta:405',   { name: 'Portal', genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] });
 
   let fetchedUrls = [];
   t.mock.method(globalThis, 'fetch', async (url) => {
@@ -417,7 +417,7 @@ test('GET /api/game-details/:appid: only fetches sources not already cached', as
     throw new Error(`Unexpected fetch: ${url}`);
   });
 
-  const res = await api.get('/api/game-details/405?name=Portal');
+  const res = await api.get('/api/game-details/405');
   assert.equal(res.status, 200);
   assert.equal(res.body.rating?.total, 1000);
   assert.deepEqual(res.body.meta?.genres, ['Action']);
@@ -446,7 +446,7 @@ function makeCountingDetailsFetch(counts, { delayMs = 0 } = {}) {
     if (url.includes('appdetails')) {
       counts.meta++;
       const appid = url.match(/appids=(\d+)/)?.[1];
-      return { ok: true, json: async () => ({ [appid]: { success: true, data: { genres: [], categories: [], developers: [], publishers: [] } } }) };
+      return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] } } }) };
     }
     if (url.includes('bleed/init')) {
       counts.hltbInit++;
@@ -467,7 +467,7 @@ test('GET /api/game-details/:appid: a repeated request is served from cache, no 
   const counts = { rating: 0, hltb: 0, hltbInit: 0, meta: 0, tags: 0 };
   t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts));
 
-  const res1 = await api.get('/api/game-details/500?name=Portal');
+  const res1 = await api.get('/api/game-details/500');
   assert.equal(res1.status, 200);
   assert.equal(counts.rating, 1);
   assert.equal(counts.hltb, 1);
@@ -475,7 +475,7 @@ test('GET /api/game-details/:appid: a repeated request is served from cache, no 
   assert.equal(counts.tags, 1);
 
   // Simulates the page being refreshed: same appid requested again.
-  const res2 = await api.get('/api/game-details/500?name=Portal');
+  const res2 = await api.get('/api/game-details/500');
   assert.equal(res2.status, 200);
   assert.deepEqual(res2.body, res1.body);
   assert.equal(counts.rating, 1, 'rating must not be re-fetched on refresh');
@@ -494,8 +494,8 @@ test('GET /api/game-details/:appid: concurrent requests for the same appid dedup
 
   // Fire both without awaiting the first — they overlap in flight.
   const [res1, res2] = await Promise.all([
-    api.get('/api/game-details/501?name=Portal'),
-    api.get('/api/game-details/501?name=Portal'),
+    api.get('/api/game-details/501'),
+    api.get('/api/game-details/501'),
   ]);
 
   assert.equal(res1.status, 200);
@@ -533,13 +533,17 @@ test('GET /api/game-details/:appid: a request aborted mid-flight still caches, s
 
   // Fire and kill the socket after 20ms — the handler has started upstream
   // fetches (~100ms each) but no response has been sent yet.
-  await abortedGet(port, '/api/game-details/600?name=Portal', 20);
+  await abortedGet(port, '/api/game-details/600', 20);
 
-  // Give the stranded handler time to finish its upstream work and setCache.
-  await new Promise(r => setTimeout(r, 300));
+  // Give the stranded handler time to finish its upstream work and setCache. HLTB now
+  // waits on meta before searching (see fetchGameDetails — it always resolves the search
+  // name from store metadata rather than trusting a client-supplied one), so that chain is
+  // meta → bleed/init → bleed, three sequential ~100ms hops instead of running in parallel
+  // with meta — comfortably under this budget but no longer as slack as it used to be.
+  await new Promise(r => setTimeout(r, 500));
 
   // The refresh: same appid requested again.
-  const res = await api.get('/api/game-details/600?name=Portal');
+  const res = await api.get('/api/game-details/600');
   assert.equal(res.status, 200);
   assert.equal(counts.rating, 1, 'aborted request should have completed and cached the rating — refresh must not re-fetch');
   assert.equal(counts.hltb, 1, 'aborted request should have completed and cached HLTB');
@@ -555,18 +559,18 @@ test('GET /api/game-details/:appid: failed fetch is not cached, retried on next 
     if (url.includes('appreviews')) return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
     if (url.includes('appdetails')) {
       const appid = url.match(/appids=(\d+)/)?.[1];
-      return { ok: true, json: async () => ({ [appid]: { success: true, data: { genres: [], categories: [], developers: [], publishers: [] } } }) };
+      return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] } } }) };
     }
     if (url.includes('bleed/init')) return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
     if (url.includes('bleed')) { hltbCalls++; return { ok: false, status: 503 }; }
     throw new Error(`Unexpected fetch: ${url}`);
   });
 
-  const res1 = await api.get('/api/game-details/406?name=Portal');
+  const res1 = await api.get('/api/game-details/406');
   assert.equal(res1.status, 200);
   assert.equal(res1.body.hltb, null);
 
-  const res2 = await api.get('/api/game-details/406?name=Portal');
+  const res2 = await api.get('/api/game-details/406');
   assert.equal(res2.status, 200);
   assert.equal(hltbCalls, 2, 'HLTB should be retried — failed fetch must not be cached');
 });
@@ -601,7 +605,7 @@ test('POST /api/game-details/stream: 400 for empty games list', async () => {
 });
 
 test('POST /api/game-details/stream: 400 for invalid appid in list', async () => {
-  const res = await api.post('/api/game-details/stream').send({ games: [{ appid: 'abc', name: 'Portal' }] });
+  const res = await api.post('/api/game-details/stream').send({ games: [{ appid: 'abc' }] });
   assert.equal(res.status, 400);
 });
 
@@ -609,7 +613,7 @@ test('POST /api/game-details/stream: streams one event per game plus a done even
   _reset();
   const rawRating = { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' };
   const rawHltb   = [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }];
-  const rawMeta   = { genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] };
+  const rawMeta   = { name: 'Portal', genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] };
   const rawTags   = { 'Action': 9054, 'Co-op': 4532 };
   setCache('rating:400', rawRating);
   setCache('hltb:400',   rawHltb);
@@ -625,7 +629,7 @@ test('POST /api/game-details/stream: streams one event per game plus a done even
   await new Promise(r => server.once('listening', r));
 
   const res = await ssePost(server.address().port, '/api/game-details/stream',
-    { games: [{ appid: 400, name: 'Portal' }, { appid: 401, name: 'Portal 2' }] });
+    { games: [{ appid: 400 }, { appid: 401 }] });
 
   assert.equal(res.status, 200);
   assert.equal(res.headers['content-type'], 'text/event-stream');
@@ -648,7 +652,7 @@ test('POST /api/game-details/stream: fetches fresh details and streams them', as
   await new Promise(r => server.once('listening', r));
 
   const res = await ssePost(server.address().port, '/api/game-details/stream',
-    { games: [{ appid: 700, name: 'Portal' }] });
+    { games: [{ appid: 700 }] });
 
   assert.equal(res.status, 200);
   const events = parseSseEvents(res.body);
@@ -659,11 +663,12 @@ test('POST /api/game-details/stream: fetches fresh details and streams them', as
   assert.deepEqual(gameEvent.meta?.genres, ['Action']);
 });
 
-// Wishlist rows have no name of their own (GetWishlist returns only appid/priority/
-// date_added) — the client sends name: '' for them, and fetchGameDetails must resolve
-// a name from store metadata before searching HLTB, instead of short-circuiting on the
-// empty name like it normally would (getHLTB returns null immediately when !name).
-test('POST /api/game-details/stream: resolves HLTB name from store metadata when name is empty', async (t) => {
+// The client never sends a name (see fetchGameDetails in server.js — the server always
+// resolves it from store metadata itself, keyed on the appid, rather than trusting one from
+// the client). This must still work for wishlist rows, which have no name of their own to
+// begin with (GetWishlist returns only appid/priority/date_added) — getHLTB would otherwise
+// short-circuit to null immediately on an empty name (`if (!name) return null`).
+test('POST /api/game-details/stream: resolves HLTB name from store metadata', async (t) => {
   _reset();
   _resetAuth();
   let hltbSearchCalls = 0;
@@ -693,7 +698,7 @@ test('POST /api/game-details/stream: resolves HLTB name from store metadata when
   await new Promise(r => server.once('listening', r));
 
   const res = await ssePost(server.address().port, '/api/game-details/stream',
-    { games: [{ appid: 701, name: '' }] });
+    { games: [{ appid: 701 }] });
 
   assert.equal(res.status, 200);
   const events = parseSseEvents(res.body);

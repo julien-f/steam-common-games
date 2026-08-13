@@ -238,19 +238,18 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
 
 const dedupDetails = createDedup();
 
-function fetchGameDetails(appid, name, { force = false } = {}) {
+function fetchGameDetails(appid, { force = false } = {}) {
   // Force-refresh gets its own dedup lane so it never joins an already in-flight
   // non-forced fetch that started before the cache was known to be bypassed.
   const dedupKey = force ? `details:force:${appid}` : `details:${appid}`;
   return dedupDetails(dedupKey, () => {
     const metaPromise = getAppDetails(appid, { force });
-    // Owned games always come with a name (from Steam's library API), so HLTB can
-    // search in parallel with everything else. Wishlist items have no name at all
-    // (GetWishlist returns only appid/priority/date_added) — for those, wait for
-    // store metadata and search HLTB using its `name` field instead.
-    const hltbPromise = name
-      ? getHLTB(appid, name, { force })
-      : metaPromise.then(meta => getHLTB(appid, meta?.name || '', { force }), () => null);
+    // The name used to search HLTB always comes from store metadata resolved from the
+    // appid itself, never from client input — this endpoint has no ownership check, so a
+    // client-supplied name would just be an unverified string. This costs a little latency
+    // versus searching HLTB in parallel with an already-known, trusted name (e.g. an owned
+    // game's name from Steam's library API) — that's the trade for not trusting the client.
+    const hltbPromise = metaPromise.then(meta => getHLTB(appid, meta?.name || '', { force }), () => null);
 
     return Promise.allSettled([
       getGameRating(appid, { force }),
@@ -293,8 +292,7 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
   if (!Number.isInteger(appid) || appid <= 0) {
     return res.status(400).json({ error: 'Invalid appid' });
   }
-  const name = (req.query.name || '').trim().slice(0, 200);
-  res.json(await fetchGameDetails(appid, name, { force: isForceRefresh(req) }));
+  res.json(await fetchGameDetails(appid, { force: isForceRefresh(req) }));
 });
 
 app.post('/api/game-details/stream', async (req, res) => {
@@ -309,7 +307,7 @@ app.post('/api/game-details/stream', async (req, res) => {
     if (!Number.isInteger(appid) || appid <= 0) {
       return res.status(400).json({ error: 'Invalid appid' });
     }
-    validated.push({ appid, name: String(g.name || '').trim().slice(0, 200) });
+    validated.push(appid);
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -324,10 +322,10 @@ app.post('/api/game-details/stream', async (req, res) => {
     if (!closed && !res.writableEnded) res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
-  await Promise.allSettled(validated.map(async ({ appid, name }) => {
+  await Promise.allSettled(validated.map(async appid => {
     if (closed) return;
     try {
-      const result = await fetchGameDetails(appid, name);
+      const result = await fetchGameDetails(appid);
       send({ appid, ...result });
     } catch {
       send({ appid, rating: null, hltb: null, meta: null, tags: null });

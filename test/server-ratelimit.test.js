@@ -30,7 +30,7 @@ function workingDetailsFetch(fetchedAppids) {
       return { ok: true, json: async () => ({ tags: { 'Action': 9054 } }) };
     }
     if (url.includes('appdetails')) {
-      return { ok: true, json: async () => ({ [appid]: { success: true, data: { genres: [], categories: [], developers: [], publishers: [] } } }) };
+      return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] } } }) };
     }
     if (url.includes('bleed/init')) return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
     if (url.includes('bleed'))      return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
@@ -50,22 +50,22 @@ test('details limiter: counts cache misses but never counts cache hits', async (
   // Pre-cache appid 800 fully — this one should always be served.
   setCache('rating:800', { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
   setCache('hltb:800',   [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
-  setCache('meta:800',   { genres: [], categories: [], developers: [], publishers: [] });
+  setCache('meta:800',   { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] });
   setCache('tags:800',   { 'Action': 9054 });
 
   // Three uncached appids consume the budget (max = 3).
   for (const appid of [801, 802, 803]) {
-    const res = await api.get(`/api/game-details/${appid}?name=Portal`);
+    const res = await api.get(`/api/game-details/${appid}`);
     assert.equal(res.status, 200, `miss ${appid} should succeed within budget`);
   }
 
   // A fourth cache miss is over budget → 429.
-  const over = await api.get('/api/game-details/804?name=Portal');
+  const over = await api.get('/api/game-details/804');
   assert.equal(over.status, 429, 'a cache miss past the budget should be rate limited');
 
   // The cached appid is still served even though the budget is exhausted,
   // and crucially does NOT trigger any upstream fetch.
-  const cached = await api.get('/api/game-details/800?name=Portal');
+  const cached = await api.get('/api/game-details/800');
   assert.equal(cached.status, 200, 'a cache hit must bypass the limiter');
   assert.equal(cached.body.rating.score, 88);
   assert.ok(!fetchedAppids.has('800'), 'cache hit must not fetch upstream');

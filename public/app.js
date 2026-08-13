@@ -367,7 +367,7 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
 // cache TTL — used by the side panel's "↻ Refresh" button (panel.js's onRefresh).
 async function refreshGameDetails(game) {
   try {
-    const res = await fetch(`/api/game-details/${game.appid}?name=${encodeURIComponent(game.name)}&refresh=1`);
+    const res = await fetch(`/api/game-details/${game.appid}?refresh=1`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Refresh failed');
     game.details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags };
@@ -399,7 +399,7 @@ async function loadAllDetails(thisRun) {
     res = await fetch('/api/game-details/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ games: games.map(g => ({ appid: g.appid, name: g.name })) }),
+      body: JSON.stringify({ games: games.map(g => ({ appid: g.appid })) }),
       signal: controller.signal,
     });
   } catch {
@@ -567,9 +567,10 @@ function updateProgress(loaded, total) {
 // Opens the panel for a game from the "look up any game" search box (public/gameSearch.js)
 // rather than from a table row — it has no `groupKey` (nobody in this comparison necessarily
 // owns it), which the rest of this section treats as "not part of any group": no owners
-// section, no group nav/random-pick, no table row to highlight. `name` is '' when the user
-// typed a raw appid/store URL instead of picking a search result — same as a wishlist row,
-// the panel just shows a loading name until store metadata streams in and backfills it.
+// section, no group nav/random-pick, no table row to highlight. `name` is known client-side
+// (picked from the search dropdown) and used only to avoid a title flash while the panel's own
+// fetch is in flight — it's never sent to the server; the server always resolves the real name
+// itself from store metadata, keyed on the appid, same as it does for a nameless wishlist row.
 // If the appid is actually part of the current comparison, open its real row instead — full
 // owners/nav/highlight rather than a lesser standalone view of data already in `games`.
 function openStandaloneGame(appid, name) {
@@ -577,17 +578,17 @@ function openStandaloneGame(appid, name) {
   if (existing) { openPanel(existing); return; }
   const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true };
   openPanel(game);
-  fetchStandaloneDetails(game, name);
+  fetchStandaloneDetails(game);
 }
 
-async function fetchStandaloneDetails(game, name) {
+async function fetchStandaloneDetails(game) {
   try {
-    const res = await fetch(`/api/game-details/${game.appid}?name=${encodeURIComponent(name || '')}`);
+    const res = await fetch(`/api/game-details/${game.appid}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Lookup failed');
     game.details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags };
     game.loading = false;
-    if (!name && game.details.meta?.name) game.name = game.details.meta.name;
+    if (game.details.meta?.name) game.name = game.details.meta.name;
     if (activeGame === game) renderPanelBody(game); // no-op if the user moved on mid-fetch
   } catch (err) {
     if (activeGame === game) showAlert(err.message);
