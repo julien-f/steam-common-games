@@ -21,6 +21,12 @@ test('buildMediaItems: banner only when details has no movies or screenshots', (
   assert.equal(items[0].shotId, 'banner');
 });
 
+test('buildMediaItems: uses details.banner when present instead of guessing the CDN path', () => {
+  const items = buildMediaItems(570, { banner: 'https://cdn.akamai.steamstatic.com/steam/apps/570/real_header.jpg' });
+  assert.equal(items[0].main, 'https://cdn.akamai.steamstatic.com/steam/apps/570/real_header.jpg');
+  assert.equal(items[0].thumb, items[0].main);
+});
+
 test('buildMediaItems: includes movies with v<id> shotId', () => {
   const details = {
     movies: [{ id: 256810, thumbnail: 'thumb.jpg', hls: 'video.m3u8' }],

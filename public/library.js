@@ -114,6 +114,7 @@ const loadBtn       = document.getElementById('load-btn');
 const statusEl      = document.getElementById('status');
 const accountsBarEl = document.getElementById('accounts-bar');
 const recentsBarEl  = document.getElementById('recents-bar');
+const recentGamesBarEl = document.getElementById('recent-games-bar');
 const tableContainer = document.getElementById('table-container');
 const resetViewBtn  = document.getElementById('reset-view-btn');
 const tabLibraryBtn  = document.getElementById('tab-library');
@@ -147,6 +148,13 @@ initPanel({
       statusEl.textContent = `Refresh failed: ${err.message}`;
     }
   },
+  // Runs on every close path (see the comment on `onClose` in panel.js) — not just the
+  // Escape-key one, which used to be the only one that remembered to clear `?game=`/
+  // `&shot=`; the backdrop click, × button, and swipe-to-close left them stale otherwise.
+  // resetTableState()'s own panelClose() call (a genuine new Load/refresh/tab-switch)
+  // already clears these params itself beforehand via updateUrlParams, so this just runs
+  // redundantly-but-harmlessly there — see loadLibrary/loadWishlist.
+  onClose: () => setPanelParam(null),
 });
 initLightbox({ onParamChange: setLightboxParam });
 
@@ -225,15 +233,6 @@ function openGame(game, { isRandom = false } = {}) {
   setPanelParam(game.appid);
 }
 
-// Wraps the shared panelClose() with the URL-state cleanup — mirrors app.js's own
-// closePanel() wrapper. Only reached from the Escape-key shortcut below; the panel's own
-// backdrop-click/close-button/swipe-to-close paths call panel.js's panelClose() directly
-// (same pre-existing gap as on the comparison page — see app.js).
-function closePanel() {
-  panelClose();
-  setPanelParam(null);
-}
-
 function pickRandomGame() {
   if (!table || getPanelGame()?.standalone) return; // see renderPanelNav
   const pick = pickRandomFrom(getGameList(), randomQueueKey(), getPanelGame()?.appid);
@@ -251,7 +250,12 @@ function pickRandomGame() {
 // sitting in `rows`.
 function openStandaloneLookup(appid, name) {
   const existing = rowMap.get(appid);
-  if (existing) { openGame(existing); return; }
+  if (existing) {
+    openGame(existing);
+    addRecentGame(existing.appid, existing.name, existing.capsule || null);
+    renderRecentGamesBar(recentGamesBarEl);
+    return;
+  }
   const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true };
   openGame(game);
   fetchStandaloneDetails(game);
@@ -266,6 +270,8 @@ async function fetchStandaloneDetails(game) {
     game.loading = false;
     if (data.meta?.name) game.name = data.meta.name;
     if (getPanelGame() === game) { renderPanelBody(game); setPanelParam(game.appid); }
+    addRecentGame(game.appid, game.name, data.meta?.capsule || null);
+    renderRecentGamesBar(recentGamesBarEl);
   } catch (err) {
     if (getPanelGame() === game) statusEl.textContent = `Lookup failed: ${err.message}`;
   }
@@ -331,7 +337,7 @@ document.addEventListener('keydown', e => {
       return;
     }
     if (document.getElementById('shortcuts-modal').classList.contains('open')) { closeShortcuts(); return; }
-    closePanel();
+    panelClose(); // onClose (see initPanel above) handles the URL cleanup
     return;
   }
   if (e.key === '?') { e.preventDefault(); toggleShortcuts(); return; }
@@ -397,6 +403,10 @@ bindRecentsBar(recentsBarEl, RECENTS_KEY, playerStr => {
 });
 
 renderRecentsBar(recentsBarEl, RECENTS_KEY);
+
+// Shared, un-namespaced across both pages — see gameSearch.js.
+bindRecentGamesBar(recentGamesBarEl, (appid, name) => openStandaloneLookup(appid, name));
+renderRecentGamesBar(recentGamesBarEl);
 
 function updateUrlParams(patch) {
   const url = new URL(location.href);
@@ -529,7 +539,7 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
   const allGames = result.groups.flatMap(g => g.games);
   const slotSteamIds = result.slots[0].map(p => p.steamid);
   renderAccountsBar(result.slots[0], 'games');
-  addRecent(RECENTS_KEY, playerStr, result.slots[0], playerStr);
+  addRecent(RECENTS_KEY, playerStr, [result.slots[0]], playerStr);
   renderRecentsBar(recentsBarEl, RECENTS_KEY);
 
   rows = allGames.map(game => {
@@ -611,7 +621,7 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
   }
 
   renderAccountsBar(result.players, 'wishlisted');
-  addRecent(RECENTS_KEY, playerStr, result.players, playerStr);
+  addRecent(RECENTS_KEY, playerStr, [result.players], playerStr);
   renderRecentsBar(recentsBarEl, RECENTS_KEY);
 
   rows = result.items.map(item => ({

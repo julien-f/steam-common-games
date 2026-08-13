@@ -419,7 +419,7 @@ test('getAppDetails: returns genres, categories, developers and publishers', asy
 test('getAppDetails: handles missing optional fields with empty arrays', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
-  assert.deepEqual(await getAppDetails(400), { name: null, genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, metacritic: null, capsule: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg', movies: [], screenshots: [] });
+  assert.deepEqual(await getAppDetails(400), { name: null, genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, metacritic: null, capsule: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg', banner: 'https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg', movies: [], screenshots: [] });
 });
 
 test('getAppDetails: extracts name field', async (t) => {
@@ -453,6 +453,22 @@ test('getAppDetails: falls back to constructed sm_120 URL when no capsule fields
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
   const result = await getAppDetails(400);
   assert.equal(result.capsule, 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg');
+});
+
+test('getAppDetails: uses header_image for the panel hero banner when present', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {
+    header_image: 'https://cdn.akamai.steamstatic.com/steam/apps/400/header_real.jpg',
+  }));
+  const result = await getAppDetails(400);
+  assert.equal(result.banner, 'https://cdn.akamai.steamstatic.com/steam/apps/400/header_real.jpg');
+});
+
+test('getAppDetails: falls back to constructed header.jpg URL when header_image is absent', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
+  const result = await getAppDetails(400);
+  assert.equal(result.banner, 'https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg');
 });
 
 test('getAppDetails: extracts movies with hls field', async (t) => {

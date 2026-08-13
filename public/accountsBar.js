@@ -99,10 +99,14 @@ function bindAccountRefresh(containerEl, onRefresh) {
 // the list per page (the two pages' searches aren't interchangeable: a Library Explorer
 // search is one Family group, a comparison-page search is a whole set of slots). Each
 // entry is `{ id, players, data }` — `id` is a canonicalized identifier used to dedupe/
-// remove/reload; `players` is a lightweight snapshot (steamid/personaname/avatarmedium)
-// used to render the chip; `data` is whatever the host page needs to replay the search
-// (a plain identifier string for the Library Explorer, a whole slots array for the
-// comparison page) and is never inspected here.
+// remove/reload; `data` is whatever the host page needs to replay the search (a plain
+// identifier string for the Library Explorer, a whole slots array for the comparison
+// page) and is never inspected here. `players` is a lightweight display snapshot
+// (steamid/personaname/avatarmedium) — always **one array per slot/group**, even for a
+// single-group search, so recentChipHtml below always knows slot boundaries: a Library
+// Explorer search (or a one-slot comparison-page search) passes a one-element array.
+// Without that grouping, a comparison of two 2-account Families and a plain 4-account
+// comparison would render as the exact same "A + B + C + D" label.
 
 const MAX_RECENTS = 10;
 
@@ -120,11 +124,11 @@ function saveRecents(storageKey, list) {
 }
 
 // Moves this search to the front, refreshing its cached display data, rather than
-// appending a duplicate.
-function addRecent(storageKey, id, players, data) {
-  const snapshot = (players || []).map(p => ({
+// appending a duplicate. `groups`: array of slot groups, each an array of player objects.
+function addRecent(storageKey, id, groups, data) {
+  const snapshot = (groups || []).map(g => (g || []).map(p => ({
     steamid: p.steamid, personaname: p.personaname, avatarmedium: p.avatarmedium,
-  }));
+  })));
   const rest = loadRecents(storageKey).filter(r => r.id !== id);
   rest.unshift({ id, players: snapshot, data });
   saveRecents(storageKey, rest.slice(0, MAX_RECENTS));
@@ -134,11 +138,19 @@ function removeRecent(storageKey, id) {
   saveRecents(storageKey, loadRecents(storageKey).filter(r => r.id !== id));
 }
 
+// "+" joins accounts merged within one slot/group, ", " separates distinct slots/groups —
+// same convention as the accounts bar's own "N accounts merged" labeling, so a Family
+// merge and a multi-player comparison never look identical here either. Each element of
+// `entry.players` is normalized to a group array (`Array.isArray(g) ? g : [g]`) rather than
+// assumed to already be one — entries written before this grouping existed have a flat
+// array of player objects, not an array of groups, and this is the only thing standing
+// between reading one of those out of localStorage and a hard crash on every page load.
 function recentChipHtml(entry) {
-  const label = esc(entry.players && entry.players.length
-    ? entry.players.map(p => p.personaname || p.steamid).join(' + ')
+  const groups = (entry.players || []).map(g => Array.isArray(g) ? g : [g]);
+  const label = esc(groups.length
+    ? groups.map(g => g.map(p => p.personaname || p.steamid).join(' + ')).join(', ')
     : entry.id);
-  const avatarUrl = entry.players && entry.players[0] && entry.players[0].avatarmedium;
+  const avatarUrl = groups[0]?.[0]?.avatarmedium;
   const safeAvatar = /^https?:\/\//i.test(avatarUrl || '') ? avatarUrl : '';
   return `
     <span class="recent-chip">

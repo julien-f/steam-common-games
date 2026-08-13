@@ -1,7 +1,15 @@
 'use strict';
 
 function buildMediaItems(appid, details) {
-  const bannerUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`;
+  // `details.banner` (see extractAppDetails in lib/steam.js) is Steam's own header image
+  // for this specific game, resolved once store metadata has loaded — before that (the
+  // game is still `loading`, so `details` itself is absent), guess the conventional CDN
+  // path as a placeholder; it's replaced by the real one as soon as metadata arrives, same
+  // as every other placeholder in the panel. Guessing here unconditionally (regardless of
+  // whether the real header image happens to exist at that path) used to mean a game
+  // without one showed a permanently broken hero image no matter how many times the panel
+  // was reopened, since the guessed URL never changes.
+  const bannerUrl = details?.banner || `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`;
   const movies = details?.movies || [];
   const screenshots = details?.screenshots || [];
   return [

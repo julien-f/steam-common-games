@@ -304,10 +304,23 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
  * a per-account count, an optional private-profile badge, and a refresh icon.
  */
 .accounts-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-/* Comparison page only — clusters a slot's account chip(s) under a "Player N" label,
-   since (unlike the Library Explorer) a search can compare several separate slots. */
-.slot-accounts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.slot-label { font-size: 12px; color: var(--text2); }
+/* Comparison page only — clusters a slot's account chip(s) under a "Player N" /
+   "N accounts merged" label, since (unlike the Library Explorer) a search can compare
+   several separate slots, each possibly itself a multi-account Steam Family merge. Each
+   slot gets its own bounding box on its own row (flex-basis 100%) rather than flowing
+   inline with the next slot's chips — a shared border is what actually tells apart
+   "these chips are merged into one library" (inside one box) from "these are being
+   compared" (separate boxes), since the two can otherwise look like the same flat row of
+   chips with a small label sprinkled in between. */
+.slot-accounts {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  flex: 1 1 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--bg2);
+}
+.slot-label { font-size: 12px; font-weight: 600; color: var(--text1); }
 .account-chip {
   display: flex; align-items: center; gap: 6px;
   padding: 5px 6px 5px 5px;

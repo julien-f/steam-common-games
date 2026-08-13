@@ -104,3 +104,84 @@ function initGameSearch({ inputEl, resultsEl, onSelect }) {
     if (e.target !== inputEl && !resultsEl.contains(e.target)) hideResults();
   });
 }
+
+// ── Recently looked-up games (localStorage) ─────────────────────────────────
+// Unlike accountsBar.js's "Recent:" row (namespaced per page — a Library Explorer player
+// search and a comparison-page search aren't interchangeable), a game looked up via this
+// box means the same thing regardless of which page it was looked up from, so both pages
+// read/write one shared, un-namespaced list. Purely a client-side convenience — never sent
+// to the server. Callers (see openStandaloneGame in app.js, openStandaloneLookup in
+// library.js) call `addRecentGame` once a game's real name/thumbnail is known (resolved
+// from store metadata, or already on hand for a game that turned out to already be loaded)
+// — never with the `App <appid>` placeholder a fetch-in-flight game opens with.
+
+const RECENT_GAMES_KEY = 'recent-games';
+const MAX_RECENT_GAMES = 10;
+
+function loadRecentGames() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(RECENT_GAMES_KEY));
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return []; // corrupt/blocked storage — behave as if there's no history
+  }
+}
+
+function saveRecentGames(list) {
+  try { localStorage.setItem(RECENT_GAMES_KEY, JSON.stringify(list)); } catch { /* storage full/blocked — drop silently */ }
+}
+
+// Moves this game to the front, refreshing its cached name/thumbnail, rather than
+// appending a duplicate.
+function addRecentGame(appid, name, tinyImage) {
+  const rest = loadRecentGames().filter(g => g.appid !== appid);
+  rest.unshift({ appid, name, tinyImage: tinyImage || null });
+  saveRecentGames(rest.slice(0, MAX_RECENT_GAMES));
+}
+
+function removeRecentGame(appid) {
+  saveRecentGames(loadRecentGames().filter(g => g.appid !== appid));
+}
+
+function recentGameChipHtml(entry) {
+  const label = esc(entry.name || `App ${entry.appid}`);
+  const safeThumb = /^https?:\/\//i.test(entry.tinyImage || '') ? entry.tinyImage : '';
+  return `
+    <span class="recent-chip">
+      <button type="button" class="recent-chip-btn" data-appid="${entry.appid}" title="Look up ${label}">
+        ${safeThumb ? `<img class="recent-chip-avatar" src="${esc(safeThumb)}" alt="">` : ''}
+        ${label}
+      </button>
+      <button type="button" class="recent-chip-remove" data-appid="${entry.appid}" title="Remove from recent">×</button>
+    </span>
+  `;
+}
+
+function renderRecentGamesBar(containerEl) {
+  const recents = loadRecentGames();
+  if (recents.length === 0) { containerEl.hidden = true; containerEl.innerHTML = ''; return; }
+  containerEl.innerHTML = `
+    <span class="recents-label">Recently looked up:</span>
+    ${recents.map(recentGameChipHtml).join('')}
+    <button type="button" class="recents-clear">Clear</button>
+  `;
+  containerEl.hidden = false;
+}
+
+// `onLoad(appid, name)` opens the remembered game — same shape as bindRecentsBar in
+// accountsBar.js, but keyed directly on the appid rather than an opaque id/data pair since
+// a game is always just its appid.
+function bindRecentGamesBar(containerEl, onLoad) {
+  containerEl.addEventListener('click', e => {
+    const loadBtn = e.target.closest('.recent-chip-btn');
+    if (loadBtn) {
+      const appid = Number(loadBtn.dataset.appid);
+      const entry = loadRecentGames().find(g => g.appid === appid);
+      if (entry) onLoad(entry.appid, entry.name);
+      return;
+    }
+    const removeBtn = e.target.closest('.recent-chip-remove');
+    if (removeBtn) { removeRecentGame(Number(removeBtn.dataset.appid)); renderRecentGamesBar(containerEl); return; }
+    if (e.target.closest('.recents-clear')) { saveRecentGames([]); renderRecentGamesBar(containerEl); }
+  });
+}

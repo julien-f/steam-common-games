@@ -9,6 +9,11 @@
 // to show/hide it. Anything page-specific — the "Owned by" section, tag-click
 // filtering, the nav bar's list of games — is left to the host page via
 // options or by wrapping panelOpen/panelClose with its own extra logic.
+// `options.onClose` specifically exists because panelClose() itself is called from more
+// places than just the host's own code (the backdrop click, × button, and swipe-to-close
+// all call it directly) — a host that needs to run cleanup on every close (not just the
+// ones it explicitly triggers) should do it there rather than in a wrapper around
+// panelClose(), which those other paths would silently bypass.
 // pickRandomFrom() below is a generic "shuffle bag" usable by both pages.
 
 let panelOptions = {};
@@ -140,7 +145,12 @@ function panelOpen(game) {
   (document.getElementById('panel-hero').querySelector('.panel-hero-img') ?? document.getElementById('panel-close')).focus();
 }
 
-function panelClose() {
+// `preserveUrl`: threaded through to `onClose` unchanged — for a host that clears
+// `?game=`/`&shot=` there, this lets a caller that's about to reopen the same game right
+// after (e.g. a forced-refresh reload) close the panel's DOM state without losing the
+// deep link it'll restore from once the reload completes. Not used by the backdrop
+// click/× button/swipe paths below, which always want the default (URL cleared).
+function panelClose({ preserveUrl = false } = {}) {
   if (!panelGame) return;
   panelGame = null;
   document.getElementById('game-panel').classList.remove('open');
@@ -152,6 +162,12 @@ function panelClose() {
   document.getElementById('panel-nav')?.replaceChildren();
   panelPrevFocus?.focus();
   panelPrevFocus = null;
+  // Every close path funnels through here — the backdrop click and × button are bound
+  // straight to this function (see initPanel below), and swipe-to-close calls it directly
+  // too — so this is the one place host-specific close cleanup (clearing `?game=`/`&shot=`
+  // from the URL, resetting the host's own "active game" state) can hook in without every
+  // host having to remember to wrap all of those paths itself.
+  panelOptions.onClose?.({ preserveUrl });
 }
 
 function getPanelItems() {

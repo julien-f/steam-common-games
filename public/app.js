@@ -78,6 +78,19 @@ document.addEventListener('DOMContentLoaded', () => {
       renderPanel();
     },
     onRefresh: refreshGameDetails,
+    // Runs on every close path, not just the Escape-key one below — see the comment on
+    // `onClose` in panel.js. Mirrors what the old closePanel() wrapper did, but now also
+    // covers the backdrop click / × button / swipe-to-close, which used to leave
+    // `activeGame` and `?game=` stale until something else (e.g. a later Escape press)
+    // happened to clean them up. `preserveUrl` is set by findCommonGames when it closes the
+    // panel only to immediately reopen the same game once a refresh/restore completes —
+    // see its own `panelClose({ preserveUrl: true })` call.
+    onClose: ({ preserveUrl } = {}) => {
+      activeGame = null;
+      randomGroupKey = null;
+      refreshTable(); // remove active row highlight
+      if (!preserveUrl) setPanelParam(null);
+    },
   });
 
   initGameSearch({
@@ -85,6 +98,10 @@ document.addEventListener('DOMContentLoaded', () => {
     resultsEl: document.getElementById('game-lookup-results'),
     onSelect: ({ appid, name }) => openStandaloneGame(appid, name),
   });
+
+  // Shared, un-namespaced across both pages — see gameSearch.js.
+  bindRecentGamesBar(document.getElementById('recent-games-bar'), (appid, name) => openStandaloneGame(appid, name));
+  renderRecentGamesBar(document.getElementById('recent-games-bar'));
 
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
@@ -94,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       if (document.getElementById('shortcuts-modal').classList.contains('open')) { closeShortcuts(); return; }
-      closePanel(); return;
+      panelClose(); return; // onClose (see initPanel above) handles the URL/state cleanup
     }
     if (e.key === '?') { e.preventDefault(); toggleShortcuts(); return; }
     const tag = document.activeElement?.tagName;
@@ -174,6 +191,9 @@ function loadFromUrl() {
     accountsBarEl.hidden = true;
     accountsBarEl.innerHTML = '';
     document.title = 'Steam Common Games';
+    // No comparison loaded at all — still honor a bare `?game=` standalone-lookup deep
+    // link (findCommonGames would otherwise be the only caller of restorePanelFromUrl).
+    restorePanelFromUrl(restoreShot);
   }
 }
 
@@ -304,7 +324,10 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
   }
 
   const thisRun = ++runId;
-  closePanel({ updateUrl: false });
+  // preserveUrl: this may be a refresh/restore of the same search rather than a brand new
+  // one (pushState: false) — restorePanelFromUrl() below re-reads `?game=`/`&shot=` from
+  // the URL once the data's back in, so they mustn't be wiped out by closing the panel here.
+  panelClose({ preserveUrl: true });
   for (const s of Object.values(activeFilters)) s.clear();
   for (const s of Object.values(allOpts)) s.clear();
   for (const k of Object.keys(filterSearch)) filterSearch[k] = '';
@@ -342,14 +365,21 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
     playtime = data.playtime || {};
 
     renderPage();
-    // One labelled cluster of chips per slot — the label is only useful once there's
-    // more than one slot to tell apart (a single-slot search is just "the library").
-    renderAccountChipsGrouped(accountsBarEl, slots.map((players, i) => ({
-      label: slots.length > 1 ? `Player ${i + 1}` : null,
-      players,
-    })), 'games');
+    // One labelled, boxed cluster of chips per slot (see the .slot-accounts border in
+    // style.css) — "Player N" is only useful once there's more than one slot to tell apart
+    // (a single-slot search is just "the library"), but the "· N accounts merged" suffix is
+    // shown whenever a slot itself unions more than one account, on a single-slot search
+    // too — otherwise a Steam Family search (several accounts, one slot) and a plain
+    // multi-player comparison (one account per slot) render as the same flat row of chips
+    // and there's no way to tell "merged into one library" from "compared side by side".
+    renderAccountChipsGrouped(accountsBarEl, slots.map((players, i) => {
+      const parts = [];
+      if (slots.length > 1) parts.push(`Player ${i + 1}`);
+      if (players.length > 1) parts.push(`${players.length} accounts merged`);
+      return { label: parts.length ? parts.join(' · ') : null, players };
+    }), 'games');
     const normalized = normalizedSlots(inputSlots);
-    addRecent(RECENTS_KEY, normalized.map(s => s.join(',')).join('|'), slots.flat(), normalized);
+    addRecent(RECENTS_KEY, normalized.map(s => s.join(',')).join('|'), slots, normalized);
     renderRecentsBar(document.getElementById('recents-bar'), RECENTS_KEY);
     restorePanelFromUrl(restoreShot);
     await loadAllDetails(thisRun);
@@ -575,7 +605,12 @@ function updateProgress(loaded, total) {
 // owners/nav/highlight rather than a lesser standalone view of data already in `games`.
 function openStandaloneGame(appid, name) {
   const existing = games.find(g => g.appid === appid);
-  if (existing) { openPanel(existing); return; }
+  if (existing) {
+    openPanel(existing);
+    addRecentGame(existing.appid, existing.name, existing.details?.meta?.capsule || null);
+    renderRecentGamesBar(document.getElementById('recent-games-bar'));
+    return;
+  }
   const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true };
   openPanel(game);
   fetchStandaloneDetails(game);
@@ -590,6 +625,8 @@ async function fetchStandaloneDetails(game) {
     game.loading = false;
     if (game.details.meta?.name) game.name = game.details.meta.name;
     if (activeGame === game) renderPanelBody(game); // no-op if the user moved on mid-fetch
+    addRecentGame(game.appid, game.name, game.details.meta?.capsule || null);
+    renderRecentGamesBar(document.getElementById('recent-games-bar'));
   } catch (err) {
     if (activeGame === game) showAlert(err.message);
   }
@@ -627,20 +664,11 @@ function openPanel(game, { isRandom = false } = {}) {
   renderPanelNav();
   refreshTable(); // re-render rows so the active highlight appears
   document.getElementById(`tbody-${game.groupKey}`)?.querySelector(`tr.game-row[data-appid="${game.appid}"]`)?.scrollIntoView({ block: 'nearest' });
-  // A standalone lookup's URL isn't restorable on reload (restorePanelFromUrl only looks
-  // through `games`, this page's loaded comparison) — skip setting `?game=` so the address
-  // bar doesn't imply a link that wouldn't actually reopen it.
-  if (!game.standalone) setPanelParam(game.appid);
+  // Standalone lookups are restorable too (see restorePanelFromUrl's fallback to
+  // openStandaloneGame below), so `?game=` is set unconditionally.
+  setPanelParam(game.appid);
 }
 
-function closePanel({ updateUrl = true } = {}) {
-  if (!activeGame) return;
-  activeGame = null;
-  randomGroupKey = null;
-  panelClose(); // shared: hides the panel, restores focus
-  refreshTable(); // remove active highlight
-  if (updateUrl) setPanelParam(null);
-}
 
 function openShortcuts() {
   document.getElementById('shortcuts-modal').classList.add('open');
@@ -683,11 +711,18 @@ function restorePanelFromUrl(restoreShot = null) {
   const appid = Number(params.get('game'));
   if (!appid) return;
   const game = games.find(g => g.appid === appid);
-  if (game && activeGame?.appid !== appid) openPanel(game);
-  const shotParam = restoreShot ?? params.get('shot');
-  if (shotParam !== null && activeGame && !activeGame.loading) {
-    openLightbox(activeGame, shotParam);
+  if (game) {
+    if (activeGame?.appid !== appid) openPanel(game);
+    const shotParam = restoreShot ?? params.get('shot');
+    if (shotParam !== null && !game.loading) openLightbox(game, shotParam);
+    return;
   }
+  // Not (yet) part of the loaded comparison — e.g. a game nobody in it owns, or no
+  // comparison loaded at all. Fetch it directly instead of silently giving up, same as
+  // library.js's equivalent fallback — its name isn't known yet (see openStandaloneGame),
+  // so the panel opens with a placeholder title until the fetch resolves it.
+  if (activeGame?.appid === appid) return; // already open / fetch already in flight
+  openStandaloneGame(appid);
 }
 
 function renderPanelNav() {
