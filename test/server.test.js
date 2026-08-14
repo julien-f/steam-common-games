@@ -55,6 +55,9 @@ function makeDetailsFetch({ ratingOk = true, metaOk = true, tagsOk = true } = {}
       const appid = url.match(/appids=(\d+)/)?.[1];
       return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: 'Portal', genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] } } }) };
     }
+    if (url.includes('protondb.com')) {
+      return { ok: true, json: async () => ({ tier: 'gold', confidence: 'strong', total: 500 }) };
+    }
     if (url.includes('bleed/init')) {
       return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
     }
@@ -334,10 +337,11 @@ test('GET /api/game-details/-1: 400 for negative appid', async () => {
 
 test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) => {
   _reset();
-  setCache('rating:400', { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
-  setCache('hltb:400',   [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
-  setCache('meta:400',   { name: 'Portal', genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] });
-  setCache('tags:400',   { 'Action': 9054, 'Co-op': 4532 });
+  setCache('rating:400',   { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
+  setCache('hltb:400',     [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
+  setCache('meta:400',     { name: 'Portal', genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] });
+  setCache('tags:400',     { 'Action': 9054, 'Co-op': 4532 });
+  setCache('protondb:400', { tier: 'gold', confidence: 'strong', total: 500 });
 
   let fetchCalled = false;
   t.mock.method(globalThis, 'fetch', async () => { fetchCalled = true; });
@@ -349,6 +353,7 @@ test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) 
   assert.equal(res.body.hltb?.main, 10);
   assert.deepEqual(res.body.meta?.genres, ['Action']);
   assert.deepEqual(res.body.tags, ['Action', 'Co-op']);
+  assert.equal(res.body.protondb?.tier, 'gold');
   assert.equal(fetchCalled, false);
 });
 
@@ -614,15 +619,18 @@ test('POST /api/game-details/stream: streams one event per game plus a done even
   const rawRating = { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' };
   const rawHltb   = [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }];
   const rawMeta   = { name: 'Portal', genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] };
-  const rawTags   = { 'Action': 9054, 'Co-op': 4532 };
-  setCache('rating:400', rawRating);
-  setCache('hltb:400',   rawHltb);
-  setCache('meta:400',   rawMeta);
-  setCache('tags:400',   rawTags);
-  setCache('rating:401', rawRating);
-  setCache('hltb:401',   rawHltb);
-  setCache('meta:401',   rawMeta);
-  setCache('tags:401',   rawTags);
+  const rawTags     = { 'Action': 9054, 'Co-op': 4532 };
+  const rawProtonDb = { tier: 'gold', confidence: 'strong', total: 500 };
+  setCache('rating:400',   rawRating);
+  setCache('hltb:400',     rawHltb);
+  setCache('meta:400',     rawMeta);
+  setCache('tags:400',     rawTags);
+  setCache('protondb:400', rawProtonDb);
+  setCache('rating:401',   rawRating);
+  setCache('hltb:401',     rawHltb);
+  setCache('meta:401',     rawMeta);
+  setCache('tags:401',     rawTags);
+  setCache('protondb:401', rawProtonDb);
 
   const server = app.listen(0);
   t.after(() => new Promise(r => server.close(r)));
@@ -682,6 +690,9 @@ test('POST /api/game-details/stream: resolves HLTB name from store metadata', as
     if (url.includes('appdetails')) {
       const appid = url.match(/appids=(\d+)/)?.[1];
       return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] } } }) };
+    }
+    if (url.includes('protondb.com')) {
+      return { ok: true, json: async () => ({ tier: 'gold', confidence: 'strong', total: 500 }) };
     }
     if (url.includes('bleed/init')) {
       return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };

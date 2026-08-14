@@ -26,12 +26,18 @@ function parseDirectAppid(raw) {
   return m ? Number(m[1]) : null;
 }
 
-function gameSearchResultHtml(r) {
+// `active`: true for the result currently highlighted via ArrowUp/ArrowDown (not hover —
+// hover is native `:hover`/`:focus-visible` CSS, this is the keyboard roving selection).
+// `id` + `role="option"` back `inputEl`'s `aria-activedescendant` in initGameSearch below;
+// `tabindex="-1"` keeps real DOM focus on the input the whole time, same combobox pattern
+// as a native `<select>`'s listbox — arrow keys move the highlight, not focus itself.
+function gameSearchResultHtml(r, active) {
   const thumb = r.tinyImage
     ? `<img class="game-search-thumb" src="${esc(r.tinyImage)}" alt="" loading="lazy">`
     : '<span class="game-search-thumb game-search-thumb--empty"></span>';
   return `
-    <button type="button" class="game-search-result" data-appid="${r.appid}" data-name="${esc(r.name)}">
+    <button type="button" id="game-search-opt-${r.appid}" role="option" aria-selected="${active}" tabindex="-1"
+      class="game-search-result${active ? ' active' : ''}" data-appid="${r.appid}" data-name="${esc(r.name)}">
       ${thumb}
       <span class="game-search-name">${esc(r.name)}</span>
     </button>
@@ -42,18 +48,48 @@ function initGameSearch({ inputEl, resultsEl, onSelect }) {
   let debounceTimer = null;
   let lastResults = [];
   let activeFetch = 0; // guards against a slower earlier request clobbering a faster later one
+  let activeIdx = -1;  // ArrowUp/ArrowDown highlight; -1 = none yet (Enter falls back to the top match)
+
+  resultsEl.setAttribute('role', 'listbox');
+  inputEl.setAttribute('aria-autocomplete', 'list');
+  inputEl.setAttribute('aria-expanded', 'false');
+  if (resultsEl.id) inputEl.setAttribute('aria-controls', resultsEl.id);
+
+  function renderResults() {
+    resultsEl.innerHTML = lastResults.map((r, i) => gameSearchResultHtml(r, i === activeIdx)).join('');
+    if (activeIdx >= 0) inputEl.setAttribute('aria-activedescendant', `game-search-opt-${lastResults[activeIdx].appid}`);
+    else inputEl.removeAttribute('aria-activedescendant');
+  }
 
   function showResults(results) {
     lastResults = results;
+    activeIdx = -1;
     if (!results.length) { hideResults(); return; }
-    resultsEl.innerHTML = results.map(gameSearchResultHtml).join('');
+    renderResults();
     resultsEl.hidden = false;
+    inputEl.setAttribute('aria-expanded', 'true');
   }
 
   function hideResults() {
     lastResults = [];
+    activeIdx = -1;
     resultsEl.hidden = true;
     resultsEl.innerHTML = '';
+    inputEl.setAttribute('aria-expanded', 'false');
+    inputEl.removeAttribute('aria-activedescendant');
+  }
+
+  // dir: 1 (ArrowDown) or -1 (ArrowUp). Wraps at both ends, same `(idx + dir + len) % len`
+  // convention panel.js/library.js use for prev/next game paging — except the very first
+  // press, which has no current index to offset from: ArrowDown starts at the top result,
+  // ArrowUp starts at the bottom one, matching most native combobox widgets.
+  function moveActive(dir) {
+    if (!lastResults.length) return;
+    activeIdx = activeIdx === -1
+      ? (dir > 0 ? 0 : lastResults.length - 1)
+      : (activeIdx + dir + lastResults.length) % lastResults.length;
+    renderResults();
+    resultsEl.querySelector('.game-search-result.active')?.scrollIntoView({ block: 'nearest' });
   }
 
   async function runSearch(term) {
@@ -84,13 +120,16 @@ function initGameSearch({ inputEl, resultsEl, onSelect }) {
 
   inputEl.addEventListener('keydown', e => {
     if (e.key === 'Escape') { hideResults(); return; }
+    if (e.key === 'ArrowDown') { if (lastResults.length) e.preventDefault(); moveActive(1); return; }
+    if (e.key === 'ArrowUp')   { if (lastResults.length) e.preventDefault(); moveActive(-1); return; }
     if (e.key !== 'Enter') return;
     e.preventDefault();
     const term = inputEl.value.trim();
     if (!term) return;
     const directAppid = parseDirectAppid(term);
     if (directAppid != null) { pick({ appid: directAppid, name: '' }); return; }
-    if (lastResults.length) pick(lastResults[0]); // Enter picks the top match, same as clicking it
+    if (activeIdx >= 0 && lastResults[activeIdx]) { pick(lastResults[activeIdx]); return; }
+    if (lastResults.length) pick(lastResults[0]); // no arrow-key highlight yet — same as clicking the top match
   });
 
   resultsEl.addEventListener('click', e => {

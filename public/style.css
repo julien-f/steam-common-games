@@ -411,7 +411,7 @@ a.account-identity:hover .account-name { color: var(--accent2); }
   padding: 7px 10px; background: transparent; border: none; cursor: pointer;
   color: var(--text0); font-size: 13px; text-align: left;
 }
-.game-search-result:hover, .game-search-result:focus-visible { background: var(--bg1); }
+.game-search-result:hover, .game-search-result:focus-visible, .game-search-result.active { background: var(--bg1); }
 .game-search-thumb { width: 46px; height: 22px; object-fit: cover; border-radius: 3px; flex-shrink: 0; }
 .game-search-thumb--empty { background: var(--bg0); }
 .game-search-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -859,6 +859,11 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 .panel-score-desc a { color: var(--text1); text-decoration: none; border-bottom: 1px solid transparent; transition: color 0.15s, border-color 0.15s; }
 .panel-score-desc a:hover { color: var(--accent2); border-bottom-color: var(--accent2); }
 .panel-reviews { font-size: 12px; color: var(--text1); }
+
+.panel-score-row--proton { align-items: center; }
+/* Shared with the Library Explorer's ProtonDB table column (public/library.js) — same
+   colored pill both places, not just the side panel. */
+.proton-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; color: #fff; line-height: 1.4; }
 
 .panel-hltb { display: flex; flex-wrap: wrap; gap: 24px 24px; row-gap: 14px; }
 .panel-hltb-label { font-size: 11px; color: var(--text2); margin-bottom: 3px; }

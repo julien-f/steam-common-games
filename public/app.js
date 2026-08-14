@@ -400,8 +400,11 @@ async function refreshGameDetails(game) {
     const res = await fetch(`/api/game-details/${game.appid}?refresh=1`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Refresh failed');
-    game.details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags };
-    if (game.details.meta || game.details.tags) updateFilterOptions(game.details.meta, game.details.tags);
+    game.details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags, protondb: data.protondb };
+    // Standalone lookups (see openStandaloneGame) aren't part of the loaded comparison table —
+    // feeding their tags/genres/categories into the table's filter option pool would make the
+    // filter card spuriously appear (or gain new options) with no comparison ever having run.
+    if (!game.standalone && (game.details.meta || game.details.tags)) updateFilterOptions(game.details.meta, game.details.tags);
     const tr = document.querySelector(`tr.game-row[data-appid="${game.appid}"]`);
     if (tr) syncRow(tr, game);
     refreshTable();
@@ -463,7 +466,7 @@ async function loadAllDetails(thisRun) {
         const idx = idxByAppid.get(data.appid);
         if (idx === undefined) continue;
 
-        games[idx].details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags };
+        games[idx].details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags, protondb: data.protondb };
         games[idx].loading = false;
         loaded++;
         updateProgress(loaded, games.length);
@@ -621,7 +624,7 @@ async function fetchStandaloneDetails(game) {
     const res = await fetch(`/api/game-details/${game.appid}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Lookup failed');
-    game.details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags };
+    game.details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags, protondb: data.protondb };
     game.loading = false;
     if (game.details.meta?.name) game.name = game.details.meta.name;
     if (activeGame === game) renderPanelBody(game); // no-op if the user moved on mid-fetch

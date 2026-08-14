@@ -32,6 +32,9 @@ function workingDetailsFetch(fetchedAppids) {
     if (url.includes('appdetails')) {
       return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] } } }) };
     }
+    if (url.includes('protondb.com')) {
+      return { ok: true, json: async () => ({ tier: 'gold', confidence: 'strong', total: 500 }) };
+    }
     if (url.includes('bleed/init')) return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
     if (url.includes('bleed'))      return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
     throw new Error(`Unexpected fetch: ${url}`);
@@ -48,10 +51,11 @@ test('details limiter: counts cache misses but never counts cache hits', async (
   t.mock.method(globalThis, 'fetch', workingDetailsFetch(fetchedAppids));
 
   // Pre-cache appid 800 fully — this one should always be served.
-  setCache('rating:800', { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
-  setCache('hltb:800',   [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
-  setCache('meta:800',   { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] });
-  setCache('tags:800',   { 'Action': 9054 });
+  setCache('rating:800',   { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
+  setCache('hltb:800',     [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
+  setCache('meta:800',     { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] });
+  setCache('tags:800',     { 'Action': 9054 });
+  setCache('protondb:800', { tier: 'gold', confidence: 'strong', total: 500 });
 
   // Three uncached appids consume the budget (max = 3).
   for (const appid of [801, 802, 803]) {

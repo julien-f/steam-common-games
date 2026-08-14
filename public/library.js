@@ -1,7 +1,7 @@
 'use strict';
 
 import { createDataTable, syncViewToUrl, resetView } from '@vates/data-table-vanilla';
-import { processData, searchData, DEFAULT_LABELS } from '@vates/data-table-core';
+import { processData, searchData, DEFAULT_LABELS, compareMissingLast } from '@vates/data-table-core';
 
 const fmt = {
   loading: v => v === undefined ? '…' : v,
@@ -32,6 +32,49 @@ function renderScoreNum(v) {
   return span;
 }
 
+// ProtonDB's Linux/Steam Deck compatibility tiers, worst to best (see the matching color map
+// in public/panel.js, which renders the same badge in the side panel — kept as a separate copy
+// there since panel.js is a classic script and library.js a module, not for any semantic
+// reason). "Native" (an actual Linux port, no Proton needed) ranks above "Platinum" (flawless
+// *through* Proton). No "pending" entry — extractProtonDb (lib/steam.js) already collapses that
+// tier to null server-side, since "too few reports to rate yet" isn't a quality tier at all, so
+// it never reaches the client as a value that would need a place in this ordering.
+const PROTON_TIER_ORDER = ['borked', 'bronze', 'silver', 'gold', 'platinum', 'native'];
+const PROTON_TIER_COLORS = {
+  borked: '#b91c1c', bronze: '#8b4513', silver: '#757575', gold: '#b8860b',
+  platinum: '#5b6b85', native: '#15803d',
+};
+
+// Backing value is the plain capitalized tier name ("Gold", "Platinum") — @vates/data-table-core
+// 0.7.0 added a per-column `compare` option (see the ProtonDB column below) precisely so a
+// categorical column can sort by real quality order without needing display text to double as
+// a sort key; see https://github.com/vatesfr/data-table/issues/15 for the request behind it (an
+// earlier version of this column baked a rank digit into the value itself — "3 Gold" — to work
+// around not having this, which leaked into the filter checklist/search text; not needed anymore).
+function protonDbValue(tier) {
+  if (PROTON_TIER_ORDER.indexOf(tier) === -1) return null;
+  return tier.charAt(0).toUpperCase() + tier.slice(1);
+}
+
+// Ordering used by the ProtonDB column's `compare` below — same tier list as protonDbValue.
+// `compareMissingLast` (new in 0.7.0 alongside `compare` itself) pins a missing rating to the
+// end of the sort regardless of ascending/descending, rather than an empty value sorting first
+// under plain ascending lexicographic comparison — games with no ProtonDB data yet shouldn't
+// float to the top just because "" sorts before every real tier name.
+const compareProtonTier = compareMissingLast((a, b) =>
+  PROTON_TIER_ORDER.indexOf(a.toLowerCase()) - PROTON_TIER_ORDER.indexOf(b.toLowerCase()));
+
+// Same colored pill as the side panel's ProtonDB badge (`.proton-badge`, shared style.css rule).
+function renderProtonBadge(v) {
+  if (v === undefined) return document.createTextNode('…');
+  if (!v) return document.createTextNode('—');
+  const span = document.createElement('span');
+  span.className = 'proton-badge';
+  span.style.background = PROTON_TIER_COLORS[v.toLowerCase()] || '#52525b';
+  span.textContent = v;
+  return span;
+}
+
 // Ignores `value` and reads `row.capsule` directly — `value` is forced to null on this column
 // (see COLUMNS below) so the raw image URL never surfaces in full-text search matches.
 function renderThumb(_, row) {
@@ -46,6 +89,19 @@ function renderThumb(_, row) {
   return img;
 }
 
+// Plain numeric comparator, wrapped so a `null` ("no data" — no reviews, no Metacritic score,
+// no HLTB match) always sorts last regardless of direction. Without this, a `type: 'number'`
+// column's own coercion (`Number(null) === 0`) makes "no data" indistinguishable from an actual
+// zero score/duration — most visibly on `steamdbRating`, the default sort column: a game with
+// zero reviews currently ties with one confirmed 0% positive instead of being set apart from it.
+const compareNumMissingLast = compareMissingLast((a, b) => a - b);
+
+// Same idea for `type: 'date'` columns (`releaseDate`, wishlist's `dateAdded`) — setting
+// `compare` bypasses the column's own `parseDate`/type coercion too, so a `null` date would
+// otherwise become epoch 1970 via `new Date(null).getTime()` and sort as impossibly old; the
+// date parsing has to happen in here instead.
+const compareDateMissingLast = compareMissingLast((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
 const COLUMNS = [
   { key: 'capsule', label: '', width: 128, sortable: false, filterable: false, groupable: false,
     value: () => null, render: renderThumb },
@@ -55,36 +111,45 @@ const COLUMNS = [
   // unrounded so sort/default-sort operate on full precision (two games both displaying "97"
   // still order deterministically); not groupable for the same reason — grouping keys off the
   // raw value, and a near-unique float per game would produce a useless one-row-per-group split.
-  { key: 'steamdbRating',    label: 'SteamDB Rating',  type: 'number', groupable: false, format: fmt.numRound, render: renderScoreNum },
+  { key: 'steamdbRating',    label: 'SteamDB Rating',  type: 'number', groupable: false, format: fmt.numRound, render: renderScoreNum, compare: compareNumMissingLast },
   // Wilson score lower bound — statistically rigorous but harder to explain than SteamDB's
   // current formula (which is why it isn't the default-visible score anymore); kept available
   // for anyone who wants the more conservative, confidence-bound number instead.
-  { key: 'score',            label: 'Wilson Score',    type: 'number', groupable: true, format: fmt.num, render: renderScoreNum },
+  { key: 'score',            label: 'Wilson Score',    type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast },
   // Raw positive/total ratio — the plain percentage Steam's own store page shows, as opposed to
   // the two adjusted scores above. No "%" in the cell (the column header already says so) —
   // same bare colored number treatment as the other three score columns for consistency.
-  { key: 'positivePct',      label: 'Steam %',         type: 'number', groupable: true, format: fmt.num, render: renderScoreNum },
+  { key: 'positivePct',      label: 'Steam %',         type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast },
   // Grouped with the other user-review scores above rather than off near HLTB/playtime — it's a
   // critic (not player) score, but it's still one of the four "how good is this game" numbers,
   // and keeping all of them contiguous makes them easier to compare at a glance.
-  { key: 'metacritic',       label: 'Metacritic Score',type: 'number', groupable: true, format: fmt.num, render: renderScoreNum },
+  { key: 'metacritic',       label: 'Metacritic Score',type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast },
+  // No compare override here — 0 reviews is a real, meaningful value (not "no data" standing in
+  // for one), so the default numeric sort already treats it correctly, unlike the score/HLTB
+  // columns above and below.
   { key: 'reviewsTotal',     label: 'Review Count',    type: 'number', groupable: true, format: fmt.ct },
   // "All PlayStyles" listed first among the HLTB columns — same convention as the side panel,
   // which shows it leftmost precisely because it's a single representative number rather than
   // one specific playstyle (see the comment on `all` in lib/hltb.js). Keeping it first here too
   // means toggling on Main/+Extra/100% doesn't push it out of its default-visible position.
-  { key: 'hltbAll',          label: 'All (h)',         type: 'number', groupable: true, format: fmt.dec1 },
-  { key: 'hltbMain',         label: 'Main (h)',        type: 'number', groupable: true, format: fmt.dec1 },
-  { key: 'hltbExtra',        label: '+Extra (h)',      type: 'number', groupable: true, format: fmt.dec1 },
-  { key: 'hltbCompletionist',label: '100% (h)',        type: 'number', groupable: true, format: fmt.dec1 },
+  { key: 'hltbAll',          label: 'All (h)',         type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast },
+  { key: 'hltbMain',         label: 'Main (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast },
+  { key: 'hltbExtra',        label: '+Extra (h)',      type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast },
+  { key: 'hltbCompletionist',label: '100% (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast },
+  // No compare override here either — 0 hours played is real data (owned, never launched), not
+  // a stand-in for "unknown," so the default numeric sort is already correct.
   { key: 'playtime',         label: 'Played (h)',      type: 'number', groupable: true,
     format: v => v > 0 ? Number(v).toFixed(1) : '—' },
-  { key: 'releaseDate',      label: 'Released',     type: 'date', groupable: true, format: fmt.str },
+  { key: 'releaseDate',      label: 'Released',     type: 'date', groupable: true, format: fmt.str, compare: compareDateMissingLast },
   { key: 'genres',           label: 'Genres',       groupable: true, format: fmt.arr },
   { key: 'developers',       label: 'Developer',    groupable: true, format: fmt.arr },
   { key: 'publishers',       label: 'Publisher',    groupable: true, format: fmt.arr },
   { key: 'tags',             label: 'Tags',         groupable: true, format: fmt.arr },
   { key: 'categories',       label: 'Categories',   groupable: true, format: fmt.arr },
+  // Linux/Steam Deck compatibility tier from ProtonDB — sorted/grouped by actual compatibility
+  // quality (see compareProtonTier above), not alphabetically; public/panel.js shows the same
+  // data as a colored badge in the side panel.
+  { key: 'protondb',         label: 'ProtonDB',     groupable: true, format: fmt.str, render: renderProtonBadge, compare: compareProtonTier },
 ];
 
 const DEFAULT_VISIBLE = [
@@ -102,7 +167,7 @@ const DEFAULT_SORT = [{ key: 'steamdbRating', dir: 'desc' }];
 const WISHLIST_COLUMNS = [
   ...COLUMNS.filter(c => c.key !== 'playtime').map(c => (c.key === 'name' ? { ...c, format: fmt.str } : c)),
   { key: 'priority',  label: 'Wishlist Rank', type: 'number', groupable: false, format: fmt.num },
-  { key: 'dateAdded', label: 'Added',         type: 'date',   groupable: true,  format: fmt.str },
+  { key: 'dateAdded', label: 'Added',         type: 'date',   groupable: true,  format: fmt.str, compare: compareDateMissingLast },
 ];
 
 const WISHLIST_DEFAULT_VISIBLE = [
@@ -440,8 +505,9 @@ function applyDetailsEvent(row, event) {
   row.publishers        = event.meta?.publishers ?? [];
   row.categories        = event.meta?.categories ?? [];
   row.tags              = event.tags ?? [];
+  row.protondb          = protonDbValue(event.protondb?.tier);
   row.loading           = false;
-  row.details           = { rating: event.rating, hltb: event.hltb, meta: event.meta, tags: event.tags };
+  row.details           = { rating: event.rating, hltb: event.hltb, meta: event.meta, tags: event.tags, protondb: event.protondb };
 }
 
 // Streams rating/hltb/meta/tags for `games` ({appid, name}[]) over SSE and applies each
@@ -565,8 +631,9 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
       publishers:         undefined,
       tags:               undefined,
       categories:         undefined,
+      protondb:           undefined,
       loading:            true,
-      details:            null, // { rating, hltb, meta, tags } — same shape the side panel expects
+      details:            null, // { rating, hltb, meta, tags, protondb } — same shape the side panel expects
     };
   });
 
@@ -645,6 +712,7 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
     publishers:         undefined,
     tags:               undefined,
     categories:         undefined,
+    protondb:           undefined,
     loading:            true,
     details:            null,
   }));

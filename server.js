@@ -11,7 +11,7 @@ const rateLimit = require('express-rate-limit');
 
 const { getCached, getCacheStats } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames } = require('./lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames, getProtonDbStatus } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 
@@ -62,10 +62,11 @@ const detailsLimit = rateLimit({
     if (isForceRefresh(req)) return false; // force-refresh always re-fetches, so it must always count
     const appid = Number(req.params.appid);
     if (!Number.isInteger(appid) || appid <= 0) return false;
-    return getCached(`rating:${appid}`) !== undefined
-        && getCached(`hltb:${appid}`)   !== undefined
-        && getCached(`meta:${appid}`)   !== undefined
-        && getCached(`tags:${appid}`)   !== undefined;
+    return getCached(`rating:${appid}`)   !== undefined
+        && getCached(`hltb:${appid}`)     !== undefined
+        && getCached(`meta:${appid}`)     !== undefined
+        && getCached(`tags:${appid}`)     !== undefined
+        && getCached(`protondb:${appid}`) !== undefined;
   },
 });
 
@@ -256,16 +257,19 @@ function fetchGameDetails(appid, { force = false } = {}) {
       hltbPromise,
       metaPromise,
       getSteamSpyTags(appid, { force }),
-    ]).then(([ratingRes, hltbRes, metaRes, tagsRes]) => {
-      if (ratingRes.status === 'rejected') console.warn('[game-details] rating:', ratingRes.reason?.message);
-      if (hltbRes.status   === 'rejected') console.warn('[game-details] hltb:',   hltbRes.reason?.message);
-      if (metaRes.status   === 'rejected') console.warn('[game-details] meta:',   metaRes.reason?.message);
-      if (tagsRes.status   === 'rejected') console.warn('[game-details] tags:',   tagsRes.reason?.message);
+      getProtonDbStatus(appid, { force }),
+    ]).then(([ratingRes, hltbRes, metaRes, tagsRes, protondbRes]) => {
+      if (ratingRes.status   === 'rejected') console.warn('[game-details] rating:',   ratingRes.reason?.message);
+      if (hltbRes.status     === 'rejected') console.warn('[game-details] hltb:',     hltbRes.reason?.message);
+      if (metaRes.status     === 'rejected') console.warn('[game-details] meta:',     metaRes.reason?.message);
+      if (tagsRes.status     === 'rejected') console.warn('[game-details] tags:',     tagsRes.reason?.message);
+      if (protondbRes.status === 'rejected') console.warn('[game-details] protondb:', protondbRes.reason?.message);
       return {
-        rating: ratingRes.status === 'fulfilled' ? ratingRes.value : null,
-        hltb:   hltbRes.status   === 'fulfilled' ? hltbRes.value   : null,
-        meta:   metaRes.status   === 'fulfilled' ? metaRes.value   : null,
-        tags:   tagsRes.status   === 'fulfilled' ? tagsRes.value   : null,
+        rating:   ratingRes.status   === 'fulfilled' ? ratingRes.value   : null,
+        hltb:     hltbRes.status     === 'fulfilled' ? hltbRes.value     : null,
+        meta:     metaRes.status     === 'fulfilled' ? metaRes.value     : null,
+        tags:     tagsRes.status     === 'fulfilled' ? tagsRes.value     : null,
+        protondb: protondbRes.status === 'fulfilled' ? protondbRes.value : null,
       };
     });
   });
@@ -328,7 +332,7 @@ app.post('/api/game-details/stream', async (req, res) => {
       const result = await fetchGameDetails(appid);
       send({ appid, ...result });
     } catch {
-      send({ appid, rating: null, hltb: null, meta: null, tags: null });
+      send({ appid, rating: null, hltb: null, meta: null, tags: null, protondb: null });
     }
   }));
 

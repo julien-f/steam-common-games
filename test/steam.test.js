@@ -9,7 +9,7 @@ process.env.DB_FILE = '';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames } = require('../lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames, getProtonDbStatus } = require('../lib/steam');
 const { _reset } = require('../lib/cache');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
@@ -550,6 +550,71 @@ test('getSteamSpyTags: throws isUpstream when fetch fails', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
   await assert.rejects(() => getSteamSpyTags(400), err => err.isUpstream === true);
+});
+
+// ── getProtonDbStatus ──────────────────────────────────────────────────────────
+
+test('getProtonDbStatus: returns tier, confidence and total', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ tier: 'gold', bestReportedTier: 'platinum', confidence: 'strong', score: 0.71, total: 2009, trendingTier: 'platinum' }),
+  }));
+
+  const result = await getProtonDbStatus(400);
+  assert.deepEqual(result, { tier: 'gold', confidence: 'strong', total: 2009 });
+});
+
+// A 404 means "ProtonDB has no reports for this appid" — not an upstream failure —
+// same treatment as getGameRating's "no reviews yet" case.
+test('getProtonDbStatus: returns null on 404 (no reports for this appid)', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 404 }));
+  const result = await getProtonDbStatus(999999999);
+  assert.equal(result, null);
+});
+
+// "pending" means too few reports for ProtonDB to confidently assign a tier — not a
+// compatibility outcome, so it carries the same actionable information as no rating at all.
+// Collapsed to null here rather than passed through, so the side panel/Library Explorer never
+// have to special-case a tier that isn't a real point on the quality scale the others represent.
+test('getProtonDbStatus: treats a "pending" tier as no rating (returns null)', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ tier: 'pending', confidence: 'low', total: 2 }),
+  }));
+  const result = await getProtonDbStatus(400);
+  assert.equal(result, null);
+});
+
+test('getProtonDbStatus: throws isUpstream for a non-404 error', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+  await assert.rejects(() => getProtonDbStatus(400), err => err.isUpstream === true);
+});
+
+test('getProtonDbStatus: caches result — second call skips fetch', async (t) => {
+  _reset();
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    calls++;
+    return { ok: true, json: async () => ({ tier: 'platinum', confidence: 'strong', total: 10 }) };
+  });
+
+  await getProtonDbStatus(400);
+  await getProtonDbStatus(400);
+  assert.equal(calls, 1);
+});
+
+test('getProtonDbStatus: caches the null result of a 404 too', async (t) => {
+  _reset();
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => { calls++; return { ok: false, status: 404 }; });
+
+  await getProtonDbStatus(400);
+  await getProtonDbStatus(400);
+  assert.equal(calls, 1);
 });
 
 // ── searchStoreGames ──────────────────────────────────────────────────────────

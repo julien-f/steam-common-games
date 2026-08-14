@@ -236,6 +236,22 @@ function setupHeroImg(hero) {
   heroEl.onerror = () => { heroEl.closest('.panel-hero-main').style.display = 'none'; };
 }
 
+// ProtonDB's community-reported Linux/Steam Deck compatibility tiers, worst to best.
+// Colors are our own (not scraped from protondb.com), just distinct + dark enough for
+// white badge text: red (unplayable) through gold/platinum (flawless) plus a green
+// "native" tier for games with an actual Linux port (no Proton layer needed at all).
+// Tier names themselves come straight from ProtonDB's API (see lib/steam.js) and are
+// already human-readable words — capitalized for display, not remapped through a label
+// table, so a new tier ProtonDB introduces still renders (just without a custom color).
+// No "pending" entry — extractProtonDb (lib/steam.js) already collapses that tier to null
+// server-side, since "too few reports to rate yet" isn't a compatibility outcome worth a
+// badge of its own; `pd` is simply absent for those games, same as one with no data at all.
+const PROTON_TIER_COLORS = {
+  borked: '#b91c1c', bronze: '#8b4513', silver: '#757575', gold: '#b8860b',
+  platinum: '#5b6b85', native: '#15803d',
+};
+const capitalize = s => s.charAt(0).toUpperCase() + s.slice(1);
+
 // Compact review-count suffix for the reviews line, e.g. 465234 -> "465k", 2100000 -> "2.1m".
 function fmtCompactCount(n) {
   if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}m`;
@@ -306,6 +322,24 @@ function renderPanelBody(game) {
     </div>`;
   }
 
+  const pd = g.details?.protondb;
+  let protonHtml = '';
+  if (g.loading) {
+    protonHtml = `<div class="panel-section">
+      <div class="panel-section-title">Linux / Steam Deck</div>
+      <span class="sk" style="width:80px;height:24px;border-radius:12px"></span>
+    </div>`;
+  } else if (pd?.tier) {
+    const color = PROTON_TIER_COLORS[pd.tier] || '#52525b';
+    protonHtml = `<div class="panel-section">
+      <div class="panel-section-title"><a href="${esc(protondbUrl)}" target="_blank" rel="noopener">Linux / Steam Deck ↗</a></div>
+      <div class="panel-score-row panel-score-row--proton">
+        <span class="proton-badge" style="background:${color}">${esc(capitalize(pd.tier))}</span>
+        <div class="panel-score-desc">${pd.confidence ? `${esc(pd.confidence)} confidence` : ''}${pd.total ? `${pd.confidence ? ' · ' : ''}${fmtCompactCount(pd.total)} reports` : ''}</div>
+      </div>
+    </div>`;
+  }
+
   let hltbHtml = '';
   let hltbSearchUrl = '';
   if (g.loading) {
@@ -367,6 +401,7 @@ function renderPanelBody(game) {
     ${releaseDate ? `<div class="panel-release">${esc(releaseDate)}</div>` : ''}
     ${description ? `<div class="panel-desc">${description}</div>` : ''}
     ${scoreHtml}
+    ${protonHtml}
     ${hltbHtml}
     ${ownersHtml}
     ${metaHtml}
