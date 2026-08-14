@@ -259,11 +259,14 @@ function fetchGameDetails(appid, { force = false } = {}) {
       getSteamSpyTags(appid, { force }),
       getProtonDbStatus(appid, { force }),
     ]).then(([ratingRes, hltbRes, metaRes, tagsRes, protondbRes]) => {
-      if (ratingRes.status   === 'rejected') console.warn('[game-details] rating:',   ratingRes.reason?.message);
-      if (hltbRes.status     === 'rejected') console.warn('[game-details] hltb:',     hltbRes.reason?.message);
-      if (metaRes.status     === 'rejected') console.warn('[game-details] meta:',     metaRes.reason?.message);
-      if (tagsRes.status     === 'rejected') console.warn('[game-details] tags:',     tagsRes.reason?.message);
-      if (protondbRes.status === 'rejected') console.warn('[game-details] protondb:', protondbRes.reason?.message);
+      // appid is included on every line — fetchGameDetails runs once per appid, often many in
+      // parallel via the SSE stream endpoint, so without it there's no way to tell a one-game
+      // failure apart from every game in a batch failing the same way (e.g. an upstream block).
+      if (ratingRes.status   === 'rejected') console.warn(`[game-details] rating (appid ${appid}):`,   ratingRes.reason?.message);
+      if (hltbRes.status     === 'rejected') console.warn(`[game-details] hltb (appid ${appid}):`,     hltbRes.reason?.message);
+      if (metaRes.status     === 'rejected') console.warn(`[game-details] meta (appid ${appid}):`,     metaRes.reason?.message);
+      if (tagsRes.status     === 'rejected') console.warn(`[game-details] tags (appid ${appid}):`,     tagsRes.reason?.message);
+      if (protondbRes.status === 'rejected') console.warn(`[game-details] protondb (appid ${appid}):`, protondbRes.reason?.message);
       return {
         rating:   ratingRes.status   === 'fulfilled' ? ratingRes.value   : null,
         hltb:     hltbRes.status     === 'fulfilled' ? hltbRes.value     : null,

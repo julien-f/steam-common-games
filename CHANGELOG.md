@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- The `[game-details]` upstream-failure warnings logged by `fetchGameDetails` (`server.js`) now include the appid — with several games fetched in parallel via `/api/game-details/stream`, a bare `ProtonDB error 403` gave no way to tell a single game's failure apart from every game in the batch failing the same way. The ProtonDB error message itself also now carries the appid plus a short response-body snippet, since that endpoint is called with no headers at all (unlike HLTB's spoofed UA/Referer) and a 403 there is as likely to be a blanket bot-block as a per-game issue.
+
 ### Fixed
 
 - An unreleased game with an announced release date (e.g. "Oct 14, 2026") no longer shows a blank Released date in the wishlist/side panel. `getAppDetails` (`lib/steam.js`) was nulling out the date whenever Steam's `coming_soon` flag was true, conflating "not out yet" with "no known date" — it now always passes through whatever date string Steam provides.
