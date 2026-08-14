@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-14
+
 ### Added
 
 - "Look up any game" search box on both pages (new shared `public/gameSearch.js`, new `GET /api/search-games` wrapping Steam's undocumented store search endpoint): type a name to pick from a dropdown of matches, or paste a bare appid/store URL directly, and preview it in the existing side panel — score, HLTB, tags, screenshots, links — regardless of whether anyone in the current search owns or has wishlisted it. `GET /api/game-details/:appid` already had no ownership check, so this only needed a way to turn a typed name into an appid. On the Library Explorer, the `?game=<appid>` deep link (see below) now also falls back to fetching an unmatched appid directly instead of silently doing nothing, including with no player loaded at all — the panel shows a placeholder title until the fetch resolves the real one (see "Changed" below for why the name isn't carried in the URL).
