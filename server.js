@@ -262,11 +262,16 @@ function fetchGameDetails(appid, { force = false } = {}) {
       // appid is included on every line — fetchGameDetails runs once per appid, often many in
       // parallel via the SSE stream endpoint, so without it there's no way to tell a one-game
       // failure apart from every game in a batch failing the same way (e.g. an upstream block).
-      if (ratingRes.status   === 'rejected') console.warn(`[game-details] rating (appid ${appid}):`,   ratingRes.reason?.message);
-      if (hltbRes.status     === 'rejected') console.warn(`[game-details] hltb (appid ${appid}):`,     hltbRes.reason?.message);
-      if (metaRes.status     === 'rejected') console.warn(`[game-details] meta (appid ${appid}):`,     metaRes.reason?.message);
-      if (tagsRes.status     === 'rejected') console.warn(`[game-details] tags (appid ${appid}):`,     tagsRes.reason?.message);
-      if (protondbRes.status === 'rejected') console.warn(`[game-details] protondb (appid ${appid}):`, protondbRes.reason?.message);
+      // logErr also appends `.cause` when present: Node's fetch throws a generic "fetch failed"
+      // TypeError for any network-level failure (DNS, connection reset, timeout, ...) and buries
+      // the actual reason in `.cause` — without it every such failure looks identical and gives
+      // no signal about what actually went wrong.
+      const logErr = (label, err) => console.warn(`[game-details] ${label} (appid ${appid}):`, err?.message, err?.cause ?? '');
+      if (ratingRes.status   === 'rejected') logErr('rating',   ratingRes.reason);
+      if (hltbRes.status     === 'rejected') logErr('hltb',     hltbRes.reason);
+      if (metaRes.status     === 'rejected') logErr('meta',     metaRes.reason);
+      if (tagsRes.status     === 'rejected') logErr('tags',     tagsRes.reason);
+      if (protondbRes.status === 'rejected') logErr('protondb', protondbRes.reason);
       return {
         rating:   ratingRes.status   === 'fulfilled' ? ratingRes.value   : null,
         hltb:     hltbRes.status     === 'fulfilled' ? hltbRes.value     : null,
