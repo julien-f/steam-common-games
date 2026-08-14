@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- An unreleased game with an announced release date (e.g. "Oct 14, 2026") no longer shows a blank Released date in the wishlist/side panel. `getAppDetails` (`lib/steam.js`) was nulling out the date whenever Steam's `coming_soon` flag was true, conflating "not out yet" with "no known date" — it now always passes through whatever date string Steam provides.
+- Library Explorer: sorting/filtering by Released no longer misorders games with a coarse or fuzzy date ("2026", "Fall 2026", "Q4 2026", "2026 or later") — `new Date()` anchors those at the *start* of the period it can parse (e.g. "2026" → Jan 1), which could sort a still-unreleased game before ones that already shipped earlier that same year. A new `endOfReleasePeriod` helper anchors coarse dates at the *end* of their stated period instead (the latest point consistent with what Steam told us — genuinely unparseable placeholders like "Coming soon" still sort last), and is now wired into both the Released column's sort `compare` and its `parseDate` (so the date filter tree/range picker agree with the sort order too, which they didn't before since `parseDate` wasn't set at all).
+
 ## [0.3.0] - 2026-08-14
 
 ### Added

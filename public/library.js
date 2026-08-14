@@ -96,11 +96,45 @@ function renderThumb(_, row) {
 // zero reviews currently ties with one confirmed 0% positive instead of being set apart from it.
 const compareNumMissingLast = compareMissingLast((a, b) => a - b);
 
+// Steam's release_date.date only gets this coarse ("2026", "Fall 2026", "2026 or later") while
+// a game is still unreleased — once it ships, Steam always returns a specific day. JS's own Date
+// parser anchors whatever it can partially recognize at the START of that period ("2026" -> Jan 1,
+// "October 2026" -> Oct 1), which would sort a still-unreleased game BEFORE games that already
+// shipped earlier that same year/month — backwards, since the real date can only land later.
+// Anchor coarse dates at the END of their stated period instead (the latest point consistent with
+// what Steam told us); a fully-specified date (or wishlist's `dateAdded`, always a precise
+// timestamp) matches none of these patterns and falls through to plain `new Date()` unchanged.
+const SEASON_END = { spring: [5, 20], summer: [8, 21], fall: [11, 20], autumn: [11, 20], winter: [2, 19] };
+function endOfReleasePeriod(str) {
+  const s = String(str).trim();
+  let m;
+  if ((m = /^(spring|summer|fall|autumn|winter)\s+(\d{4})$/i.exec(s))) {
+    const [month, day] = SEASON_END[m[1].toLowerCase()];
+    const year = m[1].toLowerCase() === 'winter' ? Number(m[2]) + 1 : Number(m[2]); // winter spills into next year
+    return new Date(year, month, day).getTime();
+  }
+  if ((m = /^Q([1-4])\s+(\d{4})$/i.exec(s))) {
+    return new Date(Number(m[2]), Number(m[1]) * 3, 0).getTime(); // last day of the quarter's final month
+  }
+  if ((m = /^(\d{4})(?:\s+or\s+later)?$/i.exec(s))) {
+    return new Date(Number(m[1]), 11, 31).getTime(); // bare year, or open-ended "2026 or later" — end of that year either way
+  }
+  if (/^[A-Za-z]+\s+\d{4}$/.test(s)) {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth() + 1, 0).getTime(); // month name + year, no day — last day of that month
+  }
+  return new Date(s).getTime();
+}
+
 // Same idea for `type: 'date'` columns (`releaseDate`, wishlist's `dateAdded`) — setting
 // `compare` bypasses the column's own `parseDate`/type coercion too, so a `null` date would
-// otherwise become epoch 1970 via `new Date(null).getTime()` and sort as impossibly old; the
-// date parsing has to happen in here instead.
-const compareDateMissingLast = compareMissingLast((a, b) => new Date(a).getTime() - new Date(b).getTime());
+// otherwise become epoch 1970 via `new Date(null).getTime()` and sort as impossibly old, and a
+// genuinely unparseable placeholder ("Coming soon", "Q4 2026" without a resolvable quarter) would
+// sort at a nondeterministic spot via NaN comparisons — both need to be pinned last instead.
+const compareDateMissingLast = compareMissingLast(
+  (a, b) => endOfReleasePeriod(a) - endOfReleasePeriod(b),
+  v => v == null || v === '' || isNaN(endOfReleasePeriod(v)),
+);
 
 const COLUMNS = [
   { key: 'capsule', label: '', width: 128, sortable: false, filterable: false, groupable: false,
@@ -140,7 +174,8 @@ const COLUMNS = [
   // a stand-in for "unknown," so the default numeric sort is already correct.
   { key: 'playtime',         label: 'Played (h)',      type: 'number', groupable: true,
     format: v => v > 0 ? Number(v).toFixed(1) : '—' },
-  { key: 'releaseDate',      label: 'Released',     type: 'date', groupable: true, format: fmt.str, compare: compareDateMissingLast },
+  { key: 'releaseDate',      label: 'Released',     type: 'date', groupable: true, format: fmt.str,
+    parseDate: endOfReleasePeriod, compare: compareDateMissingLast },
   { key: 'genres',           label: 'Genres',       groupable: true, format: fmt.arr },
   { key: 'developers',       label: 'Developer',    groupable: true, format: fmt.arr },
   { key: 'publishers',       label: 'Publisher',    groupable: true, format: fmt.arr },
