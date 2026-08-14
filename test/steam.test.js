@@ -419,7 +419,7 @@ test('getAppDetails: returns genres, categories, developers and publishers', asy
 test('getAppDetails: handles missing optional fields with empty arrays', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
-  assert.deepEqual(await getAppDetails(400), { name: null, genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, metacritic: null, capsule: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg', banner: 'https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg', movies: [], screenshots: [] });
+  assert.deepEqual(await getAppDetails(400), { name: null, genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, comingSoon: false, metacritic: null, capsule: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg', banner: 'https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg', movies: [], screenshots: [] });
 });
 
 test('getAppDetails: extracts name field', async (t) => {
@@ -437,6 +437,16 @@ test('getAppDetails: uses capsule_imagev5 when present', async (t) => {
   }));
   const result = await getAppDetails(400);
   assert.equal(result.capsule, 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_231x87.jpg');
+});
+
+test('getAppDetails: comingSoon reflects release_date.coming_soon', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {
+    release_date: { coming_soon: true, date: 'Oct 14, 2026' },
+  }));
+  const result = await getAppDetails(400);
+  assert.equal(result.comingSoon, true);
+  assert.equal(result.releaseDate, 'Oct 14, 2026');
 });
 
 test('getAppDetails: falls back to capsule_image when capsule_imagev5 is absent', async (t) => {

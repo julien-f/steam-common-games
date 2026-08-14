@@ -104,10 +104,28 @@ const compareNumMissingLast = compareMissingLast((a, b) => a - b);
 // Anchor coarse dates at the END of their stated period instead (the latest point consistent with
 // what Steam told us); a fully-specified date (or wishlist's `dateAdded`, always a precise
 // timestamp) matches none of these patterns and falls through to plain `new Date()` unchanged.
+//
+// A bare year and Q4 of that same year both anchor at Dec 31 — same timestamp, so without a
+// tie-break they wouldn't sort in any defined order relative to each other. "2026" carries less
+// information than "Q4 2026" (it could still land in Q1-Q3), so nudge it 1ms later: a vaguer claim
+// for the same end-of-period ranks just after a more specific one, without disturbing its order
+// against any other, actually-different, day.
+//
+// Steam also uses two placeholders with no date in them at all: "Coming soon" (some info — it's
+// presumably nearer than a distant bare year) and "To be announced"/"TBA" (no info whatsoever).
+// Both need to sort after every real or coarse date — including a far-future bare year like
+// "2028" — while still preserving Coming soon < TBA between themselves. Sentinel timestamps
+// anchored past any realistic release year do that; they're deliberately not NaN (unlike a
+// genuinely unrecognized string) so they get a real, deterministic position instead of falling
+// into the null/empty "missing" bucket handled by compareDateMissingLast below.
 const SEASON_END = { spring: [5, 20], summer: [8, 21], fall: [11, 20], autumn: [11, 20], winter: [2, 19] };
+const COMING_SOON_SENTINEL = new Date(9999, 0, 1).getTime();
+const TBA_SENTINEL         = new Date(9999, 0, 2).getTime();
 function endOfReleasePeriod(str) {
   const s = String(str).trim();
   let m;
+  if (/^coming soon$/i.test(s)) return COMING_SOON_SENTINEL;
+  if (/^(to be announced|tba)$/i.test(s)) return TBA_SENTINEL;
   if ((m = /^(spring|summer|fall|autumn|winter)\s+(\d{4})$/i.exec(s))) {
     const [month, day] = SEASON_END[m[1].toLowerCase()];
     const year = m[1].toLowerCase() === 'winter' ? Number(m[2]) + 1 : Number(m[2]); // winter spills into next year
@@ -117,7 +135,7 @@ function endOfReleasePeriod(str) {
     return new Date(Number(m[2]), Number(m[1]) * 3, 0).getTime(); // last day of the quarter's final month
   }
   if ((m = /^(\d{4})(?:\s+or\s+later)?$/i.exec(s))) {
-    return new Date(Number(m[1]), 11, 31).getTime(); // bare year, or open-ended "2026 or later" — end of that year either way
+    return new Date(Number(m[1]), 11, 31).getTime() + 1; // bare year, or open-ended "2026 or later" — end of that year, nudged 1ms past a same-year Q4 tie
   }
   if (/^[A-Za-z]+\s+\d{4}$/.test(s)) {
     const d = new Date(s);
@@ -129,12 +147,29 @@ function endOfReleasePeriod(str) {
 // Same idea for `type: 'date'` columns (`releaseDate`, wishlist's `dateAdded`) — setting
 // `compare` bypasses the column's own `parseDate`/type coercion too, so a `null` date would
 // otherwise become epoch 1970 via `new Date(null).getTime()` and sort as impossibly old, and a
-// genuinely unparseable placeholder ("Coming soon", "Q4 2026" without a resolvable quarter) would
-// sort at a nondeterministic spot via NaN comparisons — both need to be pinned last instead.
+// string `endOfReleasePeriod` genuinely can't make sense of (not one of the recognized coarse
+// forms, and not a valid date either) would sort at a nondeterministic spot via NaN comparisons —
+// both need to be pinned last instead. "Coming soon" and "To be announced" are NOT examples of
+// that anymore — endOfReleasePeriod gives them real sentinel positions (see above) so they sort
+// deterministically after every dated/coarse entry instead of landing in this bucket.
 const compareDateMissingLast = compareMissingLast(
   (a, b) => endOfReleasePeriod(a) - endOfReleasePeriod(b),
   v => v == null || v === '' || isNaN(endOfReleasePeriod(v)),
 );
+
+// Amber-flags still-unreleased games in the Released column — reuses scoreColor's own
+// mid-tier amber (`#e4a82e`) rather than introducing a new color, so it reads as "notable,
+// not final" the same way a middling score does elsewhere in the table. Backed by Steam's own
+// `comingSoon` flag (see extractAppDetails in lib/steam.js), not by comparing the parsed date
+// to today — a coarse placeholder like "Coming soon" has no parseable date to compare at all.
+function renderReleaseDate(v, row) {
+  if (v === undefined) return document.createTextNode('…');
+  if (!v) return document.createTextNode('—');
+  const span = document.createElement('span');
+  if (row.comingSoon) span.style.color = '#e4a82e';
+  span.textContent = v;
+  return span;
+}
 
 const COLUMNS = [
   { key: 'capsule', label: '', width: 128, sortable: false, filterable: false, groupable: false,
@@ -175,7 +210,7 @@ const COLUMNS = [
   { key: 'playtime',         label: 'Played (h)',      type: 'number', groupable: true,
     format: v => v > 0 ? Number(v).toFixed(1) : '—' },
   { key: 'releaseDate',      label: 'Released',     type: 'date', groupable: true, format: fmt.str,
-    parseDate: endOfReleasePeriod, compare: compareDateMissingLast },
+    parseDate: endOfReleasePeriod, compare: compareDateMissingLast, render: renderReleaseDate },
   { key: 'genres',           label: 'Genres',       groupable: true, format: fmt.arr },
   { key: 'developers',       label: 'Developer',    groupable: true, format: fmt.arr },
   { key: 'publishers',       label: 'Publisher',    groupable: true, format: fmt.arr },
@@ -535,6 +570,7 @@ function applyDetailsEvent(row, event) {
   row.hltbAll           = event.hltb?.all            ?? null;
   row.metacritic        = event.meta?.metacritic?.score ?? null;
   row.releaseDate       = event.meta?.releaseDate    ?? null;
+  row.comingSoon        = event.meta?.comingSoon     ?? false;
   row.genres            = event.meta?.genres     ?? [];
   row.developers        = event.meta?.developers ?? [];
   row.publishers        = event.meta?.publishers ?? [];
