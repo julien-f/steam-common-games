@@ -184,14 +184,29 @@ function buildPanelHero() {
   hero.innerHTML = `
     ${renderHeroMain(items)}
     ${hasMany ? `
-      <div class="panel-filmstrip">${items.map((item, i) =>
-        `<button type="button" class="panel-film-item${i === heroIdx ? ' active' : ''}${item.type === 'video' ? ' is-video' : ''}" data-idx="${i}" aria-label="${i === 0 ? esc(panelGame.name) : (item.type === 'video' ? `Video ${i}` : `Screenshot ${i}`)}">` +
-        `<img class="panel-film-thumb" src="${esc(item.thumb)}" alt="" loading="lazy">` +
-        `</button>`
-      ).join('')}</div>
+      <div class="panel-filmstrip">${items.map((item, i) => {
+        // Screenshots have a separate full-res `main` behind the small `thumb` — if the
+        // thumbnail variant 404s (a stale/broken CDN asset upstream), retrying with the
+        // full-res image gives the filmstrip a second shot before giving up. Videos have
+        // no such fallback (there's no full-res still behind the poster), so a broken
+        // video thumb goes straight to the broken-image state below.
+        const fallback = item.type === 'image' && item.main !== item.thumb ? item.main : '';
+        return `<button type="button" class="panel-film-item${i === heroIdx ? ' active' : ''}${item.type === 'video' ? ' is-video' : ''}" data-idx="${i}" aria-label="${i === 0 ? esc(panelGame.name) : (item.type === 'video' ? `Video ${i}` : `Screenshot ${i}`)}">` +
+        `<img class="panel-film-thumb" src="${esc(item.thumb)}" data-fallback="${esc(fallback)}" alt="" loading="lazy">` +
+        `</button>`;
+      }).join('')}</div>
     ` : ''}`;
 
   setupHeroImg(hero);
+  // `error` doesn't bubble, so this needs the capture phase; delegated (rather than one
+  // listener per <img>) since the whole filmstrip is rebuilt fresh here each time.
+  hero.querySelector('.panel-filmstrip')?.addEventListener('error', (e) => {
+    const img = e.target;
+    if (!img.classList?.contains('panel-film-thumb')) return;
+    const fallback = img.dataset.fallback;
+    if (fallback && img.src !== fallback) { img.src = fallback; return; }
+    img.classList.add('panel-film-thumb--broken');
+  }, true);
   hero.querySelector('.panel-film-item.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
 }
 
@@ -228,12 +243,16 @@ function renderHeroMain(items) {
 }
 
 function setupHeroImg(hero) {
-  const main = hero.querySelector('.panel-hero-main');
-  if (main) main.style.display = '';
   const heroEl = hero.querySelector('.panel-hero-img');
+  heroEl.classList.remove('panel-hero-img--broken');
   heroEl.classList.add('loading');
   heroEl.onload  = () => heroEl.classList.remove('loading');
-  heroEl.onerror = () => { heroEl.closest('.panel-hero-main').style.display = 'none'; };
+  // A broken image (banner guess 404ing, or — as with a video's poster — a genuinely dead
+  // upstream Steam CDN asset) used to hide the whole `.panel-hero-main`, which also wiped
+  // out the prev/next nav and, for videos, the play-button overlay and click target —
+  // even though the video itself (or the full-res screenshot behind a broken thumb) still
+  // plays/loads fine. Just mark the image broken and leave the rest of the hero working.
+  heroEl.onerror = () => { heroEl.classList.remove('loading'); heroEl.classList.add('panel-hero-img--broken'); };
 }
 
 // ProtonDB's community-reported Linux/Steam Deck compatibility tiers, worst to best.

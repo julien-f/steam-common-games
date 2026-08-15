@@ -650,6 +650,10 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   background-size: 600px 100%;
   animation: shimmer 1.4s linear infinite;
 }
+/* A dead upstream image (broken banner guess, broken video poster, …) — keep the hero's
+   footprint and background instead of collapsing it, so the play button/nav/click target
+   for whatever still works (the video, the full-res shot) stay usable. */
+.panel-hero-img--broken { background: var(--bg3); }
 .panel-hero-btn {
   position: absolute;
   top: 50%;
@@ -732,6 +736,7 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 }
 .panel-film-item:hover .panel-film-thumb { opacity: 0.8; }
 .panel-film-item.active .panel-film-thumb { opacity: 1; border-color: var(--accent); }
+.panel-film-thumb--broken { background: var(--bg3); }
 
 /* Sticky to the bottom of the panel on both desktop and mobile now (previously sat
    between the hero and the body, which meant reaching it on desktop required
