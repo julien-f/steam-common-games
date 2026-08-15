@@ -266,7 +266,7 @@ const WISHLIST_COLUMNS = [
 ];
 
 const WISHLIST_DEFAULT_VISIBLE = [
-  'capsule', 'name', 'priority', 'dateAdded', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres',
+  'capsule', 'name', 'dateAdded', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres',
 ];
 
 const playerInput   = document.getElementById('player-input');
