@@ -11,7 +11,7 @@ const rateLimit = require('express-rate-limit');
 
 const { getCached, getCacheStats } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames, getProtonDbStatus } = require('./lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 
@@ -22,6 +22,7 @@ const TRUST_PROXY = process.env.TRUST_PROXY;
 const SEARCH_RATE_LIMIT_MAX = Number(process.env.SEARCH_RATE_LIMIT_MAX);
 const DETAILS_RATE_LIMIT_MAX = Number(process.env.DETAILS_RATE_LIMIT_MAX);
 const GAME_SEARCH_RATE_LIMIT_MAX = Number(process.env.GAME_SEARCH_RATE_LIMIT_MAX);
+const ACHIEVEMENTS_RATE_LIMIT_MAX = Number(process.env.ACHIEVEMENTS_RATE_LIMIT_MAX);
 
 // Rate limiting is bypassed under NODE_ENV=test so the suite isn't throttled,
 // unless a test opts in with RATE_LIMIT_ENABLED=true to exercise the limiter.
@@ -88,6 +89,30 @@ const gameSearchLimit = rateLimit({
     const term = normalizeSearchTerm(req.query.q);
     if (term.length < 2) return true; // no upstream call happens below this length
     return getCached(`search:${term}`) !== undefined;
+  },
+});
+
+const STEAM64_RE = /^7656119\d{10}$/;
+
+// Schema is per-appid (one call regardless of how many accounts are loaded); player progress
+// is per (steamid, appid) — skip only once every one of those is already cached, same
+// "cache hits don't count" rule as detailsLimit above. Unresolved (non-Steam64, e.g. vanity
+// name) ids can't be cache-checked without resolving them first, so they always count.
+const achievementsLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: ACHIEVEMENTS_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please wait a minute and try again.' },
+  skip: (req) => {
+    if (rateLimitBypassed()) return true;
+    if (isForceRefresh(req)) return false;
+    const appid = Number(req.params.appid);
+    if (!Number.isInteger(appid) || appid <= 0) return false;
+    if (getCached(`schema:${appid}`) === undefined) return false;
+    const ids = (req.query.steamids || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (!ids.length) return false;
+    return ids.every(id => STEAM64_RE.test(id) && getCached(`playerach:${id}:${appid}`) !== undefined);
   },
 });
 
@@ -310,6 +335,71 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
     return res.status(400).json({ error: 'Invalid appid' });
   }
   res.json(await fetchGameDetails(appid, { force: isForceRefresh(req) }));
+});
+
+// Backs the Library Explorer side panel's "Achievements" section — schema (names/icons,
+// shared regardless of who's asking) plus per-account unlock state for every account
+// currently loaded (`steamids`, comma-separated; raw identifiers, resolved here same as
+// everywhere else — never trusted as already-Steam64 even though the client always does
+// send resolved ids in practice). Accounts within a slot are unioned the same way
+// /api/common-games unions owned games: an achievement counts as unlocked for the group if
+// any member has it, keeping the earliest unlock time among those that do.
+app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
+  const appid = Number(req.params.appid);
+  if (!Number.isInteger(appid) || appid <= 0) {
+    return res.status(400).json({ error: 'Invalid appid' });
+  }
+  const rawIds = (req.query.steamids || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (rawIds.length < 1) {
+    return res.status(400).json({ error: 'Provide at least 1 player' });
+  }
+  if (rawIds.length > MAX_USERS) {
+    return res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
+  }
+
+  const force = isForceRefresh(req);
+  try {
+    const steamIds = [...new Set(await Promise.all(rawIds.map(resolveSteamId)))];
+    const [schema, ...perPlayer] = await Promise.all([
+      getGameSchema(appid, { force }),
+      ...steamIds.map(id => getPlayerAchievements(id, appid, { force })),
+    ]);
+
+    if (!schema || schema.length === 0) {
+      return res.json({ achievements: [], total: 0, unlocked: 0, private: false });
+    }
+
+    // null means "no data for this account" (private profile, or never touched this game's
+    // stats) — distinguished here from "resolved, but genuinely 0 achieved" so the frontend
+    // can tell "nobody has unlocked anything (yet)" apart from "can't tell, profile's private".
+    const anyPlayerData = perPlayer.some(p => p !== null);
+    const unlockedAt = new Map(); // apiname -> earliest unlocktime across members who have it
+    for (const list of perPlayer) {
+      if (!list) continue;
+      for (const a of list) {
+        if (!a.achieved) continue;
+        const prev = unlockedAt.get(a.apiname);
+        if (prev === undefined || (a.unlocktime && a.unlocktime < prev)) unlockedAt.set(a.apiname, a.unlocktime || 0);
+      }
+    }
+
+    const achievements = schema.map(a => ({
+      ...a,
+      achieved: unlockedAt.has(a.apiname),
+      unlocktime: unlockedAt.get(a.apiname) ?? null,
+    }));
+
+    res.json({
+      achievements,
+      total: achievements.length,
+      unlocked: unlockedAt.size,
+      private: !anyPlayerData,
+    });
+  } catch (err) {
+    if (err.isUpstream || err.name === 'TimeoutError') console.error('[upstream]', err.message);
+    const status = err.isUpstream ? 502 : err.name === 'TimeoutError' ? 504 : 400;
+    res.status(status).json({ error: err.message });
+  }
 });
 
 app.post('/api/game-details/stream', async (req, res) => {

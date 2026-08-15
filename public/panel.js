@@ -82,6 +82,11 @@ function initPanel(options = {}) {
   });
   panelBodyEl.addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.closest('.panel-hero-img')) { e.preventDefault(); openLightbox(panelGame, heroIdx); }
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.panel-achievement--spoiler')) {
+      e.preventDefault();
+      const el = e.target.closest('.panel-achievement--spoiler');
+      revealAchievement(Number(el.dataset.appid), el.dataset.apiname);
+    }
   });
   panelBodyEl.addEventListener('wheel', e => {
     const strip = e.target.closest('.panel-filmstrip');
@@ -92,6 +97,10 @@ function initPanel(options = {}) {
 
   document.getElementById('game-panel').addEventListener('click', e => {
     if (e.target.closest('.panel-refresh-btn')) { handlePanelRefresh(); return; }
+    const toggleBtn = e.target.closest('.panel-achievements-chip');
+    if (toggleBtn) { toggleAchievementsExpanded(Number(toggleBtn.dataset.appid)); return; }
+    const hiddenAch = e.target.closest('.panel-achievement--spoiler');
+    if (hiddenAch) { revealAchievement(Number(hiddenAch.dataset.appid), hiddenAch.dataset.apiname); return; }
     const btn = e.target.closest('.panel-tag-btn');
     if (!btn || !panelOptions.onTagClick) return;
     panelOptions.onTagClick(btn.dataset.dim, btn.dataset.val);
@@ -397,6 +406,106 @@ function glanceGrid(g) {
   return `<div class="panel-glance">${chips.join('')}</div>`;
 }
 
+// Which games' achievement lists are expanded (collapsed by default — a 40-100 item list
+// would otherwise dominate the panel for every game that has one) and which individual
+// hidden achievements have been click-revealed. Keyed by appid / `${appid}:${apiname}` so
+// re-opening the same game later in the same session remembers the choice; never cleared
+// (a couple of numbers/strings per game touched is negligible, and a page reload resets it
+// anyway). Module-level like heroIdx/randomQueues above — this is UI state, not game data.
+const expandedAchievements = new Set();
+const revealedAchievements = new Set();
+
+function toggleAchievementsExpanded(appid) {
+  if (expandedAchievements.has(appid)) expandedAchievements.delete(appid);
+  else expandedAchievements.add(appid);
+  if (panelGame) renderPanelBody(panelGame);
+}
+
+function revealAchievement(appid, apiname) {
+  revealedAchievements.add(`${appid}:${apiname}`);
+  if (panelGame) renderPanelBody(panelGame);
+}
+
+// Achievements section — opt-in via panelOptions.showAchievements (only the Library
+// Explorer sets it; the comparison page's groups have no single well-defined "player" to
+// fetch progress for). `g.achievements` is loaded and attached by the host page itself
+// (library.js), asynchronously and separately from the rating/HLTB/tags SSE stream, since
+// it depends on which account(s) are currently loaded rather than just the appid — `g`
+// carries `achievementsLoading` while that fetch is in flight, then either `achievements`
+// (the server's `{ achievements, total, unlocked, private, steamUrl }` shape) or nothing at
+// all (no player loaded yet).
+function achievementsHtml(g) {
+  if (!panelOptions.showAchievements) return '';
+  if (g.achievementsLoading) {
+    return `<div class="panel-section">
+      <div class="panel-section-title">Achievements</div>
+      <div class="panel-achievements"><span class="sk" style="width:100%;height:48px;border-radius:6px"></span></div>
+    </div>`;
+  }
+  const data = g.achievements;
+  if (!data) return '';
+  if (!data.total) {
+    return `<div class="panel-section">
+      <div class="panel-section-title">Achievements</div>
+      <div class="panel-no-data">This game has no achievements.</div>
+    </div>`;
+  }
+  const pct = Math.round((data.unlocked / data.total) * 100);
+  const expanded = expandedAchievements.has(g.appid);
+
+  // Rows, not individual cards — one divider between rows instead of a border around each,
+  // so the list reads as one thing inside the card rather than boxes stacked inside a box.
+  const listHtml = !expanded ? '' : `<div class="panel-achievements-list">
+    ${data.private ? `<div class="panel-no-data">Progress unavailable — profile may be private.</div>` : ''}
+    ${data.achievements
+      .slice()
+      .sort((a, b) => Number(b.achieved) - Number(a.achieved))
+      .map(a => {
+        // A hidden achievement not yet unlocked keeps its name/description a surprise by
+        // default, same as Steam's own profile pages — the schema still carries the real
+        // text either way (whether it's still a spoiler depends on which account(s) are
+        // loaded, not on the shared/cached schema), this just withholds it client-side
+        // until clicked, rather than never sending it at all.
+        const revealed = revealedAchievements.has(`${g.appid}:${a.apiname}`);
+        const spoiler = a.hidden && !a.achieved && !revealed;
+        const name = spoiler ? 'Hidden achievement' : (a.name || a.apiname);
+        const desc = spoiler ? 'Click to reveal' : (a.description || '');
+        const icon = a.achieved ? a.icon : (a.icongray || a.icon);
+        // Unlock date is real data the server already returns (`unlocktime`, seconds since
+        // epoch) but otherwise has nowhere to show — surfaced as a plain hover tooltip
+        // rather than a fifth line of on-card text. fmtLastPlayed (utils.js) is the same
+        // plain-date formatter the Last Played column uses.
+        const title = a.achieved && a.unlocktime ? `Unlocked ${fmtLastPlayed(a.unlocktime)}` : '';
+        return `<div class="panel-achievement-row${a.achieved ? ' unlocked' : ''}${spoiler ? ' panel-achievement--spoiler' : ''}"${title ? ` title="${esc(title)}"` : ''}${spoiler ? ` data-appid="${g.appid}" data-apiname="${esc(a.apiname)}" role="button" tabindex="0"` : ''}>
+          <img class="panel-achievement-icon" src="${esc(icon)}" alt="" loading="lazy">
+          <div class="panel-achievement-text">
+            <div class="panel-achievement-name">${esc(name)}</div>
+            ${desc ? `<div class="panel-achievement-desc">${esc(desc)}</div>` : ''}
+          </div>
+        </div>`;
+      }).join('')}
+  </div>`;
+
+  // One outer card (border/radius/background) holds both the header and the list, rather
+  // than a chip floating above a separate stack of boxes — a single grouped unit instead of
+  // two visually disconnected pieces. The header keeps the glance-grid chip look (bold
+  // color-coded percentage via scoreColor) as its clickable expand/collapse control; the
+  // list, when expanded, sits below a divider rather than a gap.
+  return `<div class="panel-section">
+    <div class="panel-achievements-card">
+      <div class="panel-achievements-card-header">
+        <button type="button" class="panel-achievements-chip" data-appid="${g.appid}" aria-expanded="${expanded}">
+          <span class="panel-glance-num" style="color:${scoreColor(pct)}">${pct}%</span>
+          <span class="panel-glance-val"><b>Achievements</b> · ${data.unlocked} / ${data.total} unlocked</span>
+          <span class="panel-achievements-chevron">${expanded ? '▾' : '▸'}</span>
+        </button>
+        ${data.steamUrl ? `<a class="panel-icon-link" href="${esc(data.steamUrl)}" target="_blank" rel="noopener" title="View on Steam" aria-label="View achievements on Steam">↗</a>` : ''}
+      </div>
+      ${listHtml}
+    </div>
+  </div>`;
+}
+
 function renderPanelBody(game) {
   const g = game;
   const h = g.details?.hltb;
@@ -466,6 +575,7 @@ function renderPanelBody(game) {
     ${glanceGrid(g)}
     ${description ? `<div class="panel-desc">${description}</div>` : ''}
     ${hltbDetailHtml}
+    ${achievementsHtml(g)}
     ${ownersHtml}
     ${cloudHtml}`;
 

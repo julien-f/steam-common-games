@@ -325,6 +325,18 @@ let flushTimer    = null;
 let activeColumns = COLUMNS;   // COLUMNS or WISHLIST_COLUMNS, whichever tab is active
 let activeTab     = 'library'; // 'library' | 'wishlist'
 let currentPlayerStr = '';     // last player string actually loaded (not just typed)
+// Steam64 ids of every account currently loaded (one flat group — see accountsBar.js's
+// comment on why the Library Explorer only ever has one), used to fetch per-game
+// achievement progress for the side panel. Achievements aren't tied to a specific tab —
+// wishlisted/standalone-looked-up games can still report progress — only to a player
+// actually being loaded, so this is shared by both loadLibrary and loadWishlist.
+let currentSteamIds = [];
+// appid → the achievements API's response, cached client-side per (appid, loaded accounts)
+// so reopening the same game's panel doesn't refetch. Cleared whenever the loaded
+// player(s) change (resetTableState) since a stale entry there would show the wrong
+// account's progress.
+const achievementsCache = new Map();
+const achievementsCacheKey = appid => `${appid}:${currentSteamIds.slice().sort().join(',')}`;
 
 // Separate shuffle history per tab, so picking randomly in one doesn't affect the other.
 const randomQueueKey = () => activeTab;
@@ -332,6 +344,7 @@ const viewParamName  = () => (activeTab === 'wishlist' ? 'wview' : 'view');
 
 initPanel({
   inertSelector: '.lib-page',
+  showAchievements: true,
   onRefresh: async (row) => {
     try {
       const res = await fetch(`/api/game-details/${row.appid}?refresh=1`);
@@ -339,6 +352,7 @@ initPanel({
       if (!res.ok) throw new Error(data.error || 'Refresh failed');
       applyDetailsEvent(row, data);
       if (table) table.setData(visibleRows());
+      if (currentSteamIds.length) await loadAchievements(row, { force: true });
     } catch (err) {
       statusEl.textContent = `Refresh failed: ${err.message}`;
     }
@@ -426,6 +440,49 @@ function openGame(game, { isRandom = false } = {}) {
   panelOpen(game);
   renderPanelNav(game);
   setPanelParam(game.appid);
+  loadAchievements(game);
+}
+
+// Fetches this game's achievement schema + unlock state for whichever account(s) are
+// currently loaded, and re-renders the panel body as it goes (loading, then loaded) if
+// the panel is still open on this same game by the time each stage settles — the panel
+// may have moved on to a different game mid-fetch (fast prev/next/random navigation).
+async function loadAchievements(game, { force = false } = {}) {
+  if (!currentSteamIds.length) { game.achievements = null; return; }
+
+  const key = achievementsCacheKey(game.appid);
+  if (!force) {
+    const cached = achievementsCache.get(key);
+    if (cached) {
+      game.achievements = cached;
+      if (isPanelOpen() && getPanelGame() === game) renderPanelBody(game);
+      return;
+    }
+  }
+
+  game.achievementsLoading = true;
+  if (isPanelOpen() && getPanelGame() === game) renderPanelBody(game);
+
+  try {
+    const qs = new URLSearchParams({ steamids: currentSteamIds.join(',') });
+    if (force) qs.set('refresh', '1');
+    const res = await fetch(`/api/achievements/${game.appid}?${qs}`);
+    const data = await res.json();
+    if (res.ok) {
+      // Links out to this specific account's own Steam achievements page — the server has
+      // no single "the" account to link to when a slot merges a Steam Family, so this picks
+      // whichever account loaded first, same "first-seen wins" convention used elsewhere
+      // (e.g. the owned-games union) rather than trying to represent every member at once.
+      data.steamUrl = `https://steamcommunity.com/profiles/${currentSteamIds[0]}/stats/${game.appid}/achievements/`;
+      achievementsCache.set(key, data);
+    }
+    game.achievements = res.ok ? data : null;
+  } catch {
+    game.achievements = null;
+  } finally {
+    game.achievementsLoading = false;
+    if (isPanelOpen() && getPanelGame() === game) renderPanelBody(game);
+  }
 }
 
 function pickRandomGame() {
@@ -718,6 +775,8 @@ function resetTableState() {
   resetViewBtn.hidden = true;
   accountsBarEl.hidden = true;
   accountsBarEl.innerHTML = '';
+  currentSteamIds = [];
+  achievementsCache.clear();
 }
 
 async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, restoreShot = null } = {}) {
@@ -760,6 +819,7 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
   // above has actually resolved it — see the comment on the `game`/`shot` clearing above.
   const idStr = slotSteamIds.join(',');
   updateUrlParams({ u: idStr });
+  currentSteamIds = slotSteamIds;
   renderAccountsBar(result.slots[0], 'games');
   addRecent(RECENTS_KEY, idStr, [result.slots[0]], idStr);
   renderRecentsBar(recentsBarEl, RECENTS_KEY);
@@ -852,6 +912,7 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
   // comment in loadLibrary above.
   const idStr = result.players.map(p => p.steamid).join(',');
   updateUrlParams({ u: idStr });
+  currentSteamIds = result.players.map(p => p.steamid);
   renderAccountsBar(result.players, 'wishlisted');
   addRecent(RECENTS_KEY, idStr, [result.players], idStr);
   renderRecentsBar(recentsBarEl, RECENTS_KEY);

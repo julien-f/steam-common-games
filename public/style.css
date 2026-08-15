@@ -968,6 +968,47 @@ a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var
 .panel-hltb-label { font-size: 11px; color: var(--text2); margin-bottom: 3px; }
 .panel-hltb-val { font-size: 20px; font-weight: 600; color: var(--text0); }
 
+/* One card (border/radius/background) holds both the header and the list — a single
+   grouped unit instead of a chip floating above a separate stack of boxes. The header
+   still uses the glance grid's chip template (panel-glance-num/-val) for its bold
+   color-coded percentage, but as a plain full-width control (no border/background of its
+   own — the card supplies both) rather than a second nested chip. */
+.panel-achievements-card {
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--bg0);
+  overflow: hidden; /* clips the list's rows to the card's rounded corners */
+}
+.panel-achievements-card-header { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
+.panel-achievements-chip {
+  flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0;
+  background: none; border: none; padding: 0; margin: 0;
+  font: inherit; text-align: left; cursor: pointer;
+}
+.panel-achievements-chip:hover .panel-achievements-chevron,
+.panel-achievements-chip:focus-visible .panel-achievements-chevron { color: var(--accent2); outline: none; }
+.panel-achievements-chip .panel-glance-val { flex: 1; }
+.panel-achievements-chevron { color: var(--text2); font-size: 12px; flex-shrink: 0; transition: color 0.15s; }
+
+/* Rows divided by a line between them, not individually bordered/boxed — reads as one
+   list inside the card rather than boxes stacked inside a box. */
+.panel-achievements-list { border-top: 1px solid var(--border); }
+.panel-achievements-list .panel-no-data { padding: 8px 10px; }
+.panel-achievement-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  opacity: 0.55; /* locked, by default */
+}
+.panel-achievement-row + .panel-achievement-row { border-top: 1px solid var(--border); }
+.panel-achievement-row.unlocked { opacity: 1; }
+.panel-achievement-row.panel-achievement--spoiler { cursor: pointer; }
+.panel-achievement-row.panel-achievement--spoiler:hover { background: rgba(255, 255, 255, 0.04); }
+.panel-achievement-row.panel-achievement--spoiler .panel-achievement-desc { font-style: italic; }
+.panel-achievement-icon { width: 32px; height: 32px; border-radius: 4px; flex-shrink: 0; }
+.panel-achievement-text { min-width: 0; }
+.panel-achievement-name { font-size: 12px; font-weight: 600; color: var(--text0); }
+.panel-achievement-desc { font-size: 11px; color: var(--text2); margin-top: 1px; }
+
 .panel-tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .panel-tag {
   background: rgba(61,80,104,0.5);

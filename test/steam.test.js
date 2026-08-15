@@ -9,7 +9,7 @@ process.env.DB_FILE = '';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames, getProtonDbStatus } = require('../lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements } = require('../lib/steam');
 const { _reset } = require('../lib/cache');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
@@ -679,5 +679,93 @@ test('searchStoreGames: throws isUpstream when fetch fails', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
   await assert.rejects(() => searchStoreGames('portal'), err => err.isUpstream === true);
+});
+
+// ── getGameSchema ─────────────────────────────────────────────────────────────
+
+test('getGameSchema: extracts achievement fields', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({
+      game: { availableGameStats: { achievements: [
+        { name: 'ACH_WIN', displayName: 'Winner', description: 'Win a match', icon: 'a.jpg', icongray: 'a_gray.jpg', hidden: 0 },
+      ] } },
+    }),
+  }));
+  const result = await getGameSchema(400);
+  assert.deepEqual(result, [{ apiname: 'ACH_WIN', name: 'Winner', description: 'Win a match', icon: 'a.jpg', icongray: 'a_gray.jpg', hidden: false }]);
+});
+
+test('getGameSchema: returns empty array when game has no achievements', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({ game: {} }) }));
+  assert.deepEqual(await getGameSchema(400), []);
+});
+
+test('getGameSchema: caches result — second call skips fetch', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({ game: {} }) }));
+  await getGameSchema(400);
+  await getGameSchema(400);
+  assert.equal(fetchMock.mock.callCount(), 1);
+});
+
+test('getGameSchema: throws isUpstream when fetch fails', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+  await assert.rejects(() => getGameSchema(400), err => err.isUpstream === true);
+});
+
+// ── getPlayerAchievements ─────────────────────────────────────────────────────
+
+test('getPlayerAchievements: extracts achieved state and unlocktime', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ playerstats: { success: true, achievements: [
+      { apiname: 'ACH_WIN', achieved: 1, unlocktime: 1700000000 },
+      { apiname: 'ACH_LOSE', achieved: 0, unlocktime: 0 },
+    ] } }),
+  }));
+  const result = await getPlayerAchievements('7656119123456789', 400);
+  assert.deepEqual(result, [
+    { apiname: 'ACH_WIN', achieved: true, unlocktime: 1700000000 },
+    { apiname: 'ACH_LOSE', achieved: false, unlocktime: 0 },
+  ]);
+});
+
+test('getPlayerAchievements: returns null (not throw) on 400 — game has no stats', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 400 }));
+  assert.equal(await getPlayerAchievements('7656119123456789', 400), null);
+});
+
+test('getPlayerAchievements: returns null (not throw) on 403 — private profile', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
+  assert.equal(await getPlayerAchievements('7656119123456789', 400), null);
+});
+
+test('getPlayerAchievements: returns null when success is false', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({ playerstats: { success: false } }) }));
+  assert.equal(await getPlayerAchievements('7656119123456789', 400), null);
+});
+
+test('getPlayerAchievements: throws isUpstream for a non-400/403 error', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+  await assert.rejects(() => getPlayerAchievements('7656119123456789', 400), err => err.isUpstream === true);
+});
+
+test('getPlayerAchievements: caches result — second call skips fetch', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true, json: async () => ({ playerstats: { success: true, achievements: [] } }),
+  }));
+  await getPlayerAchievements('7656119123456789', 400);
+  await getPlayerAchievements('7656119123456789', 400);
+  assert.equal(fetchMock.mock.callCount(), 1);
 });
 
