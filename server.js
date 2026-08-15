@@ -11,7 +11,7 @@ const rateLimit = require('express-rate-limit');
 
 const { getCached, getCacheStats } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements } = require('./lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 
@@ -110,6 +110,7 @@ const achievementsLimit = rateLimit({
     const appid = Number(req.params.appid);
     if (!Number.isInteger(appid) || appid <= 0) return false;
     if (getCached(`schema:${appid}`) === undefined) return false;
+    if (getCached(`achrarity:${appid}`) === undefined) return false;
     const ids = (req.query.steamids || '').split(',').map(s => s.trim()).filter(Boolean);
     if (!ids.length) return false;
     return ids.every(id => STEAM64_RE.test(id) && getCached(`playerach:${id}:${appid}`) !== undefined);
@@ -360,8 +361,13 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
   const force = isForceRefresh(req);
   try {
     const steamIds = [...new Set(await Promise.all(rawIds.map(resolveSteamId)))];
-    const [schema, ...perPlayer] = await Promise.all([
+    const [schema, rarity, ...perPlayer] = await Promise.all([
       getGameSchema(appid, { force }),
+      // Rarity is a nice-to-have annotation, not core progress data — a transient upstream
+      // failure here shouldn't take down the whole achievements panel the way a genuine
+      // schema/player-achievements failure does, so it degrades to "no rarity data" instead
+      // of rejecting the whole Promise.all.
+      getGlobalAchievementPercentages(appid, { force }).catch(() => null),
       ...steamIds.map(id => getPlayerAchievements(id, appid, { force })),
     ]);
 
@@ -387,6 +393,10 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
       ...a,
       achieved: unlockedAt.has(a.apiname),
       unlocktime: unlockedAt.get(a.apiname) ?? null,
+      // Community-wide unlock % (rarity) — absent rather than 0 when Steam has no rarity
+      // data at all for this apiname, so the frontend can tell "genuinely unrated" apart
+      // from "rounds to 0%".
+      globalPct: rarity?.[a.apiname] ?? null,
     }));
 
     res.json({

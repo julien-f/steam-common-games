@@ -1005,9 +1005,15 @@ a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var
 .panel-achievement-row.panel-achievement--spoiler:hover { background: rgba(255, 255, 255, 0.04); }
 .panel-achievement-row.panel-achievement--spoiler .panel-achievement-desc { font-style: italic; }
 .panel-achievement-icon { width: 32px; height: 32px; border-radius: 4px; flex-shrink: 0; }
-.panel-achievement-text { min-width: 0; }
+.panel-achievement-text { flex: 1; min-width: 0; }
 .panel-achievement-name { font-size: 12px; font-weight: 600; color: var(--text0); }
 .panel-achievement-desc { font-size: 11px; color: var(--text2); margin-top: 1px; }
+/* Rarity (community-wide unlock %) — kept neutral/muted, not color-coded like the ratings
+   elsewhere in the panel, since a low % isn't a "bad" value the way a low score is. */
+.panel-achievement-rarity {
+  font-size: 11px; color: var(--text2); font-variant-numeric: tabular-nums;
+  flex-shrink: 0; margin-left: 8px;
+}
 
 .panel-tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .panel-tag {

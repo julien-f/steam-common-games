@@ -415,6 +415,13 @@ function glanceGrid(g) {
 const expandedAchievements = new Set();
 const revealedAchievements = new Set();
 
+// Steam's own percent strings already carry a decimal (e.g. "80.9"), but round numbers
+// parse to a plain integer (100 from "100.0") — toFixed(1) on those would print "100.0%",
+// so only force the decimal when the value isn't already a whole number.
+function fmtRarity(pct) {
+  return `${Number.isInteger(pct) ? pct : pct.toFixed(1)}%`;
+}
+
 function toggleAchievementsExpanded(appid) {
   if (expandedAchievements.has(appid)) expandedAchievements.delete(appid);
   else expandedAchievements.add(appid);
@@ -476,12 +483,19 @@ function achievementsHtml(g) {
         // rather than a fifth line of on-card text. fmtLastPlayed (utils.js) is the same
         // plain-date formatter the Last Played column uses.
         const title = a.achieved && a.unlocktime ? `Unlocked ${fmtLastPlayed(a.unlocktime)}` : '';
+        // Rarity isn't a spoiler — it's shown even for a still-hidden achievement, same as
+        // Steam's own profile pages (knowing "2% of players have this" doesn't give away
+        // what it actually is). Fixed to 1 decimal only when it's not a whole number, so
+        // "80.9%" and "100%" both read naturally instead of "100.0%".
+        const rarityLabel = a.globalPct == null ? null : fmtRarity(a.globalPct);
+        const rarityHtml = rarityLabel == null ? '' : `<div class="panel-achievement-rarity" title="${esc(rarityLabel)} of players have unlocked this">${esc(rarityLabel)}</div>`;
         return `<div class="panel-achievement-row${a.achieved ? ' unlocked' : ''}${spoiler ? ' panel-achievement--spoiler' : ''}"${title ? ` title="${esc(title)}"` : ''}${spoiler ? ` data-appid="${g.appid}" data-apiname="${esc(a.apiname)}" role="button" tabindex="0"` : ''}>
           <img class="panel-achievement-icon" src="${esc(icon)}" alt="" loading="lazy">
           <div class="panel-achievement-text">
             <div class="panel-achievement-name">${esc(name)}</div>
             ${desc ? `<div class="panel-achievement-desc">${esc(desc)}</div>` : ''}
           </div>
+          ${rarityHtml}
         </div>`;
       }).join('')}
   </div>`;

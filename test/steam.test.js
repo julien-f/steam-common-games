@@ -9,7 +9,7 @@ process.env.DB_FILE = '';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements } = require('../lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages } = require('../lib/steam');
 const { _reset } = require('../lib/cache');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
@@ -766,6 +766,43 @@ test('getPlayerAchievements: caches result — second call skips fetch', async (
   }));
   await getPlayerAchievements('7656119123456789', 400);
   await getPlayerAchievements('7656119123456789', 400);
+  assert.equal(fetchMock.mock.callCount(), 1);
+});
+
+// ── getGlobalAchievementPercentages ──────────────────────────────────────────
+
+test('getGlobalAchievementPercentages: maps apiname to percent as a number', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ achievementpercentages: { achievements: [
+      { name: 'PORTAL_GET_PORTALGUNS', percent: '80.9' },
+      { name: 'PORTAL_LONGJUMP', percent: '14.1' },
+    ] } }),
+  }));
+  const result = await getGlobalAchievementPercentages(400);
+  assert.deepEqual(result, { PORTAL_GET_PORTALGUNS: 80.9, PORTAL_LONGJUMP: 14.1 });
+});
+
+test('getGlobalAchievementPercentages: returns null (not throw) on 403 — no stats or unknown appid', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
+  assert.equal(await getGlobalAchievementPercentages(400), null);
+});
+
+test('getGlobalAchievementPercentages: throws isUpstream for a non-403 error', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+  await assert.rejects(() => getGlobalAchievementPercentages(400), err => err.isUpstream === true);
+});
+
+test('getGlobalAchievementPercentages: caches result — second call skips fetch', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true, json: async () => ({ achievementpercentages: { achievements: [] } }),
+  }));
+  await getGlobalAchievementPercentages(400);
+  await getGlobalAchievementPercentages(400);
   assert.equal(fetchMock.mock.callCount(), 1);
 });
 
