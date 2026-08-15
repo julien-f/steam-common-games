@@ -640,6 +640,18 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   aspect-ratio: 460 / 215;
   overflow: hidden;
 }
+/* The hero's height otherwise scales purely off panel width via the aspect-ratio above —
+   fine in portrait, where width is the panel's scarce dimension, but on landscape mobile
+   (or any other short viewport) width is plentiful and height is scarce instead: a
+   full-width panel there produces a hero tall enough to dominate the whole viewport
+   before any real content, including the sticky title bar, comes into view. Keyed on
+   height rather than width/orientation so it also catches a landscape phone whose width
+   happens to be wide enough to already dodge the max-width:768px mobile rule. `max-height`
+   simply overrides the aspect-ratio's computed height; `object-fit: cover` on the image
+   itself means it crops tighter rather than distorting. */
+@media (max-height: 500px) {
+  .panel-hero-main { max-height: 30vh; }
+}
 .panel-hero-img {
   width: 100%;
   height: 100%;
