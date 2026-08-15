@@ -317,13 +317,6 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
     sortDir = restoreSort.dir;
   }
 
-  if (pushState) {
-    const params = new URLSearchParams();
-    normalizedSlots(inputSlots).forEach(slot => params.append('u', slot.join(',')));
-    params.set('sort', (sortDir < 0 ? '-' : '') + sortCol);
-    history.pushState(null, '', `?${params}`);
-  }
-
   const thisRun = ++runId;
   // preserveUrl: this may be a refresh/restore of the same search rather than a brand new
   // one (pushState: false) — restorePanelFromUrl() below re-reads `?game=`/`&shot=` from
@@ -366,6 +359,22 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
     playtime = data.playtime || {};
     lastPlayed = data.lastPlayed || {};
 
+    // Written from the server-resolved `steamid`s, not the raw typed/normalized input — a
+    // vanity name (or an account whose vanity name changes later) always canonicalizes to the
+    // same shareable URL and recent-search entry, rather than one keyed on whatever string
+    // happened to be typed this time. Deliberately deferred until the fetch actually resolves
+    // them, rather than optimistically written with the typed input before the round-trip —
+    // simpler (one write, not a write-then-correct pair), at the cost of the URL/recents not
+    // reflecting a search that's still in flight or that failed outright.
+    const idSlots = normalizedSlots(slots.map(group => group.map(p => p.steamid)));
+
+    if (pushState) {
+      const params = new URLSearchParams();
+      idSlots.forEach(slot => params.append('u', slot.join(',')));
+      params.set('sort', (sortDir < 0 ? '-' : '') + sortCol);
+      history.pushState(null, '', `?${params}`);
+    }
+
     renderPage();
     // One labelled, boxed cluster of chips per slot (see the .slot-accounts border in
     // style.css) — "Player N" is only useful once there's more than one slot to tell apart
@@ -380,8 +389,7 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
       if (players.length > 1) parts.push(`${players.length} accounts merged`);
       return { label: parts.length ? parts.join(' · ') : null, players };
     }), 'games');
-    const normalized = normalizedSlots(inputSlots);
-    addRecent(RECENTS_KEY, normalized.map(s => s.join(',')).join('|'), slots, normalized);
+    addRecent(RECENTS_KEY, idSlots.map(s => s.join(',')).join('|'), slots, idSlots);
     renderRecentsBar(document.getElementById('recents-bar'), RECENTS_KEY);
     restorePanelFromUrl(restoreShot);
     await loadAllDetails(thisRun);

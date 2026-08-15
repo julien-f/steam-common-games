@@ -695,8 +695,10 @@ function resetTableState() {
 async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, restoreShot = null } = {}) {
   // A genuine new load drops any `game`/`shot` left in the URL from a previous player/tab —
   // it may not even exist in the new list. The initial page-load path (bottom of this file)
-  // passes preserveGameParam so it can restore the deep link once the new data is in.
-  updateUrlParams(preserveGameParam ? { u: playerStr } : { u: playerStr, game: null, shot: null });
+  // passes preserveGameParam so it can restore the deep link once the new data is in. This
+  // doesn't need to wait on the fetch below — unlike the `u` param (see further down), it's
+  // not derived from anything the server resolves.
+  if (!preserveGameParam) updateUrlParams({ game: null, shot: null });
   currentPlayerStr = playerStr;
 
   const members = playerStr.split(',').map(s => normalizeInput(s.trim())).filter(Boolean);
@@ -724,8 +726,14 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
 
   const allGames = result.groups.flatMap(g => g.games);
   const slotSteamIds = result.slots[0].map(p => p.steamid);
+  // Written from the server-resolved `steamid`s, not the raw typed input — a vanity name (or
+  // an account whose vanity name changes later) always canonicalizes to the same shareable
+  // URL and recent-search entry. `u` is deliberately not written until here, once the fetch
+  // above has actually resolved it — see the comment on the `game`/`shot` clearing above.
+  const idStr = slotSteamIds.join(',');
+  updateUrlParams({ u: idStr });
   renderAccountsBar(result.slots[0], 'games');
-  addRecent(RECENTS_KEY, playerStr, [result.slots[0]], playerStr);
+  addRecent(RECENTS_KEY, idStr, [result.slots[0]], idStr);
   renderRecentsBar(recentsBarEl, RECENTS_KEY);
 
   rows = allGames.map(game => {
@@ -784,7 +792,9 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
 }
 
 async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, restoreShot = null } = {}) {
-  updateUrlParams(preserveGameParam ? { u: playerStr } : { u: playerStr, game: null, shot: null });
+  // See the matching comment in loadLibrary above — game/shot clearing doesn't need the
+  // fetch below, but the `u` param does (it's written further down from resolved steamids).
+  if (!preserveGameParam) updateUrlParams({ game: null, shot: null });
   currentPlayerStr = playerStr;
 
   const members = playerStr.split(',').map(s => normalizeInput(s.trim())).filter(Boolean);
@@ -810,8 +820,12 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
     return;
   }
 
+  // Written from the server-resolved `steamid`s, not the raw typed input — see the matching
+  // comment in loadLibrary above.
+  const idStr = result.players.map(p => p.steamid).join(',');
+  updateUrlParams({ u: idStr });
   renderAccountsBar(result.players, 'wishlisted');
-  addRecent(RECENTS_KEY, playerStr, [result.players], playerStr);
+  addRecent(RECENTS_KEY, idStr, [result.players], idStr);
   renderRecentsBar(recentsBarEl, RECENTS_KEY);
 
   rows = result.items.map(item => ({
