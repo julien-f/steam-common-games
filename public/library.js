@@ -232,6 +232,13 @@ const COLUMNS = [
   // anyone in the slot", not any one account in particular). '' (never played by anyone in the
   // slot) is real data, not missing data, so no compare override is needed beyond the shared
   // date comparator below, which already pins an empty string last.
+  // Hidden by default (see DEFAULT_VISIBLE) — Steam's GetOwnedGames only returns real
+  // rtime_last_played data for the account whose own key is querying it; every other account
+  // comes back with it absent, indistinguishable from "owned but never launched". Most searches
+  // here involve at least one non-key-owner account, so a visible-by-default column would read
+  // as meaningful data when it's often just an API restriction. updateLastPlayedTooltip() below
+  // adds a header tooltip warning specifically when every loaded row shows no value at all —
+  // the tell for "this whole column is unavailable", not "nobody's touched their library".
   { key: 'lastPlayed',       label: 'Last Played',   type: 'date', groupable: true, format: fmt.str,
     compare: compareDateMissingLast },
   { key: 'releaseDate',      label: 'Released',     type: 'date', groupable: true, format: fmt.str,
@@ -248,7 +255,7 @@ const COLUMNS = [
 ];
 
 const DEFAULT_VISIBLE = [
-  'capsule', 'name', 'steamdbRating', 'hltbAll', 'playtime', 'lastPlayed', 'releaseDate', 'genres',
+  'capsule', 'name', 'steamdbRating', 'hltbAll', 'playtime', 'releaseDate', 'genres',
 ];
 
 // Applied via setViewState() after table creation and after "Reset view" — there's no
@@ -532,8 +539,24 @@ function scheduleFlush() {
   flushTimer = setTimeout(() => {
     flushTimer = null;
     if (table) table.setData(visibleRows());
+    updateLastPlayedTooltip();
     updateStatus();
   }, 150);
+}
+
+// See the `lastPlayed` column comment in COLUMNS above — 0/absent `rtime_last_played` for a
+// non-key-owner account is indistinguishable from "never played", so a column that's entirely
+// empty for the currently loaded rows is a much stronger signal of "Steam withheld this data"
+// than of "this player has never launched a single game". Only the library tab has this column
+// (see WISHLIST_COLUMNS) — the selector simply finds nothing on the wishlist tab, a harmless no-op.
+function updateLastPlayedTooltip() {
+  const th = tableContainer.querySelector('th[data-col-key="lastPlayed"]');
+  if (!th) return;
+  const loadedRows = visibleRows();
+  const allMissing = loadedRows.length > 0 && loadedRows.every(r => !r.lastPlayed);
+  th.title = allMissing
+    ? 'No Last Played data for any game here — Steam\'s API only reports this for the account whose own key is being used, so this is likely unavailable rather than "never played".'
+    : '';
 }
 
 function updateStatus() {
@@ -653,6 +676,7 @@ async function streamGameDetails(games) {
 
   if (flushTimer !== null) { clearTimeout(flushTimer); flushTimer = null; }
   if (table) table.setData(visibleRows());
+  updateLastPlayedTooltip();
   updateStatus();
 }
 

@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - Library Explorer: the Wishlist tab's "Wishlist Rank" column is now hidden by default (still available via the column picker) — Steam's wishlist ordering isn't something most users track or find meaningful at a glance.
+- Library Explorer: the "Last Played" column is now hidden by default too (still available via the column picker). Steam's `GetOwnedGames` only returns real `rtime_last_played` data for the account whose own API key is querying it — every other account comes back with it silently absent, indistinguishable from "owned but never launched." Most searches here involve at least one non-key-owner account, so showing it by default risked reading as real data when it's often just an unavailable field. The column header now also gets a tooltip warning specifically when every currently loaded game shows no value at all — the actual tell that the whole column is unavailable for this account, rather than that nobody's touched their library.
 
 ### Fixed
 
