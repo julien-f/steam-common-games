@@ -457,7 +457,7 @@ function initPanelSwipe() {
   let startX = 0, startY = 0, tracking = false, decided = false, horiz = false;
 
   panel.addEventListener('touchstart', e => {
-    if (e.touches.length !== 1) return;
+    if (e.touches.length !== 1 || e.target.closest('.panel-filmstrip')) return;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     tracking = true;

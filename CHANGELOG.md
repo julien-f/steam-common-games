@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Side panel: on touch devices, dragging right over the hero filmstrip to scroll it toward earlier thumbnails no longer gets hijacked by the swipe-to-close gesture. `initPanelSwipe` (`public/panel.js`) tracked touches starting anywhere in the panel and `preventDefault()`'d any rightward horizontal drag to animate the close, which blocked the filmstrip's own native scroll for that same direction; it now excludes touches starting on `.panel-filmstrip`, matching the exclusion `initHeroSwipe` already had for its own hero-image-stepping swipe.
 - ProtonDB requests (`getProtonDbStatus`, `lib/steam.js`) had no concurrency limiter, unlike Steam's store fetches or SteamSpy — a library/comparison load fetching details for dozens of games at once fired that many unthrottled connections at `protondb.com` simultaneously, which surfaced as bursts of network-level `fetch failed` errors (connection resets/DNS contention) across most or all of the games in the batch. Now capped at 3 concurrent requests, same as SteamSpy.
 
 - An unreleased game with an announced release date (e.g. "Oct 14, 2026") no longer shows a blank Released date in the wishlist/side panel. `getAppDetails` (`lib/steam.js`) was nulling out the date whenever Steam's `coming_soon` flag was true, conflating "not out yet" with "no known date" — it now always passes through whatever date string Steam provides.
