@@ -347,19 +347,34 @@ function glanceGrid(g) {
   const steamdbUrl = `https://www.steamdb.info/app/${g.appid}/`;
   const protondbUrl = `https://www.protondb.com/app/${g.appid}`;
 
+  if (!g.details) return '';
+
+  // Every chip stays in the grid even when its source has no data for this game —
+  // a missing SteamDB rating or ProtonDB tier is itself informative, and a chip that
+  // vanishes instead makes the 2×2 grid reflow into a lopsided 3-chip layout. Each
+  // still links out where a useful destination exists, same as the HLTB search fallback.
   const chips = [];
   if (r) {
     const pct = r.total ? Math.round(r.positive / r.total * 100) : 0;
     const steamdbRating = Math.round(computeSteamdbRating(r.positive, r.total));
     chips.push(glanceChip(steamdbUrl, steamdbRating, scoreColor(steamdbRating), `<b>SteamDB</b> · ${pct}% of ${fmtCompactCount(r.total)}`));
+  } else {
+    chips.push(glanceChip(steamdbUrl, '—', null, `<b>SteamDB</b> · no rating`));
   }
   if (mc) {
     chips.push(glanceChip(mc.url, mc.score, scoreColor(mc.score), `<b>Metacritic</b> · critic score`));
+  } else {
+    chips.push(glanceChip(null, '—', null, `<b>Metacritic</b> · no score`));
   }
-  if (h?.all) {
-    const hltbUrl = h.id ? `https://howlongtobeat.com/game/${h.id}` : null;
-    chips.push(glanceChip(hltbUrl, `${h.all}h`, null, `<b>HLTB</b> · all playstyles`));
-  } else if (g.details) {
+  if (h?.id) {
+    // A matched HLTB entry can still have no submitted completion times (all: null,
+    // e.g. a very new/obscure game) — that's a real page with no data, not a failed
+    // search, so it still links straight to the page rather than a generic search.
+    const hltbUrl = `https://howlongtobeat.com/game/${h.id}`;
+    chips.push(h.all
+      ? glanceChip(hltbUrl, `${h.all}h`, null, `<b>HLTB</b> · all playstyles`)
+      : glanceChip(hltbUrl, '—', null, `<b>HLTB</b> · no data`));
+  } else {
     chips.push(glanceChip(`https://howlongtobeat.com/?q=${encodeURIComponent(g.name)}`, '—', null, `<b>HLTB</b> · search`));
   }
   if (pd?.tier) {
@@ -368,8 +383,10 @@ function glanceGrid(g) {
     // truncates rather than wraps, and "strong · 336" already reads fine without them.
     const detail = [pd.confidence, pd.total ? fmtCompactCount(pd.total) : ''].filter(Boolean).join(' · ');
     chips.push(glanceChip(protondbUrl, capitalize(pd.tier), color, `<b>Linux/Deck</b>${detail ? ' · ' + detail : ''}`));
+  } else {
+    chips.push(glanceChip(protondbUrl, '—', null, `<b>Linux/Deck</b> · no reports`));
   }
-  return chips.length ? `<div class="panel-glance">${chips.join('')}</div>` : '';
+  return `<div class="panel-glance">${chips.join('')}</div>`;
 }
 
 function renderPanelBody(game) {
