@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Library Explorer: a new "Last Played" column showing the most recent time anyone in the loaded slot launched each game, sourced from `rtime_last_played` on Steam's `GetOwnedGames` response (already fetched for every game, just unused until now — no new upstream call). For a merged Steam Family slot this is the max across every account in the slot, not any one account's own timestamp. Shown as a plain date (e.g. "2026-07-01"), same convention as the Released/Added columns; blank means owned but never launched by anyone in the slot, and the column is dropped entirely from the Wishlist tab (wishlist games aren't owned, so there's nothing to have played). The comparison page's side panel "Owned by" tags gained the same per-account info (`· last played 2026-07-01`) next to existing playtime.
 - Library Explorer: the Released column now colors an unreleased game's date/placeholder amber (reusing `scoreColor`'s existing mid-tier amber), so scanning the wishlist for what's still coming makes released vs. unreleased visible at a glance instead of requiring a close read of each date string. Backed by a new `comingSoon` field on `extractAppDetails` (`lib/steam.js`) carrying Steam's own `coming_soon` flag through to the client, rather than re-deriving release status by parsing the (sometimes unparseable, e.g. "Coming soon") date string.
 
 ### Changed

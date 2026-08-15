@@ -209,6 +209,13 @@ const COLUMNS = [
   // a stand-in for "unknown," so the default numeric sort is already correct.
   { key: 'playtime',         label: 'Played (h)',      type: 'number', groupable: true,
     format: v => v > 0 ? Number(v).toFixed(1) : '—' },
+  // Most recent `rtime_last_played` across every account merged into this row (a Steam Family
+  // slot unions several accounts — see groupByOwnership — so "last played" here means "by
+  // anyone in the slot", not any one account in particular). '' (never played by anyone in the
+  // slot) is real data, not missing data, so no compare override is needed beyond the shared
+  // date comparator below, which already pins an empty string last.
+  { key: 'lastPlayed',       label: 'Last Played',   type: 'date', groupable: true, format: fmt.str,
+    compare: compareDateMissingLast },
   { key: 'releaseDate',      label: 'Released',     type: 'date', groupable: true, format: fmt.str,
     parseDate: endOfReleasePeriod, compare: compareDateMissingLast, render: renderReleaseDate },
   { key: 'genres',           label: 'Genres',       groupable: true, format: fmt.arr },
@@ -223,19 +230,19 @@ const COLUMNS = [
 ];
 
 const DEFAULT_VISIBLE = [
-  'capsule', 'name', 'steamdbRating', 'hltbAll', 'playtime', 'releaseDate', 'genres',
+  'capsule', 'name', 'steamdbRating', 'hltbAll', 'playtime', 'lastPlayed', 'releaseDate', 'genres',
 ];
 
 // Applied via setViewState() after table creation and after "Reset view" — there's no
 // construction-time default-sort option, only defaultVisibleColumns (see README).
 const DEFAULT_SORT = [{ key: 'steamdbRating', dir: 'desc' }];
 
-// Same as COLUMNS minus playtime (wishlist games aren't owned, so there's no
-// playtime to show), plus two wishlist-specific columns. Unlike owned games —
-// whose name is known upfront from Steam's library API — a wishlist row's name
+// Same as COLUMNS minus playtime and lastPlayed (wishlist games aren't owned, so there's no
+// playtime or last-played data to show), plus two wishlist-specific columns. Unlike owned
+// games — whose name is known upfront from Steam's library API — a wishlist row's name
 // only arrives once its store metadata streams in, so it needs a loading state.
 const WISHLIST_COLUMNS = [
-  ...COLUMNS.filter(c => c.key !== 'playtime').map(c => (c.key === 'name' ? { ...c, format: fmt.str } : c)),
+  ...COLUMNS.filter(c => c.key !== 'playtime' && c.key !== 'lastPlayed').map(c => (c.key === 'name' ? { ...c, format: fmt.str } : c)),
   { key: 'priority',  label: 'Wishlist Rank', type: 'number', groupable: false, format: fmt.num },
   { key: 'dateAdded', label: 'Added',         type: 'date',   groupable: true,  format: fmt.str, compare: compareDateMissingLast },
 ];
@@ -682,10 +689,13 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
   rows = allGames.map(game => {
     const ptByAccount = (result.playtime && result.playtime[game.appid]) || {};
     const totalMin = slotSteamIds.reduce((s, id) => s + (ptByAccount[id] || 0), 0);
+    const lpByAccount = (result.lastPlayed && result.lastPlayed[game.appid]) || {};
+    const lastPlayedMax = Math.max(0, ...slotSteamIds.map(id => lpByAccount[id] || 0));
     return {
       appid:              game.appid,
       name:               game.name,
       playtime:           totalMin / 60,
+      lastPlayed:         fmtLastPlayed(lastPlayedMax),
       capsule:            undefined,
       score:              undefined,
       positivePct:        undefined,

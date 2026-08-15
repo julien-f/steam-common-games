@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeInput, scoreColor, fmtH, fmtPlaytime, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating } = require('../public/utils');
+const { normalizeInput, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating } = require('../public/utils');
 
 // ── normalizeInput ────────────────────────────────────────────────────────────
 
@@ -133,6 +133,18 @@ test('fmtPlaytime: formats exactly 60 minutes as 1h', () => {
 test('fmtPlaytime: rounds to nearest hour above 60 minutes', () => {
   assert.equal(fmtPlaytime(90), '2h');
   assert.equal(fmtPlaytime(120), '2h');
+});
+
+// ── fmtLastPlayed ─────────────────────────────────────────────────────────────
+
+test('fmtLastPlayed: returns empty string for 0/null/undefined', () => {
+  assert.equal(fmtLastPlayed(0), '');
+  assert.equal(fmtLastPlayed(null), '');
+  assert.equal(fmtLastPlayed(undefined), '');
+});
+
+test('fmtLastPlayed: formats a Unix timestamp as an ISO date', () => {
+  assert.equal(fmtLastPlayed(1751846400), '2025-07-07');
 });
 
 // ── renderScoreCell ───────────────────────────────────────────────────────────

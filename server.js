@@ -161,18 +161,23 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
 
     const groups = groupByOwnership(slotLibraries);
 
-    // Build per-account playtime for common games only
+    // Build per-account playtime, and last-played timestamp, for common games only
     const groupAppIds = new Set(groups.flatMap(g => g.games.map(game => game.appid)));
     const playtime = {};
+    const lastPlayed = {};
     for (const [steamId, games] of libraryById) {
       for (const game of games) {
         if (!groupAppIds.has(game.appid)) continue;
         if (!playtime[game.appid]) playtime[game.appid] = {};
         playtime[game.appid][steamId] = game.playtime_forever || 0;
+        // Steam returns this as a Unix timestamp (seconds) directly on GetOwnedGames — no
+        // extra request param needed. 0/missing means "never played" (owned but not launched).
+        if (!lastPlayed[game.appid]) lastPlayed[game.appid] = {};
+        lastPlayed[game.appid][steamId] = game.rtime_last_played || 0;
       }
     }
 
-    res.json({ groups, slots: playerSlots, playtime });
+    res.json({ groups, slots: playerSlots, playtime, lastPlayed });
   } catch (err) {
     if (err.isUpstream || err.name === 'TimeoutError') console.error('[upstream]', err.message);
     const status = err.isUpstream ? 502 : err.name === 'TimeoutError' ? 504 : 400;

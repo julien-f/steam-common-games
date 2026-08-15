@@ -146,6 +146,18 @@ test('POST /api/common-games: 200 with groups and slots', async (t) => {
   assert.equal(res.body.slots[0][0].gameCount, 1, 'gameCount reflects that account\'s own library size');
 });
 
+test('POST /api/common-games: lastPlayed carries rtime_last_played per account, 0 when absent', async (t) => {
+  _reset();
+  const GAME1 = { appid: 400, name: 'Portal', rtime_last_played: 1751846400 };
+  const GAME2 = { appid: 400, name: 'Portal' }; // no rtime_last_played from this account
+  t.mock.method(globalThis, 'fetch', makeLibraryFetch([GAME1], [GAME2]));
+
+  const res = await api.post('/api/common-games').send({ slots: [[ID1], [ID2]] });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.lastPlayed[400][ID1], 1751846400);
+  assert.equal(res.body.lastPlayed[400][ID2], 0);
+});
+
 test('POST /api/common-games: 200 accepts legacy users array', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', makeLibraryFetch([], []));

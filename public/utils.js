@@ -43,6 +43,15 @@ function fmtPlaytime(mins) {
   return mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`;
 }
 
+// Format a GetOwnedGames `rtime_last_played` Unix timestamp (seconds) as a plain ISO date
+// (e.g. "2026-07-01") — same bare-date convention as the releaseDate/dateAdded table columns,
+// rather than a relative "3 days ago" string. Returns '' for 0/missing (owned but never
+// launched — a real, meaningful state, not absent data).
+function fmtLastPlayed(epochSec) {
+  if (!epochSec) return '';
+  return new Date(epochSec * 1000).toISOString().slice(0, 10);
+}
+
 function foldStr(s) {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
@@ -75,4 +84,4 @@ function renderExtraCell(game) {
   return h ? fmtH(h.extra) : '<span class="dim">—</span>';
 }
 
-if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, fmtH, fmtPlaytime, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating };
+if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating };

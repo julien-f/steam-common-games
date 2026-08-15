@@ -6,6 +6,7 @@ let games = [];     // flat: { appid, name, groupKey, loading, details }
 let groups = [];    // [{ userIndices, games }] — ordered, from server
 let slots = [];     // [[{steamid, personaname, profileurl}, ...], ...] — one entry per logical player
 let playtime = {};  // { [appid]: { [steamId]: minutes } } — per-account playtime for common games
+let lastPlayed = {}; // { [appid]: { [steamId]: unix seconds } } — per-account last-played timestamp
 let sortCol = 'score';
 let sortDir = -1;
 let runId = 0;           // increments on each search to cancel stale updates
@@ -363,6 +364,7 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
     });
     slots = data.slots || [];
     playtime = data.playtime || {};
+    lastPlayed = data.lastPlayed || {};
 
     renderPage();
     // One labelled, boxed cluster of chips per slot (see the .slot-accounts border in
@@ -639,12 +641,15 @@ function buildOwnersHtml(g) {
   if (!g.groupKey) return ''; // standalone lookup — not part of any comparison group
   const ownerIndices = g.groupKey.split(',').map(Number);
   const gamePt = playtime[g.appid] || {};
+  const gameLp = lastPlayed[g.appid] || {};
   return `<div class="panel-section">
     <div class="panel-section-title">Owned by</div>
     <div class="panel-tags">${ownerIndices.flatMap(slotIdx =>
       (slots[slotIdx] || []).filter(p => p.steamid in gamePt).map(p => {
         const pt = fmtPlaytime(gamePt[p.steamid]);
-        return `<span class="panel-tag">${esc(p.personaname || '?')}${pt ? `<span class="panel-tag-playtime"> · ${pt}</span>` : ''}</span>`;
+        const lp = fmtLastPlayed(gameLp[p.steamid]);
+        const extra = [pt, lp && `last played ${lp}`].filter(Boolean).join(' · ');
+        return `<span class="panel-tag">${esc(p.personaname || '?')}${extra ? `<span class="panel-tag-playtime"> · ${extra}</span>` : ''}</span>`;
       })
     ).join('')}</div>
   </div>`;
