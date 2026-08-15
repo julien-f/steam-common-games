@@ -111,21 +111,21 @@ const compareNumMissingLast = compareMissingLast((a, b) => a - b);
 // for the same end-of-period ranks just after a more specific one, without disturbing its order
 // against any other, actually-different, day.
 //
-// Steam also uses two placeholders with no date in them at all: "Coming soon" (some info — it's
-// presumably nearer than a distant bare year) and "To be announced"/"TBA" (no info whatsoever).
-// Both need to sort after every real or coarse date — including a far-future bare year like
-// "2028" — while still preserving Coming soon < TBA between themselves. Sentinel timestamps
-// anchored past any realistic release year do that; they're deliberately not NaN (unlike a
-// genuinely unrecognized string) so they get a real, deterministic position instead of falling
-// into the null/empty "missing" bucket handled by compareDateMissingLast below.
+// Steam also uses two placeholders with no date in them at all: "Coming soon" and "To be
+// announced"/"TBA". Deliberately NOT handled here — this function is also the column's
+// `parseDate`, which the table framework reuses for the range-filter bounds and the date-tree
+// filter dropdown, not just sorting. If a placeholder produced a real (if huge) timestamp, one
+// "Coming soon" wishlist row would drag the whole column's computed max to that fake date,
+// squashing every real release date into a sliver of the range slider, and a "released after X"
+// filter would wrongly match games we have no actual date for. Letting them fall through to plain
+// `new Date(s).getTime()` (NaN, same as any other unrecognized string) makes every one of those
+// consumers correctly treat "unreleased" as "no known date" instead of "year 9999". Sort order is
+// handled separately below, by `releaseSortTimestamp`, the only consumer that actually wants a
+// deterministic placeholder position.
 const SEASON_END = { spring: [5, 20], summer: [8, 21], fall: [11, 20], autumn: [11, 20], winter: [2, 19] };
-const COMING_SOON_SENTINEL = new Date(9999, 0, 1).getTime();
-const TBA_SENTINEL         = new Date(9999, 0, 2).getTime();
 function endOfReleasePeriod(str) {
   const s = String(str).trim();
   let m;
-  if (/^coming soon$/i.test(s)) return COMING_SOON_SENTINEL;
-  if (/^(to be announced|tba)$/i.test(s)) return TBA_SENTINEL;
   if ((m = /^(spring|summer|fall|autumn|winter)\s+(\d{4})$/i.exec(s))) {
     const [month, day] = SEASON_END[m[1].toLowerCase()];
     const year = m[1].toLowerCase() === 'winter' ? Number(m[2]) + 1 : Number(m[2]); // winter spills into next year
@@ -144,17 +144,35 @@ function endOfReleasePeriod(str) {
   return new Date(s).getTime();
 }
 
+// Sort-only view of the Released column. "Coming soon" (some info — it's presumably nearer than a
+// distant bare year) and "To be announced"/"TBA" (no info whatsoever) both need to sort after
+// every real or coarse date — including a far-future bare year like "2028" — while still
+// preserving Coming soon < TBA between themselves. Sentinel timestamps anchored past any realistic
+// release year do that; they're deliberately not NaN (unlike a genuinely unrecognized string) so
+// they get a real, deterministic position instead of falling into the null/empty "missing" bucket
+// handled by compareDateMissingLast below. Kept local to the sort comparator (not folded back into
+// endOfReleasePeriod/parseDate) so the range-filter bounds and date-tree — which also read
+// `parseDate` — never see these fake dates; see the comment on endOfReleasePeriod above.
+const COMING_SOON_SENTINEL = new Date(9999, 0, 1).getTime();
+const TBA_SENTINEL         = new Date(9999, 0, 2).getTime();
+function releaseSortTimestamp(str) {
+  const s = String(str).trim();
+  if (/^coming soon$/i.test(s)) return COMING_SOON_SENTINEL;
+  if (/^(to be announced|tba)$/i.test(s)) return TBA_SENTINEL;
+  return endOfReleasePeriod(s);
+}
+
 // Same idea for `type: 'date'` columns (`releaseDate`, wishlist's `dateAdded`) — setting
 // `compare` bypasses the column's own `parseDate`/type coercion too, so a `null` date would
 // otherwise become epoch 1970 via `new Date(null).getTime()` and sort as impossibly old, and a
-// string `endOfReleasePeriod` genuinely can't make sense of (not one of the recognized coarse
-// forms, and not a valid date either) would sort at a nondeterministic spot via NaN comparisons —
-// both need to be pinned last instead. "Coming soon" and "To be announced" are NOT examples of
-// that anymore — endOfReleasePeriod gives them real sentinel positions (see above) so they sort
-// deterministically after every dated/coarse entry instead of landing in this bucket.
+// string neither `releaseSortTimestamp` nor plain `new Date()` can make sense of (not one of the
+// recognized coarse forms, and not a valid date either) would sort at a nondeterministic spot via
+// NaN comparisons — both need to be pinned last instead. "Coming soon" and "To be announced" are
+// NOT examples of that — `releaseSortTimestamp` gives them real sentinel positions (see above) so
+// they sort deterministically after every dated/coarse entry instead of landing in this bucket.
 const compareDateMissingLast = compareMissingLast(
-  (a, b) => endOfReleasePeriod(a) - endOfReleasePeriod(b),
-  v => v == null || v === '' || isNaN(endOfReleasePeriod(v)),
+  (a, b) => releaseSortTimestamp(a) - releaseSortTimestamp(b),
+  v => v == null || v === '' || isNaN(releaseSortTimestamp(v)),
 );
 
 // Amber-flags still-unreleased games in the Released column — reuses scoreColor's own
