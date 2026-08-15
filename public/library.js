@@ -198,23 +198,30 @@ const COLUMNS = [
   // unrounded so sort/default-sort operate on full precision (two games both displaying "97"
   // still order deterministically); not groupable for the same reason — grouping keys off the
   // raw value, and a near-unique float per game would produce a useless one-row-per-group split.
-  { key: 'steamdbRating',    label: 'SteamDB Rating',  type: 'number', groupable: false, format: fmt.numRound, render: renderScoreNum, compare: compareNumMissingLast },
+  // `defaultSortDir: 'desc'` (new in @vates/data-table-core 0.8.0) on this and the other three
+  // score-ish columns below — a fresh click on any of them should show the best-rated games
+  // first, not the worst; without it a first click started every numeric column ascending
+  // (worst-first) regardless of what the number actually means. Only changes where a *new* sort
+  // entry starts; it doesn't touch this column's own already-applied `DEFAULT_SORT` above.
+  { key: 'steamdbRating',    label: 'SteamDB Rating',  type: 'number', groupable: false, format: fmt.numRound, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
   // Wilson score lower bound — statistically rigorous but harder to explain than SteamDB's
   // current formula (which is why it isn't the default-visible score anymore); kept available
   // for anyone who wants the more conservative, confidence-bound number instead.
-  { key: 'score',            label: 'Wilson Score',    type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast },
+  { key: 'score',            label: 'Wilson Score',    type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
   // Raw positive/total ratio — the plain percentage Steam's own store page shows, as opposed to
   // the two adjusted scores above. No "%" in the cell (the column header already says so) —
   // same bare colored number treatment as the other three score columns for consistency.
-  { key: 'positivePct',      label: 'Steam %',         type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast },
+  { key: 'positivePct',      label: 'Steam %',         type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
   // Grouped with the other user-review scores above rather than off near HLTB/playtime — it's a
   // critic (not player) score, but it's still one of the four "how good is this game" numbers,
   // and keeping all of them contiguous makes them easier to compare at a glance.
-  { key: 'metacritic',       label: 'Metacritic Score',type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast },
+  { key: 'metacritic',       label: 'Metacritic Score',type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
   // No compare override here — 0 reviews is a real, meaningful value (not "no data" standing in
   // for one), so the default numeric sort already treats it correctly, unlike the score/HLTB
-  // columns above and below.
-  { key: 'reviewsTotal',     label: 'Review Count',    type: 'number', groupable: true, format: fmt.ct },
+  // columns above and below. `defaultSortDir: 'desc'` still applies though — the most-reviewed
+  // (most talked-about) games are the more useful thing to see on a first click, same reasoning
+  // as the score columns just without the missing-data wrinkle.
+  { key: 'reviewsTotal',     label: 'Review Count',    type: 'number', groupable: true, format: fmt.ct, defaultSortDir: 'desc' },
   // "All PlayStyles" listed first among the HLTB columns — same convention as the side panel,
   // which shows it leftmost precisely because it's a single representative number rather than
   // one specific playstyle (see the comment on `all` in lib/hltb.js). Keeping it first here too
@@ -224,9 +231,11 @@ const COLUMNS = [
   { key: 'hltbExtra',        label: '+Extra (h)',      type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast },
   { key: 'hltbCompletionist',label: '100% (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast },
   // No compare override here either — 0 hours played is real data (owned, never launched), not
-  // a stand-in for "unknown," so the default numeric sort is already correct.
+  // a stand-in for "unknown," so the default numeric sort is already correct. `defaultSortDir:
+  // 'desc'` still applies — "what have I sunk the most hours into" is the more common question
+  // than the reverse.
   { key: 'playtime',         label: 'Played (h)',      type: 'number', groupable: true,
-    format: v => v > 0 ? Number(v).toFixed(1) : '—' },
+    format: v => v > 0 ? Number(v).toFixed(1) : '—', defaultSortDir: 'desc' },
   // Most recent `rtime_last_played` across every account merged into this row (a Steam Family
   // slot unions several accounts — see groupByOwnership — so "last played" here means "by
   // anyone in the slot", not any one account in particular). '' (never played by anyone in the
@@ -239,19 +248,32 @@ const COLUMNS = [
   // as meaningful data when it's often just an API restriction. updateLastPlayedTooltip() below
   // adds a header tooltip warning specifically when every loaded row shows no value at all —
   // the tell for "this whole column is unavailable", not "nobody's touched their library".
+  // `defaultSortDir: 'desc'` — "last modified"-style date column, the textbook case the option's
+  // own doc comment cites; a first click should surface who's been played most recently, not
+  // dredge up the stalest entry. `defaultValueSort` (also new in 0.8.0) opens the date filter
+  // tree most-recent-year-first instead of the tree's own default oldest-first — `by: 'alpha'`
+  // is what a date tree actually uses (there's no by-count order for a tree of date branches;
+  // see the Grouped columns / Date filter tree docs), just flipped to descending.
   { key: 'lastPlayed',       label: 'Last Played',   type: 'date', groupable: true, format: fmt.str,
-    compare: compareDateMissingLast },
+    compare: compareDateMissingLast, defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' } },
   { key: 'releaseDate',      label: 'Released',     type: 'date', groupable: true, format: fmt.str,
-    parseDate: endOfReleasePeriod, compare: compareDateMissingLast, render: renderReleaseDate },
+    parseDate: endOfReleasePeriod, compare: compareDateMissingLast, render: renderReleaseDate,
+    defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' } },
   { key: 'genres',           label: 'Genres',       groupable: true, format: fmt.arr },
-  { key: 'developers',       label: 'Developer',    groupable: true, format: fmt.arr },
-  { key: 'publishers',       label: 'Publisher',    groupable: true, format: fmt.arr },
-  { key: 'tags',             label: 'Tags',         groupable: true, format: fmt.arr },
-  { key: 'categories',       label: 'Categories',   groupable: true, format: fmt.arr },
+  // `defaultValueSort: { by: 'count', dir: 'desc' }` (new in 0.8.0) — Developer/Publisher/Tags/
+  // Categories are all higher-cardinality than Genres (a small, well-known fixed list that reads
+  // fine alphabetically), so their filter checklists open "most common first" instead of A→Z;
+  // still just the starting point — `cycleValueSort`'s toggle still cycles through all 4 states
+  // the same as before.
+  { key: 'developers',       label: 'Developer',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
+  { key: 'publishers',       label: 'Publisher',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
+  { key: 'tags',             label: 'Tags',         groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
+  { key: 'categories',       label: 'Categories',   groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
   // Linux/Steam Deck compatibility tier from ProtonDB — sorted/grouped by actual compatibility
   // quality (see compareProtonTier above), not alphabetically; public/panel.js shows the same
-  // data as a colored badge in the side panel.
-  { key: 'protondb',         label: 'ProtonDB',     groupable: true, format: fmt.str, render: renderProtonBadge, compare: compareProtonTier },
+  // data as a colored badge in the side panel. `defaultSortDir: 'desc'` shows the best-compatibility
+  // games first on a fresh click, matching compareProtonTier's worst-to-best ordering.
+  { key: 'protondb',         label: 'ProtonDB',     groupable: true, format: fmt.str, render: renderProtonBadge, compare: compareProtonTier, defaultSortDir: 'desc' },
 ];
 
 const DEFAULT_VISIBLE = [
@@ -268,8 +290,14 @@ const DEFAULT_SORT = [{ key: 'steamdbRating', dir: 'desc' }];
 // only arrives once its store metadata streams in, so it needs a loading state.
 const WISHLIST_COLUMNS = [
   ...COLUMNS.filter(c => c.key !== 'playtime' && c.key !== 'lastPlayed').map(c => (c.key === 'name' ? { ...c, format: fmt.str } : c)),
+  // No defaultSortDir here — Steam's wishlist rank is already 1-at-the-top, so the plain
+  // ascending default a fresh click starts at is the useful direction as-is.
   { key: 'priority',  label: 'Wishlist Rank', type: 'number', groupable: false, format: fmt.num },
-  { key: 'dateAdded', label: 'Added',         type: 'date',   groupable: true,  format: fmt.str, compare: compareDateMissingLast },
+  // Same "last modified"-style reasoning as the owned-library's Last Played/Released columns
+  // above — a fresh click (and the filter's date tree) should lead with what was added most
+  // recently, not the oldest wishlist entry.
+  { key: 'dateAdded', label: 'Added',         type: 'date',   groupable: true,  format: fmt.str, compare: compareDateMissingLast,
+    defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' } },
 ];
 
 const WISHLIST_DEFAULT_VISIBLE = [
