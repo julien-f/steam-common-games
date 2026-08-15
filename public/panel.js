@@ -65,17 +65,25 @@ function initPanel(options = {}) {
   document.getElementById('panel-backdrop').addEventListener('click', panelClose);
   document.getElementById('panel-close').addEventListener('click', panelClose);
 
-  document.getElementById('panel-hero').addEventListener('click', e => {
+  // Delegated on #panel-body (a stable element that only has its innerHTML replaced)
+  // rather than bound directly to #panel-hero — the hero now lives inside #panel-body's
+  // generated markup (see renderPanelBody) and is recreated from scratch on every
+  // render, so a listener attached straight to the old hero node would go stale/detached
+  // the moment the panel re-renders (including at init time, before the first
+  // panelOpen() has rendered anything at all).
+  const panelBodyEl = document.getElementById('panel-body');
+  panelBodyEl.addEventListener('click', e => {
+    if (!e.target.closest('.panel-hero')) return;
     const thumb = e.target.closest('.panel-film-item');
     if (thumb) { heroIdx = Number(thumb.dataset.idx); renderPanelHero(); return; }
     if (e.target.closest('.panel-hero-prev')) { panelStepHero(-1); return; }
     if (e.target.closest('.panel-hero-next')) { panelStepHero(1); return; }
     if (e.target.closest('.panel-hero-img')) openLightbox(panelGame, heroIdx);
   });
-  document.getElementById('panel-hero').addEventListener('keydown', e => {
+  panelBodyEl.addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.closest('.panel-hero-img')) { e.preventDefault(); openLightbox(panelGame, heroIdx); }
   });
-  document.getElementById('panel-hero').addEventListener('wheel', e => {
+  panelBodyEl.addEventListener('wheel', e => {
     const strip = e.target.closest('.panel-filmstrip');
     if (!strip) return;
     e.preventDefault();
@@ -432,10 +440,16 @@ function renderPanelBody(game) {
     <button type="button" class="panel-refresh-btn${panelRefreshing ? ' is-refreshing' : ''}"${panelRefreshing ? ' disabled' : ''}
       title="Refresh rating, HLTB &amp; store details for this game" aria-label="Refresh details">↻</button>` : '';
 
-  // Title/release/icon-links/glance strip are wrapped in .panel-header-sticky so they
-  // stay visible while only the rest (description, HLTB breakdown, owners, tag cloud)
-  // scrolls underneath — see .panel-header-sticky in style.css.
+  // Only the title row (title/release date/icon-links) is wrapped in .panel-header-sticky
+  // and stays pinned while scrolling — the hero (built into #panel-hero below) and the
+  // glance grid scroll away with the rest of the body (description, HLTB breakdown,
+  // owners, tag cloud). #panel-hero used to be a fixed sibling of #panel-body outside the
+  // scroll container, which meant it (plus the glance grid) permanently ate into the
+  // panel's visible height on short/mobile screens with no way to scroll it out of the
+  // way. Rendering it as the first child here instead — and rebuilding it fresh via
+  // buildPanelHero() below, same as before — lets it scroll away like everything else.
   document.getElementById('panel-body').innerHTML = `
+    <div id="panel-hero" class="panel-hero"></div>
     <div class="panel-header-sticky">
       <div class="panel-title-row">
         <div>
@@ -448,8 +462,8 @@ function renderPanelBody(game) {
           ${refreshBtn}
         </div>
       </div>
-      ${glanceGrid(g)}
     </div>
+    ${glanceGrid(g)}
     ${description ? `<div class="panel-desc">${description}</div>` : ''}
     ${hltbDetailHtml}
     ${ownersHtml}
@@ -459,11 +473,17 @@ function renderPanelBody(game) {
 }
 
 function initHeroSwipe() {
-  const hero = document.getElementById('panel-hero');
+  // Bound to #panel-body (stable across renders) rather than #panel-hero itself, which —
+  // now that it's part of #panel-body's generated markup (see renderPanelBody) — is a
+  // brand new DOM node after every render; a listener attached directly to it would stop
+  // working (or, before the first panelOpen(), fail to attach at all) the moment the
+  // panel re-renders. The `.panel-hero` check in touchstart scopes tracking to touches
+  // that actually start on the hero, same as the old direct binding did implicitly.
+  const hero = document.getElementById('panel-body');
   let startX = 0, startY = 0, tracking = false, decided = false, isHoriz = false;
 
   hero.addEventListener('touchstart', e => {
-    if (e.touches.length !== 1 || e.target.closest('.panel-filmstrip')) return;
+    if (e.touches.length !== 1 || e.target.closest('.panel-filmstrip') || !e.target.closest('.panel-hero')) return;
     startX = e.touches[0].clientX; startY = e.touches[0].clientY;
     tracking = true; decided = false; isHoriz = false;
   }, { passive: true });

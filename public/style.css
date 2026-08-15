@@ -627,7 +627,13 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 }
 .panel-close:hover { background: rgba(0,0,0,0.75); }
 
-.panel-hero { flex-shrink: 0; background: var(--bg3); }
+/* Rendered as the first child of the scrollable #panel-body (see renderPanelBody in
+   panel.js) rather than a fixed sibling outside it, so it scrolls away with the rest of
+   the content instead of permanently occupying space above the sticky title bar. The
+   negative side margins cancel .panel-body's own side padding so the hero still bleeds
+   edge-to-edge; no top margin/padding needed since .panel-body has none of its own
+   (that padding lives on .panel-header-sticky below, see its comment). */
+.panel-hero { margin: 0 -20px; background: var(--bg3); }
 .panel-hero-main {
   position: relative;
   width: 100%;
@@ -805,12 +811,13 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   padding: 0 20px 20px;
 }
 
-/* Wraps the title row + glance strip so they stay visible while only the rest
-   (description, HLTB breakdown, owners, tag cloud) scrolls underneath — the
-   "glanceable header" that doesn't require scrolling to see. `position: sticky`
-   rather than pulling these out of `.panel-body` into their own flex sibling in the
-   HTML: same visual effect, zero markup changes to index.html/library.html. The
-   background matches `.game-panel`'s own (`--bg1`) so there's no seam once scrolled.
+/* Wraps just the title row (title/release date/icon-links) so it stays visible while
+   the hero, glance strip, description, HLTB breakdown, owners and tag cloud all scroll
+   underneath — the hero and glance grid used to be exempt from scrolling too (see the
+   .panel-hero comment above), which left too little of a short/mobile screen for actual
+   content. `position: sticky` rather than pulling this out of `.panel-body` into its own
+   flex sibling in the HTML: same visual effect, zero markup changes to index.html/library.html.
+   The background matches `.game-panel`'s own (`--bg1`) so there's no seam once scrolled.
    `.panel-body`'s own top padding moved here (negative margin cancels it, padding
    re-adds it) — a sticky child inside a padded scroll container otherwise leaves
    that padding's worth of scrolled content peeking through above it before the
@@ -821,8 +828,8 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   top: 0;
   z-index: 2;
   background: var(--bg1);
-  margin: 0 -20px 8px;
-  padding: 16px 20px 8px;
+  margin: 0 -20px;
+  padding: 16px 20px 12px;
 }
 
 .panel-title-row {
@@ -830,7 +837,6 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 4px;
 }
 
 .panel-icon-links { display: flex; gap: 6px; flex-shrink: 0; margin-top: 1px; }
@@ -883,7 +889,6 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 .panel-release {
   font-size: 12px;
   color: var(--text2);
-  margin-bottom: 10px;
 }
 
 .panel-desc {
@@ -928,7 +933,11 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
    swipe-vs-scroll conflict already fixed once for the hero filmstrip (see
    initPanelSwipe/initHeroSwipe in panel.js). Every chip shares one template — a
    value, then a one-line caption — built in glanceChip()/glanceGrid() (panel.js). */
-.panel-glance { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+/* No margin-top here — the 12px gap above the grid comes from .panel-header-sticky's own
+   padding-bottom instead (that box's edge IS the top of this gap), so margin-bottom below
+   is set to match it rather than stacking a second top margin on top of that padding,
+   which used to make the gap above the grid nearly 3x the (near-zero) gap below it. */
+.panel-glance { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
 .panel-glance-chip {
   display: flex; align-items: center; padding: 8px 10px;
   border-radius: var(--r); background: var(--bg0); border: 1px solid var(--border);
