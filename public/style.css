@@ -733,15 +733,33 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 .panel-film-item:hover .panel-film-thumb { opacity: 0.8; }
 .panel-film-item.active .panel-film-thumb { opacity: 1; border-color: var(--accent); }
 
+/* Sticky to the bottom of the panel on both desktop and mobile now (previously sat
+   between the hero and the body, which meant reaching it on desktop required
+   scrolling back up past the hero every time) — one behavior instead of two, and it
+   keeps prev/next/random reachable without the trip. `.game-panel` is `position:
+   fixed`, so this `position: absolute` pins to its bottom edge without needing any
+   DOM change. `:empty` hides it entirely for standalone lookups (no group/list to
+   page through) rather than showing an empty floating bar. */
 .panel-nav {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  gap: 6px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--bg1);
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.35);
   min-height: 40px;
 }
+.panel-nav:empty { display: none; }
+/* Extra bottom padding only when a nav bar is actually present, so its last section
+   never sits underneath the floating bar. */
+.panel-nav:not(:empty) ~ .panel-body { padding-bottom: 76px; }
 .panel-nav-btn {
   background: transparent;
   border: 1px solid var(--border);
@@ -761,7 +779,13 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 }
 .panel-nav-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
 .panel-nav-btn:disabled { opacity: 0.3; cursor: default; }
-.panel-nav-reroll { font-size: 14px; margin-left: 4px; }
+.panel-nav-reroll { font-size: 14px; margin-left: 4px; position: relative; }
+/* Only the reroll button gets a key hint — prev/next's ↑/↓ icon already IS the key,
+   so labeling it again would be redundant; 🎲 isn't a keyboard glyph, so it needs one. */
+.panel-nav-kbd {
+  position: absolute; bottom: -1px; right: 1px; font-size: 8px; line-height: 1.3;
+  color: var(--text2); background: var(--bg3); border-radius: 2px; padding: 0 2px;
+}
 .panel-nav-pos {
   font-size: 12px;
   color: var(--text1);
@@ -773,7 +797,27 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 .panel-body {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 20px 28px;
+  padding: 0 20px 20px;
+}
+
+/* Wraps the title row + glance strip so they stay visible while only the rest
+   (description, HLTB breakdown, owners, tag cloud) scrolls underneath — the
+   "glanceable header" that doesn't require scrolling to see. `position: sticky`
+   rather than pulling these out of `.panel-body` into their own flex sibling in the
+   HTML: same visual effect, zero markup changes to index.html/library.html. The
+   background matches `.game-panel`'s own (`--bg1`) so there's no seam once scrolled.
+   `.panel-body`'s own top padding moved here (negative margin cancels it, padding
+   re-adds it) — a sticky child inside a padded scroll container otherwise leaves
+   that padding's worth of scrolled content peeking through above it before the
+   sticky region "catches", since `top: 0` sticks flush with the padding edge, not
+   the border edge. */
+.panel-header-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg1);
+  margin: 0 -20px 8px;
+  padding: 16px 20px 8px;
 }
 
 .panel-title-row {
@@ -783,6 +827,24 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   gap: 8px;
   margin-bottom: 4px;
 }
+
+.panel-icon-links { display: flex; gap: 6px; flex-shrink: 0; margin-top: 1px; }
+.panel-icon-link {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text1);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.panel-icon-link:hover { border-color: var(--accent); color: var(--accent2); }
 
 .panel-title {
   font-size: 17px;
@@ -852,18 +914,29 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 .panel-no-data a { color: var(--text1); text-decoration: none; border-bottom: 1px solid transparent; transition: color 0.15s, border-color 0.15s; }
 .panel-no-data a:hover { color: var(--accent2); border-bottom-color: var(--accent2); }
 
-.panel-score-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
-.panel-score-row--mc { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
-.panel-score-num { font-size: 32px; font-weight: 700; line-height: 1; }
-.panel-score-desc { font-size: 13px; color: var(--text1); }
-.panel-score-desc a { color: var(--text1); text-decoration: none; border-bottom: 1px solid transparent; transition: color 0.15s, border-color 0.15s; }
-.panel-score-desc a:hover { color: var(--accent2); border-bottom-color: var(--accent2); }
-.panel-reviews { font-size: 12px; color: var(--text1); }
-
-.panel-score-row--proton { align-items: center; }
 /* Shared with the Library Explorer's ProtonDB table column (public/library.js) — same
    colored pill both places, not just the side panel. */
 .proton-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; color: #fff; line-height: 1.4; }
+
+/* Glance strip: a fixed 2×2 grid (SteamDB+Metacritic, then HLTB+Linux/Deck) instead of
+   a horizontally-scrolling row — a scrollable strip here would risk the exact
+   swipe-vs-scroll conflict already fixed once for the hero filmstrip (see
+   initPanelSwipe/initHeroSwipe in panel.js). Every chip shares one template — a
+   value, then a one-line caption — built in glanceChip()/glanceGrid() (panel.js). */
+.panel-glance { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.panel-glance-chip {
+  display: flex; align-items: center; padding: 8px 10px;
+  border-radius: var(--r); background: var(--bg0); border: 1px solid var(--border);
+  text-decoration: none; cursor: pointer; min-width: 0;
+  transition: border-color 0.15s;
+}
+.panel-glance-chip--static { cursor: default; }
+.panel-glance-chip--sk { padding: 8px 10px; }
+a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var(--accent); outline: none; }
+.panel-glance-sub { display: flex; flex-direction: column; line-height: 1.25; gap: 1px; min-width: 0; }
+.panel-glance-num { font-size: 17px; font-weight: 700; color: var(--text0); font-variant-numeric: tabular-nums; }
+.panel-glance-val { font-size: 11px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panel-glance-val b { color: var(--text1); font-weight: 600; }
 
 .panel-hltb { display: flex; flex-wrap: wrap; gap: 24px 24px; row-gap: 14px; }
 .panel-hltb-label { font-size: 11px; color: var(--text2); margin-bottom: 3px; }
@@ -885,6 +958,26 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 .panel-tag-btn:hover { border-color: var(--accent); color: var(--accent2); }
 .panel-tag-btn.active { background: rgba(26,159,255,0.15); border-color: rgba(26,159,255,0.4); color: var(--accent); }
 .panel-tag-playtime { color: var(--text2); }
+
+/* Tags/genres/categories/developer-publisher merged into one cloud (tagCloud() in
+   panel.js) instead of four near-identical "uppercase title + pill row" sections —
+   kind distinguished by this small dot + the legend below instead of by section. */
+.panel-tag-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+.panel-tag-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 8px; font-size: 10.5px; color: var(--text2); }
+.panel-tag-legend-item { display: inline-flex; align-items: center; }
+
+/* Owned by — ordered by last played (most recent first, see buildOwnersHtml in
+   app.js), with a playtime meter: a sequential single-hue magnitude cue layered
+   *under* the number, which stays the primary read — color never stands in alone
+   for the value. */
+.panel-owners { display: flex; flex-direction: column; gap: 10px; }
+.panel-owner-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.panel-owner-name { color: var(--text0); font-weight: 500; font-size: 12.5px; }
+.panel-owner-lastplayed { color: var(--text2); font-size: 11px; flex-shrink: 0; white-space: nowrap; }
+.panel-owner-meter-track { height: 4px; border-radius: 2px; background: var(--bg0); overflow: hidden; margin-top: 5px; }
+.panel-owner-meter-fill { height: 100%; background: var(--accent2); border-radius: 2px; }
+.panel-owner-playtime { display: block; margin-top: 3px; font-size: 11px; color: var(--text1); }
+.panel-section-subtitle { text-transform: none; font-weight: 400; letter-spacing: 0; color: var(--text2); }
 
 /* Screenshot lightbox */
 #screenshot-lightbox {
@@ -1080,20 +1173,6 @@ body.lb-open { overflow: hidden; }
   z-index: 2;
   pointer-events: none;
 }
-
-.panel-links { display: flex; gap: 8px; flex-wrap: wrap; }
-.panel-link {
-  display: inline-block;
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  background: var(--bg2);
-  color: var(--text1);
-  font-size: 12px;
-  text-decoration: none;
-  transition: border-color 0.15s, color 0.15s;
-}
-.panel-link:hover { border-color: var(--accent); color: var(--accent2); }
 
 /* Site footer */
 .site-footer {

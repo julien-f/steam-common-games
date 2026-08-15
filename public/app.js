@@ -642,16 +642,36 @@ function buildOwnersHtml(g) {
   const ownerIndices = g.groupKey.split(',').map(Number);
   const gamePt = playtime[g.appid] || {};
   const gameLp = lastPlayed[g.appid] || {};
+  const owners = ownerIndices.flatMap(slotIdx =>
+    (slots[slotIdx] || []).filter(p => p.steamid in gamePt).map(p => ({
+      name: p.personaname || '?',
+      minutes: gamePt[p.steamid] || 0,
+      lastPlayedSec: gameLp[p.steamid] || 0,
+    }))
+  );
+  if (!owners.length) return '';
+  // Most recently played first — ties into the Last Played feature itself; someone who's
+  // never launched it (lastPlayedSec 0) sorts last, alphabetically among themselves so the
+  // order stays deterministic rather than depending on slot iteration order.
+  owners.sort((a, b) => b.lastPlayedSec - a.lastPlayedSec || a.name.localeCompare(b.name));
+  const maxMinutes = Math.max(...owners.map(o => o.minutes), 1);
   return `<div class="panel-section">
-    <div class="panel-section-title">Owned by</div>
-    <div class="panel-tags">${ownerIndices.flatMap(slotIdx =>
-      (slots[slotIdx] || []).filter(p => p.steamid in gamePt).map(p => {
-        const pt = fmtPlaytime(gamePt[p.steamid]);
-        const lp = fmtLastPlayed(gameLp[p.steamid]);
-        const extra = [pt, lp && `last played ${lp}`].filter(Boolean).join(' · ');
-        return `<span class="panel-tag">${esc(p.personaname || '?')}${extra ? `<span class="panel-tag-playtime"> · ${extra}</span>` : ''}</span>`;
-      })
-    ).join('')}</div>
+    <div class="panel-section-title">Owned by <span class="panel-section-subtitle">most recently played first</span></div>
+    <div class="panel-owners">${owners.map(o => {
+      const lp = fmtLastPlayed(o.lastPlayedSec);
+      const pt = fmtPlaytime(o.minutes);
+      // Playtime also gets a meter (single hue, width proportional to the max among these
+      // owners) — a secondary cue for relative investment, never the only signal: the
+      // number itself stays the primary, always-visible value.
+      return `<div class="panel-owner">
+        <div class="panel-owner-top">
+          <span class="panel-owner-name">${esc(o.name)}</span>
+          <span class="panel-owner-lastplayed">${lp ? esc(lp) : 'never played'}</span>
+        </div>
+        <div class="panel-owner-meter-track"><div class="panel-owner-meter-fill" style="width:${Math.round(o.minutes / maxMinutes * 100)}%"></div></div>
+        <span class="panel-owner-playtime">${pt ? `${esc(pt)} played` : 'not played'}</span>
+      </div>`;
+    }).join('')}</div>
   </div>`;
 }
 
@@ -742,10 +762,10 @@ function renderPanelNav() {
   const list = sortedGames(activeGame.groupKey);
   const idx = list.findIndex(g => g.appid === activeGame.appid);
   nav.innerHTML = `
-    <button class="panel-nav-btn" id="panel-prev" aria-label="Previous game">↑</button>
-    <span class="panel-nav-pos">${idx + 1} / ${list.length}</span>
-    <button class="panel-nav-btn" id="panel-next" aria-label="Next game">↓</button>
-    <button class="panel-nav-btn panel-nav-reroll" id="panel-reroll" aria-label="Pick a random game" title="Pick a random game">🎲</button>
+    <button class="panel-nav-btn" id="panel-prev" aria-label="Previous game" title="Previous game (↑)">↑</button>
+    <span class="panel-nav-pos" aria-live="polite">${idx + 1} / ${list.length}</span>
+    <button class="panel-nav-btn" id="panel-next" aria-label="Next game" title="Next game (↓)">↓</button>
+    <button class="panel-nav-btn panel-nav-reroll" id="panel-reroll" aria-label="Pick a random game" title="Pick a random game (R)">🎲<span class="panel-nav-kbd">R</span></button>
   `;
   document.getElementById('panel-prev').addEventListener('click', () => {
     openPanel(list[(idx - 1 + list.length) % list.length]);

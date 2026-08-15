@@ -354,10 +354,10 @@ function renderPanelNav(game) {
   const list = getGameList();
   const idx = list.findIndex(g => g.appid === game.appid);
   nav.innerHTML = `
-    <button class="panel-nav-btn" id="panel-prev" aria-label="Previous game">↑</button>
-    <span class="panel-nav-pos">${idx + 1} / ${list.length}</span>
-    <button class="panel-nav-btn" id="panel-next" aria-label="Next game">↓</button>
-    <button class="panel-nav-btn panel-nav-reroll" id="panel-reroll" aria-label="Pick a random game" title="Pick a random game">🎲</button>
+    <button class="panel-nav-btn" id="panel-prev" aria-label="Previous game" title="Previous game (↑)">↑</button>
+    <span class="panel-nav-pos" aria-live="polite">${idx + 1} / ${list.length}</span>
+    <button class="panel-nav-btn" id="panel-next" aria-label="Next game" title="Next game (↓)">↓</button>
+    <button class="panel-nav-btn panel-nav-reroll" id="panel-reroll" aria-label="Pick a random game" title="Pick a random game (R)">🎲<span class="panel-nav-kbd">R</span></button>
   `;
   document.getElementById('panel-prev').addEventListener('click', () => {
     openGame(list[(idx - 1 + list.length) % list.length]);

@@ -259,162 +259,165 @@ function fmtCompactCount(n) {
   return String(n);
 }
 
-function tagSection(title, items, dim) {
-  if (!items?.length) return '';
-  const values = dim === 'tags' ? [...items] : [...items].sort((a, b) => a.localeCompare(b));
-  return `<div class="panel-section panel-section--meta">
-    <div class="panel-section-title">${title}</div>
-    <div class="panel-tags">${values.map(v => {
+// Tags/genres/categories/developer-publisher used to each get their own "uppercase
+// title + pill row" section — four near-identical blocks in a row. Merged into one
+// cloud instead, kind distinguished by a small colored dot (+ a legend) rather than
+// by which section a pill happens to sit in. `kind` picks the dot color/legend label;
+// `dim` (may be null when tag-click filtering is disabled) is the actual click-filter
+// dimension, kept separate from `kind` since developers/publishers share one visual
+// kind but are two different filter dimensions.
+const TAG_KIND_META = {
+  tags: { label: 'Tag', color: '#d97757' },
+  genres: { label: 'Genre', color: '#66c0f4' },
+  categories: { label: 'Category', color: '#66c04f' },
+  devpub: { label: 'Developer/Publisher', color: '#b892d6' },
+};
+
+function tagCloud(groups) {
+  const present = groups.filter(gr => gr.items?.length);
+  if (!present.length) return '';
+  const seenKinds = new Set();
+  const pillsHtml = present.flatMap(({ kind, dim, items }) => {
+    const values = kind === 'tags' ? [...items] : [...items].sort((a, b) => a.localeCompare(b));
+    seenKinds.add(kind);
+    const dot = `<span class="panel-tag-dot" style="background:${TAG_KIND_META[kind].color}"></span>`;
+    return values.map(v => {
       if (dim) {
         const active = panelOptions.isTagActive?.(dim, v) ? ' active' : '';
-        return `<button class="panel-tag panel-tag-btn${active}" data-dim="${dim}" data-val="${esc(v)}">${esc(v)}</button>`;
+        return `<button class="panel-tag panel-tag-btn${active}" data-dim="${dim}" data-val="${esc(v)}">${dot}${esc(v)}</button>`;
       }
-      return `<span class="panel-tag">${esc(v)}</span>`;
-    }).join('')}</div>
+      return `<span class="panel-tag">${dot}${esc(v)}</span>`;
+    });
+  }).join('');
+  const legendHtml = [...seenKinds].map(k =>
+    `<span class="panel-tag-legend-item"><span class="panel-tag-dot" style="background:${TAG_KIND_META[k].color}"></span>${TAG_KIND_META[k].label}</span>`
+  ).join('');
+  return `<div class="panel-section panel-section--meta">
+    <div class="panel-section-title">Tags &amp; details</div>
+    <div class="panel-tags">${pillsHtml}</div>
+    <div class="panel-tag-legend">${legendHtml}</div>
   </div>`;
+}
+
+// The glance strip: a fixed 2×2 grid (SteamDB+Metacritic, then HLTB+Linux/Deck) —
+// every chip built from one template (a value, then a one-line caption) so the four
+// read as one family. Each chip IS the link to its source; there's no separate
+// "Links" section duplicating them. Only *evaluative* values (the two scores, the
+// Linux/Deck tier) get semantic color — HLTB is a plain duration, not a judgment,
+// so it stays neutral ink.
+function glanceChip(href, value, color, caption) {
+  const inner = `<span class="panel-glance-sub">
+    <span class="panel-glance-num"${color ? ` style="color:${color}"` : ''}>${esc(String(value))}</span>
+    <span class="panel-glance-val">${caption}</span>
+  </span>`;
+  return href
+    ? `<a class="panel-glance-chip" href="${esc(href)}" target="_blank" rel="noopener">${inner}</a>`
+    : `<div class="panel-glance-chip panel-glance-chip--static">${inner}</div>`;
+}
+
+function glanceGrid(g) {
+  if (g.loading) {
+    return `<div class="panel-glance">${
+      '<div class="panel-glance-chip panel-glance-chip--sk"><span class="sk" style="width:100%;height:32px;border-radius:6px"></span></div>'.repeat(4)
+    }</div>`;
+  }
+  const r = g.details?.rating;
+  const mc = g.details?.meta?.metacritic;
+  const h = g.details?.hltb;
+  const pd = g.details?.protondb;
+  const steamdbUrl = `https://www.steamdb.info/app/${g.appid}/`;
+  const protondbUrl = `https://www.protondb.com/app/${g.appid}`;
+
+  const chips = [];
+  if (r) {
+    const pct = r.total ? Math.round(r.positive / r.total * 100) : 0;
+    const steamdbRating = Math.round(computeSteamdbRating(r.positive, r.total));
+    chips.push(glanceChip(steamdbUrl, steamdbRating, scoreColor(steamdbRating), `<b>SteamDB</b> · ${pct}% of ${fmtCompactCount(r.total)}`));
+  }
+  if (mc) {
+    chips.push(glanceChip(mc.url, mc.score, scoreColor(mc.score), `<b>Metacritic</b> · critic score`));
+  }
+  if (h?.all) {
+    const hltbUrl = h.id ? `https://howlongtobeat.com/game/${h.id}` : null;
+    chips.push(glanceChip(hltbUrl, `${h.all}h`, null, `<b>HLTB</b> · all playstyles`));
+  } else if (g.details) {
+    chips.push(glanceChip(`https://howlongtobeat.com/?q=${encodeURIComponent(g.name)}`, '—', null, `<b>HLTB</b> · search`));
+  }
+  if (pd?.tier) {
+    const color = PROTON_TIER_COLORS[pd.tier] || '#52525b';
+    // Kept short (no "reports"/"confidence" words) — the glance chip's one-line caption
+    // truncates rather than wraps, and "strong · 336" already reads fine without them.
+    const detail = [pd.confidence, pd.total ? fmtCompactCount(pd.total) : ''].filter(Boolean).join(' · ');
+    chips.push(glanceChip(protondbUrl, capitalize(pd.tier), color, `<b>Linux/Deck</b>${detail ? ' · ' + detail : ''}`));
+  }
+  return chips.length ? `<div class="panel-glance">${chips.join('')}</div>` : '';
 }
 
 function renderPanelBody(game) {
   const g = game;
-  const r = g.details?.rating;
   const h = g.details?.hltb;
   const meta = g.details?.meta;
 
   const storeUrl    = `https://store.steampowered.com/app/${g.appid}`;
-  const steamdbUrl  = `https://www.steamdb.info/app/${g.appid}/`;
-  const protondbUrl = `https://www.protondb.com/app/${g.appid}`;
   const itadUrl     = `https://isthereanydeal.com/steam/app/${g.appid}`;
   const releaseDate = meta?.releaseDate;
   const description = meta?.description;
 
   const ownersHtml = panelOptions.getOwnersHtml?.(g) ?? '';
 
-  const mc = meta?.metacritic;
-  let scoreHtml = '';
-  if (g.loading) {
-    scoreHtml = `<div class="panel-section">
-      <div class="panel-section-title">Score</div>
-      <span class="sk" style="width:64px;height:32px;border-radius:4px"></span>
-    </div>`;
-  } else if (r || mc) {
-    // SteamDB's rating formula (see computeSteamdbRating in utils.js) rather than the Wilson
-    // score lower bound — same number now shown by default in the Library Explorer table, more
-    // recognizable than a raw confidence bound. No review-summary text tier (e.g. "Very
-    // Positive") here; the reviews line below gives the same read without needing Steam's
-    // wording. Label links to the game's SteamDB page, like Metacritic links to its own page.
-    const pct = r?.total ? Math.round(r.positive / r.total * 100) : 0;
-    const steamdbRating = r ? Math.round(computeSteamdbRating(r.positive, r.total)) : null;
-    const steamdbHtml = r ? `
-      <div class="panel-score-row">
-        <div class="panel-score-num" style="color:${scoreColor(steamdbRating)}">${steamdbRating}</div>
-        <div class="panel-score-desc"><a href="${esc(steamdbUrl)}" target="_blank" rel="noopener">SteamDB ↗</a></div>
-      </div>
-      <div class="panel-reviews">${pct}% positive of ${fmtCompactCount(r.total)} reviews</div>` : '';
-    const mcHtml = mc ? `
-      <div class="panel-score-row panel-score-row--mc">
-        <div class="panel-score-num" style="color:${scoreColor(mc.score)}">${mc.score}</div>
-        <div class="panel-score-desc">${mc.url ? `<a href="${esc(mc.url)}" target="_blank" rel="noopener">Metacritic ↗</a>` : 'Metacritic'}</div>
-      </div>` : '';
-    scoreHtml = `<div class="panel-section">
-      <div class="panel-section-title">Score</div>
-      ${steamdbHtml}
-      ${mcHtml}
-    </div>`;
-  }
-
-  const pd = g.details?.protondb;
-  let protonHtml = '';
-  if (g.loading) {
-    protonHtml = `<div class="panel-section">
-      <div class="panel-section-title">Linux / Steam Deck</div>
-      <span class="sk" style="width:80px;height:24px;border-radius:12px"></span>
-    </div>`;
-  } else if (pd?.tier) {
-    const color = PROTON_TIER_COLORS[pd.tier] || '#52525b';
-    protonHtml = `<div class="panel-section">
-      <div class="panel-section-title"><a href="${esc(protondbUrl)}" target="_blank" rel="noopener">Linux / Steam Deck ↗</a></div>
-      <div class="panel-score-row panel-score-row--proton">
-        <span class="proton-badge" style="background:${color}">${esc(capitalize(pd.tier))}</span>
-        <div class="panel-score-desc">${pd.confidence ? `${esc(pd.confidence)} confidence` : ''}${pd.total ? `${pd.confidence ? ' · ' : ''}${fmtCompactCount(pd.total)} reports` : ''}</div>
-      </div>
-    </div>`;
-  }
-
-  let hltbHtml = '';
-  let hltbSearchUrl = '';
-  if (g.loading) {
-    hltbHtml = `<div class="panel-section">
-      <div class="panel-section-title">How Long To Beat</div>
-      <span class="sk" style="width:140px"></span>
-    </div>`;
-  } else if (h) {
-    const hltbUrl = h.id ? `https://howlongtobeat.com/game/${h.id}` : null;
-    hltbHtml = `<div class="panel-section">
-      <div class="panel-section-title">${hltbUrl ? `<a href="${esc(hltbUrl)}" target="_blank" rel="noopener">How Long To Beat ↗</a>` : 'How Long To Beat'}</div>
+  // The glance strip already carries HLTB's "All PlayStyles" number (see glanceGrid
+  // above) — this is just the fuller Main/Extra/Completionist breakdown beneath it,
+  // once, not a second copy of the headline figure.
+  let hltbDetailHtml = '';
+  if (!g.loading && h && (h.main || h.extra || h.completionist)) {
+    hltbDetailHtml = `<div class="panel-section">
+      <div class="panel-section-title">How Long To Beat — breakdown</div>
       <div class="panel-hltb">
-        ${h.all ? `<div class="panel-hltb-item">
-          <div class="panel-hltb-label">All PlayStyles</div>
-          <div class="panel-hltb-val">${fmtH(h.all)}</div>
-        </div>` : ''}
-        <div class="panel-hltb-item">
-          <div class="panel-hltb-label">Main Story</div>
-          <div class="panel-hltb-val">${fmtH(h.main)}</div>
-        </div>
-        <div class="panel-hltb-item">
-          <div class="panel-hltb-label">Main + Extra</div>
-          <div class="panel-hltb-val">${fmtH(h.extra)}</div>
-        </div>
-        ${h.completionist ? `<div class="panel-hltb-item">
-          <div class="panel-hltb-label">Completionist</div>
-          <div class="panel-hltb-val">${fmtH(h.completionist)}</div>
-        </div>` : ''}
+        ${h.main ? `<div class="panel-hltb-item"><div class="panel-hltb-label">Main Story</div><div class="panel-hltb-val">${fmtH(h.main)}</div></div>` : ''}
+        ${h.extra ? `<div class="panel-hltb-item"><div class="panel-hltb-label">Main + Extra</div><div class="panel-hltb-val">${fmtH(h.extra)}</div></div>` : ''}
+        ${h.completionist ? `<div class="panel-hltb-item"><div class="panel-hltb-label">Completionist</div><div class="panel-hltb-val">${fmtH(h.completionist)}</div></div>` : ''}
       </div>
     </div>`;
-  } else if (g.details) {
-    hltbSearchUrl = `https://howlongtobeat.com/?q=${encodeURIComponent(g.name)}`;
   }
 
   const tagDim = key => panelOptions.enableTagFilters ? key : null;
-  const tags = g.details?.tags;
-  // Merge developer and publisher when identical
   const devs = meta?.developers || [];
   const pubs = meta?.publishers || [];
   const sameDevPub = devs.length > 0 && devs.length === pubs.length && devs.every((d, i) => d === pubs[i]);
-  const metaHtml = g.loading ? '' : [
-    tagSection('Tags', tags, tagDim('tags')),
-    tagSection('Genres', meta?.genres, tagDim('genres')),
-    tagSection('Categories', meta?.categories, tagDim('categories')),
-    sameDevPub
-      ? tagSection('Developer / Publisher', devs, tagDim('developers'))
-      : [tagSection('Developer', devs, tagDim('developers')), tagSection('Publisher', pubs, tagDim('publishers'))].join(''),
-  ].join('');
+  const cloudHtml = g.loading ? '' : tagCloud([
+    { kind: 'tags', dim: tagDim('tags'), items: g.details?.tags },
+    { kind: 'genres', dim: tagDim('genres'), items: meta?.genres },
+    { kind: 'categories', dim: tagDim('categories'), items: meta?.categories },
+    { kind: 'devpub', dim: tagDim('developers'), items: devs },
+    ...(sameDevPub ? [] : [{ kind: 'devpub', dim: tagDim('publishers'), items: pubs }]),
+  ]);
 
   const refreshBtn = (panelOptions.onRefresh && !g.loading) ? `
     <button type="button" class="panel-refresh-btn${panelRefreshing ? ' is-refreshing' : ''}"${panelRefreshing ? ' disabled' : ''}
       title="Refresh rating, HLTB &amp; store details for this game" aria-label="Refresh details">↻</button>` : '';
 
+  // Title/release/icon-links/glance strip are wrapped in .panel-header-sticky so they
+  // stay visible while only the rest (description, HLTB breakdown, owners, tag cloud)
+  // scrolls underneath — see .panel-header-sticky in style.css.
   document.getElementById('panel-body').innerHTML = `
-    <div class="panel-title-row">
-      <div class="panel-title">${esc(g.name)}</div>
-      ${refreshBtn}
-    </div>
-    ${releaseDate ? `<div class="panel-release">${esc(releaseDate)}</div>` : ''}
-    ${description ? `<div class="panel-desc">${description}</div>` : ''}
-    ${scoreHtml}
-    ${protonHtml}
-    ${hltbHtml}
-    ${ownersHtml}
-    ${metaHtml}
-    <div class="panel-section panel-section--meta">
-      <div class="panel-section-title">Links</div>
-      <div class="panel-links">
-        <a class="panel-link" href="${esc(storeUrl)}" target="_blank" rel="noopener">Steam Store</a>
-        <a class="panel-link" href="${esc(steamdbUrl)}" target="_blank" rel="noopener">SteamDB</a>
-        <a class="panel-link" href="${esc(protondbUrl)}" target="_blank" rel="noopener">ProtonDB</a>
-        <a class="panel-link" href="${esc(itadUrl)}" target="_blank" rel="noopener">IsThereAnyDeal</a>
-        ${hltbSearchUrl ? `<a class="panel-link" href="${esc(hltbSearchUrl)}" target="_blank" rel="noopener">HowLongToBeat</a>` : ''}
+    <div class="panel-header-sticky">
+      <div class="panel-title-row">
+        <div>
+          <div class="panel-title" id="panel-title">${esc(g.name)}</div>
+          ${releaseDate ? `<div class="panel-release">${esc(releaseDate)}</div>` : ''}
+        </div>
+        <div class="panel-icon-links">
+          <a class="panel-icon-link" href="${esc(storeUrl)}" target="_blank" rel="noopener" title="Steam Store" aria-label="Steam Store">🛒</a>
+          <a class="panel-icon-link" href="${esc(itadUrl)}" target="_blank" rel="noopener" title="IsThereAnyDeal" aria-label="IsThereAnyDeal">$</a>
+          ${refreshBtn}
+        </div>
       </div>
-    </div>`;
+      ${glanceGrid(g)}
+    </div>
+    ${description ? `<div class="panel-desc">${description}</div>` : ''}
+    ${hltbDetailHtml}
+    ${ownersHtml}
+    ${cloudHtml}`;
 
   buildPanelHero();
 }
