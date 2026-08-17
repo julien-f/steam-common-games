@@ -58,6 +58,11 @@ function makeDetailsFetch({ ratingOk = true, metaOk = true, tagsOk = true } = {}
     if (url.includes('protondb.com')) {
       return { ok: true, json: async () => ({ tier: 'gold', confidence: 'strong', total: 500 }) };
     }
+    if (url.includes('GetNewsForApp')) {
+      return { ok: true, json: async () => ({ appnews: { newsitems: [
+        { title: 'Patch 1.2 released', url: 'https://store.steampowered.com/news/app/1/view/123', date: 1700000000, feedlabel: 'Community Announcements', feedname: 'steam_community_announcements' },
+      ] } }) };
+    }
     if (url.includes('bleed/init')) {
       return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
     }
@@ -382,6 +387,39 @@ test('GET /api/game-details/:appid: 200 fetching fresh rating, HLTB, meta and ta
   assert.deepEqual(res.body.meta?.categories, ['Co-op']);
   assert.ok(Array.isArray(res.body.tags), 'tags should be an array');
   assert.ok(res.body.tags.includes('Action'));
+});
+
+// ── GET /api/game-news/:appid ─────────────────────────────────────────────────
+// Deliberately its own endpoint, not part of /api/game-details — see newsLimit's
+// comment in server.js for why (no table column, so fetched on-demand per panel open
+// rather than for every game in a whole loaded library/comparison).
+
+test('GET /api/game-news/abc: 400 for non-numeric appid', async () => {
+  const res = await api.get('/api/game-news/abc');
+  assert.equal(res.status, 400);
+});
+
+test('GET /api/game-news/:appid: 200 with recent news items', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeDetailsFetch());
+
+  const res = await api.get('/api/game-news/407');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.news.length, 1);
+  assert.equal(res.body.news[0].title, 'Patch 1.2 released');
+  assert.equal(res.body.news[0].feedLabel, 'Community Announcements');
+});
+
+test('GET /api/game-news/:appid: 200 from cache without fetching', async (t) => {
+  _reset();
+  setCache('news:408', []);
+  let fetchCalled = false;
+  t.mock.method(globalThis, 'fetch', async () => { fetchCalled = true; });
+
+  const res = await api.get('/api/game-news/408');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.news, []);
+  assert.equal(fetchCalled, false);
 });
 
 test('GET /api/game-details/:appid: 200 with null rating when reviews fetch fails', async (t) => {
@@ -780,4 +818,87 @@ test('GET /api/search-games: 502 when the store search endpoint errors', async (
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
   const res = await api.get('/api/search-games?q=portal');
   assert.equal(res.status, 502);
+});
+
+// ── GET /api/achievements/:appid ─────────────────────────────────────────────
+
+function makeAchievementsFetch({ achieved = [] } = {}) {
+  return async (url) => {
+    if (url.includes('GetSchemaForGame')) {
+      return { ok: true, json: async () => ({ game: { availableGameStats: { achievements: [
+        { name: 'ACH_1', displayName: 'First', description: 'Do the thing', icon: 'i1', icongray: 'g1', hidden: 0 },
+        { name: 'ACH_2', displayName: 'Second', description: 'Do another thing', icon: 'i2', icongray: 'g2', hidden: 0 },
+      ] } } }) };
+    }
+    if (url.includes('GetGlobalAchievementPercentagesForApp')) {
+      return { ok: true, json: async () => ({ achievementpercentages: { achievements: [
+        { name: 'ACH_1', percent: '42.0' }, { name: 'ACH_2', percent: '8.5' },
+      ] } }) };
+    }
+    if (url.includes('GetPlayerAchievements')) {
+      return { ok: true, json: async () => ({ playerstats: { success: true, achievements: [
+        { apiname: 'ACH_1', achieved: achieved.includes('ACH_1') ? 1 : 0, unlocktime: achieved.includes('ACH_1') ? 1700000000 : 0 },
+        { apiname: 'ACH_2', achieved: achieved.includes('ACH_2') ? 1 : 0, unlocktime: achieved.includes('ACH_2') ? 1700000001 : 0 },
+      ] } }) };
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+}
+
+test('GET /api/achievements/:appid: no steamids returns the achievement list with playerCount 0, no progress claimed', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeAchievementsFetch());
+
+  const res = await api.get('/api/achievements/400');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.total, 2);
+  assert.equal(res.body.unlocked, 0);
+  assert.equal(res.body.private, false);
+  assert.equal(res.body.playerCount, 0);
+  assert.equal(res.body.achievements[0].globalPct, 42);
+  assert.equal(res.body.achievements.every(a => a.achieved === false), true);
+});
+
+test('GET /api/achievements/:appid: with steamids returns unlock progress and playerCount', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeAchievementsFetch({ achieved: ['ACH_1'] }));
+
+  const res = await api.get(`/api/achievements/400?steamids=${ID1}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.playerCount, 1);
+  assert.equal(res.body.unlocked, 1);
+  assert.equal(res.body.private, false);
+  const first = res.body.achievements.find(a => a.apiname === 'ACH_1');
+  assert.equal(first.achieved, true);
+  assert.equal(first.unlocktime, 1700000000);
+});
+
+test('GET /api/achievements/:appid: private/no-data account is distinguished from no steamids at all', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('GetSchemaForGame')) {
+      return { ok: true, json: async () => ({ game: { availableGameStats: { achievements: [
+        { name: 'ACH_1', displayName: 'First', description: '', icon: 'i1', icongray: 'g1', hidden: 0 },
+      ] } } }) };
+    }
+    if (url.includes('GetGlobalAchievementPercentagesForApp')) return { ok: false, status: 403 };
+    if (url.includes('GetPlayerAchievements')) return { ok: false, status: 403 }; // private profile
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  const res = await api.get(`/api/achievements/400?steamids=${ID1}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.playerCount, 1);
+  assert.equal(res.body.private, true);
+});
+
+test('GET /api/achievements/:appid: too many steamids is a 400', async () => {
+  const ids = Array.from({ length: 20 }, (_, i) => `7656119800000${String(i).padStart(4, '0')}`).join(',');
+  const res = await api.get(`/api/achievements/400?steamids=${ids}`);
+  assert.equal(res.status, 400);
+});
+
+test('GET /api/achievements/abc: 400 for non-numeric appid', async () => {
+  const res = await api.get('/api/achievements/abc');
+  assert.equal(res.status, 400);
 });

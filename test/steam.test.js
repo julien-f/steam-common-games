@@ -9,7 +9,7 @@ process.env.DB_FILE = '';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages } = require('../lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews } = require('../lib/steam');
 const { _reset } = require('../lib/cache');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
@@ -803,6 +803,76 @@ test('getGlobalAchievementPercentages: caches result — second call skips fetch
   }));
   await getGlobalAchievementPercentages(400);
   await getGlobalAchievementPercentages(400);
+  assert.equal(fetchMock.mock.callCount(), 1);
+});
+
+// ── getGameNews ────────────────────────────────────────────────────────────────
+
+test('getGameNews: extracts title, url, date and feedLabel, capped at 5', async (t) => {
+  _reset();
+  const newsitems = Array.from({ length: 8 }, (_, i) => ({
+    gid: String(i), title: `Update ${i}`, url: `https://store.steampowered.com/news/app/400/view/${i}`,
+    date: 1700000000 + i, feedlabel: 'Community Announcements', feedname: 'steam_community_announcements', contents: 'ignored',
+  }));
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true, json: async () => ({ appnews: { appid: 400, newsitems, count: 8 } }),
+  }));
+
+  const result = await getGameNews(400);
+  assert.equal(result.length, 5);
+  assert.deepEqual(result[0], {
+    title: 'Update 0', url: 'https://store.steampowered.com/news/app/400/view/0',
+    date: 1700000000, feedLabel: 'Community Announcements',
+  });
+});
+
+test('getGameNews: filters out syndicated third-party press, keeping only steam_community_announcements', async (t) => {
+  _reset();
+  const newsitems = [
+    { title: 'Пресса на русском', url: 'https://x/1', date: 1700000002, feedlabel: 'Gamemag.ru', feedname: 'Gamemag.ru' },
+    { title: 'RPS coverage', url: 'https://x/2', date: 1700000001, feedlabel: 'Rock, Paper, Shotgun', feedname: 'Rock, Paper, Shotgun' },
+    { title: 'Official patch notes', url: 'https://x/3', date: 1700000000, feedlabel: 'Community Announcements', feedname: 'steam_community_announcements' },
+  ];
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true, json: async () => ({ appnews: { newsitems } }),
+  }));
+
+  const result = await getGameNews(400);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].title, 'Official patch notes');
+});
+
+test('getGameNews: returns empty array when newsitems is missing', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true, json: async () => ({ appnews: { appid: 400, count: 0 } }),
+  }));
+  assert.deepEqual(await getGameNews(400), []);
+});
+
+test('getGameNews: feedLabel is null when absent', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ appnews: { newsitems: [{ title: 'Update', url: 'https://x/1', date: 1700000000, feedname: 'steam_community_announcements' }] } }),
+  }));
+  const result = await getGameNews(400);
+  assert.equal(result[0].feedLabel, null);
+});
+
+test('getGameNews: throws isUpstream when fetch fails', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+  await assert.rejects(() => getGameNews(400), err => err.isUpstream === true);
+});
+
+test('getGameNews: caches result — second call skips fetch', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true, json: async () => ({ appnews: { newsitems: [] } }),
+  }));
+  await getGameNews(400);
+  await getGameNews(400);
   assert.equal(fetchMock.mock.callCount(), 1);
 });
 

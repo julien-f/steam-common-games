@@ -331,6 +331,21 @@ let currentPlayerStr = '';     // last player string actually loaded (not just t
 // wishlisted/standalone-looked-up games can still report progress — only to a player
 // actually being loaded, so this is shared by both loadLibrary and loadWishlist.
 let currentSteamIds = [];
+// Persona name(s) of whoever's currently loaded (joined with " + " for a merged Family), used
+// by updateTitle below. Kept separate from currentPlayerStr (which holds raw typed/URL input)
+// since the title should show resolved persona names, not account handles.
+let currentPlayerLabel = '';
+// Full player objects ({steamid, personaname, profileurl}[]) for the side panel's "Owned by"
+// section (buildLibraryOwnersHtml) — only ever populated by loadLibrary, never loadWishlist
+// (wishlist items aren't owned by anyone), so the section naturally stays hidden on that tab
+// without needing its own tab check. playtimeByAppid/lastPlayedByAppid are the matching
+// per-account raw maps `/api/common-games` already returns (same shape as app.js's own
+// `playtime`/`lastPlayed`) — loadLibrary otherwise only keeps the summed/maxed-across-accounts
+// numbers it writes onto each row, which is all the table itself needs but flattens away
+// exactly the per-member breakdown a merged Steam Family's owners section wants to show.
+let currentPlayers = [];
+let playtimeByAppid = {};
+let lastPlayedByAppid = {};
 // appid → the achievements API's response, cached client-side per (appid, loaded accounts)
 // so reopening the same game's panel doesn't refetch. Cleared whenever the loaded
 // player(s) change (resetTableState) since a stale entry there would show the wrong
@@ -345,6 +360,7 @@ const viewParamName  = () => (activeTab === 'wishlist' ? 'wview' : 'view');
 initPanel({
   inertSelector: '.lib-page',
   showAchievements: true,
+  getOwnersHtml: buildLibraryOwnersHtml,
   onRefresh: async (row) => {
     try {
       const res = await fetch(`/api/game-details/${row.appid}?refresh=1`);
@@ -352,7 +368,7 @@ initPanel({
       if (!res.ok) throw new Error(data.error || 'Refresh failed');
       applyDetailsEvent(row, data);
       if (table) table.setData(visibleRows());
-      if (currentSteamIds.length) await loadAchievements(row, { force: true });
+      await loadAchievements(row, { force: true }); // still meaningful with no player loaded — see loadAchievements
     } catch (err) {
       statusEl.textContent = `Refresh failed: ${err.message}`;
     }
@@ -363,7 +379,7 @@ initPanel({
   // resetTableState()'s own panelClose() call (a genuine new Load/refresh/tab-switch)
   // already clears these params itself beforehand via updateUrlParams, so this just runs
   // redundantly-but-harmlessly there — see loadLibrary/loadWishlist.
-  onClose: () => setPanelParam(null),
+  onClose: () => { setPanelParam(null); updateTitle(); },
 });
 initLightbox({ onParamChange: setLightboxParam });
 
@@ -412,6 +428,46 @@ function getGameList() {
   return processData(searched, filters, view.rangeFilters ?? {}, view.sorts ?? [], activeColumns, DEFAULT_LABELS.emptyValue);
 }
 
+// Same template as the comparison page's buildOwnersHtml (app.js) — kept as a separate copy
+// here rather than shared, since the two pages' underlying data shapes differ (slots/groups
+// there vs. one flat currentPlayers array here) enough that sharing would need its own
+// abstraction layer for what's otherwise a handful of lines. Naturally empty for a standalone
+// lookup (the appid won't be a key in playtimeByAppid at all) and for the Wishlist tab
+// (playtimeByAppid is only ever populated by loadLibrary — see its declaration above) without
+// needing an explicit check for either case.
+function buildLibraryOwnersHtml(g) {
+  const gamePt = playtimeByAppid[g.appid] || {};
+  const gameLp = lastPlayedByAppid[g.appid] || {};
+  const owners = currentPlayers
+    .filter(p => p.steamid in gamePt)
+    .map(p => ({
+      name: p.personaname || '?',
+      minutes: gamePt[p.steamid] || 0,
+      lastPlayedSec: gameLp[p.steamid] || 0,
+    }));
+  if (!owners.length) return '';
+  // Most recently played first, same convention as the comparison page's version — someone
+  // who's never launched it (lastPlayedSec 0) sorts last, alphabetically among themselves so
+  // the order stays deterministic.
+  owners.sort((a, b) => b.lastPlayedSec - a.lastPlayedSec || a.name.localeCompare(b.name));
+  const maxMinutes = Math.max(...owners.map(o => o.minutes), 1);
+  return `<div class="panel-section">
+    <div class="panel-section-title">Owned by <span class="panel-section-subtitle">most recently played first</span></div>
+    <div class="panel-owners">${owners.map(o => {
+      const lp = fmtLastPlayed(o.lastPlayedSec);
+      const pt = fmtPlaytime(o.minutes);
+      return `<div class="panel-owner">
+        <div class="panel-owner-top">
+          <span class="panel-owner-name">${esc(o.name)}</span>
+          <span class="panel-owner-lastplayed">${lp ? esc(lp) : 'never played'}</span>
+        </div>
+        <div class="panel-owner-meter-track"><div class="panel-owner-meter-fill" style="width:${Math.round(o.minutes / maxMinutes * 100)}%"></div></div>
+        <span class="panel-owner-playtime">${pt ? `${esc(pt)} played` : 'not played'}</span>
+      </div>`;
+    }).join('')}</div>
+  </div>`;
+}
+
 function renderPanelNav(game) {
   const nav = document.getElementById('panel-nav');
   // A standalone lookup (see openStandaloneLookup below) isn't part of the loaded
@@ -438,6 +494,7 @@ function renderPanelNav(game) {
 function openGame(game, { isRandom = false } = {}) {
   if (!isRandom) clearRandomQueue(randomQueueKey());
   panelOpen(game);
+  updateTitle();
   renderPanelNav(game);
   setPanelParam(game.appid);
   loadAchievements(game);
@@ -447,9 +504,12 @@ function openGame(game, { isRandom = false } = {}) {
 // currently loaded, and re-renders the panel body as it goes (loading, then loaded) if
 // the panel is still open on this same game by the time each stage settles — the panel
 // may have moved on to a different game mid-fetch (fast prev/next/random navigation).
+// currentSteamIds is optional here — the achievement *list* (names, descriptions, icons,
+// community-wide rarity) is store metadata, not tied to any account, so it's still worth
+// fetching with nobody loaded (e.g. a standalone "look up any game" lookup). Only the
+// achieved/unlocktime state per item needs an account; the server's `playerCount` field
+// (see achievementsHtml in panel.js) tells the panel whether that part applies at all.
 async function loadAchievements(game, { force = false } = {}) {
-  if (!currentSteamIds.length) { game.achievements = null; return; }
-
   const key = achievementsCacheKey(game.appid);
   if (!force) {
     const cached = achievementsCache.get(key);
@@ -464,7 +524,8 @@ async function loadAchievements(game, { force = false } = {}) {
   if (isPanelOpen() && getPanelGame() === game) renderPanelBody(game);
 
   try {
-    const qs = new URLSearchParams({ steamids: currentSteamIds.join(',') });
+    const qs = new URLSearchParams();
+    if (currentSteamIds.length) qs.set('steamids', currentSteamIds.join(','));
     if (force) qs.set('refresh', '1');
     const res = await fetch(`/api/achievements/${game.appid}?${qs}`);
     const data = await res.json();
@@ -473,7 +534,10 @@ async function loadAchievements(game, { force = false } = {}) {
       // no single "the" account to link to when a slot merges a Steam Family, so this picks
       // whichever account loaded first, same "first-seen wins" convention used elsewhere
       // (e.g. the owned-games union) rather than trying to represent every member at once.
-      data.steamUrl = `https://steamcommunity.com/profiles/${currentSteamIds[0]}/stats/${game.appid}/achievements/`;
+      // Only meaningful with an account loaded at all — omitted otherwise.
+      if (currentSteamIds.length) {
+        data.steamUrl = `https://steamcommunity.com/profiles/${currentSteamIds[0]}/stats/${game.appid}/achievements/`;
+      }
       achievementsCache.set(key, data);
     }
     game.achievements = res.ok ? data : null;
@@ -521,7 +585,7 @@ async function fetchStandaloneDetails(game) {
     game.details = data;
     game.loading = false;
     if (data.meta?.name) game.name = data.meta.name;
-    if (getPanelGame() === game) { renderPanelBody(game); setPanelParam(game.appid); }
+    if (getPanelGame() === game) { renderPanelBody(game); setPanelParam(game.appid); updateTitle(); }
     addRecentGame(game.appid, game.name, data.meta?.capsule || null);
     renderRecentGamesBar(recentGamesBarEl);
   } catch (err) {
@@ -542,14 +606,14 @@ function setPanelParam(appid) {
   params.delete('shot');
   if (appid == null) params.delete('game');
   else params.set('game', appid);
-  history.replaceState(null, '', `?${params}`);
+  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
 }
 
 function setLightboxParam(idx) {
   const params = new URLSearchParams(location.search);
   if (idx == null) params.delete('shot');
   else params.set('shot', idx);
-  history.replaceState(null, '', `?${params}`);
+  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
 }
 
 // Reopens the panel (and, if present, the lightbox) from the current `?game=`/`?shot=`
@@ -644,6 +708,31 @@ function updateLastPlayedTooltip() {
     : '';
 }
 
+// Single source of truth for the tab title: an open game (from a table row or a standalone
+// lookup) takes over the title entirely, same convention as the comparison page's app.js —
+// it's what the user is looking at, and what they'll want to find again in history/tab search.
+function updateTitle() {
+  const game = getPanelGame();
+  if (game) {
+    document.title = `${game.name} — Library Explorer`;
+    return;
+  }
+  if (currentPlayerLabel) {
+    const tabLabel = activeTab === 'wishlist' ? 'Wishlist' : 'Library';
+    document.title = `${currentPlayerLabel}'s ${tabLabel} — Library Explorer`;
+    return;
+  }
+  document.title = 'Library Explorer — Steam Common Games'; // matches the static <title> in library.html
+}
+
+// The header's back-link to the comparison tool carries the currently-loaded player(s) along —
+// they arrive there as a single slot (comma-joined, same as a Steam Family), showing that
+// player's library rather than landing on the bare empty form.
+function updateBackLink() {
+  const link = document.getElementById('back-to-comparison-link');
+  link.href = currentSteamIds.length ? `/?u=${currentSteamIds.join(',')}` : '/';
+}
+
 function updateStatus() {
   if (total === 0) { statusEl.textContent = ''; return; }
   if (loaded >= total) {
@@ -676,13 +765,21 @@ renderRecentsBar(recentsBarEl, RECENTS_KEY);
 bindRecentGamesBar(recentGamesBarEl, (appid, name) => openStandaloneLookup(appid, name));
 renderRecentGamesBar(recentGamesBarEl);
 
-function updateUrlParams(patch) {
+// Defaults to replaceState — most callers are just keeping the URL in sync with state that's
+// already reflected in the page (a stream event landing, a panel closing), not a new
+// back/forward-worthy navigation. Pass `push: true` for the one action per logical "search"
+// that should actually be undoable — see loadLibrary/loadWishlist/setActiveTab below, which
+// used to each push their own partial update (clearing game/shot, then setting `u`, then
+// `tab`), piling up several near-duplicate history entries per click.
+function updateUrlParams(patch, { push = false } = {}) {
   const url = new URL(location.href);
   for (const [key, value] of Object.entries(patch)) {
     if (value === null || value === '') url.searchParams.delete(key);
     else url.searchParams.set(key, value);
   }
-  history.pushState(null, '', url);
+  url.search = `?${reorderUrlParams(url.searchParams)}`;
+  if (push) history.pushState(null, '', url);
+  else history.replaceState(null, '', url);
 }
 
 // Applies one SSE details event (rating/hltb/meta/tags) to its row. `name` is only
@@ -765,8 +862,12 @@ async function streamGameDetails(games) {
   updateStatus();
 }
 
-function resetTableState() {
-  if (isPanelOpen()) panelClose();
+// preserveGameParam: skip clearing `?game=`/`&shot=` when closing a leftover panel — for a
+// caller (loadLibrary/loadWishlist restoring a deep link, or loadFromUrl below on back/forward)
+// that's about to reopen a game from those very params once the new data's in. See panel.js's
+// own `preserveUrl` option, which this maps straight onto.
+function resetTableState({ preserveGameParam = false } = {}) {
+  if (isPanelOpen()) panelClose({ preserveUrl: preserveGameParam });
   clearRandomQueue(randomQueueKey());
   if (unsyncView) { unsyncView(); unsyncView = null; }
   if (table) { table.destroy(); table = null; }
@@ -776,10 +877,15 @@ function resetTableState() {
   accountsBarEl.hidden = true;
   accountsBarEl.innerHTML = '';
   currentSteamIds = [];
+  currentPlayerLabel = '';
+  currentPlayers = [];
+  playtimeByAppid = {};
+  lastPlayedByAppid = {};
+  updateBackLink();
   achievementsCache.clear();
 }
 
-async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, restoreShot = null } = {}) {
+async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, restoreShot = null, push = true } = {}) {
   // A genuine new load drops any `game`/`shot` left in the URL from a previous player/tab —
   // it may not even exist in the new list. The initial page-load path (bottom of this file)
   // passes preserveGameParam so it can restore the deep link once the new data is in. This
@@ -791,7 +897,7 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
   const members = playerStr.split(',').map(s => normalizeInput(s.trim())).filter(Boolean);
 
   statusEl.textContent = refreshIds ? 'Refreshing account…' : 'Fetching library…';
-  resetTableState();
+  resetTableState({ preserveGameParam });
 
   let result;
   try {
@@ -818,8 +924,18 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
   // URL and recent-search entry. `u` is deliberately not written until here, once the fetch
   // above has actually resolved it — see the comment on the `game`/`shot` clearing above.
   const idStr = slotSteamIds.join(',');
-  updateUrlParams({ u: idStr });
+  // A single push per genuine new load (never for a same-search account refresh, never when
+  // just restoring whatever the URL already says on initial load/back-forward — see `push`
+  // above) — this used to be a separate pushState from the game/shot clear above, piling up
+  // two history entries per click.
+  updateUrlParams({ u: idStr }, { push: push && !refreshIds });
   currentSteamIds = slotSteamIds;
+  currentPlayerLabel = result.slots[0].map(p => p.personaname || '?').join(' + ');
+  currentPlayers = result.slots[0];
+  playtimeByAppid = result.playtime || {};
+  lastPlayedByAppid = result.lastPlayed || {};
+  updateTitle();
+  updateBackLink();
   renderAccountsBar(result.slots[0], 'games');
   addRecent(RECENTS_KEY, idStr, [result.slots[0]], idStr);
   renderRecentsBar(recentsBarEl, RECENTS_KEY);
@@ -879,7 +995,7 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
   if (preserveGameParam) restorePanelFromUrl(restoreShot);
 }
 
-async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, restoreShot = null } = {}) {
+async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, restoreShot = null, push = true } = {}) {
   // See the matching comment in loadLibrary above — game/shot clearing doesn't need the
   // fetch below, but the `u` param does (it's written further down from resolved steamids).
   if (!preserveGameParam) updateUrlParams({ game: null, shot: null });
@@ -888,7 +1004,7 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
   const members = playerStr.split(',').map(s => normalizeInput(s.trim())).filter(Boolean);
 
   statusEl.textContent = refreshIds ? 'Refreshing account…' : 'Fetching wishlist…';
-  resetTableState();
+  resetTableState({ preserveGameParam });
 
   let result;
   try {
@@ -911,8 +1027,12 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
   // Written from the server-resolved `steamid`s, not the raw typed input — see the matching
   // comment in loadLibrary above.
   const idStr = result.players.map(p => p.steamid).join(',');
-  updateUrlParams({ u: idStr });
+  // See the matching comment in loadLibrary above.
+  updateUrlParams({ u: idStr }, { push: push && !refreshIds });
   currentSteamIds = result.players.map(p => p.steamid);
+  currentPlayerLabel = result.players.map(p => p.personaname || '?').join(' + ');
+  updateTitle();
+  updateBackLink();
   renderAccountsBar(result.players, 'wishlisted');
   addRecent(RECENTS_KEY, idStr, [result.players], idStr);
   renderRecentsBar(recentsBarEl, RECENTS_KEY);
@@ -976,7 +1096,12 @@ function setActiveTab(tab, { fetch: shouldFetch = true } = {}) {
   tabLibraryBtn.setAttribute('aria-selected', String(tab === 'library'));
   tabWishlistBtn.setAttribute('aria-selected', String(tab === 'wishlist'));
   loadBtn.textContent = tab === 'wishlist' ? 'Load Wishlist' : 'Load Library';
+  // Never pushes on its own — when a load follows right below, that load's own `u` update
+  // (see loadLibrary/loadWishlist) pushes the single history entry for "switched to this tab
+  // for this player", already carrying the `tab` value set here. With nothing to fetch (no
+  // player loaded yet) there's nothing worth a history entry for either.
   updateUrlParams({ tab: tab === 'wishlist' ? 'wishlist' : null });
+  updateTitle();
   if (shouldFetch && currentPlayerStr) loadCurrentTab(currentPlayerStr);
 }
 
@@ -1002,19 +1127,35 @@ playerInput.addEventListener('keydown', e => {
   }
 });
 
-const initParams = new URLSearchParams(location.search);
-const initPlayer = initParams.get('u');
-if (initParams.get('tab') === 'wishlist') setActiveTab('wishlist', { fetch: false });
-if (initPlayer) {
-  playerInput.value = initPlayer;
-  currentPlayerStr = initPlayer;
-  // preserveGameParam: a `?game=<appid>` (and `&shot=<idx>`) present in the URL on page
-  // load should reopen that game/media once its row is in — see restorePanelFromUrl().
-  // `shot` is captured here (not re-read later) since opening the panel deletes it from
-  // the live URL — see the comment on restorePanelFromUrl().
-  loadCurrentTab(initPlayer, { preserveGameParam: true, restoreShot: initParams.get('shot') });
-} else {
-  // No player loaded at all — still honor a bare `?game=` standalone-lookup deep link
-  // (loadLibrary/loadWishlist would otherwise be the only callers of restorePanelFromUrl).
-  restorePanelFromUrl(initParams.get('shot'));
+// Shared by the initial page load and browser back/forward — now that loadLibrary/loadWishlist
+// push one real history entry per load/tab-switch (see `push` there), back/forward need an
+// actual handler to act on those entries rather than just changing the address bar.
+function loadFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const player = params.get('u');
+  const tab = params.get('tab') === 'wishlist' ? 'wishlist' : 'library';
+  if (tab !== activeTab) setActiveTab(tab, { fetch: false }); // the load below does the fetching, in the right order
+  if (player) {
+    playerInput.value = player;
+    currentPlayerStr = player;
+    // preserveGameParam: a `?game=<appid>` (and `&shot=<idx>`) present in the URL on page
+    // load should reopen that game/media once its row is in — see restorePanelFromUrl().
+    // `shot` is captured here (not re-read later) since opening the panel deletes it from
+    // the live URL — see the comment on restorePanelFromUrl(). `push: false` since this is
+    // restoring state the URL already has, not a new navigable action.
+    loadCurrentTab(player, { preserveGameParam: true, restoreShot: params.get('shot'), push: false });
+  } else {
+    if (currentPlayerStr) {
+      currentPlayerStr = '';
+      resetTableState({ preserveGameParam: true }); // a `?game=` in the new URL is restored below
+      updateStatus();
+      updateTitle();
+    }
+    // No player loaded at all — still honor a bare `?game=` standalone-lookup deep link
+    // (loadLibrary/loadWishlist would otherwise be the only callers of restorePanelFromUrl).
+    restorePanelFromUrl(params.get('shot'));
+  }
 }
+
+window.addEventListener('popstate', loadFromUrl);
+loadFromUrl();

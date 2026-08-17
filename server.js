@@ -11,7 +11,7 @@ const rateLimit = require('express-rate-limit');
 
 const { getCached, getCacheStats } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages } = require('./lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 
@@ -71,6 +71,28 @@ const detailsLimit = rateLimit({
   },
 });
 
+// News is deliberately NOT part of fetchGameDetails/the details limiter above — unlike
+// rating/HLTB/meta/tags/ProtonDB, it's never shown anywhere but the side panel (no table
+// column, nothing to sort/filter on), so fetching it for every game in a whole loaded
+// library/comparison via the SSE stream would mean paying for it on games whose panel is
+// never opened. It's fetched lazily instead, once per game, only when that game's panel
+// actually opens (see loadNews in public/panel.js) — same on-demand shape as achievements
+// (achievementsLimit below), just without the per-account fan-out.
+const newsLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: DETAILS_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please wait a minute and try again.' },
+  skip: (req) => {
+    if (rateLimitBypassed()) return true;
+    if (isForceRefresh(req)) return false;
+    const appid = Number(req.params.appid);
+    if (!Number.isInteger(appid) || appid <= 0) return false;
+    return getCached(`news:${appid}`) !== undefined;
+  },
+});
+
 // Shared by the /api/search-games route and its rate limiter below.
 const normalizeSearchTerm = (raw) => (raw || '').trim().slice(0, 100).toLowerCase();
 
@@ -112,7 +134,9 @@ const achievementsLimit = rateLimit({
     if (getCached(`schema:${appid}`) === undefined) return false;
     if (getCached(`achrarity:${appid}`) === undefined) return false;
     const ids = (req.query.steamids || '').split(',').map(s => s.trim()).filter(Boolean);
-    if (!ids.length) return false;
+    // No steamids at all (a standalone lookup with no player loaded) only ever needed
+    // schema+rarity above, both already confirmed cached — nothing left to check.
+    if (!ids.length) return true;
     return ids.every(id => STEAM64_RE.test(id) && getCached(`playerach:${id}:${appid}`) !== undefined);
   },
 });
@@ -338,6 +362,24 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
   res.json(await fetchGameDetails(appid, { force: isForceRefresh(req) }));
 });
 
+// Recent news/announcements for one game — see newsLimit above for why this is its own
+// route rather than folded into fetchGameDetails/the SSE stream. Fetched by the side panel
+// (public/panel.js's loadNews) once per game, only when that game's panel actually opens.
+app.get('/api/game-news/:appid', newsLimit, async (req, res) => {
+  const appid = Number(req.params.appid);
+  if (!Number.isInteger(appid) || appid <= 0) {
+    return res.status(400).json({ error: 'Invalid appid' });
+  }
+  try {
+    const news = await getGameNews(appid, { force: isForceRefresh(req) });
+    res.json({ news });
+  } catch (err) {
+    if (err.isUpstream || err.name === 'TimeoutError') console.error('[upstream]', err.message);
+    const status = err.isUpstream ? 502 : err.name === 'TimeoutError' ? 504 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
+
 // Backs the Library Explorer side panel's "Achievements" section — schema (names/icons,
 // shared regardless of who's asking) plus per-account unlock state for every account
 // currently loaded (`steamids`, comma-separated; raw identifiers, resolved here same as
@@ -350,10 +392,13 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
   if (!Number.isInteger(appid) || appid <= 0) {
     return res.status(400).json({ error: 'Invalid appid' });
   }
+  // Player progress (steamids) is optional — the achievement *list* (names, descriptions,
+  // icons, community-wide rarity) is store metadata, not tied to any account, so it's still
+  // useful with nobody loaded (e.g. a standalone "look up any game" lookup). Only the
+  // achieved/unlocktime state per item depends on steamids being present; see `playerCount`
+  // in the response below, which the frontend uses to distinguish "no player was asked about"
+  // from "a player was asked about but their data is unavailable" (private:true).
   const rawIds = (req.query.steamids || '').split(',').map(s => s.trim()).filter(Boolean);
-  if (rawIds.length < 1) {
-    return res.status(400).json({ error: 'Provide at least 1 player' });
-  }
   if (rawIds.length > MAX_USERS) {
     return res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
   }
@@ -372,7 +417,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
     ]);
 
     if (!schema || schema.length === 0) {
-      return res.json({ achievements: [], total: 0, unlocked: 0, private: false });
+      return res.json({ achievements: [], total: 0, unlocked: 0, private: false, playerCount: steamIds.length });
     }
 
     // null means "no data for this account" (private profile, or never touched this game's
@@ -403,7 +448,11 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
       achievements,
       total: achievements.length,
       unlocked: unlockedAt.size,
-      private: !anyPlayerData,
+      // `private:true` when steamIds were given but yielded no usable data (private profile,
+      // or nobody in the group has touched this game's stats) — never true when steamIds was
+      // empty in the first place, that's what `playerCount` is for instead (see comment above).
+      private: steamIds.length > 0 && !anyPlayerData,
+      playerCount: steamIds.length,
     });
   } catch (err) {
     if (err.isUpstream || err.name === 'TimeoutError') console.error('[upstream]', err.message);

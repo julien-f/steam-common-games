@@ -7,8 +7,17 @@ let groups = [];    // [{ userIndices, games }] — ordered, from server
 let slots = [];     // [[{steamid, personaname, profileurl}, ...], ...] — one entry per logical player
 let playtime = {};  // { [appid]: { [steamId]: minutes } } — per-account playtime for common games
 let lastPlayed = {}; // { [appid]: { [steamId]: unix seconds } } — per-account last-played timestamp
-let sortCol = 'score';
-let sortDir = -1;
+const DEFAULT_SORT_COL = 'score';
+const DEFAULT_SORT_DIR = -1;
+let sortCol = DEFAULT_SORT_COL;
+let sortDir = DEFAULT_SORT_DIR;
+
+// null at the default sort — omitted from the URL entirely rather than writing out `-score`
+// on every search, since that's what a bare search already sorts by.
+function sortUrlParam() {
+  if (sortCol === DEFAULT_SORT_COL && sortDir === DEFAULT_SORT_DIR) return null;
+  return (sortDir < 0 ? '-' : '') + sortCol;
+}
 let runId = 0;           // increments on each search to cancel stale updates
 let streamController = null; // AbortController for the active detail stream
 let refreshDebounceTimer = null;
@@ -90,6 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
       activeGame = null;
       randomGroupKey = null;
       refreshTable(); // remove active row highlight
+      updateTitle();
       if (!preserveUrl) setPanelParam(null);
     },
   });
@@ -191,7 +201,8 @@ function loadFromUrl() {
     const accountsBarEl = document.getElementById('accounts-bar');
     accountsBarEl.hidden = true;
     accountsBarEl.innerHTML = '';
-    document.title = 'Steam Common Games';
+    updateTitle();
+    updateLibraryExplorerLink();
     // No comparison loaded at all — still honor a bare `?game=` standalone-lookup deep
     // link (findCommonGames would otherwise be the only caller of restorePanelFromUrl).
     restorePanelFromUrl(restoreShot);
@@ -371,8 +382,9 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
     if (pushState) {
       const params = new URLSearchParams();
       idSlots.forEach(slot => params.append('u', slot.join(',')));
-      params.set('sort', (sortDir < 0 ? '-' : '') + sortCol);
-      history.pushState(null, '', `?${params}`);
+      const sp = sortUrlParam();
+      if (sp) params.set('sort', sp);
+      history.pushState(null, '', `?${reorderUrlParams(params)}`);
     }
 
     renderPage();
@@ -499,6 +511,38 @@ function slotDisplayName(i) {
   return (slots[i] || []).map((p, j) => p.personaname || `Player ${i + 1}.${j + 1}`).join(' + ');
 }
 
+// Single source of truth for the tab title: an open game (from a table row or a standalone
+// lookup) takes over the title entirely rather than being appended to the comparison context —
+// once a game is open that's what the user is looking at, and it's what they'll want to find
+// again in browser history/tab search. Falls back to the slot names, then the bare app name
+// when nothing's loaded at all (see loadFromUrl's empty branch and renderPage below).
+function updateTitle() {
+  if (activeGame) {
+    document.title = `${activeGame.name} — Steam Common Games`;
+    return;
+  }
+  if (slots.length) {
+    const sortedSlotIndices = [...slots.keys()].sort((a, b) =>
+      slotDisplayName(a).toLowerCase().localeCompare(slotDisplayName(b).toLowerCase())
+    );
+    document.title = sortedSlotIndices.map(i => slotDisplayName(i)).join(', ') + ' — Steam Common Games';
+    return;
+  }
+  document.title = 'Steam Common Games';
+}
+
+// The header's cross-link to the Library Explorer (see index.html) points at that specific
+// player's data once exactly one slot is loaded — the Library Explorer has no notion of
+// multiple slots/a comparison, so a multi-slot search just falls back to the plain link.
+function updateLibraryExplorerLink() {
+  const link = document.getElementById('library-explorer-link');
+  if (slots.length === 1 && slots[0].length) {
+    link.href = `/library.html?u=${slots[0].map(p => p.steamid).join(',')}`;
+  } else {
+    link.href = '/library.html';
+  }
+}
+
 function slotHtml(i) {
   return (slots[i] || []).map((p, j) => {
     const name = esc(p.personaname || `Player ${i + 1}.${j + 1}`);
@@ -522,9 +566,8 @@ function renderPage() {
   );
   const playerList = sortedSlotIndices.map(i => slotHtml(i)).join(', ');
 
-  if (slots.length) {
-    document.title = sortedSlotIndices.map(i => slotDisplayName(i)).join(', ') + ' — Steam Common Games';
-  }
+  updateTitle();
+  updateLibraryExplorerLink();
 
   const groupSections = groups.map(group => {
     const key = group.userIndices.join(',');
@@ -637,7 +680,7 @@ async function fetchStandaloneDetails(game) {
     game.details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags, protondb: data.protondb };
     game.loading = false;
     if (game.details.meta?.name) game.name = game.details.meta.name;
-    if (activeGame === game) renderPanelBody(game); // no-op if the user moved on mid-fetch
+    if (activeGame === game) { renderPanelBody(game); updateTitle(); } // no-op if the user moved on mid-fetch
     addRecentGame(game.appid, game.name, game.details.meta?.capsule || null);
     renderRecentGamesBar(document.getElementById('recent-games-bar'));
   } catch (err) {
@@ -697,6 +740,7 @@ function openPanel(game, { isRandom = false } = {}) {
   }
   activeGame = game;
   panelOpen(game); // shared: renders hero+body, opens the panel, focuses it
+  updateTitle();
   renderPanelNav();
   refreshTable(); // re-render rows so the active highlight appears
   document.getElementById(`tbody-${game.groupKey}`)?.querySelector(`tr.game-row[data-appid="${game.appid}"]`)?.scrollIntoView({ block: 'nearest' });
@@ -729,7 +773,7 @@ function setPanelParam(appid) {
   } else {
     params.set('game', appid);
   }
-  history.replaceState(null, '', `?${params}`);
+  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
 }
 
 function setLightboxParam(idx) {
@@ -739,7 +783,7 @@ function setLightboxParam(idx) {
   } else {
     params.set('shot', idx);
   }
-  history.replaceState(null, '', `?${params}`);
+  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
 }
 
 function restorePanelFromUrl(restoreShot = null) {
@@ -912,14 +956,15 @@ function updateFilterUrl() {
   // Preserve current player slots as-is — already canonical from the last pushState
   const prev = new URLSearchParams(location.search);
   prev.getAll('u').forEach(u => params.append('u', u));
-  params.set('sort', (sortDir < 0 ? '-' : '') + sortCol);
+  const sp = sortUrlParam();
+  if (sp) params.set('sort', sp);
   if (prev.has('game')) params.set('game', prev.get('game'));
   if (nameFilter) params.set('name', nameFilter);
   // Append filter values in fixed dimension order, each sorted alphabetically
   for (const { key, param } of FILTER_DIMS) {
     [...activeFilters[key]].sort(cmp).forEach(v => params.append(param, v));
   }
-  history.replaceState(null, '', `?${params}`);
+  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
 }
 
 function hasActiveFilters() {

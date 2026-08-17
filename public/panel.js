@@ -123,9 +123,31 @@ async function handlePanelRefresh() {
   panelRefreshing = true;
   renderPanelBody(game);
   try {
-    await panelOptions.onRefresh(game);
+    await Promise.all([panelOptions.onRefresh(game), loadNews(game, { force: true })]);
   } finally {
     panelRefreshing = false;
+    if (panelGame === game) renderPanelBody(game); // no-op if the panel moved on mid-fetch
+  }
+}
+
+// News is deliberately NOT part of the host pages' rating/HLTB/meta/tags fetch (see
+// server.js's newsLimit comment for why) — it's kept entirely off `game.details` (which
+// app.js/library.js freely reassign wholesale whenever fresh rating/HLTB/etc. lands) and
+// fetched here instead, once per game, lazily, the same on-demand shape achievements
+// already use. `game.news`/`game.newsLoading` persist on the game/row object itself, so a
+// game already opened once in this session doesn't refetch on a later reopen.
+async function loadNews(game, { force = false } = {}) {
+  if (game.news !== undefined && !force) return; // already loaded this session
+  game.newsLoading = true;
+  try {
+    const res = await fetch(`/api/game-news/${game.appid}${force ? '?refresh=1' : ''}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'News lookup failed');
+    game.news = data.news;
+  } catch {
+    game.news = game.news ?? null; // leave the section hidden rather than surfacing an error for a non-essential feature
+  } finally {
+    game.newsLoading = false;
     if (panelGame === game) renderPanelBody(game); // no-op if the panel moved on mid-fetch
   }
 }
@@ -152,6 +174,7 @@ function panelOpen(game) {
   heroIdx = 0;
   panelPrevFocus = document.activeElement;
   document.getElementById('panel-body').scrollTop = 0;
+  loadNews(game); // no-op (see loadNews) if this game's news was already fetched this session
   renderPanelBody(game);
   document.getElementById('game-panel').classList.add('open');
   document.getElementById('panel-backdrop').classList.add('open');
@@ -437,10 +460,13 @@ function revealAchievement(appid, apiname) {
 // Explorer sets it; the comparison page's groups have no single well-defined "player" to
 // fetch progress for). `g.achievements` is loaded and attached by the host page itself
 // (library.js), asynchronously and separately from the rating/HLTB/tags SSE stream, since
-// it depends on which account(s) are currently loaded rather than just the appid — `g`
-// carries `achievementsLoading` while that fetch is in flight, then either `achievements`
-// (the server's `{ achievements, total, unlocked, private, steamUrl }` shape) or nothing at
-// all (no player loaded yet).
+// the achievement *list* only depends on the appid but progress depends on which account(s)
+// are currently loaded — `g` carries `achievementsLoading` while that fetch is in flight,
+// then either `achievements` (the server's `{ achievements, total, unlocked, private,
+// playerCount, steamUrl }` shape) or nothing at all (fetch never ran/failed). The list itself
+// is still fetched and shown with zero accounts loaded (`playerCount: 0`, no `steamUrl`) —
+// only the achieved/unlocktime/progress-summary parts need an account, gated by `hasProgress`
+// below.
 function achievementsHtml(g) {
   if (!panelOptions.showAchievements) return '';
   if (g.achievementsLoading) {
@@ -457,13 +483,20 @@ function achievementsHtml(g) {
       <div class="panel-no-data">This game has no achievements.</div>
     </div>`;
   }
-  const pct = Math.round((data.unlocked / data.total) * 100);
+  // With no player loaded (data.playerCount === 0 — a standalone "look up any game" lookup,
+  // see loadAchievements in library.js), `data.unlocked` is always 0 by construction, not a
+  // real "nobody's unlocked anything" result — the list itself (names/descriptions/icons/
+  // rarity) is still real store metadata worth showing, just without any progress claim on
+  // top of it. `hasProgress` gates every place that would otherwise imply real unlock data.
+  const hasProgress = data.playerCount > 0;
+  const pct = hasProgress ? Math.round((data.unlocked / data.total) * 100) : null;
   const expanded = expandedAchievements.has(g.appid);
 
   // Rows, not individual cards — one divider between rows instead of a border around each,
   // so the list reads as one thing inside the card rather than boxes stacked inside a box.
   const listHtml = !expanded ? '' : `<div class="panel-achievements-list">
-    ${data.private ? `<div class="panel-no-data">Progress unavailable — profile may be private.</div>` : ''}
+    ${!hasProgress ? `<div class="panel-no-data">Load a player above to see who's unlocked what.</div>`
+      : data.private ? `<div class="panel-no-data">Progress unavailable — profile may be private.</div>` : ''}
     ${data.achievements
       .slice()
       .sort((a, b) => Number(b.achieved) - Number(a.achieved))
@@ -509,14 +542,40 @@ function achievementsHtml(g) {
     <div class="panel-achievements-card">
       <div class="panel-achievements-card-header">
         <button type="button" class="panel-achievements-chip" data-appid="${g.appid}" aria-expanded="${expanded}">
-          <span class="panel-glance-num" style="color:${scoreColor(pct)}">${pct}%</span>
-          <span class="panel-glance-val"><b>Achievements</b> · ${data.unlocked} / ${data.total} unlocked</span>
+          <span class="panel-glance-num"${hasProgress ? ` style="color:${scoreColor(pct)}"` : ''}>${hasProgress ? `${pct}%` : '—'}</span>
+          <span class="panel-glance-val"><b>Achievements</b> · ${hasProgress ? `${data.unlocked} / ${data.total} unlocked` : `${data.total} total`}</span>
           <span class="panel-achievements-chevron">${expanded ? '▾' : '▸'}</span>
         </button>
         ${data.steamUrl ? `<a class="panel-icon-link" href="${esc(data.steamUrl)}" target="_blank" rel="noopener" title="View on Steam" aria-label="View achievements on Steam">↗</a>` : ''}
       </div>
       ${listHtml}
     </div>
+  </div>`;
+}
+
+// Recent news/announcements (patch notes, event posts) — a handful of headlines, each
+// linking straight to the full post, plus a link to the game's full news hub on the Steam
+// store for anything older than what's shown here. Dates use the same plain-ISO convention
+// as fmtLastPlayed/the table's date columns rather than a relative "3 days ago" string.
+function newsHtml(g) {
+  if (g.newsLoading) {
+    return `<div class="panel-section">
+      <div class="panel-section-title">News</div>
+      <span class="sk" style="display:block;width:100%;height:48px;border-radius:6px"></span>
+    </div>`;
+  }
+  const items = g.news;
+  if (!items || !items.length) return '';
+  return `<div class="panel-section">
+    <div class="panel-section-title">News</div>
+    <div class="panel-news">
+      ${items.slice(0, 3).map(n => `
+        <a class="panel-news-item" href="${esc(n.url)}" target="_blank" rel="noopener">
+          <span class="panel-news-title">${esc(n.title)}</span>
+          <span class="panel-news-meta">${esc(fmtLastPlayed(n.date))}${n.feedLabel ? ` · ${esc(n.feedLabel)}` : ''}</span>
+        </a>`).join('')}
+    </div>
+    <a class="panel-news-more" href="https://store.steampowered.com/news/app/${g.appid}" target="_blank" rel="noopener">More news →</a>
   </div>`;
 }
 
@@ -582,6 +641,7 @@ function renderPanelBody(game) {
         <div class="panel-icon-links">
           <a class="panel-icon-link" href="${esc(storeUrl)}" target="_blank" rel="noopener" title="Steam Store" aria-label="Steam Store">🛒</a>
           <a class="panel-icon-link" href="${esc(itadUrl)}" target="_blank" rel="noopener" title="IsThereAnyDeal" aria-label="IsThereAnyDeal">$</a>
+          <a class="panel-icon-link" href="https://store.steampowered.com/news/app/${g.appid}" target="_blank" rel="noopener" title="News" aria-label="News">📰</a>
           ${refreshBtn}
         </div>
       </div>
@@ -589,6 +649,7 @@ function renderPanelBody(game) {
     ${glanceGrid(g)}
     ${description ? `<div class="panel-desc">${description}</div>` : ''}
     ${hltbDetailHtml}
+    ${newsHtml(g)}
     ${achievementsHtml(g)}
     ${ownersHtml}
     ${cloudHtml}`;

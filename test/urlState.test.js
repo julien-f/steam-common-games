@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { FILTER_DIMS, parseUrlState } = require('../public/urlState');
+const { FILTER_DIMS, parseUrlState, reorderUrlParams } = require('../public/urlState');
 
 // ── parseUrlState — slots ─────────────────────────────────────────────────────
 
@@ -93,4 +93,31 @@ test('parseUrlState: nameFilter is empty string when absent', () => {
 test('FILTER_DIMS: has expected keys', () => {
   const keys = FILTER_DIMS.map(d => d.key);
   assert.deepEqual(keys, ['tags', 'genres', 'categories', 'developers', 'publishers']);
+});
+
+// ── reorderUrlParams ────────────────────────────────────────────────────────
+
+test('reorderUrlParams: sorts known params into a fixed canonical order regardless of input order', () => {
+  const params = new URLSearchParams('?name=portal&game=440&u=alice&sort=-score&tag=Indie');
+  assert.equal(reorderUrlParams(params).toString(), 'u=alice&sort=-score&game=440&name=portal&tag=Indie');
+});
+
+test('reorderUrlParams: two equivalent states with fields set in different orders serialize identically', () => {
+  const a = reorderUrlParams(new URLSearchParams('?u=alice&game=440&name=portal'));
+  const b = reorderUrlParams(new URLSearchParams('?name=portal&u=alice&game=440'));
+  assert.equal(a.toString(), b.toString());
+});
+
+test('reorderUrlParams: preserves repeated-key relative order (multiple u/tag values)', () => {
+  const params = new URLSearchParams('?tag=Indie&u=bob&tag=Coop&u=alice');
+  assert.equal(reorderUrlParams(params).toString(), 'u=bob&u=alice&tag=Indie&tag=Coop');
+});
+
+test('reorderUrlParams: appends unknown params after every known one, preserving their order', () => {
+  const params = new URLSearchParams('?foo=1&u=alice&bar=2');
+  assert.equal(reorderUrlParams(params).toString(), 'u=alice&foo=1&bar=2');
+});
+
+test('reorderUrlParams: empty input yields empty output', () => {
+  assert.equal(reorderUrlParams(new URLSearchParams()).toString(), '');
 });

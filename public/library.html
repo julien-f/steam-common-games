@@ -20,12 +20,6 @@
      table room to breathe; everything else here reuses index.html's shared
      header/.card/.btn styling rather than re-defining its own look. */
   .lib-page { max-width: 1600px; margin: 0 auto; padding: 36px 20px 60px; }
-  /* The shared `header`/`h1`/`p` rules in style.css already give this the same
-     centered hero treatment as index.html's header — only the back-link (which
-     index.html's header has no equivalent of) needs its own positioning here. */
-  .lib-page > header { position: relative; }
-  .lib-back { position: absolute; left: 0; top: 4px; color: var(--text1); text-decoration: none; font-size: 13px; }
-  .lib-back:hover { color: var(--accent2); }
 
   .lib-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
   /* .lib-tab supplies only the toggle-state coloring — padding/border-radius/font
@@ -81,7 +75,7 @@
 <div class="lib-page">
 
   <header>
-    <a class="lib-back" href="/">← Comparison tool</a>
+    <a class="header-nav-link left" id="back-to-comparison-link" href="/">← Comparison tool</a>
     <h1>Library Explorer</h1>
     <p>Browse one player's full Steam library or wishlist in a sortable, filterable table</p>
   </header>
@@ -159,6 +153,7 @@
 
 <script src="/hls.min.js"></script>
 <script src="/mediaItems.js"></script>
+<script src="/urlState.js"></script>
 <script src="/utils.js"></script>
 <script src="/accountsBar.js"></script>
 <script src="/gameSearch.js"></script>
