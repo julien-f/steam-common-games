@@ -416,6 +416,27 @@ test('getAppDetails: returns genres, categories, developers and publishers', asy
   assert.deepEqual(result.publishers, ['Valve']);
 });
 
+test('getAppDetails: dedupes genres/categories that share the same label but different ids', async (t) => {
+  // Real-world case (app 3357650): Steam lists distinct ids 55/56 both labeled "DualShock
+  // Controller Support" and 57/58 both "DualSense Controller Support" — since only the label
+  // is ever displayed, the duplicate id is never meaningful and shouldn't render as a
+  // repeated pill/table entry.
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {
+    genres:     [{ id: '1', description: 'Action' }, { id: '2', description: 'Action' }],
+    categories: [
+      { id: 55, description: 'DualShock Controller Support' },
+      { id: 56, description: 'DualShock Controller Support' },
+      { id: 57, description: 'DualSense Controller Support' },
+    ],
+    developers: ['Valve'],
+    publishers: ['Valve'],
+  }));
+  const result = await getAppDetails(400);
+  assert.deepEqual(result.genres,     ['Action']);
+  assert.deepEqual(result.categories, ['DualShock Controller Support', 'DualSense Controller Support']);
+});
+
 test('getAppDetails: handles missing optional fields with empty arrays', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
