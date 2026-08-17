@@ -453,6 +453,12 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
       // empty in the first place, that's what `playerCount` is for instead (see comment above).
       private: steamIds.length > 0 && !anyPlayerData,
       playerCount: steamIds.length,
+      // Steam's public, non-player-specific achievements page for this game (works with no
+      // login, no steamid needed) — not the same as a specific account's own achievements
+      // page (which would need a steamid and, for a merged Family slot, picking one member
+      // arbitrarily over the others), so this is the one link that's always correct
+      // regardless of who — if anyone — is currently loaded.
+      steamUrl: `https://steamcommunity.com/stats/${appid}/achievements/`,
     });
   } catch (err) {
     if (err.isUpstream || err.name === 'TimeoutError') console.error('[upstream]', err.message);

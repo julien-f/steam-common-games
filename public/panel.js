@@ -97,10 +97,12 @@ function initPanel(options = {}) {
 
   document.getElementById('game-panel').addEventListener('click', e => {
     if (e.target.closest('.panel-refresh-btn')) { handlePanelRefresh(); return; }
-    const toggleBtn = e.target.closest('.panel-achievements-chip');
-    if (toggleBtn) { toggleAchievementsExpanded(Number(toggleBtn.dataset.appid)); return; }
+    const toggleBtn = e.target.closest('.panel-collapsible-chip');
+    if (toggleBtn) { toggleSection(Number(toggleBtn.dataset.appid), toggleBtn.dataset.section); return; }
     const hiddenAch = e.target.closest('.panel-achievement--spoiler');
     if (hiddenAch) { revealAchievement(Number(hiddenAch.dataset.appid), hiddenAch.dataset.apiname); return; }
+    const navBtn = e.target.closest('.panel-subnav-btn');
+    if (navBtn) { jumpToPanelSection(navBtn.dataset.target); return; }
     const btn = e.target.closest('.panel-tag-btn');
     if (!btn || !panelOptions.onTagClick) return;
     panelOptions.onTagClick(btn.dataset.dim, btn.dataset.val);
@@ -208,6 +210,22 @@ function panelClose({ preserveUrl = false } = {}) {
   // from the URL, resetting the host's own "active game" state) can hook in without every
   // host having to remember to wrap all of those paths itself.
   panelOptions.onClose?.({ preserveUrl });
+}
+
+// Scrolls #panel-body so `target` (a section id, or the literal 'top') sits just below the
+// sticky title/subnav header, rather than under it. Computed via getBoundingClientRect()
+// deltas (viewport-relative, so it's correct regardless of #panel-body's own positioning
+// context) rather than offsetTop, which is relative to the nearest *positioned* ancestor —
+// here that's #game-panel (position: fixed), not #panel-body itself, so offsetTop would
+// include the hero/hero-filmstrip height above the header and land short.
+function jumpToPanelSection(target) {
+  const body = document.getElementById('panel-body');
+  if (target === 'top') { body.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  const el = document.getElementById(target);
+  if (!el) return;
+  const headerH = document.querySelector('.panel-header-sticky')?.getBoundingClientRect().height ?? 0;
+  const delta = el.getBoundingClientRect().top - body.getBoundingClientRect().top - headerH - 8;
+  body.scrollTo({ top: body.scrollTop + delta, behavior: 'smooth' });
 }
 
 function getPanelItems() {
@@ -429,26 +447,55 @@ function glanceGrid(g) {
   return `<div class="panel-glance">${chips.join('')}</div>`;
 }
 
-// Which games' achievement lists are expanded (collapsed by default — a 40-100 item list
-// would otherwise dominate the panel for every game that has one) and which individual
-// hidden achievements have been click-revealed. Keyed by appid / `${appid}:${apiname}` so
-// re-opening the same game later in the same session remembers the choice; never cleared
-// (a couple of numbers/strings per game touched is negligible, and a page reload resets it
-// anyway). Module-level like heroIdx/randomQueues above — this is UI state, not game data.
-const expandedAchievements = new Set();
+// Which collapsible sections (HLTB breakdown, news, achievements — anything built with
+// collapsibleCard() below) are expanded, keyed `${appid}:${section}` so each game/section
+// pair remembers its own choice independently, and which individual hidden achievements
+// have been click-revealed (keyed `${appid}:${apiname}`). Re-opening a game later in the
+// same session remembers prior choices; never cleared (a handful of strings per game
+// touched is negligible, and a page reload resets it anyway). Module-level like
+// heroIdx/randomQueues above — this is UI state, not game data.
+const expandedSections = new Set();
 const revealedAchievements = new Set();
+
+function isSectionExpanded(appid, section) { return expandedSections.has(`${appid}:${section}`); }
+
+function toggleSection(appid, section) {
+  const key = `${appid}:${section}`;
+  if (expandedSections.has(key)) expandedSections.delete(key);
+  else expandedSections.add(key);
+  if (panelGame) renderPanelBody(panelGame);
+}
+
+// Shared "one card, expand-in-place" shape used by HLTB breakdown, news, and achievements:
+// a full-width chip (glance-grid numeral + caption, same template as glanceChip) as the
+// header/toggle, an optional icon-link out to the source, and a divided list below once
+// expanded. Kept as one function so the three sections read as one visual family instead
+// of three near-identical hand-rolled blocks that drift apart over time.
+// `numHtml` is optional — HLTB's breakdown has no single number that isn't either
+// misleading (an arbitrary pick among Main/Extra/Completionist) or a plain repeat of the
+// glance strip's own "All PlayStyles" figure, so it renders as a plain text-only teaser
+// instead of forcing a numeral into a slot where one doesn't actually fit.
+function collapsibleCard({ appid, section, numHtml, numColor, valHtml, bodyHtml, linkHref, linkTitle }) {
+  const expanded = isSectionExpanded(appid, section);
+  const numSpan = numHtml == null ? '' : `<span class="panel-glance-num"${numColor ? ` style="color:${numColor}"` : ''}>${numHtml}</span>`;
+  return `<div class="panel-achievements-card">
+    <div class="panel-achievements-card-header">
+      <button type="button" class="panel-achievements-chip panel-collapsible-chip" data-appid="${appid}" data-section="${section}" aria-expanded="${expanded}">
+        ${numSpan}
+        <span class="panel-glance-val">${valHtml}</span>
+        <span class="panel-achievements-chevron">${expanded ? '▾' : '▸'}</span>
+      </button>
+      ${linkHref ? `<a class="panel-icon-link" href="${esc(linkHref)}" target="_blank" rel="noopener" title="${esc(linkTitle)}" aria-label="${esc(linkTitle)}">↗</a>` : ''}
+    </div>
+    ${expanded ? `<div class="panel-achievements-list">${bodyHtml}</div>` : ''}
+  </div>`;
+}
 
 // Steam's own percent strings already carry a decimal (e.g. "80.9"), but round numbers
 // parse to a plain integer (100 from "100.0") — toFixed(1) on those would print "100.0%",
 // so only force the decimal when the value isn't already a whole number.
 function fmtRarity(pct) {
   return `${Number.isInteger(pct) ? pct : pct.toFixed(1)}%`;
-}
-
-function toggleAchievementsExpanded(appid) {
-  if (expandedAchievements.has(appid)) expandedAchievements.delete(appid);
-  else expandedAchievements.add(appid);
-  if (panelGame) renderPanelBody(panelGame);
 }
 
 function revealAchievement(appid, apiname) {
@@ -470,7 +517,7 @@ function revealAchievement(appid, apiname) {
 function achievementsHtml(g) {
   if (!panelOptions.showAchievements) return '';
   if (g.achievementsLoading) {
-    return `<div class="panel-section">
+    return `<div class="panel-section" id="panel-section-achievements">
       <div class="panel-section-title">Achievements</div>
       <div class="panel-achievements"><span class="sk" style="width:100%;height:48px;border-radius:6px"></span></div>
     </div>`;
@@ -478,7 +525,7 @@ function achievementsHtml(g) {
   const data = g.achievements;
   if (!data) return '';
   if (!data.total) {
-    return `<div class="panel-section">
+    return `<div class="panel-section" id="panel-section-achievements">
       <div class="panel-section-title">Achievements</div>
       <div class="panel-no-data">This game has no achievements.</div>
     </div>`;
@@ -490,11 +537,10 @@ function achievementsHtml(g) {
   // top of it. `hasProgress` gates every place that would otherwise imply real unlock data.
   const hasProgress = data.playerCount > 0;
   const pct = hasProgress ? Math.round((data.unlocked / data.total) * 100) : null;
-  const expanded = expandedAchievements.has(g.appid);
 
   // Rows, not individual cards — one divider between rows instead of a border around each,
   // so the list reads as one thing inside the card rather than boxes stacked inside a box.
-  const listHtml = !expanded ? '' : `<div class="panel-achievements-list">
+  const bodyHtml = `
     ${!hasProgress ? `<div class="panel-no-data">Load a player above to see who's unlocked what.</div>`
       : data.private ? `<div class="panel-no-data">Progress unavailable — profile may be private.</div>` : ''}
     ${data.achievements
@@ -530,27 +576,18 @@ function achievementsHtml(g) {
           </div>
           ${rarityHtml}
         </div>`;
-      }).join('')}
-  </div>`;
+      }).join('')}`;
 
-  // One outer card (border/radius/background) holds both the header and the list, rather
-  // than a chip floating above a separate stack of boxes — a single grouped unit instead of
-  // two visually disconnected pieces. The header keeps the glance-grid chip look (bold
-  // color-coded percentage via scoreColor) as its clickable expand/collapse control; the
-  // list, when expanded, sits below a divider rather than a gap.
-  return `<div class="panel-section">
-    <div class="panel-achievements-card">
-      <div class="panel-achievements-card-header">
-        <button type="button" class="panel-achievements-chip" data-appid="${g.appid}" aria-expanded="${expanded}">
-          <span class="panel-glance-num"${hasProgress ? ` style="color:${scoreColor(pct)}"` : ''}>${hasProgress ? `${pct}%` : '—'}</span>
-          <span class="panel-glance-val"><b>Achievements</b> · ${hasProgress ? `${data.unlocked} / ${data.total} unlocked` : `${data.total} total`}</span>
-          <span class="panel-achievements-chevron">${expanded ? '▾' : '▸'}</span>
-        </button>
-        ${data.steamUrl ? `<a class="panel-icon-link" href="${esc(data.steamUrl)}" target="_blank" rel="noopener" title="View on Steam" aria-label="View achievements on Steam">↗</a>` : ''}
-      </div>
-      ${listHtml}
-    </div>
-  </div>`;
+  return `<div class="panel-section" id="panel-section-achievements">${collapsibleCard({
+    appid: g.appid,
+    section: 'achievements',
+    numHtml: hasProgress ? `${pct}%` : '—',
+    numColor: hasProgress ? scoreColor(pct) : null,
+    valHtml: `<b>Achievements</b> · ${hasProgress ? `${data.unlocked} / ${data.total} unlocked` : `${data.total} total`}`,
+    bodyHtml,
+    linkHref: data.steamUrl,
+    linkTitle: 'View achievements on Steam',
+  })}</div>`;
 }
 
 // Recent news/announcements (patch notes, event posts) — a handful of headlines, each
@@ -559,24 +596,44 @@ function achievementsHtml(g) {
 // as fmtLastPlayed/the table's date columns rather than a relative "3 days ago" string.
 function newsHtml(g) {
   if (g.newsLoading) {
-    return `<div class="panel-section">
+    return `<div class="panel-section" id="panel-section-news">
       <div class="panel-section-title">News</div>
       <span class="sk" style="display:block;width:100%;height:48px;border-radius:6px"></span>
     </div>`;
   }
   const items = g.news;
   if (!items || !items.length) return '';
-  return `<div class="panel-section">
-    <div class="panel-section-title">News</div>
+  // Used to truncate further to 3 client-side on top of extractNews' own 5-item cap
+  // (lib/steam.js), back when this section always rendered inline and a longer list ate
+  // into the panel's visible height for every game that had one. Now that it's collapsed
+  // by default (see collapsibleCard above), that constraint is gone — showing everything
+  // the server already fetched costs nothing until someone actually expands the card.
+  const bodyHtml = `<div class="panel-collapsible-body-pad">
     <div class="panel-news">
-      ${items.slice(0, 3).map(n => `
+      ${items.map(n => `
         <a class="panel-news-item" href="${esc(n.url)}" target="_blank" rel="noopener">
           <span class="panel-news-title">${esc(n.title)}</span>
           <span class="panel-news-meta">${esc(fmtLastPlayed(n.date))}${n.feedLabel ? ` · ${esc(n.feedLabel)}` : ''}</span>
         </a>`).join('')}
     </div>
-    <a class="panel-news-more" href="https://store.steampowered.com/news/app/${g.appid}" target="_blank" rel="noopener">More news →</a>
   </div>`;
+  return `<div class="panel-section" id="panel-section-news">${collapsibleCard({
+    appid: g.appid,
+    section: 'news',
+    // No numeral here (same reasoning as HLTB's chip, see collapsibleCard's numHtml
+    // comment) — the latest post's date used to sit here, but each headline already shows
+    // its own date once expanded, so repeating just the newest one in the collapsed header
+    // added a number without adding new information over what a click away reveals.
+    //
+    // Spelling out "more on Steam" here (not just relying on the ↗ icon's title tooltip)
+    // makes it explicit that this list is a preview, not the full history — the fetch
+    // itself is capped at 5 posts (extractNews, lib/steam.js), so there's essentially
+    // always more on the actual Steam news hub even once every fetched item is shown.
+    valHtml: `<b>News</b> · more on Steam`,
+    bodyHtml,
+    linkHref: `https://store.steampowered.com/news/app/${g.appid}`,
+    linkTitle: 'View all news on Steam',
+  })}</div>`;
 }
 
 function renderPanelBody(game) {
@@ -593,17 +650,33 @@ function renderPanelBody(game) {
 
   // The glance strip already carries HLTB's "All PlayStyles" number (see glanceGrid
   // above) — this is just the fuller Main/Extra/Completionist breakdown beneath it,
-  // once, not a second copy of the headline figure.
+  // once, not a second copy of the headline figure. Collapsed by default like
+  // achievements/news, EXCEPT when `all` itself is missing — then this breakdown is the
+  // only duration data the panel has at all, so hiding it behind a click would bury the
+  // one piece of HLTB info actually available for this game.
   let hltbDetailHtml = '';
   if (!g.loading && h && (h.main || h.extra || h.completionist)) {
-    hltbDetailHtml = `<div class="panel-section">
-      <div class="panel-section-title">How Long To Beat — breakdown</div>
+    if (!isSectionExpanded(g.appid, 'hltb') && h.all == null) expandedSections.add(`${g.appid}:hltb`);
+    // No numeral in this chip (see collapsibleCard's numHtml comment) — Main Story would
+    // be an arbitrary pick among three categories the breakdown itself doesn't privilege,
+    // and "All PlayStyles" is already the glance strip's own headline figure just above.
+    // The caption instead just names which categories the breakdown actually has.
+    const parts = [h.main && 'Main Story', h.extra && 'Main + Extra', h.completionist && 'Completionist'].filter(Boolean);
+    const bodyHtml = `<div class="panel-collapsible-body-pad">
       <div class="panel-hltb">
         ${h.main ? `<div class="panel-hltb-item"><div class="panel-hltb-label">Main Story</div><div class="panel-hltb-val">${fmtH(h.main)}</div></div>` : ''}
         ${h.extra ? `<div class="panel-hltb-item"><div class="panel-hltb-label">Main + Extra</div><div class="panel-hltb-val">${fmtH(h.extra)}</div></div>` : ''}
         ${h.completionist ? `<div class="panel-hltb-item"><div class="panel-hltb-label">Completionist</div><div class="panel-hltb-val">${fmtH(h.completionist)}</div></div>` : ''}
       </div>
     </div>`;
+    hltbDetailHtml = `<div class="panel-section" id="panel-section-hltb">${collapsibleCard({
+      appid: g.appid,
+      section: 'hltb',
+      valHtml: `<b>How Long To Beat</b> · ${parts.join(', ')}`,
+      bodyHtml,
+      linkHref: h.id ? `https://howlongtobeat.com/game/${h.id}` : null,
+      linkTitle: 'View on HowLongToBeat',
+    })}</div>`;
   }
 
   const tagDim = key => panelOptions.enableTagFilters ? key : null;
@@ -621,6 +694,28 @@ function renderPanelBody(game) {
   const refreshBtn = (panelOptions.onRefresh && !g.loading) ? `
     <button type="button" class="panel-refresh-btn${panelRefreshing ? ' is-refreshing' : ''}"${panelRefreshing ? ' disabled' : ''}
       title="Refresh rating, HLTB &amp; store details for this game" aria-label="Refresh details">↻</button>` : '';
+
+  const newsSectionHtml = newsHtml(g);
+  const achievementsSectionHtml = achievementsHtml(g);
+
+  // A sticky jump-nav for the sections below the fold — collapsing HLTB/news/achievements
+  // by default (see collapsibleCard above) means the panel is now mostly a scroll of
+  // section headers, so there's no longer an at-a-glance way to tell what's *in* a long
+  // panel without scrolling all the way through it. Built from which sections actually
+  // rendered content this time (an ownersHtml-less standalone lookup, or a game with no
+  // achievements/news/HLTB data, simply doesn't get a button for it) — only shown once
+  // there's more than one place worth jumping to; a lone "Owners" button with nothing
+  // else below it isn't worth the row.
+  const subnavItems = [
+    ownersHtml && { label: 'Owners', target: 'panel-section-owners' },
+    hltbDetailHtml && { label: 'HLTB', target: 'panel-section-hltb' },
+    newsSectionHtml && { label: 'News', target: 'panel-section-news' },
+    achievementsSectionHtml && { label: 'Achievements', target: 'panel-section-achievements' },
+  ].filter(Boolean);
+  const subnavHtml = subnavItems.length < 2 ? '' : `<div class="panel-subnav">
+    <button type="button" class="panel-subnav-btn" data-target="top">Overview</button>
+    ${subnavItems.map(it => `<button type="button" class="panel-subnav-btn" data-target="${it.target}">${it.label}</button>`).join('')}
+  </div>`;
 
   // Only the title row (title/release date/icon-links) is wrapped in .panel-header-sticky
   // and stays pinned while scrolling — the hero (built into #panel-hero below) and the
@@ -645,13 +740,14 @@ function renderPanelBody(game) {
           ${refreshBtn}
         </div>
       </div>
+      ${subnavHtml}
     </div>
     ${glanceGrid(g)}
     ${description ? `<div class="panel-desc">${description}</div>` : ''}
     ${hltbDetailHtml}
-    ${newsHtml(g)}
-    ${achievementsHtml(g)}
-    ${ownersHtml}
+    ${newsSectionHtml}
+    ${achievementsSectionHtml}
+    ${ownersHtml ? `<div id="panel-section-owners">${ownersHtml}</div>` : ''}
     ${cloudHtml}`;
 
   buildPanelHero();

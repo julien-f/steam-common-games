@@ -858,6 +858,30 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   gap: 8px;
 }
 
+/* Sticky sub-nav for jumping straight to a lower section — only rendered (see
+   renderPanelBody in panel.js) once there are at least two sections worth jumping to, so a
+   game with no HLTB/news/achievements/owners data never gets a lone useless button. Sits
+   inside .panel-header-sticky, below the title row, so it scrolls with (and stays pinned
+   alongside) the title rather than as a separate sticky region of its own. */
+.panel-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.panel-subnav-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text1);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.panel-subnav-btn:hover, .panel-subnav-btn:focus-visible { border-color: var(--accent); color: var(--accent2); outline: none; }
+
 .panel-icon-links { display: flex; gap: 6px; flex-shrink: 0; margin-top: 1px; }
 .panel-icon-link {
   width: 26px;
@@ -975,9 +999,11 @@ a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var
 .panel-hltb-label { font-size: 11px; color: var(--text2); margin-bottom: 3px; }
 .panel-hltb-val { font-size: 20px; font-weight: 600; color: var(--text0); }
 
-/* News — a short list of recent headlines (each linking straight to the post), plus a
-   trailing link to the game's full news hub for anything older. Rows, not cards, same
-   "one thing" treatment the achievements list uses instead of a border around each item. */
+/* News — a short list of recent headlines, each linking straight to the post. The link
+   out to the game's full news hub for anything older lives in the card header (see
+   collapsibleCard's linkHref, same spot achievements/HLTB put theirs) rather than a
+   trailing link here. Rows, not cards, same "one thing" treatment the achievements list
+   uses instead of a border around each item. */
 .panel-news { display: flex; flex-direction: column; }
 .panel-news-item {
   display: flex; flex-direction: column; gap: 2px;
@@ -988,12 +1014,6 @@ a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var
 .panel-news-title { font-size: 12.5px; color: var(--text0); font-weight: 500; }
 .panel-news-item:hover .panel-news-title { color: var(--accent2); }
 .panel-news-meta { font-size: 11px; color: var(--text2); }
-.panel-news-more {
-  display: inline-block; margin-top: 8px; font-size: 11.5px;
-  color: var(--text1); text-decoration: none;
-  border-bottom: 1px solid transparent; transition: color 0.15s, border-color 0.15s;
-}
-.panel-news-more:hover { color: var(--accent2); border-bottom-color: var(--accent2); }
 
 /* One card (border/radius/background) holds both the header and the list — a single
    grouped unit instead of a chip floating above a separate stack of boxes. The header
@@ -1021,6 +1041,12 @@ a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var
    list inside the card rather than boxes stacked inside a box. */
 .panel-achievements-list { border-top: 1px solid var(--border); }
 .panel-achievements-list .panel-no-data { padding: 8px 10px; }
+
+/* collapsibleCard() (panel.js) is shared by achievements, HLTB breakdown, and news, but
+   only achievements' own rows (.panel-achievement-row) carry their own left/right padding
+   — HLTB's grid and news' list don't, so their bodyHtml wraps in this instead of every
+   non-achievement caller having to remember matching inset padding by hand. */
+.panel-collapsible-body-pad { padding: 10px; }
 .panel-achievement-row {
   display: flex; align-items: center; gap: 10px;
   padding: 8px 10px;

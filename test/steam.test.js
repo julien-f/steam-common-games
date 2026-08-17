@@ -808,18 +808,18 @@ test('getGlobalAchievementPercentages: caches result — second call skips fetch
 
 // ── getGameNews ────────────────────────────────────────────────────────────────
 
-test('getGameNews: extracts title, url, date and feedLabel, capped at 5', async (t) => {
+test('getGameNews: extracts title, url, date and feedLabel, capped at 20', async (t) => {
   _reset();
-  const newsitems = Array.from({ length: 8 }, (_, i) => ({
+  const newsitems = Array.from({ length: 25 }, (_, i) => ({
     gid: String(i), title: `Update ${i}`, url: `https://store.steampowered.com/news/app/400/view/${i}`,
     date: 1700000000 + i, feedlabel: 'Community Announcements', feedname: 'steam_community_announcements', contents: 'ignored',
   }));
   t.mock.method(globalThis, 'fetch', async () => ({
-    ok: true, json: async () => ({ appnews: { appid: 400, newsitems, count: 8 } }),
+    ok: true, json: async () => ({ appnews: { appid: 400, newsitems, count: 25 } }),
   }));
 
   const result = await getGameNews(400);
-  assert.equal(result.length, 5);
+  assert.equal(result.length, 20);
   assert.deepEqual(result[0], {
     title: 'Update 0', url: 'https://store.steampowered.com/news/app/400/view/0',
     date: 1700000000, feedLabel: 'Community Announcements',
