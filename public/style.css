@@ -54,7 +54,7 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
   margin-bottom: 18px;
 }
 .card h2 { font-size: 13px; font-weight: 600; color: var(--text1); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
-.card-subtitle { font-size: 13px; color: var(--text2); margin-bottom: 14px; line-height: 1.5; }
+.card-subtitle { font-size: 13px; color: var(--text1); margin-bottom: 14px; line-height: 1.5; }
 
 /* User inputs */
 #user-inputs { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
@@ -217,7 +217,7 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
 /* HLTB cells */
 .td-hltb { min-width: 80px; font-variant-numeric: tabular-nums; }
 
-.dim { color: var(--text2); }
+.dim { color: var(--text1); }
 
 /* Game groups */
 .game-group { margin-bottom: 32px; }
@@ -287,7 +287,7 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   height: 32px;
   background: transparent;
   border: 1px solid var(--border);
-  color: var(--text2);
+  color: var(--text1);
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
@@ -298,7 +298,7 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
 .family-hint {
   display: none;
   font-size: 12px;
-  color: var(--text2);
+  color: var(--text1);
   padding-left: 40px;
   font-style: italic;
 }
@@ -342,7 +342,7 @@ a.account-identity:hover .account-name { color: var(--accent2); }
 .account-refresh-btn {
   flex-shrink: 0; width: 20px; height: 20px; padding: 0;
   background: transparent; border: 1px solid var(--border); border-radius: 50%;
-  color: var(--text2); font-size: 11px; line-height: 1; cursor: pointer;
+  color: var(--text1); font-size: 11px; line-height: 1; cursor: pointer;
 }
 .account-refresh-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .account-refresh-btn:disabled { cursor: default; opacity: 0.6; }
@@ -357,7 +357,7 @@ a.account-identity:hover .account-name { color: var(--accent2); }
 .account-status-ingame  { background: #a3cf4e; }
 .account-meta { display: flex; flex-direction: column; line-height: 1.25; }
 .account-name { font-size: 13px; font-weight: 500; }
-.account-count { font-size: 11px; color: var(--text2); }
+.account-count { font-size: 11px; color: var(--text1); }
 .account-private {
   font-size: 11px; font-weight: 500;
   padding: 2px 7px; border-radius: 999px;
@@ -366,7 +366,7 @@ a.account-identity:hover .account-name { color: var(--accent2); }
 
 /* Recent searches bar — locally-remembered past searches, shown above the accounts bar */
 .recents-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
-.recents-label { font-size: 12px; color: var(--text2); }
+.recents-label { font-size: 12px; color: var(--text1); }
 .recent-chip {
   display: flex; align-items: center; gap: 6px;
   padding: 3px 4px 3px 4px;
@@ -382,10 +382,10 @@ a.account-identity:hover .account-name { color: var(--accent2); }
 .recent-chip-remove {
   flex-shrink: 0; width: 16px; height: 16px; padding: 0;
   background: transparent; border: none; border-radius: 50%;
-  color: var(--text2); font-size: 12px; line-height: 1; cursor: pointer;
+  color: var(--text1); font-size: 12px; line-height: 1; cursor: pointer;
 }
 .recent-chip-remove:hover { color: #cc5050; }
-.recents-clear { font-size: 12px; color: var(--text2); background: none; border: none; cursor: pointer; padding: 0; }
+.recents-clear { font-size: 12px; color: var(--text1); background: none; border: none; cursor: pointer; padding: 0; }
 .recents-clear:hover { color: var(--accent2); }
 
 /*
@@ -814,7 +814,7 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
    so labeling it again would be redundant; 🎲 isn't a keyboard glyph, so it needs one. */
 .panel-nav-kbd {
   position: absolute; bottom: -1px; right: 1px; font-size: 8px; line-height: 1.3;
-  color: var(--text2); background: var(--bg3); border-radius: 2px; padding: 0 2px;
+  color: var(--text1); background: var(--bg3); border-radius: 2px; padding: 0 2px;
 }
 .panel-nav-pos {
   font-size: 12px;
@@ -931,7 +931,7 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 
 .panel-release {
   font-size: 12px;
-  color: var(--text2);
+  color: var(--text1);
 }
 
 .panel-desc {
@@ -948,7 +948,7 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--text2);
+  color: var(--text1);
   margin-bottom: 7px;
   display: flex;
   align-items: center;
@@ -992,11 +992,11 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var(--accent); outline: none; }
 .panel-glance-sub { display: flex; flex-direction: column; line-height: 1.25; gap: 1px; min-width: 0; }
 .panel-glance-num { font-size: 17px; font-weight: 700; color: var(--text0); font-variant-numeric: tabular-nums; }
-.panel-glance-val { font-size: 11px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panel-glance-val { font-size: 11px; color: var(--text1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .panel-glance-val b { color: var(--text1); font-weight: 600; }
 
 .panel-hltb { display: flex; flex-wrap: wrap; gap: 24px 24px; row-gap: 14px; }
-.panel-hltb-label { font-size: 11px; color: var(--text2); margin-bottom: 3px; }
+.panel-hltb-label { font-size: 11px; color: var(--text1); margin-bottom: 3px; }
 .panel-hltb-val { font-size: 20px; font-weight: 600; color: var(--text0); }
 
 /* News — a short list of recent headlines, each linking straight to the post. The link
@@ -1013,29 +1013,39 @@ a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var
 .panel-news-item:last-child { border-bottom: none; }
 .panel-news-title { font-size: 12.5px; color: var(--text0); font-weight: 500; }
 .panel-news-item:hover .panel-news-title { color: var(--accent2); }
-.panel-news-meta { font-size: 11px; color: var(--text2); }
+.panel-news-meta { font-size: 11px; color: var(--text1); }
 
 /* One card (border/radius/background) holds both the header and the list — a single
    grouped unit instead of a chip floating above a separate stack of boxes. The header
-   still uses the glance grid's chip template (panel-glance-num/-val) for its bold
-   color-coded percentage, but as a plain full-width control (no border/background of its
-   own — the card supplies both) rather than a second nested chip. */
+   reuses the glance grid's chip template (panel-glance-num/-val) for its bold
+   color-coded percentage, but everything else about it is deliberately NOT chip-styled:
+   the glance grid is inert data (a value you read), this header is a control (something
+   you click). Background stays --bg0, same as the glance chips — that pairing already
+   has proven contrast against the panel's own --bg1 fill (a lighter --bg1 fill here
+   measures ~1:1 luminance contrast against that same panel background, i.e.
+   *invisible* but for its 1px border; --bg0 measures ~1.5:1, which is why the glance
+   grid reads as a distinct panel of chips rather than a description). What actually
+   marks this as a control rather than a data point is the left accent stripe (absent
+   from glance chips) plus a chevron that's accent-colored at rest, not just on hover. */
 .panel-achievements-card {
   border: 1px solid var(--border);
+  border-left: 3px solid var(--accent2);
   border-radius: var(--r);
   background: var(--bg0);
   overflow: hidden; /* clips the list's rows to the card's rounded corners */
+  transition: border-color 0.15s;
 }
+.panel-achievements-card:has(.panel-achievements-chip:hover),
+.panel-achievements-card:has(.panel-achievements-chip:focus-visible) { border-color: var(--accent); }
 .panel-achievements-card-header { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
 .panel-achievements-chip {
   flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0;
   background: none; border: none; padding: 0; margin: 0;
   font: inherit; text-align: left; cursor: pointer;
 }
-.panel-achievements-chip:hover .panel-achievements-chevron,
-.panel-achievements-chip:focus-visible .panel-achievements-chevron { color: var(--accent2); outline: none; }
+.panel-achievements-chip:focus-visible { outline: none; }
 .panel-achievements-chip .panel-glance-val { flex: 1; }
-.panel-achievements-chevron { color: var(--text2); font-size: 12px; flex-shrink: 0; transition: color 0.15s; }
+.panel-achievements-chevron { color: var(--accent2); font-size: 14px; font-weight: 700; flex-shrink: 0; }
 
 /* Rows divided by a line between them, not individually bordered/boxed — reads as one
    list inside the card rather than boxes stacked inside a box. */
@@ -1060,11 +1070,11 @@ a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var
 .panel-achievement-icon { width: 32px; height: 32px; border-radius: 4px; flex-shrink: 0; }
 .panel-achievement-text { flex: 1; min-width: 0; }
 .panel-achievement-name { font-size: 12px; font-weight: 600; color: var(--text0); }
-.panel-achievement-desc { font-size: 11px; color: var(--text2); margin-top: 1px; }
+.panel-achievement-desc { font-size: 11px; color: var(--text1); margin-top: 1px; }
 /* Rarity (community-wide unlock %) — kept neutral/muted, not color-coded like the ratings
    elsewhere in the panel, since a low % isn't a "bad" value the way a low score is. */
 .panel-achievement-rarity {
-  font-size: 11px; color: var(--text2); font-variant-numeric: tabular-nums;
+  font-size: 11px; color: var(--text1); font-variant-numeric: tabular-nums;
   flex-shrink: 0; margin-left: 8px;
 }
 
@@ -1083,13 +1093,13 @@ a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var
 }
 .panel-tag-btn:hover { border-color: var(--accent); color: var(--accent2); }
 .panel-tag-btn.active { background: rgba(26,159,255,0.15); border-color: rgba(26,159,255,0.4); color: var(--accent); }
-.panel-tag-playtime { color: var(--text2); }
+.panel-tag-playtime { color: var(--text1); }
 
 /* Tags/genres/categories/developer-publisher merged into one cloud (tagCloud() in
    panel.js) instead of four near-identical "uppercase title + pill row" sections —
    kind distinguished by this small dot + the legend below instead of by section. */
 .panel-tag-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
-.panel-tag-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 8px; font-size: 10.5px; color: var(--text2); }
+.panel-tag-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 8px; font-size: 10.5px; color: var(--text1); }
 .panel-tag-legend-item { display: inline-flex; align-items: center; }
 
 /* Owned by — ordered by last played (most recent first, see buildOwnersHtml in
@@ -1099,11 +1109,11 @@ a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var
 .panel-owners { display: flex; flex-direction: column; gap: 10px; }
 .panel-owner-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .panel-owner-name { color: var(--text0); font-weight: 500; font-size: 12.5px; }
-.panel-owner-lastplayed { color: var(--text2); font-size: 11px; flex-shrink: 0; white-space: nowrap; }
+.panel-owner-lastplayed { color: var(--text1); font-size: 11px; flex-shrink: 0; white-space: nowrap; }
 .panel-owner-meter-track { height: 4px; border-radius: 2px; background: var(--bg0); overflow: hidden; margin-top: 5px; }
 .panel-owner-meter-fill { height: 100%; background: var(--accent2); border-radius: 2px; }
 .panel-owner-playtime { display: block; margin-top: 3px; font-size: 11px; color: var(--text1); }
-.panel-section-subtitle { text-transform: none; font-weight: 400; letter-spacing: 0; color: var(--text2); }
+.panel-section-subtitle { text-transform: none; font-weight: 400; letter-spacing: 0; color: var(--text1); }
 
 /* Screenshot lightbox */
 #screenshot-lightbox {
@@ -1304,7 +1314,7 @@ body.lb-open { overflow: hidden; }
 .site-footer {
   text-align: center;
   font-size: 12px;
-  color: var(--text2);
+  color: var(--text1);
   margin-top: 40px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
@@ -1318,7 +1328,7 @@ body.lb-open { overflow: hidden; }
   padding: 1px 5px;
   color: var(--text1);
 }
-.footer-link { color: var(--text2); text-decoration: none; }
+.footer-link { color: var(--text1); text-decoration: none; }
 .footer-link:hover { color: var(--accent2); }
 
 /* Keyboard shortcuts modal */
@@ -1393,7 +1403,7 @@ kbd {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: var(--text2);
+  color: var(--text1);
   margin-bottom: 8px;
 }
 .shortcuts-row {

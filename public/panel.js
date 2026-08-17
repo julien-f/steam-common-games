@@ -743,12 +743,12 @@ function renderPanelBody(game) {
       ${subnavHtml}
     </div>
     ${glanceGrid(g)}
+    ${cloudHtml}
     ${description ? `<div class="panel-desc">${description}</div>` : ''}
     ${hltbDetailHtml}
     ${newsSectionHtml}
     ${achievementsSectionHtml}
-    ${ownersHtml ? `<div id="panel-section-owners">${ownersHtml}</div>` : ''}
-    ${cloudHtml}`;
+    ${ownersHtml ? `<div id="panel-section-owners">${ownersHtml}</div>` : ''}`;
 
   buildPanelHero();
 }
