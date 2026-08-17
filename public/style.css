@@ -881,6 +881,9 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   transition: border-color 0.15s, color 0.15s;
 }
 .panel-subnav-btn:hover, .panel-subnav-btn:focus-visible { border-color: var(--accent); color: var(--accent2); outline: none; }
+/* Scroll-spy state (updateSubnavScrollSpy in panel.js) — filled instead of just the
+   hover/focus outline, so "where am I" reads at a glance without needing to hover. */
+.panel-subnav-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 .panel-icon-links { display: flex; gap: 6px; flex-shrink: 0; margin-top: 1px; }
 .panel-icon-link {
@@ -934,9 +937,27 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   color: var(--text1);
 }
 
+/* Shared "inert data" card shell — same bg0-on-bg1 + 1px border pairing the glance chips
+   use (see the comment above .panel-achievements-card for why that specific pairing is
+   the one that actually reads as a distinct panel rather than a description at ~1:1
+   contrast). No left accent stripe/chevron here, unlike .panel-achievements-card — those
+   mark a *control* (something you click to expand); the description and tag cloud are
+   plain content, so they get the same box treatment minus the "this is clickable" cues.
+   Applied alongside each section's own class (.panel-desc, .panel-section--meta) rather
+   than replacing them, so this only owns the shared box and each keeps its own spacing. */
+.panel-card {
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--bg0);
+  padding: 10px 12px;
+}
+
+/* --text0/13px, not the --text1/12px caption treatment used elsewhere in the panel — this
+   is prose meant to be read, not secondary metadata. Sits directly under the glance grid,
+   ahead of the tag cloud, so it reads as "what this game is" before "how it's tagged". */
 .panel-desc {
-  font-size: 12px;
-  color: var(--text1);
+  font-size: 13px;
+  color: var(--text0);
   line-height: 1.5;
   margin-bottom: 18px;
 }
@@ -1046,6 +1067,10 @@ a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var
 .panel-achievements-chip:focus-visible { outline: none; }
 .panel-achievements-chip .panel-glance-val { flex: 1; }
 .panel-achievements-chevron { color: var(--accent2); font-size: 14px; font-weight: 700; flex-shrink: 0; }
+/* Fills the numeral's slot for a card with no number to show (HLTB, News) — same
+   font-size as panel-glance-num so the row's height/alignment doesn't shift depending on
+   whether a card happens to have a numeral or an icon there. */
+.panel-achievements-icon { font-size: 17px; line-height: 1; flex-shrink: 0; }
 
 /* Rows divided by a line between them, not individually bordered/boxed — reads as one
    list inside the card rather than boxes stacked inside a box. */

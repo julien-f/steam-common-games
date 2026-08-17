@@ -110,6 +110,42 @@ function initPanel(options = {}) {
 
   initPanelSwipe();
   initHeroSwipe();
+  initSubnavScrollSpy();
+}
+
+// Highlights whichever subnav button corresponds to the section currently scrolled to the
+// top of the visible body, instead of the subnav being a static row of jump-links with no
+// sense of "where am I". Bound once to #panel-body (stable across re-renders, same
+// reasoning as the other delegated listeners in initPanel above) rather than to the subnav
+// itself, which is rebuilt from scratch on every renderPanelBody call.
+function initSubnavScrollSpy() {
+  document.getElementById('panel-body').addEventListener('scroll', () => {
+    requestAnimationFrame(updateSubnavScrollSpy);
+  }, { passive: true });
+}
+
+// Buttons are walked in DOM order, which renderPanelBody keeps identical to the physical
+// top-to-bottom order of the sections themselves (Owners right after the description,
+// then HLTB/News/Achievements — see subnavItems above) — so the *last* button whose
+// section has scrolled up to (or past) the sticky header counts as "current", same idea as
+// a scrollspy TOC. None qualifying means we're still above the first section, i.e. still
+// looking at the Overview (glance grid/description) itself.
+function updateSubnavScrollSpy() {
+  const nav = document.querySelector('.panel-subnav');
+  if (!nav) return;
+  const body = document.getElementById('panel-body');
+  const headerH = document.querySelector('.panel-header-sticky')?.getBoundingClientRect().height ?? 0;
+  const threshold = body.getBoundingClientRect().top + headerH + 8;
+  const buttons = [...nav.querySelectorAll('.panel-subnav-btn')];
+  let activeTarget = 'top';
+  for (const btn of buttons) {
+    const target = btn.dataset.target;
+    if (target === 'top') continue;
+    const el = document.getElementById(target);
+    if (!el || el.getBoundingClientRect().top > threshold) continue;
+    activeTarget = target;
+  }
+  buttons.forEach(btn => btn.classList.toggle('active', btn.dataset.target === activeTarget));
 }
 
 function isPanelOpen() { return panelGame != null; }
@@ -369,7 +405,7 @@ function tagCloud(groups) {
   const legendHtml = [...seenKinds].map(k =>
     `<span class="panel-tag-legend-item"><span class="panel-tag-dot" style="background:${TAG_KIND_META[k].color}"></span>${TAG_KIND_META[k].label}</span>`
   ).join('');
-  return `<div class="panel-section panel-section--meta">
+  return `<div class="panel-section panel-section--meta panel-card">
     <div class="panel-section-title">Tags &amp; details</div>
     <div class="panel-tags">${pillsHtml}</div>
     <div class="panel-tag-legend">${legendHtml}</div>
@@ -474,10 +510,15 @@ function toggleSection(appid, section) {
 // `numHtml` is optional — HLTB's breakdown has no single number that isn't either
 // misleading (an arbitrary pick among Main/Extra/Completionist) or a plain repeat of the
 // glance strip's own "All PlayStyles" figure, so it renders as a plain text-only teaser
-// instead of forcing a numeral into a slot where one doesn't actually fit.
-function collapsibleCard({ appid, section, numHtml, numColor, valHtml, bodyHtml, linkHref, linkTitle }) {
+// instead of forcing a numeral into a slot where one doesn't actually fit. `icon` fills
+// that same leading slot instead, for a card with no numHtml at all (HLTB, News) — without
+// it, those two rows read as plain text next to achievements' bold colored percentage,
+// losing the "one visual family" look this whole shape is meant to have.
+function collapsibleCard({ appid, section, numHtml, numColor, icon, valHtml, bodyHtml, linkHref, linkTitle }) {
   const expanded = isSectionExpanded(appid, section);
-  const numSpan = numHtml == null ? '' : `<span class="panel-glance-num"${numColor ? ` style="color:${numColor}"` : ''}>${numHtml}</span>`;
+  const numSpan = numHtml != null
+    ? `<span class="panel-glance-num"${numColor ? ` style="color:${numColor}"` : ''}>${numHtml}</span>`
+    : icon ? `<span class="panel-achievements-icon">${icon}</span>` : '';
   return `<div class="panel-achievements-card">
     <div class="panel-achievements-card-header">
       <button type="button" class="panel-achievements-chip panel-collapsible-chip" data-appid="${appid}" data-section="${section}" aria-expanded="${expanded}">
@@ -620,6 +661,7 @@ function newsHtml(g) {
   return `<div class="panel-section" id="panel-section-news">${collapsibleCard({
     appid: g.appid,
     section: 'news',
+    icon: '📰',
     // No numeral here (same reasoning as HLTB's chip, see collapsibleCard's numHtml
     // comment) — the latest post's date used to sit here, but each headline already shows
     // its own date once expanded, so repeating just the newest one in the collapsed header
@@ -672,6 +714,7 @@ function renderPanelBody(game) {
     hltbDetailHtml = `<div class="panel-section" id="panel-section-hltb">${collapsibleCard({
       appid: g.appid,
       section: 'hltb',
+      icon: '⏱️',
       valHtml: `<b>How Long To Beat</b> · ${parts.join(', ')}`,
       bodyHtml,
       linkHref: h.id ? `https://howlongtobeat.com/game/${h.id}` : null,
@@ -705,7 +748,11 @@ function renderPanelBody(game) {
   // rendered content this time (an ownersHtml-less standalone lookup, or a game with no
   // achievements/news/HLTB data, simply doesn't get a button for it) — only shown once
   // there's more than one place worth jumping to; a lone "Owners" button with nothing
-  // else below it isn't worth the row.
+  // else below it isn't worth the row. Listed in the same order the sections actually
+  // appear below (Owners right after the description, ahead of the collapsibles — see
+  // renderPanelBody's markup below) so scroll-spy highlighting (see
+  // initSubnavScrollSpy) always lights up left-to-right as you scroll down, never out
+  // of order.
   const subnavItems = [
     ownersHtml && { label: 'Owners', target: 'panel-section-owners' },
     hltbDetailHtml && { label: 'HLTB', target: 'panel-section-hltb' },
@@ -719,8 +766,8 @@ function renderPanelBody(game) {
 
   // Only the title row (title/release date/icon-links) is wrapped in .panel-header-sticky
   // and stays pinned while scrolling — the hero (built into #panel-hero below) and the
-  // glance grid scroll away with the rest of the body (description, HLTB breakdown,
-  // owners, tag cloud). #panel-hero used to be a fixed sibling of #panel-body outside the
+  // glance grid scroll away with the rest of the body (description, owners, tag cloud,
+  // HLTB breakdown). #panel-hero used to be a fixed sibling of #panel-body outside the
   // scroll container, which meant it (plus the glance grid) permanently ate into the
   // panel's visible height on short/mobile screens with no way to scroll it out of the
   // way. Rendering it as the first child here instead — and rebuilding it fresh via
@@ -736,21 +783,26 @@ function renderPanelBody(game) {
         <div class="panel-icon-links">
           <a class="panel-icon-link" href="${esc(storeUrl)}" target="_blank" rel="noopener" title="Steam Store" aria-label="Steam Store">🛒</a>
           <a class="panel-icon-link" href="${esc(itadUrl)}" target="_blank" rel="noopener" title="IsThereAnyDeal" aria-label="IsThereAnyDeal">$</a>
-          <a class="panel-icon-link" href="https://store.steampowered.com/news/app/${g.appid}" target="_blank" rel="noopener" title="News" aria-label="News">📰</a>
+          ${!newsSectionHtml ? `<a class="panel-icon-link" href="https://store.steampowered.com/news/app/${g.appid}" target="_blank" rel="noopener" title="News" aria-label="News">📰</a>` : ''}
           ${refreshBtn}
         </div>
       </div>
       ${subnavHtml}
     </div>
     ${glanceGrid(g)}
+    ${description ? `<div class="panel-desc panel-card">${description}</div>` : ''}
+    ${ownersHtml ? `<div id="panel-section-owners">${ownersHtml}</div>` : ''}
     ${cloudHtml}
-    ${description ? `<div class="panel-desc">${description}</div>` : ''}
     ${hltbDetailHtml}
     ${newsSectionHtml}
-    ${achievementsSectionHtml}
-    ${ownersHtml ? `<div id="panel-section-owners">${ownersHtml}</div>` : ''}`;
+    ${achievementsSectionHtml}`;
 
   buildPanelHero();
+  // Subnav markup (and every section it targets) is rebuilt fresh above — re-run the
+  // scroll-spy once so a re-render triggered mid-scroll (toggling a collapsible, the
+  // refresh button) doesn't leave the old subnav's active button highlighted, or none at
+  // all, until the next scroll event fires.
+  updateSubnavScrollSpy();
 }
 
 function initHeroSwipe() {
