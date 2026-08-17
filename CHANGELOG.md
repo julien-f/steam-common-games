@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Comparison page (`public/app.js`): a standalone "look up any game" lookup (no player loaded, or a game nobody in the comparison owns) now shows the Achievements section too, matching what the Library Explorer already did for its own no-player case — the section was silently never wired up on this page at all (`showAchievements` was never set on `initPanel`), so it just never appeared regardless of whether a game had achievements. A loaded comparison-group game still shows nothing here, same as before: unlike the Library Explorer's single player, a comparison group has no one well-defined account to fetch unlock progress for (a game can belong to several slots/Families at once), so per-account progress on this page remains a separate, not-yet-tackled piece of work — this fix only covers the list-only, no-progress case standalone lookups already support server-side (`steamids` is optional on `GET /api/achievements/:appid`).
+
 ### Changed
 
 - Side panel (`public/panel.js`, shared by both pages): the game description now renders right under the glance grid, ahead of the tag cloud, instead of after it — it's the "what this game is" text and previously got buried under a wall of tag/genre/category chips. It, along with the tag cloud, now sits in the same bordered `.panel-card` box HLTB/News/Achievements already used, instead of being bare unboxed `<div>`s — the whole panel body now reads as one consistent stack of cards rather than two different visual systems glued together.

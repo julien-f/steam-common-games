@@ -23,6 +23,9 @@ let streamController = null; // AbortController for the active detail stream
 let refreshDebounceTimer = null;
 let activeGame = null;
 let randomGroupKey = null;      // groupKey of the active random session, or null (queues themselves live in panel.js)
+// Achievement list cache for standalone lookups only (see loadAchievements) — keyed by
+// appid, no per-account progress since a standalone game has no steamids at all.
+const achievementsCache = new Map();
 
 const RECENTS_KEY = 'comparison:recent-searches'; // see public/accountsBar.js
 
@@ -77,6 +80,16 @@ document.addEventListener('DOMContentLoaded', () => {
   initPanel({
     inertSelector: '.container',
     enableTagFilters: true,
+    // Achievements are opt-in per host page (see panel.js's achievementsHtml). Unlike the
+    // Library Explorer, a comparison group has no single well-defined "player" to fetch
+    // unlock progress for (a game can belong to several slots at once, each possibly a
+    // merged Family) — so for now this only actually renders anything for a standalone
+    // "look up any game" lookup (see loadAchievements below), where the list itself
+    // (names/descriptions/icons/rarity, no progress) is store metadata that doesn't
+    // depend on any account. A loaded comparison-group game simply never gets
+    // `g.achievements` set, so achievementsHtml's `if (!data) return ''` keeps the
+    // section hidden for those, same as before this was turned on at all.
+    showAchievements: true,
     getOwnersHtml: buildOwnersHtml,
     isTagActive: (dim, val) => activeFilters[dim].has(val),
     onTagClick: (dim, val) => {
@@ -87,7 +100,9 @@ document.addEventListener('DOMContentLoaded', () => {
       renderFilterPanel();
       renderPanel();
     },
-    onRefresh: refreshGameDetails,
+    onRefresh: async game => {
+      await Promise.all([refreshGameDetails(game), loadAchievements(game, { force: true })]);
+    },
     // Runs on every close path, not just the Escape-key one below — see the comment on
     // `onClose` in panel.js. Mirrors what the old closePanel() wrapper did, but now also
     // covers the backdrop click / × button / swipe-to-close, which used to leave
@@ -670,6 +685,36 @@ function openStandaloneGame(appid, name) {
   const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true };
   openPanel(game);
   fetchStandaloneDetails(game);
+  loadAchievements(game);
+}
+
+// Achievement list for a standalone lookup — see the showAchievements comment on initPanel
+// above for why this is standalone-only. No `steamids` param at all (there's no account to
+// ask about), which server.js's `/api/achievements/:appid` already treats as a valid
+// request: it returns the achievement schema/rarity with `playerCount: 0` and everything
+// achieved:false, which achievementsHtml (panel.js) renders as "Load a player above to see
+// who's unlocked what" instead of implying 0% progress. Mirrors library.js's
+// loadAchievements (same shape, same guards against a stale re-render after the user moved
+// on), just without any steamids/cache-key-per-player concept to thread through.
+async function loadAchievements(game, { force = false } = {}) {
+  if (!game.standalone) return;
+  if (!force) {
+    const cached = achievementsCache.get(game.appid);
+    if (cached) { game.achievements = cached; if (activeGame === game) renderPanelBody(game); return; }
+  }
+  game.achievementsLoading = true;
+  if (activeGame === game) renderPanelBody(game);
+  try {
+    const res = await fetch(`/api/achievements/${game.appid}${force ? '?refresh=1' : ''}`);
+    const data = await res.json();
+    if (res.ok) achievementsCache.set(game.appid, data);
+    game.achievements = res.ok ? data : null;
+  } catch {
+    game.achievements = null;
+  } finally {
+    game.achievementsLoading = false;
+    if (activeGame === game) renderPanelBody(game); // no-op if the user moved on mid-fetch
+  }
 }
 
 async function fetchStandaloneDetails(game) {
