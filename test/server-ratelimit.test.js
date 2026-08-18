@@ -57,7 +57,7 @@ test('details limiter: counts cache misses but never counts cache hits', async (
   setCache('rating:800',   { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
   setCache('hltb:800',     [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
   setCache('meta:800',     { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] });
-  setCache('tags:800',     [1001]);
+  setCache('tagids:800',   [1001]);
   setCache('tagnames:all', { 1001: 'Action' });
   setCache('protondb:800', { tier: 'gold', confidence: 'strong', total: 500 });
 

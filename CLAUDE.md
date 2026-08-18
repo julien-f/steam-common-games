@@ -74,7 +74,7 @@ If HLTB breaks again, recent npm packages (e.g. `howlongtobeat-ts`) tend to reve
 `getSteamTags` (`lib/steam.js`) fetches the same user tags shown on a game's own Steam store page (and, downstream of that, SteamDB and IsThereAnyDeal) rather than SteamSpy's separate crowd-voted dataset, which this used to pull from and which can be sparse or empty for a game Steam itself has plenty of tag data for — especially anything niche or too recent for SteamSpy's own community to have caught up on. Two undocumented, key-less endpoints (same trust tier as the other endpoints covered by this compliance note) stand in for it:
 
 - `https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json={"ids":[{"appid":N}],"context":{"language":"english","country_code":"US"},"data_request":{"include_tag_count":30}}` returns that one app's `tagids`, already ordered by relevance weight descending — the same order the store page itself displays them in. All returned tagids are shown; there's no further display cap on top of this.
-- `https://store.steampowered.com/actions/ajaxgetstoretags?l=english` maps every tagid to its human-readable name — a single, near-static ~430-entry list, not per-game, so it's fetched once and cached long-term (`tagnames:all`, same 60-day `META_CACHE_TTL_MINUTES` group as `tags:` — see the cache table above) rather than repeated for every game lookup.
+- `https://store.steampowered.com/actions/ajaxgetstoretags?l=english` maps every tagid to its human-readable name — a single, near-static ~430-entry list, not per-game, so it's fetched once and cached long-term (`tagnames:all`, same 60-day `META_CACHE_TTL_MINUTES` group as `tagids:` — see the cache table above) rather than repeated for every game lookup.
 
 ### Looking up an arbitrary game
 
@@ -94,7 +94,7 @@ Opening a looked-up game writes `?game=<appid>` to the URL on both pages (and, w
 |---|---|---|---|
 | `resolve:` | `RESOLVE_CACHE_TTL_MINUTES` | 90 days | Steam ID resolution — essentially permanent |
 | `rating:` | `RATING_CACHE_TTL_MINUTES` | 30 days | Steam review scores — drifts slowly |
-| `hltb:`, `meta:`, `tags:`, `tagnames:` | `META_CACHE_TTL_MINUTES` | 60 days | Store metadata, HLTB, tags — rarely changes for an existing game |
+| `hltb:`, `meta:`, `tagids:`, `tagnames:` | `META_CACHE_TTL_MINUTES` | 60 days | Store metadata, HLTB, tags — rarely changes for an existing game |
 | `games:`, `player:`, `wishlist:` | `LIBRARY_CACHE_TTL_MINUTES` | 6 hours | Changes when users buy games / edit their wishlist |
 | `search:` | `SEARCH_CACHE_TTL_MINUTES` | 1 day | Game name → appid search results — much shorter than the other game-details tiers since new games ship regularly |
 | `news:` | `NEWS_CACHE_TTL_MINUTES` | 6 hours | Recent news/announcements for a game — changes far more often than store metadata (patch notes, event posts), so it shares the library tier's cadence rather than the 60-day META one above |

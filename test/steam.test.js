@@ -645,12 +645,26 @@ test('getSteamTags: throws isUpstream when the tag name map fetch fails', async 
   await assert.rejects(() => getSteamTags(400), err => err.isUpstream === true);
 });
 
-// A `tags:` entry from before this function switched from SteamSpy's `{tagname: count}`
-// object to a `tagid[]` array is still sitting in the cache under the old shape — it must
-// be treated as a miss and re-fetched, not passed straight to `.slice()` and crash.
-test('getSteamTags: treats a stale pre-migration cache entry (old SteamSpy object shape) as a miss', async (t) => {
+// Old `tags:` entries from before this function moved to Steam's own tag ids (SteamSpy-era
+// `{tagname: voteCount}` objects) must never be read by the new code — it now keys off a
+// distinct `tagids:` prefix instead. A shape check (e.g. "is it an array?") isn't safe here:
+// a game with zero SteamSpy votes cached a bare `[]` under the old key, which is
+// indistinguishable by shape alone from a legitimate empty `tagid[]` result under the new
+// format — that ambiguity used to leave every "no SteamSpy tags" game stuck showing no tags
+// forever, even once Steam's own data (fetched below) had some. Using a new key prefix
+// sidesteps the whole problem: old `tags:` entries, in any shape, are simply never consulted.
+test('getSteamTags: ignores a stale `tags:` entry from before the key moved to `tagids:` (old SteamSpy object shape)', async (t) => {
   _reset();
-  setCache('tags:400', { 'Action': 9054, 'Co-op': 4532 }); // old SteamSpy-shaped cache value
+  setCache('tags:400', { 'Action': 9054, 'Co-op': 4532 }); // old SteamSpy-shaped cache value, old key
+  mockTagEndpoints(t, { tagids: [1, 2], nameMap: { 1: 'Action', 2: 'Indie' } });
+
+  const result = await getSteamTags(400);
+  assert.deepEqual(result, ['Action', 'Indie']);
+});
+
+test('getSteamTags: ignores a stale `tags:` entry of `[]` (old SteamSpy "no votes" games) — the exact case a shape check could not distinguish from a real empty result', async (t) => {
+  _reset();
+  setCache('tags:400', []); // old key, empty array — SteamSpy's shape for "no tags recorded"
   mockTagEndpoints(t, { tagids: [1, 2], nameMap: { 1: 'Action', 2: 'Indie' } });
 
   const result = await getSteamTags(400);

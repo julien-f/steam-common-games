@@ -366,7 +366,7 @@ test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) 
   setCache('rating:400',   { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
   setCache('hltb:400',     [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
   setCache('meta:400',     { name: 'Portal', genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] });
-  setCache('tags:400',     TAG_IDS);
+  setCache('tagids:400',   TAG_IDS);
   setCache('tagnames:all', TAG_NAME_MAP);
   setCache('protondb:400', { tier: 'gold', confidence: 'strong', total: 500 });
 
@@ -696,12 +696,12 @@ test('POST /api/game-details/stream: streams one event per game plus a done even
   setCache('rating:400',   rawRating);
   setCache('hltb:400',     rawHltb);
   setCache('meta:400',     rawMeta);
-  setCache('tags:400',     TAG_IDS);
+  setCache('tagids:400',   TAG_IDS);
   setCache('protondb:400', rawProtonDb);
   setCache('rating:401',   rawRating);
   setCache('hltb:401',     rawHltb);
   setCache('meta:401',     rawMeta);
-  setCache('tags:401',     TAG_IDS);
+  setCache('tagids:401',   TAG_IDS);
   setCache('protondb:401', rawProtonDb);
   setCache('tagnames:all', TAG_NAME_MAP);
 

@@ -67,7 +67,7 @@ const detailsLimit = rateLimit({
     return getCached(`rating:${appid}`)   !== undefined
         && getCached(`hltb:${appid}`)     !== undefined
         && getCached(`meta:${appid}`)     !== undefined
-        && getCached(`tags:${appid}`)     !== undefined
+        && getCached(`tagids:${appid}`)   !== undefined
         && getCached(`protondb:${appid}`) !== undefined;
   },
 });
