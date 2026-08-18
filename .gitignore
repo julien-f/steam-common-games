@@ -6,3 +6,4 @@ cache.json.tmp
 db.sqlite
 db.sqlite-wal
 db.sqlite-shm
+.playwright-mcp/
