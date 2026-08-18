@@ -26,8 +26,11 @@ function workingDetailsFetch(fetchedAppids) {
     if (url.includes('appreviews')) {
       return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
     }
-    if (url.includes('steamspy.com')) {
-      return { ok: true, json: async () => ({ tags: { 'Action': 9054 } }) };
+    if (url.includes('IStoreBrowseService')) {
+      return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: [1001] }] } }) };
+    }
+    if (url.includes('ajaxgetstoretags')) {
+      return { ok: true, json: async () => ({ tags: [{ tagid: 1001, name: 'Action' }] }) };
     }
     if (url.includes('appdetails')) {
       return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] } } }) };
@@ -54,7 +57,8 @@ test('details limiter: counts cache misses but never counts cache hits', async (
   setCache('rating:800',   { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
   setCache('hltb:800',     [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
   setCache('meta:800',     { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] });
-  setCache('tags:800',     { 'Action': 9054 });
+  setCache('tags:800',     [1001]);
+  setCache('tagnames:all', { 1001: 'Action' });
   setCache('protondb:800', { tier: 'gold', confidence: 'strong', total: 500 });
 
   // Three uncached appids consume the budget (max = 3).

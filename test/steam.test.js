@@ -9,8 +9,8 @@ process.env.DB_FILE = '';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews } = require('../lib/steam');
-const { _reset } = require('../lib/cache');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews } = require('../lib/steam');
+const { _reset, setCache } = require('../lib/cache');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
   return {
@@ -568,61 +568,93 @@ test('getAppDetails: caps movies at 5', async (t) => {
   assert.equal(result.movies.length, 5);
 });
 
-// ── getSteamSpyTags ───────────────────────────────────────────────────────────
+// ── getSteamTags ───────────────────────────────────────────────────────────
 
-test('getSteamSpyTags: returns top 10 tags sorted by vote count descending', async (t) => {
+// Routes the shared fetch mock by URL: IStoreBrowseService for per-app tagids,
+// ajaxgetstoretags for the tagid → name map.
+function mockTagEndpoints(t, { tagids = [], nameMap = {}, browseOk = true, namesOk = true } = {}) {
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url).includes('IStoreBrowseService')) {
+      if (!browseOk) return { ok: false, status: 503 };
+      return {
+        ok: true,
+        json: async () => ({ response: { store_items: [{ success: 1, tagids }] } }),
+      };
+    }
+    if (String(url).includes('ajaxgetstoretags')) {
+      if (!namesOk) return { ok: false, status: 503 };
+      return {
+        ok: true,
+        json: async () => ({ tags: Object.entries(nameMap).map(([tagid, name]) => ({ tagid: Number(tagid), name })) }),
+      };
+    }
+    throw new Error(`unexpected fetch: ${url}`);
+  });
+}
+
+test('getSteamTags: returns every tag in weight order, resolved via the name map (no display cap)', async (t) => {
   _reset();
-  const rawTags = Object.fromEntries(
-    Array.from({ length: 15 }, (_, i) => [`Tag${i}`, (15 - i) * 100])
-  );
-  t.mock.method(globalThis, 'fetch', async () => ({
-    ok: true,
-    json: async () => ({ tags: rawTags }),
-  }));
+  const tagids = Array.from({ length: 30 }, (_, i) => 100 + i); // already weight-ordered
+  const nameMap = Object.fromEntries(tagids.map(id => [id, `Tag${id}`]));
+  mockTagEndpoints(t, { tagids, nameMap });
 
-  const result = await getSteamSpyTags(400);
-  assert.equal(result.length, 10);
-  assert.equal(result[0], 'Tag0');   // highest votes first
-  assert.equal(result[9], 'Tag9');
+  const result = await getSteamTags(400);
+  assert.equal(result.length, 30);
+  assert.equal(result[0], 'Tag100');
+  assert.equal(result[29], 'Tag129');
 });
 
-test('getSteamSpyTags: returns correct tag names in vote-count order', async (t) => {
+test('getSteamTags: returns empty array when the app has no tagids', async (t) => {
   _reset();
-  t.mock.method(globalThis, 'fetch', async () => ({
-    ok: true,
-    json: async () => ({ tags: { 'RPG': 500, 'Action': 9000, 'Indie': 3000 } }),
-  }));
+  mockTagEndpoints(t, { tagids: [], nameMap: {} });
 
-  const result = await getSteamSpyTags(400);
-  assert.deepEqual(result, ['Action', 'Indie', 'RPG']);
-});
-
-test('getSteamSpyTags: returns empty array when tags field is missing', async (t) => {
-  _reset();
-  t.mock.method(globalThis, 'fetch', async () => ({
-    ok: true,
-    json: async () => ({ appid: 400, name: 'Portal' }),
-  }));
-
-  const result = await getSteamSpyTags(400);
+  const result = await getSteamTags(400);
   assert.deepEqual(result, []);
 });
 
-test('getSteamSpyTags: returns empty array when tags is empty object', async (t) => {
+test('getSteamTags: returns empty array when the store item lookup is unsuccessful', async (t) => {
   _reset();
-  t.mock.method(globalThis, 'fetch', async () => ({
-    ok: true,
-    json: async () => ({ tags: {} }),
-  }));
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url).includes('IStoreBrowseService')) {
+      return { ok: true, json: async () => ({ response: { store_items: [{ success: 0 }] } }) };
+    }
+    return { ok: true, json: async () => ({ tags: [] }) };
+  });
 
-  const result = await getSteamSpyTags(400);
+  const result = await getSteamTags(400);
   assert.deepEqual(result, []);
 });
 
-test('getSteamSpyTags: throws isUpstream when fetch fails', async (t) => {
+test('getSteamTags: drops tagids with no matching name in the map', async (t) => {
   _reset();
-  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
-  await assert.rejects(() => getSteamSpyTags(400), err => err.isUpstream === true);
+  mockTagEndpoints(t, { tagids: [1, 2, 3], nameMap: { 1: 'Action', 3: 'Indie' } });
+
+  const result = await getSteamTags(400);
+  assert.deepEqual(result, ['Action', 'Indie']);
+});
+
+test('getSteamTags: throws isUpstream when the tagid fetch fails', async (t) => {
+  _reset();
+  mockTagEndpoints(t, { browseOk: false });
+  await assert.rejects(() => getSteamTags(400), err => err.isUpstream === true);
+});
+
+test('getSteamTags: throws isUpstream when the tag name map fetch fails', async (t) => {
+  _reset();
+  mockTagEndpoints(t, { tagids: [1], namesOk: false });
+  await assert.rejects(() => getSteamTags(400), err => err.isUpstream === true);
+});
+
+// A `tags:` entry from before this function switched from SteamSpy's `{tagname: count}`
+// object to a `tagid[]` array is still sitting in the cache under the old shape — it must
+// be treated as a miss and re-fetched, not passed straight to `.slice()` and crash.
+test('getSteamTags: treats a stale pre-migration cache entry (old SteamSpy object shape) as a miss', async (t) => {
+  _reset();
+  setCache('tags:400', { 'Action': 9054, 'Co-op': 4532 }); // old SteamSpy-shaped cache value
+  mockTagEndpoints(t, { tagids: [1, 2], nameMap: { 1: 'Action', 2: 'Indie' } });
+
+  const result = await getSteamTags(400);
+  assert.deepEqual(result, ['Action', 'Indie']);
 });
 
 // ── getProtonDbStatus ──────────────────────────────────────────────────────────

@@ -40,15 +40,24 @@ function makeLibraryFetch(games1 = [], games2 = []) {
   };
 }
 
+// Fixture tag ids/names shared across tests — Steam tags are now fetched as an
+// (appid → tagids) call plus a separate, shared (tagid → name) map.
+const TAG_IDS = [1001, 1002];
+const TAG_NAME_MAP = { 1001: 'Action', 1002: 'Co-op' };
+
 function makeDetailsFetch({ ratingOk = true, metaOk = true, tagsOk = true } = {}) {
   return async (url) => {
     if (url.includes('appreviews')) {
       if (!ratingOk) return { ok: false, status: 503 };
       return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
     }
-    if (url.includes('steamspy.com')) {
+    if (url.includes('IStoreBrowseService')) {
       if (!tagsOk) return { ok: false, status: 503 };
-      return { ok: true, json: async () => ({ tags: { 'Action': 9054, 'Co-op': 4532 } }) };
+      return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: TAG_IDS }] } }) };
+    }
+    if (url.includes('ajaxgetstoretags')) {
+      if (!tagsOk) return { ok: false, status: 503 };
+      return { ok: true, json: async () => ({ tags: Object.entries(TAG_NAME_MAP).map(([tagid, name]) => ({ tagid: Number(tagid), name })) }) };
     }
     if (url.includes('appdetails')) {
       if (!metaOk) return { ok: false, status: 503 };
@@ -357,7 +366,8 @@ test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) 
   setCache('rating:400',   { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
   setCache('hltb:400',     [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
   setCache('meta:400',     { name: 'Portal', genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] });
-  setCache('tags:400',     { 'Action': 9054, 'Co-op': 4532 });
+  setCache('tags:400',     TAG_IDS);
+  setCache('tagnames:all', TAG_NAME_MAP);
   setCache('protondb:400', { tier: 'gold', confidence: 'strong', total: 500 });
 
   let fetchCalled = false;
@@ -445,7 +455,7 @@ test('GET /api/game-details/:appid: 200 with null meta when appdetails fetch fai
   assert.equal(res.body.meta, null);
 });
 
-test('GET /api/game-details/:appid: 200 with null tags when SteamSpy fetch fails', async (t) => {
+test('GET /api/game-details/:appid: 200 with null tags when the Steam tags fetch fails', async (t) => {
   _reset();
   _resetAuth();
   t.mock.method(globalThis, 'fetch', makeDetailsFetch({ tagsOk: false }));
@@ -466,7 +476,8 @@ test('GET /api/game-details/:appid: only fetches sources not already cached', as
   let fetchedUrls = [];
   t.mock.method(globalThis, 'fetch', async (url) => {
     fetchedUrls.push(url);
-    if (url.includes('steamspy.com')) return { ok: true, json: async () => ({ tags: { 'Action': 9054 } }) };
+    if (url.includes('IStoreBrowseService')) return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: TAG_IDS }] } }) };
+    if (url.includes('ajaxgetstoretags'))    return { ok: true, json: async () => ({ tags: Object.entries(TAG_NAME_MAP).map(([tagid, name]) => ({ tagid: Number(tagid), name })) }) };
     if (url.includes('bleed/init'))   return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
     if (url.includes('bleed'))        return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
     throw new Error(`Unexpected fetch: ${url}`);
@@ -494,9 +505,13 @@ function makeCountingDetailsFetch(counts, { delayMs = 0 } = {}) {
       counts.rating++;
       return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
     }
-    if (url.includes('steamspy.com')) {
+    if (url.includes('IStoreBrowseService')) {
       counts.tags++;
-      return { ok: true, json: async () => ({ tags: { 'Action': 9054 } }) };
+      return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: TAG_IDS }] } }) };
+    }
+    if (url.includes('ajaxgetstoretags')) {
+      counts.tags++;
+      return { ok: true, json: async () => ({ tags: Object.entries(TAG_NAME_MAP).map(([tagid, name]) => ({ tagid: Number(tagid), name })) }) };
     }
     if (url.includes('appdetails')) {
       counts.meta++;
@@ -527,7 +542,7 @@ test('GET /api/game-details/:appid: a repeated request is served from cache, no 
   assert.equal(counts.rating, 1);
   assert.equal(counts.hltb, 1);
   assert.equal(counts.meta, 1);
-  assert.equal(counts.tags, 1);
+  assert.equal(counts.tags, 2, 'tags fetch = one IStoreBrowseService call + one ajaxgetstoretags call');
 
   // Simulates the page being refreshed: same appid requested again.
   const res2 = await api.get('/api/game-details/500');
@@ -536,7 +551,7 @@ test('GET /api/game-details/:appid: a repeated request is served from cache, no 
   assert.equal(counts.rating, 1, 'rating must not be re-fetched on refresh');
   assert.equal(counts.hltb, 1, 'HLTB must not be re-fetched on refresh');
   assert.equal(counts.meta, 1, 'meta must not be re-fetched on refresh');
-  assert.equal(counts.tags, 1, 'tags must not be re-fetched on refresh');
+  assert.equal(counts.tags, 2, 'tags must not be re-fetched on refresh');
 });
 
 // #2 — concurrent refresh: overlapping in-flight requests for the same appid
@@ -559,7 +574,7 @@ test('GET /api/game-details/:appid: concurrent requests for the same appid dedup
   assert.equal(counts.rating, 1, 'rating fetched once for two concurrent requests');
   assert.equal(counts.hltb, 1, 'HLTB fetched once for two concurrent requests');
   assert.equal(counts.meta, 1, 'meta fetched once for two concurrent requests');
-  assert.equal(counts.tags, 1, 'tags fetched once for two concurrent requests');
+  assert.equal(counts.tags, 2, 'tags fetched once for two concurrent requests (one browse + one name-map call)');
 });
 
 // #3 — real browser-abort on fast refresh. supertest awaits the full response,
@@ -603,7 +618,7 @@ test('GET /api/game-details/:appid: a request aborted mid-flight still caches, s
   assert.equal(counts.rating, 1, 'aborted request should have completed and cached the rating — refresh must not re-fetch');
   assert.equal(counts.hltb, 1, 'aborted request should have completed and cached HLTB');
   assert.equal(counts.meta, 1, 'aborted request should have completed and cached meta');
-  assert.equal(counts.tags, 1, 'aborted request should have completed and cached tags');
+  assert.equal(counts.tags, 2, 'aborted request should have completed and cached tags');
 });
 
 test('GET /api/game-details/:appid: failed fetch is not cached, retried on next request', async (t) => {
@@ -677,18 +692,18 @@ test('POST /api/game-details/stream: streams one event per game plus a done even
   const rawRating = { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' };
   const rawHltb   = [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }];
   const rawMeta   = { name: 'Portal', genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] };
-  const rawTags     = { 'Action': 9054, 'Co-op': 4532 };
   const rawProtonDb = { tier: 'gold', confidence: 'strong', total: 500 };
   setCache('rating:400',   rawRating);
   setCache('hltb:400',     rawHltb);
   setCache('meta:400',     rawMeta);
-  setCache('tags:400',     rawTags);
+  setCache('tags:400',     TAG_IDS);
   setCache('protondb:400', rawProtonDb);
   setCache('rating:401',   rawRating);
   setCache('hltb:401',     rawHltb);
   setCache('meta:401',     rawMeta);
-  setCache('tags:401',     rawTags);
+  setCache('tags:401',     TAG_IDS);
   setCache('protondb:401', rawProtonDb);
+  setCache('tagnames:all', TAG_NAME_MAP);
 
   const server = app.listen(0);
   t.after(() => new Promise(r => server.close(r)));
@@ -742,8 +757,11 @@ test('POST /api/game-details/stream: resolves HLTB name from store metadata', as
     if (url.includes('appreviews')) {
       return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
     }
-    if (url.includes('steamspy.com')) {
-      return { ok: true, json: async () => ({ tags: { Action: 9054 } }) };
+    if (url.includes('IStoreBrowseService')) {
+      return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: TAG_IDS }] } }) };
+    }
+    if (url.includes('ajaxgetstoretags')) {
+      return { ok: true, json: async () => ({ tags: Object.entries(TAG_NAME_MAP).map(([tagid, name]) => ({ tagid: Number(tagid), name })) }) };
     }
     if (url.includes('appdetails')) {
       const appid = url.match(/appids=(\d+)/)?.[1];

@@ -18,7 +18,7 @@ The server binds to `http://127.0.0.1:3000` by default. `default.env` (committed
 - **`lib/cache.js`** — Persistent cache (`getCached`, `setCache`), disk I/O, process exit hooks.
 - **`lib/config.js`** — TTL constants (`LIBRARY_CACHE_TTL_MS`, `RESOLVE_CACHE_TTL_MS`, `RATING_CACHE_TTL_MS`, `META_CACHE_TTL_MS`, `SEARCH_CACHE_TTL_MS`) shared across modules.
 - **`lib/dedup.js`** — In-flight request deduplicator (`createDedup`): concurrent calls for the same key share one promise.
-- **`lib/steam.js`** — Steam API calls (`resolveSteamId`, `getOwnedGames`, `getWishlist`, `getPlayerSummaries`, `getGameRating`, `getAppDetails`, `getSteamSpyTags`, `searchStoreGames`, `getGameNews`).
+- **`lib/steam.js`** — Steam API calls (`resolveSteamId`, `getOwnedGames`, `getWishlist`, `getPlayerSummaries`, `getGameRating`, `getAppDetails`, `getSteamTags`, `searchStoreGames`, `getGameNews`).
 - **`lib/hltb.js`** — HLTB auth + search (`getHLTB`), plus exported `stringSimilarity` and `levenshtein` for unit testing.
 - **`lib/groupGames.js`** — Groups slot libraries by exact ownership set (`groupByOwnership`).
 - **`public/index.html`** — Single-page frontend shell (vanilla JS, no framework).
@@ -69,6 +69,13 @@ If HLTB breaks again, recent npm packages (e.g. `howlongtobeat-ts`) tend to reve
 
 `getWishlist` calls `https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid={id}`, which is not listed in Valve's published Web API docs (same unofficial-endpoint situation as HLTB above, though no spoofed headers are needed here — it works with a plain request). A private wishlist, a private profile, and a genuinely empty wishlist are all indistinguishable: each returns `200 OK` with `{"response":{}}` (no `items` key). The app treats a missing `items` key as an empty wishlist rather than surfacing an error, since there's no way to tell those cases apart.
 
+### Tags — Steam's own store tags, not SteamSpy
+
+`getSteamTags` (`lib/steam.js`) fetches the same user tags shown on a game's own Steam store page (and, downstream of that, SteamDB and IsThereAnyDeal) rather than SteamSpy's separate crowd-voted dataset, which this used to pull from and which can be sparse or empty for a game Steam itself has plenty of tag data for — especially anything niche or too recent for SteamSpy's own community to have caught up on. Two undocumented, key-less endpoints (same trust tier as the other endpoints covered by this compliance note) stand in for it:
+
+- `https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json={"ids":[{"appid":N}],"context":{"language":"english","country_code":"US"},"data_request":{"include_tag_count":30}}` returns that one app's `tagids`, already ordered by relevance weight descending — the same order the store page itself displays them in. All returned tagids are shown; there's no further display cap on top of this.
+- `https://store.steampowered.com/actions/ajaxgetstoretags?l=english` maps every tagid to its human-readable name — a single, near-static ~430-entry list, not per-game, so it's fetched once and cached long-term (`tagnames:all`, same 60-day `META_CACHE_TTL_MINUTES` group as `tags:` — see the cache table above) rather than repeated for every game lookup.
+
 ### Looking up an arbitrary game
 
 Both pages have a "look up any game" search box (`public/gameSearch.js`) for previewing a game in the shared side panel regardless of whether anyone in the current search owns or has wishlisted it — see the "Ratings" and "HLTB" sections above for what that panel shows. `GET /api/game-details/:appid` has no ownership check at all (it already has to work for wishlist items, which aren't "owned" either), so the only missing piece was turning a typed name into an appid.
@@ -87,7 +94,7 @@ Opening a looked-up game writes `?game=<appid>` to the URL on both pages (and, w
 |---|---|---|---|
 | `resolve:` | `RESOLVE_CACHE_TTL_MINUTES` | 90 days | Steam ID resolution — essentially permanent |
 | `rating:` | `RATING_CACHE_TTL_MINUTES` | 30 days | Steam review scores — drifts slowly |
-| `hltb:`, `meta:`, `tags:` | `META_CACHE_TTL_MINUTES` | 60 days | Store metadata, HLTB, tags — rarely changes for an existing game |
+| `hltb:`, `meta:`, `tags:`, `tagnames:` | `META_CACHE_TTL_MINUTES` | 60 days | Store metadata, HLTB, tags — rarely changes for an existing game |
 | `games:`, `player:`, `wishlist:` | `LIBRARY_CACHE_TTL_MINUTES` | 6 hours | Changes when users buy games / edit their wishlist |
 | `search:` | `SEARCH_CACHE_TTL_MINUTES` | 1 day | Game name → appid search results — much shorter than the other game-details tiers since new games ship regularly |
 | `news:` | `NEWS_CACHE_TTL_MINUTES` | 6 hours | Recent news/announcements for a game — changes far more often than store metadata (patch notes, event posts), so it shares the library tier's cadence rather than the 60-day META one above |

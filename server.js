@@ -11,7 +11,7 @@ const rateLimit = require('express-rate-limit');
 
 const { getCached, getCacheStats } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamSpyTags, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews } = require('./lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 
@@ -312,7 +312,7 @@ function fetchGameDetails(appid, { force = false } = {}) {
       getGameRating(appid, { force }),
       hltbPromise,
       metaPromise,
-      getSteamSpyTags(appid, { force }),
+      getSteamTags(appid, { force }),
       getProtonDbStatus(appid, { force }),
     ]).then(([ratingRes, hltbRes, metaRes, tagsRes, protondbRes]) => {
       // appid is included on every line — fetchGameDetails runs once per appid, often many in
