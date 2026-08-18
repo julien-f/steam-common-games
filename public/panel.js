@@ -772,7 +772,17 @@ function renderPanelBody(game) {
   // panel's visible height on short/mobile screens with no way to scroll it out of the
   // way. Rendering it as the first child here instead — and rebuilding it fresh via
   // buildPanelHero() below, same as before — lets it scroll away like everything else.
-  document.getElementById('panel-body').innerHTML = `
+  const panelBody = document.getElementById('panel-body');
+  // Replacing #panel-body's innerHTML rebuilds #panel-hero from scratch, and
+  // buildPanelHero() below unconditionally scrollIntoView()s its active filmstrip item —
+  // needed so opening the panel or paging the hero lands on the right frame, but with no
+  // sense of "did the user actually ask to see the hero", it just as happily yanks the
+  // whole panel back up to the top on a re-render that has nothing to do with the hero at
+  // all (toggling a collapsible section, the refresh button). Snapshot the scroll position
+  // now and restore it after, so those re-renders leave the reader wherever they were.
+  const prevScrollTop = panelBody.scrollTop;
+
+  panelBody.innerHTML = `
     <div id="panel-hero" class="panel-hero"></div>
     <div class="panel-header-sticky">
       <div class="panel-title-row">
@@ -798,6 +808,7 @@ function renderPanelBody(game) {
     ${achievementsSectionHtml}`;
 
   buildPanelHero();
+  panelBody.scrollTop = prevScrollTop;
   // Subnav markup (and every section it targets) is rebuilt fresh above — re-run the
   // scroll-spy once so a re-render triggered mid-scroll (toggling a collapsible, the
   // refresh button) doesn't leave the old subnav's active button highlighted, or none at
