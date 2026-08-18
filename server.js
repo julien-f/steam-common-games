@@ -23,6 +23,7 @@ const SEARCH_RATE_LIMIT_MAX = Number(process.env.SEARCH_RATE_LIMIT_MAX);
 const DETAILS_RATE_LIMIT_MAX = Number(process.env.DETAILS_RATE_LIMIT_MAX);
 const GAME_SEARCH_RATE_LIMIT_MAX = Number(process.env.GAME_SEARCH_RATE_LIMIT_MAX);
 const ACHIEVEMENTS_RATE_LIMIT_MAX = Number(process.env.ACHIEVEMENTS_RATE_LIMIT_MAX);
+const STREAM_MAX_GAMES = Number(process.env.STREAM_MAX_GAMES);
 
 // Rate limiting is bypassed under NODE_ENV=test so the suite isn't throttled,
 // unless a test opts in with RATE_LIMIT_ENABLED=true to exercise the limiter.
@@ -467,10 +468,21 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
   }
 });
 
-app.post('/api/game-details/stream', async (req, res) => {
+// This does the exact same per-appid work (rating/HLTB/meta/tags/ProtonDB) as
+// GET /api/game-details/:appid above and is meant to be throttled by the same budget — it's
+// just delivered as one SSE batch instead of N separate requests — so it shares detailsLimit
+// rather than going unthrottled. Its skip() keys off req.params.appid, which doesn't exist on
+// this array-bodied route, so every stream request counts fully against the budget (no
+// cache-hit exemption here, unlike the single-appid route); that's the safe direction to be
+// wrong in. STREAM_MAX_GAMES also caps how much work one request can queue up regardless of
+// how many requests/minute the budget above allows.
+app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   const { games: gameList } = req.body;
   if (!Array.isArray(gameList) || gameList.length === 0) {
     return res.status(400).json({ error: 'Provide at least one game' });
+  }
+  if (gameList.length > STREAM_MAX_GAMES) {
+    return res.status(400).json({ error: `Too many games — maximum is ${STREAM_MAX_GAMES}` });
   }
 
   const validated = [];

@@ -44,6 +44,15 @@ function panelShuffle(arr) {
   return a;
 }
 
+// Rejects anything but a plain http(s) URL — same guard accountsBar.js/app.js already apply
+// to profile URLs. esc() alone escapes HTML special chars but does nothing about the scheme,
+// so a developer-supplied `meta.website` or a news item's `url` (both flow through unfiltered
+// from Steam's own APIs — see lib/steam.js) could otherwise be a `javascript:`/`data:` URI
+// that runs script when clicked instead of navigating away. Returns '' for anything unsafe.
+function safeHref(url) {
+  return /^https?:\/\//i.test(url || '') ? url : '';
+}
+
 const randomQueues = new Map(); // queueKey → remaining shuffled games
 
 // Picks the next game from a shuffle bag scoped to queueKey (e.g. a group key,
@@ -892,7 +901,7 @@ function newsHtml(g) {
   const bodyHtml = `<div class="panel-collapsible-body-pad">
     <div class="panel-news">
       ${items.map(n => `
-        <a class="panel-news-item" href="${esc(n.url)}" target="_blank" rel="noopener">
+        <a class="panel-news-item" href="${esc(safeHref(n.url))}" target="_blank" rel="noopener">
           <span class="panel-news-title">${esc(n.title)}</span>
           <span class="panel-news-meta">${esc(fmtLastPlayed(n.date))}${n.feedLabel ? ` · ${esc(n.feedLabel)}` : ''}</span>
         </a>`).join('')}
@@ -1095,7 +1104,7 @@ function renderPanelBody(game) {
   const moreLinksHtml = moreLinkItems.length ? `<div class="panel-icon-more">
     <button type="button" class="panel-icon-link panel-icon-more-btn" aria-haspopup="true" aria-expanded="${moreLinksOpen}" title="More links" aria-label="More links">⋯</button>
     ${moreLinksOpen ? `<div class="panel-icon-more-menu">${moreLinkItems.map(it =>
-      `<a class="panel-icon-more-item" href="${esc(it.href)}" target="_blank" rel="noopener">${it.icon} ${esc(it.label)}</a>`
+      `<a class="panel-icon-more-item" href="${esc(safeHref(it.href))}" target="_blank" rel="noopener">${it.icon} ${esc(it.label)}</a>`
     ).join('')}</div>` : ''}
   </div>` : '';
 
@@ -1181,13 +1190,30 @@ function renderPanelBody(game) {
       ${subnavHtml}
     </div>
     ${glanceGrid(g)}
-    ${description ? `<div class="panel-desc panel-card">${description}</div>` : ''}
+    ${description ? `<div class="panel-desc panel-card" id="panel-desc"></div>` : ''}
     ${cloudHtml}
     ${ownersHtml ? `<div id="panel-section-owners">${ownersHtml}</div>` : ''}
     ${hltbDetailHtml}
     ${newsSectionHtml}
     ${achievementsSectionHtml}
     ${dlcSectionHtml}`;
+
+  // `description` (Steam's `short_description`) isn't run through the innerHTML template
+  // above like everything else here: it's store metadata attributed to the game's own
+  // developer/publisher, and the panel opens for any appid with no ownership check (the
+  // "look up any game" box, a bare `?game=` link) — dropping it into innerHTML unescaped
+  // would let a malicious/compromised store listing run arbitrary script the moment its
+  // panel opens. But it can also contain literal HTML entities as plain text (e.g. "Baldur's
+  // Gate..." legitimately has "&amp;" for "Dungeons & Dragons"), so esc()'ing it like every
+  // other field here would double-escape those into visible "&amp;" text instead of "&".
+  // Decoding it inertly first — a DOMParser document that's never attached to the page runs
+  // no scripts and loads no resources — then inserting the result as plain text handles both:
+  // entities decode correctly, and any actual markup (there shouldn't be any in this field,
+  // but nothing here assumes that) degrades to visible text rather than executing.
+  if (description) {
+    document.getElementById('panel-desc').textContent =
+      new DOMParser().parseFromString(description, 'text/html').body.textContent || '';
+  }
 
   buildPanelHero();
   panelBody.scrollTop = prevScrollTop;

@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Security
+
+- Side panel (`public/panel.js`): a game's store `short_description` was interpolated directly into `panelBody.innerHTML` with no escaping (every other field in the same template went through `esc()`), and the panel opens for any appid with no ownership check — a malicious/compromised Steam listing's description could run arbitrary script in the app's origin the moment its panel opened. `esc()` alone wasn't the right fix since the field can legitimately contain literal HTML entities (e.g. "Baldur's Gate... Dungeons &amp; Dragons") that `esc()` would double-escape into visible `&amp;` text. It's now decoded via an inert `DOMParser` document (no scripts run, no resources load) and inserted with `textContent` instead.
+- Side panel: the Official Website link and news-item links used only `esc()` on their `href`, which escapes HTML special characters but not the URL scheme — a `javascript:`/`data:` URL from a developer-supplied website field or a news item would have passed through untouched. Both now go through the same `/^https?:\/\//i` allowlist `accountsBar.js`/`app.js` already apply to profile URLs (`safeHref` in `panel.js`).
+- `POST /api/game-details/stream`: unlike every sibling data-fetching route, this SSE batch endpoint had no rate limit and no cap on how many games one request could list — a single request could queue unbounded upstream Steam/HLTB/SteamSpy/ProtonDB calls and unbounded `db.sqlite` cache writes. It now shares `detailsLimit`'s per-minute budget and rejects a request above the new `STREAM_MAX_GAMES` cap (default 5000).
+- `lib/steam.js`: the shared upstream-call semaphores (`storeLimit`/`spyLimit`/`protonLimit`) had no maximum queue depth — `createSemaphore` now takes a `maxQueue` (20000) as a coarse safety valve against unbounded queue growth, on top of the request-level bound above.
+
 ### Fixed
 
 - Side panel (`public/panel.js`, shared by both pages): the News and Achievements sections used to render nothing at all when their fetch failed, looking identical to "this game genuinely has no news/achievements" instead of a failure worth noticing. Both now show an explicit "Couldn't load …" message when there's no data to fall back on (a failed *refresh* that still has stale data from an earlier successful load keeps showing that stale data instead, rather than replacing it with an error).

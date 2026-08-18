@@ -664,6 +664,14 @@ test('POST /api/game-details/stream: 400 for invalid appid in list', async () =>
   assert.equal(res.status, 400);
 });
 
+test('POST /api/game-details/stream: 400 when games list exceeds STREAM_MAX_GAMES', async () => {
+  const max = Number(process.env.STREAM_MAX_GAMES);
+  const games = Array.from({ length: max + 1 }, (_, i) => ({ appid: i + 1 }));
+  const res = await api.post('/api/game-details/stream').send({ games });
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /Too many games/);
+});
+
 test('POST /api/game-details/stream: streams one event per game plus a done event from cache', async (t) => {
   _reset();
   const rawRating = { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' };
