@@ -21,6 +21,19 @@ let panelGame = null;
 let heroIdx = 0;
 let panelPrevFocus = null;
 let panelRefreshing = false; // true while the host's onRefresh() is in flight
+let moreLinksOpen = false; // whether the header's "⋯" overflow menu (News/Workshop/Website) is open
+
+// Stack of {appid, name} for games navigated away from via a DLC link or "Part of <Base
+// Game>" link click (see navigateToGame/panelGoBack below) — NOT touched by an ordinary
+// panel open (a table row click, a search-box pick, prev/next/random) since those aren't
+// part of any such browsing trail; panelOpen() below clears it unless told to keep it
+// (`keepHistory: true`), which only navigateToGame/panelGoBack ever pass through the host's
+// onNavigateGame callback.
+// Holds plain {appid, name} pairs rather than full game objects — going back re-opens via
+// the same host mechanism (panelOptions.onNavigateGame) a fresh lookup would use, same
+// dedup-with-already-loaded-rows behavior included, rather than panel.js caching its own
+// stale copy of a game's details.
+let panelHistory = [];
 
 function panelShuffle(arr) {
   const a = arr.slice();
@@ -97,20 +110,52 @@ function initPanel(options = {}) {
 
   document.getElementById('game-panel').addEventListener('click', e => {
     if (e.target.closest('.panel-refresh-btn')) { handlePanelRefresh(); return; }
+    if (e.target.closest('.panel-back-btn')) { panelGoBack(); return; }
     const toggleBtn = e.target.closest('.panel-collapsible-chip');
     if (toggleBtn) { toggleSection(Number(toggleBtn.dataset.appid), toggleBtn.dataset.section); return; }
     const hiddenAch = e.target.closest('.panel-achievement--spoiler');
     if (hiddenAch) { revealAchievement(Number(hiddenAch.dataset.appid), hiddenAch.dataset.apiname); return; }
+    const filterBtn = e.target.closest('.panel-achievements-filter-btn');
+    if (filterBtn) { setAchievementsFilter(Number(filterBtn.dataset.appid), filterBtn.dataset.filter); return; }
+    const copyLinkBtn = e.target.closest('.panel-copy-link-btn');
+    if (copyLinkBtn) { copyPanelLink(copyLinkBtn); return; }
+    const moreLinksBtn = e.target.closest('.panel-icon-more-btn');
+    if (moreLinksBtn) { toggleMoreLinks(); return; }
     const navBtn = e.target.closest('.panel-subnav-btn');
     if (navBtn) { jumpToPanelSection(navBtn.dataset.target); return; }
+    // A real <a href> (see dlcHtml/baseGameHtml) so ctrl/cmd/shift-click and middle-click
+    // still open it in a new tab/window the normal browser way — only a plain click is
+    // intercepted to navigate within the panel itself instead of leaving the page. Shared by
+    // both a DLC entry and the "Part of <Base Game>" link (the same relationship, just
+    // walked in opposite directions), so both carry the same data-appid/data-name pair.
+    const gameLink = e.target.closest('.panel-dlc-item, .panel-basegame-link');
+    if (gameLink) {
+      if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      navigateToGame(Number(gameLink.dataset.appid), gameLink.dataset.name);
+      return;
+    }
     const btn = e.target.closest('.panel-tag-btn');
     if (!btn || !panelOptions.onTagClick) return;
     panelOptions.onTagClick(btn.dataset.dim, btn.dataset.val);
   });
 
+  // Dismiss the "⋯ More links" menu on outside click, same convention as gameSearch.js's
+  // own dropdown. Bound to document (not #game-panel) since the header rebuilds on every
+  // renderPanelBody, same reasoning as every other delegated listener above — but this one
+  // specifically needs to catch clicks *outside* the panel too (backdrop, page behind it).
+  document.addEventListener('click', e => {
+    if (moreLinksOpen && !e.target.closest('.panel-icon-more')) { moreLinksOpen = false; if (panelGame) renderPanelBody(panelGame); }
+  });
+
   initPanelSwipe();
   initHeroSwipe();
   initSubnavScrollSpy();
+}
+
+function toggleMoreLinks() {
+  moreLinksOpen = !moreLinksOpen;
+  if (panelGame) renderPanelBody(panelGame);
 }
 
 // Highlights whichever subnav button corresponds to the section currently scrolled to the
@@ -125,7 +170,7 @@ function initSubnavScrollSpy() {
 }
 
 // Buttons are walked in DOM order, which renderPanelBody keeps identical to the physical
-// top-to-bottom order of the sections themselves (Owners right after the description,
+// top-to-bottom order of the sections themselves (Owners right after the tag cloud,
 // then HLTB/News/Achievements — see subnavItems above) — so the *last* button whose
 // section has scrolled up to (or past) the sticky header counts as "current", same idea as
 // a scrollspy TOC. None qualifying means we're still above the first section, i.e. still
@@ -161,11 +206,42 @@ async function handlePanelRefresh() {
   panelRefreshing = true;
   renderPanelBody(game);
   try {
-    await Promise.all([panelOptions.onRefresh(game), loadNews(game, { force: true })]);
+    // DLC is only force-refetched if it was ever actually loaded (i.e. the card was expanded
+    // at some point this session) — no reason to kick off a fetch for a card nobody's opened
+    // just because the refresh button was clicked.
+    await Promise.all([
+      panelOptions.onRefresh(game),
+      loadNews(game, { force: true }),
+      game.dlc !== undefined ? loadDlc(game, { force: true }) : null,
+    ]);
   } finally {
     panelRefreshing = false;
     if (panelGame === game) renderPanelBody(game); // no-op if the panel moved on mid-fetch
   }
+}
+
+// The 🔗 button beside Store/ITAD in the header — copies a link back to this exact game.
+// Deliberately just `?game=<appid>` on the current page's own path, not the full current
+// URL (which may carry `u=`/filters/sort/tab/view from whatever search led here) — someone
+// sharing "check out this game" almost always means the game itself, not "reproduce my
+// exact search too", and each host page's own `?game=` handling (see restorePanelFromUrl in
+// app.js, the standalone-lookup fallback in library.js) already knows how to open just that.
+function copyPanelLink(btn) {
+  if (!panelGame || !navigator.clipboard?.writeText) return;
+  const url = `${location.origin}${location.pathname}?game=${panelGame.appid}`;
+  navigator.clipboard.writeText(url).then(() => flashCopyLinkBtn(btn), () => {});
+}
+
+function flashCopyLinkBtn(btn) {
+  const prevTitle = btn.title;
+  btn.textContent = '✓';
+  btn.title = 'Copied!';
+  btn.classList.add('panel-copy-link-btn--copied');
+  setTimeout(() => {
+    btn.textContent = '🔗';
+    btn.title = prevTitle;
+    btn.classList.remove('panel-copy-link-btn--copied');
+  }, 1500);
 }
 
 // News is deliberately NOT part of the host pages' rating/HLTB/meta/tags fetch (see
@@ -177,17 +253,122 @@ async function handlePanelRefresh() {
 async function loadNews(game, { force = false } = {}) {
   if (game.news !== undefined && !force) return; // already loaded this session
   game.newsLoading = true;
+  game.newsError = false;
   try {
     const res = await fetch(`/api/game-news/${game.appid}${force ? '?refresh=1' : ''}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'News lookup failed');
     game.news = data.news;
   } catch {
-    game.news = game.news ?? null; // leave the section hidden rather than surfacing an error for a non-essential feature
+    game.newsError = true;
+    // Keep whatever was last successfully loaded rather than wiping it on a failed forced
+    // refresh; null only the first time (nothing to fall back to). newsHtml below shows an
+    // explicit "couldn't load" message instead of silently hiding the section whenever
+    // there's no fallback data to show in its place.
+    game.news = game.news ?? null;
   } finally {
     game.newsLoading = false;
     if (panelGame === game) renderPanelBody(game); // no-op if the panel moved on mid-fetch
   }
+}
+
+// DLC list — like news/achievements, kept off `game.details` and fetched lazily by
+// panel.js itself, but unlike those two it's not even fetched on panelOpen: the DLC card's
+// collapsed header only needs `game.details.meta.dlc`'s bare appid *count* (already present
+// for free, see extractAppDetails in lib/steam.js), so the name/capsule-resolving fetch
+// itself is deferred until the card is actually expanded (see toggleSection below).
+// `game.dlc`/`game.dlcLoading` persist on the game object, so re-expanding later in the same
+// session doesn't refetch.
+//
+// Each DLC appid is resolved through the exact same `GET /api/game-details/:appid` every
+// other single-game lookup already goes through (`fetchStandaloneDetails`, the "look up any
+// game" search box, prev/next/random) — not a bespoke batch endpoint. A DLC appid isn't
+// fundamentally different from any other appid the app looks up, so it shouldn't need its
+// own rate-limit policy or its own cap on how many get resolved at once: it's subject to the
+// same `detailsLimit` per-minute budget as any other burst of game lookups (e.g. rapidly
+// opening many panels), and the same cache/dedup/circuit-breaker underneath. A DLC entry
+// that fails to resolve (delisted, or simply rate-limited this time) is just dropped from
+// the list rather than surfaced as an error — the rest is still worth showing. Only `meta`
+// is used for display here, but resolving the full response (rating/HLTB/tags/ProtonDB too)
+// is a feature, not waste: it warms that DLC's own cache, so clicking into its panel next
+// (see navigateToGame) opens instantly instead of re-fetching everything from scratch.
+//
+// A base game can have dozens of DLC entries (e.g. Stellaris), each its own network
+// round-trip subject to the same rate limiter as everything else — waiting for every single
+// one to settle before showing anything (the original `Promise.allSettled` shape) meant the
+// card sat on its loading skeleton for however long the *slowest* entry took, even though
+// most had already resolved. `game.dlcPartial` holds the in-progress array (one slot per
+// `dlcIds` index, filled in as each fetch resolves) so `dlcHtml` can render what's already
+// available immediately and stream the rest in, rather than an all-or-nothing reveal.
+// `game.dlc` itself is still only assigned once every entry has settled — every other spot
+// that reads it (the refresh gate above, `toggleSection`'s expand-fetch, the "already loaded"
+// early-return below) keeps treating "loaded" as "fully loaded", unchanged.
+async function loadDlc(game, { force = false } = {}) {
+  if (game.dlc !== undefined && !force) return; // already loaded (or already failed) this session
+  const dlcIds = game.details?.meta?.dlc || [];
+  if (!dlcIds.length) { game.dlc = []; return; }
+  game.dlcLoading = true;
+  // Seed partial slots from the previous complete list (keyed by appid) so a force-refresh
+  // keeps showing the old entries in place while each is re-fetched, instead of the list
+  // shrinking back down to empty and refilling.
+  const prevById = new Map((game.dlc || []).map(d => [d.appid, d]));
+  const partial = dlcIds.map(id => prevById.get(id));
+  game.dlcPartial = partial;
+  if (panelGame === game) renderPanelBody(game);
+  try {
+    await Promise.all(dlcIds.map(async (id, i) => {
+      try {
+        const res = await fetch(`/api/game-details/${id}${force ? '?refresh=1' : ''}`);
+        const data = await res.json();
+        partial[i] = (res.ok && data.meta)
+          ? { appid: id, name: data.meta.name, capsule: data.meta.capsule, releaseDate: data.meta.releaseDate, comingSoon: data.meta.comingSoon }
+          : undefined; // delisted, or just failed/rate-limited this time
+      } catch {
+        partial[i] = undefined;
+      }
+      if (panelGame === game) renderPanelBody(game); // stream this entry in as soon as it resolves
+    }));
+    game.dlc = partial.filter(Boolean);
+  } catch {
+    game.dlc = game.dlc ?? null; // leave the card's body empty rather than surfacing an error for a non-essential feature
+  } finally {
+    game.dlcLoading = false;
+    game.dlcPartial = undefined;
+    if (panelGame === game) renderPanelBody(game); // no-op if the panel moved on mid-fetch
+  }
+}
+
+// Clicking a DLC entry in the expanded card (see dlcHtml), or the "Part of <Base Game>" link
+// (see baseGameHtml) — same relationship walked in opposite directions, so both push the
+// game being left onto panelHistory, then hand off to the host's own "open this appid"
+// mechanism (the same one backing the "look up any game" search box), just told to keep the
+// history stack instead of starting a fresh one. `name` is the target's already-known name
+// (from the just-fetched DLC list, or from `fullgame` on the current game's own metadata),
+// passed through purely to avoid a title flash while the host's own fetch is in flight, same
+// convention as gameSearch.js's onSelect.
+function navigateToGame(appid, name) {
+  if (!panelGame || !panelOptions.onNavigateGame) return;
+  // If the target is whatever's already sitting on top of the stack, this is a
+  // there-and-back-again hop (e.g. base game → DLC → the same base game's own "Part of"
+  // link) reached via a forward link rather than the explicit ← Back button — collapse it
+  // by popping instead of pushing, so bouncing between a base game and its DLC entries
+  // doesn't grow a stack of duplicate consecutive appids.
+  if (panelHistory.length && panelHistory[panelHistory.length - 1].appid === appid) {
+    panelHistory.pop();
+  } else {
+    panelHistory.push({ appid: panelGame.appid, name: panelGame.name });
+  }
+  panelOptions.onNavigateGame(appid, name);
+}
+
+// The header's "← Back" button (see renderPanelBody) — pops the trail and reopens whatever
+// was on top the same way navigateToGame opens a DLC/base-game link, just in the other
+// direction. Popping before calling onNavigateGame (rather than after) means the callback
+// only ever needs to know "keep whatever's left in the stack", identical in both directions.
+function panelGoBack() {
+  if (!panelHistory.length || !panelOptions.onNavigateGame) return;
+  const prev = panelHistory.pop();
+  panelOptions.onNavigateGame(prev.appid, prev.name);
 }
 
 // dir: -1 (previous) or 1 (next). wrap: true for keyboard arrow navigation
@@ -207,9 +388,14 @@ function panelStepHero(dir, { wrap = false } = {}) {
   return true;
 }
 
-function panelOpen(game) {
+// `keepHistory`: true only when this open is a DLC/base-game navigation hop (forward via
+// navigateToGame, or backward via panelGoBack) — every other opener (table row, search pick,
+// prev/next/random) leaves it false, which starts a fresh browsing trail.
+function panelOpen(game, { keepHistory = false } = {}) {
+  if (!keepHistory) panelHistory = [];
   panelGame = game;
   heroIdx = 0;
+  moreLinksOpen = false;
   panelPrevFocus = document.activeElement;
   document.getElementById('panel-body').scrollTop = 0;
   loadNews(game); // no-op (see loadNews) if this game's news was already fetched this session
@@ -231,6 +417,7 @@ function panelOpen(game) {
 function panelClose({ preserveUrl = false } = {}) {
   if (!panelGame) return;
   panelGame = null;
+  panelHistory = []; // closing the panel ends whatever DLC browsing trail was in progress
   document.getElementById('game-panel').classList.remove('open');
   document.getElementById('panel-backdrop').classList.remove('open');
   if (panelOptions.inertSelector) {
@@ -492,14 +679,26 @@ function glanceGrid(g) {
 // heroIdx/randomQueues above — this is UI state, not game data.
 const expandedSections = new Set();
 const revealedAchievements = new Set();
+// Which achievement list filter ('all' | 'unlocked' | 'locked') each game is currently
+// showing — same per-appid, never-cleared-this-session shape as expandedSections above.
+// Defaults to 'all' (map lookup miss) for any appid never touched.
+const achievementsFilter = new Map();
 
 function isSectionExpanded(appid, section) { return expandedSections.has(`${appid}:${section}`); }
 
 function toggleSection(appid, section) {
   const key = `${appid}:${section}`;
-  if (expandedSections.has(key)) expandedSections.delete(key);
+  const wasExpanded = expandedSections.has(key);
+  if (wasExpanded) expandedSections.delete(key);
   else expandedSections.add(key);
   if (panelGame) renderPanelBody(panelGame);
+  // DLC is the one collapsible card whose contents aren't already loaded by the time it's
+  // rendered (news/achievements are fetched as soon as the panel opens, whether or not
+  // their card ever gets expanded) — see loadDlc's own comment for why. Kick the fetch off
+  // only on the first actual expand, and only for the game the chip belongs to (a stale
+  // click on a chip from a re-render that's already moved on shouldn't fetch for the wrong
+  // game — matching `panelGame`, not just any appid, guards that).
+  if (!wasExpanded && section === 'dlc' && panelGame?.appid === appid) loadDlc(panelGame);
 }
 
 // Shared "one card, expand-in-place" shape used by HLTB breakdown, news, and achievements:
@@ -544,6 +743,11 @@ function revealAchievement(appid, apiname) {
   if (panelGame) renderPanelBody(panelGame);
 }
 
+function setAchievementsFilter(appid, filter) {
+  achievementsFilter.set(appid, filter);
+  if (panelGame) renderPanelBody(panelGame);
+}
+
 // Achievements section — opt-in via panelOptions.showAchievements (only the Library
 // Explorer sets it; the comparison page's groups have no single well-defined "player" to
 // fetch progress for). `g.achievements` is loaded and attached by the host page itself
@@ -564,7 +768,17 @@ function achievementsHtml(g) {
     </div>`;
   }
   const data = g.achievements;
-  if (!data) return '';
+  // `undefined` means the fetch hasn't been attempted (or finished) yet — nothing to show
+  // and no failure to report either, so stay silent same as before. `null` (see library.js's
+  // loadAchievements) means it was attempted and failed — that's worth a visible message
+  // rather than silently looking identical to a game with no achievements at all.
+  if (data === undefined) return '';
+  if (data === null) {
+    return `<div class="panel-section" id="panel-section-achievements">
+      <div class="panel-section-title">Achievements</div>
+      <div class="panel-no-data">Couldn't load achievements.</div>
+    </div>`;
+  }
   if (!data.total) {
     return `<div class="panel-section" id="panel-section-achievements">
       <div class="panel-section-title">Achievements</div>
@@ -579,14 +793,29 @@ function achievementsHtml(g) {
   const hasProgress = data.playerCount > 0;
   const pct = hasProgress ? Math.round((data.unlocked / data.total) * 100) : null;
 
+  // Sorted once per fetch and cached on the data object itself (a fresh object every
+  // fetch/refresh, so this never goes stale) rather than re-sorting the full list on every
+  // render — any unrelated toggle elsewhere in the panel re-renders the whole body, and a
+  // game with a few hundred achievements shouldn't pay for a full re-sort every time.
+  const sorted = data._sortedAchievements ??= data.achievements
+    .slice()
+    .sort((a, b) => Number(b.achieved) - Number(a.achieved));
+  // 'unlocked'/'locked' only make sense with real progress loaded — filtering by achieved
+  // status when nobody's loaded would just be "everything" vs. "nothing" either way.
+  const filter = hasProgress ? (achievementsFilter.get(g.appid) || 'all') : 'all';
+  const visible = filter === 'all' ? sorted : sorted.filter(a => (filter === 'unlocked') === !!a.achieved);
+  const filterRowHtml = hasProgress ? `<div class="panel-achievements-filter">
+    ${['all', 'unlocked', 'locked'].map(f => `<button type="button" class="panel-achievements-filter-btn${filter === f ? ' active' : ''}" data-appid="${g.appid}" data-filter="${f}">${f === 'all' ? 'All' : f === 'unlocked' ? 'Unlocked' : 'Locked'}</button>`).join('')}
+  </div>` : '';
+
   // Rows, not individual cards — one divider between rows instead of a border around each,
   // so the list reads as one thing inside the card rather than boxes stacked inside a box.
   const bodyHtml = `
+    ${filterRowHtml}
     ${!hasProgress ? `<div class="panel-no-data">Load a player above to see who's unlocked what.</div>`
       : data.private ? `<div class="panel-no-data">Progress unavailable — profile may be private.</div>` : ''}
-    ${data.achievements
-      .slice()
-      .sort((a, b) => Number(b.achieved) - Number(a.achieved))
+    ${!visible.length ? `<div class="panel-no-data">No achievements match this filter.</div>` : ''}
+    ${visible
       .map(a => {
         // A hidden achievement not yet unlocked keeps its name/description a surprise by
         // default, same as Steam's own profile pages — the schema still carries the real
@@ -643,6 +872,17 @@ function newsHtml(g) {
     </div>`;
   }
   const items = g.news;
+  // `newsError` with nothing to fall back on (no prior successful load) is worth a visible
+  // message rather than silently looking identical to a game with no news at all — same
+  // reasoning as achievements' explicit "couldn't load" state above. A failed *refresh* that
+  // still has stale data from an earlier successful load (see loadNews) just shows that
+  // stale list below instead, since it's still real, if no-longer-fresh, data.
+  if (g.newsError && !items) {
+    return `<div class="panel-section" id="panel-section-news">
+      <div class="panel-section-title">News</div>
+      <div class="panel-no-data">Couldn't load news.</div>
+    </div>`;
+  }
   if (!items || !items.length) return '';
   // Used to truncate further to 3 client-side on top of extractNews' own 5-item cap
   // (lib/steam.js), back when this section always rendered inline and a longer list ate
@@ -675,6 +915,93 @@ function newsHtml(g) {
     bodyHtml,
     linkHref: `https://store.steampowered.com/news/app/${g.appid}`,
     linkTitle: 'View all news on Steam',
+  })}</div>`;
+}
+
+// "Part of <Base Game>" — the reverse of the DLC card below: present only when the
+// currently open game is itself a piece of DLC (`meta.fullgame`, free on the same
+// appdetails response, see extractAppDetails in lib/steam.js). Same real-`<a href>` /
+// intercepted-click treatment as a DLC entry (see the delegated listener in initPanel),
+// just walking the base-game/DLC relationship in the other direction via the same
+// navigateToGame.
+// Returns inline content only (no wrapping block element) — folded into the same line as
+// the release date in renderPanelBody's markup, rather than a line of its own, so a DLC
+// entry's sticky header isn't title + release date + "DLC for X" stacked three deep.
+function baseGameHtml(g) {
+  const fg = g.details?.meta?.fullgame;
+  if (!fg) return '';
+  return `DLC for <a class="panel-basegame-link" href="${esc(panelOptions.gameHref?.(fg.appid) ?? '#')}" data-appid="${fg.appid}" data-name="${esc(fg.name || '')}">${esc(fg.name || `App ${fg.appid}`)}</a>`;
+}
+
+// DLC — a base game's downloadable content, collapsed by default (see loadDlc above for
+// why it's the one card whose body isn't already loaded by render time). The collapsed
+// header's count comes straight from `meta.dlc` (the bare appid list, free — see
+// extractAppDetails in lib/steam.js) so it's shown immediately even before the card is ever
+// expanded; only the expanded body's names/capsules depend on the lazy fetch. Each entry is
+// a real `<a href>` (panelOptions.gameHref, host-supplied so the URL matches whichever page
+// this is) rather than a plain button, so ctrl/cmd/shift-click and middle-click open it in a
+// new tab the normal way — a plain click is intercepted (see the delegated listener in
+// initPanel) to navigate within this panel instead via navigateToGame.
+//
+// `g.dlc.length` can come back smaller than `dlcIds.length` — not a truncation (loadDlc
+// resolves every one of them, no cap), just individual entries that failed to resolve this
+// time (delisted, or genuinely rate-limited under a big burst) and were silently dropped,
+// same graceful degradation as any other per-item failure elsewhere in the panel.
+// Newest-released first, with not-yet-released entries surfaced above everything else (the
+// same "what's coming" framing Steam's own DLC listings use) rather than buried below the
+// oldest release. `releaseDate` is Steam's raw display string (e.g. "3 Mar, 2017"), not a
+// machine-sortable field — Date.parse() on it is a best effort; a comingSoon entry with no
+// parseable date, or any other unparseable date, sorts to the bottom of its group instead of
+// throwing the whole order off.
+function sortDlcByRelease(list) {
+  const sortKey = d => {
+    const t = d.releaseDate ? Date.parse(d.releaseDate) : NaN;
+    return Number.isNaN(t) ? -Infinity : t;
+  };
+  return list.slice().sort((a, b) => {
+    if (!!a.comingSoon !== !!b.comingSoon) return a.comingSoon ? -1 : 1;
+    return sortKey(b) - sortKey(a);
+  });
+}
+
+function dlcItemHtml(d) {
+  return `<a class="panel-dlc-item" href="${esc(panelOptions.gameHref?.(d.appid) ?? '#')}" data-appid="${d.appid}" data-name="${esc(d.name)}">
+      <img class="panel-dlc-capsule" src="${esc(d.capsule)}" alt="" loading="lazy">
+      <span class="panel-dlc-name">${esc(d.name)}</span>
+    </a>`;
+}
+
+function dlcHtml(g) {
+  const dlcIds = g.details?.meta?.dlc;
+  if (!dlcIds || !dlcIds.length) return '';
+
+  let bodyHtml = `<div class="panel-collapsible-body-pad"><span class="sk" style="display:block;width:100%;height:48px;border-radius:6px"></span></div>`;
+  if (g.dlcLoading) {
+    // Stream in whichever entries have already resolved instead of holding the whole card on
+    // its skeleton until every single one settles (see loadDlc's own comment).
+    const loaded = (g.dlcPartial || []).filter(Boolean);
+    const remaining = dlcIds.length - loaded.length;
+    if (loaded.length) {
+      bodyHtml = `<div class="panel-dlc-list">${loaded.map(dlcItemHtml).join('')}${
+        remaining ? `<div class="panel-dlc-loading-more">Loading ${remaining} more…</div>` : ''
+      }</div>`;
+    }
+  } else if (g.dlc === null) {
+    bodyHtml = `<div class="panel-collapsible-body-pad"><div class="panel-no-data">Couldn't load DLC details.</div></div>`;
+  } else if (g.dlc) {
+    bodyHtml = g.dlc.length
+      ? `<div class="panel-dlc-list">${sortDlcByRelease(g.dlc).map(dlcItemHtml).join('')}</div>`
+      : `<div class="panel-collapsible-body-pad"><div class="panel-no-data">No DLC details available.</div></div>`;
+  }
+
+  return `<div class="panel-section" id="panel-section-dlc">${collapsibleCard({
+    appid: g.appid,
+    section: 'dlc',
+    icon: '📦',
+    valHtml: `<b>DLC</b> · ${dlcIds.length} available`,
+    bodyHtml,
+    linkHref: `https://store.steampowered.com/dlc/${g.appid}/`,
+    linkTitle: 'View all DLC on Steam',
   })}</div>`;
 }
 
@@ -738,8 +1065,49 @@ function renderPanelBody(game) {
     <button type="button" class="panel-refresh-btn${panelRefreshing ? ' is-refreshing' : ''}"${panelRefreshing ? ' disabled' : ''}
       title="Refresh rating, HLTB &amp; store details for this game" aria-label="Refresh details">↻</button>` : '';
 
+  const baseGameSectionHtml = g.loading ? '' : baseGameHtml(g);
+  const dlcSectionHtml = g.loading ? '' : dlcHtml(g);
   const newsSectionHtml = newsHtml(g);
   const achievementsSectionHtml = achievementsHtml(g);
+
+  // Store and ITAD are the two links everyone wants at a glance (info page, deal price) and
+  // stay directly in the row — Workshop/Website are each conditional (present for some games,
+  // absent for others) and, unlike Store/ITAD, only ever add up on top of an already full row
+  // rather than replacing anything in it. Tucked into a single "⋯ More" menu instead, so the
+  // row's width no longer scales with how many of these a given game happens to have.
+  //
+  // No News item here — a standalone header icon to the Steam news hub used to exist as a
+  // fallback for whenever the News *section* itself has nothing to show (no card if there are
+  // zero official announcements), but the section's own ↗ icon already covers the case that
+  // matters (an actual News card, linking to the exact same hub); a game with confirmed zero
+  // official posts isn't worth a dedicated icon just to go check whether unrelated syndicated
+  // press showed up on the raw hub instead.
+  const moreLinkItems = [
+    // Steam Workshop — a category like any other in `meta.categories` (already fetched,
+    // feeds the tag cloud), just also worth a direct link for the games that actually have
+    // it, rather than only ever showing up as one pill among many.
+    !g.loading && (meta?.categories || []).includes('Steam Workshop') &&
+      { icon: '🛠️', label: 'Steam Workshop', href: `https://steamcommunity.com/app/${g.appid}/workshop/` },
+    // Official website — a plain field on the same appdetails response as everything else
+    // here, present for plenty of games and absent for plenty of others (mostly smaller ones).
+    meta?.website && { icon: '🌐', label: 'Official Website', href: meta.website },
+  ].filter(Boolean);
+  const moreLinksHtml = moreLinkItems.length ? `<div class="panel-icon-more">
+    <button type="button" class="panel-icon-link panel-icon-more-btn" aria-haspopup="true" aria-expanded="${moreLinksOpen}" title="More links" aria-label="More links">⋯</button>
+    ${moreLinksOpen ? `<div class="panel-icon-more-menu">${moreLinkItems.map(it =>
+      `<a class="panel-icon-more-item" href="${esc(it.href)}" target="_blank" rel="noopener">${it.icon} ${esc(it.label)}</a>`
+    ).join('')}</div>` : ''}
+  </div>` : '';
+
+  // "← Back" only appears once a DLC hop is actually in progress (panelHistory is empty
+  // for every ordinary panel open — see panelOpen's keepHistory param) — a plain table-row
+  // click never gets this button, only a game reached by following a DLC link (or by going
+  // back through more than one of them) does.
+  const backHtml = panelHistory.length
+    ? `<button type="button" class="panel-back-btn" title="Back to ${esc(panelHistory[panelHistory.length - 1].name)}">
+        &#8249; ${esc(panelHistory[panelHistory.length - 1].name)}
+      </button>`
+    : '';
 
   // A sticky jump-nav for the sections below the fold — collapsing HLTB/news/achievements
   // by default (see collapsibleCard above) means the panel is now mostly a scroll of
@@ -749,7 +1117,7 @@ function renderPanelBody(game) {
   // achievements/news/HLTB data, simply doesn't get a button for it) — only shown once
   // there's more than one place worth jumping to; a lone "Owners" button with nothing
   // else below it isn't worth the row. Listed in the same order the sections actually
-  // appear below (Owners right after the description, ahead of the collapsibles — see
+  // appear below (Owners right after the tag cloud, ahead of the collapsibles — see
   // renderPanelBody's markup below) so scroll-spy highlighting (see
   // initSubnavScrollSpy) always lights up left-to-right as you scroll down, never out
   // of order.
@@ -758,6 +1126,7 @@ function renderPanelBody(game) {
     hltbDetailHtml && { label: 'HLTB', target: 'panel-section-hltb' },
     newsSectionHtml && { label: 'News', target: 'panel-section-news' },
     achievementsSectionHtml && { label: 'Achievements', target: 'panel-section-achievements' },
+    dlcSectionHtml && { label: 'DLC', target: 'panel-section-dlc' },
   ].filter(Boolean);
   const subnavHtml = subnavItems.length < 2 ? '' : `<div class="panel-subnav">
     <button type="button" class="panel-subnav-btn" data-target="top">Overview</button>
@@ -782,18 +1151,30 @@ function renderPanelBody(game) {
   // now and restore it after, so those re-renders leave the reader wherever they were.
   const prevScrollTop = panelBody.scrollTop;
 
+  // Release date and "DLC for X" used to stack as two separate lines under the title —
+  // folded onto one ("<date> · DLC for X") since both are short, secondary metadata about
+  // the same thing (when/what this is), and stacking them was most of what made the sticky
+  // header tall for a DLC entry reached via a base-game/DLC hop (which also has the ← Back
+  // line above the title).
+  const metaLineHtml = releaseDate || baseGameSectionHtml
+    ? `<div class="panel-release">${releaseDate ? esc(releaseDate) : ''}${releaseDate && baseGameSectionHtml ? ' <span class="panel-meta-sep">·</span> ' : ''}${baseGameSectionHtml}</div>`
+    : '';
+
   panelBody.innerHTML = `
     <div id="panel-hero" class="panel-hero"></div>
     <div class="panel-header-sticky">
+      ${backHtml}
       <div class="panel-title-row">
         <div>
           <div class="panel-title" id="panel-title">${esc(g.name)}</div>
-          ${releaseDate ? `<div class="panel-release">${esc(releaseDate)}</div>` : ''}
+          ${metaLineHtml}
         </div>
         <div class="panel-icon-links">
           <a class="panel-icon-link" href="${esc(storeUrl)}" target="_blank" rel="noopener" title="Steam Store" aria-label="Steam Store">🛒</a>
           <a class="panel-icon-link" href="${esc(itadUrl)}" target="_blank" rel="noopener" title="IsThereAnyDeal" aria-label="IsThereAnyDeal">$</a>
-          ${!newsSectionHtml ? `<a class="panel-icon-link" href="https://store.steampowered.com/news/app/${g.appid}" target="_blank" rel="noopener" title="News" aria-label="News">📰</a>` : ''}
+          ${moreLinksHtml}
+          <span class="panel-icon-divider" role="separator" aria-hidden="true"></span>
+          <button type="button" class="panel-icon-link panel-copy-link-btn" title="Copy link to this game" aria-label="Copy link to this game">🔗</button>
           ${refreshBtn}
         </div>
       </div>
@@ -801,11 +1182,12 @@ function renderPanelBody(game) {
     </div>
     ${glanceGrid(g)}
     ${description ? `<div class="panel-desc panel-card">${description}</div>` : ''}
-    ${ownersHtml ? `<div id="panel-section-owners">${ownersHtml}</div>` : ''}
     ${cloudHtml}
+    ${ownersHtml ? `<div id="panel-section-owners">${ownersHtml}</div>` : ''}
     ${hltbDetailHtml}
     ${newsSectionHtml}
-    ${achievementsSectionHtml}`;
+    ${achievementsSectionHtml}
+    ${dlcSectionHtml}`;
 
   buildPanelHero();
   panelBody.scrollTop = prevScrollTop;
@@ -814,6 +1196,19 @@ function renderPanelBody(game) {
   // refresh button) doesn't leave the old subnav's active button highlighted, or none at
   // all, until the next scroll event fires.
   updateSubnavScrollSpy();
+
+  // DLC is the one collapsible card whose fetch is normally gated behind an actual click
+  // (see toggleSection/loadDlc above) — but `expandedSections` remembers "DLC is expanded"
+  // per appid for the rest of the session, independent of any one game *object*. Navigating
+  // to a game via a DLC link (or back, or prev/next/random) always creates/looks up a fresh
+  // game object with its own never-yet-fetched `dlc` — so if that appid's card was expanded
+  // at some earlier point this session, it renders open here too (dlcHtml honors the same
+  // isSectionExpanded flag toggleSection reads) but with nothing loaded to show, and no click
+  // is ever going to happen to trigger the fetch since it's already open. Kick it off here
+  // instead whenever that mismatch shows up. Placed after the render above (not before) so
+  // loadDlc's own synchronous pre-fetch renderPanelBody() call — same as a real toggle click
+  // triggers — runs after this call's own DOM writes are done, not nested inside them.
+  if (!g.loading && g.dlc === undefined && !g.dlcLoading && isSectionExpanded(g.appid, 'dlc')) loadDlc(g);
 }
 
 function initHeroSwipe() {

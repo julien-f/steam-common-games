@@ -380,6 +380,18 @@ initPanel({
   // already clears these params itself beforehand via updateUrlParams, so this just runs
   // redundantly-but-harmlessly there — see loadLibrary/loadWishlist.
   onClose: () => { setPanelParam(null); updateTitle(); },
+  // Backs the DLC card's links (public/panel.js) — a real href so ctrl/cmd/shift/middle
+  // click still opens it in a new tab, alongside whatever else is in the current URL.
+  gameHref: appid => {
+    const params = new URLSearchParams(location.search);
+    params.delete('shot');
+    params.set('game', appid);
+    return `?${reorderUrlParams(params)}`;
+  },
+  // Clicking a DLC entry (or the panel's own "← Back" button) — reuses the same "open this
+  // appid" mechanism as the "look up any game" search box, just keeping panel.js's own
+  // DLC-navigation history stack instead of starting a fresh one.
+  onNavigateGame: (appid, name) => openStandaloneLookup(appid, name, { keepHistory: true }),
 });
 initLightbox({ onParamChange: setLightboxParam });
 
@@ -451,7 +463,7 @@ function buildLibraryOwnersHtml(g) {
   // the order stays deterministic.
   owners.sort((a, b) => b.lastPlayedSec - a.lastPlayedSec || a.name.localeCompare(b.name));
   const maxMinutes = Math.max(...owners.map(o => o.minutes), 1);
-  return `<div class="panel-section">
+  return `<div class="panel-section panel-card">
     <div class="panel-section-title">Owned by <span class="panel-section-subtitle">most recently played first</span></div>
     <div class="panel-owners">${owners.map(o => {
       const lp = fmtLastPlayed(o.lastPlayedSec);
@@ -491,9 +503,9 @@ function renderPanelNav(game) {
   document.getElementById('panel-reroll').addEventListener('click', pickRandomGame);
 }
 
-function openGame(game, { isRandom = false } = {}) {
+function openGame(game, { isRandom = false, keepHistory = false } = {}) {
   if (!isRandom) clearRandomQueue(randomQueueKey());
-  panelOpen(game);
+  panelOpen(game, { keepHistory });
   updateTitle();
   renderPanelNav(game);
   setPanelParam(game.appid);
@@ -564,16 +576,16 @@ function pickRandomGame() {
 // (the looked-up game is actually owned/wishlisted by the current player), open that row
 // instead — full nav, playtime, etc. rather than a lesser standalone view of data already
 // sitting in `rows`.
-function openStandaloneLookup(appid, name) {
+function openStandaloneLookup(appid, name, { keepHistory = false } = {}) {
   const existing = rowMap.get(appid);
   if (existing) {
-    openGame(existing);
+    openGame(existing, { keepHistory });
     addRecentGame(existing.appid, existing.name, existing.capsule || null);
     renderRecentGamesBar(recentGamesBarEl);
     return;
   }
   const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true };
-  openGame(game);
+  openGame(game, { keepHistory });
   fetchStandaloneDetails(game);
 }
 

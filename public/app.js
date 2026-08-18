@@ -103,6 +103,19 @@ document.addEventListener('DOMContentLoaded', () => {
     onRefresh: async game => {
       await Promise.all([refreshGameDetails(game), loadAchievements(game, { force: true })]);
     },
+    // Backs the DLC card's links (public/panel.js) — a real href so ctrl/cmd/shift/middle
+    // click still opens it in a new tab, alongside the current URL's other state (`u=`,
+    // filters, etc.), same as setPanelParam builds for the panel's own deep link.
+    gameHref: appid => {
+      const params = new URLSearchParams(location.search);
+      params.delete('shot');
+      params.set('game', appid);
+      return `?${reorderUrlParams(params)}`;
+    },
+    // Clicking a DLC entry (or the panel's own "← Back" button) — reuses the exact same
+    // "open this appid" mechanism as the "look up any game" search box, just telling it to
+    // keep panel.js's own DLC-navigation history stack instead of starting a fresh one.
+    onNavigateGame: (appid, name) => openStandaloneGame(appid, name, { keepHistory: true }),
     // Runs on every close path, not just the Escape-key one below — see the comment on
     // `onClose` in panel.js. Mirrors what the old closePanel() wrapper did, but now also
     // covers the backdrop click / × button / swipe-to-close, which used to leave
@@ -674,16 +687,16 @@ function updateProgress(loaded, total) {
 // itself from store metadata, keyed on the appid, same as it does for a nameless wishlist row.
 // If the appid is actually part of the current comparison, open its real row instead — full
 // owners/nav/highlight rather than a lesser standalone view of data already in `games`.
-function openStandaloneGame(appid, name) {
+function openStandaloneGame(appid, name, { keepHistory = false } = {}) {
   const existing = games.find(g => g.appid === appid);
   if (existing) {
-    openPanel(existing);
+    openPanel(existing, { keepHistory });
     addRecentGame(existing.appid, existing.name, existing.details?.meta?.capsule || null);
     renderRecentGamesBar(document.getElementById('recent-games-bar'));
     return;
   }
   const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true };
-  openPanel(game);
+  openPanel(game, { keepHistory });
   fetchStandaloneDetails(game);
   loadAchievements(game);
 }
@@ -751,7 +764,7 @@ function buildOwnersHtml(g) {
   // order stays deterministic rather than depending on slot iteration order.
   owners.sort((a, b) => b.lastPlayedSec - a.lastPlayedSec || a.name.localeCompare(b.name));
   const maxMinutes = Math.max(...owners.map(o => o.minutes), 1);
-  return `<div class="panel-section">
+  return `<div class="panel-section panel-card">
     <div class="panel-section-title">Owned by <span class="panel-section-subtitle">most recently played first</span></div>
     <div class="panel-owners">${owners.map(o => {
       const lp = fmtLastPlayed(o.lastPlayedSec);
@@ -778,13 +791,13 @@ function pickRandom(groupKey) {
   openPanel(pick, { isRandom: true });
 }
 
-function openPanel(game, { isRandom = false } = {}) {
+function openPanel(game, { isRandom = false, keepHistory = false } = {}) {
   if (!isRandom) {
     randomGroupKey = null;
     clearAllRandomQueues();
   }
   activeGame = game;
-  panelOpen(game); // shared: renders hero+body, opens the panel, focuses it
+  panelOpen(game, { keepHistory }); // shared: renders hero+body, opens the panel, focuses it
   updateTitle();
   renderPanelNav();
   refreshTable(); // re-render rows so the active highlight appears

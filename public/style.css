@@ -858,6 +858,29 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   gap: 8px;
 }
 
+/* "← Back to <game>" — only rendered while a DLC-navigation trail is in progress (see
+   panelHistory in panel.js), so it sits above the title row rather than replacing any of
+   its own controls. Plain text treatment (no border/box) since it's a single, temporary
+   affordance, not a persistent icon-link like the ones beside it. */
+.panel-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text1);
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.panel-back-btn:hover, .panel-back-btn:focus-visible { color: var(--accent2); outline: none; }
+
 /* Sticky sub-nav for jumping straight to a lower section — only rendered (see
    renderPanelBody in panel.js) once there are at least two sections worth jumping to, so a
    game with no HLTB/news/achievements/owners data never gets a lone useless button. Sits
@@ -885,7 +908,34 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
    hover/focus outline, so "where am I" reads at a glance without needing to hover. */
 .panel-subnav-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-.panel-icon-links { display: flex; gap: 6px; flex-shrink: 0; margin-top: 1px; }
+.panel-icon-links { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-top: 1px; }
+/* Separates the outbound links (Store/ITAD/News/Workshop/Website — leave the page) from the
+   in-panel actions after it (copy link, refresh — do something in place) — both used to
+   render as one undifferentiated row of identical icon buttons with no cue that the last
+   one or two behave completely differently from the rest. */
+.panel-icon-divider { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; }
+
+/* "⋯ More" — News (only when there's no News section to link out from instead)/Workshop/
+   Website, whichever apply, tucked behind one toggle instead of each getting its own
+   always-visible icon. Keeps the row's width fixed regardless of how many of these a given
+   game happens to have — with all three showing at once alongside Store/ITAD/copy-link/
+   refresh, the row used to run to 7-8 icon buttons, wide enough to squeeze the title into a
+   two-line wrap on a narrow panel. */
+.panel-icon-more { position: relative; }
+.panel-icon-more-btn[aria-expanded="true"] { border-color: var(--accent); color: var(--accent2); }
+.panel-icon-more-menu {
+  position: absolute; z-index: 5; top: calc(100% + 4px); right: 0;
+  display: flex; flex-direction: column; min-width: 170px;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  overflow: hidden;
+}
+.panel-icon-more-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; color: var(--text0); font-size: 13px;
+  text-decoration: none; white-space: nowrap;
+}
+.panel-icon-more-item:hover, .panel-icon-more-item:focus-visible { background: var(--bg1); outline: none; }
 .panel-icon-link {
   width: 26px;
   height: 26px;
@@ -910,7 +960,14 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   line-height: 1.35;
 }
 
-.panel-refresh-btn {
+/* "DLC for <Base Game>" — only present when the open game is itself a piece of DLC
+   (meta.fullgame, see baseGameHtml in panel.js). Folded inline into .panel-release (below)
+   rather than its own block, so it doesn't add a third stacked line under the title. */
+.panel-basegame-link { color: var(--text1); text-decoration: none; border-bottom: 1px solid transparent; font-weight: 600; transition: color 0.15s, border-color 0.15s; }
+.panel-basegame-link:hover, .panel-basegame-link:focus-visible { color: var(--accent2); border-bottom-color: var(--accent2); outline: none; }
+.panel-meta-sep { opacity: 0.6; }
+
+.panel-refresh-btn, .panel-copy-link-btn {
   flex-shrink: 0;
   margin-top: 1px;
   background: transparent;
@@ -928,9 +985,12 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   padding: 0;
   transition: border-color 0.15s, color 0.15s;
 }
-.panel-refresh-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
+.panel-refresh-btn:hover:not(:disabled), .panel-copy-link-btn:hover { border-color: var(--accent); color: var(--accent2); }
 .panel-refresh-btn:disabled { opacity: 0.6; cursor: default; }
 .panel-refresh-btn.is-refreshing { animation: spin 0.75s linear infinite; }
+/* Brief post-click feedback (see flashCopyLinkBtn in panel.js) — green rather than the
+   hover accent, so "copied" reads as a distinct confirmation, not just a hover state. */
+.panel-copy-link-btn--copied { border-color: #15803d; color: #15803d; }
 
 .panel-release {
   font-size: 12px;
@@ -1036,6 +1096,23 @@ a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var
 .panel-news-item:hover .panel-news-title { color: var(--accent2); }
 .panel-news-meta { font-size: 11px; color: var(--text1); }
 
+/* DLC — rows of capsule + name, same "list not boxes" treatment as news/achievements.
+   Each row is a real <a href> (panel.js's dlcHtml/navigateToGame) so it works as a normal
+   link (new tab via ctrl/cmd/middle-click) as well as in-panel navigation on a plain click. */
+.panel-dlc-list { display: flex; flex-direction: column; }
+.panel-dlc-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; text-decoration: none;
+  border-bottom: 1px solid var(--border);
+}
+.panel-dlc-item:last-child { border-bottom: none; }
+.panel-dlc-capsule { width: 64px; height: 30px; border-radius: 4px; flex-shrink: 0; object-fit: cover; background: var(--bg1); }
+.panel-dlc-name { font-size: 12.5px; color: var(--text0); font-weight: 500; }
+.panel-dlc-item:hover .panel-dlc-name { color: var(--accent2); }
+/* Shown while a DLC card is streaming in results (see loadDlc/dlcHtml in panel.js) — the
+   entries already resolved render as normal rows above this, one line per still-pending one. */
+.panel-dlc-loading-more { padding: 8px 10px; font-size: 12px; color: var(--text2); }
+
 /* One card (border/radius/background) holds both the header and the list — a single
    grouped unit instead of a chip floating above a separate stack of boxes. The header
    reuses the glance grid's chip template (panel-glance-num/-val) for its bold
@@ -1076,6 +1153,25 @@ a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var
    list inside the card rather than boxes stacked inside a box. */
 .panel-achievements-list { border-top: 1px solid var(--border); }
 .panel-achievements-list .panel-no-data { padding: 8px 10px; }
+
+/* All/Unlocked/Locked filter pills — only rendered with real progress loaded (see
+   achievementsHtml in panel.js; filtering by achieved status is meaningless otherwise),
+   same pill styling as .panel-subnav-btn so the two "choose one of a few states" controls
+   in the panel read as one family. */
+.panel-achievements-filter { display: flex; gap: 6px; padding: 8px 10px 0; }
+.panel-achievements-filter-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text1);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.panel-achievements-filter-btn:hover, .panel-achievements-filter-btn:focus-visible { border-color: var(--accent); color: var(--accent2); outline: none; }
+.panel-achievements-filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 /* collapsibleCard() (panel.js) is shared by achievements, HLTB breakdown, and news, but
    only achievements' own rows (.panel-achievement-row) carry their own left/right padding

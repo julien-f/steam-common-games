@@ -440,7 +440,49 @@ test('getAppDetails: dedupes genres/categories that share the same label but dif
 test('getAppDetails: handles missing optional fields with empty arrays', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
-  assert.deepEqual(await getAppDetails(400), { name: null, genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, comingSoon: false, metacritic: null, capsule: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg', banner: 'https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg', movies: [], screenshots: [] });
+  assert.deepEqual(await getAppDetails(400), { name: null, genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, comingSoon: false, metacritic: null, capsule: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg', banner: 'https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg', movies: [], screenshots: [], dlc: [], fullgame: null, website: null });
+});
+
+test('getAppDetails: extracts dlc appid list', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, { dlc: [123, 456] }));
+  const result = await getAppDetails(400);
+  assert.deepEqual(result.dlc, [123, 456]);
+});
+
+test('getAppDetails: dlc defaults to empty array when field is not an array', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, { dlc: 'not-an-array' }));
+  const result = await getAppDetails(400);
+  assert.deepEqual(result.dlc, []);
+});
+
+test('getAppDetails: extracts fullgame (a DLC app pointing back at its base game)', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(500, { fullgame: { appid: '400', name: 'Portal' } }));
+  const result = await getAppDetails(500);
+  assert.deepEqual(result.fullgame, { appid: 400, name: 'Portal' });
+});
+
+test('getAppDetails: fullgame is null when absent (a base game, not DLC)', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
+  const result = await getAppDetails(400);
+  assert.equal(result.fullgame, null);
+});
+
+test('getAppDetails: extracts website field', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, { website: 'https://example.com' }));
+  const result = await getAppDetails(400);
+  assert.equal(result.website, 'https://example.com');
+});
+
+test('getAppDetails: website is null when absent', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
+  const result = await getAppDetails(400);
+  assert.equal(result.website, null);
 });
 
 test('getAppDetails: extracts name field', async (t) => {
