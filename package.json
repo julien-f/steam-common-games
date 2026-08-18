@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@vates/data-table-core": "^0.8.0",
-    "@vates/data-table-vanilla": "^0.8.0",
+    "@vates/data-table-vanilla": "^0.9.0",
     "dotenv": "^17.4.2",
     "express": "^4.18.2",
     "express-rate-limit": "^8.6.2"
