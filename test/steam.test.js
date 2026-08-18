@@ -9,7 +9,7 @@ process.env.DB_FILE = '';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews } = require('../lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews } = require('../lib/steam');
 const { _reset, setCache } = require('../lib/cache');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
@@ -568,17 +568,26 @@ test('getAppDetails: caps movies at 5', async (t) => {
   assert.equal(result.movies.length, 5);
 });
 
-// ── getSteamTags ───────────────────────────────────────────────────────────
+// ── getSteamTags / getGameDemo ─────────────────────────────────────────────
+// Both are backed by the same cached IStoreBrowseService item (see getStoreBrowseItem in
+// lib/steam.js) — tags via its `tagids` field, the demo link via `related_items.demo_appid`
+// — so they're tested together here rather than in separate sections.
 
-// Routes the shared fetch mock by URL: IStoreBrowseService for per-app tagids,
-// ajaxgetstoretags for the tagid → name map.
-function mockTagEndpoints(t, { tagids = [], nameMap = {}, browseOk = true, namesOk = true } = {}) {
+// Routes the shared fetch mock by URL: IStoreBrowseService for the per-app store browse item
+// (tagids + related_items), ajaxgetstoretags for the tagid → name map.
+function mockTagEndpoints(t, { tagids = [], nameMap = {}, demoAppid, browseOk = true, namesOk = true } = {}) {
+  let browseCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (String(url).includes('IStoreBrowseService')) {
+      browseCalls++;
       if (!browseOk) return { ok: false, status: 503 };
       return {
         ok: true,
-        json: async () => ({ response: { store_items: [{ success: 1, tagids }] } }),
+        json: async () => ({ response: { store_items: [{
+          success: 1,
+          tagids,
+          ...(demoAppid != null ? { related_items: { demo_appid: [demoAppid] } } : {}),
+        }] } }),
       };
     }
     if (String(url).includes('ajaxgetstoretags')) {
@@ -590,6 +599,7 @@ function mockTagEndpoints(t, { tagids = [], nameMap = {}, browseOk = true, names
     }
     throw new Error(`unexpected fetch: ${url}`);
   });
+  return () => browseCalls;
 }
 
 test('getSteamTags: returns every tag in weight order, resolved via the name map (no display cap)', async (t) => {
@@ -645,17 +655,37 @@ test('getSteamTags: throws isUpstream when the tag name map fetch fails', async 
   await assert.rejects(() => getSteamTags(400), err => err.isUpstream === true);
 });
 
-// Old `tags:` entries from before this function moved to Steam's own tag ids (SteamSpy-era
-// `{tagname: voteCount}` objects) must never be read by the new code — it now keys off a
-// distinct `tagids:` prefix instead. A shape check (e.g. "is it an array?") isn't safe here:
-// a game with zero SteamSpy votes cached a bare `[]` under the old key, which is
-// indistinguishable by shape alone from a legitimate empty `tagid[]` result under the new
-// format — that ambiguity used to leave every "no SteamSpy tags" game stuck showing no tags
-// forever, even once Steam's own data (fetched below) had some. Using a new key prefix
-// sidesteps the whole problem: old `tags:` entries, in any shape, are simply never consulted.
-test('getSteamTags: ignores a stale `tags:` entry from before the key moved to `tagids:` (old SteamSpy object shape)', async (t) => {
+// Observed live: ajaxgetstoretags returning a 200 OK with a literal JSON `null` body during
+// what looked like an upstream hiccup, rather than the usual `{tags: [...]}` shape.
+// Destructuring straight off that would throw an opaque TypeError instead of a clean,
+// caller-recognizable upstream error.
+test('getSteamTags: throws isUpstream (not a raw TypeError) when the tag name map response body is null', async (t) => {
   _reset();
-  setCache('tags:400', { 'Action': 9054, 'Co-op': 4532 }); // old SteamSpy-shaped cache value, old key
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url).includes('IStoreBrowseService')) {
+      return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: [1] }] } }) };
+    }
+    if (String(url).includes('ajaxgetstoretags')) {
+      return { ok: true, json: async () => null };
+    }
+    throw new Error(`unexpected fetch: ${url}`);
+  });
+
+  await assert.rejects(() => getSteamTags(400), err => err.isUpstream === true);
+});
+
+// Tags have moved cache key twice: `tags:` (SteamSpy-era `{tagname: voteCount}` objects) →
+// `tagids:` (a bare `tagid[]`, briefly) → `browse:` (the whole raw store browse item, current).
+// Entries under either retired key must never be read by the new code, in any shape — a shape
+// check (e.g. "is it an array?") isn't safe: a game with zero SteamSpy votes cached a bare
+// `[]` under the old key, indistinguishable by shape alone from a legitimate empty result
+// under either later format. That ambiguity used to leave every "no SteamSpy tags" game stuck
+// showing no tags forever, even once Steam's own data (fetched below) had some. A distinct key
+// each time a format changes sidesteps the whole problem: retired-key entries, in any shape,
+// are simply never consulted.
+test('getSteamTags: ignores a stale `tags:` entry (old SteamSpy object shape)', async (t) => {
+  _reset();
+  setCache('tags:400', { 'Action': 9054, 'Co-op': 4532 }); // old SteamSpy-shaped cache value, retired key
   mockTagEndpoints(t, { tagids: [1, 2], nameMap: { 1: 'Action', 2: 'Indie' } });
 
   const result = await getSteamTags(400);
@@ -664,11 +694,62 @@ test('getSteamTags: ignores a stale `tags:` entry from before the key moved to `
 
 test('getSteamTags: ignores a stale `tags:` entry of `[]` (old SteamSpy "no votes" games) — the exact case a shape check could not distinguish from a real empty result', async (t) => {
   _reset();
-  setCache('tags:400', []); // old key, empty array — SteamSpy's shape for "no tags recorded"
+  setCache('tags:400', []); // retired key, empty array — SteamSpy's shape for "no tags recorded"
   mockTagEndpoints(t, { tagids: [1, 2], nameMap: { 1: 'Action', 2: 'Indie' } });
 
   const result = await getSteamTags(400);
   assert.deepEqual(result, ['Action', 'Indie']);
+});
+
+test('getSteamTags: ignores a stale `tagids:` entry (the brief bare-array key format)', async (t) => {
+  _reset();
+  setCache('tagids:400', [999]); // retired key, from the format that sat between `tags:` and `browse:`
+  mockTagEndpoints(t, { tagids: [1, 2], nameMap: { 1: 'Action', 2: 'Indie' } });
+
+  const result = await getSteamTags(400);
+  assert.deepEqual(result, ['Action', 'Indie']);
+});
+
+test('getGameDemo: returns the demo appid from related_items.demo_appid', async (t) => {
+  _reset();
+  mockTagEndpoints(t, { tagids: [], nameMap: {}, demoAppid: 1714800 });
+
+  const result = await getGameDemo(1634360);
+  assert.equal(result, 1714800);
+});
+
+test('getGameDemo: returns null when the game has no demo', async (t) => {
+  _reset();
+  mockTagEndpoints(t, { tagids: [], nameMap: {} });
+
+  const result = await getGameDemo(400);
+  assert.equal(result, null);
+});
+
+test('getGameDemo: returns null when the store item lookup is unsuccessful', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url).includes('IStoreBrowseService')) {
+      return { ok: true, json: async () => ({ response: { store_items: [{ success: 0 }] } }) };
+    }
+    return { ok: true, json: async () => ({ tags: [] }) };
+  });
+
+  const result = await getGameDemo(400);
+  assert.equal(result, null);
+});
+
+// The whole point of caching the raw store browse item (rather than just the extracted
+// tagids, as an earlier version of this code did) — getSteamTags and getGameDemo must share
+// one upstream fetch per appid, not make two, since both read off the same cached response.
+test('getSteamTags and getGameDemo share a single upstream IStoreBrowseService call per appid', async (t) => {
+  _reset();
+  const browseCalls = mockTagEndpoints(t, { tagids: [1], nameMap: { 1: 'Action' }, demoAppid: 555 });
+
+  const [tags, demo] = await Promise.all([getSteamTags(400), getGameDemo(400)]);
+  assert.deepEqual(tags, ['Action']);
+  assert.equal(demo, 555);
+  assert.equal(browseCalls(), 1, 'both calls should share one upstream fetch via cache + dedup');
 });
 
 // ── getProtonDbStatus ──────────────────────────────────────────────────────────

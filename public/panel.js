@@ -1079,6 +1079,18 @@ function renderPanelBody(game) {
   const newsSectionHtml = newsHtml(g);
   const achievementsSectionHtml = achievementsHtml(g);
 
+  // A free demo is a "try before you buy" call to action, not supplementary info like
+  // Website/Workshop below — those are fine tucked one click away in "⋯ More", but a demo
+  // link is worth surfacing without any extra click. A standalone banner right under the
+  // sticky header (rather than a header icon) keeps the header itself compact — it's the
+  // first thing seen on open, but scrolls away with the rest of the body like everything
+  // else, instead of permanently occupying pinned header space for every game that has one.
+  const demoBannerHtml = (!g.loading && g.details?.demo)
+    ? `<a class="panel-demo-banner" href="${esc(safeHref(`https://store.steampowered.com/app/${g.details.demo}`))}" target="_blank" rel="noopener">
+        <span class="panel-demo-banner-icon">🎮</span> Try the Free Demo
+      </a>`
+    : '';
+
   // Store and ITAD are the two links everyone wants at a glance (info page, deal price) and
   // stay directly in the row — Workshop/Website are each conditional (present for some games,
   // absent for others) and, unlike Store/ITAD, only ever add up on top of an already full row
@@ -1100,6 +1112,9 @@ function renderPanelBody(game) {
     // Official website — a plain field on the same appdetails response as everything else
     // here, present for plenty of games and absent for plenty of others (mostly smaller ones).
     meta?.website && { icon: '🌐', label: 'Official Website', href: meta.website },
+    // Free demo is NOT here — unlike Website/Workshop (supplementary info, worth a quiet
+    // icon-link), a demo is a "try before you buy" call to action worth surfacing without an
+    // extra click. See demoBannerHtml below instead.
   ].filter(Boolean);
   const moreLinksHtml = moreLinkItems.length ? `<div class="panel-icon-more">
     <button type="button" class="panel-icon-link panel-icon-more-btn" aria-haspopup="true" aria-expanded="${moreLinksOpen}" title="More links" aria-label="More links">⋯</button>
@@ -1189,6 +1204,7 @@ function renderPanelBody(game) {
       </div>
       ${subnavHtml}
     </div>
+    ${demoBannerHtml}
     ${glanceGrid(g)}
     ${description ? `<div class="panel-desc panel-card" id="panel-desc"></div>` : ''}
     ${cloudHtml}

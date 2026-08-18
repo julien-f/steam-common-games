@@ -44,6 +44,9 @@ function makeLibraryFetch(games1 = [], games2 = []) {
 // (appid → tagids) call plus a separate, shared (tagid → name) map.
 const TAG_IDS = [1001, 1002];
 const TAG_NAME_MAP = { 1001: 'Action', 1002: 'Co-op' };
+// The demo link (getGameDemo) rides on the exact same IStoreBrowseService item as the
+// tagids above — see the `tagsOk` flag below, which gates both.
+const DEMO_APPID = 999900;
 
 function makeDetailsFetch({ ratingOk = true, metaOk = true, tagsOk = true } = {}) {
   return async (url) => {
@@ -53,7 +56,7 @@ function makeDetailsFetch({ ratingOk = true, metaOk = true, tagsOk = true } = {}
     }
     if (url.includes('IStoreBrowseService')) {
       if (!tagsOk) return { ok: false, status: 503 };
-      return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: TAG_IDS }] } }) };
+      return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: TAG_IDS, related_items: { demo_appid: [DEMO_APPID] } }] } }) };
     }
     if (url.includes('ajaxgetstoretags')) {
       if (!tagsOk) return { ok: false, status: 503 };
@@ -366,7 +369,7 @@ test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) 
   setCache('rating:400',   { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
   setCache('hltb:400',     [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
   setCache('meta:400',     { name: 'Portal', genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] });
-  setCache('tagids:400',   TAG_IDS);
+  setCache('browse:400',   { tagids: TAG_IDS, related_items: { demo_appid: [1714800] } });
   setCache('tagnames:all', TAG_NAME_MAP);
   setCache('protondb:400', { tier: 'gold', confidence: 'strong', total: 500 });
 
@@ -380,6 +383,7 @@ test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) 
   assert.equal(res.body.hltb?.main, 10);
   assert.deepEqual(res.body.meta?.genres, ['Action']);
   assert.deepEqual(res.body.tags, ['Action', 'Co-op']);
+  assert.equal(res.body.demo, 1714800);
   assert.equal(res.body.protondb?.tier, 'gold');
   assert.equal(fetchCalled, false);
 });
@@ -397,6 +401,7 @@ test('GET /api/game-details/:appid: 200 fetching fresh rating, HLTB, meta and ta
   assert.deepEqual(res.body.meta?.categories, ['Co-op']);
   assert.ok(Array.isArray(res.body.tags), 'tags should be an array');
   assert.ok(res.body.tags.includes('Action'));
+  assert.equal(res.body.demo, DEMO_APPID);
 });
 
 // ── GET /api/game-news/:appid ─────────────────────────────────────────────────
@@ -455,7 +460,7 @@ test('GET /api/game-details/:appid: 200 with null meta when appdetails fetch fai
   assert.equal(res.body.meta, null);
 });
 
-test('GET /api/game-details/:appid: 200 with null tags when the Steam tags fetch fails', async (t) => {
+test('GET /api/game-details/:appid: 200 with null tags and null demo when the Steam store browse fetch fails (same call backs both)', async (t) => {
   _reset();
   _resetAuth();
   t.mock.method(globalThis, 'fetch', makeDetailsFetch({ tagsOk: false }));
@@ -465,6 +470,7 @@ test('GET /api/game-details/:appid: 200 with null tags when the Steam tags fetch
   assert.equal(typeof res.body.rating?.score, 'number');
   assert.ok(res.body.meta !== undefined, 'meta should still be present');
   assert.equal(res.body.tags, null);
+  assert.equal(res.body.demo, null);
 });
 
 test('GET /api/game-details/:appid: only fetches sources not already cached', async (t) => {
@@ -696,12 +702,12 @@ test('POST /api/game-details/stream: streams one event per game plus a done even
   setCache('rating:400',   rawRating);
   setCache('hltb:400',     rawHltb);
   setCache('meta:400',     rawMeta);
-  setCache('tagids:400',   TAG_IDS);
+  setCache('browse:400',   { tagids: TAG_IDS });
   setCache('protondb:400', rawProtonDb);
   setCache('rating:401',   rawRating);
   setCache('hltb:401',     rawHltb);
   setCache('meta:401',     rawMeta);
-  setCache('tagids:401',   TAG_IDS);
+  setCache('browse:401',   { tagids: TAG_IDS });
   setCache('protondb:401', rawProtonDb);
   setCache('tagnames:all', TAG_NAME_MAP);
 

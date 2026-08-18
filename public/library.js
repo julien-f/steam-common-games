@@ -820,7 +820,7 @@ function applyDetailsEvent(row, event) {
   row.tags              = event.tags ?? [];
   row.protondb          = protonDbValue(event.protondb?.tier);
   row.loading           = false;
-  row.details           = { rating: event.rating, hltb: event.hltb, meta: event.meta, tags: event.tags, protondb: event.protondb };
+  row.details           = { rating: event.rating, hltb: event.hltb, meta: event.meta, tags: event.tags, demo: event.demo, protondb: event.protondb };
 }
 
 // Streams rating/hltb/meta/tags for `games` ({appid, name}[]) over SSE and applies each
@@ -980,7 +980,7 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
       categories:         undefined,
       protondb:           undefined,
       loading:            true,
-      details:            null, // { rating, hltb, meta, tags, protondb } — same shape the side panel expects
+      details:            null, // { rating, hltb, meta, tags, demo, protondb } — same shape the side panel expects
     };
   });
 

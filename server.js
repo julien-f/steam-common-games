@@ -11,7 +11,7 @@ const rateLimit = require('express-rate-limit');
 
 const { getCached, getCacheStats } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews } = require('./lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 
@@ -67,7 +67,7 @@ const detailsLimit = rateLimit({
     return getCached(`rating:${appid}`)   !== undefined
         && getCached(`hltb:${appid}`)     !== undefined
         && getCached(`meta:${appid}`)     !== undefined
-        && getCached(`tagids:${appid}`)   !== undefined
+        && getCached(`browse:${appid}`)   !== undefined
         && getCached(`protondb:${appid}`) !== undefined;
   },
 });
@@ -313,8 +313,12 @@ function fetchGameDetails(appid, { force = false } = {}) {
       hltbPromise,
       metaPromise,
       getSteamTags(appid, { force }),
+      // Rides on the exact same cached IStoreBrowseService item getSteamTags just fetched
+      // (or is about to) — see getGameDemo/getStoreBrowseItem in lib/steam.js — so this
+      // never costs an extra upstream call of its own.
+      getGameDemo(appid, { force }),
       getProtonDbStatus(appid, { force }),
-    ]).then(([ratingRes, hltbRes, metaRes, tagsRes, protondbRes]) => {
+    ]).then(([ratingRes, hltbRes, metaRes, tagsRes, demoRes, protondbRes]) => {
       // appid is included on every line — fetchGameDetails runs once per appid, often many in
       // parallel via the SSE stream endpoint, so without it there's no way to tell a one-game
       // failure apart from every game in a batch failing the same way (e.g. an upstream block).
@@ -327,12 +331,14 @@ function fetchGameDetails(appid, { force = false } = {}) {
       if (hltbRes.status     === 'rejected') logErr('hltb',     hltbRes.reason);
       if (metaRes.status     === 'rejected') logErr('meta',     metaRes.reason);
       if (tagsRes.status     === 'rejected') logErr('tags',     tagsRes.reason);
+      if (demoRes.status     === 'rejected') logErr('demo',     demoRes.reason);
       if (protondbRes.status === 'rejected') logErr('protondb', protondbRes.reason);
       return {
         rating:   ratingRes.status   === 'fulfilled' ? ratingRes.value   : null,
         hltb:     hltbRes.status     === 'fulfilled' ? hltbRes.value     : null,
         meta:     metaRes.status     === 'fulfilled' ? metaRes.value     : null,
         tags:     tagsRes.status     === 'fulfilled' ? tagsRes.value     : null,
+        demo:     demoRes.status     === 'fulfilled' ? demoRes.value     : null,
         protondb: protondbRes.status === 'fulfilled' ? protondbRes.value : null,
       };
     });
@@ -512,7 +518,7 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
       const result = await fetchGameDetails(appid);
       send({ appid, ...result });
     } catch {
-      send({ appid, rating: null, hltb: null, meta: null, tags: null, protondb: null });
+      send({ appid, rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null });
     }
   }));
 

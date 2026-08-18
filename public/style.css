@@ -1012,6 +1012,29 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   padding: 10px 12px;
 }
 
+/* A solid accent fill (not the bg0-on-bg1 .panel-card treatment used for plain content
+   below) — this is the one call-to-action in the whole panel, so it needs to read as a
+   button, not a card. Sits between the sticky header and the glance grid: the first thing
+   seen on open, but part of the ordinary scrolling body (not the header itself) so a game
+   with a demo doesn't permanently cost pinned header space over one without. */
+.panel-demo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: var(--r);
+  background: var(--accent);
+  color: #0b1620;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.panel-demo-banner:hover, .panel-demo-banner:focus-visible { background: var(--accent2); outline: none; }
+.panel-demo-banner-icon { font-size: 15px; }
+
 /* --text0/13px, not the --text1/12px caption treatment used elsewhere in the panel — this
    is prose meant to be read, not secondary metadata. Sits directly under the glance grid,
    ahead of the tag cloud, so it reads as "what this game is" before "how it's tagged". */
