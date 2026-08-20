@@ -149,7 +149,7 @@ test('resolveSteamId: throws user error when account is not found', async (t) =>
 
   await assert.rejects(
     () => resolveSteamId('nobody'),
-    err => !err.isUpstream && /Cannot find Steam account/.test(err.message)
+    err => !err.isUpstream && err.isClientError === true && /Cannot find Steam account/.test(err.message)
   );
 });
 
@@ -199,7 +199,7 @@ test('getOwnedGames: throws user error when library is private', async (t) => {
 
   await assert.rejects(
     () => getOwnedGames('76561198000000004'),
-    err => !err.isUpstream && /private/.test(err.message)
+    err => !err.isUpstream && err.isClientError === true && /private/.test(err.message)
   );
 });
 

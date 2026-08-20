@@ -32,6 +32,23 @@ const rateLimitBypassed = () =>
 
 const isForceRefresh = (req) => req.query.refresh === '1' || req.query.refresh === 'true';
 
+// Shared by every route's catch block below. Used to only log isUpstream/TimeoutError
+// errors — anything else (including a genuine bug: a TypeError, a bug in groupByOwnership,
+// etc.) fell through unlogged, because a plain, unmarked Error was indistinguishable from
+// one of lib/steam.js's deliberately-thrown, expected client-facing errors (bad Steam id,
+// private profile — see clientError() there). Those are still skipped here since they're
+// normal and frequent, not worth a log line, but now that they're explicitly marked
+// (isClientError), everything unmarked is logged too, on the assumption that an error
+// nobody bothered to mark expected is probably a bug worth being able to find later. Logs
+// the full stack, not just the message, since a bug needs its source line to be traceable.
+function routeErrorStatus(route, err) {
+  if (err.isClientError) return 400;
+  if (err.isUpstream) { console.error(`[upstream:${route}]`, err.stack || err.message); return 502; }
+  if (err.name === 'TimeoutError') { console.error(`[timeout:${route}]`, err.stack || err.message); return 504; }
+  console.error(`[bug:${route}]`, err.stack || err.message);
+  return 400;
+}
+
 const app = express();
 if (TRUST_PROXY) app.set('trust proxy', TRUST_PROXY);
 if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
@@ -230,8 +247,7 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
 
     res.json({ groups, slots: playerSlots, playtime, lastPlayed });
   } catch (err) {
-    if (err.isUpstream || err.name === 'TimeoutError') console.error('[upstream]', err.message);
-    const status = err.isUpstream ? 502 : err.name === 'TimeoutError' ? 504 : 400;
+    const status = routeErrorStatus('common-games', err);
     res.status(status).json({ error: err.message });
   }
 });
@@ -287,8 +303,7 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
 
     res.json({ items, players });
   } catch (err) {
-    if (err.isUpstream || err.name === 'TimeoutError') console.error('[upstream]', err.message);
-    const status = err.isUpstream ? 502 : err.name === 'TimeoutError' ? 504 : 400;
+    const status = routeErrorStatus('wishlist', err);
     res.status(status).json({ error: err.message });
   }
 });
@@ -355,8 +370,7 @@ app.get('/api/search-games', gameSearchLimit, async (req, res) => {
     const results = await searchStoreGames(term, { force: isForceRefresh(req) });
     res.json({ results });
   } catch (err) {
-    if (err.isUpstream || err.name === 'TimeoutError') console.error('[upstream]', err.message);
-    const status = err.isUpstream ? 502 : err.name === 'TimeoutError' ? 504 : 400;
+    const status = routeErrorStatus('search-games', err);
     res.status(status).json({ error: err.message });
   }
 });
@@ -381,8 +395,7 @@ app.get('/api/game-news/:appid', newsLimit, async (req, res) => {
     const news = await getGameNews(appid, { force: isForceRefresh(req) });
     res.json({ news });
   } catch (err) {
-    if (err.isUpstream || err.name === 'TimeoutError') console.error('[upstream]', err.message);
-    const status = err.isUpstream ? 502 : err.name === 'TimeoutError' ? 504 : 400;
+    const status = routeErrorStatus('game-news', err);
     res.status(status).json({ error: err.message });
   }
 });
@@ -468,8 +481,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
       steamUrl: `https://steamcommunity.com/stats/${appid}/achievements/`,
     });
   } catch (err) {
-    if (err.isUpstream || err.name === 'TimeoutError') console.error('[upstream]', err.message);
-    const status = err.isUpstream ? 502 : err.name === 'TimeoutError' ? 504 : 400;
+    const status = routeErrorStatus('achievements', err);
     res.status(status).json({ error: err.message });
   }
 });
@@ -517,7 +529,12 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
     try {
       const result = await fetchGameDetails(appid);
       send({ appid, ...result });
-    } catch {
+    } catch (err) {
+      // fetchGameDetails resolves every sub-fetch via Promise.allSettled internally and should
+      // never itself reject — this is a defensive backstop, not an expected path, so unlike
+      // the per-field failures it already logs (see logErr above) this used to vanish with
+      // no trace at all if it ever did fire.
+      console.error(`[bug:stream]`, `appid ${appid}:`, err.stack || err.message);
       send({ appid, rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null });
     }
   }));
