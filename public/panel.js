@@ -1112,6 +1112,15 @@ function renderPanelBody(game) {
     // Official website — a plain field on the same appdetails response as everything else
     // here, present for plenty of games and absent for plenty of others (mostly smaller ones).
     meta?.website && { icon: '🌐', label: 'Official Website', href: meta.website },
+    // "Discover similar games" — Steam's own "More Like This" page for this appid, the exact
+    // same first-party recommendation surface the app's own store page embeds. Deliberately
+    // just a link, not a fetched/rendered list: this app has no way to compute or source that
+    // ranking itself (see the earlier investigation into steampeek.hu/gmndx.com — third-party,
+    // undocumented, and either scrape-only or, for gmndx.com, explicitly opted out of AI-agent
+    // crawling) that doesn't cost either a real upstream trust-tier risk or a wrong/derived
+    // answer. Unconditional (no `!g.loading` gate, unlike Workshop/Website above) since it only
+    // needs `g.appid`, already known before any metadata has loaded.
+    { icon: '🔎', label: 'More Like This (Steam)', href: `https://store.steampowered.com/recommended/morelike/app/${g.appid}/` },
     // Free demo is NOT here — unlike Website/Workshop (supplementary info, worth a quiet
     // icon-link), a demo is a "try before you buy" call to action worth surfacing without an
     // extra click. See demoBannerHtml below instead.
