@@ -56,6 +56,14 @@ function protonDbValue(tier) {
   return tier.charAt(0).toUpperCase() + tier.slice(1);
 }
 
+// Worst-to-best ordering for the Production Tier column's `compare` below. `computeProductionTier`
+// (public/utils.js) already returns null for "not enough signal to guess" (DLC, or a priced game
+// with no price data) — `compareMissingLast` handles that the same way every other heuristic/
+// possibly-absent column here does, pinning it last regardless of sort direction.
+const PRODUCTION_TIER_ORDER = ['Indie', 'AA', 'AAA'];
+const compareProductionTier = compareMissingLast((a, b) =>
+  PRODUCTION_TIER_ORDER.indexOf(a) - PRODUCTION_TIER_ORDER.indexOf(b));
+
 // Ordering used by the ProtonDB column's `compare` below — same tier list as protonDbValue.
 // `compareMissingLast` (new in 0.7.0 alongside `compare` itself) pins a missing rating to the
 // end of the sort regardless of ascending/descending, rather than an empty value sorting first
@@ -303,6 +311,14 @@ const COLUMNS = [
   // Parsed from Steam's `supported_languages` HTML string (see parseSupportedLanguages in
   // lib/steam.js) — same high-cardinality multi-value treatment as Tags/Developers/Publisher.
   { key: 'languages',        label: 'Languages',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
+  // Estimated, not authoritative — see computeProductionTier's doc comment (public/utils.js)
+  // and CLAUDE.md's AAA/AA/Indie section. The label spells out "(est.)" rather than relying on
+  // a hover tooltip, since @vates/data-table-vanilla has no per-column header-tooltip option to
+  // hang a caveat on. Hidden by default (see DEFAULT_VISIBLE) for the same reason Wilson
+  // Score/Steam %/Achievements are — a secondary number, not the primary thing most searches
+  // here care about, and one that's explicitly a best-effort guess on top of that.
+  { key: 'productionTier',   label: 'Production Tier (est.)', groupable: true, format: fmt.str,
+    compare: compareProductionTier, defaultSortDir: 'desc' },
 
   // ── Compatibility ───────────────────────────────────────────────────────────
   // Native OS support (`platforms` in lib/steam.js's extractAppDetails) — distinct from the
@@ -917,6 +933,18 @@ function applyDetailsEvent(row, event) {
   row.platforms         = event.meta?.platforms ?? [];
   row.languages         = event.meta?.languages ?? [];
   row.hasDemo           = event.demo != null;
+  // Heuristic, not fact — see computeProductionTier's own doc comment (public/utils.js) and
+  // CLAUDE.md's AAA/AA/Indie section for what it's derived from and where it's known to be
+  // wrong (cheap AAA remasters, prestige-priced small-studio sims, veteran-founded small
+  // studios). Recomputed client-side from fields already delivered rather than added as its
+  // own backend field, same pattern as steamdbRating above.
+  row.productionTier    = computeProductionTier({
+    isFree:       event.meta?.isFree ?? false,
+    priceInitial: event.meta?.priceInitial ?? null,
+    reviewsTotal: event.rating?.total ?? null,
+    hasMetacritic: event.meta?.metacritic != null,
+    isDlc:        event.meta?.fullgame != null,
+  });
   row.loading           = false;
   row.details           = { rating: event.rating, hltb: event.hltb, meta: event.meta, tags: event.tags, demo: event.demo, protondb: event.protondb };
 }

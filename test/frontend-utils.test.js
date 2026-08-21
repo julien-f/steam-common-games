@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeInput, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating } = require('../public/utils');
+const { normalizeInput, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier } = require('../public/utils');
 
 // ── normalizeInput ────────────────────────────────────────────────────────────
 
@@ -241,4 +241,42 @@ test('computeSteamdbRating: a large sample stays much closer to the raw ratio th
 test('computeSteamdbRating: returns unrounded precision, not an integer', () => {
   const rating = computeSteamdbRating(9123, 10000);
   assert.notEqual(rating, Math.round(rating));
+});
+
+// ── computeProductionTier ───────────────────────────────────────────────────────
+
+test('computeProductionTier: null for DLC/expansion appids, regardless of price', () => {
+  assert.equal(computeProductionTier({ isDlc: true, priceInitial: 5999, reviewsTotal: 1000000 }), null);
+});
+
+test('computeProductionTier: AAA at $50+ launch price, even with zero reviews (fresh release)', () => {
+  assert.equal(computeProductionTier({ priceInitial: 5999, reviewsTotal: 0 }), 'AAA');
+});
+
+test('computeProductionTier: AA when priced $20-$50 with enough reviews', () => {
+  assert.equal(computeProductionTier({ priceInitial: 2999, reviewsTotal: 25000 }), 'AA');
+});
+
+test('computeProductionTier: AA when priced $20-$50 with a Metacritic entry, even with few reviews', () => {
+  assert.equal(computeProductionTier({ priceInitial: 2999, reviewsTotal: 100, hasMetacritic: true }), 'AA');
+});
+
+test('computeProductionTier: Indie when priced $20-$50 but neither reviews nor Metacritic clear the bar', () => {
+  assert.equal(computeProductionTier({ priceInitial: 2499, reviewsTotal: 100 }), 'Indie');
+});
+
+test('computeProductionTier: Indie under $20 regardless of review count', () => {
+  assert.equal(computeProductionTier({ priceInitial: 999, reviewsTotal: 500000 }), 'Indie');
+});
+
+test('computeProductionTier: free-to-play AAA needs very high review volume', () => {
+  assert.equal(computeProductionTier({ isFree: true, reviewsTotal: 250000 }), 'AAA');
+});
+
+test('computeProductionTier: free-to-play without enough reviews defaults to Indie', () => {
+  assert.equal(computeProductionTier({ isFree: true, reviewsTotal: 1000 }), 'Indie');
+});
+
+test('computeProductionTier: null when priced but priceInitial is missing (no price signal at all)', () => {
+  assert.equal(computeProductionTier({ priceInitial: null, reviewsTotal: 500000 }), null);
 });

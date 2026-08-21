@@ -24,6 +24,35 @@ function computeSteamdbRating(positive, total) {
   return (p - (p - 0.5) * weight) * 100;
 }
 
+// Rough AAA/AA/Indie production-tier proxy. Steam's API has no direct budget/studio-size
+// signal, so this leans on the only things that correlate with it at all: launch price
+// (`priceInitial`, whole cents, USD — see isFree/priceInitial in lib/steam.js's
+// extractAppDetails), review volume as a reach proxy, and Metacritic presence as a "got
+// professional press coverage at all" signal. It's a heuristic, not fact — see CLAUDE.md's
+// AAA/AA/Indie section for the tradeoffs and known misclassifications (cheap AAA
+// remasters/rereleases, prestige-priced small-studio sim games, veteran-founded small studios
+// with high polish — none of these have any data-side tell). Returns null, not a tier, when
+// there isn't enough signal to guess at all (DLC — `isDlc` — or a priced game with no price
+// data).
+//
+// DLC/expansion appids are skipped outright rather than scored on their own price: a $10
+// expansion attached to a AAA base game would otherwise read as Indie. No parent-game lookup
+// is attempted (that would mean fetching the base game's own rating/meta just for this), so
+// DLC rows simply render blank in this column.
+const AAA_PRICE_CENTS = 5000; // $50+ launch price
+const AA_PRICE_CENTS = 2000;  // $20+ launch price — the AA/premium-indie overlap zone
+const AA_REVIEW_THRESHOLD = 20000;         // needed (alongside AA-band price) to clear "just an expensive indie game"
+const FREE_AAA_REVIEW_THRESHOLD = 200000;  // the only lever available for F2P titles, which have no price signal at all
+function computeProductionTier({ isFree, priceInitial, reviewsTotal, hasMetacritic, isDlc } = {}) {
+  if (isDlc) return null;
+  const reviews = reviewsTotal ?? 0;
+  if (isFree) return reviews >= FREE_AAA_REVIEW_THRESHOLD ? 'AAA' : 'Indie';
+  if (priceInitial == null) return null;
+  if (priceInitial >= AAA_PRICE_CENTS) return 'AAA';
+  if (priceInitial >= AA_PRICE_CENTS) return (reviews >= AA_REVIEW_THRESHOLD || hasMetacritic) ? 'AA' : 'Indie';
+  return 'Indie';
+}
+
 function scoreColor(n) {
   if (n == null) return 'var(--text1)';
   if (n >= 80) return '#57cbde';
@@ -84,4 +113,4 @@ function renderExtraCell(game) {
   return h ? fmtH(h.extra) : '<span class="dim">—</span>';
 }
 
-if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating };
+if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier };

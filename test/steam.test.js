@@ -440,7 +440,45 @@ test('getAppDetails: dedupes genres/categories that share the same label but dif
 test('getAppDetails: handles missing optional fields with empty arrays', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
-  assert.deepEqual(await getAppDetails(400), { name: null, genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, comingSoon: false, metacritic: null, capsule: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg', banner: 'https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg', movies: [], screenshots: [], dlc: [], fullgame: null, website: null, achievementCount: null, platforms: [], languages: [] });
+  assert.deepEqual(await getAppDetails(400), { name: null, genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, comingSoon: false, metacritic: null, capsule: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg', banner: 'https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg', movies: [], screenshots: [], dlc: [], fullgame: null, website: null, achievementCount: null, platforms: [], languages: [], isFree: false, priceInitial: null });
+});
+
+test('getAppDetails: requests the US region so price_overview is always USD', async (t) => {
+  _reset();
+  let requestedUrl;
+  t.mock.method(globalThis, 'fetch', async (url) => { requestedUrl = url; return makeAppDetailsResponse(400, {}); });
+  await getAppDetails(400);
+  assert.match(requestedUrl, /(?:\?|&)cc=us(?:&|$)/);
+});
+
+test('getAppDetails: extracts isFree from is_free', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, { is_free: true }));
+  const result = await getAppDetails(400);
+  assert.equal(result.isFree, true);
+});
+
+test('getAppDetails: isFree defaults to false when is_free is absent', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
+  const result = await getAppDetails(400);
+  assert.equal(result.isFree, false);
+});
+
+test('getAppDetails: extracts priceInitial (undiscounted launch price, in cents) from price_overview', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {
+    price_overview: { currency: 'USD', initial: 5999, final: 2999, discount_percent: 50 },
+  }));
+  const result = await getAppDetails(400);
+  assert.equal(result.priceInitial, 5999, 'uses the undiscounted `initial` price, not the discounted `final` one');
+});
+
+test('getAppDetails: priceInitial is null when price_overview is absent (free game or no price data)', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
+  const result = await getAppDetails(400);
+  assert.equal(result.priceInitial, null);
 });
 
 test('getAppDetails: extracts dlc appid list', async (t) => {
