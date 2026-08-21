@@ -64,14 +64,30 @@ function protonDbValue(tier) {
 const compareProtonTier = compareMissingLast((a, b) =>
   PROTON_TIER_ORDER.indexOf(a.toLowerCase()) - PROTON_TIER_ORDER.indexOf(b.toLowerCase()));
 
-// Same colored pill as the side panel's ProtonDB badge (`.proton-badge`, shared style.css rule).
+// The generic colored-pill treatment (`.status-badge`, shared style.css rule) — shared with
+// renderDemoBadge below rather than each column inventing its own pill styling.
 function renderProtonBadge(v) {
   if (v === undefined) return document.createTextNode('…');
   if (!v) return document.createTextNode('—');
   const span = document.createElement('span');
-  span.className = 'proton-badge';
+  span.className = 'status-badge';
   span.style.background = PROTON_TIER_COLORS[v.toLowerCase()] || '#52525b';
   span.textContent = v;
+  return span;
+}
+
+// Same `.status-badge` pill shape as renderProtonBadge above, in the app's own accent blue —
+// the same color and dark-on-blue text the side panel's "🎮 Try the Free Demo" banner already
+// uses (`.panel-demo-banner`, style.css) — so the two read as the same "this game has a demo"
+// signifier rather than introducing a new color/shape just for this column.
+function renderDemoBadge(v) {
+  if (v === undefined) return document.createTextNode('…');
+  if (!v) return document.createTextNode('—');
+  const span = document.createElement('span');
+  span.className = 'status-badge';
+  span.style.background = 'var(--accent)';
+  span.style.color = '#0b1620';
+  span.textContent = 'Demo';
   return span;
 }
 
@@ -190,7 +206,7 @@ function renderReleaseDate(v, row) {
 }
 
 // Grouped into sections (identity → scores → HLTB → play time/dates → classification →
-// compatibility → completionist extras) rather than roughly the order each was added to the
+// compatibility → extras) rather than roughly the order each was added to the
 // codebase — with 20+ columns now, an alphabetical or add-order list makes both the column
 // picker and this source file hard to scan. Within a section, the most commonly-useful/
 // default-visible column leads. WISHLIST_COLUMNS (below) inserts its two wishlist-only columns
@@ -300,7 +316,23 @@ const COLUMNS = [
   // games first on a fresh click, matching compareProtonTier's worst-to-best ordering.
   { key: 'protondb',         label: 'ProtonDB',     groupable: true, format: fmt.str, render: renderProtonBadge, compare: compareProtonTier, defaultSortDir: 'desc' },
 
-  // ── Completionist extras ────────────────────────────────────────────────────
+  // ── Extras ──────────────────────────────────────────────────────────────────
+  // Leads the section — "can I try this first" is relevant to any prospective player, unlike
+  // Achievements/DLC Count right below, which only matter to completionists. `event.demo`
+  // (top-level on the SSE/game-details response, not nested under `meta`) — the free demo's
+  // appid if this game has one, from the same IStoreBrowseService item tags/demo share (see
+  // getGameDemo in lib/steam.js); the side panel's own "🎮 Try the Free Demo" banner
+  // (public/panel.js) reads the exact same field. Only a plain has-a-demo boolean here — the
+  // demo's own appid isn't useful in a cell with nowhere to link it (see the "no link" decision
+  // above — outbound links stay in the panel, not the table). Rendered as a colored badge
+  // (renderDemoBadge above) rather than plain text/an emoji glyph, so it reads as a quick status
+  // chip at a glance, same treatment as ProtonDB right above. `format` still returns plain text
+  // for non-visual consumers (filter checklist labels, CSV export) that don't go through
+  // `render`. True/false is real data either way (no separate "unknown" state), same as
+  // panel.js's own `!!g.details?.demo` check, so no `compare`/missing-last handling is needed —
+  // plain boolean comparison already puts demo games first with `defaultSortDir: 'desc'`.
+  { key: 'hasDemo',          label: 'Demo',         groupable: true,
+    format: v => v === undefined ? '…' : v ? 'Demo' : '—', render: renderDemoBadge, defaultSortDir: 'desc' },
   // Steam's own achievement count for the game (`achievements.total` on the appdetails
   // response — see `achievementCount` in lib/steam.js's extractAppDetails), not this
   // player's unlock progress — that's the side panel's own Achievements section
@@ -327,7 +359,7 @@ const DEFAULT_SORT = [{ key: 'steamdbRating', dir: 'desc' }];
 // Inserts `newColumns` right after the column keyed `afterKey`, rather than always appending at
 // the very end — used by WISHLIST_COLUMNS below so its two wishlist-only columns land in the
 // section they actually belong to (identity, play time & dates) instead of trailing after
-// Completionist extras where nobody would think to look for a wishlist rank or an added date.
+// Extras where nobody would think to look for a wishlist rank or an added date.
 function insertColumnsAfter(columns, afterKey, ...newColumns) {
   const idx = columns.findIndex(c => c.key === afterKey);
   return [...columns.slice(0, idx + 1), ...newColumns, ...columns.slice(idx + 1)];
@@ -884,6 +916,7 @@ function applyDetailsEvent(row, event) {
   row.dlcCount          = event.meta?.dlc?.length ?? null;
   row.platforms         = event.meta?.platforms ?? [];
   row.languages         = event.meta?.languages ?? [];
+  row.hasDemo           = event.demo != null;
   row.loading           = false;
   row.details           = { rating: event.rating, hltb: event.hltb, meta: event.meta, tags: event.tags, demo: event.demo, protondb: event.protondb };
 }
@@ -1048,6 +1081,7 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
       dlcCount:           undefined,
       platforms:          undefined,
       languages:          undefined,
+      hasDemo:            undefined,
       loading:            true,
       details:            null, // { rating, hltb, meta, tags, demo, protondb } — same shape the side panel expects
     };
@@ -1144,6 +1178,7 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
     dlcCount:           undefined,
     platforms:          undefined,
     languages:          undefined,
+    hasDemo:            undefined,
     loading:            true,
     details:            null,
   }));

@@ -1071,9 +1071,12 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 .panel-no-data a { color: var(--text1); text-decoration: none; border-bottom: 1px solid transparent; transition: color 0.15s, border-color 0.15s; }
 .panel-no-data a:hover { color: var(--accent2); border-bottom-color: var(--accent2); }
 
-/* Shared with the Library Explorer's ProtonDB table column (public/library.js) — same
-   colored pill both places, not just the side panel. */
-.proton-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; color: #fff; line-height: 1.4; }
+/* Generic colored-pill treatment for a categorical status cell in the Library Explorer's table
+   (public/library.js) — used by the ProtonDB column (colored per compatibility tier) and the
+   Demo column (fixed accent blue), and available for any future column that wants the same
+   "quick status chip" look rather than plain text. Not used by the side panel — its own
+   ProtonDB indicator is a separate `glanceChip` with inline styling (see panel.js). */
+.status-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; color: #fff; line-height: 1.4; }
 
 /* Glance strip: a fixed 2×2 grid (SteamDB+Metacritic, then HLTB+Linux/Deck) instead of
    a horizontally-scrolling row — a scrollable strip here would risk the exact
