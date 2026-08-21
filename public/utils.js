@@ -9,18 +9,27 @@ function normalizeInput(raw) {
   return raw;
 }
 
-// SteamDB's current rating formula — they moved away from the Wilson score interval to this
-// Bayesian shrinkage, specifically because Wilson's confidence-bound framing was hard to explain
-// to users. It starts every game at a neutral 50% prior and lets the observed positive ratio
-// pull it away as review volume grows — e.g. 90% positive over 100 reviews lands at 80%, not
-// 90%, because 100 reviews still isn't much evidence. See
+// Adapted from SteamDB's current rating formula — they moved away from the Wilson score
+// interval to this Bayesian shrinkage, specifically because Wilson's confidence-bound framing
+// was hard to explain to users. It starts every game at a neutral 50% prior and lets the
+// observed positive ratio pull it away as review volume grows. See
 // https://github.com/SteamDatabase/steamdb.info-issues/issues/793.
+// SHRINK_STRENGTH scales how fast that pull happens: the shrinkage weight decays as
+// (total+1)^-(SHRINK_STRENGTH * log10(2)) ≈ (total+1)^-(0.301 * SHRINK_STRENGTH), so higher
+// values trust smaller samples more and converge to the raw ratio sooner. SteamDB's own
+// published formula is SHRINK_STRENGTH = 1 (their 90%-positive/100-review example lands at
+// 80%); this app deliberately runs hotter than that — at SHRINK_STRENGTH = 2 the same example
+// lands at ~87.5%, i.e. roughly the convergence SteamDB reaches only around 1,000 reviews.
+// Whatever this is set to, the result is mathematically guaranteed to stay between 50 and the
+// raw ratio `p`, moving monotonically closer to `p` as `total` grows — it can never overshoot
+// past `p`, since the shrinkage weight is always in (0, 1].
 // Returns the raw, unrounded value (0-100) — round only for display; sorting/grouping should
 // use the full precision so games with the same rounded score still order deterministically.
+const STEAMDB_RATING_SHRINK_STRENGTH = 2;
 function computeSteamdbRating(positive, total) {
   if (!total) return null;
   const p = positive / total;
-  const weight = 2 ** -Math.log10(total + 1);
+  const weight = 2 ** (-STEAMDB_RATING_SHRINK_STRENGTH * Math.log10(total + 1));
   return (p - (p - 0.5) * weight) * 100;
 }
 

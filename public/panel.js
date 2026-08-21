@@ -608,7 +608,7 @@ function tagCloud(groups) {
   </div>`;
 }
 
-// The glance strip: a fixed 2×2 grid (SteamDB+Metacritic, then HLTB+Linux/Deck) —
+// The glance strip: a fixed 2×2 grid (Weighted Rating+Metacritic, then HLTB+Linux/Deck) —
 // every chip built from one template (a value, then a one-line caption) so the four
 // read as one family. Each chip IS the link to its source; there's no separate
 // "Links" section duplicating them. Only *evaluative* values (the two scores, the
@@ -634,22 +634,25 @@ function glanceGrid(g) {
   const mc = g.details?.meta?.metacritic;
   const h = g.details?.hltb;
   const pd = g.details?.protondb;
-  const steamdbUrl = `https://www.steamdb.info/app/${g.appid}/`;
+  const reviewsUrl = `https://store.steampowered.com/app/${g.appid}/#app_reviews_hash`;
   const protondbUrl = `https://www.protondb.com/app/${g.appid}`;
 
   if (!g.details) return '';
 
   // Every chip stays in the grid even when its source has no data for this game —
-  // a missing SteamDB rating or ProtonDB tier is itself informative, and a chip that
+  // a missing weighted rating or ProtonDB tier is itself informative, and a chip that
   // vanishes instead makes the 2×2 grid reflow into a lopsided 3-chip layout. Each
   // still links out where a useful destination exists, same as the HLTB search fallback.
+  // The link points at the game's Steam reviews (the actual source of the underlying
+  // data) rather than SteamDB, since the number/caption is this app's own weighted
+  // rating, not SteamDB's.
   const chips = [];
   if (r) {
     const pct = r.total ? Math.round(r.positive / r.total * 100) : 0;
     const steamdbRating = Math.round(computeSteamdbRating(r.positive, r.total));
-    chips.push(glanceChip(steamdbUrl, steamdbRating, scoreColor(steamdbRating), `<b>SteamDB</b> · ${pct}% of ${fmtCompactCount(r.total)}`));
+    chips.push(glanceChip(reviewsUrl, steamdbRating, scoreColor(steamdbRating), `<b>Weighted</b> · ${pct}% of ${fmtCompactCount(r.total)}`));
   } else {
-    chips.push(glanceChip(steamdbUrl, '—', null, `<b>SteamDB</b> · no rating`));
+    chips.push(glanceChip(reviewsUrl, '—', null, `<b>Weighted</b> · no rating`));
   }
   if (mc) {
     chips.push(glanceChip(mc.url, mc.score, scoreColor(mc.score), `<b>Metacritic</b> · critic score`));

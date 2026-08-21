@@ -19,7 +19,7 @@ const fmt = {
 
 // Bare colored number rather than a progress bar — a bar's fill color carries the same
 // good/bad signal the number's color already does, and with up to four score-ish columns
-// (SteamDB Rating, Wilson Score, Steam %, Metacritic Score) visible at once, bars add visual
+// (Weighted Rating, Wilson Score, Steam %, Metacritic Score) visible at once, bars add visual
 // weight without adding information. Uses the global `scoreColor()` from utils.js so the
 // color scale matches the side panel's score display exactly, instead of a second copy of
 // the same thresholds.
@@ -320,8 +320,9 @@ const COLUMNS = [
   { key: 'name',             label: 'Name',            filterable: false, groupable: false },
 
   // ── Scores & reviews ────────────────────────────────────────────────────────
-  // The default-visible score: SteamDB's current formula (see computeSteamdbRating in utils.js)
-  // — shown first because it's the number most people recognize from SteamDB itself. Stored
+  // The default-visible score: a Bayesian-shrinkage formula adapted from SteamDB's own (see
+  // computeSteamdbRating in utils.js, tuned to converge to the raw ratio faster than SteamDB's
+  // published version does) — shown first as the app's primary rating. Stored
   // unrounded so sort/default-sort operate on full precision (two games both displaying "97"
   // still order deterministically); not groupable for the same reason — grouping keys off the
   // raw value, and a near-unique float per game would produce a useless one-row-per-group split.
@@ -330,7 +331,7 @@ const COLUMNS = [
   // first, not the worst; without it a first click started every numeric column ascending
   // (worst-first) regardless of what the number actually means. Only changes where a *new* sort
   // entry starts; it doesn't touch this column's own already-applied `DEFAULT_SORT` above.
-  { key: 'steamdbRating',    label: 'SteamDB Rating',  type: 'number', groupable: false, format: fmt.numRound, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
+  { key: 'steamdbRating',    label: 'Weighted Rating',  type: 'number', groupable: false, format: fmt.numRound, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
   // Wilson score lower bound — statistically rigorous but harder to explain than SteamDB's
   // current formula (which is why it isn't the default-visible score anymore); kept available
   // for anyone who wants the more conservative, confidence-bound number instead.

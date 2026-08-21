@@ -223,12 +223,12 @@ test('computeSteamdbRating: returns null with no reviews', () => {
   assert.equal(computeSteamdbRating(0, 0), null);
 });
 
-test('computeSteamdbRating: matches the published worked example (90/100 -> 80)', () => {
-  assert.equal(Math.round(computeSteamdbRating(90, 100)), 80);
+test('computeSteamdbRating: 90/100 lands around 87-88 at this app\'s shrink strength', () => {
+  assert.equal(Math.round(computeSteamdbRating(90, 100)), 88);
 });
 
 test('computeSteamdbRating: pulls a tiny 100%-positive sample well below 100', () => {
-  assert.ok(computeSteamdbRating(2, 2) < 70);
+  assert.ok(computeSteamdbRating(2, 2) < 80);
 });
 
 test('computeSteamdbRating: a large sample stays much closer to the raw ratio than a small one', () => {
