@@ -189,10 +189,19 @@ function renderReleaseDate(v, row) {
   return span;
 }
 
+// Grouped into sections (identity → scores → HLTB → play time/dates → classification →
+// compatibility → completionist extras) rather than roughly the order each was added to the
+// codebase — with 20+ columns now, an alphabetical or add-order list makes both the column
+// picker and this source file hard to scan. Within a section, the most commonly-useful/
+// default-visible column leads. WISHLIST_COLUMNS (below) inserts its two wishlist-only columns
+// into the matching sections rather than tacking them on at the end, for the same reason.
 const COLUMNS = [
+  // ── Identity ────────────────────────────────────────────────────────────────
   { key: 'capsule', label: '', width: 128, sortable: false, filterable: false, groupable: false,
     value: () => null, render: renderThumb },
   { key: 'name',             label: 'Name',            filterable: false },
+
+  // ── Scores & reviews ────────────────────────────────────────────────────────
   // The default-visible score: SteamDB's current formula (see computeSteamdbRating in utils.js)
   // — shown first because it's the number most people recognize from SteamDB itself. Stored
   // unrounded so sort/default-sort operate on full precision (two games both displaying "97"
@@ -222,6 +231,8 @@ const COLUMNS = [
   // (most talked-about) games are the more useful thing to see on a first click, same reasoning
   // as the score columns just without the missing-data wrinkle.
   { key: 'reviewsTotal',     label: 'Review Count',    type: 'number', groupable: true, format: fmt.ct, defaultSortDir: 'desc' },
+
+  // ── How Long To Beat ────────────────────────────────────────────────────────
   // "All PlayStyles" listed first among the HLTB columns — same convention as the side panel,
   // which shows it leftmost precisely because it's a single representative number rather than
   // one specific playstyle (see the comment on `all` in lib/hltb.js). Keeping it first here too
@@ -230,6 +241,8 @@ const COLUMNS = [
   { key: 'hltbMain',         label: 'Main (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast },
   { key: 'hltbExtra',        label: '+Extra (h)',      type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast },
   { key: 'hltbCompletionist',label: '100% (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast },
+
+  // ── Play time & dates ───────────────────────────────────────────────────────
   // No compare override here either — 0 hours played is real data (owned, never launched), not
   // a stand-in for "unknown," so the default numeric sort is already correct. `defaultSortDir:
   // 'desc'` still applies — "what have I sunk the most hours into" is the more common question
@@ -259,21 +272,48 @@ const COLUMNS = [
   { key: 'releaseDate',      label: 'Released',     type: 'date', groupable: true, format: fmt.str,
     parseDate: endOfReleasePeriod, compare: compareDateMissingLast, render: renderReleaseDate,
     defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' } },
+
+  // ── Classification ──────────────────────────────────────────────────────────
   { key: 'genres',           label: 'Genres',       groupable: true, format: fmt.arr },
   // `defaultValueSort: { by: 'count', dir: 'desc' }` (new in 0.8.0) — Developer/Publisher/Tags/
   // Categories are all higher-cardinality than Genres (a small, well-known fixed list that reads
   // fine alphabetically), so their filter checklists open "most common first" instead of A→Z;
   // still just the starting point — `cycleValueSort`'s toggle still cycles through all 4 states
   // the same as before.
+  { key: 'categories',       label: 'Categories',   groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
+  { key: 'tags',             label: 'Tags',         groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
   { key: 'developers',       label: 'Developer',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
   { key: 'publishers',       label: 'Publisher',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
-  { key: 'tags',             label: 'Tags',         groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
-  { key: 'categories',       label: 'Categories',   groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
+  // Parsed from Steam's `supported_languages` HTML string (see parseSupportedLanguages in
+  // lib/steam.js) — same high-cardinality multi-value treatment as Tags/Developers/Publisher.
+  { key: 'languages',        label: 'Languages',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
+
+  // ── Compatibility ───────────────────────────────────────────────────────────
+  // Native OS support (`platforms` in lib/steam.js's extractAppDetails) — distinct from the
+  // ProtonDB column right below, which is Linux/Deck compatibility *through Proton*, a
+  // compatibility layer, not native support. Same multi-value groupable/filterable treatment as
+  // Genres/Categories rather than three separate boolean columns.
+  { key: 'platforms',        label: 'Platforms',    groupable: true, format: fmt.arr },
   // Linux/Steam Deck compatibility tier from ProtonDB — sorted/grouped by actual compatibility
   // quality (see compareProtonTier above), not alphabetically; public/panel.js shows the same
   // data as a colored badge in the side panel. `defaultSortDir: 'desc'` shows the best-compatibility
   // games first on a fresh click, matching compareProtonTier's worst-to-best ordering.
   { key: 'protondb',         label: 'ProtonDB',     groupable: true, format: fmt.str, render: renderProtonBadge, compare: compareProtonTier, defaultSortDir: 'desc' },
+
+  // ── Completionist extras ────────────────────────────────────────────────────
+  // Steam's own achievement count for the game (`achievements.total` on the appdetails
+  // response — see `achievementCount` in lib/steam.js's extractAppDetails), not this
+  // player's unlock progress — that's the side panel's own Achievements section
+  // (public/panel.js), which needs a per-account fetch this column doesn't. 0 is real data
+  // (the game genuinely has none); `null` (missing, sorted last by compareNumMissingLast)
+  // only when store metadata itself failed to load. Hidden by default — a fairly niche
+  // completionist-facing number compared to the rest of DEFAULT_VISIBLE.
+  { key: 'achievementCount', label: 'Achievements', type: 'number', groupable: true, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'desc' },
+  // Length of `meta.dlc` (the bare DLC appid list every appdetails response already carries —
+  // see the `dlc` comment in lib/steam.js's extractAppDetails) — computed here rather than in
+  // a new backend field since the array itself is already on the row's `details.meta`. 0 is
+  // real data (base game has no DLC); `null` only when store metadata itself failed to load.
+  { key: 'dlcCount',         label: 'DLC Count',    type: 'number', groupable: true, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'desc' },
 ];
 
 const DEFAULT_VISIBLE = [
@@ -284,21 +324,42 @@ const DEFAULT_VISIBLE = [
 // construction-time default-sort option, only defaultVisibleColumns (see README).
 const DEFAULT_SORT = [{ key: 'steamdbRating', dir: 'desc' }];
 
-// Same as COLUMNS minus playtime and lastPlayed (wishlist games aren't owned, so there's no
-// playtime or last-played data to show), plus two wishlist-specific columns. Unlike owned
-// games — whose name is known upfront from Steam's library API — a wishlist row's name
-// only arrives once its store metadata streams in, so it needs a loading state.
-const WISHLIST_COLUMNS = [
-  ...COLUMNS.filter(c => c.key !== 'playtime' && c.key !== 'lastPlayed').map(c => (c.key === 'name' ? { ...c, format: fmt.str } : c)),
-  // No defaultSortDir here — Steam's wishlist rank is already 1-at-the-top, so the plain
-  // ascending default a fresh click starts at is the useful direction as-is.
-  { key: 'priority',  label: 'Wishlist Rank', type: 'number', groupable: false, format: fmt.num },
-  // Same "last modified"-style reasoning as the owned-library's Last Played/Released columns
-  // above — a fresh click (and the filter's date tree) should lead with what was added most
-  // recently, not the oldest wishlist entry.
+// Inserts `newColumns` right after the column keyed `afterKey`, rather than always appending at
+// the very end — used by WISHLIST_COLUMNS below so its two wishlist-only columns land in the
+// section they actually belong to (identity, play time & dates) instead of trailing after
+// Completionist extras where nobody would think to look for a wishlist rank or an added date.
+function insertColumnsAfter(columns, afterKey, ...newColumns) {
+  const idx = columns.findIndex(c => c.key === afterKey);
+  return [...columns.slice(0, idx + 1), ...newColumns, ...columns.slice(idx + 1)];
+}
+
+// No defaultSortDir — Steam's wishlist rank is already 1-at-the-top, so the plain ascending
+// default a fresh click starts at is the useful direction as-is. Placed right after Name (an
+// identity-adjacent "which one is this" attribute for a wishlist row) rather than off in the
+// Scores/Dates sections where it doesn't fit either.
+const WISHLIST_RANK_COLUMN =
+  { key: 'priority',  label: 'Wishlist Rank', type: 'number', groupable: false, format: fmt.num };
+
+// Same "last modified"-style reasoning as the owned-library's Last Played/Released columns
+// above — a fresh click (and the filter's date tree) should lead with what was added most
+// recently, not the oldest wishlist entry. Placed right after Released, in the same Play
+// time & dates section, rather than at the very end of the column list.
+const WISHLIST_DATE_ADDED_COLUMN =
   { key: 'dateAdded', label: 'Added',         type: 'date',   groupable: true,  format: fmt.str, compare: compareDateMissingLast,
-    defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' } },
-];
+    defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' } };
+
+// Same as COLUMNS minus playtime and lastPlayed (wishlist games aren't owned, so there's no
+// playtime or last-played data to show), plus the two wishlist-specific columns above, inserted
+// into their matching sections rather than tacked on at the end. Unlike owned games — whose
+// name is known upfront from Steam's library API — a wishlist row's name only arrives once its
+// store metadata streams in, so it needs a loading state.
+const WISHLIST_COLUMNS = insertColumnsAfter(
+  insertColumnsAfter(
+    COLUMNS.filter(c => c.key !== 'playtime' && c.key !== 'lastPlayed').map(c => (c.key === 'name' ? { ...c, format: fmt.str } : c)),
+    'name', WISHLIST_RANK_COLUMN
+  ),
+  'releaseDate', WISHLIST_DATE_ADDED_COLUMN
+);
 
 const WISHLIST_DEFAULT_VISIBLE = [
   'capsule', 'name', 'dateAdded', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres',
@@ -819,6 +880,10 @@ function applyDetailsEvent(row, event) {
   row.categories        = event.meta?.categories ?? [];
   row.tags              = event.tags ?? [];
   row.protondb          = protonDbValue(event.protondb?.tier);
+  row.achievementCount  = event.meta?.achievementCount ?? null;
+  row.dlcCount          = event.meta?.dlc?.length ?? null;
+  row.platforms         = event.meta?.platforms ?? [];
+  row.languages         = event.meta?.languages ?? [];
   row.loading           = false;
   row.details           = { rating: event.rating, hltb: event.hltb, meta: event.meta, tags: event.tags, demo: event.demo, protondb: event.protondb };
 }
@@ -979,6 +1044,10 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
       tags:               undefined,
       categories:         undefined,
       protondb:           undefined,
+      achievementCount:   undefined,
+      dlcCount:           undefined,
+      platforms:          undefined,
+      languages:          undefined,
       loading:            true,
       details:            null, // { rating, hltb, meta, tags, demo, protondb } — same shape the side panel expects
     };
@@ -1071,6 +1140,10 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
     tags:               undefined,
     categories:         undefined,
     protondb:           undefined,
+    achievementCount:   undefined,
+    dlcCount:           undefined,
+    platforms:          undefined,
+    languages:          undefined,
     loading:            true,
     details:            null,
   }));

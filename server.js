@@ -426,8 +426,29 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
   const force = isForceRefresh(req);
   try {
     const steamIds = [...new Set(await Promise.all(rawIds.map(resolveSteamId)))];
-    const [schema, rarity, ...perPlayer] = await Promise.all([
-      getGameSchema(appid, { force }),
+
+    // Cheap short-circuit: appdetails (already fetched/cached for this game via
+    // fetchGameDetails, well before any panel opens) already tells us — for free — whether
+    // this game has achievements at all. Skip GetSchemaForGame/GetGlobalAchievementPercentages/
+    // one GetPlayerAchievements per account entirely for a confirmed zero, since the only
+    // possible result below is the same empty response. `force: false` — this is just an
+    // opportunistic cache read; refreshing achievements shouldn't force a redundant appdetails
+    // re-fetch. Any failure here (upstream down, never cached) is tolerated — it only costs
+    // the optimization, never breaks the route — by falling through to the schema fetch below.
+    const meta = await getAppDetails(appid, { force: false }).catch(() => null);
+    if (meta && meta.achievementCount === 0) {
+      return res.json({ achievements: [], total: 0, unlocked: 0, private: false, playerCount: steamIds.length });
+    }
+
+    // Sequenced rather than batched with the calls below: even when appdetails didn't confirm
+    // zero (meta missing/failed, or achievementCount unknown), don't fire rarity/per-player
+    // calls until schema itself confirms there's something to annotate.
+    const schema = await getGameSchema(appid, { force });
+    if (!schema || schema.length === 0) {
+      return res.json({ achievements: [], total: 0, unlocked: 0, private: false, playerCount: steamIds.length });
+    }
+
+    const [rarity, ...perPlayer] = await Promise.all([
       // Rarity is a nice-to-have annotation, not core progress data — a transient upstream
       // failure here shouldn't take down the whole achievements panel the way a genuine
       // schema/player-achievements failure does, so it degrades to "no rarity data" instead
@@ -435,10 +456,6 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
       getGlobalAchievementPercentages(appid, { force }).catch(() => null),
       ...steamIds.map(id => getPlayerAchievements(id, appid, { force })),
     ]);
-
-    if (!schema || schema.length === 0) {
-      return res.json({ achievements: [], total: 0, unlocked: 0, private: false, playerCount: steamIds.length });
-    }
 
     // null means "no data for this account" (private profile, or never touched this game's
     // stats) — distinguished here from "resolved, but genuinely 0 achieved" so the frontend

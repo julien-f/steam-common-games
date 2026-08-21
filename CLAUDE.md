@@ -17,7 +17,7 @@ The server binds to `http://127.0.0.1:3000` by default. `default.env` (committed
 - **`server.js`** — Express setup and route handlers only.
 - **`lib/cache.js`** — Persistent cache (`getCached`, `setCache`), disk I/O, process exit hooks.
 - **`lib/config.js`** — TTL constants (`LIBRARY_CACHE_TTL_MS`, `RESOLVE_CACHE_TTL_MS`, `RATING_CACHE_TTL_MS`, `META_CACHE_TTL_MS`, `SEARCH_CACHE_TTL_MS`) shared across modules.
-- **`lib/dedup.js`** — In-flight request deduplicator (`createDedup`): concurrent calls for the same key share one promise.
+- **`lib/dedup.js`** — In-flight request deduplicator (`createDedup`): concurrent calls for the same key share one promise. Its in-flight map, and `lib/steam.js`'s per-host rate-limiting semaphores (`storeLimit`/`tagLimit`/`protonLimit`), are process-local state — correct for this app's current single-process deployment, but would need rethinking (e.g. a shared store) before ever running multiple instances/workers, since each would get its own independent map/semaphore and silently multiply real upstream request volume rather than erroring.
 - **`lib/steam.js`** — Steam API calls (`resolveSteamId`, `getOwnedGames`, `getWishlist`, `getPlayerSummaries`, `getGameRating`, `getAppDetails`, `getSteamTags`, `getGameDemo`, `searchStoreGames`, `getGameNews`).
 - **`lib/hltb.js`** — HLTB auth + search (`getHLTB`), plus exported `stringSimilarity` and `levenshtein` for unit testing.
 - **`lib/groupGames.js`** — Groups slot libraries by exact ownership set (`groupByOwnership`).

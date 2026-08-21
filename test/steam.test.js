@@ -440,7 +440,7 @@ test('getAppDetails: dedupes genres/categories that share the same label but dif
 test('getAppDetails: handles missing optional fields with empty arrays', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
-  assert.deepEqual(await getAppDetails(400), { name: null, genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, comingSoon: false, metacritic: null, capsule: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg', banner: 'https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg', movies: [], screenshots: [], dlc: [], fullgame: null, website: null });
+  assert.deepEqual(await getAppDetails(400), { name: null, genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, comingSoon: false, metacritic: null, capsule: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg', banner: 'https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg', movies: [], screenshots: [], dlc: [], fullgame: null, website: null, achievementCount: null, platforms: [], languages: [] });
 });
 
 test('getAppDetails: extracts dlc appid list', async (t) => {
@@ -483,6 +483,61 @@ test('getAppDetails: website is null when absent', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
   const result = await getAppDetails(400);
   assert.equal(result.website, null);
+});
+
+test('getAppDetails: extracts achievementCount from achievements.total', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {
+    achievements: { total: 42, highlighted: [{ name: 'ACH_1', path: 'i1' }] },
+  }));
+  const result = await getAppDetails(400);
+  assert.equal(result.achievementCount, 42);
+});
+
+test('getAppDetails: achievementCount is 0 (not null) when Steam reports zero achievements', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, { achievements: { total: 0, highlighted: [] } }));
+  const result = await getAppDetails(400);
+  assert.equal(result.achievementCount, 0);
+});
+
+test('getAppDetails: achievementCount is null when the achievements field is absent', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
+  const result = await getAppDetails(400);
+  assert.equal(result.achievementCount, null);
+});
+
+test('getAppDetails: extracts platforms as an array of supported OS names', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {
+    platforms: { windows: true, mac: false, linux: true },
+  }));
+  const result = await getAppDetails(400);
+  assert.deepEqual(result.platforms, ['Windows', 'Linux']);
+});
+
+test('getAppDetails: platforms is empty array when the field is absent', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
+  const result = await getAppDetails(400);
+  assert.deepEqual(result.platforms, []);
+});
+
+test('getAppDetails: parses supported_languages into a clean array of names', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {
+    supported_languages: 'English<strong>*</strong>, French, German<br><strong>*</strong>languages with full audio support',
+  }));
+  const result = await getAppDetails(400);
+  assert.deepEqual(result.languages, ['English', 'French', 'German']);
+});
+
+test('getAppDetails: languages is empty array when supported_languages is absent', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
+  const result = await getAppDetails(400);
+  assert.deepEqual(result.languages, []);
 });
 
 test('getAppDetails: extracts name field', async (t) => {

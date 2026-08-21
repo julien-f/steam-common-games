@@ -924,6 +924,54 @@ test('GET /api/achievements/:appid: private/no-data account is distinguished fro
   assert.equal(res.body.private, true);
 });
 
+test('GET /api/achievements/:appid: short-circuits on appdetails-confirmed zero achievements — schema/rarity/player calls are never made', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('appdetails')) {
+      return { ok: true, json: async () => ({ '400': { success: true, data: { achievements: { total: 0, highlighted: [] } } } }) };
+    }
+    // Any of these firing would mean the short-circuit didn't work — fail loudly rather
+    // than silently answering with fabricated achievement data.
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  const res = await api.get(`/api/achievements/400?steamids=${ID1}`);
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { achievements: [], total: 0, unlocked: 0, private: false, playerCount: 1 });
+});
+
+test('GET /api/achievements/:appid: appdetails failure falls back to the schema fetch instead of erroring', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('appdetails')) return { ok: false, status: 503 };
+    return makeAchievementsFetch()(url);
+  });
+
+  const res = await api.get('/api/achievements/400');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.total, 2);
+});
+
+test('GET /api/achievements/:appid: schema-confirmed zero achievements skips rarity/per-player calls', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('appdetails')) {
+      // achievementCount unknown (field absent) — forces the route to actually ask the schema.
+      return { ok: true, json: async () => ({ '400': { success: true, data: {} } }) };
+    }
+    if (url.includes('GetSchemaForGame')) {
+      return { ok: true, json: async () => ({ game: { availableGameStats: {} } }) }; // no achievements key
+    }
+    // Rarity/per-player firing here would mean the sequencing regressed back to batching
+    // them alongside the schema fetch.
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  const res = await api.get(`/api/achievements/400?steamids=${ID1}`);
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { achievements: [], total: 0, unlocked: 0, private: false, playerCount: 1 });
+});
+
 test('GET /api/achievements/:appid: too many steamids is a 400', async () => {
   const ids = Array.from({ length: 20 }, (_, i) => `7656119800000${String(i).padStart(4, '0')}`).join(',');
   const res = await api.get(`/api/achievements/400?steamids=${ids}`);
