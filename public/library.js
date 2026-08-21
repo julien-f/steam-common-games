@@ -1,7 +1,10 @@
 'use strict';
 
 import { createDataTable, syncViewToUrl, resetView } from '@vates/data-table-vanilla';
-import { processData, searchData, DEFAULT_LABELS, compareMissingLast } from '@vates/data-table-core';
+import {
+  processData, searchData, DEFAULT_LABELS, compareMissingLast,
+  bucketNumericRange, bucketDatePart, formatNumericRange, formatDatePart,
+} from '@vates/data-table-core';
 
 const fmt = {
   loading: v => v === undefined ? '…' : v,
@@ -227,6 +230,77 @@ function renderReleaseDate(v, row) {
   return span;
 }
 
+// ── Group-by bucketing for continuous/high-cardinality columns ─────────────────────────────
+// @vates/data-table-core's `groupValue`/`groupFormat` exist precisely so a `type: 'number'`/
+// `type: 'date'` column with a near-unique value per row (an exact review count, an hours-played
+// figure, an exact release date) can still group into a handful of useful buckets instead of one
+// row-sized group per game. None of the columns below used to set it at all.
+
+// reviewsTotal and playtime both span several orders of magnitude — a handful of games with
+// millions of reviews or thousands of hours sitting next to dozens with single digits — so a
+// fixed linear step (`bucketNumericRange`) is the wrong tool for either: too small a step and the
+// long tail collapses into one dominant bucket, too large and the 0-100 range where most of the
+// actual variety lives gets flattened into one or two. Half-decade ("1-3-10") log buckets fix
+// both ends — twice the resolution of plain base-10 decades, which checked against a real
+// library's data put the entire 1h-10h range (roughly half of any typical player's *played*
+// games) into a single indistinguishable bucket. Snapping to the fixed {1, 3, 10, 30, 100, ...}
+// staircase (rather than the raw irrational 10**(n/2) it approximates) keeps every boundary a
+// clean, recognizable number instead of "3.162".
+function halfDecadeBucket(value) {
+  const n = Number(value);
+  if (!(n > 0)) return 0; // covers a real 0 and (via withMissingGroup below) never sees a missing value
+  // Collapse everything under 1 into its own single bucket rather than continuing the half-decade
+  // staircase below it (0.3-1, 0.1-0.3, 0.03-0.1, 0.01-0.03, ...) — verified against a real
+  // library, that finer breakdown split "barely touched" playtime into four buckets nobody
+  // actually distinguishes between (a game played for 2 minutes vs. 40 isn't a meaningful
+  // difference), just to preserve resolution reviewsTotal never even reaches this range to need.
+  if (n < 1) return -1;
+  const exp = Math.floor(Math.log10(n) + 1e-9); // epsilon guards e.g. log10(1000) landing a hair under 3
+  const base = 10 ** exp;
+  return n < base * 3 ? base : base * 3;
+}
+function nextHalfDecadeBound(lower) {
+  const exp = Math.floor(Math.log10(lower) + 1e-9);
+  const base = 10 ** exp;
+  return lower === base ? base * 3 : base * 10;
+}
+// Whole numbers as-is; large ones with a k/M suffix (same readability idea as fmt.ct's
+// toLocaleString); sub-1 ones (only ever reached by playtime, which has real data down to a few
+// minutes) kept as a short decimal instead of rounding away to a misleading "0".
+function formatMagnitude(n) {
+  if (n >= 1e6) return `${+(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `${+(n / 1e3).toFixed(1)}K`;
+  if (n > 0 && n < 1) return String(+n.toFixed(2));
+  return String(Math.round(n));
+}
+function formatHalfDecadeBucket(unit, zeroLabel, subOneLabel = `<1${unit}`) {
+  return keyPart => {
+    const lower = Number(keyPart);
+    if (lower === 0) return zeroLabel;
+    if (lower === -1) return subOneLabel;
+    return `${formatMagnitude(lower)}–${formatMagnitude(nextHalfDecadeBound(lower))}${unit}`;
+  };
+}
+
+// A `groupValue` that returns `null`/`undefined` for a missing value ends up keyed by the empty
+// string once the table's own internals stringify it (`null ?? ''`) — but bucketNumericRange/
+// bucketDatePart don't know that convention; each calls `String(value)`/coerces it *before* any
+// such check, so a genuinely missing `null` column value (a failed rating fetch, an unparseable
+// release date) would come out the other end as the literal string `"null"` and show up as a
+// group header that reads "null" rather than "—". Checking for "missing" ourselves before ever
+// calling the underlying bucket function sidesteps that regardless of which one's used —
+// `lastPlayed`'s "never played by anyone" is `''`, not `null`, so it takes its own `isMissing`.
+function withMissingGroup(bucketFn, isMissing = v => v == null) {
+  return value => isMissing(value) ? null : bucketFn(value);
+}
+// Pairs with withMissingGroup above — the empty-string group key it produces for a missing value
+// needs its own label rather than being handed to a real formatter that has no idea what to do
+// with it (formatDatePart('year') on '' would print '' itself: `new Date('')` is invalid, but
+// still not NaN in a way that function checks for).
+function formatMissingGroup(formatFn, missingLabel = '—') {
+  return keyPart => keyPart === '' ? missingLabel : formatFn(keyPart);
+}
+
 // Grouped into sections (identity → scores → HLTB → play time/dates → classification →
 // compatibility → extras) rather than roughly the order each was added to the
 // codebase — with 20+ columns now, an alphabetical or add-order list makes both the column
@@ -237,7 +311,10 @@ const COLUMNS = [
   // ── Identity ────────────────────────────────────────────────────────────────
   { key: 'capsule', label: '', width: 128, sortable: false, filterable: false, groupable: false,
     value: () => null, render: renderThumb },
-  { key: 'name',             label: 'Name',            filterable: false },
+  // Not groupable — a game's name is (almost always) unique per row, same "one group per row is
+  // useless" reasoning steamdbRating's own groupable:false comment below already gives; `priority`
+  // (Wishlist Rank) gets the same treatment further down for the identical reason.
+  { key: 'name',             label: 'Name',            filterable: false, groupable: false },
 
   // ── Scores & reviews ────────────────────────────────────────────────────────
   // The default-visible score: SteamDB's current formula (see computeSteamdbRating in utils.js)
@@ -267,26 +344,47 @@ const COLUMNS = [
   // for one), so the default numeric sort already treats it correctly, unlike the score/HLTB
   // columns above and below. `defaultSortDir: 'desc'` still applies though — the most-reviewed
   // (most talked-about) games are the more useful thing to see on a first click, same reasoning
-  // as the score columns just without the missing-data wrinkle.
-  { key: 'reviewsTotal',     label: 'Review Count',    type: 'number', groupable: true, format: fmt.ct, defaultSortDir: 'desc' },
+  // as the score columns just without the missing-data wrinkle. `null` (a failed rating fetch, not
+  // a confirmed 0) is still possible though, hence `withMissingGroup` on the grouping side below —
+  // see its own comment above for why that needs to be checked explicitly rather than left to
+  // halfDecadeBucket's own `Number(null) === 0` coercion, which would otherwise silently fold a
+  // failed fetch into the same group as a genuinely zero-review game.
+  { key: 'reviewsTotal',     label: 'Review Count',    type: 'number', groupable: true, format: fmt.ct, defaultSortDir: 'desc',
+    groupValue: withMissingGroup(halfDecadeBucket), groupFormat: formatMissingGroup(formatHalfDecadeBucket('', '0')) },
 
   // ── How Long To Beat ────────────────────────────────────────────────────────
   // "All PlayStyles" listed first among the HLTB columns — same convention as the side panel,
   // which shows it leftmost precisely because it's a single representative number rather than
   // one specific playstyle (see the comment on `all` in lib/hltb.js). Keeping it first here too
   // means toggling on Main/+Extra/100% doesn't push it out of its default-visible position.
-  { key: 'hltbAll',          label: 'All (h)',         type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast },
-  { key: 'hltbMain',         label: 'Main (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast },
-  { key: 'hltbExtra',        label: '+Extra (h)',      type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast },
-  { key: 'hltbCompletionist',label: '100% (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast },
+  // HLTB times are bounded to roughly 0-150h for the overwhelming majority (a handful of
+  // open-world completionist runs into the 300-500h range, nothing like reviewsTotal/playtime's
+  // spread into the millions/thousands) — a plain linear step stays meaningful across that whole
+  // range, unlike those two, so a 10h `bucketNumericRange` is the right tool here rather than the
+  // log buckets above. `null` (no HLTB match found) needs the same `withMissingGroup` treatment.
+  { key: 'hltbAll',          label: 'All (h)',         type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
+    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')) },
+  { key: 'hltbMain',         label: 'Main (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
+    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')) },
+  { key: 'hltbExtra',        label: '+Extra (h)',      type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
+    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')) },
+  { key: 'hltbCompletionist',label: '100% (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
+    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')) },
 
   // ── Play time & dates ───────────────────────────────────────────────────────
   // No compare override here either — 0 hours played is real data (owned, never launched), not
   // a stand-in for "unknown," so the default numeric sort is already correct. `defaultSortDir:
   // 'desc'` still applies — "what have I sunk the most hours into" is the more common question
   // than the reverse.
+  // Same log-scale reasoning as reviewsTotal above — Steam playtime is famously long-tailed
+  // (thousands of hours in a handful of games next to dozens barely launched), verified against a
+  // real library where p50-p90 of played games alone spanned 1.1h-9.8h, entirely inside one
+  // base-10 decade. `totalMin / 60` (see loadLibrary below) is always a real number, never `null`
+  // — a slot that owns but never played a game still sums to a real 0 — so no `withMissingGroup`
+  // wrapper is needed here, unlike reviewsTotal/hltb*/the three date columns.
   { key: 'playtime',         label: 'Played (h)',      type: 'number', groupable: true,
-    format: v => v > 0 ? Number(v).toFixed(1) : '—', defaultSortDir: 'desc' },
+    format: v => v > 0 ? Number(v).toFixed(1) : '—', defaultSortDir: 'desc',
+    groupValue: halfDecadeBucket, groupFormat: formatHalfDecadeBucket('h', 'Not played') },
   // Most recent `rtime_last_played` across every account merged into this row (a Steam Family
   // slot unions several accounts — see groupByOwnership — so "last played" here means "by
   // anyone in the slot", not any one account in particular). '' (never played by anyone in the
@@ -305,11 +403,26 @@ const COLUMNS = [
   // tree most-recent-year-first instead of the tree's own default oldest-first — `by: 'alpha'`
   // is what a date tree actually uses (there's no by-count order for a tree of date branches;
   // see the Grouped columns / Date filter tree docs), just flipped to descending.
+  // Grouped by year (`bucketDatePart('year')`) rather than the exact date — an exact release/
+  // last-played date is close to unique per game, so ungrouped grouping would produce close to
+  // one row-sized group per game, the same "continuous column" problem reviewsTotal/playtime have
+  // above. "Never played by anyone in the slot" is `''`, not `null` (see fmtLastPlayed in
+  // utils.js), hence the explicit `isMissing` override — `withMissingGroup`'s default only checks
+  // for `null`/`undefined`.
   { key: 'lastPlayed',       label: 'Last Played',   type: 'date', groupable: true, format: fmt.str,
-    compare: compareDateMissingLast, defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' } },
+    compare: compareDateMissingLast, defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
+    groupValue: withMissingGroup(bucketDatePart('year'), v => v == null || v === ''),
+    groupFormat: formatMissingGroup(formatDatePart('year')) },
+  // Same year-bucketed grouping, using this column's own `parseDate` (endOfReleasePeriod) so a
+  // fuzzy "Fall 2026"/bare-year release groups under the year it actually resolves to instead of
+  // bucketDatePart's own default `new Date(value).getTime()`, which can't make sense of those
+  // forms at all. `null` (no metadata) is the only missing case here — "Coming soon"/"TBA" are
+  // real (if imprecise) strings that endOfReleasePeriod resolves to an actual year, not `null`.
   { key: 'releaseDate',      label: 'Released',     type: 'date', groupable: true, format: fmt.str,
     parseDate: endOfReleasePeriod, compare: compareDateMissingLast, render: renderReleaseDate,
-    defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' } },
+    defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
+    groupValue: withMissingGroup(bucketDatePart('year', endOfReleasePeriod)),
+    groupFormat: formatMissingGroup(formatDatePart('year')) },
 
   // ── Classification ──────────────────────────────────────────────────────────
   { key: 'genres',           label: 'Genres',       groupable: true, format: fmt.arr },
