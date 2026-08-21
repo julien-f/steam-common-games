@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Bumped `@vates/data-table-vanilla` from 0.9.0 to 0.10.0, and the direct `@vates/data-table-core` dependency from ^0.8.0 to ^0.10.0 alongside it. No usage changes needed for the vanilla package — the functions this app relies on (`createDataTable`, `syncViewToUrl`, `resetView`) are unaffected; the release drops some vestigial Solid-based exports (`createTableState`, `DataTableView`) this app never used and adds new opt-in `DataTable` methods (`setRowKey`, `setSelectable`, `onSelectionChange`, `getRowId`, `persistView`). The `data-table-core` bump wasn't optional, though: leaving it at ^0.8.0 kept a stale, older copy at the top of `node_modules` — the one `server.js` statically serves at `/vendor/data-table-core` — while `data-table-vanilla` actually needs 0.10.0's `data-table-core`, which broke `library.html` at load time (`doesn't provide an export named: 'reconcileSelection'`) since the served 0.8.0 module lacked that export. Bumping the direct dependency lets npm dedupe to a single 0.10.0 copy.
+
 ### Security
 
 - Side panel (`public/panel.js`): a game's store `short_description` was interpolated directly into `panelBody.innerHTML` with no escaping (every other field in the same template went through `esc()`), and the panel opens for any appid with no ownership check — a malicious/compromised Steam listing's description could run arbitrary script in the app's origin the moment its panel opened. `esc()` alone wasn't the right fix since the field can legitimately contain literal HTML entities (e.g. "Baldur's Gate... Dungeons &amp; Dragons") that `esc()` would double-escape into visible `&amp;` text. It's now decoded via an inert `DOMParser` document (no scripts run, no resources load) and inserted with `textContent` instead.
