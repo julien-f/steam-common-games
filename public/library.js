@@ -503,6 +503,36 @@ const DEFAULT_VISIBLE = [
   'capsule', 'name', 'steamdbRating', 'hltbAll', 'playtime', 'releaseDate', 'genres',
 ];
 
+// Auto-sorts by whatever column was just added to Group by — grouping by a column and *not*
+// sorting by it leaves rows shuffled within each group in whatever order they happened to load
+// in, which is rarely what someone grouping by, say, Released actually wants (games within each
+// year in release order, not a random one). Only fires on a genuine live "user clicked a column
+// in the Group menu" interaction, not on a restored view (URL load, back/forward, "Reset view")
+// that happens to include a group — those all replace many `TableViewState` fields (sorts,
+// filters, visibleCols, page, ...) in one `setViewState` call, whereas toggling one column in the
+// Group menu touches only `groupBy` in isolation. `viewSignature` (below) captures every field
+// *except* the two this function itself cares about, so an isolated groupBy-only change is
+// exactly the case where the "rest" signature comes out unchanged.
+function viewSignature(view) {
+  const { groupBy, sorts, ...rest } = view;
+  return JSON.stringify(rest);
+}
+function bindGroupBySort(table, columns) {
+  let prevView = table.getViewState();
+  return table.onViewChange(view => {
+    const prevGroupBy = prevView.groupBy ?? [];
+    const groupBy = view.groupBy ?? [];
+    const added = groupBy.filter(k => !prevGroupBy.includes(k));
+    const isIsolatedChange = viewSignature(view) === viewSignature(prevView);
+    prevView = view;
+    if (added.length !== 1 || !isIsolatedChange) return; // 0 added: removal or an unrelated change; >1 or a non-isolated change: a bulk restore, not a live click
+    const [key] = added;
+    if (view.sorts?.length === 1 && view.sorts[0].key === key) return; // already sorted by it
+    const col = columns.find(c => c.key === key);
+    table.setViewState({ ...view, sorts: [{ key, dir: col?.defaultSortDir ?? 'asc' }] });
+  });
+}
+
 // Applied via setViewState() after table creation and after "Reset view" — there's no
 // construction-time default-sort option, only defaultVisibleColumns (see README).
 const DEFAULT_SORT = [{ key: 'steamdbRating', dir: 'desc' }];
@@ -561,6 +591,7 @@ const tabWishlistBtn = document.getElementById('tab-wishlist');
 
 let table         = null;
 let unsyncView    = null;
+let unGroupSort   = null; // see bindGroupBySort above
 let rows          = [];
 let rowMap        = new Map();
 let total         = 0;
@@ -1152,6 +1183,7 @@ function resetTableState({ preserveGameParam = false } = {}) {
   if (isPanelOpen()) panelClose({ preserveUrl: preserveGameParam });
   clearRandomQueue(randomQueueKey());
   if (unsyncView) { unsyncView(); unsyncView = null; }
+  if (unGroupSort) { unGroupSort(); unGroupSort = null; }
   if (table) { table.destroy(); table = null; }
   rows = []; rowMap = new Map(); total = 0; loaded = 0;
   tableContainer.innerHTML = '';
@@ -1273,6 +1305,10 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
   });
   table.setViewState({ sorts: DEFAULT_SORT });
   unsyncView = syncViewToUrl(table);
+  // Bound after syncViewToUrl's own initial load (not before) so bindGroupBySort's starting
+  // snapshot already reflects a `?view=`-restored groupBy, if any — otherwise that restore
+  // would itself look like a live "just grouped by this" click and get its sort overridden.
+  unGroupSort = bindGroupBySort(table, COLUMNS);
   resetViewBtn.hidden = false;
 
   updateStatus();
@@ -1369,6 +1405,8 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
   });
   table.setViewState({ sorts: DEFAULT_SORT });
   unsyncView = syncViewToUrl(table, { paramName: 'wview' });
+  // See the matching comment in loadLibrary above.
+  unGroupSort = bindGroupBySort(table, WISHLIST_COLUMNS);
   resetViewBtn.hidden = false;
 
   updateStatus();
