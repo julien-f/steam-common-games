@@ -254,7 +254,11 @@ function halfDecadeBucket(value) {
   // library, that finer breakdown split "barely touched" playtime into four buckets nobody
   // actually distinguishes between (a game played for 2 minutes vs. 40 isn't a meaningful
   // difference), just to preserve resolution reviewsTotal never even reaches this range to need.
-  if (n < 1) return -1;
+  // The sentinel is 0.5, not e.g. -1 — group order sorts by this raw numeric key (including when
+  // grouping auto-applies a matching sort, see bindGroupBySort above), and a value below 0 would
+  // rank "played a little" as LESS than the real-zero "Not played" bucket, backwards from what it
+  // means; 0.5 keeps 0 < 0.5 < 1 < 3 < ... ordering correct in both directions.
+  if (n < 1) return 0.5;
   const exp = Math.floor(Math.log10(n) + 1e-9); // epsilon guards e.g. log10(1000) landing a hair under 3
   const base = 10 ** exp;
   return n < base * 3 ? base : base * 3;
@@ -277,7 +281,7 @@ function formatHalfDecadeBucket(unit, zeroLabel, subOneLabel = `<1${unit}`) {
   return keyPart => {
     const lower = Number(keyPart);
     if (lower === 0) return zeroLabel;
-    if (lower === -1) return subOneLabel;
+    if (lower === 0.5) return subOneLabel;
     return `${formatMagnitude(lower)}–${formatMagnitude(nextHalfDecadeBound(lower))}${unit}`;
   };
 }
