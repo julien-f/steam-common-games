@@ -578,8 +578,11 @@ const WISHLIST_COLUMNS = insertColumnsAfter(
   'releaseDate', WISHLIST_DATE_ADDED_COLUMN
 );
 
+// Same as DEFAULT_VISIBLE plus `hasDemo` — "can I try this before buying" matters more on a
+// wishlist (games not yet owned) than in an owned library, unlike DEFAULT_VISIBLE above where
+// it stays hidden.
 const WISHLIST_DEFAULT_VISIBLE = [
-  'capsule', 'name', 'dateAdded', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres',
+  'capsule', 'name', 'dateAdded', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres', 'hasDemo',
 ];
 
 const playerInput   = document.getElementById('player-input');
