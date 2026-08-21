@@ -235,7 +235,16 @@ function renderReleaseDate(v, row) {
 // @vates/data-table-core's `groupValue`/`groupFormat` exist precisely so a `type: 'number'`/
 // `type: 'date'` column with a near-unique value per row (an exact review count, an hours-played
 // figure, an exact release date) can still group into a handful of useful buckets instead of one
-// row-sized group per game. None of the columns below used to set it at all.
+// row-sized group per game.
+//
+// Every bucketed column below (and every multi-value/array column — Genres, Tags, Developer,
+// Publisher, Categories, Languages, Platforms) also sets `keepVisibleWhenGrouped: true` (new in
+// `@vates/data-table-core` 0.11.0). Without it, grouping auto-hides the column's own cells since
+// the group header normally already shows the same thing — true for a plain single-value column,
+// but not for these: a bucketed column's header only shows the bucket label (e.g. "3–10h"), losing
+// the row's exact value entirely, and a multi-value column fans a row into one group per value
+// (e.g. a "Tags" row with `["Roguelike", "Deckbuilder"]` appears in both groups), so hiding it
+// would remove the only way to see a row's *other* values while looking at one particular group.
 
 // reviewsTotal and playtime both span several orders of magnitude — a handful of games with
 // millions of reviews or thousands of hours sitting next to dozens with single digits — so a
@@ -344,7 +353,8 @@ const COLUMNS = [
   // halfDecadeBucket's own `Number(null) === 0` coercion, which would otherwise silently fold a
   // failed fetch into the same group as a genuinely zero-review game.
   { key: 'reviewsTotal',     label: 'Review Count',    type: 'number', groupable: true, format: fmt.ct, defaultSortDir: 'desc',
-    groupValue: withMissingGroup(halfDecadeBucket), groupFormat: formatMissingGroup(formatHalfDecadeBucket('', '0')) },
+    groupValue: withMissingGroup(halfDecadeBucket), groupFormat: formatMissingGroup(formatHalfDecadeBucket('', '0')),
+    keepVisibleWhenGrouped: true },
 
   // ── How Long To Beat ────────────────────────────────────────────────────────
   // "All PlayStyles" listed first among the HLTB columns — same convention as the side panel,
@@ -357,13 +367,17 @@ const COLUMNS = [
   // range, unlike those two, so a 10h `bucketNumericRange` is the right tool here rather than the
   // log buckets above. `null` (no HLTB match found) needs the same `withMissingGroup` treatment.
   { key: 'hltbAll',          label: 'All (h)',         type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')) },
+    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')),
+    keepVisibleWhenGrouped: true },
   { key: 'hltbMain',         label: 'Main (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')) },
+    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')),
+    keepVisibleWhenGrouped: true },
   { key: 'hltbExtra',        label: '+Extra (h)',      type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')) },
+    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')),
+    keepVisibleWhenGrouped: true },
   { key: 'hltbCompletionist',label: '100% (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')) },
+    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')),
+    keepVisibleWhenGrouped: true },
 
   // ── Play time & dates ───────────────────────────────────────────────────────
   // No compare override here either — 0 hours played is real data (owned, never launched), not
@@ -378,7 +392,8 @@ const COLUMNS = [
   // wrapper is needed here, unlike reviewsTotal/hltb*/the three date columns.
   { key: 'playtime',         label: 'Played (h)',      type: 'number', groupable: true,
     format: v => v > 0 ? Number(v).toFixed(1) : '—', defaultSortDir: 'desc',
-    groupValue: halfDecadeBucket, groupFormat: formatHalfDecadeBucket('h', 'Not played') },
+    groupValue: halfDecadeBucket, groupFormat: formatHalfDecadeBucket('h', 'Not played'),
+    keepVisibleWhenGrouped: true },
   // Most recent `rtime_last_played` across every account merged into this row (a Steam Family
   // slot unions several accounts — see groupByOwnership — so "last played" here means "by
   // anyone in the slot", not any one account in particular). '' (never played by anyone in the
@@ -406,7 +421,7 @@ const COLUMNS = [
   { key: 'lastPlayed',       label: 'Last Played',   type: 'date', groupable: true, format: fmt.str,
     compare: compareDateMissingLast, defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
     groupValue: withMissingGroup(bucketDatePart('year'), v => v == null || v === ''),
-    groupFormat: formatMissingGroup(formatDatePart('year')) },
+    groupFormat: formatMissingGroup(formatDatePart('year')), keepVisibleWhenGrouped: true },
   // Same year-bucketed grouping, using this column's own `parseDate` (endOfReleasePeriod) so a
   // fuzzy "Fall 2026"/bare-year release groups under the year it actually resolves to instead of
   // bucketDatePart's own default `new Date(value).getTime()`, which can't make sense of those
@@ -416,22 +431,22 @@ const COLUMNS = [
     parseDate: endOfReleasePeriod, compare: compareDateMissingLast, render: renderReleaseDate,
     defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
     groupValue: withMissingGroup(bucketDatePart('year', endOfReleasePeriod)),
-    groupFormat: formatMissingGroup(formatDatePart('year')) },
+    groupFormat: formatMissingGroup(formatDatePart('year')), keepVisibleWhenGrouped: true },
 
   // ── Classification ──────────────────────────────────────────────────────────
-  { key: 'genres',           label: 'Genres',       groupable: true, format: fmt.arr },
+  { key: 'genres',           label: 'Genres',       groupable: true, format: fmt.arr, keepVisibleWhenGrouped: true },
   // `defaultValueSort: { by: 'count', dir: 'desc' }` (new in 0.8.0) — Developer/Publisher/Tags/
   // Categories are all higher-cardinality than Genres (a small, well-known fixed list that reads
   // fine alphabetically), so their filter checklists open "most common first" instead of A→Z;
   // still just the starting point — `cycleValueSort`'s toggle still cycles through all 4 states
   // the same as before.
-  { key: 'categories',       label: 'Categories',   groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
-  { key: 'tags',             label: 'Tags',         groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
-  { key: 'developers',       label: 'Developer',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
-  { key: 'publishers',       label: 'Publisher',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
+  { key: 'categories',       label: 'Categories',   groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
+  { key: 'tags',             label: 'Tags',         groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
+  { key: 'developers',       label: 'Developer',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
+  { key: 'publishers',       label: 'Publisher',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
   // Parsed from Steam's `supported_languages` HTML string (see parseSupportedLanguages in
   // lib/steam.js) — same high-cardinality multi-value treatment as Tags/Developers/Publisher.
-  { key: 'languages',        label: 'Languages',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
+  { key: 'languages',        label: 'Languages',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
   // Steam's own content-type for this appid (see TYPE_LABELS above and the `type` comment in
   // lib/steam.js's extractAppDetails) — the overwhelming majority of rows are 'Game', but a
   // library/wishlist can genuinely contain soundtrack ('Soundtrack'), video, or DLC entries
@@ -454,7 +469,7 @@ const COLUMNS = [
   // ProtonDB column right below, which is Linux/Deck compatibility *through Proton*, a
   // compatibility layer, not native support. Same multi-value groupable/filterable treatment as
   // Genres/Categories rather than three separate boolean columns.
-  { key: 'platforms',        label: 'Platforms',    groupable: true, format: fmt.arr },
+  { key: 'platforms',        label: 'Platforms',    groupable: true, format: fmt.arr, keepVisibleWhenGrouped: true },
   // Linux/Steam Deck compatibility tier from ProtonDB — sorted/grouped by actual compatibility
   // quality (see compareProtonTier above), not alphabetically; public/panel.js shows the same
   // data as a colored badge in the side panel. `defaultSortDir: 'desc'` shows the best-compatibility
