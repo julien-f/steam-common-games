@@ -4,6 +4,7 @@ import { createDataTable, syncViewToUrl, resetView } from '@vates/data-table-van
 import {
   processData, searchData, DEFAULT_LABELS, compareMissingLast,
   bucketNumericRange, bucketDatePart, formatNumericRange, formatDatePart,
+  bucketLogRange, formatLogRange,
 } from '@vates/data-table-core';
 
 const fmt = {
@@ -243,46 +244,35 @@ function renderReleaseDate(v, row) {
 // actual variety lives gets flattened into one or two. Half-decade ("1-3-10") log buckets fix
 // both ends — twice the resolution of plain base-10 decades, which checked against a real
 // library's data put the entire 1h-10h range (roughly half of any typical player's *played*
-// games) into a single indistinguishable bucket. Snapping to the fixed {1, 3, 10, 30, 100, ...}
-// staircase (rather than the raw irrational 10**(n/2) it approximates) keeps every boundary a
-// clean, recognizable number instead of "3.162".
+// games) into a single indistinguishable bucket.
+//
+// The staircase/formatting itself is `bucketLogRange`/`formatLogRange` (new in
+// `@vates/data-table-core` 0.11.0) with a `[1, 3]` division — this app used to hand-roll the same
+// {1, 3, 10, 30, 100, ...} math (and its "30–100" range formatting) before core provided it. The
+// one piece core's `min` option can't express is kept as a thin wrapper below: `min` alone folds a
+// real zero (never played, 0 reviews) into the exact same "<1" bucket as a game briefly played for
+// a few minutes, which reads as the same thing when it isn't. `LogRangeOptions.min` also has no
+// notion of a value being exactly the floor rather than merely below it, so there's no option that
+// gets this split for free.
+const LOG_BUCKET_OPTS = { divisions: [1, 3] }; // base 10 (default), halved via a 1-3-10 grid
+const logBucketValue = bucketLogRange(LOG_BUCKET_OPTS);
 function halfDecadeBucket(value) {
   const n = Number(value);
-  if (!(n > 0)) return 0; // covers a real 0 and (via withMissingGroup below) never sees a missing value
-  // Collapse everything under 1 into its own single bucket rather than continuing the half-decade
-  // staircase below it (0.3-1, 0.1-0.3, 0.03-0.1, 0.01-0.03, ...) — verified against a real
-  // library, that finer breakdown split "barely touched" playtime into four buckets nobody
-  // actually distinguishes between (a game played for 2 minutes vs. 40 isn't a meaningful
-  // difference), just to preserve resolution reviewsTotal never even reaches this range to need.
-  // The sentinel is 0.5, not e.g. -1 — group order sorts by this raw numeric key (including when
-  // grouping auto-applies a matching sort, see bindGroupBySort above), and a value below 0 would
-  // rank "played a little" as LESS than the real-zero "Not played" bucket, backwards from what it
-  // means; 0.5 keeps 0 < 0.5 < 1 < 3 < ... ordering correct in both directions.
-  if (n < 1) return 0.5;
-  const exp = Math.floor(Math.log10(n) + 1e-9); // epsilon guards e.g. log10(1000) landing a hair under 3
-  const base = 10 ** exp;
-  return n < base * 3 ? base : base * 3;
+  if (n <= 0) return 0; // covers a real 0 and (via withMissingGroup below) never sees a missing value
+  const bucket = logBucketValue(value);
+  // core's own "below min" sentinel is -Infinity — sorts before the real-zero bucket above, the
+  // opposite of what "played a little" vs. "never played" should mean. Remapped to 0.5 (strictly
+  // between the "Not played" bucket's `0` and the first real decade bucket's `1`) so
+  // `0 < 0.5 < 1 < 3 < ...` stays correct in both sort directions.
+  return bucket === -Infinity ? 0.5 : bucket;
 }
-function nextHalfDecadeBound(lower) {
-  const exp = Math.floor(Math.log10(lower) + 1e-9);
-  const base = 10 ** exp;
-  return lower === base ? base * 3 : base * 10;
-}
-// Whole numbers as-is; large ones with a k/M suffix (same readability idea as fmt.ct's
-// toLocaleString); sub-1 ones (only ever reached by playtime, which has real data down to a few
-// minutes) kept as a short decimal instead of rounding away to a misleading "0".
-function formatMagnitude(n) {
-  if (n >= 1e6) return `${+(n / 1e6).toFixed(1)}M`;
-  if (n >= 1e3) return `${+(n / 1e3).toFixed(1)}K`;
-  if (n > 0 && n < 1) return String(+n.toFixed(2));
-  return String(Math.round(n));
-}
-function formatHalfDecadeBucket(unit, zeroLabel, subOneLabel = `<1${unit}`) {
+function formatHalfDecadeBucket(unit, zeroLabel) {
+  const formatBucket = formatLogRange(LOG_BUCKET_OPTS, unit);
   return keyPart => {
-    const lower = Number(keyPart);
-    if (lower === 0) return zeroLabel;
-    if (lower === 0.5) return subOneLabel;
-    return `${formatMagnitude(lower)}–${formatMagnitude(nextHalfDecadeBound(lower))}${unit}`;
+    const n = Number(keyPart);
+    if (n === 0) return zeroLabel;
+    if (n === 0.5) return formatBucket(-Infinity); // core's own "<1{unit}" label for the sentinel
+    return formatBucket(keyPart);
   };
 }
 
@@ -507,36 +497,6 @@ const DEFAULT_VISIBLE = [
   'capsule', 'name', 'steamdbRating', 'hltbAll', 'playtime', 'releaseDate', 'genres',
 ];
 
-// Auto-sorts by whatever column was just added to Group by — grouping by a column and *not*
-// sorting by it leaves rows shuffled within each group in whatever order they happened to load
-// in, which is rarely what someone grouping by, say, Released actually wants (games within each
-// year in release order, not a random one). Only fires on a genuine live "user clicked a column
-// in the Group menu" interaction, not on a restored view (URL load, back/forward, "Reset view")
-// that happens to include a group — those all replace many `TableViewState` fields (sorts,
-// filters, visibleCols, page, ...) in one `setViewState` call, whereas toggling one column in the
-// Group menu touches only `groupBy` in isolation. `viewSignature` (below) captures every field
-// *except* the two this function itself cares about, so an isolated groupBy-only change is
-// exactly the case where the "rest" signature comes out unchanged.
-function viewSignature(view) {
-  const { groupBy, sorts, ...rest } = view;
-  return JSON.stringify(rest);
-}
-function bindGroupBySort(table, columns) {
-  let prevView = table.getViewState();
-  return table.onViewChange(view => {
-    const prevGroupBy = prevView.groupBy ?? [];
-    const groupBy = view.groupBy ?? [];
-    const added = groupBy.filter(k => !prevGroupBy.includes(k));
-    const isIsolatedChange = viewSignature(view) === viewSignature(prevView);
-    prevView = view;
-    if (added.length !== 1 || !isIsolatedChange) return; // 0 added: removal or an unrelated change; >1 or a non-isolated change: a bulk restore, not a live click
-    const [key] = added;
-    if (view.sorts?.length === 1 && view.sorts[0].key === key) return; // already sorted by it
-    const col = columns.find(c => c.key === key);
-    table.setViewState({ ...view, sorts: [{ key, dir: col?.defaultSortDir ?? 'asc' }] });
-  });
-}
-
 // Applied via setViewState() after table creation and after "Reset view" — there's no
 // construction-time default-sort option, only defaultVisibleColumns (see README).
 const DEFAULT_SORT = [{ key: 'steamdbRating', dir: 'desc' }];
@@ -598,7 +558,6 @@ const tabWishlistBtn = document.getElementById('tab-wishlist');
 
 let table         = null;
 let unsyncView    = null;
-let unGroupSort   = null; // see bindGroupBySort above
 let rows          = [];
 let rowMap        = new Map();
 let total         = 0;
@@ -1190,7 +1149,6 @@ function resetTableState({ preserveGameParam = false } = {}) {
   if (isPanelOpen()) panelClose({ preserveUrl: preserveGameParam });
   clearRandomQueue(randomQueueKey());
   if (unsyncView) { unsyncView(); unsyncView = null; }
-  if (unGroupSort) { unGroupSort(); unGroupSort = null; }
   if (table) { table.destroy(); table = null; }
   rows = []; rowMap = new Map(); total = 0; loaded = 0;
   tableContainer.innerHTML = '';
@@ -1312,10 +1270,6 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
   });
   table.setViewState({ sorts: DEFAULT_SORT });
   unsyncView = syncViewToUrl(table);
-  // Bound after syncViewToUrl's own initial load (not before) so bindGroupBySort's starting
-  // snapshot already reflects a `?view=`-restored groupBy, if any — otherwise that restore
-  // would itself look like a live "just grouped by this" click and get its sort overridden.
-  unGroupSort = bindGroupBySort(table, COLUMNS);
   resetViewBtn.hidden = false;
 
   updateStatus();
@@ -1412,8 +1366,6 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
   });
   table.setViewState({ sorts: DEFAULT_SORT });
   unsyncView = syncViewToUrl(table, { paramName: 'wview' });
-  // See the matching comment in loadLibrary above.
-  unGroupSort = bindGroupBySort(table, WISHLIST_COLUMNS);
   resetViewBtn.hidden = false;
 
   updateStatus();
