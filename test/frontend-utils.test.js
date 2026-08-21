@@ -249,6 +249,10 @@ test('computeProductionTier: null for DLC/expansion appids, regardless of price'
   assert.equal(computeProductionTier({ isDlc: true, priceInitial: 5999, reviewsTotal: 1000000 }), null);
 });
 
+test('computeProductionTier: null for non-game content types (e.g. a soundtrack), regardless of price', () => {
+  assert.equal(computeProductionTier({ type: 'music', priceInitial: 5999, reviewsTotal: 1000000 }), null);
+});
+
 test('computeProductionTier: AAA at $50+ launch price, even with zero reviews (fresh release)', () => {
   assert.equal(computeProductionTier({ priceInitial: 5999, reviewsTotal: 0 }), 'AAA');
 });

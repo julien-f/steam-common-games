@@ -56,6 +56,20 @@ function protonDbValue(tier) {
   return tier.charAt(0).toUpperCase() + tier.slice(1);
 }
 
+// Friendly labels for Steam's raw appdetails `type` enum (see the `type` comment in
+// lib/steam.js's extractAppDetails) — backs the Type column below. `game` isn't listed:
+// applyDetailsEvent falls back to the raw string itself for any value not in this map, and
+// 'game' reads fine as-is capitalized... except it isn't capitalized raw, so it's listed too
+// for consistent casing. Values Steam is known to actually use for entries that can end up
+// owned/wishlisted (a soundtrack or artbook DLC, not just base games); `demo`/`advertising`
+// are here mostly for completeness — a free demo/ad appid isn't normally something a person
+// owns or wishlists in its own right.
+const TYPE_LABELS = {
+  game: 'Game', dlc: 'DLC', music: 'Soundtrack', video: 'Video',
+  series: 'Series', episode: 'Episode', mod: 'Mod', hardware: 'Hardware', demo: 'Demo',
+  advertising: 'Advertising',
+};
+
 // Worst-to-best ordering for the Production Tier column's `compare` below. `computeProductionTier`
 // (public/utils.js) already returns null for "not enough signal to guess" (DLC, or a priced game
 // with no price data) — `compareMissingLast` handles that the same way every other heuristic/
@@ -311,6 +325,14 @@ const COLUMNS = [
   // Parsed from Steam's `supported_languages` HTML string (see parseSupportedLanguages in
   // lib/steam.js) — same high-cardinality multi-value treatment as Tags/Developers/Publisher.
   { key: 'languages',        label: 'Languages',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' } },
+  // Steam's own content-type for this appid (see TYPE_LABELS above and the `type` comment in
+  // lib/steam.js's extractAppDetails) — the overwhelming majority of rows are 'Game', but a
+  // library/wishlist can genuinely contain soundtrack ('Soundtrack'), video, or DLC entries
+  // too. Hidden by default for exactly that reason (almost every row would show the same
+  // value), but groupable/filterable so a search can be narrowed to just base games, or
+  // audited for stray non-game entries. `null` ("Unknown") only when store metadata itself
+  // failed to load or Steam's response omitted the field.
+  { key: 'type',             label: 'Type',         groupable: true, format: v => v || 'Unknown' },
   // Estimated, not authoritative — see computeProductionTier's doc comment (public/utils.js)
   // and CLAUDE.md's AAA/AA/Indie section. The label spells out "(est.)" rather than relying on
   // a hover tooltip, since @vates/data-table-vanilla has no per-column header-tooltip option to
@@ -933,6 +955,14 @@ function applyDetailsEvent(row, event) {
   row.platforms         = event.meta?.platforms ?? [];
   row.languages         = event.meta?.languages ?? [];
   row.hasDemo           = event.demo != null;
+  // Steam's own content-type enum (`game`/`dlc`/`music`/`video`/`series`/`episode`/`mod`/
+  // `hardware`/`advertising`, or `null` if the store response omitted it — see the `type`
+  // comment in lib/steam.js's extractAppDetails). Mapped to a friendly label rather than
+  // shown as Steam's raw enum string; `TYPE_LABELS` below has the full mapping. `null` is its
+  // own bucket ("Unknown") rather than defaulting to "Game" — most rows really are games, but
+  // silently assuming that for the rare metadata-fetch failure would hide the difference
+  // between "we don't know" and "confirmed a game".
+  row.type              = TYPE_LABELS[event.meta?.type] ?? (event.meta?.type ? event.meta.type : null);
   // Heuristic, not fact — see computeProductionTier's own doc comment (public/utils.js) and
   // CLAUDE.md's AAA/AA/Indie section for what it's derived from and where it's known to be
   // wrong (cheap AAA remasters, prestige-priced small-studio sims, veteran-founded small
@@ -944,6 +974,7 @@ function applyDetailsEvent(row, event) {
     reviewsTotal: event.rating?.total ?? null,
     hasMetacritic: event.meta?.metacritic != null,
     isDlc:        event.meta?.fullgame != null,
+    type:         event.meta?.type ?? null,
   });
   row.loading           = false;
   row.details           = { rating: event.rating, hltb: event.hltb, meta: event.meta, tags: event.tags, demo: event.demo, protondb: event.protondb };

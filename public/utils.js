@@ -32,19 +32,27 @@ function computeSteamdbRating(positive, total) {
 // AAA/AA/Indie section for the tradeoffs and known misclassifications (cheap AAA
 // remasters/rereleases, prestige-priced small-studio sim games, veteran-founded small studios
 // with high polish — none of these have any data-side tell). Returns null, not a tier, when
-// there isn't enough signal to guess at all (DLC — `isDlc` — or a priced game with no price
-// data).
+// there isn't enough signal to guess at all (DLC/non-game entries — `isDlc`/`type` — or a
+// priced game with no price data).
 //
 // DLC/expansion appids are skipped outright rather than scored on their own price: a $10
 // expansion attached to a AAA base game would otherwise read as Indie. No parent-game lookup
 // is attempted (that would mean fetching the base game's own rating/meta just for this), so
-// DLC rows simply render blank in this column.
+// DLC rows simply render blank in this column. Same reasoning extends to Steam's other
+// non-game content types (see NON_GAME_TYPES below) — a soundtrack or video has no "budget
+// tier" at all, and `isDlc` (`fullgame != null`) alone doesn't catch those since they have no
+// base-game back-reference. `isDlc` is still checked independently of `type` as a belt-and-
+// suspenders fallback — `type` is only ever missing when Steam's response omits it entirely.
 const AAA_PRICE_CENTS = 5000; // $50+ launch price
 const AA_PRICE_CENTS = 2000;  // $20+ launch price — the AA/premium-indie overlap zone
 const AA_REVIEW_THRESHOLD = 20000;         // needed (alongside AA-band price) to clear "just an expensive indie game"
 const FREE_AAA_REVIEW_THRESHOLD = 200000;  // the only lever available for F2P titles, which have no price signal at all
-function computeProductionTier({ isFree, priceInitial, reviewsTotal, hasMetacritic, isDlc } = {}) {
-  if (isDlc) return null;
+// Steam's appdetails `type` field, values other than 'game' — see the `type` comment in
+// lib/steam.js's extractAppDetails. Shared with public/library.js's Type column so the two
+// don't drift into disagreeing about what counts as "not really a game".
+const NON_GAME_TYPES = new Set(['dlc', 'demo', 'music', 'video', 'series', 'episode', 'mod', 'hardware', 'advertising']);
+function computeProductionTier({ isFree, priceInitial, reviewsTotal, hasMetacritic, isDlc, type } = {}) {
+  if (isDlc || NON_GAME_TYPES.has(type)) return null;
   const reviews = reviewsTotal ?? 0;
   if (isFree) return reviews >= FREE_AAA_REVIEW_THRESHOLD ? 'AAA' : 'Indie';
   if (priceInitial == null) return null;
@@ -113,4 +121,4 @@ function renderExtraCell(game) {
   return h ? fmtH(h.extra) : '<span class="dim">—</span>';
 }
 
-if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier };
+if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier, NON_GAME_TYPES };

@@ -440,7 +440,7 @@ test('getAppDetails: dedupes genres/categories that share the same label but dif
 test('getAppDetails: handles missing optional fields with empty arrays', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
-  assert.deepEqual(await getAppDetails(400), { name: null, genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, comingSoon: false, metacritic: null, capsule: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg', banner: 'https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg', movies: [], screenshots: [], dlc: [], fullgame: null, website: null, achievementCount: null, platforms: [], languages: [], isFree: false, priceInitial: null });
+  assert.deepEqual(await getAppDetails(400), { name: null, type: null, genres: [], categories: [], developers: [], publishers: [], description: null, releaseDate: null, comingSoon: false, metacritic: null, capsule: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg', banner: 'https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg', movies: [], screenshots: [], dlc: [], fullgame: null, website: null, achievementCount: null, platforms: [], languages: [], isFree: false, priceInitial: null });
 });
 
 test('getAppDetails: requests the US region so price_overview is always USD', async (t) => {
@@ -507,6 +507,20 @@ test('getAppDetails: fullgame is null when absent (a base game, not DLC)', async
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
   const result = await getAppDetails(400);
   assert.equal(result.fullgame, null);
+});
+
+test('getAppDetails: extracts type', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, { type: 'music' }));
+  const result = await getAppDetails(400);
+  assert.equal(result.type, 'music');
+});
+
+test('getAppDetails: type is null when absent', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {}));
+  const result = await getAppDetails(400);
+  assert.equal(result.type, null);
 });
 
 test('getAppDetails: extracts website field', async (t) => {
