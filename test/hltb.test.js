@@ -148,7 +148,7 @@ test('getHLTB: returns completionist and all-playstyles hours when present', asy
   });
 
   const result = await getHLTB(1, 'Portal 2');
-  assert.deepEqual(result, { id: 7231, main: 9, extra: 14, completionist: 23, all: 11 });
+  assert.deepEqual(result, { id: 7231, main: 8.5, extra: 13.5, completionist: 22.5, all: 10.5 });
 });
 
 test('getHLTB: strips trademark symbols from query', async (t) => {
