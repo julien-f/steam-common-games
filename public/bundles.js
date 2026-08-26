@@ -354,6 +354,62 @@ const BUNDLES_PAGE_SIZE = 20;
 let bundles = [];
 let activeBundleId = null;
 
+// `rows`/`rowMap` hold long-lived, mutated-in-place row objects — every other consumer
+// (the panel, achievements cache, prev/next-style lookups) wants that stable identity, and
+// panel.js in particular re-renders by reading fields straight off whatever object `panelOpen`
+// was called with, so it MUST stay the same reference across a refresh. `@vates/data-table-
+// vanilla`'s `setData`, however, only re-renders a row's cells when the object at its rowKey is
+// a genuinely new reference — a mutated-but-identity-unchanged row that was already visible in
+// a previous `setData` call is not detected as changed and its cells go stale (confirmed live:
+// `loadPrices` correctly writes `row.steamRegular`/etc., but a row already made visible by
+// `streamGameDetails` before `loadPrices` resolves — the common case once everything is
+// cache-warm and both fire near-instantly — never shows it, even though the row object itself
+// is provably correct).
+//
+// `tableRowCache` (appid → the last copy actually handed to the table) is what makes the fix
+// targeted rather than blanket: `visibleRowsForTable()` reuses a row's cached copy verbatim
+// unless `markRowChanged` was called for it since the last render, in which case a fresh copy
+// is made. A naive "copy every visible row on every setData call" version of this fix (an
+// earlier draft) technically worked but was wrong: it forced the table to re-render every
+// visible row's cells on every single event during streaming, not just the one that changed.
+//
+// The table's own click handler only ever has a `tableRowCache` copy to hand back, never
+// `rowMap`'s canonical object — a row-copy that's discarded and remade every render (the naive
+// version) would mean the panel silently opens a *different* copy each time, going stale the
+// next time anything about that row streams in after the panel's already open. `onRowClick`
+// below looks the canonical row back up by appid before opening it specifically to avoid that —
+// so `applyDetailsEvent`/`markRowChanged` in `onRefresh` mutate the same object `rowMap` does,
+// not a disconnected copy. Reusing the cached copy (rather than remaking it every render) is
+// what makes that lookup meaningful across renders — a copy that's stable until something
+// actually changes matches `rowMap`'s own object closely enough that identity bugs like this
+// only need the one `onRowClick` guard, not a guard at every call site that reads a row back
+// from the table.
+//
+// EVERY mutation site must call `markRowChanged` right after mutating, including
+// `streamGameDetails`'s own first-time reveal of a row — not just `loadPrices`/`onRefresh`,
+// which touch an already-visible row. `visibleRowsForTable`'s "no cache entry yet" fallback
+// below looks like it would cover a fresh reveal on its own, but `loadPrices` and
+// `streamGameDetails` run concurrently (`Promise.all` in `openBundle`), and on a cache-warm
+// bundle `loadPrices` (one cheap batched ITAD call) routinely resolves *before*
+// `streamGameDetails` (several real per-game Steam/HLTB calls) reveals that same row — its
+// `markRowChanged` call fires first and creates a cache entry from the row's still-`loading`
+// state, so by the time `streamGameDetails` later flips it visible, `tableRowCache` already
+// "has" an entry and the fallback never fires, permanently stuck on that premature snapshot.
+// Confirmed live exactly this way. Calling `markRowChanged` unconditionally after every mutation
+// removes the ordering dependency entirely — the fallback below only exists as a defensive
+// backstop for a row that somehow becomes visible with no mutator having called it.
+let tableRowCache = new Map();
+function markRowChanged(appid) {
+  const row = rowMap.get(appid);
+  if (row) tableRowCache.set(appid, { ...row });
+}
+function visibleRowsForTable() {
+  return rows.filter(r => !r.loading).map(r => {
+    if (!tableRowCache.has(r.appid)) tableRowCache.set(r.appid, { ...r }); // first reveal
+    return tableRowCache.get(r.appid);
+  });
+}
+
 initPanel({
   inertSelector: '.bundles-page',
   showAchievements: true,
@@ -363,7 +419,8 @@ initPanel({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Refresh failed');
       applyDetailsEvent(row, data);
-      if (table) table.setData(rows.filter(r => !r.loading));
+      markRowChanged(row.appid);
+      if (table) table.setData(visibleRowsForTable());
       await loadAchievements(row, { force: true });
     } catch (err) {
       detailStatusEl.textContent = `Refresh failed: ${err.message}`;
@@ -571,13 +628,14 @@ async function streamGameDetails(appids) {
       const row = rowMap.get(event.appid);
       if (!row) continue;
       applyDetailsEvent(row, event);
+      markRowChanged(row.appid);
       if (isPanelOpen() && getPanelGame()?.appid === row.appid) renderPanelBody(row);
       loaded++;
-      if (table) table.setData(rows.filter(r => !r.loading));
+      if (table) table.setData(visibleRowsForTable());
       detailStatusEl.textContent = `${loaded} / ${appids.length} games loaded…`;
     }
   }
-  if (table) table.setData(rows.filter(r => !r.loading));
+  if (table) table.setData(visibleRowsForTable());
   detailStatusEl.textContent = `${rows.length} games`;
 }
 
@@ -656,6 +714,7 @@ async function loadPrices(resolved) {
       // null) — backfill from whichever price figure actually came with one, so the render
       // functions above still know what to format the other columns in.
       if (!row.currency) row.currency = info.steamRegular?.currency ?? info.lowAll?.currency ?? null;
+      markRowChanged(g.appid);
     }
   } catch (err) {
     console.warn('[bundles] price lookup failed:', err.message);
@@ -672,10 +731,11 @@ async function loadPrices(resolved) {
       if (row.lowAll        === undefined) row.lowAll        = null;
       if (row.lowY1          === undefined) row.lowY1          = null;
       if (row.lowM3          === undefined) row.lowM3          = null;
+      markRowChanged(g.appid);
     }
     priceStatusEl.textContent = `Couldn't load Steam pricing (${err.message}) — other columns are unaffected.`;
   } finally {
-    if (table) table.setData(rows.filter(r => !r.loading));
+    if (table) table.setData(visibleRowsForTable());
   }
 }
 
@@ -698,6 +758,7 @@ async function openBundle(bundle) {
   tableContainer.innerHTML = '';
   rows = [];
   rowMap = new Map();
+  tableRowCache = new Map();
 
   const games = flattenBundleGames(bundle);
 
@@ -754,7 +815,13 @@ async function openBundle(bundle) {
     rowKey: 'appid',
     defaultPageSize: 50,
     defaultVisibleColumns: DEFAULT_VISIBLE,
-    onRowClick: row => openGame(row),
+    // The table's own click handler hands back whatever object is currently in
+    // `tableRowCache` for this row — a copy, not `rowMap`'s canonical one (see
+    // `visibleRowsForTable`'s comment above). Looking the canonical row back up by appid
+    // before opening it means the panel (and anything that mutates whatever object it opened,
+    // like `onRefresh` below) always operates on the same object `rowMap` does, not a
+    // disconnected copy that further updates would silently stop reaching.
+    onRowClick: row => openGame(rowMap.get(row.appid) ?? row),
   });
   table.setViewState({ sorts: DEFAULT_SORT });
 
