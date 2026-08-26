@@ -982,3 +982,126 @@ test('GET /api/achievements/abc: 400 for non-numeric appid', async () => {
   const res = await api.get('/api/achievements/abc');
   assert.equal(res.status, 400);
 });
+
+// ── GET /api/bundles, POST /api/bundles/resolve ──────────────────────────────
+
+test('GET /api/bundles: 503 when ITAD_API_KEY is not configured', async () => {
+  const prev = process.env.ITAD_API_KEY;
+  delete process.env.ITAD_API_KEY;
+  try {
+    const res = await api.get('/api/bundles');
+    assert.equal(res.status, 503);
+  } finally {
+    if (prev !== undefined) process.env.ITAD_API_KEY = prev;
+  }
+});
+
+test('POST /api/bundles/resolve: 503 when ITAD_API_KEY is not configured', async () => {
+  const prev = process.env.ITAD_API_KEY;
+  delete process.env.ITAD_API_KEY;
+  try {
+    const res = await api.post('/api/bundles/resolve').send({ gids: ['a'] });
+    assert.equal(res.status, 503);
+  } finally {
+    if (prev !== undefined) process.env.ITAD_API_KEY = prev;
+  }
+});
+
+test('GET /api/bundles: 200 with bundle list, defaults applied', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  const bundles = [{ id: 1, title: 'Test Bundle' }];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    assert.match(url, /\/bundles\/v1\?/);
+    assert.match(url, /country=US/);
+    assert.match(url, /offset=0/);
+    assert.match(url, /limit=20/);
+    return { ok: true, json: async () => bundles };
+  });
+  const res = await api.get('/api/bundles');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { bundles, offset: 0, limit: 20 });
+});
+
+test('GET /api/bundles: clamps limit and validates country', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    assert.match(url, /country=US/); // invalid country falls back to default
+    assert.match(url, /limit=50/);   // clamped from 999
+    return { ok: true, json: async () => [] };
+  });
+  const res = await api.get('/api/bundles?country=usa&limit=999');
+  assert.equal(res.status, 200);
+});
+
+test('GET /api/bundles: 502 when the upstream call fails', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
+  const res = await api.get('/api/bundles');
+  assert.equal(res.status, 502);
+});
+
+test('POST /api/bundles/resolve: 400 without gids', async () => {
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  const res = await api.post('/api/bundles/resolve').send({});
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/bundles/resolve: 200 with resolved appids map', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  t.mock.method(globalThis, 'fetch', async (url, opts) => {
+    if (String(url).includes('/service/shops/')) return { ok: true, json: async () => [{ id: 61, title: 'Steam' }] };
+    const gids = JSON.parse(opts.body);
+    const body = Object.fromEntries(gids.map(g => [g, g === 'gid-1' ? ['app/400'] : null]));
+    return { ok: true, json: async () => body };
+  });
+  const res = await api.post('/api/bundles/resolve').send({ gids: ['gid-1', 'gid-2'] });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { appids: { 'gid-1': 400, 'gid-2': null } });
+});
+
+test('POST /api/bundles/prices: 503 when ITAD_API_KEY is not configured', async () => {
+  const prev = process.env.ITAD_API_KEY;
+  delete process.env.ITAD_API_KEY;
+  try {
+    const res = await api.post('/api/bundles/prices').send({ gids: ['a'] });
+    assert.equal(res.status, 503);
+  } finally {
+    if (prev !== undefined) process.env.ITAD_API_KEY = prev;
+  }
+});
+
+test('POST /api/bundles/prices: 400 without gids', async () => {
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  const res = await api.post('/api/bundles/prices').send({});
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/bundles/prices: 200 with Steam regular price and historical lows', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url).includes('/service/shops/')) return { ok: true, json: async () => [{ id: 61, title: 'Steam' }] };
+    if (String(url).includes('/games/prices/v3')) {
+      return {
+        ok: true, json: async () => [{
+          id: 'gid-1',
+          historyLow: { all: { amount: 1, amountInt: 100, currency: 'USD' }, y1: null, m3: null },
+          deals: [{ shop: { id: 61, name: 'Steam' }, regular: { amount: 20, amountInt: 2000, currency: 'USD' } }],
+        }],
+      };
+    }
+    return { ok: false, status: 500 };
+  });
+  const res = await api.post('/api/bundles/prices?country=US').send({ gids: ['gid-1'] });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.prices['gid-1'], {
+    steamRegular: { amount: 20, amountInt: 2000, currency: 'USD' },
+    lowAll: { amount: 1, amountInt: 100, currency: 'USD' },
+    lowY1: null,
+    lowM3: null,
+  });
+});

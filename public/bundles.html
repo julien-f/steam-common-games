@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bundles — Steam Common Games</title>
+<script type="importmap">
+{
+  "imports": {
+    "@vates/data-table-core": "/vendor/data-table-core/index.js",
+    "@vates/data-table-core/locales": "/vendor/data-table-core/locales.js",
+    "@vates/data-table-core/theme": "/vendor/data-table-core/theme.js",
+    "@vates/data-table-vanilla": "/vendor/data-table-vanilla/data-table-vanilla.js"
+  }
+}
+</script>
+<link rel="stylesheet" href="/style.css">
+<style>
+  /* Same wider container as library.html, for the same reason — the data table needs room. */
+  .bundles-page { max-width: 1600px; margin: 0 auto; padding: 36px 20px 60px; }
+
+  .bundles-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+  .bundles-controls select {
+    padding: 8px 10px;
+    background: var(--bg3); color: var(--text0);
+    border: 1px solid var(--border); border-radius: var(--r);
+    font-size: 13px;
+  }
+  .bundles-controls label { font-size: 13px; color: var(--text1); display: flex; align-items: center; gap: 6px; }
+  .bundles-list-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  .bundles-status { font-size: 13px; color: var(--text1); min-height: 18px; }
+
+  /* Bounded + scrollable rather than growing with however many bundles are loaded — a full-
+     length list otherwise pushes the actual content (a bundle's game table) far down the page.
+     #bundle-list-wrap also collapses entirely (see .collapsed below) once a bundle's been
+     picked, since the list itself stops being the focus at that point. */
+  .bundle-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; margin-bottom: 10px; padding-right: 2px; }
+  #bundle-list-wrap.collapsed { display: none; }
+  .bundle-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 8px 12px;
+    background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r);
+    cursor: pointer; text-align: left;
+  }
+  .bundle-item:hover, .bundle-item[aria-current="true"] { border-color: var(--accent); }
+  .bundle-item[aria-current="true"] { background: var(--bg3); }
+  .bundle-item-title { font-weight: 600; color: var(--text0); flex: 1; min-width: 200px; }
+  .bundle-item-shop { color: var(--text1); font-size: 13px; min-width: 100px; }
+  .bundle-item-price { color: var(--accent2); font-size: 13px; font-weight: 600; min-width: 80px; }
+  .bundle-item-count { color: var(--text2); font-size: 12px; min-width: 70px; }
+  .bundle-item-expiry { color: var(--text2); font-size: 12px; }
+
+  .bundle-detail { margin-top: 8px; }
+  .bundle-detail-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .bundle-detail-title { font-size: 18px; font-weight: 700; color: var(--text0); }
+  .bundle-detail-meta { font-size: 13px; color: var(--text1); }
+  .bundle-detail-links { display: flex; gap: 8px; flex-wrap: wrap; }
+  .bundle-detail-links a { text-decoration: none; }
+
+  .unresolved-section { margin-top: 24px; }
+  .unresolved-list { display: flex; flex-wrap: wrap; gap: 10px; }
+  .unresolved-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px;
+    background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r);
+    color: var(--text1); font-size: 13px; max-width: 320px;
+  }
+  .unresolved-item img { width: 60px; height: 22px; object-fit: cover; border-radius: 2px; flex-shrink: 0; }
+  .unresolved-item-title { color: var(--text0); }
+  .unresolved-item-type { color: var(--text2); font-size: 11px; }
+
+  #table-container {
+    --color-background-primary:   #17212b;
+    --color-background-secondary: #2a475e;
+    --color-text-primary:         #c6d4df;
+    --color-text-secondary:       #8f98a0;
+    --color-text-tertiary:        #4c6b8a;
+    --color-border-secondary:     #3d5068;
+    --color-border-tertiary:      #2a3f57;
+    --color-background-info:      #0d2640;
+    --color-text-info:            #66c0f4;
+    --color-border-info:          #1a4070;
+    --color-background-warning:   #2a1900;
+    --color-text-warning:         #e8a040;
+    --color-border-warning:       #4a2c00;
+  }
+  #table-container .dt-th { background: #0f1923 !important; }
+</style>
+</head>
+<body>
+<div class="bundles-page">
+
+  <header>
+    <a class="header-nav-link left" href="/">← Comparison tool</a>
+    <a class="header-nav-link right" href="/library.html">Library Explorer →</a>
+    <h1>Bundles</h1>
+    <p>Browse current Steam game bundles from IsThereAnyDeal, with the same ratings/HLTB/tags table as the Library Explorer</p>
+  </header>
+
+  <div class="card" id="not-configured-card" hidden>
+    <p>The Bundles page needs an IsThereAnyDeal API key. Set <code>ITAD_API_KEY</code> in your <code>.env</code> file (register a free key at
+      <a href="https://isthereanydeal.com/apps/my/" target="_blank" rel="noopener">isthereanydeal.com</a>) and restart the server.</p>
+  </div>
+
+  <div class="card" id="browse-card">
+    <div class="bundles-controls">
+      <label>Region
+        <select id="country-select"></select>
+      </label>
+      <label>Sort
+        <select id="sort-select">
+          <option value="-publish">Newest</option>
+          <option value="-cut">Best discount</option>
+          <option value="-count">Most games</option>
+          <option value="expiry">Ending soon</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="expired-checkbox"> Include expired</label>
+    </div>
+    <p class="card-subtitle">Prices are shown in whatever currency each store actually charges for that bundle — most stores follow the region above, but some (e.g. certain Fanatical/Digiphile bundles) only ever price in USD regardless of region.</p>
+    <div class="bundles-list-header">
+      <div id="bundles-status" class="bundles-status"></div>
+      <button class="btn btn-ghost btn-sm" id="toggle-list-btn" hidden>Show list</button>
+    </div>
+    <div id="bundle-list-wrap">
+      <div id="bundle-list" class="bundle-list"></div>
+      <button class="btn btn-ghost btn-sm" id="load-more-btn" hidden>Load more</button>
+    </div>
+  </div>
+
+  <div class="card bundle-detail" id="detail-card" hidden>
+    <div class="bundle-detail-header">
+      <div>
+        <div class="bundle-detail-title" id="detail-title"></div>
+        <div class="bundle-detail-meta" id="detail-meta"></div>
+      </div>
+      <div class="bundle-detail-links" id="detail-links"></div>
+    </div>
+    <div id="detail-status" class="bundles-status"></div>
+    <div id="table-container"></div>
+    <div class="unresolved-section" id="unresolved-section" hidden>
+      <h2>Not on Steam</h2>
+      <p class="card-subtitle">Included in this bundle but not resolved to a Steam listing — other-shop-only, DRM-free, or ITAD has no mapping yet.</p>
+      <div class="unresolved-list" id="unresolved-list"></div>
+    </div>
+  </div>
+
+</div>
+
+<footer class="site-footer"><a href="/" class="footer-link">Comparison tool</a> &nbsp;·&nbsp; <a href="/library.html" class="footer-link">Library Explorer</a> &nbsp;·&nbsp; <a href="/about.html" class="footer-link">About &amp; data sources</a></footer>
+
+<div id="panel-backdrop" class="panel-backdrop"></div>
+<div id="game-panel" class="game-panel" role="dialog" aria-modal="true" aria-labelledby="panel-title">
+  <button id="panel-close" class="panel-close" aria-label="Close">×</button>
+  <div id="panel-nav" class="panel-nav"></div>
+  <div id="panel-body" class="panel-body"></div>
+</div>
+
+<script src="/hls.min.js"></script>
+<script src="/mediaItems.js"></script>
+<script src="/urlState.js"></script>
+<script src="/utils.js"></script>
+<script src="/lightbox.js"></script>
+<script src="/panel.js"></script>
+<script type="module" src="/bundles.js"></script>
+</body>
+</html>

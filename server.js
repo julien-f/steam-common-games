@@ -14,6 +14,7 @@ const { createDedup } = require('./lib/dedup');
 const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
+const { getBundles, resolveSteamAppIds, getSteamShopId, getPrices, extractPriceInfo } = require('./lib/itad');
 
 const HOST = process.env.HOST;
 const PORT = process.env.PORT;
@@ -24,6 +25,10 @@ const DETAILS_RATE_LIMIT_MAX = Number(process.env.DETAILS_RATE_LIMIT_MAX);
 const GAME_SEARCH_RATE_LIMIT_MAX = Number(process.env.GAME_SEARCH_RATE_LIMIT_MAX);
 const ACHIEVEMENTS_RATE_LIMIT_MAX = Number(process.env.ACHIEVEMENTS_RATE_LIMIT_MAX);
 const STREAM_MAX_GAMES = Number(process.env.STREAM_MAX_GAMES);
+const BUNDLES_RATE_LIMIT_MAX = Number(process.env.BUNDLES_RATE_LIMIT_MAX);
+// Optional feature — see ITAD_API_KEY's comment in default.env. Checked once here rather than
+// duplicated across every /api/bundles* route handler.
+const isItadConfigured = () => !!process.env.ITAD_API_KEY;
 
 // Rate limiting is bypassed under NODE_ENV=test so the suite isn't throttled,
 // unless a test opts in with RATE_LIMIT_ENABLED=true to exercise the limiter.
@@ -160,7 +165,19 @@ const achievementsLimit = rateLimit({
 });
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, configured: !!process.env.STEAM_API_KEY, cache: getCacheStats() });
+  res.json({ ok: true, configured: !!process.env.STEAM_API_KEY, itadConfigured: isItadConfigured(), cache: getCacheStats() });
+});
+
+// Browsing the bundle list and resolving a bundle's games to Steam appids — each distinct
+// combination of params/gids only ever costs one upstream call (repeats hit the cache), same
+// reasoning as gameSearchLimit above.
+const bundlesLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: BUNDLES_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please wait a minute and try again.' },
+  skip: () => rateLimitBypassed(),
 });
 
 app.post('/api/common-games', searchLimit, async (req, res) => {
@@ -371,6 +388,81 @@ app.get('/api/search-games', gameSearchLimit, async (req, res) => {
     res.json({ results });
   } catch (err) {
     const status = routeErrorStatus('search-games', err);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+// Backs the Bundles page's bundle list — a thin, cached proxy over ITAD's GET /bundles/v1.
+// See lib/itad.js and CLAUDE.md for the upstream API and caching notes.
+app.get('/api/bundles', bundlesLimit, async (req, res) => {
+  if (!isItadConfigured()) {
+    return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
+  }
+  const country = /^[A-Za-z]{2}$/.test(req.query.country || '') ? req.query.country.toUpperCase() : 'US';
+  const offset = Math.max(0, Number(req.query.offset) || 0);
+  const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+  const sort = typeof req.query.sort === 'string' && req.query.sort ? req.query.sort : '-publish';
+  const expired = req.query.expired === '1' || req.query.expired === 'true';
+  try {
+    const bundles = await getBundles({ country, offset, limit, sort, expired });
+    res.json({ bundles, offset, limit });
+  } catch (err) {
+    const status = routeErrorStatus('bundles', err);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+// Resolves a bundle's ITAD game ids (uuids, off tiers[].games[].id) to their Steam appid, so
+// the Bundles page can feed the resolved subset into the same GET /api/game-details/:appid /
+// POST /api/game-details/stream pipeline every other page already uses. Returns null for a
+// gid with no Steam listing — the frontend renders those as the separate "not on Steam" list.
+const MAX_BUNDLE_RESOLVE_GAMES = 500;
+app.post('/api/bundles/resolve', bundlesLimit, async (req, res) => {
+  if (!isItadConfigured()) {
+    return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
+  }
+  const gids = req.body.gids;
+  if (!Array.isArray(gids) || gids.length === 0 || !gids.every(g => typeof g === 'string' && g)) {
+    return res.status(400).json({ error: 'Provide at least one game id' });
+  }
+  if (gids.length > MAX_BUNDLE_RESOLVE_GAMES) {
+    return res.status(400).json({ error: `Too many games — maximum is ${MAX_BUNDLE_RESOLVE_GAMES}` });
+  }
+  try {
+    const resolved = await resolveSteamAppIds([...new Set(gids)]);
+    res.json({ appids: Object.fromEntries(resolved) });
+  } catch (err) {
+    const status = routeErrorStatus('bundles-resolve', err);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+// Steam's non-discounted regular price plus historical lows (all-time/1yr/3mo) for a bundle's
+// resolved games — a separate route from /api/bundles/resolve since it needs `country` (prices
+// are region-specific; appid resolution isn't) and isn't always wanted (e.g. before games have
+// even resolved to Steam). See lib/itad.js's getPrices/extractPriceInfo.
+app.post('/api/bundles/prices', bundlesLimit, async (req, res) => {
+  if (!isItadConfigured()) {
+    return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
+  }
+  const gids = req.body.gids;
+  if (!Array.isArray(gids) || gids.length === 0 || !gids.every(g => typeof g === 'string' && g)) {
+    return res.status(400).json({ error: 'Provide at least one game id' });
+  }
+  if (gids.length > MAX_BUNDLE_RESOLVE_GAMES) {
+    return res.status(400).json({ error: `Too many games — maximum is ${MAX_BUNDLE_RESOLVE_GAMES}` });
+  }
+  const country = /^[A-Za-z]{2}$/.test(req.query.country || '') ? req.query.country.toUpperCase() : 'US';
+  try {
+    const [shopId, prices] = await Promise.all([
+      getSteamShopId(),
+      getPrices([...new Set(gids)], { country }),
+    ]);
+    const out = {};
+    for (const [gid, entry] of prices) out[gid] = extractPriceInfo(entry, shopId);
+    res.json({ prices: out });
+  } catch (err) {
+    const status = routeErrorStatus('bundles-prices', err);
     res.status(status).json({ error: err.message });
   }
 });
