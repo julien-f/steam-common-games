@@ -1130,7 +1130,10 @@ test('POST /api/bundles/prices: 200 with Steam regular price and historical lows
         ok: true, json: async () => [{
           id: 'gid-1',
           historyLow: { all: { amount: 1, amountInt: 100, currency: 'USD' }, y1: null, m3: null },
-          deals: [{ shop: { id: 61, name: 'Steam' }, regular: { amount: 20, amountInt: 2000, currency: 'USD' } }],
+          deals: [
+            { shop: { id: 61, name: 'Steam' }, regular: { amount: 20, amountInt: 2000, currency: 'USD' }, price: { amount: 20, amountInt: 2000, currency: 'USD' } },
+            { shop: { id: 6, name: 'Fanatical' }, regular: { amount: 20, amountInt: 2000, currency: 'USD' }, price: { amount: 15, amountInt: 1500, currency: 'USD' } },
+          ],
         }],
       };
     }
@@ -1143,5 +1146,6 @@ test('POST /api/bundles/prices: 200 with Steam regular price and historical lows
     lowAll: { amount: 1, amountInt: 100, currency: 'USD' },
     lowY1: null,
     lowM3: null,
+    bestDeal: { price: { amount: 15, amountInt: 1500, currency: 'USD' }, shop: 'Fanatical' },
   });
 });

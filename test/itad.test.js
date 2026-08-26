@@ -138,8 +138,8 @@ const PRICE_ENTRY = {
     m3:  { amount: 9.99, amountInt: 999, currency: 'USD' },
   },
   deals: [
-    { shop: { id: 61, name: 'Steam' }, regular: { amount: 19.99, amountInt: 1999, currency: 'USD' } },
-    { shop: { id: 6, name: 'Fanatical' }, regular: { amount: 14.99, amountInt: 1499, currency: 'USD' } },
+    { shop: { id: 61, name: 'Steam' }, regular: { amount: 19.99, amountInt: 1999, currency: 'USD' }, price: { amount: 19.99, amountInt: 1999, currency: 'USD' } },
+    { shop: { id: 6, name: 'Fanatical' }, regular: { amount: 14.99, amountInt: 1499, currency: 'USD' }, price: { amount: 11.24, amountInt: 1124, currency: 'USD' } },
   ],
 };
 
@@ -176,8 +176,18 @@ test('extractPriceInfo: pulls Steam\'s regular price and the three historical lo
   assert.deepEqual(info.lowM3, PRICE_ENTRY.historyLow.m3);
 });
 
+test('extractPriceInfo: bestDeal picks the cheapest current price across every shop, Steam included', () => {
+  const info = extractPriceInfo(PRICE_ENTRY, 61);
+  assert.deepEqual(info.bestDeal, { price: { amount: 11.24, amountInt: 1124, currency: 'USD' }, shop: 'Fanatical' });
+});
+
+test('extractPriceInfo: bestDeal is null when no deal has a price', () => {
+  const noPrices = { ...PRICE_ENTRY, deals: PRICE_ENTRY.deals.map(({ price, ...d }) => d) };
+  assert.equal(extractPriceInfo(noPrices, 61).bestDeal, null);
+});
+
 test('extractPriceInfo: all fields null for a missing entry or a shop with no Steam deal', () => {
-  assert.deepEqual(extractPriceInfo(null, 61), { steamRegular: null, lowAll: null, lowY1: null, lowM3: null });
+  assert.deepEqual(extractPriceInfo(null, 61), { steamRegular: null, lowAll: null, lowY1: null, lowM3: null, bestDeal: null });
   const noSteam = { ...PRICE_ENTRY, deals: [PRICE_ENTRY.deals[1]] };
   assert.equal(extractPriceInfo(noSteam, 61).steamRegular, null);
 });

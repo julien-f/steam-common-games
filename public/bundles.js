@@ -195,6 +195,20 @@ function renderTierPrice(v, row) {
   return renderPrice(v, row);
 }
 
+// Best Deal shows the shop name alongside the price (e.g. "€11.24 · Fanatical") rather than
+// leaving it to the separate bestDealShop column alone — a price with no context for where it's
+// from is a lot less scannable than the same price everywhere else in this column set, which is
+// always implicitly "on Steam" or "this bundle's own price".
+function renderBestDeal(v, row) {
+  if (v === undefined) return document.createTextNode('…');
+  if (v == null) return document.createTextNode('—');
+  const priceNode = renderPrice(v, row);
+  if (!row.bestDealShop) return priceNode;
+  const span = document.createElement('span');
+  span.append(priceNode, document.createTextNode(` · ${row.bestDealShop}`));
+  return span;
+}
+
 const BUNDLE_COLUMNS = [
   // ── Identity ────────────────────────────────────────────────────────────────
   { key: 'capsule', label: '', width: 128, sortable: false, filterable: false, groupable: false,
@@ -219,6 +233,17 @@ const BUNDLE_COLUMNS = [
   // narrower-window lows (1yr/3mo) are hidden by default, same "secondary number" convention as
   // Wilson Score/Steam %/Achievements elsewhere in this column set.
   { key: 'steamRegular', label: 'Steam Price',    type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
+  // The cheapest *current* price across every shop ITAD tracks for this game (Steam included) —
+  // the "where do I actually buy this for less, right now" answer, as opposed to Steam Price
+  // (Steam's own non-discounted list price) or the historical lows below (what something has
+  // sold for at some point, not necessarily today). `bestDealShop` rides along on the same cell
+  // (`renderBestDeal`) rather than getting its own visible-by-default column — the price is the
+  // number worth sorting/scanning by; the shop name is context for it, not a separate axis
+  // someone would sort a whole table by on its own. Still a real, independent column
+  // (`bestDealShop`, hidden by default) for anyone who *does* want to group/filter by "which
+  // shop currently has the best price across this bundle's games".
+  { key: 'bestDealPrice', label: 'Best Deal',     type: 'number', groupable: false, format: fmt.num, render: renderBestDeal, compare: compareNumMissingLast, defaultSortDir: 'asc' },
+  { key: 'bestDealShop',   label: 'Best Deal Shop', groupable: true, format: fmt.str },
   { key: 'lowAll',        label: 'All-Time Low',  type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
   { key: 'lowY1',          label: '1yr Low',      type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
   { key: 'lowM3',          label: '3mo Low',      type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
@@ -269,7 +294,7 @@ const BUNDLE_COLUMNS = [
   { key: 'dlcCount',         label: 'DLC Count',    type: 'number', groupable: true, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'desc' },
 ];
 
-const DEFAULT_VISIBLE = ['capsule', 'name', 'tierPrice', 'steamRegular', 'lowAll', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
+const DEFAULT_VISIBLE = ['capsule', 'name', 'tierPrice', 'steamRegular', 'bestDealPrice', 'lowAll', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
 const DEFAULT_SORT = [{ key: 'tierPrice', dir: 'asc' }];
 
 // ── Region picker ───────────────────────────────────────────────────────────
@@ -707,13 +732,15 @@ async function loadPrices(resolved) {
       const info = data.prices[g.gid];
       if (!row || !info) continue;
       row.steamRegular = info.steamRegular?.amount ?? null;
+      row.bestDealPrice = info.bestDeal?.price?.amount ?? null;
+      row.bestDealShop   = info.bestDeal?.shop          ?? null;
       row.lowAll        = info.lowAll?.amount        ?? null;
       row.lowY1          = info.lowY1?.amount          ?? null;
       row.lowM3          = info.lowM3?.amount          ?? null;
       // A free/pay-what-you-want tier has no currency of its own (tierPrice/currency both
       // null) — backfill from whichever price figure actually came with one, so the render
       // functions above still know what to format the other columns in.
-      if (!row.currency) row.currency = info.steamRegular?.currency ?? info.lowAll?.currency ?? null;
+      if (!row.currency) row.currency = info.steamRegular?.currency ?? info.bestDeal?.price?.currency ?? info.lowAll?.currency ?? null;
       markRowChanged(g.appid);
     }
   } catch (err) {
@@ -728,6 +755,8 @@ async function loadPrices(resolved) {
       const row = rowMap.get(g.appid);
       if (!row) continue;
       if (row.steamRegular === undefined) row.steamRegular = null;
+      if (row.bestDealPrice === undefined) row.bestDealPrice = null;
+      if (row.bestDealShop   === undefined) row.bestDealShop   = null;
       if (row.lowAll        === undefined) row.lowAll        = null;
       if (row.lowY1          === undefined) row.lowY1          = null;
       if (row.lowM3          === undefined) row.lowM3          = null;
@@ -798,7 +827,8 @@ async function openBundle(bundle) {
     tierPrice: g.tierPrice,
     currency: g.tierCurrency, // backfilled by loadPrices if the tier itself was free (no currency of its own)
     addon: g.addon,
-    steamRegular: undefined, lowAll: undefined, lowY1: undefined, lowM3: undefined,
+    steamRegular: undefined, bestDealPrice: undefined, bestDealShop: undefined,
+    lowAll: undefined, lowY1: undefined, lowM3: undefined,
     capsule: undefined, score: undefined, positivePct: undefined, steamdbRating: undefined,
     reviewsTotal: undefined, hltbMain: undefined, hltbExtra: undefined, hltbCompletionist: undefined,
     hltbAll: undefined, metacritic: undefined, releaseDate: undefined, genres: undefined,
