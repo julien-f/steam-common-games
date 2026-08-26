@@ -1,6 +1,6 @@
 'use strict';
 
-import { createDataTable } from '@vates/data-table-vanilla';
+import { createDataTable, persistViewToLocalStorage, resetView } from '@vates/data-table-vanilla';
 import {
   processData, searchData, DEFAULT_LABELS, compareMissingLast,
   bucketNumericRange, bucketDatePart, formatNumericRange, formatDatePart,
@@ -348,6 +348,7 @@ const detailMetaEl       = document.getElementById('detail-meta');
 const detailLinksEl      = document.getElementById('detail-links');
 const detailStatusEl     = document.getElementById('detail-status');
 const priceStatusEl      = document.getElementById('price-status');
+const resetViewBtn       = document.getElementById('reset-view-btn');
 const tableContainer     = document.getElementById('table-container');
 const unresolvedSection  = document.getElementById('unresolved-section');
 const unresolvedListEl   = document.getElementById('unresolved-list');
@@ -371,7 +372,14 @@ function setListCollapsed(collapsed) {
 }
 toggleListBtn.addEventListener('click', () => setListCollapsed(!bundleListWrapEl.classList.contains('collapsed')));
 
+// One shared key rather than per-bundle — this is "how I like the table set up" (which
+// columns, sort, grouping), not something tied to any one bundle's own data, so it should
+// carry over from whichever bundle was open last to the next one, same as it would if this
+// page only ever showed a single table.
+const TABLE_VIEW_STORAGE_KEY = 'bundles:table-view';
+
 let table = null;
+let unpersistView = null;
 let rows = [];
 let rowMap = new Map();
 let bundlesOffset = 0;
@@ -783,8 +791,10 @@ async function openBundle(bundle) {
   unresolvedSection.hidden = true;
   unresolvedListEl.innerHTML = '';
 
+  if (unpersistView) { unpersistView(); unpersistView = null; }
   if (table) { table.destroy(); table = null; }
   tableContainer.innerHTML = '';
+  resetViewBtn.hidden = true;
   rows = [];
   rowMap = new Map();
   tableRowCache = new Map();
@@ -854,6 +864,11 @@ async function openBundle(bundle) {
     onRowClick: row => openGame(rowMap.get(row.appid) ?? row),
   });
   table.setViewState({ sorts: DEFAULT_SORT });
+  // Loads whatever was last persisted (if anything) on top of the default sort just applied
+  // above, and saves it back on every subsequent change — same "construction-time default,
+  // then let persistence override it" ordering `syncViewToUrl` uses in library.js.
+  unpersistView = persistViewToLocalStorage(table, TABLE_VIEW_STORAGE_KEY);
+  resetViewBtn.hidden = false;
 
   detailStatusEl.textContent = `0 / ${resolved.length} games loaded…`;
   // Independent calls — Steam pricing has nothing to do with the rating/HLTB/tags pipeline —
@@ -867,6 +882,15 @@ countrySelect.addEventListener('change', () => { updateCountryParam(); loadBundl
 sortSelect.addEventListener('change', () => loadBundles());
 expiredCheckbox.addEventListener('change', () => loadBundles());
 loadMoreBtn.addEventListener('click', () => loadBundles({ reset: false }));
+
+resetViewBtn.addEventListener('click', () => {
+  if (!table) return;
+  resetView(table, { storageKey: TABLE_VIEW_STORAGE_KEY });
+  // resetView() clears sorts to none along with everything else — reapply our own default
+  // sort on top, same as library.js's own reset-view button does (there's no construction-time
+  // option to make resetView itself preserve a non-empty default).
+  table.setViewState({ sorts: DEFAULT_SORT });
+});
 
 // `country` is the one durable, shareable piece of state this page writes to the URL — it
 // changes what data is actually shown (prices/currency), same reasoning as `sort`/`view` on
@@ -920,8 +944,10 @@ async function openBundleById(id) {
     detailStatusEl.textContent = err.message;
     priceStatusEl.textContent = '';
     unresolvedSection.hidden = true;
+    if (unpersistView) { unpersistView(); unpersistView = null; }
     if (table) { table.destroy(); table = null; }
     tableContainer.innerHTML = '';
+    resetViewBtn.hidden = true;
     setBundleParam(null);
   }
 }

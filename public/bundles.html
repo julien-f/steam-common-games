@@ -34,6 +34,7 @@
      space for their own always-present status text. */
   .price-status:empty { min-height: 0; }
   .price-status { color: #e4a82e; }
+  .bundles-status-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 
   /* Bounded + scrollable rather than growing with however many bundles are loaded — a full-
      length list otherwise pushes the actual content (a bundle's game table) far down the page.
@@ -141,8 +142,13 @@
       </div>
       <div class="bundle-detail-links" id="detail-links"></div>
     </div>
-    <div id="detail-status" class="bundles-status"></div>
-    <div id="price-status" class="bundles-status price-status"></div>
+    <div class="bundles-status-row">
+      <div>
+        <div id="detail-status" class="bundles-status"></div>
+        <div id="price-status" class="bundles-status price-status"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="reset-view-btn" hidden>Reset view</button>
+    </div>
     <div id="table-container"></div>
     <div class="unresolved-section" id="unresolved-section" hidden>
       <h2>Not on Steam</h2>
