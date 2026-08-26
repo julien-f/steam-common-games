@@ -38,6 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- HLTB lookups (`lib/hltb.js`) were failing with `HLTB auth unavailable`/`404` on every request — HowLongToBeat renamed its undocumented auth/search endpoints from `api/bleed/init`/`api/bleed` to `api/search/site/init`/`api/search/site`. Updated to the new paths (payload/header shape is unchanged).
 - HLTB times (`main`/`extra`/`completionist`/`all`, `lib/hltb.js`) are now rounded to the nearest **half** hour instead of a whole hour, matching the granularity HLTB's own site displays (e.g. "2½ Hours"). Previously the decimal shown in the Library Explorer's How Long To Beat columns and the side panel (e.g. "2.0h") was purely cosmetic formatting — the underlying value had already been rounded to a whole hour server-side, so the ".0"/".5" never reflected real precision.
 - Library Explorer: grouping by "Played (h)" sorted the "Not played" group between "1-3h" and "<1h" instead of last (when sorted most-to-least played) — the "<1h" bucket's sentinel value was `-1`, which is numerically *less* than the real-zero "Not played" bucket, so "played a little" ranked below "never played". Changed to `0.5` (strictly between the "Not played" bucket's `0` and the first real decade bucket's `1`), which keeps `0 < 0.5 < 1 < 3 < ...` correct in both sort directions.
 

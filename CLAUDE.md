@@ -60,8 +60,10 @@ Decision order: DLC/expansion appids (`meta.fullgame` set) and Steam's other non
 
 The `howlongtobeat` npm package was removed (it pulled in a vulnerable `axios`). HLTB is called directly with a two-step auth flow:
 
-1. `GET https://howlongtobeat.com/api/bleed/init?t={ms}` → returns `{ token, hpKey, hpVal }`
-2. `POST https://howlongtobeat.com/api/bleed` with `X-Auth-Token`, `X-Hp-Key`, `X-Hp-Val` headers and `{ [hpKey]: hpVal, ...payload }` in the body
+1. `GET https://howlongtobeat.com/api/search/site/init?t={ms}` → returns `{ token, hpKey, hpVal }`
+2. `POST https://howlongtobeat.com/api/search/site` with `X-Auth-Token`, `X-Hp-Key`, `X-Hp-Val` headers and `{ [hpKey]: hpVal, ...payload }` in the body
+
+(Previously `api/bleed/init` and `api/bleed` — HLTB renamed these endpoints; the `howlongtobeat-ts` npm package's source is what surfaced the new paths when the old ones started 404ing.)
 
 The token is cached in memory for 5 minutes (not on disk — it's session-bound). A 401/403 from the search endpoint clears the cache so the next call re-fetches. Match quality is checked via Levenshtein similarity; results below 0.35 are discarded.
 
@@ -69,7 +71,7 @@ The token is cached in memory for 5 minutes (not on disk — it's session-bound)
 
 If HLTB breaks again, recent npm packages (e.g. `howlongtobeat-ts`) tend to reverse-engineer the new flow quickly and are a good first place to look.
 
-**Compliance note:** `/api/bleed` is an undocumented, internal HLTB endpoint reached with spoofed browser `User-Agent`/`Referer` headers — this is not a published public API and isn't guaranteed to be sanctioned by HLTB's terms of service. Usage here is low-volume and non-commercial, but treat it as liable to break or be blocked without notice, and don't scale up request volume without revisiting this.
+**Compliance note:** `/api/search/site` is an undocumented, internal HLTB endpoint reached with spoofed browser `User-Agent`/`Referer` headers — this is not a published public API and isn't guaranteed to be sanctioned by HLTB's terms of service. Usage here is low-volume and non-commercial, but treat it as liable to break or be blocked without notice, and don't scale up request volume without revisiting this.
 
 ### Wishlist — undocumented endpoint
 
