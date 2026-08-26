@@ -9,6 +9,8 @@ process.env.NODE_ENV = 'test';
 process.env.RATE_LIMIT_ENABLED = 'true';
 process.env.DETAILS_RATE_LIMIT_MAX = '3';
 process.env.GAME_SEARCH_RATE_LIMIT_MAX = '2';
+process.env.ITAD_API_KEY = 'test-itad-key';
+process.env.BUNDLES_RATE_LIMIT_MAX = '2';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -38,8 +40,8 @@ function workingDetailsFetch(fetchedAppids) {
     if (url.includes('protondb.com')) {
       return { ok: true, json: async () => ({ tier: 'gold', confidence: 'strong', total: 500 }) };
     }
-    if (url.includes('bleed/init')) return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
-    if (url.includes('bleed'))      return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
+    if (url.includes('search/site/init')) return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
+    if (url.includes('search/site'))      return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
     throw new Error(`Unexpected fetch: ${url}`);
   };
 }
@@ -102,4 +104,53 @@ test('game search limiter: counts cache misses but never counts cache hits', asy
   const cached = await api.get('/api/search-games?q=cached term');
   assert.equal(cached.status, 200, 'a cache hit must bypass the limiter');
   assert.deepEqual(cached.body.results, [{ appid: 900, name: 'Pre-cached', tinyImage: null }]);
+});
+
+// Regression test for the bug reported live: reloading the Bundles page a handful of times (or
+// re-opening the same deep-linked bundle) used to burn the whole per-minute budget on requests
+// that never made an upstream call, since bundlesLimit's original skip() was just
+// rateLimitBypassed() — every request counted, cache hit or not (unlike every other limiter in
+// this file). GET /api/bundles/:id (bundlesByIdLimit) has no skip of its own — see its own
+// comment in server.js — so it isn't covered here.
+test('bundles list limiter: counts cache misses but never counts cache hits', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => [{ id: 1, title: 'Bundle' }] }));
+
+  setCache('itad-bundles:US:-publish:false:false:100:20', [{ id: 99, title: 'Pre-cached Page' }]);
+
+  // Two uncached pages consume the budget (max = 2).
+  for (const offset of [0, 20]) {
+    const res = await api.get(`/api/bundles?offset=${offset}`);
+    assert.equal(res.status, 200, `miss offset=${offset} should succeed within budget`);
+  }
+
+  const over = await api.get('/api/bundles?offset=40');
+  assert.equal(over.status, 429, 'a cache miss past the budget should be rate limited');
+
+  const cached = await api.get('/api/bundles?offset=100');
+  assert.equal(cached.status, 200, 'a cache hit must bypass the limiter');
+  assert.deepEqual(cached.body.bundles, [{ id: 99, title: 'Pre-cached Page' }]);
+});
+
+test('bundles resolve limiter: counts cache misses but never counts fully-cached gid batches', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url, opts) => {
+    if (String(url).includes('/service/shops/')) return { ok: true, json: async () => [{ id: 61, title: 'Steam' }] };
+    const gids = JSON.parse(opts.body);
+    return { ok: true, json: async () => Object.fromEntries(gids.map(g => [g, ['app/1']])) };
+  });
+
+  setCache('itad-appid:cached-gid', 555);
+
+  for (const gid of ['gid-a', 'gid-b']) {
+    const res = await api.post('/api/bundles/resolve').send({ gids: [gid] });
+    assert.equal(res.status, 200, `miss "${gid}" should succeed within budget`);
+  }
+
+  const over = await api.post('/api/bundles/resolve').send({ gids: ['gid-c'] });
+  assert.equal(over.status, 429, 'a cache miss past the budget should be rate limited');
+
+  const cached = await api.post('/api/bundles/resolve').send({ gids: ['cached-gid'] });
+  assert.equal(cached.status, 200, 'an all-cached gid batch must bypass the limiter');
+  assert.deepEqual(cached.body.appids, { 'cached-gid': 555 });
 });

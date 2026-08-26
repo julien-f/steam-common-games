@@ -7,7 +7,7 @@ process.env.ITAD_API_KEY = 'test-itad-key';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { getSteamShopId, getBundles, resolveSteamAppIds, getPrices, extractPriceInfo } = require('../lib/itad');
+const { getSteamShopId, getBundles, findBundleById, resolveSteamAppIds, getPrices, extractPriceInfo } = require('../lib/itad');
 const { _reset } = require('../lib/cache');
 
 const SHOPS = [
@@ -49,6 +49,42 @@ test('getBundles: returns and caches the bundle list', async (t) => {
   assert.equal(calls, 1, 'identical params should hit the cache');
   await getBundles({ country: 'DE', offset: 0, limit: 20 });
   assert.equal(calls, 2, 'a different country is a different cache key');
+});
+
+// Simulates paginated GET /bundles/v1 responses for findBundleById — `active`/`expired` are
+// flat arrays of bundle objects; each fetch slices out one 50-item page based on offset.
+function makeBundlesPager({ active = [], expired = [] } = {}) {
+  return async (url) => {
+    const u = new URL(url);
+    const isExpired = u.searchParams.get('expired') === 'true';
+    const offset = Number(u.searchParams.get('offset'));
+    const limit = Number(u.searchParams.get('limit'));
+    const source = isExpired ? expired : active;
+    return { ok: true, json: async () => source.slice(offset, offset + limit) };
+  };
+}
+
+test('findBundleById: finds a bundle on the first page of active bundles', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeBundlesPager({ active: [{ id: 42, title: 'Found Me' }] }));
+  const result = await findBundleById(42, { country: 'US' });
+  assert.equal(result?.title, 'Found Me');
+});
+
+test('findBundleById: pages through active bundles before falling back to expired ones', async (t) => {
+  _reset();
+  const page1 = Array.from({ length: 50 }, (_, i) => ({ id: i + 1, title: `Active ${i + 1}` }));
+  const target = { id: 999, title: 'Expired Target' };
+  t.mock.method(globalThis, 'fetch', makeBundlesPager({ active: page1, expired: [...page1, target] }));
+  const result = await findBundleById(999, { country: 'US' });
+  assert.equal(result?.title, 'Expired Target');
+});
+
+test('findBundleById: returns null when the id is never found within the search budget', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeBundlesPager({ active: [{ id: 1, title: 'Only Bundle' }] }));
+  const result = await findBundleById(999999, { country: 'US' });
+  assert.equal(result, null);
 });
 
 test('resolveSteamAppIds: resolves, caches, and treats a missing mapping as null', async (t) => {

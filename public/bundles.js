@@ -322,6 +322,7 @@ const detailTitleEl      = document.getElementById('detail-title');
 const detailMetaEl       = document.getElementById('detail-meta');
 const detailLinksEl      = document.getElementById('detail-links');
 const detailStatusEl     = document.getElementById('detail-status');
+const priceStatusEl      = document.getElementById('price-status');
 const tableContainer     = document.getElementById('table-container');
 const unresolvedSection  = document.getElementById('unresolved-section');
 const unresolvedListEl   = document.getElementById('unresolved-list');
@@ -633,6 +634,7 @@ function renderDetailLinks(bundle) {
 // `loading`) simply carry the price fields already set by the time they do appear; rows
 // already visible get a follow-up `table.setData` to pick the new columns up.
 async function loadPrices(resolved) {
+  priceStatusEl.textContent = '';
   try {
     const qs = new URLSearchParams({ country: countrySelect.value });
     const res = await fetch(`/api/bundles/prices?${qs}`, {
@@ -657,6 +659,21 @@ async function loadPrices(resolved) {
     }
   } catch (err) {
     console.warn('[bundles] price lookup failed:', err.message);
+    // Without this, a failed request (rate limited, transient upstream error) left every
+    // price-ish cell stuck on its "…" loading placeholder forever — indistinguishable from
+    // "still loading" and easy to mistake for a hung page rather than a failure. `null` here
+    // means "we tried and it didn't work", same as the "no data" state these columns already
+    // render for a genuinely missing price — and a status line makes the failure visible
+    // rather than only a console warning nobody but a developer would see.
+    for (const g of resolved) {
+      const row = rowMap.get(g.appid);
+      if (!row) continue;
+      if (row.steamRegular === undefined) row.steamRegular = null;
+      if (row.lowAll        === undefined) row.lowAll        = null;
+      if (row.lowY1          === undefined) row.lowY1          = null;
+      if (row.lowM3          === undefined) row.lowM3          = null;
+    }
+    priceStatusEl.textContent = `Couldn't load Steam pricing (${err.message}) — other columns are unaffected.`;
   } finally {
     if (table) table.setData(rows.filter(r => !r.loading));
   }
@@ -666,12 +683,14 @@ async function openBundle(bundle) {
   activeBundleId = bundle.id;
   renderBundleList();
   setListCollapsed(true);
+  setBundleParam(bundle.id);
 
   detailCard.hidden = false;
   detailTitleEl.textContent = bundle.title;
   detailMetaEl.textContent = `${bundle.page?.name || 'Unknown shop'} · ${bundle.counts?.games ?? '?'} games · ${fmtExpiry(bundle.expiry)}`;
   renderDetailLinks(bundle);
   detailStatusEl.textContent = 'Resolving games to Steam…';
+  priceStatusEl.textContent = '';
   unresolvedSection.hidden = true;
   unresolvedListEl.innerHTML = '';
 
@@ -769,6 +788,47 @@ function initCountry() {
   updateCountryParam();
 }
 
+// `?bundle=<id>` deep link — writes/clears the param while preserving everything else already
+// in the URL (country, in particular), same `replaceState`-preserving-other-params pattern as
+// updateCountryParam above. Not pushed — opening a different bundle isn't meant to be a
+// separate back/forward-navigable step (this page has no popstate listener at all, unlike
+// library.js/app.js), same as how `sort`/`view` elsewhere in this app are written.
+function setBundleParam(id) {
+  const params = new URLSearchParams(location.search);
+  if (id == null) params.delete('bundle');
+  else params.set('bundle', id);
+  history.replaceState(null, '', `?${params}`);
+}
+
+// There's no single-bundle-fetch endpoint upstream (see findBundleById's own comment in
+// lib/itad.js) — a deep link always goes straight to GET /api/bundles/:id (a bounded
+// server-side search) rather than trying to find the id in whatever's already loaded in
+// `bundles`, which may not even include it (a different sort/page, or not loaded yet at all on
+// initial page load — this runs concurrently with loadBundles(), not after it).
+async function openBundleById(id) {
+  try {
+    const qs = new URLSearchParams({ country: countrySelect.value });
+    const res = await fetch(`/api/bundles/${id}?${qs}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Bundle not found');
+    await openBundle(data.bundle);
+  } catch (err) {
+    // Same UI slot a normally-opened bundle would use — there's no other sensible place to
+    // surface "the bundle this link pointed at doesn't exist (anymore)". The invalid id is
+    // dropped from the URL so a refresh doesn't repeat the same failed lookup.
+    detailCard.hidden = false;
+    detailTitleEl.textContent = 'Bundle not found';
+    detailMetaEl.textContent = '';
+    detailLinksEl.innerHTML = '';
+    detailStatusEl.textContent = err.message;
+    priceStatusEl.textContent = '';
+    unresolvedSection.hidden = true;
+    if (table) { table.destroy(); table = null; }
+    tableContainer.innerHTML = '';
+    setBundleParam(null);
+  }
+}
+
 async function init() {
   try {
     const res = await fetch('/api/health');
@@ -780,7 +840,11 @@ async function init() {
     }
   } catch { /* if health itself fails, fall through and let loadBundles surface the real error */ }
   initCountry();
+  // Independent of each other — the deep link's own server-side search doesn't depend on
+  // whatever page of the list loadBundles happens to fetch.
+  const deepLinkId = Number(new URLSearchParams(location.search).get('bundle'));
   loadBundles();
+  if (Number.isInteger(deepLinkId) && deepLinkId > 0) openBundleById(deepLinkId);
 }
 
 init();

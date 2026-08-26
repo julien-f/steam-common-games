@@ -29,6 +29,11 @@
   .bundles-controls label { font-size: 13px; color: var(--text1); display: flex; align-items: center; gap: 6px; }
   .bundles-list-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
   .bundles-status { font-size: 13px; color: var(--text1); min-height: 18px; }
+  /* Only ever has content on a price-lookup failure (see loadPrices in bundles.js) — empty and
+     collapsed to 0 height the rest of the time, unlike .bundles-status siblings which reserve
+     space for their own always-present status text. */
+  .price-status:empty { min-height: 0; }
+  .price-status { color: #e4a82e; }
 
   /* Bounded + scrollable rather than growing with however many bundles are loaded — a full-
      length list otherwise pushes the actual content (a bundle's game table) far down the page.
@@ -137,6 +142,7 @@
       <div class="bundle-detail-links" id="detail-links"></div>
     </div>
     <div id="detail-status" class="bundles-status"></div>
+    <div id="price-status" class="bundles-status price-status"></div>
     <div id="table-container"></div>
     <div class="unresolved-section" id="unresolved-section" hidden>
       <h2>Not on Steam</h2>

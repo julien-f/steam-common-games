@@ -127,7 +127,7 @@ test('getHLTB: returns null without fetching when name is only stripped symbols'
 test('getHLTB: returns main and extra hours on match', async (t) => {
   _reset(); _resetAuth();
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('bleed/init')) return makeInitResponse();
+    if (url.includes('search/site/init')) return makeInitResponse();
     return makeSearchResponse([
       { game_id: 42, game_name: 'Portal 2', comp_main: 25200, comp_plus: 36000 }, // 7h, 10h
     ]);
@@ -140,7 +140,7 @@ test('getHLTB: returns main and extra hours on match', async (t) => {
 test('getHLTB: returns completionist and all-playstyles hours when present', async (t) => {
   _reset(); _resetAuth();
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('bleed/init')) return makeInitResponse();
+    if (url.includes('search/site/init')) return makeInitResponse();
     return makeSearchResponse([
       // 8.5h main, 13.7h extra, 22.6h completionist, 10.6h all-playstyles (Portal 2's real HLTB figures)
       { game_id: 7231, game_name: 'Portal 2', comp_main: 30726, comp_plus: 49475, comp_100: 81374, comp_all: 38161 },
@@ -155,7 +155,7 @@ test('getHLTB: strips trademark symbols from query', async (t) => {
   _reset(); _resetAuth();
   let capturedBody;
   t.mock.method(globalThis, 'fetch', async (url, opts) => {
-    if (url.includes('bleed/init')) return makeInitResponse();
+    if (url.includes('search/site/init')) return makeInitResponse();
     capturedBody = JSON.parse(opts.body);
     return makeSearchResponse([
       { game_name: 'Hades', comp_main: 36000, comp_plus: 72000 },
@@ -169,7 +169,7 @@ test('getHLTB: strips trademark symbols from query', async (t) => {
 test('getHLTB: returns null when best match is below 0.35 similarity', async (t) => {
   _reset(); _resetAuth();
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('bleed/init')) return makeInitResponse();
+    if (url.includes('search/site/init')) return makeInitResponse();
     return makeSearchResponse([
       { game_name: 'Zzzzz Totally Unrelated Game', comp_main: 3600, comp_plus: 7200 },
     ]);
@@ -182,7 +182,7 @@ test('getHLTB: returns null when best match is below 0.35 similarity', async (t)
 test('getHLTB: returns null when no results', async (t) => {
   _reset(); _resetAuth();
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('bleed/init')) return makeInitResponse();
+    if (url.includes('search/site/init')) return makeInitResponse();
     return makeSearchResponse([]);
   });
 
@@ -194,7 +194,7 @@ test('getHLTB: 401 does not set retry cooldown — init is retried immediately',
   _reset(); _resetAuth();
   let initCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('bleed/init')) { initCalls++; return makeInitResponse(); }
+    if (url.includes('search/site/init')) { initCalls++; return makeInitResponse(); }
     return { ok: false, status: 401 };
   });
 
@@ -210,7 +210,7 @@ test('getHLTB: throws and clears auth on 401', async (t) => {
   _reset(); _resetAuth();
   let initCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('bleed/init')) { initCalls++; return makeInitResponse(); }
+    if (url.includes('search/site/init')) { initCalls++; return makeInitResponse(); }
     return { ok: false, status: 401 };
   });
 
@@ -218,7 +218,7 @@ test('getHLTB: throws and clears auth on 401', async (t) => {
 
   // On the next call, auth should have been cleared so init is called again
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('bleed/init')) { initCalls++; return makeInitResponse(); }
+    if (url.includes('search/site/init')) { initCalls++; return makeInitResponse(); }
     return makeSearchResponse([{ game_name: 'Portal', comp_main: 7200, comp_plus: 18000 }]);
   });
   await getHLTB(1, 'Portal');
@@ -236,7 +236,7 @@ test('getHLTB: skips init retry within 30s cooldown after failed init', async (t
   _reset(); _resetAuth();
   let initCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('bleed/init')) { initCalls++; return { ok: false, status: 503 }; }
+    if (url.includes('search/site/init')) { initCalls++; return { ok: false, status: 503 }; }
     return makeSearchResponse([]);
   });
 
@@ -252,7 +252,7 @@ test('getHLTB: skips init retry within 30s cooldown after failed init', async (t
 test('getHLTB: picks the best match by similarity, not first result', async (t) => {
   _reset(); _resetAuth();
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('bleed/init')) return makeInitResponse();
+    if (url.includes('search/site/init')) return makeInitResponse();
     return makeSearchResponse([
       { game_id: 1, game_name: 'Portal Stories: Mel', comp_main: 18000, comp_plus: 21600 }, // weaker match
       { game_id: 2, game_name: 'Portal',              comp_main:  7200, comp_plus: 14400 }, // exact match

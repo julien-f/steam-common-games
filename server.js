@@ -14,7 +14,7 @@ const { createDedup } = require('./lib/dedup');
 const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
-const { getBundles, resolveSteamAppIds, getSteamShopId, getPrices, extractPriceInfo } = require('./lib/itad');
+const { getBundles, findBundleById, resolveSteamAppIds, getSteamShopId, getPrices, extractPriceInfo } = require('./lib/itad');
 
 const HOST = process.env.HOST;
 const PORT = process.env.PORT;
@@ -29,6 +29,10 @@ const BUNDLES_RATE_LIMIT_MAX = Number(process.env.BUNDLES_RATE_LIMIT_MAX);
 // Optional feature — see ITAD_API_KEY's comment in default.env. Checked once here rather than
 // duplicated across every /api/bundles* route handler.
 const isItadConfigured = () => !!process.env.ITAD_API_KEY;
+// Shared by every /api/bundles* route that takes a `country` query param — falls back to US
+// for anything that isn't a plain 2-letter code rather than rejecting the request outright,
+// same "trust but sanitize" treatment as the rest of this app's query params.
+const parseCountry = (req) => /^[A-Za-z]{2}$/.test(req.query.country || '') ? req.query.country.toUpperCase() : 'US';
 
 // Rate limiting is bypassed under NODE_ENV=test so the suite isn't throttled,
 // unless a test opts in with RATE_LIMIT_ENABLED=true to exercise the limiter.
@@ -168,16 +172,69 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, configured: !!process.env.STEAM_API_KEY, itadConfigured: isItadConfigured(), cache: getCacheStats() });
 });
 
-// Browsing the bundle list and resolving a bundle's games to Steam appids — each distinct
-// combination of params/gids only ever costs one upstream call (repeats hit the cache), same
-// reasoning as gameSearchLimit above.
-const bundlesLimit = rateLimit({
+// Browsing the bundle list, resolving a bundle's games to Steam appids, and pricing them —
+// each distinct combination of params/gids only ever costs one upstream call (repeats hit the
+// cache), same reasoning as gameSearchLimit above. Unlike gameSearchLimit's single shared
+// limiter, this is 4 separate rateLimit() instances (one per route below) each with a `skip`
+// tailored to that route's own cache-key shape — mirroring detailsLimit/achievementsLimit's own
+// "cache hits don't count" skip, not just a shared always-counts limiter. Without this, simply
+// reloading the Bundles page a handful of times (every reload re-requests the list, and
+// re-opens whatever bundle is deep-linked — see the `?bundle=` section in CLAUDE.md) burns the
+// whole per-minute budget on requests that never actually hit ITAD, and once burned, real
+// upstream calls (a newly-opened bundle) start 429ing with no visible explanation.
+const bundlesRateLimitOpts = {
   windowMs: 60 * 1000,
   max: BUNDLES_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Please wait a minute and try again.' },
-  skip: () => rateLimitBypassed(),
+};
+
+const bundlesListLimit = rateLimit({
+  ...bundlesRateLimitOpts,
+  skip: (req) => {
+    if (rateLimitBypassed()) return true;
+    const country = parseCountry(req);
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+    const sort = typeof req.query.sort === 'string' && req.query.sort ? req.query.sort : '-publish';
+    const expired = req.query.expired === '1' || req.query.expired === 'true';
+    // Mirrors getBundles' own cache key exactly (lib/itad.js) — `mature` is always `false` here
+    // since GET /api/bundles never accepts it as a query param.
+    return getCached(`itad-bundles:${country}:${sort}:${expired}:false:${offset}:${limit}`) !== undefined;
+  },
+});
+
+// GET /api/bundles/:id has no single deterministic cache key of its own — findBundleById
+// (lib/itad.js) walks a variable number of already-cache-checked pages depending on where (or
+// whether) the id turns up, so there's no cheap way to know in advance whether a given call
+// will cost zero upstream requests. It still benefits from getBundles' own per-page cache
+// underneath (a repeat deep link to an already-searched bundle makes no upstream calls even
+// though it still counts here) — just given a looser budget instead of a skip, since deep
+// links are a comparatively rare action (once per opened bundle) next to list browsing.
+const bundlesByIdLimit = rateLimit({ ...bundlesRateLimitOpts, max: BUNDLES_RATE_LIMIT_MAX * 2, skip: () => rateLimitBypassed() });
+
+const bundlesResolveLimit = rateLimit({
+  ...bundlesRateLimitOpts,
+  skip: (req) => {
+    if (rateLimitBypassed()) return true;
+    const gids = req.body?.gids;
+    if (!Array.isArray(gids) || gids.length === 0) return false; // let the route's own validation reject it
+    // Mirrors resolveSteamAppIds' own per-gid cache key (lib/itad.js).
+    return gids.every(gid => typeof gid === 'string' && getCached(`itad-appid:${gid}`) !== undefined);
+  },
+});
+
+const bundlesPricesLimit = rateLimit({
+  ...bundlesRateLimitOpts,
+  skip: (req) => {
+    if (rateLimitBypassed()) return true;
+    const gids = req.body?.gids;
+    if (!Array.isArray(gids) || gids.length === 0) return false;
+    const country = parseCountry(req);
+    // Mirrors getPrices' own per-(gid,country) cache key (lib/itad.js).
+    return gids.every(gid => typeof gid === 'string' && getCached(`itad-price:${country}:${gid}`) !== undefined);
+  },
 });
 
 app.post('/api/common-games', searchLimit, async (req, res) => {
@@ -394,11 +451,11 @@ app.get('/api/search-games', gameSearchLimit, async (req, res) => {
 
 // Backs the Bundles page's bundle list — a thin, cached proxy over ITAD's GET /bundles/v1.
 // See lib/itad.js and CLAUDE.md for the upstream API and caching notes.
-app.get('/api/bundles', bundlesLimit, async (req, res) => {
+app.get('/api/bundles', bundlesListLimit, async (req, res) => {
   if (!isItadConfigured()) {
     return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
   }
-  const country = /^[A-Za-z]{2}$/.test(req.query.country || '') ? req.query.country.toUpperCase() : 'US';
+  const country = parseCountry(req);
   const offset = Math.max(0, Number(req.query.offset) || 0);
   const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
   const sort = typeof req.query.sort === 'string' && req.query.sort ? req.query.sort : '-publish';
@@ -412,12 +469,38 @@ app.get('/api/bundles', bundlesLimit, async (req, res) => {
   }
 });
 
+// Backs the Bundles page's `?bundle=<id>` deep link. There's no single-bundle-fetch endpoint
+// upstream (see findBundleById's own comment in lib/itad.js) — this pages through the same
+// GET /bundles/v1 the list above uses, active bundles first then expired, up to a bounded
+// number of pages, and 404s rather than searching indefinitely if the id never turns up (very
+// old/deleted bundle, or a bad id).
+app.get('/api/bundles/:id', bundlesByIdLimit, async (req, res) => {
+  if (!isItadConfigured()) {
+    return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
+  }
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'Invalid bundle id' });
+  }
+  const country = parseCountry(req);
+  try {
+    const bundle = await findBundleById(id, { country });
+    if (!bundle) {
+      return res.status(404).json({ error: 'Bundle not found — it may be older than what we search, or already fully expired' });
+    }
+    res.json({ bundle });
+  } catch (err) {
+    const status = routeErrorStatus('bundles-by-id', err);
+    res.status(status).json({ error: err.message });
+  }
+});
+
 // Resolves a bundle's ITAD game ids (uuids, off tiers[].games[].id) to their Steam appid, so
 // the Bundles page can feed the resolved subset into the same GET /api/game-details/:appid /
 // POST /api/game-details/stream pipeline every other page already uses. Returns null for a
 // gid with no Steam listing — the frontend renders those as the separate "not on Steam" list.
 const MAX_BUNDLE_RESOLVE_GAMES = 500;
-app.post('/api/bundles/resolve', bundlesLimit, async (req, res) => {
+app.post('/api/bundles/resolve', bundlesResolveLimit, async (req, res) => {
   if (!isItadConfigured()) {
     return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
   }
@@ -441,7 +524,7 @@ app.post('/api/bundles/resolve', bundlesLimit, async (req, res) => {
 // resolved games — a separate route from /api/bundles/resolve since it needs `country` (prices
 // are region-specific; appid resolution isn't) and isn't always wanted (e.g. before games have
 // even resolved to Steam). See lib/itad.js's getPrices/extractPriceInfo.
-app.post('/api/bundles/prices', bundlesLimit, async (req, res) => {
+app.post('/api/bundles/prices', bundlesPricesLimit, async (req, res) => {
   if (!isItadConfigured()) {
     return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
   }
@@ -452,7 +535,7 @@ app.post('/api/bundles/prices', bundlesLimit, async (req, res) => {
   if (gids.length > MAX_BUNDLE_RESOLVE_GAMES) {
     return res.status(400).json({ error: `Too many games — maximum is ${MAX_BUNDLE_RESOLVE_GAMES}` });
   }
-  const country = /^[A-Za-z]{2}$/.test(req.query.country || '') ? req.query.country.toUpperCase() : 'US';
+  const country = parseCountry(req);
   try {
     const [shopId, prices] = await Promise.all([
       getSteamShopId(),

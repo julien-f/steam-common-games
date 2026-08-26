@@ -75,10 +75,10 @@ function makeDetailsFetch({ ratingOk = true, metaOk = true, tagsOk = true } = {}
         { title: 'Patch 1.2 released', url: 'https://store.steampowered.com/news/app/1/view/123', date: 1700000000, feedlabel: 'Community Announcements', feedname: 'steam_community_announcements' },
       ] } }) };
     }
-    if (url.includes('bleed/init')) {
+    if (url.includes('search/site/init')) {
       return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
     }
-    if (url.includes('bleed')) {
+    if (url.includes('search/site')) {
       return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
     }
     throw new Error(`Unexpected fetch: ${url}`);
@@ -484,8 +484,8 @@ test('GET /api/game-details/:appid: only fetches sources not already cached', as
     fetchedUrls.push(url);
     if (url.includes('IStoreBrowseService')) return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: TAG_IDS }] } }) };
     if (url.includes('ajaxgetstoretags'))    return { ok: true, json: async () => ({ tags: Object.entries(TAG_NAME_MAP).map(([tagid, name]) => ({ tagid: Number(tagid), name })) }) };
-    if (url.includes('bleed/init'))   return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
-    if (url.includes('bleed'))        return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
+    if (url.includes('search/site/init'))   return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
+    if (url.includes('search/site'))        return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
     throw new Error(`Unexpected fetch: ${url}`);
   });
 
@@ -524,11 +524,11 @@ function makeCountingDetailsFetch(counts, { delayMs = 0 } = {}) {
       const appid = url.match(/appids=(\d+)/)?.[1];
       return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] } } }) };
     }
-    if (url.includes('bleed/init')) {
+    if (url.includes('search/site/init')) {
       counts.hltbInit++;
       return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
     }
-    if (url.includes('bleed')) {
+    if (url.includes('search/site')) {
       counts.hltb++;
       return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
     }
@@ -614,7 +614,7 @@ test('GET /api/game-details/:appid: a request aborted mid-flight still caches, s
   // Give the stranded handler time to finish its upstream work and setCache. HLTB now
   // waits on meta before searching (see fetchGameDetails — it always resolves the search
   // name from store metadata rather than trusting a client-supplied one), so that chain is
-  // meta → bleed/init → bleed, three sequential ~100ms hops instead of running in parallel
+  // meta → search/site/init → search/site, three sequential ~100ms hops instead of running in parallel
   // with meta — comfortably under this budget but no longer as slack as it used to be.
   await new Promise(r => setTimeout(r, 500));
 
@@ -637,8 +637,8 @@ test('GET /api/game-details/:appid: failed fetch is not cached, retried on next 
       const appid = url.match(/appids=(\d+)/)?.[1];
       return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] } } }) };
     }
-    if (url.includes('bleed/init')) return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
-    if (url.includes('bleed')) { hltbCalls++; return { ok: false, status: 503 }; }
+    if (url.includes('search/site/init')) return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
+    if (url.includes('search/site')) { hltbCalls++; return { ok: false, status: 503 }; }
     throw new Error(`Unexpected fetch: ${url}`);
   });
 
@@ -776,10 +776,10 @@ test('POST /api/game-details/stream: resolves HLTB name from store metadata', as
     if (url.includes('protondb.com')) {
       return { ok: true, json: async () => ({ tier: 'gold', confidence: 'strong', total: 500 }) };
     }
-    if (url.includes('bleed/init')) {
+    if (url.includes('search/site/init')) {
       return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
     }
-    if (url.includes('bleed')) {
+    if (url.includes('search/site')) {
       hltbSearchCalls++;
       return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }] }) };
     }
@@ -1041,6 +1041,46 @@ test('GET /api/bundles: 502 when the upstream call fails', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
   const res = await api.get('/api/bundles');
   assert.equal(res.status, 502);
+});
+
+// ── GET /api/bundles/:id ──────────────────────────────────────────────────────
+
+test('GET /api/bundles/:id: 503 when ITAD_API_KEY is not configured', async () => {
+  const prev = process.env.ITAD_API_KEY;
+  delete process.env.ITAD_API_KEY;
+  try {
+    const res = await api.get('/api/bundles/42');
+    assert.equal(res.status, 503);
+  } finally {
+    if (prev !== undefined) process.env.ITAD_API_KEY = prev;
+  }
+});
+
+test('GET /api/bundles/abc: 400 for non-numeric id', async () => {
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  const res = await api.get('/api/bundles/abc');
+  assert.equal(res.status, 400);
+});
+
+test('GET /api/bundles/:id: 200 with the matching bundle', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const u = new URL(url);
+    if (u.searchParams.get('expired') === 'true') return { ok: true, json: async () => [] };
+    return { ok: true, json: async () => [{ id: 42, title: 'Deep-Linked Bundle' }] };
+  });
+  const res = await api.get('/api/bundles/42');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.bundle?.title, 'Deep-Linked Bundle');
+});
+
+test('GET /api/bundles/:id: 404 when the id is never found', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => [] }));
+  const res = await api.get('/api/bundles/999999');
+  assert.equal(res.status, 404);
 });
 
 test('POST /api/bundles/resolve: 400 without gids', async () => {
