@@ -166,20 +166,27 @@ function formatMissingGroup(formatFn, missingLabel = '—') {
   return keyPart => keyPart === '' ? missingLabel : formatFn(keyPart);
 }
 
-// Every price-ish column (Tier Price, Steam Price, the three historical lows) is shown in the
-// region currently selected (see COUNTRY_OPTIONS/detectCountry below) — `row.currency` rides
-// along once per row (set from whichever price value arrives first; the bundle's own tier
-// price and the /games/prices/v3 figures are always fetched with the same `country`, so they
-// agree) since a column formatter has no other way to reach that value. `null` means "free"/
-// "no data", never rendered as $0 or blank.
+// Every price-ish column is shown in the region currently selected (see COUNTRY_OPTIONS/
+// detectCountry below) — but NOT necessarily all in the *same* currency as each other, which is
+// why there are two separate currency fields on a row rather than one shared `row.currency` (an
+// earlier version of this file had exactly that single shared field, and it was a real bug:
+// confirmed live, a bundle's own tier price can come back from ITAD in USD only — same
+// "this shop just doesn't offer this country's currency" situation documented elsewhere for
+// bundle prices — while that SAME bundle's games' Steam/other-shop prices, a separate upstream
+// call, correctly come back in the requested EUR. A single shared field meant whichever request
+// finished first "won" and silently mislabeled the other's amounts with the wrong currency
+// symbol — right number, wrong currency, easy to miss since only the symbol was wrong).
+// `tierCurrency` (bundle tier data) backs only the Tier Price column; `priceCurrency`
+// (/games/prices/v3 data, set in loadPrices) backs every other price column. `null` means
+// "free"/"no data" throughout, never rendered as $0 or blank.
+function formatMoney(v, currency) {
+  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(v); }
+  catch { return `${v.toFixed(2)} ${currency || ''}`; }
+}
 function renderPrice(v, row) {
   if (v === undefined) return document.createTextNode('…');
   if (v == null) return document.createTextNode('—');
-  try {
-    return document.createTextNode(new Intl.NumberFormat(undefined, { style: 'currency', currency: row.currency || 'USD' }).format(v));
-  } catch {
-    return document.createTextNode(`${v.toFixed(2)} ${row.currency || ''}`);
-  }
+  return document.createTextNode(formatMoney(v, row.priceCurrency));
 }
 // A `null` tier price does NOT mean free — ITAD only ever sends an explicit `{amount: 0}` for
 // that (observed nowhere in practice, but the correct thing to special-case if it appears); a
@@ -192,7 +199,7 @@ function renderTierPrice(v, row) {
   if (v === undefined) return document.createTextNode('…');
   if (v == null) return document.createTextNode('Varies');
   if (v === 0) return document.createTextNode('Free');
-  return renderPrice(v, row);
+  return document.createTextNode(formatMoney(v, row.tierCurrency));
 }
 
 // Bare price only — no shop name in the cell itself (see the bestDealShop column below for
@@ -794,10 +801,11 @@ async function loadPrices(resolved) {
       row.lowAll        = info.lowAll?.amount        ?? null;
       row.lowY1          = info.lowY1?.amount          ?? null;
       row.lowM3          = info.lowM3?.amount          ?? null;
-      // A free/pay-what-you-want tier has no currency of its own (tierPrice/currency both
-      // null) — backfill from whichever price figure actually came with one, so the render
-      // functions above still know what to format the other columns in.
-      if (!row.currency) row.currency = info.steamRegular?.currency ?? info.bestDeal?.price?.currency ?? info.lowAll?.currency ?? null;
+      // Always set directly from this batch's own response — never conditionally backfilled
+      // off the bundle's own tier currency (see the comment on formatMoney/renderPrice above
+      // for why those two can legitimately disagree). Every figure in one /games/prices/v3
+      // response is in the same currency, so any of them is an equally valid source here.
+      row.priceCurrency = info.steamRegular?.currency ?? info.bestDeal?.price?.currency ?? info.lowAll?.currency ?? info.lowY1?.currency ?? info.lowM3?.currency ?? null;
       markRowChanged(g.appid);
     }
   } catch (err) {
@@ -885,7 +893,8 @@ async function openBundle(bundle) {
     appid: g.appid,
     name: g.title,
     tierPrice: g.tierPrice,
-    currency: g.tierCurrency, // backfilled by loadPrices if the tier itself was free (no currency of its own)
+    tierCurrency: g.tierCurrency,
+    priceCurrency: undefined, // set by loadPrices — see the comment on formatMoney/renderPrice above for why this is a separate field from tierCurrency
     addon: g.addon,
     steamRegular: undefined, bestDealPrice: undefined, bestDealShop: undefined,
     lowAll: undefined, lowY1: undefined, lowM3: undefined,
