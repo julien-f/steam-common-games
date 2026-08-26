@@ -226,12 +226,15 @@ function renderBestDeal(v, row) {
   else if (isYearLow) span.append(' ★');
   // Native `title` tooltip — the shop name was deliberately dropped from the cell's own text
   // (see the column's doc comment above) but is still worth surfacing on hover rather than
-  // losing entirely, alongside a plain-language explanation of the 🔥/★ badges for anyone who
-  // hasn't already puzzled those out from color alone.
-  const shopClause = row.bestDealShop ? ` at ${row.bestDealShop}` : '';
-  if (isAllTimeLow) span.title = `Cheapest price ever tracked${shopClause} — an all-time low.`;
-  else if (isYearLow) span.title = `Cheapest price${shopClause} in the last 12 months.`;
-  else if (row.bestDealShop) span.title = `Cheapest current price — ${row.bestDealShop}.`;
+  // losing entirely. No "cheapest current price" restatement — that's already what the Best
+  // Deal column itself means, so the tooltip is just the shop, plus a short dash-separated
+  // record note when it's also a low — one consistent shape rather than a different sentence
+  // per case, so the 🔥/★ badges have a plain-language explanation right there for anyone who
+  // hasn't already puzzled them out from color alone.
+  if (row.bestDealShop) {
+    const record = isAllTimeLow ? ' — all-time low' : isYearLow ? ' — 1-year low' : '';
+    span.title = `${row.bestDealShop}${record}`;
+  }
   return span;
 }
 
