@@ -58,6 +58,9 @@
 
   .bundle-detail { margin-top: 8px; }
   .bundle-detail-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .bundle-detail-titlebar { display: flex; align-items: center; gap: 10px; }
+  .bundle-detail-nav { display: flex; gap: 4px; }
+  .bundle-detail-nav button:disabled { opacity: 0.35; cursor: default; }
   .bundle-detail-title { font-size: 18px; font-weight: 700; color: var(--text0); }
   .bundle-detail-meta { font-size: 13px; color: var(--text1); }
   .bundle-detail-links { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -136,9 +139,15 @@
 
   <div class="card bundle-detail" id="detail-card" hidden>
     <div class="bundle-detail-header">
-      <div>
-        <div class="bundle-detail-title" id="detail-title"></div>
-        <div class="bundle-detail-meta" id="detail-meta"></div>
+      <div class="bundle-detail-titlebar">
+        <div class="bundle-detail-nav">
+          <button class="btn btn-ghost btn-sm" id="prev-bundle-btn" title="Previous bundle" aria-label="Previous bundle">‹</button>
+          <button class="btn btn-ghost btn-sm" id="next-bundle-btn" title="Next bundle" aria-label="Next bundle">›</button>
+        </div>
+        <div>
+          <div class="bundle-detail-title" id="detail-title"></div>
+          <div class="bundle-detail-meta" id="detail-meta"></div>
+        </div>
       </div>
       <div class="bundle-detail-links" id="detail-links"></div>
     </div>

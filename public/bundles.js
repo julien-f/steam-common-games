@@ -195,17 +195,36 @@ function renderTierPrice(v, row) {
   return renderPrice(v, row);
 }
 
-// Best Deal shows the shop name alongside the price (e.g. "€11.24 · Fanatical") rather than
-// leaving it to the separate bestDealShop column alone — a price with no context for where it's
-// from is a lot less scannable than the same price everywhere else in this column set, which is
-// always implicitly "on Steam" or "this bundle's own price".
+// Bare price only — no shop name in the cell itself (see the bestDealShop column below for
+// that, kept separate/hidden for anyone who wants to group/filter by it). Colored, with a small
+// icon suffix, when the current best deal is at or below a historical low: bright teal + 🔥 for
+// an all-time low, green + ★ for a 1-year low that isn't (yet) an all-time one — reusing
+// scoreColor's own "excellent"/"good" tier colors (see the side panel/table score columns)
+// rather than inventing a new palette just for this. `<=` rather than `<` since the current
+// deal genuinely can BE the historical low itself (it's what set it), not only ever beat it.
 function renderBestDeal(v, row) {
   if (v === undefined) return document.createTextNode('…');
   if (v == null) return document.createTextNode('—');
-  const priceNode = renderPrice(v, row);
-  if (!row.bestDealShop) return priceNode;
+  const isAllTimeLow = row.lowAll != null && v <= row.lowAll;
+  const isYearLow    = row.lowY1  != null && v <= row.lowY1;
   const span = document.createElement('span');
-  span.append(priceNode, document.createTextNode(` · ${row.bestDealShop}`));
+  if (isAllTimeLow) {
+    span.style.color = scoreColor(90); // '#57cbde', the ≥80 "excellent" tier
+    span.style.fontWeight = '700';
+  } else if (isYearLow) {
+    span.style.color = scoreColor(70); // '#a3cf4e', the ≥65 "good" tier
+  }
+  span.append(renderPrice(v, row));
+  if (isAllTimeLow) span.append(' 🔥');
+  else if (isYearLow) span.append(' ★');
+  // Native `title` tooltip — the shop name was deliberately dropped from the cell's own text
+  // (see the column's doc comment above) but is still worth surfacing on hover rather than
+  // losing entirely, alongside a plain-language explanation of the 🔥/★ badges for anyone who
+  // hasn't already puzzled those out from color alone.
+  const shopClause = row.bestDealShop ? ` at ${row.bestDealShop}` : '';
+  if (isAllTimeLow) span.title = `Cheapest price ever tracked${shopClause} — an all-time low.`;
+  else if (isYearLow) span.title = `Cheapest price${shopClause} in the last 12 months.`;
+  else if (row.bestDealShop) span.title = `Cheapest current price — ${row.bestDealShop}.`;
   return span;
 }
 
@@ -229,19 +248,25 @@ const BUNDLE_COLUMNS = [
   // right after the game-details stream starts — see loadPrices below) since it's a distinct
   // upstream call with its own per-(gid,country) cache tier, unlike tierPrice/addon above
   // which come straight off the bundle object already in hand. Visible by default, alongside
-  // Tier Price, precisely to answer "is this bundle actually a good deal" at a glance; the two
-  // narrower-window lows (1yr/3mo) are hidden by default, same "secondary number" convention as
-  // Wilson Score/Steam %/Achievements elsewhere in this column set.
-  { key: 'steamRegular', label: 'Steam Price',    type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
+  // Tier Price and Best Deal, precisely to answer "is this bundle actually a good deal" at a
+  // glance; the two narrower-window lows (1yr/3mo) are hidden by default, same "secondary
+  // number" convention as Wilson Score/Steam %/Achievements elsewhere in this column set. Named
+  // "Steam Full Price" rather than the shorter "Steam Price" specifically to make clear it's
+  // the non-discounted list price, not whatever Steam happens to be charging today.
+  { key: 'steamRegular', label: 'Steam Full Price', type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
   // The cheapest *current* price across every shop ITAD tracks for this game (Steam included) —
-  // the "where do I actually buy this for less, right now" answer, as opposed to Steam Price
-  // (Steam's own non-discounted list price) or the historical lows below (what something has
-  // sold for at some point, not necessarily today). `bestDealShop` rides along on the same cell
-  // (`renderBestDeal`) rather than getting its own visible-by-default column — the price is the
-  // number worth sorting/scanning by; the shop name is context for it, not a separate axis
-  // someone would sort a whole table by on its own. Still a real, independent column
-  // (`bestDealShop`, hidden by default) for anyone who *does* want to group/filter by "which
-  // shop currently has the best price across this bundle's games".
+  // the "where do I actually buy this for less, right now" answer, as opposed to Steam Full
+  // Price (Steam's own non-discounted list price) or the historical lows below (what something
+  // has sold for at some point, not necessarily today). `renderBestDeal` colors/badges the price
+  // itself when it's at or below a historical low (🔥 all-time, ★ 1yr) rather than showing the
+  // shop name in the cell — the shop is still available as its own column (`bestDealShop`,
+  // hidden by default) for anyone who wants to group/filter by "which shop currently has the
+  // best price", but cluttering the price cell itself with it wasn't worth losing the room for
+  // the low-price indicator, which is the more actionable of the two at a glance. All-Time Low
+  // itself is hidden by default now that Best Deal's own color/badge already answers "is this a
+  // record low" without a separate column — it's kept, not removed outright, since the exact
+  // number is still sometimes worth seeing (e.g. how far above the record low the deal actually
+  // is), just not something worth showing by default alongside the other 5 price-ish columns.
   { key: 'bestDealPrice', label: 'Best Deal',     type: 'number', groupable: false, format: fmt.num, render: renderBestDeal, compare: compareNumMissingLast, defaultSortDir: 'asc' },
   { key: 'bestDealShop',   label: 'Best Deal Shop', groupable: true, format: fmt.str },
   { key: 'lowAll',        label: 'All-Time Low',  type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
@@ -294,8 +319,10 @@ const BUNDLE_COLUMNS = [
   { key: 'dlcCount',         label: 'DLC Count',    type: 'number', groupable: true, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'desc' },
 ];
 
-const DEFAULT_VISIBLE = ['capsule', 'name', 'tierPrice', 'steamRegular', 'bestDealPrice', 'lowAll', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
-const DEFAULT_SORT = [{ key: 'tierPrice', dir: 'asc' }];
+const DEFAULT_VISIBLE = ['capsule', 'name', 'tierPrice', 'steamRegular', 'bestDealPrice', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
+// Cheapest first, best-rated among ties second — a genuinely useful browsing order (unlike a
+// single-column sort, which leaves same-priced games in an arbitrary relative order).
+const DEFAULT_SORT = [{ key: 'tierPrice', dir: 'asc' }, { key: 'steamdbRating', dir: 'desc' }];
 
 // ── Region picker ───────────────────────────────────────────────────────────
 // Curated rather than the full ISO 3166-1 list — these are the regions with meaningfully
@@ -346,6 +373,8 @@ const detailCard         = document.getElementById('detail-card');
 const detailTitleEl      = document.getElementById('detail-title');
 const detailMetaEl       = document.getElementById('detail-meta');
 const detailLinksEl      = document.getElementById('detail-links');
+const prevBundleBtn      = document.getElementById('prev-bundle-btn');
+const nextBundleBtn      = document.getElementById('next-bundle-btn');
 const detailStatusEl     = document.getElementById('detail-status');
 const priceStatusEl      = document.getElementById('price-status');
 const resetViewBtn       = document.getElementById('reset-view-btn');
@@ -581,6 +610,7 @@ async function loadBundles({ reset = true } = {}) {
     bundles = reset ? data.bundles : [...bundles, ...data.bundles];
     bundlesOffset += data.bundles.length;
     renderBundleList();
+    renderBundleNav(); // the loaded list changed — e.g. "Load more" may have just made Next available
     bundlesStatusEl.textContent = bundles.length ? `${bundles.length} bundles` : 'No current bundles';
     loadMoreBtn.hidden = data.bundles.length < BUNDLES_PAGE_SIZE;
     toggleListBtn.hidden = bundles.length === 0;
@@ -718,6 +748,25 @@ function renderDetailLinks(bundle) {
   `;
 }
 
+// Prev/Next step through whatever's currently loaded in `bundles` (respecting its current
+// sort/filter), not the full remote list — no auto-"Load more" and no wraparound at the ends,
+// both buttons just disable there. A bundle opened via deep link that isn't part of the
+// currently loaded page (or opened before any list has loaded at all) has no list position to
+// navigate from, so both buttons disable rather than guessing.
+function renderBundleNav() {
+  const idx = bundles.findIndex(b => b.id === activeBundleId);
+  prevBundleBtn.disabled = idx <= 0;
+  nextBundleBtn.disabled = idx === -1 || idx >= bundles.length - 1;
+}
+prevBundleBtn.addEventListener('click', () => {
+  const idx = bundles.findIndex(b => b.id === activeBundleId);
+  if (idx > 0) openBundle(bundles[idx - 1]);
+});
+nextBundleBtn.addEventListener('click', () => {
+  const idx = bundles.findIndex(b => b.id === activeBundleId);
+  if (idx !== -1 && idx < bundles.length - 1) openBundle(bundles[idx + 1]);
+});
+
 // Fetches Steam's non-discounted price + historical lows for the bundle's resolved games
 // (see /api/bundles/prices) and applies them once available — a single batch call, not
 // streamed per-game like ratings/HLTB/tags, so it can land before or after any given row has
@@ -779,6 +828,7 @@ async function loadPrices(resolved) {
 async function openBundle(bundle) {
   activeBundleId = bundle.id;
   renderBundleList();
+  renderBundleNav();
   setListCollapsed(true);
   setBundleParam(bundle.id);
 
@@ -948,6 +998,8 @@ async function openBundleById(id) {
     if (table) { table.destroy(); table = null; }
     tableContainer.innerHTML = '';
     resetViewBtn.hidden = true;
+    activeBundleId = null;
+    renderBundleNav();
     setBundleParam(null);
   }
 }
