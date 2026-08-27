@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Bundles page and the Library Explorer's Wishlist tab: every price column (Tier Price on Bundles, Steam Full Price, Best Deal, All-Time/1yr/3mo Low) and the Discount column are now groupable, not just filterable — price columns bucket against Steam's own common price tiers (Free / $0–5 / $5–15 / $15–30 / $30–50 / $50–75 / $75–100 / $100+, no currency symbol since the selected region isn't always USD), Discount buckets in plain 25-point steps (0–25%/25–50%/50–75%/75–100%). A bundle's "Varies" tier price (Build Your Own pick-and-mix) groups under its own "Varies" label rather than the generic "—" other price columns use for missing data.
+- Same two tables: a new hidden-by-default "Price Status" column categorizes a row's current deal as All-Time Low / 1yr Low / 3mo Low / On Sale (discounted but not a historical low) / Not Discounted / — (no price data) — computed live from the same fields the Best Deal cell's 🔥/★ badge already uses (now extended to also recognize a 3-month low), so it's filterable/groupable directly instead of only eyeballed off that badge. Reuses that same badge's color/icon treatment for the record tiers (bright teal + bold + 🔥 for All-Time Low, green + ★ for 1yr Low, amber + ☆ for 3mo Low; On Sale/Not Discounted stay plain) so a genuinely record-breaking deal visually stands out from a merely-discounted one, sorted worst-to-best by a single canonical tier list shared between the column's sort order and its render styling.
+
 ### Changed
 
 - `CLAUDE.md`'s Development workflow section now notes not to re-run `npm test` manually right before `git commit` once step 1 has already confirmed tests pass — the pre-commit hook re-runs it and blocks on failure regardless, so a run whose only purpose is "will this commit succeed" is redundant with the hook.

@@ -166,6 +166,32 @@ function formatMissingGroup(formatFn, missingLabel = '—') {
   return keyPart => keyPart === '' ? missingLabel : formatFn(keyPart);
 }
 
+// Price columns (Tier Price, Best Deal, Steam Full Price, the three historical lows) bucket
+// against Steam's own common price tiers ($4.99/$14.99/$29.99/$49.99/$74.99) rather than an
+// evenly-spaced or geometric step — the breakpoints where a player actually thinks "under $5" vs
+// "a $50 game" vs "$75+ premium" don't sit on a fixed multiplier, so neither a plain
+// bucketNumericRange step nor halfDecadeBucket's log grid above reproduces them. Hand-rolled the
+// same "real zero gets its own bucket, distinct from a merely-cheap game" shape halfDecadeBucket
+// already uses (there: 0 reviews vs. the log grid; here: Free vs. $0.01-$4.99). No currency
+// symbol in the bucket boundaries themselves (unlike renderPrice's per-row formatMoney) — the
+// selected region's currency isn't fixed to USD, and a hardcoded "$" would mislabel every other
+// currency's amounts the same way the tierCurrency/priceCurrency split above exists to avoid.
+const PRICE_TIERS = [0, 5, 15, 30, 50, 75, 100]; // bucket lower bounds; 100 is the open-ended "100+" tier
+function priceTierBucket(value) {
+  const n = Number(value);
+  if (n === 0) return -1; // Free — its own bucket, strictly below the "0–5" range of priced games
+  if (!(n > 0)) return null; // missing/NaN/negative
+  for (let i = PRICE_TIERS.length - 1; i >= 0; i--) if (n >= PRICE_TIERS[i]) return PRICE_TIERS[i];
+  return PRICE_TIERS[0];
+}
+function formatPriceTier(keyPart) {
+  const n = Number(keyPart);
+  if (n === -1) return 'Free';
+  const top = PRICE_TIERS[PRICE_TIERS.length - 1];
+  if (n === top) return `${top}+`;
+  return `${n}–${PRICE_TIERS[PRICE_TIERS.indexOf(n) + 1]}`;
+}
+
 // Every price-ish column is shown in the region currently selected (see COUNTRY_OPTIONS/
 // detectCountry in public/region.js) — but NOT necessarily all in the *same* currency as each other, which is
 // why there are two separate currency fields on a row rather than one shared `row.currency` (an
@@ -260,6 +286,64 @@ function renderCut(v) {
   return document.createTextNode(`-${v}%`);
 }
 
+// Categorizes a row's current best deal so it can be filtered/grouped on directly, rather than
+// only eyeballed off the Best Deal cell's 🔥/★ badge (which itself only distinguishes all-time
+// vs. 1yr low, not 3mo). Priority order top-to-bottom, same "highest record wins" logic
+// renderBestDeal's own badge uses, extended one tier further: a row lands in the first one it
+// qualifies for. 'On Sale' is the catch-all for a real discount that isn't (yet) any kind of
+// historical low; 'Not Discounted' is a confirmed bestDealCut === 0, kept distinct from missing
+// price data entirely (no ITAD data yet / still loading), which falls through to null/undefined
+// same as every other price column here — see PRICE_STATUS_COLUMN's own format below.
+function computePriceStatus(row) {
+  if (row.bestDealPrice === undefined) return undefined;
+  if (row.bestDealPrice == null) return null;
+  if (row.lowAll != null && row.bestDealPrice <= row.lowAll) return 'All-Time Low';
+  if (row.lowY1  != null && row.bestDealPrice <= row.lowY1)  return '1yr Low';
+  if (row.lowM3  != null && row.bestDealPrice <= row.lowM3)  return '3mo Low';
+  if (row.bestDealCut == null) return null;
+  return row.bestDealCut > 0 ? 'On Sale' : 'Not Discounted';
+}
+// Single source of truth for Price Status, worst deal to best — both the column's `compare`
+// (via PRICE_STATUS_ORDER, same "ordered array + indexOf" shape as PRODUCTION_TIER_ORDER/
+// PROTON_TIER_ORDER above) and renderPriceStatus's badge/color below are derived from this one
+// list, so the sort order and the visual "how good is this deal" ramp can't drift out of sync
+// with each other the way two separately hand-maintained arrays could. `defaultSortDir: 'desc'`
+// on the column then shows the best deals (All-Time Low) first on a fresh click.
+//
+// color/icon reuse renderBestDeal's own treatment verbatim for the two tiers it already covers
+// (bright teal + bold + 🔥 for All-Time Low, green + ★ for 1yr Low) rather than a new palette,
+// extended one tier further for 3mo Low — a real record, just over a shorter window, so it gets
+// scoreColor's next tier down (amber) and an outline star (☆) instead of 1yr Low's filled one,
+// reading as "still a record, just a lesser one" rather than inventing an unrelated icon. On
+// Sale/Not Discounted stay plain, uncolored, no icon — not being a record isn't a bad thing
+// worth flagging red, so nothing here draws the eye away from the three real record tiers.
+const PRICE_STATUS_TIERS = [
+  { label: 'Not Discounted' },
+  { label: 'On Sale' },
+  { label: '3mo Low',     color: scoreColor(55), icon: ' ☆' },
+  { label: '1yr Low',     color: scoreColor(70), icon: ' ★' },
+  { label: 'All-Time Low', color: scoreColor(90), icon: ' 🔥', bold: true },
+];
+const PRICE_STATUS_ORDER = PRICE_STATUS_TIERS.map(t => t.label);
+const comparePriceStatus = compareMissingLast((a, b) =>
+  PRICE_STATUS_ORDER.indexOf(a) - PRICE_STATUS_ORDER.indexOf(b));
+function renderPriceStatus(v) {
+  if (v === undefined) return document.createTextNode('…');
+  if (v == null) return document.createTextNode('—');
+  const tier = PRICE_STATUS_TIERS.find(t => t.label === v);
+  if (!tier?.color) return document.createTextNode(v); // On Sale / Not Discounted — plain text
+  const span = document.createElement('span');
+  span.style.color = tier.color;
+  if (tier.bold) span.style.fontWeight = '700';
+  span.textContent = v + tier.icon;
+  return span;
+}
+const PRICE_STATUS_COLUMN = {
+  key: 'priceStatus', label: 'Price Status', groupable: true,
+  value: computePriceStatus, format: v => v === undefined ? '…' : v ?? '—', render: renderPriceStatus,
+  compare: comparePriceStatus, defaultSortDir: 'desc',
+};
+
 const BUNDLE_COLUMNS = [
   // ── Identity ────────────────────────────────────────────────────────────────
   { key: 'capsule', label: '', width: 128, sortable: false, filterable: false, groupable: false,
@@ -272,7 +356,12 @@ const BUNDLE_COLUMNS = [
   // would sort every "Build Your Own" bundle's games as if they were the single cheapest thing
   // in the table under the default ascending Tier Price sort. Pinned last instead, same as
   // every other "missing data" numeric column in this file.
-  { key: 'tierPrice',  label: 'Tier Price', type: 'number', groupable: false, format: v => v == null ? 'Varies' : v === 0 ? 'Free' : v.toFixed(2), render: renderTierPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
+  // Grouped via the same PRICE_TIERS breakpoints as the other price columns below, except a
+  // missing tier price means "Varies" (a Build Your Own bundle's pick-and-mix pricing — see
+  // renderTierPrice above), not "no data" — its own `missingLabel` reflects that distinction
+  // instead of the generic '—' the other price columns' groups fall back to.
+  { key: 'tierPrice',  label: 'Tier Price', type: 'number', groupable: true, format: v => v == null ? 'Varies' : v === 0 ? 'Free' : v.toFixed(2), render: renderTierPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
+    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier, 'Varies'), keepVisibleWhenGrouped: true },
   { key: 'addon',      label: 'Add-on',     groupable: true, format: v => v ? 'Add-on' : 'Base', render: renderAddonBadge },
 
   // ── Steam pricing (IsThereAnyDeal) ──────────────────────────────────────────
@@ -285,7 +374,8 @@ const BUNDLE_COLUMNS = [
   // (rather than removed) for anyone who wants the exact number, or to sort/group by it. Named
   // "Steam Full Price" rather than the shorter "Steam Price" specifically to make clear it's
   // the non-discounted list price, not whatever Steam happens to be charging today.
-  { key: 'steamRegular', label: 'Steam Full Price', type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
+  { key: 'steamRegular', label: 'Steam Full Price', type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
+    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
   // The cheapest *current* price across every shop ITAD tracks for this game (Steam included) —
   // the "where do I actually buy this for less, right now" answer, as opposed to Steam Full
   // Price (Steam's own non-discounted list price) or the historical lows below (what something
@@ -301,18 +391,27 @@ const BUNDLE_COLUMNS = [
   // it's kept, not removed outright, since the exact number is still sometimes worth seeing
   // (e.g. how far above the record low the deal actually is), just not something worth showing
   // by default alongside the other price-ish columns.
-  { key: 'bestDealPrice', label: 'Best Deal',     type: 'number', groupable: false, format: fmt.num, render: renderBestDeal, compare: compareNumMissingLast, defaultSortDir: 'asc' },
+  { key: 'bestDealPrice', label: 'Best Deal',     type: 'number', groupable: true, format: fmt.num, render: renderBestDeal, compare: compareNumMissingLast, defaultSortDir: 'asc',
+    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
   // How much cheaper the best deal is than Steam Full Price (`discountPct`, computed in
   // loadPrices below — see its own comment for why this is computed against Steam's price
   // rather than taken from ITAD's own per-deal "cut" field). Rendered with a leading "-"
   // (`renderCut`) and "—" for a deal that isn't actually any cheaper than Steam (`0`) — real
   // data, not a missing value, but not worth a "-0%" reading either. Visible by default
   // alongside Best Deal.
-  { key: 'bestDealCut',   label: 'Discount',      type: 'number', groupable: false, format: fmt.num, render: renderCut, compare: compareNumMissingLast, defaultSortDir: 'desc' },
+  // Bucketed in fixed 25-point steps (0-25%/25-50%/50-75%/75-100%) rather than PRICE_TIERS'
+  // hand-picked breakpoints above — a percentage is already bounded 0-100 with no long tail to
+  // worry about, so there's no reason to reach for anything fancier than an even step.
+  { key: 'bestDealCut',   label: 'Discount',      type: 'number', groupable: true, format: fmt.num, render: renderCut, compare: compareNumMissingLast, defaultSortDir: 'desc',
+    groupValue: withMissingGroup(bucketNumericRange(25)), groupFormat: formatMissingGroup(formatNumericRange(25, '%')), keepVisibleWhenGrouped: true },
+  PRICE_STATUS_COLUMN,
   { key: 'bestDealShop',   label: 'Best Deal Shop', groupable: true, format: fmt.str },
-  { key: 'lowAll',        label: 'All-Time Low',  type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
-  { key: 'lowY1',          label: '1yr Low',      type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
-  { key: 'lowM3',          label: '3mo Low',      type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
+  { key: 'lowAll',        label: 'All-Time Low',  type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
+    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
+  { key: 'lowY1',          label: '1yr Low',      type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
+    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
+  { key: 'lowM3',          label: '3mo Low',      type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
+    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
 
   // ── Scores & reviews ────────────────────────────────────────────────────────
   { key: 'steamdbRating',    label: 'Weighted Rating',  type: 'number', groupable: false, format: fmt.numRound, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },

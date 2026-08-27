@@ -304,6 +304,34 @@ function formatMissingGroup(formatFn, missingLabel = '—') {
   return keyPart => keyPart === '' ? missingLabel : formatFn(keyPart);
 }
 
+// Price columns (Best Deal, Steam Full Price, the three historical lows) bucket against Steam's
+// own common price tiers ($4.99/$14.99/$29.99/$49.99/$74.99) rather than an evenly-spaced or
+// geometric step — the breakpoints where a player actually thinks "under $5" vs "a $50 game" vs
+// "$75+ premium" don't sit on a fixed multiplier, so neither a plain bucketNumericRange step nor
+// halfDecadeBucket's log grid above reproduces them. Hand-rolled the same "real zero gets its own
+// bucket, distinct from a merely-cheap game" shape halfDecadeBucket already uses (there: 0
+// reviews vs. the log grid; here: Free vs. $0.01-$4.99). No currency symbol in the bucket
+// boundaries themselves (unlike renderPrice's per-row formatMoney) — the selected region's
+// currency isn't fixed to USD, and a hardcoded "$" would mislabel every other currency's amounts.
+// Deliberate separate copy from bundles.js's identical PRICE_TIERS/priceTierBucket/
+// formatPriceTier, same "kept as a separate copy" precedent as this file's other bits relative
+// to bundles.js.
+const PRICE_TIERS = [0, 5, 15, 30, 50, 75, 100]; // bucket lower bounds; 100 is the open-ended "100+" tier
+function priceTierBucket(value) {
+  const n = Number(value);
+  if (n === 0) return -1; // Free — its own bucket, strictly below the "0–5" range of priced games
+  if (!(n > 0)) return null; // missing/NaN/negative
+  for (let i = PRICE_TIERS.length - 1; i >= 0; i--) if (n >= PRICE_TIERS[i]) return PRICE_TIERS[i];
+  return PRICE_TIERS[0];
+}
+function formatPriceTier(keyPart) {
+  const n = Number(keyPart);
+  if (n === -1) return 'Free';
+  const top = PRICE_TIERS[PRICE_TIERS.length - 1];
+  if (n === top) return `${top}+`;
+  return `${n}–${PRICE_TIERS[PRICE_TIERS.indexOf(n) + 1]}`;
+}
+
 // Grouped into sections (identity → scores → HLTB → play time/dates → classification →
 // compatibility → extras) rather than roughly the order each was added to the
 // codebase — with 20+ columns now, an alphabetical or add-order list makes both the column
@@ -586,6 +614,67 @@ function renderCut(v) {
   return document.createTextNode(`-${v}%`);
 }
 
+// Categorizes a row's current best deal so it can be filtered/grouped on directly, rather than
+// only eyeballed off the Best Deal cell's 🔥/★ badge (which itself only distinguishes all-time
+// vs. 1yr low, not 3mo). Priority order top-to-bottom, same "highest record wins" logic
+// renderBestDeal's own badge uses, extended one tier further: a row lands in the first one it
+// qualifies for. 'On Sale' is the catch-all for a real discount that isn't (yet) any kind of
+// historical low; 'Not Discounted' is a confirmed bestDealCut === 0, kept distinct from missing
+// price data entirely (no ITAD data yet / still loading), which falls through to null/undefined
+// same as every other price column here — see PRICE_STATUS_COLUMN's own format below. Deliberate
+// separate copy from bundles.js's identical computePriceStatus/PRICE_STATUS_ORDER/
+// comparePriceStatus/PRICE_STATUS_COLUMN.
+function computePriceStatus(row) {
+  if (row.bestDealPrice === undefined) return undefined;
+  if (row.bestDealPrice == null) return null;
+  if (row.lowAll != null && row.bestDealPrice <= row.lowAll) return 'All-Time Low';
+  if (row.lowY1  != null && row.bestDealPrice <= row.lowY1)  return '1yr Low';
+  if (row.lowM3  != null && row.bestDealPrice <= row.lowM3)  return '3mo Low';
+  if (row.bestDealCut == null) return null;
+  return row.bestDealCut > 0 ? 'On Sale' : 'Not Discounted';
+}
+// Single source of truth for Price Status, worst deal to best — both the column's `compare`
+// (via PRICE_STATUS_ORDER, same "ordered array + indexOf" shape as compareProductionTier/
+// compareProtonTier above) and renderPriceStatus's badge/color below are derived from this one
+// list, so the sort order and the visual "how good is this deal" ramp can't drift out of sync
+// with each other the way two separately hand-maintained arrays could. `defaultSortDir: 'desc'`
+// on the column then shows the best deals (All-Time Low) first on a fresh click. Deliberate
+// separate copy from bundles.js's identical PRICE_STATUS_TIERS/renderPriceStatus.
+//
+// color/icon reuse renderBestDeal's own treatment verbatim for the two tiers it already covers
+// (bright teal + bold + 🔥 for All-Time Low, green + ★ for 1yr Low) rather than a new palette,
+// extended one tier further for 3mo Low — a real record, just over a shorter window, so it gets
+// scoreColor's next tier down (amber) and an outline star (☆) instead of 1yr Low's filled one,
+// reading as "still a record, just a lesser one" rather than inventing an unrelated icon. On
+// Sale/Not Discounted stay plain, uncolored, no icon — not being a record isn't a bad thing
+// worth flagging red, so nothing here draws the eye away from the three real record tiers.
+const PRICE_STATUS_TIERS = [
+  { label: 'Not Discounted' },
+  { label: 'On Sale' },
+  { label: '3mo Low',     color: scoreColor(55), icon: ' ☆' },
+  { label: '1yr Low',     color: scoreColor(70), icon: ' ★' },
+  { label: 'All-Time Low', color: scoreColor(90), icon: ' 🔥', bold: true },
+];
+const PRICE_STATUS_ORDER = PRICE_STATUS_TIERS.map(t => t.label);
+const comparePriceStatus = compareMissingLast((a, b) =>
+  PRICE_STATUS_ORDER.indexOf(a) - PRICE_STATUS_ORDER.indexOf(b));
+function renderPriceStatus(v) {
+  if (v === undefined) return document.createTextNode('…');
+  if (v == null) return document.createTextNode('—');
+  const tier = PRICE_STATUS_TIERS.find(t => t.label === v);
+  if (!tier?.color) return document.createTextNode(v); // On Sale / Not Discounted — plain text
+  const span = document.createElement('span');
+  span.style.color = tier.color;
+  if (tier.bold) span.style.fontWeight = '700';
+  span.textContent = v + tier.icon;
+  return span;
+}
+const PRICE_STATUS_COLUMN = {
+  key: 'priceStatus', label: 'Price Status', groupable: true,
+  value: computePriceStatus, format: v => v === undefined ? '…' : v ?? '—', render: renderPriceStatus,
+  compare: comparePriceStatus, defaultSortDir: 'desc',
+};
+
 // Best Deal + Discount are visible by default, precisely to answer "is this worth buying now"
 // at a glance, which is why Steam Full Price itself stays hidden despite being right here next
 // to them (same reasoning as bundles.js's own DEFAULT_VISIBLE). The narrower-window lows and
@@ -594,13 +683,23 @@ function renderCut(v) {
 // shorter "Steam Price" specifically to make clear it's the non-discounted list price, not
 // whatever Steam happens to be charging today.
 const WISHLIST_PRICE_COLUMNS = [
-  { key: 'steamRegular',  label: 'Steam Full Price', type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
-  { key: 'bestDealPrice', label: 'Best Deal',        type: 'number', groupable: false, format: fmt.num, render: renderBestDeal, compare: compareNumMissingLast, defaultSortDir: 'asc' },
-  { key: 'bestDealCut',   label: 'Discount',         type: 'number', groupable: false, format: fmt.num, render: renderCut, compare: compareNumMissingLast, defaultSortDir: 'desc' },
+  { key: 'steamRegular',  label: 'Steam Full Price', type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
+    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
+  { key: 'bestDealPrice', label: 'Best Deal',        type: 'number', groupable: true, format: fmt.num, render: renderBestDeal, compare: compareNumMissingLast, defaultSortDir: 'asc',
+    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
+  // Bucketed in fixed 25-point steps (0-25%/25-50%/50-75%/75-100%) rather than PRICE_TIERS'
+  // hand-picked breakpoints — a percentage is already bounded 0-100 with no long tail to worry
+  // about, so there's no reason to reach for anything fancier than an even step.
+  { key: 'bestDealCut',   label: 'Discount',         type: 'number', groupable: true, format: fmt.num, render: renderCut, compare: compareNumMissingLast, defaultSortDir: 'desc',
+    groupValue: withMissingGroup(bucketNumericRange(25)), groupFormat: formatMissingGroup(formatNumericRange(25, '%')), keepVisibleWhenGrouped: true },
+  PRICE_STATUS_COLUMN,
   { key: 'bestDealShop',  label: 'Best Deal Shop',   groupable: true, format: fmt.str },
-  { key: 'lowAll',        label: 'All-Time Low',     type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
-  { key: 'lowY1',         label: '1yr Low',          type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
-  { key: 'lowM3',         label: '3mo Low',          type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
+  { key: 'lowAll',        label: 'All-Time Low',     type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
+    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
+  { key: 'lowY1',         label: '1yr Low',          type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
+    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
+  { key: 'lowM3',         label: '3mo Low',          type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
+    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
 ];
 
 // No defaultSortDir — Steam's wishlist rank is already 1-at-the-top, so the plain ascending
