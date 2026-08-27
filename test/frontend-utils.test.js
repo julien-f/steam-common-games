@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeInput, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier } = require('../public/utils');
+const { normalizeInput, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier, dealRecordTier } = require('../public/utils');
 
 // ── normalizeInput ────────────────────────────────────────────────────────────
 
@@ -283,4 +283,57 @@ test('computeProductionTier: free-to-play without enough reviews defaults to Ind
 
 test('computeProductionTier: null when priced but priceInitial is missing (no price signal at all)', () => {
   assert.equal(computeProductionTier({ priceInitial: null, reviewsTotal: 500000 }), null);
+});
+
+// ── dealRecordTier ───────────────────────────────────────────────────────────────
+// Single shared source for the Best Deal cell's badge, the side panel's Price card, and the
+// Price Status column (renderBestDeal in bundles.js/library.js, priceHtml in panel.js,
+// computePriceStatus/PRICE_STATUS_TIERS in bundles.js/library.js) — see its own comment in
+// public/utils.js for why: hand-duplicating this tier logic in each place is exactly what let a
+// 3-month-low tier go missing from two of them.
+
+test('dealRecordTier: null when price is missing', () => {
+  assert.equal(dealRecordTier(null, { lowAll: 10, lowY1: 15, lowM3: 20 }), null);
+  assert.equal(dealRecordTier(undefined, { lowAll: 10, lowY1: 15, lowM3: 20 }), null);
+});
+
+test('dealRecordTier: null when price beats none of the three windows', () => {
+  assert.equal(dealRecordTier(25, { lowAll: 10, lowY1: 15, lowM3: 20 }), null);
+});
+
+test('dealRecordTier: null when none of the three lows are known', () => {
+  assert.equal(dealRecordTier(5, {}), null);
+});
+
+test('dealRecordTier: all-time low takes priority even when the price also matches 1yr/3mo', () => {
+  const rec = dealRecordTier(10, { lowAll: 10, lowY1: 10, lowM3: 10 });
+  assert.equal(rec.tier, 'all-time');
+  assert.equal(rec.statusLabel, 'All-Time Low');
+  assert.equal(rec.tooltipLabel, 'all-time low');
+  assert.equal(rec.icon, '🔥');
+  assert.equal(rec.bold, true);
+});
+
+test('dealRecordTier: 1yr low when it beats the 1yr/3mo windows but not the all-time one', () => {
+  const rec = dealRecordTier(15, { lowAll: 10, lowY1: 15, lowM3: 15 });
+  assert.equal(rec.tier, '1yr');
+  assert.equal(rec.statusLabel, '1yr Low');
+  assert.equal(rec.icon, '★');
+  assert.ok(!rec.bold);
+});
+
+test('dealRecordTier: 3mo low when it beats only the 3mo window', () => {
+  const rec = dealRecordTier(20, { lowAll: 10, lowY1: 15, lowM3: 20 });
+  assert.equal(rec.tier, '3mo');
+  assert.equal(rec.statusLabel, '3mo Low');
+  assert.equal(rec.icon, '☆');
+});
+
+test('dealRecordTier: <= not < — a price equal to the historical low still counts as a record', () => {
+  assert.equal(dealRecordTier(10, { lowAll: 10 }).tier, 'all-time');
+});
+
+test('dealRecordTier: a missing individual low is skipped in favor of a matching one further down the list', () => {
+  const rec = dealRecordTier(20, { lowAll: null, lowY1: null, lowM3: 20 });
+  assert.equal(rec.tier, '3mo');
 });

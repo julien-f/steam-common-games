@@ -1,65 +1,18 @@
 'use strict';
 
 import { createDataTable, persistViewToLocalStorage, resetView } from '@vates/data-table-vanilla';
+import { processData, searchData, DEFAULT_LABELS } from '@vates/data-table-core';
 import {
-  processData, searchData, DEFAULT_LABELS, compareMissingLast,
-  bucketNumericRange, bucketDatePart, formatNumericRange, formatDatePart,
-  bucketLogRange, formatLogRange,
-} from '@vates/data-table-core';
+  fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareNumMissingLast,
+  withMissingGroup, formatMissingGroup, priceTierBucket, formatPriceTier,
+  protonDbValue, TYPE_LABELS, discountPct,
+} from '/gameColumns.js';
 
-// ── Column building blocks — deliberately a separate copy from public/library.js's own
-// COLUMNS, not a shared import. The two pages' row shapes differ enough (no playtime/
-// ownership here, plus bundle-specific tierPrice/addon) that sharing would need its own
-// abstraction layer for what's otherwise a few dozen lines; same "kept as a separate copy"
-// precedent as library.js's own PROTON_TIER_COLORS/buildLibraryOwnersHtml relative to panel.js.
+// ── Bundle-specific column building blocks — Tier Price/Add-on have no Library/Wishlist
+// equivalent (a bundle-tier concept), so they stay local rather than living in the shared
+// public/gameColumns.js (see its own header comment for what's shared vs. page-specific and
+// why).
 
-const fmt = {
-  num:  v => v === undefined ? '…' : v === null ? '—' : String(v),
-  numRound: v => v === undefined ? '…' : v === null ? '—' : String(Math.round(v)),
-  dec1: v => v === undefined ? '…' : v === null ? '—' : Number(v).toFixed(1),
-  str:  v => v === undefined ? '…' : v || '—',
-  ct:   v => v === undefined ? '…' : v === null ? '—' : Number(v).toLocaleString(),
-  arr:  v => v === undefined ? '…' : Array.isArray(v) ? (v.length ? v.join(', ') : '—') : (v || '—'),
-};
-
-function renderScoreNum(v) {
-  if (v === undefined) return document.createTextNode('…');
-  if (v === null) return document.createTextNode('—');
-  const rounded = Math.round(v);
-  const span = document.createElement('span');
-  span.style.color = scoreColor(rounded);
-  span.textContent = String(rounded);
-  return span;
-}
-
-const PROTON_TIER_ORDER = ['borked', 'bronze', 'silver', 'gold', 'platinum', 'native'];
-const PROTON_TIER_COLORS = {
-  borked: '#b91c1c', bronze: '#8b4513', silver: '#757575', gold: '#b8860b',
-  platinum: '#5b6b85', native: '#15803d',
-};
-function protonDbValue(tier) {
-  if (PROTON_TIER_ORDER.indexOf(tier) === -1) return null;
-  return tier.charAt(0).toUpperCase() + tier.slice(1);
-}
-function renderProtonBadge(v) {
-  if (v === undefined) return document.createTextNode('…');
-  if (!v) return document.createTextNode('—');
-  const span = document.createElement('span');
-  span.className = 'status-badge';
-  span.style.background = PROTON_TIER_COLORS[v.toLowerCase()] || '#52525b';
-  span.textContent = v;
-  return span;
-}
-function renderDemoBadge(v) {
-  if (v === undefined) return document.createTextNode('…');
-  if (!v) return document.createTextNode('—');
-  const span = document.createElement('span');
-  span.className = 'status-badge';
-  span.style.background = 'var(--accent)';
-  span.style.color = '#0b1620';
-  span.textContent = 'Demo';
-  return span;
-}
 // Same pill shape, distinguishing a tier that only adds bonus content (soundtrack, extra
 // DLC-ish items) on top of an already-unlocked base game, from a tier that unlocks a base
 // game outright — an ITAD-specific fact this app's own library/wishlist tables have no
@@ -74,153 +27,14 @@ function renderAddonBadge(v) {
   return span;
 }
 
-function renderThumb(_, row) {
-  const img = document.createElement('img');
-  img.className = 'game-thumb';
-  img.alt = '';
-  img.loading = 'lazy';
-  img.width = 120;
-  img.height = 45;
-  if (row.capsule) img.src = row.capsule;
-  img.addEventListener('error', () => { img.style.visibility = 'hidden'; });
-  return img;
-}
-
-const TYPE_LABELS = {
-  game: 'Game', dlc: 'DLC', music: 'Soundtrack', video: 'Video',
-  series: 'Series', episode: 'Episode', mod: 'Mod', hardware: 'Hardware', demo: 'Demo',
-  advertising: 'Advertising',
-};
-
-const PRODUCTION_TIER_ORDER = ['Indie', 'AA', 'AAA'];
-const compareProductionTier = compareMissingLast((a, b) =>
-  PRODUCTION_TIER_ORDER.indexOf(a) - PRODUCTION_TIER_ORDER.indexOf(b));
-const compareProtonTier = compareMissingLast((a, b) =>
-  PROTON_TIER_ORDER.indexOf(a.toLowerCase()) - PROTON_TIER_ORDER.indexOf(b.toLowerCase()));
-const compareNumMissingLast = compareMissingLast((a, b) => a - b);
-
-// Same coarse-release-date handling as library.js — see its own extensive comment on why
-// "2026"/"Fall 2026"/"Q4 2026"/"Coming soon"/"TBA" all need special-cased anchoring rather
-// than plain `new Date()` parsing.
-const SEASON_END = { spring: [5, 20], summer: [8, 21], fall: [11, 20], autumn: [11, 20], winter: [2, 19] };
-function endOfReleasePeriod(str) {
-  const s = String(str).trim();
-  let m;
-  if ((m = /^(spring|summer|fall|autumn|winter)\s+(\d{4})$/i.exec(s))) {
-    const [month, day] = SEASON_END[m[1].toLowerCase()];
-    const year = m[1].toLowerCase() === 'winter' ? Number(m[2]) + 1 : Number(m[2]);
-    return new Date(year, month, day).getTime();
-  }
-  if ((m = /^Q([1-4])\s+(\d{4})$/i.exec(s))) return new Date(Number(m[2]), Number(m[1]) * 3, 0).getTime();
-  if ((m = /^(\d{4})(?:\s+or\s+later)?$/i.exec(s))) return new Date(Number(m[1]), 11, 31).getTime() + 1;
-  if (/^[A-Za-z]+\s+\d{4}$/.test(s)) {
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth() + 1, 0).getTime();
-  }
-  return new Date(s).getTime();
-}
-const COMING_SOON_SENTINEL = new Date(9999, 0, 1).getTime();
-const TBA_SENTINEL         = new Date(9999, 0, 2).getTime();
-function releaseSortTimestamp(str) {
-  const s = String(str).trim();
-  if (/^coming soon$/i.test(s)) return COMING_SOON_SENTINEL;
-  if (/^(to be announced|tba)$/i.test(s)) return TBA_SENTINEL;
-  return endOfReleasePeriod(s);
-}
-const compareDateMissingLast = compareMissingLast(
-  (a, b) => releaseSortTimestamp(a) - releaseSortTimestamp(b),
-  v => v == null || v === '' || isNaN(releaseSortTimestamp(v)),
-);
-function renderReleaseDate(v, row) {
-  if (v === undefined) return document.createTextNode('…');
-  if (!v) return document.createTextNode('—');
-  const span = document.createElement('span');
-  if (row.comingSoon) span.style.color = '#e4a82e';
-  span.textContent = v;
-  return span;
-}
-
-// Same half-decade log bucketing as library.js's Review Count column — see its own comment
-// for why a fixed linear step is wrong for a value that spans orders of magnitude.
-const LOG_BUCKET_OPTS = { divisions: [1, 3] };
-const logBucketValue = bucketLogRange(LOG_BUCKET_OPTS);
-function halfDecadeBucket(value) {
-  const n = Number(value);
-  if (n <= 0) return 0;
-  const bucket = logBucketValue(value);
-  return bucket === -Infinity ? 0.5 : bucket;
-}
-function formatHalfDecadeBucket(unit, zeroLabel) {
-  const formatBucket = formatLogRange(LOG_BUCKET_OPTS, unit);
-  return keyPart => {
-    const n = Number(keyPart);
-    if (n === 0) return zeroLabel;
-    if (n === 0.5) return formatBucket(-Infinity);
-    return formatBucket(keyPart);
-  };
-}
-function withMissingGroup(bucketFn, isMissing = v => v == null) {
-  return value => isMissing(value) ? null : bucketFn(value);
-}
-function formatMissingGroup(formatFn, missingLabel = '—') {
-  return keyPart => keyPart === '' ? missingLabel : formatFn(keyPart);
-}
-
-// Price columns (Tier Price, Best Deal, Steam Full Price, the three historical lows) bucket
-// against Steam's own common price tiers ($4.99/$14.99/$29.99/$49.99/$74.99) rather than an
-// evenly-spaced or geometric step — the breakpoints where a player actually thinks "under $5" vs
-// "a $50 game" vs "$75+ premium" don't sit on a fixed multiplier, so neither a plain
-// bucketNumericRange step nor halfDecadeBucket's log grid above reproduces them. Hand-rolled the
-// same "real zero gets its own bucket, distinct from a merely-cheap game" shape halfDecadeBucket
-// already uses (there: 0 reviews vs. the log grid; here: Free vs. $0.01-$4.99). No currency
-// symbol in the bucket boundaries themselves (unlike renderPrice's per-row formatMoney) — the
-// selected region's currency isn't fixed to USD, and a hardcoded "$" would mislabel every other
-// currency's amounts the same way the tierCurrency/priceCurrency split above exists to avoid.
-const PRICE_TIERS = [0, 5, 15, 30, 50, 75, 100]; // bucket lower bounds; 100 is the open-ended "100+" tier
-function priceTierBucket(value) {
-  const n = Number(value);
-  if (n === 0) return -1; // Free — its own bucket, strictly below the "0–5" range of priced games
-  if (!(n > 0)) return null; // missing/NaN/negative
-  for (let i = PRICE_TIERS.length - 1; i >= 0; i--) if (n >= PRICE_TIERS[i]) return PRICE_TIERS[i];
-  return PRICE_TIERS[0];
-}
-function formatPriceTier(keyPart) {
-  const n = Number(keyPart);
-  if (n === -1) return 'Free';
-  const top = PRICE_TIERS[PRICE_TIERS.length - 1];
-  if (n === top) return `${top}+`;
-  return `${n}–${PRICE_TIERS[PRICE_TIERS.indexOf(n) + 1]}`;
-}
-
-// Every price-ish column is shown in the region currently selected (see COUNTRY_OPTIONS/
-// detectCountry in public/region.js) — but NOT necessarily all in the *same* currency as each other, which is
-// why there are two separate currency fields on a row rather than one shared `row.currency` (an
-// earlier version of this file had exactly that single shared field, and it was a real bug:
-// confirmed live, a bundle's own tier price can come back from ITAD in USD only — same
-// "this shop just doesn't offer this country's currency" situation documented elsewhere for
-// bundle prices — while that SAME bundle's games' Steam/other-shop prices, a separate upstream
-// call, correctly come back in the requested EUR. A single shared field meant whichever request
-// finished first "won" and silently mislabeled the other's amounts with the wrong currency
-// symbol — right number, wrong currency, easy to miss since only the symbol was wrong).
-// `tierCurrency` (bundle tier data) backs only the Tier Price column; `priceCurrency`
-// (/games/prices/v3 data, set in loadPrices) backs every other price column. `null` means
-// "free"/"no data" throughout, never rendered as $0 or blank.
-function formatMoney(v, currency) {
-  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(v); }
-  catch { return `${v.toFixed(2)} ${currency || ''}`; }
-}
-function renderPrice(v, row) {
-  if (v === undefined) return document.createTextNode('…');
-  if (v == null) return document.createTextNode('—');
-  return document.createTextNode(formatMoney(v, row.priceCurrency));
-}
 // A `null` tier price does NOT mean free — ITAD only ever sends an explicit `{amount: 0}` for
 // that (observed nowhere in practice, but the correct thing to special-case if it appears); a
 // `null` `tiers[].price` means "no single fixed price at all", which in practice is Fanatical's
 // "Build Your Own ⟨N⟩ Bundle" pick-and-mix format — one tier, a pool of 15-30 games, price
 // scales with however many you pick rather than being a property of the bundle itself. Showing
 // "Free" for that (the previous behavior) was flatly wrong — these bundles are never free.
-// "Varies" is shown instead; only a real `amount === 0` renders as "Free".
+// "Varies" is shown instead; only a real `amount === 0` renders as "Free". `formatMoney` lives
+// in utils.js, not here — see gameColumns.js's own header comment for why.
 function renderTierPrice(v, row) {
   if (v === undefined) return document.createTextNode('…');
   if (v == null) return document.createTextNode('Varies');
@@ -228,236 +42,32 @@ function renderTierPrice(v, row) {
   return document.createTextNode(formatMoney(v, row.tierCurrency));
 }
 
-// Bare price only — no shop name in the cell itself (see the bestDealShop column below for
-// that, kept separate/hidden for anyone who wants to group/filter by it). Colored, with a small
-// icon suffix, when the current best deal is at or below a historical low: bright teal + 🔥 for
-// an all-time low, green + ★ for a 1-year low that isn't (yet) an all-time one — reusing
-// scoreColor's own "excellent"/"good" tier colors (see the side panel/table score columns)
-// rather than inventing a new palette just for this. `<=` rather than `<` since the current
-// deal genuinely can BE the historical low itself (it's what set it), not only ever beat it.
-function renderBestDeal(v, row) {
-  if (v === undefined) return document.createTextNode('…');
-  if (v == null) return document.createTextNode('—');
-  const isAllTimeLow = row.lowAll != null && v <= row.lowAll;
-  const isYearLow    = row.lowY1  != null && v <= row.lowY1;
-  const span = document.createElement('span');
-  if (isAllTimeLow) {
-    span.style.color = scoreColor(90); // '#57cbde', the ≥80 "excellent" tier
-    span.style.fontWeight = '700';
-  } else if (isYearLow) {
-    span.style.color = scoreColor(70); // '#a3cf4e', the ≥65 "good" tier
-  }
-  span.append(renderPrice(v, row));
-  if (isAllTimeLow) span.append(' 🔥');
-  else if (isYearLow) span.append(' ★');
-  // Native `title` tooltip — the shop name was deliberately dropped from the cell's own text
-  // (see the column's doc comment above) but is still worth surfacing on hover rather than
-  // losing entirely. No "cheapest current price" restatement — that's already what the Best
-  // Deal column itself means, so the tooltip is just the shop, plus a short dash-separated
-  // record note when it's also a low — one consistent shape rather than a different sentence
-  // per case, so the 🔥/★ badges have a plain-language explanation right there for anyone who
-  // hasn't already puzzled them out from color alone.
-  if (row.bestDealShop) {
-    const record = isAllTimeLow ? ' — all-time low' : isYearLow ? ' — 1-year low' : '';
-    span.title = `${row.bestDealShop}${record}`;
-  }
-  return span;
-}
-
-// How much cheaper the best deal is than Steam Full Price, as a whole percentage — computed
-// here (in loadPrices, from the same response's steamRegular/bestDeal.price) rather than taken
-// from ITAD's own per-deal `cut` field, deliberately: `cut` is that shop's own discount off
-// *its own* regular price, which shops set independently and isn't consistent from row to row,
-// whereas Steam Full Price is one stable, Valve-set anchor this app already treats as the
-// reference price throughout — every row's Discount ends up answering the same "vs. buying it
-// on Steam" question. Best Deal is defined as the cheapest price across *every* shop including
-// Steam, so `bestDealAmt <= steamRegularAmt` always holds — this can't go negative in practice.
-function discountPct(bestDealAmt, steamRegularAmt) {
-  if (!(steamRegularAmt > 0) || bestDealAmt == null) return null;
-  return Math.round((1 - bestDealAmt / steamRegularAmt) * 100);
-}
-// `0` (the best deal genuinely isn't any cheaper than Steam Full Price — distinct from
-// `null`/`undefined`, which mean "no data"/"still loading") renders the same as missing data: a
-// flat "0%" reads as noise next to every other row's real discount, and nothing else in this
-// column set treats a confirmed zero differently from "nothing to show" either.
-function renderCut(v) {
-  if (v === undefined) return document.createTextNode('…');
-  if (v == null || v === 0) return document.createTextNode('—');
-  return document.createTextNode(`-${v}%`);
-}
-
-// Categorizes a row's current best deal so it can be filtered/grouped on directly, rather than
-// only eyeballed off the Best Deal cell's 🔥/★ badge (which itself only distinguishes all-time
-// vs. 1yr low, not 3mo). Priority order top-to-bottom, same "highest record wins" logic
-// renderBestDeal's own badge uses, extended one tier further: a row lands in the first one it
-// qualifies for. 'On Sale' is the catch-all for a real discount that isn't (yet) any kind of
-// historical low; 'Not Discounted' is a confirmed bestDealCut === 0, kept distinct from missing
-// price data entirely (no ITAD data yet / still loading), which falls through to null/undefined
-// same as every other price column here — see PRICE_STATUS_COLUMN's own format below.
-function computePriceStatus(row) {
-  if (row.bestDealPrice === undefined) return undefined;
-  if (row.bestDealPrice == null) return null;
-  if (row.lowAll != null && row.bestDealPrice <= row.lowAll) return 'All-Time Low';
-  if (row.lowY1  != null && row.bestDealPrice <= row.lowY1)  return '1yr Low';
-  if (row.lowM3  != null && row.bestDealPrice <= row.lowM3)  return '3mo Low';
-  if (row.bestDealCut == null) return null;
-  return row.bestDealCut > 0 ? 'On Sale' : 'Not Discounted';
-}
-// Single source of truth for Price Status, worst deal to best — both the column's `compare`
-// (via PRICE_STATUS_ORDER, same "ordered array + indexOf" shape as PRODUCTION_TIER_ORDER/
-// PROTON_TIER_ORDER above) and renderPriceStatus's badge/color below are derived from this one
-// list, so the sort order and the visual "how good is this deal" ramp can't drift out of sync
-// with each other the way two separately hand-maintained arrays could. `defaultSortDir: 'desc'`
-// on the column then shows the best deals (All-Time Low) first on a fresh click.
-//
-// color/icon reuse renderBestDeal's own treatment verbatim for the two tiers it already covers
-// (bright teal + bold + 🔥 for All-Time Low, green + ★ for 1yr Low) rather than a new palette,
-// extended one tier further for 3mo Low — a real record, just over a shorter window, so it gets
-// scoreColor's next tier down (amber) and an outline star (☆) instead of 1yr Low's filled one,
-// reading as "still a record, just a lesser one" rather than inventing an unrelated icon. On
-// Sale/Not Discounted stay plain, uncolored, no icon — not being a record isn't a bad thing
-// worth flagging red, so nothing here draws the eye away from the three real record tiers.
-const PRICE_STATUS_TIERS = [
-  { label: 'Not Discounted' },
-  { label: 'On Sale' },
-  { label: '3mo Low',     color: scoreColor(55), icon: ' ☆' },
-  { label: '1yr Low',     color: scoreColor(70), icon: ' ★' },
-  { label: 'All-Time Low', color: scoreColor(90), icon: ' 🔥', bold: true },
-];
-const PRICE_STATUS_ORDER = PRICE_STATUS_TIERS.map(t => t.label);
-const comparePriceStatus = compareMissingLast((a, b) =>
-  PRICE_STATUS_ORDER.indexOf(a) - PRICE_STATUS_ORDER.indexOf(b));
-function renderPriceStatus(v) {
-  if (v === undefined) return document.createTextNode('…');
-  if (v == null) return document.createTextNode('—');
-  const tier = PRICE_STATUS_TIERS.find(t => t.label === v);
-  if (!tier?.color) return document.createTextNode(v); // On Sale / Not Discounted — plain text
-  const span = document.createElement('span');
-  span.style.color = tier.color;
-  if (tier.bold) span.style.fontWeight = '700';
-  span.textContent = v + tier.icon;
-  return span;
-}
-const PRICE_STATUS_COLUMN = {
-  key: 'priceStatus', label: 'Price Status', groupable: true,
-  value: computePriceStatus, format: v => v === undefined ? '…' : v ?? '—', render: renderPriceStatus,
-  compare: comparePriceStatus, defaultSortDir: 'desc',
+// `compare: compareNumMissingLast` — without it, a `null` ("Varies", no fixed price — see
+// renderTierPrice above) coerces to 0 under the column's default numeric comparator, which
+// would sort every "Build Your Own" bundle's games as if they were the single cheapest thing
+// in the table under the default ascending Tier Price sort. Pinned last instead, same as
+// every other "missing data" numeric column in this app.
+// Grouped via the same PRICE_TIERS breakpoints gameColumns.js's own price columns use, except a
+// missing tier price means "Varies" (a Build Your Own bundle's pick-and-mix pricing — see
+// renderTierPrice above), not "no data" — its own `missingLabel` reflects that distinction
+// instead of the generic '—' the other price columns' groups fall back to.
+const TIER_PRICE_COLUMN = {
+  key: 'tierPrice', label: 'Tier Price', type: 'number', groupable: true,
+  format: v => v == null ? 'Varies' : v === 0 ? 'Free' : v.toFixed(2), render: renderTierPrice,
+  compare: compareNumMissingLast, defaultSortDir: 'asc',
+  groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier, 'Varies'), keepVisibleWhenGrouped: true,
 };
+const ADDON_COLUMN =
+  { key: 'addon', label: 'Add-on', groupable: true, format: v => v ? 'Add-on' : 'Base', render: renderAddonBadge };
 
-const BUNDLE_COLUMNS = [
-  // ── Identity ────────────────────────────────────────────────────────────────
-  { key: 'capsule', label: '', width: 128, sortable: false, filterable: false, groupable: false,
-    value: () => null, render: renderThumb },
-  { key: 'name',       label: 'Name',       filterable: false, groupable: false, format: fmt.str },
-
-  // ── Bundle-specific ─────────────────────────────────────────────────────────
-  // `compare: compareNumMissingLast` — without it, a `null` ("Varies", no fixed price — see
-  // renderTierPrice above) coerces to 0 under the column's default numeric comparator, which
-  // would sort every "Build Your Own" bundle's games as if they were the single cheapest thing
-  // in the table under the default ascending Tier Price sort. Pinned last instead, same as
-  // every other "missing data" numeric column in this file.
-  // Grouped via the same PRICE_TIERS breakpoints as the other price columns below, except a
-  // missing tier price means "Varies" (a Build Your Own bundle's pick-and-mix pricing — see
-  // renderTierPrice above), not "no data" — its own `missingLabel` reflects that distinction
-  // instead of the generic '—' the other price columns' groups fall back to.
-  { key: 'tierPrice',  label: 'Tier Price', type: 'number', groupable: true, format: v => v == null ? 'Varies' : v === 0 ? 'Free' : v.toFixed(2), render: renderTierPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier, 'Varies'), keepVisibleWhenGrouped: true },
-  { key: 'addon',      label: 'Add-on',     groupable: true, format: v => v ? 'Add-on' : 'Base', render: renderAddonBadge },
-
-  // ── Steam pricing (IsThereAnyDeal) ──────────────────────────────────────────
-  // Not part of the bundle response itself — fetched separately (POST /api/prices, right after
-  // the game-details stream starts — see loadPrices below) since it's a distinct
-  // upstream call with its own per-(gid,country) cache tier, unlike tierPrice/addon above
-  // which come straight off the bundle object already in hand. Hidden by default — Best Deal
-  // and Discount (below) already answer "is this worth buying" without it, so seeing the
-  // absolute Steam price too every time is rarely necessary; it's kept as its own column
-  // (rather than removed) for anyone who wants the exact number, or to sort/group by it. Named
-  // "Steam Full Price" rather than the shorter "Steam Price" specifically to make clear it's
-  // the non-discounted list price, not whatever Steam happens to be charging today.
-  { key: 'steamRegular', label: 'Steam Full Price', type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
-  // The cheapest *current* price across every shop ITAD tracks for this game (Steam included) —
-  // the "where do I actually buy this for less, right now" answer, as opposed to Steam Full
-  // Price (Steam's own non-discounted list price) or the historical lows below (what something
-  // has sold for at some point, not necessarily today). Visible by default, alongside Tier
-  // Price and Discount, precisely to answer "is this bundle actually a good deal" at a glance.
-  // `renderBestDeal` colors/badges the price itself when it's at or below a historical low (🔥
-  // all-time, ★ 1yr) rather than showing the shop name in the cell — the shop is still
-  // available as its own column (`bestDealShop`, hidden by default) for anyone who wants to
-  // group/filter by "which shop currently has the best price", but cluttering the price cell
-  // itself with it wasn't worth losing the room for the low-price indicator, judged the more
-  // actionable of the two at a glance. All-Time Low itself is hidden by default now that Best
-  // Deal's own color/badge already answers "is this a record low" without a separate column —
-  // it's kept, not removed outright, since the exact number is still sometimes worth seeing
-  // (e.g. how far above the record low the deal actually is), just not something worth showing
-  // by default alongside the other price-ish columns.
-  { key: 'bestDealPrice', label: 'Best Deal',     type: 'number', groupable: true, format: fmt.num, render: renderBestDeal, compare: compareNumMissingLast, defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
-  // How much cheaper the best deal is than Steam Full Price (`discountPct`, computed in
-  // loadPrices below — see its own comment for why this is computed against Steam's price
-  // rather than taken from ITAD's own per-deal "cut" field). Rendered with a leading "-"
-  // (`renderCut`) and "—" for a deal that isn't actually any cheaper than Steam (`0`) — real
-  // data, not a missing value, but not worth a "-0%" reading either. Visible by default
-  // alongside Best Deal.
-  // Bucketed in fixed 25-point steps (0-25%/25-50%/50-75%/75-100%) rather than PRICE_TIERS'
-  // hand-picked breakpoints above — a percentage is already bounded 0-100 with no long tail to
-  // worry about, so there's no reason to reach for anything fancier than an even step.
-  { key: 'bestDealCut',   label: 'Discount',      type: 'number', groupable: true, format: fmt.num, render: renderCut, compare: compareNumMissingLast, defaultSortDir: 'desc',
-    groupValue: withMissingGroup(bucketNumericRange(25)), groupFormat: formatMissingGroup(formatNumericRange(25, '%')), keepVisibleWhenGrouped: true },
-  PRICE_STATUS_COLUMN,
-  { key: 'bestDealShop',   label: 'Best Deal Shop', groupable: true, format: fmt.str },
-  { key: 'lowAll',        label: 'All-Time Low',  type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
-  { key: 'lowY1',          label: '1yr Low',      type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
-  { key: 'lowM3',          label: '3mo Low',      type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
-
-  // ── Scores & reviews ────────────────────────────────────────────────────────
-  { key: 'steamdbRating',    label: 'Weighted Rating',  type: 'number', groupable: false, format: fmt.numRound, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
-  { key: 'score',            label: 'Wilson Score',    type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
-  { key: 'positivePct',      label: 'Steam %',         type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
-  { key: 'metacritic',       label: 'Metacritic Score',type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
-  { key: 'reviewsTotal',     label: 'Review Count',    type: 'number', groupable: true, format: fmt.ct, defaultSortDir: 'desc',
-    groupValue: withMissingGroup(halfDecadeBucket), groupFormat: formatMissingGroup(formatHalfDecadeBucket('', '0')),
-    keepVisibleWhenGrouped: true },
-
-  // ── How Long To Beat ────────────────────────────────────────────────────────
-  { key: 'hltbAll',          label: 'All (h)',         type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')), keepVisibleWhenGrouped: true },
-  { key: 'hltbMain',         label: 'Main (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')), keepVisibleWhenGrouped: true },
-  { key: 'hltbExtra',        label: '+Extra (h)',      type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')), keepVisibleWhenGrouped: true },
-  { key: 'hltbCompletionist',label: '100% (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')), keepVisibleWhenGrouped: true },
-
-  // ── Dates ───────────────────────────────────────────────────────────────────
-  { key: 'releaseDate',      label: 'Released',     type: 'date', groupable: true, format: fmt.str,
-    parseDate: endOfReleasePeriod, compare: compareDateMissingLast, render: renderReleaseDate,
-    defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
-    groupValue: withMissingGroup(bucketDatePart('year', endOfReleasePeriod)),
-    groupFormat: formatMissingGroup(formatDatePart('year')), keepVisibleWhenGrouped: true },
-
-  // ── Classification ──────────────────────────────────────────────────────────
-  { key: 'genres',           label: 'Genres',       groupable: true, format: fmt.arr, keepVisibleWhenGrouped: true },
-  { key: 'categories',       label: 'Categories',   groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
-  { key: 'tags',             label: 'Tags',         groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
-  { key: 'developers',       label: 'Developer',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
-  { key: 'publishers',       label: 'Publisher',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
-  { key: 'languages',        label: 'Languages',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
-  { key: 'type',             label: 'Type',         groupable: true, format: v => v || 'Unknown' },
-  { key: 'productionTier',   label: 'Production Tier (est.)', groupable: true, format: fmt.str, compare: compareProductionTier, defaultSortDir: 'desc' },
-
-  // ── Compatibility ───────────────────────────────────────────────────────────
-  { key: 'platforms',        label: 'Platforms',    groupable: true, format: fmt.arr, keepVisibleWhenGrouped: true },
-  { key: 'protondb',         label: 'ProtonDB',     groupable: true, format: fmt.str, render: renderProtonBadge, compare: compareProtonTier, defaultSortDir: 'desc' },
-
-  // ── Extras ──────────────────────────────────────────────────────────────────
-  { key: 'hasDemo',          label: 'Demo',         groupable: true, format: v => v === undefined ? '…' : v ? 'Demo' : '—', render: renderDemoBadge, defaultSortDir: 'desc' },
-  { key: 'achievementCount', label: 'Achievements', type: 'number', groupable: true, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'desc' },
-  { key: 'dlcCount',         label: 'DLC Count',    type: 'number', groupable: true, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'desc' },
-];
+// The Bundles page's own column list — CORE_COLUMNS (public/gameColumns.js) plus Tier Price/
+// Add-on right after Name, and this page's price cluster (PRICE_COLUMNS — the same shared
+// cluster the Wishlist tab gets, in the same relative position: right after its own identity/
+// page-specific columns, before Scores & reviews) right after Add-on.
+const BUNDLE_COLUMNS = insertColumnsAfter(
+  insertColumnsAfter(CORE_COLUMNS, 'name', TIER_PRICE_COLUMN, ADDON_COLUMN),
+  'addon', ...PRICE_COLUMNS
+);
 
 // Steam Full Price stays hidden by default — Best Deal + Discount (ITAD's own "cut" on that
 // deal) together already answer "is this actually worth buying" without needing a third column
@@ -1066,9 +676,10 @@ async function loadPrices(resolved) {
       row.lowY1          = info.lowY1?.amount          ?? null;
       row.lowM3          = info.lowM3?.amount          ?? null;
       // Always set directly from this batch's own response — never conditionally backfilled
-      // off the bundle's own tier currency (see the comment on formatMoney/renderPrice above
-      // for why those two can legitimately disagree). Every figure in one /games/prices/v3
-      // response is in the same currency, so any of them is an equally valid source here.
+      // off the bundle's own tier currency (see the comment on formatMoney (public/utils.js)/
+      // renderPrice (public/gameColumns.js) for why those two can legitimately disagree). Every
+      // figure in one /games/prices/v3 response is in the same currency, so any of them is an
+      // equally valid source here.
       row.priceCurrency = info.steamRegular?.currency ?? info.bestDeal?.price?.currency ?? info.lowAll?.currency ?? info.lowY1?.currency ?? info.lowM3?.currency ?? null;
       markRowChanged(g.appid);
       if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
@@ -1174,7 +785,7 @@ async function openBundle(bundle, { preserveGameParam = false, restoreShot = nul
     name: g.title,
     tierPrice: g.tierPrice,
     tierCurrency: g.tierCurrency,
-    priceCurrency: undefined, // set by loadPrices — see the comment on formatMoney/renderPrice above for why this is a separate field from tierCurrency
+    priceCurrency: undefined, // set by loadPrices — see the comment on formatMoney (utils.js)/renderPrice (gameColumns.js) for why this is a separate field from tierCurrency
     addon: g.addon,
     steamRegular: undefined, bestDealPrice: undefined, bestDealShop: undefined, bestDealUrl: undefined, bestDealCut: undefined,
     lowAll: undefined, lowY1: undefined, lowM3: undefined,

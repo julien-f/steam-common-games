@@ -1,541 +1,67 @@
 'use strict';
 
 import { createDataTable, syncViewToUrl, resetView } from '@vates/data-table-vanilla';
+import { processData, searchData, DEFAULT_LABELS, bucketDatePart, formatDatePart } from '@vates/data-table-core';
 import {
-  processData, searchData, DEFAULT_LABELS, compareMissingLast,
-  bucketNumericRange, bucketDatePart, formatNumericRange, formatDatePart,
-  bucketLogRange, formatLogRange,
-} from '@vates/data-table-core';
+  fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareDateMissingLast,
+  withMissingGroup, formatMissingGroup, halfDecadeBucket, formatHalfDecadeBucket,
+  protonDbValue, TYPE_LABELS, discountPct,
+} from '/gameColumns.js';
 
-const fmt = {
-  loading: v => v === undefined ? '…' : v,
-  num:  v => v === undefined ? '…' : v === null ? '—' : String(v),
-  numRound: v => v === undefined ? '…' : v === null ? '—' : String(Math.round(v)),
-  dec1: v => v === undefined ? '…' : v === null ? '—' : Number(v).toFixed(1),
-  str:  v => v === undefined ? '…' : v || '—',
-  ct:   v => v === undefined ? '…' : v === null ? '—' : Number(v).toLocaleString(),
-  arr:  v => v === undefined ? '…' : Array.isArray(v) ? (v.length ? v.join(', ') : '—') : (v || '—'),
+// ── Library-tab-only columns — an owned game has playtime/last-played data a wishlist or
+// bundle game doesn't (see gameColumns.js's own header comment for what's shared vs.
+// page-specific and why everything else lives there instead).
+//
+// No compare override here either — 0 hours played is real data (owned, never launched), not
+// a stand-in for "unknown," so the default numeric sort is already correct. `defaultSortDir:
+// 'desc'` still applies — "what have I sunk the most hours into" is the more common question
+// than the reverse.
+// Same log-scale reasoning as reviewsTotal (gameColumns.js) — Steam playtime is famously
+// long-tailed (thousands of hours in a handful of games next to dozens barely launched),
+// verified against a real library where p50-p90 of played games alone spanned 1.1h-9.8h,
+// entirely inside one base-10 decade. `totalMin / 60` (see loadLibrary below) is always a real
+// number, never `null` — a slot that owns but never played a game still sums to a real 0 — so
+// no `withMissingGroup` wrapper is needed here, unlike reviewsTotal/hltb*/the date columns.
+const PLAYTIME_COLUMN = {
+  key: 'playtime', label: 'Played (h)', type: 'number', groupable: true,
+  format: v => v > 0 ? Number(v).toFixed(1) : '—', defaultSortDir: 'desc',
+  groupValue: halfDecadeBucket, groupFormat: formatHalfDecadeBucket('h', 'Not played'),
+  keepVisibleWhenGrouped: true,
+};
+// Most recent `rtime_last_played` across every account merged into this row (a Steam Family
+// slot unions several accounts — see groupByOwnership — so "last played" here means "by
+// anyone in the slot", not any one account in particular). '' (never played by anyone in the
+// slot) is real data, not missing data, so no compare override is needed beyond the shared
+// date comparator below, which already pins an empty string last.
+// Hidden by default (see DEFAULT_VISIBLE) — Steam's GetOwnedGames only returns real
+// rtime_last_played data for the account whose own key is querying it; every other account
+// comes back with it absent, indistinguishable from "owned but never launched". Most searches
+// here involve at least one non-key-owner account, so a visible-by-default column would read
+// as meaningful data when it's often just an API restriction. updateLastPlayedTooltip() below
+// adds a header tooltip warning specifically when every loaded row shows no value at all —
+// the tell for "this whole column is unavailable", not "nobody's touched their library".
+// `defaultSortDir: 'desc'` — "last modified"-style date column, the textbook case the option's
+// own doc comment cites; a first click should surface who's been played most recently, not
+// dredge up the stalest entry. `defaultValueSort` (also new in 0.8.0) opens the date filter
+// tree most-recent-year-first instead of the tree's own default oldest-first — `by: 'alpha'`
+// is what a date tree actually uses (there's no by-count order for a tree of date branches;
+// see the Grouped columns / Date filter tree docs), just flipped to descending.
+// Grouped by year (`bucketDatePart('year')`) rather than the exact date — an exact last-played
+// date is close to unique per game, so ungrouped grouping would produce close to one row-sized
+// group per game, the same "continuous column" problem reviewsTotal/playtime have. "Never
+// played by anyone in the slot" is `''`, not `null` (see fmtLastPlayed in utils.js), hence the
+// explicit `isMissing` override — `withMissingGroup`'s default only checks for `null`/`undefined`.
+const LAST_PLAYED_COLUMN = {
+  key: 'lastPlayed', label: 'Last Played', type: 'date', groupable: true, format: fmt.str,
+  compare: compareDateMissingLast, defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
+  groupValue: withMissingGroup(bucketDatePart('year'), v => v == null || v === ''),
+  groupFormat: formatMissingGroup(formatDatePart('year')), keepVisibleWhenGrouped: true,
 };
 
-// Bare colored number rather than a progress bar — a bar's fill color carries the same
-// good/bad signal the number's color already does, and with up to four score-ish columns
-// (Weighted Rating, Wilson Score, Steam %, Metacritic Score) visible at once, bars add visual
-// weight without adding information. Uses the global `scoreColor()` from utils.js so the
-// color scale matches the side panel's score display exactly, instead of a second copy of
-// the same thresholds.
-// `computeSteamdbRating` returns unrounded precision (0-100) so sort/group operate on the full
-// number rather than the display-rounded integer — round only where displayed (here, and in
-// `fmt.numRound`/`applyDetailsEvent` below).
-function renderScoreNum(v) {
-  if (v === undefined) return document.createTextNode('…');
-  if (v === null) return document.createTextNode('—');
-  const rounded = Math.round(v);
-  const span = document.createElement('span');
-  span.style.color = scoreColor(rounded);
-  span.textContent = String(rounded);
-  return span;
-}
-
-// ProtonDB's Linux/Steam Deck compatibility tiers, worst to best (see the matching color map
-// in public/panel.js, which renders the same badge in the side panel — kept as a separate copy
-// there since panel.js is a classic script and library.js a module, not for any semantic
-// reason). "Native" (an actual Linux port, no Proton needed) ranks above "Platinum" (flawless
-// *through* Proton). No "pending" entry — extractProtonDb (lib/steam.js) already collapses that
-// tier to null server-side, since "too few reports to rate yet" isn't a quality tier at all, so
-// it never reaches the client as a value that would need a place in this ordering.
-const PROTON_TIER_ORDER = ['borked', 'bronze', 'silver', 'gold', 'platinum', 'native'];
-const PROTON_TIER_COLORS = {
-  borked: '#b91c1c', bronze: '#8b4513', silver: '#757575', gold: '#b8860b',
-  platinum: '#5b6b85', native: '#15803d',
-};
-
-// Backing value is the plain capitalized tier name ("Gold", "Platinum") — @vates/data-table-core
-// 0.7.0 added a per-column `compare` option (see the ProtonDB column below) precisely so a
-// categorical column can sort by real quality order without needing display text to double as
-// a sort key; see https://github.com/vatesfr/data-table/issues/15 for the request behind it (an
-// earlier version of this column baked a rank digit into the value itself — "3 Gold" — to work
-// around not having this, which leaked into the filter checklist/search text; not needed anymore).
-function protonDbValue(tier) {
-  if (PROTON_TIER_ORDER.indexOf(tier) === -1) return null;
-  return tier.charAt(0).toUpperCase() + tier.slice(1);
-}
-
-// Friendly labels for Steam's raw appdetails `type` enum (see the `type` comment in
-// lib/steam.js's extractAppDetails) — backs the Type column below. `game` isn't listed:
-// applyDetailsEvent falls back to the raw string itself for any value not in this map, and
-// 'game' reads fine as-is capitalized... except it isn't capitalized raw, so it's listed too
-// for consistent casing. Values Steam is known to actually use for entries that can end up
-// owned/wishlisted (a soundtrack or artbook DLC, not just base games); `demo`/`advertising`
-// are here mostly for completeness — a free demo/ad appid isn't normally something a person
-// owns or wishlists in its own right.
-const TYPE_LABELS = {
-  game: 'Game', dlc: 'DLC', music: 'Soundtrack', video: 'Video',
-  series: 'Series', episode: 'Episode', mod: 'Mod', hardware: 'Hardware', demo: 'Demo',
-  advertising: 'Advertising',
-};
-
-// Worst-to-best ordering for the Production Tier column's `compare` below. `computeProductionTier`
-// (public/utils.js) already returns null for "not enough signal to guess" (DLC, or a priced game
-// with no price data) — `compareMissingLast` handles that the same way every other heuristic/
-// possibly-absent column here does, pinning it last regardless of sort direction.
-const PRODUCTION_TIER_ORDER = ['Indie', 'AA', 'AAA'];
-const compareProductionTier = compareMissingLast((a, b) =>
-  PRODUCTION_TIER_ORDER.indexOf(a) - PRODUCTION_TIER_ORDER.indexOf(b));
-
-// Ordering used by the ProtonDB column's `compare` below — same tier list as protonDbValue.
-// `compareMissingLast` (new in 0.7.0 alongside `compare` itself) pins a missing rating to the
-// end of the sort regardless of ascending/descending, rather than an empty value sorting first
-// under plain ascending lexicographic comparison — games with no ProtonDB data yet shouldn't
-// float to the top just because "" sorts before every real tier name.
-const compareProtonTier = compareMissingLast((a, b) =>
-  PROTON_TIER_ORDER.indexOf(a.toLowerCase()) - PROTON_TIER_ORDER.indexOf(b.toLowerCase()));
-
-// The generic colored-pill treatment (`.status-badge`, shared style.css rule) — shared with
-// renderDemoBadge below rather than each column inventing its own pill styling.
-function renderProtonBadge(v) {
-  if (v === undefined) return document.createTextNode('…');
-  if (!v) return document.createTextNode('—');
-  const span = document.createElement('span');
-  span.className = 'status-badge';
-  span.style.background = PROTON_TIER_COLORS[v.toLowerCase()] || '#52525b';
-  span.textContent = v;
-  return span;
-}
-
-// Same `.status-badge` pill shape as renderProtonBadge above, in the app's own accent blue —
-// the same color and dark-on-blue text the side panel's "🎮 Try the Free Demo" banner already
-// uses (`.panel-demo-banner`, style.css) — so the two read as the same "this game has a demo"
-// signifier rather than introducing a new color/shape just for this column.
-function renderDemoBadge(v) {
-  if (v === undefined) return document.createTextNode('…');
-  if (!v) return document.createTextNode('—');
-  const span = document.createElement('span');
-  span.className = 'status-badge';
-  span.style.background = 'var(--accent)';
-  span.style.color = '#0b1620';
-  span.textContent = 'Demo';
-  return span;
-}
-
-// Ignores `value` and reads `row.capsule` directly — `value` is forced to null on this column
-// (see COLUMNS below) so the raw image URL never surfaces in full-text search matches.
-function renderThumb(_, row) {
-  const img = document.createElement('img');
-  img.className = 'game-thumb';
-  img.alt = '';
-  img.loading = 'lazy';
-  img.width = 120;
-  img.height = 45;
-  if (row.capsule) img.src = row.capsule;
-  img.addEventListener('error', () => { img.style.visibility = 'hidden'; });
-  return img;
-}
-
-// Plain numeric comparator, wrapped so a `null` ("no data" — no reviews, no Metacritic score,
-// no HLTB match) always sorts last regardless of direction. Without this, a `type: 'number'`
-// column's own coercion (`Number(null) === 0`) makes "no data" indistinguishable from an actual
-// zero score/duration — most visibly on `steamdbRating`, the default sort column: a game with
-// zero reviews currently ties with one confirmed 0% positive instead of being set apart from it.
-const compareNumMissingLast = compareMissingLast((a, b) => a - b);
-
-// Steam's release_date.date only gets this coarse ("2026", "Fall 2026", "2026 or later") while
-// a game is still unreleased — once it ships, Steam always returns a specific day. JS's own Date
-// parser anchors whatever it can partially recognize at the START of that period ("2026" -> Jan 1,
-// "October 2026" -> Oct 1), which would sort a still-unreleased game BEFORE games that already
-// shipped earlier that same year/month — backwards, since the real date can only land later.
-// Anchor coarse dates at the END of their stated period instead (the latest point consistent with
-// what Steam told us); a fully-specified date (or wishlist's `dateAdded`, always a precise
-// timestamp) matches none of these patterns and falls through to plain `new Date()` unchanged.
-//
-// A bare year and Q4 of that same year both anchor at Dec 31 — same timestamp, so without a
-// tie-break they wouldn't sort in any defined order relative to each other. "2026" carries less
-// information than "Q4 2026" (it could still land in Q1-Q3), so nudge it 1ms later: a vaguer claim
-// for the same end-of-period ranks just after a more specific one, without disturbing its order
-// against any other, actually-different, day.
-//
-// Steam also uses two placeholders with no date in them at all: "Coming soon" and "To be
-// announced"/"TBA". Deliberately NOT handled here — this function is also the column's
-// `parseDate`, which the table framework reuses for the range-filter bounds and the date-tree
-// filter dropdown, not just sorting. If a placeholder produced a real (if huge) timestamp, one
-// "Coming soon" wishlist row would drag the whole column's computed max to that fake date,
-// squashing every real release date into a sliver of the range slider, and a "released after X"
-// filter would wrongly match games we have no actual date for. Letting them fall through to plain
-// `new Date(s).getTime()` (NaN, same as any other unrecognized string) makes every one of those
-// consumers correctly treat "unreleased" as "no known date" instead of "year 9999". Sort order is
-// handled separately below, by `releaseSortTimestamp`, the only consumer that actually wants a
-// deterministic placeholder position.
-const SEASON_END = { spring: [5, 20], summer: [8, 21], fall: [11, 20], autumn: [11, 20], winter: [2, 19] };
-function endOfReleasePeriod(str) {
-  const s = String(str).trim();
-  let m;
-  if ((m = /^(spring|summer|fall|autumn|winter)\s+(\d{4})$/i.exec(s))) {
-    const [month, day] = SEASON_END[m[1].toLowerCase()];
-    const year = m[1].toLowerCase() === 'winter' ? Number(m[2]) + 1 : Number(m[2]); // winter spills into next year
-    return new Date(year, month, day).getTime();
-  }
-  if ((m = /^Q([1-4])\s+(\d{4})$/i.exec(s))) {
-    return new Date(Number(m[2]), Number(m[1]) * 3, 0).getTime(); // last day of the quarter's final month
-  }
-  if ((m = /^(\d{4})(?:\s+or\s+later)?$/i.exec(s))) {
-    return new Date(Number(m[1]), 11, 31).getTime() + 1; // bare year, or open-ended "2026 or later" — end of that year, nudged 1ms past a same-year Q4 tie
-  }
-  if (/^[A-Za-z]+\s+\d{4}$/.test(s)) {
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth() + 1, 0).getTime(); // month name + year, no day — last day of that month
-  }
-  return new Date(s).getTime();
-}
-
-// Sort-only view of the Released column. "Coming soon" (some info — it's presumably nearer than a
-// distant bare year) and "To be announced"/"TBA" (no info whatsoever) both need to sort after
-// every real or coarse date — including a far-future bare year like "2028" — while still
-// preserving Coming soon < TBA between themselves. Sentinel timestamps anchored past any realistic
-// release year do that; they're deliberately not NaN (unlike a genuinely unrecognized string) so
-// they get a real, deterministic position instead of falling into the null/empty "missing" bucket
-// handled by compareDateMissingLast below. Kept local to the sort comparator (not folded back into
-// endOfReleasePeriod/parseDate) so the range-filter bounds and date-tree — which also read
-// `parseDate` — never see these fake dates; see the comment on endOfReleasePeriod above.
-const COMING_SOON_SENTINEL = new Date(9999, 0, 1).getTime();
-const TBA_SENTINEL         = new Date(9999, 0, 2).getTime();
-function releaseSortTimestamp(str) {
-  const s = String(str).trim();
-  if (/^coming soon$/i.test(s)) return COMING_SOON_SENTINEL;
-  if (/^(to be announced|tba)$/i.test(s)) return TBA_SENTINEL;
-  return endOfReleasePeriod(s);
-}
-
-// Same idea for `type: 'date'` columns (`releaseDate`, wishlist's `dateAdded`) — setting
-// `compare` bypasses the column's own `parseDate`/type coercion too, so a `null` date would
-// otherwise become epoch 1970 via `new Date(null).getTime()` and sort as impossibly old, and a
-// string neither `releaseSortTimestamp` nor plain `new Date()` can make sense of (not one of the
-// recognized coarse forms, and not a valid date either) would sort at a nondeterministic spot via
-// NaN comparisons — both need to be pinned last instead. "Coming soon" and "To be announced" are
-// NOT examples of that — `releaseSortTimestamp` gives them real sentinel positions (see above) so
-// they sort deterministically after every dated/coarse entry instead of landing in this bucket.
-const compareDateMissingLast = compareMissingLast(
-  (a, b) => releaseSortTimestamp(a) - releaseSortTimestamp(b),
-  v => v == null || v === '' || isNaN(releaseSortTimestamp(v)),
-);
-
-// Amber-flags still-unreleased games in the Released column — reuses scoreColor's own
-// mid-tier amber (`#e4a82e`) rather than introducing a new color, so it reads as "notable,
-// not final" the same way a middling score does elsewhere in the table. Backed by Steam's own
-// `comingSoon` flag (see extractAppDetails in lib/steam.js), not by comparing the parsed date
-// to today — a coarse placeholder like "Coming soon" has no parseable date to compare at all.
-function renderReleaseDate(v, row) {
-  if (v === undefined) return document.createTextNode('…');
-  if (!v) return document.createTextNode('—');
-  const span = document.createElement('span');
-  if (row.comingSoon) span.style.color = '#e4a82e';
-  span.textContent = v;
-  return span;
-}
-
-// ── Group-by bucketing for continuous/high-cardinality columns ─────────────────────────────
-// @vates/data-table-core's `groupValue`/`groupFormat` exist precisely so a `type: 'number'`/
-// `type: 'date'` column with a near-unique value per row (an exact review count, an hours-played
-// figure, an exact release date) can still group into a handful of useful buckets instead of one
-// row-sized group per game.
-//
-// Every bucketed column below (and every multi-value/array column — Genres, Tags, Developer,
-// Publisher, Categories, Languages, Platforms) also sets `keepVisibleWhenGrouped: true` (new in
-// `@vates/data-table-core` 0.11.0). Without it, grouping auto-hides the column's own cells since
-// the group header normally already shows the same thing — true for a plain single-value column,
-// but not for these: a bucketed column's header only shows the bucket label (e.g. "3–10h"), losing
-// the row's exact value entirely, and a multi-value column fans a row into one group per value
-// (e.g. a "Tags" row with `["Roguelike", "Deckbuilder"]` appears in both groups), so hiding it
-// would remove the only way to see a row's *other* values while looking at one particular group.
-
-// reviewsTotal and playtime both span several orders of magnitude — a handful of games with
-// millions of reviews or thousands of hours sitting next to dozens with single digits — so a
-// fixed linear step (`bucketNumericRange`) is the wrong tool for either: too small a step and the
-// long tail collapses into one dominant bucket, too large and the 0-100 range where most of the
-// actual variety lives gets flattened into one or two. Half-decade ("1-3-10") log buckets fix
-// both ends — twice the resolution of plain base-10 decades, which checked against a real
-// library's data put the entire 1h-10h range (roughly half of any typical player's *played*
-// games) into a single indistinguishable bucket.
-//
-// The staircase/formatting itself is `bucketLogRange`/`formatLogRange` (new in
-// `@vates/data-table-core` 0.11.0) with a `[1, 3]` division — this app used to hand-roll the same
-// {1, 3, 10, 30, 100, ...} math (and its "30–100" range formatting) before core provided it. The
-// one piece core's `min` option can't express is kept as a thin wrapper below: `min` alone folds a
-// real zero (never played, 0 reviews) into the exact same "<1" bucket as a game briefly played for
-// a few minutes, which reads as the same thing when it isn't. `LogRangeOptions.min` also has no
-// notion of a value being exactly the floor rather than merely below it, so there's no option that
-// gets this split for free.
-const LOG_BUCKET_OPTS = { divisions: [1, 3] }; // base 10 (default), halved via a 1-3-10 grid
-const logBucketValue = bucketLogRange(LOG_BUCKET_OPTS);
-function halfDecadeBucket(value) {
-  const n = Number(value);
-  if (n <= 0) return 0; // covers a real 0 and (via withMissingGroup below) never sees a missing value
-  const bucket = logBucketValue(value);
-  // core's own "below min" sentinel is -Infinity — sorts before the real-zero bucket above, the
-  // opposite of what "played a little" vs. "never played" should mean. Remapped to 0.5 (strictly
-  // between the "Not played" bucket's `0` and the first real decade bucket's `1`) so
-  // `0 < 0.5 < 1 < 3 < ...` stays correct in both sort directions.
-  return bucket === -Infinity ? 0.5 : bucket;
-}
-function formatHalfDecadeBucket(unit, zeroLabel) {
-  const formatBucket = formatLogRange(LOG_BUCKET_OPTS, unit);
-  return keyPart => {
-    const n = Number(keyPart);
-    if (n === 0) return zeroLabel;
-    if (n === 0.5) return formatBucket(-Infinity); // core's own "<1{unit}" label for the sentinel
-    return formatBucket(keyPart);
-  };
-}
-
-// A `groupValue` that returns `null`/`undefined` for a missing value ends up keyed by the empty
-// string once the table's own internals stringify it (`null ?? ''`) — but bucketNumericRange/
-// bucketDatePart don't know that convention; each calls `String(value)`/coerces it *before* any
-// such check, so a genuinely missing `null` column value (a failed rating fetch, an unparseable
-// release date) would come out the other end as the literal string `"null"` and show up as a
-// group header that reads "null" rather than "—". Checking for "missing" ourselves before ever
-// calling the underlying bucket function sidesteps that regardless of which one's used —
-// `lastPlayed`'s "never played by anyone" is `''`, not `null`, so it takes its own `isMissing`.
-function withMissingGroup(bucketFn, isMissing = v => v == null) {
-  return value => isMissing(value) ? null : bucketFn(value);
-}
-// Pairs with withMissingGroup above — the empty-string group key it produces for a missing value
-// needs its own label rather than being handed to a real formatter that has no idea what to do
-// with it (formatDatePart('year') on '' would print '' itself: `new Date('')` is invalid, but
-// still not NaN in a way that function checks for).
-function formatMissingGroup(formatFn, missingLabel = '—') {
-  return keyPart => keyPart === '' ? missingLabel : formatFn(keyPart);
-}
-
-// Price columns (Best Deal, Steam Full Price, the three historical lows) bucket against Steam's
-// own common price tiers ($4.99/$14.99/$29.99/$49.99/$74.99) rather than an evenly-spaced or
-// geometric step — the breakpoints where a player actually thinks "under $5" vs "a $50 game" vs
-// "$75+ premium" don't sit on a fixed multiplier, so neither a plain bucketNumericRange step nor
-// halfDecadeBucket's log grid above reproduces them. Hand-rolled the same "real zero gets its own
-// bucket, distinct from a merely-cheap game" shape halfDecadeBucket already uses (there: 0
-// reviews vs. the log grid; here: Free vs. $0.01-$4.99). No currency symbol in the bucket
-// boundaries themselves (unlike renderPrice's per-row formatMoney) — the selected region's
-// currency isn't fixed to USD, and a hardcoded "$" would mislabel every other currency's amounts.
-// Deliberate separate copy from bundles.js's identical PRICE_TIERS/priceTierBucket/
-// formatPriceTier, same "kept as a separate copy" precedent as this file's other bits relative
-// to bundles.js.
-const PRICE_TIERS = [0, 5, 15, 30, 50, 75, 100]; // bucket lower bounds; 100 is the open-ended "100+" tier
-function priceTierBucket(value) {
-  const n = Number(value);
-  if (n === 0) return -1; // Free — its own bucket, strictly below the "0–5" range of priced games
-  if (!(n > 0)) return null; // missing/NaN/negative
-  for (let i = PRICE_TIERS.length - 1; i >= 0; i--) if (n >= PRICE_TIERS[i]) return PRICE_TIERS[i];
-  return PRICE_TIERS[0];
-}
-function formatPriceTier(keyPart) {
-  const n = Number(keyPart);
-  if (n === -1) return 'Free';
-  const top = PRICE_TIERS[PRICE_TIERS.length - 1];
-  if (n === top) return `${top}+`;
-  return `${n}–${PRICE_TIERS[PRICE_TIERS.indexOf(n) + 1]}`;
-}
-
-// Grouped into sections (identity → scores → HLTB → play time/dates → classification →
-// compatibility → extras) rather than roughly the order each was added to the
-// codebase — with 20+ columns now, an alphabetical or add-order list makes both the column
-// picker and this source file hard to scan. Within a section, the most commonly-useful/
-// default-visible column leads. WISHLIST_COLUMNS (below) inserts its two wishlist-only columns
-// into the matching sections rather than tacking them on at the end, for the same reason.
-const COLUMNS = [
-  // ── Identity ────────────────────────────────────────────────────────────────
-  { key: 'capsule', label: '', width: 128, sortable: false, filterable: false, groupable: false,
-    value: () => null, render: renderThumb },
-  // Not groupable — a game's name is (almost always) unique per row, same "one group per row is
-  // useless" reasoning steamdbRating's own groupable:false comment below already gives; `priority`
-  // (Wishlist Rank) gets the same treatment further down for the identical reason.
-  { key: 'name',             label: 'Name',            filterable: false, groupable: false },
-
-  // ── Scores & reviews ────────────────────────────────────────────────────────
-  // The default-visible score: a Bayesian-shrinkage formula adapted from SteamDB's own (see
-  // computeSteamdbRating in utils.js, tuned to converge to the raw ratio faster than SteamDB's
-  // published version does) — shown first as the app's primary rating. Stored
-  // unrounded so sort/default-sort operate on full precision (two games both displaying "97"
-  // still order deterministically); not groupable for the same reason — grouping keys off the
-  // raw value, and a near-unique float per game would produce a useless one-row-per-group split.
-  // `defaultSortDir: 'desc'` (new in @vates/data-table-core 0.8.0) on this and the other three
-  // score-ish columns below — a fresh click on any of them should show the best-rated games
-  // first, not the worst; without it a first click started every numeric column ascending
-  // (worst-first) regardless of what the number actually means. Only changes where a *new* sort
-  // entry starts; it doesn't touch this column's own already-applied `DEFAULT_SORT` above.
-  { key: 'steamdbRating',    label: 'Weighted Rating',  type: 'number', groupable: false, format: fmt.numRound, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
-  // Wilson score lower bound — statistically rigorous but harder to explain than SteamDB's
-  // current formula (which is why it isn't the default-visible score anymore); kept available
-  // for anyone who wants the more conservative, confidence-bound number instead.
-  { key: 'score',            label: 'Wilson Score',    type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
-  // Raw positive/total ratio — the plain percentage Steam's own store page shows, as opposed to
-  // the two adjusted scores above. No "%" in the cell (the column header already says so) —
-  // same bare colored number treatment as the other three score columns for consistency.
-  { key: 'positivePct',      label: 'Steam %',         type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
-  // Grouped with the other user-review scores above rather than off near HLTB/playtime — it's a
-  // critic (not player) score, but it's still one of the four "how good is this game" numbers,
-  // and keeping all of them contiguous makes them easier to compare at a glance.
-  { key: 'metacritic',       label: 'Metacritic Score',type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
-  // No compare override here — 0 reviews is a real, meaningful value (not "no data" standing in
-  // for one), so the default numeric sort already treats it correctly, unlike the score/HLTB
-  // columns above and below. `defaultSortDir: 'desc'` still applies though — the most-reviewed
-  // (most talked-about) games are the more useful thing to see on a first click, same reasoning
-  // as the score columns just without the missing-data wrinkle. `null` (a failed rating fetch, not
-  // a confirmed 0) is still possible though, hence `withMissingGroup` on the grouping side below —
-  // see its own comment above for why that needs to be checked explicitly rather than left to
-  // halfDecadeBucket's own `Number(null) === 0` coercion, which would otherwise silently fold a
-  // failed fetch into the same group as a genuinely zero-review game.
-  { key: 'reviewsTotal',     label: 'Review Count',    type: 'number', groupable: true, format: fmt.ct, defaultSortDir: 'desc',
-    groupValue: withMissingGroup(halfDecadeBucket), groupFormat: formatMissingGroup(formatHalfDecadeBucket('', '0')),
-    keepVisibleWhenGrouped: true },
-
-  // ── How Long To Beat ────────────────────────────────────────────────────────
-  // "All PlayStyles" listed first among the HLTB columns — same convention as the side panel,
-  // which shows it leftmost precisely because it's a single representative number rather than
-  // one specific playstyle (see the comment on `all` in lib/hltb.js). Keeping it first here too
-  // means toggling on Main/+Extra/100% doesn't push it out of its default-visible position.
-  // HLTB times are bounded to roughly 0-150h for the overwhelming majority (a handful of
-  // open-world completionist runs into the 300-500h range, nothing like reviewsTotal/playtime's
-  // spread into the millions/thousands) — a plain linear step stays meaningful across that whole
-  // range, unlike those two, so a 10h `bucketNumericRange` is the right tool here rather than the
-  // log buckets above. `null` (no HLTB match found) needs the same `withMissingGroup` treatment.
-  { key: 'hltbAll',          label: 'All (h)',         type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')),
-    keepVisibleWhenGrouped: true },
-  { key: 'hltbMain',         label: 'Main (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')),
-    keepVisibleWhenGrouped: true },
-  { key: 'hltbExtra',        label: '+Extra (h)',      type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')),
-    keepVisibleWhenGrouped: true },
-  { key: 'hltbCompletionist',label: '100% (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')),
-    keepVisibleWhenGrouped: true },
-
-  // ── Play time & dates ───────────────────────────────────────────────────────
-  // No compare override here either — 0 hours played is real data (owned, never launched), not
-  // a stand-in for "unknown," so the default numeric sort is already correct. `defaultSortDir:
-  // 'desc'` still applies — "what have I sunk the most hours into" is the more common question
-  // than the reverse.
-  // Same log-scale reasoning as reviewsTotal above — Steam playtime is famously long-tailed
-  // (thousands of hours in a handful of games next to dozens barely launched), verified against a
-  // real library where p50-p90 of played games alone spanned 1.1h-9.8h, entirely inside one
-  // base-10 decade. `totalMin / 60` (see loadLibrary below) is always a real number, never `null`
-  // — a slot that owns but never played a game still sums to a real 0 — so no `withMissingGroup`
-  // wrapper is needed here, unlike reviewsTotal/hltb*/the three date columns.
-  { key: 'playtime',         label: 'Played (h)',      type: 'number', groupable: true,
-    format: v => v > 0 ? Number(v).toFixed(1) : '—', defaultSortDir: 'desc',
-    groupValue: halfDecadeBucket, groupFormat: formatHalfDecadeBucket('h', 'Not played'),
-    keepVisibleWhenGrouped: true },
-  // Most recent `rtime_last_played` across every account merged into this row (a Steam Family
-  // slot unions several accounts — see groupByOwnership — so "last played" here means "by
-  // anyone in the slot", not any one account in particular). '' (never played by anyone in the
-  // slot) is real data, not missing data, so no compare override is needed beyond the shared
-  // date comparator below, which already pins an empty string last.
-  // Hidden by default (see DEFAULT_VISIBLE) — Steam's GetOwnedGames only returns real
-  // rtime_last_played data for the account whose own key is querying it; every other account
-  // comes back with it absent, indistinguishable from "owned but never launched". Most searches
-  // here involve at least one non-key-owner account, so a visible-by-default column would read
-  // as meaningful data when it's often just an API restriction. updateLastPlayedTooltip() below
-  // adds a header tooltip warning specifically when every loaded row shows no value at all —
-  // the tell for "this whole column is unavailable", not "nobody's touched their library".
-  // `defaultSortDir: 'desc'` — "last modified"-style date column, the textbook case the option's
-  // own doc comment cites; a first click should surface who's been played most recently, not
-  // dredge up the stalest entry. `defaultValueSort` (also new in 0.8.0) opens the date filter
-  // tree most-recent-year-first instead of the tree's own default oldest-first — `by: 'alpha'`
-  // is what a date tree actually uses (there's no by-count order for a tree of date branches;
-  // see the Grouped columns / Date filter tree docs), just flipped to descending.
-  // Grouped by year (`bucketDatePart('year')`) rather than the exact date — an exact release/
-  // last-played date is close to unique per game, so ungrouped grouping would produce close to
-  // one row-sized group per game, the same "continuous column" problem reviewsTotal/playtime have
-  // above. "Never played by anyone in the slot" is `''`, not `null` (see fmtLastPlayed in
-  // utils.js), hence the explicit `isMissing` override — `withMissingGroup`'s default only checks
-  // for `null`/`undefined`.
-  { key: 'lastPlayed',       label: 'Last Played',   type: 'date', groupable: true, format: fmt.str,
-    compare: compareDateMissingLast, defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
-    groupValue: withMissingGroup(bucketDatePart('year'), v => v == null || v === ''),
-    groupFormat: formatMissingGroup(formatDatePart('year')), keepVisibleWhenGrouped: true },
-  // Same year-bucketed grouping, using this column's own `parseDate` (endOfReleasePeriod) so a
-  // fuzzy "Fall 2026"/bare-year release groups under the year it actually resolves to instead of
-  // bucketDatePart's own default `new Date(value).getTime()`, which can't make sense of those
-  // forms at all. `null` (no metadata) is the only missing case here — "Coming soon"/"TBA" are
-  // real (if imprecise) strings that endOfReleasePeriod resolves to an actual year, not `null`.
-  { key: 'releaseDate',      label: 'Released',     type: 'date', groupable: true, format: fmt.str,
-    parseDate: endOfReleasePeriod, compare: compareDateMissingLast, render: renderReleaseDate,
-    defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
-    groupValue: withMissingGroup(bucketDatePart('year', endOfReleasePeriod)),
-    groupFormat: formatMissingGroup(formatDatePart('year')), keepVisibleWhenGrouped: true },
-
-  // ── Classification ──────────────────────────────────────────────────────────
-  { key: 'genres',           label: 'Genres',       groupable: true, format: fmt.arr, keepVisibleWhenGrouped: true },
-  // `defaultValueSort: { by: 'count', dir: 'desc' }` (new in 0.8.0) — Developer/Publisher/Tags/
-  // Categories are all higher-cardinality than Genres (a small, well-known fixed list that reads
-  // fine alphabetically), so their filter checklists open "most common first" instead of A→Z;
-  // still just the starting point — `cycleValueSort`'s toggle still cycles through all 4 states
-  // the same as before.
-  { key: 'categories',       label: 'Categories',   groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
-  { key: 'tags',             label: 'Tags',         groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
-  { key: 'developers',       label: 'Developer',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
-  { key: 'publishers',       label: 'Publisher',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
-  // Parsed from Steam's `supported_languages` HTML string (see parseSupportedLanguages in
-  // lib/steam.js) — same high-cardinality multi-value treatment as Tags/Developers/Publisher.
-  { key: 'languages',        label: 'Languages',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
-  // Steam's own content-type for this appid (see TYPE_LABELS above and the `type` comment in
-  // lib/steam.js's extractAppDetails) — the overwhelming majority of rows are 'Game', but a
-  // library/wishlist can genuinely contain soundtrack ('Soundtrack'), video, or DLC entries
-  // too. Hidden by default for exactly that reason (almost every row would show the same
-  // value), but groupable/filterable so a search can be narrowed to just base games, or
-  // audited for stray non-game entries. `null` ("Unknown") only when store metadata itself
-  // failed to load or Steam's response omitted the field.
-  { key: 'type',             label: 'Type',         groupable: true, format: v => v || 'Unknown' },
-  // Estimated, not authoritative — see computeProductionTier's doc comment (public/utils.js)
-  // and CLAUDE.md's AAA/AA/Indie section. The label spells out "(est.)" rather than relying on
-  // a hover tooltip, since @vates/data-table-vanilla has no per-column header-tooltip option to
-  // hang a caveat on. Hidden by default (see DEFAULT_VISIBLE) for the same reason Wilson
-  // Score/Steam %/Achievements are — a secondary number, not the primary thing most searches
-  // here care about, and one that's explicitly a best-effort guess on top of that.
-  { key: 'productionTier',   label: 'Production Tier (est.)', groupable: true, format: fmt.str,
-    compare: compareProductionTier, defaultSortDir: 'desc' },
-
-  // ── Compatibility ───────────────────────────────────────────────────────────
-  // Native OS support (`platforms` in lib/steam.js's extractAppDetails) — distinct from the
-  // ProtonDB column right below, which is Linux/Deck compatibility *through Proton*, a
-  // compatibility layer, not native support. Same multi-value groupable/filterable treatment as
-  // Genres/Categories rather than three separate boolean columns.
-  { key: 'platforms',        label: 'Platforms',    groupable: true, format: fmt.arr, keepVisibleWhenGrouped: true },
-  // Linux/Steam Deck compatibility tier from ProtonDB — sorted/grouped by actual compatibility
-  // quality (see compareProtonTier above), not alphabetically; public/panel.js shows the same
-  // data as a colored badge in the side panel. `defaultSortDir: 'desc'` shows the best-compatibility
-  // games first on a fresh click, matching compareProtonTier's worst-to-best ordering.
-  { key: 'protondb',         label: 'ProtonDB',     groupable: true, format: fmt.str, render: renderProtonBadge, compare: compareProtonTier, defaultSortDir: 'desc' },
-
-  // ── Extras ──────────────────────────────────────────────────────────────────
-  // Leads the section — "can I try this first" is relevant to any prospective player, unlike
-  // Achievements/DLC Count right below, which only matter to completionists. `event.demo`
-  // (top-level on the SSE/game-details response, not nested under `meta`) — the free demo's
-  // appid if this game has one, from the same IStoreBrowseService item tags/demo share (see
-  // getGameDemo in lib/steam.js); the side panel's own "🎮 Try the Free Demo" banner
-  // (public/panel.js) reads the exact same field. Only a plain has-a-demo boolean here — the
-  // demo's own appid isn't useful in a cell with nowhere to link it (see the "no link" decision
-  // above — outbound links stay in the panel, not the table). Rendered as a colored badge
-  // (renderDemoBadge above) rather than plain text/an emoji glyph, so it reads as a quick status
-  // chip at a glance, same treatment as ProtonDB right above. `format` still returns plain text
-  // for non-visual consumers (filter checklist labels, CSV export) that don't go through
-  // `render`. True/false is real data either way (no separate "unknown" state), same as
-  // panel.js's own `!!g.details?.demo` check, so no `compare`/missing-last handling is needed —
-  // plain boolean comparison already puts demo games first with `defaultSortDir: 'desc'`.
-  { key: 'hasDemo',          label: 'Demo',         groupable: true,
-    format: v => v === undefined ? '…' : v ? 'Demo' : '—', render: renderDemoBadge, defaultSortDir: 'desc' },
-  // Steam's own achievement count for the game (`achievements.total` on the appdetails
-  // response — see `achievementCount` in lib/steam.js's extractAppDetails), not this
-  // player's unlock progress — that's the side panel's own Achievements section
-  // (public/panel.js), which needs a per-account fetch this column doesn't. 0 is real data
-  // (the game genuinely has none); `null` (missing, sorted last by compareNumMissingLast)
-  // only when store metadata itself failed to load. Hidden by default — a fairly niche
-  // completionist-facing number compared to the rest of DEFAULT_VISIBLE.
-  { key: 'achievementCount', label: 'Achievements', type: 'number', groupable: true, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'desc' },
-  // Length of `meta.dlc` (the bare DLC appid list every appdetails response already carries —
-  // see the `dlc` comment in lib/steam.js's extractAppDetails) — computed here rather than in
-  // a new backend field since the array itself is already on the row's `details.meta`. 0 is
-  // real data (base game has no DLC); `null` only when store metadata itself failed to load.
-  { key: 'dlcCount',         label: 'DLC Count',    type: 'number', groupable: true, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'desc' },
-];
+// The Library tab's own column list — CORE_COLUMNS (public/gameColumns.js) plus Played/Last
+// Played inserted right after the HLTB section, the "Play time & dates" position those two
+// have always occupied (no price columns — an owned game has nothing to buy).
+const COLUMNS = insertColumnsAfter(CORE_COLUMNS, 'hltbCompletionist', PLAYTIME_COLUMN, LAST_PLAYED_COLUMN);
 
 const DEFAULT_VISIBLE = [
   'capsule', 'name', 'steamdbRating', 'hltbAll', 'playtime', 'releaseDate', 'genres',
@@ -545,163 +71,7 @@ const DEFAULT_VISIBLE = [
 // construction-time default-sort option, only defaultVisibleColumns (see README).
 const DEFAULT_SORT = [{ key: 'steamdbRating', dir: 'desc' }];
 
-// Inserts `newColumns` right after the column keyed `afterKey`, rather than always appending at
-// the very end — used by WISHLIST_COLUMNS below so its two wishlist-only columns land in the
-// section they actually belong to (identity, play time & dates) instead of trailing after
-// Extras where nobody would think to look for a wishlist rank or an added date.
-function insertColumnsAfter(columns, afterKey, ...newColumns) {
-  const idx = columns.findIndex(c => c.key === afterKey);
-  return [...columns.slice(0, idx + 1), ...newColumns, ...columns.slice(idx + 1)];
-}
-
-// ── Wishlist pricing (IsThereAnyDeal) ────────────────────────────────────────
-// Same underlying data/rendering as the Bundles page's own price columns (public/bundles.js) —
-// kept as a separate copy here rather than shared, same "kept as a separate copy" precedent as
-// this file's other bits relative to bundles.js/panel.js (buildLibraryOwnersHtml, PROTON_TIER_
-// COLORS, etc.) — but fetched via the same shared `POST /api/prices` route (server.js), with
-// `appids` instead of `gids` since a wishlist row already has a Steam appid and no ITAD game id
-// at all (see loadWishlistPrices below and resolveItadIds in lib/itad.js). Optional — entirely
-// absent (not just empty) when ITAD_API_KEY isn't configured; see itadConfiguredPromise below.
-function formatMoney(v, currency) {
-  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(v); }
-  catch { return `${v.toFixed(2)} ${currency || ''}`; }
-}
-function renderPrice(v, row) {
-  if (v === undefined) return document.createTextNode('…');
-  if (v == null) return document.createTextNode('—');
-  return document.createTextNode(formatMoney(v, row.priceCurrency));
-}
-// Bare price only — no shop name in the cell itself (see the bestDealShop column below for
-// that). Colored, with a small icon suffix, when the current best deal is at or below a
-// historical low: bright teal + 🔥 for an all-time low, green + ★ for a 1-year low that isn't
-// (yet) an all-time one — reusing scoreColor's own "excellent"/"good" tier colors rather than
-// inventing a new palette just for this. `<=` rather than `<` since the current deal genuinely
-// can BE the historical low itself (it's what set it), not only ever beat it.
-function renderBestDeal(v, row) {
-  if (v === undefined) return document.createTextNode('…');
-  if (v == null) return document.createTextNode('—');
-  const isAllTimeLow = row.lowAll != null && v <= row.lowAll;
-  const isYearLow    = row.lowY1  != null && v <= row.lowY1;
-  const span = document.createElement('span');
-  if (isAllTimeLow) {
-    span.style.color = scoreColor(90); // '#57cbde', the ≥80 "excellent" tier
-    span.style.fontWeight = '700';
-  } else if (isYearLow) {
-    span.style.color = scoreColor(70); // '#a3cf4e', the ≥65 "good" tier
-  }
-  span.append(renderPrice(v, row));
-  if (isAllTimeLow) span.append(' 🔥');
-  else if (isYearLow) span.append(' ★');
-  if (row.bestDealShop) {
-    const record = isAllTimeLow ? ' — all-time low' : isYearLow ? ' — 1-year low' : '';
-    span.title = `${row.bestDealShop}${record}`;
-  }
-  return span;
-}
-
-// How much cheaper the best deal is than Steam Full Price — see the matching comment on
-// bundles.js's own discountPct/renderCut/column for why this is computed against Steam's price
-// rather than taken from ITAD's own per-deal "cut" field. `0` renders the same as missing data
-// — a deal that isn't actually any cheaper than Steam reads as noise next to every other row's
-// real discount, same treatment "no data" already gets.
-function discountPct(bestDealAmt, steamRegularAmt) {
-  if (!(steamRegularAmt > 0) || bestDealAmt == null) return null;
-  return Math.round((1 - bestDealAmt / steamRegularAmt) * 100);
-}
-function renderCut(v) {
-  if (v === undefined) return document.createTextNode('…');
-  if (v == null || v === 0) return document.createTextNode('—');
-  return document.createTextNode(`-${v}%`);
-}
-
-// Categorizes a row's current best deal so it can be filtered/grouped on directly, rather than
-// only eyeballed off the Best Deal cell's 🔥/★ badge (which itself only distinguishes all-time
-// vs. 1yr low, not 3mo). Priority order top-to-bottom, same "highest record wins" logic
-// renderBestDeal's own badge uses, extended one tier further: a row lands in the first one it
-// qualifies for. 'On Sale' is the catch-all for a real discount that isn't (yet) any kind of
-// historical low; 'Not Discounted' is a confirmed bestDealCut === 0, kept distinct from missing
-// price data entirely (no ITAD data yet / still loading), which falls through to null/undefined
-// same as every other price column here — see PRICE_STATUS_COLUMN's own format below. Deliberate
-// separate copy from bundles.js's identical computePriceStatus/PRICE_STATUS_ORDER/
-// comparePriceStatus/PRICE_STATUS_COLUMN.
-function computePriceStatus(row) {
-  if (row.bestDealPrice === undefined) return undefined;
-  if (row.bestDealPrice == null) return null;
-  if (row.lowAll != null && row.bestDealPrice <= row.lowAll) return 'All-Time Low';
-  if (row.lowY1  != null && row.bestDealPrice <= row.lowY1)  return '1yr Low';
-  if (row.lowM3  != null && row.bestDealPrice <= row.lowM3)  return '3mo Low';
-  if (row.bestDealCut == null) return null;
-  return row.bestDealCut > 0 ? 'On Sale' : 'Not Discounted';
-}
-// Single source of truth for Price Status, worst deal to best — both the column's `compare`
-// (via PRICE_STATUS_ORDER, same "ordered array + indexOf" shape as compareProductionTier/
-// compareProtonTier above) and renderPriceStatus's badge/color below are derived from this one
-// list, so the sort order and the visual "how good is this deal" ramp can't drift out of sync
-// with each other the way two separately hand-maintained arrays could. `defaultSortDir: 'desc'`
-// on the column then shows the best deals (All-Time Low) first on a fresh click. Deliberate
-// separate copy from bundles.js's identical PRICE_STATUS_TIERS/renderPriceStatus.
-//
-// color/icon reuse renderBestDeal's own treatment verbatim for the two tiers it already covers
-// (bright teal + bold + 🔥 for All-Time Low, green + ★ for 1yr Low) rather than a new palette,
-// extended one tier further for 3mo Low — a real record, just over a shorter window, so it gets
-// scoreColor's next tier down (amber) and an outline star (☆) instead of 1yr Low's filled one,
-// reading as "still a record, just a lesser one" rather than inventing an unrelated icon. On
-// Sale/Not Discounted stay plain, uncolored, no icon — not being a record isn't a bad thing
-// worth flagging red, so nothing here draws the eye away from the three real record tiers.
-const PRICE_STATUS_TIERS = [
-  { label: 'Not Discounted' },
-  { label: 'On Sale' },
-  { label: '3mo Low',     color: scoreColor(55), icon: ' ☆' },
-  { label: '1yr Low',     color: scoreColor(70), icon: ' ★' },
-  { label: 'All-Time Low', color: scoreColor(90), icon: ' 🔥', bold: true },
-];
-const PRICE_STATUS_ORDER = PRICE_STATUS_TIERS.map(t => t.label);
-const comparePriceStatus = compareMissingLast((a, b) =>
-  PRICE_STATUS_ORDER.indexOf(a) - PRICE_STATUS_ORDER.indexOf(b));
-function renderPriceStatus(v) {
-  if (v === undefined) return document.createTextNode('…');
-  if (v == null) return document.createTextNode('—');
-  const tier = PRICE_STATUS_TIERS.find(t => t.label === v);
-  if (!tier?.color) return document.createTextNode(v); // On Sale / Not Discounted — plain text
-  const span = document.createElement('span');
-  span.style.color = tier.color;
-  if (tier.bold) span.style.fontWeight = '700';
-  span.textContent = v + tier.icon;
-  return span;
-}
-const PRICE_STATUS_COLUMN = {
-  key: 'priceStatus', label: 'Price Status', groupable: true,
-  value: computePriceStatus, format: v => v === undefined ? '…' : v ?? '—', render: renderPriceStatus,
-  compare: comparePriceStatus, defaultSortDir: 'desc',
-};
-
-// Best Deal + Discount are visible by default, precisely to answer "is this worth buying now"
-// at a glance, which is why Steam Full Price itself stays hidden despite being right here next
-// to them (same reasoning as bundles.js's own DEFAULT_VISIBLE). The narrower-window lows and
-// the shop name are hidden by default too, same "secondary number" convention as Wilson Score/
-// Steam %/Achievements elsewhere in this column set. Named "Steam Full Price" rather than the
-// shorter "Steam Price" specifically to make clear it's the non-discounted list price, not
-// whatever Steam happens to be charging today.
-const WISHLIST_PRICE_COLUMNS = [
-  { key: 'steamRegular',  label: 'Steam Full Price', type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
-  { key: 'bestDealPrice', label: 'Best Deal',        type: 'number', groupable: true, format: fmt.num, render: renderBestDeal, compare: compareNumMissingLast, defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
-  // Bucketed in fixed 25-point steps (0-25%/25-50%/50-75%/75-100%) rather than PRICE_TIERS'
-  // hand-picked breakpoints — a percentage is already bounded 0-100 with no long tail to worry
-  // about, so there's no reason to reach for anything fancier than an even step.
-  { key: 'bestDealCut',   label: 'Discount',         type: 'number', groupable: true, format: fmt.num, render: renderCut, compare: compareNumMissingLast, defaultSortDir: 'desc',
-    groupValue: withMissingGroup(bucketNumericRange(25)), groupFormat: formatMissingGroup(formatNumericRange(25, '%')), keepVisibleWhenGrouped: true },
-  PRICE_STATUS_COLUMN,
-  { key: 'bestDealShop',  label: 'Best Deal Shop',   groupable: true, format: fmt.str },
-  { key: 'lowAll',        label: 'All-Time Low',     type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
-  { key: 'lowY1',         label: '1yr Low',          type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
-  { key: 'lowM3',         label: '3mo Low',          type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
-];
-
+// ── Wishlist-only columns ────────────────────────────────────────────────────
 // No defaultSortDir — Steam's wishlist rank is already 1-at-the-top, so the plain ascending
 // default a fresh click starts at is the useful direction as-is. Placed right after Name (an
 // identity-adjacent "which one is this" attribute for a wishlist row) rather than off in the
@@ -717,21 +87,20 @@ const WISHLIST_DATE_ADDED_COLUMN =
   { key: 'dateAdded', label: 'Added',         type: 'date',   groupable: true,  format: fmt.str, compare: compareDateMissingLast,
     defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' } };
 
-// Same as COLUMNS minus playtime and lastPlayed (wishlist games aren't owned, so there's no
-// playtime or last-played data to show), plus the wishlist-specific columns above, each
-// inserted into the section it actually belongs to rather than tacked on at the end: Wishlist
-// Rank right after Name (an identity attribute), the price columns right after that — the same
-// relative position bundles.js gives its own price columns, right before Scores & reviews —
-// and Added right after Released, in the Play time & dates section. Unlike owned games — whose
-// name is known upfront from Steam's library API — a wishlist row's name only arrives once its
-// store metadata streams in, so it needs a loading state.
+// The Wishlist tab's own column list — CORE_COLUMNS plus its price cluster (PRICE_COLUMNS,
+// public/gameColumns.js — Bundles gets the exact same cluster in the exact same relative
+// position, right after its own identity/page-specific columns and before Scores & reviews)
+// plus Wishlist Rank right after Name and Added right after Released. Unlike owned games —
+// whose name is known upfront from Steam's library API — a wishlist row's name only arrives
+// once its store metadata streams in; CORE_COLUMNS' own `name` column already uses `fmt.str`
+// for that loading state unconditionally (harmless for the Library tab above, whose owned-game
+// names are always known upfront), so no per-page override is needed here the way there used
+// to be. No playtime/lastPlayed either — those live only on COLUMNS (the Library tab) above,
+// never in CORE_COLUMNS itself.
 const WISHLIST_COLUMNS = insertColumnsAfter(
   insertColumnsAfter(
-    insertColumnsAfter(
-      COLUMNS.filter(c => c.key !== 'playtime' && c.key !== 'lastPlayed').map(c => (c.key === 'name' ? { ...c, format: fmt.str } : c)),
-      'name', WISHLIST_RANK_COLUMN
-    ),
-    'priority', ...WISHLIST_PRICE_COLUMNS
+    insertColumnsAfter(CORE_COLUMNS, 'name', WISHLIST_RANK_COLUMN),
+    'priority', ...PRICE_COLUMNS
   ),
   'releaseDate', WISHLIST_DATE_ADDED_COLUMN
 );
@@ -1470,7 +839,8 @@ async function loadWishlistPrices(items) {
         row.lowY1         = info.lowY1?.amount           ?? null;
         row.lowM3         = info.lowM3?.amount           ?? null;
         // Always set directly from this batch's own response — see the matching comment on
-        // formatMoney/renderPrice above for why this can legitimately differ per row.
+        // formatMoney (public/utils.js)/renderPrice (public/gameColumns.js) for why this can
+        // legitimately differ per row.
         row.priceCurrency = info.steamRegular?.currency ?? info.bestDeal?.price?.currency ?? info.lowAll?.currency ?? info.lowY1?.currency ?? info.lowM3?.currency ?? null;
         markRowChanged(appid);
         if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);

@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- The Library Explorer and Bundles pages now share their entire game-table column set via a new `public/gameColumns.js` module (`CORE_COLUMNS` — identity/scores/HLTB/dates/classification/compatibility/extras, shown on all three views — and `PRICE_COLUMNS` — Wishlist and Bundles only), instead of each maintaining its own near-identical copy of ~35 column definitions and their render/format/compare/bucket helpers. Each page layers its own page-specific columns (Bundles: Tier Price/Add-on; Wishlist: Rank/Added; Library tab: Played/Last Played) onto the shared base via `insertColumnsAfter`. `formatMoney` moved to `public/utils.js` so `panel.js`'s Price card (a plain script that can't `import` from `gameColumns.js`, an ES module) can keep sharing it. No behavior change — verified live that both pages' tables, column pickers, and the side panel's Price card render identically to before across Bundles, the Library tab, and the Wishlist tab.
+
+### Fixed
+
+- Best Deal cell (`renderBestDeal`, both `bundles.js` and `library.js`) and the side panel's Price card (`priceHtml` in `panel.js`) now also recognize a 3-month low (amber + ☆, same treatment as the 🔥/★ tiers) — they previously only checked all-time/1yr low, so a game whose Price Status column read "3mo Low" showed no visual indicator at all on the Best Deal price itself or in the panel.
+
+### Changed
+
+- The "given a price and its historical lows, which record tier does it qualify for" logic (color/icon/tooltip text for All-Time/1yr/3mo Low) is now one shared `dealRecordTier` function in `public/utils.js`, used by `renderBestDeal` (bundles.js + library.js), the side panel's Price card, and the Price Status column instead of each hand-rolling its own copy — the 3-month-low bug just above is exactly the kind of divergence that duplication caused (the tier was added to Price Status first and silently missed everywhere else). Added unit tests for it in `test/frontend-utils.test.js`.
+
 ### Added
 
 - Bundles page and the Library Explorer's Wishlist tab: every price column (Tier Price on Bundles, Steam Full Price, Best Deal, All-Time/1yr/3mo Low) and the Discount column are now groupable, not just filterable — price columns bucket against Steam's own common price tiers (Free / $0–5 / $5–15 / $15–30 / $30–50 / $50–75 / $75–100 / $100+, no currency symbol since the selected region isn't always USD), Discount buckets in plain 25-point steps (0–25%/25–50%/50–75%/75–100%). A bundle's "Varies" tier price (Build Your Own pick-and-mix) groups under its own "Varies" label rather than the generic "—" other price columns use for missing data.

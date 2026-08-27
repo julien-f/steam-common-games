@@ -78,6 +78,51 @@ function scoreColor(n) {
   return '#cc5050';
 }
 
+// Shared money formatter — used by public/gameColumns.js's price-column renderers (an ES
+// module, which reads this as a bare global the same way it reads scoreColor/dealRecordTier
+// above) and by panel.js's Price card directly (a plain script, which can't `import` from an ES
+// module at all — this is why formatMoney lives here rather than alongside the rest of the
+// price-column logic in gameColumns.js, which needs real `@vates/data-table-core` imports and
+// so can't be a plain global script itself). `currency` falsy (not yet known/loaded) falls back
+// to USD rather than throwing; an invalid/unrecognized currency code falls back to a plain
+// "12.34 XYZ" string rather than letting Intl.NumberFormat's own error propagate.
+function formatMoney(v, currency) {
+  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(v); }
+  catch { return `${v.toFixed(2)} ${currency || ''}`; }
+}
+
+// Single source of truth for "is this price a historical record, and how should it look" —
+// shared by renderBestDeal (bundles.js/library.js), panel.js's Price card (priceHtml), and the
+// Price Status column (PRICE_STATUS_TIERS/computePriceStatus, bundles.js/library.js), all of
+// which used to hand-roll their own copy of this exact tier logic. A 3-month-low tier was once
+// added to the Price Status column before anyone remembered to add it to the other three places
+// too — this function exists specifically so that can't happen again: change the tier list once,
+// here, and every caller picks it up.
+//
+// Ordered rarest/best record first — a price only ever matches the first (rarest) tier it
+// qualifies for, since an all-time low is by definition also a 1yr/3mo low (a longer lookback
+// window can only find a price at or below any shorter window's minimum). Colors reuse
+// scoreColor's own "excellent"/"good"/"ok" tiers rather than a new palette; the icons step down
+// from a filled 🔥 to a filled ★ to an outline ☆, reading as "still a record, just a
+// lesser/older one" for the shortest window.
+const DEAL_RECORD_TIERS = [
+  { tier: 'all-time', low: 'lowAll', statusLabel: 'All-Time Low', tooltipLabel: 'all-time low', color: scoreColor(90), icon: '🔥', bold: true },
+  { tier: '1yr',       low: 'lowY1',  statusLabel: '1yr Low',       tooltipLabel: '1-year low',   color: scoreColor(70), icon: '★' },
+  { tier: '3mo',        low: 'lowM3',  statusLabel: '3mo Low',        tooltipLabel: '3-month low',  color: scoreColor(55), icon: '☆' },
+];
+// `lows` is any object carrying `lowAll`/`lowY1`/`lowM3` fields — a row/game object works as-is,
+// no need to destructure at the call site. `<=`, not `<` — the current deal genuinely can BE the
+// historical low itself (it's what set it), not only ever beat it. Returns `null` (not a tier)
+// when `price` is missing or doesn't beat any of the three windows.
+function dealRecordTier(price, lows) {
+  if (price == null) return null;
+  for (const t of DEAL_RECORD_TIERS) {
+    const low = lows?.[t.low];
+    if (low != null && price <= low) return t;
+  }
+  return null;
+}
+
 function fmtH(h) {
   if (!h) return '<span class="dim">—</span>';
   return h % 1 === 0 ? `${h}h` : `${h.toFixed(1)}h`;
@@ -130,4 +175,4 @@ function renderExtraCell(game) {
   return h ? fmtH(h.extra) : '<span class="dim">—</span>';
 }
 
-if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier, NON_GAME_TYPES };
+if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, formatMoney, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier, NON_GAME_TYPES, dealRecordTier, DEAL_RECORD_TIERS };

@@ -956,7 +956,7 @@ function newsHtml(g) {
 // lows, every other shop) this card deliberately leaves out. Entirely passive: no fetch
 // happens here. library.js's Wishlist tab (loadWishlistPrices) and bundles.js's game table
 // (loadPrices) both set these exact field names (bestDealPrice/bestDealCut/bestDealShop/
-// bestDealUrl/lowAll/lowY1/priceCurrency) directly on the row object well before it's ever
+// bestDealUrl/lowAll/lowY1/lowM3/priceCurrency) directly on the row object well before it's ever
 // opened here. The comparison page's owned-games rows and gameSearch.js's standalone lookups
 // never set them at all, so g.bestDealPrice stays undefined and this section renders nothing
 // for those — same "if present, render" shape the rest of the panel already uses for
@@ -968,14 +968,10 @@ function newsHtml(g) {
 // panel opened before its price batch resolved would never pick the numbers up even once they
 // landed, since nothing here is polling or re-fetching on its own.
 //
-// Deliberately its own formatMoney copy rather than importing bundles.js's/library.js's own —
-// same "kept as a separate copy" precedent CLAUDE.md already documents between those two.
-// panel.js is a plain global script while both of those are ES modules, so there's no actual
-// name collision either way, just the established convention of not sharing this bit.
-function formatMoney(v, currency) {
-  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(v); }
-  catch { return `${v.toFixed(2)} ${currency || ''}`; }
-}
+// formatMoney itself is the global from public/utils.js, not a local copy — see its own
+// comment there for why it (unlike the rest of the price-column logic, which lives in
+// public/gameColumns.js, an ES module panel.js can't import from) lives in the one shared
+// plain-script file every page already loads before panel.js.
 
 function priceHtml(g) {
   if (g.bestDealPrice === undefined) return ''; // never priced (or not loaded yet) — see comment above
@@ -987,16 +983,14 @@ function priceHtml(g) {
     return `<div class="panel-section panel-card" id="panel-section-price">${titleHtml}<div class="panel-no-data">No pricing data available.</div></div>`;
   }
 
-  // Same 🔥 all-time-low / ★ 1-year-low color+badge+tooltip as the table cell's own
-  // renderBestDeal (bundles.js/library.js) — reusing scoreColor's "excellent"/"good" tiers
-  // rather than a new palette, same reasoning those two already give. `<=`, not `<` — the
-  // current deal can BE the historical low itself, not only ever beat it.
-  const isAllTimeLow = g.lowAll != null && g.bestDealPrice <= g.lowAll;
-  const isYearLow    = g.lowY1  != null && g.bestDealPrice <= g.lowY1;
-  const color = isAllTimeLow ? scoreColor(90) : isYearLow ? scoreColor(70) : null;
-  const badge = isAllTimeLow ? ' 🔥' : isYearLow ? ' ★' : '';
-  const record = isAllTimeLow ? ' — all-time low' : isYearLow ? ' — 1-year low' : '';
-  const tooltip = g.bestDealShop ? `${g.bestDealShop}${record}` : '';
+  // dealRecordTier (public/utils.js) is the single shared source of this tier/color/icon logic
+  // — reused verbatim by the table cell's own renderBestDeal (bundles.js/library.js) and the
+  // Price Status column, so all three stay in sync automatically (see dealRecordTier's own
+  // comment for why that matters: a 3-month-low tier was once added to only one of these).
+  const rec = dealRecordTier(g.bestDealPrice, g);
+  const color = rec ? rec.color : null;
+  const badge = rec ? ' ' + rec.icon : '';
+  const tooltip = g.bestDealShop ? `${g.bestDealShop}${rec ? ` — ${rec.tooltipLabel}` : ''}` : '';
 
   // `0` (the best deal genuinely isn't any cheaper than Steam) is treated the same as `null`/
   // undefined (no discount to show) — "if any" per the spec, not a flat "-0%" reading as noise.
