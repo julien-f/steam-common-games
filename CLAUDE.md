@@ -12,6 +12,8 @@ npm start                                    # or: npm run dev  (restarts on fil
 
 The server binds to `http://127.0.0.1:3000` by default. `default.env` (committed to the repo) holds all settings with their defaults and documentation. Create `.env` (gitignored) with only the values you want to override — `STEAM_API_KEY` is the only required one. The server exits immediately at startup with a clear error message if it is missing.
 
+Run the test suite with `npm test` (Node's built-in test runner against `test/*.test.js`, with `DB_FILE=` so it uses an in-memory database). There is no linter or formatter configured — match the existing style in whatever file/module you're editing rather than reformatting it.
+
 ## Architecture
 
 - **`server.js`** — Express setup and route handlers only.
@@ -172,6 +174,43 @@ Neither refresh path touches `resolve:` — a vanity-URL mapping isn't expected 
 Players are encoded as `?u=` query params. A single-account player is `?u=alice`; a multi-account slot (Steam Family) is `?u=alice,bob_family` (comma-joined). Old single-account URLs are fully compatible. Members within each slot and slots themselves are sorted alphabetically so the same comparison always produces the same URL. `history.pushState` is used for explicit searches; `pushState: false` is used when restoring from URL on load or back/forward navigation to avoid polluting history. Every URL-writing function on both pages runs its params through `reorderUrlParams` (`public/urlState.js`) before writing, so the same state always produces byte-identical query strings regardless of write order. `sort` is omitted from the URL entirely when it matches the default (`score` descending) rather than always spelling out `-score`.
 
 The Library Explorer (`public/library.js`) pushes exactly one history entry per genuine new action (Load button, recent-search click, tab switch, per-account refresh is `push: false`) instead of the 2-3 partial `updateUrlParams` pushes each of those used to fire (clearing `game`/`shot`, then setting `u`, then `tab` — each its own entry); everything else (panel open/close, lightbox step, restoring from a URL/back-forward navigation) uses `replaceState`. A `popstate` listener (`loadFromUrl`, mirroring `app.js`'s own) makes browser Back/Forward actually work on this page — previously the URL changed on every action but nothing reacted to History API navigation at all.
+
+## Working style
+
+- Be concise: short responses, no filler, no restating what was just done.
+- Suggest Claude Code plugins, skills, or agents when relevant to the task at hand.
+- When asked a question, answer it — don't jump straight to implementing.
+- When a request is ambiguous, ask clarifying questions **one at a time** before proceeding.
+- Don't re-read a file already read in the current session unless it may have changed.
+- When there are multiple valid approaches, present the options and trade-offs and wait for a choice before implementing.
+- For non-trivial changes (multiple files, non-obvious design decisions, refactors), outline a brief plan and get confirmation before implementing. Trivial/obvious edits can proceed directly.
+- Stay in scope: only make the changes asked for. Flag other issues noticed rather than fixing them unprompted.
+- Match the existing code style and conventions in the file/project rather than imposing personal preference; don't reformat unrelated code.
+- Ask before adding a new dependency; prefer what's already in use.
+
+## Knowledge sharing
+
+- Project conventions, workflow rules, and architecture decisions belong in this file (or docs linked from it) — they're version-controlled and apply on every machine/session this repo is worked on from, not just the current one.
+- Facts specific to one person (role, personal working-style preferences, in-progress session/project context) belong in Claude's own memory, not here — this file is loaded for every session working on the repo, not a place for one contributor's personal notes.
+- Secrets, credentials, and ephemeral state belong in neither — see `default.env`/`.env` above.
+
+## Git workflow
+
+- Make commits atomic: each commit represents one logical change.
+- Write descriptive commit messages that explain the *why*, not just the *what* — a short subject line, with a body when context is needed.
+- Commit directly to `main` — this is a solo repo with no PR/review process; there's no history of feature branches being merged back in, even for large multi-file changes (e.g. the whole Bundles subsystem landed as direct commits).
+- Only commit or push when explicitly asked.
+- Never commit secrets, credentials, API keys, or `.env` values.
+- Update `CHANGELOG.md` in the same commit as the code change it documents (see "Changelog" below) — never as a separate follow-up commit.
+- If a change is accidentally left out of a commit that was just made, amend that commit (`git commit --amend`) rather than adding a separate fixup commit for it.
+
+## Development workflow
+
+After making changes:
+
+1. Check whether existing tests need updating, or new ones are needed, to cover the change, then run `npm test` and report actual results — not assumptions.
+2. Update any affected documentation (this file, `README.md`, `CHANGELOG.md`) — see "Knowledge sharing" above for where things belong.
+3. A `pre-commit` git hook (plain shell script at `.git/hooks/pre-commit`, not a package like Husky — this repo has no dependency for it) runs `npm test` automatically and blocks the commit on failure; there's still no linter/formatter configured. The hook lives under `.git/`, so it isn't version-controlled — it needs to be recreated after a fresh clone (see the snippet in this repo's own `.git/hooks/pre-commit` if you need to reproduce it elsewhere).
 
 ## Changelog
 
