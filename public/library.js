@@ -1076,11 +1076,10 @@ function restorePanelFromUrl(restoreShot = null) {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    if (isLightboxOpen()) {
-      if (document.fullscreenElement || document.webkitFullscreenElement) return; // browser exits FS; keep lightbox open
-      closeLightbox();
-      return;
-    }
+    // panelHandleEscape (panel.js) owns the lightbox-close/fullscreen-guard logic shared by
+    // all three pages — delegate to it whenever the lightbox is open so this page can't drift
+    // from the other two the way bundles.js once did (see its own comment).
+    if (isLightboxOpen()) { panelHandleEscape(); return; }
     if (document.getElementById('shortcuts-modal').classList.contains('open')) { closeShortcuts(); return; }
     panelClose(); // onClose (see initPanel above) handles the URL cleanup
     return;

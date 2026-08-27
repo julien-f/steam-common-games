@@ -474,12 +474,41 @@ function markRowChanged(appid) {
   const row = rowMap.get(appid);
   if (row) tableRowCache.set(appid, { ...row });
 }
+// Canonical rows whose details have streamed in — the *same* object references `rows`/`rowMap`
+// hold, unlike visibleRowsForTable()'s cached copies above. Used by nav/random-pick
+// (getGameList/pickRandomGame below) and onRowClick, all of which need the reference the panel
+// keeps displaying and any later mutation (refresh, price loading) needs to keep reaching —
+// same distinction library.js's own visibleRows()/visibleRowsForTable() pair draws.
+function visibleRows() {
+  return rows.filter(r => !r.loading);
+}
 function visibleRowsForTable() {
-  return rows.filter(r => !r.loading).map(r => {
+  return visibleRows().map(r => {
     if (!tableRowCache.has(r.appid)) tableRowCache.set(r.appid, { ...r }); // first reveal
     return tableRowCache.get(r.appid);
   });
 }
+
+// Stable order for the panel's prev/next/random nav — the table's current search/filter/sort
+// order (same pipeline @vates/data-table-vanilla applies internally: searchData then
+// processData), independent of pagination/grouping (display-only, no single well-defined linear
+// order once a multi-value column like Genres fans a game out into more than one group). Same
+// approach library.js's own getGameList uses.
+function getGameList() {
+  const view = table.getViewState();
+  const filters = Object.fromEntries(
+    Object.entries(view.filters ?? {}).map(([key, values]) => [key, new Set(values)])
+  );
+  const searched = searchData(visibleRows(), view.searchQuery ?? '', BUNDLE_COLUMNS);
+  return processData(searched, filters, view.rangeFilters ?? {}, view.sorts ?? [], BUNDLE_COLUMNS, DEFAULT_LABELS.emptyValue);
+}
+
+// This page only ever has one game list open at a time (the currently open bundle's table),
+// unlike library.js's Library/Wishlist tabs — a fixed queueKey is enough (see pickRandomFrom's
+// own comment in panel.js). Switching bundles doesn't need to explicitly clear it either:
+// pickRandomFrom already rebuilds the queue on its own once none of its remaining entries match
+// the current list's appids, which a bundle switch naturally causes.
+const RANDOM_QUEUE_KEY = 'bundle-games';
 
 initPanel({
   inertSelector: '.bundles-page',
@@ -501,9 +530,21 @@ initPanel({
   // bundle's own resolved rows (e.g. a DLC not itself included in the bundle), so it's fetched
   // standalone the same way public/library.js's "look up any game" flow does.
   onNavigateGame: (appid, name) => openStandaloneGame(appid, name, { keepHistory: true }),
-  gameHref: () => '#',
+  // Runs on every close path (see the comment on `onClose` in panel.js) — the backdrop click,
+  // × button, and swipe-to-close, not just an explicit Escape — so `?game=` never sticks around
+  // after the panel's actually gone. openBundle()'s own panelClose() call (a genuine new bundle
+  // open) already clears it beforehand too — see its own comment — so this just runs
+  // redundantly-but-harmlessly there.
+  onClose: () => setPanelParam(null),
+  // A real href (not the placeholder '#' this used to be, back when there was no `?game=` URL
+  // to point at) so ctrl/cmd/shift/middle-click on a DLC entry still opens it in a new tab.
+  gameHref: appid => {
+    const params = new URLSearchParams(location.search);
+    params.set('game', appid);
+    return `?${params}`;
+  },
 });
-initLightbox({ onParamChange: () => {} });
+initLightbox({ onParamChange: setLightboxParam });
 
 const achievementsCache = new Map();
 
@@ -529,19 +570,52 @@ async function loadAchievements(game, { force = false } = {}) {
   }
 }
 
-function openGame(game) {
-  panelOpen(game);
+// Builds the panel's prev/next/random nav bar (`#panel-nav`, shared markup/CSS with
+// library.js/app.js — see CLAUDE.md's panel.js bullet) from getGameList()'s current
+// search/filter/sort order. Empty for a standalone lookup (see openStandaloneGame below) —
+// there's no natural list to page through, same as library.js's own version of this function.
+function renderPanelNav(game) {
+  const nav = document.getElementById('panel-nav');
+  if (!table || game.standalone) { nav.innerHTML = ''; return; }
+  const list = getGameList();
+  const idx = list.findIndex(g => g.appid === game.appid);
+  nav.innerHTML = `
+    <button class="panel-nav-btn" id="panel-prev" aria-label="Previous game" title="Previous game (↑)">↑</button>
+    <span class="panel-nav-pos" aria-live="polite">${idx + 1} / ${list.length}</span>
+    <button class="panel-nav-btn" id="panel-next" aria-label="Next game" title="Next game (↓)">↓</button>
+    <button class="panel-nav-btn panel-nav-reroll" id="panel-reroll" aria-label="Pick a random game" title="Pick a random game (R)">🎲<span class="panel-nav-kbd">R</span></button>
+  `;
+  document.getElementById('panel-prev').addEventListener('click', () => openGame(list[(idx - 1 + list.length) % list.length]));
+  document.getElementById('panel-next').addEventListener('click', () => openGame(list[(idx + 1) % list.length]));
+  document.getElementById('panel-reroll').addEventListener('click', pickRandomGame);
+}
+
+function openGame(game, { isRandom = false, keepHistory = false } = {}) {
+  if (!isRandom) clearRandomQueue(RANDOM_QUEUE_KEY);
+  panelOpen(game, { keepHistory });
+  renderPanelNav(game);
+  setPanelParam(game.appid);
   loadAchievements(game);
+}
+
+function pickRandomGame() {
+  if (!table || getPanelGame()?.standalone) return; // see renderPanelNav
+  const pick = pickRandomFrom(getGameList(), RANDOM_QUEUE_KEY, getPanelGame()?.appid);
+  if (pick) openGame(pick, { isRandom: true });
 }
 
 // A game linked from the panel (DLC/base-game nav) that isn't one of this bundle's own
 // resolved rows — fetched directly, same "standalone lookup" shape as
-// public/library.js/public/gameSearch.js use for the same situation.
+// public/library.js/public/gameSearch.js use for the same situation. Routed through openGame
+// (rather than calling panelOpen directly, as this used to) so the nav bar actually clears
+// itself for a standalone view instead of showing stale buttons/position left over from
+// whichever row was open before, and so `?game=` follows this navigation too, same as it does
+// library.js's own DLC-link navigation.
 function openStandaloneGame(appid, name, { keepHistory = false } = {}) {
   const existing = rowMap.get(appid);
-  if (existing) { panelOpen(existing, { keepHistory }); loadAchievements(existing); return; }
+  if (existing) { openGame(existing, { keepHistory }); return; }
   const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true };
-  panelOpen(game, { keepHistory });
+  openGame(game, { keepHistory });
   fetch(`/api/game-details/${appid}`)
     .then(res => res.json().then(data => ({ ok: res.ok, data })))
     .then(({ ok, data }) => {
@@ -553,8 +627,78 @@ function openStandaloneGame(appid, name, { keepHistory = false } = {}) {
     .catch(() => {});
 }
 
+// `?game=<appid>` (and, within it, `&shot=<idx>` for an open lightbox screenshot/video) — deep
+// link to an open game panel, mirroring library.js's own setPanelParam/setLightboxParam/
+// restorePanelFromUrl for the comparison/Library Explorer pages (see CLAUDE.md's "Looking up
+// an arbitrary game" section for the general shape). Not pushed/reordered, same convention as
+// this page's own setBundleParam right below.
+function setPanelParam(appid) {
+  const params = new URLSearchParams(location.search);
+  params.delete('shot');
+  if (appid == null) params.delete('game');
+  else params.set('game', appid);
+  history.replaceState(null, '', `?${params}`);
+}
+
+function setLightboxParam(idx) {
+  const params = new URLSearchParams(location.search);
+  if (idx == null) params.delete('shot');
+  else params.set('shot', idx);
+  history.replaceState(null, '', `?${params}`);
+}
+
+// Reopens the panel (and, if present, the lightbox) from `?game=`/`?shot=`. Takes an explicit
+// `restoreShot` rather than always re-reading `location.search` — opening the panel calls
+// setPanelParam(), which deletes `shot` from the live URL (a fresh panel open always resets to
+// the hero), so by the time a row's details are in on the second (post-stream) call below,
+// `shot` would already be gone from the URL itself; the caller threads the page-load value
+// through instead. Mirrors library.js's own restorePanelFromUrl exactly (see its own comment).
+function restorePanelFromUrl(restoreShot = null) {
+  const params = new URLSearchParams(location.search);
+  const appid = Number(params.get('game'));
+  if (!appid) return;
+  const row = rowMap.get(appid);
+  if (row) {
+    if (getPanelGame()?.appid !== appid) openGame(row);
+    const shotParam = restoreShot ?? params.get('shot');
+    if (shotParam !== null && !row.loading) openLightbox(row, shotParam);
+    return;
+  }
+  if (getPanelGame()?.appid === appid) return; // already open / fetch already in flight
+  openStandaloneGame(appid);
+}
+
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !isLightboxOpen()) panelClose();
+  if (e.key === 'Escape') {
+    // panelHandleEscape (panel.js) owns the lightbox-close/fullscreen-guard logic shared by
+    // all three pages — this page used to hand-roll its own copy of it, missing the
+    // lightbox-close branch entirely (Escape did nothing while the lightbox was open); see
+    // panelHandleEscape's own comment.
+    if (isLightboxOpen()) { panelHandleEscape(); return; }
+    panelClose(); // onClose (see initPanel above) handles the URL cleanup
+    return;
+  }
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (!isPanelOpen()) return;
+  // Hero screenshot/video stepping — this page previously only supported it via click/swipe,
+  // unlike app.js/library.js's identical keyboard handling for the same shared hero carousel.
+  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !isLightboxOpen()) {
+    if (panelStepHero(e.key === 'ArrowRight' ? 1 : -1, { wrap: true })) e.preventDefault();
+    return;
+  }
+  if ((e.key === 'r' || e.key === 'R') && !isLightboxOpen()) {
+    e.preventDefault();
+    pickRandomGame();
+    return;
+  }
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+  if (!table || getPanelGame()?.standalone) return; // see renderPanelNav — no list to page through
+  e.preventDefault();
+  const list = getGameList();
+  const idx = list.findIndex(g => g.appid === getPanelGame().appid);
+  const next = (idx + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
+  openGame(list[next]);
 });
 
 // ── Bundle list ───────────────────────────────────────────────────────────────
@@ -710,7 +854,13 @@ async function streamGameDetails(appids) {
       if (!row) continue;
       applyDetailsEvent(row, event);
       markRowChanged(row.appid);
-      if (isPanelOpen() && getPanelGame()?.appid === row.appid) renderPanelBody(row);
+      // renderPanelNav too, not just renderPanelBody — the nav bar's list/position (see
+      // getGameList) only includes non-loading rows, so a panel opened via a `?game=` deep
+      // link (which opens the row immediately, before the stream starts — see openBundle's
+      // early restorePanelFromUrl call) would otherwise be stuck showing "0 / 0" and a stale,
+      // empty nav-button list until every game in the bundle finished loading, not just this
+      // one. Same fix library.js's own stream loop already has.
+      if (isPanelOpen() && getPanelGame()?.appid === row.appid) { renderPanelBody(row); renderPanelNav(row); }
       loaded++;
       if (table) table.setData(visibleRowsForTable());
       detailStatusEl.textContent = `${loaded} / ${appids.length} games loaded…`;
@@ -852,7 +1002,19 @@ async function loadPrices(resolved) {
   }
 }
 
-async function openBundle(bundle) {
+// `preserveGameParam`: true only for the initial page-load deep link (init() below) — a
+// genuine new bundle open (list click, ‹/› nav, a fresh `?bundle=` deep link) always closes
+// whatever's open and clears `?game=` first, since that game's nav position/owners-equivalent
+// belonged to whichever bundle (or standalone lookup) was open before and no longer applies —
+// same "a new Load clears the panel unless explicitly restoring" convention library.js's own
+// resetTableState/loadLibrary use. Region changes (see the countrySelect handler below) are the
+// one case that reopens the *same* bundle in place and does pass this, so the open game — same
+// bundle, same rows, same order, just re-priced — stays open across it.
+async function openBundle(bundle, { preserveGameParam = false, restoreShot = null } = {}) {
+  if (!preserveGameParam) {
+    if (isPanelOpen()) panelClose(); // onClose (see initPanel above) clears `?game=` itself
+    else setPanelParam(null); // no panel open, but a leftover `?game=` from before should still go
+  }
   activeBundleId = bundle.id;
   renderBundleList();
   renderBundleNav();
@@ -949,9 +1111,17 @@ async function openBundle(bundle) {
   resetViewBtn.hidden = false;
 
   detailStatusEl.textContent = `0 / ${resolved.length} games loaded…`;
+  // Early attempt — rowMap is populated (just above) well before the stream below finishes, so
+  // a `?game=` that's part of this bundle can open right away as a real, progressively-filling
+  // row instead of waiting for every game in the bundle to finish loading first; the lightbox
+  // needs actual media data though, so `restorePanelFromUrl` is tried again once the stream
+  // below completes — same two-call shape library.js's own loadLibrary/loadWishlist use, for
+  // the same reason (see restorePanelFromUrl's own comment).
+  if (preserveGameParam) restorePanelFromUrl(restoreShot);
   // Independent calls — Steam pricing has nothing to do with the rating/HLTB/tags pipeline —
   // run concurrently rather than one after the other.
   await Promise.all([streamGameDetails(resolved.map(g => g.appid)), loadPrices(resolved)]);
+  if (preserveGameParam) restorePanelFromUrl(restoreShot);
 }
 
 // ── Wiring ──────────────────────────────────────────────────────────────────
@@ -969,7 +1139,10 @@ countrySelect.addEventListener('change', () => {
   // again once the reopen resolves, so expanding it here only produces a pointless flicker.
   // When no bundle is open, this is a plain browsing action and the list expands as usual.
   loadBundles({ expandList: !reopening });
-  if (reopening) openBundleById(activeBundleId);
+  // Same bundle, same rows, same order, just re-priced — whatever game is open should stay
+  // open across this, not get closed the way a genuine new bundle open otherwise would (see
+  // openBundle's own comment).
+  if (reopening) openBundleById(activeBundleId, { preserveGameParam: true });
 });
 sortSelect.addEventListener('change', () => loadBundles());
 expiredCheckbox.addEventListener('change', () => loadBundles());
@@ -1003,13 +1176,13 @@ function setBundleParam(id) {
 // server-side search) rather than trying to find the id in whatever's already loaded in
 // `bundles`, which may not even include it (a different sort/page, or not loaded yet at all on
 // initial page load — this runs concurrently with loadBundles(), not after it).
-async function openBundleById(id) {
+async function openBundleById(id, { preserveGameParam = false, restoreShot = null } = {}) {
   try {
     const qs = new URLSearchParams({ country: resolveRegion(countrySelect.value) });
     const res = await fetch(`/api/bundles/${id}?${qs}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Bundle not found');
-    await openBundle(data.bundle);
+    await openBundle(data.bundle, { preserveGameParam, restoreShot });
   } catch (err) {
     // Same UI slot a normally-opened bundle would use — there's no other sensible place to
     // surface "the bundle this link pointed at doesn't exist (anymore)". The invalid id is
@@ -1052,12 +1225,26 @@ async function init() {
   // whatever page of the list loadBundles happens to fetch.
   const deepLinkId = Number(new URLSearchParams(location.search).get('bundle'));
   const hasDeepLink = Number.isInteger(deepLinkId) && deepLinkId > 0;
+  // Captured once, up front — opening the panel deletes `shot` from the live URL (see
+  // restorePanelFromUrl's own comment), so re-reading location.search for it after that point
+  // would already be too late.
+  const restoreShot = new URLSearchParams(location.search).get('shot');
   // Skip loadBundles' own list expand when a deep link is about to open a bundle right after —
   // otherwise the list would flash open with the freshly loaded bundles only to be immediately
   // collapsed again once the deep link resolves (see `expandList`'s own comment above).
   if (hasDeepLink) setListCollapsed(true);
-  loadBundles({ expandList: !hasDeepLink });
-  if (hasDeepLink) openBundleById(deepLinkId);
+  loadBundles({ expandList: !hasDeepLink }); // deliberately not awaited — unrelated to either deep link below
+  if (hasDeepLink) {
+    // `preserveGameParam: true` — this is the initial page-load open, so a `?game=`/`&shot=`
+    // alongside `?bundle=` needs to survive until openBundle()'s own restorePanelFromUrl calls
+    // get to read them; openBundle() would otherwise clear `?game=` immediately (no panel is
+    // open yet to preserve).
+    await openBundleById(deepLinkId, { preserveGameParam: true, restoreShot });
+  } else {
+    // No bundle deep link at all — still honor a bare `?game=`/`&shot=` standalone lookup
+    // (openBundle's own restorePanelFromUrl calls would otherwise be the only callers).
+    restorePanelFromUrl(restoreShot);
+  }
 }
 
 init();

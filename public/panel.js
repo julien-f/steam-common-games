@@ -205,6 +205,25 @@ function updateSubnavScrollSpy() {
 function isPanelOpen() { return panelGame != null; }
 function getPanelGame() { return panelGame; }
 
+// Shared Escape-key handling: close the lightbox first (unless the browser's own Escape is
+// about to exit fullscreen instead — bail and leave the lightbox open, same as the lightbox's
+// own fullscreen behavior expects), else close the panel. Exposed as a function rather than a
+// document-level listener panel.js binds itself, since a host page's own Escape handling may
+// need to check something else first with higher priority (app.js's/library.js's keyboard-
+// shortcuts help modal) — a host calls this only once nothing more specific has already
+// claimed the keypress. Previously each of app.js/library.js/bundles.js hand-rolled this exact
+// same lightbox-then-panel logic; bundles.js's copy had drifted and silently dropped the
+// lightbox-close branch entirely (Escape did nothing while its lightbox was open) — pulled out
+// here so there's one copy to keep correct instead of three that can quietly disagree.
+function panelHandleEscape() {
+  if (isLightboxOpen()) {
+    if (document.fullscreenElement || document.webkitFullscreenElement) return; // browser exits FS; keep lightbox open
+    closeLightbox();
+    return;
+  }
+  panelClose();
+}
+
 // Forces a fresh rating/HLTB/store-metadata/tags fetch for the open game, bypassing
 // its cache TTL. The actual fetch + state update is host-specific (app.js updates its
 // `games` array and table row; library.js updates its data-table row) — panelOptions.onRefresh
