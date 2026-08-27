@@ -3,6 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createDedup } = require('../lib/dedup');
+const { getMetrics, _reset: resetMetrics } = require('../lib/metrics');
 
 test('dedup: calls fn and returns its resolved value', async () => {
   const withDedup = createDedup();
@@ -67,4 +68,32 @@ test('dedup: different keys invoke fn independently', async () => {
 
   assert.equal(callCount, 2);
   assert.notEqual(r1, r2);
+});
+
+test('dedup: a named instance records a metrics hit only when a call actually coalesces', async () => {
+  resetMetrics();
+  const withDedup = createDedup('mymodule');
+  let resolve;
+  const p1 = withDedup('k', () => new Promise(r => { resolve = r; }));
+  const p2 = withDedup('k', () => Promise.resolve('wrong')); // coalesces onto p1 — should record a hit
+  assert.equal(getMetrics().dedupHits.mymodule.sinceRestart, 1);
+
+  resolve('shared');
+  await p1; await p2;
+
+  // A second, independent call (no concurrent duplicate) must not record another hit.
+  await withDedup('k', async () => 'again');
+  assert.equal(getMetrics().dedupHits.mymodule.sinceRestart, 1);
+});
+
+test('dedup: an unnamed instance (createDedup()) does not record any metrics hit', async () => {
+  resetMetrics();
+  const withDedup = createDedup();
+  let resolve;
+  const p1 = withDedup('k', () => new Promise(r => { resolve = r; }));
+  const p2 = withDedup('k', () => Promise.resolve('wrong'));
+  resolve('shared');
+  await p1; await p2;
+
+  assert.deepEqual(getMetrics().dedupHits, {});
 });

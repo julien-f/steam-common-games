@@ -9,10 +9,10 @@ const morgan = require('morgan');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 
-const { getCached, getCacheStats } = require('./lib/cache');
+const { getCached, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
-const { getMetrics } = require('./lib/metrics');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker } = require('./lib/steam');
+const { getMetrics, recordLimiterTrip } = require('./lib/metrics');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker, getSemaphoreStats } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 const { getBundles, findBundleById, resolveSteamAppIds, resolveItadIds, getSteamShopId, getPrices, extractPriceInfo } = require('./lib/itad');
@@ -42,6 +42,23 @@ const rateLimitBypassed = () =>
 
 const isForceRefresh = (req) => req.query.refresh === '1' || req.query.refresh === 'true';
 
+// Wraps rateLimit() so every limiter also records when it actually rejects a request — the
+// inbound counterpart to lib/metrics.js's outbound statusCounts. `handler` only runs once a
+// request is actually over budget (not on every request, and not on a skip), so this is a
+// direct trip count, not a coarser proxy. Centralized here rather than repeating a `handler`
+// on each of the limiter definitions below. Mirrors express-rate-limit's own default handler
+// (status + message) after recording the trip — see lib/metrics.js's rateLimiters.
+function namedRateLimit(name, opts) {
+  return rateLimit({
+    ...opts,
+    handler: (req, res, _next, options) => {
+      recordLimiterTrip(name);
+      res.status(options.statusCode);
+      if (!res.writableEnded) res.send(options.message);
+    },
+  });
+}
+
 // Shared by every route's catch block below. Used to only log isUpstream/TimeoutError
 // errors — anything else (including a genuine bug: a TypeError, a bug in groupByOwnership,
 // etc.) fell through unlogged, because a plain, unmarked Error was indistinguishable from
@@ -68,7 +85,7 @@ app.use('/vendor/data-table-core', express.static(path.join(__dirname, 'node_mod
 app.use('/vendor/data-table-vanilla', express.static(path.join(__dirname, 'node_modules/@vates/data-table-vanilla/dist')));
 
 // Stricter limit for searches — each uncached user triggers Steam API calls
-const searchLimit = rateLimit({
+const searchLimit = namedRateLimit('search', {
   windowMs: 60 * 1000,
   max: SEARCH_RATE_LIMIT_MAX,
   standardHeaders: true,
@@ -80,7 +97,7 @@ const searchLimit = rateLimit({
 // The details limit exists to throttle upstream Steam/HLTB calls. Cache hits make
 // no upstream calls, so they must not count — otherwise a refresh of an already
 // loaded comparison (all cache hits) burns the budget and 429s itself.
-const detailsLimit = rateLimit({
+const detailsLimit = namedRateLimit('details', {
   windowMs: 60 * 1000,
   max: DETAILS_RATE_LIMIT_MAX,
   standardHeaders: true,
@@ -106,7 +123,7 @@ const detailsLimit = rateLimit({
 // never opened. It's fetched lazily instead, once per game, only when that game's panel
 // actually opens (see loadNews in public/panel.js) — same on-demand shape as achievements
 // (achievementsLimit below), just without the per-account fan-out.
-const newsLimit = rateLimit({
+const newsLimit = namedRateLimit('news', {
   windowMs: 60 * 1000,
   max: DETAILS_RATE_LIMIT_MAX,
   standardHeaders: true,
@@ -128,7 +145,7 @@ const normalizeSearchTerm = (raw) => (raw || '').trim().slice(0, 100).toLowerCas
 // distinct search term only ever costs one upstream call (subsequent requests for the same
 // term hit the cache), so this can be looser than searchLimit — it never fans out into the
 // dozens of Steam calls a library search does.
-const gameSearchLimit = rateLimit({
+const gameSearchLimit = namedRateLimit('gameSearch', {
   windowMs: 60 * 1000,
   max: GAME_SEARCH_RATE_LIMIT_MAX,
   standardHeaders: true,
@@ -148,7 +165,7 @@ const STEAM64_RE = /^7656119\d{10}$/;
 // is per (steamid, appid) — skip only once every one of those is already cached, same
 // "cache hits don't count" rule as detailsLimit above. Unresolved (non-Steam64, e.g. vanity
 // name) ids can't be cache-checked without resolving them first, so they always count.
-const achievementsLimit = rateLimit({
+const achievementsLimit = namedRateLimit('achievements', {
   windowMs: 60 * 1000,
   max: ACHIEVEMENTS_RATE_LIMIT_MAX,
   standardHeaders: true,
@@ -174,12 +191,23 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Outbound-request counts to Steam/HLTB/ITAD/ProtonDB, grouped by trust-tier/routing boundary
-// then by the specific function making the call — see lib/metrics.js. In-memory, resets on
-// restart; no auth, same trust level as /api/health (nothing sensitive in it). `circuitBreakers`
-// is composed in here rather than folded into lib/metrics.js itself — that state is owned by
-// lib/steam.js (storeBlockedUntil), not the request counters.
+// then by the specific function making the call — see lib/metrics.js (also carries
+// rateLimiters/dedupHits/cacheHits, tracked there directly — cacheHits named distinctly from
+// GET /api/health's own `cache` field, a different shape: per-group hit/miss/forced windowed
+// breakdown here vs. a flat entry count there). In-memory, resets on restart; no auth, same
+// trust level as /api/health (nothing sensitive in it). `circuitBreakers`/`semaphores`/
+// `cacheEntries` are composed in here rather than folded into lib/metrics.js itself — none of
+// them are append-only counters the way everything else here is: `circuitBreakers`/`semaphores`
+// are live state owned by lib/steam.js (storeBlockedUntil, the storeLimit/tagLimit/protonLimit
+// semaphores' own active/queued/rejected counts), and `cacheEntries` is a snapshot read
+// straight from db.sqlite by lib/cache.js, not an in-memory counter at all.
 app.get('/api/metrics', (_req, res) => {
-  res.json({ ...getMetrics(), circuitBreakers: { 'steam-store': getStoreCircuitBreaker() } });
+  res.json({
+    ...getMetrics(),
+    circuitBreakers: { 'steam-store': getStoreCircuitBreaker() },
+    semaphores: getSemaphoreStats(),
+    cacheEntries: getCacheEntryCounts(),
+  });
 });
 
 // Browsing the bundle list, resolving games to/from Steam appids, and pricing them — each
@@ -202,7 +230,7 @@ const itadRateLimitOpts = {
   message: { error: 'Too many requests. Please wait a minute and try again.' },
 };
 
-const bundlesListLimit = rateLimit({
+const bundlesListLimit = namedRateLimit('bundlesList', {
   ...itadRateLimitOpts,
   skip: (req) => {
     if (rateLimitBypassed()) return true;
@@ -224,9 +252,9 @@ const bundlesListLimit = rateLimit({
 // underneath (a repeat deep link to an already-searched bundle makes no upstream calls even
 // though it still counts here) — just given a looser budget instead of a skip, since deep
 // links are a comparatively rare action (once per opened bundle) next to list browsing.
-const bundlesByIdLimit = rateLimit({ ...itadRateLimitOpts, max: BUNDLES_RATE_LIMIT_MAX * 2, skip: () => rateLimitBypassed() });
+const bundlesByIdLimit = namedRateLimit('bundlesById', { ...itadRateLimitOpts, max: BUNDLES_RATE_LIMIT_MAX * 2, skip: () => rateLimitBypassed() });
 
-const bundlesResolveLimit = rateLimit({
+const bundlesResolveLimit = namedRateLimit('bundlesResolve', {
   ...itadRateLimitOpts,
   skip: (req) => {
     if (rateLimitBypassed()) return true;
@@ -242,7 +270,7 @@ const bundlesResolveLimit = rateLimit({
 // internally by that route via resolveItadIds first). Mirrors getPrices' own per-(gid,country)
 // cache key either way; the appids branch additionally checks resolveItadIds' own
 // per-appid cache key, since that resolution step is this route's own internal work too.
-const pricesLimit = rateLimit({
+const pricesLimit = namedRateLimit('prices', {
   ...itadRateLimitOpts,
   skip: (req) => {
     if (rateLimitBypassed()) return true;

@@ -9,7 +9,7 @@ process.env.DB_FILE = '';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker, _resetStoreCircuitBreaker } = require('../lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker, _resetStoreCircuitBreaker, getSemaphoreStats, createSemaphore } = require('../lib/steam');
 const { _reset, setCache } = require('../lib/cache');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
@@ -45,6 +45,92 @@ test('getStoreCircuitBreaker: trips (blockedUntil in the future) after 2 consecu
   // calling fetch again at all.
   await assert.rejects(() => getGameRating(402), /circuit open/);
   assert.equal(fetchMock.mock.callCount(), 2);
+});
+
+test('getStoreCircuitBreaker: tripCount increments on trip and stays 0 until then', async (t) => {
+  _reset();
+  _resetStoreCircuitBreaker();
+  t.after(_resetStoreCircuitBreaker);
+  assert.equal(getStoreCircuitBreaker().tripCount, 0);
+
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
+  await assert.rejects(() => getGameRating(400));
+  assert.equal(getStoreCircuitBreaker().tripCount, 0, 'a single 403 must not trip it');
+  await assert.rejects(() => getGameRating(401));
+  assert.equal(getStoreCircuitBreaker().tripCount, 1, 'two consecutive 403s trip it once');
+});
+
+test('getStoreCircuitBreaker: consecutive403s exposes pre-trip state and resets on success', async (t) => {
+  _reset();
+  _resetStoreCircuitBreaker();
+  t.after(_resetStoreCircuitBreaker);
+  assert.equal(getStoreCircuitBreaker().consecutive403s, 0);
+
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
+  await assert.rejects(() => getGameRating(410));
+  assert.equal(getStoreCircuitBreaker().consecutive403s, 1, 'a single 403 is visible before it trips anything');
+
+  t.mock.method(globalThis, 'fetch', async () => makeReviewResponse(10, 9));
+  await getGameRating(411);
+  assert.equal(getStoreCircuitBreaker().consecutive403s, 0, 'a success resets the streak');
+});
+
+test('getSemaphoreStats: reports live active/queued and a lifetime queue-depth high-water mark', async (t) => {
+  _reset();
+  const releases = [];
+  // tagLimit (concurrency 3, no minIntervalMs cooldown, unlike storeLimit's 500ms one — see
+  // its own comment in lib/steam.js) backs getGameDemo, so contention here resolves
+  // deterministically without a cross-test real-time release delay to account for.
+  t.mock.method(globalThis, 'fetch', () => new Promise(resolve => {
+    releases.push(() => resolve({ ok: true, json: async () => ({ response: { store_items: [{ success: 1, related_items: {} }] } }) }));
+  }));
+
+  const results = Promise.all([704, 705, 706, 707].map(appid => getGameDemo(appid)));
+  await new Promise(r => setImmediate(r)); // let the first three fetches actually start
+
+  const busy = getSemaphoreStats();
+  assert.equal(busy.tag.active, 3);
+  assert.equal(busy.tag.queued, 1);
+  assert.ok(busy.tag.maxQueueSeen >= 1);
+
+  // Drain whatever fetch calls show up until all four resolve — the 4th call's own fetch
+  // doesn't start until a slot frees up, so this polls rather than releasing everything up front.
+  let settled = false;
+  results.then(() => { settled = true; });
+  while (!settled) {
+    while (releases.length) releases.shift()();
+    await new Promise(r => setImmediate(r));
+  }
+
+  // A high-water mark must not reset back down once the queue has drained.
+  assert.ok(getSemaphoreStats().tag.maxQueueSeen >= 1);
+  assert.equal(typeof getSemaphoreStats().store.active, 'number');
+  assert.equal(typeof getSemaphoreStats().proton.queued, 'number');
+  assert.equal(typeof getSemaphoreStats().tag.rejected, 'number');
+});
+
+// createSemaphore's maxQueue safety valve is tested directly here (rather than by exhausting
+// storeLimit/tagLimit/protonLimit's real, deliberately-generous 20000-deep queue — see
+// SEMAPHORE_MAX_QUEUE's own comment in lib/steam.js) since createSemaphore is exported
+// specifically for this.
+test('createSemaphore: rejected counts calls turned away once maxQueue is hit, active/queued unaffected', async () => {
+  const sem = createSemaphore(1, 0, 1); // 1 concurrent slot, queue depth 1
+  let releaseFirst;
+  const p1 = sem(() => new Promise(r => { releaseFirst = r; })); // occupies the one active slot
+  const p2 = sem(() => Promise.resolve('queued'));               // fills the one queue slot
+  await new Promise(r => setImmediate(r));
+
+  assert.deepEqual(sem.getStats(), { active: 1, queued: 1, maxQueueSeen: 1, rejected: 0 });
+
+  // A 3rd call is turned away outright — the queue is already full.
+  await assert.rejects(() => sem(() => Promise.resolve('never runs')), /Too many queued/);
+  assert.equal(sem.getStats().rejected, 1);
+  assert.equal(sem.getStats().active, 1, 'a rejection must not touch active');
+  assert.equal(sem.getStats().queued, 1, 'a rejection must not touch queued — it never entered the queue');
+
+  releaseFirst('done');
+  assert.equal(await p1, 'done');
+  assert.equal(await p2, 'queued');
 });
 
 test('getGameRating: throws when fetch fails', async (t) => {

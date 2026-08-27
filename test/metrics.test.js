@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { trackedFetch, getMetrics, _reset } = require('../lib/metrics');
+const { trackedFetch, recordLimiterTrip, recordDedupHit, recordCacheEvent, getMetrics, _reset } = require('../lib/metrics');
 
 test.beforeEach(() => _reset());
 
@@ -135,20 +135,133 @@ test('getMetrics: lastHour re-filters at read time even with no writes since agi
   }
 });
 
+test('getMetrics: sinceRestart/lastHour report avg/max latency per label', async (t) => {
+  const durations = [10, 20, 30];
+  let i = 0;
+  const restore = globalThis.fetch;
+  t.mock.timers.enable({ apis: ['Date'] });
+  globalThis.fetch = async () => {
+    t.mock.timers.tick(durations[i++]);
+    return { ok: true, status: 200 };
+  };
+  try {
+    for (let n = 0; n < durations.length; n++) await trackedFetch('steam-store', 'getAppDetails', 'u');
+
+    const { sinceRestart, lastHour } = getMetrics();
+    const entry = sinceRestart.groups['steam-store'].getAppDetails;
+    // avg of 10/20/30 = 20, max = 30
+    assert.equal(entry.avgLatencyMs, 20);
+    assert.equal(entry.maxLatencyMs, 30);
+    assert.equal(lastHour.groups['steam-store'].getAppDetails.avgLatencyMs, 20);
+    assert.equal(lastHour.groups['steam-store'].getAppDetails.maxLatencyMs, 30);
+  } finally {
+    globalThis.fetch = restore;
+  }
+});
+
+test('getMetrics: a thrown/network failure still counts toward latency (not just successes)', async (t) => {
+  const restore = globalThis.fetch;
+  t.mock.timers.enable({ apis: ['Date'] });
+  globalThis.fetch = async () => { t.mock.timers.tick(50); throw new Error('timeout'); };
+  try {
+    await assert.rejects(() => trackedFetch('hltb', 'search', 'u'));
+    const entry = getMetrics().sinceRestart.groups.hltb.search;
+    assert.equal(entry.avgLatencyMs, 50);
+    assert.equal(entry.maxLatencyMs, 50);
+  } finally {
+    globalThis.fetch = restore;
+  }
+});
+
+test('recordLimiterTrip: counts trips per limiter name, absent for one never tripped', () => {
+  recordLimiterTrip('details');
+  recordLimiterTrip('details');
+  recordLimiterTrip('search');
+
+  const { rateLimiters } = getMetrics();
+  assert.equal(rateLimiters.details.sinceRestart, 2);
+  assert.equal(rateLimiters.search.sinceRestart, 1);
+  assert.equal(rateLimiters.gameSearch, undefined);
+});
+
+test('recordLimiterTrip: lastHour drops trips older than an hour but sinceRestart keeps them', (t) => {
+  t.mock.timers.enable({ apis: ['Date'] });
+  recordLimiterTrip('details');
+  t.mock.timers.tick(61 * 60 * 1000);
+  recordLimiterTrip('details');
+
+  const { rateLimiters } = getMetrics();
+  assert.equal(rateLimiters.details.sinceRestart, 2);
+  assert.equal(rateLimiters.details.lastHour, 1);
+});
+
+test('recordDedupHit: counts hits per name under sinceRestart, ignores an unnamed (undefined) dedup instance', () => {
+  recordDedupHit('steam');
+  recordDedupHit('steam');
+  recordDedupHit('itad');
+  recordDedupHit(undefined);
+
+  const { dedupHits } = getMetrics();
+  assert.equal(dedupHits.steam.sinceRestart, 2);
+  assert.equal(dedupHits.itad.sinceRestart, 1);
+  assert.equal(Object.keys(dedupHits).length, 2);
+});
+
+test('recordDedupHit: lastHour drops hits older than an hour but sinceRestart keeps them', (t) => {
+  t.mock.timers.enable({ apis: ['Date'] });
+  recordDedupHit('steam');
+  t.mock.timers.tick(61 * 60 * 1000);
+  recordDedupHit('steam');
+
+  const { dedupHits } = getMetrics();
+  assert.equal(dedupHits.steam.sinceRestart, 2);
+  assert.equal(dedupHits.steam.lastHour, 1);
+});
+
+test('recordCacheEvent: tallies hits/misses/forced per group under sinceRestart', () => {
+  recordCacheEvent('library', 'hits');
+  recordCacheEvent('library', 'hits');
+  recordCacheEvent('library', 'misses');
+  recordCacheEvent('library', 'forced');
+  recordCacheEvent('rating', 'misses');
+
+  const { cacheHits } = getMetrics();
+  assert.deepEqual(cacheHits.library.sinceRestart, { hits: 2, misses: 1, forced: 1 });
+  assert.deepEqual(cacheHits.rating.sinceRestart, { hits: 0, misses: 1, forced: 0 });
+});
+
+test('recordCacheEvent: lastHour drops events older than an hour but sinceRestart keeps them', (t) => {
+  t.mock.timers.enable({ apis: ['Date'] });
+  recordCacheEvent('library', 'hits');
+  t.mock.timers.tick(61 * 60 * 1000);
+  recordCacheEvent('library', 'misses');
+
+  const { cacheHits } = getMetrics();
+  assert.deepEqual(cacheHits.library.sinceRestart, { hits: 1, misses: 1, forced: 0 });
+  assert.deepEqual(cacheHits.library.lastHour, { hits: 0, misses: 1, forced: 0 });
+});
+
 test('getMetrics: includes a stable "since" timestamp', () => {
   const { since } = getMetrics();
   assert.equal(typeof since, 'number');
   assert.ok(since <= Date.now());
 });
 
-test('_reset: clears all counters', async () => {
+test('_reset: clears all counters, including rate-limiter trips, dedup hits, and cache events', async () => {
   const restore = globalThis.fetch;
   globalThis.fetch = async () => ({ ok: true, status: 200 });
   try {
     await trackedFetch('hltb', 'search', 'u1');
+    recordLimiterTrip('details');
+    recordDedupHit('steam');
+    recordCacheEvent('library', 'hits');
     assert.equal(getMetrics().sinceRestart.groups.hltb.search.requests, 1);
     _reset();
-    assert.deepEqual(getMetrics().sinceRestart.groups, {});
+    const metrics = getMetrics();
+    assert.deepEqual(metrics.sinceRestart.groups, {});
+    assert.deepEqual(metrics.rateLimiters, {});
+    assert.deepEqual(metrics.dedupHits, {});
+    assert.deepEqual(metrics.cacheHits, {});
   } finally {
     globalThis.fetch = restore;
   }

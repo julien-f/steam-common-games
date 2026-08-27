@@ -18,6 +18,7 @@ const supertest = require('supertest');
 const { app } = require('../server');
 const { _reset, setCache } = require('../lib/cache');
 const { _resetAuth } = require('../lib/hltb');
+const { _reset: _resetMetrics } = require('../lib/metrics');
 
 const api = supertest(app);
 
@@ -153,4 +154,31 @@ test('bundles resolve limiter: counts cache misses but never counts fully-cached
   const cached = await api.post('/api/bundles/resolve').send({ gids: ['cached-gid'] });
   assert.equal(cached.status, 200, 'an all-cached gid batch must bypass the limiter');
   assert.deepEqual(cached.body.appids, { 'cached-gid': 555 });
+});
+
+// A limiter actually rejecting a request must be visible in GET /api/metrics's own
+// rateLimiters field (lib/metrics.js's recordLimiterTrip) — not just returned as a 429 to the
+// caller that hit it, with no server-side trail of how often that's happening overall.
+test('a rejected request is recorded in GET /api/metrics rateLimiters', async (t) => {
+  _reset();
+  _resetMetrics();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true, json: async () => ({ items: [{ id: 400, name: 'Portal' }] }),
+  }));
+
+  // gameSearchLimit's own window-based budget is shared process-wide across every test in this
+  // file (not reset by _reset()/_resetMetrics() above, which only touch the app cache/metrics
+  // counters) — so exactly how many of these are rejected depends on what earlier tests in this
+  // file already consumed. Firing several distinct-term requests and counting the rejections
+  // ourselves, rather than assuming "first N succeed", keeps this robust to that shared state.
+  let rejected = 0;
+  for (let i = 0; i < 5; i++) {
+    const res = await api.get(`/api/search-games?q=metrics-trip-term-${i}`);
+    if (res.status === 429) rejected++;
+  }
+  assert.ok(rejected >= 1, 'expected at least one rejection to exercise the metrics path');
+
+  const metrics = await api.get('/api/metrics');
+  assert.equal(metrics.body.rateLimiters.gameSearch.sinceRestart, rejected);
+  assert.equal(metrics.body.rateLimiters.gameSearch.lastHour, rejected);
 });

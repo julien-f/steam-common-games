@@ -119,8 +119,46 @@ test('GET /api/metrics: 200 with a since timestamp and per-group/label request c
   assert.ok(label.requests >= 1);
   assert.equal(typeof label.statusCounts, 'object');
   assert.equal(label.networkErrors, 0);
+  assert.equal(typeof label.avgLatencyMs, 'number');
+  assert.equal(typeof label.maxLatencyMs, 'number');
   assert.ok(res.body.lastHour.groups['steam-api'].getOwnedGames.requests >= 1);
   assert.equal(res.body.circuitBreakers['steam-store'].blockedUntil, 0);
+  assert.equal(typeof res.body.circuitBreakers['steam-store'].tripCount, 'number');
+  assert.equal(res.body.circuitBreakers['steam-store'].consecutive403s, 0);
+});
+
+test('GET /api/metrics: includes semaphore, cache hit/entry, rate-limiter, and dedup stats', async (t) => {
+  _reset();
+  const GAME = { appid: 400, name: 'Portal' };
+  t.mock.method(globalThis, 'fetch', makeLibraryFetch([GAME], []));
+  await api.post('/api/common-games').send({ slots: [[ID1], [ID2]] });
+
+  const res = await api.get('/api/metrics');
+  assert.equal(res.status, 200);
+  for (const name of ['store', 'tag', 'proton']) {
+    assert.equal(typeof res.body.semaphores[name].active, 'number');
+    assert.equal(typeof res.body.semaphores[name].queued, 'number');
+    assert.equal(typeof res.body.semaphores[name].maxQueueSeen, 'number');
+    assert.equal(res.body.semaphores[name].rejected, 0);
+  }
+  // Only groups actually touched by this request are present — resolveSteamId short-circuits
+  // on an already-Steam64 id without a cache read, so 'resolve' never shows up here, but
+  // getOwnedGames/getPlayerSummaries do (games:/player: — both 'library'), same "absent when
+  // never called" convention the rest of lib/metrics.js already uses.
+  assert.equal(typeof res.body.cacheHits.library.sinceRestart.hits, 'number');
+  assert.equal(typeof res.body.cacheHits.library.sinceRestart.misses, 'number');
+  assert.equal(typeof res.body.cacheHits.library.sinceRestart.forced, 'number');
+  assert.equal(typeof res.body.cacheHits.library.lastHour.hits, 'number');
+  // cacheEntries, unlike cacheHits, always lists every group (a db.sqlite row count, not an
+  // in-memory-since-restart counter — see lib/cache.js's getCacheEntryCounts).
+  for (const label of ['library', 'resolve', 'rating', 'meta', 'search', 'news', 'bundles']) {
+    assert.equal(typeof res.body.cacheEntries[label], 'number');
+  }
+  assert.equal(typeof res.body.rateLimiters, 'object');
+  assert.equal(typeof res.body.dedupHits, 'object');
+  // Two accounts resolved in the same POST /api/common-games share the 'steam' dedup instance
+  // for anything they both trigger concurrently — not asserted on an exact count here (that's
+  // covered by lib/dedup.js's own unit tests), just that the field is wired through.
 });
 
 // ── POST /api/common-games — input validation ─────────────────────────────────
