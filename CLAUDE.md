@@ -223,7 +223,7 @@ After making changes:
 
 1. Check whether existing tests need updating, or new ones are needed, to cover the change, then run `npm test` and report actual results — not assumptions.
 2. Update any affected documentation (this file, `README.md`, `CHANGELOG.md`) — see "Knowledge sharing" above for where things belong.
-3. A `pre-commit` git hook (plain shell script at `.git/hooks/pre-commit`, not a package like Husky — this repo has no dependency for it) runs `npm test` automatically and blocks the commit on failure; there's still no linter/formatter configured. The hook lives under `.git/`, so it isn't version-controlled — it needs to be recreated after a fresh clone (see the snippet in this repo's own `.git/hooks/pre-commit` if you need to reproduce it elsewhere).
+3. A `pre-commit` git hook (plain shell script at `.git/hooks/pre-commit`, not a package like Husky — this repo has no dependency for it) runs `npm test` automatically and blocks the commit on failure; there's still no linter/formatter configured. The hook lives under `.git/`, so it isn't version-controlled — it needs to be recreated after a fresh clone (see the snippet in this repo's own `.git/hooks/pre-commit` if you need to reproduce it elsewhere). Once step 1 above has already confirmed tests pass, don't run `npm test` again immediately before `git commit` just because a commit is about to happen — the hook already re-runs it and blocks on failure, so a run whose only purpose is "will this commit succeed" is redundant with the hook, not an extra safety margin.
 
 ## Changelog
 
