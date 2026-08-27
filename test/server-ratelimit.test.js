@@ -179,6 +179,6 @@ test('a rejected request is recorded in GET /api/metrics rateLimiters', async (t
   assert.ok(rejected >= 1, 'expected at least one rejection to exercise the metrics path');
 
   const metrics = await api.get('/api/metrics');
-  assert.equal(metrics.body.rateLimiters.gameSearch.sinceRestart, rejected);
-  assert.equal(metrics.body.rateLimiters.gameSearch.lastHour, rejected);
+  assert.equal(metrics.body.sinceRestart.rateLimiters.gameSearch, rejected);
+  assert.equal(metrics.body.lastHour.rateLimiters.gameSearch, rejected);
 });

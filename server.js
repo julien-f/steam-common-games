@@ -197,11 +197,12 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Outbound-request counts to Steam/HLTB/ITAD/ProtonDB, grouped by trust-tier/routing boundary
-// then by the specific function making the call — see lib/metrics.js (also carries
-// rateLimiters/dedupHits/cacheHits, tracked there directly — cacheHits named distinctly from
-// GET /api/health's own `cache` field, a different shape: per-group hit/miss/forced windowed
-// breakdown here vs. a flat entry count there). In-memory, resets on restart; no auth, same
-// trust level as /api/health (nothing sensitive in it). `circuitBreakers`/`semaphores`/
+// then by the specific function making the call — see lib/metrics.js. Every windowed signal
+// (groups, rateLimiters, dedupHits, cacheHits — all tracked there directly) nests under the
+// top-level sinceRestart/lastHour buckets, not the other way around — cacheHits named
+// distinctly from GET /api/health's own `cache` field, a different shape: per-group hit/miss/
+// forced windowed breakdown here vs. a flat entry count there. In-memory, resets on restart; no
+// auth, same trust level as /api/health (nothing sensitive in it). `circuitBreakers`/`semaphores`/
 // `cacheEntries` are composed in here rather than folded into lib/metrics.js itself — none of
 // them are append-only counters the way everything else here is: `circuitBreakers`/`semaphores`
 // are live state owned by lib/steam.js (storeBlockedUntil, the storeLimit/tagLimit/protonLimit

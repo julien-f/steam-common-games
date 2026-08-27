@@ -173,15 +173,15 @@ test('getMetrics: a thrown/network failure still counts toward latency (not just
   }
 });
 
-test('recordLimiterTrip: counts trips per limiter name, absent for one never tripped', () => {
+test('recordLimiterTrip: counts trips per limiter name under sinceRestart, absent for one never tripped', () => {
   recordLimiterTrip('details');
   recordLimiterTrip('details');
   recordLimiterTrip('search');
 
-  const { rateLimiters } = getMetrics();
-  assert.equal(rateLimiters.details.sinceRestart, 2);
-  assert.equal(rateLimiters.search.sinceRestart, 1);
-  assert.equal(rateLimiters.gameSearch, undefined);
+  const { sinceRestart } = getMetrics();
+  assert.equal(sinceRestart.rateLimiters.details, 2);
+  assert.equal(sinceRestart.rateLimiters.search, 1);
+  assert.equal(sinceRestart.rateLimiters.gameSearch, undefined);
 });
 
 test('recordLimiterTrip: lastHour drops trips older than an hour but sinceRestart keeps them', (t) => {
@@ -190,9 +190,9 @@ test('recordLimiterTrip: lastHour drops trips older than an hour but sinceRestar
   t.mock.timers.tick(61 * 60 * 1000);
   recordLimiterTrip('details');
 
-  const { rateLimiters } = getMetrics();
-  assert.equal(rateLimiters.details.sinceRestart, 2);
-  assert.equal(rateLimiters.details.lastHour, 1);
+  const { sinceRestart, lastHour } = getMetrics();
+  assert.equal(sinceRestart.rateLimiters.details, 2);
+  assert.equal(lastHour.rateLimiters.details, 1);
 });
 
 test('recordDedupHit: counts hits per name under sinceRestart, ignores an unnamed (undefined) dedup instance', () => {
@@ -201,10 +201,10 @@ test('recordDedupHit: counts hits per name under sinceRestart, ignores an unname
   recordDedupHit('itad');
   recordDedupHit(undefined);
 
-  const { dedupHits } = getMetrics();
-  assert.equal(dedupHits.steam.sinceRestart, 2);
-  assert.equal(dedupHits.itad.sinceRestart, 1);
-  assert.equal(Object.keys(dedupHits).length, 2);
+  const { sinceRestart } = getMetrics();
+  assert.equal(sinceRestart.dedupHits.steam, 2);
+  assert.equal(sinceRestart.dedupHits.itad, 1);
+  assert.equal(Object.keys(sinceRestart.dedupHits).length, 2);
 });
 
 test('recordDedupHit: lastHour drops hits older than an hour but sinceRestart keeps them', (t) => {
@@ -213,9 +213,9 @@ test('recordDedupHit: lastHour drops hits older than an hour but sinceRestart ke
   t.mock.timers.tick(61 * 60 * 1000);
   recordDedupHit('steam');
 
-  const { dedupHits } = getMetrics();
-  assert.equal(dedupHits.steam.sinceRestart, 2);
-  assert.equal(dedupHits.steam.lastHour, 1);
+  const { sinceRestart, lastHour } = getMetrics();
+  assert.equal(sinceRestart.dedupHits.steam, 2);
+  assert.equal(lastHour.dedupHits.steam, 1);
 });
 
 test('recordCacheEvent: tallies hits/misses/forced per group under sinceRestart', () => {
@@ -225,9 +225,9 @@ test('recordCacheEvent: tallies hits/misses/forced per group under sinceRestart'
   recordCacheEvent('library', 'forced');
   recordCacheEvent('rating', 'misses');
 
-  const { cacheHits } = getMetrics();
-  assert.deepEqual(cacheHits.library.sinceRestart, { hits: 2, misses: 1, forced: 1 });
-  assert.deepEqual(cacheHits.rating.sinceRestart, { hits: 0, misses: 1, forced: 0 });
+  const { sinceRestart } = getMetrics();
+  assert.deepEqual(sinceRestart.cacheHits.library, { hits: 2, misses: 1, forced: 1 });
+  assert.deepEqual(sinceRestart.cacheHits.rating, { hits: 0, misses: 1, forced: 0 });
 });
 
 test('recordCacheEvent: lastHour drops events older than an hour but sinceRestart keeps them', (t) => {
@@ -236,9 +236,9 @@ test('recordCacheEvent: lastHour drops events older than an hour but sinceRestar
   t.mock.timers.tick(61 * 60 * 1000);
   recordCacheEvent('library', 'misses');
 
-  const { cacheHits } = getMetrics();
-  assert.deepEqual(cacheHits.library.sinceRestart, { hits: 1, misses: 1, forced: 0 });
-  assert.deepEqual(cacheHits.library.lastHour, { hits: 0, misses: 1, forced: 0 });
+  const { sinceRestart, lastHour } = getMetrics();
+  assert.deepEqual(sinceRestart.cacheHits.library, { hits: 1, misses: 1, forced: 0 });
+  assert.deepEqual(lastHour.cacheHits.library, { hits: 0, misses: 1, forced: 0 });
 });
 
 test('getMetrics: includes a stable "since" timestamp', () => {
@@ -259,9 +259,9 @@ test('_reset: clears all counters, including rate-limiter trips, dedup hits, and
     _reset();
     const metrics = getMetrics();
     assert.deepEqual(metrics.sinceRestart.groups, {});
-    assert.deepEqual(metrics.rateLimiters, {});
-    assert.deepEqual(metrics.dedupHits, {});
-    assert.deepEqual(metrics.cacheHits, {});
+    assert.deepEqual(metrics.sinceRestart.rateLimiters, {});
+    assert.deepEqual(metrics.sinceRestart.dedupHits, {});
+    assert.deepEqual(metrics.sinceRestart.cacheHits, {});
   } finally {
     globalThis.fetch = restore;
   }

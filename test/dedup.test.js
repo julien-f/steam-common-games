@@ -76,14 +76,14 @@ test('dedup: a named instance records a metrics hit only when a call actually co
   let resolve;
   const p1 = withDedup('k', () => new Promise(r => { resolve = r; }));
   const p2 = withDedup('k', () => Promise.resolve('wrong')); // coalesces onto p1 — should record a hit
-  assert.equal(getMetrics().dedupHits.mymodule.sinceRestart, 1);
+  assert.equal(getMetrics().sinceRestart.dedupHits.mymodule, 1);
 
   resolve('shared');
   await p1; await p2;
 
   // A second, independent call (no concurrent duplicate) must not record another hit.
   await withDedup('k', async () => 'again');
-  assert.equal(getMetrics().dedupHits.mymodule.sinceRestart, 1);
+  assert.equal(getMetrics().sinceRestart.dedupHits.mymodule, 1);
 });
 
 test('dedup: an unnamed instance (createDedup()) does not record any metrics hit', async () => {
@@ -95,5 +95,5 @@ test('dedup: an unnamed instance (createDedup()) does not record any metrics hit
   resolve('shared');
   await p1; await p2;
 
-  assert.deepEqual(getMetrics().dedupHits, {});
+  assert.deepEqual(getMetrics().sinceRestart.dedupHits, {});
 });
