@@ -167,7 +167,7 @@ function formatMissingGroup(formatFn, missingLabel = '—') {
 }
 
 // Every price-ish column is shown in the region currently selected (see COUNTRY_OPTIONS/
-// detectCountry below) — but NOT necessarily all in the *same* currency as each other, which is
+// detectCountry in public/region.js) — but NOT necessarily all in the *same* currency as each other, which is
 // why there are two separate currency fields on a row rather than one shared `row.currency` (an
 // earlier version of this file had exactly that single shared field, and it was a real bug:
 // confirmed live, a bundle's own tier price can come back from ITAD in USD only — same
@@ -238,6 +238,28 @@ function renderBestDeal(v, row) {
   return span;
 }
 
+// How much cheaper the best deal is than Steam Full Price, as a whole percentage — computed
+// here (in loadPrices, from the same response's steamRegular/bestDeal.price) rather than taken
+// from ITAD's own per-deal `cut` field, deliberately: `cut` is that shop's own discount off
+// *its own* regular price, which shops set independently and isn't consistent from row to row,
+// whereas Steam Full Price is one stable, Valve-set anchor this app already treats as the
+// reference price throughout — every row's Discount ends up answering the same "vs. buying it
+// on Steam" question. Best Deal is defined as the cheapest price across *every* shop including
+// Steam, so `bestDealAmt <= steamRegularAmt` always holds — this can't go negative in practice.
+function discountPct(bestDealAmt, steamRegularAmt) {
+  if (!(steamRegularAmt > 0) || bestDealAmt == null) return null;
+  return Math.round((1 - bestDealAmt / steamRegularAmt) * 100);
+}
+// `0` (the best deal genuinely isn't any cheaper than Steam Full Price — distinct from
+// `null`/`undefined`, which mean "no data"/"still loading") renders the same as missing data: a
+// flat "0%" reads as noise next to every other row's real discount, and nothing else in this
+// column set treats a confirmed zero differently from "nothing to show" either.
+function renderCut(v) {
+  if (v === undefined) return document.createTextNode('…');
+  if (v == null || v === 0) return document.createTextNode('—');
+  return document.createTextNode(`-${v}%`);
+}
+
 const BUNDLE_COLUMNS = [
   // ── Identity ────────────────────────────────────────────────────────────────
   { key: 'capsule', label: '', width: 128, sortable: false, filterable: false, groupable: false,
@@ -254,30 +276,39 @@ const BUNDLE_COLUMNS = [
   { key: 'addon',      label: 'Add-on',     groupable: true, format: v => v ? 'Add-on' : 'Base', render: renderAddonBadge },
 
   // ── Steam pricing (IsThereAnyDeal) ──────────────────────────────────────────
-  // Not part of the bundle response itself — fetched separately (POST /api/bundles/prices,
-  // right after the game-details stream starts — see loadPrices below) since it's a distinct
+  // Not part of the bundle response itself — fetched separately (POST /api/prices, right after
+  // the game-details stream starts — see loadPrices below) since it's a distinct
   // upstream call with its own per-(gid,country) cache tier, unlike tierPrice/addon above
-  // which come straight off the bundle object already in hand. Visible by default, alongside
-  // Tier Price and Best Deal, precisely to answer "is this bundle actually a good deal" at a
-  // glance; the two narrower-window lows (1yr/3mo) are hidden by default, same "secondary
-  // number" convention as Wilson Score/Steam %/Achievements elsewhere in this column set. Named
+  // which come straight off the bundle object already in hand. Hidden by default — Best Deal
+  // and Discount (below) already answer "is this worth buying" without it, so seeing the
+  // absolute Steam price too every time is rarely necessary; it's kept as its own column
+  // (rather than removed) for anyone who wants the exact number, or to sort/group by it. Named
   // "Steam Full Price" rather than the shorter "Steam Price" specifically to make clear it's
   // the non-discounted list price, not whatever Steam happens to be charging today.
   { key: 'steamRegular', label: 'Steam Full Price', type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
   // The cheapest *current* price across every shop ITAD tracks for this game (Steam included) —
   // the "where do I actually buy this for less, right now" answer, as opposed to Steam Full
   // Price (Steam's own non-discounted list price) or the historical lows below (what something
-  // has sold for at some point, not necessarily today). `renderBestDeal` colors/badges the price
-  // itself when it's at or below a historical low (🔥 all-time, ★ 1yr) rather than showing the
-  // shop name in the cell — the shop is still available as its own column (`bestDealShop`,
-  // hidden by default) for anyone who wants to group/filter by "which shop currently has the
-  // best price", but cluttering the price cell itself with it wasn't worth losing the room for
-  // the low-price indicator, which is the more actionable of the two at a glance. All-Time Low
-  // itself is hidden by default now that Best Deal's own color/badge already answers "is this a
-  // record low" without a separate column — it's kept, not removed outright, since the exact
-  // number is still sometimes worth seeing (e.g. how far above the record low the deal actually
-  // is), just not something worth showing by default alongside the other 5 price-ish columns.
+  // has sold for at some point, not necessarily today). Visible by default, alongside Tier
+  // Price and Discount, precisely to answer "is this bundle actually a good deal" at a glance.
+  // `renderBestDeal` colors/badges the price itself when it's at or below a historical low (🔥
+  // all-time, ★ 1yr) rather than showing the shop name in the cell — the shop is still
+  // available as its own column (`bestDealShop`, hidden by default) for anyone who wants to
+  // group/filter by "which shop currently has the best price", but cluttering the price cell
+  // itself with it wasn't worth losing the room for the low-price indicator, judged the more
+  // actionable of the two at a glance. All-Time Low itself is hidden by default now that Best
+  // Deal's own color/badge already answers "is this a record low" without a separate column —
+  // it's kept, not removed outright, since the exact number is still sometimes worth seeing
+  // (e.g. how far above the record low the deal actually is), just not something worth showing
+  // by default alongside the other price-ish columns.
   { key: 'bestDealPrice', label: 'Best Deal',     type: 'number', groupable: false, format: fmt.num, render: renderBestDeal, compare: compareNumMissingLast, defaultSortDir: 'asc' },
+  // How much cheaper the best deal is than Steam Full Price (`discountPct`, computed in
+  // loadPrices below — see its own comment for why this is computed against Steam's price
+  // rather than taken from ITAD's own per-deal "cut" field). Rendered with a leading "-"
+  // (`renderCut`) and "—" for a deal that isn't actually any cheaper than Steam (`0`) — real
+  // data, not a missing value, but not worth a "-0%" reading either. Visible by default
+  // alongside Best Deal.
+  { key: 'bestDealCut',   label: 'Discount',      type: 'number', groupable: false, format: fmt.num, render: renderCut, compare: compareNumMissingLast, defaultSortDir: 'desc' },
   { key: 'bestDealShop',   label: 'Best Deal Shop', groupable: true, format: fmt.str },
   { key: 'lowAll',        label: 'All-Time Low',  type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
   { key: 'lowY1',          label: '1yr Low',      type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
@@ -329,88 +360,19 @@ const BUNDLE_COLUMNS = [
   { key: 'dlcCount',         label: 'DLC Count',    type: 'number', groupable: true, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'desc' },
 ];
 
-const DEFAULT_VISIBLE = ['capsule', 'name', 'tierPrice', 'steamRegular', 'bestDealPrice', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
+// Steam Full Price stays hidden by default — Best Deal + Discount (ITAD's own "cut" on that
+// deal) together already answer "is this actually worth buying" without needing a third column
+// to cross-reference against.
+const DEFAULT_VISIBLE = ['capsule', 'name', 'tierPrice', 'bestDealPrice', 'bestDealCut', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
 // Cheapest first, best-rated among ties second — a genuinely useful browsing order (unlike a
 // single-column sort, which leaves same-priced games in an arbitrary relative order).
 const DEFAULT_SORT = [{ key: 'tierPrice', dir: 'asc' }, { key: 'steamdbRating', dir: 'desc' }];
 
 // ── Region picker ───────────────────────────────────────────────────────────
-// Curated rather than the full ISO 3166-1 list — these are the regions with meaningfully
-// distinct Steam pricing/currency; ITAD's `country` param accepts any 2-letter code, but a
-// bare dropdown of ~250 countries is worse UX than a short, deliberate list for a feature
-// that only exists to compare bundle prices at a glance.
-const COUNTRY_OPTIONS = [
-  { code: 'US', label: 'United States (USD)' },
-  { code: 'GB', label: 'United Kingdom (GBP)' },
-  { code: 'DE', label: 'Germany / EU (EUR)' },
-  { code: 'CA', label: 'Canada (CAD)' },
-  { code: 'AU', label: 'Australia (AUD)' },
-  { code: 'JP', label: 'Japan (JPY)' },
-  { code: 'BR', label: 'Brazil (BRL)' },
-  { code: 'RU', label: 'Russia (RUB)' },
-  { code: 'TR', label: 'Turkey (TRY)' },
-  { code: 'UA', label: 'Ukraine (UAH)' },
-  { code: 'AR', label: 'Argentina (ARS)' },
-  { code: 'IN', label: 'India (INR)' },
-  { code: 'CN', label: 'China (CNY)' },
-  { code: 'KR', label: 'South Korea (KRW)' },
-  { code: 'MX', label: 'Mexico (MXN)' },
-];
-
-// IANA timezone → curated COUNTRY_OPTIONS code, used by detectCountry below as a stronger
-// location signal than `navigator.language` (see its own comment). Deliberately not
-// exhaustive — same "curated, not the full list" reasoning as COUNTRY_OPTIONS itself — just
-// enough well-known zones per country to cover the common case; a zone that isn't listed here
-// simply falls through to the language-based guess rather than being misclassified. Zones that
-// don't unambiguously identify one of these countries (e.g. many "America/*" zones are shared
-// between the US and Canada) are deliberately left out rather than guessed. The DE bucket
-// covers Eurozone countries generally (its label is "Germany / EU (EUR)") since Steam prices
-// the euro itself, not each Eurozone country individually — but only actual euro-using EU
-// countries; EU members with their own currency (Sweden/Poland/Czechia/Hungary/Denmark, etc.)
-// are left unmapped rather than incorrectly bucketed into EUR pricing.
-const TIMEZONE_COUNTRY = {
-  'Europe/London': 'GB',
-  'Europe/Berlin': 'DE', 'Europe/Paris': 'DE', 'Europe/Madrid': 'DE', 'Europe/Rome': 'DE',
-  'Europe/Amsterdam': 'DE', 'Europe/Brussels': 'DE', 'Europe/Vienna': 'DE', 'Europe/Dublin': 'DE',
-  'Europe/Lisbon': 'DE', 'Europe/Helsinki': 'DE', 'Europe/Luxembourg': 'DE', 'Europe/Athens': 'DE',
-  'America/Toronto': 'CA', 'America/Vancouver': 'CA', 'America/Edmonton': 'CA',
-  'America/Winnipeg': 'CA', 'America/Halifax': 'CA', 'America/St_Johns': 'CA',
-  'Australia/Sydney': 'AU', 'Australia/Melbourne': 'AU', 'Australia/Brisbane': 'AU',
-  'Australia/Perth': 'AU', 'Australia/Adelaide': 'AU', 'Australia/Darwin': 'AU', 'Australia/Hobart': 'AU',
-  'Asia/Tokyo': 'JP',
-  'America/Sao_Paulo': 'BR', 'America/Manaus': 'BR', 'America/Bahia': 'BR', 'America/Fortaleza': 'BR',
-  'Europe/Moscow': 'RU', 'Asia/Yekaterinburg': 'RU', 'Asia/Novosibirsk': 'RU',
-  'Asia/Vladivostok': 'RU', 'Asia/Krasnoyarsk': 'RU', 'Asia/Irkutsk': 'RU',
-  'Europe/Istanbul': 'TR',
-  'Europe/Kyiv': 'UA', 'Europe/Kiev': 'UA', // Kiev is the older alias for the same zone
-  'America/Argentina/Buenos_Aires': 'AR', 'America/Argentina/Cordoba': 'AR',
-  'Asia/Kolkata': 'IN', 'Asia/Calcutta': 'IN', // Calcutta is the older alias for the same zone
-  'Asia/Shanghai': 'CN', 'Asia/Urumqi': 'CN',
-  'Asia/Seoul': 'KR',
-  'America/Mexico_City': 'MX', 'America/Tijuana': 'MX', 'America/Cancun': 'MX',
-};
-
-// Best-effort location detection, falling back to US when nothing below matches or the browser
-// doesn't support the APIs involved — see the "URL param, autodetect from the browser, curated
-// country list" decision. Tries the OS timezone (via TIMEZONE_COUNTRY above) before
-// `navigator.language`: language reflects a UI preference, not where the user actually is, and
-// very commonly stays "en-US" (or another English variant) regardless of physical location —
-// confirmed live on a machine with `LANG=en_US.UTF-8` but an OS timezone of "Europe/Paris",
-// which `Intl.Locale('en-US').maximize().region` resolves straight to "US" while the timezone
-// correctly implies a Eurozone country. The timezone isn't infallible either (a US expat who
-// never changed their laptop's clock would still misdetect), but it's a meaningfully better
-// default than a language tag that many browsers leave on its out-of-the-box value forever.
-function detectCountry() {
-  try {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (TIMEZONE_COUNTRY[tz]) return TIMEZONE_COUNTRY[tz];
-  } catch { /* Intl.DateTimeFormat unsupported */ }
-  try {
-    const region = new Intl.Locale(navigator.language).maximize().region;
-    if (COUNTRY_OPTIONS.some(c => c.code === region)) return region;
-  } catch { /* Intl.Locale unsupported or unparseable navigator.language */ }
-  return 'US';
-}
+// COUNTRY_OPTIONS/TIMEZONE_COUNTRY/detectCountry now live in the shared public/region.js
+// (loaded as a plain script before this module, same convention as esc()/reorderUrlParams from
+// utils.js/urlState.js) — library.js's Wishlist price columns need the exact same curated list
+// and detection heuristic, and there's no reason for the two to drift apart.
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const notConfiguredCard = document.getElementById('not-configured-card');
@@ -435,13 +397,6 @@ const resetViewBtn       = document.getElementById('reset-view-btn');
 const tableContainer     = document.getElementById('table-container');
 const unresolvedSection  = document.getElementById('unresolved-section');
 const unresolvedListEl   = document.getElementById('unresolved-list');
-
-for (const { code, label } of COUNTRY_OPTIONS) {
-  const opt = document.createElement('option');
-  opt.value = code;
-  opt.textContent = label;
-  countrySelect.appendChild(opt);
-}
 
 // Collapses the bundle list (see #bundle-list-wrap.collapsed in bundles.html) once a bundle has
 // actually been picked — the list itself stops being the thing to focus on at that point, and a
@@ -660,7 +615,7 @@ async function loadBundles({ reset = true, expandList = true } = {}) {
   }
   bundlesStatusEl.textContent = 'Loading bundles…';
   const qs = new URLSearchParams({
-    country: countrySelect.value,
+    country: resolveRegion(countrySelect.value),
     sort: sortSelect.value,
     expired: String(expiredCheckbox.checked),
     offset: String(bundlesOffset),
@@ -830,8 +785,10 @@ nextBundleBtn.addEventListener('click', () => {
   if (idx !== -1 && idx < bundles.length - 1) openBundle(bundles[idx + 1]);
 });
 
-// Fetches Steam's non-discounted price + historical lows for the bundle's resolved games
-// (see /api/bundles/prices) and applies them once available — a single batch call, not
+// Fetches Steam's non-discounted price + historical lows for the bundle's resolved games (see
+// the shared POST /api/prices — gid-keyed here, since Bundles already has ITAD gids; the
+// Library Explorer's Wishlist price columns hit the same route with `appids` instead — see its
+// own comment in server.js) and applies them once available — a single batch call, not
 // streamed per-game like ratings/HLTB/tags, so it can land before or after any given row has
 // finished streaming its other details. Either order is fine: rows not yet visible (still
 // `loading`) simply carry the price fields already set by the time they do appear; rows
@@ -839,8 +796,8 @@ nextBundleBtn.addEventListener('click', () => {
 async function loadPrices(resolved) {
   priceStatusEl.textContent = '';
   try {
-    const qs = new URLSearchParams({ country: countrySelect.value });
-    const res = await fetch(`/api/bundles/prices?${qs}`, {
+    const qs = new URLSearchParams({ country: resolveRegion(countrySelect.value) });
+    const res = await fetch(`/api/prices?${qs}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ gids: resolved.map(g => g.gid) }),
@@ -854,6 +811,7 @@ async function loadPrices(resolved) {
       row.steamRegular = info.steamRegular?.amount ?? null;
       row.bestDealPrice = info.bestDeal?.price?.amount ?? null;
       row.bestDealShop   = info.bestDeal?.shop          ?? null;
+      row.bestDealCut    = discountPct(row.bestDealPrice, row.steamRegular);
       row.lowAll        = info.lowAll?.amount        ?? null;
       row.lowY1          = info.lowY1?.amount          ?? null;
       row.lowM3          = info.lowM3?.amount          ?? null;
@@ -878,6 +836,7 @@ async function loadPrices(resolved) {
       if (row.steamRegular === undefined) row.steamRegular = null;
       if (row.bestDealPrice === undefined) row.bestDealPrice = null;
       if (row.bestDealShop   === undefined) row.bestDealShop   = null;
+      if (row.bestDealCut    === undefined) row.bestDealCut    = null;
       if (row.lowAll        === undefined) row.lowAll        = null;
       if (row.lowY1          === undefined) row.lowY1          = null;
       if (row.lowM3          === undefined) row.lowM3          = null;
@@ -952,7 +911,7 @@ async function openBundle(bundle) {
     tierCurrency: g.tierCurrency,
     priceCurrency: undefined, // set by loadPrices — see the comment on formatMoney/renderPrice above for why this is a separate field from tierCurrency
     addon: g.addon,
-    steamRegular: undefined, bestDealPrice: undefined, bestDealShop: undefined,
+    steamRegular: undefined, bestDealPrice: undefined, bestDealShop: undefined, bestDealCut: undefined,
     lowAll: undefined, lowY1: undefined, lowM3: undefined,
     capsule: undefined, score: undefined, positivePct: undefined, steamdbRating: undefined,
     reviewsTotal: undefined, hltbMain: undefined, hltbExtra: undefined, hltbCompletionist: undefined,
@@ -994,7 +953,7 @@ async function openBundle(bundle) {
 // ── Wiring ──────────────────────────────────────────────────────────────────
 
 countrySelect.addEventListener('change', () => {
-  updateCountryParam();
+  setStoredRegion(countrySelect.value);
   // A bundle's tier price and its games' Steam Full Price/Best Deal/lows (loadPrices above)
   // are all region-specific, but loadBundles() only refreshes the browse list above — it
   // never touches whatever bundle is currently open in the detail view below it. Re-open it
@@ -1021,28 +980,13 @@ resetViewBtn.addEventListener('click', () => {
   table.setViewState({ sorts: DEFAULT_SORT });
 });
 
-// `country` is the one durable, shareable piece of state this page writes to the URL — it
-// changes what data is actually shown (prices/currency), same reasoning as `sort`/`view` on
-// the other pages; see CLAUDE.md's URL / sharing section.
-function updateCountryParam() {
-  const params = new URLSearchParams(location.search);
-  params.set('country', countrySelect.value);
-  history.replaceState(null, '', `?${params}`);
-}
-
-function initCountry() {
-  const params = new URLSearchParams(location.search);
-  const fromUrl = params.get('country');
-  const code = fromUrl && COUNTRY_OPTIONS.some(c => c.code === fromUrl) ? fromUrl : detectCountry();
-  countrySelect.value = code;
-  updateCountryParam();
-}
-
 // `?bundle=<id>` deep link — writes/clears the param while preserving everything else already
-// in the URL (country, in particular), same `replaceState`-preserving-other-params pattern as
-// updateCountryParam above. Not pushed — opening a different bundle isn't meant to be a
-// separate back/forward-navigable step (this page has no popstate listener at all, unlike
-// library.js/app.js), same as how `sort`/`view` elsewhere in this app are written.
+// in the URL. Not pushed — opening a different bundle isn't meant to be a separate back/
+// forward-navigable step (this page has no popstate listener at all, unlike library.js/app.js),
+// same as how `sort`/`view` elsewhere in this app are written. `country` is deliberately not
+// part of this (or any) URL — it's a `localStorage` preference (see public/region.js), not
+// shareable state, since it says more about the viewer than about which bundle they're looking
+// at.
 function setBundleParam(id) {
   const params = new URLSearchParams(location.search);
   if (id == null) params.delete('bundle');
@@ -1057,7 +1001,7 @@ function setBundleParam(id) {
 // initial page load — this runs concurrently with loadBundles(), not after it).
 async function openBundleById(id) {
   try {
-    const qs = new URLSearchParams({ country: countrySelect.value });
+    const qs = new URLSearchParams({ country: resolveRegion(countrySelect.value) });
     const res = await fetch(`/api/bundles/${id}?${qs}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Bundle not found');
@@ -1098,7 +1042,7 @@ async function init() {
       return;
     }
   } catch { /* if health itself fails, fall through and let loadBundles surface the real error */ }
-  initCountry();
+  initRegionSelect(countrySelect);
   // Independent of each other — the deep link's own server-side search doesn't depend on
   // whatever page of the list loadBundles happens to fetch.
   const deepLinkId = Number(new URLSearchParams(location.search).get('bundle'));

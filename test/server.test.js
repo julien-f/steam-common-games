@@ -1103,24 +1103,30 @@ test('POST /api/bundles/resolve: 200 with resolved appids map', async (t) => {
   assert.deepEqual(res.body, { appids: { 'gid-1': 400, 'gid-2': null } });
 });
 
-test('POST /api/bundles/prices: 503 when ITAD_API_KEY is not configured', async () => {
+test('POST /api/prices: 503 when ITAD_API_KEY is not configured', async () => {
   const prev = process.env.ITAD_API_KEY;
   delete process.env.ITAD_API_KEY;
   try {
-    const res = await api.post('/api/bundles/prices').send({ gids: ['a'] });
+    const res = await api.post('/api/prices').send({ gids: ['a'] });
     assert.equal(res.status, 503);
   } finally {
     if (prev !== undefined) process.env.ITAD_API_KEY = prev;
   }
 });
 
-test('POST /api/bundles/prices: 400 without gids', async () => {
+test('POST /api/prices: 400 with neither gids nor appids', async () => {
   process.env.ITAD_API_KEY = 'test-itad-key';
-  const res = await api.post('/api/bundles/prices').send({});
+  const res = await api.post('/api/prices').send({});
   assert.equal(res.status, 400);
 });
 
-test('POST /api/bundles/prices: 200 with Steam regular price and historical lows', async (t) => {
+test('POST /api/prices: 400 with both gids and appids', async () => {
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  const res = await api.post('/api/prices').send({ gids: ['gid-1'], appids: [400] });
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/prices: 200 with Steam regular price and historical lows, by gids', async (t) => {
   _reset();
   process.env.ITAD_API_KEY = 'test-itad-key';
   t.mock.method(globalThis, 'fetch', async (url) => {
@@ -1132,14 +1138,14 @@ test('POST /api/bundles/prices: 200 with Steam regular price and historical lows
           historyLow: { all: { amount: 1, amountInt: 100, currency: 'USD' }, y1: null, m3: null },
           deals: [
             { shop: { id: 61, name: 'Steam' }, regular: { amount: 20, amountInt: 2000, currency: 'USD' }, price: { amount: 20, amountInt: 2000, currency: 'USD' } },
-            { shop: { id: 6, name: 'Fanatical' }, regular: { amount: 20, amountInt: 2000, currency: 'USD' }, price: { amount: 15, amountInt: 1500, currency: 'USD' } },
+            { shop: { id: 6, name: 'Fanatical' }, regular: { amount: 20, amountInt: 2000, currency: 'USD' }, price: { amount: 15, amountInt: 1500, currency: 'USD' }, cut: 25 },
           ],
         }],
       };
     }
     return { ok: false, status: 500 };
   });
-  const res = await api.post('/api/bundles/prices?country=US').send({ gids: ['gid-1'] });
+  const res = await api.post('/api/prices?country=US').send({ gids: ['gid-1'] });
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.prices['gid-1'], {
     steamRegular: { amount: 20, amountInt: 2000, currency: 'USD' },
@@ -1148,4 +1154,43 @@ test('POST /api/bundles/prices: 200 with Steam regular price and historical lows
     lowM3: null,
     bestDeal: { price: { amount: 15, amountInt: 1500, currency: 'USD' }, shop: 'Fanatical' },
   });
+});
+
+test('POST /api/prices: 400 with appids that are not positive integers', async () => {
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  const res = await api.post('/api/prices').send({ appids: [400, 'nope'] });
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/prices: 200 by appids — resolves to gids first, then prices, keyed back by appid', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  t.mock.method(globalThis, 'fetch', async (url, opts) => {
+    if (String(url).includes('/service/shops/')) return { ok: true, json: async () => [{ id: 61, title: 'Steam' }] };
+    if (String(url).includes('/lookup/id/shop/')) {
+      const keys = JSON.parse(opts.body); // ["app/400", "app/500"]
+      const body = Object.fromEntries(keys.map(k => [k, k === 'app/400' ? 'gid-1' : null]));
+      return { ok: true, json: async () => body };
+    }
+    if (String(url).includes('/games/prices/v3')) {
+      return {
+        ok: true, json: async () => [{
+          id: 'gid-1',
+          historyLow: { all: null, y1: null, m3: null },
+          deals: [{ shop: { id: 61, name: 'Steam' }, regular: { amount: 20, amountInt: 2000, currency: 'USD' }, price: { amount: 20, amountInt: 2000, currency: 'USD' }, cut: 0 }],
+        }],
+      };
+    }
+    return { ok: false, status: 500 };
+  });
+  const res = await api.post('/api/prices?country=US').send({ appids: [400, 500] });
+  assert.equal(res.status, 200);
+  // 400 resolved to a real gid and got priced; 500 had no ITAD listing at all (null gid) — both
+  // still get an entry, keyed by their own appid, not the internal gid.
+  assert.deepEqual(res.body.prices['400'], {
+    steamRegular: { amount: 20, amountInt: 2000, currency: 'USD' },
+    lowAll: null, lowY1: null, lowM3: null,
+    bestDeal: { price: { amount: 20, amountInt: 2000, currency: 'USD' }, shop: 'Steam' },
+  });
+  assert.deepEqual(res.body.prices['500'], { steamRegular: null, lowAll: null, lowY1: null, lowM3: null, bestDeal: null });
 });

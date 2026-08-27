@@ -14,7 +14,7 @@ const { createDedup } = require('./lib/dedup');
 const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
-const { getBundles, findBundleById, resolveSteamAppIds, getSteamShopId, getPrices, extractPriceInfo } = require('./lib/itad');
+const { getBundles, findBundleById, resolveSteamAppIds, resolveItadIds, getSteamShopId, getPrices, extractPriceInfo } = require('./lib/itad');
 
 const HOST = process.env.HOST;
 const PORT = process.env.PORT;
@@ -172,8 +172,8 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, configured: !!process.env.STEAM_API_KEY, itadConfigured: isItadConfigured(), cache: getCacheStats() });
 });
 
-// Browsing the bundle list, resolving a bundle's games to Steam appids, and pricing them —
-// each distinct combination of params/gids only ever costs one upstream call (repeats hit the
+// Browsing the bundle list, resolving games to/from Steam appids, and pricing them — each
+// distinct combination of params/ids only ever costs one upstream call (repeats hit the
 // cache), same reasoning as gameSearchLimit above. Unlike gameSearchLimit's single shared
 // limiter, this is 4 separate rateLimit() instances (one per route below) each with a `skip`
 // tailored to that route's own cache-key shape — mirroring detailsLimit/achievementsLimit's own
@@ -181,8 +181,10 @@ app.get('/api/health', (_req, res) => {
 // reloading the Bundles page a handful of times (every reload re-requests the list, and
 // re-opens whatever bundle is deep-linked — see the `?bundle=` section in CLAUDE.md) burns the
 // whole per-minute budget on requests that never actually hit ITAD, and once burned, real
-// upstream calls (a newly-opened bundle) start 429ing with no visible explanation.
-const bundlesRateLimitOpts = {
+// upstream calls (a newly-opened bundle) start 429ing with no visible explanation. Named
+// generically (not `bundlesRateLimitOpts`) since `pricesLimit` below also backs the Library
+// Explorer's Wishlist price columns, not just the Bundles page.
+const itadRateLimitOpts = {
   windowMs: 60 * 1000,
   max: BUNDLES_RATE_LIMIT_MAX,
   standardHeaders: true,
@@ -191,7 +193,7 @@ const bundlesRateLimitOpts = {
 };
 
 const bundlesListLimit = rateLimit({
-  ...bundlesRateLimitOpts,
+  ...itadRateLimitOpts,
   skip: (req) => {
     if (rateLimitBypassed()) return true;
     const country = parseCountry(req);
@@ -212,10 +214,10 @@ const bundlesListLimit = rateLimit({
 // underneath (a repeat deep link to an already-searched bundle makes no upstream calls even
 // though it still counts here) — just given a looser budget instead of a skip, since deep
 // links are a comparatively rare action (once per opened bundle) next to list browsing.
-const bundlesByIdLimit = rateLimit({ ...bundlesRateLimitOpts, max: BUNDLES_RATE_LIMIT_MAX * 2, skip: () => rateLimitBypassed() });
+const bundlesByIdLimit = rateLimit({ ...itadRateLimitOpts, max: BUNDLES_RATE_LIMIT_MAX * 2, skip: () => rateLimitBypassed() });
 
 const bundlesResolveLimit = rateLimit({
-  ...bundlesRateLimitOpts,
+  ...itadRateLimitOpts,
   skip: (req) => {
     if (rateLimitBypassed()) return true;
     const gids = req.body?.gids;
@@ -225,15 +227,30 @@ const bundlesResolveLimit = rateLimit({
   },
 });
 
-const bundlesPricesLimit = rateLimit({
-  ...bundlesRateLimitOpts,
+// Backs the one shared /api/prices route below, so its skip has to handle both shapes a
+// request can take: `gids` (Bundles, already resolved) or `appids` (Wishlist, resolved
+// internally by that route via resolveItadIds first). Mirrors getPrices' own per-(gid,country)
+// cache key either way; the appids branch additionally checks resolveItadIds' own
+// per-appid cache key, since that resolution step is this route's own internal work too.
+const pricesLimit = rateLimit({
+  ...itadRateLimitOpts,
   skip: (req) => {
     if (rateLimitBypassed()) return true;
-    const gids = req.body?.gids;
-    if (!Array.isArray(gids) || gids.length === 0) return false;
+    const { gids, appids } = req.body || {};
     const country = parseCountry(req);
-    // Mirrors getPrices' own per-(gid,country) cache key (lib/itad.js).
-    return gids.every(gid => typeof gid === 'string' && getCached(`itad-price:${country}:${gid}`) !== undefined);
+    if (Array.isArray(gids) && gids.length > 0) {
+      return gids.every(gid => typeof gid === 'string' && getCached(`itad-price:${country}:${gid}`) !== undefined);
+    }
+    if (Array.isArray(appids) && appids.length > 0) {
+      return appids.every(appid => {
+        if (!Number.isInteger(appid)) return false;
+        const gid = getCached(`itad-gid:${appid}`);
+        if (gid === undefined) return false; // resolution itself not cached yet
+        if (gid === null) return true; // confirmed no ITAD listing — nothing left to price
+        return getCached(`itad-price:${country}:${gid}`) !== undefined;
+      });
+    }
+    return false; // let the route's own validation reject it
   },
 });
 
@@ -520,32 +537,56 @@ app.post('/api/bundles/resolve', bundlesResolveLimit, async (req, res) => {
   }
 });
 
-// Steam's non-discounted regular price plus historical lows (all-time/1yr/3mo) for a bundle's
-// resolved games — a separate route from /api/bundles/resolve since it needs `country` (prices
-// are region-specific; appid resolution isn't) and isn't always wanted (e.g. before games have
-// even resolved to Steam). See lib/itad.js's getPrices/extractPriceInfo.
-app.post('/api/bundles/prices', bundlesPricesLimit, async (req, res) => {
+// Steam's non-discounted regular price plus historical lows (all-time/1yr/3mo) and the current
+// best deal across every shop ITAD tracks — one shared route for both callers that need this,
+// since the actual pricing operation is identical either way and only the identifier space the
+// caller already has differs:
+//   - Bundles already has ITAD gids (off a bundle's own tiers[].games[].id) — pass `gids`.
+//   - The Library Explorer's Wishlist tab only has Steam appids — pass `appids`; they're
+//     resolved to gids internally first (resolveItadIds, the reverse of resolveSteamAppIds
+//     above) before the identical price lookup runs. That reverse resolution isn't exposed as
+//     its own route the way /api/bundles/resolve's gid→appid mapping is — nothing needs the raw
+//     gid itself, unlike Bundles' own "which of these games have no Steam listing at all" list.
+// A separate route from /api/bundles/resolve since it needs `country` (prices are region-
+// specific; appid resolution isn't) and isn't always wanted (e.g. before a bundle's games have
+// even resolved to Steam). See lib/itad.js's resolveItadIds/getPrices/extractPriceInfo.
+const MAX_PRICE_LOOKUP_GAMES = 500;
+app.post('/api/prices', pricesLimit, async (req, res) => {
   if (!isItadConfigured()) {
     return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
   }
-  const gids = req.body.gids;
-  if (!Array.isArray(gids) || gids.length === 0 || !gids.every(g => typeof g === 'string' && g)) {
-    return res.status(400).json({ error: 'Provide at least one game id' });
+  const { gids, appids } = req.body;
+  const byGid = Array.isArray(gids) && gids.length > 0;
+  const byAppid = Array.isArray(appids) && appids.length > 0;
+  if (byGid === byAppid) { // neither, or both — exactly one is required
+    return res.status(400).json({ error: 'Provide exactly one of gids or appids' });
   }
-  if (gids.length > MAX_BUNDLE_RESOLVE_GAMES) {
-    return res.status(400).json({ error: `Too many games — maximum is ${MAX_BUNDLE_RESOLVE_GAMES}` });
+  if (byGid && !gids.every(g => typeof g === 'string' && g)) {
+    return res.status(400).json({ error: 'gids must be non-empty strings' });
+  }
+  if (byAppid && !appids.every(a => Number.isInteger(a) && a > 0)) {
+    return res.status(400).json({ error: 'appids must be positive integers' });
+  }
+  if ((byGid ? gids : appids).length > MAX_PRICE_LOOKUP_GAMES) {
+    return res.status(400).json({ error: `Too many games — maximum is ${MAX_PRICE_LOOKUP_GAMES}` });
   }
   const country = parseCountry(req);
   try {
+    // Map(requested key → gid|null) — an identity map when the caller already sent gids, so
+    // the response-shaping loop below doesn't need two separate code paths.
+    const gidByKey = byAppid
+      ? await resolveItadIds([...new Set(appids)])
+      : new Map(gids.map(g => [g, g]));
+    const gidsToPrice = [...new Set([...gidByKey.values()].filter(Boolean))];
     const [shopId, prices] = await Promise.all([
       getSteamShopId(),
-      getPrices([...new Set(gids)], { country }),
+      getPrices(gidsToPrice, { country }),
     ]);
     const out = {};
-    for (const [gid, entry] of prices) out[gid] = extractPriceInfo(entry, shopId);
+    for (const [key, gid] of gidByKey) out[key] = extractPriceInfo(gid ? prices.get(gid) : null, shopId);
     res.json({ prices: out });
   } catch (err) {
-    const status = routeErrorStatus('bundles-prices', err);
+    const status = routeErrorStatus('prices', err);
     res.status(status).json({ error: err.message });
   }
 });

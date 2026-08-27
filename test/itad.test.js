@@ -7,7 +7,7 @@ process.env.ITAD_API_KEY = 'test-itad-key';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { getSteamShopId, getBundles, findBundleById, resolveSteamAppIds, getPrices, extractPriceInfo } = require('../lib/itad');
+const { getSteamShopId, getBundles, findBundleById, resolveSteamAppIds, resolveItadIds, getPrices, extractPriceInfo } = require('../lib/itad');
 const { _reset } = require('../lib/cache');
 
 const SHOPS = [
@@ -130,6 +130,38 @@ test('resolveSteamAppIds: throws when the lookup call fails', async (t) => {
   await assert.rejects(() => resolveSteamAppIds(['gid-x']), err => err.isUpstream === true);
 });
 
+test('resolveItadIds: resolves, caches, and treats a missing mapping as null', async (t) => {
+  _reset();
+  let fetchCalls = 0;
+  t.mock.method(globalThis, 'fetch', async (url, opts) => {
+    fetchCalls++;
+    if (String(url).includes('/service/shops/')) return { ok: true, json: async () => SHOPS };
+    // lookup/id/shop/{shopId}/v1 — keyed by exactly what was sent ("app/<id>")
+    const keys = JSON.parse(opts.body);
+    const body = {};
+    for (const key of keys) body[key] = key === 'app/400' ? 'gid-known' : null;
+    return { ok: true, json: async () => body };
+  });
+
+  const result = await resolveItadIds([400, 500]);
+  assert.equal(result.get(400), 'gid-known');
+  assert.equal(result.get(500), null);
+
+  const callsBefore = fetchCalls;
+  const again = await resolveItadIds([400, 500]);
+  assert.equal(again.get(400), 'gid-known');
+  assert.equal(fetchCalls, callsBefore, 'both appids should now be cached individually');
+});
+
+test('resolveItadIds: throws when the lookup call fails', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url).includes('/service/shops/')) return { ok: true, json: async () => SHOPS };
+    return { ok: false, status: 502 };
+  });
+  await assert.rejects(() => resolveItadIds([400]), err => err.isUpstream === true);
+});
+
 const PRICE_ENTRY = {
   id: 'gid-1',
   historyLow: {
@@ -139,7 +171,7 @@ const PRICE_ENTRY = {
   },
   deals: [
     { shop: { id: 61, name: 'Steam' }, regular: { amount: 19.99, amountInt: 1999, currency: 'USD' }, price: { amount: 19.99, amountInt: 1999, currency: 'USD' } },
-    { shop: { id: 6, name: 'Fanatical' }, regular: { amount: 14.99, amountInt: 1499, currency: 'USD' }, price: { amount: 11.24, amountInt: 1124, currency: 'USD' } },
+    { shop: { id: 6, name: 'Fanatical' }, regular: { amount: 14.99, amountInt: 1499, currency: 'USD' }, price: { amount: 11.24, amountInt: 1124, currency: 'USD' }, cut: 25 },
   ],
 };
 

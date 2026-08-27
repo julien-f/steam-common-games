@@ -526,6 +526,83 @@ function insertColumnsAfter(columns, afterKey, ...newColumns) {
   return [...columns.slice(0, idx + 1), ...newColumns, ...columns.slice(idx + 1)];
 }
 
+// ── Wishlist pricing (IsThereAnyDeal) ────────────────────────────────────────
+// Same underlying data/rendering as the Bundles page's own price columns (public/bundles.js) —
+// kept as a separate copy here rather than shared, same "kept as a separate copy" precedent as
+// this file's other bits relative to bundles.js/panel.js (buildLibraryOwnersHtml, PROTON_TIER_
+// COLORS, etc.) — but fetched via the same shared `POST /api/prices` route (server.js), with
+// `appids` instead of `gids` since a wishlist row already has a Steam appid and no ITAD game id
+// at all (see loadWishlistPrices below and resolveItadIds in lib/itad.js). Optional — entirely
+// absent (not just empty) when ITAD_API_KEY isn't configured; see itadConfiguredPromise below.
+function formatMoney(v, currency) {
+  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(v); }
+  catch { return `${v.toFixed(2)} ${currency || ''}`; }
+}
+function renderPrice(v, row) {
+  if (v === undefined) return document.createTextNode('…');
+  if (v == null) return document.createTextNode('—');
+  return document.createTextNode(formatMoney(v, row.priceCurrency));
+}
+// Bare price only — no shop name in the cell itself (see the bestDealShop column below for
+// that). Colored, with a small icon suffix, when the current best deal is at or below a
+// historical low: bright teal + 🔥 for an all-time low, green + ★ for a 1-year low that isn't
+// (yet) an all-time one — reusing scoreColor's own "excellent"/"good" tier colors rather than
+// inventing a new palette just for this. `<=` rather than `<` since the current deal genuinely
+// can BE the historical low itself (it's what set it), not only ever beat it.
+function renderBestDeal(v, row) {
+  if (v === undefined) return document.createTextNode('…');
+  if (v == null) return document.createTextNode('—');
+  const isAllTimeLow = row.lowAll != null && v <= row.lowAll;
+  const isYearLow    = row.lowY1  != null && v <= row.lowY1;
+  const span = document.createElement('span');
+  if (isAllTimeLow) {
+    span.style.color = scoreColor(90); // '#57cbde', the ≥80 "excellent" tier
+    span.style.fontWeight = '700';
+  } else if (isYearLow) {
+    span.style.color = scoreColor(70); // '#a3cf4e', the ≥65 "good" tier
+  }
+  span.append(renderPrice(v, row));
+  if (isAllTimeLow) span.append(' 🔥');
+  else if (isYearLow) span.append(' ★');
+  if (row.bestDealShop) {
+    const record = isAllTimeLow ? ' — all-time low' : isYearLow ? ' — 1-year low' : '';
+    span.title = `${row.bestDealShop}${record}`;
+  }
+  return span;
+}
+
+// How much cheaper the best deal is than Steam Full Price — see the matching comment on
+// bundles.js's own discountPct/renderCut/column for why this is computed against Steam's price
+// rather than taken from ITAD's own per-deal "cut" field. `0` renders the same as missing data
+// — a deal that isn't actually any cheaper than Steam reads as noise next to every other row's
+// real discount, same treatment "no data" already gets.
+function discountPct(bestDealAmt, steamRegularAmt) {
+  if (!(steamRegularAmt > 0) || bestDealAmt == null) return null;
+  return Math.round((1 - bestDealAmt / steamRegularAmt) * 100);
+}
+function renderCut(v) {
+  if (v === undefined) return document.createTextNode('…');
+  if (v == null || v === 0) return document.createTextNode('—');
+  return document.createTextNode(`-${v}%`);
+}
+
+// Best Deal + Discount are visible by default, precisely to answer "is this worth buying now"
+// at a glance, which is why Steam Full Price itself stays hidden despite being right here next
+// to them (same reasoning as bundles.js's own DEFAULT_VISIBLE). The narrower-window lows and
+// the shop name are hidden by default too, same "secondary number" convention as Wilson Score/
+// Steam %/Achievements elsewhere in this column set. Named "Steam Full Price" rather than the
+// shorter "Steam Price" specifically to make clear it's the non-discounted list price, not
+// whatever Steam happens to be charging today.
+const WISHLIST_PRICE_COLUMNS = [
+  { key: 'steamRegular',  label: 'Steam Full Price', type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
+  { key: 'bestDealPrice', label: 'Best Deal',        type: 'number', groupable: false, format: fmt.num, render: renderBestDeal, compare: compareNumMissingLast, defaultSortDir: 'asc' },
+  { key: 'bestDealCut',   label: 'Discount',         type: 'number', groupable: false, format: fmt.num, render: renderCut, compare: compareNumMissingLast, defaultSortDir: 'desc' },
+  { key: 'bestDealShop',  label: 'Best Deal Shop',   groupable: true, format: fmt.str },
+  { key: 'lowAll',        label: 'All-Time Low',     type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
+  { key: 'lowY1',         label: '1yr Low',          type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
+  { key: 'lowM3',         label: '3mo Low',          type: 'number', groupable: false, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc' },
+];
+
 // No defaultSortDir — Steam's wishlist rank is already 1-at-the-top, so the plain ascending
 // default a fresh click starts at is the useful direction as-is. Placed right after Name (an
 // identity-adjacent "which one is this" attribute for a wishlist row) rather than off in the
@@ -542,28 +619,42 @@ const WISHLIST_DATE_ADDED_COLUMN =
     defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' } };
 
 // Same as COLUMNS minus playtime and lastPlayed (wishlist games aren't owned, so there's no
-// playtime or last-played data to show), plus the two wishlist-specific columns above, inserted
-// into their matching sections rather than tacked on at the end. Unlike owned games — whose
+// playtime or last-played data to show), plus the wishlist-specific columns above, each
+// inserted into the section it actually belongs to rather than tacked on at the end: Wishlist
+// Rank right after Name (an identity attribute), the price columns right after that — the same
+// relative position bundles.js gives its own price columns, right before Scores & reviews —
+// and Added right after Released, in the Play time & dates section. Unlike owned games — whose
 // name is known upfront from Steam's library API — a wishlist row's name only arrives once its
 // store metadata streams in, so it needs a loading state.
 const WISHLIST_COLUMNS = insertColumnsAfter(
   insertColumnsAfter(
-    COLUMNS.filter(c => c.key !== 'playtime' && c.key !== 'lastPlayed').map(c => (c.key === 'name' ? { ...c, format: fmt.str } : c)),
-    'name', WISHLIST_RANK_COLUMN
+    insertColumnsAfter(
+      COLUMNS.filter(c => c.key !== 'playtime' && c.key !== 'lastPlayed').map(c => (c.key === 'name' ? { ...c, format: fmt.str } : c)),
+      'name', WISHLIST_RANK_COLUMN
+    ),
+    'priority', ...WISHLIST_PRICE_COLUMNS
   ),
   'releaseDate', WISHLIST_DATE_ADDED_COLUMN
 );
 
-// Same as DEFAULT_VISIBLE plus `hasDemo` — "can I try this before buying" matters more on a
-// wishlist (games not yet owned) than in an owned library, unlike DEFAULT_VISIBLE above where
-// it stays hidden.
+// Same as DEFAULT_VISIBLE plus `hasDemo` ("can I try this before buying" matters more on a
+// wishlist than in an owned library) and Best Deal/Discount — same "visible by default" pair
+// bundles.js's own price columns get, for the same "is this actually worth buying" at-a-glance
+// reason. Steam Full Price itself stays hidden (see bundles.js's own DEFAULT_VISIBLE comment).
+// Included unconditionally, even when ITAD isn't configured (in which case loadWishlistPrices
+// below fills every row's price fields with `null` rather than leaving the columns stuck on
+// their loading placeholder) — same "just renders as no-data" treatment any other optional/
+// missing field gets elsewhere in this table, rather than needing a second, conditionally-built
+// visible-columns list just for this one optional feature.
 const WISHLIST_DEFAULT_VISIBLE = [
   'capsule', 'name', 'dateAdded', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres', 'hasDemo',
+  'bestDealPrice', 'bestDealCut',
 ];
 
 const playerInput   = document.getElementById('player-input');
 const loadBtn       = document.getElementById('load-btn');
 const statusEl      = document.getElementById('status');
+const priceStatusEl = document.getElementById('price-status');
 const accountsBarEl = document.getElementById('accounts-bar');
 const recentsBarEl  = document.getElementById('recents-bar');
 const recentGamesBarEl = document.getElementById('recent-games-bar');
@@ -571,6 +662,8 @@ const tableContainer = document.getElementById('table-container');
 const resetViewBtn  = document.getElementById('reset-view-btn');
 const tabLibraryBtn  = document.getElementById('tab-library');
 const tabWishlistBtn = document.getElementById('tab-wishlist');
+const wishlistRegionLabelEl = document.getElementById('wishlist-region-label');
+const countrySelectEl = document.getElementById('country-select');
 
 let table         = null;
 let unsyncView    = null;
@@ -579,6 +672,9 @@ let rowMap        = new Map();
 let total         = 0;
 let loaded        = 0;
 let flushTimer    = null;
+// Per-appid cache backing visibleRowsForTable() below — see its own comment for why this
+// exists. Keyed the same as rowMap; reset alongside it in resetTableState().
+let tableRowCache = new Map();
 let activeColumns = COLUMNS;   // COLUMNS or WISHLIST_COLUMNS, whichever tab is active
 let activeTab     = 'library'; // 'library' | 'wishlist'
 let currentPlayerStr = '';     // last player string actually loaded (not just typed)
@@ -614,6 +710,41 @@ const achievementsCacheKey = appid => `${appid}:${currentSteamIds.slice().sort()
 const randomQueueKey = () => activeTab;
 const viewParamName  = () => (activeTab === 'wishlist' ? 'wview' : 'view');
 
+// ── Wishlist pricing setup ────────────────────────────────────────────────────
+// Fired once at module load, not awaited here — resolves in the background while the rest of
+// the page sets itself up, and is only actually awaited once something (loadWishlistPrices,
+// updateRegionLabelVisibility) needs to know whether ITAD is configured. Never rejects: a
+// failed health check is treated the same as "not configured" (the price columns/region picker
+// just don't do anything) rather than surfacing a separate error for a supplementary feature.
+const itadConfiguredPromise = fetch('/api/health')
+  .then(res => res.json())
+  .then(data => !!data.itadConfigured)
+  .catch(() => false);
+
+// Populates the select (curated list + "Auto-detect" entry) and restores whatever region was
+// last picked — a `localStorage` preference shared with the Bundles page (public/region.js),
+// not URL state; see initRegionSelect's own comment for why "Auto-detect" always shows what it
+// currently resolves to rather than a value frozen at picker-population time.
+initRegionSelect(countrySelectEl);
+
+// Only meaningful on the Wishlist tab, and only when there's a pricing feature to pick a
+// region for at all — hidden on the Library tab (no price columns there) and hidden outright
+// when ITAD isn't configured (no point offering a region picker for a feature that isn't
+// running), rather than showing a picker that visibly does nothing either way.
+async function updateRegionLabelVisibility() {
+  const configured = await itadConfiguredPromise;
+  wishlistRegionLabelEl.hidden = !(configured && activeTab === 'wishlist');
+}
+updateRegionLabelVisibility();
+countrySelectEl.addEventListener('change', () => {
+  setStoredRegion(countrySelectEl.value);
+  // Re-prices whatever wishlist is currently loaded in place — unlike the Bundles page's own
+  // region change, there's no bundle-detail-view/list-collapse state to juggle here, just the
+  // one already-loaded table's price columns going back to "…" until the new country's prices
+  // land (see loadWishlistPrices below for why they show as reloading rather than stale).
+  if (activeTab === 'wishlist' && rows.length > 0) loadWishlistPrices(rows);
+});
+
 initPanel({
   inertSelector: '.lib-page',
   showAchievements: true,
@@ -624,7 +755,8 @@ initPanel({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Refresh failed');
       applyDetailsEvent(row, data);
-      if (table) table.setData(visibleRows());
+      markRowChanged(row.appid);
+      if (table) table.setData(visibleRowsForTable());
       await loadAchievements(row, { force: true }); // still meaningful with no player loaded — see loadAchievements
     } catch (err) {
       statusEl.textContent = `Refresh failed: ${err.message}`;
@@ -678,8 +810,34 @@ function toggleShortcuts() {
 
 // Rows whose details have streamed in — what's actually shown in the table (see
 // visibleRows() below for why unloaded rows are withheld rather than shown as '…' placeholders).
+// Returns the canonical `rows`/`rowMap` objects themselves — used by nav/random-pick (below)
+// and by onRowClick, all of which need the *same* reference the panel keeps displaying and any
+// later mutation (refresh, price loading) needs to keep reaching. table.setData() itself goes
+// through visibleRowsForTable() instead — see its own comment for why the two must differ.
 function visibleRows() {
   return rows.filter(r => !r.loading);
+}
+
+// @vates/data-table-vanilla's setData() only re-renders a row's cells when the object at its
+// rowKey is a genuinely *new* reference — mutating an already-visible row in place and calling
+// setData() again with an array that still contains that same reference (even a brand-new
+// outer array from a fresh .filter()) leaves its rendered cells stale. This never bit
+// streamGameDetails's own normal flow, since a row is only ever added to visibleRows()' output
+// the moment it first flips `loading: false` — a genuinely new appearance in the rendered set,
+// not a mutation of something already there. It does bite the Wishlist tab's price loading
+// (loadWishlistPrices) and the panel's "↻ Refresh" button (onRefresh below), both of which
+// mutate a row that may already be visible — same underlying bug confirmed live in bundles.js,
+// fixed there with this exact pattern (see its own comment on tableRowCache/markRowChanged).
+// A row keeps its cached copy across renders until markRowChanged() is called for it, so only
+// the row that actually changed gets a new reference and every other row's DOM is left alone.
+function visibleRowsForTable() {
+  return visibleRows().map(r => {
+    if (!tableRowCache.has(r.appid)) tableRowCache.set(r.appid, { ...r });
+    return tableRowCache.get(r.appid);
+  });
+}
+function markRowChanged(appid) {
+  tableRowCache.delete(appid);
 }
 
 // Stable order for prev/next nav — independent of the table's own live
@@ -956,7 +1114,7 @@ function scheduleFlush() {
   if (flushTimer !== null) return;
   flushTimer = setTimeout(() => {
     flushTimer = null;
-    if (table) table.setData(visibleRows());
+    if (table) table.setData(visibleRowsForTable());
     updateLastPlayedTooltip();
     updateStatus();
   }, 150);
@@ -1144,6 +1302,7 @@ async function streamGameDetails(games) {
       if (!row) continue;
 
       applyDetailsEvent(row, event);
+      markRowChanged(row.appid);
       if (isPanelOpen() && getPanelGame().appid === row.appid) { renderPanelBody(row); renderPanelNav(row); }
 
       loaded++;
@@ -1152,9 +1311,88 @@ async function streamGameDetails(games) {
   }
 
   if (flushTimer !== null) { clearTimeout(flushTimer); flushTimer = null; }
-  if (table) table.setData(visibleRows());
+  if (table) table.setData(visibleRowsForTable());
   updateLastPlayedTooltip();
   updateStatus();
+}
+
+// Fetches Steam's non-discounted price + historical lows for the Wishlist tab's games, via the
+// same shared POST /api/prices route bundles.js uses — `appids` here (a wishlist row already
+// has a Steam appid, no ITAD game id) rather than `gids`, resolved to gids server-side first
+// (resolveItadIds in lib/itad.js). A single batch call, not streamed per-game like ratings/
+// HLTB/tags — see streamGameDetails above — run concurrently with it (Promise.all in
+// loadWishlist), so it can land before or after any given row has finished streaming its other
+// details; either order is fine, same reasoning as bundles.js's own loadPrices.
+const MAX_PRICE_LOOKUP_GAMES = 500; // mirrors the server's own cap (server.js) — see the chunking below
+async function loadWishlistPrices(items) {
+  priceStatusEl.textContent = '';
+  const configured = await itadConfiguredPromise;
+  if (!configured) {
+    // No ITAD key configured at all — fill every row with "no data" (not "…", which would
+    // otherwise look stuck loading forever) rather than attempting a request bound to 503.
+    for (const item of items) {
+      const row = rowMap.get(item.appid);
+      if (!row) continue;
+      row.steamRegular = row.bestDealPrice = row.bestDealShop = row.bestDealCut = row.lowAll = row.lowY1 = row.lowM3 = row.priceCurrency = null;
+      markRowChanged(item.appid);
+    }
+    if (table) table.setData(visibleRowsForTable());
+    return;
+  }
+
+  const country = resolveRegion(countrySelectEl.value);
+  // Chunked client-side, sequentially (not in parallel) — a wishlist can run well past the
+  // server's own MAX_PRICE_LOOKUP_GAMES cap (a bundle's game list never does, which is why
+  // bundles.js's own loadPrices sends everything in one call), and firing several chunks at
+  // once would just be several concurrent ITAD-backed requests instead of one, for no benefit.
+  const appids = items.map(i => i.appid);
+  for (let i = 0; i < appids.length; i += MAX_PRICE_LOOKUP_GAMES) {
+    const chunk = appids.slice(i, i + MAX_PRICE_LOOKUP_GAMES);
+    try {
+      const qs = new URLSearchParams({ country });
+      const res = await fetch(`/api/prices?${qs}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appids: chunk }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Price lookup failed');
+      for (const appid of chunk) {
+        const row = rowMap.get(appid);
+        const info = data.prices[appid];
+        if (!row || !info) continue;
+        row.steamRegular  = info.steamRegular?.amount ?? null;
+        row.bestDealPrice = info.bestDeal?.price?.amount ?? null;
+        row.bestDealShop  = info.bestDeal?.shop          ?? null;
+        row.bestDealCut   = discountPct(row.bestDealPrice, row.steamRegular);
+        row.lowAll        = info.lowAll?.amount          ?? null;
+        row.lowY1         = info.lowY1?.amount           ?? null;
+        row.lowM3         = info.lowM3?.amount           ?? null;
+        // Always set directly from this batch's own response — see the matching comment on
+        // formatMoney/renderPrice above for why this can legitimately differ per row.
+        row.priceCurrency = info.steamRegular?.currency ?? info.bestDeal?.price?.currency ?? info.lowAll?.currency ?? info.lowY1?.currency ?? info.lowM3?.currency ?? null;
+        markRowChanged(appid);
+      }
+    } catch (err) {
+      // Same "don't leave price columns stuck on their loading placeholder forever" treatment
+      // as bundles.js's own loadPrices — a failed chunk still fills its own games with `null`
+      // (rendered "—", same as any other "no data" case) rather than leaving them on "…".
+      for (const appid of chunk) {
+        const row = rowMap.get(appid);
+        if (!row) continue;
+        if (row.steamRegular === undefined) row.steamRegular = null;
+        if (row.bestDealPrice === undefined) row.bestDealPrice = null;
+        if (row.bestDealShop  === undefined) row.bestDealShop  = null;
+        if (row.bestDealCut   === undefined) row.bestDealCut   = null;
+        if (row.lowAll        === undefined) row.lowAll        = null;
+        if (row.lowY1         === undefined) row.lowY1         = null;
+        if (row.lowM3         === undefined) row.lowM3         = null;
+        markRowChanged(appid);
+      }
+      priceStatusEl.textContent = `Couldn't load Steam pricing (${err.message}) — other columns are unaffected.`;
+    }
+  }
+  if (table) table.setData(visibleRowsForTable());
 }
 
 // preserveGameParam: skip clearing `?game=`/`&shot=` when closing a leftover panel — for a
@@ -1166,8 +1404,9 @@ function resetTableState({ preserveGameParam = false } = {}) {
   clearRandomQueue(randomQueueKey());
   if (unsyncView) { unsyncView(); unsyncView = null; }
   if (table) { table.destroy(); table = null; }
-  rows = []; rowMap = new Map(); total = 0; loaded = 0;
+  rows = []; rowMap = new Map(); total = 0; loaded = 0; tableRowCache = new Map();
   tableContainer.innerHTML = '';
+  priceStatusEl.textContent = '';
   resetViewBtn.hidden = true;
   accountsBarEl.hidden = true;
   accountsBarEl.innerHTML = '';
@@ -1282,7 +1521,13 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
     rowKey: 'appid',
     defaultPageSize: 50,
     defaultVisibleColumns: DEFAULT_VISIBLE,
-    onRowClick: row => openGame(row),
+    // The table's own click handler hands back whatever object is currently in
+    // tableRowCache for this row (see visibleRowsForTable's comment above) — a copy, not
+    // rowMap's canonical one. Looking the canonical row back up by appid means the panel (and
+    // anything that mutates whatever object it opened, like onRefresh below) always operates
+    // on the same object rowMap does, not a disconnected copy further updates would stop
+    // reaching — same fix bundles.js already needed for the same reason.
+    onRowClick: row => openGame(rowMap.get(row.appid) ?? row),
   });
   table.setViewState({ sorts: DEFAULT_SORT });
   unsyncView = syncViewToUrl(table);
@@ -1342,6 +1587,16 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
     name:               undefined, // unknown until store metadata streams in
     priority:           item.priority,
     dateAdded:          item.dateAdded,
+    // Filled by loadWishlistPrices below, concurrently with streamGameDetails — same
+    // "undefined until its own async source resolves" convention as everything else here.
+    steamRegular:       undefined,
+    bestDealPrice:      undefined,
+    bestDealShop:       undefined,
+    bestDealCut:        undefined,
+    lowAll:             undefined,
+    lowY1:              undefined,
+    lowM3:              undefined,
+    priceCurrency:      undefined,
     capsule:            undefined,
     score:              undefined,
     positivePct:        undefined,
@@ -1378,7 +1633,8 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
     rowKey: 'appid',
     defaultPageSize: 50,
     defaultVisibleColumns: WISHLIST_DEFAULT_VISIBLE,
-    onRowClick: row => openGame(row),
+    // See the matching comment in loadLibrary above.
+    onRowClick: row => openGame(rowMap.get(row.appid) ?? row),
   });
   table.setViewState({ sorts: DEFAULT_SORT });
   unsyncView = syncViewToUrl(table, { paramName: 'wview' });
@@ -1387,7 +1643,10 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
   updateStatus();
   if (preserveGameParam) restorePanelFromUrl(restoreShot); // early attempt — lightbox needs details, tried again below
 
-  await streamGameDetails(result.items);
+  // Independent of each other — Steam pricing has nothing to do with the rating/HLTB/tags
+  // pipeline — so they run concurrently rather than one after the other, same reasoning as
+  // bundles.js's own openBundle.
+  await Promise.all([streamGameDetails(result.items), loadWishlistPrices(result.items)]);
   if (preserveGameParam) restorePanelFromUrl(restoreShot);
 }
 
@@ -1407,6 +1666,7 @@ function setActiveTab(tab, { fetch: shouldFetch = true } = {}) {
   // player loaded yet) there's nothing worth a history entry for either.
   updateUrlParams({ tab: tab === 'wishlist' ? 'wishlist' : null });
   updateTitle();
+  updateRegionLabelVisibility();
   if (shouldFetch && currentPlayerStr) loadCurrentTab(currentPlayerStr);
 }
 

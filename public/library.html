@@ -21,12 +21,23 @@
      header/.card/.btn styling rather than re-defining its own look. */
   .lib-page { max-width: 1600px; margin: 0 auto; padding: 36px 20px 60px; }
 
-  .lib-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+  .lib-tabs { display: flex; gap: 4px; margin-bottom: 16px; align-items: center; }
   /* .lib-tab supplies only the toggle-state coloring — padding/border-radius/font
      come from the shared .btn class alongside it (see the buttons below). */
   .lib-tab { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); }
   .lib-tab[aria-selected="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
   .lib-tab:not([aria-selected="true"]):hover { color: var(--text0); }
+
+  /* Only meaningful on the Wishlist tab (its price columns — see bundles.html's identical
+     region picker, which this mirrors) — toggled by setActiveTab in library.js rather than
+     living in its own always-visible row, since it has nothing to say on the Library tab. */
+  .wishlist-region-label { margin-left: auto; font-size: 13px; color: var(--text1); display: flex; align-items: center; gap: 6px; }
+  .wishlist-region-label select {
+    padding: 8px 10px;
+    background: var(--bg3); color: var(--text0);
+    border: 1px solid var(--border); border-radius: var(--r);
+    font-size: 13px;
+  }
 
   .lib-form { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
   .lib-form input {
@@ -40,6 +51,12 @@
   .lib-form input::placeholder { color: var(--text2); }
   .lib-status { font-size: 13px; color: var(--text1); min-height: 18px; }
   .lib-status-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  /* Kept separate from #status (whose text streamGameDetails' own progress messages
+     overwrite constantly — see loadWishlistPrices in library.js) rather than sharing it, same
+     reasoning as bundles.html's own #price-status. Only ever has content on a Wishlist price-
+     lookup failure — empty and collapsed to 0 height the rest of the time. */
+  #price-status:empty { min-height: 0; }
+  #price-status { color: #e4a82e; margin-bottom: 8px; }
   /* Same 440px cap the player-input row above uses — .game-search-wrap itself has
      no max-width by default (fine on index.html's already-narrow .container), but
      this page's much wider .lib-page would otherwise stretch it edge-to-edge. */
@@ -85,6 +102,9 @@
     <div class="lib-tabs" role="tablist">
       <button class="btn lib-tab" id="tab-library" role="tab" aria-selected="true">Library</button>
       <button class="btn lib-tab" id="tab-wishlist" role="tab" aria-selected="false">Wishlist</button>
+      <label class="wishlist-region-label" id="wishlist-region-label" hidden>Prices in
+        <select id="country-select"></select>
+      </label>
     </div>
     <div class="lib-form">
       <input id="player-input" type="text"
@@ -109,6 +129,7 @@
     <div id="status" class="lib-status"></div>
     <button class="btn btn-ghost btn-sm" id="reset-view-btn" hidden>Reset view</button>
   </div>
+  <div id="price-status"></div>
   <div id="table-container"></div>
 </div>
 
@@ -156,6 +177,7 @@
 <script src="/mediaItems.js"></script>
 <script src="/urlState.js"></script>
 <script src="/utils.js"></script>
+<script src="/region.js"></script>
 <script src="/accountsBar.js"></script>
 <script src="/gameSearch.js"></script>
 <script src="/lightbox.js"></script>
