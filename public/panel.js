@@ -930,6 +930,89 @@ function newsHtml(g) {
   })}</div>`;
 }
 
+// Price info — a single always-open card (no chip grid, no collapsible secondary numbers):
+// the current best deal (same display/color/badge/tooltip as the Best Deal table cell in
+// bundles.js/library.js), its discount off Steam Full Price when there is one, a direct link
+// to the shop itself, and a link to the game's ITAD page for the fuller picture (historical
+// lows, every other shop) this card deliberately leaves out. Entirely passive: no fetch
+// happens here. library.js's Wishlist tab (loadWishlistPrices) and bundles.js's game table
+// (loadPrices) both set these exact field names (bestDealPrice/bestDealCut/bestDealShop/
+// bestDealUrl/lowAll/lowY1/priceCurrency) directly on the row object well before it's ever
+// opened here. The comparison page's owned-games rows and gameSearch.js's standalone lookups
+// never set them at all, so g.bestDealPrice stays undefined and this section renders nothing
+// for those — same "if present, render" shape the rest of the panel already uses for
+// rating/HLTB/tags off g.details.
+//
+// Both host mutation sites re-render an already-open panel right after they mutate a row (the
+// same `if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row)` idiom
+// streamGameDetails/loadAchievements already use elsewhere in those files) — without that, a
+// panel opened before its price batch resolved would never pick the numbers up even once they
+// landed, since nothing here is polling or re-fetching on its own.
+//
+// Deliberately its own formatMoney copy rather than importing bundles.js's/library.js's own —
+// same "kept as a separate copy" precedent CLAUDE.md already documents between those two.
+// panel.js is a plain global script while both of those are ES modules, so there's no actual
+// name collision either way, just the established convention of not sharing this bit.
+function formatMoney(v, currency) {
+  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(v); }
+  catch { return `${v.toFixed(2)} ${currency || ''}`; }
+}
+
+function priceHtml(g) {
+  if (g.bestDealPrice === undefined) return ''; // never priced (or not loaded yet) — see comment above
+
+  const itadUrl = `https://isthereanydeal.com/steam/app/${g.appid}`;
+  const titleHtml = `<div class="panel-section-title">Price <a href="${esc(itadUrl)}" target="_blank" rel="noopener">IsThereAnyDeal ↗</a></div>`;
+
+  if (g.bestDealPrice == null) {
+    return `<div class="panel-section panel-card" id="panel-section-price">${titleHtml}<div class="panel-no-data">No pricing data available.</div></div>`;
+  }
+
+  // Same 🔥 all-time-low / ★ 1-year-low color+badge+tooltip as the table cell's own
+  // renderBestDeal (bundles.js/library.js) — reusing scoreColor's "excellent"/"good" tiers
+  // rather than a new palette, same reasoning those two already give. `<=`, not `<` — the
+  // current deal can BE the historical low itself, not only ever beat it.
+  const isAllTimeLow = g.lowAll != null && g.bestDealPrice <= g.lowAll;
+  const isYearLow    = g.lowY1  != null && g.bestDealPrice <= g.lowY1;
+  const color = isAllTimeLow ? scoreColor(90) : isYearLow ? scoreColor(70) : null;
+  const badge = isAllTimeLow ? ' 🔥' : isYearLow ? ' ★' : '';
+  const record = isAllTimeLow ? ' — all-time low' : isYearLow ? ' — 1-year low' : '';
+  const tooltip = g.bestDealShop ? `${g.bestDealShop}${record}` : '';
+
+  // `0` (the best deal genuinely isn't any cheaper than Steam) is treated the same as `null`/
+  // undefined (no discount to show) — "if any" per the spec, not a flat "-0%" reading as noise.
+  const discountHtml = g.bestDealCut
+    ? `<span class="panel-price-sep">·</span><span class="panel-price-discount">-${g.bestDealCut}%</span>`
+    : '';
+
+  // The shop name, and — unlike the table cell, which stays tooltip-only since it's
+  // space-constrained — the *whole rest of the card* doubles as the buy link: ITAD's own
+  // affiliate/redirect link for this exact deal (`bestDealUrl`, passed through unmodified,
+  // same as the Bundles page's own "Get this bundle" link), so there's a large, easy target
+  // rather than one small "Fanatical ↗" word to hit. Only the title row above (the "Price"
+  // label and its separate IsThereAnyDeal ↗ link) stays outside it. safeHref guards against
+  // anything but a plain http(s) URL, same as every other external link built from
+  // third-party data in this file; with no url for this deal, the line falls back to a plain
+  // (unlinked) div — still worth naming the shop as text either way.
+  const shopUrl = safeHref(g.bestDealUrl);
+  const shopHtml = g.bestDealShop
+    ? `<span class="panel-price-sep">·</span><span class="panel-price-shop">${shopUrl ? 'Buy at ' : 'at '}${esc(g.bestDealShop)}${shopUrl ? ' ↗' : ''}</span>`
+    : '';
+  const lineInner = `
+      <span class="panel-price-amount"${color ? ` style="color:${color}"` : ''}>${esc(formatMoney(g.bestDealPrice, g.priceCurrency))}${badge}</span>
+      ${discountHtml}
+      ${shopHtml}`;
+  const lineTitleAttr = tooltip ? ` title="${esc(tooltip)}"` : '';
+  const lineHtml = shopUrl
+    ? `<a class="panel-price-line panel-price-line--link" href="${esc(shopUrl)}" target="_blank" rel="noopener"${lineTitleAttr}>${lineInner}</a>`
+    : `<div class="panel-price-line"${lineTitleAttr}>${lineInner}</div>`;
+
+  return `<div class="panel-section panel-card" id="panel-section-price">
+    ${titleHtml}
+    ${lineHtml}
+  </div>`;
+}
+
 // "Part of <Base Game>" — the reverse of the DLC card below: present only when the
 // currently open game is itself a piece of DLC (`meta.fullgame`, free on the same
 // appdetails response, see extractAppDetails in lib/steam.js). Same real-`<a href>` /
@@ -1078,6 +1161,7 @@ function renderPanelBody(game) {
       title="Refresh rating, HLTB &amp; store details for this game" aria-label="Refresh details">↻</button>` : '';
 
   const baseGameSectionHtml = g.loading ? '' : baseGameHtml(g);
+  const priceSectionHtml = g.loading ? '' : priceHtml(g);
   const dlcSectionHtml = g.loading ? '' : dlcHtml(g);
   const newsSectionHtml = newsHtml(g);
   const achievementsSectionHtml = achievementsHtml(g);
@@ -1218,6 +1302,7 @@ function renderPanelBody(game) {
     </div>
     ${demoBannerHtml}
     ${glanceGrid(g)}
+    ${priceSectionHtml}
     ${description ? `<div class="panel-desc panel-card" id="panel-desc"></div>` : ''}
     ${cloudHtml}
     ${ownersHtml ? `<div id="panel-section-owners">${ownersHtml}</div>` : ''}

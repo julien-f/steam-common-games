@@ -1334,8 +1334,9 @@ async function loadWishlistPrices(items) {
     for (const item of items) {
       const row = rowMap.get(item.appid);
       if (!row) continue;
-      row.steamRegular = row.bestDealPrice = row.bestDealShop = row.bestDealCut = row.lowAll = row.lowY1 = row.lowM3 = row.priceCurrency = null;
+      row.steamRegular = row.bestDealPrice = row.bestDealShop = row.bestDealUrl = row.bestDealCut = row.lowAll = row.lowY1 = row.lowM3 = row.priceCurrency = null;
       markRowChanged(item.appid);
+      if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
     }
     if (table) table.setData(visibleRowsForTable());
     return;
@@ -1365,6 +1366,7 @@ async function loadWishlistPrices(items) {
         row.steamRegular  = info.steamRegular?.amount ?? null;
         row.bestDealPrice = info.bestDeal?.price?.amount ?? null;
         row.bestDealShop  = info.bestDeal?.shop          ?? null;
+        row.bestDealUrl   = info.bestDeal?.url           ?? null;
         row.bestDealCut   = discountPct(row.bestDealPrice, row.steamRegular);
         row.lowAll        = info.lowAll?.amount          ?? null;
         row.lowY1         = info.lowY1?.amount           ?? null;
@@ -1373,6 +1375,7 @@ async function loadWishlistPrices(items) {
         // formatMoney/renderPrice above for why this can legitimately differ per row.
         row.priceCurrency = info.steamRegular?.currency ?? info.bestDeal?.price?.currency ?? info.lowAll?.currency ?? info.lowY1?.currency ?? info.lowM3?.currency ?? null;
         markRowChanged(appid);
+        if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
       }
     } catch (err) {
       // Same "don't leave price columns stuck on their loading placeholder forever" treatment
@@ -1384,11 +1387,13 @@ async function loadWishlistPrices(items) {
         if (row.steamRegular === undefined) row.steamRegular = null;
         if (row.bestDealPrice === undefined) row.bestDealPrice = null;
         if (row.bestDealShop  === undefined) row.bestDealShop  = null;
+        if (row.bestDealUrl   === undefined) row.bestDealUrl   = null;
         if (row.bestDealCut   === undefined) row.bestDealCut   = null;
         if (row.lowAll        === undefined) row.lowAll        = null;
         if (row.lowY1         === undefined) row.lowY1         = null;
         if (row.lowM3         === undefined) row.lowM3         = null;
         markRowChanged(appid);
+        if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
       }
       priceStatusEl.textContent = `Couldn't load Steam pricing (${err.message}) — other columns are unaffected.`;
     }
@@ -1593,6 +1598,7 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
     steamRegular:       undefined,
     bestDealPrice:      undefined,
     bestDealShop:       undefined,
+    bestDealUrl:        undefined,
     bestDealCut:        undefined,
     lowAll:             undefined,
     lowY1:              undefined,

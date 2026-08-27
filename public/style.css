@@ -1122,6 +1122,33 @@ a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var
 .panel-glance-val { font-size: 11px; color: var(--text1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .panel-glance-val b { color: var(--text1); font-weight: 600; }
 
+/* Price card (panel.js's priceHtml) — one line: the best-deal amount (badge/tooltip/color
+   mirroring the Best Deal table cell), its discount when there is one, and the shop name.
+   Uses the shared .panel-card box (same as the tag cloud/description) rather than the glance
+   grid's chip template — deliberately lighter than that, a plain line of text, not another
+   bordered chip. When there's a deal to buy (bestDealUrl), the whole line — not just the shop
+   name — is itself the outbound link (.panel-price-line--link): a big, easy target rather
+   than one small "Fanatical ↗" word, since going to buy is the entire point of this card.
+   Negative margin + padding on the link variant expands its hit/hover area right up to the
+   card's own edges without pushing the line's content off the plain (non-link) variant's
+   flush-left position. */
+.panel-price-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 13px; }
+a.panel-price-line--link {
+  text-decoration: none; color: inherit;
+  margin: -4px -12px; padding: 4px 12px;
+  border-radius: var(--r);
+  border: 1px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+a.panel-price-line--link:hover, a.panel-price-line--link:focus-visible {
+  border-color: var(--accent); background: var(--bg1); outline: none;
+}
+a.panel-price-line--link:hover .panel-price-shop, a.panel-price-line--link:focus-visible .panel-price-shop { color: var(--accent2); }
+.panel-price-amount { font-size: 17px; font-weight: 700; color: var(--text0); font-variant-numeric: tabular-nums; }
+.panel-price-discount { color: var(--text1); }
+.panel-price-sep { color: var(--text1); }
+.panel-price-shop { color: var(--text1); font-weight: 600; transition: color 0.15s; }
+
 .panel-hltb { display: flex; flex-wrap: wrap; gap: 24px 24px; row-gap: 14px; }
 .panel-hltb-label { font-size: 11px; color: var(--text1); margin-bottom: 3px; }
 .panel-hltb-val { font-size: 20px; font-weight: 600; color: var(--text0); }

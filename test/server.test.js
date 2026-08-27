@@ -1170,7 +1170,7 @@ test('POST /api/prices: 200 with Steam regular price and historical lows, by gid
     lowAll: { amount: 1, amountInt: 100, currency: 'USD' },
     lowY1: null,
     lowM3: null,
-    bestDeal: { price: { amount: 15, amountInt: 1500, currency: 'USD' }, shop: 'Fanatical' },
+    bestDeal: { price: { amount: 15, amountInt: 1500, currency: 'USD' }, shop: 'Fanatical', url: null },
   });
 });
 
@@ -1208,7 +1208,7 @@ test('POST /api/prices: 200 by appids — resolves to gids first, then prices, k
   assert.deepEqual(res.body.prices['400'], {
     steamRegular: { amount: 20, amountInt: 2000, currency: 'USD' },
     lowAll: null, lowY1: null, lowM3: null,
-    bestDeal: { price: { amount: 20, amountInt: 2000, currency: 'USD' }, shop: 'Steam' },
+    bestDeal: { price: { amount: 20, amountInt: 2000, currency: 'USD' }, shop: 'Steam', url: null },
   });
   assert.deepEqual(res.body.prices['500'], { steamRegular: null, lowAll: null, lowY1: null, lowM3: null, bestDeal: null });
 });

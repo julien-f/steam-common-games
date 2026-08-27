@@ -811,6 +811,7 @@ async function loadPrices(resolved) {
       row.steamRegular = info.steamRegular?.amount ?? null;
       row.bestDealPrice = info.bestDeal?.price?.amount ?? null;
       row.bestDealShop   = info.bestDeal?.shop          ?? null;
+      row.bestDealUrl    = info.bestDeal?.url           ?? null;
       row.bestDealCut    = discountPct(row.bestDealPrice, row.steamRegular);
       row.lowAll        = info.lowAll?.amount        ?? null;
       row.lowY1          = info.lowY1?.amount          ?? null;
@@ -821,6 +822,7 @@ async function loadPrices(resolved) {
       // response is in the same currency, so any of them is an equally valid source here.
       row.priceCurrency = info.steamRegular?.currency ?? info.bestDeal?.price?.currency ?? info.lowAll?.currency ?? info.lowY1?.currency ?? info.lowM3?.currency ?? null;
       markRowChanged(g.appid);
+      if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
     }
   } catch (err) {
     console.warn('[bundles] price lookup failed:', err.message);
@@ -836,11 +838,13 @@ async function loadPrices(resolved) {
       if (row.steamRegular === undefined) row.steamRegular = null;
       if (row.bestDealPrice === undefined) row.bestDealPrice = null;
       if (row.bestDealShop   === undefined) row.bestDealShop   = null;
+      if (row.bestDealUrl    === undefined) row.bestDealUrl    = null;
       if (row.bestDealCut    === undefined) row.bestDealCut    = null;
       if (row.lowAll        === undefined) row.lowAll        = null;
       if (row.lowY1          === undefined) row.lowY1          = null;
       if (row.lowM3          === undefined) row.lowM3          = null;
       markRowChanged(g.appid);
+      if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
     }
     priceStatusEl.textContent = `Couldn't load Steam pricing (${err.message}) — other columns are unaffected.`;
   } finally {
@@ -911,7 +915,7 @@ async function openBundle(bundle) {
     tierCurrency: g.tierCurrency,
     priceCurrency: undefined, // set by loadPrices — see the comment on formatMoney/renderPrice above for why this is a separate field from tierCurrency
     addon: g.addon,
-    steamRegular: undefined, bestDealPrice: undefined, bestDealShop: undefined, bestDealCut: undefined,
+    steamRegular: undefined, bestDealPrice: undefined, bestDealShop: undefined, bestDealUrl: undefined, bestDealCut: undefined,
     lowAll: undefined, lowY1: undefined, lowM3: undefined,
     capsule: undefined, score: undefined, positivePct: undefined, steamdbRating: undefined,
     reviewsTotal: undefined, hltbMain: undefined, hltbExtra: undefined, hltbCompletionist: undefined,

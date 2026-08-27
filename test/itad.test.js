@@ -171,7 +171,7 @@ const PRICE_ENTRY = {
   },
   deals: [
     { shop: { id: 61, name: 'Steam' }, regular: { amount: 19.99, amountInt: 1999, currency: 'USD' }, price: { amount: 19.99, amountInt: 1999, currency: 'USD' } },
-    { shop: { id: 6, name: 'Fanatical' }, regular: { amount: 14.99, amountInt: 1499, currency: 'USD' }, price: { amount: 11.24, amountInt: 1124, currency: 'USD' }, cut: 25 },
+    { shop: { id: 6, name: 'Fanatical' }, regular: { amount: 14.99, amountInt: 1499, currency: 'USD' }, price: { amount: 11.24, amountInt: 1124, currency: 'USD' }, cut: 25, url: 'https://next.isthereanydeal.com/link/abc' },
   ],
 };
 
@@ -208,9 +208,14 @@ test('extractPriceInfo: pulls Steam\'s regular price and the three historical lo
   assert.deepEqual(info.lowM3, PRICE_ENTRY.historyLow.m3);
 });
 
-test('extractPriceInfo: bestDeal picks the cheapest current price across every shop, Steam included', () => {
+test('extractPriceInfo: bestDeal picks the cheapest current price across every shop, Steam included, and carries that deal\'s own url', () => {
   const info = extractPriceInfo(PRICE_ENTRY, 61);
-  assert.deepEqual(info.bestDeal, { price: { amount: 11.24, amountInt: 1124, currency: 'USD' }, shop: 'Fanatical' });
+  assert.deepEqual(info.bestDeal, { price: { amount: 11.24, amountInt: 1124, currency: 'USD' }, shop: 'Fanatical', url: 'https://next.isthereanydeal.com/link/abc' });
+});
+
+test('extractPriceInfo: bestDeal.url is null when the deal has no url', () => {
+  const noUrl = { ...PRICE_ENTRY, deals: PRICE_ENTRY.deals.map(d => { const { url, ...rest } = d; return rest; }) };
+  assert.equal(extractPriceInfo(noUrl, 61).bestDeal.url, null);
 });
 
 test('extractPriceInfo: bestDeal is null when no deal has a price', () => {
