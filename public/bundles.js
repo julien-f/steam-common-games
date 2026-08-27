@@ -1033,6 +1033,7 @@ async function openBundleById(id) {
 }
 
 async function init() {
+  initNav('bundles');
   try {
     const res = await fetch('/api/health');
     const data = await res.json();

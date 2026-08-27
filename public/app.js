@@ -39,6 +39,8 @@ let nameFilter = '';
 // ── Init ───────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
+  initNav('compare');
+
   document.getElementById('add-btn').addEventListener('click', () => addPlayerSlot());
   document.getElementById('search-btn').addEventListener('click', findCommonGames);
 
@@ -559,16 +561,14 @@ function updateTitle() {
   document.title = 'Steam Common Games';
 }
 
-// The header's cross-link to the Library Explorer (see index.html) points at that specific
-// player's data once exactly one slot is loaded — the Library Explorer has no notion of
-// multiple slots/a comparison, so a multi-slot search just falls back to the plain link.
+// The site nav's Library Explorer link (see public/nav.js) points at that specific player's
+// data once exactly one slot is loaded — the Library Explorer has no notion of multiple
+// slots/a comparison, so a multi-slot search just falls back to the plain link.
 function updateLibraryExplorerLink() {
-  const link = document.getElementById('library-explorer-link');
-  if (slots.length === 1 && slots[0].length) {
-    link.href = `/library.html?u=${slots[0].map(p => p.steamid).join(',')}`;
-  } else {
-    link.href = '/library.html';
-  }
+  const href = slots.length === 1 && slots[0].length
+    ? `/library.html?u=${slots[0].map(p => p.steamid).join(',')}`
+    : '/library.html';
+  updateNavLink('library', href);
 }
 
 function slotHtml(i) {

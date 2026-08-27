@@ -745,6 +745,8 @@ countrySelectEl.addEventListener('change', () => {
   if (activeTab === 'wishlist' && rows.length > 0) loadWishlistPrices(rows);
 });
 
+initNav('library');
+
 initPanel({
   inertSelector: '.lib-page',
   showAchievements: true,
@@ -1152,12 +1154,11 @@ function updateTitle() {
   document.title = 'Library Explorer — Steam Common Games'; // matches the static <title> in library.html
 }
 
-// The header's back-link to the comparison tool carries the currently-loaded player(s) along —
-// they arrive there as a single slot (comma-joined, same as a Steam Family), showing that
-// player's library rather than landing on the bare empty form.
+// The site nav's Comparison link (see public/nav.js) carries the currently-loaded player(s)
+// along — they arrive there as a single slot (comma-joined, same as a Steam Family), showing
+// that player's library rather than landing on the bare empty form.
 function updateBackLink() {
-  const link = document.getElementById('back-to-comparison-link');
-  link.href = currentSteamIds.length ? `/?u=${currentSteamIds.join(',')}` : '/';
+  updateNavLink('compare', currentSteamIds.length ? `/?u=${currentSteamIds.join(',')}` : '/');
 }
 
 function updateStatus() {
