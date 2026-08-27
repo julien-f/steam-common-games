@@ -357,10 +357,54 @@ const COUNTRY_OPTIONS = [
   { code: 'MX', label: 'Mexico (MXN)' },
 ];
 
-// Best-effort browser-locale region, falling back to US when detection fails or lands
-// outside the curated list above — see the "URL param, autodetect from the browser, curated
-// country list" decision.
+// IANA timezone → curated COUNTRY_OPTIONS code, used by detectCountry below as a stronger
+// location signal than `navigator.language` (see its own comment). Deliberately not
+// exhaustive — same "curated, not the full list" reasoning as COUNTRY_OPTIONS itself — just
+// enough well-known zones per country to cover the common case; a zone that isn't listed here
+// simply falls through to the language-based guess rather than being misclassified. Zones that
+// don't unambiguously identify one of these countries (e.g. many "America/*" zones are shared
+// between the US and Canada) are deliberately left out rather than guessed. The DE bucket
+// covers Eurozone countries generally (its label is "Germany / EU (EUR)") since Steam prices
+// the euro itself, not each Eurozone country individually — but only actual euro-using EU
+// countries; EU members with their own currency (Sweden/Poland/Czechia/Hungary/Denmark, etc.)
+// are left unmapped rather than incorrectly bucketed into EUR pricing.
+const TIMEZONE_COUNTRY = {
+  'Europe/London': 'GB',
+  'Europe/Berlin': 'DE', 'Europe/Paris': 'DE', 'Europe/Madrid': 'DE', 'Europe/Rome': 'DE',
+  'Europe/Amsterdam': 'DE', 'Europe/Brussels': 'DE', 'Europe/Vienna': 'DE', 'Europe/Dublin': 'DE',
+  'Europe/Lisbon': 'DE', 'Europe/Helsinki': 'DE', 'Europe/Luxembourg': 'DE', 'Europe/Athens': 'DE',
+  'America/Toronto': 'CA', 'America/Vancouver': 'CA', 'America/Edmonton': 'CA',
+  'America/Winnipeg': 'CA', 'America/Halifax': 'CA', 'America/St_Johns': 'CA',
+  'Australia/Sydney': 'AU', 'Australia/Melbourne': 'AU', 'Australia/Brisbane': 'AU',
+  'Australia/Perth': 'AU', 'Australia/Adelaide': 'AU', 'Australia/Darwin': 'AU', 'Australia/Hobart': 'AU',
+  'Asia/Tokyo': 'JP',
+  'America/Sao_Paulo': 'BR', 'America/Manaus': 'BR', 'America/Bahia': 'BR', 'America/Fortaleza': 'BR',
+  'Europe/Moscow': 'RU', 'Asia/Yekaterinburg': 'RU', 'Asia/Novosibirsk': 'RU',
+  'Asia/Vladivostok': 'RU', 'Asia/Krasnoyarsk': 'RU', 'Asia/Irkutsk': 'RU',
+  'Europe/Istanbul': 'TR',
+  'Europe/Kyiv': 'UA', 'Europe/Kiev': 'UA', // Kiev is the older alias for the same zone
+  'America/Argentina/Buenos_Aires': 'AR', 'America/Argentina/Cordoba': 'AR',
+  'Asia/Kolkata': 'IN', 'Asia/Calcutta': 'IN', // Calcutta is the older alias for the same zone
+  'Asia/Shanghai': 'CN', 'Asia/Urumqi': 'CN',
+  'Asia/Seoul': 'KR',
+  'America/Mexico_City': 'MX', 'America/Tijuana': 'MX', 'America/Cancun': 'MX',
+};
+
+// Best-effort location detection, falling back to US when nothing below matches or the browser
+// doesn't support the APIs involved — see the "URL param, autodetect from the browser, curated
+// country list" decision. Tries the OS timezone (via TIMEZONE_COUNTRY above) before
+// `navigator.language`: language reflects a UI preference, not where the user actually is, and
+// very commonly stays "en-US" (or another English variant) regardless of physical location —
+// confirmed live on a machine with `LANG=en_US.UTF-8` but an OS timezone of "Europe/Paris",
+// which `Intl.Locale('en-US').maximize().region` resolves straight to "US" while the timezone
+// correctly implies a Eurozone country. The timezone isn't infallible either (a US expat who
+// never changed their laptop's clock would still misdetect), but it's a meaningfully better
+// default than a language tag that many browsers leave on its out-of-the-box value forever.
 function detectCountry() {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (TIMEZONE_COUNTRY[tz]) return TIMEZONE_COUNTRY[tz];
+  } catch { /* Intl.DateTimeFormat unsupported */ }
   try {
     const region = new Intl.Locale(navigator.language).maximize().region;
     if (COUNTRY_OPTIONS.some(c => c.code === region)) return region;
@@ -603,8 +647,17 @@ function renderBundleList() {
   }
 }
 
-async function loadBundles({ reset = true } = {}) {
-  if (reset) { bundlesOffset = 0; bundles = []; bundleListEl.innerHTML = ''; setListCollapsed(false); }
+// `expandList: false` skips the reset branch's own re-expand — for a caller that's about to
+// (re)open a bundle right after this resolves (a `?bundle=` deep link on init, or re-opening
+// the still-active bundle after a country change — see both call sites below). Without it, the
+// list would flash open with this call's freshly (re-)fetched bundles only to be immediately
+// re-collapsed once that other, independent bundle-open call lands — a visible "list pops open
+// then snaps shut" flicker, worse the more cache-warm both calls are (i.e. often).
+async function loadBundles({ reset = true, expandList = true } = {}) {
+  if (reset) {
+    bundlesOffset = 0; bundles = []; bundleListEl.innerHTML = '';
+    if (expandList) setListCollapsed(false);
+  }
   bundlesStatusEl.textContent = 'Loading bundles…';
   const qs = new URLSearchParams({
     country: countrySelect.value,
@@ -940,7 +993,21 @@ async function openBundle(bundle) {
 
 // ── Wiring ──────────────────────────────────────────────────────────────────
 
-countrySelect.addEventListener('change', () => { updateCountryParam(); loadBundles(); });
+countrySelect.addEventListener('change', () => {
+  updateCountryParam();
+  // A bundle's tier price and its games' Steam Full Price/Best Deal/lows (loadPrices above)
+  // are all region-specific, but loadBundles() only refreshes the browse list above — it
+  // never touches whatever bundle is currently open in the detail view below it. Re-open it
+  // the same way a `?bundle=` deep link does, so its prices actually pick up the new country
+  // instead of staying stuck on whatever was loaded before.
+  const reopening = activeBundleId != null;
+  // Skip the list's own re-expand when we're about to reopen the still-active bundle right
+  // after — it's already collapsed (a bundle is open) and openBundle() will just collapse it
+  // again once the reopen resolves, so expanding it here only produces a pointless flicker.
+  // When no bundle is open, this is a plain browsing action and the list expands as usual.
+  loadBundles({ expandList: !reopening });
+  if (reopening) openBundleById(activeBundleId);
+});
 sortSelect.addEventListener('change', () => loadBundles());
 expiredCheckbox.addEventListener('change', () => loadBundles());
 loadMoreBtn.addEventListener('click', () => loadBundles({ reset: false }));
@@ -1013,6 +1080,11 @@ async function openBundleById(id) {
     activeBundleId = null;
     renderBundleNav();
     setBundleParam(null);
+    // No bundle ended up open, so this is back to being a plain browsing state — re-expand the
+    // list rather than leaving it stuck collapsed with nothing open underneath it (a caller
+    // that skipped loadBundles' own expand in anticipation of this call succeeding — see
+    // `expandList` above — otherwise has no other path back to an expanded list).
+    setListCollapsed(false);
   }
 }
 
@@ -1030,8 +1102,13 @@ async function init() {
   // Independent of each other — the deep link's own server-side search doesn't depend on
   // whatever page of the list loadBundles happens to fetch.
   const deepLinkId = Number(new URLSearchParams(location.search).get('bundle'));
-  loadBundles();
-  if (Number.isInteger(deepLinkId) && deepLinkId > 0) openBundleById(deepLinkId);
+  const hasDeepLink = Number.isInteger(deepLinkId) && deepLinkId > 0;
+  // Skip loadBundles' own list expand when a deep link is about to open a bundle right after —
+  // otherwise the list would flash open with the freshly loaded bundles only to be immediately
+  // collapsed again once the deep link resolves (see `expandList`'s own comment above).
+  if (hasDeepLink) setListCollapsed(true);
+  loadBundles({ expandList: !hasDeepLink });
+  if (hasDeepLink) openBundleById(deepLinkId);
 }
 
 init();
