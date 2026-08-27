@@ -17,6 +17,7 @@ const supertest = require('supertest');
 const { app } = require('../server');
 const { _reset, setCache } = require('../lib/cache');
 const { _resetAuth } = require('../lib/hltb');
+const { _resetStoreCircuitBreaker } = require('../lib/steam');
 
 const api = supertest(app);
 
@@ -858,6 +859,45 @@ test('POST /api/game-details/stream: resolves HLTB name from store metadata', as
   assert.equal(gameEvent.hltb?.main, 10, 'HLTB result should be present, not short-circuited to null');
 });
 
+// fetchGameDetails' own logErr (server.js) is a second, separate consumer of the isCircuitOpen
+// flag besides routeErrorStatus (covered under GET /api/search-games below) — this closes the
+// loop on that one too, since a batch stream is exactly the "hundreds of near-identical lines"
+// scenario the flag exists to prevent (one appid's rating + meta both go through fetchStoreApi).
+test('POST /api/game-details/stream: does not log [game-details] for rating/meta blocked by an already-open circuit', async (t) => {
+  _reset();
+  _resetAuth();
+  _resetStoreCircuitBreaker();
+  t.after(_resetStoreCircuitBreaker);
+  const warnMock = t.mock.method(console, 'warn', () => {});
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('appreviews') || url.includes('appdetails')) return { ok: false, status: 403 };
+    if (url.includes('IStoreBrowseService')) return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: [], related_items: {} }] } }) };
+    if (url.includes('ajaxgetstoretags')) return { ok: true, json: async () => ({ tags: [] }) };
+    if (url.includes('protondb.com')) return { ok: false, status: 404 }; // "no reports yet", not an error
+    if (url.includes('search/site/init')) return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
+    if (url.includes('search/site')) return { ok: true, json: async () => ({ data: [] }) };
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  const server = app.listen(0);
+  t.after(() => new Promise(r => server.close(r)));
+  await new Promise(r => server.once('listening', r));
+
+  // First game's own rating+meta 403s trip the circuit (2 consecutive 403s) — these ARE new
+  // information and are expected to log normally.
+  await ssePost(server.address().port, '/api/game-details/stream', { games: [{ appid: 900 }] });
+  assert.equal(warnMock.mock.calls.filter(c => /\[circuit-breaker\]/.test(c.arguments[0])).length, 1);
+  warnMock.mock.resetCalls();
+
+  // Second game, different appid, while the circuit is still open — its rating/meta calls are
+  // immediately isCircuitOpen errors and must not each log their own [game-details] line.
+  const res = await ssePost(server.address().port, '/api/game-details/stream', { games: [{ appid: 901 }] });
+  const gameEvent = parseSseEvents(res.body).find(e => e.appid === 901);
+  assert.equal(gameEvent.rating, null);
+  assert.equal(gameEvent.meta, null);
+  assert.equal(warnMock.mock.calls.filter(c => /\[game-details\]/.test(c.arguments[0])).length, 0);
+});
+
 // ── GET /api/search-games ─────────────────────────────────────────────────────
 
 test('GET /api/search-games: empty results (no fetch) when q is missing', async (t) => {
@@ -906,6 +946,30 @@ test('GET /api/search-games: 502 when the store search endpoint errors', async (
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
   const res = await api.get('/api/search-games?q=portal');
   assert.equal(res.status, 502);
+});
+
+// A request blocked by an already-open circuit still 502s, but must not log its own
+// [upstream:...] line — that's an expected, already-explained consequence of the trip itself
+// (see the one-time [circuit-breaker] warning lib/steam.js logs at the moment it trips), not
+// new information worth repeating once per blocked request.
+test('GET /api/search-games: a request blocked by an open circuit returns 502 without its own [upstream:...] log line', async (t) => {
+  _reset();
+  _resetStoreCircuitBreaker();
+  t.after(_resetStoreCircuitBreaker);
+  const errorMock = t.mock.method(console, 'error', () => {});
+  const warnMock = t.mock.method(console, 'warn', () => {});
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
+
+  // Two distinct uncached terms trip the circuit (2 consecutive 403s).
+  await api.get('/api/search-games?q=trip-term-a');
+  await api.get('/api/search-games?q=trip-term-b');
+  const tripWarnings = warnMock.mock.calls.filter(c => /\[circuit-breaker\]/.test(c.arguments[0]));
+  assert.equal(tripWarnings.length, 1, 'the trip itself is still logged once');
+
+  const errorsBefore = errorMock.mock.callCount();
+  const res = await api.get('/api/search-games?q=trip-term-c');
+  assert.equal(res.status, 502);
+  assert.equal(errorMock.mock.callCount(), errorsBefore, 'no new [upstream:...] line for a call blocked by the already-open circuit');
 });
 
 // ── GET /api/achievements/:appid ─────────────────────────────────────────────

@@ -225,6 +225,33 @@ test('getHLTB: throws and clears auth on 401', async (t) => {
   assert.equal(initCalls, 2, 'expected init to be called again after 401');
 });
 
+test('getHLTB: throttles the "[HLTB] search failed" warning to once per 30s window', async (t) => {
+  _reset(); _resetAuth();
+  // `now` must be passed explicitly — mock timers otherwise start the mocked clock at epoch 0,
+  // which would make _hltbAuthFailedAt/_hltbSearchWarnedAt's own "0 means never" sentinel
+  // (reset by _resetAuth() above, before the mock takes over) look like "just failed at time
+  // 0" instead, spuriously triggering the auth-retry backoff and short-circuiting getHLTB
+  // before it ever reaches the search call this test means to exercise.
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  const warnMock = t.mock.method(console, 'warn', () => {});
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('search/site/init')) return makeInitResponse();
+    return { ok: false, status: 500 }; // search endpoint itself rejecting everything
+  });
+
+  // A burst of failures across several different games (as a batch load would produce) within
+  // the throttle window must only warn once, not once per game.
+  await assert.rejects(() => getHLTB(1, 'Portal'));
+  await assert.rejects(() => getHLTB(2, 'Half-Life'));
+  await assert.rejects(() => getHLTB(3, 'Half-Life 2'));
+  assert.equal(warnMock.mock.callCount(), 1);
+
+  // Once the throttle window elapses, the next failure warns again.
+  t.mock.timers.tick(31 * 1000);
+  await assert.rejects(() => getHLTB(4, 'Portal 2'));
+  assert.equal(warnMock.mock.callCount(), 2);
+});
+
 test('getHLTB: throws when init fails', async (t) => {
   _reset(); _resetAuth();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));

@@ -47,6 +47,38 @@ test('getStoreCircuitBreaker: trips (blockedUntil in the future) after 2 consecu
   assert.equal(fetchMock.mock.callCount(), 2);
 });
 
+test('fetchStoreApi: the circuit-open error is marked isCircuitOpen so callers can skip re-logging it', async (t) => {
+  _reset();
+  _resetStoreCircuitBreaker();
+  t.after(_resetStoreCircuitBreaker);
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
+
+  await assert.rejects(() => getGameRating(420));
+  await assert.rejects(() => getGameRating(421)); // trips it
+  await assert.rejects(() => getGameRating(422), err => err.isCircuitOpen === true && err.isUpstream === true);
+});
+
+test('getStoreCircuitBreaker: logs a [circuit-breaker] warning exactly once at the moment it trips, not on every blocked call after', async (t) => {
+  _reset();
+  _resetStoreCircuitBreaker();
+  t.after(_resetStoreCircuitBreaker);
+  const warnMock = t.mock.method(console, 'warn', () => {});
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
+
+  await assert.rejects(() => getGameRating(430));
+  assert.equal(warnMock.mock.callCount(), 0, 'a single 403 must not warn — it has not tripped anything yet');
+
+  await assert.rejects(() => getGameRating(431)); // the trip itself
+  assert.equal(warnMock.mock.callCount(), 1);
+  assert.match(warnMock.mock.calls[0].arguments[0], /\[circuit-breaker\]/);
+
+  // Further calls while blocked are silent — they're an expected consequence of the trip
+  // already logged above, not new information.
+  await assert.rejects(() => getGameRating(432));
+  await assert.rejects(() => getGameRating(433));
+  assert.equal(warnMock.mock.callCount(), 1);
+});
+
 test('getStoreCircuitBreaker: tripCount increments on trip and stays 0 until then', async (t) => {
   _reset();
   _resetStoreCircuitBreaker();
@@ -113,8 +145,9 @@ test('getSemaphoreStats: reports live active/queued and a lifetime queue-depth h
 // storeLimit/tagLimit/protonLimit's real, deliberately-generous 20000-deep queue — see
 // SEMAPHORE_MAX_QUEUE's own comment in lib/steam.js) since createSemaphore is exported
 // specifically for this.
-test('createSemaphore: rejected counts calls turned away once maxQueue is hit, active/queued unaffected', async () => {
-  const sem = createSemaphore(1, 0, 1); // 1 concurrent slot, queue depth 1
+test('createSemaphore: rejected counts calls turned away once maxQueue is hit, active/queued unaffected', async (t) => {
+  const warnMock = t.mock.method(console, 'warn', () => {});
+  const sem = createSemaphore(1, 0, 1, 'test-sem'); // 1 concurrent slot, queue depth 1
   let releaseFirst;
   const p1 = sem(() => new Promise(r => { releaseFirst = r; })); // occupies the one active slot
   const p2 = sem(() => Promise.resolve('queued'));               // fills the one queue slot
@@ -127,6 +160,8 @@ test('createSemaphore: rejected counts calls turned away once maxQueue is hit, a
   assert.equal(sem.getStats().rejected, 1);
   assert.equal(sem.getStats().active, 1, 'a rejection must not touch active');
   assert.equal(sem.getStats().queued, 1, 'a rejection must not touch queued — it never entered the queue');
+  assert.equal(warnMock.mock.callCount(), 1);
+  assert.match(warnMock.mock.calls[0].arguments[0], /\[semaphore:test-sem\]/);
 
   releaseFirst('done');
   assert.equal(await p1, 'done');
