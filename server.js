@@ -11,7 +11,8 @@ const rateLimit = require('express-rate-limit');
 
 const { getCached, getCacheStats } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews } = require('./lib/steam');
+const { getMetrics } = require('./lib/metrics');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 const { getBundles, findBundleById, resolveSteamAppIds, resolveItadIds, getSteamShopId, getPrices, extractPriceInfo } = require('./lib/itad');
@@ -170,6 +171,15 @@ const achievementsLimit = rateLimit({
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, configured: !!process.env.STEAM_API_KEY, itadConfigured: isItadConfigured(), cache: getCacheStats() });
+});
+
+// Outbound-request counts to Steam/HLTB/ITAD/ProtonDB, grouped by trust-tier/routing boundary
+// then by the specific function making the call — see lib/metrics.js. In-memory, resets on
+// restart; no auth, same trust level as /api/health (nothing sensitive in it). `circuitBreakers`
+// is composed in here rather than folded into lib/metrics.js itself — that state is owned by
+// lib/steam.js (storeBlockedUntil), not the request counters.
+app.get('/api/metrics', (_req, res) => {
+  res.json({ ...getMetrics(), circuitBreakers: { 'steam-store': getStoreCircuitBreaker() } });
 });
 
 // Browsing the bundle list, resolving games to/from Steam appids, and pricing them — each

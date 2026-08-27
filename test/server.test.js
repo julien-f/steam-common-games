@@ -105,6 +105,24 @@ test('GET /api/health: configured=false when STEAM_API_KEY is absent', async (t)
   assert.equal(res.body.configured, false);
 });
 
+// ── GET /api/metrics ───────────────────────────────────────────────────────────
+
+test('GET /api/metrics: 200 with a since timestamp and per-group/label request counts', async (t) => {
+  const GAME = { appid: 400, name: 'Portal' };
+  t.mock.method(globalThis, 'fetch', makeLibraryFetch([GAME], []));
+  await api.post('/api/common-games').send({ slots: [[ID1], [ID2]] });
+
+  const res = await api.get('/api/metrics');
+  assert.equal(res.status, 200);
+  assert.equal(typeof res.body.since, 'number');
+  const label = res.body.sinceRestart.groups['steam-api'].getOwnedGames;
+  assert.ok(label.requests >= 1);
+  assert.equal(typeof label.statusCounts, 'object');
+  assert.equal(label.networkErrors, 0);
+  assert.ok(res.body.lastHour.groups['steam-api'].getOwnedGames.requests >= 1);
+  assert.equal(res.body.circuitBreakers['steam-store'].blockedUntil, 0);
+});
+
 // ── POST /api/common-games — input validation ─────────────────────────────────
 
 test('POST /api/common-games: 400 when body has no slots field', async () => {

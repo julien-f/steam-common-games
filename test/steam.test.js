@@ -9,7 +9,7 @@ process.env.DB_FILE = '';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews } = require('../lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker, _resetStoreCircuitBreaker } = require('../lib/steam');
 const { _reset, setCache } = require('../lib/cache');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
@@ -20,6 +20,32 @@ function makeReviewResponse(total, positive, desc = 'Very Positive') {
     }),
   };
 }
+
+test('getStoreCircuitBreaker: blockedUntil is 0 when the circuit has never tripped', async (t) => {
+  _reset();
+  _resetStoreCircuitBreaker();
+  t.after(_resetStoreCircuitBreaker);
+  assert.equal(getStoreCircuitBreaker().blockedUntil, 0);
+});
+
+test('getStoreCircuitBreaker: trips (blockedUntil in the future) after 2 consecutive 403s, and blocks further calls without hitting fetch', async (t) => {
+  _reset();
+  _resetStoreCircuitBreaker();
+  t.after(_resetStoreCircuitBreaker);
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
+
+  await assert.rejects(() => getGameRating(400), err => err.isUpstream === true);
+  await assert.rejects(() => getGameRating(401), err => err.isUpstream === true);
+  assert.equal(fetchMock.mock.callCount(), 2);
+
+  const { blockedUntil } = getStoreCircuitBreaker();
+  assert.ok(blockedUntil > Date.now());
+
+  // Circuit is now open — a third call must reject immediately (circuit-open message) without
+  // calling fetch again at all.
+  await assert.rejects(() => getGameRating(402), /circuit open/);
+  assert.equal(fetchMock.mock.callCount(), 2);
+});
 
 test('getGameRating: throws when fetch fails', async (t) => {
   _reset();
