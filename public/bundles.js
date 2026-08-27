@@ -102,6 +102,7 @@ const prevBundleBtn      = document.getElementById('prev-bundle-btn');
 const nextBundleBtn      = document.getElementById('next-bundle-btn');
 const detailStatusEl     = document.getElementById('detail-status');
 const priceStatusEl      = document.getElementById('price-status');
+const refreshPricesBtn   = document.getElementById('refresh-prices-btn');
 const resetViewBtn       = document.getElementById('reset-view-btn');
 const tableContainer     = document.getElementById('table-container');
 const unresolvedSection  = document.getElementById('unresolved-section');
@@ -133,6 +134,11 @@ let bundlesOffset = 0;
 const BUNDLES_PAGE_SIZE = 20;
 let bundles = [];
 let activeBundleId = null;
+// The `resolved` list (appid + gid per game) for whatever bundle is currently open — kept
+// around so the "↻ Refresh prices" button (see the refreshPricesBtn wiring below) can re-run
+// just loadPrices() for the open bundle without re-resolving Steam appids or re-streaming
+// ratings/HLTB/tags, which openBundle()'s own full reopen would otherwise repeat for nothing.
+let currentResolvedGames = [];
 
 // `rows`/`rowMap` hold long-lived, mutated-in-place row objects — every other consumer
 // (the panel, achievements cache, prev/next-style lookups) wants that stable identity, and
@@ -652,10 +658,16 @@ nextBundleBtn.addEventListener('click', () => {
 // finished streaming its other details. Either order is fine: rows not yet visible (still
 // `loading`) simply carry the price fields already set by the time they do appear; rows
 // already visible get a follow-up `table.setData` to pick the new columns up.
-async function loadPrices(resolved) {
+//
+// `force`: set by the "↻ Refresh prices" button below — bypasses the server's `itad-price:`
+// cache read for this call (?refresh=1, same convention as every other force-refresh in this
+// app) so a stale price actually gets re-fetched from ITAD instead of just re-reading the same
+// cached response back.
+async function loadPrices(resolved, { force = false } = {}) {
   priceStatusEl.textContent = '';
   try {
     const qs = new URLSearchParams({ country: resolveRegion(countrySelect.value) });
+    if (force) qs.set('refresh', '1');
     const res = await fetch(`/api/prices?${qs}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -744,9 +756,11 @@ async function openBundle(bundle, { preserveGameParam = false, restoreShot = nul
   if (table) { table.destroy(); table = null; }
   tableContainer.innerHTML = '';
   resetViewBtn.hidden = true;
+  refreshPricesBtn.hidden = true;
   rows = [];
   rowMap = new Map();
   tableRowCache = new Map();
+  currentResolvedGames = [];
 
   const games = flattenBundleGames(bundle);
 
@@ -774,6 +788,7 @@ async function openBundle(bundle, { preserveGameParam = false, restoreShot = nul
     else unresolved.push(g);
   }
   renderUnresolvedList(unresolved);
+  currentResolvedGames = resolved;
 
   if (resolved.length === 0) {
     detailStatusEl.textContent = 'No games in this bundle could be matched to a Steam listing.';
@@ -819,6 +834,7 @@ async function openBundle(bundle, { preserveGameParam = false, restoreShot = nul
   // then let persistence override it" ordering `syncViewToUrl` uses in library.js.
   unpersistView = persistViewToLocalStorage(table, TABLE_VIEW_STORAGE_KEY);
   resetViewBtn.hidden = false;
+  refreshPricesBtn.hidden = false;
 
   detailStatusEl.textContent = `0 / ${resolved.length} games loaded…`;
   // Early attempt — rowMap is populated (just above) well before the stream below finishes, so
@@ -865,6 +881,21 @@ resetViewBtn.addEventListener('click', () => {
   // sort on top, same as library.js's own reset-view button does (there's no construction-time
   // option to make resetView itself preserve a non-empty default).
   table.setViewState({ sorts: DEFAULT_SORT });
+});
+
+// Refreshes just the price columns for the currently open bundle's games, in one shot — no
+// reason to make a user step through every game's own panel "↻ Refresh" one at a time when
+// the whole batch is a single cheap POST /api/prices call anyway.
+refreshPricesBtn.addEventListener('click', async () => {
+  if (currentResolvedGames.length === 0 || refreshPricesBtn.disabled) return;
+  refreshPricesBtn.disabled = true;
+  refreshPricesBtn.textContent = 'Refreshing…';
+  try {
+    await loadPrices(currentResolvedGames, { force: true });
+  } finally {
+    refreshPricesBtn.disabled = false;
+    refreshPricesBtn.textContent = '↻ Refresh prices';
+  }
 });
 
 // `?bundle=<id>` deep link — writes/clears the param while preserving everything else already

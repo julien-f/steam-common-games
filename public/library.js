@@ -123,6 +123,7 @@ const playerInput   = document.getElementById('player-input');
 const loadBtn       = document.getElementById('load-btn');
 const statusEl      = document.getElementById('status');
 const priceStatusEl = document.getElementById('price-status');
+const refreshPricesBtn = document.getElementById('refresh-prices-btn');
 const accountsBarEl = document.getElementById('accounts-bar');
 const recentsBarEl  = document.getElementById('recents-bar');
 const recentGamesBarEl = document.getElementById('recent-games-bar');
@@ -792,7 +793,11 @@ async function streamGameDetails(games) {
 // loadWishlist), so it can land before or after any given row has finished streaming its other
 // details; either order is fine, same reasoning as bundles.js's own loadPrices.
 const MAX_PRICE_LOOKUP_GAMES = 500; // mirrors the server's own cap (server.js) — see the chunking below
-async function loadWishlistPrices(items) {
+// `force`: set by the "↻ Refresh prices" button below — bypasses the server's `itad-price:`
+// cache read for this call (?refresh=1, same convention as every other force-refresh in this
+// app, and the same option bundles.js's own loadPrices takes) so a stale price actually gets
+// re-fetched from ITAD instead of just re-reading the same cached response back.
+async function loadWishlistPrices(items, { force = false } = {}) {
   priceStatusEl.textContent = '';
   const configured = await itadConfiguredPromise;
   if (!configured) {
@@ -819,6 +824,7 @@ async function loadWishlistPrices(items) {
     const chunk = appids.slice(i, i + MAX_PRICE_LOOKUP_GAMES);
     try {
       const qs = new URLSearchParams({ country });
+      if (force) qs.set('refresh', '1');
       const res = await fetch(`/api/prices?${qs}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -882,6 +888,7 @@ function resetTableState({ preserveGameParam = false } = {}) {
   tableContainer.innerHTML = '';
   priceStatusEl.textContent = '';
   resetViewBtn.hidden = true;
+  refreshPricesBtn.hidden = true;
   accountsBarEl.hidden = true;
   accountsBarEl.innerHTML = '';
   currentSteamIds = [];
@@ -1114,6 +1121,10 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
   table.setViewState({ sorts: DEFAULT_SORT });
   unsyncView = syncViewToUrl(table, { paramName: 'wview' });
   resetViewBtn.hidden = false;
+  // Same "don't show a control for a feature that isn't running" reasoning as
+  // wishlistRegionLabelEl (see updateRegionLabelVisibility above) — no point offering a price
+  // refresh when ITAD isn't configured and every price column is just going to read "—".
+  itadConfiguredPromise.then(configured => { refreshPricesBtn.hidden = !configured; });
 
   updateStatus();
   if (preserveGameParam) restorePanelFromUrl(restoreShot); // early attempt — lightbox needs details, tried again below
@@ -1158,6 +1169,23 @@ resetViewBtn.addEventListener('click', () => {
   // resetView() clears sorts to none along with everything else — reapply our own default
   // sort on top, since there's no construction-time option for it (see DEFAULT_SORT above).
   table.setViewState({ sorts: DEFAULT_SORT });
+});
+
+// Refreshes just the price columns for the currently loaded wishlist, in one shot — same
+// reasoning as bundles.js's own refreshPricesBtn: it's a single cheap POST /api/prices call
+// either way, no reason to make the user step through every game's own panel "↻ Refresh".
+// Only ever visible on the Wishlist tab (see loadWishlist above), so `rows` here is always the
+// wishlist's own rows.
+refreshPricesBtn.addEventListener('click', async () => {
+  if (rows.length === 0 || refreshPricesBtn.disabled) return;
+  refreshPricesBtn.disabled = true;
+  refreshPricesBtn.textContent = 'Refreshing…';
+  try {
+    await loadWishlistPrices(rows, { force: true });
+  } finally {
+    refreshPricesBtn.disabled = false;
+    refreshPricesBtn.textContent = '↻ Refresh prices';
+  }
 });
 
 playerInput.addEventListener('keydown', e => {

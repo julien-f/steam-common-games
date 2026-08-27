@@ -1174,6 +1174,45 @@ test('POST /api/prices: 200 with Steam regular price and historical lows, by gid
   });
 });
 
+test('POST /api/prices: refresh=1 bypasses the price cache and re-fetches, without re-resolving gids', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  let priceCalls = 0;
+  let resolveCalls = 0;
+  t.mock.method(globalThis, 'fetch', async (url, opts) => {
+    if (String(url).includes('/service/shops/')) return { ok: true, json: async () => [{ id: 61, title: 'Steam' }] };
+    if (String(url).includes('/lookup/id/shop/')) {
+      resolveCalls++;
+      const keys = JSON.parse(opts.body);
+      return { ok: true, json: async () => Object.fromEntries(keys.map(k => [k, 'gid-1'])) };
+    }
+    if (String(url).includes('/games/prices/v3')) {
+      priceCalls++;
+      return {
+        ok: true, json: async () => [{
+          id: 'gid-1',
+          historyLow: { all: null, y1: null, m3: null },
+          deals: [{ shop: { id: 61, name: 'Steam' }, regular: { amount: 20, amountInt: 2000, currency: 'USD' }, price: { amount: 20, amountInt: 2000, currency: 'USD' }, cut: 0 }],
+        }],
+      };
+    }
+    return { ok: false, status: 500 };
+  });
+  await api.post('/api/prices?country=US').send({ appids: [400] });
+  assert.equal(priceCalls, 1);
+  assert.equal(resolveCalls, 1);
+
+  const cached = await api.post('/api/prices?country=US').send({ appids: [400] });
+  assert.equal(priceCalls, 1, 'plain repeat should be a cache hit');
+  assert.equal(resolveCalls, 1, 'gid resolution should also be cached');
+  assert.equal(cached.status, 200);
+
+  const refreshed = await api.post('/api/prices?country=US&refresh=1').send({ appids: [400] });
+  assert.equal(refreshed.status, 200);
+  assert.equal(priceCalls, 2, 'refresh=1 should re-fetch the price even though it was cached');
+  assert.equal(resolveCalls, 1, 'refresh=1 should NOT force the appid→gid resolution — that stays cached');
+});
+
 test('POST /api/prices: 400 with appids that are not positive integers', async () => {
   process.env.ITAD_API_KEY = 'test-itad-key';
   const res = await api.post('/api/prices').send({ appids: [400, 'nope'] });

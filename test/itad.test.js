@@ -194,6 +194,24 @@ test('getPrices: fetches, caches per (gid, country), and treats a missing gid as
   assert.equal(priceCalls, callsBefore + 1, 'a different country is a different cache entry');
 });
 
+test('getPrices: force bypasses the cache read and re-fetches', async (t) => {
+  _reset();
+  let priceCalls = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url).includes('/games/prices/v3')) { priceCalls++; return { ok: true, json: async () => [PRICE_ENTRY] }; }
+    return { ok: false, status: 500 };
+  });
+  await getPrices(['gid-1'], { country: 'US' });
+  assert.equal(priceCalls, 1);
+
+  await getPrices(['gid-1'], { country: 'US' });
+  assert.equal(priceCalls, 1, 'plain call should be a cache hit');
+
+  const result = await getPrices(['gid-1'], { country: 'US', force: true });
+  assert.equal(priceCalls, 2, 'force should re-fetch even though the entry is cached');
+  assert.deepEqual(result.get('gid-1'), PRICE_ENTRY);
+});
+
 test('getPrices: throws on upstream error', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));

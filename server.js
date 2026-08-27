@@ -246,6 +246,7 @@ const pricesLimit = rateLimit({
   ...itadRateLimitOpts,
   skip: (req) => {
     if (rateLimitBypassed()) return true;
+    if (isForceRefresh(req)) return false; // force-refresh always re-fetches, so it must always count
     const { gids, appids } = req.body || {};
     const country = parseCountry(req);
     if (Array.isArray(gids) && gids.length > 0) {
@@ -581,6 +582,12 @@ app.post('/api/prices', pricesLimit, async (req, res) => {
     return res.status(400).json({ error: `Too many games — maximum is ${MAX_PRICE_LOOKUP_GAMES}` });
   }
   const country = parseCountry(req);
+  // ?refresh=1 backs the page-level "↻ Refresh prices" button (bundles.js/library.js) — force
+  // only the price lookup itself, not the appid↔gid resolution above: that's an identity
+  // mapping, not price data, and near-permanent in practice (same reasoning as the panel's own
+  // ↻ Refresh never touching `resolve:` — see the "Refresh" section in CLAUDE.md), so refreshing
+  // it on every price refresh would just be an extra upstream call for nothing.
+  const force = isForceRefresh(req);
   try {
     // Map(requested key → gid|null) — an identity map when the caller already sent gids, so
     // the response-shaping loop below doesn't need two separate code paths.
@@ -590,7 +597,7 @@ app.post('/api/prices', pricesLimit, async (req, res) => {
     const gidsToPrice = [...new Set([...gidByKey.values()].filter(Boolean))];
     const [shopId, prices] = await Promise.all([
       getSteamShopId(),
-      getPrices(gidsToPrice, { country }),
+      getPrices(gidsToPrice, { country, force }),
     ]);
     const out = {};
     for (const [key, gid] of gidByKey) out[key] = extractPriceInfo(gid ? prices.get(gid) : null, shopId);

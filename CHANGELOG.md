@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Bundles page and the Library Explorer's Wishlist tab: a page-level "↻ Refresh prices" button (next to Reset view) force-refreshes every price column for whatever's currently loaded in one batched `POST /api/prices` call, bypassing the `itad-price:` cache — previously the only way to get fresh ITAD pricing for a game was the side panel's own "↻ Refresh" button, one game at a time, which was needlessly slow given pricing is already fetched as a single cheap batch call.
+
 ### Changed
 
 - The Library Explorer and Bundles pages now share their entire game-table column set via a new `public/gameColumns.js` module (`CORE_COLUMNS` — identity/scores/HLTB/dates/classification/compatibility/extras, shown on all three views — and `PRICE_COLUMNS` — Wishlist and Bundles only), instead of each maintaining its own near-identical copy of ~35 column definitions and their render/format/compare/bucket helpers. Each page layers its own page-specific columns (Bundles: Tier Price/Add-on; Wishlist: Rank/Added; Library tab: Played/Last Played) onto the shared base via `insertColumnsAfter`. `formatMoney` moved to `public/utils.js` so `panel.js`'s Price card (a plain script that can't `import` from `gameColumns.js`, an ES module) can keep sharing it. No behavior change — verified live that both pages' tables, column pickers, and the side panel's Price card render identically to before across Bundles, the Library tab, and the Wishlist tab.

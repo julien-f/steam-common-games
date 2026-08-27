@@ -51,6 +51,7 @@
   .lib-form input::placeholder { color: var(--text2); }
   .lib-status { font-size: 13px; color: var(--text1); min-height: 18px; }
   .lib-status-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .lib-status-row-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   /* Kept separate from #status (whose text streamGameDetails' own progress messages
      overwrite constantly — see loadWishlistPrices in library.js) rather than sharing it, same
      reasoning as bundles.html's own #price-status. Only ever has content on a Wishlist price-
@@ -127,7 +128,10 @@
 
   <div class="lib-status-row">
     <div id="status" class="lib-status"></div>
-    <button class="btn btn-ghost btn-sm" id="reset-view-btn" hidden>Reset view</button>
+    <div class="lib-status-row-actions">
+      <button class="btn btn-ghost btn-sm" id="refresh-prices-btn" hidden>↻ Refresh prices</button>
+      <button class="btn btn-ghost btn-sm" id="reset-view-btn" hidden>Reset view</button>
+    </div>
   </div>
   <div id="price-status"></div>
   <div id="table-container"></div>
