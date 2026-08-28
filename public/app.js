@@ -162,6 +162,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (document.getElementById('shortcuts-modal').classList.contains('open')) { closeShortcuts(); return; }
       panelClose(); return; // onClose (see initPanel above) handles the URL/state cleanup
     }
+    // The lightbox owns the keyboard while open (its own arrows/Home/End/f/space/m,
+    // wired in lightbox.js's own listener) — every other page-level shortcut below is
+    // blocked rather than firing invisibly behind it. This used to let ↑/↓ page games
+    // while the lightbox stayed open on the new game's first shot, with no visible sign
+    // the game had actually changed (see the lightbox's own caption for that fix).
+    if (isLightboxOpen()) return;
     if (e.key === '?') { e.preventDefault(); toggleShortcuts(); return; }
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
@@ -178,12 +184,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     if (!activeGame) return;
-    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !isLightboxOpen()) {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       if (panelStepHero(e.key === 'ArrowRight' ? 1 : -1, { wrap: true })) e.preventDefault();
       return;
     }
     if (activeGame.standalone) return; // no group to page through or randomize within — see renderPanelNav
-    if ((e.key === 'r' || e.key === 'R') && !isLightboxOpen()) {
+    if (e.key === 'r' || e.key === 'R') {
       e.preventDefault();
       pickRandom(activeGame.groupKey);
       return;
@@ -193,9 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const list = sortedGames(activeGame.groupKey);
     const idx = list.findIndex(g => g.appid === activeGame.appid);
     const next = (idx + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
-    const lightboxWasOpen = isLightboxOpen();
     openPanel(list[next]);
-    if (lightboxWasOpen) openLightbox(activeGame, 0);
   });
 
   fetch('/api/health').then(r => r.json()).then(d => {
@@ -208,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }).catch(() => {});
 
-  initLightbox({ onParamChange: setLightboxParam });
+  initLightbox({ onParamChange: setLightboxParam, onGameNav: navigateLightboxGame });
   loadFromUrl();
 });
 
@@ -815,6 +819,18 @@ function openPanel(game, { isRandom = false, keepHistory = false } = {}) {
   setPanelParam(game.appid);
 }
 
+// Lightbox's own ↑/↓ handler (see initLightbox below) — same game-list step the
+// document keydown handler above does when the lightbox is closed, but also jumps
+// straight into the new game's lightbox at shot 0 rather than leaving the lightbox
+// closed behind it. No-ops with no group to page through, same guard as above.
+function navigateLightboxGame(dir) {
+  if (!activeGame || activeGame.standalone) return;
+  const list = sortedGames(activeGame.groupKey);
+  const idx = list.findIndex(g => g.appid === activeGame.appid);
+  const next = list[(idx + dir + list.length) % list.length];
+  openPanel(next);
+  openLightbox(next, 0);
+}
 
 function openShortcuts() {
   document.getElementById('shortcuts-modal').classList.add('open');

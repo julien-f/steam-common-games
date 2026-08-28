@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Lightbox: a visible game-name caption in the toolbar (`.lb-caption`) — previously the game/shot identity only existed as invisible `alt`/`aria-label` text, so it was impossible to tell at a glance which game's media was showing.
+
 ### Changed
 
 - Bumped `@vates/data-table-core`/`@vates/data-table-vanilla` to 0.12.0, adopting its new `initialViewState` construction option (`vatesfr/data-table#20`, `vatesfr/data-table#21`) in place of the old `defaultVisibleColumns`/`defaultPageSize` options (removed upstream). `DEFAULT_SORT` is now part of `initialViewState` on all three table constructions (Library Explorer's Library/Wishlist tabs, Bundles), which — since `resetView`/`setViewState({})` now resolve back to `initialViewState` too — removed the manual "reapply DEFAULT_SORT after reset" workaround both pages needed before.
@@ -13,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Lightbox now blocks every page-level keyboard shortcut while it's open, rather than each one individually opting out via its own `!isLightboxOpen()` check — a check that ArrowUp/Down (the panel's prev/next-game nav) had never had, so switching games via ↑/↓ used to still work while the lightbox stayed open on the new game's first shot, with no visible sign the game had actually changed. ArrowUp/Down is the one exception, reimplemented as one of the lightbox's *own* shortcuts (`initLightbox`'s new `onGameNav` hook) rather than being silenced along with everything else — it still pages the panel's game list, jumping straight into the new game's lightbox at shot 0, with the switch now visible via the new caption above. `R` (random pick) is deliberately left blocked for now rather than getting the same treatment.
 - Lightbox: stepping to the next/previous screenshot no longer leaves the *previous* image on screen for the duration of the load — `renderLightbox` only blanked/loading-masked the image on the initial (non-animated) open, not on `stepLightbox`/`gotoLightbox` navigation, and a browser doesn't clear an `<img>`'s painted pixels just because `src` was reassigned. Now shows the shot's own thumbnail (already loaded/cached from the hero carousel) as a degraded placeholder while the full-size image loads in the background via a throwaway `Image()`, falling back to blank for the banner shot (which has no separate thumbnail). `retryCurrentShot` updated to match.
 - Library Explorer and Bundles: the default sort no longer disappears on a first-ever visit (no stored table-view pref yet). `restoreTableView` was unconditionally calling `setViewState({})` when nothing was stored, which cleared the construction-time default sort right back out. Regressed in 0.4.0's move of table-view persistence to `prefs.js`; fixed for good by the `initialViewState` migration above, which is what `setViewState({})` now resolves an omitted sort back to instead of blanking it.
 

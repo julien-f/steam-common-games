@@ -23,13 +23,21 @@ const LB_DOUBLE_TAP_MS = 300;
 const LB_DOUBLE_TAP_DIST = 30;
 
 let _onLightboxParamChange = null;
+let _onGameNav = null;
 let _lbPrevFocus = null;
 const _lbPrefetchedHls = new Set();
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
-function initLightbox({ onParamChange } = {}) {
+// `onGameNav(dir)`: the host's own prev/next-game step (the same list ↑/↓ pages
+// through on the panel itself) — lets ↑/↓ page games while the lightbox stays open,
+// jumping straight to the new game's own media (see `renderLightbox`'s caption for
+// how the switch is made visible), rather than either doing nothing or silently
+// switching games behind a fullscreen image that never changed. Optional — a host
+// with no group to page through (e.g. a standalone lookup) just no-ops.
+function initLightbox({ onParamChange, onGameNav } = {}) {
   _onLightboxParamChange = onParamChange ?? null;
+  _onGameNav = onGameNav ?? null;
   document.addEventListener('fullscreenchange', syncLightboxFullscreenBtn);
   document.addEventListener('webkitfullscreenchange', syncLightboxFullscreenBtn);
 }
@@ -265,13 +273,16 @@ function createLightboxDom() {
       <button class="lb-vc-btn lb-vc-mute" aria-label="Mute">${LB_VOL_ICON}</button>
     </div>
     <div class="lb-toolbar">
-      <div class="lb-toolbar-left">
-        <button class="lb-fullscreen" aria-label="Enter fullscreen">${LB_FS_ENTER}</button>
-        <button class="lb-share" aria-label="Copy link to this screenshot">${LB_LINK_ICON}</button>
-      </div>
-      <div class="lb-counter" aria-live="polite" aria-atomic="true"></div>
-      <div class="lb-toolbar-right">
-        <button class="lb-close" aria-label="Close lightbox">&#215;</button>
+      <div class="lb-caption" aria-hidden="true"></div>
+      <div class="lb-toolbar-row">
+        <div class="lb-toolbar-left">
+          <button class="lb-fullscreen" aria-label="Enter fullscreen">${LB_FS_ENTER}</button>
+          <button class="lb-share" aria-label="Copy link to this screenshot">${LB_LINK_ICON}</button>
+        </div>
+        <div class="lb-counter" aria-live="polite" aria-atomic="true"></div>
+        <div class="lb-toolbar-right">
+          <button class="lb-close" aria-label="Close lightbox">&#215;</button>
+        </div>
       </div>
     </div>`;
   return lb;
@@ -343,6 +354,10 @@ function wireKeyboard(lb) {
     if (!onScrub && (e.key === 'Home' || e.key === 'End') && lightboxShots.length > 1) {
       e.preventDefault();
       gotoLightbox(e.key === 'Home' ? 0 : lightboxShots.length - 1);
+    }
+    if (!onScrub && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && _onGameNav) {
+      e.preventDefault();
+      _onGameNav(e.key === 'ArrowDown' ? 1 : -1);
     }
     if (e.key === 'f' || e.key === 'F') {
       if (document.fullscreenElement || document.webkitFullscreenElement) {
@@ -610,6 +625,13 @@ function renderLightbox() {
   resetLbZoom();
   showLbChrome();
   hideLbError();
+  // Visible game-name caption — previously the game/shot identity only existed as
+  // invisible alt/aria-label text (see `label` below), so switching games while the
+  // lightbox stayed open (e.g. via the panel's ↑/↓ nav) had no on-screen confirmation
+  // it had actually happened, especially when the new shot looked similar to the old one.
+  const caption = lb.querySelector('.lb-caption');
+  caption.textContent = lightboxGameName;
+  caption.style.display = lightboxGameName ? '' : 'none';
   const label = `${lightboxGameName ? lightboxGameName + ' — ' : ''}` +
     `${shot.type === 'video' ? 'Video' : 'Screenshot'} ${lightboxIdx + 1} of ${lightboxShots.length}`;
   if (shot.type === 'video') {

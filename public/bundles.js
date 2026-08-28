@@ -345,7 +345,7 @@ initPanel({
     return `?${params}`;
   },
 });
-initLightbox({ onParamChange: setLightboxParam });
+initLightbox({ onParamChange: setLightboxParam, onGameNav: navigateLightboxGame });
 
 const achievementsCache = new Map();
 
@@ -397,6 +397,19 @@ function openGame(game, { isRandom = false, keepHistory = false } = {}) {
   renderPanelNav(game);
   setPanelParam(game.appid);
   loadAchievements(game);
+}
+
+// Lightbox's own ↑/↓ handler (see initLightbox below) — same game-list step the
+// document keydown handler below does when the lightbox is closed, but also jumps
+// straight into the new game's lightbox at shot 0 rather than leaving the lightbox
+// closed behind it. No-ops with no group to page through, same guard as below.
+function navigateLightboxGame(dir) {
+  if (!table || getPanelGame()?.standalone) return;
+  const list = getGameList();
+  const idx = list.findIndex(g => g.appid === getPanelGame().appid);
+  const next = list[(idx + dir + list.length) % list.length];
+  openGame(next);
+  openLightbox(next, 0);
 }
 
 function pickRandomGame() {
@@ -479,16 +492,19 @@ document.addEventListener('keydown', e => {
     panelClose(); // onClose (see initPanel above) handles the URL cleanup
     return;
   }
+  // The lightbox owns the keyboard while open — see the identical comment in app.js's
+  // own keydown handler for why every other page-level shortcut is blocked here.
+  if (isLightboxOpen()) return;
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if (!isPanelOpen()) return;
   // Hero screenshot/video stepping — this page previously only supported it via click/swipe,
   // unlike app.js/library.js's identical keyboard handling for the same shared hero carousel.
-  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !isLightboxOpen()) {
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
     if (panelStepHero(e.key === 'ArrowRight' ? 1 : -1, { wrap: true })) e.preventDefault();
     return;
   }
-  if ((e.key === 'r' || e.key === 'R') && !isLightboxOpen()) {
+  if (e.key === 'r' || e.key === 'R') {
     e.preventDefault();
     pickRandomGame();
     return;
