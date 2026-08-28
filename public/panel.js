@@ -1116,9 +1116,51 @@ function priceHtml(g) {
     ? `<a class="panel-price-line panel-price-line--link" href="${esc(shopUrl)}" target="_blank" rel="noopener"${lineTitleAttr}>${lineInner}</a>`
     : `<div class="panel-price-line"${lineTitleAttr}>${lineInner}</div>`;
 
+  // Historical lows (all-time/1yr/3mo) — a second, compact line below the buy line, reusing
+  // DEAL_RECORD_TIERS' own icon/color/label (public/utils.js) so this stays in sync with the
+  // badge shown on the amount above rather than hand-rolling a second copy of that mapping.
+  // Omitted entirely when ITAD returned none of the three (a very new/unlisted game).
+  //
+  // A low that exactly equals bestDealPrice is dropped — the main price line already carries
+  // that exact number, badged via `rec` above, so repeating it here would just be the same
+  // figure twice. (This can empty the whole lows line, e.g. the current deal already IS the
+  // all-time low and every window shares that value — the main line's own 🔥 badge already
+  // said so, so there's nothing left worth adding.)
+  //
+  // lowAll <= lowY1 <= lowM3 always (a longer lookback window can only find a price at or
+  // below any shorter window's minimum), so it's common for two or all three to share the same
+  // value (e.g. the all-time low happened within the last 3 months). Showing "🔥 $4.99 · ★
+  // $4.99 · ☆ $4.99" reads as noise/a possible bug rather than three real distinct data
+  // points, so consecutive tiers with an identical amount are collapsed into one entry with
+  // their icons combined (rarest first, e.g. "🔥★☆ $4.99") rather than repeating the price.
+  //
+  // Displayed shortest window first (3mo, 1yr, all-time) — DEAL_RECORD_TIERS itself stays
+  // ordered rarest-first (that's the order dealRecordTier needs to pick the first/rarest
+  // matching tier for the badge above), so this line iterates it in reverse rather than
+  // reordering the shared list. Equal-amount grouping still works the same either way (equal
+  // amounts stay adjacent, just in the opposite direction); `unshift` below keeps each group's
+  // own icons/label in rarest-first order regardless of the reversed iteration, so a collapsed
+  // "🔥★☆ $4.99" entry never comes out as "☆★🔥" instead.
+  const presentTiers = [...DEAL_RECORD_TIERS].reverse().filter(t => g[t.low] != null && g[t.low] !== g.bestDealPrice);
+  const lowGroups = [];
+  for (const t of presentTiers) {
+    const last = lowGroups[lowGroups.length - 1];
+    if (last && last.amount === g[t.low]) last.tiers.unshift(t);
+    else lowGroups.push({ amount: g[t.low], tiers: [t] });
+  }
+  const lowsHtml = lowGroups
+    .map(({ amount, tiers }) => {
+      const icons = tiers.map(t => t.icon).join('');
+      const label = tiers.map(t => t.statusLabel).join(' / ');
+      const color = tiers[0].color; // rarest tier in the group leads the color too
+      return `<span class="panel-price-low" title="${esc(label)}: ${esc(formatMoney(amount, g.priceCurrency))}" style="color:${color}">${icons} ${esc(formatMoney(amount, g.priceCurrency))}</span>`;
+    })
+    .join('<span class="panel-price-sep">·</span>');
+
   return `<div class="panel-section panel-card" id="panel-section-price">
     ${titleHtml}
     ${lineHtml}
+    ${lowsHtml ? `<div class="panel-price-lows">${lowsHtml}</div>` : ''}
   </div>`;
 }
 

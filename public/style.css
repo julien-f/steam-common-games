@@ -1241,6 +1241,12 @@ a.panel-price-line--link:hover .panel-price-shop, a.panel-price-line--link:focus
 .panel-price-sep { color: var(--text1); }
 .panel-price-shop { color: var(--text1); font-weight: 600; transition: color 0.15s; }
 
+/* Historical lows line (all-time/1yr/3mo) — a second, smaller line under the main price line,
+   each present low tagged with its own DEAL_RECORD_TIERS icon/color for a quick "how good is
+   this deal, historically" glance without needing the IsThereAnyDeal ↗ link out. */
+.panel-price-lows { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 12px; margin-top: 4px; }
+.panel-price-low { font-weight: 600; font-variant-numeric: tabular-nums; }
+
 .panel-hltb { display: flex; flex-wrap: wrap; gap: 24px 24px; row-gap: 14px; }
 .panel-hltb-label { font-size: 11px; color: var(--text1); margin-bottom: 3px; }
 .panel-hltb-val { font-size: 20px; font-weight: 600; color: var(--text0); }
