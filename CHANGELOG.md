@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Lightbox: stepping to the next/previous screenshot no longer leaves the *previous* image on screen for the duration of the load — `renderLightbox` only blanked/loading-masked the image on the initial (non-animated) open, not on `stepLightbox`/`gotoLightbox` navigation, and a browser doesn't clear an `<img>`'s painted pixels just because `src` was reassigned. Now shows the shot's own thumbnail (already loaded/cached from the hero carousel) as a degraded placeholder while the full-size image loads in the background via a throwaway `Image()`, falling back to blank for the banner shot (which has no separate thumbnail). `retryCurrentShot` updated to match.
 - Library Explorer and Bundles: the default sort no longer disappears on a first-ever visit (no stored table-view pref yet). `restoreTableView` was unconditionally calling `setViewState({})` when nothing was stored, which cleared the construction-time default sort right back out. Regressed in 0.4.0's move of table-view persistence to `prefs.js`; fixed for good by the `initialViewState` migration above, which is what `setViewState({})` now resolves an omitted sort back to instead of blanking it.
 
 ## [0.4.0] - 2026-08-28

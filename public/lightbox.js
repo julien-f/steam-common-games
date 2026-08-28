@@ -104,12 +104,15 @@ function retryCurrentShot() {
     playHls(vid, shot.hls);
   } else {
     const img = document.querySelector('#screenshot-lightbox .lb-img');
-    img.style.opacity = '0';
-    document.getElementById('screenshot-lightbox')?.classList.add('lb--loading');
+    const lb = document.getElementById('screenshot-lightbox');
+    lb?.classList.add('lb--loading');
     // Cache-bust: a browser that already recorded this exact URL as failed
     // won't necessarily re-attempt the network request otherwise.
     const bust = shot.main + (shot.main.includes('?') ? '&' : '?') + '_retry=' + Date.now();
-    img.src = bust;
+    const full = new Image();
+    full.onload  = () => { img.src = bust; img.style.opacity = '1'; lb?.classList.remove('lb--loading'); };
+    full.onerror = () => { img.style.opacity = '0'; lb?.classList.remove('lb--loading'); showLbError("Couldn't load this image."); };
+    full.src = bust;
   }
 }
 
@@ -625,26 +628,32 @@ function renderLightbox() {
     vid.style.display = 'none';
     img.style.display = 'block';
     img.alt = label;
-    const onLoad  = () => { img.style.opacity = '1'; lb.classList.remove('lb--loading'); };
-    // Left at opacity 0 (rather than 1) so the browser's own broken-image
-    // icon doesn't show behind the error overlay.
-    const onError = () => { img.style.opacity = '0'; lb.classList.remove('lb--loading'); showLbError("Couldn't load this image."); };
+    img.onload = null;
+    img.onerror = null;
     if (dir !== 0) {
-      img.style.opacity = '';
-      img.onload = onLoad;
-      img.onerror = onError;
-      img.src = shot.main;
       img.className = `lb-img lb-anim-${dir > 0 ? 'right' : 'left'}`;
       img.addEventListener('animationend', () => { img.className = 'lb-img'; }, { once: true });
     } else {
       img.className = 'lb-img';
-      img.style.opacity = '0';
-      lb.classList.add('lb--loading');
-      img.onload  = onLoad;
-      img.onerror = onError;
-      img.src = shot.main;
-      if (img.complete) { img.onload = null; img.style.opacity = '1'; lb.classList.remove('lb--loading'); }
     }
+    // Show a degraded placeholder (the thumbnail, already loaded/cached from
+    // the hero carousel) instead of leaving the *previous* shot on screen
+    // while the full-size image loads. The banner shot has no separate
+    // thumbnail (thumb === main), so there's nothing degraded to show — fall
+    // back to blank there.
+    if (shot.thumb && shot.thumb !== shot.main) {
+      img.style.opacity = '1';
+      img.src = shot.thumb;
+    } else {
+      img.style.opacity = '0';
+    }
+    lb.classList.add('lb--loading');
+    const full = new Image();
+    // Left at opacity 0 (rather than 1) so the browser's own broken-image
+    // icon doesn't show behind the error overlay.
+    full.onload  = () => { img.src = shot.main; img.style.opacity = '1'; lb.classList.remove('lb--loading'); };
+    full.onerror = () => { img.style.opacity = '0'; lb.classList.remove('lb--loading'); showLbError("Couldn't load this image."); };
+    full.src = shot.main;
     schedHideLbChrome();
   }
   lb.querySelector('.lb-counter').textContent = `${lightboxIdx + 1} / ${lightboxShots.length}`;
