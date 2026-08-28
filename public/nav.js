@@ -3,9 +3,10 @@
 // Shared cross-page navigation bar — one component (`#site-nav`, present as an empty <nav> in
 // every page's markup) instead of each page hand-rolling its own header corner links plus a
 // second, differently-worded footer link row. Loaded as a plain script (not a module) on all
-// four pages, after prefs.js/region.js (needed for the Preferences popover below), same
-// convention as urlState.js/utils.js — about.html has no page-specific JS of its own, so this
-// (plus prefs.js/region.js, loaded solely for this file's own popover) is all it loads.
+// four pages, after prefs.js/region.js/prefsPopover.js (needed for the Preferences popover
+// below), same convention as urlState.js/utils.js — about.html has no page-specific JS of its
+// own, so this (plus prefs.js/region.js/prefsPopover.js, loaded solely for this file's own
+// popover) is all it loads.
 const NAV_PAGES = [
   { key: 'compare', href: '/', label: 'Comparison' },
   { key: 'library', href: '/library.html', label: 'Library Explorer' },
@@ -20,9 +21,10 @@ const NAV_PAGES = [
 //
 // A ⚙ "Preferences" popover sits at the end of the same bar — a place to manage a preference
 // independent of whatever page happens to be open, rather than each page needing its own UI for
-// it (see the region control below, which replaced Bundles' and the Wishlist tab's own inline
-// pickers). Only region lives here today; more preferences are expected to land in this same
-// popover later rather than each needing a new place of its own.
+// it (this replaced Bundles' and the Wishlist tab's own inline region pickers). This file owns
+// only the popover's shell — the `<details>`/`<summary>` toggle and its open/close mechanics;
+// what's actually inside the panel (today, just region) is prefsPopover.js's job, so this file
+// stays about page navigation regardless of how many preferences land in that panel later.
 function initNav(current) {
   const el = document.getElementById('site-nav');
   if (!el) return;
@@ -32,28 +34,19 @@ function initNav(current) {
   ).join('') + `
     <details class="site-nav-prefs">
       <summary class="site-nav-link site-nav-prefs-btn" aria-label="Preferences">⚙</summary>
-      <div class="site-nav-prefs-panel">
-        <label class="site-nav-prefs-row">Region
-          <select id="nav-region-select"></select>
-        </label>
-      </div>
+      ${prefsPopoverPanelHtml()}
     </details>
   `;
-  initNavPrefs();
+  initPrefsPopover();
+  bindPrefsPopoverClose();
 }
 
-// Populates the region select and wires it to the shared region preference (region.js) — the
-// one place it's picked now. `setStoredRegion` broadcasts `REGION_CHANGED_EVENT` on every
-// change regardless of which UI made it, so this popover doesn't need to know anything about
-// Bundles/library.js reacting to it (see their own comments).
-//
 // `<details>` has no built-in "close on outside click" or "close on Escape" — added by hand
-// here since a popover that only closes by re-clicking its own summary reads as broken.
-function initNavPrefs() {
+// here since a popover that only closes by re-clicking its own summary reads as broken. Purely
+// about the `<details>` shell's own toggle mechanics, so it stays here rather than in
+// prefsPopover.js regardless of what ends up inside the panel.
+function bindPrefsPopoverClose() {
   const details = document.querySelector('.site-nav-prefs');
-  const select = document.getElementById('nav-region-select');
-  initRegionSelect(select);
-  select.addEventListener('change', () => setStoredRegion(select.value));
   document.addEventListener('click', e => {
     if (details.open && !details.contains(e.target)) details.open = false;
   });

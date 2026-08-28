@@ -1,9 +1,10 @@
 'use strict';
 
-// Shared by both bundles.js and library.js's Wishlist price columns — both need "what region's
-// prices am I looking at" and there's no reason for the curated list, the detection heuristic,
-// or the persisted preference to drift between the two. Loaded as a plain script (not a
-// module) on both pages, same esc()/reorderUrlParams() convention as utils.js/urlState.js — a
+// The region preference's data and logic — the curated list, the detection heuristic, and
+// get/set/resolve for the stored value — with no DOM/UI code of its own (see prefsPopover.js
+// for the actual `<select>` this backs). Loaded as a plain script (not a module) on all four
+// pages — bundles.js and library.js's Wishlist tab need `resolveRegion`/`getStoredRegion` for
+// their price lookups, same esc()/reorderUrlParams() convention as utils.js/urlState.js — a
 // module reaches these off the global scope rather than importing them.
 
 // Curated rather than the full ISO 3166-1 list — these are the regions with meaningfully
@@ -86,9 +87,9 @@ function detectCountry() {
 }
 
 // Sentinel value for "always track auto-detection, don't pin a fixed region" — the region
-// picker's own default entry (see initRegionSelect below) and the default when nothing has
-// been explicitly chosen yet. Deliberately not one of the real 2-letter ISO codes above, so it
-// can never collide with a genuine country selection.
+// picker's own default entry (see prefsPopover.js's initPrefsPopover) and the default when
+// nothing has been explicitly chosen yet. Deliberately not one of the real 2-letter ISO codes
+// above, so it can never collide with a genuine country selection.
 const AUTO_COUNTRY = 'auto';
 
 // One shared preference, not per-page — this is "what currency do I want to see prices in", a
@@ -130,32 +131,14 @@ function resolveRegion(selected) {
   return selected === AUTO_COUNTRY ? detectCountry() : selected;
 }
 
-// Populates `selectEl` with COUNTRY_OPTIONS plus a leading "Auto-detect" entry — labeled with
-// whatever it currently resolves to (e.g. "Auto-detect (Europe / Germany (EUR))") so picking it
-// isn't a leap of faith, and restores whatever region was last stored (getStoredRegion above).
-// Returns the resolved (never AUTO_COUNTRY) country code to use immediately, so a caller
-// doesn't need its own separate resolveRegion() call right after.
-function initRegionSelect(selectEl) {
-  const detected = detectCountry();
-  const detectedLabel = COUNTRY_OPTIONS.find(c => c.code === detected)?.label ?? detected;
-  selectEl.innerHTML = '';
-  const autoOpt = document.createElement('option');
-  autoOpt.value = AUTO_COUNTRY;
-  autoOpt.textContent = `Auto-detect (${detectedLabel})`;
-  selectEl.appendChild(autoOpt);
-  for (const { code, label } of COUNTRY_OPTIONS) {
-    const opt = document.createElement('option');
-    opt.value = code;
-    opt.textContent = label;
-    selectEl.appendChild(opt);
-  }
-  selectEl.value = getStoredRegion();
-  return resolveRegion(selectEl.value);
-}
+// `initRegionSelect` (the region <select>'s only remaining populator, public/prefsPopover.js)
+// used to live here — moved out since this file's own job is the region preference's data and
+// logic (the curated list, detection, get/set, the changed-event), not rendering a picker for
+// it; the DOM-populating half belongs with whichever UI actually owns a `<select>` for it.
 
 if (typeof module !== 'undefined') {
   module.exports = {
     COUNTRY_OPTIONS, TIMEZONE_COUNTRY, detectCountry,
-    AUTO_COUNTRY, REGION_PREF_KEY, REGION_CHANGED_EVENT, getStoredRegion, setStoredRegion, resolveRegion, initRegionSelect,
+    AUTO_COUNTRY, REGION_PREF_KEY, REGION_CHANGED_EVENT, getStoredRegion, setStoredRegion, resolveRegion,
   };
 }
