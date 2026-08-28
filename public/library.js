@@ -83,9 +83,15 @@ const WISHLIST_RANK_COLUMN =
 // above — a fresh click (and the filter's date tree) should lead with what was added most
 // recently, not the oldest wishlist entry. Placed right after Released, in the same Play
 // time & dates section, rather than at the very end of the column list.
+// Grouped by year (`bucketDatePart('year')`), same as Released/Last Played above — an exact
+// added-on date is close to unique per row, so ungrouped grouping would produce close to one
+// group per game, the same "continuous column" problem those two columns already solve for.
+// `null` (no wishlist add-date at all) is the only missing case here.
 const WISHLIST_DATE_ADDED_COLUMN =
   { key: 'dateAdded', label: 'Added',         type: 'date',   groupable: true,  format: fmt.str, compare: compareDateMissingLast,
-    defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' } };
+    defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
+    groupValue: withMissingGroup(bucketDatePart('year')),
+    groupFormat: formatMissingGroup(formatDatePart('year')), keepVisibleWhenGrouped: true };
 
 // The Wishlist tab's own column list — CORE_COLUMNS plus its price cluster (PRICE_COLUMNS,
 // public/gameColumns.js — Bundles gets the exact same cluster in the exact same relative
