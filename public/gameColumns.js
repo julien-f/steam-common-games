@@ -308,6 +308,32 @@ export function formatHalfDecadeBucket(unit, zeroLabel) {
   };
 }
 
+// The four "how good is this game" score columns (Weighted Rating, Wilson Score, Steam %,
+// Metacritic) are all bounded 0-100 but, for any library skewed toward games people actually
+// chose to own, cluster tightly near the top — verified live against a 1,131-game collector
+// library, where a plain 25-point step (bucketNumericRange(25), fine for Discount below, also
+// bounded 0-100 but genuinely spread out) put 75-86% of games into a single 75-100 bucket.
+// Fixed 5-point steps read the top of the range at real resolution instead; everything below
+// SCORE_BUCKET_FLOOR collapses into one "< 60" bucket rather than several sparse near-empty
+// ones nobody's low-rated tail actually needs distinguished — the same "coarse tail, fine head"
+// shape halfDecadeBucket/PRICE_TIERS already use above, just linear instead of log/staircase
+// since the whole range is only 0-100 to begin with. `positivePct` is the one of the four that
+// can hit a real 100 (a game with zero negative reviews) — `Math.min(..., 100 - STEP)` folds it
+// into the same 95-100 bucket as everything else in that range rather than spawning its own
+// single-value "100-105" bucket the way a bare `Math.floor(v/step)*step` would.
+const SCORE_BUCKET_STEP = 5;
+const SCORE_BUCKET_FLOOR = 60;
+export function scoreBucket(value) {
+  const n = Number(value);
+  if (!(n >= SCORE_BUCKET_FLOOR)) return -1; // below the floor (or NaN) — the single "< 60" bucket
+  return Math.min(Math.floor(n / SCORE_BUCKET_STEP) * SCORE_BUCKET_STEP, 100 - SCORE_BUCKET_STEP);
+}
+export function formatScoreBucket(keyPart) {
+  const n = Number(keyPart);
+  if (n === -1) return `< ${SCORE_BUCKET_FLOOR}`;
+  return `${n}–${n + SCORE_BUCKET_STEP}`;
+}
+
 // A `groupValue` that returns `null`/`undefined` for a missing value ends up keyed by the empty
 // string once the table's own internals stringify it (`null ?? ''`) — but bucketNumericRange/
 // bucketDatePart don't know that convention; each calls `String(value)`/coerces it *before* any
@@ -506,8 +532,8 @@ export const CORE_COLUMNS = [
   // ── Identity ────────────────────────────────────────────────────────────────
   { key: 'capsule', label: '', width: 128, sortable: false, filterable: false, groupable: false,
     value: () => null, render: renderThumb },
-  // Not groupable — a game's name is (almost always) unique per row, same "one group per row is
-  // useless" reasoning steamdbRating's own groupable:false comment below already gives.
+  // Not groupable — a game's name is (almost always) unique per row, so grouping by it would
+  // produce close to one row-sized group per game.
   // `format: fmt.str` handles a still-streaming-in name (Wishlist/Bundles rows only know a
   // placeholder name until store metadata resolves) the same way every other loading cell does;
   // harmless for the Library tab, whose owned-game names are always known upfront.
@@ -516,27 +542,35 @@ export const CORE_COLUMNS = [
   // ── Scores & reviews ────────────────────────────────────────────────────────
   // The default-visible score: a Bayesian-shrinkage formula adapted from SteamDB's own (see
   // computeSteamdbRating in utils.js, tuned to converge to the raw ratio faster than SteamDB's
-  // published version does) — shown first as the app's primary rating. Stored
-  // unrounded so sort/default-sort operate on full precision (two games both displaying "97"
-  // still order deterministically); not groupable for the same reason — grouping keys off the
-  // raw value, and a near-unique float per game would produce a useless one-row-per-group split.
-  // `defaultSortDir: 'desc'` (new in @vates/data-table-core 0.8.0) on this and the other three
-  // score-ish columns below — a fresh click on any of them should show the best-rated games
-  // first, not the worst; without it a first click started every numeric column ascending
-  // (worst-first) regardless of what the number actually means.
-  { key: 'steamdbRating',    label: 'Weighted Rating',  type: 'number', groupable: false, format: fmt.numRound, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
+  // published version does) — shown first as the app's primary rating. Stored unrounded so
+  // sort/default-sort operate on full precision (two games both displaying "97" still order
+  // deterministically) — `scoreBucket` (see its own comment above) buckets by the same floored
+  // value regardless, so that precision isn't lost for grouping either. `defaultSortDir: 'desc'`
+  // (new in @vates/data-table-core 0.8.0) on this and the other three score-ish columns below —
+  // a fresh click on any of them should show the best-rated games first, not the worst; without
+  // it a first click started every numeric column ascending (worst-first) regardless of what the
+  // number actually means.
+  { key: 'steamdbRating',    label: 'Weighted Rating',  type: 'number', groupable: true, format: fmt.numRound, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc',
+    groupValue: withMissingGroup(scoreBucket), groupFormat: formatMissingGroup(formatScoreBucket), keepVisibleWhenGrouped: true },
   // Wilson score lower bound — statistically rigorous but harder to explain than SteamDB's
   // current formula (which is why it isn't the default-visible score anymore); kept available
   // for anyone who wants the more conservative, confidence-bound number instead.
-  { key: 'score',            label: 'Wilson Score',    type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
+  { key: 'score',            label: 'Wilson Score',    type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc',
+    groupValue: withMissingGroup(scoreBucket), groupFormat: formatMissingGroup(formatScoreBucket), keepVisibleWhenGrouped: true },
   // Raw positive/total ratio — the plain percentage Steam's own store page shows, as opposed to
   // the two adjusted scores above. No "%" in the cell (the column header already says so) —
   // same bare colored number treatment as the other three score columns for consistency.
-  { key: 'positivePct',      label: 'Steam %',         type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
+  { key: 'positivePct',      label: 'Steam %',         type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc',
+    groupValue: withMissingGroup(scoreBucket), groupFormat: formatMissingGroup(formatScoreBucket), keepVisibleWhenGrouped: true },
   // Grouped with the other user-review scores above rather than off near HLTB — it's a critic
   // (not player) score, but it's still one of the four "how good is this game" numbers, and
-  // keeping all of them contiguous makes them easier to compare at a glance.
-  { key: 'metacritic',       label: 'Metacritic Score',type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc' },
+  // keeping all of them contiguous makes them easier to compare at a glance. Shares the exact
+  // same scoreBucket scheme as the other three rather than its own — Metacritic reads less
+  // skewed in isolation (no games above 96 in the same sample), but a shared scheme is what lets
+  // all four columns' group breakdowns be compared at a glance against each other, which is the
+  // more useful property here than each column individually having the tightest-fitting buckets.
+  { key: 'metacritic',       label: 'Metacritic Score',type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc',
+    groupValue: withMissingGroup(scoreBucket), groupFormat: formatMissingGroup(formatScoreBucket), keepVisibleWhenGrouped: true },
   // No compare override here — 0 reviews is a real, meaningful value (not "no data" standing in
   // for one), so the default numeric sort already treats it correctly, unlike the score/HLTB
   // columns above and below. `defaultSortDir: 'desc'` still applies though — the most-reviewed
