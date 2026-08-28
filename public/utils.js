@@ -105,10 +105,16 @@ function formatMoney(v, currency) {
 // scoreColor's own "excellent"/"good"/"ok" tiers rather than a new palette; the icons step down
 // from a filled 🔥 to a filled ★ to an outline ☆, reading as "still a record, just a
 // lesser/older one" for the shortest window.
+// statusLabel/tooltipLabel spell out "Year"/"Month" in full — matching the wording of the
+// lowY1/lowM3 columns themselves ("1-Year Low"/"3-Month Low", gameColumns.js) — rather than the
+// abbreviated "1yr"/"3mo" this used to carry, which drifted from those column labels the moment
+// they were spelled out. tooltipLabel is the same wording lowercased to read inline in a
+// sentence ("Fanatical — 1-year low"); statusLabel is the title-cased standalone form shown as
+// the Price Status column's own cell value.
 const DEAL_RECORD_TIERS = [
-  { tier: 'all-time', low: 'lowAll', statusLabel: 'All-Time Low', tooltipLabel: 'all-time low', color: scoreColor(90), icon: '🔥', bold: true },
-  { tier: '1yr',       low: 'lowY1',  statusLabel: '1yr Low',       tooltipLabel: '1-year low',   color: scoreColor(70), icon: '★' },
-  { tier: '3mo',        low: 'lowM3',  statusLabel: '3mo Low',        tooltipLabel: '3-month low',  color: scoreColor(55), icon: '☆' },
+  { tier: 'all-time', low: 'lowAll', statusLabel: 'All-Time Low',  tooltipLabel: 'all-time low',  color: scoreColor(90), icon: '🔥', bold: true },
+  { tier: '1yr',       low: 'lowY1',  statusLabel: '1-Year Low',   tooltipLabel: '1-year low',    color: scoreColor(70), icon: '★' },
+  { tier: '3mo',        low: 'lowM3',  statusLabel: '3-Month Low', tooltipLabel: '3-month low',   color: scoreColor(55), icon: '☆' },
 ];
 // `lows` is any object carrying `lowAll`/`lowY1`/`lowM3` fields — a row/game object works as-is,
 // no need to destructure at the call site. `<=`, not `<` — the current deal genuinely can BE the

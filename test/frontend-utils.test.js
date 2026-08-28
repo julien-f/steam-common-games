@@ -317,7 +317,7 @@ test('dealRecordTier: all-time low takes priority even when the price also match
 test('dealRecordTier: 1yr low when it beats the 1yr/3mo windows but not the all-time one', () => {
   const rec = dealRecordTier(15, { lowAll: 10, lowY1: 15, lowM3: 15 });
   assert.equal(rec.tier, '1yr');
-  assert.equal(rec.statusLabel, '1yr Low');
+  assert.equal(rec.statusLabel, '1-Year Low');
   assert.equal(rec.icon, '★');
   assert.ok(!rec.bold);
 });
@@ -325,7 +325,7 @@ test('dealRecordTier: 1yr low when it beats the 1yr/3mo windows but not the all-
 test('dealRecordTier: 3mo low when it beats only the 3mo window', () => {
   const rec = dealRecordTier(20, { lowAll: 10, lowY1: 15, lowM3: 20 });
   assert.equal(rec.tier, '3mo');
-  assert.equal(rec.statusLabel, '3mo Low');
+  assert.equal(rec.statusLabel, '3-Month Low');
   assert.equal(rec.icon, '☆');
 });
 

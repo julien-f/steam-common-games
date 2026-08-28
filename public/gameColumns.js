@@ -590,8 +590,8 @@ export const CORE_COLUMNS = [
   // the same as before.
   { key: 'categories',       label: 'Categories',   groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
   { key: 'tags',             label: 'Tags',         groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
-  { key: 'developers',       label: 'Developer',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
-  { key: 'publishers',       label: 'Publisher',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
+  { key: 'developers',       label: 'Developers',   groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
+  { key: 'publishers',       label: 'Publishers',   groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
   // Parsed from Steam's `supported_languages` HTML string (see parseSupportedLanguages in
   // lib/steam.js) — same high-cardinality multi-value treatment as Tags/Developers/Publisher.
   { key: 'languages',        label: 'Languages',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
@@ -646,7 +646,7 @@ export const CORE_COLUMNS = [
   // (the game genuinely has none); `null` (missing, sorted last by compareNumMissingLast)
   // only when store metadata itself failed to load. Hidden by default — a fairly niche
   // completionist-facing number compared to the rest of each page's own DEFAULT_VISIBLE.
-  { key: 'achievementCount', label: 'Achievements', type: 'number', groupable: true, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'desc' },
+  { key: 'achievementCount', label: 'Achievement Count', type: 'number', groupable: true, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'desc' },
   // Length of `meta.dlc` (the bare DLC appid list every appdetails response already carries —
   // see the `dlc` comment in lib/steam.js's extractAppDetails) — computed server-side, already
   // on the row's `details.meta`. 0 is real data (base game has no DLC); `null` only when store
@@ -695,8 +695,8 @@ export const PRICE_COLUMNS = [
   // the current deal actually is).
   { key: 'lowAll',        label: 'All-Time Low',  type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
     groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
-  { key: 'lowY1',         label: '1yr Low',      type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
+  { key: 'lowY1',         label: '1-Year Low',   type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
     groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
-  { key: 'lowM3',         label: '3mo Low',      type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
+  { key: 'lowM3',         label: '3-Month Low',  type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
     groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
 ];
