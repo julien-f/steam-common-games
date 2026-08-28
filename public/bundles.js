@@ -1,7 +1,11 @@
 'use strict';
 
 import { createDataTable } from '@vates/data-table-vanilla';
-import { processData, searchData, DEFAULT_LABELS } from '@vates/data-table-core';
+import { DEFAULT_LABELS } from '@vates/data-table-core';
+// processData/searchData moved off @vates/data-table-core's public surface in 0.12 — see the
+// matching comment in library.js for why this still reaches into the explicitly-unsupported
+// /internal sub-path rather than a sanctioned alternative (there isn't one yet).
+import { processData, searchData } from '@vates/data-table-core/internal';
 import {
   fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareNumMissingLast,
   withMissingGroup, formatMissingGroup, priceTierBucket, formatPriceTier,
@@ -74,7 +78,10 @@ const BUNDLE_COLUMNS = insertColumnsAfter(
 // to cross-reference against.
 const DEFAULT_VISIBLE = ['capsule', 'name', 'tierPrice', 'bestDealPrice', 'bestDealCut', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
 // Cheapest first, best-rated among ties second — a genuinely useful browsing order (unlike a
-// single-column sort, which leaves same-priced games in an arbitrary relative order).
+// single-column sort, which leaves same-priced games in an arbitrary relative order). Passed as
+// part of `initialViewState` at table construction (`@vates/data-table-vanilla` >= 0.12) — also
+// what `resetTableView`'s own `setViewState({})` blanking restores, so unlike before there's no
+// separate priming call or manual reapply-after-reset needed for this.
 const DEFAULT_SORT = [{ key: 'tierPrice', dir: 'asc' }, { key: 'steamdbRating', dir: 'desc' }];
 
 // ── Region ────────────────────────────────────────────────────────────────────
@@ -126,6 +133,11 @@ const shareViewBtn       = document.getElementById('share-view-btn');
 // rebuilds its table on every bundle open (list click, ‹/›, a region-reopen), far more often
 // than a single page load, so a shared `?bv=` link is applied once, seeded as the new stored
 // default, and stripped from the URL rather than clobbering later edits on every reopen.
+//
+// No stored pref yet (first-ever visit) falls through to `table.setViewState({})`, same as
+// before `@vates/data-table-vanilla` 0.12 — but as of that version an empty view state resolves
+// each omitted field back to the table's own `initialViewState` (see the createDataTable call
+// below) rather than blanking it, so this no longer needs its own guard against that.
 function restoreTableView(table, prefKey, paramName) {
   const params = new URLSearchParams(location.search);
   const raw = params.get(paramName);
@@ -162,6 +174,9 @@ function flashShareViewBtn(btn) {
   setTimeout(() => { btn.textContent = prevText; }, 1500);
 }
 
+// Blanks the table's view state, which resolves back to the table's own `initialViewState`
+// (including DEFAULT_SORT) rather than to nothing, same as `restoreTableView`'s own fallback
+// above.
 function resetTableView(table, prefKey, paramName) {
   table.setViewState({});
   setPref(prefKey, {});
@@ -890,8 +905,7 @@ async function openBundle(bundle, { preserveGameParam = false, restoreShot = nul
     data: [],
     columns: BUNDLE_COLUMNS,
     rowKey: 'appid',
-    defaultPageSize: 50,
-    defaultVisibleColumns: DEFAULT_VISIBLE,
+    initialViewState: { pageSize: 50, visibleCols: DEFAULT_VISIBLE, sorts: DEFAULT_SORT },
     // The table's own click handler hands back whatever object is currently in
     // `tableRowCache` for this row — a copy, not `rowMap`'s canonical one (see
     // `visibleRowsForTable`'s comment above). Looking the canonical row back up by appid
@@ -900,11 +914,9 @@ async function openBundle(bundle, { preserveGameParam = false, restoreShot = nul
     // disconnected copy that further updates would silently stop reaching.
     onRowClick: row => openGame(rowMap.get(row.appid) ?? row),
   });
-  table.setViewState({ sorts: DEFAULT_SORT });
   // Loads whatever URL param / stored pref should win (see restoreTableView's own comment) on
-  // top of the default sort just applied above, then persists every subsequent change locally —
-  // same "construction-time default, then let the stored view override it" ordering the old
-  // persistViewToLocalStorage used.
+  // top of the construction-time default view just applied above, then persists every
+  // subsequent change locally.
   restoreTableView(table, TABLE_VIEW_PREF_KEY, TABLE_VIEW_PARAM);
   unpersistView = bindViewPersistence(table, TABLE_VIEW_PREF_KEY);
   resetViewBtn.hidden = false;
@@ -963,9 +975,6 @@ loadMoreBtn.addEventListener('click', () => loadBundles({ reset: false }));
 resetViewBtn.addEventListener('click', () => {
   if (!table) return;
   resetTableView(table, TABLE_VIEW_PREF_KEY, TABLE_VIEW_PARAM);
-  // resetTableView() clears sorts to none along with everything else — reapply our own default
-  // sort on top, same as library.js's own reset-view button does.
-  table.setViewState({ sorts: DEFAULT_SORT });
 });
 
 shareViewBtn.addEventListener('click', () => shareTableView(table, TABLE_VIEW_PARAM, shareViewBtn));

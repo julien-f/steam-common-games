@@ -1,7 +1,15 @@
 'use strict';
 
 import { createDataTable } from '@vates/data-table-vanilla';
-import { processData, searchData, DEFAULT_LABELS, bucketDatePart, formatDatePart } from '@vates/data-table-core';
+import { DEFAULT_LABELS, bucketDatePart, formatDatePart } from '@vates/data-table-core';
+// processData/searchData moved off @vates/data-table-core's public surface in 0.12 (into
+// @vates/data-table-core/internal, alongside every other adapter-internal helper) — that
+// sub-path is explicitly documented as unsupported/no-semver-guarantee (see that package's own
+// README), but there's currently no supported alternative for getGameList's own need below
+// (the table's live filtered/sorted/searched row order, independent of its display-only
+// grouping/pagination — @vates/data-table-vanilla's own DataTableInstance exposes no such
+// method). Flagged upstream; revisit if/when an adapter-level equivalent lands.
+import { processData, searchData } from '@vates/data-table-core/internal';
 import {
   fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareDateMissingLast,
   withMissingGroup, formatMissingGroup, halfDecadeBucket, formatHalfDecadeBucket,
@@ -67,8 +75,9 @@ const DEFAULT_VISIBLE = [
   'capsule', 'name', 'steamdbRating', 'hltbAll', 'playtime', 'releaseDate', 'genres',
 ];
 
-// Applied via setViewState() after table creation and after "Reset view" — there's no
-// construction-time default-sort option, only defaultVisibleColumns (see README).
+// Passed as part of `initialViewState` at table construction (`@vates/data-table-vanilla` >=
+// 0.12) — also what `resetTableView`'s own `setViewState({})` blanking restores, so unlike
+// before there's no separate priming call or manual reapply-after-reset needed for this.
 const DEFAULT_SORT = [{ key: 'steamdbRating', dir: 'desc' }];
 
 // ── Wishlist-only columns ────────────────────────────────────────────────────
@@ -199,8 +208,8 @@ const viewPrefKey    = () => (activeTab === 'wishlist' ? 'libraryWishlistView' :
 // lightbox.js's share button.
 
 // Applies whichever of the URL param / stored pref should win at load time — an explicit URL
-// param (a shared link) always wins over the stored default. Called right after the
-// construction-time default sort, same ordering syncViewToUrl used to apply things in.
+// param (a shared link) always wins over the stored default. Called right after table
+// construction (which already seeded the default view via `initialViewState`).
 //
 // Consumed once, not read on every call: a shared link's view is applied, seeded as the new
 // stored default, and stripped from the (live) URL — this table gets rebuilt from scratch far
@@ -208,6 +217,11 @@ const viewPrefKey    = () => (activeTab === 'wishlist' ? 'libraryWishlistView' :
 // this again), and without consuming it, the shared view would keep clobbering whatever the user
 // changed since, on every one of those, instead of being a one-time starting point the way a
 // bookmarked/shared link is supposed to be.
+//
+// No stored pref yet (first-ever visit) falls through to `table.setViewState({})`, same as
+// before `@vates/data-table-vanilla` 0.12 — but as of that version an empty view state resolves
+// each omitted field back to the table's own `initialViewState` (see the createDataTable calls
+// below) rather than blanking it, so this no longer needs its own guard against that.
 function restoreTableView(table, prefKey, paramName) {
   const params = new URLSearchParams(location.search);
   const raw = params.get(paramName);
@@ -254,8 +268,8 @@ function flashShareViewBtn(btn) {
 }
 
 // Clears both the stored default and whatever's currently in `paramName`, then blanks the
-// table's view state — callers reapply their own DEFAULT_SORT on top afterward (blanking clears
-// sorts to none too, same as @vates/data-table-vanilla's own resetView required).
+// table's view state — which resolves back to the table's own `initialViewState` (including
+// DEFAULT_SORT) rather than to nothing, same as `restoreTableView`'s own fallback above.
 function resetTableView(table, prefKey, paramName) {
   table.setViewState({});
   setPref(prefKey, {});
@@ -1098,8 +1112,7 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
     data: visibleRows(), // empty at this point — every row starts out loading:true, see below
     columns: COLUMNS,
     rowKey: 'appid',
-    defaultPageSize: 50,
-    defaultVisibleColumns: DEFAULT_VISIBLE,
+    initialViewState: { pageSize: 50, visibleCols: DEFAULT_VISIBLE, sorts: DEFAULT_SORT },
     // The table's own click handler hands back whatever object is currently in
     // tableRowCache for this row (see visibleRowsForTable's comment above) — a copy, not
     // rowMap's canonical one. Looking the canonical row back up by appid means the panel (and
@@ -1108,7 +1121,6 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
     // reaching — same fix bundles.js already needed for the same reason.
     onRowClick: row => openGame(rowMap.get(row.appid) ?? row),
   });
-  table.setViewState({ sorts: DEFAULT_SORT });
   restoreTableView(table, viewPrefKey(), viewParamName());
   unsyncView = bindViewPersistence(table, viewPrefKey());
   resetViewBtn.hidden = false;
@@ -1213,12 +1225,10 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
     data: visibleRows(), // empty at this point — every row starts out loading:true, see below
     columns: WISHLIST_COLUMNS,
     rowKey: 'appid',
-    defaultPageSize: 50,
-    defaultVisibleColumns: WISHLIST_DEFAULT_VISIBLE,
+    initialViewState: { pageSize: 50, visibleCols: WISHLIST_DEFAULT_VISIBLE, sorts: DEFAULT_SORT },
     // See the matching comment in loadLibrary above.
     onRowClick: row => openGame(rowMap.get(row.appid) ?? row),
   });
-  table.setViewState({ sorts: DEFAULT_SORT });
   restoreTableView(table, viewPrefKey(), viewParamName());
   unsyncView = bindViewPersistence(table, viewPrefKey());
   resetViewBtn.hidden = false;
@@ -1268,9 +1278,6 @@ loadBtn.addEventListener('click', () => {
 
 resetViewBtn.addEventListener('click', () => {
   resetTableView(table, viewPrefKey(), viewParamName());
-  // resetTableView() clears sorts to none along with everything else — reapply our own default
-  // sort on top, since there's no construction-time option for it (see DEFAULT_SORT above).
-  table.setViewState({ sorts: DEFAULT_SORT });
 });
 
 shareViewBtn.addEventListener('click', () => shareTableView(table, viewParamName(), shareViewBtn));

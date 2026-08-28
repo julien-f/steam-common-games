@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Bumped `@vates/data-table-core`/`@vates/data-table-vanilla` to 0.12.0, adopting its new `initialViewState` construction option (`vatesfr/data-table#20`, `vatesfr/data-table#21`) in place of the old `defaultVisibleColumns`/`defaultPageSize` options (removed upstream). `DEFAULT_SORT` is now part of `initialViewState` on all three table constructions (Library Explorer's Library/Wishlist tabs, Bundles), which — since `resetView`/`setViewState({})` now resolve back to `initialViewState` too — removed the manual "reapply DEFAULT_SORT after reset" workaround both pages needed before.
+  - The upgrade needed two follow-up fixes: `library.html`/`bundles.html`'s import map needed a new `@vates/data-table-core/internal` entry (the vanilla adapter's ESM build now imports from it at runtime); and `library.js`/`bundles.js`'s direct `processData`/`searchData` imports (used by `getGameList`'s own prev/next-nav ordering) had to move to that same `/internal` sub-path, since 0.12 split them off `@vates/data-table-core`'s public surface. That sub-path is explicitly documented upstream as unsupported/no-semver-guarantee — there's currently no sanctioned adapter-level alternative for what `getGameList` needs (the table's live filtered/sorted/searched row order, independent of its display-only grouping/pagination).
+
+### Fixed
+
+- Library Explorer and Bundles: the default sort no longer disappears on a first-ever visit (no stored table-view pref yet). `restoreTableView` was unconditionally calling `setViewState({})` when nothing was stored, which cleared the construction-time default sort right back out. Regressed in 0.4.0's move of table-view persistence to `prefs.js`; fixed for good by the `initialViewState` migration above, which is what `setViewState({})` now resolves an omitted sort back to instead of blanking it.
+
 ## [0.4.0] - 2026-08-28
 
 ### Added
