@@ -1,6 +1,6 @@
 'use strict';
 
-import { createDataTable, syncViewToUrl, resetView } from '@vates/data-table-vanilla';
+import { createDataTable } from '@vates/data-table-vanilla';
 import { processData, searchData, DEFAULT_LABELS, bucketDatePart, formatDatePart } from '@vates/data-table-core';
 import {
   fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareDateMissingLast,
@@ -135,10 +135,11 @@ const recentsBarEl  = document.getElementById('recents-bar');
 const recentGamesBarEl = document.getElementById('recent-games-bar');
 const tableContainer = document.getElementById('table-container');
 const resetViewBtn  = document.getElementById('reset-view-btn');
+const shareViewBtn  = document.getElementById('share-view-btn');
 const tabLibraryBtn  = document.getElementById('tab-library');
 const tabWishlistBtn = document.getElementById('tab-wishlist');
 const wishlistRegionLabelEl = document.getElementById('wishlist-region-label');
-const countrySelectEl = document.getElementById('country-select');
+const wishlistRegionValueEl = document.getElementById('wishlist-region-value');
 
 let table         = null;
 let unsyncView    = null;
@@ -183,40 +184,123 @@ const achievementsCacheKey = appid => `${appid}:${currentSteamIds.slice().sort()
 
 // Separate shuffle history per tab, so picking randomly in one doesn't affect the other.
 const randomQueueKey = () => activeTab;
-const viewParamName  = () => (activeTab === 'wishlist' ? 'wview' : 'view');
+// `lv`/`wv` — short, consistent with Bundles' own `bv` (see urlState.js's PARAM_ORDER comment).
+const viewParamName  = () => (activeTab === 'wishlist' ? 'wv' : 'lv');
+const viewPrefKey    = () => (activeTab === 'wishlist' ? 'libraryWishlistView' : 'libraryView');
+
+// ── Table view persistence & sharing ──────────────────────────────────────────
+// Sort/filter/columns/grouping state auto-persists locally via the shared prefs.js (getPref/
+// setPref — same per-key store region.js's own region preference uses) but is deliberately NOT
+// written to the URL as it changes anymore — @vates/data-table-vanilla's own syncViewToUrl did
+// that (a replaceState on every single interaction), which fights with a URL that's meant to be
+// shared on purpose rather than incidentally carrying along whatever view happened to be active.
+// A "Share view" button (shareTableView below) snapshots the current view into the URL param on
+// demand instead, and copies the resulting link — same copy-link idiom as panel.js's 🔗 button/
+// lightbox.js's share button.
+
+// Applies whichever of the URL param / stored pref should win at load time — an explicit URL
+// param (a shared link) always wins over the stored default. Called right after the
+// construction-time default sort, same ordering syncViewToUrl used to apply things in.
+//
+// Consumed once, not read on every call: a shared link's view is applied, seeded as the new
+// stored default, and stripped from the (live) URL — this table gets rebuilt from scratch far
+// more often than "page load" (a tab switch, a fresh player search, an account refresh all call
+// this again), and without consuming it, the shared view would keep clobbering whatever the user
+// changed since, on every one of those, instead of being a one-time starting point the way a
+// bookmarked/shared link is supposed to be.
+function restoreTableView(table, prefKey, paramName) {
+  const params = new URLSearchParams(location.search);
+  const raw = params.get(paramName);
+  if (raw) {
+    try {
+      const view = JSON.parse(raw);
+      table.setViewState(view);
+      setPref(prefKey, view);
+      params.delete(paramName);
+      history.replaceState(null, '', `?${reorderUrlParams(params)}`);
+      return;
+    } catch { /* malformed param — fall through to the stored default */ }
+  }
+  table.setViewState(getPref(prefKey, {}));
+}
+
+// Wires the table to auto-persist every future change under prefKey — the only ongoing side
+// effect table interaction has now; the URL stays untouched until explicitly shared. Returns the
+// unsubscribe function (same shape onViewChange itself returns), stored in `unsyncView` below.
+function bindViewPersistence(table, prefKey) {
+  return table.onViewChange(view => setPref(prefKey, view));
+}
+
+// Snapshots the table's current view into `paramName` and copies the resulting link to the
+// clipboard — deliberately does NOT write it to the page's own address bar (no
+// `history.replaceState`). It used to, but that left a stale param sitting in the visible URL
+// the moment the user made one more change to the table — the address bar would keep showing a
+// snapshot that no longer matched what was on screen, silently wrong instead of just not there.
+// The stored pref (bindViewPersistence above) already captures live state on every change; the
+// only thing this link is for is handing the *current* view to someone else (or a future visit
+// via the copied link itself, not the omnibox).
+function shareTableView(table, paramName, btn) {
+  const params = new URLSearchParams(location.search);
+  params.set(paramName, JSON.stringify(table.getViewState()));
+  const qs = reorderUrlParams(params).toString();
+  const url = `${location.origin}${location.pathname}${qs ? `?${qs}` : ''}`;
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(url).then(() => flashShareViewBtn(btn), () => {});
+}
+
+function flashShareViewBtn(btn) {
+  const prevText = btn.textContent;
+  btn.textContent = '✓ Copied!';
+  setTimeout(() => { btn.textContent = prevText; }, 1500);
+}
+
+// Clears both the stored default and whatever's currently in `paramName`, then blanks the
+// table's view state — callers reapply their own DEFAULT_SORT on top afterward (blanking clears
+// sorts to none too, same as @vates/data-table-vanilla's own resetView required).
+function resetTableView(table, prefKey, paramName) {
+  table.setViewState({});
+  setPref(prefKey, {});
+  const params = new URLSearchParams(location.search);
+  params.delete(paramName);
+  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
+}
 
 // ── Wishlist pricing setup ────────────────────────────────────────────────────
 // Fired once at module load, not awaited here — resolves in the background while the rest of
 // the page sets itself up, and is only actually awaited once something (loadWishlistPrices,
 // updateRegionLabelVisibility) needs to know whether ITAD is configured. Never rejects: a
-// failed health check is treated the same as "not configured" (the price columns/region picker
+// failed health check is treated the same as "not configured" (the price columns/region readout
 // just don't do anything) rather than surfacing a separate error for a supplementary feature.
 const itadConfiguredPromise = fetch('/api/health')
   .then(res => res.json())
   .then(data => !!data.itadConfigured)
   .catch(() => false);
 
-// Populates the select (curated list + "Auto-detect" entry) and restores whatever region was
-// last picked — a `localStorage` preference shared with the Bundles page (public/region.js),
-// not URL state; see initRegionSelect's own comment for why "Auto-detect" always shows what it
-// currently resolves to rather than a value frozen at picker-population time.
-initRegionSelect(countrySelectEl);
+// Region itself is a single global preference picked from the nav bar's own ⚙ Preferences
+// popover (public/nav.js) now, not a picker on this page — this just shows a read-only readout
+// of whatever it currently resolves to.
+function updateWishlistRegionLabel() {
+  const code = resolveRegion(getStoredRegion());
+  wishlistRegionValueEl.textContent = COUNTRY_OPTIONS.find(c => c.code === code)?.label ?? code;
+}
 
-// Only meaningful on the Wishlist tab, and only when there's a pricing feature to pick a
-// region for at all — hidden on the Library tab (no price columns there) and hidden outright
-// when ITAD isn't configured (no point offering a region picker for a feature that isn't
-// running), rather than showing a picker that visibly does nothing either way.
+// Only meaningful on the Wishlist tab, and only when there's a pricing feature to show a region
+// for at all — hidden on the Library tab (no price columns there) and hidden outright when ITAD
+// isn't configured (no point showing a region readout for a feature that isn't running).
 async function updateRegionLabelVisibility() {
   const configured = await itadConfiguredPromise;
   wishlistRegionLabelEl.hidden = !(configured && activeTab === 'wishlist');
+  if (!wishlistRegionLabelEl.hidden) updateWishlistRegionLabel();
 }
 updateRegionLabelVisibility();
-countrySelectEl.addEventListener('change', () => {
-  setStoredRegion(countrySelectEl.value);
-  // Re-prices whatever wishlist is currently loaded in place — unlike the Bundles page's own
-  // region change, there's no bundle-detail-view/list-collapse state to juggle here, just the
-  // one already-loaded table's price columns going back to "…" until the new country's prices
-  // land (see loadWishlistPrices below for why they show as reloading rather than stale).
+
+// Fired by region.js's setStoredRegion on every change, regardless of which UI made it (now
+// always the nav bar's popover) — same reprice-in-place effect this page's own inline picker's
+// 'change' handler used to have directly. Unlike the Bundles page's own region change, there's
+// no bundle-detail-view/list-collapse state to juggle here, just the one already-loaded table's
+// price columns going back to "…" until the new country's prices land (see loadWishlistPrices
+// below for why they show as reloading rather than stale).
+window.addEventListener(REGION_CHANGED_EVENT, () => {
+  updateWishlistRegionLabel();
   if (activeTab === 'wishlist' && rows.length > 0) loadWishlistPrices(rows);
 });
 
@@ -508,7 +592,8 @@ async function fetchStandaloneDetails(game) {
 // screenshot/video (`?shot=`). Mirrors app.js's setPanelParam/setLightboxParam/
 // restorePanelFromUrl for the comparison page; see public/urlState.js for the equivalent
 // parsing there (library.js has no analogous shared parser since its only other URL params —
-// `u`, `tab`, `view`/`wview` — are handled by updateUrlParams/syncViewToUrl already). The name
+// `u`, `tab`, `lv`/`wv` — are handled by updateUrlParams/restoreTableView/shareTableView
+// already). The name
 // deliberately never rides along in this URL (see openStandaloneLookup) — only the appid is
 // trusted, and the panel just shows a placeholder title until the fetch resolves it.
 function setPanelParam(appid) {
@@ -826,7 +911,7 @@ async function loadWishlistPrices(items, { force = false } = {}) {
     return;
   }
 
-  const country = resolveRegion(countrySelectEl.value);
+  const country = resolveRegion(getStoredRegion());
   // Chunked client-side, sequentially (not in parallel) — a wishlist can run well past the
   // server's own MAX_PRICE_LOOKUP_GAMES cap (a bundle's game list never does, which is why
   // bundles.js's own loadPrices sends everything in one call), and firing several chunks at
@@ -900,6 +985,7 @@ function resetTableState({ preserveGameParam = false } = {}) {
   tableContainer.innerHTML = '';
   priceStatusEl.textContent = '';
   resetViewBtn.hidden = true;
+  shareViewBtn.hidden = true;
   refreshPricesBtn.hidden = true;
   accountsBarEl.hidden = true;
   accountsBarEl.innerHTML = '';
@@ -1023,8 +1109,10 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
     onRowClick: row => openGame(rowMap.get(row.appid) ?? row),
   });
   table.setViewState({ sorts: DEFAULT_SORT });
-  unsyncView = syncViewToUrl(table);
+  restoreTableView(table, viewPrefKey(), viewParamName());
+  unsyncView = bindViewPersistence(table, viewPrefKey());
   resetViewBtn.hidden = false;
+  shareViewBtn.hidden = false;
 
   updateStatus();
   if (preserveGameParam) restorePanelFromUrl(restoreShot); // early attempt — lightbox needs details, tried again below
@@ -1131,8 +1219,10 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
     onRowClick: row => openGame(rowMap.get(row.appid) ?? row),
   });
   table.setViewState({ sorts: DEFAULT_SORT });
-  unsyncView = syncViewToUrl(table, { paramName: 'wview' });
+  restoreTableView(table, viewPrefKey(), viewParamName());
+  unsyncView = bindViewPersistence(table, viewPrefKey());
   resetViewBtn.hidden = false;
+  shareViewBtn.hidden = false;
   // Same "don't show a control for a feature that isn't running" reasoning as
   // wishlistRegionLabelEl (see updateRegionLabelVisibility above) — no point offering a price
   // refresh when ITAD isn't configured and every price column is just going to read "—".
@@ -1177,11 +1267,13 @@ loadBtn.addEventListener('click', () => {
 });
 
 resetViewBtn.addEventListener('click', () => {
-  resetView(table, { paramName: viewParamName() });
-  // resetView() clears sorts to none along with everything else — reapply our own default
+  resetTableView(table, viewPrefKey(), viewParamName());
+  // resetTableView() clears sorts to none along with everything else — reapply our own default
   // sort on top, since there's no construction-time option for it (see DEFAULT_SORT above).
   table.setViewState({ sorts: DEFAULT_SORT });
 });
+
+shareViewBtn.addEventListener('click', () => shareTableView(table, viewParamName(), shareViewBtn));
 
 // Refreshes just the price columns for the currently loaded wishlist, in one shot — same
 // reasoning as bundles.js's own refreshPricesBtn: it's a single cheap POST /api/prices call

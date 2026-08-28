@@ -1,6 +1,6 @@
 'use strict';
 
-import { createDataTable, persistViewToLocalStorage, resetView } from '@vates/data-table-vanilla';
+import { createDataTable } from '@vates/data-table-vanilla';
 import { processData, searchData, DEFAULT_LABELS } from '@vates/data-table-core';
 import {
   fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareNumMissingLast,
@@ -77,16 +77,18 @@ const DEFAULT_VISIBLE = ['capsule', 'name', 'tierPrice', 'bestDealPrice', 'bestD
 // single-column sort, which leaves same-priced games in an arbitrary relative order).
 const DEFAULT_SORT = [{ key: 'tierPrice', dir: 'asc' }, { key: 'steamdbRating', dir: 'desc' }];
 
-// ── Region picker ───────────────────────────────────────────────────────────
-// COUNTRY_OPTIONS/TIMEZONE_COUNTRY/detectCountry now live in the shared public/region.js
-// (loaded as a plain script before this module, same convention as esc()/reorderUrlParams from
-// utils.js/urlState.js) — library.js's Wishlist price columns need the exact same curated list
-// and detection heuristic, and there's no reason for the two to drift apart.
+// ── Region ────────────────────────────────────────────────────────────────────
+// COUNTRY_OPTIONS/TIMEZONE_COUNTRY/detectCountry/getStoredRegion/resolveRegion/
+// REGION_CHANGED_EVENT live in the shared public/region.js (loaded as a plain script before this
+// module, same convention as esc()/reorderUrlParams from utils.js/urlState.js) — library.js's
+// Wishlist price columns need the exact same curated list and detection heuristic, and there's
+// no reason for the two to drift apart. The picker itself now lives in the nav bar's own ⚙
+// Preferences popover (public/nav.js), not on this page — see updateBundlesRegionLabel below.
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const notConfiguredCard = document.getElementById('not-configured-card');
 const browseCard        = document.getElementById('browse-card');
-const countrySelect      = document.getElementById('country-select');
+const bundlesRegionValueEl = document.getElementById('bundles-region-value');
 const sortSelect         = document.getElementById('sort-select');
 const expiredCheckbox    = document.getElementById('expired-checkbox');
 const bundlesStatusEl    = document.getElementById('bundles-status');
@@ -107,6 +109,66 @@ const resetViewBtn       = document.getElementById('reset-view-btn');
 const tableContainer     = document.getElementById('table-container');
 const unresolvedSection  = document.getElementById('unresolved-section');
 const unresolvedListEl   = document.getElementById('unresolved-list');
+const shareViewBtn       = document.getElementById('share-view-btn');
+
+// ── Table view persistence & sharing ──────────────────────────────────────────
+// Same mechanism as library.js's own copy (see its header comment) — sort/filter/columns/
+// grouping auto-persist locally via prefs.js, but the URL is only ever written on demand via the
+// "Share view" button, not on every interaction the way @vates/data-table-vanilla's own
+// persistViewToLocalStorage/syncViewToUrl did. Kept as its own local copy rather than shared
+// with library.js — same "genuinely page-specific fetch/state logic stays local" convention the
+// rest of this file and library.js already follow (see gameColumns.js's own header comment for
+// the one deliberate exception to that). Deliberately not routed through urlState.js's
+// reorderUrlParams either, matching this file's own existing convention for `bundle`/`game`/
+// `shot` (see setBundleParam's comment) rather than library.js's.
+
+// Consumed once, not read on every call — see library.js's own copy of this comment. This page
+// rebuilds its table on every bundle open (list click, ‹/›, a region-reopen), far more often
+// than a single page load, so a shared `?bv=` link is applied once, seeded as the new stored
+// default, and stripped from the URL rather than clobbering later edits on every reopen.
+function restoreTableView(table, prefKey, paramName) {
+  const params = new URLSearchParams(location.search);
+  const raw = params.get(paramName);
+  if (raw) {
+    try {
+      const view = JSON.parse(raw);
+      table.setViewState(view);
+      setPref(prefKey, view);
+      params.delete(paramName);
+      history.replaceState(null, '', `?${params}`);
+      return;
+    } catch { /* malformed param — fall through to the stored default */ }
+  }
+  table.setViewState(getPref(prefKey, {}));
+}
+
+function bindViewPersistence(table, prefKey) {
+  return table.onViewChange(view => setPref(prefKey, view));
+}
+
+// Deliberately does NOT write to the page's own address bar — see library.js's own copy of this
+// comment for why (a stale param left in a visible URL the moment the user makes one more
+// change is worse than one that was never written there).
+function shareTableView(table, paramName, btn) {
+  const params = new URLSearchParams(location.search);
+  params.set(paramName, JSON.stringify(table.getViewState()));
+  const url = `${location.origin}${location.pathname}?${params}`;
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(url).then(() => flashShareViewBtn(btn), () => {});
+}
+
+function flashShareViewBtn(btn) {
+  const prevText = btn.textContent;
+  btn.textContent = '✓ Copied!';
+  setTimeout(() => { btn.textContent = prevText; }, 1500);
+}
+
+function resetTableView(table, prefKey, paramName) {
+  table.setViewState({});
+  setPref(prefKey, {});
+  const params = new URLSearchParams(location.search);
+  params.delete(paramName);
+  history.replaceState(null, '', `?${params}`);
+}
 
 // Collapses the bundle list (see #bundle-list-wrap.collapsed in bundles.html) once a bundle has
 // actually been picked — the list itself stops being the thing to focus on at that point, and a
@@ -123,8 +185,14 @@ toggleListBtn.addEventListener('click', () => setListCollapsed(!bundleListWrapEl
 // One shared key rather than per-bundle — this is "how I like the table set up" (which
 // columns, sort, grouping), not something tied to any one bundle's own data, so it should
 // carry over from whichever bundle was open last to the next one, same as it would if this
-// page only ever showed a single table.
-const TABLE_VIEW_STORAGE_KEY = 'bundles:table-view';
+// page only ever showed a single table. Stored via the shared prefs.js (getPref/setPref) under
+// its own key, same store region.js's own region preference and library.js's table views use —
+// see prefs.js's own header comment for why (one store, ready for a future per-key server sync).
+const TABLE_VIEW_PREF_KEY = 'bundlesTableView';
+// `bv` in the URL — see urlState.js's PARAM_ORDER comment for why this and library.js's `lv`/
+// `wv` share one short naming scheme. Unlike those, `bv` isn't written automatically as the
+// table changes anymore either — only by the "Share view" button (shareTableView below).
+const TABLE_VIEW_PARAM = 'bv';
 
 let table = null;
 let unpersistView = null;
@@ -477,7 +545,7 @@ async function loadBundles({ reset = true, expandList = true } = {}) {
   }
   bundlesStatusEl.textContent = 'Loading bundles…';
   const qs = new URLSearchParams({
-    country: resolveRegion(countrySelect.value),
+    country: resolveRegion(getStoredRegion()),
     sort: sortSelect.value,
     expired: String(expiredCheckbox.checked),
     offset: String(bundlesOffset),
@@ -669,7 +737,7 @@ nextBundleBtn.addEventListener('click', () => {
 async function loadPrices(resolved, { force = false } = {}) {
   priceStatusEl.textContent = '';
   try {
-    const qs = new URLSearchParams({ country: resolveRegion(countrySelect.value) });
+    const qs = new URLSearchParams({ country: resolveRegion(getStoredRegion()) });
     if (force) qs.set('refresh', '1');
     const res = await fetch(`/api/prices?${qs}`, {
       method: 'POST',
@@ -732,7 +800,7 @@ async function loadPrices(resolved, { force = false } = {}) {
 // whatever's open and clears `?game=` first, since that game's nav position/owners-equivalent
 // belonged to whichever bundle (or standalone lookup) was open before and no longer applies —
 // same "a new Load clears the panel unless explicitly restoring" convention library.js's own
-// resetTableState/loadLibrary use. Region changes (see the countrySelect handler below) are the
+// resetTableState/loadLibrary use. Region changes (see the REGION_CHANGED_EVENT handler below) are the
 // one case that reopens the *same* bundle in place and does pass this, so the open game — same
 // bundle, same rows, same order, just re-priced — stays open across it.
 async function openBundle(bundle, { preserveGameParam = false, restoreShot = null } = {}) {
@@ -759,6 +827,7 @@ async function openBundle(bundle, { preserveGameParam = false, restoreShot = nul
   if (table) { table.destroy(); table = null; }
   tableContainer.innerHTML = '';
   resetViewBtn.hidden = true;
+  shareViewBtn.hidden = true;
   refreshPricesBtn.hidden = true;
   rows = [];
   rowMap = new Map();
@@ -832,11 +901,14 @@ async function openBundle(bundle, { preserveGameParam = false, restoreShot = nul
     onRowClick: row => openGame(rowMap.get(row.appid) ?? row),
   });
   table.setViewState({ sorts: DEFAULT_SORT });
-  // Loads whatever was last persisted (if anything) on top of the default sort just applied
-  // above, and saves it back on every subsequent change — same "construction-time default,
-  // then let persistence override it" ordering `syncViewToUrl` uses in library.js.
-  unpersistView = persistViewToLocalStorage(table, TABLE_VIEW_STORAGE_KEY);
+  // Loads whatever URL param / stored pref should win (see restoreTableView's own comment) on
+  // top of the default sort just applied above, then persists every subsequent change locally —
+  // same "construction-time default, then let the stored view override it" ordering the old
+  // persistViewToLocalStorage used.
+  restoreTableView(table, TABLE_VIEW_PREF_KEY, TABLE_VIEW_PARAM);
+  unpersistView = bindViewPersistence(table, TABLE_VIEW_PREF_KEY);
   resetViewBtn.hidden = false;
+  shareViewBtn.hidden = false;
   refreshPricesBtn.hidden = false;
 
   detailStatusEl.textContent = `0 / ${resolved.length} games loaded…`;
@@ -855,8 +927,19 @@ async function openBundle(bundle, { preserveGameParam = false, restoreShot = nul
 
 // ── Wiring ──────────────────────────────────────────────────────────────────
 
-countrySelect.addEventListener('change', () => {
-  setStoredRegion(countrySelect.value);
+// Region itself is picked from the nav bar's own ⚙ Preferences popover (public/nav.js) now, not
+// a picker on this page — this just shows a read-only readout of whatever it currently resolves to.
+function updateBundlesRegionLabel() {
+  const code = resolveRegion(getStoredRegion());
+  bundlesRegionValueEl.textContent = COUNTRY_OPTIONS.find(c => c.code === code)?.label ?? code;
+}
+updateBundlesRegionLabel();
+
+// Fired by region.js's setStoredRegion on every change, regardless of which UI made it (now
+// always the nav bar's popover) — same effect this page's own inline picker's 'change' handler
+// used to have directly.
+window.addEventListener(REGION_CHANGED_EVENT, () => {
+  updateBundlesRegionLabel();
   // A bundle's tier price and its games' Steam Full Price/Best Deal/lows (loadPrices above)
   // are all region-specific, but loadBundles() only refreshes the browse list above — it
   // never touches whatever bundle is currently open in the detail view below it. Re-open it
@@ -879,12 +962,13 @@ loadMoreBtn.addEventListener('click', () => loadBundles({ reset: false }));
 
 resetViewBtn.addEventListener('click', () => {
   if (!table) return;
-  resetView(table, { storageKey: TABLE_VIEW_STORAGE_KEY });
-  // resetView() clears sorts to none along with everything else — reapply our own default
-  // sort on top, same as library.js's own reset-view button does (there's no construction-time
-  // option to make resetView itself preserve a non-empty default).
+  resetTableView(table, TABLE_VIEW_PREF_KEY, TABLE_VIEW_PARAM);
+  // resetTableView() clears sorts to none along with everything else — reapply our own default
+  // sort on top, same as library.js's own reset-view button does.
   table.setViewState({ sorts: DEFAULT_SORT });
 });
+
+shareViewBtn.addEventListener('click', () => shareTableView(table, TABLE_VIEW_PARAM, shareViewBtn));
 
 // Refreshes just the price columns for the currently open bundle's games, in one shot — no
 // reason to make a user step through every game's own panel "↻ Refresh" one at a time when
@@ -922,7 +1006,7 @@ function setBundleParam(id) {
 // initial page load — this runs concurrently with loadBundles(), not after it).
 async function openBundleById(id, { preserveGameParam = false, restoreShot = null } = {}) {
   try {
-    const qs = new URLSearchParams({ country: resolveRegion(countrySelect.value) });
+    const qs = new URLSearchParams({ country: resolveRegion(getStoredRegion()) });
     const res = await fetch(`/api/bundles/${id}?${qs}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Bundle not found');
@@ -942,6 +1026,7 @@ async function openBundleById(id, { preserveGameParam = false, restoreShot = nul
     if (table) { table.destroy(); table = null; }
     tableContainer.innerHTML = '';
     resetViewBtn.hidden = true;
+    shareViewBtn.hidden = true;
     activeBundleId = null;
     renderBundleNav();
     setBundleParam(null);
@@ -964,7 +1049,6 @@ async function init() {
       return;
     }
   } catch { /* if health itself fails, fall through and let loadBundles surface the real error */ }
-  initRegionSelect(countrySelect);
   // Independent of each other — the deep link's own server-side search doesn't depend on
   // whatever page of the list loadBundles happens to fetch.
   const deepLinkId = Number(new URLSearchParams(location.search).get('bundle'));

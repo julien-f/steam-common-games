@@ -32,6 +32,7 @@ body {
    Bundles / About. Sits above the header title as its own row, instead of the title competing
    with absolutely-positioned corner links the way it used to. */
 .site-nav {
+  position: relative; /* positioning root for .site-nav-prefs-panel below — see its own comment */
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
@@ -53,6 +54,43 @@ body {
   border-color: var(--border);
   font-weight: 600;
   cursor: default;
+}
+
+/* ⚙ Preferences popover (public/nav.js's initNav/initNavPrefs) — a native <details> for a free,
+   accessible open/close toggle; outside-click/Escape closing is added by hand in nav.js since
+   <details> has no built-in support for either. */
+.site-nav-prefs-btn { cursor: pointer; list-style: none; }
+.site-nav-prefs-btn::-webkit-details-marker { display: none; }
+.site-nav-prefs-panel {
+  position: absolute;
+  /* Centered under the whole nav bar (.site-nav is the positioning root — see its own rule
+     above), not anchored to the ⚙ <details> itself. .site-nav's flex-wrap centers its items as
+     a group, so which row/x-position the ⚙ button lands on shifts with viewport width and isn't
+     something this panel can anchor to reliably — confirmed live (reported on a real Galaxy S10/
+     Firefox, not just emulated widths) as the panel landing far enough left to run off-screen.
+     Anchoring to the nav bar as a whole instead is stable regardless of where the button wrapped to. */
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  /* A fixed width (not just min-width) — a bare <select> otherwise sizes itself off its widest
+     <option> text (here, the long "Auto-detect (Europe / Germany (EUR))" entry), which grew
+     this panel wide enough to overflow the viewport on its own. `max-width` is the safety net
+     for anything narrower still (down to the ~320px floor this app otherwise targets). */
+  width: 200px;
+  max-width: calc(100vw - 24px);
+  z-index: 20;
+}
+.site-nav-prefs-row { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text1); }
+.site-nav-prefs-row select {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--bg3); color: var(--text0);
+  border: 1px solid var(--border); border-radius: 4px;
+  font-size: 13px;
 }
 
 /* Header */

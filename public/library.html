@@ -29,15 +29,12 @@
   .lib-tab:not([aria-selected="true"]):hover { color: var(--text0); }
 
   /* Only meaningful on the Wishlist tab (its price columns — see bundles.html's identical
-     region picker, which this mirrors) — toggled by setActiveTab in library.js rather than
-     living in its own always-visible row, since it has nothing to say on the Library tab. */
+     read-only region readout) — toggled by setActiveTab in library.js rather than living in
+     its own always-visible row, since it has nothing to say on the Library tab. Read-only —
+     region itself is picked from the nav bar's own ⚙ Preferences popover (public/nav.js) now,
+     not a picker on this page (see updateWishlistRegionLabel in library.js). */
   .wishlist-region-label { margin-left: auto; font-size: 13px; color: var(--text1); display: flex; align-items: center; gap: 6px; }
-  .wishlist-region-label select {
-    padding: 8px 10px;
-    background: var(--bg3); color: var(--text0);
-    border: 1px solid var(--border); border-radius: var(--r);
-    font-size: 13px;
-  }
+  .wishlist-region-hint { color: var(--text2); font-size: 12px; }
   /* .wishlist-region-label's own display:flex above otherwise wins over the browser's
      default [hidden]{display:none} — author styles beat UA styles in the cascade
      regardless of specificity, so the "hidden" property setActiveTab toggles in
@@ -128,9 +125,7 @@
     <div class="lib-tabs" role="tablist">
       <button class="btn lib-tab" id="tab-library" role="tab" aria-selected="true">Library</button>
       <button class="btn lib-tab" id="tab-wishlist" role="tab" aria-selected="false">Wishlist</button>
-      <label class="wishlist-region-label" id="wishlist-region-label" hidden>Prices in
-        <select id="country-select"></select>
-      </label>
+      <span class="wishlist-region-label" id="wishlist-region-label" hidden>Prices in <strong id="wishlist-region-value"></strong> <span class="wishlist-region-hint">(⚙ Preferences to change)</span></span>
     </div>
     <div class="lib-form">
       <input id="player-input" type="text"
@@ -155,6 +150,7 @@
     <div id="status" class="lib-status"></div>
     <div class="lib-status-row-actions">
       <button class="btn btn-ghost btn-sm" id="refresh-prices-btn" hidden>↻ Refresh prices</button>
+      <button class="btn btn-ghost btn-sm" id="share-view-btn" hidden title="Copy a link to this exact table view (sort/filters/columns)">🔗 Share view</button>
       <button class="btn btn-ghost btn-sm" id="reset-view-btn" hidden>Reset view</button>
     </div>
   </div>
@@ -206,6 +202,7 @@
 <script src="/mediaItems.js"></script>
 <script src="/urlState.js"></script>
 <script src="/utils.js"></script>
+<script src="/prefs.js"></script>
 <script src="/region.js"></script>
 <script src="/nav.js"></script>
 <script src="/accountsBar.js"></script>

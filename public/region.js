@@ -93,22 +93,33 @@ const AUTO_COUNTRY = 'auto';
 
 // One shared preference, not per-page — this is "what currency do I want to see prices in", a
 // single user preference rather than page-specific browsing/display state (unlike e.g.
-// bundles.js's own `bundles:table-view`, which genuinely is specific to that page's table).
-// Picking a region on either page updates both.
-const REGION_STORAGE_KEY = 'steam-common-games:region';
+// bundles.js's own table view, which genuinely is specific to that page's table — see prefs.js).
+// Picking a region on either page updates both. Stored via the shared prefs.js (getPref/setPref)
+// under the 'region' key rather than its own standalone localStorage key, so it's covered by the
+// same future per-key server sync every other preference will be. No migration from the old
+// pre-prefs.js key (`steam-common-games:region`) — an existing user's region just resets to
+// Auto-detect once, a one-time, low-stakes reset accepted in favor of not carrying that
+// migration fallback forever.
+const REGION_PREF_KEY = 'region';
 
 // Whatever was last explicitly picked (a real code, or AUTO_COUNTRY), or AUTO_COUNTRY when
 // nothing was ever picked, storage is unavailable (private browsing, cleared site data), or the
 // stored value isn't recognized (an old/foreign value). Never throws.
 function getStoredRegion() {
-  try {
-    const v = localStorage.getItem(REGION_STORAGE_KEY);
-    if (v === AUTO_COUNTRY || COUNTRY_OPTIONS.some(c => c.code === v)) return v;
-  } catch { /* localStorage unavailable */ }
+  const v = getPref(REGION_PREF_KEY);
+  if (v === AUTO_COUNTRY || COUNTRY_OPTIONS.some(c => c.code === v)) return v;
   return AUTO_COUNTRY;
 }
+// Fired on `window` on every change, regardless of which UI triggered it — the nav bar's own
+// ⚙ Preferences popover (public/nav.js) is the only place region is picked now (Bundles/the
+// Wishlist tab dropped their own inline pickers once that existed), but this stays a plain
+// broadcast rather than nav.js reaching into those pages directly, so any future picker (or a
+// synced update from a future Steam-auth account) needs to know nothing about who's listening.
+const REGION_CHANGED_EVENT = 'scg:region-changed';
+
 function setStoredRegion(value) {
-  try { localStorage.setItem(REGION_STORAGE_KEY, value); } catch { /* ignore — not persisted this session */ }
+  setPref(REGION_PREF_KEY, value);
+  try { window.dispatchEvent(new CustomEvent(REGION_CHANGED_EVENT, { detail: { region: value } })); } catch { /* no window (tests) */ }
 }
 
 // Resolves whatever the picker is currently set to (a real code, or AUTO_COUNTRY) to an actual
@@ -145,6 +156,6 @@ function initRegionSelect(selectEl) {
 if (typeof module !== 'undefined') {
   module.exports = {
     COUNTRY_OPTIONS, TIMEZONE_COUNTRY, detectCountry,
-    AUTO_COUNTRY, REGION_STORAGE_KEY, getStoredRegion, setStoredRegion, resolveRegion, initRegionSelect,
+    AUTO_COUNTRY, REGION_PREF_KEY, REGION_CHANGED_EVENT, getStoredRegion, setStoredRegion, resolveRegion, initRegionSelect,
   };
 }

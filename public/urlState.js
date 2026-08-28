@@ -14,7 +14,13 @@ const FILTER_DIMS = [
 // otherwise e.g. opening a game before vs. after adding a tag filter would leave `game` in a
 // different position, making two visits to an identical state look like different history
 // entries and cluttering the query string with no benefit.
-const PARAM_ORDER = ['u', 'tab', 'sort', 'game', 'shot', 'name', ...FILTER_DIMS.map(d => d.param), 'view', 'wview'];
+//
+// `lv`/`wv` (Library/Wishlist tab table view — a JSON-encoded @vates/data-table-vanilla view
+// snapshot) replace the older `view`/`wview` names: short, and consistent with Bundles' own `bv`
+// (see bundles.js — that page doesn't route its URL writes through reorderUrlParams at all, so
+// `bv` isn't listed here). Unlike the old names, these are no longer written automatically on
+// every table interaction — only by the table's own "Share view" button — see library.js.
+const PARAM_ORDER = ['u', 'tab', 'sort', 'game', 'shot', 'name', ...FILTER_DIMS.map(d => d.param), 'lv', 'wv'];
 
 function reorderUrlParams(params) {
   const ordered = new URLSearchParams();

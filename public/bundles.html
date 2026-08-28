@@ -27,6 +27,10 @@
     font-size: 13px;
   }
   .bundles-controls label { font-size: 13px; color: var(--text1); display: flex; align-items: center; gap: 6px; }
+  /* Read-only readout — region itself is picked from the nav bar's own ⚙ Preferences popover
+     (public/nav.js) now, not a picker on this page (see updateBundlesRegionLabel in bundles.js). */
+  .bundles-region-label { font-size: 13px; color: var(--text1); display: flex; align-items: center; gap: 6px; }
+  .bundles-region-hint { color: var(--text2); font-size: 12px; }
   .bundles-list-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
   .bundles-status { font-size: 13px; color: var(--text1); min-height: 18px; }
   /* Only ever has content on a price-lookup failure (see loadPrices in bundles.js) — empty and
@@ -125,9 +129,7 @@
 
   <div class="card" id="browse-card">
     <div class="bundles-controls">
-      <label>Region
-        <select id="country-select"></select>
-      </label>
+      <span class="bundles-region-label">Region: <strong id="bundles-region-value"></strong> <span class="bundles-region-hint">(⚙ Preferences to change)</span></span>
       <label>Sort
         <select id="sort-select">
           <option value="-publish">Newest</option>
@@ -137,7 +139,7 @@
       </label>
       <label><input type="checkbox" id="expired-checkbox"> Include expired</label>
     </div>
-    <p class="card-subtitle">Prices are shown in whatever currency each store actually charges for that bundle — most stores follow the region above, but some (e.g. certain Fanatical/Digiphile bundles) only ever price in USD regardless of region.</p>
+    <p class="card-subtitle">Prices are shown in whatever currency each store actually charges for that bundle — most stores follow your region preference, but some (e.g. certain Fanatical/Digiphile bundles) only ever price in USD regardless of region.</p>
     <div class="bundles-list-header">
       <div id="bundles-status" class="bundles-status"></div>
       <button class="btn btn-ghost btn-sm" id="toggle-list-btn" hidden>Show list</button>
@@ -169,6 +171,7 @@
       </div>
       <div class="bundles-status-row-actions">
         <button class="btn btn-ghost btn-sm" id="refresh-prices-btn" hidden>↻ Refresh prices</button>
+        <button class="btn btn-ghost btn-sm" id="share-view-btn" hidden title="Copy a link to this exact table view (sort/filters/columns)">🔗 Share view</button>
         <button class="btn btn-ghost btn-sm" id="reset-view-btn" hidden>Reset view</button>
       </div>
     </div>
@@ -193,6 +196,7 @@
 <script src="/mediaItems.js"></script>
 <script src="/urlState.js"></script>
 <script src="/utils.js"></script>
+<script src="/prefs.js"></script>
 <script src="/region.js"></script>
 <script src="/nav.js"></script>
 <script src="/lightbox.js"></script>
