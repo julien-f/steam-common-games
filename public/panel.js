@@ -240,6 +240,7 @@ async function handlePanelRefresh() {
     await Promise.all([
       panelOptions.onRefresh(game),
       loadNews(game, { force: true }),
+      loadPrice(game, { force: true }), // no-op (see loadPrice) if this game is priced by the host instead
       game.dlc !== undefined ? loadDlc(game, { force: true }) : null,
     ]);
   } finally {
@@ -270,6 +271,80 @@ function flashCopyLinkBtn(btn) {
     btn.title = prevTitle;
     btn.classList.remove('panel-copy-link-btn--copied');
   }, 1500);
+}
+
+// Whether this game's price is someone else's job to fetch. `panelOptions.pricesHandledByHost`
+// is either a plain boolean (bundles.js: every row is always batch-priced by loadPrices) or a
+// function of the game (library.js: only the Wishlist tab's own loadWishlistPrices batches
+// prices — its Library tab rows are owned games with no price columns/batch of their own, same
+// as the comparison page). Checked purely at fetch-decision time, not by racing against
+// whether that host's own batch call has actually resolved yet — a host that says it handles
+// pricing is trusted to do so on its own schedule, so loadPrice below never fires for it
+// regardless of timing, which is what keeps this from ever duplicating that host's own batched
+// /api/prices call (see CLAUDE.md's "one page-level control, not per-game" reasoning for why
+// that matters). Pages that never set the option at all (app.js) always fall through to
+// loadPrice — nothing else there ever prices a row.
+function pricesHandledByHost(game) {
+  const opt = panelOptions.pricesHandledByHost;
+  return typeof opt === 'function' ? !!opt(game) : !!opt;
+}
+
+// Lazily resolved once per session (like library.js's/bundles.js's own itadConfiguredPromise)
+// rather than per-call — a plain GET /api/health, cheap to over-share across every game this
+// fetches a price for.
+let panelItadConfiguredPromise = null;
+function isItadConfigured() {
+  if (!panelItadConfiguredPromise) {
+    panelItadConfiguredPromise = fetch('/api/health').then(r => r.json()).then(d => !!d.itadConfigured).catch(() => false);
+  }
+  return panelItadConfiguredPromise;
+}
+
+// Prices a single game via the shared POST /api/prices route (appids: [appid], same route
+// bundles.js/library.js batch through) — only for a game nothing else already prices (see
+// pricesHandledByHost above). Mirrors loadNews's shape: fetched once per game per session
+// (`game.priceLoading` guards a fast reopen from firing a second concurrent request for the
+// same game), and a stale resolve for a game the panel has since moved on from just updates
+// the (now background) game object without forcing a re-render.
+//
+// discountPct's formula is duplicated here as a two-line inline calc rather than imported —
+// it lives in public/gameColumns.js, an ES module panel.js (a plain script) can't import from,
+// same reasoning as the rest of this card's own small copy of gameColumns.js/bundles.js render
+// logic (see priceHtml's own comment below).
+async function loadPrice(game, { force = false } = {}) {
+  if (pricesHandledByHost(game)) return;
+  if (game.bestDealPrice !== undefined && !force) return; // already loaded (or already tried) this session
+  if (game.priceLoading) return; // already in flight
+  game.priceLoading = true;
+  try {
+    if (!(await isItadConfigured())) { game.bestDealPrice = null; return; }
+    const country = resolveRegion(getStoredRegion());
+    const qs = new URLSearchParams({ country });
+    if (force) qs.set('refresh', '1');
+    const res = await fetch(`/api/prices?${qs}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appids: [game.appid] }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Price lookup failed');
+    const info = data.prices[game.appid];
+    game.steamRegular  = info?.steamRegular?.amount ?? null;
+    game.bestDealPrice = info?.bestDeal?.price?.amount ?? null;
+    game.bestDealShop  = info?.bestDeal?.shop          ?? null;
+    game.bestDealUrl   = info?.bestDeal?.url           ?? null;
+    game.bestDealCut   = (game.steamRegular > 0 && game.bestDealPrice != null)
+      ? Math.round((1 - game.bestDealPrice / game.steamRegular) * 100) : null;
+    game.lowAll        = info?.lowAll?.amount          ?? null;
+    game.lowY1         = info?.lowY1?.amount           ?? null;
+    game.lowM3         = info?.lowM3?.amount           ?? null;
+    game.priceCurrency = info?.steamRegular?.currency ?? info?.bestDeal?.price?.currency ?? info?.lowAll?.currency ?? info?.lowY1?.currency ?? info?.lowM3?.currency ?? null;
+  } catch {
+    game.bestDealPrice = game.bestDealPrice ?? null; // leave the card on "no data" rather than stuck "…" forever
+  } finally {
+    game.priceLoading = false;
+    if (panelGame === game) renderPanelBody(game); // no-op if the panel moved on mid-fetch
+  }
 }
 
 // News is deliberately NOT part of the host pages' rating/HLTB/meta/tags fetch (see
@@ -427,6 +502,7 @@ function panelOpen(game, { keepHistory = false } = {}) {
   panelPrevFocus = document.activeElement;
   document.getElementById('panel-body').scrollTop = 0;
   loadNews(game); // no-op (see loadNews) if this game's news was already fetched this session
+  loadPrice(game); // no-op (see loadPrice) if this game is priced by the host, or already loaded
   renderPanelBody(game);
   document.getElementById('game-panel').classList.add('open');
   document.getElementById('panel-backdrop').classList.add('open');
@@ -953,20 +1029,31 @@ function newsHtml(g) {
 // the current best deal (same display/color/badge/tooltip as the Best Deal table cell in
 // bundles.js/library.js), its discount off Steam Full Price when there is one, a direct link
 // to the shop itself, and a link to the game's ITAD page for the fuller picture (historical
-// lows, every other shop) this card deliberately leaves out. Entirely passive: no fetch
-// happens here. library.js's Wishlist tab (loadWishlistPrices) and bundles.js's game table
-// (loadPrices) both set these exact field names (bestDealPrice/bestDealCut/bestDealShop/
-// bestDealUrl/lowAll/lowY1/lowM3/priceCurrency) directly on the row object well before it's ever
-// opened here. The comparison page's owned-games rows and gameSearch.js's standalone lookups
-// never set them at all, so g.bestDealPrice stays undefined and this section renders nothing
-// for those — same "if present, render" shape the rest of the panel already uses for
-// rating/HLTB/tags off g.details.
+// lows, every other shop) this card deliberately leaves out.
 //
-// Both host mutation sites re-render an already-open panel right after they mutate a row (the
-// same `if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row)` idiom
-// streamGameDetails/loadAchievements already use elsewhere in those files) — without that, a
-// panel opened before its price batch resolved would never pick the numbers up even once they
-// landed, since nothing here is polling or re-fetching on its own.
+// The numbers themselves come from one of two places, so every game gets a price rather than
+// only the ones a host page already happens to batch-price:
+//   - library.js's Wishlist tab (loadWishlistPrices) and bundles.js's game table (loadPrices)
+//     both set these exact field names (bestDealPrice/bestDealCut/bestDealShop/bestDealUrl/
+//     lowAll/lowY1/lowM3/priceCurrency) directly on the row object as part of their own
+//     page-level batch call, well before it's ever opened here — panel.js's own loadPrice
+//     (see its own comment above) never fires for these (pricesHandledByHost), so there's
+//     only ever one price fetch per game, not two racing each other.
+//   - Everything else (the comparison page's owned-games rows, library.js's own Library tab,
+//     and any standalone gameSearch.js lookup on any page) gets priced by loadPrice itself,
+//     fired once from panelOpen — a lazy single-game fetch through the same shared
+//     POST /api/prices route, the same on-demand shape news/achievements already use.
+// Either way this card just reads whatever's currently on `g` — same "if present, render"
+// idiom used throughout this file for rating/HLTB/tags off g.details — so it doesn't need to
+// know which of the two populated it. `g.bestDealPrice === undefined` still means "no data
+// yet" (loading, or genuinely not fetched); `null` means "fetched, and there's nothing to
+// show" (ITAD not configured, no listing, or a failed lookup).
+//
+// Both host mutation sites (loadWishlistPrices/loadPrices) and loadPrice itself re-render an
+// already-open panel right after mutating a row (the same
+// `if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row)` idiom
+// streamGameDetails/loadAchievements already use elsewhere) — without that, a panel opened
+// before its price fetch resolved would never pick the numbers up once they landed.
 //
 // formatMoney itself is the global from public/utils.js, not a local copy — see its own
 // comment there for why it (unlike the rest of the price-column logic, which lives in
@@ -974,6 +1061,15 @@ function newsHtml(g) {
 // plain-script file every page already loads before panel.js.
 
 function priceHtml(g) {
+  // `priceLoading` only ever gets set by panel.js's own loadPrice (see its own comment above)
+  // — a host page's own batch call sets bestDealPrice directly, with no intermediate loading
+  // flag on the row, same as rating/HLTB/tags off g.details elsewhere in this file.
+  if (g.priceLoading) {
+    return `<div class="panel-section panel-card" id="panel-section-price">
+      <div class="panel-section-title">Price</div>
+      <span class="sk" style="display:block;width:100%;height:32px;border-radius:6px"></span>
+    </div>`;
+  }
   if (g.bestDealPrice === undefined) return ''; // never priced (or not loaded yet) — see comment above
 
   const itadUrl = `https://isthereanydeal.com/steam/app/${g.appid}`;

@@ -226,6 +226,12 @@ initPanel({
   inertSelector: '.lib-page',
   showAchievements: true,
   getOwnersHtml: buildLibraryOwnersHtml,
+  // Only the Wishlist tab's own loadWishlistPrices batch-prices its rows — the Library tab's
+  // rows are owned games with no price columns/batch of their own, same as the comparison
+  // page, so they fall through to panel.js's own per-game loadPrice instead. A function (not a
+  // plain boolean) since it's read fresh on every panel open/refresh, well after activeTab may
+  // have changed since this initPanel call.
+  pricesHandledByHost: () => activeTab === 'wishlist',
   onRefresh: async (row) => {
     try {
       const res = await fetch(`/api/game-details/${row.appid}?refresh=1`);
