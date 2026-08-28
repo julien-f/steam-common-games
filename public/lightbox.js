@@ -323,12 +323,14 @@ function wireKeyboard(lb) {
     const vc = lb.querySelector('.lb-vctrls');
     const vid = vc && vc.style.display !== 'none' ? lb.querySelector('.lb-video') : null;
 
-    if (!onScrub && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    if ((!onScrub || e.shiftKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
       e.preventDefault();
       const dir = e.key === 'ArrowRight' ? 1 : -1;
       // While a video is playing, bare arrows seek it in place so the user
       // isn't yanked to the next screenshot mid-scrub; Shift+arrow always
-      // forces media navigation instead, as an explicit escape hatch.
+      // forces media navigation instead, as an explicit escape hatch — even
+      // when focus is on the scrub bar itself, whose native range-input
+      // behavior would otherwise consume a bare arrow key to nudge its value.
       if (vid && !e.shiftKey) {
         seekVideo(vid, dir * LB_SEEK_SECONDS);
       } else {
