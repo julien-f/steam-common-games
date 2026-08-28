@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Comparison page: the filter panel (Tag/Genre/Category/Developer/Publisher, each its own checkbox list) now collapses behind a "Filters ▾" toggle on narrow (≤768px) viewports, defaulting to collapsed — previously it always rendered fully expanded, pushing the results table roughly two screens down on a phone before any game was visible. Active-filter chips stay visible either way; unaffected on wider viewports.
 - Game tables (Comparison, Library Explorer, Bundles) now show a subtle edge-fade shadow on `.table-wrap`/`.dt-table-wrap` when a horizontally-scrollable table has more columns off to one side — previously there was no visual cue at all that columns beyond the first were reachable by swiping, so most of a table's columns went undiscovered on mobile. Pure CSS (no JS), automatically hidden once scrolled to that edge.
+- Screenshot/video lightbox (`public/lightbox.js`, shared by all three pages):
+  - A failed image or video load now shows a "Couldn't load this ..." message with a Retry button instead of silently leaving a broken image or a stuck loading spinner. Retry re-attempts the image (cache-busted) or replays the HLS stream.
+  - `.lb-counter` is now `aria-live="polite"` so screen readers announce navigation, and the image/video now carries a descriptive `alt`/`aria-label` (game name + "Screenshot/Video N of M") instead of a generic hardcoded `"Screenshot"`.
+  - `Home`/`End` jump to the first/last item, alongside the existing arrow-key stepping.
+  - Touch: double-tap now zooms 2× toward the tap point (or resets zoom if already zoomed in), matching the existing desktop double-click behavior — previously only pinch-zoom was available on touch.
+  - Prev/next preloading now also warms a video's poster image and primes its HLS manifest in the HTTP cache, not just adjacent images, so stepping onto a video feels less cold.
+  - Idle-hide chrome (toolbar, prev/next, cursor) now also applies while looking at a still image — previously it only ever armed for a playing video (`showLbVc`/`schedHideLbVc`, renamed to the media-agnostic `showLbChrome`/`schedHideLbChrome`); a paused video remains the one exception that always stays fully visible.
+  - Touch: double-tapping the left/right third of a video now seeks ∓10s (with a brief "⏪10s"/"10s⏩" flash), mirroring the common mobile-player convention — previously the on-screen scrub bar was the only way to seek on touch. The middle third and single taps are unaffected (still toggle play/pause).
 
 ### Fixed
 

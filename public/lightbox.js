@@ -16,11 +16,15 @@ const LB_MUTE_ICON  = `<svg viewBox="0 0 14 12" width="16" height="14" fill="non
 let lightboxShots = [];
 let lightboxIdx   = 0;
 let lbZoom = 1, lbPanX = 0, lbPanY = 0, lbLastDir = 0, lbVcTimer = null;
+let lightboxGameName = '';
 
 const LB_SEEK_SECONDS = 5;
+const LB_DOUBLE_TAP_MS = 300;
+const LB_DOUBLE_TAP_DIST = 30;
 
 let _onLightboxParamChange = null;
 let _lbPrevFocus = null;
+const _lbPrefetchedHls = new Set();
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
@@ -46,12 +50,19 @@ function syncLightboxFullscreenBtn() {
 
 function playHls(videoEl, src) {
   if (!src) return;
+  hideLbError();
   if (videoEl._hls) { videoEl._hls.destroy(); videoEl._hls = null; }
   if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+    // Assigned as a property (not addEventListener) since videoEl is reused
+    // across shots — a property assignment overwrites rather than stacking.
+    videoEl.onerror = () => showLbError("Couldn't load this video.");
     videoEl.src = src;
     videoEl.play().catch(() => {});
   } else if (typeof Hls !== 'undefined' && Hls.isSupported()) {
     const hls = new Hls({ autoStartLoad: true, startLevel: -1 });
+    hls.on(Hls.Events.ERROR, (_event, data) => {
+      if (data?.fatal) showLbError("Couldn't load this video.");
+    });
     hls.loadSource(src);
     hls.attachMedia(videoEl);
     hls.on(Hls.Events.MANIFEST_PARSED, () => videoEl.play().catch(() => {}));
@@ -64,6 +75,42 @@ function stopHls(videoEl) {
   videoEl.pause();
   if (videoEl._hls) { videoEl._hls.destroy(); videoEl._hls = null; }
   videoEl.removeAttribute('src');
+}
+
+// ── Load errors (image/video) ──────────────────────────────────────────────
+
+function showLbError(msg) {
+  const lb = document.getElementById('screenshot-lightbox');
+  if (!lb) return;
+  lb.classList.remove('lb--loading');
+  const err = lb.querySelector('.lb-error');
+  err.querySelector('.lb-error-msg').textContent = msg;
+  err.style.display = 'flex';
+}
+
+function hideLbError() {
+  const lb = document.getElementById('screenshot-lightbox');
+  const err = lb?.querySelector('.lb-error');
+  if (err) err.style.display = 'none';
+}
+
+// Re-attempts loading whatever shot is currently shown, from the Retry button.
+function retryCurrentShot() {
+  hideLbError();
+  const shot = lightboxShots[lightboxIdx];
+  if (!shot) return;
+  if (shot.type === 'video') {
+    const vid = document.querySelector('#screenshot-lightbox .lb-video');
+    playHls(vid, shot.hls);
+  } else {
+    const img = document.querySelector('#screenshot-lightbox .lb-img');
+    img.style.opacity = '0';
+    document.getElementById('screenshot-lightbox')?.classList.add('lb--loading');
+    // Cache-bust: a browser that already recorded this exact URL as failed
+    // won't necessarily re-attempt the network request otherwise.
+    const bust = shot.main + (shot.main.includes('?') ? '&' : '?') + '_retry=' + Date.now();
+    img.src = bust;
+  }
 }
 
 // ── Zoom / pan ─────────────────────────────────────────────────────────────
@@ -90,6 +137,42 @@ function resetLbZoom() {
   applyLbTransform();
 }
 
+// Zooms 2x centered on a given viewport point — shared by desktop dblclick
+// and touch double-tap.
+function lbZoomTowardPoint(clientX, clientY) {
+  const img = document.querySelector('#screenshot-lightbox .lb-img');
+  if (!img) return;
+  const rect = img.getBoundingClientRect();
+  lbZoom = 2;
+  lbPanX = -(clientX - rect.left - rect.width  / 2);
+  lbPanY = -(clientY - rect.top  - rect.height / 2);
+  applyLbTransform();
+  img.style.cursor = 'grab';
+}
+
+// ── Video seeking (keyboard arrows + touch double-tap) ─────────────────────
+
+const LB_TOUCH_SEEK_SECONDS = 10; // matches the common mobile-player convention (YouTube etc.)
+
+function seekVideo(vid, deltaSeconds) {
+  if (!vid) return;
+  vid.currentTime = Math.max(0, Math.min(vid.duration || Infinity, vid.currentTime + deltaSeconds));
+  showLbChrome();
+  schedHideLbChrome();
+}
+
+// Transient "⏪10s" / "10s⏩" flash shown on a touch double-tap seek. Each
+// side tracks its own hide timer (rather than one shared timer) so a
+// double-tap on one side can't be cut short by one on the other.
+function flashSeek(side) {
+  const lb = document.getElementById('screenshot-lightbox');
+  const el = lb?.querySelector(`.lb-seek-flash-${side}`);
+  if (!el) return;
+  clearTimeout(el._flashTimer);
+  el.classList.add('lb-seek-flash--show');
+  el._flashTimer = setTimeout(() => el.classList.remove('lb-seek-flash--show'), 500);
+}
+
 // ── Time formatting ────────────────────────────────────────────────────────
 
 function fmtTime(s) {
@@ -113,26 +196,27 @@ function resetLbVc(vc) {
   vc.querySelector('.lb-vc-dur').textContent = '0:00';
 }
 
-// ── Video controls visibility ──────────────────────────────────────────────
+// ── Chrome (toolbar/nav/video-controls) idle-hide ──────────────────────────
 
 // Idle state hides ALL lightbox chrome (video controls, prev/next, toolbar)
-// and the mouse cursor — not just the video controls bar — while a video
-// plays unattended.
-function showLbVc() {
+// and the mouse cursor while the viewer is inactive — whether a video is
+// playing unattended or it's just a still image sitting there. A *paused*
+// video is the one exception: it stays fully visible regardless of the
+// timer, since "paused" itself already signals the viewer is looking at it.
+function showLbChrome() {
   const lb = document.getElementById('screenshot-lightbox');
-  const vc = lb?.querySelector('.lb-vctrls');
-  if (!vc || vc.style.display === 'none') return;
+  if (!lb) return;
   lb.classList.remove('lb-idle');
   clearTimeout(lbVcTimer);
 }
 
-function schedHideLbVc() {
+function schedHideLbChrome() {
   const lb  = document.getElementById('screenshot-lightbox');
-  const vc  = lb?.querySelector('.lb-vctrls');
-  const vid = lb?.querySelector('.lb-video');
-  if (!vc || vc.style.display === 'none') return;
+  if (!lb) return;
+  const vid = lb.querySelector('.lb-video');
+  const isPausedVideo = vid && vid.style.display !== 'none' && vid.paused;
   clearTimeout(lbVcTimer);
-  if (vid && !vid.paused) lbVcTimer = setTimeout(() => lb.classList.add('lb-idle'), 3000);
+  if (!isPausedVideo) lbVcTimer = setTimeout(() => lb.classList.add('lb-idle'), 3000);
 }
 
 // ── Focus helpers ──────────────────────────────────────────────────────────
@@ -164,6 +248,12 @@ function createLightboxDom() {
     <img class="lb-img" src="" alt="Screenshot">
     <video class="lb-video" playsinline></video>
     <button class="lb-btn lb-next" aria-label="Next screenshot">&#8250;</button>
+    <div class="lb-error" style="display:none" role="alert">
+      <p class="lb-error-msg"></p>
+      <button class="lb-error-retry">Retry</button>
+    </div>
+    <div class="lb-seek-flash lb-seek-flash-left" aria-hidden="true">⏪ ${LB_TOUCH_SEEK_SECONDS}s</div>
+    <div class="lb-seek-flash lb-seek-flash-right" aria-hidden="true">${LB_TOUCH_SEEK_SECONDS}s ⏩</div>
     <div class="lb-vctrls" style="display:none">
       <button class="lb-vc-btn lb-vc-play" aria-label="Play">${LB_PLAY_ICON}</button>
       <span class="lb-vc-time">0:00</span>
@@ -176,7 +266,7 @@ function createLightboxDom() {
         <button class="lb-fullscreen" aria-label="Enter fullscreen">${LB_FS_ENTER}</button>
         <button class="lb-share" aria-label="Copy link to this screenshot">${LB_LINK_ICON}</button>
       </div>
-      <div class="lb-counter"></div>
+      <div class="lb-counter" aria-live="polite" aria-atomic="true"></div>
       <div class="lb-toolbar-right">
         <button class="lb-close" aria-label="Close lightbox">&#215;</button>
       </div>
@@ -199,6 +289,7 @@ function wireButtons(lb) {
       window.prompt('Copy this link:', location.href);
     }
   });
+  lb.querySelector('.lb-error-retry').addEventListener('click', retryCurrentShot);
   lb.querySelector('.lb-prev').addEventListener('click', () => stepLightbox(-1));
   lb.querySelector('.lb-next').addEventListener('click', () => stepLightbox(1));
   lb.querySelector('.lb-fullscreen').addEventListener('click', () => {
@@ -239,12 +330,14 @@ function wireKeyboard(lb) {
       // isn't yanked to the next screenshot mid-scrub; Shift+arrow always
       // forces media navigation instead, as an explicit escape hatch.
       if (vid && !e.shiftKey) {
-        vid.currentTime = Math.max(0, Math.min(vid.duration || Infinity, vid.currentTime + dir * LB_SEEK_SECONDS));
-        showLbVc();
-        schedHideLbVc();
+        seekVideo(vid, dir * LB_SEEK_SECONDS);
       } else {
         stepLightbox(dir);
       }
+    }
+    if (!onScrub && (e.key === 'Home' || e.key === 'End') && lightboxShots.length > 1) {
+      e.preventDefault();
+      gotoLightbox(e.key === 'Home' ? 0 : lightboxShots.length - 1);
     }
     if (e.key === 'f' || e.key === 'F') {
       if (document.fullscreenElement || document.webkitFullscreenElement) {
@@ -292,19 +385,8 @@ function wireMouseHandlers(lb) {
     lbImg.style.cursor = lbZoom > 1 ? 'grab' : '';
   });
   lbImg.addEventListener('dblclick', e => {
-    if (lbZoom > 1) {
-      resetLbZoom();
-    } else {
-      // zoom 2× towards the clicked point
-      const rect = lbImg.getBoundingClientRect();
-      const cx = e.clientX - rect.left - rect.width  / 2;
-      const cy = e.clientY - rect.top  - rect.height / 2;
-      lbZoom = 2;
-      lbPanX = -cx;
-      lbPanY = -cy;
-      applyLbTransform();
-      lbImg.style.cursor = 'grab';
-    }
+    if (lbZoom > 1) resetLbZoom();
+    else lbZoomTowardPoint(e.clientX, e.clientY);
   });
 }
 
@@ -312,6 +394,7 @@ function wireTouchHandlers(lb) {
   let lbX = 0, lbY = 0, lbActive = false;
   let pinchStartDist = 0, pinchStartZoom = 1;
   let touchPanning = false, touchPanStartX = 0, touchPanStartY = 0, touchPanOriginX = 0, touchPanOriginY = 0;
+  let lbLastTapTime = 0, lbLastTapX = 0, lbLastTapY = 0;
 
   lb.addEventListener('touchstart', e => {
     if (e.touches.length === 2) {
@@ -324,13 +407,11 @@ function wireTouchHandlers(lb) {
       lbActive = false;
       e.preventDefault();
     } else if (e.touches.length === 1) {
+      lbX = e.touches[0].clientX; lbY = e.touches[0].clientY; lbActive = true;
       if (lbZoom > 1) {
         touchPanning = true;
         touchPanStartX = e.touches[0].clientX; touchPanStartY = e.touches[0].clientY;
         touchPanOriginX = lbPanX; touchPanOriginY = lbPanY;
-        lbActive = false;
-      } else {
-        lbX = e.touches[0].clientX; lbY = e.touches[0].clientY; lbActive = true;
       }
     }
   }, { passive: false });
@@ -358,9 +439,35 @@ function wireTouchHandlers(lb) {
     if (e.touches.length < 2) touchPanning = false;
     if (!lbActive) return;
     lbActive = false;
+    const endX = e.changedTouches[0].clientX, endY = e.changedTouches[0].clientY;
+    const dx = endX - lbX, dy = endY - lbY;
+    const isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
+    const showingImg = lb.querySelector('.lb-img').style.display !== 'none';
+    const showingVid = lb.querySelector('.lb-video').style.display !== 'none';
+    if (isTap && (showingImg || showingVid)) {
+      const now = Date.now();
+      const tapDist = Math.hypot(endX - lbLastTapX, endY - lbLastTapY);
+      if (now - lbLastTapTime < LB_DOUBLE_TAP_MS && tapDist < LB_DOUBLE_TAP_DIST) {
+        lbLastTapTime = 0; // consume, so a 3rd quick tap starts a fresh pair rather than re-triggering
+        if (showingImg) {
+          if (lbZoom > 1) resetLbZoom();
+          else lbZoomTowardPoint(endX, endY);
+        } else {
+          // Video: double-tap the left/right third to seek, YouTube-style.
+          // The middle third is left alone — a plain single tap already
+          // toggles play/pause via the video's own 'click' listener.
+          const rect = lb.getBoundingClientRect();
+          const frac = (endX - rect.left) / rect.width;
+          const vid = lb.querySelector('.lb-video');
+          if (frac < 1 / 3) { seekVideo(vid, -LB_TOUCH_SEEK_SECONDS); flashSeek('left'); }
+          else if (frac > 2 / 3) { seekVideo(vid, LB_TOUCH_SEEK_SECONDS); flashSeek('right'); }
+        }
+      } else {
+        lbLastTapTime = now; lbLastTapX = endX; lbLastTapY = endY;
+      }
+      return;
+    }
     if (lbZoom > 1) return;
-    const dx = e.changedTouches[0].clientX - lbX;
-    const dy = e.changedTouches[0].clientY - lbY;
     if (Math.abs(dx) > Math.abs(dy) * 1.2 && Math.abs(dx) > 50) stepLightbox(dx < 0 ? 1 : -1);
     else if (dy > 80 && Math.abs(dy) > Math.abs(dx)) closeLightbox();
   }, { passive: true });
@@ -389,17 +496,17 @@ function wireVideoControls(lb) {
   vid2.addEventListener('play',  () => {
     playBtn.innerHTML = LB_PAUSE_ICON;
     playBtn.setAttribute('aria-label', 'Pause');
-    schedHideLbVc();
+    schedHideLbChrome();
   });
   vid2.addEventListener('pause', () => {
     playBtn.innerHTML = LB_PLAY_ICON;
     playBtn.setAttribute('aria-label', 'Play');
-    showLbVc();
+    showLbChrome();
   });
   vid2.addEventListener('ended', () => {
     playBtn.innerHTML = LB_PLAY_ICON;
     playBtn.setAttribute('aria-label', 'Play');
-    showLbVc();
+    showLbChrome();
   });
   vid2.addEventListener('volumechange', () => {
     muteBtn.innerHTML = vid2.muted ? LB_MUTE_ICON : LB_VOL_ICON;
@@ -411,16 +518,18 @@ function wireVideoControls(lb) {
     updateScrubBg();
   });
   scrub.addEventListener('mousedown', () => clearTimeout(lbVcTimer));
-  scrub.addEventListener('mouseup',   () => schedHideLbVc());
+  scrub.addEventListener('mouseup',   () => schedHideLbChrome());
 
   playBtn.addEventListener('click', () => { vid2.paused ? vid2.play().catch(() => {}) : vid2.pause(); });
   muteBtn.addEventListener('click', () => { vid2.muted = !vid2.muted; });
 
   vid2.addEventListener('click', () => { vid2.paused ? vid2.play().catch(() => {}) : vid2.pause(); });
 
-  lb.addEventListener('mousemove',  () => { if (vc2.style.display !== 'none') { showLbVc(); schedHideLbVc(); } });
-  lb.addEventListener('mouseleave', () => { if (vc2.style.display !== 'none') schedHideLbVc(); });
-  lb.addEventListener('touchstart', () => { if (vc2.style.display !== 'none') { showLbVc(); schedHideLbVc(); } }, { passive: true });
+  // Unconditional (not gated on vc2 being visible) so an image, not just a
+  // video, also gets idle-hide chrome on interaction — see showLbChrome.
+  lb.addEventListener('mousemove',  () => { showLbChrome(); schedHideLbChrome(); });
+  lb.addEventListener('mouseleave', () => { schedHideLbChrome(); });
+  lb.addEventListener('touchstart', () => { showLbChrome(); schedHideLbChrome(); }, { passive: true });
 }
 
 // ── Singleton getter ────────────────────────────────────────────────────────
@@ -442,6 +551,7 @@ function getLightbox() {
 
 function openLightbox(game, idxOrShotId) {
   _lbPrevFocus = document.activeElement;
+  lightboxGameName = game.name || '';
   lightboxShots = buildMediaItems(game.appid, game.details?.meta);
   lightboxIdx = resolveShotIndex(lightboxShots, idxOrShotId);
   renderLightbox();
@@ -474,6 +584,16 @@ function stepLightbox(dir) {
   _onLightboxParamChange?.(lightboxShots[lightboxIdx].shotId);
 }
 
+// Absolute jump (Home/End) — still animates in the right direction rather
+// than always sliding one way, same as a multi-step stepLightbox would.
+function gotoLightbox(idx) {
+  if (idx === lightboxIdx) return;
+  lbLastDir = idx > lightboxIdx ? 1 : -1;
+  lightboxIdx = idx;
+  renderLightbox();
+  _onLightboxParamChange?.(lightboxShots[lightboxIdx].shotId);
+}
+
 function renderLightbox() {
   const lb = getLightbox();
   const shot = lightboxShots[lightboxIdx];
@@ -483,25 +603,34 @@ function renderLightbox() {
   const dir  = lbLastDir;
   lbLastDir = 0;
   resetLbZoom();
-  lb.classList.remove('lb-idle');
+  showLbChrome();
+  hideLbError();
+  const label = `${lightboxGameName ? lightboxGameName + ' — ' : ''}` +
+    `${shot.type === 'video' ? 'Video' : 'Screenshot'} ${lightboxIdx + 1} of ${lightboxShots.length}`;
   if (shot.type === 'video') {
     img.style.display = 'none';
     lb.classList.remove('lb--loading');
     vid.style.display = 'block';
     vid.poster = shot.thumb || '';
+    vid.setAttribute('aria-label', label);
     vc.style.display = '';
     resetLbVc(vc);
     playHls(vid, shot.hls);
-    schedHideLbVc();
+    schedHideLbChrome();
   } else {
     stopHls(vid);
     vc.style.display = 'none';
-    clearTimeout(lbVcTimer);
     vid.style.display = 'none';
     img.style.display = 'block';
+    img.alt = label;
+    const onLoad  = () => { img.style.opacity = '1'; lb.classList.remove('lb--loading'); };
+    // Left at opacity 0 (rather than 1) so the browser's own broken-image
+    // icon doesn't show behind the error overlay.
+    const onError = () => { img.style.opacity = '0'; lb.classList.remove('lb--loading'); showLbError("Couldn't load this image."); };
     if (dir !== 0) {
-      img.onload = null;
       img.style.opacity = '';
+      img.onload = onLoad;
+      img.onerror = onError;
       img.src = shot.main;
       img.className = `lb-img lb-anim-${dir > 0 ? 'right' : 'left'}`;
       img.addEventListener('animationend', () => { img.className = 'lb-img'; }, { once: true });
@@ -509,33 +638,45 @@ function renderLightbox() {
       img.className = 'lb-img';
       img.style.opacity = '0';
       lb.classList.add('lb--loading');
-      img.onload  = () => { img.style.opacity = '1'; lb.classList.remove('lb--loading'); };
-      img.onerror = () => { img.style.opacity = '1'; lb.classList.remove('lb--loading'); };
+      img.onload  = onLoad;
+      img.onerror = onError;
       img.src = shot.main;
       if (img.complete) { img.onload = null; img.style.opacity = '1'; lb.classList.remove('lb--loading'); }
     }
+    schedHideLbChrome();
   }
   lb.querySelector('.lb-counter').textContent = `${lightboxIdx + 1} / ${lightboxShots.length}`;
   lb.querySelector('.lb-prev').disabled = lightboxShots.length <= 1;
   lb.querySelector('.lb-next').disabled = lightboxShots.length <= 1;
-  // Preload prev and next images so navigation feels instant
+  // Preload prev and next images so navigation feels instant; for a video,
+  // warm its poster the same way and prime its HLS manifest in the HTTP
+  // cache so stepping onto it doesn't pay the full fetch latency cold.
   for (const offset of [-1, 1]) {
     const adjacent = lightboxShots[(lightboxIdx + offset + lightboxShots.length) % lightboxShots.length];
-    if (adjacent && adjacent.type !== 'video' && adjacent.main !== shot.main) {
-      let pre = lb.querySelector(`.lb-preload[data-src="${CSS.escape(adjacent.main)}"]`);
+    if (!adjacent) continue;
+    const preloadSrc = adjacent.type === 'video' ? adjacent.thumb : adjacent.main;
+    if (preloadSrc && preloadSrc !== shot.main) {
+      let pre = lb.querySelector(`.lb-preload[data-src="${CSS.escape(preloadSrc)}"]`);
       if (!pre) {
         pre = document.createElement('img');
         pre.className = 'lb-preload';
-        pre.dataset.src = adjacent.main;
-        pre.src = adjacent.main;
+        pre.dataset.src = preloadSrc;
+        pre.src = preloadSrc;
         pre.style.cssText = 'position:absolute;width:0;height:0;opacity:0;pointer-events:none';
         lb.appendChild(pre);
       }
     }
+    if (adjacent.type === 'video' && adjacent.hls && !_lbPrefetchedHls.has(adjacent.hls)) {
+      _lbPrefetchedHls.add(adjacent.hls);
+      fetch(adjacent.hls).catch(() => {});
+    }
   }
   // Drop stale preloads (keep only prev/next)
   const keep = new Set(
-    [-1, 1].map(o => lightboxShots[(lightboxIdx + o + lightboxShots.length) % lightboxShots.length]?.main)
+    [-1, 1].map(o => {
+      const s = lightboxShots[(lightboxIdx + o + lightboxShots.length) % lightboxShots.length];
+      return s && (s.type === 'video' ? s.thumb : s.main);
+    })
   );
   lb.querySelectorAll('.lb-preload').forEach(el => { if (!keep.has(el.dataset.src)) el.remove(); });
 }
