@@ -95,6 +95,17 @@
     --color-border-warning:       #4a2c00;
   }
   #table-container .dt-th { background: #0f1923 !important; }
+
+  @media (max-width: 768px) {
+    /* .bundle-item is nowrap by default, so price/count/expiry get pushed off the
+       right edge at phone widths — .bundle-list does scroll horizontally, but nothing
+       hints that it does (confirmed live at 360px: title + shop name is all that's
+       visible, shop name itself clipped mid-word). Wrapping lets the title keep its
+       own full-width line and the rest flow onto a second line below it instead, so
+       every field stays visible with no horizontal scroll needed. */
+    .bundle-item { flex-wrap: wrap; row-gap: 4px; }
+    .bundle-item-title { flex-basis: 100%; min-width: 0; }
+  }
 </style>
 </head>
 <body>

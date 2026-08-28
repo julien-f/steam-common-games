@@ -35,6 +35,15 @@ const activeFilters = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set()]
 const allOpts       = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set()]));
 const filterSearch  = Object.fromEntries(FILTER_DIMS.map(d => [d.key, '']));
 let nameFilter = '';
+// Mobile-only collapse for the filter body (chips/search/dims) — defaulted from the
+// viewport at first render so a phone starts collapsed (results visible immediately
+// instead of pushed ~2 screens down by Tag/Genre/Category/etc.) while desktop keeps
+// today's always-expanded panel. Once a user actually clicks the toggle it's a plain
+// user preference for the rest of the session, surviving renderFilterPanel()'s full
+// DOM rebuild on every filter change since it lives here, not in the DOM itself. The
+// toggle button that flips this is itself only shown on mobile via CSS (see
+// .filter-toggle-btn in style.css), so the variable has no effect on desktop.
+let filterPanelCollapsed = typeof matchMedia === 'function' && matchMedia('(max-width: 768px)').matches;
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
@@ -1139,28 +1148,38 @@ function renderFilterPanel() {
     <div class="card">
       <div class="filter-header">
         <h2>Filter${totalActive ? `<span class="filter-badge">${totalActive}</span>` : ''}</h2>
-        ${totalActive ? '<button class="btn btn-ghost btn-sm" id="clear-filters-btn">Clear all</button>' : ''}
+        <div class="filter-header-actions">
+          ${totalActive ? '<button class="btn btn-ghost btn-sm" id="clear-filters-btn">Clear all</button>' : ''}
+          <button class="btn btn-ghost btn-sm filter-toggle-btn" id="filter-toggle-btn" aria-expanded="${!filterPanelCollapsed}">${filterPanelCollapsed ? 'Filters ▾' : 'Filters ▴'}</button>
+        </div>
       </div>
       ${chips ? `<div class="filter-chips">${chips}</div>` : ''}
-      <div class="filter-name-row">
-        <input class="filter-search filter-name-input" type="search" id="name-filter-input" placeholder="Search by name…" value="${esc(nameFilter)}">
-      </div>
-      <div class="filter-dims">
-        ${activeDims.map(d => `
-          <div class="filter-dim">
-            <div class="filter-dim-title">${d.label}</div>
-            <input class="filter-search" type="search" placeholder="Search…" data-search-dim="${d.key}" value="${esc(filterSearch[d.key])}">
-            <div class="filter-opts">
-              ${[...allOpts[d.key]].sort().map(v => `
-                <label class="filter-opt">
-                  <input type="checkbox" data-dim="${d.key}" value="${esc(v)}"${activeFilters[d.key].has(v) ? ' checked' : ''}>
-                  ${esc(v)}
-                </label>
-              `).join('')}
-            </div>
-          </div>`).join('')}
+      <div class="filter-body"${filterPanelCollapsed ? ' hidden' : ''}>
+        <div class="filter-name-row">
+          <input class="filter-search filter-name-input" type="search" id="name-filter-input" placeholder="Search by name…" value="${esc(nameFilter)}">
+        </div>
+        <div class="filter-dims">
+          ${activeDims.map(d => `
+            <div class="filter-dim">
+              <div class="filter-dim-title">${d.label}</div>
+              <input class="filter-search" type="search" placeholder="Search…" data-search-dim="${d.key}" value="${esc(filterSearch[d.key])}">
+              <div class="filter-opts">
+                ${[...allOpts[d.key]].sort().map(v => `
+                  <label class="filter-opt">
+                    <input type="checkbox" data-dim="${d.key}" value="${esc(v)}"${activeFilters[d.key].has(v) ? ' checked' : ''}>
+                    ${esc(v)}
+                  </label>
+                `).join('')}
+              </div>
+            </div>`).join('')}
+        </div>
       </div>
     </div>`;
+
+  document.getElementById('filter-toggle-btn').addEventListener('click', () => {
+    filterPanelCollapsed = !filterPanelCollapsed;
+    renderFilterPanel();
+  });
 
   const nameInput = document.getElementById('name-filter-input');
   if (nameInput) {

@@ -188,6 +188,32 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
   border-radius: var(--r);
 }
 
+/* Horizontal-scroll affordance, shared with the data-table library's own
+   .dt-table-wrap (library.js/bundles.js) — nothing on either page hints that a
+   narrow table has more columns off-screen (confirmed live at 360px: the Comparison
+   page and Library Explorer both scroll horizontally with zero visual cue, so most
+   users never find the columns past "Game"). Pure CSS, no JS: two opaque "cover"
+   gradients attached `local` (they scroll away with the table's own content) sit on
+   top of two soft shadow gradients attached `scroll` (fixed to the wrap's edges).
+   At the very start/end of the scroll range the matching cover still masks its
+   shadow; scroll past it and the cover moves out of the way, revealing the shadow —
+   so the fade only ever shows on the side there's still more to scroll toward. Both
+   wraps sit directly on a .card, so var(--bg1) is what's actually behind them either
+   way (dt-table-wrap's own alternating-row tint is a transparent overlay on top of
+   that, not a different base color). */
+.table-wrap,
+.dt-table-wrap {
+  background-image:
+    linear-gradient(to right, var(--bg1) 0%, var(--bg1) 100%),
+    linear-gradient(to left, var(--bg1) 0%, var(--bg1) 100%),
+    linear-gradient(to right, rgba(0,0,0,0.35), rgba(0,0,0,0)),
+    linear-gradient(to left, rgba(0,0,0,0.35), rgba(0,0,0,0));
+  background-repeat: no-repeat;
+  background-size: 20px 100%, 20px 100%, 12px 100%, 12px 100%;
+  background-position: left top, right top, left top, right top;
+  background-attachment: local, local, scroll, scroll;
+}
+
 table { width: 100%; border-collapse: collapse; }
 
 thead th {
@@ -487,6 +513,11 @@ a.account-identity:hover .account-name { color: var(--accent2); }
   margin-bottom: 14px;
 }
 .filter-header h2 { margin-bottom: 0; }
+.filter-header-actions { display: flex; align-items: center; gap: 8px; }
+/* Shown only under the max-width:768px rule below — collapsing the filter body only
+   makes sense once it's actually the thing pushing results off-screen (see the mobile
+   block's own comment). Desktop keeps the panel always expanded with no toggle at all. */
+.filter-toggle-btn { display: none; }
 .filter-badge {
   display: inline-flex;
   align-items: center;
@@ -620,8 +651,6 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   .card { padding: 14px 16px; }
   .game-group { margin-bottom: 20px; }
   .btn-remove { width: 44px; height: 44px; line-height: 42px; }
-  .panel-nav-btn { width: 44px; height: 44px; }
-  .panel-close { width: 36px; height: 36px; line-height: 36px; font-size: 20px; }
   .td-name { min-width: 140px; }
   .td-score { min-width: 70px; }
   .td-hltb { min-width: 60px; }
@@ -634,6 +663,14 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   .user-row { flex-wrap: wrap; }
   .user-row .btn-remove { order: 1; }
   .user-row .btn-add-family { order: 2; flex-basis: 100%; }
+
+  /* The filter panel's Tag/Genre/Category/Developer/Publisher dims (each its own
+     independently-scrolling checkbox list) otherwise push the actual results table
+     ~2 screens down before a phone user ever sees a game. Collapsed by default (see
+     filterPanelCollapsed in app.js) behind this toggle so results are visible first;
+     the chips summary of active filters stays visible either way. */
+  .filter-toggle-btn { display: inline-flex; }
+  .filter-body[hidden] { display: none; }
 }
 
 .panel-close {
@@ -653,6 +690,15 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   padding: 0;
 }
 .panel-close:hover { background: rgba(0,0,0,0.75); }
+@media (max-width: 768px) {
+  /* Bigger tap target on touch devices — kept right next to the base rule (rather than
+     the shared max-width:768px block above) after this exact override was previously
+     placed there instead and silently overridden right back down to 28x28: that block
+     sits earlier in the file, so the later, unconditional .panel-close rule above won
+     regardless of viewport at equal specificity. Confirmed live at 360px before this
+     fix — the close button rendered 28x28, well under the ~44px recommended minimum. */
+  .panel-close { width: 36px; height: 36px; line-height: 36px; font-size: 20px; }
+}
 
 /* Rendered as the first child of the scrollable #panel-body (see renderPanelBody in
    panel.js) rather than a fixed sibling outside it, so it scrolls away with the rest of
@@ -829,6 +875,14 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 }
 .panel-nav-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
 .panel-nav-btn:disabled { opacity: 0.3; cursor: default; }
+@media (max-width: 768px) {
+  /* Bigger tap target on touch devices — see .panel-close's identical comment above
+     for why this lives here rather than the shared max-width:768px block: the same
+     override placed there was silently losing to this later, unconditional rule at
+     equal specificity. Confirmed live at 360px before this fix — the ↑/↓/🎲 nav
+     buttons rendered 36x32, under the ~44px recommended minimum. */
+  .panel-nav-btn { width: 44px; height: 44px; }
+}
 .panel-nav-reroll { font-size: 14px; margin-left: 4px; position: relative; }
 /* Only the reroll button gets a key hint — prev/next's ↑/↓ icon already IS the key,
    so labeling it again would be redundant; 🎲 isn't a keyboard glyph, so it needs one. */

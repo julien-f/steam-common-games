@@ -38,6 +38,12 @@
     border: 1px solid var(--border); border-radius: var(--r);
     font-size: 13px;
   }
+  /* .wishlist-region-label's own display:flex above otherwise wins over the browser's
+     default [hidden]{display:none} — author styles beat UA styles in the cascade
+     regardless of specificity, so the "hidden" property setActiveTab toggles in
+     library.js was being silently ignored and the label stayed visible on the Library
+     tab too. Confirmed live at both mobile and desktop widths before this rule existed. */
+  .wishlist-region-label[hidden] { display: none; }
 
   .lib-form { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
   .lib-form input {
@@ -87,6 +93,25 @@
 
   /* Darker header bar so it reads clearly above the data rows */
   #table-container .dt-th { background: #0f1923 !important; }
+
+  @media (max-width: 768px) {
+    /* .lib-tabs has no wrap by default — fine as long as it only ever holds the two
+       tab buttons, but the Wishlist tab's region picker (margin-left: auto) shares the
+       row too, and at phone widths the row has nowhere near enough space for tabs +
+       picker + Load button on one line. Confirmed live: without this, the row overflows
+       the whole page horizontally and clips the Load Library/Load Wishlist button
+       off-screen. Wrapping puts the region picker on its own line instead. */
+    .lib-tabs { flex-wrap: wrap; row-gap: 8px; }
+    .wishlist-region-label { flex-basis: 100%; margin-left: 0; }
+    /* .lib-form's input has flex:1 but the Load Library/Load Wishlist button next to
+       it doesn't shrink, so at phone widths the two together still don't fit one row
+       — confirmed live: the button stayed clipped even after the .lib-tabs fix above,
+       since this is a second, independent overflow in a different row. Wrapping puts
+       the button on its own full-width line below the input instead. */
+    .lib-form { flex-wrap: wrap; }
+    .lib-form input { flex-basis: 100%; max-width: none; }
+    .lib-form .btn-primary { flex: 1; }
+  }
 </style>
 </head>
 <body>
