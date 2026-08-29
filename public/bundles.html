@@ -84,7 +84,12 @@
   .unresolved-item-title { color: var(--text0); }
   .unresolved-item-type { color: var(--text2); font-size: 11px; }
 
-  #table-container {
+  /* Override data-table colors to match the Steam dark theme — set on `html:root`,
+     not #table-container, so the data-table's category submenus (portaled straight
+     onto <body>, not nested inside #table-container) inherit these too, while still
+     out-specificity-ing the library's own plain `:root` defaults. See library.html's
+     identical block for the fuller reasoning. */
+  html:root {
     --color-background-primary:   #17212b;
     --color-background-secondary: #2a475e;
     --color-text-primary:         #c6d4df;

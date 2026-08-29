@@ -69,11 +69,19 @@
 
   /*
    * Override data-table colors to match the Steam dark theme.
-   * Variables are set on #table-container (not :root) so they win over the
-   * data-table's own :root defaults, which are injected into <head> after this
-   * stylesheet and would otherwise override any :root rules we define here.
+   * Set on `html:root` (not plain #table-container, and not plain :root) for two
+   * reasons at once: `html:root`'s specificity beats the data-table's own plain
+   * :root rules regardless of import order (its <style> is injected into <head>
+   * after this stylesheet, so a same-specificity :root here would otherwise lose
+   * to it), AND — unlike #table-container — `<html>` is an actual ancestor of the
+   * data-table's category submenus (Columns/Sort/Group/Filter's `.dt-dd-submenu`),
+   * which render via a portal straight onto <body>, not nested inside
+   * #table-container. Scoping to #table-container alone left those submenus
+   * unstyled (falling back to the library's light-theme defaults) since custom
+   * properties only inherit through the real DOM tree, not wherever the trigger
+   * button happens to live. Confirmed live before this fix.
    */
-  #table-container {
+  html:root {
     --color-background-primary:   #17212b;
     --color-background-secondary: #2a475e;
     --color-text-primary:         #c6d4df;
