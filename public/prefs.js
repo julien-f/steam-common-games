@@ -12,7 +12,7 @@
 // account pulls down) without needing to know every individual key up front. This is purely a
 // local-storage convenience, though — it does NOT mean sync itself works on the whole blob (see
 // setPref below).
-const PREFS_STORAGE_KEY = 'steam-common-games:prefs';
+export const PREFS_STORAGE_KEY = 'steam-common-games:prefs';
 
 function readPrefsBlob() {
   try {
@@ -25,12 +25,12 @@ function readPrefsBlob() {
 
 // Returns `fallback` when the key was never set, storage is unavailable (private browsing,
 // cleared site data), or the stored blob itself is corrupted — never throws.
-function getPref(key, fallback) {
+export function getPref(key, fallback) {
   const blob = readPrefsBlob();
   return key in blob ? blob[key] : fallback;
 }
 
-function setPref(key, value) {
+export function setPref(key, value) {
   try {
     const blob = readPrefsBlob();
     blob[key] = value;
@@ -40,5 +40,3 @@ function setPref(key, value) {
   // per-key — deliberately never a whole-blob PUT, so two preferences changing around the same
   // time (different tabs/devices) can't race each other's writes. No-op today.
 }
-
-if (typeof module !== 'undefined') module.exports = { PREFS_STORAGE_KEY, getPref, setPref };

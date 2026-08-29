@@ -1,7 +1,7 @@
 'use strict';
 
 // Extract username/ID from a pasted Steam profile URL
-function normalizeInput(raw) {
+export function normalizeInput(raw) {
   const mId  = raw.match(/steamcommunity\.com\/id\/([^/?\s]+)/);
   if (mId)  return mId[1];
   const mNum = raw.match(/steamcommunity\.com\/profiles\/(\d+)/);
@@ -26,7 +26,7 @@ function normalizeInput(raw) {
 // Returns the raw, unrounded value (0-100) — round only for display; sorting/grouping should
 // use the full precision so games with the same rounded score still order deterministically.
 const STEAMDB_RATING_SHRINK_STRENGTH = 2;
-function computeSteamdbRating(positive, total) {
+export function computeSteamdbRating(positive, total) {
   if (!total) return null;
   const p = positive / total;
   const weight = 2 ** (-STEAMDB_RATING_SHRINK_STRENGTH * Math.log10(total + 1));
@@ -59,8 +59,8 @@ const FREE_AAA_REVIEW_THRESHOLD = 200000;  // the only lever available for F2P t
 // Steam's appdetails `type` field, values other than 'game' — see the `type` comment in
 // lib/steam.js's extractAppDetails. Shared with public/library.js's Type column so the two
 // don't drift into disagreeing about what counts as "not really a game".
-const NON_GAME_TYPES = new Set(['dlc', 'demo', 'music', 'video', 'series', 'episode', 'mod', 'hardware', 'advertising']);
-function computeProductionTier({ isFree, priceInitial, reviewsTotal, hasMetacritic, isDlc, type } = {}) {
+export const NON_GAME_TYPES = new Set(['dlc', 'demo', 'music', 'video', 'series', 'episode', 'mod', 'hardware', 'advertising']);
+export function computeProductionTier({ isFree, priceInitial, reviewsTotal, hasMetacritic, isDlc, type } = {}) {
   if (isDlc || NON_GAME_TYPES.has(type)) return null;
   const reviews = reviewsTotal ?? 0;
   if (isFree) return reviews >= FREE_AAA_REVIEW_THRESHOLD ? 'AAA' : 'Indie';
@@ -70,7 +70,7 @@ function computeProductionTier({ isFree, priceInitial, reviewsTotal, hasMetacrit
   return 'Indie';
 }
 
-function scoreColor(n) {
+export function scoreColor(n) {
   if (n == null) return 'var(--text1)';
   if (n >= 80) return '#57cbde';
   if (n >= 65) return '#a3cf4e';
@@ -86,7 +86,7 @@ function scoreColor(n) {
 // so can't be a plain global script itself). `currency` falsy (not yet known/loaded) falls back
 // to USD rather than throwing; an invalid/unrecognized currency code falls back to a plain
 // "12.34 XYZ" string rather than letting Intl.NumberFormat's own error propagate.
-function formatMoney(v, currency) {
+export function formatMoney(v, currency) {
   try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(v); }
   catch { return `${v.toFixed(2)} ${currency || ''}`; }
 }
@@ -111,7 +111,7 @@ function formatMoney(v, currency) {
 // they were spelled out. tooltipLabel is the same wording lowercased to read inline in a
 // sentence ("Fanatical — 1-year low"); statusLabel is the title-cased standalone form shown as
 // the Price Status column's own cell value.
-const DEAL_RECORD_TIERS = [
+export const DEAL_RECORD_TIERS = [
   { tier: 'all-time', low: 'lowAll', statusLabel: 'All-Time Low',  tooltipLabel: 'all-time low',  color: scoreColor(90), icon: '🔥', bold: true },
   { tier: '1yr',       low: 'lowY1',  statusLabel: '1-Year Low',   tooltipLabel: '1-year low',    color: scoreColor(70), icon: '★' },
   { tier: '3mo',        low: 'lowM3',  statusLabel: '3-Month Low', tooltipLabel: '3-month low',   color: scoreColor(55), icon: '☆' },
@@ -120,7 +120,7 @@ const DEAL_RECORD_TIERS = [
 // no need to destructure at the call site. `<=`, not `<` — the current deal genuinely can BE the
 // historical low itself (it's what set it), not only ever beat it. Returns `null` (not a tier)
 // when `price` is missing or doesn't beat any of the three windows.
-function dealRecordTier(price, lows) {
+export function dealRecordTier(price, lows) {
   if (price == null) return null;
   for (const t of DEAL_RECORD_TIERS) {
     const low = lows?.[t.low];
@@ -129,13 +129,13 @@ function dealRecordTier(price, lows) {
   return null;
 }
 
-function fmtH(h) {
+export function fmtH(h) {
   if (!h) return '<span class="dim">—</span>';
   return h % 1 === 0 ? `${h}h` : `${h.toFixed(1)}h`;
 }
 
 // Format Steam playtime (minutes) as a compact string, e.g. "47m" or "12h". Returns '' for 0.
-function fmtPlaytime(mins) {
+export function fmtPlaytime(mins) {
   if (!mins) return '';
   return mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`;
 }
@@ -144,16 +144,16 @@ function fmtPlaytime(mins) {
 // (e.g. "2026-07-01") — same bare-date convention as the releaseDate/dateAdded table columns,
 // rather than a relative "3 days ago" string. Returns '' for 0/missing (owned but never
 // launched — a real, meaningful state, not absent data).
-function fmtLastPlayed(epochSec) {
+export function fmtLastPlayed(epochSec) {
   if (!epochSec) return '';
   return new Date(epochSec * 1000).toISOString().slice(0, 10);
 }
 
-function foldStr(s) {
+export function foldStr(s) {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
-function esc(s) {
+export function esc(s) {
   return String(s)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -161,7 +161,7 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
-function renderScoreCell(game) {
+export function renderScoreCell(game) {
   if (game.loading) return '<span class="sk"></span>';
   const r = game.details?.rating;
   return r
@@ -169,16 +169,14 @@ function renderScoreCell(game) {
     : '<span class="dim">—</span>';
 }
 
-function renderMainCell(game) {
+export function renderMainCell(game) {
   if (game.loading) return '<span class="sk sm"></span>';
   const h = game.details?.hltb;
   return h ? fmtH(h.main) : '<span class="dim">—</span>';
 }
 
-function renderExtraCell(game) {
+export function renderExtraCell(game) {
   if (game.loading) return '<span class="sk sm"></span>';
   const h = game.details?.hltb;
   return h ? fmtH(h.extra) : '<span class="dim">—</span>';
 }
-
-if (typeof module !== 'undefined') module.exports = { normalizeInput, scoreColor, formatMoney, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier, NON_GAME_TYPES, dealRecordTier, DEAL_RECORD_TIERS };

@@ -1,5 +1,17 @@
 'use strict';
 
+import { esc, formatMoney, computeSteamdbRating, computeProductionTier } from '/utils.js';
+import { reorderUrlParams } from '/urlState.js';
+import { getPref, setPref } from '/prefs.js';
+import { COUNTRY_OPTIONS, TIMEZONE_COUNTRY, detectCountry, getStoredRegion, setStoredRegion, resolveRegion, REGION_CHANGED_EVENT } from '/region.js';
+import { initNav } from '/nav.js';
+import { initLightbox, openLightbox, isLightboxOpen } from '/lightbox.js';
+import {
+  initPanel, panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,
+  pickRandomFrom, clearRandomQueue, panelHandleEscape,
+  renderPanelBody,
+} from '/panel.js';
+
 import { createDataTable } from '@vates/data-table-vanilla';
 import {
   fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareNumMissingLast,

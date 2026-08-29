@@ -1,5 +1,9 @@
 'use strict';
 
+import { esc, formatMoney, scoreColor, dealRecordTier, DEAL_RECORD_TIERS, fmtH, fmtLastPlayed, computeSteamdbRating } from './utils.js';
+import { openLightbox, closeLightbox, isLightboxOpen } from './lightbox.js';
+import { buildMediaItems } from './mediaItems.js';
+
 // ── Shared game side panel ──────────────────────────────────────────────────
 // Used by both the comparison page (app.js) and the Library Explorer
 // (library.js). Depends on globals from utils.js, mediaItems.js, and
@@ -59,7 +63,7 @@ const randomQueues = new Map(); // queueKey → remaining shuffled games
 // or a fixed constant for a page with only one list) so repeated picks cycle
 // through every item before repeating. The bag is rebuilt when exhausted or
 // when `list` no longer matches what's left in it (e.g. after filtering).
-function pickRandomFrom(list, queueKey, currentAppid) {
+export function pickRandomFrom(list, queueKey, currentAppid) {
   if (!list.length) return null;
   let queue = randomQueues.get(queueKey) || [];
   const ids = new Set(list.map(g => g.appid));
@@ -73,15 +77,15 @@ function pickRandomFrom(list, queueKey, currentAppid) {
   return pick;
 }
 
-function clearRandomQueue(queueKey) {
+export function clearRandomQueue(queueKey) {
   randomQueues.delete(queueKey);
 }
 
-function clearAllRandomQueues() {
+export function clearAllRandomQueues() {
   randomQueues.clear();
 }
 
-function initPanel(options = {}) {
+export function initPanel(options = {}) {
   panelOptions = options;
 
   document.getElementById('panel-backdrop').addEventListener('click', panelClose);
@@ -202,8 +206,8 @@ function updateSubnavScrollSpy() {
   buttons.forEach(btn => btn.classList.toggle('active', btn.dataset.target === activeTarget));
 }
 
-function isPanelOpen() { return panelGame != null; }
-function getPanelGame() { return panelGame; }
+export function isPanelOpen() { return panelGame != null; }
+export function getPanelGame() { return panelGame; }
 
 // Shared Escape-key handling: close the lightbox first (unless the browser's own Escape is
 // about to exit fullscreen instead — bail and leave the lightbox open, same as the lightbox's
@@ -215,7 +219,7 @@ function getPanelGame() { return panelGame; }
 // same lightbox-then-panel logic; bundles.js's copy had drifted and silently dropped the
 // lightbox-close branch entirely (Escape did nothing while its lightbox was open) — pulled out
 // here so there's one copy to keep correct instead of three that can quietly disagree.
-function panelHandleEscape() {
+export function panelHandleEscape() {
   if (isLightboxOpen()) {
     if (document.fullscreenElement || document.webkitFullscreenElement) return; // browser exits FS; keep lightbox open
     closeLightbox();
@@ -477,7 +481,7 @@ function panelGoBack() {
 // dir: -1 (previous) or 1 (next). wrap: true for keyboard arrow navigation
 // (cycles through all media), false for the hero prev/next buttons (clamps
 // at the ends — the next button is disabled once heroIdx is at the last item).
-function panelStepHero(dir, { wrap = false } = {}) {
+export function panelStepHero(dir, { wrap = false } = {}) {
   if (!panelGame) return false;
   const items = getPanelItems();
   if (wrap) {
@@ -494,7 +498,7 @@ function panelStepHero(dir, { wrap = false } = {}) {
 // `keepHistory`: true only when this open is a DLC/base-game navigation hop (forward via
 // navigateToGame, or backward via panelGoBack) — every other opener (table row, search pick,
 // prev/next/random) leaves it false, which starts a fresh browsing trail.
-function panelOpen(game, { keepHistory = false } = {}) {
+export function panelOpen(game, { keepHistory = false } = {}) {
   if (!keepHistory) panelHistory = [];
   panelGame = game;
   heroIdx = 0;
@@ -518,7 +522,7 @@ function panelOpen(game, { keepHistory = false } = {}) {
 // after (e.g. a forced-refresh reload) close the panel's DOM state without losing the
 // deep link it'll restore from once the reload completes. Not used by the backdrop
 // click/× button/swipe paths below, which always want the default (URL cleared).
-function panelClose({ preserveUrl = false } = {}) {
+export function panelClose({ preserveUrl = false } = {}) {
   if (!panelGame) return;
   panelGame = null;
   panelHistory = []; // closing the panel ends whatever DLC browsing trail was in progress
@@ -1251,7 +1255,7 @@ function dlcHtml(g) {
   })}</div>`;
 }
 
-function renderPanelBody(game) {
+export function renderPanelBody(game) {
   const g = game;
   const h = g.details?.hltb;
   const meta = g.details?.meta;

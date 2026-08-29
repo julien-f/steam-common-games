@@ -1,5 +1,7 @@
 'use strict';
 
+import { esc } from './utils.js';
+
 // Shared by the comparison page (app.js) and the Library Explorer (library.js): renders
 // the "accounts bar" of resolved-account chips under a search form, plus a locally
 // remembered "recent searches" row above it. Loaded as a plain global script (like
@@ -9,13 +11,13 @@
 // personastate values per Steam's docs: 0 Offline, 1 Online, 2 Busy, 3 Away, 4 Snooze,
 // 5 Looking to trade, 6 Looking to play. `gameextrainfo` (present while in-game) takes
 // priority over all of these for the status dot/tooltip.
-const ACCOUNT_STATE_LABELS = ['Offline', 'Online', 'Busy', 'Away', 'Snooze', 'Looking to trade', 'Looking to play'];
+export const ACCOUNT_STATE_LABELS = ['Offline', 'Online', 'Busy', 'Away', 'Snooze', 'Looking to trade', 'Looking to play'];
 
 // The identity (avatar + name, linking out to the profile) is its own <a> nested inside
 // the chip <div> rather than the whole chip being one big link — the chip also holds a
 // <button> (per-account refresh), and interactive content nested inside an <a> is
 // invalid HTML / fights click-target handling.
-function accountChipHtml(p, countLabel) {
+export function accountChipHtml(p, countLabel) {
   const name = esc(p.personaname || p.steamid);
   const safeUrl = /^https?:\/\//i.test(p.profileurl || '') ? p.profileurl : '';
   const safeAvatar = /^https?:\/\//i.test(p.avatarmedium || '') ? p.avatarmedium : '';
@@ -59,7 +61,7 @@ function accountChipHtml(p, countLabel) {
 
 // Flat row of chips — one group's worth of accounts (the Library Explorer's single
 // Family group, or the comparison page when there's only one slot).
-function renderAccountChips(containerEl, players, countLabel) {
+export function renderAccountChips(containerEl, players, countLabel) {
   if (!players || players.length === 0) { containerEl.hidden = true; containerEl.innerHTML = ''; return; }
   containerEl.innerHTML = players.map(p => accountChipHtml(p, countLabel)).join('');
   containerEl.hidden = false;
@@ -69,7 +71,7 @@ function renderAccountChips(containerEl, players, countLabel) {
 // search there can compare several separate slots (each possibly itself a multi-account
 // Family). `groups`: [{ label, players }]. `label` is omitted (no heading rendered) for
 // a single-group search, where per-slot labeling would just be noise.
-function renderAccountChipsGrouped(containerEl, groups, countLabel) {
+export function renderAccountChipsGrouped(containerEl, groups, countLabel) {
   const nonEmpty = (groups || []).filter(g => g.players && g.players.length > 0);
   if (nonEmpty.length === 0) { containerEl.hidden = true; containerEl.innerHTML = ''; return; }
   containerEl.innerHTML = nonEmpty.map(g => `
@@ -84,7 +86,7 @@ function renderAccountChipsGrouped(containerEl, groups, countLabel) {
 // Delegated rather than per-chip, since chips are wholesale replaced on every render.
 // `onRefresh(steamid, btnEl)` is responsible for re-running the search with that one
 // account force-refreshed and re-rendering the bar (which naturally resets the button).
-function bindAccountRefresh(containerEl, onRefresh) {
+export function bindAccountRefresh(containerEl, onRefresh) {
   containerEl.addEventListener('click', e => {
     const btn = e.target.closest('.account-refresh-btn');
     if (!btn || btn.disabled) return;
@@ -108,9 +110,9 @@ function bindAccountRefresh(containerEl, onRefresh) {
 // Without that grouping, a comparison of two 2-account Families and a plain 4-account
 // comparison would render as the exact same "A + B + C + D" label.
 
-const MAX_RECENTS = 10;
+export const MAX_RECENTS = 10;
 
-function loadRecents(storageKey) {
+export function loadRecents(storageKey) {
   try {
     const raw = JSON.parse(localStorage.getItem(storageKey));
     return Array.isArray(raw) ? raw : [];
@@ -119,13 +121,13 @@ function loadRecents(storageKey) {
   }
 }
 
-function saveRecents(storageKey, list) {
+export function saveRecents(storageKey, list) {
   try { localStorage.setItem(storageKey, JSON.stringify(list)); } catch { /* storage full/blocked — drop silently */ }
 }
 
 // Moves this search to the front, refreshing its cached display data, rather than
 // appending a duplicate. `groups`: array of slot groups, each an array of player objects.
-function addRecent(storageKey, id, groups, data) {
+export function addRecent(storageKey, id, groups, data) {
   const snapshot = (groups || []).map(g => (g || []).map(p => ({
     steamid: p.steamid, personaname: p.personaname, avatarmedium: p.avatarmedium,
   })));
@@ -134,7 +136,7 @@ function addRecent(storageKey, id, groups, data) {
   saveRecents(storageKey, rest.slice(0, MAX_RECENTS));
 }
 
-function removeRecent(storageKey, id) {
+export function removeRecent(storageKey, id) {
   saveRecents(storageKey, loadRecents(storageKey).filter(r => r.id !== id));
 }
 
@@ -145,7 +147,7 @@ function removeRecent(storageKey, id) {
 // assumed to already be one — entries written before this grouping existed have a flat
 // array of player objects, not an array of groups, and this is the only thing standing
 // between reading one of those out of localStorage and a hard crash on every page load.
-function recentChipHtml(entry) {
+export function recentChipHtml(entry) {
   const groups = (entry.players || []).map(g => Array.isArray(g) ? g : [g]);
   const label = esc(groups.length
     ? groups.map(g => g.map(p => p.personaname || p.steamid).join(' + ')).join(', ')
@@ -163,7 +165,7 @@ function recentChipHtml(entry) {
   `;
 }
 
-function renderRecentsBar(containerEl, storageKey) {
+export function renderRecentsBar(containerEl, storageKey) {
   const recents = loadRecents(storageKey);
   if (recents.length === 0) { containerEl.hidden = true; containerEl.innerHTML = ''; return; }
   containerEl.innerHTML = `
@@ -176,7 +178,7 @@ function renderRecentsBar(containerEl, storageKey) {
 
 // `onLoad(data)` replays a remembered search; re-rendering the bar after removal/clear
 // is handled here since it's always the same follow-up regardless of the host page.
-function bindRecentsBar(containerEl, storageKey, onLoad) {
+export function bindRecentsBar(containerEl, storageKey, onLoad) {
   containerEl.addEventListener('click', e => {
     const loadBtn = e.target.closest('.recent-chip-btn');
     if (loadBtn) {

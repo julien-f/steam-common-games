@@ -1,5 +1,7 @@
 'use strict';
 
+import { esc } from './utils.js';
+
 // Shared "look up any game" widget — used by both the comparison page (app.js) and the
 // Library Explorer (library.js) to open the shared game detail side panel (panel.js) for an
 // arbitrary Steam game, independent of anyone's library or wishlist. Loaded as a plain global
@@ -14,12 +16,12 @@
 //    metadata once /api/game-details resolves, same as it already does for wishlist rows with
 //    no name of their own)
 
-const GAME_SEARCH_DEBOUNCE_MS = 300;
-const GAME_SEARCH_MIN_CHARS = 2;
+export const GAME_SEARCH_DEBOUNCE_MS = 300;
+export const GAME_SEARCH_MIN_CHARS = 2;
 
 // Recognizes a bare appid ("1245620") or a Steam store URL containing "/app/<id>" — either
 // way, no name search is needed; the appid alone is enough to open the panel.
-function parseDirectAppid(raw) {
+export function parseDirectAppid(raw) {
   const text = raw.trim();
   if (/^\d+$/.test(text)) return Number(text);
   const m = text.match(/\/app\/(\d+)/);
@@ -31,7 +33,7 @@ function parseDirectAppid(raw) {
 // `id` + `role="option"` back `inputEl`'s `aria-activedescendant` in initGameSearch below;
 // `tabindex="-1"` keeps real DOM focus on the input the whole time, same combobox pattern
 // as a native `<select>`'s listbox — arrow keys move the highlight, not focus itself.
-function gameSearchResultHtml(r, active) {
+export function gameSearchResultHtml(r, active) {
   const thumb = r.tinyImage
     ? `<img class="game-search-thumb" src="${esc(r.tinyImage)}" alt="" loading="lazy">`
     : '<span class="game-search-thumb game-search-thumb--empty"></span>';
@@ -44,7 +46,7 @@ function gameSearchResultHtml(r, active) {
   `;
 }
 
-function initGameSearch({ inputEl, resultsEl, onSelect }) {
+export function initGameSearch({ inputEl, resultsEl, onSelect }) {
   let debounceTimer = null;
   let lastResults = [];
   let activeFetch = 0; // guards against a slower earlier request clobbering a faster later one
@@ -154,10 +156,10 @@ function initGameSearch({ inputEl, resultsEl, onSelect }) {
 // from store metadata, or already on hand for a game that turned out to already be loaded)
 // — never with the `App <appid>` placeholder a fetch-in-flight game opens with.
 
-const RECENT_GAMES_KEY = 'recent-games';
-const MAX_RECENT_GAMES = 10;
+export const RECENT_GAMES_KEY = 'recent-games';
+export const MAX_RECENT_GAMES = 10;
 
-function loadRecentGames() {
+export function loadRecentGames() {
   try {
     const raw = JSON.parse(localStorage.getItem(RECENT_GAMES_KEY));
     return Array.isArray(raw) ? raw : [];
@@ -166,23 +168,23 @@ function loadRecentGames() {
   }
 }
 
-function saveRecentGames(list) {
+export function saveRecentGames(list) {
   try { localStorage.setItem(RECENT_GAMES_KEY, JSON.stringify(list)); } catch { /* storage full/blocked — drop silently */ }
 }
 
 // Moves this game to the front, refreshing its cached name/thumbnail, rather than
 // appending a duplicate.
-function addRecentGame(appid, name, tinyImage) {
+export function addRecentGame(appid, name, tinyImage) {
   const rest = loadRecentGames().filter(g => g.appid !== appid);
   rest.unshift({ appid, name, tinyImage: tinyImage || null });
   saveRecentGames(rest.slice(0, MAX_RECENT_GAMES));
 }
 
-function removeRecentGame(appid) {
+export function removeRecentGame(appid) {
   saveRecentGames(loadRecentGames().filter(g => g.appid !== appid));
 }
 
-function recentGameChipHtml(entry) {
+export function recentGameChipHtml(entry) {
   const label = esc(entry.name || `App ${entry.appid}`);
   const safeThumb = /^https?:\/\//i.test(entry.tinyImage || '') ? entry.tinyImage : '';
   return `
@@ -196,7 +198,7 @@ function recentGameChipHtml(entry) {
   `;
 }
 
-function renderRecentGamesBar(containerEl) {
+export function renderRecentGamesBar(containerEl) {
   const recents = loadRecentGames();
   if (recents.length === 0) { containerEl.hidden = true; containerEl.innerHTML = ''; return; }
   containerEl.innerHTML = `
@@ -210,7 +212,7 @@ function renderRecentGamesBar(containerEl) {
 // `onLoad(appid, name)` opens the remembered game — same shape as bindRecentsBar in
 // accountsBar.js, but keyed directly on the appid rather than an opaque id/data pair since
 // a game is always just its appid.
-function bindRecentGamesBar(containerEl, onLoad) {
+export function bindRecentGamesBar(containerEl, onLoad) {
   containerEl.addEventListener('click', e => {
     const loadBtn = e.target.closest('.recent-chip-btn');
     if (loadBtn) {

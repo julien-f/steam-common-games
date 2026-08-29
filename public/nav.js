@@ -1,5 +1,7 @@
 'use strict';
 
+import { prefsPopoverPanelHtml, initPrefsPopover } from './prefsPopover.js';
+
 // Shared cross-page navigation bar — one component (`#site-nav`, present as an empty <nav> in
 // every page's markup) instead of each page hand-rolling its own header corner links plus a
 // second, differently-worded footer link row. Loaded as a plain script (not a module) on all
@@ -25,7 +27,7 @@ const NAV_PAGES = [
 // only the popover's shell — the `<details>`/`<summary>` toggle and its open/close mechanics;
 // what's actually inside the panel (today, just region) is prefsPopover.js's job, so this file
 // stays about page navigation regardless of how many preferences land in that panel later.
-function initNav(current) {
+export function initNav(current) {
   const el = document.getElementById('site-nav');
   if (!el) return;
   el.innerHTML = NAV_PAGES.map(p => p.key === current
@@ -61,7 +63,7 @@ function bindPrefsPopoverClose() {
 // empty page. A no-op if that link isn't rendered on the current page (e.g. `library` on the
 // Comparison page itself, where it's the active label, not a link) or `#site-nav` isn't in the
 // page's markup at all.
-function updateNavLink(key, href) {
+export function updateNavLink(key, href) {
   const link = document.querySelector(`#site-nav a[data-nav-key="${key}"]`);
   if (link) link.href = href;
 }

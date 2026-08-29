@@ -1,5 +1,17 @@
 'use strict';
 
+import { esc, fmtPlaytime, fmtLastPlayed, foldStr, renderScoreCell, renderMainCell, renderExtraCell, normalizeInput } from '/utils.js';
+import { FILTER_DIMS, parseUrlState, reorderUrlParams } from '/urlState.js';
+import { initNav, updateNavLink } from '/nav.js';
+import { renderAccountChipsGrouped, bindAccountRefresh, addRecent, renderRecentsBar, bindRecentsBar } from '/accountsBar.js';
+import { initGameSearch, addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.js';
+import { initLightbox, openLightbox, isLightboxOpen } from '/lightbox.js';
+import {
+  initPanel, panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,
+  pickRandomFrom, clearAllRandomQueues, panelHandleEscape,
+  renderPanelBody,
+} from '/panel.js';
+
 // ── State ──────────────────────────────────────────────────────────────────
 
 let games = [];     // flat: { appid, name, groupKey, loading, details }

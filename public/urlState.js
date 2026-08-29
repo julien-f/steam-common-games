@@ -1,6 +1,6 @@
 'use strict';
 
-const FILTER_DIMS = [
+export const FILTER_DIMS = [
   { key: 'tags',       label: 'Tag',       param: 'tag'   },
   { key: 'genres',     label: 'Genre',     param: 'genre' },
   { key: 'categories', label: 'Category',  param: 'cat'   },
@@ -22,7 +22,7 @@ const FILTER_DIMS = [
 // every table interaction — only by the table's own "Share view" button — see library.js.
 const PARAM_ORDER = ['u', 'tab', 'sort', 'game', 'shot', 'name', ...FILTER_DIMS.map(d => d.param), 'lv', 'wv'];
 
-function reorderUrlParams(params) {
+export function reorderUrlParams(params) {
   const ordered = new URLSearchParams();
   for (const key of PARAM_ORDER) {
     for (const v of params.getAll(key)) ordered.append(key, v);
@@ -35,7 +35,7 @@ function reorderUrlParams(params) {
   return ordered;
 }
 
-function parseUrlState(search) {
+export function parseUrlState(search) {
   const params = new URLSearchParams(search);
   const slots = params.getAll('u')
     .map(s => s.split(',').map(v => v.trim()).filter(Boolean));
@@ -52,5 +52,3 @@ function parseUrlState(search) {
     filters:    Object.fromEntries(FILTER_DIMS.map(d => [d.key, params.getAll(d.param)])),
   };
 }
-
-if (typeof module !== 'undefined') module.exports = { FILTER_DIMS, parseUrlState, reorderUrlParams };

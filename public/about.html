@@ -55,11 +55,10 @@
 
 </div>
 
-<script src="/prefs.js"></script>
-<script src="/region.js"></script>
-<script src="/prefsPopover.js"></script>
-<script src="/nav.js"></script>
-<script>initNav('about');</script>
+<script type="module">
+  import { initNav } from '/nav.js';
+  initNav('about');
+</script>
 
 </body>
 </html>

@@ -12,19 +12,13 @@
 // layering its own page-specific columns on top via `insertColumnsAfter`.
 //
 // An ES module — imported directly by `bundles.js`/`library.js` (`import { CORE_COLUMNS, ... }
-// from '/gameColumns.js'`), not loaded via its own `<script>` tag on either page's HTML. This
-// is *unlike* `utils.js`/`urlState.js`/`region.js`, which are plain global scripts: those have
-// no dependency on `@vates/data-table-core`, but this file's compare/bucket/format helpers
-// (`compareMissingLast`, `bucketNumericRange`, etc.) do, and that package is only reachable via
-// a real ES `import` (resolved through the import map already used for `@vates/data-table-
-// vanilla` — see library.html) — a classic script has no way to reach a bare-specifier package
-// import at all. It still reads `scoreColor`/`dealRecordTier`/`DEAL_RECORD_TIERS`/`formatMoney`
-// from `utils.js` as bare globals rather than importing them, the same mechanism `bundles.js`/
-// `library.js` already use for `utils.js` today — utils.js stays a plain script (panel.js, also
-// a plain script, needs to read it the same way), so this file can't `import` from it, but a
-// module's top-level code still sees whatever the browser's already-loaded classic scripts put
-// in scope. `formatMoney` specifically lives in `utils.js`, not here, precisely so panel.js's
-// own (plain-script) Price card can share it too — see its own comment there.
+// from '/gameColumns.js'`), not loaded via its own `<script>` tag on either page's HTML. Now
+// that `utils.js`/`urlState.js`/`region.js`/`panel.js`/etc. are all real ES modules too (see
+// CLAUDE.md's git history — they used to be plain global scripts), this file imports
+// `scoreColor`/`dealRecordTier`/`DEAL_RECORD_TIERS`/`formatMoney` from `utils.js` directly
+// rather than reading them off the global scope. `formatMoney` specifically lives in
+// `utils.js`, not here, precisely so `panel.js`'s own Price card can import it too — see its
+// own comment there.
 //
 // What's NOT here, and stays page-specific: `tierPrice`/`addon` (bundles.js — no Library/
 // Wishlist equivalent, a bundle-tier concept), `priority`/`dateAdded` (library.js's Wishlist
@@ -40,6 +34,7 @@ import {
   compareMissingLast, bucketNumericRange, bucketDatePart, formatNumericRange, formatDatePart,
   bucketLogRange, formatLogRange,
 } from '@vates/data-table-core';
+import { scoreColor, dealRecordTier, DEAL_RECORD_TIERS, formatMoney } from '/utils.js';
 
 export const fmt = {
   num:  v => v === undefined ? '…' : v === null ? '—' : String(v),

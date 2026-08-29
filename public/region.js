@@ -1,5 +1,7 @@
 'use strict';
 
+import { getPref, setPref } from './prefs.js';
+
 // The region preference's data and logic — the curated list, the detection heuristic, and
 // get/set/resolve for the stored value — with no DOM/UI code of its own (see prefsPopover.js
 // for the actual `<select>` this backs). Loaded as a plain script (not a module) on all four
@@ -14,7 +16,7 @@
 // with "Europe" in its own label (rather than "Germany / EU") — `DE` is just the ISO code
 // Steam/ITAD happen to key Eurozone pricing off, an implementation detail nobody picking a
 // region cares about; the concept being selected is "Europe", not specifically Germany.
-const COUNTRY_OPTIONS = [
+export const COUNTRY_OPTIONS = [
   { code: 'US', label: 'United States (USD)' },
   { code: 'GB', label: 'United Kingdom (GBP)' },
   { code: 'DE', label: 'Europe / Germany (EUR)' },
@@ -43,7 +45,7 @@ const COUNTRY_OPTIONS = [
 // country individually — but only actual euro-using EU countries; EU members with their own
 // currency (Sweden/Poland/Czechia/Hungary/Denmark, etc.) are left unmapped rather than
 // incorrectly bucketed into EUR pricing.
-const TIMEZONE_COUNTRY = {
+export const TIMEZONE_COUNTRY = {
   'Europe/London': 'GB',
   'Europe/Berlin': 'DE', 'Europe/Paris': 'DE', 'Europe/Madrid': 'DE', 'Europe/Rome': 'DE',
   'Europe/Amsterdam': 'DE', 'Europe/Brussels': 'DE', 'Europe/Vienna': 'DE', 'Europe/Dublin': 'DE',
@@ -74,7 +76,7 @@ const TIMEZONE_COUNTRY = {
 // correctly implies a Eurozone country. The timezone isn't infallible either (a US expat who
 // never changed their laptop's clock would still misdetect), but it's a meaningfully better
 // default than a language tag that many browsers leave on its out-of-the-box value forever.
-function detectCountry() {
+export function detectCountry() {
   try {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (TIMEZONE_COUNTRY[tz]) return TIMEZONE_COUNTRY[tz];
@@ -90,7 +92,7 @@ function detectCountry() {
 // picker's own default entry (see prefsPopover.js's initPrefsPopover) and the default when
 // nothing has been explicitly chosen yet. Deliberately not one of the real 2-letter ISO codes
 // above, so it can never collide with a genuine country selection.
-const AUTO_COUNTRY = 'auto';
+export const AUTO_COUNTRY = 'auto';
 
 // One shared preference, not per-page — this is "what currency do I want to see prices in", a
 // single user preference rather than page-specific browsing/display state (unlike e.g.
@@ -106,7 +108,7 @@ const REGION_PREF_KEY = 'region';
 // Whatever was last explicitly picked (a real code, or AUTO_COUNTRY), or AUTO_COUNTRY when
 // nothing was ever picked, storage is unavailable (private browsing, cleared site data), or the
 // stored value isn't recognized (an old/foreign value). Never throws.
-function getStoredRegion() {
+export function getStoredRegion() {
   const v = getPref(REGION_PREF_KEY);
   if (v === AUTO_COUNTRY || COUNTRY_OPTIONS.some(c => c.code === v)) return v;
   return AUTO_COUNTRY;
@@ -116,9 +118,9 @@ function getStoredRegion() {
 // Wishlist tab dropped their own inline pickers once that existed), but this stays a plain
 // broadcast rather than nav.js reaching into those pages directly, so any future picker (or a
 // synced update from a future Steam-auth account) needs to know nothing about who's listening.
-const REGION_CHANGED_EVENT = 'scg:region-changed';
+export const REGION_CHANGED_EVENT = 'scg:region-changed';
 
-function setStoredRegion(value) {
+export function setStoredRegion(value) {
   setPref(REGION_PREF_KEY, value);
   try { window.dispatchEvent(new CustomEvent(REGION_CHANGED_EVENT, { detail: { region: value } })); } catch { /* no window (tests) */ }
 }
@@ -127,7 +129,7 @@ function setStoredRegion(value) {
 // 2-letter country code to send upstream — the one place `detectCountry()` gets consulted for
 // a *live* value, so "Auto-detect" always tracks the current OS/browser signals rather than
 // freezing whatever they happened to resolve to at picker-population time.
-function resolveRegion(selected) {
+export function resolveRegion(selected) {
   return selected === AUTO_COUNTRY ? detectCountry() : selected;
 }
 

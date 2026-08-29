@@ -1,5 +1,19 @@
 'use strict';
 
+import { esc, formatMoney, fmtPlaytime, fmtLastPlayed, computeSteamdbRating, computeProductionTier, normalizeInput } from '/utils.js';
+import { reorderUrlParams } from '/urlState.js';
+import { getPref, setPref } from '/prefs.js';
+import { COUNTRY_OPTIONS, getStoredRegion, setStoredRegion, resolveRegion, REGION_CHANGED_EVENT } from '/region.js';
+import { initNav, updateNavLink } from '/nav.js';
+import { renderAccountChips, bindAccountRefresh, addRecent, renderRecentsBar, bindRecentsBar } from '/accountsBar.js';
+import { initGameSearch, addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.js';
+import { initLightbox, openLightbox, isLightboxOpen } from '/lightbox.js';
+import {
+  initPanel, panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,
+  pickRandomFrom, clearRandomQueue, panelHandleEscape,
+  renderPanelBody,
+} from '/panel.js';
+
 import { createDataTable } from '@vates/data-table-vanilla';
 import { bucketDatePart, formatDatePart } from '@vates/data-table-core';
 import {

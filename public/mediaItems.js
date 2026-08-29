@@ -1,6 +1,6 @@
 'use strict';
 
-function buildMediaItems(appid, details) {
+export function buildMediaItems(appid, details) {
   // `details.banner` (see extractAppDetails in lib/steam.js) is Steam's own header image
   // for this specific game, resolved once store metadata has loaded — before that (the
   // game is still `loading`, so `details` itself is absent), guess the conventional CDN
@@ -19,12 +19,10 @@ function buildMediaItems(appid, details) {
   ];
 }
 
-function resolveShotIndex(shots, idxOrShotId) {
+export function resolveShotIndex(shots, idxOrShotId) {
   if (typeof idxOrShotId === 'string') {
     const idx = shots.findIndex(s => s.shotId === idxOrShotId);
     return idx >= 0 ? idx : 0;
   }
   return Math.max(0, Math.min(idxOrShotId, shots.length - 1));
 }
-
-if (typeof module !== 'undefined') module.exports = { buildMediaItems, resolveShotIndex };

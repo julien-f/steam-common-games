@@ -1,5 +1,7 @@
 'use strict';
 
+import { buildMediaItems, resolveShotIndex } from './mediaItems.js';
+
 // ── Icons ──────────────────────────────────────────────────────────────────
 
 const LB_FS_ENTER  = `<svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" aria-hidden="true"><polyline points="4,1 1,1 1,4"/><polyline points="8,1 11,1 11,4"/><polyline points="1,8 1,11 4,11"/><polyline points="11,8 11,11 8,11"/></svg>`;
@@ -35,14 +37,14 @@ const _lbPrefetchedHls = new Set();
 // how the switch is made visible), rather than either doing nothing or silently
 // switching games behind a fullscreen image that never changed. Optional — a host
 // with no group to page through (e.g. a standalone lookup) just no-ops.
-function initLightbox({ onParamChange, onGameNav } = {}) {
+export function initLightbox({ onParamChange, onGameNav } = {}) {
   _onLightboxParamChange = onParamChange ?? null;
   _onGameNav = onGameNav ?? null;
   document.addEventListener('fullscreenchange', syncLightboxFullscreenBtn);
   document.addEventListener('webkitfullscreenchange', syncLightboxFullscreenBtn);
 }
 
-function isLightboxOpen() { return lightboxShots.length > 0; }
+export function isLightboxOpen() { return lightboxShots.length > 0; }
 
 // ── Fullscreen button sync ─────────────────────────────────────────────────
 
@@ -186,7 +188,7 @@ function flashSeek(side) {
 
 // ── Time formatting ────────────────────────────────────────────────────────
 
-function fmtTime(s) {
+export function fmtTime(s) {
   if (!isFinite(s) || s < 0) return '0:00';
   const m = Math.floor(s / 60);
   return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -569,7 +571,7 @@ function getLightbox() {
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
-function openLightbox(game, idxOrShotId) {
+export function openLightbox(game, idxOrShotId) {
   _lbPrevFocus = document.activeElement;
   lightboxGameName = game.name || '';
   lightboxShots = buildMediaItems(game.appid, game.details?.meta);
@@ -582,7 +584,7 @@ function openLightbox(game, idxOrShotId) {
   _onLightboxParamChange?.(lightboxShots[lightboxIdx].shotId);
 }
 
-function closeLightbox() {
+export function closeLightbox() {
   lightboxShots = [];
   clearTimeout(lbVcTimer);
   const lb = getLightbox();
@@ -597,7 +599,7 @@ function closeLightbox() {
   _lbPrevFocus = null;
 }
 
-function stepLightbox(dir) {
+export function stepLightbox(dir) {
   lbLastDir = dir;
   lightboxIdx = (lightboxIdx + dir + lightboxShots.length) % lightboxShots.length;
   renderLightbox();
@@ -713,5 +715,3 @@ function renderLightbox() {
   );
   lb.querySelectorAll('.lb-preload').forEach(el => { if (!keep.has(el.dataset.src)) el.remove(); });
 }
-
-if (typeof module !== 'undefined') module.exports = { fmtTime, isLightboxOpen };

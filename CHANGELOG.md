@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Added
+### Changed
+
+- All shared frontend files (`utils.js`, `urlState.js`, `prefs.js`, `mediaItems.js`, `region.js`, `prefsPopover.js`, `nav.js`, `accountsBar.js`, `gameSearch.js`, `lightbox.js`, `panel.js`) converted from plain global scripts to real ES modules with explicit `import`/`export`, and `app.js`/`library.js`/`bundles.js` updated to import from them instead of relying on load-order-dependent globals. `public/package.json` (`{"type":"module"}`) lets Node's test runner keep `require()`-ing these files unchanged (Node 22+'s synchronous `require(esm)` support), so no test files needed changes. Each page's HTML now loads a single `type="module"` entry script instead of a dozen separate `<script>` tags in a specific order. First step of moving toward a real build pipeline (Vite) — not yet done: this pass keeps native browser ES modules with the existing import map for `@vates/data-table-*`, no bundler/dev-server yet.
 
 - Lightbox: a visible game-name caption in the toolbar (`.lb-caption`) — previously the game/shot identity only existed as invisible `alt`/`aria-label` text, so it was impossible to tell at a glance which game's media was showing.
 - Side panel Price card: a compact line of historical lows (3mo/1yr/all-time, most recent first) under the buy line, whichever of the three ITAD already returned for that game — reuses `DEAL_RECORD_TIERS`' own icon/color/label (`public/utils.js`) so it stays in sync with the Best Deal badge above it. Consecutive tiers sharing the same amount (common when the all-time low happened recently) are collapsed into one entry with combined icons instead of repeating the price, and any low that equals the current best-deal price above (already badged there) is dropped entirely rather than shown twice.
