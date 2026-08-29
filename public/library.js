@@ -1,15 +1,7 @@
 'use strict';
 
 import { createDataTable } from '@vates/data-table-vanilla';
-import { DEFAULT_LABELS, bucketDatePart, formatDatePart } from '@vates/data-table-core';
-// processData/searchData moved off @vates/data-table-core's public surface in 0.12 (into
-// @vates/data-table-core/internal, alongside every other adapter-internal helper) — that
-// sub-path is explicitly documented as unsupported/no-semver-guarantee (see that package's own
-// README), but there's currently no supported alternative for getGameList's own need below
-// (the table's live filtered/sorted/searched row order, independent of its display-only
-// grouping/pagination — @vates/data-table-vanilla's own DataTableInstance exposes no such
-// method). Flagged upstream; revisit if/when an adapter-level equivalent lands.
-import { processData, searchData } from '@vates/data-table-core/internal';
+import { bucketDatePart, formatDatePart } from '@vates/data-table-core';
 import {
   fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareDateMissingLast,
   withMissingGroup, formatMissingGroup, halfDecadeBucket, formatHalfDecadeBucket,
@@ -34,7 +26,7 @@ const PLAYTIME_COLUMN = {
   key: 'playtime', label: 'Played (h)', type: 'number', groupable: true,
   format: v => v > 0 ? Number(v).toFixed(1) : '—', defaultSortDir: 'desc',
   groupValue: halfDecadeBucket, groupFormat: formatHalfDecadeBucket('h', 'Not played'),
-  keepVisibleWhenGrouped: true,
+  keepVisibleWhenGrouped: true, category: 'Play Time & Dates',
 };
 // Most recent `rtime_last_played` across every account merged into this row (a Steam Family
 // slot unions several accounts — see groupByOwnership — so "last played" here means "by
@@ -64,6 +56,7 @@ const LAST_PLAYED_COLUMN = {
   compare: compareDateMissingLast, defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
   groupValue: withMissingGroup(bucketDatePart('year'), v => v == null || v === ''),
   groupFormat: formatMissingGroup(formatDatePart('year')), keepVisibleWhenGrouped: true,
+  category: 'Play Time & Dates',
 };
 
 // The Library tab's own column list — CORE_COLUMNS (public/gameColumns.js) plus Played/Last
@@ -100,7 +93,8 @@ const WISHLIST_DATE_ADDED_COLUMN =
   { key: 'dateAdded', label: 'Added',         type: 'date',   groupable: true,  format: fmt.str, compare: compareDateMissingLast,
     defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
     groupValue: withMissingGroup(bucketDatePart('year')),
-    groupFormat: formatMissingGroup(formatDatePart('year')), keepVisibleWhenGrouped: true };
+    groupFormat: formatMissingGroup(formatDatePart('year')), keepVisibleWhenGrouped: true,
+    category: 'Play Time & Dates' };
 
 // The Wishlist tab's own column list — CORE_COLUMNS plus its price cluster (PRICE_COLUMNS,
 // public/gameColumns.js — Bundles gets the exact same cluster in the exact same relative
@@ -421,19 +415,14 @@ function markRowChanged(appid) {
   tableRowCache.delete(appid);
 }
 
-// Stable order for prev/next nav — independent of the table's own live
-// sort/filter/group state, which isn't exposed by @vates/data-table-vanilla.
-// The table's current search/filter/sort order — same pipeline @vates/data-table-vanilla
-// applies internally (searchData then processData), minus its grouping/pagination, which are
-// display-only concerns with no single well-defined linear order (a grouped multi-value column
-// like Genres fans a game out into more than one group).
+// Stable order for prev/next nav — the table's current search/filter/sort order, independent
+// of its own display-only grouping/pagination (a grouped multi-value column like Genres fans a
+// game out into more than one group, so there's no single well-defined linear order once
+// grouping is applied). `table.getProcessedData()` (`@vates/data-table-vanilla` >= 0.13, added
+// per vatesfr/data-table#22) exposes exactly this directly — before that, this had to reach
+// into @vates/data-table-core/internal's processData/searchData by hand.
 function getGameList() {
-  const view = table.getViewState();
-  const filters = Object.fromEntries(
-    Object.entries(view.filters ?? {}).map(([key, values]) => [key, new Set(values)])
-  );
-  const searched = searchData(visibleRows(), view.searchQuery ?? '', activeColumns);
-  return processData(searched, filters, view.rangeFilters ?? {}, view.sorts ?? [], activeColumns, DEFAULT_LABELS.emptyValue);
+  return table.getProcessedData();
 }
 
 // Same template as the comparison page's buildOwnersHtml (app.js) — kept as a separate copy

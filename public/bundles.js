@@ -1,11 +1,6 @@
 'use strict';
 
 import { createDataTable } from '@vates/data-table-vanilla';
-import { DEFAULT_LABELS } from '@vates/data-table-core';
-// processData/searchData moved off @vates/data-table-core's public surface in 0.12 — see the
-// matching comment in library.js for why this still reaches into the explicitly-unsupported
-// /internal sub-path rather than a sanctioned alternative (there isn't one yet).
-import { processData, searchData } from '@vates/data-table-core/internal';
 import {
   fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareNumMissingLast,
   withMissingGroup, formatMissingGroup, priceTierBucket, formatPriceTier,
@@ -60,9 +55,10 @@ const TIER_PRICE_COLUMN = {
   format: v => v == null ? 'Varies' : v === 0 ? 'Free' : v.toFixed(2), render: renderTierPrice,
   compare: compareNumMissingLast, defaultSortDir: 'asc',
   groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier, 'Varies'), keepVisibleWhenGrouped: true,
+  category: 'Pricing',
 };
 const ADDON_COLUMN =
-  { key: 'addon', label: 'Add-on', groupable: true, format: v => v ? 'Add-on' : 'Base', render: renderAddonBadge };
+  { key: 'addon', label: 'Add-on', groupable: true, format: v => v ? 'Add-on' : 'Base', render: renderAddonBadge, category: 'Classification' };
 
 // The Bundles page's own column list — CORE_COLUMNS (public/gameColumns.js) plus Tier Price/
 // Add-on right after Name, and this page's price cluster (PRICE_COLUMNS — the same shared
@@ -288,17 +284,13 @@ function visibleRowsForTable() {
 }
 
 // Stable order for the panel's prev/next/random nav — the table's current search/filter/sort
-// order (same pipeline @vates/data-table-vanilla applies internally: searchData then
-// processData), independent of pagination/grouping (display-only, no single well-defined linear
-// order once a multi-value column like Genres fans a game out into more than one group). Same
-// approach library.js's own getGameList uses.
+// order, independent of pagination/grouping (display-only, no single well-defined linear order
+// once a multi-value column like Genres fans a game out into more than one group).
+// `table.getProcessedData()` (`@vates/data-table-vanilla` >= 0.13, added per
+// vatesfr/data-table#22) exposes exactly this directly. Same approach library.js's own
+// getGameList uses.
 function getGameList() {
-  const view = table.getViewState();
-  const filters = Object.fromEntries(
-    Object.entries(view.filters ?? {}).map(([key, values]) => [key, new Set(values)])
-  );
-  const searched = searchData(visibleRows(), view.searchQuery ?? '', BUNDLE_COLUMNS);
-  return processData(searched, filters, view.rangeFilters ?? {}, view.sorts ?? [], BUNDLE_COLUMNS, DEFAULT_LABELS.emptyValue);
+  return table.getProcessedData();
 }
 
 // This page only ever has one game list open at a time (the currently open bundle's table),

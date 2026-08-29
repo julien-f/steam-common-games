@@ -504,7 +504,7 @@ export function renderPriceStatus(v) {
 export const PRICE_STATUS_COLUMN = {
   key: 'priceStatus', label: 'Price Status', groupable: true,
   value: computePriceStatus, format: v => v === undefined ? '…' : v ?? '—', render: renderPriceStatus,
-  compare: comparePriceStatus, defaultSortDir: 'desc',
+  compare: comparePriceStatus, defaultSortDir: 'desc', category: 'Pricing',
 };
 
 // Inserts `newColumns` right after the column keyed `afterKey`, rather than always appending at
@@ -523,6 +523,19 @@ export function insertColumnsAfter(columns, afterKey, ...newColumns) {
 // codebase — with 20+ columns, an alphabetical or add-order list makes both the column picker
 // and this source file hard to scan. Within a section, the most commonly-useful/default-visible
 // column leads.
+//
+// Most of these sections also carry a matching `category` (`@vates/data-table-core` >= 0.13 —
+// see vatesfr/data-table's "Column categories" feature) — with 25+ core columns plus PRICE_COLUMNS
+// and each page's own extras, the Columns/Sort/Group dropdowns' flat lists (and the Filter
+// dropdown's left pane) get long enough that a category submenu genuinely helps scanning, the
+// exact problem the feature exists for. Identity (capsule/name) stays uncategorized — only two
+// columns, both default-visible, not worth a submenu; same for page-specific columns that are the
+// only thing of their kind on a given page (Wishlist Rank). `category` values match this file's
+// own section headers verbatim so the two can't drift apart — except Dates, folded into a wider
+// "Play Time & Dates" category alongside library.js's own Played/Last Played/Added columns (see
+// their own comments), since all four answer the same "when" question a reader would look for
+// together, and Released alone wouldn't be worth its own category on the Bundles/Library-tab
+// pages that don't have the other three.
 //
 // Deliberately does NOT include price columns (see PRICE_COLUMNS below) or anything page-
 // specific (Tier Price/Add-on, Wishlist Rank/Added, Played/Last Played) — an owned game in the
@@ -551,17 +564,17 @@ export const CORE_COLUMNS = [
   // it a first click started every numeric column ascending (worst-first) regardless of what the
   // number actually means.
   { key: 'steamdbRating',    label: 'Weighted Rating',  type: 'number', groupable: true, format: fmt.numRound, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc',
-    groupValue: withMissingGroup(scoreBucket), groupFormat: formatMissingGroup(formatScoreBucket), keepVisibleWhenGrouped: true },
+    groupValue: withMissingGroup(scoreBucket), groupFormat: formatMissingGroup(formatScoreBucket), keepVisibleWhenGrouped: true, category: 'Scores & Reviews' },
   // Wilson score lower bound — statistically rigorous but harder to explain than SteamDB's
   // current formula (which is why it isn't the default-visible score anymore); kept available
   // for anyone who wants the more conservative, confidence-bound number instead.
   { key: 'score',            label: 'Wilson Score',    type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc',
-    groupValue: withMissingGroup(scoreBucket), groupFormat: formatMissingGroup(formatScoreBucket), keepVisibleWhenGrouped: true },
+    groupValue: withMissingGroup(scoreBucket), groupFormat: formatMissingGroup(formatScoreBucket), keepVisibleWhenGrouped: true, category: 'Scores & Reviews' },
   // Raw positive/total ratio — the plain percentage Steam's own store page shows, as opposed to
   // the two adjusted scores above. No "%" in the cell (the column header already says so) —
   // same bare colored number treatment as the other three score columns for consistency.
   { key: 'positivePct',      label: 'Steam %',         type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc',
-    groupValue: withMissingGroup(scoreBucket), groupFormat: formatMissingGroup(formatScoreBucket), keepVisibleWhenGrouped: true },
+    groupValue: withMissingGroup(scoreBucket), groupFormat: formatMissingGroup(formatScoreBucket), keepVisibleWhenGrouped: true, category: 'Scores & Reviews' },
   // Grouped with the other user-review scores above rather than off near HLTB — it's a critic
   // (not player) score, but it's still one of the four "how good is this game" numbers, and
   // keeping all of them contiguous makes them easier to compare at a glance. Shares the exact
@@ -570,7 +583,7 @@ export const CORE_COLUMNS = [
   // all four columns' group breakdowns be compared at a glance against each other, which is the
   // more useful property here than each column individually having the tightest-fitting buckets.
   { key: 'metacritic',       label: 'Metacritic Score',type: 'number', groupable: true, format: fmt.num, render: renderScoreNum, compare: compareNumMissingLast, defaultSortDir: 'desc',
-    groupValue: withMissingGroup(scoreBucket), groupFormat: formatMissingGroup(formatScoreBucket), keepVisibleWhenGrouped: true },
+    groupValue: withMissingGroup(scoreBucket), groupFormat: formatMissingGroup(formatScoreBucket), keepVisibleWhenGrouped: true, category: 'Scores & Reviews' },
   // No compare override here — 0 reviews is a real, meaningful value (not "no data" standing in
   // for one), so the default numeric sort already treats it correctly, unlike the score/HLTB
   // columns above and below. `defaultSortDir: 'desc'` still applies though — the most-reviewed
@@ -582,7 +595,7 @@ export const CORE_COLUMNS = [
   // failed fetch into the same group as a genuinely zero-review game.
   { key: 'reviewsTotal',     label: 'Review Count',    type: 'number', groupable: true, format: fmt.ct, defaultSortDir: 'desc',
     groupValue: withMissingGroup(halfDecadeBucket), groupFormat: formatMissingGroup(formatHalfDecadeBucket('', '0')),
-    keepVisibleWhenGrouped: true },
+    keepVisibleWhenGrouped: true, category: 'Scores & Reviews' },
 
   // ── How Long To Beat ────────────────────────────────────────────────────────
   // "All PlayStyles" listed first among the HLTB columns — same convention as the side panel,
@@ -595,13 +608,13 @@ export const CORE_COLUMNS = [
   // that one, so a 10h `bucketNumericRange` is the right tool here rather than the log buckets
   // above. `null` (no HLTB match found) needs the same `withMissingGroup` treatment.
   { key: 'hltbAll',          label: 'All (h)',         type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')), keepVisibleWhenGrouped: true },
+    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')), keepVisibleWhenGrouped: true, category: 'How Long To Beat' },
   { key: 'hltbMain',         label: 'Main (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')), keepVisibleWhenGrouped: true },
+    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')), keepVisibleWhenGrouped: true, category: 'How Long To Beat' },
   { key: 'hltbExtra',        label: '+Extra (h)',      type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')), keepVisibleWhenGrouped: true },
+    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')), keepVisibleWhenGrouped: true, category: 'How Long To Beat' },
   { key: 'hltbCompletionist',label: '100% (h)',        type: 'number', groupable: true, format: fmt.dec1, compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')), keepVisibleWhenGrouped: true },
+    groupValue: withMissingGroup(bucketNumericRange(10)), groupFormat: formatMissingGroup(formatNumericRange(10, 'h')), keepVisibleWhenGrouped: true, category: 'How Long To Beat' },
 
   // ── Dates ───────────────────────────────────────────────────────────────────
   // Same year-bucketed grouping, using this column's own `parseDate` (endOfReleasePeriod) so a
@@ -613,22 +626,23 @@ export const CORE_COLUMNS = [
     parseDate: endOfReleasePeriod, compare: compareDateMissingLast, render: renderReleaseDate,
     defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
     groupValue: withMissingGroup(bucketDatePart('year', endOfReleasePeriod)),
-    groupFormat: formatMissingGroup(formatDatePart('year')), keepVisibleWhenGrouped: true },
+    groupFormat: formatMissingGroup(formatDatePart('year')), keepVisibleWhenGrouped: true,
+    category: 'Play Time & Dates' },
 
   // ── Classification ──────────────────────────────────────────────────────────
-  { key: 'genres',           label: 'Genres',       groupable: true, format: fmt.arr, keepVisibleWhenGrouped: true },
+  { key: 'genres',           label: 'Genres',       groupable: true, format: fmt.arr, keepVisibleWhenGrouped: true, category: 'Classification' },
   // `defaultValueSort: { by: 'count', dir: 'desc' }` (new in 0.8.0) — Developer/Publisher/Tags/
   // Categories are all higher-cardinality than Genres (a small, well-known fixed list that reads
   // fine alphabetically), so their filter checklists open "most common first" instead of A→Z;
   // still just the starting point — `cycleValueSort`'s toggle still cycles through all 4 states
   // the same as before.
-  { key: 'categories',       label: 'Categories',   groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
-  { key: 'tags',             label: 'Tags',         groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
-  { key: 'developers',       label: 'Developers',   groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
-  { key: 'publishers',       label: 'Publishers',   groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
+  { key: 'categories',       label: 'Categories',   groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true, category: 'Classification' },
+  { key: 'tags',             label: 'Tags',         groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true, category: 'Classification' },
+  { key: 'developers',       label: 'Developers',   groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true, category: 'Classification' },
+  { key: 'publishers',       label: 'Publishers',   groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true, category: 'Classification' },
   // Parsed from Steam's `supported_languages` HTML string (see parseSupportedLanguages in
   // lib/steam.js) — same high-cardinality multi-value treatment as Tags/Developers/Publisher.
-  { key: 'languages',        label: 'Languages',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true },
+  { key: 'languages',        label: 'Languages',    groupable: true, format: fmt.arr, defaultValueSort: { by: 'count', dir: 'desc' }, keepVisibleWhenGrouped: true, category: 'Classification' },
   // Steam's own content-type for this appid (see TYPE_LABELS above and the `type` comment in
   // lib/steam.js's extractAppDetails) — the overwhelming majority of rows are 'Game', but a
   // library/wishlist/bundle can genuinely contain soundtrack ('Soundtrack'), video, or DLC
@@ -636,26 +650,26 @@ export const CORE_COLUMNS = [
   // same value), but groupable/filterable so a search can be narrowed to just base games, or
   // audited for stray non-game entries. `null` ("Unknown") only when store metadata itself
   // failed to load or Steam's response omitted the field.
-  { key: 'type',             label: 'Type',         groupable: true, format: v => v || 'Unknown' },
+  { key: 'type',             label: 'Type',         groupable: true, format: v => v || 'Unknown', category: 'Classification' },
   // Estimated, not authoritative — see computeProductionTier's doc comment (public/utils.js)
   // and CLAUDE.md's AAA/AA/Indie section. The label spells out "(est.)" rather than relying on
   // a hover tooltip, since @vates/data-table-vanilla has no per-column header-tooltip option to
   // hang a caveat on. Hidden by default — a secondary number, not the primary thing most
   // searches here care about, and one that's explicitly a best-effort guess on top of that.
   { key: 'productionTier',   label: 'Production Tier (est.)', groupable: true, format: fmt.str,
-    compare: compareProductionTier, defaultSortDir: 'desc' },
+    compare: compareProductionTier, defaultSortDir: 'desc', category: 'Classification' },
 
   // ── Compatibility ───────────────────────────────────────────────────────────
   // Native OS support (`platforms` in lib/steam.js's extractAppDetails) — distinct from the
   // ProtonDB column right below, which is Linux/Deck compatibility *through Proton*, a
   // compatibility layer, not native support. Same multi-value groupable/filterable treatment as
   // Genres/Categories rather than three separate boolean columns.
-  { key: 'platforms',        label: 'Platforms',    groupable: true, format: fmt.arr, keepVisibleWhenGrouped: true },
+  { key: 'platforms',        label: 'Platforms',    groupable: true, format: fmt.arr, keepVisibleWhenGrouped: true, category: 'Compatibility' },
   // Linux/Steam Deck compatibility tier from ProtonDB — sorted/grouped by actual compatibility
   // quality (see compareProtonTier above), not alphabetically; public/panel.js shows the same
   // data as a colored badge in the side panel. `defaultSortDir: 'desc'` shows the best-
   // compatibility games first on a fresh click, matching compareProtonTier's worst-to-best order.
-  { key: 'protondb',         label: 'ProtonDB',     groupable: true, format: fmt.str, render: renderProtonBadge, compare: compareProtonTier, defaultSortDir: 'desc' },
+  { key: 'protondb',         label: 'ProtonDB',     groupable: true, format: fmt.str, render: renderProtonBadge, compare: compareProtonTier, defaultSortDir: 'desc', category: 'Compatibility' },
 
   // ── Extras ──────────────────────────────────────────────────────────────────
   // Leads the section — "can I try this first" is relevant to any prospective player, unlike
@@ -672,7 +686,7 @@ export const CORE_COLUMNS = [
   // way (no separate "unknown" state), so no `compare`/missing-last handling is needed — plain
   // boolean comparison already puts demo games first with `defaultSortDir: 'desc'`.
   { key: 'hasDemo',          label: 'Demo',         groupable: true,
-    format: v => v === undefined ? '…' : v ? 'Demo' : '—', render: renderDemoBadge, defaultSortDir: 'desc' },
+    format: v => v === undefined ? '…' : v ? 'Demo' : '—', render: renderDemoBadge, defaultSortDir: 'desc', category: 'Extras' },
   // Steam's own achievement count for the game (`achievements.total` on the appdetails
   // response — see `achievementCount` in lib/steam.js's extractAppDetails), not this
   // player's unlock progress — that's the side panel's own Achievements section
@@ -680,12 +694,12 @@ export const CORE_COLUMNS = [
   // (the game genuinely has none); `null` (missing, sorted last by compareNumMissingLast)
   // only when store metadata itself failed to load. Hidden by default — a fairly niche
   // completionist-facing number compared to the rest of each page's own DEFAULT_VISIBLE.
-  { key: 'achievementCount', label: 'Achievement Count', type: 'number', groupable: true, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'desc' },
+  { key: 'achievementCount', label: 'Achievement Count', type: 'number', groupable: true, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'desc', category: 'Extras' },
   // Length of `meta.dlc` (the bare DLC appid list every appdetails response already carries —
   // see the `dlc` comment in lib/steam.js's extractAppDetails) — computed server-side, already
   // on the row's `details.meta`. 0 is real data (base game has no DLC); `null` only when store
   // metadata itself failed to load.
-  { key: 'dlcCount',         label: 'DLC Count',    type: 'number', groupable: true, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'desc' },
+  { key: 'dlcCount',         label: 'DLC Count',    type: 'number', groupable: true, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'desc', category: 'Extras' },
 ];
 
 // ── Price columns (IsThereAnyDeal) — shared by Wishlist and Bundles only, not the Library tab
@@ -701,7 +715,7 @@ export const PRICE_COLUMNS = [
   // sort/group by it. Named "Steam Full Price" rather than the shorter "Steam Price" specifically
   // to make clear it's the non-discounted list price, not whatever Steam happens to charge today.
   { key: 'steamRegular', label: 'Steam Full Price', type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
+    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true, category: 'Pricing' },
   // The cheapest *current* price across every shop ITAD tracks for this game (Steam included) —
   // the "where do I actually buy this for less, right now" answer, as opposed to Steam Full
   // Price (Steam's own non-discounted list price) or the historical lows below (what something
@@ -710,7 +724,7 @@ export const PRICE_COLUMNS = [
   // — the shop is still available as its own column (`bestDealShop`, hidden by default) for
   // anyone who wants to group/filter by "which shop currently has the best price".
   { key: 'bestDealPrice', label: 'Best Deal',     type: 'number', groupable: true, format: fmt.num, render: renderBestDeal, compare: compareNumMissingLast, defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
+    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true, category: 'Pricing' },
   // How much cheaper the best deal is than Steam Full Price (`discountPct`, computed by each
   // page's own loadPrices/loadWishlistPrices — see its own comment above for why this is
   // computed against Steam's price rather than taken from ITAD's own per-deal "cut" field).
@@ -720,17 +734,17 @@ export const PRICE_COLUMNS = [
   // hand-picked breakpoints above — a percentage is already bounded 0-100 with no long tail to
   // worry about, so there's no reason to reach for anything fancier than an even step.
   { key: 'bestDealCut',   label: 'Discount',      type: 'number', groupable: true, format: fmt.num, render: renderCut, compare: compareNumMissingLast, defaultSortDir: 'desc',
-    groupValue: withMissingGroup(bucketNumericRange(25)), groupFormat: formatMissingGroup(formatNumericRange(25, '%')), keepVisibleWhenGrouped: true },
+    groupValue: withMissingGroup(bucketNumericRange(25)), groupFormat: formatMissingGroup(formatNumericRange(25, '%')), keepVisibleWhenGrouped: true, category: 'Pricing' },
   PRICE_STATUS_COLUMN,
-  { key: 'bestDealShop',  label: 'Best Deal Shop', groupable: true, format: fmt.str },
+  { key: 'bestDealShop',  label: 'Best Deal Shop', groupable: true, format: fmt.str, category: 'Pricing' },
   // Hidden by default now that Best Deal's own color/badge already answers "is this a record
   // low" without a separate column for each of the three windows — kept, not removed outright,
   // since the exact number is still sometimes worth seeing (e.g. how far above the record low
   // the current deal actually is).
   { key: 'lowAll',        label: 'All-Time Low',  type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
+    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true, category: 'Pricing' },
   { key: 'lowY1',         label: '1-Year Low',   type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
+    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true, category: 'Pricing' },
   { key: 'lowM3',         label: '3-Month Low',  type: 'number', groupable: true, format: fmt.num, render: renderPrice, compare: compareNumMissingLast, defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true },
+    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier), keepVisibleWhenGrouped: true, category: 'Pricing' },
 ];
