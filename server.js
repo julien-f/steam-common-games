@@ -98,7 +98,20 @@ app.use(express.json());
 // unconditionally regardless of which one is serving, since a dist/ build simply never
 // requests them (harmless either way).
 const DIST_DIR = path.join(__dirname, 'dist');
-const STATIC_DIR = fs.existsSync(path.join(DIST_DIR, 'index.html')) ? DIST_DIR : path.join(__dirname, 'public');
+const usingDist = fs.existsSync(path.join(DIST_DIR, 'index.html'));
+const STATIC_DIR = usingDist ? DIST_DIR : path.join(__dirname, 'public');
+if (usingDist) {
+  // Vite's dist/assets/* filenames are content-hashed (e.g. panel-BSUK1-Ck.js) — genuinely
+  // immutable once built, unlike public/'s own unhashed filenames (which can't get this
+  // treatment: the same name there really can hold different content across a deploy). A long
+  // max-age + immutable lets a repeat visitor's browser skip the conditional-GET round-trip
+  // entirely instead of re-validating an ETag for a file that can never actually change under
+  // that exact hashed name. Mounted ahead of the plain express.static below specifically so it
+  // only applies to /assets — the dist/*.html entry files (served by that general handler,
+  // with no special caching) are what reference the current hashes and must always be
+  // refetched, not cached alongside them.
+  app.use('/assets', express.static(path.join(DIST_DIR, 'assets'), { immutable: true, maxAge: '1y' }));
+}
 app.use(express.static(STATIC_DIR));
 app.use('/vendor/data-table-core', express.static(path.join(__dirname, 'node_modules/@vates/data-table-core/dist')));
 app.use('/vendor/data-table-vanilla', express.static(path.join(__dirname, 'node_modules/@vates/data-table-vanilla/dist')));

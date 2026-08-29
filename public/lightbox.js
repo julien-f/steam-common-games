@@ -1,6 +1,5 @@
 'use strict';
 
-import Hls from 'hls.js';
 import { buildMediaItems, resolveShotIndex } from './mediaItems.js';
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -59,7 +58,20 @@ function syncLightboxFullscreenBtn() {
 
 // ── Video playback (HLS) ───────────────────────────────────────────────────
 
-function playHls(videoEl, src) {
+// hls.js is ~130KB gzipped — dwarfing the rest of this app's own JS combined — for a library
+// only Safari's *own* native HLS support (the canPlayType branch below) doesn't need at all,
+// and which most panel opens never touch regardless of browser (screenshots, not video, are
+// the common case). Loaded via a dynamic import the first time a non-Safari browser actually
+// needs to play a video, instead of a static import that shipped it to every page load
+// unconditionally. Memoized so a second video only pays the (already-resolved) promise, not a
+// second network fetch; also let's the adjacent-shot prefetch below warm this same promise
+// ahead of the user actually reaching a video shot, same idea as its existing manifest prefetch.
+let _hlsModulePromise = null;
+function loadHlsModule() {
+  return (_hlsModulePromise ??= import('hls.js').then(m => m.default));
+}
+
+async function playHls(videoEl, src) {
   if (!src) return;
   hideLbError();
   if (videoEl._hls) { videoEl._hls.destroy(); videoEl._hls = null; }
@@ -69,21 +81,29 @@ function playHls(videoEl, src) {
     videoEl.onerror = () => showLbError("Couldn't load this video.");
     videoEl.src = src;
     videoEl.play().catch(() => {});
-  } else if (Hls.isSupported()) {
-    const hls = new Hls({ autoStartLoad: true, startLevel: -1 });
-    hls.on(Hls.Events.ERROR, (_event, data) => {
-      if (data?.fatal) showLbError("Couldn't load this video.");
-    });
-    hls.loadSource(src);
-    hls.attachMedia(videoEl);
-    hls.on(Hls.Events.MANIFEST_PARSED, () => videoEl.play().catch(() => {}));
-    videoEl._hls = hls;
+    return;
   }
+  // videoEl is reused across shots, and loading hls.js is async — guard against a stale
+  // load resolving after the user already stepped to a different shot (stopHls bumps this
+  // same token) or reopened this same videoEl with a newer playHls call in the meantime.
+  const token = (videoEl._hlsToken = (videoEl._hlsToken || 0) + 1);
+  const Hls = await loadHlsModule();
+  if (videoEl._hlsToken !== token) return;
+  if (!Hls.isSupported()) return;
+  const hls = new Hls({ autoStartLoad: true, startLevel: -1 });
+  hls.on(Hls.Events.ERROR, (_event, data) => {
+    if (data?.fatal) showLbError("Couldn't load this video.");
+  });
+  hls.loadSource(src);
+  hls.attachMedia(videoEl);
+  hls.on(Hls.Events.MANIFEST_PARSED, () => videoEl.play().catch(() => {}));
+  videoEl._hls = hls;
 }
 
 function stopHls(videoEl) {
   if (!videoEl) return;
   videoEl.pause();
+  videoEl._hlsToken = (videoEl._hlsToken || 0) + 1; // invalidate any in-flight playHls() load
   if (videoEl._hls) { videoEl._hls.destroy(); videoEl._hls = null; }
   videoEl.removeAttribute('src');
 }
@@ -705,6 +725,7 @@ function renderLightbox() {
     if (adjacent.type === 'video' && adjacent.hls && !_lbPrefetchedHls.has(adjacent.hls)) {
       _lbPrefetchedHls.add(adjacent.hls);
       fetch(adjacent.hls).catch(() => {});
+      loadHlsModule().catch(() => {}); // warm it ahead of time — see its own comment above
     }
   }
   // Drop stale preloads (keep only prev/next)
