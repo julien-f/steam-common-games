@@ -1,16 +1,18 @@
 'use strict';
 
-import { esc, fmtPlaytime, fmtLastPlayed, foldStr, renderScoreCell, renderMainCell, renderExtraCell, normalizeInput } from '/utils.js';
+import { esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, normalizeInput } from '/utils.js';
+import { renderOwnersHtml } from '/ownerListHtml.js';
 import { FILTER_DIMS, parseUrlState, reorderUrlParams } from '/urlState.js';
-import { initNav, updateNavLink } from '/nav.js';
+import { updateNavLink } from '/nav.js';
 import { renderAccountChipsGrouped, bindAccountRefresh, addRecent, renderRecentsBar, bindRecentsBar } from '/accountsBar.js';
 import { initGameSearch, addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.js';
-import { initLightbox, openLightbox, isLightboxOpen } from '/lightbox.js';
+import { openLightbox, isLightboxOpen } from '/lightbox.js';
 import {
-  initPanel, panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,
+  panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,
   pickRandomFrom, clearAllRandomQueues, panelHandleEscape,
   renderPanelBody,
 } from '/panel.js';
+import { initPageShell } from '/pageShell.js';
 
 // ── State ──────────────────────────────────────────────────────────────────
 
@@ -60,7 +62,64 @@ let filterPanelCollapsed = typeof matchMedia === 'function' && matchMedia('(max-
 // ── Init ───────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-  initNav('compare');
+  initPageShell({
+    page: 'compare',
+    lightbox: { onParamChange: setLightboxParam, onGameNav: navigateLightboxGame },
+    panel: {
+      inertSelector: '.container',
+      enableTagFilters: true,
+      // Achievements are opt-in per host page (see panel.js's achievementsHtml). Unlike the
+      // Library Explorer, a comparison group has no single well-defined "player" to fetch
+      // unlock progress for (a game can belong to several slots at once, each possibly a
+      // merged Family) — so for now this only actually renders anything for a standalone
+      // "look up any game" lookup (see loadAchievements below), where the list itself
+      // (names/descriptions/icons/rarity, no progress) is store metadata that doesn't
+      // depend on any account. A loaded comparison-group game simply never gets
+      // `g.achievements` set, so achievementsHtml's `if (!data) return ''` keeps the
+      // section hidden for those, same as before this was turned on at all.
+      showAchievements: true,
+      getOwnersHtml: buildOwnersHtml,
+      isTagActive: (dim, val) => activeFilters[dim].has(val),
+      onTagClick: (dim, val) => {
+        if (activeFilters[dim].has(val)) activeFilters[dim].delete(val);
+        else activeFilters[dim].add(val);
+        refreshTable();
+        updateFilterUrl();
+        renderFilterPanel();
+        renderPanel();
+      },
+      onRefresh: async game => {
+        await Promise.all([refreshGameDetails(game), loadAchievements(game, { force: true })]);
+      },
+      // Backs the DLC card's links (public/panel.js) — a real href so ctrl/cmd/shift/middle
+      // click still opens it in a new tab, alongside the current URL's other state (`u=`,
+      // filters, etc.), same as setPanelParam builds for the panel's own deep link.
+      gameHref: appid => {
+        const params = new URLSearchParams(location.search);
+        params.delete('shot');
+        params.set('game', appid);
+        return `?${reorderUrlParams(params)}`;
+      },
+      // Clicking a DLC entry (or the panel's own "← Back" button) — reuses the exact same
+      // "open this appid" mechanism as the "look up any game" search box, just telling it to
+      // keep panel.js's own DLC-navigation history stack instead of starting a fresh one.
+      onNavigateGame: (appid, name) => openStandaloneGame(appid, name, { keepHistory: true }),
+      // Runs on every close path, not just the Escape-key one below — see the comment on
+      // `onClose` in panel.js. Mirrors what the old closePanel() wrapper did, but now also
+      // covers the backdrop click / × button / swipe-to-close, which used to leave
+      // `activeGame` and `?game=` stale until something else (e.g. a later Escape press)
+      // happened to clean them up. `preserveUrl` is set by findCommonGames when it closes the
+      // panel only to immediately reopen the same game once a refresh/restore completes —
+      // see its own `panelClose({ preserveUrl: true })` call.
+      onClose: ({ preserveUrl } = {}) => {
+        activeGame = null;
+        randomGroupKey = null;
+        refreshTable(); // remove active row highlight
+        updateTitle();
+        if (!preserveUrl) setPanelParam(null);
+      },
+    },
+  });
 
   document.getElementById('add-btn').addEventListener('click', () => addPlayerSlot());
   document.getElementById('search-btn').addEventListener('click', findCommonGames);
@@ -99,61 +158,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('shortcuts-backdrop').addEventListener('click', closeShortcuts);
   document.querySelector('.shortcuts-close').addEventListener('click', closeShortcuts);
-
-  initPanel({
-    inertSelector: '.container',
-    enableTagFilters: true,
-    // Achievements are opt-in per host page (see panel.js's achievementsHtml). Unlike the
-    // Library Explorer, a comparison group has no single well-defined "player" to fetch
-    // unlock progress for (a game can belong to several slots at once, each possibly a
-    // merged Family) — so for now this only actually renders anything for a standalone
-    // "look up any game" lookup (see loadAchievements below), where the list itself
-    // (names/descriptions/icons/rarity, no progress) is store metadata that doesn't
-    // depend on any account. A loaded comparison-group game simply never gets
-    // `g.achievements` set, so achievementsHtml's `if (!data) return ''` keeps the
-    // section hidden for those, same as before this was turned on at all.
-    showAchievements: true,
-    getOwnersHtml: buildOwnersHtml,
-    isTagActive: (dim, val) => activeFilters[dim].has(val),
-    onTagClick: (dim, val) => {
-      if (activeFilters[dim].has(val)) activeFilters[dim].delete(val);
-      else activeFilters[dim].add(val);
-      refreshTable();
-      updateFilterUrl();
-      renderFilterPanel();
-      renderPanel();
-    },
-    onRefresh: async game => {
-      await Promise.all([refreshGameDetails(game), loadAchievements(game, { force: true })]);
-    },
-    // Backs the DLC card's links (public/panel.js) — a real href so ctrl/cmd/shift/middle
-    // click still opens it in a new tab, alongside the current URL's other state (`u=`,
-    // filters, etc.), same as setPanelParam builds for the panel's own deep link.
-    gameHref: appid => {
-      const params = new URLSearchParams(location.search);
-      params.delete('shot');
-      params.set('game', appid);
-      return `?${reorderUrlParams(params)}`;
-    },
-    // Clicking a DLC entry (or the panel's own "← Back" button) — reuses the exact same
-    // "open this appid" mechanism as the "look up any game" search box, just telling it to
-    // keep panel.js's own DLC-navigation history stack instead of starting a fresh one.
-    onNavigateGame: (appid, name) => openStandaloneGame(appid, name, { keepHistory: true }),
-    // Runs on every close path, not just the Escape-key one below — see the comment on
-    // `onClose` in panel.js. Mirrors what the old closePanel() wrapper did, but now also
-    // covers the backdrop click / × button / swipe-to-close, which used to leave
-    // `activeGame` and `?game=` stale until something else (e.g. a later Escape press)
-    // happened to clean them up. `preserveUrl` is set by findCommonGames when it closes the
-    // panel only to immediately reopen the same game once a refresh/restore completes —
-    // see its own `panelClose({ preserveUrl: true })` call.
-    onClose: ({ preserveUrl } = {}) => {
-      activeGame = null;
-      randomGroupKey = null;
-      refreshTable(); // remove active row highlight
-      updateTitle();
-      if (!preserveUrl) setPanelParam(null);
-    },
-  });
 
   initGameSearch({
     inputEl: document.getElementById('game-lookup-input'),
@@ -224,7 +228,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }).catch(() => {});
 
-  initLightbox({ onParamChange: setLightboxParam, onGameNav: navigateLightboxGame });
   loadFromUrl();
 });
 
@@ -770,6 +773,10 @@ async function fetchStandaloneDetails(game) {
   }
 }
 
+// Resolves this group's owners for renderOwnersHtml (ownerListHtml.js), which owns the actual
+// markup/sort/meter logic shared with library.js's own buildLibraryOwnersHtml — the two only
+// ever differed in this resolution step (a comparison group's multiple slots vs. a Library
+// Explorer search's one flat player list).
 function buildOwnersHtml(g) {
   if (!g.groupKey) return ''; // standalone lookup — not part of any comparison group
   const ownerIndices = g.groupKey.split(',').map(Number);
@@ -782,30 +789,7 @@ function buildOwnersHtml(g) {
       lastPlayedSec: gameLp[p.steamid] || 0,
     }))
   );
-  if (!owners.length) return '';
-  // Most recently played first — ties into the Last Played feature itself; someone who's
-  // never launched it (lastPlayedSec 0) sorts last, alphabetically among themselves so the
-  // order stays deterministic rather than depending on slot iteration order.
-  owners.sort((a, b) => b.lastPlayedSec - a.lastPlayedSec || a.name.localeCompare(b.name));
-  const maxMinutes = Math.max(...owners.map(o => o.minutes), 1);
-  return `<div class="panel-section panel-card">
-    <div class="panel-section-title">Owned by <span class="panel-section-subtitle">most recently played first</span></div>
-    <div class="panel-owners">${owners.map(o => {
-      const lp = fmtLastPlayed(o.lastPlayedSec);
-      const pt = fmtPlaytime(o.minutes);
-      // Playtime also gets a meter (single hue, width proportional to the max among these
-      // owners) — a secondary cue for relative investment, never the only signal: the
-      // number itself stays the primary, always-visible value.
-      return `<div class="panel-owner">
-        <div class="panel-owner-top">
-          <span class="panel-owner-name">${esc(o.name)}</span>
-          <span class="panel-owner-lastplayed">${lp ? esc(lp) : 'never played'}</span>
-        </div>
-        <div class="panel-owner-meter-track"><div class="panel-owner-meter-fill" style="width:${Math.round(o.minutes / maxMinutes * 100)}%"></div></div>
-        <span class="panel-owner-playtime">${pt ? `${esc(pt)} played` : 'not played'}</span>
-      </div>`;
-    }).join('')}</div>
-  </div>`;
+  return renderOwnersHtml(owners);
 }
 
 function pickRandom(groupKey) {

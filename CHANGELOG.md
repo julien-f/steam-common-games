@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Test coverage for five new shared frontend modules (`test/tableViewPrefs.test.js`, `test/rowCache.test.js`, `test/panelNav.test.js`, `test/priceLoading.test.js`, `test/ownerListHtml.test.js`) — see Changed below.
+
+### Changed
+
+- De-duplicated logic that `library.js`/`bundles.js` (and, for the owner list, `app.js`) each carried their own near-identical copy of, into shared modules:
+  - `public/tableViewPrefs.js` — the `?lv=`/`?wv=`/`?bv=` table-view restore/persist/share/reset logic. Along the way, `bundles.js`'s copy is fixed to route its writes through `reorderUrlParams` the same way `library.js`'s always did (`urlState.js`'s `PARAM_ORDER` now also lists `bv`).
+  - `public/rowCache.js` — the `@vates/data-table-vanilla` `setData()`-reference-identity fix (a row keeps its cached copy across renders until explicitly marked changed).
+  - `public/panelNav.js` — the prev/next/random panel nav-bar rendering and the shared "step to the next/prev game in the list, with wraparound" logic used by both the nav buttons and lightbox arrow-key navigation.
+  - `public/priceLoading.js` — the ITAD `/api/prices` response → row-fields mapping and the "failed request nulls the fields instead of leaving them on their loading placeholder forever" fallback.
+  - `public/ownerListHtml.js` — the "Owned by" panel-card markup, sort, and playtime-meter rendering (`app.js`'s `buildOwnersHtml` and `library.js`'s `buildLibraryOwnersHtml` were byte-identical past the point where each page resolves its own owners array; only that resolution step stays page-local now).
+  - `public/pageShell.js` — the `initNav` → `initLightbox` → `initPanel` bootstrap sequence all three pages repeat, fixing an incidental difference where `bundles.js` used to defer its `initNav` call to the end of its own async `init()` instead of calling it up front like the other two pages.
+
 - Lightbox: a visible game-name caption in the toolbar (`.lb-caption`) — previously the game/shot identity only existed as invisible `alt`/`aria-label` text, so it was impossible to tell at a glance which game's media was showing.
 - Side panel Price card: a compact line of historical lows (3mo/1yr/all-time, most recent first) under the buy line, whichever of the three ITAD already returned for that game — reuses `DEAL_RECORD_TIERS`' own icon/color/label (`public/utils.js`) so it stays in sync with the Best Deal badge above it. Consecutive tiers sharing the same amount (common when the all-time low happened recently) are collapsed into one entry with combined icons instead of repeating the price, and any low that equals the current best-deal price above (already badged there) is dropped entirely rather than shown twice.
 - Test coverage for `region.js`, `accountsBar.js`, and `gameSearch.js` (`test/region.test.js`/`test/accountsBar.test.js`/`test/gameSearch.test.js`, 69 tests) — these had none despite backing real logic (region detection, the recent-searches/recent-games lists, `parseDirectAppid`), a gap the ES-module conversion above made easy to finally close since they're real `import`/`export` modules now rather than plain scripts reached only via the global scope. A minimal hand-rolled fake DOM (`hidden`/`innerHTML`/`addEventListener`/`closest`) covers the `render*`/`bind*` functions' event-delegation logic without a jsdom dependency. `initGameSearch` itself (the debounced fetch/keyboard-nav widget) is intentionally not covered — meaningful tests would need fetch/timer/full-element mocking disproportionate to its risk next to the pure logic it's built from, which is what's actually tested.

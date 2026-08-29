@@ -2,15 +2,18 @@
 
 import { esc, formatMoney, computeSteamdbRating, computeProductionTier } from '/utils.js';
 import { reorderUrlParams } from '/urlState.js';
-import { getPref, setPref } from '/prefs.js';
+import { restoreTableView, bindViewPersistence, shareTableView, resetTableView } from '/tableViewPrefs.js';
+import { createRowCache } from '/rowCache.js';
+import { renderPanelNav as renderPanelNavShared, stepGameList } from '/panelNav.js';
+import { postPrices, applyPriceInfo, nullMissingPriceFields } from '/priceLoading.js';
 import { COUNTRY_OPTIONS, TIMEZONE_COUNTRY, detectCountry, getStoredRegion, setStoredRegion, resolveRegion, REGION_CHANGED_EVENT } from '/region.js';
-import { initNav } from '/nav.js';
-import { initLightbox, openLightbox, isLightboxOpen } from '/lightbox.js';
+import { openLightbox, isLightboxOpen } from '/lightbox.js';
 import {
-  initPanel, panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,
+  panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,
   pickRandomFrom, clearRandomQueue, panelHandleEscape,
   renderPanelBody,
 } from '/panel.js';
+import { initPageShell } from '/pageShell.js';
 
 import { createDataTable } from '@vates/data-table-vanilla';
 import {
@@ -145,52 +148,8 @@ const shareViewBtn       = document.getElementById('share-view-btn');
 // before `@vates/data-table-vanilla` 0.12 — but as of that version an empty view state resolves
 // each omitted field back to the table's own `initialViewState` (see the createDataTable call
 // below) rather than blanking it, so this no longer needs its own guard against that.
-function restoreTableView(table, prefKey, paramName) {
-  const params = new URLSearchParams(location.search);
-  const raw = params.get(paramName);
-  if (raw) {
-    try {
-      const view = JSON.parse(raw);
-      table.setViewState(view);
-      setPref(prefKey, view);
-      params.delete(paramName);
-      history.replaceState(null, '', `?${params}`);
-      return;
-    } catch { /* malformed param — fall through to the stored default */ }
-  }
-  table.setViewState(getPref(prefKey, {}));
-}
-
-function bindViewPersistence(table, prefKey) {
-  return table.onViewChange(view => setPref(prefKey, view));
-}
-
-// Deliberately does NOT write to the page's own address bar — see library.js's own copy of this
-// comment for why (a stale param left in a visible URL the moment the user makes one more
-// change is worse than one that was never written there).
-function shareTableView(table, paramName, btn) {
-  const params = new URLSearchParams(location.search);
-  params.set(paramName, JSON.stringify(table.getViewState()));
-  const url = `${location.origin}${location.pathname}?${params}`;
-  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(url).then(() => flashShareViewBtn(btn), () => {});
-}
-
-function flashShareViewBtn(btn) {
-  const prevText = btn.textContent;
-  btn.textContent = '✓ Copied!';
-  setTimeout(() => { btn.textContent = prevText; }, 1500);
-}
-
-// Blanks the table's view state, which resolves back to the table's own `initialViewState`
-// (including DEFAULT_SORT) rather than to nothing, same as `restoreTableView`'s own fallback
-// above.
-function resetTableView(table, prefKey, paramName) {
-  table.setViewState({});
-  setPref(prefKey, {});
-  const params = new URLSearchParams(location.search);
-  params.delete(paramName);
-  history.replaceState(null, '', `?${params}`);
-}
+// restoreTableView/bindViewPersistence/shareTableView/resetTableView now live in
+// tableViewPrefs.js, shared verbatim with library.js's own copies (see its own header comment).
 
 // Collapses the bundle list (see #bundle-list-wrap.collapsed in bundles.html) once a bundle has
 // actually been picked — the list itself stops being the thing to focus on at that point, and a
@@ -242,45 +201,21 @@ let currentResolvedGames = [];
 // cache-warm and both fire near-instantly — never shows it, even though the row object itself
 // is provably correct).
 //
-// `tableRowCache` (appid → the last copy actually handed to the table) is what makes the fix
-// targeted rather than blanket: `visibleRowsForTable()` reuses a row's cached copy verbatim
-// unless `markRowChanged` was called for it since the last render, in which case a fresh copy
-// is made. A naive "copy every visible row on every setData call" version of this fix (an
-// earlier draft) technically worked but was wrong: it forced the table to re-render every
-// visible row's cells on every single event during streaming, not just the one that changed.
-//
-// The table's own click handler only ever has a `tableRowCache` copy to hand back, never
-// `rowMap`'s canonical object — a row-copy that's discarded and remade every render (the naive
-// version) would mean the panel silently opens a *different* copy each time, going stale the
-// next time anything about that row streams in after the panel's already open. `onRowClick`
-// below looks the canonical row back up by appid before opening it specifically to avoid that —
-// so `applyDetailsEvent`/`markRowChanged` in `onRefresh` mutate the same object `rowMap` does,
-// not a disconnected copy. Reusing the cached copy (rather than remaking it every render) is
-// what makes that lookup meaningful across renders — a copy that's stable until something
-// actually changes matches `rowMap`'s own object closely enough that identity bugs like this
-// only need the one `onRowClick` guard, not a guard at every call site that reads a row back
-// from the table.
+// `rowCache` (rowCache.js) is what makes the fix targeted rather than blanket:
+// `visibleRowsForTable()` reuses a row's cached copy verbatim unless `markRowChanged` was called
+// for it since the last render, in which case a fresh copy is made. See rowCache.js's own header
+// comment for the full story (shared verbatim with library.js's identical fix).
 //
 // EVERY mutation site must call `markRowChanged` right after mutating, including
 // `streamGameDetails`'s own first-time reveal of a row — not just `loadPrices`/`onRefresh`,
-// which touch an already-visible row. `visibleRowsForTable`'s "no cache entry yet" fallback
-// below looks like it would cover a fresh reveal on its own, but `loadPrices` and
-// `streamGameDetails` run concurrently (`Promise.all` in `openBundle`), and on a cache-warm
-// bundle `loadPrices` (one cheap batched ITAD call) routinely resolves *before*
-// `streamGameDetails` (several real per-game Steam/HLTB calls) reveals that same row — its
-// `markRowChanged` call fires first and creates a cache entry from the row's still-`loading`
-// state, so by the time `streamGameDetails` later flips it visible, `tableRowCache` already
-// "has" an entry and the fallback never fires, permanently stuck on that premature snapshot.
-// Confirmed live exactly this way. Calling `markRowChanged` unconditionally after every mutation
-// removes the ordering dependency entirely — the fallback below only exists as a defensive
-// backstop for a row that somehow becomes visible with no mutator having called it.
-let tableRowCache = new Map();
+// which touch an already-visible row (see rowCache.js for why the "no cache entry yet" fallback
+// alone isn't enough once two async sources can reveal/mutate the same row out of order).
+let rowCache = createRowCache();
 function markRowChanged(appid) {
-  const row = rowMap.get(appid);
-  if (row) tableRowCache.set(appid, { ...row });
+  rowCache.markChanged(appid);
 }
 // Canonical rows whose details have streamed in — the *same* object references `rows`/`rowMap`
-// hold, unlike visibleRowsForTable()'s cached copies above. Used by nav/random-pick
+// hold, unlike visibleRowsForTable()'s cached copies below. Used by nav/random-pick
 // (getGameList/pickRandomGame below) and onRowClick, all of which need the reference the panel
 // keeps displaying and any later mutation (refresh, price loading) needs to keep reaching —
 // same distinction library.js's own visibleRows()/visibleRowsForTable() pair draws.
@@ -288,10 +223,7 @@ function visibleRows() {
   return rows.filter(r => !r.loading);
 }
 function visibleRowsForTable() {
-  return visibleRows().map(r => {
-    if (!tableRowCache.has(r.appid)) tableRowCache.set(r.appid, { ...r }); // first reveal
-    return tableRowCache.get(r.appid);
-  });
+  return rowCache.visibleRowsForTable(visibleRows(), r => r.appid);
 }
 
 // Stable order for the panel's prev/next/random nav — the table's current search/filter/sort
@@ -311,44 +243,51 @@ function getGameList() {
 // the current list's appids, which a bundle switch naturally causes.
 const RANDOM_QUEUE_KEY = 'bundle-games';
 
-initPanel({
-  inertSelector: '.bundles-page',
-  showAchievements: true,
-  // Every row here is always batch-priced by loadPrices (see its own comment) — never a
-  // per-game fetch of panel.js's own, which would just duplicate that same call.
-  pricesHandledByHost: true,
-  onRefresh: async (row) => {
-    try {
-      const res = await fetch(`/api/game-details/${row.appid}?refresh=1`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Refresh failed');
-      applyDetailsEvent(row, data);
-      markRowChanged(row.appid);
-      if (table) table.setData(visibleRowsForTable());
-      await loadAchievements(row, { force: true });
-    } catch (err) {
-      detailStatusEl.textContent = `Refresh failed: ${err.message}`;
-    }
-  },
-  // Clicking a DLC/base-game link inside the panel — the linked appid may not be one of this
-  // bundle's own resolved rows (e.g. a DLC not itself included in the bundle), so it's fetched
-  // standalone the same way public/library.js's "look up any game" flow does.
-  onNavigateGame: (appid, name) => openStandaloneGame(appid, name, { keepHistory: true }),
-  // Runs on every close path (see the comment on `onClose` in panel.js) — the backdrop click,
-  // × button, and swipe-to-close, not just an explicit Escape — so `?game=` never sticks around
-  // after the panel's actually gone. openBundle()'s own panelClose() call (a genuine new bundle
-  // open) already clears it beforehand too — see its own comment — so this just runs
-  // redundantly-but-harmlessly there.
-  onClose: () => setPanelParam(null),
-  // A real href (not the placeholder '#' this used to be, back when there was no `?game=` URL
-  // to point at) so ctrl/cmd/shift/middle-click on a DLC entry still opens it in a new tab.
-  gameHref: appid => {
-    const params = new URLSearchParams(location.search);
-    params.set('game', appid);
-    return `?${params}`;
+// initNav('bundles') used to be the first line of init() below, called only once the page's own
+// async setup ran — an accidental difference from app.js/library.js, which both call it
+// immediately. It has no dependency on anything init() computes, so it's folded into the same
+// initPageShell() sequence those two pages use instead.
+initPageShell({
+  page: 'bundles',
+  lightbox: { onParamChange: setLightboxParam, onGameNav: navigateLightboxGame },
+  panel: {
+    inertSelector: '.bundles-page',
+    showAchievements: true,
+    // Every row here is always batch-priced by loadPrices (see its own comment) — never a
+    // per-game fetch of panel.js's own, which would just duplicate that same call.
+    pricesHandledByHost: true,
+    onRefresh: async (row) => {
+      try {
+        const res = await fetch(`/api/game-details/${row.appid}?refresh=1`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Refresh failed');
+        applyDetailsEvent(row, data);
+        markRowChanged(row.appid);
+        if (table) table.setData(visibleRowsForTable());
+        await loadAchievements(row, { force: true });
+      } catch (err) {
+        detailStatusEl.textContent = `Refresh failed: ${err.message}`;
+      }
+    },
+    // Clicking a DLC/base-game link inside the panel — the linked appid may not be one of this
+    // bundle's own resolved rows (e.g. a DLC not itself included in the bundle), so it's fetched
+    // standalone the same way public/library.js's "look up any game" flow does.
+    onNavigateGame: (appid, name) => openStandaloneGame(appid, name, { keepHistory: true }),
+    // Runs on every close path (see the comment on `onClose` in panel.js) — the backdrop click,
+    // × button, and swipe-to-close, not just an explicit Escape — so `?game=` never sticks around
+    // after the panel's actually gone. openBundle()'s own panelClose() call (a genuine new bundle
+    // open) already clears it beforehand too — see its own comment — so this just runs
+    // redundantly-but-harmlessly there.
+    onClose: () => setPanelParam(null),
+    // A real href (not the placeholder '#' this used to be, back when there was no `?game=` URL
+    // to point at) so ctrl/cmd/shift/middle-click on a DLC entry still opens it in a new tab.
+    gameHref: appid => {
+      const params = new URLSearchParams(location.search);
+      params.set('game', appid);
+      return `?${params}`;
+    },
   },
 });
-initLightbox({ onParamChange: setLightboxParam, onGameNav: navigateLightboxGame });
 
 const achievementsCache = new Map();
 
@@ -374,24 +313,12 @@ async function loadAchievements(game, { force = false } = {}) {
   }
 }
 
-// Builds the panel's prev/next/random nav bar (`#panel-nav`, shared markup/CSS with
-// library.js/app.js — see CLAUDE.md's panel.js bullet) from getGameList()'s current
+// Builds the panel's prev/next/random nav bar (`#panel-nav`, shared markup/CSS/keys with
+// library.js/app.js — see panelNav.js/CLAUDE.md's panel.js bullet) from getGameList()'s current
 // search/filter/sort order. Empty for a standalone lookup (see openStandaloneGame below) —
 // there's no natural list to page through, same as library.js's own version of this function.
 function renderPanelNav(game) {
-  const nav = document.getElementById('panel-nav');
-  if (!table || game.standalone) { nav.innerHTML = ''; return; }
-  const list = getGameList();
-  const idx = list.findIndex(g => g.appid === game.appid);
-  nav.innerHTML = `
-    <button class="panel-nav-btn" id="panel-prev" aria-label="Previous game" title="Previous game (↑)">↑</button>
-    <span class="panel-nav-pos" aria-live="polite">${idx + 1} / ${list.length}</span>
-    <button class="panel-nav-btn" id="panel-next" aria-label="Next game" title="Next game (↓)">↓</button>
-    <button class="panel-nav-btn panel-nav-reroll" id="panel-reroll" aria-label="Pick a random game" title="Pick a random game (R)">🎲<span class="panel-nav-kbd">R</span></button>
-  `;
-  document.getElementById('panel-prev').addEventListener('click', () => openGame(list[(idx - 1 + list.length) % list.length]));
-  document.getElementById('panel-next').addEventListener('click', () => openGame(list[(idx + 1) % list.length]));
-  document.getElementById('panel-reroll').addEventListener('click', pickRandomGame);
+  renderPanelNavShared({ table, game, getGameList, onOpen: openGame, onReroll: pickRandomGame });
 }
 
 function openGame(game, { isRandom = false, keepHistory = false } = {}) {
@@ -407,10 +334,8 @@ function openGame(game, { isRandom = false, keepHistory = false } = {}) {
 // straight into the new game's lightbox at shot 0 rather than leaving the lightbox
 // closed behind it. No-ops with no group to page through, same guard as below.
 function navigateLightboxGame(dir) {
-  if (!table || getPanelGame()?.standalone) return;
-  const list = getGameList();
-  const idx = list.findIndex(g => g.appid === getPanelGame().appid);
-  const next = list[(idx + dir + list.length) % list.length];
+  const next = stepGameList(table, getGameList, getPanelGame(), dir);
+  if (!next) return;
   openGame(next);
   openLightbox(next, 0);
 }
@@ -771,33 +696,12 @@ nextBundleBtn.addEventListener('click', () => {
 async function loadPrices(resolved, { force = false } = {}) {
   priceStatusEl.textContent = '';
   try {
-    const qs = new URLSearchParams({ country: resolveRegion(getStoredRegion()) });
-    if (force) qs.set('refresh', '1');
-    const res = await fetch(`/api/prices?${qs}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ gids: resolved.map(g => g.gid) }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Price lookup failed');
+    const prices = await postPrices({ gids: resolved.map(g => g.gid), country: resolveRegion(getStoredRegion()), force });
     for (const g of resolved) {
       const row = rowMap.get(g.appid);
-      const info = data.prices[g.gid];
+      const info = prices[g.gid];
       if (!row || !info) continue;
-      row.steamRegular = info.steamRegular?.amount ?? null;
-      row.bestDealPrice = info.bestDeal?.price?.amount ?? null;
-      row.bestDealShop   = info.bestDeal?.shop          ?? null;
-      row.bestDealUrl    = info.bestDeal?.url           ?? null;
-      row.bestDealCut    = discountPct(row.bestDealPrice, row.steamRegular);
-      row.lowAll        = info.lowAll?.amount        ?? null;
-      row.lowY1          = info.lowY1?.amount          ?? null;
-      row.lowM3          = info.lowM3?.amount          ?? null;
-      // Always set directly from this batch's own response — never conditionally backfilled
-      // off the bundle's own tier currency (see the comment on formatMoney (public/utils.js)/
-      // renderPrice (public/gameColumns.js) for why those two can legitimately disagree). Every
-      // figure in one /games/prices/v3 response is in the same currency, so any of them is an
-      // equally valid source here.
-      row.priceCurrency = info.steamRegular?.currency ?? info.bestDeal?.price?.currency ?? info.lowAll?.currency ?? info.lowY1?.currency ?? info.lowM3?.currency ?? null;
+      applyPriceInfo(row, info, discountPct);
       markRowChanged(g.appid);
       if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
     }
@@ -812,14 +716,7 @@ async function loadPrices(resolved, { force = false } = {}) {
     for (const g of resolved) {
       const row = rowMap.get(g.appid);
       if (!row) continue;
-      if (row.steamRegular === undefined) row.steamRegular = null;
-      if (row.bestDealPrice === undefined) row.bestDealPrice = null;
-      if (row.bestDealShop   === undefined) row.bestDealShop   = null;
-      if (row.bestDealUrl    === undefined) row.bestDealUrl    = null;
-      if (row.bestDealCut    === undefined) row.bestDealCut    = null;
-      if (row.lowAll        === undefined) row.lowAll        = null;
-      if (row.lowY1          === undefined) row.lowY1          = null;
-      if (row.lowM3          === undefined) row.lowM3          = null;
+      nullMissingPriceFields(row);
       markRowChanged(g.appid);
       if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
     }
@@ -865,7 +762,7 @@ async function openBundle(bundle, { preserveGameParam = false, restoreShot = nul
   refreshPricesBtn.hidden = true;
   rows = [];
   rowMap = new Map();
-  tableRowCache = new Map();
+  rowCache.reset();
   currentResolvedGames = [];
 
   const games = flattenBundleGames(bundle);
@@ -926,7 +823,7 @@ async function openBundle(bundle, { preserveGameParam = false, restoreShot = nul
     rowKey: 'appid',
     initialViewState: { pageSize: 50, visibleCols: DEFAULT_VISIBLE, sorts: DEFAULT_SORT },
     // The table's own click handler hands back whatever object is currently in
-    // `tableRowCache` for this row — a copy, not `rowMap`'s canonical one (see
+    // `rowCache` for this row — a copy, not `rowMap`'s canonical one (see
     // `visibleRowsForTable`'s comment above). Looking the canonical row back up by appid
     // before opening it means the panel (and anything that mutates whatever object it opened,
     // like `onRefresh` below) always operates on the same object `rowMap` does, not a
@@ -1067,7 +964,6 @@ async function openBundleById(id, { preserveGameParam = false, restoreShot = nul
 }
 
 async function init() {
-  initNav('bundles');
   try {
     const res = await fetch('/api/health');
     const data = await res.json();
