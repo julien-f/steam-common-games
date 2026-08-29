@@ -1152,6 +1152,18 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 .panel-demo-banner:hover, .panel-demo-banner:focus-visible { background: var(--accent2); outline: none; }
 .panel-demo-banner-icon { font-size: 15px; }
 
+/* "In your library" / "On your wishlist" status — sits right under the title, inside the
+   sticky header, so it's visible the instant the panel opens with no scrolling. Plain small
+   pills, not the demo banner's solid CTA fill — this is a status readout, not a call to action. */
+.panel-ownership-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.panel-ownership-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 700;
+}
+.panel-ownership-badge.owned { background: rgba(46, 204, 113, 0.16); color: #2ecc71; }
+.panel-ownership-badge.wishlisted { background: rgba(241, 196, 15, 0.16); color: #f1c40f; }
+
 /* --text0/13px, not the --text1/12px caption treatment used elsewhere in the panel — this
    is prose meant to be read, not secondary metadata. Sits directly under the glance grid,
    ahead of the tag cloud, so it reads as "what this game is" before "how it's tagged". */

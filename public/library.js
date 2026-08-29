@@ -392,6 +392,73 @@ function buildLibraryOwnersHtml(g) {
   return renderOwnersHtml(owners);
 }
 
+// ── Ownership status (in-library / on-wishlist badges) ───────────────────────
+// Only one of the Library/Wishlist tabs is actually loaded into `rows`/`rowMap` at a time
+// (see COLUMNS/WISHLIST_COLUMNS/activeTab above), but the panel's ownership badge (panel.js's
+// ownershipHtml) wants to answer both questions regardless of which tab happens to be open.
+// libraryAppidSet/wishlistAppidSet are populated independently of activeTab: whichever tab
+// loads first fills its own set directly from data it already fetched (no extra call), then
+// kicks off a background fetch for the *other* tab's set purely for this membership check —
+// not surfaced as a second table. Keyed to ownershipPlayerStr (the resolved steamid string,
+// same as `u`) so a player switch invalidates a stale set still in flight from the previous one.
+let ownershipPlayerStr = '';
+let libraryAppidSet  = null; // null = not yet known; Set once resolved
+let wishlistAppidSet = null;
+
+// Fetches just enough of the *other* tab's data to know appid membership — same endpoints
+// loadLibrary/loadWishlist already call (so this rides the same cache tier and costs nothing
+// extra once either tab has been genuinely loaded for this player), just without building any
+// table/row state from the response.
+async function ensureOtherOwnershipSet(idStr, tab) {
+  // idStr is comma-joined (a merged Steam Family is more than one resolved steamid) — split
+  // back into individual members, same shape both endpoints already expect elsewhere in this
+  // file (each member being a resolved steamid64 resolves trivially, see resolveSteamId).
+  const members = idStr.split(',');
+  try {
+    if (tab === 'library') {
+      if (wishlistAppidSet !== null) return;
+      const res = await fetch('/api/wishlist', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ members }),
+      });
+      if (ownershipPlayerStr !== idStr || !res.ok) return;
+      const data = await res.json();
+      wishlistAppidSet = new Set(data.items.map(i => i.appid));
+    } else {
+      if (libraryAppidSet !== null) return;
+      const res = await fetch('/api/common-games', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slots: [members] }),
+      });
+      if (ownershipPlayerStr !== idStr || !res.ok) return;
+      const data = await res.json();
+      libraryAppidSet = new Set(data.groups.flatMap(g => g.games).map(g => g.appid));
+    }
+  } catch {
+    return; // best-effort — the badge just stays absent/"still checking" for this session
+  }
+  refreshOpenGameOwnership();
+}
+
+// Stamps inLibrary/onWishlist onto a game object right before it's opened, so panel.js's
+// ownership badge (passive, like the Price card) always has the latest known status. `null`
+// (not yet fetched) is left as `null` rather than coerced to `false` — see panel.js's own
+// comment on why that renders as nothing instead of a premature "not owned".
+function applyOwnershipFlags(game) {
+  game.inLibrary  = libraryAppidSet  === null ? null : libraryAppidSet.has(game.appid);
+  game.onWishlist = wishlistAppidSet === null ? null : wishlistAppidSet.has(game.appid);
+}
+
+// Called once a background ownership-set fetch resolves — re-stamps and re-renders whatever
+// game is currently open, if any, so a badge that opened before the fetch landed updates in
+// place rather than staying stuck on "still checking".
+function refreshOpenGameOwnership() {
+  const game = getPanelGame();
+  if (!game) return;
+  applyOwnershipFlags(game);
+  renderPanelBody(game);
+}
+
 // A standalone lookup (see openStandaloneLookup below) isn't part of the loaded library/
 // wishlist table — with no table yet (a bare lookup with no player loaded) or no natural list
 // to page through, panelNav.js's renderPanelNav renders no nav.
@@ -401,6 +468,7 @@ function renderPanelNav(game) {
 
 function openGame(game, { isRandom = false, keepHistory = false } = {}) {
   if (!isRandom) clearRandomQueue(randomQueueKey());
+  applyOwnershipFlags(game);
   panelOpen(game, { keepHistory });
   updateTitle();
   renderPanelNav(game);
@@ -945,6 +1013,11 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
   // above) — this used to be a separate pushState from the game/shot clear above, piling up
   // two history entries per click.
   updateUrlParams({ u: idStr }, { push: push && !refreshIds });
+  // See the "Ownership status" section above — populate this tab's own set directly from
+  // data just fetched, and kick off a background fetch for the other tab's set.
+  if (ownershipPlayerStr !== idStr) { ownershipPlayerStr = idStr; wishlistAppidSet = null; }
+  libraryAppidSet = new Set(allGames.map(g => g.appid));
+  ensureOtherOwnershipSet(idStr, 'library');
   currentSteamIds = slotSteamIds;
   currentPlayerLabel = result.slots[0].map(p => p.personaname || '?').join(' + ');
   currentPlayers = result.slots[0];
@@ -1057,6 +1130,10 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
   const idStr = result.players.map(p => p.steamid).join(',');
   // See the matching comment in loadLibrary above.
   updateUrlParams({ u: idStr }, { push: push && !refreshIds });
+  // See the "Ownership status" section above.
+  if (ownershipPlayerStr !== idStr) { ownershipPlayerStr = idStr; libraryAppidSet = null; }
+  wishlistAppidSet = new Set(result.items.map(i => i.appid));
+  ensureOtherOwnershipSet(idStr, 'wishlist');
   currentSteamIds = result.players.map(p => p.steamid);
   currentPlayerLabel = result.players.map(p => p.personaname || '?').join(' + ');
   updateTitle();
@@ -1218,6 +1295,9 @@ function loadFromUrl() {
     if (currentPlayerStr) {
       currentPlayerStr = '';
       resetTableState({ preserveGameParam: true }); // a `?game=` in the new URL is restored below
+      // No player loaded anymore — drop the ownership sets too, so a later standalone lookup
+      // doesn't show stale in-library/on-wishlist badges left over from the previous player.
+      ownershipPlayerStr = ''; libraryAppidSet = null; wishlistAppidSet = null;
       updateStatus();
       updateTitle();
     }

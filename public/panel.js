@@ -1339,6 +1339,24 @@ export function renderPanelBody(game) {
   const newsSectionHtml = newsHtml(g);
   const achievementsSectionHtml = achievementsHtml(g);
 
+  // "In library" / "On wishlist" status — passive, same convention as the Price card (panel.js
+  // doesn't fetch anything itself; it just renders whatever the host page already resolved).
+  // Only library.js ever sets g.inLibrary/g.onWishlist (from its own background-fetched
+  // ownership sets — see loadLibrary/loadWishlist's ensureOtherOwnershipSet), so this is
+  // naturally absent (both undefined) on the comparison/bundles pages and before any player is
+  // loaded here. "In library"/"On wishlist" rather than "In *your* library" — this page can
+  // browse any Steam account's library, not necessarily the person using this app's own, so
+  // "your" would misattribute whoever's actually loaded. `null` means "still checking" (the set
+  // for the tab not currently active hasn't resolved yet) — rendered as nothing rather than a
+  // "Checking…" placeholder, since it's usually near-instant (cache-warm) and a flash of
+  // "Checking…" then a badge reads noisier than the badge just appearing a beat later. Neither
+  // flag true renders nothing at all rather than an explicit "not in library or wishlist" —
+  // that's the common case for an arbitrary lookup and isn't worth a badge of its own.
+  const ownershipHtml = (g.inLibrary == null && g.onWishlist == null) ? '' : `<div class="panel-ownership-row">
+    ${g.inLibrary ? '<span class="panel-ownership-badge owned">✓ In library</span>' : ''}
+    ${g.onWishlist ? '<span class="panel-ownership-badge wishlisted">☆ On wishlist</span>' : ''}
+  </div>`;
+
   // A free demo is a "try before you buy" call to action, not supplementary info like
   // Website/Workshop below — those are fine tucked one click away in "⋯ More", but a demo
   // link is worth surfacing without any extra click. A standalone banner right under the
@@ -1461,6 +1479,7 @@ export function renderPanelBody(game) {
         <div>
           <div class="panel-title" id="panel-title">${esc(g.name)}</div>
           ${metaLineHtml}
+          ${ownershipHtml}
         </div>
         <div class="panel-icon-links">
           <a class="panel-icon-link" href="${esc(storeUrl)}" target="_blank" rel="noopener" title="Steam Store" aria-label="Steam Store">🛒</a>
