@@ -235,15 +235,20 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
    top of two soft shadow gradients attached `scroll` (fixed to the wrap's edges).
    At the very start/end of the scroll range the matching cover still masks its
    shadow; scroll past it and the cover moves out of the way, revealing the shadow —
-   so the fade only ever shows on the side there's still more to scroll toward. Both
-   wraps sit directly on a .card, so var(--bg1) is what's actually behind them either
-   way (dt-table-wrap's own alternating-row tint is a transparent overlay on top of
-   that, not a different base color). */
+   so the fade only ever shows on the side there's still more to scroll toward. All
+   three pages' wraps sit directly on <body> (var(--bg0)), not a .card — Bundles used
+   to nest its whole detail block (header + table) in one .card, which made the cover
+   color (previously var(--bg1), matching that card) wrong everywhere else: it showed
+   as a mismatched, distinctly-colored 20px strip at both edges of every row on the
+   Comparison page and Library Explorer, confirmed live. Bundles' table area was
+   pulled out of its .card (now just wrapping the bundle-detail-header) to match, so
+   one cover color is correct for all three (dt-table-wrap's own alternating-row tint
+   is a transparent overlay on top of that, not a different base color). */
 .table-wrap,
 .dt-table-wrap {
   background-image:
-    linear-gradient(to right, var(--bg1) 0%, var(--bg1) 100%),
-    linear-gradient(to left, var(--bg1) 0%, var(--bg1) 100%),
+    linear-gradient(to right, var(--bg0) 0%, var(--bg0) 100%),
+    linear-gradient(to left, var(--bg0) 0%, var(--bg0) 100%),
     linear-gradient(to right, rgba(0,0,0,0.35), rgba(0,0,0,0)),
     linear-gradient(to left, rgba(0,0,0,0.35), rgba(0,0,0,0));
   background-repeat: no-repeat;
