@@ -4,10 +4,9 @@ import { getPref, setPref } from './prefs.js';
 
 // The region preference's data and logic — the curated list, the detection heuristic, and
 // get/set/resolve for the stored value — with no DOM/UI code of its own (see prefsPopover.js
-// for the actual `<select>` this backs). Loaded as a plain script (not a module) on all four
-// pages — bundles.js and library.js's Wishlist tab need `resolveRegion`/`getStoredRegion` for
-// their price lookups, same esc()/reorderUrlParams() convention as utils.js/urlState.js — a
-// module reaches these off the global scope rather than importing them.
+// for the actual `<select>` this backs). An ES module, used on all four pages — bundles.js and
+// library.js's Wishlist tab import `resolveRegion`/`getStoredRegion` directly for their price
+// lookups.
 
 // Curated rather than the full ISO 3166-1 list — these are the regions with meaningfully
 // distinct Steam pricing/currency; ITAD's `country` param accepts any 2-letter code, but a

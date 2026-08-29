@@ -66,8 +66,9 @@ export function renderScoreNum(v) {
 
 // ProtonDB's Linux/Steam Deck compatibility tiers, worst to best (see the matching color map
 // in public/panel.js, which renders the same badge in the side panel — kept as a separate copy
-// there since panel.js is a classic script and this file an ES module, not for any semantic
-// reason). "Native" (an actual Linux port, no Proton needed) ranks above "Platinum" (flawless
+// there rather than imported, even though both are ES modules now, since importing from here
+// would also pull in this file's `@vates/data-table-core` dependency, meaningless for a plain
+// side panel). "Native" (an actual Linux port, no Proton needed) ranks above "Platinum" (flawless
 // *through* Proton). No "pending" entry — extractProtonDb (lib/steam.js) already collapses that
 // tier to null server-side, since "too few reports to rate yet" isn't a quality tier at all, so
 // it never reaches the client as a value that would need a place here.

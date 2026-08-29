@@ -4,9 +4,7 @@ import { esc } from './utils.js';
 
 // Shared by the comparison page (app.js) and the Library Explorer (library.js): renders
 // the "accounts bar" of resolved-account chips under a search form, plus a locally
-// remembered "recent searches" row above it. Loaded as a plain global script (like
-// utils.js/panel.js), not a module, so both pages' classic <script>s can call straight
-// into it — depends on the global `esc()` from utils.js, so load this after utils.js.
+// remembered "recent searches" row above it. An ES module, importing `esc()` from utils.js.
 
 // personastate values per Steam's docs: 0 Offline, 1 Online, 2 Busy, 3 Away, 4 Snooze,
 // 5 Looking to trade, 6 Looking to play. `gameextrainfo` (present while in-game) takes

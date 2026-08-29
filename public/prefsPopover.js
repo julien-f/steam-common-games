@@ -8,7 +8,7 @@ import { COUNTRY_OPTIONS, AUTO_COUNTRY, detectCountry, getStoredRegion, setStore
 // wire it up, so nav.js itself stays about page navigation, not about which preferences exist.
 // Only region lives here today; more are expected to land in this same panel later, each just
 // adding to prefsPopoverPanelHtml/initPrefsPopover rather than nav.js needing to change at all.
-// Loaded as a plain script (not a module), after region.js and before nav.js.
+// An ES module, importing from region.js and imported in turn by nav.js.
 
 // The markup nav.js splices into its own <details> — a single `<select>` for the region
 // preference (region.js), same shape the old per-page inline pickers used.

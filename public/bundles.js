@@ -94,8 +94,7 @@ const DEFAULT_SORT = [{ key: 'tierPrice', dir: 'asc' }, { key: 'steamdbRating', 
 
 // ── Region ────────────────────────────────────────────────────────────────────
 // COUNTRY_OPTIONS/TIMEZONE_COUNTRY/detectCountry/getStoredRegion/resolveRegion/
-// REGION_CHANGED_EVENT live in the shared public/region.js (loaded as a plain script before this
-// module, same convention as esc()/reorderUrlParams from utils.js/urlState.js) — library.js's
+// REGION_CHANGED_EVENT live in the shared public/region.js, imported directly — library.js's
 // Wishlist price columns need the exact same curated list and detection heuristic, and there's
 // no reason for the two to drift apart. The picker itself now lives in the nav bar's own ⚙
 // Preferences popover (public/nav.js), not on this page — see updateBundlesRegionLabel below.

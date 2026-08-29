@@ -4,11 +4,11 @@ import { prefsPopoverPanelHtml, initPrefsPopover } from './prefsPopover.js';
 
 // Shared cross-page navigation bar — one component (`#site-nav`, present as an empty <nav> in
 // every page's markup) instead of each page hand-rolling its own header corner links plus a
-// second, differently-worded footer link row. Loaded as a plain script (not a module) on all
-// four pages, after prefs.js/region.js/prefsPopover.js (needed for the Preferences popover
-// below), same convention as urlState.js/utils.js — about.html has no page-specific JS of its
-// own, so this (plus prefs.js/region.js/prefsPopover.js, loaded solely for this file's own
-// popover) is all it loads.
+// second, differently-worded footer link row. An ES module, importing from prefsPopover.js
+// (needed for the Preferences popover below) — used on all four pages; about.html has no
+// page-specific JS of its own, so importing `initNav` from this file (which pulls in
+// prefsPopover.js/region.js/prefs.js in turn, solely for this file's own popover) is all it
+// loads.
 const NAV_PAGES = [
   { key: 'compare', href: '/', label: 'Comparison' },
   { key: 'library', href: '/library.html', label: 'Library Explorer' },

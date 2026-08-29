@@ -6,8 +6,8 @@ import { buildMediaItems } from './mediaItems.js';
 
 // ── Shared game side panel ──────────────────────────────────────────────────
 // Used by both the comparison page (app.js) and the Library Explorer
-// (library.js). Depends on globals from utils.js, mediaItems.js, and
-// lightbox.js (all loaded as classic scripts before this one).
+// (library.js). An ES module, importing from utils.js, lightbox.js, and
+// mediaItems.js.
 //
 // Host pages call initPanel(options) once, then panelOpen(game)/panelClose()
 // to show/hide it. Anything page-specific — the "Owned by" section, tag-click
@@ -311,10 +311,11 @@ function isItadConfigured() {
 // same game), and a stale resolve for a game the panel has since moved on from just updates
 // the (now background) game object without forcing a re-render.
 //
-// discountPct's formula is duplicated here as a two-line inline calc rather than imported —
-// it lives in public/gameColumns.js, an ES module panel.js (a plain script) can't import from,
-// same reasoning as the rest of this card's own small copy of gameColumns.js/bundles.js render
-// logic (see priceHtml's own comment below).
+// discountPct's formula is duplicated here as a two-line inline calc rather than imported from
+// public/gameColumns.js (even though both are ES modules now) — gameColumns.js pulls in
+// @vates/data-table-core, meaningless for a plain side panel, same reasoning as the rest of
+// this card's own small copy of gameColumns.js/bundles.js render logic (see priceHtml's own
+// comment below).
 async function loadPrice(game, { force = false } = {}) {
   if (pricesHandledByHost(game)) return;
   if (game.bestDealPrice !== undefined && !force) return; // already loaded (or already tried) this session

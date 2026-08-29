@@ -78,12 +78,11 @@ export function scoreColor(n) {
   return '#cc5050';
 }
 
-// Shared money formatter — used by public/gameColumns.js's price-column renderers (an ES
-// module, which reads this as a bare global the same way it reads scoreColor/dealRecordTier
-// above) and by panel.js's Price card directly (a plain script, which can't `import` from an ES
-// module at all — this is why formatMoney lives here rather than alongside the rest of the
-// price-column logic in gameColumns.js, which needs real `@vates/data-table-core` imports and
-// so can't be a plain global script itself). `currency` falsy (not yet known/loaded) falls back
+// Shared money formatter — imported by public/gameColumns.js's price-column renderers (same as
+// scoreColor/dealRecordTier above) and by panel.js's Price card directly. Lives here rather than
+// alongside the rest of the price-column logic in gameColumns.js specifically so panel.js can
+// import it without also pulling in gameColumns.js's `@vates/data-table-core` dependency,
+// meaningless for a plain side panel. `currency` falsy (not yet known/loaded) falls back
 // to USD rather than throwing; an invalid/unrecognized currency code falls back to a plain
 // "12.34 XYZ" string rather than letting Intl.NumberFormat's own error propagate.
 export function formatMoney(v, currency) {

@@ -4,8 +4,7 @@
 // global preference (region.js's own region choice, and any future one) and every persisted
 // table view (library.js/bundles.js — see their own comments) reads and writes through, so
 // there's one place a future Steam-auth-backed server sync attaches to rather than a rewrite at
-// every call site. Loaded as a plain script (not a module), same esc()/reorderUrlParams
-// convention as utils.js/urlState.js — modules reach getPref/setPref off the global scope.
+// every call site. An ES module, importing getPref/setPref directly wherever needed.
 //
 // One JSON blob under one key (rather than one localStorage key per preference) so the whole
 // set can be enumerated at once later (e.g. a settings page, or the initial payload a synced

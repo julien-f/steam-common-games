@@ -4,9 +4,8 @@ import { esc } from './utils.js';
 
 // Shared "look up any game" widget — used by both the comparison page (app.js) and the
 // Library Explorer (library.js) to open the shared game detail side panel (panel.js) for an
-// arbitrary Steam game, independent of anyone's library or wishlist. Loaded as a plain global
-// script (like accountsBar.js), not a module — depends on the global `esc()` from utils.js,
-// so it must load after it.
+// arbitrary Steam game, independent of anyone's library or wishlist. An ES module, importing
+// `esc()` from utils.js, same as accountsBar.js.
 //
 // initGameSearch({ inputEl, resultsEl, onSelect }):
 //  - inputEl:   the text input the user types a name, appid, or store URL into
