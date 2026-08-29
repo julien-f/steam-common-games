@@ -46,5 +46,3 @@ export function initPrefsPopover() {
   select.value = getStoredRegion();
   select.addEventListener('change', () => setStoredRegion(select.value));
 }
-
-if (typeof module !== 'undefined') module.exports = { prefsPopoverPanelHtml, initPrefsPopover };

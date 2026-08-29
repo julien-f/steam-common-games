@@ -1,5 +1,6 @@
 'use strict';
 
+import Hls from 'hls.js';
 import { buildMediaItems, resolveShotIndex } from './mediaItems.js';
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -68,7 +69,7 @@ function playHls(videoEl, src) {
     videoEl.onerror = () => showLbError("Couldn't load this video.");
     videoEl.src = src;
     videoEl.play().catch(() => {});
-  } else if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+  } else if (Hls.isSupported()) {
     const hls = new Hls({ autoStartLoad: true, startLevel: -1 });
     hls.on(Hls.Events.ERROR, (_event, data) => {
       if (data?.fatal) showLbError("Couldn't load this video.");

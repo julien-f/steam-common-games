@@ -7,6 +7,7 @@ process.on('unhandledRejection', (err) => {
 const express = require('express');
 const morgan = require('morgan');
 const path = require('path');
+const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 
 const { getCached, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
@@ -86,9 +87,22 @@ const app = express();
 if (TRUST_PROXY) app.set('trust proxy', TRUST_PROXY);
 if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+
+// Serves the real Vite production build (`npm run build`) once one exists, since that's a
+// proper bundled/hashed dist/ with no need for the /vendor/* routes or import maps below
+// (Vite already resolved and inlined those imports at build time — see vite.config.js).
+// Falls back to serving public/ directly otherwise, unbundled, exactly as before Vite was
+// introduced — so a fresh clone that hasn't run `npm run build` yet still works out of the
+// box, and the existing local-dev workflow (`npm start`/`npm run dev`) needs no changes.
+// The /vendor/* routes only matter for that public/ fallback path; left mounted
+// unconditionally regardless of which one is serving, since a dist/ build simply never
+// requests them (harmless either way).
+const DIST_DIR = path.join(__dirname, 'dist');
+const STATIC_DIR = fs.existsSync(path.join(DIST_DIR, 'index.html')) ? DIST_DIR : path.join(__dirname, 'public');
+app.use(express.static(STATIC_DIR));
 app.use('/vendor/data-table-core', express.static(path.join(__dirname, 'node_modules/@vates/data-table-core/dist')));
 app.use('/vendor/data-table-vanilla', express.static(path.join(__dirname, 'node_modules/@vates/data-table-vanilla/dist')));
+app.use('/vendor/hls.js', express.static(path.join(__dirname, 'node_modules/hls.js/dist')));
 
 // Stricter limit for searches — each uncached user triggers Steam API calls
 const searchLimit = namedRateLimit('search', {

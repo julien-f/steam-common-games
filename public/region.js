@@ -137,10 +137,3 @@ export function resolveRegion(selected) {
 // used to live here — moved out since this file's own job is the region preference's data and
 // logic (the curated list, detection, get/set, the changed-event), not rendering a picker for
 // it; the DOM-populating half belongs with whichever UI actually owns a `<select>` for it.
-
-if (typeof module !== 'undefined') {
-  module.exports = {
-    COUNTRY_OPTIONS, TIMEZONE_COUNTRY, detectCountry,
-    AUTO_COUNTRY, REGION_PREF_KEY, REGION_CHANGED_EVENT, getStoredRegion, setStoredRegion, resolveRegion,
-  };
-}
