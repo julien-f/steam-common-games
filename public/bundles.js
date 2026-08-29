@@ -549,6 +549,7 @@ function applyDetailsEvent(row, event) {
   row.categories        = event.meta?.categories ?? [];
   row.tags              = event.tags ?? [];
   row.protondb          = protonDbValue(event.protondb?.tier);
+  row.protondbPending   = event.protondb?.pending ?? false;
   row.achievementCount  = event.meta?.achievementCount ?? null;
   row.dlcCount          = event.meta?.dlc?.length ?? null;
   row.platforms         = event.meta?.platforms ?? [];
@@ -811,7 +812,7 @@ async function openBundle(bundle, { preserveGameParam = false, restoreShot = nul
     reviewsTotal: undefined, hltbMain: undefined, hltbExtra: undefined, hltbCompletionist: undefined,
     hltbAll: undefined, metacritic: undefined, releaseDate: undefined, genres: undefined,
     developers: undefined, publishers: undefined, tags: undefined, categories: undefined,
-    protondb: undefined, achievementCount: undefined, dlcCount: undefined, platforms: undefined,
+    protondb: undefined, protondbPending: undefined, achievementCount: undefined, dlcCount: undefined, platforms: undefined,
     languages: undefined, hasDemo: undefined,
     loading: true, details: null,
   }));

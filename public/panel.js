@@ -646,9 +646,10 @@ function setupHeroImg(hero) {
 // Tier names themselves come straight from ProtonDB's API (see lib/steam.js) and are
 // already human-readable words — capitalized for display, not remapped through a label
 // table, so a new tier ProtonDB introduces still renders (just without a custom color).
-// No "pending" entry — extractProtonDb (lib/steam.js) already collapses that tier to null
-// server-side, since "too few reports to rate yet" isn't a compatibility outcome worth a
-// badge of its own; `pd` is simply absent for those games, same as one with no data at all.
+// No "pending" entry — extractProtonDb (lib/steam.js) maps a "pending" (too-few-reports)
+// result to its own provisionalTier before it ever reaches the client, flagged `pd.pending`
+// (see glanceGrid below) so it can still be shown, just visibly marked low-confidence rather
+// than presented as equal to a confirmed tier of the same name.
 const PROTON_TIER_COLORS = {
   borked: '#b91c1c', bronze: '#8b4513', silver: '#757575', gold: '#b8860b',
   platinum: '#5b6b85', native: '#15803d',
@@ -708,14 +709,18 @@ function tagCloud(groups) {
 // "Links" section duplicating them. Only *evaluative* values (the two scores, the
 // Linux/Deck tier) get semantic color — HLTB is a plain duration, not a judgment,
 // so it stays neutral ink.
-function glanceChip(href, value, color, caption) {
+// `faded`: for a value that's a real tier/score but a low-confidence one (currently only
+// ProtonDB's provisional-tier case below) — dims the whole chip so it doesn't read as equally
+// certain as a normal chip of the same color/value.
+function glanceChip(href, value, color, caption, { faded = false } = {}) {
   const inner = `<span class="panel-glance-sub">
     <span class="panel-glance-num"${color ? ` style="color:${color}"` : ''}>${esc(String(value))}</span>
     <span class="panel-glance-val">${caption}</span>
   </span>`;
+  const style = faded ? ' style="opacity:.65"' : '';
   return href
-    ? `<a class="panel-glance-chip" href="${esc(href)}" target="_blank" rel="noopener">${inner}</a>`
-    : `<div class="panel-glance-chip panel-glance-chip--static">${inner}</div>`;
+    ? `<a class="panel-glance-chip" href="${esc(href)}" target="_blank" rel="noopener"${style}>${inner}</a>`
+    : `<div class="panel-glance-chip panel-glance-chip--static"${style}>${inner}</div>`;
 }
 
 function glanceGrid(g) {
@@ -769,7 +774,12 @@ function glanceGrid(g) {
     // Kept short (no "reports"/"confidence" words) — the glance chip's one-line caption
     // truncates rather than wraps, and "strong · 336" already reads fine without them.
     const detail = [pd.confidence, pd.total ? fmtCompactCount(pd.total) : ''].filter(Boolean).join(' · ');
-    chips.push(glanceChip(protondbUrl, capitalize(pd.tier), color, `<b>Linux/Deck</b>${detail ? ' · ' + detail : ''}`));
+    // pd.pending: too few reports for ProtonDB itself to be confident, showing its
+    // provisionalTier instead of nothing (see extractProtonDb, lib/steam.js) — faded, with a
+    // "?" and a "provisional" caption suffix, so it doesn't read as an equally-confirmed tier.
+    const value = pd.pending ? `${capitalize(pd.tier)} ?` : capitalize(pd.tier);
+    const caption = `<b>Linux/Deck</b>${detail ? ' · ' + detail : ''}${pd.pending ? ' · provisional' : ''}`;
+    chips.push(glanceChip(protondbUrl, value, color, caption, { faded: pd.pending }));
   } else {
     chips.push(glanceChip(protondbUrl, '—', null, `<b>Linux/Deck</b> · no reports`));
   }

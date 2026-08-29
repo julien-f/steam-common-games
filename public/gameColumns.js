@@ -69,9 +69,10 @@ export function renderScoreNum(v) {
 // there rather than imported, even though both are ES modules now, since importing from here
 // would also pull in this file's `@vates/data-table-core` dependency, meaningless for a plain
 // side panel). "Native" (an actual Linux port, no Proton needed) ranks above "Platinum" (flawless
-// *through* Proton). No "pending" entry — extractProtonDb (lib/steam.js) already collapses that
-// tier to null server-side, since "too few reports to rate yet" isn't a quality tier at all, so
-// it never reaches the client as a value that would need a place here.
+// *through* Proton). No "pending" entry — extractProtonDb (lib/steam.js) maps a "pending"
+// (too-few-reports) result to its own provisionalTier before it ever reaches the client, so
+// what arrives here is always one of the real tiers above, just possibly flagged `pending`
+// (see row.protondbPending / renderProtonBadge below) to mark it as low-confidence.
 export const PROTON_TIER_ORDER = ['borked', 'bronze', 'silver', 'gold', 'platinum', 'native'];
 export const PROTON_TIER_COLORS = {
   borked: '#b91c1c', bronze: '#8b4513', silver: '#757575', gold: '#b8860b',
@@ -98,14 +99,22 @@ export const compareProtonTier = compareMissingLast((a, b) =>
   PROTON_TIER_ORDER.indexOf(a.toLowerCase()) - PROTON_TIER_ORDER.indexOf(b.toLowerCase()));
 
 // The generic colored-pill treatment (`.status-badge`, shared style.css rule) — shared with
-// renderDemoBadge below rather than each column inventing its own pill styling.
-export function renderProtonBadge(v) {
+// renderDemoBadge below rather than each column inventing its own pill styling. `row.protondbPending`
+// (set from extractProtonDb's own `pending` flag — see PROTON_TIER_ORDER's comment above) marks a
+// provisional tier assigned from too few reports for ProtonDB itself to be confident in — faded and
+// suffixed with "?" rather than rendered identically to a confirmed tier of the same name.
+export function renderProtonBadge(v, row) {
   if (v === undefined) return document.createTextNode('…');
   if (!v) return document.createTextNode('—');
   const span = document.createElement('span');
   span.className = 'status-badge';
   span.style.background = PROTON_TIER_COLORS[v.toLowerCase()] || '#52525b';
   span.textContent = v;
+  if (row?.protondbPending) {
+    span.textContent += ' ?';
+    span.style.opacity = '0.6';
+    span.title = 'Provisional — too few ProtonDB reports yet for a confident rating';
+  }
   return span;
 }
 

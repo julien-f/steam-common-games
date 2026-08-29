@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- ProtonDB: a game with a few reports but not enough for ProtonDB to confidently assign a tier (`tier: "pending"`) used to show as "no reports at all" everywhere in this app (side panel glance chip, Library Explorer/Bundles ProtonDB column) despite protondb.com itself showing those reports and its own provisional best-guess tier. `extractProtonDb` (`lib/steam.js`) now surfaces that provisional tier (flagged `pending: true`) instead of collapsing it to null; the side panel chip and table badge render it faded with a trailing "?" and a tooltip/caption noting it's provisional, rather than identically to a confirmed tier.
 - Side panel Price card: three small inconsistencies with the table's own Best Deal cell/Price Status column, all sharing the same root cause — `dealRecordTier`'s tier data wasn't being read (or displayed) the same way in both places.
   - `discountPct` (the Discount/`bestDealCut` formula) moved from `gameColumns.js` to `public/utils.js`; `bundles.js`/`library.js` now import it from there directly (same as their other `utils.js` imports) instead of via `gameColumns.js`, and `panel.js`'s own price loader imports it too instead of hand-duplicating the formula inline.
   - The bold weight the table cell gives an all-time-low price (`rec.bold`) is now also applied in the panel's Price card, rather than being silently dropped there (previously masked by `.panel-price-amount`'s own unconditional bold CSS rule).

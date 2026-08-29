@@ -728,6 +728,7 @@ function applyDetailsEvent(row, event) {
   row.categories        = event.meta?.categories ?? [];
   row.tags              = event.tags ?? [];
   row.protondb          = protonDbValue(event.protondb?.tier);
+  row.protondbPending   = event.protondb?.pending ?? false;
   row.achievementCount  = event.meta?.achievementCount ?? null;
   row.dlcCount          = event.meta?.dlc?.length ?? null;
   row.platforms         = event.meta?.platforms ?? [];
@@ -982,6 +983,7 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
       tags:               undefined,
       categories:         undefined,
       protondb:           undefined,
+      protondbPending:    undefined,
       achievementCount:   undefined,
       dlcCount:           undefined,
       platforms:          undefined,
@@ -1096,6 +1098,7 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
     tags:               undefined,
     categories:         undefined,
     protondb:           undefined,
+    protondbPending:    undefined,
     achievementCount:   undefined,
     dlcCount:           undefined,
     platforms:          undefined,

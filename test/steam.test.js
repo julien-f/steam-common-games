@@ -1028,11 +1028,24 @@ test('getProtonDbStatus: returns null on 404 (no reports for this appid)', async
   assert.equal(result, null);
 });
 
-// "pending" means too few reports for ProtonDB to confidently assign a tier — not a
-// compatibility outcome, so it carries the same actionable information as no rating at all.
-// Collapsed to null here rather than passed through, so the side panel/Library Explorer never
-// have to special-case a tier that isn't a real point on the quality scale the others represent.
-test('getProtonDbStatus: treats a "pending" tier as no rating (returns null)', async (t) => {
+// "pending" means too few reports for ProtonDB to confidently assign a tier, but ProtonDB
+// still publishes its own best-guess provisionalTier from those same reports — surfaced here
+// (flagged `pending: true`) rather than collapsed to null, since showing a low-confidence
+// guess beats showing nothing (confirmed live: an appid with 3 real reports showed no data
+// at all here before this, despite protondb.com itself showing those 3 reports).
+test('getProtonDbStatus: a "pending" tier with a provisionalTier is surfaced as pending', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ tier: 'pending', provisionalTier: 'platinum', confidence: 'inadequate', total: 3 }),
+  }));
+  const result = await getProtonDbStatus(400);
+  assert.deepEqual(result, { tier: 'platinum', confidence: 'inadequate', total: 3, pending: true });
+});
+
+// No provisionalTier at all (ProtonDB has nothing to guess from) still collapses to null —
+// there's no lesser value worth surfacing at that point.
+test('getProtonDbStatus: a "pending" tier with no provisionalTier returns null', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => ({
     ok: true,
