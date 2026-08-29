@@ -5,15 +5,7 @@ const assert = require('node:assert/strict');
 const {
   PRICE_FIELDS, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields, postPrices,
 } = require('../public/priceLoading');
-
-// Mirrors gameColumns.js's own discountPct — not imported directly since that module pulls in
-// @vates/data-table-core and uses absolute '/utils.js'-style imports that only resolve in the
-// browser (see its own header comment); applyPriceInfo takes discountPct as a plain parameter
-// for exactly this reason.
-const discountPct = (bestDealAmt, steamRegularAmt) => {
-  if (!(steamRegularAmt > 0) || bestDealAmt == null) return null;
-  return Math.round((1 - bestDealAmt / steamRegularAmt) * 100);
-};
+const { discountPct } = require('../public/utils');
 
 test('applyPriceInfo: maps an ITAD price response onto a row', () => {
   const row = {};

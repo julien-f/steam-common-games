@@ -128,6 +128,22 @@ export function dealRecordTier(price, lows) {
   return null;
 }
 
+// How much cheaper the best deal is than Steam Full Price, as a whole percentage — computed by
+// each page's own loadPrices/loadWishlistPrices (from the same response's steamRegular/
+// bestDeal.price) rather than taken from ITAD's own per-deal `cut` field, deliberately: `cut` is
+// that shop's own discount off *its own* regular price, which shops set independently and isn't
+// consistent from row to row, whereas Steam Full Price is one stable, Valve-set anchor this app
+// already treats as the reference price throughout — every row's Discount ends up answering the
+// same "vs. buying it on Steam" question. Best Deal is defined as the cheapest price across
+// *every* shop including Steam, so `bestDealAmt <= steamRegularAmt` always holds — this can't go
+// negative in practice. Lives here (not gameColumns.js, where the rest of the price-column logic
+// sits) for the same reason dealRecordTier/formatMoney do — panel.js's Price card needs it too,
+// without pulling in gameColumns.js's @vates/data-table-core dependency.
+export function discountPct(bestDealAmt, steamRegularAmt) {
+  if (!(steamRegularAmt > 0) || bestDealAmt == null) return null;
+  return Math.round((1 - bestDealAmt / steamRegularAmt) * 100);
+}
+
 export function fmtH(h) {
   if (!h) return '<span class="dim">—</span>';
   return h % 1 === 0 ? `${h}h` : `${h.toFixed(1)}h`;

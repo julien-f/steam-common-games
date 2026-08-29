@@ -1,6 +1,6 @@
 'use strict';
 
-import { esc, formatMoney, computeSteamdbRating, computeProductionTier } from '/utils.js';
+import { esc, formatMoney, computeSteamdbRating, computeProductionTier, discountPct } from '/utils.js';
 import { reorderUrlParams } from '/urlState.js';
 import { restoreTableView, bindViewPersistence, shareTableView, resetTableView } from '/tableViewPrefs.js';
 import { createRowCache } from '/rowCache.js';
@@ -19,7 +19,7 @@ import { createDataTable } from '@vates/data-table-vanilla';
 import {
   fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareNumMissingLast,
   withMissingGroup, formatMissingGroup, priceTierBucket, formatPriceTier,
-  protonDbValue, TYPE_LABELS, discountPct,
+  protonDbValue, TYPE_LABELS,
 } from '/gameColumns.js';
 
 // ── Bundle-specific column building blocks — Tier Price/Add-on have no Library/Wishlist

@@ -428,19 +428,6 @@ export function renderBestDeal(v, row) {
   return span;
 }
 
-// How much cheaper the best deal is than Steam Full Price, as a whole percentage — computed by
-// each page's own loadPrices/loadWishlistPrices (from the same response's steamRegular/
-// bestDeal.price) rather than taken from ITAD's own per-deal `cut` field, deliberately: `cut` is
-// that shop's own discount off *its own* regular price, which shops set independently and isn't
-// consistent from row to row, whereas Steam Full Price is one stable, Valve-set anchor this app
-// already treats as the reference price throughout — every row's Discount ends up answering the
-// same "vs. buying it on Steam" question. Best Deal is defined as the cheapest price across
-// *every* shop including Steam, so `bestDealAmt <= steamRegularAmt` always holds — this can't go
-// negative in practice.
-export function discountPct(bestDealAmt, steamRegularAmt) {
-  if (!(steamRegularAmt > 0) || bestDealAmt == null) return null;
-  return Math.round((1 - bestDealAmt / steamRegularAmt) * 100);
-}
 // `0` (the best deal genuinely isn't any cheaper than Steam Full Price — distinct from
 // `null`/`undefined`, which mean "no data"/"still loading") renders the same as missing data: a
 // flat "0%" reads as noise next to every other row's real discount, and nothing else in this

@@ -1,6 +1,6 @@
 'use strict';
 
-import { esc, formatMoney, fmtLastPlayed, computeSteamdbRating, computeProductionTier, normalizeInput } from '/utils.js';
+import { esc, formatMoney, fmtLastPlayed, computeSteamdbRating, computeProductionTier, normalizeInput, discountPct } from '/utils.js';
 import { renderOwnersHtml } from '/ownerListHtml.js';
 import { reorderUrlParams } from '/urlState.js';
 import { restoreTableView, bindViewPersistence, shareTableView, resetTableView } from '/tableViewPrefs.js';
@@ -24,7 +24,7 @@ import { bucketDatePart, formatDatePart } from '@vates/data-table-core';
 import {
   fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareDateMissingLast,
   withMissingGroup, formatMissingGroup, halfDecadeBucket, formatHalfDecadeBucket,
-  protonDbValue, TYPE_LABELS, discountPct,
+  protonDbValue, TYPE_LABELS,
 } from '/gameColumns.js';
 
 // ── Library-tab-only columns — an owned game has playtime/last-played data a wishlist or

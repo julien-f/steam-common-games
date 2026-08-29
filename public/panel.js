@@ -1,6 +1,6 @@
 'use strict';
 
-import { esc, formatMoney, scoreColor, dealRecordTier, DEAL_RECORD_TIERS, fmtH, fmtLastPlayed, computeSteamdbRating } from './utils.js';
+import { esc, formatMoney, scoreColor, dealRecordTier, DEAL_RECORD_TIERS, discountPct, fmtH, fmtLastPlayed, computeSteamdbRating } from './utils.js';
 import { openLightbox, closeLightbox, isLightboxOpen } from './lightbox.js';
 import { buildMediaItems } from './mediaItems.js';
 
@@ -311,11 +311,6 @@ function isItadConfigured() {
 // same game), and a stale resolve for a game the panel has since moved on from just updates
 // the (now background) game object without forcing a re-render.
 //
-// discountPct's formula is duplicated here as a two-line inline calc rather than imported from
-// public/gameColumns.js (even though both are ES modules now) — gameColumns.js pulls in
-// @vates/data-table-core, meaningless for a plain side panel, same reasoning as the rest of
-// this card's own small copy of gameColumns.js/bundles.js render logic (see priceHtml's own
-// comment below).
 async function loadPrice(game, { force = false } = {}) {
   if (pricesHandledByHost(game)) return;
   if (game.bestDealPrice !== undefined && !force) return; // already loaded (or already tried) this session
@@ -338,8 +333,7 @@ async function loadPrice(game, { force = false } = {}) {
     game.bestDealPrice = info?.bestDeal?.price?.amount ?? null;
     game.bestDealShop  = info?.bestDeal?.shop          ?? null;
     game.bestDealUrl   = info?.bestDeal?.url           ?? null;
-    game.bestDealCut   = (game.steamRegular > 0 && game.bestDealPrice != null)
-      ? Math.round((1 - game.bestDealPrice / game.steamRegular) * 100) : null;
+    game.bestDealCut   = discountPct(game.bestDealPrice, game.steamRegular);
     game.lowAll        = info?.lowAll?.amount          ?? null;
     game.lowY1         = info?.lowY1?.amount           ?? null;
     game.lowM3         = info?.lowM3?.amount           ?? null;
@@ -1090,6 +1084,12 @@ function priceHtml(g) {
   // comment for why that matters: a 3-month-low tier was once added to only one of these).
   const rec = dealRecordTier(g.bestDealPrice, g);
   const color = rec ? rec.color : null;
+  // .panel-price-amount is already unconditionally bold via CSS, so rec.bold (only true for the
+  // all-time-low tier) makes no visible difference today — but it's still read and applied here
+  // rather than silently dropped, so the table cell's "only the rarest record gets extra
+  // emphasis" rule stays intact if that CSS rule ever changes (see renderBestDeal, gameColumns.js,
+  // for the same rec.bold read).
+  const boldStyle = rec?.bold ? 'font-weight:700;' : '';
   const badge = rec ? ' ' + rec.icon : '';
   const tooltip = g.bestDealShop ? `${g.bestDealShop}${rec ? ` — ${rec.tooltipLabel}` : ''}` : '';
 
@@ -1113,7 +1113,7 @@ function priceHtml(g) {
     ? `<span class="panel-price-sep">·</span><span class="panel-price-shop">${shopUrl ? 'Buy at ' : 'at '}${esc(g.bestDealShop)}${shopUrl ? ' ↗' : ''}</span>`
     : '';
   const lineInner = `
-      <span class="panel-price-amount"${color ? ` style="color:${color}"` : ''}>${esc(formatMoney(g.bestDealPrice, g.priceCurrency))}${badge}</span>
+      <span class="panel-price-amount"${(color || boldStyle) ? ` style="${color ? `color:${color};` : ''}${boldStyle}"` : ''}>${esc(formatMoney(g.bestDealPrice, g.priceCurrency))}${badge}</span>
       ${discountHtml}
       ${shopHtml}`;
   const lineTitleAttr = tooltip ? ` title="${esc(tooltip)}"` : '';
@@ -1134,10 +1134,14 @@ function priceHtml(g) {
   //
   // lowAll <= lowY1 <= lowM3 always (a longer lookback window can only find a price at or
   // below any shorter window's minimum), so it's common for two or all three to share the same
-  // value (e.g. the all-time low happened within the last 3 months). Showing "🔥 $4.99 · ★
-  // $4.99 · ☆ $4.99" reads as noise/a possible bug rather than three real distinct data
-  // points, so consecutive tiers with an identical amount are collapsed into one entry with
-  // their icons combined (rarest first, e.g. "🔥★☆ $4.99") rather than repeating the price.
+  // value (e.g. the all-time low happened within the last 3 months). Showing "$4.99 🔥 · $4.99
+  // ★ · $4.99 ☆" reads as noise/a possible bug rather than three real distinct data points,
+  // so consecutive tiers with an identical amount are collapsed into one entry with their icons
+  // combined (rarest first, e.g. "$4.99 🔥★☆") rather than repeating the price.
+  //
+  // Icon trails the amount here, same convention as the main price line above (and renderBestDeal/
+  // renderPriceStatus in gameColumns.js) — this line used to lead with the icon instead, the one
+  // place in the app that put a price record badge before its value rather than after.
   //
   // Displayed shortest window first (3mo, 1yr, all-time) — DEAL_RECORD_TIERS itself stays
   // ordered rarest-first (that's the order dealRecordTier needs to pick the first/rarest
@@ -1145,7 +1149,10 @@ function priceHtml(g) {
   // reordering the shared list. Equal-amount grouping still works the same either way (equal
   // amounts stay adjacent, just in the opposite direction); `unshift` below keeps each group's
   // own icons/label in rarest-first order regardless of the reversed iteration, so a collapsed
-  // "🔥★☆ $4.99" entry never comes out as "☆★🔥" instead.
+  // "$4.99 🔥★☆" entry never comes out as "$4.99 ☆★🔥" instead — rarest-first here also matches
+  // `color = tiers[0].color` just below, which always colors the cluster off the rarest tier in
+  // the group, so the leading icon and the color it's shown in never disagree about which tier
+  // is "in charge" of this entry.
   const presentTiers = [...DEAL_RECORD_TIERS].reverse().filter(t => g[t.low] != null && g[t.low] !== g.bestDealPrice);
   const lowGroups = [];
   for (const t of presentTiers) {
@@ -1158,7 +1165,7 @@ function priceHtml(g) {
       const icons = tiers.map(t => t.icon).join('');
       const label = tiers.map(t => t.statusLabel).join(' / ');
       const color = tiers[0].color; // rarest tier in the group leads the color too
-      return `<span class="panel-price-low" title="${esc(label)}: ${esc(formatMoney(amount, g.priceCurrency))}" style="color:${color}">${icons} ${esc(formatMoney(amount, g.priceCurrency))}</span>`;
+      return `<span class="panel-price-low" title="${esc(label)}: ${esc(formatMoney(amount, g.priceCurrency))}" style="color:${color}">${esc(formatMoney(amount, g.priceCurrency))} ${icons}</span>`;
     })
     .join('<span class="panel-price-sep">·</span>');
 
