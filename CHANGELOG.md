@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Library Explorer: the side panel now shows an "In library" / "On wishlist" status badge right under the title for any game looked up via the search box (or opened from a table row/DLC link), regardless of which tab (Library/Wishlist) is currently active. `library.js` background-fetches whichever tab isn't currently loaded, purely to know appid membership, so both statuses are known even when only one tab's data is otherwise on screen.
 - Test coverage for five new shared frontend modules (`test/tableViewPrefs.test.js`, `test/rowCache.test.js`, `test/panelNav.test.js`, `test/priceLoading.test.js`, `test/ownerListHtml.test.js`) — see Changed below.
 
+### Fixed
+
+- Side panel's Price card silently showed "No pricing data available" for every game on the comparison page, the Library Explorer's Library tab, and standalone lookups — `panel.js`'s `loadPrice` called `resolveRegion(getStoredRegion())` without importing either from `region.js`, throwing a `ReferenceError` that its own catch block swallowed into a plain "no data" result with no console error at all, so `POST /api/prices` never actually fired.
+
 ### Changed
 
 - De-duplicated logic that `library.js`/`bundles.js` (and, for the owner list, `app.js`) each carried their own near-identical copy of, into shared modules:

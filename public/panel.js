@@ -3,6 +3,7 @@
 import { esc, formatMoney, scoreColor, dealRecordTier, DEAL_RECORD_TIERS, discountPct, fmtH, fmtLastPlayed, computeSteamdbRating } from './utils.js';
 import { openLightbox, closeLightbox, isLightboxOpen } from './lightbox.js';
 import { buildMediaItems } from './mediaItems.js';
+import { getStoredRegion, resolveRegion } from './region.js';
 
 // ── Shared game side panel ──────────────────────────────────────────────────
 // Used by both the comparison page (app.js) and the Library Explorer
