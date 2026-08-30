@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 
 - Side panel's Price card silently showed "No pricing data available" for every game on the comparison page, the Library Explorer's Library tab, and standalone lookups — `panel.js`'s `loadPrice` called `resolveRegion(getStoredRegion())` without importing either from `region.js`, throwing a `ReferenceError` that its own catch block swallowed into a plain "no data" result with no console error at all, so `POST /api/prices` never actually fired.
+- Library Explorer's Wishlist tab: looking up a game via the search box that isn't already in the loaded wishlist showed no Price card at all — `loadWishlistPrices`' batch price fetch is keyed off `rowMap`, which a standalone-lookup game never enters. `openStandaloneLookup` now separately prices that one game (`fetchStandalonePrice`) when the Wishlist tab is active.
 
 ### Changed
 

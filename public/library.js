@@ -562,6 +562,28 @@ function openStandaloneLookup(appid, name, { keepHistory = false } = {}) {
   const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true };
   openGame(game, { keepHistory });
   fetchStandaloneDetails(game);
+  // Not part of `rows`/`rowMap`, so loadWishlistPrices' own rowMap-keyed batch (see below)
+  // never reaches it — a standalone lookup made while on the Wishlist tab would otherwise
+  // show no Price card at all, since panel.js's priceHtml is purely passive (see its own
+  // comment) and nothing else ever sets bestDealPrice/etc. on this one-off game object.
+  if (activeTab === 'wishlist') fetchStandalonePrice(game);
+}
+
+// Prices a single standalone-lookup game directly (not via rowMap, which loadWishlistPrices
+// above is keyed on) — same ITAD call/field mapping, just applied straight onto `game`.
+async function fetchStandalonePrice(game) {
+  const configured = await itadConfiguredPromise;
+  if (!configured) { nullAllPriceFields(game); if (getPanelGame() === game) renderPanelBody(game); return; }
+  const country = resolveRegion(getStoredRegion());
+  try {
+    const prices = await postPrices({ appids: [game.appid], country });
+    const info = prices[game.appid];
+    if (info) applyPriceInfo(game, info, discountPct);
+    else nullAllPriceFields(game);
+  } catch {
+    nullMissingPriceFields(game);
+  }
+  if (getPanelGame() === game) renderPanelBody(game);
 }
 
 async function fetchStandaloneDetails(game) {
