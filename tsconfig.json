@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    // Vite resolves bare-absolute frontend imports (`/utils.ts`) against `root: 'public'`;
+    // tsc has no notion of the web root, so map them onto the source tree for typechecking.
+    "paths": {
+      "/*": ["./public/*"]
+    },
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true
+  },
+  "include": ["public/**/*.ts"]
+}

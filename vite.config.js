@@ -13,6 +13,15 @@ const path = require('node:path');
 module.exports = defineConfig({
   root: 'public',
   publicDir: false,
+  server: {
+    // Local dev: `npm run dev:web` serves public/ (now TypeScript, which the plain
+    // express.static fallback in server.js can't parse) with HMR on :5173, proxying
+    // the API to the backend. Run `npm run dev` in a second terminal for the backend;
+    // the old single-`npm start` flow still works against `npm run build`'s dist/.
+    proxy: {
+      '/api': 'http://127.0.0.1:3000',
+    },
+  },
   build: {
     outDir: '../dist',
     emptyOutDir: true,

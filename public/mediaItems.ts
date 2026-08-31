@@ -7,7 +7,7 @@ export interface MediaItem {
   thumb: string;
   shotId: string;
 }
-export function buildMediaItems(appid: number, details: Pick<GameMeta, 'banner' | 'movies' | 'screenshots'> | null | undefined): MediaItem[] {
+export function buildMediaItems(appid: number | string, details: Pick<GameMeta, 'banner' | 'movies' | 'screenshots'> | null | undefined): MediaItem[] {
   // `details.banner` (see extractAppDetails in lib/steam.js) is Steam's own header image
   // for this specific game, resolved once store metadata has loaded — before that (the
   // game is still `loading`, so `details` itself is absent), guess the conventional CDN

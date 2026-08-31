@@ -1,53 +1,63 @@
 'use strict';
 
-import { esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, normalizeInput } from '/utils.js';
-import { renderOwnersHtml } from '/ownerListHtml.js';
-import { FILTER_DIMS, parseUrlState, reorderUrlParams } from '/urlState.js';
-import { updateNavLink } from '/nav.js';
-import { renderAccountChipsGrouped, bindAccountRefresh, addRecent, renderRecentsBar, bindRecentsBar } from '/accountsBar.js';
-import { initGameSearch, addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.js';
-import { openLightbox, isLightboxOpen } from '/lightbox.js';
+import { esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, normalizeInput } from '/utils.ts';
+import { renderOwnersHtml } from '/ownerListHtml.ts';
+import { FILTER_DIMS, parseUrlState, reorderUrlParams } from '/urlState.ts';
+import { updateNavLink } from '/nav.ts';
+import { renderAccountChipsGrouped, bindAccountRefresh, addRecent, renderRecentsBar, bindRecentsBar } from '/accountsBar.ts';
+import { initGameSearch, addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.ts';
+import { openLightbox, isLightboxOpen } from '/lightbox.ts';
 import {
   panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,
   pickRandomFrom, clearAllRandomQueues, panelHandleEscape,
   renderPanelBody,
-} from '/panel.js';
-import { initPageShell } from '/pageShell.js';
+} from '/panel.ts';
+import { initPageShell } from '/pageShell.ts';
+import type { PanelOptions } from '/panel.ts';
+import type { Game, GameDetails, Achievements, GameMeta } from '/types.ts';
 
 // ── State ──────────────────────────────────────────────────────────────────
 
-let games = [];     // flat: { appid, name, groupKey, loading, details }
-let groups = [];    // [{ userIndices, games }] — ordered, from server
-let slots = [];     // [[{steamid, personaname, profileurl}, ...], ...] — one entry per logical player
-let playtime = {};  // { [appid]: { [steamId]: minutes } } — per-account playtime for common games
-let lastPlayed = {}; // { [appid]: { [steamId]: unix seconds } } — per-account last-played timestamp
+interface GroupGame { appid: number; name: string; }
+interface ServerGroup { userIndices: number[]; games: GroupGame[]; }
+type Account = { steamid: string; personaname?: string; profileurl?: string };
+// A loaded comparison row — the shared Game plus the groupKey this page stamps on it
+// (a comma-joined list of slot indices; standalone lookups never get one).
+type GameRow = Game & { groupKey?: string | null };
+
+let games: GameRow[] = [];     // flat: { appid, name, groupKey, loading, details }
+let groups: ServerGroup[] = [];    // [{ userIndices, games }] — ordered, from server
+let slots: Account[][] = [];     // [[{steamid, personaname, profileurl}, ...], ...] — one entry per logical player
+let playtime: Record<string, Record<string, number>> = {};  // { [appid]: { [steamId]: minutes } } — per-account playtime for common games
+let lastPlayed: Record<string, Record<string, number>> = {}; // { [appid]: { [steamId]: unix seconds } } — per-account last-played timestamp
 const DEFAULT_SORT_COL = 'score';
 const DEFAULT_SORT_DIR = -1;
-let sortCol = DEFAULT_SORT_COL;
-let sortDir = DEFAULT_SORT_DIR;
+let sortCol: string = DEFAULT_SORT_COL;
+let sortDir: number = DEFAULT_SORT_DIR;
 
 // null at the default sort — omitted from the URL entirely rather than writing out `-score`
 // on every search, since that's what a bare search already sorts by.
-function sortUrlParam() {
+function sortUrlParam(): string | null {
   if (sortCol === DEFAULT_SORT_COL && sortDir === DEFAULT_SORT_DIR) return null;
   return (sortDir < 0 ? '-' : '') + sortCol;
 }
 let runId = 0;           // increments on each search to cancel stale updates
-let streamController = null; // AbortController for the active detail stream
-let refreshDebounceTimer = null;
-let activeGame = null;
-let randomGroupKey = null;      // groupKey of the active random session, or null (queues themselves live in panel.js)
+let streamController: AbortController | null = null; // AbortController for the active detail stream
+let refreshDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+let activeGame: GameRow | null = null;
+let randomGroupKey: string | null = null;      // groupKey of the active random session, or null (queues themselves live in panel.js)
 // Achievement list cache for standalone lookups only (see loadAchievements) — keyed by
 // appid, no per-account progress since a standalone game has no steamids at all.
-const achievementsCache = new Map();
+const achievementsCache = new Map<number, Achievements>();
 
-const RECENTS_KEY = 'comparison:recent-searches'; // see public/accountsBar.js
+const RECENTS_KEY = 'comparison:recent-searches'; // see public/accountsBar.ts
 
 
 // Filter state — reset on each new search
-const activeFilters = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set()]));
-const allOpts       = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set()]));
-const filterSearch  = Object.fromEntries(FILTER_DIMS.map(d => [d.key, '']));
+type FilterDimKey = typeof FILTER_DIMS[number]['key'];
+const activeFilters = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set<string>()])) as Record<FilterDimKey, Set<string>>;
+const allOpts       = Object.fromEntries(FILTER_DIMS.map(d => [d.key, new Set<string>()])) as Record<FilterDimKey, Set<string>>;
+const filterSearch  = Object.fromEntries(FILTER_DIMS.map(d => [d.key, ''])) as Record<FilterDimKey, string>;
 let nameFilter = '';
 // Mobile-only collapse for the filter body (chips/search/dims) — defaulted from the
 // viewport at first render so a phone starts collapsed (results visible immediately
@@ -62,73 +72,75 @@ let filterPanelCollapsed = typeof matchMedia === 'function' && matchMedia('(max-
 // ── Init ───────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
+  const panelOptions: PanelOptions = {
+    inertSelector: '.container',
+    enableTagFilters: true,
+    // Achievements are opt-in per host page (see panel.ts's achievementsHtml). Unlike the
+    // Library Explorer, a comparison group has no single well-defined "player" to fetch
+    // unlock progress for (a game can belong to several slots at once, each possibly a
+    // merged Family) — so for now this only actually renders anything for a standalone
+    // "look up any game" lookup (see loadAchievements below), where the list itself
+    // (names/descriptions/icons/rarity, no progress) is store metadata that doesn't
+    // depend on any account. A loaded comparison-group game simply never gets
+    // `g.achievements` set, so achievementsHtml's `if (!data) return ''` keeps the
+    // section hidden for those, same as before this was turned on at all.
+    showAchievements: true,
+    getOwnersHtml: buildOwnersHtml,
+    isTagActive: (dim, val) => activeFilters[dim as FilterDimKey].has(val),
+    onTagClick: (dim, val) => {
+      const k = dim as FilterDimKey;
+      if (activeFilters[k].has(val)) activeFilters[k].delete(val);
+      else activeFilters[k].add(val);
+      refreshTable();
+      updateFilterUrl();
+      renderFilterPanel();
+      renderPanel();
+    },
+    onRefresh: async game => {
+      await Promise.all([refreshGameDetails(game), loadAchievements(game, { force: true })]);
+    },
+    // Backs the DLC card's links (public/panel.ts) — a real href so ctrl/cmd/shift/middle
+    // click still opens it in a new tab, alongside the current URL's other state (`u=`,
+    // filters, etc.), same as setPanelParam builds for the panel's own deep link.
+    gameHref: appid => {
+      const params = new URLSearchParams(location.search);
+      params.delete('shot');
+      params.set('game', String(appid));
+      return `?${reorderUrlParams(params)}`;
+    },
+    // Clicking a DLC entry (or the panel's own "← Back" button) — reuses the exact same
+    // "open this appid" mechanism as the "look up any game" search box, just telling it to
+    // keep panel.ts's own DLC-navigation history stack instead of starting a fresh one.
+    onNavigateGame: (appid, name) => openStandaloneGame(appid, name, { keepHistory: true }),
+    // Runs on every close path, not just the Escape-key one below — see the comment on
+    // `onClose` in panel.ts. Mirrors what the old closePanel() wrapper did, but now also
+    // covers the backdrop click / × button / swipe-to-close, which used to leave
+    // `activeGame` and `?game=` stale until something else (e.g. a later Escape press)
+    // happened to clean them up. `preserveUrl` is set by findCommonGames when it closes the
+    // panel only to immediately reopen the same game once a refresh/restore completes —
+    // see its own `panelClose({ preserveUrl: true })` call.
+    onClose: ({ preserveUrl } = {}) => {
+      activeGame = null;
+      randomGroupKey = null;
+      refreshTable(); // remove active row highlight
+      updateTitle();
+      if (!preserveUrl) setPanelParam(null);
+    },
+  };
   initPageShell({
     page: 'compare',
     lightbox: { onParamChange: setLightboxParam, onGameNav: navigateLightboxGame },
-    panel: {
-      inertSelector: '.container',
-      enableTagFilters: true,
-      // Achievements are opt-in per host page (see panel.js's achievementsHtml). Unlike the
-      // Library Explorer, a comparison group has no single well-defined "player" to fetch
-      // unlock progress for (a game can belong to several slots at once, each possibly a
-      // merged Family) — so for now this only actually renders anything for a standalone
-      // "look up any game" lookup (see loadAchievements below), where the list itself
-      // (names/descriptions/icons/rarity, no progress) is store metadata that doesn't
-      // depend on any account. A loaded comparison-group game simply never gets
-      // `g.achievements` set, so achievementsHtml's `if (!data) return ''` keeps the
-      // section hidden for those, same as before this was turned on at all.
-      showAchievements: true,
-      getOwnersHtml: buildOwnersHtml,
-      isTagActive: (dim, val) => activeFilters[dim].has(val),
-      onTagClick: (dim, val) => {
-        if (activeFilters[dim].has(val)) activeFilters[dim].delete(val);
-        else activeFilters[dim].add(val);
-        refreshTable();
-        updateFilterUrl();
-        renderFilterPanel();
-        renderPanel();
-      },
-      onRefresh: async game => {
-        await Promise.all([refreshGameDetails(game), loadAchievements(game, { force: true })]);
-      },
-      // Backs the DLC card's links (public/panel.js) — a real href so ctrl/cmd/shift/middle
-      // click still opens it in a new tab, alongside the current URL's other state (`u=`,
-      // filters, etc.), same as setPanelParam builds for the panel's own deep link.
-      gameHref: appid => {
-        const params = new URLSearchParams(location.search);
-        params.delete('shot');
-        params.set('game', appid);
-        return `?${reorderUrlParams(params)}`;
-      },
-      // Clicking a DLC entry (or the panel's own "← Back" button) — reuses the exact same
-      // "open this appid" mechanism as the "look up any game" search box, just telling it to
-      // keep panel.js's own DLC-navigation history stack instead of starting a fresh one.
-      onNavigateGame: (appid, name) => openStandaloneGame(appid, name, { keepHistory: true }),
-      // Runs on every close path, not just the Escape-key one below — see the comment on
-      // `onClose` in panel.js. Mirrors what the old closePanel() wrapper did, but now also
-      // covers the backdrop click / × button / swipe-to-close, which used to leave
-      // `activeGame` and `?game=` stale until something else (e.g. a later Escape press)
-      // happened to clean them up. `preserveUrl` is set by findCommonGames when it closes the
-      // panel only to immediately reopen the same game once a refresh/restore completes —
-      // see its own `panelClose({ preserveUrl: true })` call.
-      onClose: ({ preserveUrl } = {}) => {
-        activeGame = null;
-        randomGroupKey = null;
-        refreshTable(); // remove active row highlight
-        updateTitle();
-        if (!preserveUrl) setPanelParam(null);
-      },
-    },
+    panel: panelOptions,
   });
 
-  document.getElementById('add-btn').addEventListener('click', () => addPlayerSlot());
-  document.getElementById('search-btn').addEventListener('click', findCommonGames);
+  document.getElementById('add-btn')!.addEventListener('click', () => addPlayerSlot());
+  document.getElementById('search-btn')!.addEventListener('click', () => findCommonGames());
 
-  // Per-account refresh (accounts bar) and recent-searches (see public/accountsBar.js,
+  // Per-account refresh (accounts bar) and recent-searches (see public/accountsBar.ts,
   // shared with the Library Explorer) — re-run the current search bypassing the cache for
   // just one account, or replaying a remembered slot combo, while keeping the URL, sort,
   // filters, and open panel exactly as they are for the refresh case (not a new search).
-  bindAccountRefresh(document.getElementById('accounts-bar'), steamid => {
+  bindAccountRefresh(document.getElementById('accounts-bar')!, steamid => {
     findCommonGames({
       pushState: false,
       refreshIds: [steamid],
@@ -138,36 +150,36 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  bindRecentsBar(document.getElementById('recents-bar'), RECENTS_KEY, inputSlots => {
-    const container = document.getElementById('user-inputs');
+  bindRecentsBar(document.getElementById('recents-bar')!, RECENTS_KEY, rawInputSlots => {
+    const container = document.getElementById('user-inputs')!;
     container.innerHTML = '';
-    inputSlots.forEach(accounts => addPlayerSlot(accounts));
+    (rawInputSlots as string[][]).forEach(accounts => addPlayerSlot(accounts));
     findCommonGames();
   });
-  renderRecentsBar(document.getElementById('recents-bar'), RECENTS_KEY);
+  renderRecentsBar(document.getElementById('recents-bar')!, RECENTS_KEY);
 
-  document.getElementById('results').addEventListener('click', e => {
-    const randomBtn = e.target.closest('.group-random-btn');
-    if (randomBtn) { pickRandom(randomBtn.dataset.group); return; }
-    const row = e.target.closest('tr.game-row');
-    if (!row || e.target.closest('a')) return;
+  document.getElementById('results')!.addEventListener('click', e => {
+    const randomBtn = (e.target as Element).closest('.group-random-btn') as HTMLElement | null;
+    if (randomBtn) { pickRandom(randomBtn.dataset.group!); return; }
+    const row = (e.target as Element).closest('tr.game-row') as HTMLElement | null;
+    if (!row || (e.target as Element).closest('a')) return;
     const appid = Number(row.dataset.appid);
     const game = games.find(g => g.appid === appid);
     if (game) openPanel(game);
   });
 
-  document.getElementById('shortcuts-backdrop').addEventListener('click', closeShortcuts);
-  document.querySelector('.shortcuts-close').addEventListener('click', closeShortcuts);
+  document.getElementById('shortcuts-backdrop')!.addEventListener('click', closeShortcuts);
+  document.querySelector('.shortcuts-close')!.addEventListener('click', closeShortcuts);
 
   initGameSearch({
-    inputEl: document.getElementById('game-lookup-input'),
-    resultsEl: document.getElementById('game-lookup-results'),
+    inputEl: document.getElementById('game-lookup-input') as HTMLInputElement,
+    resultsEl: document.getElementById('game-lookup-results')!,
     onSelect: ({ appid, name }) => openStandaloneGame(appid, name),
   });
 
-  // Shared, un-namespaced across both pages — see gameSearch.js.
-  bindRecentGamesBar(document.getElementById('recent-games-bar'), (appid, name) => openStandaloneGame(appid, name));
-  renderRecentGamesBar(document.getElementById('recent-games-bar'));
+  // Shared, un-namespaced across both pages — see gameSearch.ts.
+  bindRecentGamesBar(document.getElementById('recent-games-bar')!, (appid, name) => openStandaloneGame(appid, name));
+  renderRecentGamesBar(document.getElementById('recent-games-bar')!);
 
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
@@ -175,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // all three pages — delegate to it whenever the lightbox is open so this page can't drift
       // from the other two the way bundles.js once did (see its own comment).
       if (isLightboxOpen()) { panelHandleEscape(); return; }
-      if (document.getElementById('shortcuts-modal').classList.contains('open')) { closeShortcuts(); return; }
+      if (document.getElementById('shortcuts-modal')!.classList.contains('open')) { closeShortcuts(); return; }
       panelClose(); return; // onClose (see initPanel above) handles the URL/state cleanup
     }
     // The lightbox owns the keyboard while open (its own arrows/Home/End/f/space/m,
@@ -189,31 +201,32 @@ document.addEventListener('DOMContentLoaded', () => {
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if (e.key === '/') {
       e.preventDefault();
-      document.querySelector('#user-inputs input[type="text"]')?.focus();
+      (document.querySelector('#user-inputs input[type="text"]') as HTMLInputElement | null)?.focus();
       return;
     }
     if (e.key === 'Enter') {
-      const row = document.activeElement?.closest('tr.game-row');
+      const row = (document.activeElement as HTMLElement | null)?.closest('tr.game-row') as HTMLElement | null;
       if (row) {
         const game = games.find(g => g.appid === Number(row.dataset.appid));
         if (game) { openPanel(game); return; }
       }
     }
     if (!activeGame) return;
+    const ag = activeGame;
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       if (panelStepHero(e.key === 'ArrowRight' ? 1 : -1, { wrap: true })) e.preventDefault();
       return;
     }
-    if (activeGame.standalone) return; // no group to page through or randomize within — see renderPanelNav
+    if (ag.standalone) return; // no group to page through or randomize within — see renderPanelNav
     if (e.key === 'r' || e.key === 'R') {
       e.preventDefault();
-      pickRandom(activeGame.groupKey);
+      pickRandom(ag.groupKey!);
       return;
     }
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
     e.preventDefault();
-    const list = sortedGames(activeGame.groupKey);
-    const idx = list.findIndex(g => g.appid === activeGame.appid);
+    const list = sortedGames(ag.groupKey!);
+    const idx = list.findIndex(g => g.appid === ag.appid);
     const next = (idx + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
     openPanel(list[next]);
   });
@@ -238,7 +251,7 @@ function loadFromUrl() {
   // Each u= param is a comma-joined list of accounts for one logical player slot.
   // Old single-account URLs (?u=alice&u=bob) parse naturally as single-member slots.
   const { slots: urlSlots, sort: restoreSort, filters: restoreFilters, nameFilter: restoreNameFilter, shot: restoreShot } = parseUrlState(location.search);
-  const container = document.getElementById('user-inputs');
+  const container = document.getElementById('user-inputs')!;
   container.innerHTML = '';
   if (urlSlots.length >= 1 && urlSlots.every(s => s.length > 0)) {
     urlSlots.forEach(accounts => addPlayerSlot(accounts));
@@ -250,12 +263,12 @@ function loadFromUrl() {
     slots = [];
     for (const s of Object.values(activeFilters)) s.clear();
     for (const s of Object.values(allOpts)) s.clear();
-    for (const k of Object.keys(filterSearch)) filterSearch[k] = '';
+    for (const k of Object.keys(filterSearch)) filterSearch[k as FilterDimKey] = '';
     nameFilter = '';
-    document.getElementById('filter-panel').innerHTML = '';
-    document.getElementById('results').innerHTML = '';
-    document.getElementById('how-it-works').hidden = false;
-    const accountsBarEl = document.getElementById('accounts-bar');
+    document.getElementById('filter-panel')!.innerHTML = '';
+    document.getElementById('results')!.innerHTML = '';
+    document.getElementById('how-it-works')!.hidden = false;
+    const accountsBarEl = document.getElementById('accounts-bar')!;
     accountsBarEl.hidden = true;
     accountsBarEl.innerHTML = '';
     updateTitle();
@@ -270,8 +283,8 @@ function loadFromUrl() {
 // canonical order used both for building a shareable/reproducible `?u=` URL and for
 // deduping recent searches (so "alice+bob vs. charlie" and "bob+alice vs. charlie" are
 // treated as the same search).
-function normalizedSlots(inputSlots) {
-  const cmp = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+function normalizedSlots(inputSlots: string[][]): string[][] {
+  const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' });
   return [...inputSlots]
     .map(slot => [...slot].sort(cmp))
     .sort((a, b) => cmp(a[0], b[0]));
@@ -281,11 +294,11 @@ function normalizedSlots(inputSlots) {
 
 function updateSearchBtn() {
   const multi = document.querySelectorAll('.player-slot').length > 1;
-  document.getElementById('search-btn').textContent = multi ? 'Find Common Games' : 'Show Library';
+  document.getElementById('search-btn')!.textContent = multi ? 'Find Common Games' : 'Show Library';
 }
 
-function addPlayerSlot(accounts = ['']) {
-  const container = document.getElementById('user-inputs');
+function addPlayerSlot(accounts: string[] = ['']) {
+  const container = document.getElementById('user-inputs')!;
   const slot = document.createElement('div');
   slot.className = 'player-slot';
 
@@ -322,14 +335,14 @@ function addPlayerSlot(accounts = ['']) {
   familyHint.textContent = 'Their library will be merged into this slot before comparing.';
   slot.appendChild(familyHint);
 
-  for (let i = 1; i < accounts.length; i++) addFamilyMember(slot, accounts[i]);
+  for (let i = 1; i < accounts.length; i++) addFamilyMember(slot, accounts[i] ?? '');
 
   container.appendChild(slot);
   updateSearchBtn();
   if (!accounts[0]) input.focus();
 }
 
-function addFamilyMember(slot, value = '') {
+function addFamilyMember(slot: HTMLElement, value = '') {
   const row = document.createElement('div');
   row.className = 'family-row';
 
@@ -351,9 +364,9 @@ function addFamilyMember(slot, value = '') {
   if (!value) input.focus();
 }
 
-function getSlots() {
+function getSlots(): string[][] {
   return [...document.querySelectorAll('.player-slot')].map(slot =>
-    [...slot.querySelectorAll('input')]
+    [...slot.querySelectorAll<HTMLInputElement>('input')]
       .map(i => normalizeInput(i.value.trim()))
       .filter(Boolean)
   ).filter(s => s.length > 0);
@@ -361,20 +374,28 @@ function getSlots() {
 
 // ── Alerts ─────────────────────────────────────────────────────────────────
 
-function clearAlerts() { document.getElementById('alerts').innerHTML = ''; }
+function clearAlerts() { document.getElementById('alerts')!.innerHTML = ''; }
 
-function showAlert(msg, type = 'error') {
+function showAlert(msg: string, type = 'error') {
   const el = document.createElement('div');
   el.className = `alert alert-${type}`;
   el.textContent = msg;
-  const box = document.getElementById('alerts');
+  const box = document.getElementById('alerts')!;
   box.innerHTML = '';
   box.appendChild(el);
 }
 
 // ── Main search flow ───────────────────────────────────────────────────────
 
-async function findCommonGames({ pushState = true, restoreFilters = null, restoreSort = null, restoreNameFilter = '', restoreShot = null, refreshIds = null } = {}) {
+interface FindCommonGamesOpts {
+  pushState?: boolean;
+  restoreFilters?: Record<string, string[]> | null;
+  restoreSort?: { col: string; dir: number } | null;
+  restoreNameFilter?: string;
+  restoreShot?: string | null;
+  refreshIds?: string[] | null;
+}
+async function findCommonGames({ pushState = true, restoreFilters = null, restoreSort = null, restoreNameFilter = '', restoreShot = null, refreshIds = null }: FindCommonGamesOpts = {}) {
   const inputSlots = getSlots();
   if (inputSlots.length < 1) { showAlert('Enter at least 1 Steam user.'); return; }
 
@@ -392,20 +413,20 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
   panelClose({ preserveUrl: true });
   for (const s of Object.values(activeFilters)) s.clear();
   for (const s of Object.values(allOpts)) s.clear();
-  for (const k of Object.keys(filterSearch)) filterSearch[k] = '';
+  for (const k of Object.keys(filterSearch)) filterSearch[k as FilterDimKey] = '';
   nameFilter = restoreNameFilter;
   if (restoreFilters) {
     for (const [k, vals] of Object.entries(restoreFilters)) {
-      for (const v of vals) activeFilters[k].add(v);
+      for (const v of vals) activeFilters[k as FilterDimKey].add(v);
     }
   }
-  const accountsBarEl = document.getElementById('accounts-bar');
+  const accountsBarEl = document.getElementById('accounts-bar')!;
   accountsBarEl.hidden = true;
   accountsBarEl.innerHTML = '';
-  document.getElementById('how-it-works').hidden = true;
-  document.getElementById('filter-panel').innerHTML = '';
-  document.getElementById('search-btn').disabled = true;
-  document.getElementById('results').innerHTML =
+  document.getElementById('how-it-works')!.hidden = true;
+  document.getElementById('filter-panel')!.innerHTML = '';
+  (document.getElementById('search-btn') as HTMLButtonElement).disabled = true;
+  document.getElementById('results')!.innerHTML =
     `<div style="padding:16px 0;color:var(--text1)"><span class="spinner"></span>${refreshIds ? 'Refreshing' : 'Fetching'} Steam libraries…</div>`;
 
   try {
@@ -421,7 +442,7 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
     groups = data.groups || [];
     games = groups.flatMap(g => {
       const key = g.userIndices.join(',');
-      return g.games.map(game => ({ ...game, groupKey: key, loading: true, details: null }));
+      return g.games.map(game => ({ ...game, groupKey: key, loading: true, details: null })) as GameRow[];
     });
     slots = data.slots || [];
     playtime = data.playtime || {};
@@ -453,28 +474,28 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
     // multi-player comparison (one account per slot) render as the same flat row of chips
     // and there's no way to tell "merged into one library" from "compared side by side".
     renderAccountChipsGrouped(accountsBarEl, slots.map((players, i) => {
-      const parts = [];
+      const parts: string[] = [];
       if (slots.length > 1) parts.push(`Player ${i + 1}`);
       if (players.length > 1) parts.push(`${players.length} accounts merged`);
-      return { label: parts.length ? parts.join(' · ') : null, players };
+      return { label: parts.length ? parts.join(' · ') : undefined, players };
     }), 'games');
     addRecent(RECENTS_KEY, idSlots.map(s => s.join(',')).join('|'), slots, idSlots);
-    renderRecentsBar(document.getElementById('recents-bar'), RECENTS_KEY);
+    renderRecentsBar(document.getElementById('recents-bar')!, RECENTS_KEY);
     restorePanelFromUrl(restoreShot);
     await loadAllDetails(thisRun);
     if (thisRun === runId) { refreshTable(); restorePanelFromUrl(restoreShot); }
   } catch (err) {
     if (thisRun !== runId) return;
-    showAlert(err.message);
-    document.getElementById('results').innerHTML = '';
+    showAlert(err instanceof Error ? err.message : String(err));
+    document.getElementById('results')!.innerHTML = '';
   } finally {
-    document.getElementById('search-btn').disabled = false;
+    (document.getElementById('search-btn') as HTMLButtonElement).disabled = false;
   }
 }
 
 // Forces a fresh rating/HLTB/store-metadata/tags fetch for one game, bypassing its
 // cache TTL — used by the side panel's "↻ Refresh" button (panel.js's onRefresh).
-async function refreshGameDetails(game) {
+async function refreshGameDetails(game: Game) {
   try {
     const res = await fetch(`/api/game-details/${game.appid}?refresh=1`);
     const data = await res.json();
@@ -484,17 +505,17 @@ async function refreshGameDetails(game) {
     // feeding their tags/genres/categories into the table's filter option pool would make the
     // filter card spuriously appear (or gain new options) with no comparison ever having run.
     if (!game.standalone && (game.details.meta || game.details.tags)) updateFilterOptions(game.details.meta, game.details.tags);
-    const tr = document.querySelector(`tr.game-row[data-appid="${game.appid}"]`);
+    const tr = document.querySelector<HTMLTableRowElement>(`tr.game-row[data-appid="${game.appid}"]`);
     if (tr) syncRow(tr, game);
     refreshTable();
   } catch (err) {
-    showAlert(err.message);
+    showAlert(err instanceof Error ? err.message : String(err));
   }
 }
 
 // ── Progressive detail loading ─────────────────────────────────────────────
 
-async function loadAllDetails(thisRun) {
+async function loadAllDetails(thisRun: number) {
   if (!games.length) return;
 
   streamController?.abort();
@@ -519,6 +540,7 @@ async function loadAllDetails(thisRun) {
   }
 
   if (!res.ok) return;
+  if (!res.body) return;
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -532,7 +554,7 @@ async function loadAllDetails(thisRun) {
 
       buffer += decoder.decode(value, { stream: true });
       const chunks = buffer.split('\n\n');
-      buffer = chunks.pop(); // keep any incomplete trailing chunk
+      buffer = chunks.pop() ?? ''; // keep any incomplete trailing chunk
 
       for (const chunk of chunks) {
         if (!chunk.startsWith('data: ')) continue;
@@ -545,14 +567,15 @@ async function loadAllDetails(thisRun) {
         const idx = idxByAppid.get(data.appid);
         if (idx === undefined) continue;
 
-        games[idx].details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags, demo: data.demo, protondb: data.protondb };
-        games[idx].loading = false;
+        const g = games[idx];
+        g.details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags, demo: data.demo, protondb: data.protondb };
+        g.loading = false;
         loaded++;
         updateProgress(loaded, games.length);
-        if (games[idx].details?.meta || games[idx].details?.tags) updateFilterOptions(games[idx].details.meta, games[idx].details.tags);
-        if (activeGame?.appid === games[idx].appid) renderPanel();
-        const tr = document.querySelector(`tr.game-row[data-appid="${data.appid}"]`);
-        if (tr) syncRow(tr, games[idx]);
+        if (g.details?.meta || g.details?.tags) updateFilterOptions(g.details.meta, g.details.tags);
+        if (activeGame?.appid === g.appid) renderPanel();
+        const tr = document.querySelector<HTMLTableRowElement>(`tr.game-row[data-appid="${data.appid}"]`);
+        if (tr) syncRow(tr, g);
         clearTimeout(refreshDebounceTimer);
         refreshDebounceTimer = setTimeout(refreshTable, 150);
       }
@@ -564,7 +587,7 @@ async function loadAllDetails(thisRun) {
 
 // ── Rendering ──────────────────────────────────────────────────────────────
 
-function slotDisplayName(i) {
+function slotDisplayName(i: number): string {
   return (slots[i] || []).map((p, j) => p.personaname || `Player ${i + 1}.${j + 1}`).join(' + ');
 }
 
@@ -598,17 +621,17 @@ function updateLibraryExplorerLink() {
   updateNavLink('library', href);
 }
 
-function slotHtml(i) {
+function slotHtml(i: number): string {
   return (slots[i] || []).map((p, j) => {
     const name = esc(p.personaname || `Player ${i + 1}.${j + 1}`);
-    const safeUrl = /^https?:\/\//i.test(p.profileurl) ? p.profileurl : '';
+    const safeUrl = p.profileurl && /^https?:\/\//i.test(p.profileurl) ? p.profileurl : '';
     return safeUrl
       ? `<a href="${esc(safeUrl)}" target="_blank" rel="noopener" class="slot-link">${name}</a>`
       : name;
   }).join(' + ');
 }
 
-function groupSlotsHtml(slotIndices) {
+function groupSlotsHtml(slotIndices: number[]): string {
   return [...slotIndices]
     .sort((a, b) => slotDisplayName(a).toLowerCase().localeCompare(slotDisplayName(b).toLowerCase()))
     .map(i => slotHtml(i))
@@ -652,7 +675,7 @@ function renderPage() {
       </div>`;
   }).join('');
 
-  document.getElementById('results').innerHTML = `
+  document.getElementById('results')!.innerHTML = `
     <div class="results-header">
       <h2 id="results-count">${games.length} ${slots.length === 1 ? 'games' : 'shared games'}</h2>
       ${playerList ? `<div class="results-meta">${slots.length === 1 ? 'library of' : 'across'} ${playerList}</div>` : ''}
@@ -663,18 +686,18 @@ function renderPage() {
     </div>
     ${groupSections}`;
 
-  document.querySelectorAll('thead th[data-col]').forEach(th => {
+  document.querySelectorAll<HTMLElement>('thead th[data-col]').forEach(th => {
     th.addEventListener('click', () => {
       const col = th.dataset.col;
       if (sortCol === col) sortDir = -sortDir;
-      else { sortCol = col; sortDir = col === 'name' ? 1 : -1; }
+      else { sortCol = col!; sortDir = col === 'name' ? 1 : -1; }
       refreshTable();
       updateFilterUrl();
     });
   });
 }
 
-function thHtml(col, label) {
+function thHtml(col: string, label: string): string {
   const active = sortCol === col ? ' active' : '';
   const icon = sortCol === col ? (sortDir > 0 ? '↑' : '↓') : '↕';
   return `<th class="sortable${active}" data-col="${col}">
@@ -682,11 +705,11 @@ function thHtml(col, label) {
   </th>`;
 }
 
-function rowHtml(game) {
+function rowHtml(game: GameRow): string {
   return `<tr class="game-row" tabindex="0" data-appid="${game.appid}">${rowCells(game)}</tr>`;
 }
 
-function updateProgress(loaded, total) {
+function updateProgress(loaded: number, total: number) {
   const bar = document.getElementById('prog-bar');
   const txt = document.getElementById('prog-text');
   if (!bar || !txt) return;
@@ -714,15 +737,17 @@ function updateProgress(loaded, total) {
 // itself from store metadata, keyed on the appid, same as it does for a nameless wishlist row.
 // If the appid is actually part of the current comparison, open its real row instead — full
 // owners/nav/highlight rather than a lesser standalone view of data already in `games`.
-function openStandaloneGame(appid, name, { keepHistory = false } = {}) {
+function openStandaloneGame(appid: number, name?: string, { keepHistory = false }: { keepHistory?: boolean } = {}) {
   const existing = games.find(g => g.appid === appid);
   if (existing) {
     openPanel(existing, { keepHistory });
     addRecentGame(existing.appid, existing.name, existing.details?.meta?.capsule || null);
-    renderRecentGamesBar(document.getElementById('recent-games-bar'));
+    renderRecentGamesBar(document.getElementById('recent-games-bar')!);
     return;
   }
-  const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true };
+  // Fresh standalone row — no price fields yet (a standalone lookup never touches ITAD),
+  // so this is cast rather than annotated against the full Game shape.
+  const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true } as Game;
   openPanel(game, { keepHistory });
   fetchStandaloneDetails(game);
   loadAchievements(game);
@@ -736,7 +761,7 @@ function openStandaloneGame(appid, name, { keepHistory = false } = {}) {
 // who's unlocked what" instead of implying 0% progress. Mirrors library.js's
 // loadAchievements (same shape, same guards against a stale re-render after the user moved
 // on), just without any steamids/cache-key-per-player concept to thread through.
-async function loadAchievements(game, { force = false } = {}) {
+async function loadAchievements(game: Game, { force = false }: { force?: boolean } = {}) {
   if (!game.standalone) return;
   if (!force) {
     const cached = achievementsCache.get(game.appid);
@@ -757,7 +782,7 @@ async function loadAchievements(game, { force = false } = {}) {
   }
 }
 
-async function fetchStandaloneDetails(game) {
+async function fetchStandaloneDetails(game: Game) {
   try {
     const res = await fetch(`/api/game-details/${game.appid}`);
     const data = await res.json();
@@ -767,9 +792,9 @@ async function fetchStandaloneDetails(game) {
     if (game.details.meta?.name) game.name = game.details.meta.name;
     if (activeGame === game) { renderPanelBody(game); updateTitle(); } // no-op if the user moved on mid-fetch
     addRecentGame(game.appid, game.name, game.details.meta?.capsule || null);
-    renderRecentGamesBar(document.getElementById('recent-games-bar'));
+    renderRecentGamesBar(document.getElementById('recent-games-bar')!);
   } catch (err) {
-    if (activeGame === game) showAlert(err.message);
+    if (activeGame === game) showAlert(err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -777,9 +802,10 @@ async function fetchStandaloneDetails(game) {
 // markup/sort/meter logic shared with library.js's own buildLibraryOwnersHtml — the two only
 // ever differed in this resolution step (a comparison group's multiple slots vs. a Library
 // Explorer search's one flat player list).
-function buildOwnersHtml(g) {
-  if (!g.groupKey) return ''; // standalone lookup — not part of any comparison group
-  const ownerIndices = g.groupKey.split(',').map(Number);
+function buildOwnersHtml(g: Game): string {
+  const groupKey = g.groupKey as string | undefined;
+  if (!groupKey) return ''; // standalone lookup — not part of any comparison group
+  const ownerIndices = groupKey.split(',').map(Number);
   const gamePt = playtime[g.appid] || {};
   const gameLp = lastPlayed[g.appid] || {};
   const owners = ownerIndices.flatMap(slotIdx =>
@@ -792,14 +818,17 @@ function buildOwnersHtml(g) {
   return renderOwnersHtml(owners);
 }
 
-function pickRandom(groupKey) {
-  const pick = pickRandomFrom(sortedGames(groupKey), groupKey, activeGame?.appid);
+function pickRandom(groupKey: string) {
+  const list = sortedGames(groupKey);
+  const pick = pickRandomFrom(list, groupKey, activeGame?.appid ?? -1);
   if (!pick) return;
+  const game = list.find(g => g.appid === pick.appid);
+  if (!game) return;
   randomGroupKey = groupKey;
-  openPanel(pick, { isRandom: true });
+  openPanel(game, { isRandom: true });
 }
 
-function openPanel(game, { isRandom = false, keepHistory = false } = {}) {
+function openPanel(game: GameRow, { isRandom = false, keepHistory = false }: { isRandom?: boolean; keepHistory?: boolean } = {}) {
   if (!isRandom) {
     randomGroupKey = null;
     clearAllRandomQueues();
@@ -819,42 +848,43 @@ function openPanel(game, { isRandom = false, keepHistory = false } = {}) {
 // document keydown handler above does when the lightbox is closed, but also jumps
 // straight into the new game's lightbox at shot 0 rather than leaving the lightbox
 // closed behind it. No-ops with no group to page through, same guard as above.
-function navigateLightboxGame(dir) {
+function navigateLightboxGame(dir: number) {
   if (!activeGame || activeGame.standalone) return;
-  const list = sortedGames(activeGame.groupKey);
-  const idx = list.findIndex(g => g.appid === activeGame.appid);
+  const ag = activeGame;
+  const list = sortedGames(ag.groupKey!);
+  const idx = list.findIndex(g => g.appid === ag.appid);
   const next = list[(idx + dir + list.length) % list.length];
   openPanel(next);
   openLightbox(next, 0);
 }
 
 function openShortcuts() {
-  document.getElementById('shortcuts-modal').classList.add('open');
-  document.getElementById('shortcuts-backdrop').classList.add('open');
+  document.getElementById('shortcuts-modal')!.classList.add('open');
+  document.getElementById('shortcuts-backdrop')!.classList.add('open');
 }
 
 function closeShortcuts() {
-  document.getElementById('shortcuts-modal').classList.remove('open');
-  document.getElementById('shortcuts-backdrop').classList.remove('open');
+  document.getElementById('shortcuts-modal')!.classList.remove('open');
+  document.getElementById('shortcuts-backdrop')!.classList.remove('open');
 }
 
 function toggleShortcuts() {
-  if (document.getElementById('shortcuts-modal').classList.contains('open')) closeShortcuts();
+  if (document.getElementById('shortcuts-modal')!.classList.contains('open')) closeShortcuts();
   else openShortcuts();
 }
 
-function setPanelParam(appid) {
+function setPanelParam(appid: number | string | null) {
   const params = new URLSearchParams(location.search);
   params.delete('shot');
   if (appid == null) {
     params.delete('game');
   } else {
-    params.set('game', appid);
+    params.set('game', String(appid));
   }
   history.replaceState(null, '', `?${reorderUrlParams(params)}`);
 }
 
-function setLightboxParam(idx) {
+function setLightboxParam(idx: string | null) {
   const params = new URLSearchParams(location.search);
   if (idx == null) {
     params.delete('shot');
@@ -864,7 +894,7 @@ function setLightboxParam(idx) {
   history.replaceState(null, '', `?${reorderUrlParams(params)}`);
 }
 
-function restorePanelFromUrl(restoreShot = null) {
+function restorePanelFromUrl(restoreShot: string | null = null) {
   const params = new URLSearchParams(location.search);
   const appid = Number(params.get('game'));
   if (!appid) return;
@@ -889,22 +919,24 @@ function renderPanelNav() {
   // A standalone lookup (see openStandaloneGame above) isn't part of any group — there's no
   // natural "next game" to page through, so there's no nav to show.
   if (activeGame.standalone) { nav.innerHTML = ''; return; }
-  const list = sortedGames(activeGame.groupKey);
-  const idx = list.findIndex(g => g.appid === activeGame.appid);
+  const ag = activeGame;
+  const groupKey = ag.groupKey!;
+  const list = sortedGames(groupKey);
+  const idx = list.findIndex(g => g.appid === ag.appid);
   nav.innerHTML = `
     <button class="panel-nav-btn" id="panel-prev" aria-label="Previous game" title="Previous game (↑)">↑</button>
     <span class="panel-nav-pos" aria-live="polite">${idx + 1} / ${list.length}</span>
     <button class="panel-nav-btn" id="panel-next" aria-label="Next game" title="Next game (↓)">↓</button>
     <button class="panel-nav-btn panel-nav-reroll" id="panel-reroll" aria-label="Pick a random game" title="Pick a random game (R)">🎲<span class="panel-nav-kbd">R</span></button>
   `;
-  document.getElementById('panel-prev').addEventListener('click', () => {
+  document.getElementById('panel-prev')!.addEventListener('click', () => {
     openPanel(list[(idx - 1 + list.length) % list.length]);
   });
-  document.getElementById('panel-next').addEventListener('click', () => {
+  document.getElementById('panel-next')!.addEventListener('click', () => {
     openPanel(list[(idx + 1) % list.length]);
   });
-  document.getElementById('panel-reroll').addEventListener('click', () => {
-    pickRandom(activeGame.groupKey);
+  document.getElementById('panel-reroll')!.addEventListener('click', () => {
+    pickRandom(groupKey);
   });
 }
 
@@ -915,7 +947,7 @@ function renderPanel() {
 }
 
 function refreshTable() {
-  document.querySelectorAll('thead th[data-col]').forEach(th => {
+  document.querySelectorAll<HTMLElement>('thead th[data-col]').forEach(th => {
     const col = th.dataset.col;
     const active = col === sortCol;
     th.classList.toggle('active', active);
@@ -946,10 +978,10 @@ function refreshTable() {
 // Reconcile a tbody's rows against a desired ordered game list.
 // Reuses existing <tr> nodes (moves/updates them) rather than replacing innerHTML,
 // so in-flight click events always target a live DOM node.
-function reconcileTbody(tbody, desired) {
+function reconcileTbody(tbody: HTMLElement, desired: GameRow[]) {
   // Index existing rows by appid for O(1) lookup.
-  const existing = new Map();
-  for (const tr of tbody.querySelectorAll('tr.game-row')) {
+  const existing = new Map<number, HTMLTableRowElement>();
+  for (const tr of tbody.querySelectorAll<HTMLTableRowElement>('tr.game-row')) {
     existing.set(Number(tr.dataset.appid), tr);
   }
 
@@ -960,7 +992,7 @@ function reconcileTbody(tbody, desired) {
     if (!tr) {
       tr = document.createElement('tr');
       tr.className = 'game-row';
-      tr.dataset.appid = game.appid;
+      tr.dataset.appid = String(game.appid);
     }
     syncRow(tr, game); // always sync content and active state
     // Move to the correct position if needed (insertBefore is a no-op when the
@@ -975,7 +1007,7 @@ function reconcileTbody(tbody, desired) {
 }
 
 // Render the five <td> cells for a new <tr> (active class is set by syncRow).
-function rowCells(game) {
+function rowCells(game: Game) {
   const thumb = game.details?.meta?.capsule ?? '';
   return `<td class="td-thumb"><img class="game-thumb" src="${esc(thumb)}" alt="" loading="lazy" width="120" height="45" onerror="this.style.visibility='hidden'"></td>
     <td class="td-name">${esc(game.name)}</td>
@@ -985,7 +1017,7 @@ function rowCells(game) {
 }
 
 // Update an existing <tr>'s cells and active state in place.
-function syncRow(tr, game) {
+function syncRow(tr: HTMLTableRowElement, game: Game) {
   tr.classList.toggle('active', activeGame?.appid === game.appid);
   const cells = tr.cells;
   if (!cells.length) { tr.innerHTML = rowCells(game); return; }
@@ -1000,10 +1032,10 @@ function syncRow(tr, game) {
 
 // ── Sorting ────────────────────────────────────────────────────────────────
 
-function sortedGames(groupKey, filtersActive = hasActiveFilters()) {
+function sortedGames(groupKey: string | null, filtersActive = hasActiveFilters()) {
   const subset = (groupKey != null ? games.filter(g => g.groupKey === groupKey) : games)
     .filter(g => gameMatchesFilters(g, filtersActive));
-  return [...subset].sort((a, b) => {
+  return [...subset].sort((a: GameRow, b: GameRow) => {
     switch (sortCol) {
       case 'score': {
         const av = a.details?.rating?.score ?? -1;
@@ -1029,14 +1061,15 @@ function sortedGames(groupKey, filtersActive = hasActiveFilters()) {
 // ── Filtering ──────────────────────────────────────────────────────────────
 
 function updateFilterUrl() {
-  const cmp = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+  const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' });
   const params = new URLSearchParams();
   // Preserve current player slots as-is — already canonical from the last pushState
   const prev = new URLSearchParams(location.search);
   prev.getAll('u').forEach(u => params.append('u', u));
   const sp = sortUrlParam();
   if (sp) params.set('sort', sp);
-  if (prev.has('game')) params.set('game', prev.get('game'));
+  const prevGame = prev.get('game');
+  if (prevGame) params.set('game', prevGame);
   if (nameFilter) params.set('name', nameFilter);
   // Append filter values in fixed dimension order, each sorted alphabetically
   for (const { key, param } of FILTER_DIMS) {
@@ -1049,7 +1082,7 @@ function hasActiveFilters() {
   return nameFilter !== '' || FILTER_DIMS.some(d => activeFilters[d.key].size > 0);
 }
 
-function gameMatchesFilters(game, filtersActive = hasActiveFilters()) {
+function gameMatchesFilters(game: Game, filtersActive = hasActiveFilters()) {
   if (!filtersActive) return true;
   if (nameFilter && !foldStr(game.name).includes(foldStr(nameFilter))) return false;
   if (!FILTER_DIMS.some(d => activeFilters[d.key].size > 0)) return true;
@@ -1058,13 +1091,13 @@ function gameMatchesFilters(game, filtersActive = hasActiveFilters()) {
     if (!activeFilters[key].size) return true;
     const vals = key === 'tags' ? game.details?.tags : game.details?.meta?.[key];
     if (!vals) return false;
-    return vals.some(v => activeFilters[key].has(v));
+    return vals.some((v: string) => activeFilters[key].has(v));
   });
 }
 
-function updateFilterOptions(meta, tags) {
+function updateFilterOptions(meta: GameMeta | null | undefined, tags: string[] | null | undefined) {
   const KEYS = FILTER_DIMS.map(d => d.key);
-  const newByKey = Object.fromEntries(KEYS.map(k => [k, []]));
+  const newByKey: Record<string, string[]> = Object.fromEntries(KEYS.map(k => [k, []]));
   for (const key of KEYS) {
     const vals = key === 'tags' ? (tags || []) : (meta?.[key] || []);
     for (const v of vals) {
@@ -1073,21 +1106,21 @@ function updateFilterOptions(meta, tags) {
   }
   if (KEYS.every(k => !newByKey[k].length)) return;
 
-  const panelEl = document.getElementById('filter-panel');
+  const panelEl = document.getElementById('filter-panel')!;
   const needsNewDim = KEYS.some(k =>
     newByKey[k].length > 0 && !panelEl.querySelector(`input[data-search-dim="${k}"]`)
   );
 
   if (needsNewDim || !panelEl.querySelector('.card')) {
     // Full rebuild needed — preserve focus in search inputs
-    const focused = document.activeElement;
+    const focused = document.activeElement as HTMLInputElement | null;
     const focusedDim = focused?.dataset?.searchDim;
     const selStart = focused?.selectionStart;
     const selEnd = focused?.selectionEnd;
     renderFilterPanel();
     if (focusedDim) {
-      const el = panelEl.querySelector(`input[data-search-dim="${focusedDim}"]`);
-      if (el) { el.focus(); try { el.setSelectionRange(selStart, selEnd); } catch {} }
+      const el = panelEl.querySelector<HTMLInputElement>(`input[data-search-dim="${focusedDim}"]`);
+      if (el) { el.focus(); try { el.setSelectionRange(selStart ?? null, selEnd ?? null); } catch {} }
     }
     return;
   }
@@ -1132,11 +1165,11 @@ function updateFilterOptions(meta, tags) {
   }
 }
 
-function applySearch(dim, query) {
+function applySearch(dim: string, query: string) {
   const q = foldStr(query);
   const inp = document.querySelector(`input[data-search-dim="${dim}"]`);
   if (!inp) return;
-  inp.closest('.filter-dim').querySelectorAll('.filter-opt').forEach(label => {
+  inp.closest('.filter-dim')!.querySelectorAll<HTMLElement>('.filter-opt').forEach(label => {
     const val = label.querySelector('input')?.value ?? '';
     label.style.display = !q || foldStr(val).includes(q) ? '' : 'none';
   });
@@ -1156,7 +1189,7 @@ function renderFilterPanel() {
       </span>`)
   ).join('');
 
-  document.getElementById('filter-panel').innerHTML = `
+  document.getElementById('filter-panel')!.innerHTML = `
     <div class="card">
       <div class="filter-header">
         <h2>Filter${totalActive ? `<span class="filter-badge">${totalActive}</span>` : ''}</h2>
@@ -1188,12 +1221,12 @@ function renderFilterPanel() {
       </div>
     </div>`;
 
-  document.getElementById('filter-toggle-btn').addEventListener('click', () => {
+  document.getElementById('filter-toggle-btn')!.addEventListener('click', () => {
     filterPanelCollapsed = !filterPanelCollapsed;
     renderFilterPanel();
   });
 
-  const nameInput = document.getElementById('name-filter-input');
+  const nameInput = document.getElementById('name-filter-input') as HTMLInputElement | null;
   if (nameInput) {
     nameInput.addEventListener('input', () => {
       nameFilter = nameInput.value;
@@ -1202,9 +1235,9 @@ function renderFilterPanel() {
     });
   }
 
-  document.getElementById('filter-panel').querySelectorAll('input[data-dim]').forEach(cb => {
+  document.getElementById('filter-panel')!.querySelectorAll<HTMLInputElement>('input[data-dim]').forEach(cb => {
     cb.addEventListener('change', () => {
-      const dim = cb.dataset.dim;
+      const dim = cb.dataset.dim as FilterDimKey;
       if (cb.checked) activeFilters[dim].add(cb.value);
       else activeFilters[dim].delete(cb.value);
       refreshTable();
@@ -1213,8 +1246,8 @@ function renderFilterPanel() {
     });
   });
 
-  document.getElementById('filter-panel').querySelectorAll('input[data-search-dim]').forEach(inp => {
-    const dim = inp.dataset.searchDim;
+  document.getElementById('filter-panel')!.querySelectorAll<HTMLInputElement>('input[data-search-dim]').forEach(inp => {
+    const dim = inp.dataset.searchDim as FilterDimKey;
     applySearch(dim, filterSearch[dim]);
     inp.addEventListener('input', () => {
       filterSearch[dim] = inp.value;
@@ -1222,9 +1255,9 @@ function renderFilterPanel() {
     });
   });
 
-  document.getElementById('filter-panel').querySelectorAll('.filter-chip').forEach(chip => {
+  document.getElementById('filter-panel')!.querySelectorAll<HTMLElement>('.filter-chip').forEach(chip => {
     chip.addEventListener('click', () => {
-      activeFilters[chip.dataset.chipDim].delete(chip.dataset.chipVal);
+      activeFilters[chip.dataset.chipDim as FilterDimKey].delete(chip.dataset.chipVal!);
       refreshTable();
       updateFilterUrl();
       renderFilterPanel();

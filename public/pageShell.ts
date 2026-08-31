@@ -8,13 +8,18 @@
 // bundles.js's `initNav('bundles')` call once being deferred to the end of its own init() (after
 // data fetch) rather than up front was an accidental, meaningless difference from the other two
 // pages.
-import { initNav } from './nav.js';
-import { initLightbox } from './lightbox.js';
-import { initPanel } from './panel.js';
+import { initNav, type NavPageKey } from './nav.ts';
+import { initLightbox } from './lightbox.ts';
+import { initPanel } from './panel.ts';
 
 // `page`: the nav bar's current-page key ('compare' | 'library' | 'bundles' | 'about').
-// `lightbox`/`panel`: passed straight through to initLightbox/initPanel.
-export function initPageShell({ page, lightbox, panel }) {
+// `lightbox`/`panel`: passed straight through to initLightbox/initPanel — typed off their own
+// signatures (Parameters<typeof ...>) so this stays in sync automatically if either's options grow.
+export function initPageShell({ page, lightbox, panel }: {
+  page: NavPageKey;
+  lightbox: Parameters<typeof initLightbox>[0];
+  panel: Parameters<typeof initPanel>[0];
+}) {
   initNav(page);
   initLightbox(lightbox);
   initPanel(panel);

@@ -1,9 +1,27 @@
 'use strict';
 
-import { esc, formatMoney, scoreColor, dealRecordTier, DEAL_RECORD_TIERS, discountPct, fmtH, fmtLastPlayed, computeSteamdbRating } from './utils.js';
-import { openLightbox, closeLightbox, isLightboxOpen } from './lightbox.js';
-import { buildMediaItems } from './mediaItems.js';
-import { getStoredRegion, resolveRegion } from './region.js';
+import { esc, formatMoney, scoreColor, dealRecordTier, DEAL_RECORD_TIERS, discountPct, fmtH, fmtLastPlayed, computeSteamdbRating } from './utils.ts';
+import { openLightbox, closeLightbox, isLightboxOpen } from './lightbox.ts';
+import { buildMediaItems } from './mediaItems.ts';
+import type { MediaItem } from './mediaItems.ts';
+import { getStoredRegion, resolveRegion } from './region.ts';
+import type { Game } from './types.ts';
+
+// Host-page options passed to initPanel. All optional — a page supplies only the hooks it
+// needs; the field names mirror exactly what panel.js reads off panelOptions below.
+export interface PanelOptions {
+  onTagClick?: (dim: string, val: string) => void;
+  isTagActive?: (dim: string, val: string) => boolean;
+  onRefresh?: (game: Game) => void;
+  onNavigateGame?: (appid: number, name: string) => void;
+  onClose?: (opts?: { preserveUrl?: boolean }) => void;
+  inertSelector?: string;
+  pricesHandledByHost?: boolean | ((game: Game) => boolean);
+  showAchievements?: boolean;
+  enableTagFilters?: boolean;
+  gameHref?: (appid: string | number) => string;
+  getOwnersHtml?: (game: Game) => string;
+}
 
 // ── Shared game side panel ──────────────────────────────────────────────────
 // Used by both the comparison page (app.js) and the Library Explorer
@@ -21,10 +39,10 @@ import { getStoredRegion, resolveRegion } from './region.js';
 // panelClose(), which those other paths would silently bypass.
 // pickRandomFrom() below is a generic "shuffle bag" usable by both pages.
 
-let panelOptions = {};
-let panelGame = null;
+let panelOptions: PanelOptions = {};
+let panelGame: Game | null = null;
 let heroIdx = 0;
-let panelPrevFocus = null;
+let panelPrevFocus: HTMLElement | null = null;
 let panelRefreshing = false; // true while the host's onRefresh() is in flight
 let moreLinksOpen = false; // whether the header's "⋯" overflow menu (News/Workshop/Website) is open
 
@@ -38,9 +56,9 @@ let moreLinksOpen = false; // whether the header's "⋯" overflow menu (News/Wor
 // the same host mechanism (panelOptions.onNavigateGame) a fresh lookup would use, same
 // dedup-with-already-loaded-rows behavior included, rather than panel.js caching its own
 // stale copy of a game's details.
-let panelHistory = [];
+let panelHistory: { appid: number; name: string }[] = [];
 
-function panelShuffle(arr) {
+function panelShuffle(arr: { appid: number }[]) {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -54,17 +72,25 @@ function panelShuffle(arr) {
 // so a developer-supplied `meta.website` or a news item's `url` (both flow through unfiltered
 // from Steam's own APIs — see lib/steam.js) could otherwise be a `javascript:`/`data:` URI
 // that runs script when clicked instead of navigating away. Returns '' for anything unsafe.
-function safeHref(url) {
+function safeHref(url: string | null | undefined) {
   return /^https?:\/\//i.test(url || '') ? url : '';
 }
 
-const randomQueues = new Map(); // queueKey → remaining shuffled games
+// Event `target` is typed `EventTarget` (possibly null) and its `closest` returns a bare
+// `Element` — but every delegated handler here wants an `HTMLElement` (for `.dataset`).
+// One helper keeps the null-cast + type-narrowing in one place instead of repeated at each
+// of the ~20 delegation sites in initPanel below.
+function closest(target: EventTarget | null, selector: string): HTMLElement | null {
+  return (target as Element).closest(selector) as HTMLElement | null;
+}
+
+const randomQueues = new Map<string, { appid: number }[]>(); // queueKey → remaining shuffled games
 
 // Picks the next game from a shuffle bag scoped to queueKey (e.g. a group key,
 // or a fixed constant for a page with only one list) so repeated picks cycle
 // through every item before repeating. The bag is rebuilt when exhausted or
 // when `list` no longer matches what's left in it (e.g. after filtering).
-export function pickRandomFrom(list, queueKey, currentAppid) {
+export function pickRandomFrom(list: { appid: number }[], queueKey: string, currentAppid: number) {
   if (!list.length) return null;
   let queue = randomQueues.get(queueKey) || [];
   const ids = new Set(list.map(g => g.appid));
@@ -78,7 +104,7 @@ export function pickRandomFrom(list, queueKey, currentAppid) {
   return pick;
 }
 
-export function clearRandomQueue(queueKey) {
+export function clearRandomQueue(queueKey: string) {
   randomQueues.delete(queueKey);
 }
 
@@ -89,8 +115,8 @@ export function clearAllRandomQueues() {
 export function initPanel(options = {}) {
   panelOptions = options;
 
-  document.getElementById('panel-backdrop').addEventListener('click', panelClose);
-  document.getElementById('panel-close').addEventListener('click', panelClose);
+  document.getElementById('panel-backdrop')!.addEventListener('click', () => panelClose());
+  document.getElementById('panel-close')!.addEventListener('click', () => panelClose());
 
   // Delegated on #panel-body (a stable element that only has its innerHTML replaced)
   // rather than bound directly to #panel-hero — the hero now lives inside #panel-body's
@@ -98,60 +124,61 @@ export function initPanel(options = {}) {
   // render, so a listener attached straight to the old hero node would go stale/detached
   // the moment the panel re-renders (including at init time, before the first
   // panelOpen() has rendered anything at all).
-  const panelBodyEl = document.getElementById('panel-body');
+  const panelBodyEl = document.getElementById('panel-body')!;
   panelBodyEl.addEventListener('click', e => {
-    if (!e.target.closest('.panel-hero')) return;
-    const thumb = e.target.closest('.panel-film-item');
+    const t = closest(e.target, '.panel-hero');
+    if (!t) return;
+    const thumb = closest(e.target, '.panel-film-item');
     if (thumb) { heroIdx = Number(thumb.dataset.idx); renderPanelHero(); return; }
-    if (e.target.closest('.panel-hero-prev')) { panelStepHero(-1); return; }
-    if (e.target.closest('.panel-hero-next')) { panelStepHero(1); return; }
-    if (e.target.closest('.panel-hero-img')) openLightbox(panelGame, heroIdx);
+    if (closest(e.target, '.panel-hero-prev')) { panelStepHero(-1); return; }
+    if (closest(e.target, '.panel-hero-next')) { panelStepHero(1); return; }
+    if (closest(e.target, '.panel-hero-img') && panelGame) openLightbox(panelGame, heroIdx);
   });
   panelBodyEl.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.target.closest('.panel-hero-img')) { e.preventDefault(); openLightbox(panelGame, heroIdx); }
-    if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.panel-achievement--spoiler')) {
+    if (e.key === 'Enter' && panelGame && closest(e.target, '.panel-hero-img')) { e.preventDefault(); openLightbox(panelGame, heroIdx); }
+    if ((e.key === 'Enter' || e.key === ' ') && closest(e.target, '.panel-achievement--spoiler')) {
       e.preventDefault();
-      const el = e.target.closest('.panel-achievement--spoiler');
-      revealAchievement(Number(el.dataset.appid), el.dataset.apiname);
+      const el = closest(e.target, '.panel-achievement--spoiler')!;
+      revealAchievement(Number(el.dataset.appid), el.dataset.apiname!);
     }
   });
   panelBodyEl.addEventListener('wheel', e => {
-    const strip = e.target.closest('.panel-filmstrip');
+    const strip = closest(e.target, '.panel-filmstrip');
     if (!strip) return;
     e.preventDefault();
     strip.scrollLeft += e.deltaY || e.deltaX;
   }, { passive: false });
 
-  document.getElementById('game-panel').addEventListener('click', e => {
-    if (e.target.closest('.panel-refresh-btn')) { handlePanelRefresh(); return; }
-    if (e.target.closest('.panel-back-btn')) { panelGoBack(); return; }
-    const toggleBtn = e.target.closest('.panel-collapsible-chip');
-    if (toggleBtn) { toggleSection(Number(toggleBtn.dataset.appid), toggleBtn.dataset.section); return; }
-    const hiddenAch = e.target.closest('.panel-achievement--spoiler');
-    if (hiddenAch) { revealAchievement(Number(hiddenAch.dataset.appid), hiddenAch.dataset.apiname); return; }
-    const filterBtn = e.target.closest('.panel-achievements-filter-btn');
-    if (filterBtn) { setAchievementsFilter(Number(filterBtn.dataset.appid), filterBtn.dataset.filter); return; }
-    const copyLinkBtn = e.target.closest('.panel-copy-link-btn');
+  document.getElementById('game-panel')!.addEventListener('click', e => {
+    if (closest(e.target, '.panel-refresh-btn')) { handlePanelRefresh(); return; }
+    if (closest(e.target, '.panel-back-btn')) { panelGoBack(); return; }
+    const toggleBtn = closest(e.target, '.panel-collapsible-chip');
+    if (toggleBtn) { toggleSection(Number(toggleBtn.dataset.appid), toggleBtn.dataset.section!); return; }
+    const hiddenAch = closest(e.target, '.panel-achievement--spoiler');
+    if (hiddenAch) { revealAchievement(Number(hiddenAch.dataset.appid), hiddenAch.dataset.apiname!); return; }
+    const filterBtn = closest(e.target, '.panel-achievements-filter-btn');
+    if (filterBtn) { setAchievementsFilter(Number(filterBtn.dataset.appid), filterBtn.dataset.filter!); return; }
+    const copyLinkBtn = closest(e.target, '.panel-copy-link-btn');
     if (copyLinkBtn) { copyPanelLink(copyLinkBtn); return; }
-    const moreLinksBtn = e.target.closest('.panel-icon-more-btn');
+    const moreLinksBtn = closest(e.target, '.panel-icon-more-btn');
     if (moreLinksBtn) { toggleMoreLinks(); return; }
-    const navBtn = e.target.closest('.panel-subnav-btn');
-    if (navBtn) { jumpToPanelSection(navBtn.dataset.target); return; }
+    const navBtn = closest(e.target, '.panel-subnav-btn');
+    if (navBtn) { jumpToPanelSection(navBtn.dataset.target!); return; }
     // A real <a href> (see dlcHtml/baseGameHtml) so ctrl/cmd/shift-click and middle-click
     // still open it in a new tab/window the normal browser way — only a plain click is
     // intercepted to navigate within the panel itself instead of leaving the page. Shared by
     // both a DLC entry and the "Part of <Base Game>" link (the same relationship, just
     // walked in opposite directions), so both carry the same data-appid/data-name pair.
-    const gameLink = e.target.closest('.panel-dlc-item, .panel-basegame-link');
+    const gameLink = closest(e.target, '.panel-dlc-item, .panel-basegame-link');
     if (gameLink) {
       if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
       e.preventDefault();
-      navigateToGame(Number(gameLink.dataset.appid), gameLink.dataset.name);
+      navigateToGame(Number(gameLink.dataset.appid), gameLink.dataset.name ?? '');
       return;
     }
-    const btn = e.target.closest('.panel-tag-btn');
+    const btn = closest(e.target, '.panel-tag-btn');
     if (!btn || !panelOptions.onTagClick) return;
-    panelOptions.onTagClick(btn.dataset.dim, btn.dataset.val);
+    panelOptions.onTagClick(btn.dataset.dim!, btn.dataset.val!);
   });
 
   // Dismiss the "⋯ More links" menu on outside click, same convention as gameSearch.js's
@@ -159,7 +186,7 @@ export function initPanel(options = {}) {
   // renderPanelBody, same reasoning as every other delegated listener above — but this one
   // specifically needs to catch clicks *outside* the panel too (backdrop, page behind it).
   document.addEventListener('click', e => {
-    if (moreLinksOpen && !e.target.closest('.panel-icon-more')) { moreLinksOpen = false; if (panelGame) renderPanelBody(panelGame); }
+    if (moreLinksOpen && !(e.target as Element).closest('.panel-icon-more')) { moreLinksOpen = false; if (panelGame) renderPanelBody(panelGame); }
   });
 
   initPanelSwipe();
@@ -178,7 +205,7 @@ function toggleMoreLinks() {
 // reasoning as the other delegated listeners in initPanel above) rather than to the subnav
 // itself, which is rebuilt from scratch on every renderPanelBody call.
 function initSubnavScrollSpy() {
-  document.getElementById('panel-body').addEventListener('scroll', () => {
+  document.getElementById('panel-body')!.addEventListener('scroll', () => {
     requestAnimationFrame(updateSubnavScrollSpy);
   }, { passive: true });
 }
@@ -192,14 +219,14 @@ function initSubnavScrollSpy() {
 function updateSubnavScrollSpy() {
   const nav = document.querySelector('.panel-subnav');
   if (!nav) return;
-  const body = document.getElementById('panel-body');
+  const body = document.getElementById('panel-body')!;
   const headerH = document.querySelector('.panel-header-sticky')?.getBoundingClientRect().height ?? 0;
   const threshold = body.getBoundingClientRect().top + headerH + 8;
-  const buttons = [...nav.querySelectorAll('.panel-subnav-btn')];
+  const buttons = [...nav.querySelectorAll<HTMLElement>('.panel-subnav-btn')];
   let activeTarget = 'top';
   for (const btn of buttons) {
     const target = btn.dataset.target;
-    if (target === 'top') continue;
+    if (target === undefined || target === 'top') continue;
     const el = document.getElementById(target);
     if (!el || el.getBoundingClientRect().top > threshold) continue;
     activeTarget = target;
@@ -222,7 +249,7 @@ export function getPanelGame() { return panelGame; }
 // here so there's one copy to keep correct instead of three that can quietly disagree.
 export function panelHandleEscape() {
   if (isLightboxOpen()) {
-    if (document.fullscreenElement || document.webkitFullscreenElement) return; // browser exits FS; keep lightbox open
+    if (document.fullscreenElement || (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement) return; // browser exits FS; keep lightbox open
     closeLightbox();
     return;
   }
@@ -260,13 +287,13 @@ async function handlePanelRefresh() {
 // sharing "check out this game" almost always means the game itself, not "reproduce my
 // exact search too", and each host page's own `?game=` handling (see restorePanelFromUrl in
 // app.js, the standalone-lookup fallback in library.js) already knows how to open just that.
-function copyPanelLink(btn) {
+function copyPanelLink(btn: HTMLElement) {
   if (!panelGame || !navigator.clipboard?.writeText) return;
   const url = `${location.origin}${location.pathname}?game=${panelGame.appid}`;
   navigator.clipboard.writeText(url).then(() => flashCopyLinkBtn(btn), () => {});
 }
 
-function flashCopyLinkBtn(btn) {
+function flashCopyLinkBtn(btn: HTMLElement) {
   const prevTitle = btn.title;
   btn.textContent = '✓';
   btn.title = 'Copied!';
@@ -289,7 +316,7 @@ function flashCopyLinkBtn(btn) {
 // /api/prices call (see CLAUDE.md's "one page-level control, not per-game" reasoning for why
 // that matters). Pages that never set the option at all (app.js) always fall through to
 // loadPrice — nothing else there ever prices a row.
-function pricesHandledByHost(game) {
+function pricesHandledByHost(game: Game) {
   const opt = panelOptions.pricesHandledByHost;
   return typeof opt === 'function' ? !!opt(game) : !!opt;
 }
@@ -297,7 +324,7 @@ function pricesHandledByHost(game) {
 // Lazily resolved once per session (like library.js's/bundles.js's own itadConfiguredPromise)
 // rather than per-call — a plain GET /api/health, cheap to over-share across every game this
 // fetches a price for.
-let panelItadConfiguredPromise = null;
+let panelItadConfiguredPromise: Promise<boolean> | null = null;
 function isItadConfigured() {
   if (!panelItadConfiguredPromise) {
     panelItadConfiguredPromise = fetch('/api/health').then(r => r.json()).then(d => !!d.itadConfigured).catch(() => false);
@@ -312,7 +339,7 @@ function isItadConfigured() {
 // same game), and a stale resolve for a game the panel has since moved on from just updates
 // the (now background) game object without forcing a re-render.
 //
-async function loadPrice(game, { force = false } = {}) {
+async function loadPrice(game: Game, { force = false } = {}) {
   if (pricesHandledByHost(game)) return;
   if (game.bestDealPrice !== undefined && !force) return; // already loaded (or already tried) this session
   if (game.priceLoading) return; // already in flight
@@ -353,7 +380,7 @@ async function loadPrice(game, { force = false } = {}) {
 // fetched here instead, once per game, lazily, the same on-demand shape achievements
 // already use. `game.news`/`game.newsLoading` persist on the game/row object itself, so a
 // game already opened once in this session doesn't refetch on a later reopen.
-async function loadNews(game, { force = false } = {}) {
+async function loadNews(game: Game, { force = false } = {}) {
   if (game.news !== undefined && !force) return; // already loaded this session
   game.newsLoading = true;
   game.newsError = false;
@@ -406,7 +433,8 @@ async function loadNews(game, { force = false } = {}) {
 // `game.dlc` itself is still only assigned once every entry has settled — every other spot
 // that reads it (the refresh gate above, `toggleSection`'s expand-fetch, the "already loaded"
 // early-return below) keeps treating "loaded" as "fully loaded", unchanged.
-async function loadDlc(game, { force = false } = {}) {
+type DlcEntry = { appid: number; name: string; capsule: string; releaseDate: string; comingSoon: boolean };
+async function loadDlc(game: Game, { force = false } = {}) {
   if (game.dlc !== undefined && !force) return; // already loaded (or already failed) this session
   const dlcIds = game.details?.meta?.dlc || [];
   if (!dlcIds.length) { game.dlc = []; return; }
@@ -415,11 +443,11 @@ async function loadDlc(game, { force = false } = {}) {
   // keeps showing the old entries in place while each is re-fetched, instead of the list
   // shrinking back down to empty and refilling.
   const prevById = new Map((game.dlc || []).map(d => [d.appid, d]));
-  const partial = dlcIds.map(id => prevById.get(id));
+  const partial: (DlcEntry | undefined)[] = dlcIds.map(id => prevById.get(id));
   game.dlcPartial = partial;
   if (panelGame === game) renderPanelBody(game);
   try {
-    await Promise.all(dlcIds.map(async (id, i) => {
+    await Promise.all(dlcIds.map(async (id: number, i: number) => {
       try {
         const res = await fetch(`/api/game-details/${id}${force ? '?refresh=1' : ''}`);
         const data = await res.json();
@@ -431,7 +459,7 @@ async function loadDlc(game, { force = false } = {}) {
       }
       if (panelGame === game) renderPanelBody(game); // stream this entry in as soon as it resolves
     }));
-    game.dlc = partial.filter(Boolean);
+    game.dlc = partial.filter((d): d is DlcEntry => d != null);
   } catch {
     game.dlc = game.dlc ?? null; // leave the card's body empty rather than surfacing an error for a non-essential feature
   } finally {
@@ -449,7 +477,7 @@ async function loadDlc(game, { force = false } = {}) {
 // (from the just-fetched DLC list, or from `fullgame` on the current game's own metadata),
 // passed through purely to avoid a title flash while the host's own fetch is in flight, same
 // convention as gameSearch.js's onSelect.
-function navigateToGame(appid, name) {
+function navigateToGame(appid: number, name: string) {
   if (!panelGame || !panelOptions.onNavigateGame) return;
   // If the target is whatever's already sitting on top of the stack, this is a
   // there-and-back-again hop (e.g. base game → DLC → the same base game's own "Part of"
@@ -470,14 +498,14 @@ function navigateToGame(appid, name) {
 // only ever needs to know "keep whatever's left in the stack", identical in both directions.
 function panelGoBack() {
   if (!panelHistory.length || !panelOptions.onNavigateGame) return;
-  const prev = panelHistory.pop();
+  const prev = panelHistory.pop()!;
   panelOptions.onNavigateGame(prev.appid, prev.name);
 }
 
 // dir: -1 (previous) or 1 (next). wrap: true for keyboard arrow navigation
 // (cycles through all media), false for the hero prev/next buttons (clamps
 // at the ends — the next button is disabled once heroIdx is at the last item).
-export function panelStepHero(dir, { wrap = false } = {}) {
+export function panelStepHero(dir: number, { wrap = false } = {}) {
   if (!panelGame) return false;
   const items = getPanelItems();
   if (wrap) {
@@ -487,30 +515,30 @@ export function panelStepHero(dir, { wrap = false } = {}) {
     heroIdx = Math.max(0, heroIdx + dir);
   }
   renderPanelHero();
-  if (wrap) document.getElementById('panel-hero').querySelector('.panel-hero-img')?.focus();
+  if (wrap) (document.getElementById('panel-hero')?.querySelector('.panel-hero-img') as HTMLElement | null)?.focus();
   return true;
 }
 
 // `keepHistory`: true only when this open is a DLC/base-game navigation hop (forward via
 // navigateToGame, or backward via panelGoBack) — every other opener (table row, search pick,
 // prev/next/random) leaves it false, which starts a fresh browsing trail.
-export function panelOpen(game, { keepHistory = false } = {}) {
+export function panelOpen(game: Game, { keepHistory = false } = {}) {
   if (!keepHistory) panelHistory = [];
   panelGame = game;
   heroIdx = 0;
   moreLinksOpen = false;
-  panelPrevFocus = document.activeElement;
-  document.getElementById('panel-body').scrollTop = 0;
+  panelPrevFocus = document.activeElement as HTMLElement | null;
+  document.getElementById('panel-body')!.scrollTop = 0;
   loadNews(game); // no-op (see loadNews) if this game's news was already fetched this session
   loadPrice(game); // no-op (see loadPrice) if this game is priced by the host, or already loaded
   renderPanelBody(game);
-  document.getElementById('game-panel').classList.add('open');
-  document.getElementById('panel-backdrop').classList.add('open');
+  document.getElementById('game-panel')!.classList.add('open');
+  document.getElementById('panel-backdrop')!.classList.add('open');
   if (panelOptions.inertSelector) {
     const el = document.querySelector(panelOptions.inertSelector);
-    if (el) el.inert = true;
+    if (el) (el as HTMLElement & { inert: boolean }).inert = true;
   }
-  (document.getElementById('panel-hero').querySelector('.panel-hero-img') ?? document.getElementById('panel-close')).focus();
+  ((document.getElementById('panel-hero')?.querySelector('.panel-hero-img') ?? document.getElementById('panel-close')!) as HTMLElement).focus();
 }
 
 // `preserveUrl`: threaded through to `onClose` unchanged — for a host that clears
@@ -522,11 +550,11 @@ export function panelClose({ preserveUrl = false } = {}) {
   if (!panelGame) return;
   panelGame = null;
   panelHistory = []; // closing the panel ends whatever DLC browsing trail was in progress
-  document.getElementById('game-panel').classList.remove('open');
-  document.getElementById('panel-backdrop').classList.remove('open');
+  document.getElementById('game-panel')!.classList.remove('open');
+  document.getElementById('panel-backdrop')!.classList.remove('open');
   if (panelOptions.inertSelector) {
     const el = document.querySelector(panelOptions.inertSelector);
-    if (el) el.inert = false;
+    if (el) (el as HTMLElement & { inert: boolean }).inert = false;
   }
   document.getElementById('panel-nav')?.replaceChildren();
   panelPrevFocus?.focus();
@@ -545,8 +573,8 @@ export function panelClose({ preserveUrl = false } = {}) {
 // context) rather than offsetTop, which is relative to the nearest *positioned* ancestor —
 // here that's #game-panel (position: fixed), not #panel-body itself, so offsetTop would
 // include the hero/hero-filmstrip height above the header and land short.
-function jumpToPanelSection(target) {
-  const body = document.getElementById('panel-body');
+function jumpToPanelSection(target: string) {
+  const body = document.getElementById('panel-body')!;
   if (target === 'top') { body.scrollTo({ top: 0, behavior: 'smooth' }); return; }
   const el = document.getElementById(target);
   if (!el) return;
@@ -556,12 +584,14 @@ function jumpToPanelSection(target) {
 }
 
 function getPanelItems() {
-  return buildMediaItems(panelGame.appid, panelGame.details?.meta);
+  // Callers (buildPanelHero/renderPanelHero/panelStepHero) all check panelGame first.
+  return buildMediaItems(panelGame!.appid, panelGame!.details?.meta);
 }
 
 function buildPanelHero() {
   if (!panelGame) return;
-  const hero = document.getElementById('panel-hero');
+  const g = panelGame;
+  const hero = document.getElementById('panel-hero')!;
   const items = getPanelItems();
   heroIdx = Math.max(0, Math.min(heroIdx, items.length - 1));
   const hasMany = items.length > 1;
@@ -576,7 +606,7 @@ function buildPanelHero() {
         // no such fallback (there's no full-res still behind the poster), so a broken
         // video thumb goes straight to the broken-image state below.
         const fallback = item.type === 'image' && item.main !== item.thumb ? item.main : '';
-        return `<button type="button" class="panel-film-item${i === heroIdx ? ' active' : ''}${item.type === 'video' ? ' is-video' : ''}" data-idx="${i}" aria-label="${i === 0 ? esc(panelGame.name) : (item.type === 'video' ? `Video ${i}` : `Screenshot ${i}`)}">` +
+        return `<button type="button" class="panel-film-item${i === heroIdx ? ' active' : ''}${item.type === 'video' ? ' is-video' : ''}" data-idx="${i}" aria-label="${i === 0 ? esc(g.name) : (item.type === 'video' ? `Video ${i}` : `Screenshot ${i}`)}">` +
         `<img class="panel-film-thumb" src="${esc(item.thumb)}" data-fallback="${esc(fallback)}" alt="" loading="lazy">` +
         `</button>`;
       }).join('')}</div>
@@ -586,7 +616,7 @@ function buildPanelHero() {
   // `error` doesn't bubble, so this needs the capture phase; delegated (rather than one
   // listener per <img>) since the whole filmstrip is rebuilt fresh here each time.
   hero.querySelector('.panel-filmstrip')?.addEventListener('error', (e) => {
-    const img = e.target;
+    const img = e.target as HTMLImageElement;
     if (!img.classList?.contains('panel-film-thumb')) return;
     const fallback = img.dataset.fallback;
     if (fallback && img.src !== fallback) { img.src = fallback; return; }
@@ -597,7 +627,7 @@ function buildPanelHero() {
 
 function renderPanelHero(scrollActive = true) {
   if (!panelGame) return;
-  const hero = document.getElementById('panel-hero');
+  const hero = document.getElementById('panel-hero')!;
   const items = getPanelItems();
   heroIdx = Math.max(0, Math.min(heroIdx, items.length - 1));
 
@@ -614,12 +644,13 @@ function renderPanelHero(scrollActive = true) {
   if (scrollActive) hero.querySelector('.panel-film-item.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
 }
 
-function renderHeroMain(items) {
+function renderHeroMain(items: MediaItem[]) {
   const current = items[heroIdx];
+  const name = panelGame?.name ?? '';
   const isShot = heroIdx > 0;
   const hasMany = items.length > 1;
   return `<div class="panel-hero-main${current.type === 'video' ? ' is-video' : ''}">` +
-    `<img class="panel-hero-img${isShot ? ' panel-hero-img--shot' : ''}" tabindex="0" role="button" aria-label="Open in lightbox" src="${esc(current.type === 'video' ? current.thumb : current.main)}" alt="${esc(panelGame.name)}">` +
+    `<img class="panel-hero-img${isShot ? ' panel-hero-img--shot' : ''}" tabindex="0" role="button" aria-label="Open in lightbox" src="${esc(current.type === 'video' ? current.thumb : current.main)}" alt="${esc(name)}">` +
     (hasMany
       ? `<button class="panel-hero-btn panel-hero-prev"${heroIdx <= 0 ? ' disabled' : ''} aria-label="Previous">&#8249;</button>` +
         `<button class="panel-hero-btn panel-hero-next"${heroIdx >= items.length - 1 ? ' disabled' : ''} aria-label="Next">&#8250;</button>`
@@ -627,8 +658,9 @@ function renderHeroMain(items) {
     `</div>`;
 }
 
-function setupHeroImg(hero) {
-  const heroEl = hero.querySelector('.panel-hero-img');
+function setupHeroImg(hero: HTMLElement) {
+  const heroEl = hero.querySelector<HTMLElement>('.panel-hero-img');
+  if (!heroEl) return;
   heroEl.classList.remove('panel-hero-img--broken');
   heroEl.classList.add('loading');
   heroEl.onload  = () => heroEl.classList.remove('loading');
@@ -651,14 +683,14 @@ function setupHeroImg(hero) {
 // result to its own provisionalTier before it ever reaches the client, flagged `pd.pending`
 // (see glanceGrid below) so it can still be shown, just visibly marked low-confidence rather
 // than presented as equal to a confirmed tier of the same name.
-const PROTON_TIER_COLORS = {
+const PROTON_TIER_COLORS: Record<string, string> = {
   borked: '#b91c1c', bronze: '#8b4513', silver: '#757575', gold: '#b8860b',
   platinum: '#5b6b85', native: '#15803d',
 };
-const capitalize = s => s.charAt(0).toUpperCase() + s.slice(1);
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // Compact review-count suffix for the reviews line, e.g. 465234 -> "465k", 2100000 -> "2.1m".
-function fmtCompactCount(n) {
+function fmtCompactCount(n: number) {
   if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}m`;
   if (n >= 1_000) return `${Math.round(n / 1000)}k`;
   return String(n);
@@ -671,6 +703,7 @@ function fmtCompactCount(n) {
 // `dim` (may be null when tag-click filtering is disabled) is the actual click-filter
 // dimension, kept separate from `kind` since developers/publishers share one visual
 // kind but are two different filter dimensions.
+type TagKind = keyof typeof TAG_KIND_META;
 const TAG_KIND_META = {
   tags: { label: 'Tag', color: '#d97757' },
   genres: { label: 'Genre', color: '#66c0f4' },
@@ -678,12 +711,12 @@ const TAG_KIND_META = {
   devpub: { label: 'Developer/Publisher', color: '#b892d6' },
 };
 
-function tagCloud(groups) {
+function tagCloud(groups: { kind: TagKind; dim: string | null; items?: string[] | null }[]) {
   const present = groups.filter(gr => gr.items?.length);
   if (!present.length) return '';
-  const seenKinds = new Set();
+  const seenKinds = new Set<TagKind>();
   const pillsHtml = present.flatMap(({ kind, dim, items }) => {
-    const values = kind === 'tags' ? [...items] : [...items].sort((a, b) => a.localeCompare(b));
+    const values = kind === 'tags' ? [...items!] : [...items!].sort((a, b) => a.localeCompare(b));
     seenKinds.add(kind);
     const dot = `<span class="panel-tag-dot" style="background:${TAG_KIND_META[kind].color}"></span>`;
     return values.map(v => {
@@ -713,7 +746,7 @@ function tagCloud(groups) {
 // `faded`: for a value that's a real tier/score but a low-confidence one (currently only
 // ProtonDB's provisional-tier case below) — dims the whole chip so it doesn't read as equally
 // certain as a normal chip of the same color/value.
-function glanceChip(href, value, color, caption, { faded = false } = {}) {
+function glanceChip(href: string | null, value: string | number | null, color: string | null, caption: string, { faded = false } = {}) {
   const inner = `<span class="panel-glance-sub">
     <span class="panel-glance-num"${color ? ` style="color:${color}"` : ''}>${esc(String(value))}</span>
     <span class="panel-glance-val">${caption}</span>
@@ -724,7 +757,7 @@ function glanceChip(href, value, color, caption, { faded = false } = {}) {
     : `<div class="panel-glance-chip panel-glance-chip--static"${style}>${inner}</div>`;
 }
 
-function glanceGrid(g) {
+function glanceGrid(g: Game) {
   if (g.loading) {
     return `<div class="panel-glance">${
       '<div class="panel-glance-chip panel-glance-chip--sk"><span class="sk" style="width:100%;height:32px;border-radius:6px"></span></div>'.repeat(4)
@@ -749,7 +782,7 @@ function glanceGrid(g) {
   const chips = [];
   if (r) {
     const pct = r.total ? Math.round(r.positive / r.total * 100) : 0;
-    const steamdbRating = Math.round(computeSteamdbRating(r.positive, r.total));
+    const steamdbRating = Math.round(computeSteamdbRating(r.positive, r.total) ?? 0);
     chips.push(glanceChip(reviewsUrl, steamdbRating, scoreColor(steamdbRating), `<b>Weighted</b> · ${pct}% of ${fmtCompactCount(r.total)}`));
   } else {
     chips.push(glanceChip(reviewsUrl, '—', null, `<b>Weighted</b> · no rating`));
@@ -801,9 +834,9 @@ const revealedAchievements = new Set();
 // Defaults to 'all' (map lookup miss) for any appid never touched.
 const achievementsFilter = new Map();
 
-function isSectionExpanded(appid, section) { return expandedSections.has(`${appid}:${section}`); }
+function isSectionExpanded(appid: number, section: string) { return expandedSections.has(`${appid}:${section}`); }
 
-function toggleSection(appid, section) {
+function toggleSection(appid: number, section: string) {
   const key = `${appid}:${section}`;
   const wasExpanded = expandedSections.has(key);
   if (wasExpanded) expandedSections.delete(key);
@@ -830,7 +863,18 @@ function toggleSection(appid, section) {
 // that same leading slot instead, for a card with no numHtml at all (HLTB, News) — without
 // it, those two rows read as plain text next to achievements' bold colored percentage,
 // losing the "one visual family" look this whole shape is meant to have.
-function collapsibleCard({ appid, section, numHtml, numColor, icon, valHtml, bodyHtml, linkHref, linkTitle }) {
+interface CollapsibleCardProps {
+  appid: number;
+  section: string;
+  numHtml?: string | null;
+  numColor?: string | null;
+  icon?: string;
+  valHtml: string;
+  bodyHtml: string;
+  linkHref?: string | null;
+  linkTitle: string;
+}
+function collapsibleCard({ appid, section, numHtml, numColor, icon, valHtml, bodyHtml, linkHref, linkTitle }: CollapsibleCardProps) {
   const expanded = isSectionExpanded(appid, section);
   const numSpan = numHtml != null
     ? `<span class="panel-glance-num"${numColor ? ` style="color:${numColor}"` : ''}>${numHtml}</span>`
@@ -851,16 +895,16 @@ function collapsibleCard({ appid, section, numHtml, numColor, icon, valHtml, bod
 // Steam's own percent strings already carry a decimal (e.g. "80.9"), but round numbers
 // parse to a plain integer (100 from "100.0") — toFixed(1) on those would print "100.0%",
 // so only force the decimal when the value isn't already a whole number.
-function fmtRarity(pct) {
+function fmtRarity(pct: number) {
   return `${Number.isInteger(pct) ? pct : pct.toFixed(1)}%`;
 }
 
-function revealAchievement(appid, apiname) {
+function revealAchievement(appid: number, apiname: string) {
   revealedAchievements.add(`${appid}:${apiname}`);
   if (panelGame) renderPanelBody(panelGame);
 }
 
-function setAchievementsFilter(appid, filter) {
+function setAchievementsFilter(appid: number, filter: string) {
   achievementsFilter.set(appid, filter);
   if (panelGame) renderPanelBody(panelGame);
 }
@@ -876,7 +920,7 @@ function setAchievementsFilter(appid, filter) {
 // is still fetched and shown with zero accounts loaded (`playerCount: 0`, no `steamUrl`) —
 // only the achieved/unlocktime/progress-summary parts need an account, gated by `hasProgress`
 // below.
-function achievementsHtml(g) {
+function achievementsHtml(g: Game) {
   if (!panelOptions.showAchievements) return '';
   if (g.achievementsLoading) {
     return `<div class="panel-section" id="panel-section-achievements">
@@ -981,7 +1025,7 @@ function achievementsHtml(g) {
 // linking straight to the full post, plus a link to the game's full news hub on the Steam
 // store for anything older than what's shown here. Dates use the same plain-ISO convention
 // as fmtLastPlayed/the table's date columns rather than a relative "3 days ago" string.
-function newsHtml(g) {
+function newsHtml(g: Game) {
   if (g.newsLoading) {
     return `<div class="panel-section" id="panel-section-news">
       <div class="panel-section-title">News</div>
@@ -1070,7 +1114,7 @@ function newsHtml(g) {
 // public/gameColumns.js, an ES module panel.js can't import from) lives in the one shared
 // plain-script file every page already loads before panel.js.
 
-function priceHtml(g) {
+function priceHtml(g: Game) {
   // `priceLoading` only ever gets set by panel.js's own loadPrice (see its own comment above)
   // — a host page's own batch call sets bestDealPrice directly, with no intermediate loading
   // flag on the row, same as rating/HLTB/tags off g.details elsewhere in this file.
@@ -1165,11 +1209,12 @@ function priceHtml(g) {
   // the group, so the leading icon and the color it's shown in never disagree about which tier
   // is "in charge" of this entry.
   const presentTiers = [...DEAL_RECORD_TIERS].reverse().filter(t => g[t.low] != null && g[t.low] !== g.bestDealPrice);
-  const lowGroups = [];
+  const lowGroups: { amount: number; tiers: typeof DEAL_RECORD_TIERS[number][] }[] = [];
   for (const t of presentTiers) {
+    const amount = g[t.low] as number; // filtered non-null above
     const last = lowGroups[lowGroups.length - 1];
-    if (last && last.amount === g[t.low]) last.tiers.unshift(t);
-    else lowGroups.push({ amount: g[t.low], tiers: [t] });
+    if (last && last.amount === amount) last.tiers.unshift(t);
+    else lowGroups.push({ amount, tiers: [t] });
   }
   const lowsHtml = lowGroups
     .map(({ amount, tiers }) => {
@@ -1196,7 +1241,7 @@ function priceHtml(g) {
 // Returns inline content only (no wrapping block element) — folded into the same line as
 // the release date in renderPanelBody's markup, rather than a line of its own, so a DLC
 // entry's sticky header isn't title + release date + "DLC for X" stacked three deep.
-function baseGameHtml(g) {
+function baseGameHtml(g: Game) {
   const fg = g.details?.meta?.fullgame;
   if (!fg) return '';
   return `DLC for <a class="panel-basegame-link" href="${esc(panelOptions.gameHref?.(fg.appid) ?? '#')}" data-appid="${fg.appid}" data-name="${esc(fg.name || '')}">${esc(fg.name || `App ${fg.appid}`)}</a>`;
@@ -1222,8 +1267,8 @@ function baseGameHtml(g) {
 // machine-sortable field — Date.parse() on it is a best effort; a comingSoon entry with no
 // parseable date, or any other unparseable date, sorts to the bottom of its group instead of
 // throwing the whole order off.
-function sortDlcByRelease(list) {
-  const sortKey = d => {
+function sortDlcByRelease(list: DlcEntry[]) {
+  const sortKey = (d: DlcEntry) => {
     const t = d.releaseDate ? Date.parse(d.releaseDate) : NaN;
     return Number.isNaN(t) ? -Infinity : t;
   };
@@ -1233,14 +1278,14 @@ function sortDlcByRelease(list) {
   });
 }
 
-function dlcItemHtml(d) {
+function dlcItemHtml(d: DlcEntry) {
   return `<a class="panel-dlc-item" href="${esc(panelOptions.gameHref?.(d.appid) ?? '#')}" data-appid="${d.appid}" data-name="${esc(d.name)}">
       <img class="panel-dlc-capsule" src="${esc(d.capsule)}" alt="" loading="lazy">
       <span class="panel-dlc-name">${esc(d.name)}</span>
     </a>`;
 }
 
-function dlcHtml(g) {
+function dlcHtml(g: Game) {
   const dlcIds = g.details?.meta?.dlc;
   if (!dlcIds || !dlcIds.length) return '';
 
@@ -1248,7 +1293,7 @@ function dlcHtml(g) {
   if (g.dlcLoading) {
     // Stream in whichever entries have already resolved instead of holding the whole card on
     // its skeleton until every single one settles (see loadDlc's own comment).
-    const loaded = (g.dlcPartial || []).filter(Boolean);
+    const loaded = (g.dlcPartial || []).filter((d): d is DlcEntry => d != null);
     const remaining = dlcIds.length - loaded.length;
     if (loaded.length) {
       bodyHtml = `<div class="panel-dlc-list">${loaded.map(dlcItemHtml).join('')}${
@@ -1274,7 +1319,7 @@ function dlcHtml(g) {
   })}</div>`;
 }
 
-export function renderPanelBody(game) {
+export function renderPanelBody(game: Game) {
   const g = game;
   const h = g.details?.hltb;
   const meta = g.details?.meta;
@@ -1318,7 +1363,9 @@ export function renderPanelBody(game) {
     })}</div>`;
   }
 
-  const tagDim = key => panelOptions.enableTagFilters ? key : null;
+  // The caller passes each of the four TagKind literals; narrowing back to TagKind (not a
+  // bare string) is what lets the tagCloud() call below type-check its `kind` field.
+  const tagDim = (key: string) => panelOptions.enableTagFilters ? (key as TagKind) : null;
   const devs = meta?.developers || [];
   const pubs = meta?.publishers || [];
   const sameDevPub = devs.length > 0 && devs.length === pubs.length && devs.every((d, i) => d === pubs[i]);
@@ -1327,7 +1374,7 @@ export function renderPanelBody(game) {
     { kind: 'genres', dim: tagDim('genres'), items: meta?.genres },
     { kind: 'categories', dim: tagDim('categories'), items: meta?.categories },
     { kind: 'devpub', dim: tagDim('developers'), items: devs },
-    ...(sameDevPub ? [] : [{ kind: 'devpub', dim: tagDim('publishers'), items: pubs }]),
+    ...(sameDevPub ? [] : [{ kind: 'devpub' as const, dim: tagDim('publishers'), items: pubs }]),
   ]);
 
   const refreshBtn = (panelOptions.onRefresh && !g.loading) ? `
@@ -1403,7 +1450,7 @@ export function renderPanelBody(game) {
     // Free demo is NOT here — unlike Website/Workshop (supplementary info, worth a quiet
     // icon-link), a demo is a "try before you buy" call to action worth surfacing without an
     // extra click. See demoBannerHtml below instead.
-  ].filter(Boolean);
+  ].filter((it): it is { icon: string; label: string; href: string } => !!it);
   const moreLinksHtml = moreLinkItems.length ? `<div class="panel-icon-more">
     <button type="button" class="panel-icon-link panel-icon-more-btn" aria-haspopup="true" aria-expanded="${moreLinksOpen}" title="More links" aria-label="More links">⋯</button>
     ${moreLinksOpen ? `<div class="panel-icon-more-menu">${moreLinkItems.map(it =>
@@ -1439,7 +1486,7 @@ export function renderPanelBody(game) {
     newsSectionHtml && { label: 'News', target: 'panel-section-news' },
     achievementsSectionHtml && { label: 'Achievements', target: 'panel-section-achievements' },
     dlcSectionHtml && { label: 'DLC', target: 'panel-section-dlc' },
-  ].filter(Boolean);
+  ].filter((it): it is { label: string; target: string } => !!it);
   const subnavHtml = subnavItems.length < 2 ? '' : `<div class="panel-subnav">
     <button type="button" class="panel-subnav-btn" data-target="top">Overview</button>
     ${subnavItems.map(it => `<button type="button" class="panel-subnav-btn" data-target="${it.target}">${it.label}</button>`).join('')}
@@ -1453,7 +1500,7 @@ export function renderPanelBody(game) {
   // panel's visible height on short/mobile screens with no way to scroll it out of the
   // way. Rendering it as the first child here instead — and rebuilding it fresh via
   // buildPanelHero() below, same as before — lets it scroll away like everything else.
-  const panelBody = document.getElementById('panel-body');
+  const panelBody = document.getElementById('panel-body')!;
   // Replacing #panel-body's innerHTML rebuilds #panel-hero from scratch, and
   // buildPanelHero() below unconditionally scrollIntoView()s its active filmstrip item —
   // needed so opening the panel or paging the hero lands on the right frame, but with no
@@ -1517,7 +1564,7 @@ export function renderPanelBody(game) {
   // entities decode correctly, and any actual markup (there shouldn't be any in this field,
   // but nothing here assumes that) degrades to visible text rather than executing.
   if (description) {
-    document.getElementById('panel-desc').textContent =
+    document.getElementById('panel-desc')!.textContent =
       new DOMParser().parseFromString(description, 'text/html').body.textContent || '';
   }
 
@@ -1550,11 +1597,11 @@ function initHeroSwipe() {
   // working (or, before the first panelOpen(), fail to attach at all) the moment the
   // panel re-renders. The `.panel-hero` check in touchstart scopes tracking to touches
   // that actually start on the hero, same as the old direct binding did implicitly.
-  const hero = document.getElementById('panel-body');
+  const hero = document.getElementById('panel-body')!;
   let startX = 0, startY = 0, tracking = false, decided = false, isHoriz = false;
 
   hero.addEventListener('touchstart', e => {
-    if (e.touches.length !== 1 || e.target.closest('.panel-filmstrip') || !e.target.closest('.panel-hero')) return;
+    if (e.touches.length !== 1 || closest(e.target, '.panel-filmstrip') || !closest(e.target, '.panel-hero')) return;
     startX = e.touches[0].clientX; startY = e.touches[0].clientY;
     tracking = true; decided = false; isHoriz = false;
   }, { passive: true });
@@ -1583,11 +1630,11 @@ function initHeroSwipe() {
 }
 
 function initPanelSwipe() {
-  const panel = document.getElementById('game-panel');
+  const panel = document.getElementById('game-panel')!;
   let startX = 0, startY = 0, tracking = false, decided = false, horiz = false;
 
   panel.addEventListener('touchstart', e => {
-    if (e.touches.length !== 1 || e.target.closest('.panel-filmstrip')) return;
+    if (e.touches.length !== 1 || closest(e.target, '.panel-filmstrip')) return;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     tracking = true;
@@ -1610,7 +1657,7 @@ function initPanelSwipe() {
     panel.style.transform = `translateX(${dx}px)`;
   }, { passive: false });
 
-  function finish(clientX) {
+  function finish(clientX: number) {
     if (!tracking) return;
     tracking = false;
     const dx = clientX - startX;

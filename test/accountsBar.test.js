@@ -6,7 +6,7 @@ const {
   ACCOUNT_STATE_LABELS, MAX_RECENTS, accountChipHtml, renderAccountChips, renderAccountChipsGrouped,
   bindAccountRefresh, loadRecents, saveRecents, addRecent, removeRecent, recentChipHtml,
   renderRecentsBar, bindRecentsBar,
-} = require('../public/accountsBar');
+} = require('../public/accountsBar.ts');
 
 // Same localStorage-stub convention as prefs.test.js/region.test.js — accountsBar.js's
 // recent-list functions read/write it live on every call, no module-level state to reset.
