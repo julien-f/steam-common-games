@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { FILTER_DIMS, parseUrlState, reorderUrlParams } = require('../public/urlState');
+const { FILTER_DIMS, parseUrlState, reorderUrlParams } = require('../public/urlState.ts');
 
 // ── parseUrlState — slots ─────────────────────────────────────────────────────
 

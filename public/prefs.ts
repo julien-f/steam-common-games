@@ -1,5 +1,3 @@
-'use strict';
-
 // Generic, per-key user-preference store — the single localStorage-backed mechanism every
 // global preference (region.js's own region choice, and any future one) and every persisted
 // table view (library.js/bundles.js — see their own comments) reads and writes through, so
@@ -13,23 +11,25 @@
 // setPref below).
 export const PREFS_STORAGE_KEY = 'steam-common-games:prefs';
 
-function readPrefsBlob() {
+function readPrefsBlob(): Record<string, unknown> {
   try {
     const raw = localStorage.getItem(PREFS_STORAGE_KEY);
     if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+    const parsed: unknown = JSON.parse(raw);
+    return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed as Record<string, unknown> : {};
   } catch { return {}; } // unavailable storage, or a corrupted/foreign value
 }
 
 // Returns `fallback` when the key was never set, storage is unavailable (private browsing,
 // cleared site data), or the stored blob itself is corrupted — never throws.
-export function getPref(key, fallback) {
+export function getPref<T = unknown>(key: string): T | undefined;
+export function getPref<T>(key: string, fallback: T): T;
+export function getPref<T = unknown>(key: string, fallback?: T): T | undefined {
   const blob = readPrefsBlob();
-  return key in blob ? blob[key] : fallback;
+  return key in blob ? (blob[key] as T) : (fallback as T);
 }
 
-export function setPref(key, value) {
+export function setPref(key: string, value: unknown): void {
   try {
     const blob = readPrefsBlob();
     blob[key] = value;

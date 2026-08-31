@@ -13,19 +13,19 @@
 // markChanged() right after mutating — see CLAUDE.md for why the "no cache entry yet" fallback
 // below can't be relied on alone once two async sources can reveal/mutate the same row out of
 // order.
-export function createRowCache() {
-  let cache = new Map();
+export function createRowCache<R extends object>() {
+  let cache = new Map<string, R>();
   return {
     // `rows`: the canonical, mutated-in-place row objects (rowMap's own) currently visible.
     // `keyOf`: extracts the cache key (an appid) from a row.
-    visibleRowsForTable(rows, keyOf) {
+    visibleRowsForTable(rows: R[], keyOf: (r: R) => string): R[] {
       return rows.map(r => {
         const key = keyOf(r);
         if (!cache.has(key)) cache.set(key, { ...r }); // first reveal
-        return cache.get(key);
+        return cache.get(key)!;
       });
     },
-    markChanged(key) {
+    markChanged(key: string) {
       cache.delete(key);
     },
     reset() {

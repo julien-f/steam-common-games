@@ -16,22 +16,22 @@ function makeMemoryLocalStorage() {
 
 beforeEach(() => {
   global.localStorage = makeMemoryLocalStorage();
-  delete require.cache[require.resolve('../public/prefs')];
+  delete require.cache[require.resolve('../public/prefs.ts')];
 });
 
 test('getPref: returns the fallback when the key was never set', () => {
-  const { getPref } = require('../public/prefs');
+  const { getPref } = require('../public/prefs.ts');
   assert.equal(getPref('region', 'fallback'), 'fallback');
 });
 
 test('setPref/getPref: round-trips a value', () => {
-  const { getPref, setPref } = require('../public/prefs');
+  const { getPref, setPref } = require('../public/prefs.ts');
   setPref('region', 'DE');
   assert.equal(getPref('region'), 'DE');
 });
 
 test('setPref: multiple keys coexist in the same blob', () => {
-  const { getPref, setPref } = require('../public/prefs');
+  const { getPref, setPref } = require('../public/prefs.ts');
   setPref('region', 'DE');
   setPref('libraryView', { sorts: [{ key: 'name', dir: 'asc' }] });
   assert.equal(getPref('region'), 'DE');
@@ -39,7 +39,7 @@ test('setPref: multiple keys coexist in the same blob', () => {
 });
 
 test('setPref: overwriting one key leaves other keys untouched', () => {
-  const { getPref, setPref } = require('../public/prefs');
+  const { getPref, setPref } = require('../public/prefs.ts');
   setPref('region', 'DE');
   setPref('bundlesTableView', { sorts: [] });
   setPref('region', 'US');
@@ -49,13 +49,13 @@ test('setPref: overwriting one key leaves other keys untouched', () => {
 
 test('getPref: falls back gracefully when the stored blob is corrupted JSON', () => {
   global.localStorage.setItem('steam-common-games:prefs', '{not json');
-  const { getPref } = require('../public/prefs');
+  const { getPref } = require('../public/prefs.ts');
   assert.equal(getPref('region', 'fallback'), 'fallback');
 });
 
 test('getPref: falls back gracefully when the stored value is not an object', () => {
   global.localStorage.setItem('steam-common-games:prefs', '"just a string"');
-  const { getPref } = require('../public/prefs');
+  const { getPref } = require('../public/prefs.ts');
   assert.equal(getPref('region', 'fallback'), 'fallback');
 });
 
@@ -64,8 +64,8 @@ test('getPref/setPref: never throw when localStorage is unavailable', () => {
     getItem() { throw new Error('unavailable'); },
     setItem() { throw new Error('unavailable'); },
   };
-  delete require.cache[require.resolve('../public/prefs')];
-  const { getPref, setPref } = require('../public/prefs');
+  delete require.cache[require.resolve('../public/prefs.ts')];
+  const { getPref, setPref } = require('../public/prefs.ts');
   assert.doesNotThrow(() => setPref('region', 'DE'));
   assert.equal(getPref('region', 'fallback'), 'fallback');
 });

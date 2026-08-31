@@ -2,11 +2,16 @@
 // buildLibraryOwnersHtml, which were byte-identical from here down; only how each page resolves
 // its own `owners` array differed (a comparison group's multiple slots vs. a Library Explorer
 // search's one flat player list) and stays local to each page's own small resolver.
-import { esc, fmtPlaytime, fmtLastPlayed } from './utils.js';
+import { esc, fmtPlaytime, fmtLastPlayed } from './utils.ts';
 
 // `owners`: [{ name, minutes, lastPlayedSec }]. Returns '' for an empty list (a standalone
 // lookup, or a game nobody in the current owners actually owns).
-export function renderOwnersHtml(owners) {
+interface OwnerEntry {
+  name: string;
+  minutes: number;
+  lastPlayedSec: number;
+}
+export function renderOwnersHtml(owners: OwnerEntry[]): string {
   if (!owners.length) return '';
   // Most recently played first — someone who's never launched it (lastPlayedSec 0) sorts last,
   // alphabetically among themselves so the order stays deterministic rather than depending on

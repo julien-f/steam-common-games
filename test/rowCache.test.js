@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { createRowCache } = require('../public/rowCache');
+const { createRowCache } = require('../public/rowCache.ts');
 
 test('rowCache: caches a copy on first reveal, reused verbatim on later renders', () => {
   const cache = createRowCache();

@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { renderOwnersHtml } = require('../public/ownerListHtml');
+const { renderOwnersHtml } = require('../public/ownerListHtml.ts');
 
 test('renderOwnersHtml: empty owners list renders nothing', () => {
   assert.equal(renderOwnersHtml([]), '');

@@ -1,6 +1,13 @@
-'use strict';
+import type { GameMeta } from './types.ts';
 
-export function buildMediaItems(appid, details) {
+export interface MediaItem {
+  type: 'image' | 'video';
+  main?: string;
+  hls?: string | null;
+  thumb: string;
+  shotId: string;
+}
+export function buildMediaItems(appid: number, details: Pick<GameMeta, 'banner' | 'movies' | 'screenshots'> | null | undefined): MediaItem[] {
   // `details.banner` (see extractAppDetails in lib/steam.js) is Steam's own header image
   // for this specific game, resolved once store metadata has loaded — before that (the
   // game is still `loading`, so `details` itself is absent), guess the conventional CDN
@@ -14,12 +21,12 @@ export function buildMediaItems(appid, details) {
   const screenshots = details?.screenshots || [];
   return [
     { type: 'image', main: bannerUrl, thumb: bannerUrl, shotId: 'banner' },
-    ...movies.map(m => ({ type: 'video', hls: m.hls, thumb: m.thumbnail, shotId: `v${m.id}` })),
-    ...screenshots.map(s => ({ type: 'image', main: s.full, thumb: s.thumbnail, shotId: `s${s.id}` })),
+    ...movies.map(m => ({ type: 'video' as const, hls: m.hls, thumb: m.thumbnail, shotId: `v${m.id}` })),
+    ...screenshots.map(s => ({ type: 'image' as const, main: s.full, thumb: s.thumbnail, shotId: `s${s.id}` })),
   ];
 }
 
-export function resolveShotIndex(shots, idxOrShotId) {
+export function resolveShotIndex(shots: MediaItem[], idxOrShotId: number | string): number {
   if (typeof idxOrShotId === 'string') {
     const idx = shots.findIndex(s => s.shotId === idxOrShotId);
     return idx >= 0 ? idx : 0;

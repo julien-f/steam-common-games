@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const {
   COUNTRY_OPTIONS, TIMEZONE_COUNTRY, detectCountry, AUTO_COUNTRY,
   REGION_CHANGED_EVENT, getStoredRegion, setStoredRegion, resolveRegion,
-} = require('../public/region');
+} = require('../public/region.ts');
 
 // region.js reads a handful of global-scoped APIs live on every call (no module-level state of
 // its own to reset between tests — see setPref/getPref's own equivalent note in prefs.js) —

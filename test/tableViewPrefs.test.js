@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { restoreTableView, resetTableView, shareTableView } = require('../public/tableViewPrefs');
+const { restoreTableView, resetTableView, shareTableView } = require('../public/tableViewPrefs.ts');
 
 // tableViewPrefs.js reads/writes `location`/`history` and prefs.js's own localStorage-backed
 // store directly — stub the minimal browser globals it touches, same idea prefs.test.js/
@@ -51,7 +51,7 @@ test('restoreTableView: a malformed param falls through to the stored default', 
 
 test('restoreTableView: no param at all falls back to whatever is already stored', () => {
   withLocation('', () => {
-    const { setPref } = require('../public/prefs');
+    const { setPref } = require('../public/prefs.ts');
     setPref('libraryView', { pageSize: 10 });
     const table = fakeTable();
     restoreTableView(table, 'libraryView', 'lv');

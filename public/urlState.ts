@@ -1,6 +1,9 @@
-'use strict';
-
-export const FILTER_DIMS = [
+export interface FilterDim {
+  key: 'tags' | 'genres' | 'categories' | 'developers' | 'publishers';
+  label: string;
+  param: string;
+}
+export const FILTER_DIMS: FilterDim[] = [
   { key: 'tags',       label: 'Tag',       param: 'tag'   },
   { key: 'genres',     label: 'Genre',     param: 'genre' },
   { key: 'categories', label: 'Category',  param: 'cat'   },
@@ -22,7 +25,7 @@ export const FILTER_DIMS = [
 // "Share view" button — see library.js/bundles.js.
 const PARAM_ORDER = ['u', 'tab', 'sort', 'game', 'shot', 'name', ...FILTER_DIMS.map(d => d.param), 'lv', 'wv', 'bv'];
 
-export function reorderUrlParams(params) {
+export function reorderUrlParams(params: URLSearchParams): URLSearchParams {
   const ordered = new URLSearchParams();
   for (const key of PARAM_ORDER) {
     for (const v of params.getAll(key)) ordered.append(key, v);
@@ -35,7 +38,15 @@ export function reorderUrlParams(params) {
   return ordered;
 }
 
-export function parseUrlState(search) {
+export interface UrlState {
+  slots: string[][];
+  game: number | null;
+  shot: string | null;
+  sort: { col: string; dir: 1 | -1 } | null;
+  nameFilter: string;
+  filters: Record<string, string[]>;
+}
+export function parseUrlState(search: string): UrlState {
   const params = new URLSearchParams(search);
   const slots = params.getAll('u')
     .map(s => s.split(',').map(v => v.trim()).filter(Boolean));

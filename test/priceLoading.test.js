@@ -4,8 +4,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   PRICE_FIELDS, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields, postPrices,
-} = require('../public/priceLoading');
-const { discountPct } = require('../public/utils');
+} = require('../public/priceLoading.ts');
+const { discountPct } = require('../public/utils.ts');
 
 test('applyPriceInfo: maps an ITAD price response onto a row', () => {
   const row = {};
