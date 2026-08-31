@@ -1,8 +1,9 @@
 'use strict';
 
 // Builds public/'s four HTML entry points into dist/ — a real bundled/hashed production
-// build in place of the hand-rolled import-map + /vendor/* static-route resolution server.js
-// still falls back to for local dev (see server.js's own STATIC_DIR comment). publicDir is
+// build in place of the hand-rolled import-map + /vendor/* static-route resolution this app
+// used before the frontend moved to TypeScript/Vite (both retired once nothing resolved
+// through them anymore — see server.js's own STATIC_DIR comment). publicDir is
 // disabled: public/ has no passthrough static assets left once hls.js moved from a vendored
 // public/hls.min.js to a real npm dependency (both dev and this build now resolve it as a
 // real ES import) — enabling it would also collide with Vite's own "publicDir" convention,

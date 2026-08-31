@@ -19,6 +19,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Library Explorer's Wishlist tab: looking up a game via the search box that isn't already in the loaded wishlist showed no Price card at all — `loadWishlistPrices`' batch price fetch is keyed off `rowMap`, which a standalone-lookup game never enters. `openStandaloneLookup` now separately prices that one game (`fetchStandalonePrice`) when the Wishlist tab is active.
 - A standalone lookup opened while on the Library tab still never priced itself after switching to the Wishlist tab — `openStandaloneLookup`'s wishlist-only price fetch only ran at open time, and `setActiveTab` only re-fetches when a player is loaded. `setActiveTab` now also prices the currently open standalone game on switching to the Wishlist tab if it hasn't been priced yet.
 
+### Removed
+
+- The `/vendor/data-table-core`, `/vendor/data-table-vanilla`, and `/vendor/hls.js` static routes (`server.js`) and the `<script type="importmap">` blocks in `index.html`/`library.html`/`bundles.html` that resolved bare npm specifiers against them. Both existed only for the pre-TypeScript `public/`-served-unbundled dev flow; Vite (`dev:web` and `build`) resolves these same npm dependencies itself now, and nothing else ever requested `/vendor/*`.
+
 ### Changed
 
 - A fresh clone now requires `npm run build` before `npm start` will serve a working frontend — the Express static fallback serves `public/` raw, and browsers won't parse the TypeScript sources (previously plain JS). Use `npm run dev:web` for development instead.
