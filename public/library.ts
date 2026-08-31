@@ -286,8 +286,8 @@ initPageShell({
         markRowChanged(row.appid);
         if (table) table.setData(visibleRowsForTable());
         await loadAchievements(row, { force: true }); // still meaningful with no player loaded — see loadAchievements
-      } catch (err: any) {
-        statusEl.textContent = `Refresh failed: ${err.message}`;
+      } catch (err) {
+        statusEl.textContent = `Refresh failed: ${(err as Error).message}`;
       }
     },
     // Runs on every close path (see the comment on `onClose` in panel.js) — not just the
@@ -600,8 +600,8 @@ async function fetchStandaloneDetails(game: Game) {
     if (getPanelGame() === game) { renderPanelBody(game); setPanelParam(game.appid); updateTitle(); }
     addRecentGame(game.appid, game.name, data.meta?.capsule || null);
     renderRecentGamesBar(recentGamesBarEl);
-  } catch (err: any) {
-    if (getPanelGame() === game) statusEl.textContent = `Lookup failed: ${err.message}`;
+  } catch (err) {
+    if (getPanelGame() === game) statusEl.textContent = `Lookup failed: ${(err as Error).message}`;
   }
 }
 
@@ -879,8 +879,8 @@ async function streamGameDetails(games: { appid: number }[]) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ games: games.map(g => ({ appid: g.appid })) }),
     });
-  } catch (err: any) {
-    statusEl.textContent = `Details stream failed: ${err.message}`;
+  } catch (err) {
+    statusEl.textContent = `Details stream failed: ${(err as Error).message}`;
     return;
   }
 
@@ -966,7 +966,7 @@ async function loadWishlistPrices(items: { appid: number }[], { force = false }:
         markRowChanged(appid);
         if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
       }
-    } catch (err: any) {
+    } catch (err) {
       // Same "don't leave price columns stuck on their loading placeholder forever" treatment
       // as bundles.js's own loadPrices — a failed chunk still fills its own games with `null`
       // (rendered "—", same as any other "no data" case) rather than leaving them on "…".
@@ -977,7 +977,7 @@ async function loadWishlistPrices(items: { appid: number }[], { force = false }:
         markRowChanged(appid);
         if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
       }
-      priceStatusEl.textContent = `Couldn't load Steam pricing (${err.message}) — other columns are unaffected.`;
+      priceStatusEl.textContent = `Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`;
     }
   }
   if (table) table.setData(visibleRowsForTable());
@@ -1060,8 +1060,8 @@ async function loadLibrary(playerStr: string, { refreshIds, preserveGameParam = 
       return;
     }
     result = await resp.json();
-  } catch (err: any) {
-    statusEl.textContent = `Error: ${err.message}`;
+  } catch (err) {
+    statusEl.textContent = `Error: ${(err as Error).message}`;
     return;
   }
 
@@ -1184,8 +1184,8 @@ async function loadWishlist(playerStr: string, { refreshIds, preserveGameParam =
       return;
     }
     result = await resp.json();
-  } catch (err: any) {
-    statusEl.textContent = `Error: ${err.message}`;
+  } catch (err) {
+    statusEl.textContent = `Error: ${(err as Error).message}`;
     return;
   }
 
