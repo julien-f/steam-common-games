@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Frontend converted to TypeScript — every module under `public/` is now `.ts`, checked in strict mode by `npm run typecheck` (TypeScript 7 / tsgo, `tsconfig.json`). New `public/types.ts` holds the shared row/detail types (`Game`, `GameDetails`, …). Runtime behavior is unchanged; the existing Node test suite (still `.js`) imports the `.ts` modules directly via Node's native type stripping.
+- `npm run dev:web` — a Vite dev server (`:5173`) with HMR for the TypeScript frontend, proxying `/api` to the Express backend. Development is now two processes (`dev:web` + `dev`); the production flow is unchanged (`npm run build` → `dist/`, served by `npm start`).
 - Library Explorer: the side panel now shows an "In library" / "On wishlist" status badge right under the title for any game looked up via the search box (or opened from a table row/DLC link), regardless of which tab (Library/Wishlist) is currently active. `library.js` background-fetches whichever tab isn't currently loaded, purely to know appid membership, so both statuses are known even when only one tab's data is otherwise on screen.
 - Test coverage for five new shared frontend modules (`test/tableViewPrefs.test.js`, `test/rowCache.test.js`, `test/panelNav.test.js`, `test/priceLoading.test.js`, `test/ownerListHtml.test.js`) — see Changed below.
 
@@ -15,9 +17,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Side panel's Price card silently showed "No pricing data available" for every game on the comparison page, the Library Explorer's Library tab, and standalone lookups — `panel.js`'s `loadPrice` called `resolveRegion(getStoredRegion())` without importing either from `region.js`, throwing a `ReferenceError` that its own catch block swallowed into a plain "no data" result with no console error at all, so `POST /api/prices` never actually fired.
 - Library Explorer's Wishlist tab: looking up a game via the search box that isn't already in the loaded wishlist showed no Price card at all — `loadWishlistPrices`' batch price fetch is keyed off `rowMap`, which a standalone-lookup game never enters. `openStandaloneLookup` now separately prices that one game (`fetchStandalonePrice`) when the Wishlist tab is active.
+- A standalone lookup opened while on the Library tab still never priced itself after switching to the Wishlist tab — `openStandaloneLookup`'s wishlist-only price fetch only ran at open time, and `setActiveTab` only re-fetches when a player is loaded. `setActiveTab` now also prices the currently open standalone game on switching to the Wishlist tab if it hasn't been priced yet.
+
+### Removed
+
+- The `/vendor/data-table-core`, `/vendor/data-table-vanilla`, and `/vendor/hls.js` static routes (`server.js`) and the `<script type="importmap">` blocks in `index.html`/`library.html`/`bundles.html` that resolved bare npm specifiers against them. Both existed only for the pre-TypeScript `public/`-served-unbundled dev flow; Vite (`dev:web` and `build`) resolves these same npm dependencies itself now, and nothing else ever requested `/vendor/*`.
 
 ### Changed
 
+- A fresh clone now requires `npm run build` before `npm start` will serve a working frontend — the Express static fallback serves `public/` raw, and browsers won't parse the TypeScript sources (previously plain JS). Use `npm run dev:web` for development instead.
 - De-duplicated logic that `library.js`/`bundles.js` (and, for the owner list, `app.js`) each carried their own near-identical copy of, into shared modules:
   - `public/tableViewPrefs.js` — the `?lv=`/`?wv=`/`?bv=` table-view restore/persist/share/reset logic. Along the way, `bundles.js`'s copy is fixed to route its writes through `reorderUrlParams` the same way `library.js`'s always did (`urlState.js`'s `PARAM_ORDER` now also lists `bv`).
   - `public/rowCache.js` — the `@vates/data-table-vanilla` `setData()`-reference-identity fix (a row keeps its cached copy across renders until explicitly marked changed).

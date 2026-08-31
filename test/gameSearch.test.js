@@ -6,7 +6,7 @@ const {
   GAME_SEARCH_DEBOUNCE_MS, GAME_SEARCH_MIN_CHARS, RECENT_GAMES_KEY, MAX_RECENT_GAMES,
   parseDirectAppid, gameSearchResultHtml, loadRecentGames, saveRecentGames, addRecentGame,
   removeRecentGame, recentGameChipHtml, renderRecentGamesBar, bindRecentGamesBar,
-} = require('../public/gameSearch');
+} = require('../public/gameSearch.ts');
 
 // Same localStorage-stub convention as accountsBar.test.js/region.test.js/prefs.test.js.
 function makeMemoryLocalStorage() {

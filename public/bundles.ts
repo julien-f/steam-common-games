@@ -1,26 +1,57 @@
 'use strict';
 
-import { esc, formatMoney, computeSteamdbRating, computeProductionTier, discountPct } from '/utils.js';
-import { reorderUrlParams } from '/urlState.js';
-import { restoreTableView, bindViewPersistence, shareTableView, resetTableView } from '/tableViewPrefs.js';
-import { createRowCache } from '/rowCache.js';
-import { renderPanelNav as renderPanelNavShared, stepGameList } from '/panelNav.js';
-import { postPrices, applyPriceInfo, nullMissingPriceFields } from '/priceLoading.js';
-import { COUNTRY_OPTIONS, TIMEZONE_COUNTRY, detectCountry, getStoredRegion, setStoredRegion, resolveRegion, REGION_CHANGED_EVENT } from '/region.js';
-import { openLightbox, isLightboxOpen } from '/lightbox.js';
+import { esc, formatMoney, computeSteamdbRating, computeProductionTier, discountPct } from '/utils.ts';
+import { reorderUrlParams } from '/urlState.ts';
+import { restoreTableView, bindViewPersistence, shareTableView, resetTableView } from '/tableViewPrefs.ts';
+import { createRowCache } from '/rowCache.ts';
+import { renderPanelNav as renderPanelNavShared, stepGameList } from '/panelNav.ts';
+import { postPrices, applyPriceInfo, nullMissingPriceFields } from '/priceLoading.ts';
+import { COUNTRY_OPTIONS, TIMEZONE_COUNTRY, detectCountry, getStoredRegion, setStoredRegion, resolveRegion, REGION_CHANGED_EVENT } from '/region.ts';
+import { openLightbox, isLightboxOpen } from '/lightbox.ts';
 import {
   panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,
   pickRandomFrom, clearRandomQueue, panelHandleEscape,
   renderPanelBody,
-} from '/panel.js';
-import { initPageShell } from '/pageShell.js';
+} from '/panel.ts';
+import { initPageShell } from '/pageShell.ts';
 
 import { createDataTable } from '@vates/data-table-vanilla';
+import type { ColumnDef, DataTableInstance, SortEntry } from '@vates/data-table-vanilla';
+import type { Game, GameDetails } from './types.ts';
 import {
   fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareNumMissingLast,
   withMissingGroup, formatMissingGroup, priceTierBucket, formatPriceTier,
   protonDbValue, TYPE_LABELS,
-} from '/gameColumns.js';
+} from '/gameColumns.ts';
+
+// ── Local data shapes ───────────────────────────────────────────────────────
+// A game flattened out of a bundle's tiers (see flattenBundleGames) — the ITAD-side
+// identity (gid) plus that game's tier price at the cheapest tier it appears at.
+interface FlatGame {
+  gid: string; slug: string; title: string; type: string;
+  assets: { boxart?: string } | null;
+  tierPrice: number | null; tierCurrency: string | null; addon: boolean;
+}
+// A flat game that also resolved to a Steam appid (see openBundle's resolved list).
+type ResolvedGame = FlatGame & { appid: number };
+// One SSE `data:` payload from POST /api/game-details/stream (a game-details response, plus the
+// row's appid, minus the `done` sentinel) — the shape applyDetailsEvent reads.
+interface DetailEvent extends GameDetails { appid: number; done?: boolean; }
+// One bundle as ITAD's /bundles/v1 (via GET /api/bundles) returns it — only the fields read.
+interface PriceAmount { amount: number; currency: string; }
+interface BundleTier {
+  price: PriceAmount | null;
+  games: { id: string; slug: string; title: string; type: string; assets?: { boxart?: string } | null }[];
+  addon: boolean | null;
+}
+interface Bundle {
+  id: number; title: string;
+  page: { name?: string } | null;
+  counts: { games?: number } | null;
+  expiry: string | null;
+  url: string | null; details: string | null;
+  tiers: BundleTier[];
+}
 
 // ── Bundle-specific column building blocks — Tier Price/Add-on have no Library/Wishlist
 // equivalent (a bundle-tier concept), so they stay local rather than living in the shared
@@ -31,7 +62,7 @@ import {
 // DLC-ish items) on top of an already-unlocked base game, from a tier that unlocks a base
 // game outright — an ITAD-specific fact this app's own library/wishlist tables have no
 // equivalent of.
-function renderAddonBadge(v) {
+function renderAddonBadge(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');
   const span = document.createElement('span');
   span.className = 'status-badge';
@@ -49,11 +80,11 @@ function renderAddonBadge(v) {
 // "Free" for that (the previous behavior) was flatly wrong — these bundles are never free.
 // "Varies" is shown instead; only a real `amount === 0` renders as "Free". `formatMoney` lives
 // in utils.js, not here — see gameColumns.js's own header comment for why.
-function renderTierPrice(v, row) {
+function renderTierPrice(v: unknown, row: Record<string, any>): Node {
   if (v === undefined) return document.createTextNode('…');
   if (v == null) return document.createTextNode('Varies');
   if (v === 0) return document.createTextNode('Free');
-  return document.createTextNode(formatMoney(v, row.tierCurrency));
+  return document.createTextNode(formatMoney(Number(v), row.tierCurrency));
 }
 
 // `compare: compareNumMissingLast` — without it, a `null` ("Varies", no fixed price — see
@@ -65,14 +96,14 @@ function renderTierPrice(v, row) {
 // missing tier price means "Varies" (a Build Your Own bundle's pick-and-mix pricing — see
 // renderTierPrice above), not "no data" — its own `missingLabel` reflects that distinction
 // instead of the generic '—' the other price columns' groups fall back to.
-const TIER_PRICE_COLUMN = {
+const TIER_PRICE_COLUMN: ColumnDef<Record<string, any>> = {
   key: 'tierPrice', label: 'Tier Price', type: 'number', groupable: true,
-  format: v => v == null ? 'Varies' : v === 0 ? 'Free' : v.toFixed(2), render: renderTierPrice,
+  format: v => v == null ? 'Varies' : v === 0 ? 'Free' : Number(v).toFixed(2), render: renderTierPrice,
   compare: compareNumMissingLast, defaultSortDir: 'asc',
   groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier, 'Varies'), keepVisibleWhenGrouped: true,
   category: 'Pricing',
 };
-const ADDON_COLUMN =
+const ADDON_COLUMN: ColumnDef<Record<string, any>> =
   { key: 'addon', label: 'Add-on', groupable: true, format: v => v ? 'Add-on' : 'Base', render: renderAddonBadge, category: 'Classification' };
 
 // The Bundles page's own column list — CORE_COLUMNS (public/gameColumns.js) plus Tier Price/
@@ -93,7 +124,7 @@ const DEFAULT_VISIBLE = ['capsule', 'name', 'tierPrice', 'bestDealPrice', 'bestD
 // part of `initialViewState` at table construction (`@vates/data-table-vanilla` >= 0.12) — also
 // what `resetTableView`'s own `setViewState({})` blanking restores, so unlike before there's no
 // separate priming call or manual reapply-after-reset needed for this.
-const DEFAULT_SORT = [{ key: 'tierPrice', dir: 'asc' }, { key: 'steamdbRating', dir: 'desc' }];
+const DEFAULT_SORT: SortEntry[] = [{ key: 'tierPrice', dir: 'asc' }, { key: 'steamdbRating', dir: 'desc' }];
 
 // ── Region ────────────────────────────────────────────────────────────────────
 // COUNTRY_OPTIONS/TIMEZONE_COUNTRY/detectCountry/getStoredRegion/resolveRegion/
@@ -103,30 +134,30 @@ const DEFAULT_SORT = [{ key: 'tierPrice', dir: 'asc' }, { key: 'steamdbRating', 
 // Preferences popover (public/nav.js), not on this page — see updateBundlesRegionLabel below.
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
-const notConfiguredCard = document.getElementById('not-configured-card');
-const browseCard        = document.getElementById('browse-card');
-const bundlesRegionValueEl = document.getElementById('bundles-region-value');
-const sortSelect         = document.getElementById('sort-select');
-const expiredCheckbox    = document.getElementById('expired-checkbox');
-const bundlesStatusEl    = document.getElementById('bundles-status');
-const bundleListWrapEl   = document.getElementById('bundle-list-wrap');
-const bundleListEl       = document.getElementById('bundle-list');
-const toggleListBtn      = document.getElementById('toggle-list-btn');
-const loadMoreBtn        = document.getElementById('load-more-btn');
-const detailCard         = document.getElementById('detail-card');
-const detailTitleEl      = document.getElementById('detail-title');
-const detailMetaEl       = document.getElementById('detail-meta');
-const detailLinksEl      = document.getElementById('detail-links');
-const prevBundleBtn      = document.getElementById('prev-bundle-btn');
-const nextBundleBtn      = document.getElementById('next-bundle-btn');
-const detailStatusEl     = document.getElementById('detail-status');
-const priceStatusEl      = document.getElementById('price-status');
-const refreshPricesBtn   = document.getElementById('refresh-prices-btn');
-const resetViewBtn       = document.getElementById('reset-view-btn');
-const tableContainer     = document.getElementById('table-container');
-const unresolvedSection  = document.getElementById('unresolved-section');
-const unresolvedListEl   = document.getElementById('unresolved-list');
-const shareViewBtn       = document.getElementById('share-view-btn');
+const notConfiguredCard = document.getElementById('not-configured-card')!;
+const browseCard        = document.getElementById('browse-card')!;
+const bundlesRegionValueEl = document.getElementById('bundles-region-value')!;
+const sortSelect         = document.getElementById('sort-select') as HTMLSelectElement;
+const expiredCheckbox    = document.getElementById('expired-checkbox') as HTMLInputElement;
+const bundlesStatusEl    = document.getElementById('bundles-status')!;
+const bundleListWrapEl   = document.getElementById('bundle-list-wrap')!;
+const bundleListEl       = document.getElementById('bundle-list')!;
+const toggleListBtn      = document.getElementById('toggle-list-btn')!;
+const loadMoreBtn        = document.getElementById('load-more-btn')!;
+const detailCard         = document.getElementById('detail-card')!;
+const detailTitleEl      = document.getElementById('detail-title')!;
+const detailMetaEl       = document.getElementById('detail-meta')!;
+const detailLinksEl      = document.getElementById('detail-links')!;
+const prevBundleBtn      = document.getElementById('prev-bundle-btn') as HTMLButtonElement;
+const nextBundleBtn      = document.getElementById('next-bundle-btn') as HTMLButtonElement;
+const detailStatusEl     = document.getElementById('detail-status')!;
+const priceStatusEl      = document.getElementById('price-status')!;
+const refreshPricesBtn   = document.getElementById('refresh-prices-btn') as HTMLButtonElement;
+const resetViewBtn       = document.getElementById('reset-view-btn')!;
+const tableContainer     = document.getElementById('table-container')!;
+const unresolvedSection  = document.getElementById('unresolved-section')!;
+const unresolvedListEl   = document.getElementById('unresolved-list')!;
+const shareViewBtn       = document.getElementById('share-view-btn')!;
 
 // ── Table view persistence & sharing ──────────────────────────────────────────
 // Same mechanism as library.js's own copy (see its header comment) — sort/filter/columns/
@@ -156,7 +187,7 @@ const shareViewBtn       = document.getElementById('share-view-btn');
 // full-length list otherwise pushes the real content (the opened bundle's game table) far down
 // the page. `toggleListBtn` lets it be reopened (e.g. to pick a different bundle) without
 // forgetting what's currently open.
-function setListCollapsed(collapsed) {
+function setListCollapsed(collapsed: boolean) {
   bundleListWrapEl.classList.toggle('collapsed', collapsed);
   toggleListBtn.hidden = bundles.length === 0;
   toggleListBtn.textContent = collapsed ? 'Show list' : 'Hide list';
@@ -175,19 +206,19 @@ const TABLE_VIEW_PREF_KEY = 'bundlesTableView';
 // table changes anymore either — only by the "Share view" button (shareTableView below).
 const TABLE_VIEW_PARAM = 'bv';
 
-let table = null;
-let unpersistView = null;
-let rows = [];
-let rowMap = new Map();
+let table: DataTableInstance<Record<string, any>> | null = null;
+let unpersistView: (() => void) | null = null;
+let rows: Game[] = [];
+let rowMap = new Map<number, Game>();
 let bundlesOffset = 0;
 const BUNDLES_PAGE_SIZE = 20;
-let bundles = [];
-let activeBundleId = null;
+let bundles: Bundle[] = [];
+let activeBundleId: number | null = null;
 // The `resolved` list (appid + gid per game) for whatever bundle is currently open — kept
 // around so the "↻ Refresh prices" button (see the refreshPricesBtn wiring below) can re-run
 // just loadPrices() for the open bundle without re-resolving Steam appids or re-streaming
 // ratings/HLTB/tags, which openBundle()'s own full reopen would otherwise repeat for nothing.
-let currentResolvedGames = [];
+let currentResolvedGames: ResolvedGame[] = [];
 
 // `rows`/`rowMap` hold long-lived, mutated-in-place row objects — every other consumer
 // (the panel, achievements cache, prev/next-style lookups) wants that stable identity, and
@@ -210,20 +241,20 @@ let currentResolvedGames = [];
 // `streamGameDetails`'s own first-time reveal of a row — not just `loadPrices`/`onRefresh`,
 // which touch an already-visible row (see rowCache.js for why the "no cache entry yet" fallback
 // alone isn't enough once two async sources can reveal/mutate the same row out of order).
-let rowCache = createRowCache();
-function markRowChanged(appid) {
-  rowCache.markChanged(appid);
+let rowCache = createRowCache<Game>();
+function markRowChanged(appid: number) {
+  rowCache.markChanged(String(appid));
 }
 // Canonical rows whose details have streamed in — the *same* object references `rows`/`rowMap`
 // hold, unlike visibleRowsForTable()'s cached copies below. Used by nav/random-pick
 // (getGameList/pickRandomGame below) and onRowClick, all of which need the reference the panel
 // keeps displaying and any later mutation (refresh, price loading) needs to keep reaching —
 // same distinction library.js's own visibleRows()/visibleRowsForTable() pair draws.
-function visibleRows() {
+function visibleRows(): Game[] {
   return rows.filter(r => !r.loading);
 }
-function visibleRowsForTable() {
-  return rowCache.visibleRowsForTable(visibleRows(), r => r.appid);
+function visibleRowsForTable(): Game[] {
+  return rowCache.visibleRowsForTable(visibleRows(), r => String(r.appid));
 }
 
 // Stable order for the panel's prev/next/random nav — the table's current search/filter/sort
@@ -232,8 +263,8 @@ function visibleRowsForTable() {
 // `table.getProcessedData()` (`@vates/data-table-vanilla` >= 0.13, added per
 // vatesfr/data-table#22) exposes exactly this directly. Same approach library.js's own
 // getGameList uses.
-function getGameList() {
-  return table.getProcessedData();
+function getGameList(): Game[] {
+  return table ? (table.getProcessedData() as Game[]) : [];
 }
 
 // This page only ever has one game list open at a time (the currently open bundle's table),
@@ -256,7 +287,7 @@ initPageShell({
     // Every row here is always batch-priced by loadPrices (see its own comment) — never a
     // per-game fetch of panel.js's own, which would just duplicate that same call.
     pricesHandledByHost: true,
-    onRefresh: async (row) => {
+    onRefresh: async (row: Game) => {
       try {
         const res = await fetch(`/api/game-details/${row.appid}?refresh=1`);
         const data = await res.json();
@@ -266,13 +297,13 @@ initPageShell({
         if (table) table.setData(visibleRowsForTable());
         await loadAchievements(row, { force: true });
       } catch (err) {
-        detailStatusEl.textContent = `Refresh failed: ${err.message}`;
+        detailStatusEl.textContent = `Refresh failed: ${(err as Error).message}`;
       }
     },
     // Clicking a DLC/base-game link inside the panel — the linked appid may not be one of this
     // bundle's own resolved rows (e.g. a DLC not itself included in the bundle), so it's fetched
     // standalone the same way public/library.js's "look up any game" flow does.
-    onNavigateGame: (appid, name) => openStandaloneGame(appid, name, { keepHistory: true }),
+    onNavigateGame: (appid: number, name: string) => openStandaloneGame(appid, name, { keepHistory: true }),
     // Runs on every close path (see the comment on `onClose` in panel.js) — the backdrop click,
     // × button, and swipe-to-close, not just an explicit Escape — so `?game=` never sticks around
     // after the panel's actually gone. openBundle()'s own panelClose() call (a genuine new bundle
@@ -281,9 +312,9 @@ initPageShell({
     onClose: () => setPanelParam(null),
     // A real href (not the placeholder '#' this used to be, back when there was no `?game=` URL
     // to point at) so ctrl/cmd/shift/middle-click on a DLC entry still opens it in a new tab.
-    gameHref: appid => {
+    gameHref: (appid: number) => {
       const params = new URLSearchParams(location.search);
-      params.set('game', appid);
+      params.set('game', String(appid));
       return `?${params}`;
     },
   },
@@ -291,7 +322,7 @@ initPageShell({
 
 const achievementsCache = new Map();
 
-async function loadAchievements(game, { force = false } = {}) {
+async function loadAchievements(game: Game, { force = false } = {}) {
   if (!force) {
     const cached = achievementsCache.get(game.appid);
     if (cached) { game.achievements = cached; if (isPanelOpen() && getPanelGame() === game) renderPanelBody(game); return; }
@@ -317,11 +348,11 @@ async function loadAchievements(game, { force = false } = {}) {
 // library.js/app.js — see panelNav.js/CLAUDE.md's panel.js bullet) from getGameList()'s current
 // search/filter/sort order. Empty for a standalone lookup (see openStandaloneGame below) —
 // there's no natural list to page through, same as library.js's own version of this function.
-function renderPanelNav(game) {
+function renderPanelNav(game: Game) {
   renderPanelNavShared({ table, game, getGameList, onOpen: openGame, onReroll: pickRandomGame });
 }
 
-function openGame(game, { isRandom = false, keepHistory = false } = {}) {
+function openGame(game: Game, { isRandom = false, keepHistory = false } = {}) {
   if (!isRandom) clearRandomQueue(RANDOM_QUEUE_KEY);
   panelOpen(game, { keepHistory });
   renderPanelNav(game);
@@ -333,17 +364,18 @@ function openGame(game, { isRandom = false, keepHistory = false } = {}) {
 // document keydown handler below does when the lightbox is closed, but also jumps
 // straight into the new game's lightbox at shot 0 rather than leaving the lightbox
 // closed behind it. No-ops with no group to page through, same guard as below.
-function navigateLightboxGame(dir) {
-  const next = stepGameList(table, getGameList, getPanelGame(), dir);
+function navigateLightboxGame(dir: number) {
+  const next = stepGameList(table, getGameList, getPanelGame(), dir as 1 | -1);
   if (!next) return;
   openGame(next);
   openLightbox(next, 0);
 }
 
 function pickRandomGame() {
-  if (!table || getPanelGame()?.standalone) return; // see renderPanelNav
-  const pick = pickRandomFrom(getGameList(), RANDOM_QUEUE_KEY, getPanelGame()?.appid);
-  if (pick) openGame(pick, { isRandom: true });
+  const current = getPanelGame();
+  if (!table || !current || current.standalone) return; // see renderPanelNav
+  const pick = pickRandomFrom(getGameList(), RANDOM_QUEUE_KEY, current.appid);
+  if (pick) openGame(pick as Game, { isRandom: true });
 }
 
 // A game linked from the panel (DLC/base-game nav) that isn't one of this bundle's own
@@ -353,10 +385,10 @@ function pickRandomGame() {
 // itself for a standalone view instead of showing stale buttons/position left over from
 // whichever row was open before, and so `?game=` follows this navigation too, same as it does
 // library.js's own DLC-link navigation.
-function openStandaloneGame(appid, name, { keepHistory = false } = {}) {
+function openStandaloneGame(appid: number, name = '', { keepHistory = false } = {}) {
   const existing = rowMap.get(appid);
   if (existing) { openGame(existing, { keepHistory }); return; }
-  const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true };
+  const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true } as Game;
   openGame(game, { keepHistory });
   fetch(`/api/game-details/${appid}`)
     .then(res => res.json().then(data => ({ ok: res.ok, data })))
@@ -374,15 +406,15 @@ function openStandaloneGame(appid, name, { keepHistory = false } = {}) {
 // restorePanelFromUrl for the comparison/Library Explorer pages (see CLAUDE.md's "Looking up
 // an arbitrary game" section for the general shape). Not pushed/reordered, same convention as
 // this page's own setBundleParam right below.
-function setPanelParam(appid) {
+function setPanelParam(appid: number | null) {
   const params = new URLSearchParams(location.search);
   params.delete('shot');
   if (appid == null) params.delete('game');
-  else params.set('game', appid);
+  else params.set('game', String(appid));
   history.replaceState(null, '', `?${params}`);
 }
 
-function setLightboxParam(idx) {
+function setLightboxParam(idx: string | null) {
   const params = new URLSearchParams(location.search);
   if (idx == null) params.delete('shot');
   else params.set('shot', idx);
@@ -395,7 +427,7 @@ function setLightboxParam(idx) {
 // the hero), so by the time a row's details are in on the second (post-stream) call below,
 // `shot` would already be gone from the URL itself; the caller threads the page-load value
 // through instead. Mirrors library.js's own restorePanelFromUrl exactly (see its own comment).
-function restorePanelFromUrl(restoreShot = null) {
+function restorePanelFromUrl(restoreShot: string | null = null) {
   const params = new URLSearchParams(location.search);
   const appid = Number(params.get('game'));
   if (!appid) return;
@@ -425,7 +457,8 @@ document.addEventListener('keydown', e => {
   if (isLightboxOpen()) return;
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-  if (!isPanelOpen()) return;
+  const openGameRef = getPanelGame();
+  if (!openGameRef) return;
   // Hero screenshot/video stepping — this page previously only supported it via click/swipe,
   // unlike app.js/library.js's identical keyboard handling for the same shared hero carousel.
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
@@ -438,17 +471,17 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-  if (!table || getPanelGame()?.standalone) return; // see renderPanelNav — no list to page through
+  if (!table || openGameRef.standalone) return; // see renderPanelNav — no list to page through
   e.preventDefault();
   const list = getGameList();
-  const idx = list.findIndex(g => g.appid === getPanelGame().appid);
+  const idx = list.findIndex(g => g.appid === openGameRef.appid);
   const next = (idx + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
   openGame(list[next]);
 });
 
 // ── Bundle list ───────────────────────────────────────────────────────────────
 
-function fmtExpiry(iso) {
+function fmtExpiry(iso: string | null) {
   if (!iso) return 'no expiry listed';
   const d = new Date(iso);
   return isNaN(d.getTime()) ? '' : `ends ${d.toISOString().slice(0, 10)}`;
@@ -459,13 +492,13 @@ function fmtExpiry(iso) {
 // price scales with how many you pick), never a free bundle — a genuinely free/$0 tier still has
 // a real price object (`{amount: 0, ...}`), which is truthy and included here same as any other
 // priced tier. See renderTierPrice's own comment above for the same distinction on the game table.
-function cheapestTierPrice(bundle) {
+function cheapestTierPrice(bundle: Bundle): PriceAmount | null {
   const priced = (bundle.tiers || []).filter(t => t.price);
   if (!priced.length) return null;
-  return priced.reduce((min, t) => t.price.amount < min.amount ? t.price : min, priced[0].price);
+  return priced.reduce((min, t) => (t.price as PriceAmount).amount < min.amount ? (t.price as PriceAmount) : min, priced[0].price as PriceAmount);
 }
 
-function fmtBundleListPrice(price) {
+function fmtBundleListPrice(price: PriceAmount | null) {
   if (!price) return 'Price varies';
   if (price.amount === 0) return 'Free';
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: price.currency }).format(price.amount);
@@ -522,19 +555,20 @@ async function loadBundles({ reset = true, expandList = true } = {}) {
     loadMoreBtn.hidden = data.bundles.length < BUNDLES_PAGE_SIZE;
     toggleListBtn.hidden = bundles.length === 0;
   } catch (err) {
-    bundlesStatusEl.textContent = `Error: ${err.message}`;
+    bundlesStatusEl.textContent = `Error: ${(err as Error).message}`;
   }
 }
 
 // ── Bundle detail — resolve games to Steam appids, then stream details ────────
 
-function applyDetailsEvent(row, event) {
+function applyDetailsEvent(row: Game, event: DetailEvent) {
   row.capsule           = event.meta?.capsule ?? null;
   if (!row.name) row.name = event.meta?.name || '';
   row.score             = event.rating?.score ?? null;
   row.positivePct       = (event.rating?.positive != null && event.rating?.total)
     ? Math.round((event.rating.positive / event.rating.total) * 100) : null;
-  row.steamdbRating     = computeSteamdbRating(event.rating?.positive, event.rating?.total);
+  row.steamdbRating     = (event.rating?.positive != null && event.rating?.total != null)
+    ? computeSteamdbRating(event.rating.positive, event.rating.total) : null;
   row.reviewsTotal      = event.rating?.total ?? null;
   row.hltbMain          = event.hltb?.main           ?? null;
   row.hltbExtra         = event.hltb?.extra          ?? null;
@@ -555,7 +589,8 @@ function applyDetailsEvent(row, event) {
   row.platforms         = event.meta?.platforms ?? [];
   row.languages          = event.meta?.languages ?? [];
   row.hasDemo            = event.demo != null;
-  row.type                = TYPE_LABELS[event.meta?.type] ?? (event.meta?.type ? event.meta.type : null);
+  const metaType = event.meta?.type;
+  row.type                = (metaType && (TYPE_LABELS as Record<string, string>)[metaType]) ?? (metaType ?? null);
   row.productionTier      = computeProductionTier({
     isFree:       event.meta?.isFree ?? false,
     priceInitial: event.meta?.priceInitial ?? null,
@@ -568,8 +603,8 @@ function applyDetailsEvent(row, event) {
   row.details = { rating: event.rating, hltb: event.hltb, meta: event.meta, tags: event.tags, demo: event.demo, protondb: event.protondb };
 }
 
-async function streamGameDetails(appids) {
-  let resp;
+async function streamGameDetails(appids: number[]) {
+  let resp: Response;
   try {
     resp = await fetch('/api/game-details/stream', {
       method: 'POST',
@@ -577,10 +612,10 @@ async function streamGameDetails(appids) {
       body: JSON.stringify({ games: appids.map(appid => ({ appid })) }),
     });
   } catch (err) {
-    detailStatusEl.textContent = `Details stream failed: ${err.message}`;
+    detailStatusEl.textContent = `Details stream failed: ${(err as Error).message}`;
     return;
   }
-  const reader = resp.body.getReader();
+  const reader = resp.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
   let loaded = 0;
@@ -589,11 +624,11 @@ async function streamGameDetails(appids) {
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
     const parts = buffer.split('\n\n');
-    buffer = parts.pop();
+    buffer = parts.pop() ?? '';
     for (const part of parts) {
       const line = part.trim();
       if (!line.startsWith('data: ')) continue;
-      let event;
+      let event: DetailEvent;
       try { event = JSON.parse(line.slice(6)); } catch { continue; }
       if (event.done) continue;
       const row = rowMap.get(event.appid);
@@ -621,13 +656,13 @@ async function streamGameDetails(appids) {
 // cheapest tier it first appears at, since that's the price that actually gets you this game.
 // ITAD's tiers are already price-ascending in every bundle observed, so "first occurrence" and
 // "cheapest occurrence" are the same thing here.
-function flattenBundleGames(bundle) {
-  const seen = new Map(); // gid -> { gid, slug, title, type, assets, tierPrice, tierCurrency, addon }
+function flattenBundleGames(bundle: Bundle): FlatGame[] {
+  const seen = new Map<string, FlatGame>(); // gid -> { gid, slug, title, type, assets, tierPrice, tierCurrency, addon }
   for (const tier of bundle.tiers || []) {
     for (const g of tier.games || []) {
       if (seen.has(g.id)) continue;
       seen.set(g.id, {
-        gid: g.id, slug: g.slug, title: g.title, type: g.type, assets: g.assets,
+        gid: g.id, slug: g.slug, title: g.title, type: g.type, assets: g.assets ?? null,
         tierPrice: tier.price ? tier.price.amount : null,
         tierCurrency: tier.price ? tier.price.currency : null,
         addon: !!tier.addon,
@@ -637,14 +672,14 @@ function flattenBundleGames(bundle) {
   return [...seen.values()];
 }
 
-function renderUnresolvedList(games) {
+function renderUnresolvedList(games: FlatGame[]) {
   unresolvedSection.hidden = games.length === 0;
   unresolvedListEl.innerHTML = games.map(g => `
     <div class="unresolved-item">
       ${g.assets?.boxart ? `<img src="${esc(g.assets.boxart)}" alt="" loading="lazy">` : ''}
       <div>
         <div class="unresolved-item-title">${esc(g.title)}</div>
-        <div class="unresolved-item-type">${esc(TYPE_LABELS[g.type] || g.type || 'Game')}</div>
+        <div class="unresolved-item-type">${esc((g.type && (TYPE_LABELS as Record<string, string>)[g.type]) || g.type || 'Game')}</div>
       </div>
     </div>
   `).join('');
@@ -655,7 +690,7 @@ function renderUnresolvedList(games) {
 // link. `bundle.url` is the shop/affiliate link exactly as ITAD returned it — never rewritten
 // or stripped of tracking params (ITAD's terms require passing prices/links through
 // unmodified; see CLAUDE.md).
-function renderDetailLinks(bundle) {
+function renderDetailLinks(bundle: Bundle) {
   detailLinksEl.innerHTML = `
     ${bundle.details ? `<a class="btn btn-ghost btn-sm" href="${esc(bundle.details)}" target="_blank" rel="noopener">View on IsThereAnyDeal ↗</a>` : ''}
     ${bundle.url ? `<a class="btn btn-primary btn-sm" href="${esc(bundle.url)}" target="_blank" rel="noopener">Get this bundle ↗</a>` : ''}
@@ -694,7 +729,7 @@ nextBundleBtn.addEventListener('click', () => {
 // cache read for this call (?refresh=1, same convention as every other force-refresh in this
 // app) so a stale price actually gets re-fetched from ITAD instead of just re-reading the same
 // cached response back.
-async function loadPrices(resolved, { force = false } = {}) {
+async function loadPrices(resolved: ResolvedGame[], { force = false } = {}) {
   priceStatusEl.textContent = '';
   try {
     const prices = await postPrices({ gids: resolved.map(g => g.gid), country: resolveRegion(getStoredRegion()), force });
@@ -707,7 +742,7 @@ async function loadPrices(resolved, { force = false } = {}) {
       if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
     }
   } catch (err) {
-    console.warn('[bundles] price lookup failed:', err.message);
+    console.warn('[bundles] price lookup failed:', (err as Error).message);
     // Without this, a failed request (rate limited, transient upstream error) left every
     // price-ish cell stuck on its "…" loading placeholder forever — indistinguishable from
     // "still loading" and easy to mistake for a hung page rather than a failure. `null` here
@@ -721,7 +756,7 @@ async function loadPrices(resolved, { force = false } = {}) {
       markRowChanged(g.appid);
       if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
     }
-    priceStatusEl.textContent = `Couldn't load Steam pricing (${err.message}) — other columns are unaffected.`;
+    priceStatusEl.textContent = `Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`;
   } finally {
     if (table) table.setData(visibleRowsForTable());
   }
@@ -735,7 +770,7 @@ async function loadPrices(resolved, { force = false } = {}) {
 // resetTableState/loadLibrary use. Region changes (see the REGION_CHANGED_EVENT handler below) are the
 // one case that reopens the *same* bundle in place and does pass this, so the open game — same
 // bundle, same rows, same order, just re-priced — stays open across it.
-async function openBundle(bundle, { preserveGameParam = false, restoreShot = null } = {}) {
+async function openBundle(bundle: Bundle, { preserveGameParam = false, restoreShot = null }: { preserveGameParam?: boolean; restoreShot?: string | null } = {}) {
   if (!preserveGameParam) {
     if (isPanelOpen()) panelClose(); // onClose (see initPanel above) clears `?game=` itself
     else setPanelParam(null); // no panel open, but a leftover `?game=` from before should still go
@@ -779,7 +814,7 @@ async function openBundle(bundle, { preserveGameParam = false, restoreShot = nul
     if (!res.ok) throw new Error(data.error || 'Resolution failed');
     appidsByGid = data.appids;
   } catch (err) {
-    detailStatusEl.textContent = `Error: ${err.message}`;
+    detailStatusEl.textContent = `Error: ${(err as Error).message}`;
     renderUnresolvedList(games);
     return;
   }
@@ -799,6 +834,10 @@ async function openBundle(bundle, { preserveGameParam = false, restoreShot = nul
     return;
   }
 
+  // The price/score/etc. fields start `undefined` (each "still loading until its own async
+  // source resolves") rather than `null` ("no data"), so this literal is cast to Game[] — the
+  // same "permissive at the edges, assembled from several async sources" convention types.ts's
+  // own header describes.
   rows = resolved.map(g => ({
     appid: g.appid,
     name: g.title,
@@ -815,7 +854,7 @@ async function openBundle(bundle, { preserveGameParam = false, restoreShot = nul
     protondb: undefined, protondbPending: undefined, achievementCount: undefined, dlcCount: undefined, platforms: undefined,
     languages: undefined, hasDemo: undefined,
     loading: true, details: null,
-  }));
+  })) as unknown as Game[];
   rowMap = new Map(rows.map(r => [r.appid, r]));
 
   table = createDataTable(tableContainer, {
@@ -829,7 +868,7 @@ async function openBundle(bundle, { preserveGameParam = false, restoreShot = nul
     // before opening it means the panel (and anything that mutates whatever object it opened,
     // like `onRefresh` below) always operates on the same object `rowMap` does, not a
     // disconnected copy that further updates would silently stop reaching.
-    onRowClick: row => openGame(rowMap.get(row.appid) ?? row),
+    onRowClick: row => openGame(rowMap.get(row.appid) ?? (row as Game)),
   });
   // Loads whatever URL param / stored pref should win (see restoreTableView's own comment) on
   // top of the construction-time default view just applied above, then persists every
@@ -883,7 +922,7 @@ window.addEventListener(REGION_CHANGED_EVENT, () => {
   // Same bundle, same rows, same order, just re-priced — whatever game is open should stay
   // open across this, not get closed the way a genuine new bundle open otherwise would (see
   // openBundle's own comment).
-  if (reopening) openBundleById(activeBundleId, { preserveGameParam: true });
+  if (reopening && activeBundleId != null) openBundleById(activeBundleId, { preserveGameParam: true });
 });
 sortSelect.addEventListener('change', () => loadBundles());
 expiredCheckbox.addEventListener('change', () => loadBundles());
@@ -894,7 +933,7 @@ resetViewBtn.addEventListener('click', () => {
   resetTableView(table, TABLE_VIEW_PREF_KEY, TABLE_VIEW_PARAM);
 });
 
-shareViewBtn.addEventListener('click', () => shareTableView(table, TABLE_VIEW_PARAM, shareViewBtn));
+shareViewBtn.addEventListener('click', () => shareTableView(table!, TABLE_VIEW_PARAM, shareViewBtn));
 
 // Refreshes just the price columns for the currently open bundle's games, in one shot — no
 // reason to make a user step through every game's own panel "↻ Refresh" one at a time when
@@ -918,10 +957,10 @@ refreshPricesBtn.addEventListener('click', async () => {
 // part of this (or any) URL — it's a `localStorage` preference (see public/region.js), not
 // shareable state, since it says more about the viewer than about which bundle they're looking
 // at.
-function setBundleParam(id) {
+function setBundleParam(id: number | null) {
   const params = new URLSearchParams(location.search);
   if (id == null) params.delete('bundle');
-  else params.set('bundle', id);
+  else params.set('bundle', String(id));
   history.replaceState(null, '', `?${params}`);
 }
 
@@ -930,7 +969,7 @@ function setBundleParam(id) {
 // server-side search) rather than trying to find the id in whatever's already loaded in
 // `bundles`, which may not even include it (a different sort/page, or not loaded yet at all on
 // initial page load — this runs concurrently with loadBundles(), not after it).
-async function openBundleById(id, { preserveGameParam = false, restoreShot = null } = {}) {
+async function openBundleById(id: number, { preserveGameParam = false, restoreShot = null }: { preserveGameParam?: boolean; restoreShot?: string | null } = {}) {
   try {
     const qs = new URLSearchParams({ country: resolveRegion(getStoredRegion()) });
     const res = await fetch(`/api/bundles/${id}?${qs}`);
@@ -945,7 +984,7 @@ async function openBundleById(id, { preserveGameParam = false, restoreShot = nul
     detailTitleEl.textContent = 'Bundle not found';
     detailMetaEl.textContent = '';
     detailLinksEl.innerHTML = '';
-    detailStatusEl.textContent = err.message;
+    detailStatusEl.textContent = (err as Error).message;
     priceStatusEl.textContent = '';
     unresolvedSection.hidden = true;
     if (unpersistView) { unpersistView(); unpersistView = null; }

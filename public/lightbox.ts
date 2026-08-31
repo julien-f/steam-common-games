@@ -1,6 +1,9 @@
 'use strict';
 
-import { buildMediaItems, resolveShotIndex } from './mediaItems.js';
+import { buildMediaItems, resolveShotIndex } from './mediaItems.ts';
+import type { MediaItem } from './mediaItems.ts';
+import type { Game } from './types.ts';
+import type Hls from 'hls.js';
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 
@@ -15,18 +18,21 @@ const LB_MUTE_ICON  = `<svg viewBox="0 0 14 12" width="16" height="14" fill="non
 
 // ── State ──────────────────────────────────────────────────────────────────
 
-let lightboxShots = [];
+let lightboxShots: MediaItem[] = [];
 let lightboxIdx   = 0;
-let lbZoom = 1, lbPanX = 0, lbPanY = 0, lbLastDir = 0, lbVcTimer = null;
+let lbZoom = 1, lbPanX = 0, lbPanY = 0, lbLastDir = 0, lbVcTimer: ReturnType<typeof setTimeout> | undefined;
 let lightboxGameName = '';
+
+type LbVideo = HTMLVideoElement & { _hls?: { destroy: () => void } | null; _hlsToken?: number };
+type LbFlashEl = HTMLElement & { _flashTimer?: ReturnType<typeof setTimeout> };
 
 const LB_SEEK_SECONDS = 5;
 const LB_DOUBLE_TAP_MS = 300;
 const LB_DOUBLE_TAP_DIST = 30;
 
-let _onLightboxParamChange = null;
-let _onGameNav = null;
-let _lbPrevFocus = null;
+let _onLightboxParamChange: ((shotId: string | null) => void) | null = null;
+let _onGameNav: ((dir: number) => void) | null = null;
+let _lbPrevFocus: Element | null = null;
 const _lbPrefetchedHls = new Set();
 
 // ── Init ───────────────────────────────────────────────────────────────────
@@ -37,7 +43,7 @@ const _lbPrefetchedHls = new Set();
 // how the switch is made visible), rather than either doing nothing or silently
 // switching games behind a fullscreen image that never changed. Optional — a host
 // with no group to page through (e.g. a standalone lookup) just no-ops.
-export function initLightbox({ onParamChange, onGameNav } = {}) {
+export function initLightbox({ onParamChange, onGameNav }: { onParamChange?: (shotId: string | null) => void; onGameNav?: (dir: number) => void } = {}) {
   _onLightboxParamChange = onParamChange ?? null;
   _onGameNav = onGameNav ?? null;
   document.addEventListener('fullscreenchange', syncLightboxFullscreenBtn);
@@ -48,10 +54,17 @@ export function isLightboxOpen() { return lightboxShots.length > 0; }
 
 // ── Fullscreen button sync ─────────────────────────────────────────────────
 
+// Lazily cast (not a module-level const) — a `document` reference at module
+// load would throw in the Node test environment (no DOM), which imports this
+// file just for `fmtTime`.
+function webkitDoc(): Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void } {
+  return document as Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void };
+}
+
 function syncLightboxFullscreenBtn() {
   const btn = document.querySelector('#screenshot-lightbox .lb-fullscreen');
   if (!btn) return;
-  const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  const isFs = !!(document.fullscreenElement || webkitDoc().webkitFullscreenElement);
   btn.innerHTML = isFs ? LB_FS_EXIT : LB_FS_ENTER;
   btn.setAttribute('aria-label', isFs ? 'Exit fullscreen' : 'Enter fullscreen');
 }
@@ -66,12 +79,12 @@ function syncLightboxFullscreenBtn() {
 // unconditionally. Memoized so a second video only pays the (already-resolved) promise, not a
 // second network fetch; also let's the adjacent-shot prefetch below warm this same promise
 // ahead of the user actually reaching a video shot, same idea as its existing manifest prefetch.
-let _hlsModulePromise = null;
-function loadHlsModule() {
+let _hlsModulePromise: Promise<any> | null = null;
+function loadHlsModule(): Promise<any> {
   return (_hlsModulePromise ??= import('hls.js').then(m => m.default));
 }
 
-async function playHls(videoEl, src) {
+async function playHls(videoEl: LbVideo, src: string | null | undefined) {
   if (!src) return;
   hideLbError();
   if (videoEl._hls) { videoEl._hls.destroy(); videoEl._hls = null; }
@@ -91,7 +104,7 @@ async function playHls(videoEl, src) {
   if (videoEl._hlsToken !== token) return;
   if (!Hls.isSupported()) return;
   const hls = new Hls({ autoStartLoad: true, startLevel: -1 });
-  hls.on(Hls.Events.ERROR, (_event, data) => {
+  hls.on(Hls.Events.ERROR, (_event: unknown, data: { fatal?: boolean }) => {
     if (data?.fatal) showLbError("Couldn't load this video.");
   });
   hls.loadSource(src);
@@ -100,7 +113,7 @@ async function playHls(videoEl, src) {
   videoEl._hls = hls;
 }
 
-function stopHls(videoEl) {
+function stopHls(videoEl: LbVideo | null) {
   if (!videoEl) return;
   videoEl.pause();
   videoEl._hlsToken = (videoEl._hlsToken || 0) + 1; // invalidate any in-flight playHls() load
@@ -110,18 +123,18 @@ function stopHls(videoEl) {
 
 // ── Load errors (image/video) ──────────────────────────────────────────────
 
-function showLbError(msg) {
+function showLbError(msg: string) {
   const lb = document.getElementById('screenshot-lightbox');
   if (!lb) return;
   lb.classList.remove('lb--loading');
-  const err = lb.querySelector('.lb-error');
-  err.querySelector('.lb-error-msg').textContent = msg;
+  const err = lb.querySelector<HTMLElement>('.lb-error')!;
+  err.querySelector<HTMLElement>('.lb-error-msg')!.textContent = msg;
   err.style.display = 'flex';
 }
 
 function hideLbError() {
   const lb = document.getElementById('screenshot-lightbox');
-  const err = lb?.querySelector('.lb-error');
+  const err = lb?.querySelector<HTMLElement>('.lb-error');
   if (err) err.style.display = 'none';
 }
 
@@ -131,15 +144,15 @@ function retryCurrentShot() {
   const shot = lightboxShots[lightboxIdx];
   if (!shot) return;
   if (shot.type === 'video') {
-    const vid = document.querySelector('#screenshot-lightbox .lb-video');
+    const vid = document.querySelector<LbVideo>('#screenshot-lightbox .lb-video')!;
     playHls(vid, shot.hls);
   } else {
-    const img = document.querySelector('#screenshot-lightbox .lb-img');
+    const img = document.querySelector<HTMLImageElement>('#screenshot-lightbox .lb-img')!;
     const lb = document.getElementById('screenshot-lightbox');
     lb?.classList.add('lb--loading');
     // Cache-bust: a browser that already recorded this exact URL as failed
     // won't necessarily re-attempt the network request otherwise.
-    const bust = shot.main + (shot.main.includes('?') ? '&' : '?') + '_retry=' + Date.now();
+    const bust = shot.main! + (shot.main!.includes('?') ? '&' : '?') + '_retry=' + Date.now();
     const full = new Image();
     full.onload  = () => { img.src = bust; img.style.opacity = '1'; lb?.classList.remove('lb--loading'); };
     full.onerror = () => { img.style.opacity = '0'; lb?.classList.remove('lb--loading'); showLbError("Couldn't load this image."); };
@@ -150,7 +163,7 @@ function retryCurrentShot() {
 // ── Zoom / pan ─────────────────────────────────────────────────────────────
 
 function applyLbTransform() {
-  const img = document.querySelector('#screenshot-lightbox .lb-img');
+  const img = document.querySelector<HTMLImageElement>('#screenshot-lightbox .lb-img');
   if (!img) return;
   if (lbZoom === 1) {
     lbPanX = 0; lbPanY = 0;
@@ -173,8 +186,8 @@ function resetLbZoom() {
 
 // Zooms 2x centered on a given viewport point — shared by desktop dblclick
 // and touch double-tap.
-function lbZoomTowardPoint(clientX, clientY) {
-  const img = document.querySelector('#screenshot-lightbox .lb-img');
+function lbZoomTowardPoint(clientX: number, clientY: number) {
+  const img = document.querySelector<HTMLImageElement>('#screenshot-lightbox .lb-img');
   if (!img) return;
   const rect = img.getBoundingClientRect();
   lbZoom = 2;
@@ -188,7 +201,7 @@ function lbZoomTowardPoint(clientX, clientY) {
 
 const LB_TOUCH_SEEK_SECONDS = 10; // matches the common mobile-player convention (YouTube etc.)
 
-function seekVideo(vid, deltaSeconds) {
+function seekVideo(vid: HTMLVideoElement | null, deltaSeconds: number) {
   if (!vid) return;
   vid.currentTime = Math.max(0, Math.min(vid.duration || Infinity, vid.currentTime + deltaSeconds));
   showLbChrome();
@@ -198,36 +211,37 @@ function seekVideo(vid, deltaSeconds) {
 // Transient "⏪10s" / "10s⏩" flash shown on a touch double-tap seek. Each
 // side tracks its own hide timer (rather than one shared timer) so a
 // double-tap on one side can't be cut short by one on the other.
-function flashSeek(side) {
+function flashSeek(side: 'left' | 'right') {
   const lb = document.getElementById('screenshot-lightbox');
-  const el = lb?.querySelector(`.lb-seek-flash-${side}`);
+  const el = lb?.querySelector<HTMLElement>(`.lb-seek-flash-${side}`);
   if (!el) return;
-  clearTimeout(el._flashTimer);
+  const flash = el as LbFlashEl;
+  clearTimeout(flash._flashTimer);
   el.classList.add('lb-seek-flash--show');
-  el._flashTimer = setTimeout(() => el.classList.remove('lb-seek-flash--show'), 500);
+  flash._flashTimer = setTimeout(() => el.classList.remove('lb-seek-flash--show'), 500);
 }
 
 // ── Time formatting ────────────────────────────────────────────────────────
 
-export function fmtTime(s) {
+export function fmtTime(s: number) {
   if (!isFinite(s) || s < 0) return '0:00';
   const m = Math.floor(s / 60);
   return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 }
 
-function lbScrubGradient(pct) {
+function lbScrubGradient(pct: number) {
   return `linear-gradient(to right, var(--accent) ${pct}%, rgba(255,255,255,0.25) ${pct}%)`;
 }
 
 // Zeroes out the scrubber/time labels immediately so a newly-loaded video
 // doesn't briefly show the previous video's playhead position — the video
 // element's own 'timeupdate'/'durationchange' events lag behind the src swap.
-function resetLbVc(vc) {
-  const scrub = vc.querySelector('.lb-vc-scrub');
-  scrub.value = 0;
+function resetLbVc(vc: HTMLElement) {
+  const scrub = vc.querySelector<HTMLInputElement>('.lb-vc-scrub')!;
+  scrub.value = String(0);
   scrub.style.backgroundImage = lbScrubGradient(0);
-  vc.querySelector('.lb-vc-time').textContent = '0:00';
-  vc.querySelector('.lb-vc-dur').textContent = '0:00';
+  vc.querySelector<HTMLElement>('.lb-vc-time')!.textContent = '0:00';
+  vc.querySelector<HTMLElement>('.lb-vc-dur')!.textContent = '0:00';
 }
 
 // ── Chrome (toolbar/nav/video-controls) idle-hide ──────────────────────────
@@ -247,7 +261,7 @@ function showLbChrome() {
 function schedHideLbChrome() {
   const lb  = document.getElementById('screenshot-lightbox');
   if (!lb) return;
-  const vid = lb.querySelector('.lb-video');
+  const vid = lb.querySelector<HTMLVideoElement>('.lb-video');
   const isPausedVideo = vid && vid.style.display !== 'none' && vid.paused;
   clearTimeout(lbVcTimer);
   if (!isPausedVideo) lbVcTimer = setTimeout(() => lb.classList.add('lb-idle'), 3000);
@@ -256,10 +270,10 @@ function schedHideLbChrome() {
 // ── Focus helpers ──────────────────────────────────────────────────────────
 
 // Returns all focusable elements that are not inside a display:none ancestor.
-function getFocusable(lb) {
-  return [...lb.querySelectorAll('button:not([disabled]), input[type="range"]')]
+function getFocusable(lb: HTMLElement): HTMLElement[] {
+  return [...lb.querySelectorAll<HTMLElement>('button:not([disabled]), input[type="range"]')]
     .filter(el => {
-      let node = el;
+      let node: HTMLElement | null = el;
       while (node && node !== lb) {
         if (node.style.display === 'none') return false;
         node = node.parentElement;
@@ -313,11 +327,11 @@ function createLightboxDom() {
 
 // ── Event wiring ───────────────────────────────────────────────────────────
 
-function wireButtons(lb) {
-  lb.querySelector('.lb-backdrop').addEventListener('click', closeLightbox);
-  lb.querySelector('.lb-close').addEventListener('click', closeLightbox);
-  lb.querySelector('.lb-share').addEventListener('click', async () => {
-    const btn = lb.querySelector('.lb-share');
+function wireButtons(lb: HTMLElement) {
+  lb.querySelector('.lb-backdrop')!.addEventListener('click', closeLightbox);
+  lb.querySelector('.lb-close')!.addEventListener('click', closeLightbox);
+  lb.querySelector('.lb-share')!.addEventListener('click', async () => {
+    const btn = lb.querySelector<HTMLElement>('.lb-share')!;
     try {
       await navigator.clipboard.writeText(location.href);
       btn.innerHTML = LB_CHECK_ICON;
@@ -326,22 +340,22 @@ function wireButtons(lb) {
       window.prompt('Copy this link:', location.href);
     }
   });
-  lb.querySelector('.lb-error-retry').addEventListener('click', retryCurrentShot);
-  lb.querySelector('.lb-prev').addEventListener('click', () => stepLightbox(-1));
-  lb.querySelector('.lb-next').addEventListener('click', () => stepLightbox(1));
-  lb.querySelector('.lb-fullscreen').addEventListener('click', () => {
-    if (document.fullscreenElement || document.webkitFullscreenElement) {
-      (document.exitFullscreen?.() ?? document.webkitExitFullscreen?.())?.catch?.(() => {});
+  lb.querySelector('.lb-error-retry')!.addEventListener('click', retryCurrentShot);
+  lb.querySelector('.lb-prev')!.addEventListener('click', () => stepLightbox(-1));
+  lb.querySelector('.lb-next')!.addEventListener('click', () => stepLightbox(1));
+  lb.querySelector('.lb-fullscreen')!.addEventListener('click', () => {
+    if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
+      (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
     } else {
-      (lb.requestFullscreen?.() ?? lb.webkitRequestFullscreen?.())?.catch?.(() => {});
+      (lb.requestFullscreen?.() ?? (lb as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.())?.catch?.(() => {});
     }
   });
 }
 
-function wireKeyboard(lb) {
+function wireKeyboard(lb: HTMLElement) {
   document.addEventListener('keydown', e => {
     if (!lightboxShots.length) return;
-    const onScrub = e.target.classList.contains('lb-vc-scrub');
+    const onScrub = (e.target as HTMLElement | null)?.classList.contains('lb-vc-scrub');
 
     // Focus trap
     if (e.key === 'Tab') {
@@ -357,8 +371,8 @@ function wireKeyboard(lb) {
       return;
     }
 
-    const vc = lb.querySelector('.lb-vctrls');
-    const vid = vc && vc.style.display !== 'none' ? lb.querySelector('.lb-video') : null;
+    const vc = lb.querySelector<HTMLElement>('.lb-vctrls');
+    const vid = vc && vc.style.display !== 'none' ? lb.querySelector<HTMLVideoElement>('.lb-video') : null;
 
     if ((!onScrub || e.shiftKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
       e.preventDefault();
@@ -383,10 +397,10 @@ function wireKeyboard(lb) {
       _onGameNav(e.key === 'ArrowDown' ? 1 : -1);
     }
     if (e.key === 'f' || e.key === 'F') {
-      if (document.fullscreenElement || document.webkitFullscreenElement) {
-        (document.exitFullscreen?.() ?? document.webkitExitFullscreen?.())?.catch?.(() => {});
+      if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
+        (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
       } else {
-        (lb.requestFullscreen?.() ?? lb.webkitRequestFullscreen?.())?.catch?.(() => {});
+        (lb.requestFullscreen?.() ?? (lb as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.())?.catch?.(() => {});
       }
     }
     if (vid) {
@@ -396,9 +410,9 @@ function wireKeyboard(lb) {
   });
 }
 
-function wireMouseHandlers(lb) {
+function wireMouseHandlers(lb: HTMLElement) {
   lb.addEventListener('wheel', e => {
-    if (lb.querySelector('.lb-img').style.display === 'none') return;
+    if (lb.querySelector<HTMLImageElement>('.lb-img')!.style.display === 'none') return;
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
     lbZoom = Math.max(1, Math.min(4, lbZoom * factor));
@@ -406,7 +420,7 @@ function wireMouseHandlers(lb) {
     applyLbTransform();
   }, { passive: false });
 
-  const lbImg = lb.querySelector('.lb-img');
+  const lbImg = lb.querySelector<HTMLImageElement>('.lb-img')!;
   let lbDragging = false, lbDragStartX = 0, lbDragStartY = 0, lbPanStartX = 0, lbPanStartY = 0;
   lbImg.addEventListener('mousedown', e => {
     if (lbZoom <= 1) return;
@@ -433,7 +447,7 @@ function wireMouseHandlers(lb) {
   });
 }
 
-function wireTouchHandlers(lb) {
+function wireTouchHandlers(lb: HTMLElement) {
   let lbX = 0, lbY = 0, lbActive = false;
   let pinchStartDist = 0, pinchStartZoom = 1;
   let touchPanning = false, touchPanStartX = 0, touchPanStartY = 0, touchPanOriginX = 0, touchPanOriginY = 0;
@@ -441,7 +455,7 @@ function wireTouchHandlers(lb) {
 
   lb.addEventListener('touchstart', e => {
     if (e.touches.length === 2) {
-      if (lb.querySelector('.lb-img').style.display === 'none') return;
+      if (lb.querySelector<HTMLImageElement>('.lb-img')!.style.display === 'none') return;
       pinchStartDist = Math.hypot(
         e.touches[1].clientX - e.touches[0].clientX,
         e.touches[1].clientY - e.touches[0].clientY
@@ -461,7 +475,7 @@ function wireTouchHandlers(lb) {
 
   lb.addEventListener('touchmove', e => {
     if (e.touches.length === 2) {
-      if (lb.querySelector('.lb-img').style.display === 'none') return;
+      if (lb.querySelector<HTMLImageElement>('.lb-img')!.style.display === 'none') return;
       const dist = Math.hypot(
         e.touches[1].clientX - e.touches[0].clientX,
         e.touches[1].clientY - e.touches[0].clientY
@@ -485,8 +499,8 @@ function wireTouchHandlers(lb) {
     const endX = e.changedTouches[0].clientX, endY = e.changedTouches[0].clientY;
     const dx = endX - lbX, dy = endY - lbY;
     const isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
-    const showingImg = lb.querySelector('.lb-img').style.display !== 'none';
-    const showingVid = lb.querySelector('.lb-video').style.display !== 'none';
+    const showingImg = lb.querySelector<HTMLImageElement>('.lb-img')!.style.display !== 'none';
+    const showingVid = lb.querySelector<HTMLVideoElement>('.lb-video')!.style.display !== 'none';
     if (isTap && (showingImg || showingVid)) {
       const now = Date.now();
       const tapDist = Math.hypot(endX - lbLastTapX, endY - lbLastTapY);
@@ -501,7 +515,7 @@ function wireTouchHandlers(lb) {
           // toggles play/pause via the video's own 'click' listener.
           const rect = lb.getBoundingClientRect();
           const frac = (endX - rect.left) / rect.width;
-          const vid = lb.querySelector('.lb-video');
+          const vid = lb.querySelector<HTMLVideoElement>('.lb-video');
           if (frac < 1 / 3) { seekVideo(vid, -LB_TOUCH_SEEK_SECONDS); flashSeek('left'); }
           else if (frac > 2 / 3) { seekVideo(vid, LB_TOUCH_SEEK_SECONDS); flashSeek('right'); }
         }
@@ -518,20 +532,20 @@ function wireTouchHandlers(lb) {
   lb.addEventListener('touchcancel', () => { lbActive = false; touchPanning = false; }, { passive: true });
 }
 
-function wireVideoControls(lb) {
-  const vid2    = lb.querySelector('.lb-video');
-  const vc2     = lb.querySelector('.lb-vctrls');
-  const scrub   = vc2.querySelector('.lb-vc-scrub');
-  const timEl   = vc2.querySelector('.lb-vc-time');
-  const durEl   = vc2.querySelector('.lb-vc-dur');
-  const playBtn = vc2.querySelector('.lb-vc-play');
-  const muteBtn = vc2.querySelector('.lb-vc-mute');
+function wireVideoControls(lb: HTMLElement) {
+  const vid2    = lb.querySelector<HTMLVideoElement>('.lb-video')!;
+  const vc2     = lb.querySelector<HTMLElement>('.lb-vctrls')!;
+  const scrub   = vc2.querySelector<HTMLInputElement>('.lb-vc-scrub')!;
+  const timEl   = vc2.querySelector<HTMLElement>('.lb-vc-time')!;
+  const durEl   = vc2.querySelector<HTMLElement>('.lb-vc-dur')!;
+  const playBtn = vc2.querySelector<HTMLElement>('.lb-vc-play')!;
+  const muteBtn = vc2.querySelector<HTMLElement>('.lb-vc-mute')!;
 
-  const updateScrubBg = () => { scrub.style.backgroundImage = lbScrubGradient(scrub.value * 100); };
+  const updateScrubBg = () => { scrub.style.backgroundImage = lbScrubGradient(Number(scrub.value) * 100); };
 
   vid2.addEventListener('timeupdate', () => {
     if (!vid2.duration) return;
-    scrub.value = vid2.currentTime / vid2.duration;
+    scrub.value = String(vid2.currentTime / vid2.duration);
     timEl.textContent = fmtTime(vid2.currentTime);
     updateScrubBg();
   });
@@ -557,7 +571,7 @@ function wireVideoControls(lb) {
   });
 
   scrub.addEventListener('input', () => {
-    if (vid2.duration) vid2.currentTime = scrub.value * vid2.duration;
+    if (vid2.duration) vid2.currentTime = Number(scrub.value) * vid2.duration;
     updateScrubBg();
   });
   scrub.addEventListener('mousedown', () => clearTimeout(lbVcTimer));
@@ -592,7 +606,7 @@ function getLightbox() {
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
-export function openLightbox(game, idxOrShotId) {
+export function openLightbox(game: Game, idxOrShotId: number | string) {
   _lbPrevFocus = document.activeElement;
   lightboxGameName = game.name || '';
   lightboxShots = buildMediaItems(game.appid, game.details?.meta);
@@ -601,7 +615,7 @@ export function openLightbox(game, idxOrShotId) {
   const lb = getLightbox();
   lb.classList.add('open');
   document.body.classList.add('lb-open');
-  lb.querySelector('.lb-close').focus();
+  lb.querySelector<HTMLElement>('.lb-close')!.focus();
   _onLightboxParamChange?.(lightboxShots[lightboxIdx].shotId);
 }
 
@@ -609,18 +623,18 @@ export function closeLightbox() {
   lightboxShots = [];
   clearTimeout(lbVcTimer);
   const lb = getLightbox();
-  stopHls(lb.querySelector('.lb-video'));
+  stopHls(lb.querySelector<LbVideo>('.lb-video'));
   lb.classList.remove('open', 'lb--loading', 'lb-idle');
   document.body.classList.remove('lb-open');
-  if (document.fullscreenElement || document.webkitFullscreenElement) {
-    (document.exitFullscreen?.() ?? document.webkitExitFullscreen?.())?.catch?.(() => {});
+  if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
+    (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
   }
   _onLightboxParamChange?.(null);
-  _lbPrevFocus?.focus();
+  (_lbPrevFocus as HTMLElement | null)?.focus();
   _lbPrevFocus = null;
 }
 
-export function stepLightbox(dir) {
+export function stepLightbox(dir: number) {
   lbLastDir = dir;
   lightboxIdx = (lightboxIdx + dir + lightboxShots.length) % lightboxShots.length;
   renderLightbox();
@@ -629,7 +643,7 @@ export function stepLightbox(dir) {
 
 // Absolute jump (Home/End) — still animates in the right direction rather
 // than always sliding one way, same as a multi-step stepLightbox would.
-function gotoLightbox(idx) {
+function gotoLightbox(idx: number) {
   if (idx === lightboxIdx) return;
   lbLastDir = idx > lightboxIdx ? 1 : -1;
   lightboxIdx = idx;
@@ -640,9 +654,9 @@ function gotoLightbox(idx) {
 function renderLightbox() {
   const lb = getLightbox();
   const shot = lightboxShots[lightboxIdx];
-  const img  = lb.querySelector('.lb-img');
-  const vid  = lb.querySelector('.lb-video');
-  const vc   = lb.querySelector('.lb-vctrls');
+  const img  = lb.querySelector<HTMLImageElement>('.lb-img')!;
+  const vid  = lb.querySelector<LbVideo>('.lb-video')!;
+  const vc   = lb.querySelector<HTMLElement>('.lb-vctrls')!;
   const dir  = lbLastDir;
   lbLastDir = 0;
   resetLbZoom();
@@ -652,7 +666,7 @@ function renderLightbox() {
   // invisible alt/aria-label text (see `label` below), so switching games while the
   // lightbox stayed open (e.g. via the panel's ↑/↓ nav) had no on-screen confirmation
   // it had actually happened, especially when the new shot looked similar to the old one.
-  const caption = lb.querySelector('.lb-caption');
+  const caption = lb.querySelector<HTMLElement>('.lb-caption')!;
   caption.textContent = lightboxGameName;
   caption.style.display = lightboxGameName ? '' : 'none';
   const label = `${lightboxGameName ? lightboxGameName + ' — ' : ''}` +
@@ -696,14 +710,14 @@ function renderLightbox() {
     const full = new Image();
     // Left at opacity 0 (rather than 1) so the browser's own broken-image
     // icon doesn't show behind the error overlay.
-    full.onload  = () => { img.src = shot.main; img.style.opacity = '1'; lb.classList.remove('lb--loading'); };
+    full.onload  = () => { img.src = shot.main!; img.style.opacity = '1'; lb.classList.remove('lb--loading'); };
     full.onerror = () => { img.style.opacity = '0'; lb.classList.remove('lb--loading'); showLbError("Couldn't load this image."); };
-    full.src = shot.main;
+    full.src = shot.main!;
     schedHideLbChrome();
   }
-  lb.querySelector('.lb-counter').textContent = `${lightboxIdx + 1} / ${lightboxShots.length}`;
-  lb.querySelector('.lb-prev').disabled = lightboxShots.length <= 1;
-  lb.querySelector('.lb-next').disabled = lightboxShots.length <= 1;
+  lb.querySelector('.lb-counter')!.textContent = `${lightboxIdx + 1} / ${lightboxShots.length}`;
+  lb.querySelector<HTMLButtonElement>('.lb-prev')!.disabled = lightboxShots.length <= 1;
+  lb.querySelector<HTMLButtonElement>('.lb-next')!.disabled = lightboxShots.length <= 1;
   // Preload prev and next images so navigation feels instant; for a video,
   // warm its poster the same way and prime its HLS manifest in the HTTP
   // cache so stepping onto it doesn't pay the full fetch latency cold.
@@ -712,7 +726,7 @@ function renderLightbox() {
     if (!adjacent) continue;
     const preloadSrc = adjacent.type === 'video' ? adjacent.thumb : adjacent.main;
     if (preloadSrc && preloadSrc !== shot.main) {
-      let pre = lb.querySelector(`.lb-preload[data-src="${CSS.escape(preloadSrc)}"]`);
+      let pre = lb.querySelector<HTMLImageElement>(`.lb-preload[data-src="${CSS.escape(preloadSrc)}"]`);
       if (!pre) {
         pre = document.createElement('img');
         pre.className = 'lb-preload';
@@ -729,11 +743,12 @@ function renderLightbox() {
     }
   }
   // Drop stale preloads (keep only prev/next)
-  const keep = new Set(
+  const keep = new Set<string>(
     [-1, 1].map(o => {
       const s = lightboxShots[(lightboxIdx + o + lightboxShots.length) % lightboxShots.length];
-      return s && (s.type === 'video' ? s.thumb : s.main);
-    })
+      const src = s && (s.type === 'video' ? s.thumb : s.main);
+      return src ?? '';
+    }).filter(src => src !== '')
   );
-  lb.querySelectorAll('.lb-preload').forEach(el => { if (!keep.has(el.dataset.src)) el.remove(); });
+  lb.querySelectorAll<HTMLImageElement>('.lb-preload').forEach(el => { if (!keep.has(el.dataset.src ?? '')) el.remove(); });
 }

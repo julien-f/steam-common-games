@@ -1,6 +1,4 @@
-'use strict';
-
-import { COUNTRY_OPTIONS, AUTO_COUNTRY, detectCountry, getStoredRegion, setStoredRegion } from './region.js';
+import { COUNTRY_OPTIONS, AUTO_COUNTRY, detectCountry, getStoredRegion, setStoredRegion } from './region.ts';
 
 // Contents of the nav bar's ⚙ Preferences popover — public/nav.js owns the surrounding
 // <details>/<summary> shell (part of the nav bar's own structure: rendering it, opening/closing
@@ -12,7 +10,7 @@ import { COUNTRY_OPTIONS, AUTO_COUNTRY, detectCountry, getStoredRegion, setStore
 
 // The markup nav.js splices into its own <details> — a single `<select>` for the region
 // preference (region.js), same shape the old per-page inline pickers used.
-export function prefsPopoverPanelHtml() {
+export function prefsPopoverPanelHtml(): string {
   return `
     <div class="site-nav-prefs-panel">
       <label class="site-nav-prefs-row">Region
@@ -29,7 +27,7 @@ export function prefsPopoverPanelHtml() {
 // broadcasts `REGION_CHANGED_EVENT` on every change regardless of which UI made it, so this
 // doesn't need to know anything about Bundles/library.js reacting to it (see their own comments).
 export function initPrefsPopover() {
-  const select = document.getElementById('nav-region-select');
+  const select = document.getElementById('nav-region-select') as HTMLSelectElement;
   const detected = detectCountry();
   const detectedLabel = COUNTRY_OPTIONS.find(c => c.code === detected)?.label ?? detected;
   select.innerHTML = '';

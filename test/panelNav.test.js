@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { stepGameList } = require('../public/panelNav');
+const { stepGameList } = require('../public/panelNav.ts');
 
 const list = [{ appid: 1 }, { appid: 2 }, { appid: 3 }];
 const getGameList = () => list;

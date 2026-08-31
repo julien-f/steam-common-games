@@ -1,6 +1,6 @@
-'use strict';
+import { prefsPopoverPanelHtml, initPrefsPopover } from './prefsPopover.ts';
 
-import { prefsPopoverPanelHtml, initPrefsPopover } from './prefsPopover.js';
+export type NavPageKey = 'compare' | 'library' | 'bundles' | 'about';
 
 // Shared cross-page navigation bar — one component (`#site-nav`, present as an empty <nav> in
 // every page's markup) instead of each page hand-rolling its own header corner links plus a
@@ -9,7 +9,7 @@ import { prefsPopoverPanelHtml, initPrefsPopover } from './prefsPopover.js';
 // page-specific JS of its own, so importing `initNav` from this file (which pulls in
 // prefsPopover.js/region.js/prefs.js in turn, solely for this file's own popover) is all it
 // loads.
-const NAV_PAGES = [
+const NAV_PAGES: { key: NavPageKey; href: string; label: string }[] = [
   { key: 'compare', href: '/', label: 'Comparison' },
   { key: 'library', href: '/library.html', label: 'Library Explorer' },
   { key: 'bundles', href: '/bundles.html', label: 'Bundles' },
@@ -27,7 +27,7 @@ const NAV_PAGES = [
 // only the popover's shell — the `<details>`/`<summary>` toggle and its open/close mechanics;
 // what's actually inside the panel (today, just region) is prefsPopover.js's job, so this file
 // stays about page navigation regardless of how many preferences land in that panel later.
-export function initNav(current) {
+export function initNav(current: NavPageKey) {
   const el = document.getElementById('site-nav');
   if (!el) return;
   el.innerHTML = NAV_PAGES.map(p => p.key === current
@@ -48,9 +48,9 @@ export function initNav(current) {
 // about the `<details>` shell's own toggle mechanics, so it stays here rather than in
 // prefsPopover.js regardless of what ends up inside the panel.
 function bindPrefsPopoverClose() {
-  const details = document.querySelector('.site-nav-prefs');
+  const details = document.querySelector('.site-nav-prefs') as HTMLDetailsElement;
   document.addEventListener('click', e => {
-    if (details.open && !details.contains(e.target)) details.open = false;
+    if (details.open && !details.contains(e.target as Node)) details.open = false;
   });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && details.open) details.open = false;
@@ -63,7 +63,7 @@ function bindPrefsPopoverClose() {
 // empty page. A no-op if that link isn't rendered on the current page (e.g. `library` on the
 // Comparison page itself, where it's the active label, not a link) or `#site-nav` isn't in the
 // page's markup at all.
-export function updateNavLink(key, href) {
-  const link = document.querySelector(`#site-nav a[data-nav-key="${key}"]`);
+export function updateNavLink(key: NavPageKey, href: string) {
+  const link = document.querySelector(`#site-nav a[data-nav-key="${key}"]`) as HTMLAnchorElement | null;
   if (link) link.href = href;
 }

@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { buildMediaItems, resolveShotIndex } = require('../public/mediaItems');
+const { buildMediaItems, resolveShotIndex } = require('../public/mediaItems.ts');
 
 // ── buildMediaItems ───────────────────────────────────────────────────────────
 

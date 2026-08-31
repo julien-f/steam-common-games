@@ -34,15 +34,25 @@ import {
   compareMissingLast, bucketNumericRange, bucketDatePart, formatNumericRange, formatDatePart,
   bucketLogRange, formatLogRange,
 } from '@vates/data-table-core';
-import { scoreColor, dealRecordTier, DEAL_RECORD_TIERS, formatMoney } from '/utils.js';
+// Type-only import from the vanilla adapter (the one exporting `ColumnDef` with its DOM
+// `render` callback) — no runtime dependency added, the pages import their column lists
+// from here, not from the adapter.
+import type { ColumnDef } from '@vates/data-table-vanilla';
+import { scoreColor, dealRecordTier, DEAL_RECORD_TIERS, formatMoney } from '/utils.ts';
+
+// Rows are assembled in the still-untyped library.js/bundles.js from several independent async
+// sources (the game-details stream, price lookups, ...), so `any`-valued access is the honest
+// shape here; strictness is enforced on the pure logic below, not by pretending rows are fully
+// typed at this layer.
+type Row = Record<string, any>;
 
 export const fmt = {
-  num:  v => v === undefined ? '…' : v === null ? '—' : String(v),
-  numRound: v => v === undefined ? '…' : v === null ? '—' : String(Math.round(v)),
-  dec1: v => v === undefined ? '…' : v === null ? '—' : Number(v).toFixed(1),
-  str:  v => v === undefined ? '…' : v || '—',
-  ct:   v => v === undefined ? '…' : v === null ? '—' : Number(v).toLocaleString(),
-  arr:  v => v === undefined ? '…' : Array.isArray(v) ? (v.length ? v.join(', ') : '—') : (v || '—'),
+  num:  (v: unknown): string => v === undefined ? '…' : v === null ? '—' : String(v),
+  numRound: (v: unknown): string => v === undefined ? '…' : v === null ? '—' : String(Math.round(Number(v))),
+  dec1: (v: unknown): string => v === undefined ? '…' : v === null ? '—' : Number(v).toFixed(1),
+  str:  (v: unknown): string => v === undefined ? '…' : String(v || '—'),
+  ct:   (v: unknown): string => v === undefined ? '…' : v === null ? '—' : Number(v).toLocaleString(),
+  arr:  (v: unknown): string => v === undefined ? '…' : Array.isArray(v) ? (v.length ? v.join(', ') : '—') : String(v || '—'),
 };
 
 // Bare colored number rather than a progress bar — a bar's fill color carries the same
@@ -54,10 +64,10 @@ export const fmt = {
 // `computeSteamdbRating` returns unrounded precision (0-100) so sort/group operate on the full
 // number rather than the display-rounded integer — round only where displayed (here, and in
 // `fmt.numRound`/`applyDetailsEvent` below).
-export function renderScoreNum(v) {
+export function renderScoreNum(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');
   if (v === null) return document.createTextNode('—');
-  const rounded = Math.round(v);
+  const rounded = Math.round(Number(v));
   const span = document.createElement('span');
   span.style.color = scoreColor(rounded);
   span.textContent = String(rounded);
@@ -73,8 +83,8 @@ export function renderScoreNum(v) {
 // (too-few-reports) result to its own provisionalTier before it ever reaches the client, so
 // what arrives here is always one of the real tiers above, just possibly flagged `pending`
 // (see row.protondbPending / renderProtonBadge below) to mark it as low-confidence.
-export const PROTON_TIER_ORDER = ['borked', 'bronze', 'silver', 'gold', 'platinum', 'native'];
-export const PROTON_TIER_COLORS = {
+export const PROTON_TIER_ORDER: string[] = ['borked', 'bronze', 'silver', 'gold', 'platinum', 'native'];
+export const PROTON_TIER_COLORS: Record<string, string> = {
   borked: '#b91c1c', bronze: '#8b4513', silver: '#757575', gold: '#b8860b',
   platinum: '#5b6b85', native: '#15803d',
 };
@@ -85,8 +95,8 @@ export const PROTON_TIER_COLORS = {
 // a sort key; see https://github.com/vatesfr/data-table/issues/15 for the request behind it (an
 // earlier version of this column baked a rank digit into the value itself — "3 Gold" — to work
 // around not having this, which leaked into the filter checklist/search text; not needed anymore).
-export function protonDbValue(tier) {
-  if (PROTON_TIER_ORDER.indexOf(tier) === -1) return null;
+export function protonDbValue(tier: string | null | undefined): string | null {
+  if (tier == null || PROTON_TIER_ORDER.indexOf(tier) === -1) return null;
   return tier.charAt(0).toUpperCase() + tier.slice(1);
 }
 
@@ -96,20 +106,20 @@ export function protonDbValue(tier) {
 // under plain ascending lexicographic comparison — games with no ProtonDB data yet shouldn't
 // float to the top just because "" sorts before every real tier name.
 export const compareProtonTier = compareMissingLast((a, b) =>
-  PROTON_TIER_ORDER.indexOf(a.toLowerCase()) - PROTON_TIER_ORDER.indexOf(b.toLowerCase()));
+  PROTON_TIER_ORDER.indexOf(String(a).toLowerCase()) - PROTON_TIER_ORDER.indexOf(String(b).toLowerCase()));
 
 // The generic colored-pill treatment (`.status-badge`, shared style.css rule) — shared with
 // renderDemoBadge below rather than each column inventing its own pill styling. `row.protondbPending`
 // (set from extractProtonDb's own `pending` flag — see PROTON_TIER_ORDER's comment above) marks a
 // provisional tier assigned from too few reports for ProtonDB itself to be confident in — faded and
 // suffixed with "?" rather than rendered identically to a confirmed tier of the same name.
-export function renderProtonBadge(v, row) {
+export function renderProtonBadge(v: unknown, row: Row): Node {
   if (v === undefined) return document.createTextNode('…');
   if (!v) return document.createTextNode('—');
   const span = document.createElement('span');
   span.className = 'status-badge';
-  span.style.background = PROTON_TIER_COLORS[v.toLowerCase()] || '#52525b';
-  span.textContent = v;
+  span.style.background = PROTON_TIER_COLORS[String(v).toLowerCase()] || '#52525b';
+  span.textContent = String(v);
   if (row?.protondbPending) {
     span.textContent += ' ?';
     span.style.opacity = '0.6';
@@ -122,7 +132,7 @@ export function renderProtonBadge(v, row) {
 // the same color and dark-on-blue text the side panel's "🎮 Try the Free Demo" banner already
 // uses (`.panel-demo-banner`, style.css) — so the two read as the same "this game has a demo"
 // signifier rather than introducing a new color/shape just for this column.
-export function renderDemoBadge(v) {
+export function renderDemoBadge(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');
   if (!v) return document.createTextNode('—');
   const span = document.createElement('span');
@@ -135,7 +145,7 @@ export function renderDemoBadge(v) {
 
 // Ignores `value` and reads `row.capsule` directly — `value` is forced to null on this column
 // (see CORE_COLUMNS below) so the raw image URL never surfaces in full-text search matches.
-export function renderThumb(_, row) {
+export function renderThumb(_value: unknown, row: Row): Node {
   const img = document.createElement('img');
   img.className = 'game-thumb';
   img.alt = '';
@@ -165,16 +175,16 @@ export const TYPE_LABELS = {
 // (public/utils.js) already returns null for "not enough signal to guess" (DLC, or a priced game
 // with no price data) — `compareMissingLast` handles that the same way every other heuristic/
 // possibly-absent column here does, pinning it last regardless of sort direction.
-export const PRODUCTION_TIER_ORDER = ['Indie', 'AA', 'AAA'];
+export const PRODUCTION_TIER_ORDER: string[] = ['Indie', 'AA', 'AAA'];
 export const compareProductionTier = compareMissingLast((a, b) =>
-  PRODUCTION_TIER_ORDER.indexOf(a) - PRODUCTION_TIER_ORDER.indexOf(b));
+  PRODUCTION_TIER_ORDER.indexOf(String(a)) - PRODUCTION_TIER_ORDER.indexOf(String(b)));
 
 // Plain numeric comparator, wrapped so a `null` ("no data" — no reviews, no Metacritic score,
 // no HLTB match) always sorts last regardless of direction. Without this, a `type: 'number'`
 // column's own coercion (`Number(null) === 0`) makes "no data" indistinguishable from an actual
 // zero score/duration — most visibly on `steamdbRating`, the default sort column: a game with
 // zero reviews currently ties with one confirmed 0% positive instead of being set apart from it.
-export const compareNumMissingLast = compareMissingLast((a, b) => a - b);
+export const compareNumMissingLast = compareMissingLast((a, b) => Number(a) - Number(b));
 
 // Steam's release_date.date only gets this coarse ("2026", "Fall 2026", "2026 or later") while
 // a game is still unreleased — once it ships, Steam always returns a specific day. JS's own Date
@@ -202,12 +212,12 @@ export const compareNumMissingLast = compareMissingLast((a, b) => a - b);
 // consumers correctly treat "unreleased" as "no known date" instead of "year 9999". Sort order is
 // handled separately below, by `releaseSortTimestamp`, the only consumer that actually wants a
 // deterministic placeholder position.
-const SEASON_END = { spring: [5, 20], summer: [8, 21], fall: [11, 20], autumn: [11, 20], winter: [2, 19] };
-export function endOfReleasePeriod(str) {
+const SEASON_END = { spring: [5, 20], summer: [8, 21], fall: [11, 20], autumn: [11, 20], winter: [2, 19] } as const;
+export function endOfReleasePeriod(str: string): number {
   const s = String(str).trim();
-  let m;
+  let m: RegExpExecArray | null;
   if ((m = /^(spring|summer|fall|autumn|winter)\s+(\d{4})$/i.exec(s))) {
-    const [month, day] = SEASON_END[m[1].toLowerCase()];
+    const [month, day] = SEASON_END[m[1].toLowerCase() as keyof typeof SEASON_END];
     const year = m[1].toLowerCase() === 'winter' ? Number(m[2]) + 1 : Number(m[2]); // winter spills into next year
     return new Date(year, month, day).getTime();
   }
@@ -235,7 +245,7 @@ export function endOfReleasePeriod(str) {
 // `parseDate` — never see these fake dates; see the comment on endOfReleasePeriod above.
 const COMING_SOON_SENTINEL = new Date(9999, 0, 1).getTime();
 const TBA_SENTINEL         = new Date(9999, 0, 2).getTime();
-export function releaseSortTimestamp(str) {
+export function releaseSortTimestamp(str: string): number {
   const s = String(str).trim();
   if (/^coming soon$/i.test(s)) return COMING_SOON_SENTINEL;
   if (/^(to be announced|tba)$/i.test(s)) return TBA_SENTINEL;
@@ -251,8 +261,8 @@ export function releaseSortTimestamp(str) {
 // NOT examples of that — `releaseSortTimestamp` gives them real sentinel positions (see above) so
 // they sort deterministically after every dated/coarse entry instead of landing in this bucket.
 export const compareDateMissingLast = compareMissingLast(
-  (a, b) => releaseSortTimestamp(a) - releaseSortTimestamp(b),
-  v => v == null || v === '' || isNaN(releaseSortTimestamp(v)),
+  (a, b) => releaseSortTimestamp(String(a)) - releaseSortTimestamp(String(b)),
+  v => v == null || v === '' || isNaN(releaseSortTimestamp(String(v))),
 );
 
 // Amber-flags still-unreleased games in the Released column — reuses scoreColor's own
@@ -260,12 +270,12 @@ export const compareDateMissingLast = compareMissingLast(
 // not final" the same way a middling score does elsewhere in the table. Backed by Steam's own
 // `comingSoon` flag (see extractAppDetails in lib/steam.js), not by comparing the parsed date
 // to today — a coarse placeholder like "Coming soon" has no parseable date to compare at all.
-export function renderReleaseDate(v, row) {
+export function renderReleaseDate(v: unknown, row: Row): Node {
   if (v === undefined) return document.createTextNode('…');
   if (!v) return document.createTextNode('—');
   const span = document.createElement('span');
   if (row.comingSoon) span.style.color = '#e4a82e';
-  span.textContent = v;
+  span.textContent = String(v);
   return span;
 }
 
@@ -293,7 +303,7 @@ export function renderReleaseDate(v, row) {
 // gets this split for free.
 const LOG_BUCKET_OPTS = { divisions: [1, 3] }; // base 10 (default), halved via a 1-3-10 grid
 const logBucketValue = bucketLogRange(LOG_BUCKET_OPTS);
-export function halfDecadeBucket(value) {
+export function halfDecadeBucket(value: unknown): number | null {
   const n = Number(value);
   if (n <= 0) return 0; // covers a real 0 and (via withMissingGroup below) never sees a missing value
   const bucket = logBucketValue(value);
@@ -303,12 +313,12 @@ export function halfDecadeBucket(value) {
   // `0 < 0.5 < 1 < 3 < ...` stays correct in both sort directions.
   return bucket === -Infinity ? 0.5 : bucket;
 }
-export function formatHalfDecadeBucket(unit, zeroLabel) {
+export function formatHalfDecadeBucket(unit?: string, zeroLabel?: string): (keyPart: string) => string {
   const formatBucket = formatLogRange(LOG_BUCKET_OPTS, unit);
-  return keyPart => {
+  return (keyPart: string) => {
     const n = Number(keyPart);
-    if (n === 0) return zeroLabel;
-    if (n === 0.5) return formatBucket(-Infinity); // core's own "<1{unit}" label for the sentinel
+    if (n === 0) return zeroLabel ?? '';
+    if (n === 0.5) return formatBucket(-Infinity as unknown as string); // core's own "<1{unit}" label for the sentinel (number sentinel, d.ts types keyPart as string)
     return formatBucket(keyPart);
   };
 }
@@ -328,12 +338,12 @@ export function formatHalfDecadeBucket(unit, zeroLabel) {
 // single-value "100-105" bucket the way a bare `Math.floor(v/step)*step` would.
 const SCORE_BUCKET_STEP = 5;
 const SCORE_BUCKET_FLOOR = 60;
-export function scoreBucket(value) {
+export function scoreBucket(value: unknown): number {
   const n = Number(value);
   if (!(n >= SCORE_BUCKET_FLOOR)) return -1; // below the floor (or NaN) — the single "< 60" bucket
   return Math.min(Math.floor(n / SCORE_BUCKET_STEP) * SCORE_BUCKET_STEP, 100 - SCORE_BUCKET_STEP);
 }
-export function formatScoreBucket(keyPart) {
+export function formatScoreBucket(keyPart: string): string {
   const n = Number(keyPart);
   if (n === -1) return `< ${SCORE_BUCKET_FLOOR}`;
   return `${n}–${n + SCORE_BUCKET_STEP}`;
@@ -346,14 +356,14 @@ export function formatScoreBucket(keyPart) {
 // release date) would come out the other end as the literal string `"null"` and show up as a
 // group header that reads "null" rather than "—". Checking for "missing" ourselves before ever
 // calling the underlying bucket function sidesteps that regardless of which one's used.
-export function withMissingGroup(bucketFn, isMissing = v => v == null) {
-  return value => isMissing(value) ? null : bucketFn(value);
+export function withMissingGroup(bucketFn: (v: unknown) => unknown, isMissing: (v: unknown) => boolean = v => v == null) {
+  return (value: unknown) => isMissing(value) ? null : bucketFn(value);
 }
 // Pairs with withMissingGroup above — the empty-string group key it produces for a missing value
 // needs its own label rather than being handed to a real formatter that has no idea what to do
 // with it (formatDatePart('year') on '' would print '' itself: `new Date('')` is invalid, but
 // still not NaN in a way that function checks for).
-export function formatMissingGroup(formatFn, missingLabel = '—') {
+export function formatMissingGroup(formatFn: (keyPart: string) => string, missingLabel = '—'): (keyPart: string) => string {
   return keyPart => keyPart === '' ? missingLabel : formatFn(keyPart);
 }
 
@@ -368,14 +378,14 @@ export function formatMissingGroup(formatFn, missingLabel = '—') {
 // selected region's currency isn't fixed to USD, and a hardcoded "$" would mislabel every other
 // currency's amounts the same way the tierCurrency/priceCurrency split below exists to avoid.
 export const PRICE_TIERS = [0, 5, 15, 30, 50, 75, 100]; // bucket lower bounds; 100 is the open-ended "100+" tier
-export function priceTierBucket(value) {
+export function priceTierBucket(value: unknown): number | null {
   const n = Number(value);
   if (n === 0) return -1; // Free — its own bucket, strictly below the "0–5" range of priced games
   if (!(n > 0)) return null; // missing/NaN/negative
   for (let i = PRICE_TIERS.length - 1; i >= 0; i--) if (n >= PRICE_TIERS[i]) return PRICE_TIERS[i];
   return PRICE_TIERS[0];
 }
-export function formatPriceTier(keyPart) {
+export function formatPriceTier(keyPart: string): string {
   const n = Number(keyPart);
   if (n === -1) return 'Free';
   const top = PRICE_TIERS[PRICE_TIERS.length - 1];
@@ -398,10 +408,10 @@ export function formatPriceTier(keyPart) {
 // `loadWishlistPrices`) backs every other price column here. `null` means "free"/"no data"
 // throughout, never rendered as $0 or blank. `formatMoney` itself lives in utils.js, not here —
 // see this file's own header comment for why.
-export function renderPrice(v, row) {
+export function renderPrice(v: unknown, row: Row): Node {
   if (v === undefined) return document.createTextNode('…');
   if (v == null) return document.createTextNode('—');
-  return document.createTextNode(formatMoney(v, row.priceCurrency));
+  return document.createTextNode(formatMoney(Number(v), row.priceCurrency));
 }
 
 // Bare price only — no shop name in the cell itself (see the bestDealShop column below for
@@ -409,14 +419,14 @@ export function renderPrice(v, row) {
 // icon suffix, when the current best deal is at or below a historical low — reusing
 // scoreColor's own "excellent"/"good"/"ok" tier colors (see the side panel/table score columns)
 // rather than inventing a new palette just for this.
-export function renderBestDeal(v, row) {
+export function renderBestDeal(v: unknown, row: Row): Node {
   if (v === undefined) return document.createTextNode('…');
   if (v == null) return document.createTextNode('—');
   // dealRecordTier (public/utils.js) is the single shared source of this tier/color/icon logic
   // — see its own comment for why: this column's own Price Status (below) and panel.js's Price
   // card need the exact same answer, and hand-duplicating it per file is exactly what let a
   // 3-month-low tier go missing from some of them before this file and dealRecordTier existed.
-  const rec = dealRecordTier(v, row);
+  const rec = dealRecordTier(Number(v), row);
   const span = document.createElement('span');
   if (rec) {
     span.style.color = rec.color;
@@ -441,7 +451,7 @@ export function renderBestDeal(v, row) {
 // `null`/`undefined`, which mean "no data"/"still loading") renders the same as missing data: a
 // flat "0%" reads as noise next to every other row's real discount, and nothing else in this
 // column set treats a confirmed zero differently from "nothing to show" either.
-export function renderCut(v) {
+export function renderCut(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');
   if (v == null || v === 0) return document.createTextNode('—');
   return document.createTextNode(`-${v}%`);
@@ -455,7 +465,7 @@ export function renderCut(v) {
 // distinct from missing price data entirely (no ITAD data yet / still loading), which falls
 // through to null/undefined same as every other price column here — see PRICE_STATUS_COLUMN's
 // own format below.
-export function computePriceStatus(row) {
+export function computePriceStatus(row: Row): string | null | undefined {
   if (row.bestDealPrice === undefined) return undefined;
   if (row.bestDealPrice == null) return null;
   const rec = dealRecordTier(row.bestDealPrice, row);
@@ -474,28 +484,35 @@ export function computePriceStatus(row) {
 // (All-Time Low) first on a fresh click. On Sale/Not Discounted stay plain, uncolored, no icon
 // — not being a record isn't a bad thing worth flagging, so nothing here draws the eye away
 // from the three real record tiers.
-export const PRICE_STATUS_TIERS = [
+export interface PriceStatusTier {
+  label: string;
+  color?: string;
+  icon?: string;
+  bold?: boolean;
+}
+export const PRICE_STATUS_TIERS: PriceStatusTier[] = [
   { label: 'Not Discounted' },
   { label: 'On Sale' },
   ...DEAL_RECORD_TIERS.slice().reverse().map(t => ({ label: t.statusLabel, color: t.color, icon: ' ' + t.icon, bold: t.bold })),
 ];
 export const PRICE_STATUS_ORDER = PRICE_STATUS_TIERS.map(t => t.label);
 export const comparePriceStatus = compareMissingLast((a, b) =>
-  PRICE_STATUS_ORDER.indexOf(a) - PRICE_STATUS_ORDER.indexOf(b));
-export function renderPriceStatus(v) {
+  PRICE_STATUS_ORDER.indexOf(String(a)) - PRICE_STATUS_ORDER.indexOf(String(b)));
+export function renderPriceStatus(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');
   if (v == null) return document.createTextNode('—');
-  const tier = PRICE_STATUS_TIERS.find(t => t.label === v);
-  if (!tier?.color) return document.createTextNode(v); // On Sale / Not Discounted — plain text
+  const sv = String(v);
+  const tier = PRICE_STATUS_TIERS.find(t => t.label === sv);
+  if (!tier?.color) return document.createTextNode(sv); // On Sale / Not Discounted — plain text
   const span = document.createElement('span');
   span.style.color = tier.color;
   if (tier.bold) span.style.fontWeight = '700';
-  span.textContent = v + tier.icon;
+  span.textContent = sv + tier.icon!;
   return span;
 }
-export const PRICE_STATUS_COLUMN = {
+export const PRICE_STATUS_COLUMN: ColumnDef<Row> = {
   key: 'priceStatus', label: 'Price Status', groupable: true,
-  value: computePriceStatus, format: v => v === undefined ? '…' : v ?? '—', render: renderPriceStatus,
+  value: (row: Row) => computePriceStatus(row), format: v => v === undefined ? '…' : v == null ? '—' : String(v), render: renderPriceStatus,
   compare: comparePriceStatus, defaultSortDir: 'desc', category: 'Pricing',
 };
 
@@ -504,7 +521,7 @@ export const PRICE_STATUS_COLUMN = {
 // CORE_COLUMNS/PRICE_COLUMNS in the section they actually belong to (e.g. Wishlist Rank right
 // after Name, an identity attribute, rather than trailing after Extras where nobody would think
 // to look for it).
-export function insertColumnsAfter(columns, afterKey, ...newColumns) {
+export function insertColumnsAfter(columns: ColumnDef<Row>[], afterKey: string, ...newColumns: ColumnDef<Row>[]): ColumnDef<Row>[] {
   const idx = columns.findIndex(c => c.key === afterKey);
   return [...columns.slice(0, idx + 1), ...newColumns, ...columns.slice(idx + 1)];
 }
@@ -533,7 +550,7 @@ export function insertColumnsAfter(columns, afterKey, ...newColumns) {
 // specific (Tier Price/Add-on, Wishlist Rank/Added, Played/Last Played) — an owned game in the
 // Library tab has no price data at all (nothing to buy), so price columns would be dead weight
 // there, not just hidden by default the way they are on Wishlist/Bundles.
-export const CORE_COLUMNS = [
+export const CORE_COLUMNS: ColumnDef<Row>[] = [
   // ── Identity ────────────────────────────────────────────────────────────────
   { key: 'capsule', label: '', width: 128, sortable: false, filterable: false, groupable: false,
     value: () => null, render: renderThumb },
@@ -642,7 +659,7 @@ export const CORE_COLUMNS = [
   // same value), but groupable/filterable so a search can be narrowed to just base games, or
   // audited for stray non-game entries. `null` ("Unknown") only when store metadata itself
   // failed to load or Steam's response omitted the field.
-  { key: 'type',             label: 'Type',         groupable: true, format: v => v || 'Unknown', category: 'Classification' },
+  { key: 'type',             label: 'Type',         groupable: true, format: v => v ? String(v) : 'Unknown', category: 'Classification' },
   // Estimated, not authoritative — see computeProductionTier's doc comment (public/utils.js)
   // and CLAUDE.md's AAA/AA/Indie section. The label spells out "(est.)" rather than relying on
   // a hover tooltip, since @vates/data-table-vanilla has no per-column header-tooltip option to
@@ -701,7 +718,7 @@ export const CORE_COLUMNS = [
 // `lowM3`/`priceCurrency`) itself, via its own `loadPrices`/`loadWishlistPrices` — this file only
 // defines how those fields render/sort/group, not how they're fetched. `panel.js`'s Price card
 // reads the exact same fields, off whichever page put them on the row.
-export const PRICE_COLUMNS = [
+export const PRICE_COLUMNS: ColumnDef<Row>[] = [
   // Hidden by default on both pages — Best Deal and Discount already answer "is this worth
   // buying" without it; kept as its own column for anyone who wants the exact number, or to
   // sort/group by it. Named "Steam Full Price" rather than the shorter "Steam Price" specifically

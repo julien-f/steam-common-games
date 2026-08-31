@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { fmtTime } = require('../public/lightbox');
+const { fmtTime } = require('../public/lightbox.ts');
 
 // ── fmtTime ───────────────────────────────────────────────────────────────────
 

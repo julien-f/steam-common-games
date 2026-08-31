@@ -1,6 +1,4 @@
-'use strict';
-
-import { esc } from './utils.js';
+import { esc } from './utils.ts';
 
 // Shared by the comparison page (app.js) and the Library Explorer (library.js): renders
 // the "accounts bar" of resolved-account chips under a search form, plus a locally
@@ -9,18 +7,30 @@ import { esc } from './utils.js';
 // personastate values per Steam's docs: 0 Offline, 1 Online, 2 Busy, 3 Away, 4 Snooze,
 // 5 Looking to trade, 6 Looking to play. `gameextrainfo` (present while in-game) takes
 // priority over all of these for the status dot/tooltip.
+export interface AccountChipPlayer {
+  steamid: string;
+  personaname?: string;
+  avatarmedium?: string;
+  profileurl?: string;
+  communityvisibilitystate?: number;
+  personastate?: number;
+  gameextrainfo?: string;
+  gameCount?: number;
+  itemCount?: number;
+}
+
 export const ACCOUNT_STATE_LABELS = ['Offline', 'Online', 'Busy', 'Away', 'Snooze', 'Looking to trade', 'Looking to play'];
 
 // The identity (avatar + name, linking out to the profile) is its own <a> nested inside
 // the chip <div> rather than the whole chip being one big link — the chip also holds a
 // <button> (per-account refresh), and interactive content nested inside an <a> is
 // invalid HTML / fights click-target handling.
-export function accountChipHtml(p, countLabel) {
+export function accountChipHtml(p: AccountChipPlayer, countLabel: string): string {
   const name = esc(p.personaname || p.steamid);
   const safeUrl = /^https?:\/\//i.test(p.profileurl || '') ? p.profileurl : '';
   const safeAvatar = /^https?:\/\//i.test(p.avatarmedium || '') ? p.avatarmedium : '';
   const isPrivate = p.communityvisibilitystate !== undefined && p.communityvisibilitystate !== 3;
-  const count = typeof p.gameCount === 'number' ? p.gameCount : p.itemCount;
+  const count: number | undefined = typeof p.gameCount === 'number' ? p.gameCount : p.itemCount;
 
   // `personastate`/`gameextrainfo` come from the same `player:` cache entry as everything
   // else on the chip, which sits on the library cache tier (LIBRARY_CACHE_TTL_MINUTES,
@@ -30,7 +40,7 @@ export function accountChipHtml(p, countLabel) {
   const statusClass = p.gameextrainfo ? 'ingame' : p.personastate ? 'online' : 'offline';
   const statusLabel = p.gameextrainfo
     ? `Playing ${p.gameextrainfo}`
-    : (ACCOUNT_STATE_LABELS[p.personastate] || 'Offline');
+    : (p.personastate != null ? (ACCOUNT_STATE_LABELS[p.personastate] || 'Offline') : 'Offline');
   const statusTitle = `${statusLabel} (as of this search)`;
 
   const identityInner = `
@@ -59,7 +69,7 @@ export function accountChipHtml(p, countLabel) {
 
 // Flat row of chips — one group's worth of accounts (the Library Explorer's single
 // Family group, or the comparison page when there's only one slot).
-export function renderAccountChips(containerEl, players, countLabel) {
+export function renderAccountChips(containerEl: HTMLElement, players: AccountChipPlayer[] | null | undefined, countLabel: string) {
   if (!players || players.length === 0) { containerEl.hidden = true; containerEl.innerHTML = ''; return; }
   containerEl.innerHTML = players.map(p => accountChipHtml(p, countLabel)).join('');
   containerEl.hidden = false;
@@ -69,7 +79,7 @@ export function renderAccountChips(containerEl, players, countLabel) {
 // search there can compare several separate slots (each possibly itself a multi-account
 // Family). `groups`: [{ label, players }]. `label` is omitted (no heading rendered) for
 // a single-group search, where per-slot labeling would just be noise.
-export function renderAccountChipsGrouped(containerEl, groups, countLabel) {
+export function renderAccountChipsGrouped(containerEl: HTMLElement, groups: { label?: string; players: AccountChipPlayer[] }[] | null | undefined, countLabel: string) {
   const nonEmpty = (groups || []).filter(g => g.players && g.players.length > 0);
   if (nonEmpty.length === 0) { containerEl.hidden = true; containerEl.innerHTML = ''; return; }
   containerEl.innerHTML = nonEmpty.map(g => `
@@ -84,13 +94,13 @@ export function renderAccountChipsGrouped(containerEl, groups, countLabel) {
 // Delegated rather than per-chip, since chips are wholesale replaced on every render.
 // `onRefresh(steamid, btnEl)` is responsible for re-running the search with that one
 // account force-refreshed and re-rendering the bar (which naturally resets the button).
-export function bindAccountRefresh(containerEl, onRefresh) {
+export function bindAccountRefresh(containerEl: HTMLElement, onRefresh: (steamid: string, btnEl: HTMLButtonElement) => void) {
   containerEl.addEventListener('click', e => {
-    const btn = e.target.closest('.account-refresh-btn');
+    const btn = (e.target as Element).closest('.account-refresh-btn') as HTMLButtonElement | null;
     if (!btn || btn.disabled) return;
     btn.disabled = true;
     btn.textContent = '⋯';
-    onRefresh(btn.dataset.steamid, btn);
+    onRefresh(btn.dataset.steamid ?? '', btn);
   });
 }
 
@@ -110,22 +120,31 @@ export function bindAccountRefresh(containerEl, onRefresh) {
 
 export const MAX_RECENTS = 10;
 
-export function loadRecents(storageKey) {
+// One entry in a "Recent:" row. `players` is an array of groups (see addRecent above);
+// pre-grouping entries read from localStorage have a flat array instead, so recentChipHtml
+// normalizes element-by-element. `data` is opaque host-page replay data.
+export interface RecentEntry {
+  id: string;
+  players: (AccountChipPlayer | AccountChipPlayer[])[];
+  data: unknown;
+}
+
+export function loadRecents(storageKey: string): RecentEntry[] {
   try {
-    const raw = JSON.parse(localStorage.getItem(storageKey));
+    const raw = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
     return Array.isArray(raw) ? raw : [];
   } catch {
     return []; // corrupt/blocked storage — behave as if there's no history
   }
 }
 
-export function saveRecents(storageKey, list) {
+export function saveRecents(storageKey: string, list: RecentEntry[]) {
   try { localStorage.setItem(storageKey, JSON.stringify(list)); } catch { /* storage full/blocked — drop silently */ }
 }
 
 // Moves this search to the front, refreshing its cached display data, rather than
 // appending a duplicate. `groups`: array of slot groups, each an array of player objects.
-export function addRecent(storageKey, id, groups, data) {
+export function addRecent(storageKey: string, id: string, groups: (AccountChipPlayer[] | null | undefined)[] | null | undefined, data: unknown) {
   const snapshot = (groups || []).map(g => (g || []).map(p => ({
     steamid: p.steamid, personaname: p.personaname, avatarmedium: p.avatarmedium,
   })));
@@ -134,7 +153,7 @@ export function addRecent(storageKey, id, groups, data) {
   saveRecents(storageKey, rest.slice(0, MAX_RECENTS));
 }
 
-export function removeRecent(storageKey, id) {
+export function removeRecent(storageKey: string, id: string) {
   saveRecents(storageKey, loadRecents(storageKey).filter(r => r.id !== id));
 }
 
@@ -145,7 +164,7 @@ export function removeRecent(storageKey, id) {
 // assumed to already be one — entries written before this grouping existed have a flat
 // array of player objects, not an array of groups, and this is the only thing standing
 // between reading one of those out of localStorage and a hard crash on every page load.
-export function recentChipHtml(entry) {
+export function recentChipHtml(entry: RecentEntry): string {
   const groups = (entry.players || []).map(g => Array.isArray(g) ? g : [g]);
   const label = esc(groups.length
     ? groups.map(g => g.map(p => p.personaname || p.steamid).join(' + ')).join(', ')
@@ -163,7 +182,7 @@ export function recentChipHtml(entry) {
   `;
 }
 
-export function renderRecentsBar(containerEl, storageKey) {
+export function renderRecentsBar(containerEl: HTMLElement, storageKey: string) {
   const recents = loadRecents(storageKey);
   if (recents.length === 0) { containerEl.hidden = true; containerEl.innerHTML = ''; return; }
   containerEl.innerHTML = `
@@ -176,16 +195,16 @@ export function renderRecentsBar(containerEl, storageKey) {
 
 // `onLoad(data)` replays a remembered search; re-rendering the bar after removal/clear
 // is handled here since it's always the same follow-up regardless of the host page.
-export function bindRecentsBar(containerEl, storageKey, onLoad) {
+export function bindRecentsBar(containerEl: HTMLElement, storageKey: string, onLoad: (data: unknown) => void) {
   containerEl.addEventListener('click', e => {
-    const loadBtn = e.target.closest('.recent-chip-btn');
+    const loadBtn = (e.target as Element).closest('.recent-chip-btn') as HTMLElement | null;
     if (loadBtn) {
       const entry = loadRecents(storageKey).find(r => r.id === loadBtn.dataset.id);
       if (entry) onLoad(entry.data);
       return;
     }
-    const removeBtn = e.target.closest('.recent-chip-remove');
-    if (removeBtn) { removeRecent(storageKey, removeBtn.dataset.id); renderRecentsBar(containerEl, storageKey); return; }
-    if (e.target.closest('.recents-clear')) { saveRecents(storageKey, []); renderRecentsBar(containerEl, storageKey); }
+    const removeBtn = (e.target as Element).closest('.recent-chip-remove') as HTMLElement | null;
+    if (removeBtn) { removeRecent(storageKey, removeBtn.dataset.id ?? ''); renderRecentsBar(containerEl, storageKey); return; }
+    if ((e.target as Element).closest('.recents-clear')) { saveRecents(storageKey, []); renderRecentsBar(containerEl, storageKey); }
   });
 }

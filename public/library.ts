@@ -1,31 +1,34 @@
 'use strict';
 
-import { esc, formatMoney, fmtLastPlayed, computeSteamdbRating, computeProductionTier, normalizeInput, discountPct } from '/utils.js';
-import { renderOwnersHtml } from '/ownerListHtml.js';
-import { reorderUrlParams } from '/urlState.js';
-import { restoreTableView, bindViewPersistence, shareTableView, resetTableView } from '/tableViewPrefs.js';
-import { createRowCache } from '/rowCache.js';
-import { renderPanelNav as renderPanelNavShared, stepGameList } from '/panelNav.js';
-import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from '/priceLoading.js';
-import { COUNTRY_OPTIONS, getStoredRegion, setStoredRegion, resolveRegion, REGION_CHANGED_EVENT } from '/region.js';
-import { updateNavLink } from '/nav.js';
-import { renderAccountChips, bindAccountRefresh, addRecent, renderRecentsBar, bindRecentsBar } from '/accountsBar.js';
-import { initGameSearch, addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.js';
-import { openLightbox, isLightboxOpen } from '/lightbox.js';
+import { esc, formatMoney, fmtLastPlayed, computeSteamdbRating, computeProductionTier, normalizeInput, discountPct } from '/utils.ts';
+import { renderOwnersHtml } from '/ownerListHtml.ts';
+import { reorderUrlParams } from '/urlState.ts';
+import { restoreTableView, bindViewPersistence, shareTableView, resetTableView } from '/tableViewPrefs.ts';
+import { createRowCache } from '/rowCache.ts';
+import { renderPanelNav as renderPanelNavShared, stepGameList } from '/panelNav.ts';
+import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from '/priceLoading.ts';
+import { COUNTRY_OPTIONS, getStoredRegion, setStoredRegion, resolveRegion, REGION_CHANGED_EVENT } from '/region.ts';
+import { updateNavLink } from '/nav.ts';
+import { renderAccountChips, bindAccountRefresh, addRecent, renderRecentsBar, bindRecentsBar } from '/accountsBar.ts';
+import { initGameSearch, addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.ts';
+import { openLightbox, isLightboxOpen } from '/lightbox.ts';
 import {
   panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,
   pickRandomFrom, clearRandomQueue, panelHandleEscape,
   renderPanelBody,
-} from '/panel.js';
-import { initPageShell } from '/pageShell.js';
+} from '/panel.ts';
+import { initPageShell } from '/pageShell.ts';
 
 import { createDataTable } from '@vates/data-table-vanilla';
+import type { ColumnDef, DataTableInstance, SortEntry } from '@vates/data-table-vanilla';
 import { bucketDatePart, formatDatePart } from '@vates/data-table-core';
 import {
   fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareDateMissingLast,
   withMissingGroup, formatMissingGroup, halfDecadeBucket, formatHalfDecadeBucket,
   protonDbValue, TYPE_LABELS,
-} from '/gameColumns.js';
+} from '/gameColumns.ts';
+import type { Game, Rating, Hltb, GameMeta, ProtonDb, Achievements } from '/types.ts';
+import type { AccountChipPlayer } from '/accountsBar.ts';
 
 // ── Library-tab-only columns — an owned game has playtime/last-played data a wishlist or
 // bundle game doesn't (see gameColumns.js's own header comment for what's shared vs.
@@ -41,9 +44,9 @@ import {
 // entirely inside one base-10 decade. `totalMin / 60` (see loadLibrary below) is always a real
 // number, never `null` — a slot that owns but never played a game still sums to a real 0 — so
 // no `withMissingGroup` wrapper is needed here, unlike reviewsTotal/hltb*/the date columns.
-const PLAYTIME_COLUMN = {
+const PLAYTIME_COLUMN: ColumnDef<Record<string, any>> = {
   key: 'playtime', label: 'Played (h)', type: 'number', groupable: true,
-  format: v => v > 0 ? Number(v).toFixed(1) : '—', defaultSortDir: 'desc',
+  format: v => (v as number) > 0 ? Number(v).toFixed(1) : '—', defaultSortDir: 'desc',
   groupValue: halfDecadeBucket, groupFormat: formatHalfDecadeBucket('h', 'Not played'),
   keepVisibleWhenGrouped: true, category: 'Play Time & Dates',
 };
@@ -70,10 +73,10 @@ const PLAYTIME_COLUMN = {
 // group per game, the same "continuous column" problem reviewsTotal/playtime have. "Never
 // played by anyone in the slot" is `''`, not `null` (see fmtLastPlayed in utils.js), hence the
 // explicit `isMissing` override — `withMissingGroup`'s default only checks for `null`/`undefined`.
-const LAST_PLAYED_COLUMN = {
+const LAST_PLAYED_COLUMN: ColumnDef<Record<string, any>> = {
   key: 'lastPlayed', label: 'Last Played', type: 'date', groupable: true, format: fmt.str,
   compare: compareDateMissingLast, defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
-  groupValue: withMissingGroup(bucketDatePart('year'), v => v == null || v === ''),
+  groupValue: withMissingGroup(bucketDatePart('year'), (v: unknown) => v == null || v === ''),
   groupFormat: formatMissingGroup(formatDatePart('year')), keepVisibleWhenGrouped: true,
   category: 'Play Time & Dates',
 };
@@ -90,14 +93,14 @@ const DEFAULT_VISIBLE = [
 // Passed as part of `initialViewState` at table construction (`@vates/data-table-vanilla` >=
 // 0.12) — also what `resetTableView`'s own `setViewState({})` blanking restores, so unlike
 // before there's no separate priming call or manual reapply-after-reset needed for this.
-const DEFAULT_SORT = [{ key: 'steamdbRating', dir: 'desc' }];
+const DEFAULT_SORT: SortEntry[] = [{ key: 'steamdbRating', dir: 'desc' }];
 
 // ── Wishlist-only columns ────────────────────────────────────────────────────
 // No defaultSortDir — Steam's wishlist rank is already 1-at-the-top, so the plain ascending
 // default a fresh click starts at is the useful direction as-is. Placed right after Name (an
 // identity-adjacent "which one is this" attribute for a wishlist row) rather than off in the
 // Scores/Dates sections where it doesn't fit either.
-const WISHLIST_RANK_COLUMN =
+const WISHLIST_RANK_COLUMN: ColumnDef<Record<string, any>> =
   { key: 'priority',  label: 'Wishlist Rank', type: 'number', groupable: false, format: fmt.num };
 
 // Same "last modified"-style reasoning as the owned-library's Last Played/Released columns
@@ -108,7 +111,7 @@ const WISHLIST_RANK_COLUMN =
 // added-on date is close to unique per row, so ungrouped grouping would produce close to one
 // group per game, the same "continuous column" problem those two columns already solve for.
 // `null` (no wishlist add-date at all) is the only missing case here.
-const WISHLIST_DATE_ADDED_COLUMN =
+const WISHLIST_DATE_ADDED_COLUMN: ColumnDef<Record<string, any>> =
   { key: 'dateAdded', label: 'Added',         type: 'date',   groupable: true,  format: fmt.str, compare: compareDateMissingLast,
     defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
     groupValue: withMissingGroup(bucketDatePart('year')),
@@ -147,41 +150,41 @@ const WISHLIST_DEFAULT_VISIBLE = [
   'bestDealPrice', 'bestDealCut',
 ];
 
-const playerInput   = document.getElementById('player-input');
-const loadBtn       = document.getElementById('load-btn');
-const statusEl      = document.getElementById('status');
-const priceStatusEl = document.getElementById('price-status');
-const refreshPricesBtn = document.getElementById('refresh-prices-btn');
-const accountsBarEl = document.getElementById('accounts-bar');
-const recentsBarEl  = document.getElementById('recents-bar');
-const recentGamesBarEl = document.getElementById('recent-games-bar');
-const tableContainer = document.getElementById('table-container');
-const resetViewBtn  = document.getElementById('reset-view-btn');
-const shareViewBtn  = document.getElementById('share-view-btn');
-const tabLibraryBtn  = document.getElementById('tab-library');
-const tabWishlistBtn = document.getElementById('tab-wishlist');
-const wishlistRegionLabelEl = document.getElementById('wishlist-region-label');
-const wishlistRegionValueEl = document.getElementById('wishlist-region-value');
+const playerInput   = document.getElementById('player-input') as HTMLInputElement;
+const loadBtn       = document.getElementById('load-btn')!;
+const statusEl      = document.getElementById('status')!;
+const priceStatusEl = document.getElementById('price-status')!;
+const refreshPricesBtn = document.getElementById('refresh-prices-btn') as HTMLButtonElement;
+const accountsBarEl = document.getElementById('accounts-bar')!;
+const recentsBarEl  = document.getElementById('recents-bar')!;
+const recentGamesBarEl = document.getElementById('recent-games-bar')!;
+const tableContainer = document.getElementById('table-container')!;
+const resetViewBtn  = document.getElementById('reset-view-btn')!;
+const shareViewBtn  = document.getElementById('share-view-btn')!;
+const tabLibraryBtn  = document.getElementById('tab-library')!;
+const tabWishlistBtn = document.getElementById('tab-wishlist')!;
+const wishlistRegionLabelEl = document.getElementById('wishlist-region-label')!;
+const wishlistRegionValueEl = document.getElementById('wishlist-region-value')!;
 
-let table         = null;
-let unsyncView    = null;
-let rows          = [];
-let rowMap        = new Map();
+let table         : DataTableInstance<Record<string, any>> | null = null;
+let unsyncView    : (() => void) | null            = null;
+let rows          : Game[]                         = [];
+let rowMap        = new Map<number, Game>();
 let total         = 0;
 let loaded        = 0;
-let flushTimer    = null;
+let flushTimer    : ReturnType<typeof setTimeout> | null = null;
 // Backs visibleRowsForTable() below (rowCache.js) — see its own header comment for why this
 // exists. Reset alongside rowMap in resetTableState().
-let rowCache = createRowCache();
+let rowCache = createRowCache<Game>();
 let activeColumns = COLUMNS;   // COLUMNS or WISHLIST_COLUMNS, whichever tab is active
-let activeTab     = 'library'; // 'library' | 'wishlist'
+let activeTab     : 'library' | 'wishlist' = 'library'; // 'library' | 'wishlist'
 let currentPlayerStr = '';     // last player string actually loaded (not just typed)
 // Steam64 ids of every account currently loaded (one flat group — see accountsBar.js's
 // comment on why the Library Explorer only ever has one), used to fetch per-game
 // achievement progress for the side panel. Achievements aren't tied to a specific tab —
 // wishlisted/standalone-looked-up games can still report progress — only to a player
 // actually being loaded, so this is shared by both loadLibrary and loadWishlist.
-let currentSteamIds = [];
+let currentSteamIds: string[] = [];
 // Persona name(s) of whoever's currently loaded (joined with " + " for a merged Family), used
 // by updateTitle below. Kept separate from currentPlayerStr (which holds raw typed/URL input)
 // since the title should show resolved persona names, not account handles.
@@ -194,15 +197,15 @@ let currentPlayerLabel = '';
 // `playtime`/`lastPlayed`) — loadLibrary otherwise only keeps the summed/maxed-across-accounts
 // numbers it writes onto each row, which is all the table itself needs but flattens away
 // exactly the per-member breakdown a merged Steam Family's owners section wants to show.
-let currentPlayers = [];
-let playtimeByAppid = {};
-let lastPlayedByAppid = {};
+let currentPlayers: AccountChipPlayer[] = [];
+let playtimeByAppid: Record<string, Record<string, number>> = {};
+let lastPlayedByAppid: Record<string, Record<string, number>> = {};
 // appid → the achievements API's response, cached client-side per (appid, loaded accounts)
 // so reopening the same game's panel doesn't refetch. Cleared whenever the loaded
 // player(s) change (resetTableState) since a stale entry there would show the wrong
 // account's progress.
-const achievementsCache = new Map();
-const achievementsCacheKey = appid => `${appid}:${currentSteamIds.slice().sort().join(',')}`;
+const achievementsCache = new Map<string, Achievements>();
+const achievementsCacheKey = (appid: number) => `${appid}:${currentSteamIds.slice().sort().join(',')}`;
 
 // Separate shuffle history per tab, so picking randomly in one doesn't affect the other.
 const randomQueueKey = () => activeTab;
@@ -274,7 +277,7 @@ initPageShell({
     // plain boolean) since it's read fresh on every panel open/refresh, well after activeTab may
     // have changed since this initPanel call.
     pricesHandledByHost: () => activeTab === 'wishlist',
-    onRefresh: async (row) => {
+    onRefresh: async (row: Game) => {
       try {
         const res = await fetch(`/api/game-details/${row.appid}?refresh=1`);
         const data = await res.json();
@@ -284,7 +287,7 @@ initPageShell({
         if (table) table.setData(visibleRowsForTable());
         await loadAchievements(row, { force: true }); // still meaningful with no player loaded — see loadAchievements
       } catch (err) {
-        statusEl.textContent = `Refresh failed: ${err.message}`;
+        statusEl.textContent = `Refresh failed: ${(err as Error).message}`;
       }
     },
     // Runs on every close path (see the comment on `onClose` in panel.js) — not just the
@@ -296,40 +299,40 @@ initPageShell({
     onClose: () => { setPanelParam(null); updateTitle(); },
     // Backs the DLC card's links (public/panel.js) — a real href so ctrl/cmd/shift/middle
     // click still opens it in a new tab, alongside whatever else is in the current URL.
-    gameHref: appid => {
+    gameHref: (appid: number | string) => {
       const params = new URLSearchParams(location.search);
       params.delete('shot');
-      params.set('game', appid);
+      params.set('game', String(appid));
       return `?${reorderUrlParams(params)}`;
     },
     // Clicking a DLC entry (or the panel's own "← Back" button) — reuses the same "open this
     // appid" mechanism as the "look up any game" search box, just keeping panel.js's own
     // DLC-navigation history stack instead of starting a fresh one.
-    onNavigateGame: (appid, name) => openStandaloneLookup(appid, name, { keepHistory: true }),
+    onNavigateGame: (appid: number, name: string) => openStandaloneLookup(appid, name, { keepHistory: true }),
   },
 });
 
 initGameSearch({
-  inputEl: document.getElementById('game-lookup-input'),
-  resultsEl: document.getElementById('game-lookup-results'),
+  inputEl: document.getElementById('game-lookup-input') as HTMLInputElement,
+  resultsEl: document.getElementById('game-lookup-results')!,
   onSelect: ({ appid, name }) => openStandaloneLookup(appid, name),
 });
 
-document.getElementById('shortcuts-backdrop').addEventListener('click', closeShortcuts);
-document.querySelector('.shortcuts-close').addEventListener('click', closeShortcuts);
+document.getElementById('shortcuts-backdrop')!.addEventListener('click', closeShortcuts);
+document.querySelector('.shortcuts-close')!.addEventListener('click', closeShortcuts);
 
 function openShortcuts() {
-  document.getElementById('shortcuts-modal').classList.add('open');
-  document.getElementById('shortcuts-backdrop').classList.add('open');
+  document.getElementById('shortcuts-modal')!.classList.add('open');
+  document.getElementById('shortcuts-backdrop')!.classList.add('open');
 }
 
 function closeShortcuts() {
-  document.getElementById('shortcuts-modal').classList.remove('open');
-  document.getElementById('shortcuts-backdrop').classList.remove('open');
+  document.getElementById('shortcuts-modal')!.classList.remove('open');
+  document.getElementById('shortcuts-backdrop')!.classList.remove('open');
 }
 
 function toggleShortcuts() {
-  if (document.getElementById('shortcuts-modal').classList.contains('open')) closeShortcuts();
+  if (document.getElementById('shortcuts-modal')!.classList.contains('open')) closeShortcuts();
   else openShortcuts();
 }
 
@@ -356,10 +359,10 @@ function visibleRows() {
 // is called for it, so only the row that actually changed gets a new reference and every other
 // row's DOM is left alone.
 function visibleRowsForTable() {
-  return rowCache.visibleRowsForTable(visibleRows(), r => r.appid);
+  return rowCache.visibleRowsForTable(visibleRows(), r => String(r.appid));
 }
-function markRowChanged(appid) {
-  rowCache.markChanged(appid);
+function markRowChanged(appid: number) {
+  rowCache.markChanged(String(appid));
 }
 
 // Stable order for prev/next nav — the table's current search/filter/sort order, independent
@@ -368,8 +371,8 @@ function markRowChanged(appid) {
 // grouping is applied). `table.getProcessedData()` (`@vates/data-table-vanilla` >= 0.13, added
 // per vatesfr/data-table#22) exposes exactly this directly — before that, this had to reach
 // into @vates/data-table-core/internal's processData/searchData by hand.
-function getGameList() {
-  return table.getProcessedData();
+function getGameList(): Game[] {
+  return table ? (table.getProcessedData() as Game[]) : [];
 }
 
 // Resolves this game's owners for renderOwnersHtml (ownerListHtml.js) — the shared markup/sort/
@@ -379,7 +382,7 @@ function getGameList() {
 // lookup (the appid won't be a key in playtimeByAppid at all) and for the Wishlist tab
 // (playtimeByAppid is only ever populated by loadLibrary — see its declaration above) without
 // needing an explicit check for either case.
-function buildLibraryOwnersHtml(g) {
+function buildLibraryOwnersHtml(g: Game) {
   const gamePt = playtimeByAppid[g.appid] || {};
   const gameLp = lastPlayedByAppid[g.appid] || {};
   const owners = currentPlayers
@@ -402,14 +405,14 @@ function buildLibraryOwnersHtml(g) {
 // not surfaced as a second table. Keyed to ownershipPlayerStr (the resolved steamid string,
 // same as `u`) so a player switch invalidates a stale set still in flight from the previous one.
 let ownershipPlayerStr = '';
-let libraryAppidSet  = null; // null = not yet known; Set once resolved
-let wishlistAppidSet = null;
+let libraryAppidSet  : Set<number> | null = null; // null = not yet known; Set once resolved
+let wishlistAppidSet : Set<number> | null = null;
 
 // Fetches just enough of the *other* tab's data to know appid membership — same endpoints
 // loadLibrary/loadWishlist already call (so this rides the same cache tier and costs nothing
 // extra once either tab has been genuinely loaded for this player), just without building any
 // table/row state from the response.
-async function ensureOtherOwnershipSet(idStr, tab) {
+async function ensureOtherOwnershipSet(idStr: string, tab: 'library' | 'wishlist') {
   // idStr is comma-joined (a merged Steam Family is more than one resolved steamid) — split
   // back into individual members, same shape both endpoints already expect elsewhere in this
   // file (each member being a resolved steamid64 resolves trivially, see resolveSteamId).
@@ -423,7 +426,7 @@ async function ensureOtherOwnershipSet(idStr, tab) {
       });
       if (ownershipPlayerStr !== idStr || !res.ok) return;
       const data = await res.json();
-      wishlistAppidSet = new Set(data.items.map(i => i.appid));
+      wishlistAppidSet = new Set(data.items.map((i: { appid: number }) => i.appid));
     } else {
       if (libraryAppidSet !== null) return;
       const res = await fetch('/api/common-games', {
@@ -432,7 +435,7 @@ async function ensureOtherOwnershipSet(idStr, tab) {
       });
       if (ownershipPlayerStr !== idStr || !res.ok) return;
       const data = await res.json();
-      libraryAppidSet = new Set(data.groups.flatMap(g => g.games).map(g => g.appid));
+      libraryAppidSet = new Set(data.groups.flatMap((g: { games: { appid: number }[] }) => g.games).map((g: { appid: number }) => g.appid));
     }
   } catch {
     return; // best-effort — the badge just stays absent/"still checking" for this session
@@ -444,7 +447,7 @@ async function ensureOtherOwnershipSet(idStr, tab) {
 // ownership badge (passive, like the Price card) always has the latest known status. `null`
 // (not yet fetched) is left as `null` rather than coerced to `false` — see panel.js's own
 // comment on why that renders as nothing instead of a premature "not owned".
-function applyOwnershipFlags(game) {
+function applyOwnershipFlags(game: Game) {
   game.inLibrary  = libraryAppidSet  === null ? null : libraryAppidSet.has(game.appid);
   game.onWishlist = wishlistAppidSet === null ? null : wishlistAppidSet.has(game.appid);
 }
@@ -462,11 +465,11 @@ function refreshOpenGameOwnership() {
 // A standalone lookup (see openStandaloneLookup below) isn't part of the loaded library/
 // wishlist table — with no table yet (a bare lookup with no player loaded) or no natural list
 // to page through, panelNav.js's renderPanelNav renders no nav.
-function renderPanelNav(game) {
+function renderPanelNav(game: Game) {
   renderPanelNavShared({ table, game, getGameList, onOpen: openGame, onReroll: pickRandomGame });
 }
 
-function openGame(game, { isRandom = false, keepHistory = false } = {}) {
+function openGame(game: Game, { isRandom = false, keepHistory = false }: { isRandom?: boolean; keepHistory?: boolean } = {}) {
   if (!isRandom) clearRandomQueue(randomQueueKey());
   applyOwnershipFlags(game);
   panelOpen(game, { keepHistory });
@@ -480,8 +483,8 @@ function openGame(game, { isRandom = false, keepHistory = false } = {}) {
 // document keydown handler below does when the lightbox is closed, but also jumps
 // straight into the new game's lightbox at shot 0 rather than leaving the lightbox
 // closed behind it. No-ops with no group to page through, same guard as below.
-function navigateLightboxGame(dir) {
-  const next = stepGameList(table, getGameList, getPanelGame(), dir);
+function navigateLightboxGame(dir: number) {
+  const next = stepGameList(table, getGameList, getPanelGame(), dir as 1 | -1);
   if (!next) return;
   openGame(next);
   openLightbox(next, 0);
@@ -496,7 +499,7 @@ function navigateLightboxGame(dir) {
 // fetching with nobody loaded (e.g. a standalone "look up any game" lookup). Only the
 // achieved/unlocktime state per item needs an account; the server's `playerCount` field
 // (see achievementsHtml in panel.js) tells the panel whether that part applies at all.
-async function loadAchievements(game, { force = false } = {}) {
+async function loadAchievements(game: Game, { force = false }: { force?: boolean } = {}) {
   const key = achievementsCacheKey(game.appid);
   if (!force) {
     const cached = achievementsCache.get(key);
@@ -538,8 +541,8 @@ async function loadAchievements(game, { force = false } = {}) {
 
 function pickRandomGame() {
   if (!table || getPanelGame()?.standalone) return; // see renderPanelNav
-  const pick = pickRandomFrom(getGameList(), randomQueueKey(), getPanelGame()?.appid);
-  if (pick) openGame(pick, { isRandom: true });
+  const pick = pickRandomFrom(getGameList(), randomQueueKey(), getPanelGame()?.appid ?? 0);
+  if (pick) openGame(pick as Game, { isRandom: true });
 }
 
 // Opens the panel for a game from the "look up any game" search box (public/gameSearch.js)
@@ -551,15 +554,15 @@ function pickRandomGame() {
 // (the looked-up game is actually owned/wishlisted by the current player), open that row
 // instead — full nav, playtime, etc. rather than a lesser standalone view of data already
 // sitting in `rows`.
-function openStandaloneLookup(appid, name, { keepHistory = false } = {}) {
+function openStandaloneLookup(appid: number, name = '', { keepHistory = false }: { keepHistory?: boolean } = {}) {
   const existing = rowMap.get(appid);
   if (existing) {
     openGame(existing, { keepHistory });
-    addRecentGame(existing.appid, existing.name, existing.capsule || null);
+    addRecentGame(existing.appid, existing.name, (existing.capsule as string | undefined) || null);
     renderRecentGamesBar(recentGamesBarEl);
     return;
   }
-  const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true };
+  const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true } as Game;
   openGame(game, { keepHistory });
   fetchStandaloneDetails(game);
   // Not part of `rows`/`rowMap`, so loadWishlistPrices' own rowMap-keyed batch (see below)
@@ -571,7 +574,7 @@ function openStandaloneLookup(appid, name, { keepHistory = false } = {}) {
 
 // Prices a single standalone-lookup game directly (not via rowMap, which loadWishlistPrices
 // above is keyed on) — same ITAD call/field mapping, just applied straight onto `game`.
-async function fetchStandalonePrice(game) {
+async function fetchStandalonePrice(game: Game) {
   const configured = await itadConfiguredPromise;
   if (!configured) { nullAllPriceFields(game); if (getPanelGame() === game) renderPanelBody(game); return; }
   const country = resolveRegion(getStoredRegion());
@@ -586,7 +589,7 @@ async function fetchStandalonePrice(game) {
   if (getPanelGame() === game) renderPanelBody(game);
 }
 
-async function fetchStandaloneDetails(game) {
+async function fetchStandaloneDetails(game: Game) {
   try {
     const res = await fetch(`/api/game-details/${game.appid}`);
     const data = await res.json();
@@ -598,7 +601,7 @@ async function fetchStandaloneDetails(game) {
     addRecentGame(game.appid, game.name, data.meta?.capsule || null);
     renderRecentGamesBar(recentGamesBarEl);
   } catch (err) {
-    if (getPanelGame() === game) statusEl.textContent = `Lookup failed: ${err.message}`;
+    if (getPanelGame() === game) statusEl.textContent = `Lookup failed: ${(err as Error).message}`;
   }
 }
 
@@ -611,18 +614,18 @@ async function fetchStandaloneDetails(game) {
 // already). The name
 // deliberately never rides along in this URL (see openStandaloneLookup) — only the appid is
 // trusted, and the panel just shows a placeholder title until the fetch resolves it.
-function setPanelParam(appid) {
+function setPanelParam(appid: number | null) {
   const params = new URLSearchParams(location.search);
   params.delete('shot');
   if (appid == null) params.delete('game');
-  else params.set('game', appid);
+  else params.set('game', String(appid));
   history.replaceState(null, '', `?${reorderUrlParams(params)}`);
 }
 
-function setLightboxParam(idx) {
+function setLightboxParam(idx: number | string | null) {
   const params = new URLSearchParams(location.search);
   if (idx == null) params.delete('shot');
-  else params.set('shot', idx);
+  else params.set('shot', String(idx));
   history.replaceState(null, '', `?${reorderUrlParams(params)}`);
 }
 
@@ -636,7 +639,7 @@ function setLightboxParam(idx) {
 // location.search on the second (post-stream) call: opening the panel on the first call
 // calls setPanelParam(), which deletes `shot` from the live URL (a fresh panel open always
 // resets to the hero) — by the time the row's details are in, `shot` would already be gone.
-function restorePanelFromUrl(restoreShot = null) {
+function restorePanelFromUrl(restoreShot: string | null = null) {
   const params = new URLSearchParams(location.search);
   const appid = Number(params.get('game'));
   if (!appid) return;
@@ -661,7 +664,7 @@ document.addEventListener('keydown', e => {
     // all three pages — delegate to it whenever the lightbox is open so this page can't drift
     // from the other two the way bundles.js once did (see its own comment).
     if (isLightboxOpen()) { panelHandleEscape(); return; }
-    if (document.getElementById('shortcuts-modal').classList.contains('open')) { closeShortcuts(); return; }
+    if (document.getElementById('shortcuts-modal')!.classList.contains('open')) { closeShortcuts(); return; }
     panelClose(); // onClose (see initPanel above) handles the URL cleanup
     return;
   }
@@ -690,7 +693,7 @@ document.addEventListener('keydown', e => {
   if (!table || getPanelGame()?.standalone) return; // see renderPanelNav — no list to page through
   e.preventDefault();
   const list = getGameList();
-  const idx = list.findIndex(g => g.appid === getPanelGame().appid);
+  const idx = list.findIndex(g => g.appid === getPanelGame()!.appid);
   const next = (idx + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
   openGame(list[next]);
 });
@@ -711,7 +714,7 @@ function scheduleFlush() {
 // than of "this player has never launched a single game". Only the library tab has this column
 // (see WISHLIST_COLUMNS) — the selector simply finds nothing on the wishlist tab, a harmless no-op.
 function updateLastPlayedTooltip() {
-  const th = tableContainer.querySelector('th[data-col-key="lastPlayed"]');
+  const th = tableContainer.querySelector('th[data-col-key="lastPlayed"]') as HTMLElement | null;
   if (!th) return;
   const loadedRows = visibleRows();
   const allMissing = loadedRows.length > 0 && loadedRows.every(r => !r.lastPlayed);
@@ -757,7 +760,7 @@ function updateStatus() {
 // public/accountsBar.js (also used by the comparison page's app.js).
 const RECENTS_KEY = 'library-explorer:recent-players';
 
-function renderAccountsBar(players, countLabel) {
+function renderAccountsBar(players: AccountChipPlayer[], countLabel: string) {
   renderAccountChips(accountsBarEl, players, countLabel);
 }
 
@@ -765,7 +768,9 @@ bindAccountRefresh(accountsBarEl, steamid => {
   loadCurrentTab(currentPlayerStr, { refreshIds: [steamid] });
 });
 
-bindRecentsBar(recentsBarEl, RECENTS_KEY, playerStr => {
+bindRecentsBar(recentsBarEl, RECENTS_KEY, data => {
+  // addRecent's 4th arg (the opaque `data`) is this page's own `idStr` — see the addRecent call in loadLibrary.
+  const playerStr = String(data);
   playerInput.value = playerStr;
   loadCurrentTab(playerStr);
 });
@@ -782,28 +787,41 @@ renderRecentGamesBar(recentGamesBarEl);
 // that should actually be undoable — see loadLibrary/loadWishlist/setActiveTab below, which
 // used to each push their own partial update (clearing game/shot, then setting `u`, then
 // `tab`), piling up several near-duplicate history entries per click.
-function updateUrlParams(patch, { push = false } = {}) {
+function updateUrlParams(patch: Record<string, string | number | null>, { push = false }: { push?: boolean } = {}) {
   const url = new URL(location.href);
   for (const [key, value] of Object.entries(patch)) {
     if (value === null || value === '') url.searchParams.delete(key);
-    else url.searchParams.set(key, value);
+    else url.searchParams.set(key, String(value));
   }
   url.search = `?${reorderUrlParams(url.searchParams)}`;
   if (push) history.pushState(null, '', url);
   else history.replaceState(null, '', url);
 }
 
+// The shape of one `data:` line in /api/game-details/stream's SSE response (see server.js's
+// own loop — `{ appid, ...result }` per game, result being fetchGameDetails's response).
+interface DetailsEvent {
+  appid: number;
+  done?: boolean;
+  rating: Rating | null;
+  hltb: Hltb | null;
+  meta: GameMeta | null;
+  tags: string[] | null;
+  demo: { appid: number } | null;
+  protondb: ProtonDb | null;
+}
+
 // Applies one SSE details event (rating/hltb/meta/tags) to its row. `name` is only
 // backfilled from store metadata when the row didn't already have one — owned-game
 // rows always do (from Steam's library API); wishlist rows don't, since GetWishlist
 // returns no name at all.
-function applyDetailsEvent(row, event) {
+function applyDetailsEvent(row: Game, event: DetailsEvent) {
   row.capsule           = event.meta?.capsule ?? null;
   if (!row.name) row.name = event.meta?.name || '';
   row.score             = event.rating?.score ?? null;
   row.positivePct       = (event.rating?.positive != null && event.rating?.total)
     ? Math.round((event.rating.positive / event.rating.total) * 100) : null;
-  row.steamdbRating     = computeSteamdbRating(event.rating?.positive, event.rating?.total);
+  row.steamdbRating     = computeSteamdbRating(event.rating?.positive ?? 0, event.rating?.total ?? 0);
   row.reviewsTotal      = event.rating?.total ?? null;
   row.hltbMain          = event.hltb?.main           ?? null;
   row.hltbExtra         = event.hltb?.extra          ?? null;
@@ -831,7 +849,7 @@ function applyDetailsEvent(row, event) {
   // own bucket ("Unknown") rather than defaulting to "Game" — most rows really are games, but
   // silently assuming that for the rare metadata-fetch failure would hide the difference
   // between "we don't know" and "confirmed a game".
-  row.type              = TYPE_LABELS[event.meta?.type] ?? (event.meta?.type ? event.meta.type : null);
+  row.type              = (TYPE_LABELS as Record<string, string>)[event.meta?.type ?? ''] ?? (event.meta?.type ? event.meta.type : null);
   // Heuristic, not fact — see computeProductionTier's own doc comment (public/utils.js) and
   // CLAUDE.md's AAA/AA/Indie section for what it's derived from and where it's known to be
   // wrong (cheap AAA remasters, prestige-priced small-studio sims, veteran-founded small
@@ -853,8 +871,8 @@ function applyDetailsEvent(row, event) {
 // event to its row in `rowMap` as it arrives. Shared by loadLibrary and loadWishlist. Only
 // `appid` is actually sent — the server always resolves the game's name itself rather than
 // trusting a client-supplied one (see CLAUDE.md's "Looking up an arbitrary game" section).
-async function streamGameDetails(games) {
-  let detailsResp;
+async function streamGameDetails(games: { appid: number }[]) {
+  let detailsResp: Response;
   try {
     detailsResp = await fetch('/api/game-details/stream', {
       method: 'POST',
@@ -862,11 +880,11 @@ async function streamGameDetails(games) {
       body: JSON.stringify({ games: games.map(g => ({ appid: g.appid })) }),
     });
   } catch (err) {
-    statusEl.textContent = `Details stream failed: ${err.message}`;
+    statusEl.textContent = `Details stream failed: ${(err as Error).message}`;
     return;
   }
 
-  const reader  = detailsResp.body.getReader();
+  const reader  = detailsResp.body!.getReader();
   const decoder = new TextDecoder();
   let   buffer  = '';
 
@@ -875,11 +893,11 @@ async function streamGameDetails(games) {
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
     const parts = buffer.split('\n\n');
-    buffer = parts.pop();
+    buffer = parts.pop() ?? '';
     for (const part of parts) {
       const line = part.trim();
       if (!line.startsWith('data: ')) continue;
-      let event;
+      let event: DetailsEvent;
       try { event = JSON.parse(line.slice(6)); } catch { continue; }
       if (event.done) continue;
 
@@ -888,7 +906,7 @@ async function streamGameDetails(games) {
 
       applyDetailsEvent(row, event);
       markRowChanged(row.appid);
-      if (isPanelOpen() && getPanelGame().appid === row.appid) { renderPanelBody(row); renderPanelNav(row); }
+      if (isPanelOpen() && getPanelGame()?.appid === row.appid) { renderPanelBody(row); renderPanelNav(row); }
 
       loaded++;
       scheduleFlush();
@@ -913,7 +931,7 @@ const MAX_PRICE_LOOKUP_GAMES = 500; // mirrors the server's own cap (server.js) 
 // cache read for this call (?refresh=1, same convention as every other force-refresh in this
 // app, and the same option bundles.js's own loadPrices takes) so a stale price actually gets
 // re-fetched from ITAD instead of just re-reading the same cached response back.
-async function loadWishlistPrices(items, { force = false } = {}) {
+async function loadWishlistPrices(items: { appid: number }[], { force = false }: { force?: boolean } = {}) {
   priceStatusEl.textContent = '';
   const configured = await itadConfiguredPromise;
   if (!configured) {
@@ -959,7 +977,7 @@ async function loadWishlistPrices(items, { force = false } = {}) {
         markRowChanged(appid);
         if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
       }
-      priceStatusEl.textContent = `Couldn't load Steam pricing (${err.message}) — other columns are unaffected.`;
+      priceStatusEl.textContent = `Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`;
     }
   }
   if (table) table.setData(visibleRowsForTable());
@@ -991,7 +1009,31 @@ function resetTableState({ preserveGameParam = false } = {}) {
   achievementsCache.clear();
 }
 
-async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, restoreShot = null, push = true } = {}) {
+// Shared options for loadLibrary/loadWishlist — the same "genuine new load vs. restoring a
+// deep link vs. a same-search account refresh" knobs both need.
+interface LoadOpts {
+  refreshIds?: string[];
+  preserveGameParam?: boolean;
+  restoreShot?: string | null;
+  push?: boolean;
+}
+
+// The shape of `/api/common-games`'s success response, as read below — only the fields this
+// page touches (the Library Explorer always loads a single slot, so `slots[0]`).
+interface CommonGamesResponse {
+  groups: { games: { appid: number; name: string }[] }[];
+  slots: AccountChipPlayer[][];
+  playtime: Record<string, Record<string, number>>;
+  lastPlayed: Record<string, Record<string, number>>;
+}
+
+// The shape of `/api/wishlist`'s success response, as read below.
+interface WishlistResponse {
+  players: AccountChipPlayer[];
+  items: { appid: number; priority: number; dateAdded: string | null }[];
+}
+
+async function loadLibrary(playerStr: string, { refreshIds, preserveGameParam = false, restoreShot = null, push = true }: LoadOpts = {}) {
   // A genuine new load drops any `game`/`shot` left in the URL from a previous player/tab —
   // it may not even exist in the new list. The initial page-load path (bottom of this file)
   // passes preserveGameParam so it can restore the deep link once the new data is in. This
@@ -1005,7 +1047,7 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
   statusEl.textContent = refreshIds ? 'Refreshing account…' : 'Fetching library…';
   resetTableState({ preserveGameParam });
 
-  let result;
+  let result: CommonGamesResponse;
   try {
     const resp = await fetch('/api/common-games', {
       method: 'POST',
@@ -1019,7 +1061,7 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
     }
     result = await resp.json();
   } catch (err) {
-    statusEl.textContent = `Error: ${err.message}`;
+    statusEl.textContent = `Error: ${(err as Error).message}`;
     return;
   }
 
@@ -1087,7 +1129,7 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
       loading:            true,
       details:            null, // { rating, hltb, meta, tags, demo, protondb } — same shape the side panel expects
     };
-  });
+  }) as unknown as Game[]; // price fields (steamRegular/bestDeal*/lows) filled in later by the stream — see bundles.js's identical cast
 
   rowMap = new Map(rows.map(r => [r.appid, r]));
   total = rows.length;
@@ -1118,7 +1160,7 @@ async function loadLibrary(playerStr, { refreshIds, preserveGameParam = false, r
   if (preserveGameParam) restorePanelFromUrl(restoreShot);
 }
 
-async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, restoreShot = null, push = true } = {}) {
+async function loadWishlist(playerStr: string, { refreshIds, preserveGameParam = false, restoreShot = null, push = true }: LoadOpts = {}) {
   // See the matching comment in loadLibrary above — game/shot clearing doesn't need the
   // fetch below, but the `u` param does (it's written further down from resolved steamids).
   if (!preserveGameParam) updateUrlParams({ game: null, shot: null });
@@ -1129,7 +1171,7 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
   statusEl.textContent = refreshIds ? 'Refreshing account…' : 'Fetching wishlist…';
   resetTableState({ preserveGameParam });
 
-  let result;
+  let result: WishlistResponse;
   try {
     const resp = await fetch('/api/wishlist', {
       method: 'POST',
@@ -1143,7 +1185,7 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
     }
     result = await resp.json();
   } catch (err) {
-    statusEl.textContent = `Error: ${err.message}`;
+    statusEl.textContent = `Error: ${(err as Error).message}`;
     return;
   }
 
@@ -1205,7 +1247,7 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
     hasDemo:            undefined,
     loading:            true,
     details:            null,
-  }));
+  })) as unknown as Game[]; // name: undefined until the stream resolves it, price fields filled in by loadWishlistPrices — same cast as loadLibrary above
 
   rowMap = new Map(rows.map(r => [r.appid, r]));
   total = rows.length;
@@ -1238,11 +1280,11 @@ async function loadWishlist(playerStr, { refreshIds, preserveGameParam = false, 
   if (preserveGameParam) restorePanelFromUrl(restoreShot);
 }
 
-function loadCurrentTab(playerStr, opts) {
+function loadCurrentTab(playerStr: string, opts: LoadOpts = {}) {
   return activeTab === 'wishlist' ? loadWishlist(playerStr, opts) : loadLibrary(playerStr, opts);
 }
 
-function setActiveTab(tab, { fetch: shouldFetch = true } = {}) {
+function setActiveTab(tab: 'library' | 'wishlist', { fetch: shouldFetch = true }: { fetch?: boolean } = {}) {
   if (tab === activeTab) return;
   activeTab = tab;
   tabLibraryBtn.setAttribute('aria-selected', String(tab === 'library'));
@@ -1256,6 +1298,14 @@ function setActiveTab(tab, { fetch: shouldFetch = true } = {}) {
   updateTitle();
   updateRegionLabelVisibility();
   if (shouldFetch && currentPlayerStr) loadCurrentTab(currentPlayerStr);
+  // A standalone lookup (see openStandaloneLookup) only prices itself when opened while
+  // already on the Wishlist tab — switching to this tab afterward (with or without a player
+  // loaded) would otherwise leave it permanently unpriced, since loadCurrentTab above is a
+  // no-op with no player loaded and never touches a standalone game either way.
+  const panelGame = getPanelGame();
+  if (tab === 'wishlist' && panelGame?.standalone && panelGame.bestDealPrice === undefined) {
+    fetchStandalonePrice(panelGame);
+  }
 }
 
 tabLibraryBtn.addEventListener('click', () => setActiveTab('library'));
@@ -1267,10 +1317,11 @@ loadBtn.addEventListener('click', () => {
 });
 
 resetViewBtn.addEventListener('click', () => {
+  if (!table) return;
   resetTableView(table, viewPrefKey(), viewParamName());
 });
 
-shareViewBtn.addEventListener('click', () => shareTableView(table, viewParamName(), shareViewBtn));
+shareViewBtn.addEventListener('click', () => shareTableView(table!, viewParamName(), shareViewBtn));
 
 // Refreshes just the price columns for the currently loaded wishlist, in one shot — same
 // reasoning as bundles.js's own refreshPricesBtn: it's a single cheap POST /api/prices call
