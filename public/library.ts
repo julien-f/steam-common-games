@@ -1298,6 +1298,14 @@ function setActiveTab(tab: 'library' | 'wishlist', { fetch: shouldFetch = true }
   updateTitle();
   updateRegionLabelVisibility();
   if (shouldFetch && currentPlayerStr) loadCurrentTab(currentPlayerStr);
+  // A standalone lookup (see openStandaloneLookup) only prices itself when opened while
+  // already on the Wishlist tab — switching to this tab afterward (with or without a player
+  // loaded) would otherwise leave it permanently unpriced, since loadCurrentTab above is a
+  // no-op with no player loaded and never touches a standalone game either way.
+  const panelGame = getPanelGame();
+  if (tab === 'wishlist' && panelGame?.standalone && panelGame.bestDealPrice === undefined) {
+    fetchStandalonePrice(panelGame);
+  }
 }
 
 tabLibraryBtn.addEventListener('click', () => setActiveTab('library'));
