@@ -2,25 +2,32 @@
 
 import { esc, formatMoney, fmtLastPlayed, computeSteamdbRating, computeProductionTier, normalizeInput, discountPct } from '/utils.ts';
 import { renderOwnersHtml } from '/ownerListHtml.ts';
-import { reorderUrlParams } from '/urlState.ts';
-import { restoreTableView, bindViewPersistence, shareTableView, resetTableView } from '/tableViewPrefs.ts';
-import { createRowCache } from '/rowCache.ts';
+import { reorderUrlParams, setPanelParam, setLightboxParam } from '/urlState.ts';
+import { restoreTableView, shareTableView, resetTableView } from '/tableViewPrefs.ts';
 import { renderPanelNav as renderPanelNavShared, stepGameList } from '/panelNav.ts';
+import { bindPanelKeyboardShortcuts } from '/panelKeyboard.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from '/priceLoading.ts';
 import { COUNTRY_OPTIONS, getStoredRegion, setStoredRegion, resolveRegion, REGION_CHANGED_EVENT } from '/region.ts';
-import { updateNavLink } from '/nav.ts';
+import { updateNavLink } from '/nav.tsx';
 import { renderAccountChips, bindAccountRefresh, addRecent, renderRecentsBar, bindRecentsBar } from '/accountsBar.ts';
 import { initGameSearch, addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.ts';
-import { openLightbox, isLightboxOpen } from '/lightbox.ts';
+import { openLightbox, isLightboxOpen } from '/lightbox.tsx';
 import {
   panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,
   pickRandomFrom, clearRandomQueue, panelHandleEscape,
   renderPanelBody,
-} from '/panel.ts';
+} from '/panel.tsx';
 import { initPageShell } from '/pageShell.ts';
+import { setPref } from '/prefs.ts';
+import { createRowStore } from '/rowStore.ts';
+import { createStaleGuard } from '/staleGuard.ts';
+import { createStreamBatcher } from '/streamBatcher.ts';
 
-import { createDataTable } from '@vates/data-table-vanilla';
-import type { ColumnDef, DataTableInstance, SortEntry } from '@vates/data-table-vanilla';
+import { createSignal, createRoot, createEffect, batch } from 'solid-js';
+import { createStore } from 'solid-js/store';
+import { render } from 'solid-js/web';
+import { createTableState, DataTableView } from '@vates/data-table-solid';
+import type { ColumnDef, SortEntry, TableState } from '@vates/data-table-solid';
 import { bucketDatePart, formatDatePart } from '@vates/data-table-core';
 import {
   fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareDateMissingLast,
@@ -90,9 +97,9 @@ const DEFAULT_VISIBLE = [
   'capsule', 'name', 'steamdbRating', 'hltbAll', 'playtime', 'releaseDate', 'genres',
 ];
 
-// Passed as part of `initialViewState` at table construction (`@vates/data-table-vanilla` >=
-// 0.12) — also what `resetTableView`'s own `setViewState({})` blanking restores, so unlike
-// before there's no separate priming call or manual reapply-after-reset needed for this.
+// Passed as part of `initialViewState` at table construction — also what `resetTableView`'s own
+// `setViewState({})` blanking restores, so unlike before there's no separate priming call or
+// manual reapply-after-reset needed for this.
 const DEFAULT_SORT: SortEntry[] = [{ key: 'steamdbRating', dir: 'desc' }];
 
 // ── Wishlist-only columns ────────────────────────────────────────────────────
@@ -165,17 +172,103 @@ const tabLibraryBtn  = document.getElementById('tab-library')!;
 const tabWishlistBtn = document.getElementById('tab-wishlist')!;
 const wishlistRegionLabelEl = document.getElementById('wishlist-region-label')!;
 const wishlistRegionValueEl = document.getElementById('wishlist-region-value')!;
+const shortcutsModalEl = document.getElementById('shortcuts-modal')!;
+const shortcutsBackdropEl = document.getElementById('shortcuts-backdrop')!;
 
-let table         : DataTableInstance<Record<string, any>> | null = null;
+// ── Page state signals ──────────────────────────────────────────────────────
+// The rest of this page's own scalar UI state as Solid
+// signals, each driving a small createEffect below against the existing static markup — same
+// pattern as bundles.tsx's own step 5. Every function that used to write these directly now
+// calls the matching setter instead.
+//
+// Deliberately NOT converted to a signal: `activeTab` (and the tab buttons' `aria-selected`/
+// `loadBtn`'s own label/the region label's visibility that depend on it) stays a plain variable,
+// mutated directly inside the one function that ever changes it (`setActiveTab`) exactly as
+// before. Unlike the state below, nothing reads `activeTab` reactively from anywhere outside
+// that single call site — there's no JSX/component in this file at all (no genuinely list-shaped
+// render the way bundles.tsx's bundle list needed one), so a signal here would add Solid
+// machinery for zero benefit over the direct imperative update already sitting right there. Same
+// reasoning `accountsBarEl`'s own `.hidden`/content stay untouched: `accountsBar.ts`'s
+// `renderAccountChips` (shared with the still-unconverted `app.ts`, out of scope for this plan)
+// already owns that element directly, and layering a second, Solid-driven writer over the same
+// element would just be two mechanisms fighting over one target for no reason.
+const [statusText, setStatusText] = createSignal('');
+const [priceStatusText, setPriceStatusText] = createSignal('');
+const [resetViewHidden, setResetViewHidden] = createSignal(true);
+const [shareViewHidden, setShareViewHidden] = createSignal(true);
+const [refreshPricesHidden, setRefreshPricesHidden] = createSignal(true);
+const [refreshPricesDisabled, setRefreshPricesDisabled] = createSignal(false);
+const [refreshPricesLabel, setRefreshPricesLabel] = createSignal('↻ Refresh prices');
+const [wishlistRegionHidden, setWishlistRegionHidden] = createSignal(true);
+const [wishlistRegionValue, setWishlistRegionValue] = createSignal('');
+const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
+
+// One createRoot for every scalar signal → DOM effect — module-lifetime, same as this page's own
+// event listeners and initPageShell() call below (nothing on this page tears itself down before
+// a full navigation), so it's never explicitly disposed. See bundles.tsx's own identical block
+// for the same reasoning.
+createRoot(() => {
+  createEffect(() => { statusEl.textContent = statusText(); });
+  createEffect(() => { priceStatusEl.textContent = priceStatusText(); });
+  createEffect(() => { resetViewBtn.hidden = resetViewHidden(); });
+  createEffect(() => { shareViewBtn.hidden = shareViewHidden(); });
+  createEffect(() => { refreshPricesBtn.hidden = refreshPricesHidden(); });
+  createEffect(() => { refreshPricesBtn.disabled = refreshPricesDisabled(); });
+  createEffect(() => { refreshPricesBtn.textContent = refreshPricesLabel(); });
+  createEffect(() => { wishlistRegionLabelEl.hidden = wishlistRegionHidden(); });
+  createEffect(() => { wishlistRegionValueEl.textContent = wishlistRegionValue(); });
+  createEffect(() => {
+    shortcutsModalEl.classList.toggle('open', shortcutsOpen());
+    shortcutsBackdropEl.classList.toggle('open', shortcutsOpen());
+  });
+});
+
+// The Solid table (@vates/data-table-solid —
+// mirrors bundles.tsx's own conversion) — fed by the `tableData()` accessor below, mounted into
+// `tableContainer` via Solid's own `render()`. `disposeTable` combines that render's unmount fn
+// with `createTableState`'s own disposal (see `buildTable` further down); `table` itself is
+// reused as the reactive-state object every other call site (getGameList/tableViewPrefs.ts/etc.)
+// reads from, same as before.
+let table         : TableState<Game> | null = null;
+let disposeTable  : (() => void) | null = null;
 let unsyncView    : (() => void) | null            = null;
-let rows          : Game[]                         = [];
-let rowMap        = new Map<number, Game>();
 let total         = 0;
 let loaded        = 0;
-let flushTimer    : ReturnType<typeof setTimeout> | null = null;
-// Backs visibleRowsForTable() below (rowCache.js) — see its own header comment for why this
-// exists. Reset alongside rowMap in resetTableState().
-let rowCache = createRowCache<Game>();
+// `rowsStore`/`panelRows` — a real Solid store for the table + a deliberately separate, plain
+// (never store-linked) map for the panel. Same split as bundles.tsx's own conversion — see its
+// header comment there for the full "why two objects per row" story: `@vates/data-table-solid`'s
+// own per-cell rendering re-renders correctly off a
+// store-proxied row with no rowCache.ts-style reference-copy needed, but panel.tsx's own lazy
+// loaders (news/DLC/price) mutate whatever `Game` object they're given via plain `game.field = x`
+// writes, which a Solid store blocks outright — confirmed to bite this page too, not just
+// bundles.tsx, since `onRefresh`/loadAchievements below do the exact same thing. `rowIndex`
+// (appid -> array index) replaces the old `rowMap`'s appid -> object mapping for the store side;
+// `getRow` is the one place that resolves an appid back to the *panel's* plain copy.
+const [rowsStore, setRowsStore] = createStore<Game[]>([]);
+// `rowStore` (see rowStore.ts) holds `rowIndex`/`panelRows` and the `getRow`/`mutateRow` pair —
+// `getRow` is the one place that resolves an appid back to the *panel's* plain copy.
+const rowStore = createRowStore<Game>((idx, updater) => setRowsStore(idx, updater));
+// A new generation is taken at the start of every loadLibrary()/loadWishlist() call, and
+// checked again at every point afterward that touches rowStore/table/disposeTable or their
+// derived UI — rapid Library<->Wishlist tab switching (or two quick player loads) can otherwise
+// let an earlier, superseded call's still-running fetch/stream keep writing into the newer
+// call's rowStore/table once it resolves, the same race bundles.tsx's openBundle needed
+// openBundleGuard for.
+const loadGuard = createStaleGuard();
+function getRow(appid: number): Game | undefined {
+  return rowStore.getRow(appid);
+}
+function mutateRow(appid: number, fn: (draft: Game) => void): Game | undefined {
+  return rowStore.mutateRow(appid, fn);
+}
+// Non-loading rows, fed straight to `createTableState` as a plain accessor (see `buildTable`
+// below) — no explicit "notify the table" call needed anywhere in this file anymore; reading
+// `.loading` off every row here is itself a tracked store read, so this recomputes whenever any
+// row's `loading` flag flips, same moment an explicit `setTableData(...)` used to be called by
+// hand.
+function tableData(): Game[] {
+  return rowsStore.filter(r => !r.loading);
+}
 let activeColumns = COLUMNS;   // COLUMNS or WISHLIST_COLUMNS, whichever tab is active
 let activeTab     : 'library' | 'wishlist' = 'library'; // 'library' | 'wishlist'
 let currentPlayerStr = '';     // last player string actually loaded (not just typed)
@@ -222,7 +315,46 @@ const viewPrefKey    = () => (activeTab === 'wishlist' ? 'libraryWishlistView' :
 // A "Share view" button (shareTableView, from tableViewPrefs.js — shared verbatim with
 // bundles.js's own) snapshots the current view into the URL param on demand instead, and copies
 // the resulting link — same copy-link idiom as panel.js's 🔗 button/lightbox.js's share button.
-// restoreTableView/bindViewPersistence/resetTableView also live there now.
+// restoreTableView/resetTableView also live there now. bindViewPersistence is the one
+// exception (see bindSolidViewPersistence below).
+
+// tableViewPrefs.ts's own bindViewPersistence needs `table.onViewChange`, which the Solid table
+// doesn't have (bundles.tsx hit the exact same gap — see its own identical helper) —
+// reconstructed locally via a createEffect that
+// re-reads getViewState() (tracking every signal it touches) instead of an onViewChange
+// subscription.
+function bindSolidViewPersistence(ts: TableState<Game>, prefKey: string): () => void {
+  let dispose: (() => void) | null = null;
+  createRoot(d => {
+    dispose = d;
+    createEffect(() => setPref(prefKey, ts.getViewState()));
+  });
+  return () => dispose?.();
+}
+
+// Builds and mounts the Solid table, shared by loadLibrary/loadWishlist below (the Library and
+// Wishlist tabs' own column sets/default-visible/sort differ, but everything else about
+// constructing and mounting the table is identical) — one implementation rather than two
+// near-copies that could quietly drift apart on exactly the disposal plumbing that matters most
+// here. See bundles.tsx's own identical-shaped table construction for the same
+// createTableState/createRoot/render()/disposeTable reasoning.
+function buildTable(columns: ColumnDef<Game>[], defaultVisible: string[], sort: SortEntry[]): TableState<Game> {
+  let disposeTableState!: () => void;
+  const ts = createRoot(dispose => {
+    disposeTableState = dispose;
+    return createTableState<Game>(tableData, columns, {
+      initialViewState: { pageSize: 50, visibleCols: defaultVisible, sorts: sort },
+    });
+  });
+  const disposeView = render(() => DataTableView<Game>({
+    table: ts,
+    rowKey: 'appid',
+    // See the matching comment in bundles.tsx's own onRowClick.
+    onRowClick: row => openGame(getRow(row.appid) ?? row),
+  }), tableContainer);
+  disposeTable = () => { disposeView(); disposeTableState(); };
+  return ts;
+}
 
 // ── Wishlist pricing setup ────────────────────────────────────────────────────
 // Fired once at module load, not awaited here — resolves in the background while the rest of
@@ -240,7 +372,7 @@ const itadConfiguredPromise = fetch('/api/health')
 // of whatever it currently resolves to.
 function updateWishlistRegionLabel() {
   const code = resolveRegion(getStoredRegion());
-  wishlistRegionValueEl.textContent = COUNTRY_OPTIONS.find(c => c.code === code)?.label ?? code;
+  setWishlistRegionValue(COUNTRY_OPTIONS.find(c => c.code === code)?.label ?? code);
 }
 
 // Only meaningful on the Wishlist tab, and only when there's a pricing feature to show a region
@@ -248,8 +380,9 @@ function updateWishlistRegionLabel() {
 // isn't configured (no point showing a region readout for a feature that isn't running).
 async function updateRegionLabelVisibility() {
   const configured = await itadConfiguredPromise;
-  wishlistRegionLabelEl.hidden = !(configured && activeTab === 'wishlist');
-  if (!wishlistRegionLabelEl.hidden) updateWishlistRegionLabel();
+  const hidden = !(configured && activeTab === 'wishlist');
+  setWishlistRegionHidden(hidden);
+  if (!hidden) updateWishlistRegionLabel();
 }
 updateRegionLabelVisibility();
 
@@ -261,7 +394,7 @@ updateRegionLabelVisibility();
 // below for why they show as reloading rather than stale).
 window.addEventListener(REGION_CHANGED_EVENT, () => {
   updateWishlistRegionLabel();
-  if (activeTab === 'wishlist' && rows.length > 0) loadWishlistPrices(rows);
+  if (activeTab === 'wishlist' && rowStore.size() > 0) loadWishlistPrices(rowsStore);
 });
 
 initPageShell({
@@ -282,12 +415,15 @@ initPageShell({
         const res = await fetch(`/api/game-details/${row.appid}?refresh=1`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Refresh failed');
-        applyDetailsEvent(row, data);
-        markRowChanged(row.appid);
-        if (table) table.setData(visibleRowsForTable());
-        await loadAchievements(row, { force: true }); // still meaningful with no player loaded — see loadAchievements
+        // Not every open game is one of the currently loaded tab's own store-backed rows (a
+        // standalone lookup isn't) — mutateRow returns undefined for those, so fall back to
+        // mutating the plain standalone object directly, same as before this row data was
+        // store-backed.
+        const updated = mutateRow(row.appid, draft => applyDetailsEvent(draft, data));
+        if (!updated) applyDetailsEvent(row, data);
+        await loadAchievements(updated ?? row, { force: true }); // still meaningful with no player loaded — see loadAchievements
       } catch (err) {
-        statusEl.textContent = `Refresh failed: ${(err as Error).message}`;
+        setStatusText(`Refresh failed: ${(err as Error).message}`);
       }
     },
     // Runs on every close path (see the comment on `onClose` in panel.js) — not just the
@@ -318,61 +454,35 @@ initGameSearch({
   onSelect: ({ appid, name }) => openStandaloneLookup(appid, name),
 });
 
-document.getElementById('shortcuts-backdrop')!.addEventListener('click', closeShortcuts);
+shortcutsBackdropEl.addEventListener('click', closeShortcuts);
 document.querySelector('.shortcuts-close')!.addEventListener('click', closeShortcuts);
 
 function openShortcuts() {
-  document.getElementById('shortcuts-modal')!.classList.add('open');
-  document.getElementById('shortcuts-backdrop')!.classList.add('open');
+  setShortcutsOpen(true);
 }
 
 function closeShortcuts() {
-  document.getElementById('shortcuts-modal')!.classList.remove('open');
-  document.getElementById('shortcuts-backdrop')!.classList.remove('open');
+  setShortcutsOpen(false);
 }
 
 function toggleShortcuts() {
-  if (document.getElementById('shortcuts-modal')!.classList.contains('open')) closeShortcuts();
-  else openShortcuts();
+  setShortcutsOpen(!shortcutsOpen());
 }
 
-// Rows whose details have streamed in — what's actually shown in the table (see
-// visibleRows() below for why unloaded rows are withheld rather than shown as '…' placeholders).
-// Returns the canonical `rows`/`rowMap` objects themselves — used by nav/random-pick (below)
-// and by onRowClick, all of which need the *same* reference the panel keeps displaying and any
-// later mutation (refresh, price loading) needs to keep reaching. table.setData() itself goes
-// through visibleRowsForTable() instead — see its own comment for why the two must differ.
+// Rows whose details have streamed in — used by updateLastPlayedTooltip below. Table rendering
+// itself goes through tableData() (see the rowsStore comment above), which does the same
+// `.filter(r => !r.loading)`; this is a second, thin call for the one non-table consumer left.
 function visibleRows() {
-  return rows.filter(r => !r.loading);
-}
-
-// @vates/data-table-vanilla's setData() only re-renders a row's cells when the object at its
-// rowKey is a genuinely *new* reference — mutating an already-visible row in place and calling
-// setData() again with an array that still contains that same reference (even a brand-new
-// outer array from a fresh .filter()) leaves its rendered cells stale. This never bit
-// streamGameDetails's own normal flow, since a row is only ever added to visibleRows()' output
-// the moment it first flips `loading: false` — a genuinely new appearance in the rendered set,
-// not a mutation of something already there. It does bite the Wishlist tab's price loading
-// (loadWishlistPrices) and the panel's "↻ Refresh" button (onRefresh below), both of which
-// mutate a row that may already be visible — same underlying bug rowCache.js fixes (confirmed
-// live first in bundles.js). A row keeps its cached copy across renders until markRowChanged()
-// is called for it, so only the row that actually changed gets a new reference and every other
-// row's DOM is left alone.
-function visibleRowsForTable() {
-  return rowCache.visibleRowsForTable(visibleRows(), r => String(r.appid));
-}
-function markRowChanged(appid: number) {
-  rowCache.markChanged(String(appid));
+  return rowsStore.filter(r => !r.loading);
 }
 
 // Stable order for prev/next nav — the table's current search/filter/sort order, independent
 // of its own display-only grouping/pagination (a grouped multi-value column like Genres fans a
 // game out into more than one group, so there's no single well-defined linear order once
-// grouping is applied). `table.getProcessedData()` (`@vates/data-table-vanilla` >= 0.13, added
-// per vatesfr/data-table#22) exposes exactly this directly — before that, this had to reach
-// into @vates/data-table-core/internal's processData/searchData by hand.
+// grouping is applied). `table.processedData()` (an Accessor, `@vates/data-table-solid`'s
+// equivalent of the vanilla table's `getProcessedData()` method) exposes exactly this directly.
 function getGameList(): Game[] {
-  return table ? (table.getProcessedData() as Game[]) : [];
+  return table ? table.processedData() : [];
 }
 
 // Resolves this game's owners for renderOwnersHtml (ownerListHtml.js) — the shared markup/sort/
@@ -396,7 +506,7 @@ function buildLibraryOwnersHtml(g: Game) {
 }
 
 // ── Ownership status (in-library / on-wishlist badges) ───────────────────────
-// Only one of the Library/Wishlist tabs is actually loaded into `rows`/`rowMap` at a time
+// Only one of the Library/Wishlist tabs is actually loaded into `rowsStore`/`panelRows` at a time
 // (see COLUMNS/WISHLIST_COLUMNS/activeTab above), but the panel's ownership badge (panel.js's
 // ownershipHtml) wants to answer both questions regardless of which tab happens to be open.
 // libraryAppidSet/wishlistAppidSet are populated independently of activeTab: whichever tab
@@ -471,12 +581,17 @@ function renderPanelNav(game: Game) {
 
 function openGame(game: Game, { isRandom = false, keepHistory = false }: { isRandom?: boolean; keepHistory?: boolean } = {}) {
   if (!isRandom) clearRandomQueue(randomQueueKey());
-  applyOwnershipFlags(game);
-  panelOpen(game, { keepHistory });
+  // Always open against the plain panelRows copy, never a rowsStore proxy — see that map's own
+  // comment above for why (panel.tsx's lazy loaders mutate whatever object they're given
+  // directly, which a Solid store blocks). A `game` not in panelRows (a standalone lookup) falls
+  // through to whatever was actually passed, unchanged from before.
+  const resolved = getRow(game.appid) ?? game;
+  applyOwnershipFlags(resolved);
+  panelOpen(resolved, { keepHistory });
   updateTitle();
-  renderPanelNav(game);
-  setPanelParam(game.appid);
-  loadAchievements(game);
+  renderPanelNav(resolved);
+  setPanelParam(resolved.appid);
+  loadAchievements(resolved);
 }
 
 // Lightbox's own ↑/↓ handler (see initLightbox below) — same game-list step the
@@ -487,7 +602,10 @@ function navigateLightboxGame(dir: number) {
   const next = stepGameList(table, getGameList, getPanelGame(), dir as 1 | -1);
   if (!next) return;
   openGame(next);
-  openLightbox(next, 0);
+  // getGameList() (used by stepGameList above) reads off the table's own rowsStore-backed
+  // processedData, so `next` may be a store proxy — resolve to the same plain panelRows copy
+  // openGame just opened the panel with, same reasoning as openGame's own comment.
+  openLightbox(getRow(next.appid) ?? next, 0);
 }
 
 // Fetches this game's achievement schema + unlock state for whichever account(s) are
@@ -555,7 +673,7 @@ function pickRandomGame() {
 // instead — full nav, playtime, etc. rather than a lesser standalone view of data already
 // sitting in `rows`.
 function openStandaloneLookup(appid: number, name = '', { keepHistory = false }: { keepHistory?: boolean } = {}) {
-  const existing = rowMap.get(appid);
+  const existing = getRow(appid);
   if (existing) {
     openGame(existing, { keepHistory });
     addRecentGame(existing.appid, existing.name, (existing.capsule as string | undefined) || null);
@@ -565,14 +683,14 @@ function openStandaloneLookup(appid: number, name = '', { keepHistory = false }:
   const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true } as Game;
   openGame(game, { keepHistory });
   fetchStandaloneDetails(game);
-  // Not part of `rows`/`rowMap`, so loadWishlistPrices' own rowMap-keyed batch (see below)
+  // Not part of `rowsStore`/`panelRows`, so loadWishlistPrices' own appid-keyed batch (see below)
   // never reaches it — a standalone lookup made while on the Wishlist tab would otherwise
   // show no Price card at all, since panel.js's priceHtml is purely passive (see its own
   // comment) and nothing else ever sets bestDealPrice/etc. on this one-off game object.
   if (activeTab === 'wishlist') fetchStandalonePrice(game);
 }
 
-// Prices a single standalone-lookup game directly (not via rowMap, which loadWishlistPrices
+// Prices a single standalone-lookup game directly (not via mutateRow, which loadWishlistPrices
 // above is keyed on) — same ITAD call/field mapping, just applied straight onto `game`.
 async function fetchStandalonePrice(game: Game) {
   const configured = await itadConfiguredPromise;
@@ -601,33 +719,17 @@ async function fetchStandaloneDetails(game: Game) {
     addRecentGame(game.appid, game.name, data.meta?.capsule || null);
     renderRecentGamesBar(recentGamesBarEl);
   } catch (err) {
-    if (getPanelGame() === game) statusEl.textContent = `Lookup failed: ${(err as Error).message}`;
+    if (getPanelGame() === game) setStatusText(`Lookup failed: ${(err as Error).message}`);
   }
 }
 
 // ── URL state — deep link to an open game panel (`?game=`, restored via openStandaloneLookup
 // above when the appid isn't backed by any loaded row) and, within it, a specific lightbox
-// screenshot/video (`?shot=`). Mirrors app.js's setPanelParam/setLightboxParam/
-// restorePanelFromUrl for the comparison page; see public/urlState.js for the equivalent
-// parsing there (library.js has no analogous shared parser since its only other URL params —
-// `u`, `tab`, `lv`/`wv` — are handled by updateUrlParams/restoreTableView/shareTableView
-// already). The name
-// deliberately never rides along in this URL (see openStandaloneLookup) — only the appid is
-// trusted, and the panel just shows a placeholder title until the fetch resolves it.
-function setPanelParam(appid: number | null) {
-  const params = new URLSearchParams(location.search);
-  params.delete('shot');
-  if (appid == null) params.delete('game');
-  else params.set('game', String(appid));
-  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
-}
-
-function setLightboxParam(idx: number | string | null) {
-  const params = new URLSearchParams(location.search);
-  if (idx == null) params.delete('shot');
-  else params.set('shot', String(idx));
-  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
-}
+// screenshot/video (`?shot=`). `setPanelParam`/`setLightboxParam` (`urlState.ts`) are shared
+// with `app.tsx`/`bundles.tsx`; this page has no analogous shared parser for the rest of its own
+// URL params since they're handled by updateUrlParams/restoreTableView/shareTableView already.
+// The name deliberately never rides along in this URL (see openStandaloneLookup) — only the
+// appid is trusted, and the panel just shows a placeholder title until the fetch resolves it.
 
 // Reopens the panel (and, if present, the lightbox) from the current `?game=`/`?shot=`
 // URL params. Only called on the initial page load (see the bottom of this file) —
@@ -643,7 +745,7 @@ function restorePanelFromUrl(restoreShot: string | null = null) {
   const params = new URLSearchParams(location.search);
   const appid = Number(params.get('game'));
   if (!appid) return;
-  const row = rowMap.get(appid);
+  const row = getRow(appid);
   if (row) {
     if (getPanelGame()?.appid !== appid) openGame(row);
     const shotParam = restoreShot ?? params.get('shot');
@@ -658,55 +760,37 @@ function restorePanelFromUrl(restoreShot: string | null = null) {
   openStandaloneLookup(appid);
 }
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    // panelHandleEscape (panel.js) owns the lightbox-close/fullscreen-guard logic shared by
-    // all three pages — delegate to it whenever the lightbox is open so this page can't drift
-    // from the other two the way bundles.js once did (see its own comment).
-    if (isLightboxOpen()) { panelHandleEscape(); return; }
-    if (document.getElementById('shortcuts-modal')!.classList.contains('open')) { closeShortcuts(); return; }
-    panelClose(); // onClose (see initPanel above) handles the URL cleanup
-    return;
-  }
-  // The lightbox owns the keyboard while open — see the identical comment in app.js's
-  // own keydown handler for why every other page-level shortcut is blocked here.
-  if (isLightboxOpen()) return;
-  if (e.key === '?') { e.preventDefault(); toggleShortcuts(); return; }
-  const tag = document.activeElement?.tagName;
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-  if (e.key === '/') {
-    e.preventDefault();
-    playerInput.focus();
-    return;
-  }
-  if (!isPanelOpen()) return;
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-    if (panelStepHero(e.key === 'ArrowRight' ? 1 : -1, { wrap: true })) e.preventDefault();
-    return;
-  }
-  if (e.key === 'r' || e.key === 'R') {
-    e.preventDefault();
-    pickRandomGame();
-    return;
-  }
-  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-  if (!table || getPanelGame()?.standalone) return; // see renderPanelNav — no list to page through
-  e.preventDefault();
-  const list = getGameList();
-  const idx = list.findIndex(g => g.appid === getPanelGame()!.appid);
-  const next = (idx + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
-  openGame(list[next]);
+bindPanelKeyboardShortcuts({
+  isLightboxOpen,
+  isPanelOpen,
+  panelClose,
+  panelStepHero,
+  shortcuts: { isOpen: shortcutsOpen, toggle: toggleShortcuts, close: closeShortcuts },
+  focusSearchInput: () => playerInput.focus(),
+  pickRandom: pickRandomGame,
+  stepGame: dir => {
+    const next = stepGameList(table, getGameList, getPanelGame(), dir);
+    if (!next) return false;
+    openGame(next);
+    return true;
+  },
 });
 
-function scheduleFlush() {
-  if (flushTimer !== null) return;
-  flushTimer = setTimeout(() => {
-    flushTimer = null;
-    if (table) table.setData(visibleRowsForTable());
-    updateLastPlayedTooltip();
-    updateStatus();
-  }, 150);
-}
+// Batches detail-stream events (see streamBatcher.ts's own header comment for the full story:
+// this restores the ~150ms-amortized table-update cadence the pre-Solid
+// `@vates/data-table-vanilla` table got for free via an explicit, timer-gated `table.setData()`
+// call, which the Solid conversion silently dropped once the table started reading live off the
+// store instead). `onFlush` covers the same status-text/tooltip refresh `scheduleFlush`'s old
+// timer callback did.
+const detailBatcher = createStreamBatcher<DetailsEvent>({
+  apply: event => {
+    const row = mutateRow(event.appid, draft => applyDetailsEvent(draft, event));
+    if (!row) return;
+    if (isPanelOpen() && getPanelGame()?.appid === row.appid) { renderPanelBody(row); renderPanelNav(row); }
+  },
+  isStale: gen => loadGuard.isStale(gen),
+  onFlush: () => { updateLastPlayedTooltip(); updateStatus(); },
+});
 
 // See the `lastPlayed` column comment in COLUMNS above — 0/absent `rtime_last_played` for a
 // non-key-owner account is indistinguishable from "never played", so a column that's entirely
@@ -748,11 +832,11 @@ function updateBackLink() {
 }
 
 function updateStatus() {
-  if (total === 0) { statusEl.textContent = ''; return; }
+  if (total === 0) { setStatusText(''); return; }
   if (loaded >= total) {
-    statusEl.textContent = `${total} games`;
+    setStatusText(`${total} games`);
   } else {
-    statusEl.textContent = `${loaded} / ${total} games loaded…`;
+    setStatusText(`${loaded} / ${total} games loaded…`);
   }
 }
 
@@ -868,10 +952,17 @@ function applyDetailsEvent(row: Game, event: DetailsEvent) {
 }
 
 // Streams rating/hltb/meta/tags for `games` ({appid, name}[]) over SSE and applies each
-// event to its row in `rowMap` as it arrives. Shared by loadLibrary and loadWishlist. Only
+// event to its row via mutateRow as it arrives. Shared by loadLibrary and loadWishlist. Only
 // `appid` is actually sent — the server always resolves the game's name itself rather than
 // trusting a client-supplied one (see CLAUDE.md's "Looking up an arbitrary game" section).
-async function streamGameDetails(games: { appid: number }[]) {
+//
+// `gen`: the calling loadLibrary()/loadWishlist()'s own generation (see loadGuard above) —
+// checked at the top of every loop iteration, not just once at the start, since a stream spans
+// many `await`s and a newer load can supersede this one (resetting rowStore/`loaded`/`total` for
+// a *different* tab/player) at any point while it's still reading. Without this, a superseded
+// stream kept incrementing the new load's own `loaded` counter and calling mutateRow against
+// its rowStore — same bug class bundles.tsx's openBundle needed its own generation guard for.
+async function streamGameDetails(games: { appid: number }[], gen: number) {
   let detailsResp: Response;
   try {
     detailsResp = await fetch('/api/game-details/stream', {
@@ -880,7 +971,8 @@ async function streamGameDetails(games: { appid: number }[]) {
       body: JSON.stringify({ games: games.map(g => ({ appid: g.appid })) }),
     });
   } catch (err) {
-    statusEl.textContent = `Details stream failed: ${(err as Error).message}`;
+    if (loadGuard.isStale(gen)) return;
+    setStatusText(`Details stream failed: ${(err as Error).message}`);
     return;
   }
 
@@ -889,6 +981,7 @@ async function streamGameDetails(games: { appid: number }[]) {
   let   buffer  = '';
 
   while (true) {
+    if (loadGuard.isStale(gen)) { reader.cancel(); return; }
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
@@ -901,22 +994,18 @@ async function streamGameDetails(games: { appid: number }[]) {
       try { event = JSON.parse(line.slice(6)); } catch { continue; }
       if (event.done) continue;
 
-      const row = rowMap.get(event.appid);
-      if (!row) continue;
-
-      applyDetailsEvent(row, event);
-      markRowChanged(row.appid);
-      if (isPanelOpen() && getPanelGame()?.appid === row.appid) { renderPanelBody(row); renderPanelNav(row); }
-
+      // Queued rather than applied immediately — see streamBatcher.ts's own header comment for
+      // why: applying every event's mutateRow call the moment it arrives means
+      // @vates/data-table-solid's own live `tableData()` reactivity fully re-sorts/re-filters/
+      // re-paginates once per streamed game instead of once per flush, which is the actual
+      // "browser freezes for up to a minute" bug this queue+batch fixes for a large library.
+      detailBatcher.push(event, gen);
       loaded++;
-      scheduleFlush();
     }
   }
 
-  if (flushTimer !== null) { clearTimeout(flushTimer); flushTimer = null; }
-  if (table) table.setData(visibleRowsForTable());
-  updateLastPlayedTooltip();
-  updateStatus();
+  if (loadGuard.isStale(gen)) return;
+  detailBatcher.flushNow(); // don't drop whatever's still queued from since the last flush; also runs onFlush (status/tooltip)
 }
 
 // Fetches Steam's non-discounted price + historical lows for the Wishlist tab's games, via the
@@ -931,20 +1020,29 @@ const MAX_PRICE_LOOKUP_GAMES = 500; // mirrors the server's own cap (server.js) 
 // cache read for this call (?refresh=1, same convention as every other force-refresh in this
 // app, and the same option bundles.js's own loadPrices takes) so a stale price actually gets
 // re-fetched from ITAD instead of just re-reading the same cached response back.
-async function loadWishlistPrices(items: { appid: number }[], { force = false }: { force?: boolean } = {}) {
-  priceStatusEl.textContent = '';
+// `gen`: defaults to whatever generation is currently in effect — right for the region-change
+// handler and the "↻ Refresh prices" button below, neither of which is itself starting a new
+// load, just re-pricing whatever's already loaded. loadWishlist passes its own generation
+// explicitly, same reasoning as bundles.tsx's own loadPrices.
+async function loadWishlistPrices(items: { appid: number }[], { force = false, gen = loadGuard.current() }: { force?: boolean; gen?: number } = {}) {
+  setPriceStatusText('');
   const configured = await itadConfiguredPromise;
+  if (loadGuard.isStale(gen)) return;
   if (!configured) {
     // No ITAD key configured at all — fill every row with "no data" (not "…", which would
     // otherwise look stuck loading forever) rather than attempting a request bound to 503.
-    for (const item of items) {
-      const row = rowMap.get(item.appid);
-      if (!row) continue;
-      nullAllPriceFields(row);
-      markRowChanged(item.appid);
-      if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
-    }
-    if (table) table.setData(visibleRowsForTable());
+    // `batch()` here (and around the two chunk loops below) for the same reason streamGameDetails
+    // now goes through streamBatcher.ts instead of calling mutateRow per event unbatched — a
+    // wishlist can have hundreds of items, and each is a synchronous loop with no `await` in
+    // between, so without batch() every single mutateRow call would trigger its own full
+    // @vates/data-table-solid re-sort/re-filter/re-paginate instead of just one at the end.
+    batch(() => {
+      for (const item of items) {
+        const row = mutateRow(item.appid, draft => nullAllPriceFields(draft));
+        if (!row) continue;
+        if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
+      }
+    });
     return;
   }
 
@@ -955,32 +1053,35 @@ async function loadWishlistPrices(items: { appid: number }[], { force = false }:
   // once would just be several concurrent ITAD-backed requests instead of one, for no benefit.
   const appids = items.map(i => i.appid);
   for (let i = 0; i < appids.length; i += MAX_PRICE_LOOKUP_GAMES) {
+    if (loadGuard.isStale(gen)) return;
     const chunk = appids.slice(i, i + MAX_PRICE_LOOKUP_GAMES);
     try {
       const prices = await postPrices({ appids: chunk, country, force });
-      for (const appid of chunk) {
-        const row = rowMap.get(appid);
-        const info = prices[appid];
-        if (!row || !info) continue;
-        applyPriceInfo(row, info, discountPct);
-        markRowChanged(appid);
-        if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
-      }
+      if (loadGuard.isStale(gen)) return;
+      batch(() => {
+        for (const appid of chunk) {
+          const info = prices[appid];
+          if (!info) continue;
+          const row = mutateRow(appid, draft => applyPriceInfo(draft, info, discountPct));
+          if (!row) continue;
+          if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
+        }
+      });
     } catch (err) {
+      if (loadGuard.isStale(gen)) return;
       // Same "don't leave price columns stuck on their loading placeholder forever" treatment
       // as bundles.js's own loadPrices — a failed chunk still fills its own games with `null`
       // (rendered "—", same as any other "no data" case) rather than leaving them on "…".
-      for (const appid of chunk) {
-        const row = rowMap.get(appid);
-        if (!row) continue;
-        nullMissingPriceFields(row);
-        markRowChanged(appid);
-        if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
-      }
-      priceStatusEl.textContent = `Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`;
+      batch(() => {
+        for (const appid of chunk) {
+          const row = mutateRow(appid, draft => nullMissingPriceFields(draft));
+          if (!row) continue;
+          if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
+        }
+      });
+      setPriceStatusText(`Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`);
     }
   }
-  if (table) table.setData(visibleRowsForTable());
 }
 
 // preserveGameParam: skip clearing `?game=`/`&shot=` when closing a leftover panel — for a
@@ -991,13 +1092,14 @@ function resetTableState({ preserveGameParam = false } = {}) {
   if (isPanelOpen()) panelClose({ preserveUrl: preserveGameParam });
   clearRandomQueue(randomQueueKey());
   if (unsyncView) { unsyncView(); unsyncView = null; }
-  if (table) { table.destroy(); table = null; }
-  rows = []; rowMap = new Map(); total = 0; loaded = 0; rowCache.reset();
+  if (disposeTable) { disposeTable(); disposeTable = null; }
+  table = null;
+  setRowsStore([]); rowStore.reset(); total = 0; loaded = 0;
   tableContainer.innerHTML = '';
-  priceStatusEl.textContent = '';
-  resetViewBtn.hidden = true;
-  shareViewBtn.hidden = true;
-  refreshPricesBtn.hidden = true;
+  setPriceStatusText('');
+  setResetViewHidden(true);
+  setShareViewHidden(true);
+  setRefreshPricesHidden(true);
   accountsBarEl.hidden = true;
   accountsBarEl.innerHTML = '';
   currentSteamIds = [];
@@ -1041,10 +1143,11 @@ async function loadLibrary(playerStr: string, { refreshIds, preserveGameParam = 
   // not derived from anything the server resolves.
   if (!preserveGameParam) updateUrlParams({ game: null, shot: null });
   currentPlayerStr = playerStr;
+  const gen = loadGuard.next();
 
   const members = playerStr.split(',').map(s => normalizeInput(s.trim())).filter(Boolean);
 
-  statusEl.textContent = refreshIds ? 'Refreshing account…' : 'Fetching library…';
+  setStatusText(refreshIds ? 'Refreshing account…' : 'Fetching library…');
   resetTableState({ preserveGameParam });
 
   let result: CommonGamesResponse;
@@ -1056,14 +1159,21 @@ async function loadLibrary(playerStr: string, { refreshIds, preserveGameParam = 
     });
     if (!resp.ok) {
       const { error } = await resp.json();
-      statusEl.textContent = `Error: ${error}`;
+      if (loadGuard.isStale(gen)) return;
+      setStatusText(`Error: ${error}`);
       return;
     }
     result = await resp.json();
   } catch (err) {
-    statusEl.textContent = `Error: ${(err as Error).message}`;
+    if (loadGuard.isStale(gen)) return;
+    setStatusText(`Error: ${(err as Error).message}`);
     return;
   }
+  // A newer loadLibrary()/loadWishlist() call has since taken over resetTableState's own
+  // rowStore/table/disposeTable — everything below builds on top of those, so bail out rather
+  // than racing the newer call to reassign them (same class of bug bundles.tsx's openBundle had
+  // before its own generation guard).
+  if (loadGuard.isStale(gen)) return;
 
   const allGames = result.groups.flatMap(g => g.games);
   const slotSteamIds = result.slots[0].map(p => p.steamid);
@@ -1093,7 +1203,7 @@ async function loadLibrary(playerStr: string, { refreshIds, preserveGameParam = 
   addRecent(RECENTS_KEY, idStr, [result.slots[0]], idStr);
   renderRecentsBar(recentsBarEl, RECENTS_KEY);
 
-  rows = allGames.map(game => {
+  const initialRows = allGames.map(game => {
     const ptByAccount = (result.playtime && result.playtime[game.appid]) || {};
     const totalMin = slotSteamIds.reduce((s, id) => s + (ptByAccount[id] || 0), 0);
     const lpByAccount = (result.lastPlayed && result.lastPlayed[game.appid]) || {};
@@ -1131,32 +1241,22 @@ async function loadLibrary(playerStr: string, { refreshIds, preserveGameParam = 
     };
   }) as unknown as Game[]; // price fields (steamRegular/bestDeal*/lows) filled in later by the stream — see bundles.js's identical cast
 
-  rowMap = new Map(rows.map(r => [r.appid, r]));
-  total = rows.length;
+  setRowsStore(initialRows);
+  rowStore.load(initialRows);
+  total = initialRows.length;
   activeColumns = COLUMNS;
 
-  table = createDataTable(tableContainer, {
-    data: visibleRows(), // empty at this point — every row starts out loading:true, see below
-    columns: COLUMNS,
-    rowKey: 'appid',
-    initialViewState: { pageSize: 50, visibleCols: DEFAULT_VISIBLE, sorts: DEFAULT_SORT },
-    // The table's own click handler hands back whatever object is currently in
-    // rowCache for this row (see visibleRowsForTable's comment above) — a copy, not
-    // rowMap's canonical one. Looking the canonical row back up by appid means the panel (and
-    // anything that mutates whatever object it opened, like onRefresh below) always operates
-    // on the same object rowMap does, not a disconnected copy further updates would stop
-    // reaching — same fix bundles.js already needed for the same reason.
-    onRowClick: row => openGame(rowMap.get(row.appid) ?? row),
-  });
+  table = buildTable(COLUMNS as unknown as ColumnDef<Game>[], DEFAULT_VISIBLE, DEFAULT_SORT);
   restoreTableView(table, viewPrefKey(), viewParamName());
-  unsyncView = bindViewPersistence(table, viewPrefKey());
-  resetViewBtn.hidden = false;
-  shareViewBtn.hidden = false;
+  unsyncView = bindSolidViewPersistence(table, viewPrefKey());
+  setResetViewHidden(false);
+  setShareViewHidden(false);
 
   updateStatus();
   if (preserveGameParam) restorePanelFromUrl(restoreShot); // early attempt — lightbox needs details, tried again below
 
-  await streamGameDetails(allGames);
+  await streamGameDetails(allGames, gen);
+  if (loadGuard.isStale(gen)) return;
   if (preserveGameParam) restorePanelFromUrl(restoreShot);
 }
 
@@ -1165,10 +1265,11 @@ async function loadWishlist(playerStr: string, { refreshIds, preserveGameParam =
   // fetch below, but the `u` param does (it's written further down from resolved steamids).
   if (!preserveGameParam) updateUrlParams({ game: null, shot: null });
   currentPlayerStr = playerStr;
+  const gen = loadGuard.next();
 
   const members = playerStr.split(',').map(s => normalizeInput(s.trim())).filter(Boolean);
 
-  statusEl.textContent = refreshIds ? 'Refreshing account…' : 'Fetching wishlist…';
+  setStatusText(refreshIds ? 'Refreshing account…' : 'Fetching wishlist…');
   resetTableState({ preserveGameParam });
 
   let result: WishlistResponse;
@@ -1180,14 +1281,18 @@ async function loadWishlist(playerStr: string, { refreshIds, preserveGameParam =
     });
     if (!resp.ok) {
       const { error } = await resp.json();
-      statusEl.textContent = `Error: ${error}`;
+      if (loadGuard.isStale(gen)) return;
+      setStatusText(`Error: ${error}`);
       return;
     }
     result = await resp.json();
   } catch (err) {
-    statusEl.textContent = `Error: ${(err as Error).message}`;
+    if (loadGuard.isStale(gen)) return;
+    setStatusText(`Error: ${(err as Error).message}`);
     return;
   }
+  // See the matching comment in loadLibrary above.
+  if (loadGuard.isStale(gen)) return;
 
   // Written from the server-resolved `steamid`s, not the raw typed input — see the matching
   // comment in loadLibrary above.
@@ -1206,7 +1311,7 @@ async function loadWishlist(playerStr: string, { refreshIds, preserveGameParam =
   addRecent(RECENTS_KEY, idStr, [result.players], idStr);
   renderRecentsBar(recentsBarEl, RECENTS_KEY);
 
-  rows = result.items.map(item => ({
+  const initialRows = result.items.map(item => ({
     appid:              item.appid,
     name:               undefined, // unknown until store metadata streams in
     priority:           item.priority,
@@ -1249,26 +1354,20 @@ async function loadWishlist(playerStr: string, { refreshIds, preserveGameParam =
     details:            null,
   })) as unknown as Game[]; // name: undefined until the stream resolves it, price fields filled in by loadWishlistPrices — same cast as loadLibrary above
 
-  rowMap = new Map(rows.map(r => [r.appid, r]));
-  total = rows.length;
+  setRowsStore(initialRows);
+  rowStore.load(initialRows);
+  total = initialRows.length;
   activeColumns = WISHLIST_COLUMNS;
 
-  table = createDataTable(tableContainer, {
-    data: visibleRows(), // empty at this point — every row starts out loading:true, see below
-    columns: WISHLIST_COLUMNS,
-    rowKey: 'appid',
-    initialViewState: { pageSize: 50, visibleCols: WISHLIST_DEFAULT_VISIBLE, sorts: DEFAULT_SORT },
-    // See the matching comment in loadLibrary above.
-    onRowClick: row => openGame(rowMap.get(row.appid) ?? row),
-  });
+  table = buildTable(WISHLIST_COLUMNS as unknown as ColumnDef<Game>[], WISHLIST_DEFAULT_VISIBLE, DEFAULT_SORT);
   restoreTableView(table, viewPrefKey(), viewParamName());
-  unsyncView = bindViewPersistence(table, viewPrefKey());
-  resetViewBtn.hidden = false;
-  shareViewBtn.hidden = false;
+  unsyncView = bindSolidViewPersistence(table, viewPrefKey());
+  setResetViewHidden(false);
+  setShareViewHidden(false);
   // Same "don't show a control for a feature that isn't running" reasoning as
   // wishlistRegionLabelEl (see updateRegionLabelVisibility above) — no point offering a price
   // refresh when ITAD isn't configured and every price column is just going to read "—".
-  itadConfiguredPromise.then(configured => { refreshPricesBtn.hidden = !configured; });
+  itadConfiguredPromise.then(configured => { setRefreshPricesHidden(!configured); });
 
   updateStatus();
   if (preserveGameParam) restorePanelFromUrl(restoreShot); // early attempt — lightbox needs details, tried again below
@@ -1276,7 +1375,8 @@ async function loadWishlist(playerStr: string, { refreshIds, preserveGameParam =
   // Independent of each other — Steam pricing has nothing to do with the rating/HLTB/tags
   // pipeline — so they run concurrently rather than one after the other, same reasoning as
   // bundles.js's own openBundle.
-  await Promise.all([streamGameDetails(result.items), loadWishlistPrices(result.items)]);
+  await Promise.all([streamGameDetails(result.items, gen), loadWishlistPrices(result.items, { gen })]);
+  if (loadGuard.isStale(gen)) return;
   if (preserveGameParam) restorePanelFromUrl(restoreShot);
 }
 
@@ -1326,17 +1426,17 @@ shareViewBtn.addEventListener('click', () => shareTableView(table!, viewParamNam
 // Refreshes just the price columns for the currently loaded wishlist, in one shot — same
 // reasoning as bundles.js's own refreshPricesBtn: it's a single cheap POST /api/prices call
 // either way, no reason to make the user step through every game's own panel "↻ Refresh".
-// Only ever visible on the Wishlist tab (see loadWishlist above), so `rows` here is always the
-// wishlist's own rows.
+// Only ever visible on the Wishlist tab (see loadWishlist above), so `rowsStore` here is always
+// the wishlist's own rows.
 refreshPricesBtn.addEventListener('click', async () => {
-  if (rows.length === 0 || refreshPricesBtn.disabled) return;
-  refreshPricesBtn.disabled = true;
-  refreshPricesBtn.textContent = 'Refreshing…';
+  if (rowStore.size() === 0 || refreshPricesDisabled()) return;
+  setRefreshPricesDisabled(true);
+  setRefreshPricesLabel('Refreshing…');
   try {
-    await loadWishlistPrices(rows, { force: true });
+    await loadWishlistPrices(rowsStore, { force: true });
   } finally {
-    refreshPricesBtn.disabled = false;
-    refreshPricesBtn.textContent = '↻ Refresh prices';
+    setRefreshPricesDisabled(false);
+    setRefreshPricesLabel('↻ Refresh prices');
   }
 });
 
