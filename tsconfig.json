@@ -10,10 +10,14 @@
     "paths": {
       "/*": ["./public/*"]
     },
+    // Solid JSX (only the .tsx files under public/ use it; vite-plugin-solid handles
+    // the transform at build time, tsc just needs to parse it for typechecking).
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },
-  "include": ["public/**/*.ts"]
+  "include": ["public/**/*.ts", "public/**/*.tsx"]
 }
