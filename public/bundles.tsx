@@ -1,22 +1,29 @@
 'use strict';
 
-import { esc, formatMoney, computeSteamdbRating, computeProductionTier, discountPct } from '/utils.ts';
-import { reorderUrlParams } from '/urlState.ts';
-import { restoreTableView, bindViewPersistence, shareTableView, resetTableView } from '/tableViewPrefs.ts';
-import { createRowCache } from '/rowCache.ts';
+import { formatMoney, computeSteamdbRating, computeProductionTier, discountPct } from '/utils.ts';
+import { reorderUrlParams, setPanelParam, setLightboxParam } from '/urlState.ts';
+import { restoreTableView, shareTableView, resetTableView } from '/tableViewPrefs.ts';
 import { renderPanelNav as renderPanelNavShared, stepGameList } from '/panelNav.ts';
+import { bindPanelKeyboardShortcuts } from '/panelKeyboard.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields } from '/priceLoading.ts';
 import { COUNTRY_OPTIONS, TIMEZONE_COUNTRY, detectCountry, getStoredRegion, setStoredRegion, resolveRegion, REGION_CHANGED_EVENT } from '/region.ts';
-import { openLightbox, isLightboxOpen } from '/lightbox.ts';
+import { openLightbox, isLightboxOpen } from '/lightbox.tsx';
 import {
   panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,
   pickRandomFrom, clearRandomQueue, panelHandleEscape,
   renderPanelBody,
-} from '/panel.ts';
+} from '/panel.tsx';
 import { initPageShell } from '/pageShell.ts';
+import { setPref } from '/prefs.ts';
+import { createRowStore } from '/rowStore.ts';
+import { createStaleGuard } from '/staleGuard.ts';
+import { createStreamBatcher } from '/streamBatcher.ts';
 
-import { createDataTable } from '@vates/data-table-vanilla';
-import type { ColumnDef, DataTableInstance, SortEntry } from '@vates/data-table-vanilla';
+import { createSignal, createRoot, createEffect, For, Show, batch } from 'solid-js';
+import { createStore } from 'solid-js/store';
+import { render } from 'solid-js/web';
+import { createTableState, DataTableView } from '@vates/data-table-solid';
+import type { ColumnDef, SortEntry, TableState } from '@vates/data-table-solid';
 import type { Game, GameDetails } from './types.ts';
 import {
   fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareNumMissingLast,
@@ -61,7 +68,9 @@ interface Bundle {
 // Same pill shape, distinguishing a tier that only adds bonus content (soundtrack, extra
 // DLC-ish items) on top of an already-unlocked base game, from a tier that unlocks a base
 // game outright — an ITAD-specific fact this app's own library/wishlist tables have no
-// equivalent of.
+// equivalent of. Still a plain DOM-Node-returning function, not a Solid component — this is
+// the data table's own `render` cell hook (@vates/data-table-solid's `ColumnDef.render`),
+// which wants a raw Node back, same contract the vanilla table had.
 function renderAddonBadge(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');
   const span = document.createElement('span');
@@ -121,7 +130,7 @@ const BUNDLE_COLUMNS = insertColumnsAfter(
 const DEFAULT_VISIBLE = ['capsule', 'name', 'tierPrice', 'bestDealPrice', 'bestDealCut', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
 // Cheapest first, best-rated among ties second — a genuinely useful browsing order (unlike a
 // single-column sort, which leaves same-priced games in an arbitrary relative order). Passed as
-// part of `initialViewState` at table construction (`@vates/data-table-vanilla` >= 0.12) — also
+// part of `initialViewState` at table construction — also
 // what `resetTableView`'s own `setViewState({})` blanking restores, so unlike before there's no
 // separate priming call or manual reapply-after-reset needed for this.
 const DEFAULT_SORT: SortEntry[] = [{ key: 'tierPrice', dir: 'asc' }, { key: 'steamdbRating', dir: 'desc' }];
@@ -134,6 +143,13 @@ const DEFAULT_SORT: SortEntry[] = [{ key: 'tierPrice', dir: 'asc' }, { key: 'ste
 // Preferences popover (public/nav.js), not on this page — see updateBundlesRegionLabel below.
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
+// Every element below is still real, static markup from bundles.html (unchanged) — this page
+// isn't rendering its own shell in JSX, just the genuinely dynamic pieces within it (see the
+// signals/effects and the three render()-mounted list/link components further down). Elements
+// whose *content* becomes a Solid component (bundleListEl/unresolvedListEl/detailLinksEl) are
+// mount targets for render(); every other element here is written to from a small createEffect
+// synced to one of this page's own signals, replacing what used to be direct
+// textContent/hidden/classList writes scattered across the functions below.
 const notConfiguredCard = document.getElementById('not-configured-card')!;
 const browseCard        = document.getElementById('browse-card')!;
 const bundlesRegionValueEl = document.getElementById('bundles-region-value')!;
@@ -159,6 +175,73 @@ const unresolvedSection  = document.getElementById('unresolved-section')!;
 const unresolvedListEl   = document.getElementById('unresolved-list')!;
 const shareViewBtn       = document.getElementById('share-view-btn')!;
 
+// ── Page state signals ──────────────────────────────────────────────────────
+// The rest of this page's own UI state (bundle list/nav, region
+// readout, price/detail status lines, view-button visibility, etc.) as Solid signals rather than
+// scattered direct DOM writes. Each one either drives a small createEffect below (for a plain
+// text/hidden/disabled/class write against the static markup above) or is read reactively by one
+// of the three render()-mounted components further down (the bundle list, the unresolved-games
+// list, and the detail links — the genuinely list-shaped pieces, which get real JSX/<For> instead
+// of hand-built HTML strings). Defaults match whatever bundles.html's own markup already starts
+// as (e.g. a button with a bare `hidden` attribute starts its signal at `true`), so the first
+// effect run is a no-op rather than an initial flicker.
+const [notConfiguredHidden, setNotConfiguredHidden] = createSignal(true);
+const [browseHidden, setBrowseHidden] = createSignal(false);
+const [regionLabel, setRegionLabel] = createSignal('');
+const [bundlesStatusText, setBundlesStatusText] = createSignal('');
+const [listCollapsedSig, setListCollapsedSig] = createSignal(false);
+const [bundlesSig, setBundlesSig] = createSignal<Bundle[]>([]);
+const [activeBundleIdSig, setActiveBundleIdSig] = createSignal<number | null>(null);
+const [loadMoreHidden, setLoadMoreHidden] = createSignal(true);
+const [detailHidden, setDetailHidden] = createSignal(true);
+const [detailTitleSig, setDetailTitleSig] = createSignal('');
+const [detailMetaSig, setDetailMetaSig] = createSignal('');
+const [detailLinksSig, setDetailLinksSig] = createSignal<{ details: string | null; url: string | null } | null>(null);
+const [prevDisabled, setPrevDisabled] = createSignal(true);
+const [nextDisabled, setNextDisabled] = createSignal(true);
+const [detailStatusSig, setDetailStatusSig] = createSignal('');
+const [priceStatusSig, setPriceStatusSig] = createSignal('');
+const [refreshPricesHidden, setRefreshPricesHidden] = createSignal(true);
+const [refreshPricesDisabled, setRefreshPricesDisabled] = createSignal(false);
+const [refreshPricesLabel, setRefreshPricesLabel] = createSignal('↻ Refresh prices');
+const [resetViewHidden, setResetViewHidden] = createSignal(true);
+const [shareViewHidden, setShareViewHidden] = createSignal(true);
+const [unresolvedGamesSig, setUnresolvedGamesSig] = createSignal<FlatGame[]>([]);
+
+// One createRoot for every scalar signal → DOM effect — module-lifetime, same as the page's own
+// event listeners and initPageShell() call below (nothing on this page tears itself down before
+// a full navigation), so it's never explicitly disposed. `bundleListWrapEl`'s collapsed class and
+// `toggleListBtn`'s hidden/label both need `bundlesSig()` too (an empty list always hides the
+// toggle, regardless of collapsed state) — combined into one effect rather than two so they can't
+// drift out of sync with each other's read of `bundlesSig()`.
+createRoot(() => {
+  createEffect(() => { notConfiguredCard.hidden = notConfiguredHidden(); });
+  createEffect(() => { browseCard.hidden = browseHidden(); });
+  createEffect(() => { bundlesRegionValueEl.textContent = regionLabel(); });
+  createEffect(() => { bundlesStatusEl.textContent = bundlesStatusText(); });
+  createEffect(() => { bundleListWrapEl.classList.toggle('collapsed', listCollapsedSig()); });
+  createEffect(() => {
+    toggleListBtn.hidden = bundlesSig().length === 0;
+    toggleListBtn.textContent = listCollapsedSig() ? 'Show list' : 'Hide list';
+  });
+  createEffect(() => { loadMoreBtn.hidden = loadMoreHidden(); });
+  createEffect(() => { detailCard.hidden = detailHidden(); });
+  createEffect(() => { detailTitleEl.textContent = detailTitleSig(); });
+  createEffect(() => { detailMetaEl.textContent = detailMetaSig(); });
+  createEffect(() => { prevBundleBtn.disabled = prevDisabled(); });
+  createEffect(() => { nextBundleBtn.disabled = nextDisabled(); });
+  createEffect(() => { detailStatusEl.textContent = detailStatusSig(); });
+  createEffect(() => { priceStatusEl.textContent = priceStatusSig(); });
+  createEffect(() => { refreshPricesBtn.hidden = refreshPricesHidden(); });
+  createEffect(() => { refreshPricesBtn.disabled = refreshPricesDisabled(); });
+  createEffect(() => { refreshPricesBtn.textContent = refreshPricesLabel(); });
+  createEffect(() => { resetViewBtn.hidden = resetViewHidden(); });
+  createEffect(() => { shareViewBtn.hidden = shareViewHidden(); });
+  // unresolvedSection's own visibility is derived straight from the list signal — no separate
+  // "hidden" signal to keep in sync with it.
+  createEffect(() => { unresolvedSection.hidden = unresolvedGamesSig().length === 0; });
+});
+
 // ── Table view persistence & sharing ──────────────────────────────────────────
 // Same mechanism as library.js's own copy (see its header comment) — sort/filter/columns/
 // grouping auto-persist locally via prefs.js, but the URL is only ever written on demand via the
@@ -175,12 +258,28 @@ const shareViewBtn       = document.getElementById('share-view-btn')!;
 // than a single page load, so a shared `?bv=` link is applied once, seeded as the new stored
 // default, and stripped from the URL rather than clobbering later edits on every reopen.
 //
-// No stored pref yet (first-ever visit) falls through to `table.setViewState({})`, same as
-// before `@vates/data-table-vanilla` 0.12 — but as of that version an empty view state resolves
-// each omitted field back to the table's own `initialViewState` (see the createDataTable call
-// below) rather than blanking it, so this no longer needs its own guard against that.
-// restoreTableView/bindViewPersistence/shareTableView/resetTableView now live in
-// tableViewPrefs.js, shared verbatim with library.js's own copies (see its own header comment).
+// No stored pref yet (first-ever visit) falls through to `table.setViewState({})` — an empty
+// view state resolves each omitted field back to the table's own `initialViewState` (see the
+// createTableState call below) rather than blanking it, so this needs no guard against that.
+// restoreTableView/shareTableView/resetTableView now live in tableViewPrefs.js, shared verbatim
+// with library.js's own copies (see its own header comment) — they only touch
+// setViewState/getViewState, which @vates/data-table-solid's TableState exposes under the same
+// names/signatures both pages already relied on. bindViewPersistence is the one exception: it
+// needs `table.onViewChange`, which the Solid table has no equivalent of, so both pages
+// reconstruct the same "persist on every view change" effect locally instead (this page's own
+// copy just below), via a createEffect over getViewState() rather than an onViewChange
+// subscription.
+function bindSolidViewPersistence(ts: TableState<Game>, prefKey: string): () => void {
+  let dispose: (() => void) | null = null;
+  createRoot(d => {
+    dispose = d;
+    // getViewState() reads every signal (sorts/filters/columns/grouping/etc.) that composes
+    // it, so this effect re-runs — and re-persists — on any one of them changing, the same
+    // "every subsequent change" behavior an onViewChange subscription would give.
+    createEffect(() => setPref(prefKey, ts.getViewState()));
+  });
+  return () => dispose?.();
+}
 
 // Collapses the bundle list (see #bundle-list-wrap.collapsed in bundles.html) once a bundle has
 // actually been picked — the list itself stops being the thing to focus on at that point, and a
@@ -188,11 +287,9 @@ const shareViewBtn       = document.getElementById('share-view-btn')!;
 // the page. `toggleListBtn` lets it be reopened (e.g. to pick a different bundle) without
 // forgetting what's currently open.
 function setListCollapsed(collapsed: boolean) {
-  bundleListWrapEl.classList.toggle('collapsed', collapsed);
-  toggleListBtn.hidden = bundles.length === 0;
-  toggleListBtn.textContent = collapsed ? 'Show list' : 'Hide list';
+  setListCollapsedSig(collapsed);
 }
-toggleListBtn.addEventListener('click', () => setListCollapsed(!bundleListWrapEl.classList.contains('collapsed')));
+toggleListBtn.addEventListener('click', () => setListCollapsed(!listCollapsedSig()));
 
 // One shared key rather than per-bundle — this is "how I like the table set up" (which
 // columns, sort, grouping), not something tied to any one bundle's own data, so it should
@@ -206,65 +303,102 @@ const TABLE_VIEW_PREF_KEY = 'bundlesTableView';
 // table changes anymore either — only by the "Share view" button (shareTableView below).
 const TABLE_VIEW_PARAM = 'bv';
 
-let table: DataTableInstance<Record<string, any>> | null = null;
+// The Solid table itself (@vates/data-table-solid) — fed directly
+// by `rowsStore` (below) via the `tableData()` accessor, mounted into `tableContainer` via
+// Solid's own `render()`. `disposeTable` is that render's own unmount function (no
+// `table.destroy()` method the way the vanilla table had); `table` itself is reused as the
+// reactive-state object every other call site (getGameList/tableViewPrefs.ts/etc.) reads from,
+// same as before.
+let table: TableState<Game> | null = null;
+let disposeTable: (() => void) | null = null;
 let unpersistView: (() => void) | null = null;
-let rows: Game[] = [];
-let rowMap = new Map<number, Game>();
 let bundlesOffset = 0;
 const BUNDLES_PAGE_SIZE = 20;
-let bundles: Bundle[] = [];
-let activeBundleId: number | null = null;
 // The `resolved` list (appid + gid per game) for whatever bundle is currently open — kept
 // around so the "↻ Refresh prices" button (see the refreshPricesBtn wiring below) can re-run
 // just loadPrices() for the open bundle without re-resolving Steam appids or re-streaming
 // ratings/HLTB/tags, which openBundle()'s own full reopen would otherwise repeat for nothing.
 let currentResolvedGames: ResolvedGame[] = [];
 
-// `rows`/`rowMap` hold long-lived, mutated-in-place row objects — every other consumer
-// (the panel, achievements cache, prev/next-style lookups) wants that stable identity, and
-// panel.js in particular re-renders by reading fields straight off whatever object `panelOpen`
-// was called with, so it MUST stay the same reference across a refresh. `@vates/data-table-
-// vanilla`'s `setData`, however, only re-renders a row's cells when the object at its rowKey is
-// a genuinely new reference — a mutated-but-identity-unchanged row that was already visible in
-// a previous `setData` call is not detected as changed and its cells go stale (confirmed live:
-// `loadPrices` correctly writes `row.steamRegular`/etc., but a row already made visible by
-// `streamGameDetails` before `loadPrices` resolves — the common case once everything is
-// cache-warm and both fire near-instantly — never shows it, even though the row object itself
-// is provably correct).
+// `rowsStore`/`setRowsStore` — a real Solid store, replacing the
+// plain `rows` array + `rowCache.ts` reference-copy workaround the table itself needed
+// (a bare `createStore` with direct `row.field = x` mutation is
+// actively blocked in Solid's dev mode, and was empirically found to leave the table permanently
+// empty). The fix isn't to avoid the store, it's to mutate it correctly: every mutation site
+// below goes through `mutateRow`, which wraps the existing mutate-in-place helpers
+// (`applyDetailsEvent`/`applyPriceInfo`/`nullMissingPriceFields`, all unchanged) in `produce()`
+// (`solid-js/store`) — `produce` hands its callback a draft that *does* support direct property
+// assignment, diffing it against the real store on return, so none of those shared functions
+// needed their own signature to change.
 //
-// `rowCache` (rowCache.js) is what makes the fix targeted rather than blanket:
-// `visibleRowsForTable()` reuses a row's cached copy verbatim unless `markRowChanged` was called
-// for it since the last render, in which case a fresh copy is made. See rowCache.js's own header
-// comment for the full story (shared verbatim with library.js's identical fix).
+// Because each array element is itself a store-proxied object, `@vates/data-table-solid`'s own
+// per-cell rendering (confirmed by reading its source: each `<td>` is a small reactive insertion
+// that reads `row[column.key]` directly) re-renders exactly the cell that changed, with no need
+// to give the row a new object reference at all — that half of `rowCache.ts`'s old job (the
+// table's own re-render) is done by the store itself now.
 //
-// EVERY mutation site must call `markRowChanged` right after mutating, including
-// `streamGameDetails`'s own first-time reveal of a row — not just `loadPrices`/`onRefresh`,
-// which touch an already-visible row (see rowCache.js for why the "no cache entry yet" fallback
-// alone isn't enough once two async sources can reveal/mutate the same row out of order).
-let rowCache = createRowCache<Game>();
-function markRowChanged(appid: number) {
-  rowCache.markChanged(String(appid));
+// The other half isn't: `panel.tsx` is deliberately left untouched and
+// still expects to mutate whatever `Game` object it's given via plain `game.field = x` writes —
+// its own lazy news/DLC/price loaders do exactly that. Handing it a `rowsStore` proxy directly
+// hit that same "Cannot mutate a Store directly" wall live (confirmed via Playwright: opening a
+// panel from this table warned 7 times, once per panel-owned field those loaders touch). So the
+// table and the panel deliberately read from *two different objects per row* — `rowsStore` (the
+// reactive one, table-only) and `panelRows` (a plain `Map<number, Game>`, never store-linked,
+// the only thing ever passed to `panelOpen`). `mutateRow` updates both from the same mutate
+// function, so they never drift; `getRow`/`openGame` (below) are the only two places that read
+// `panelRows`, same "one indirection point" `rowMap` used to be.
+const [rowsStore, setRowsStore] = createStore<Game[]>([]);
+// `rowStore` (see rowStore.ts) holds `rowIndex`/`panelRows` and the `getRow`/`mutateRow` pair —
+// `getRow`/`openGame` (below) are the only two places that read `panelRows`, same "one
+// indirection point" `rowMap` used to be.
+const rowStore = createRowStore<Game>((idx, updater) => setRowsStore(idx, updater));
+// A new generation is taken at the start of every openBundle() call, and checked again at
+// every point afterward that touches disposeTable/table/rowIndex/panelRows or their derived UI —
+// a stale call (superseded by a newer openBundle() fired while it was still resolving/streaming,
+// e.g. rapid ‹/› clicks) bails out instead of racing the newer call to reassign that state and
+// mount a second, orphaned Solid table root into tableContainer alongside the winning call's own.
+const openBundleGuard = createStaleGuard();
+function getRow(appid: number): Game | undefined {
+  return rowStore.getRow(appid);
 }
-// Canonical rows whose details have streamed in — the *same* object references `rows`/`rowMap`
-// hold, unlike visibleRowsForTable()'s cached copies below. Used by nav/random-pick
-// (getGameList/pickRandomGame below) and onRowClick, all of which need the reference the panel
-// keeps displaying and any later mutation (refresh, price loading) needs to keep reaching —
-// same distinction library.js's own visibleRows()/visibleRowsForTable() pair draws.
-function visibleRows(): Game[] {
-  return rows.filter(r => !r.loading);
+function mutateRow(appid: number, fn: (draft: Game) => void): Game | undefined {
+  return rowStore.mutateRow(appid, fn);
 }
-function visibleRowsForTable(): Game[] {
-  return rowCache.visibleRowsForTable(visibleRows(), r => String(r.appid));
+
+// Batches detail-stream events (see streamBatcher.ts's own header comment) — bundles are
+// usually small enough that calling mutateRow unbatched per streamed game went unnoticed, but
+// there's no structural reason this page should be exempt from the exact bug library.tsx had to
+// fix live (a large-enough game list freezing the browser tab's main thread while streaming).
+const detailBatcher = createStreamBatcher<DetailEvent>({
+  apply: event => {
+    const row = mutateRow(event.appid, draft => applyDetailsEvent(draft, event));
+    if (!row) return;
+    // renderPanelNav too, not just renderPanelBody — the nav bar's list/position (see
+    // getGameList) only includes non-loading rows, so a panel opened via a `?game=` deep
+    // link (which opens the row immediately, before the stream starts — see openBundle's
+    // early restorePanelFromUrl call) would otherwise be stuck showing "0 / 0" and a stale,
+    // empty nav-button list until every game in the bundle finished loading, not just this one.
+    if (isPanelOpen() && getPanelGame()?.appid === row.appid) { renderPanelBody(row); renderPanelNav(row); }
+  },
+  isStale: gen => openBundleGuard.isStale(gen),
+});
+
+// Non-loading rows, fed straight to `createTableState` as a plain accessor — no explicit
+// "notify the table" call needed anywhere below; reading `.loading` off every row here is itself
+// a tracked store read, so this recomputes whenever any row's `loading` flag flips (its own
+// first-time reveal), same moment an explicit `setTableData(...)` used to be called by hand.
+function tableData(): Game[] {
+  return rowsStore.filter(r => !r.loading);
 }
 
 // Stable order for the panel's prev/next/random nav — the table's current search/filter/sort
 // order, independent of pagination/grouping (display-only, no single well-defined linear order
 // once a multi-value column like Genres fans a game out into more than one group).
-// `table.getProcessedData()` (`@vates/data-table-vanilla` >= 0.13, added per
-// vatesfr/data-table#22) exposes exactly this directly. Same approach library.js's own
-// getGameList uses.
+// `table.processedData()` (an Accessor, `@vates/data-table-solid`'s equivalent of the vanilla
+// table's `getProcessedData()` method) exposes exactly this directly. Same approach library.js's
+// own getGameList uses.
 function getGameList(): Game[] {
-  return table ? (table.getProcessedData() as Game[]) : [];
+  return table ? table.processedData() : [];
 }
 
 // This page only ever has one game list open at a time (the currently open bundle's table),
@@ -292,12 +426,15 @@ initPageShell({
         const res = await fetch(`/api/game-details/${row.appid}?refresh=1`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Refresh failed');
-        applyDetailsEvent(row, data);
-        markRowChanged(row.appid);
-        if (table) table.setData(visibleRowsForTable());
-        await loadAchievements(row, { force: true });
+        // Not every open game is one of this bundle's own store-backed rows (a DLC/base-game
+        // link can navigate to something outside it — see openStandaloneGame); mutateRow returns
+        // undefined for those, so fall back to mutating the plain standalone object directly,
+        // same as before this row data was store-backed.
+        const updated = mutateRow(row.appid, draft => applyDetailsEvent(draft, data));
+        if (!updated) applyDetailsEvent(row, data);
+        await loadAchievements(updated ?? row, { force: true });
       } catch (err) {
-        detailStatusEl.textContent = `Refresh failed: ${(err as Error).message}`;
+        setDetailStatusSig(`Refresh failed: ${(err as Error).message}`);
       }
     },
     // Clicking a DLC/base-game link inside the panel — the linked appid may not be one of this
@@ -312,7 +449,7 @@ initPageShell({
     onClose: () => setPanelParam(null),
     // A real href (not the placeholder '#' this used to be, back when there was no `?game=` URL
     // to point at) so ctrl/cmd/shift/middle-click on a DLC entry still opens it in a new tab.
-    gameHref: (appid: number) => {
+    gameHref: (appid: number | string) => {
       const params = new URLSearchParams(location.search);
       params.set('game', String(appid));
       return `?${params}`;
@@ -354,10 +491,15 @@ function renderPanelNav(game: Game) {
 
 function openGame(game: Game, { isRandom = false, keepHistory = false } = {}) {
   if (!isRandom) clearRandomQueue(RANDOM_QUEUE_KEY);
-  panelOpen(game, { keepHistory });
-  renderPanelNav(game);
-  setPanelParam(game.appid);
-  loadAchievements(game);
+  // Always open against the plain panelRows copy, never a rowsStore proxy — see that map's own
+  // comment above for why (panel.tsx's lazy loaders mutate whatever object they're given
+  // directly, which a Solid store blocks). A `game` not in panelRows (a genuine standalone
+  // lookup) falls through to whatever was actually passed, unchanged from before.
+  const resolved = getRow(game.appid) ?? game;
+  panelOpen(resolved, { keepHistory });
+  renderPanelNav(resolved);
+  setPanelParam(resolved.appid);
+  loadAchievements(resolved);
 }
 
 // Lightbox's own ↑/↓ handler (see initLightbox below) — same game-list step the
@@ -368,7 +510,10 @@ function navigateLightboxGame(dir: number) {
   const next = stepGameList(table, getGameList, getPanelGame(), dir as 1 | -1);
   if (!next) return;
   openGame(next);
-  openLightbox(next, 0);
+  // getGameList() (used by stepGameList above) reads off the table's own rowsStore-backed
+  // processedData, so `next` may be a store proxy — resolve to the same plain panelRows copy
+  // openGame just opened the panel with, same reasoning as openGame's own comment.
+  openLightbox(getRow(next.appid) ?? next, 0);
 }
 
 function pickRandomGame() {
@@ -386,7 +531,7 @@ function pickRandomGame() {
 // whichever row was open before, and so `?game=` follows this navigation too, same as it does
 // library.js's own DLC-link navigation.
 function openStandaloneGame(appid: number, name = '', { keepHistory = false } = {}) {
-  const existing = rowMap.get(appid);
+  const existing = getRow(appid);
   if (existing) { openGame(existing, { keepHistory }); return; }
   const game = { appid, name: name || `App ${appid}`, loading: true, details: null, standalone: true } as Game;
   openGame(game, { keepHistory });
@@ -402,24 +547,11 @@ function openStandaloneGame(appid: number, name = '', { keepHistory = false } = 
 }
 
 // `?game=<appid>` (and, within it, `&shot=<idx>` for an open lightbox screenshot/video) — deep
-// link to an open game panel, mirroring library.js's own setPanelParam/setLightboxParam/
-// restorePanelFromUrl for the comparison/Library Explorer pages (see CLAUDE.md's "Looking up
-// an arbitrary game" section for the general shape). Not pushed/reordered, same convention as
-// this page's own setBundleParam right below.
-function setPanelParam(appid: number | null) {
-  const params = new URLSearchParams(location.search);
-  params.delete('shot');
-  if (appid == null) params.delete('game');
-  else params.set('game', String(appid));
-  history.replaceState(null, '', `?${params}`);
-}
-
-function setLightboxParam(idx: string | null) {
-  const params = new URLSearchParams(location.search);
-  if (idx == null) params.delete('shot');
-  else params.set('shot', idx);
-  history.replaceState(null, '', `?${params}`);
-}
+// link to an open game panel. `setPanelParam`/`setLightboxParam` (`urlState.ts`) are shared with
+// `app.tsx`/`library.tsx` (see CLAUDE.md's "Looking up an arbitrary game" section for the general
+// shape) — this page's own copies used to skip `reorderUrlParams` entirely, unlike the other two,
+// which could leave `?game=`/`?shot=` in a different position than the canonical order the rest
+// of the app enforces. Not pushed, same convention as this page's own `setBundleParam` below.
 
 // Reopens the panel (and, if present, the lightbox) from `?game=`/`?shot=`. Takes an explicit
 // `restoreShot` rather than always re-reading `location.search` — opening the panel calls
@@ -431,7 +563,7 @@ function restorePanelFromUrl(restoreShot: string | null = null) {
   const params = new URLSearchParams(location.search);
   const appid = Number(params.get('game'));
   if (!appid) return;
-  const row = rowMap.get(appid);
+  const row = getRow(appid);
   if (row) {
     if (getPanelGame()?.appid !== appid) openGame(row);
     const shotParam = restoreShot ?? params.get('shot');
@@ -442,41 +574,19 @@ function restorePanelFromUrl(restoreShot: string | null = null) {
   openStandaloneGame(appid);
 }
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    // panelHandleEscape (panel.js) owns the lightbox-close/fullscreen-guard logic shared by
-    // all three pages — this page used to hand-roll its own copy of it, missing the
-    // lightbox-close branch entirely (Escape did nothing while the lightbox was open); see
-    // panelHandleEscape's own comment.
-    if (isLightboxOpen()) { panelHandleEscape(); return; }
-    panelClose(); // onClose (see initPanel above) handles the URL cleanup
-    return;
-  }
-  // The lightbox owns the keyboard while open — see the identical comment in app.js's
-  // own keydown handler for why every other page-level shortcut is blocked here.
-  if (isLightboxOpen()) return;
-  const tag = document.activeElement?.tagName;
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-  const openGameRef = getPanelGame();
-  if (!openGameRef) return;
-  // Hero screenshot/video stepping — this page previously only supported it via click/swipe,
-  // unlike app.js/library.js's identical keyboard handling for the same shared hero carousel.
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-    if (panelStepHero(e.key === 'ArrowRight' ? 1 : -1, { wrap: true })) e.preventDefault();
-    return;
-  }
-  if (e.key === 'r' || e.key === 'R') {
-    e.preventDefault();
-    pickRandomGame();
-    return;
-  }
-  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-  if (!table || openGameRef.standalone) return; // see renderPanelNav — no list to page through
-  e.preventDefault();
-  const list = getGameList();
-  const idx = list.findIndex(g => g.appid === openGameRef.appid);
-  const next = (idx + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
-  openGame(list[next]);
+// No `shortcuts` modal, no `/`-focus target — this page has neither, unlike app.tsx/library.tsx.
+bindPanelKeyboardShortcuts({
+  isLightboxOpen,
+  isPanelOpen,
+  panelClose,
+  panelStepHero,
+  pickRandom: pickRandomGame,
+  stepGame: dir => {
+    const next = stepGameList(table, getGameList, getPanelGame(), dir);
+    if (!next) return false;
+    openGame(next);
+    return true;
+  },
 });
 
 // ── Bundle list ───────────────────────────────────────────────────────────────
@@ -504,25 +614,35 @@ function fmtBundleListPrice(price: PriceAmount | null) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: price.currency }).format(price.amount);
 }
 
-function renderBundleList() {
-  bundleListEl.innerHTML = '';
-  for (const bundle of bundles) {
-    const price = cheapestTierPrice(bundle);
-    const el = document.createElement('button');
-    el.type = 'button';
-    el.className = 'bundle-item';
-    el.setAttribute('aria-current', String(bundle.id === activeBundleId));
-    el.innerHTML = `
-      <span class="bundle-item-title">${esc(bundle.title)}</span>
-      <span class="bundle-item-shop">${esc(bundle.page?.name || '')}</span>
-      <span class="bundle-item-price">${esc(fmtBundleListPrice(price))}</span>
-      <span class="bundle-item-count">${bundle.counts?.games ?? '?'} games</span>
-      <span class="bundle-item-expiry">${esc(fmtExpiry(bundle.expiry))}</span>
-    `;
-    el.addEventListener('click', () => openBundle(bundle));
-    bundleListEl.appendChild(el);
-  }
+// The bundle list itself, as a real Solid <For> — mounted once via render() below, reacting to
+// `bundlesSig`/`activeBundleIdSig` on its own from then on (no more renderBundleList() call
+// needed at every loadBundles()/openBundle() site the way the old innerHTML-rebuild version
+// needed). JSX text/attribute interpolation escapes on its own (it sets textContent/attributes
+// directly, never innerHTML), so this needs none of the old version's `esc()` calls.
+function BundleListView() {
+  return (
+    <For each={bundlesSig()}>
+      {bundle => {
+        const price = cheapestTierPrice(bundle);
+        return (
+          <button
+            type="button"
+            class="bundle-item"
+            aria-current={bundle.id === activeBundleIdSig() ? 'true' : 'false'}
+            onClick={() => openBundle(bundle)}
+          >
+            <span class="bundle-item-title">{bundle.title}</span>
+            <span class="bundle-item-shop">{bundle.page?.name || ''}</span>
+            <span class="bundle-item-price">{fmtBundleListPrice(price)}</span>
+            <span class="bundle-item-count">{bundle.counts?.games ?? '?'} games</span>
+            <span class="bundle-item-expiry">{fmtExpiry(bundle.expiry)}</span>
+          </button>
+        );
+      }}
+    </For>
+  );
 }
+render(() => <BundleListView />, bundleListEl);
 
 // `expandList: false` skips the reset branch's own re-expand — for a caller that's about to
 // (re)open a bundle right after this resolves (a `?bundle=` deep link on init, or re-opening
@@ -532,10 +652,10 @@ function renderBundleList() {
 // then snaps shut" flicker, worse the more cache-warm both calls are (i.e. often).
 async function loadBundles({ reset = true, expandList = true } = {}) {
   if (reset) {
-    bundlesOffset = 0; bundles = []; bundleListEl.innerHTML = '';
+    bundlesOffset = 0; setBundlesSig([]);
     if (expandList) setListCollapsed(false);
   }
-  bundlesStatusEl.textContent = 'Loading bundles…';
+  setBundlesStatusText('Loading bundles…');
   const qs = new URLSearchParams({
     country: resolveRegion(getStoredRegion()),
     sort: sortSelect.value,
@@ -547,15 +667,13 @@ async function loadBundles({ reset = true, expandList = true } = {}) {
     const res = await fetch(`/api/bundles?${qs}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to load bundles');
-    bundles = reset ? data.bundles : [...bundles, ...data.bundles];
+    setBundlesSig(reset ? data.bundles : [...bundlesSig(), ...data.bundles]);
     bundlesOffset += data.bundles.length;
-    renderBundleList();
     renderBundleNav(); // the loaded list changed — e.g. "Load more" may have just made Next available
-    bundlesStatusEl.textContent = bundles.length ? `${bundles.length} bundles` : 'No current bundles';
-    loadMoreBtn.hidden = data.bundles.length < BUNDLES_PAGE_SIZE;
-    toggleListBtn.hidden = bundles.length === 0;
+    setBundlesStatusText(bundlesSig().length ? `${bundlesSig().length} bundles` : 'No current bundles');
+    setLoadMoreHidden(data.bundles.length < BUNDLES_PAGE_SIZE);
   } catch (err) {
-    bundlesStatusEl.textContent = `Error: ${(err as Error).message}`;
+    setBundlesStatusText(`Error: ${(err as Error).message}`);
   }
 }
 
@@ -603,7 +721,14 @@ function applyDetailsEvent(row: Game, event: DetailEvent) {
   row.details = { rating: event.rating, hltb: event.hltb, meta: event.meta, tags: event.tags, demo: event.demo, protondb: event.protondb };
 }
 
-async function streamGameDetails(appids: number[]) {
+// `gen`: the calling openBundle()'s own generation (see openBundleGuard above) — checked at the
+// top of every loop iteration, not just once at the start, since a stream spans many `await`s
+// and a newer openBundle() call can supersede this one (resetting rowIndex/panelRows/the status
+// line for a *different* bundle) at any point while it's still reading. Without this, a
+// superseded stream kept calling mutateRow (a harmless no-op once rowIndex has moved on, or
+// worse, a hit against a same-appid row belonging to the new bundle) and overwriting the new
+// bundle's own status line with this one's stale counts.
+async function streamGameDetails(appids: number[], gen: number) {
   let resp: Response;
   try {
     resp = await fetch('/api/game-details/stream', {
@@ -612,7 +737,8 @@ async function streamGameDetails(appids: number[]) {
       body: JSON.stringify({ games: appids.map(appid => ({ appid })) }),
     });
   } catch (err) {
-    detailStatusEl.textContent = `Details stream failed: ${(err as Error).message}`;
+    if (openBundleGuard.isStale(gen)) return;
+    setDetailStatusSig(`Details stream failed: ${(err as Error).message}`);
     return;
   }
   const reader = resp.body!.getReader();
@@ -620,6 +746,7 @@ async function streamGameDetails(appids: number[]) {
   let buffer = '';
   let loaded = 0;
   while (true) {
+    if (openBundleGuard.isStale(gen)) { reader.cancel(); return; }
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
@@ -631,24 +758,20 @@ async function streamGameDetails(appids: number[]) {
       let event: DetailEvent;
       try { event = JSON.parse(line.slice(6)); } catch { continue; }
       if (event.done) continue;
-      const row = rowMap.get(event.appid);
-      if (!row) continue;
-      applyDetailsEvent(row, event);
-      markRowChanged(row.appid);
-      // renderPanelNav too, not just renderPanelBody — the nav bar's list/position (see
-      // getGameList) only includes non-loading rows, so a panel opened via a `?game=` deep
-      // link (which opens the row immediately, before the stream starts — see openBundle's
-      // early restorePanelFromUrl call) would otherwise be stuck showing "0 / 0" and a stale,
-      // empty nav-button list until every game in the bundle finished loading, not just this
-      // one. Same fix library.js's own stream loop already has.
-      if (isPanelOpen() && getPanelGame()?.appid === row.appid) { renderPanelBody(row); renderPanelNav(row); }
+      // Queued rather than applied immediately — see streamBatcher.ts's own header comment
+      // (and CLAUDE.md's matching note under library.tsx) for why: an unbatched `mutateRow` per
+      // streamed game triggers @vates/data-table-solid's own full sort/filter/paginate recompute
+      // once per game instead of once per flush, confirmed to freeze the browser tab's main
+      // thread for a large-enough game list. Bundles are usually small enough that this went
+      // unnoticed, but there's no reason to leave the same gap library.tsx just had to fix live.
+      detailBatcher.push(event, gen);
       loaded++;
-      if (table) table.setData(visibleRowsForTable());
-      detailStatusEl.textContent = `${loaded} / ${appids.length} games loaded…`;
+      setDetailStatusSig(`${loaded} / ${appids.length} games loaded…`);
     }
   }
-  if (table) table.setData(visibleRowsForTable());
-  detailStatusEl.textContent = `${rows.length} games`;
+  if (openBundleGuard.isStale(gen)) return;
+  detailBatcher.flushNow();
+  setDetailStatusSig(`${rowStore.size()} games`);
 }
 
 // Flattens a bundle's tiers into one row per unique game — a game unlocked at more than one
@@ -672,48 +795,72 @@ function flattenBundleGames(bundle: Bundle): FlatGame[] {
   return [...seen.values()];
 }
 
-function renderUnresolvedList(games: FlatGame[]) {
-  unresolvedSection.hidden = games.length === 0;
-  unresolvedListEl.innerHTML = games.map(g => `
-    <div class="unresolved-item">
-      ${g.assets?.boxart ? `<img src="${esc(g.assets.boxart)}" alt="" loading="lazy">` : ''}
-      <div>
-        <div class="unresolved-item-title">${esc(g.title)}</div>
-        <div class="unresolved-item-type">${esc((g.type && (TYPE_LABELS as Record<string, string>)[g.type]) || g.type || 'Game')}</div>
-      </div>
-    </div>
-  `).join('');
+// The "Not on Steam" list — a real Solid <For>, mounted once via render() below, reacting to
+// `unresolvedGamesSig` on its own (replaces the old renderUnresolvedList()'s innerHTML rebuild;
+// its own two call sites now just call setUnresolvedGamesSig directly — see openBundle below).
+function UnresolvedListView() {
+  return (
+    <For each={unresolvedGamesSig()}>
+      {g => (
+        <div class="unresolved-item">
+          <Show when={g.assets?.boxart}>
+            {(boxart: () => string) => <img src={boxart()} alt="" loading="lazy" />}
+          </Show>
+          <div>
+            <div class="unresolved-item-title">{g.title}</div>
+            <div class="unresolved-item-type">{(g.type && (TYPE_LABELS as Record<string, string>)[g.type]) || g.type || 'Game'}</div>
+          </div>
+        </div>
+      )}
+    </For>
+  );
 }
+render(() => <UnresolvedListView />, unresolvedListEl);
 
 // Bundle-level actions kept out of the (already-crowded) list rows and shown only once a
 // bundle is actually open — a plain link to ITAD's own page for it, and its real purchase
 // link. `bundle.url` is the shop/affiliate link exactly as ITAD returned it — never rewritten
 // or stripped of tracking params (ITAD's terms require passing prices/links through
-// unmodified; see CLAUDE.md).
-function renderDetailLinks(bundle: Bundle) {
-  detailLinksEl.innerHTML = `
-    ${bundle.details ? `<a class="btn btn-ghost btn-sm" href="${esc(bundle.details)}" target="_blank" rel="noopener">View on IsThereAnyDeal ↗</a>` : ''}
-    ${bundle.url ? `<a class="btn btn-primary btn-sm" href="${esc(bundle.url)}" target="_blank" rel="noopener">Get this bundle ↗</a>` : ''}
-  `;
+// unmodified; see CLAUDE.md). A real Solid <Show> pair, mounted once via render() below,
+// reacting to `detailLinksSig` (replaces the old renderDetailLinks()'s innerHTML rebuild).
+function DetailLinksView() {
+  return (
+    <Show when={detailLinksSig()}>
+      {(links: () => { details: string | null; url: string | null }) => (
+        <>
+          <Show when={links().details}>
+            {(href: () => string) => <a class="btn btn-ghost btn-sm" href={href()} target="_blank" rel="noopener">View on IsThereAnyDeal ↗</a>}
+          </Show>
+          <Show when={links().url}>
+            {(href: () => string) => <a class="btn btn-primary btn-sm" href={href()} target="_blank" rel="noopener">Get this bundle ↗</a>}
+          </Show>
+        </>
+      )}
+    </Show>
+  );
 }
+render(() => <DetailLinksView />, detailLinksEl);
 
-// Prev/Next step through whatever's currently loaded in `bundles` (respecting its current
+// Prev/Next step through whatever's currently loaded in `bundlesSig()` (respecting its current
 // sort/filter), not the full remote list — no auto-"Load more" and no wraparound at the ends,
 // both buttons just disable there. A bundle opened via deep link that isn't part of the
 // currently loaded page (or opened before any list has loaded at all) has no list position to
 // navigate from, so both buttons disable rather than guessing.
 function renderBundleNav() {
-  const idx = bundles.findIndex(b => b.id === activeBundleId);
-  prevBundleBtn.disabled = idx <= 0;
-  nextBundleBtn.disabled = idx === -1 || idx >= bundles.length - 1;
+  const list = bundlesSig();
+  const idx = list.findIndex(b => b.id === activeBundleIdSig());
+  setPrevDisabled(idx <= 0);
+  setNextDisabled(idx === -1 || idx >= list.length - 1);
 }
 prevBundleBtn.addEventListener('click', () => {
-  const idx = bundles.findIndex(b => b.id === activeBundleId);
-  if (idx > 0) openBundle(bundles[idx - 1]);
+  const list = bundlesSig();
+  const idx = list.findIndex(b => b.id === activeBundleIdSig());
+  if (idx > 0) openBundle(list[idx - 1]);
 });
 nextBundleBtn.addEventListener('click', () => {
-  const idx = bundles.findIndex(b => b.id === activeBundleId);
-  if (idx !== -1 && idx < bundles.length - 1) openBundle(bundles[idx + 1]);
+  const list = bundlesSig();
+  const idx = list.findIndex(b => b.id === activeBundleIdSig());
+  if (idx !== -1 && idx < list.length - 1) openBundle(list[idx + 1]);
 });
 
 // Fetches Steam's non-discounted price + historical lows for the bundle's resolved games (see
@@ -722,26 +869,38 @@ nextBundleBtn.addEventListener('click', () => {
 // own comment in server.js) and applies them once available — a single batch call, not
 // streamed per-game like ratings/HLTB/tags, so it can land before or after any given row has
 // finished streaming its other details. Either order is fine: rows not yet visible (still
-// `loading`) simply carry the price fields already set by the time they do appear; rows
-// already visible get a follow-up `table.setData` to pick the new columns up.
+// `loading`) simply carry the price fields already set by the time they do appear; rows already
+// visible pick the new columns up automatically once mutateRow updates the store.
 //
 // `force`: set by the "↻ Refresh prices" button below — bypasses the server's `itad-price:`
 // cache read for this call (?refresh=1, same convention as every other force-refresh in this
 // app) so a stale price actually gets re-fetched from ITAD instead of just re-reading the same
 // cached response back.
-async function loadPrices(resolved: ResolvedGame[], { force = false } = {}) {
-  priceStatusEl.textContent = '';
+// `gen`: defaults to whatever generation is currently in effect — right for the `refreshPricesBtn`
+// handler below, which isn't itself starting a new bundle load, just re-running work for
+// whatever's already loaded. openBundle passes its own generation explicitly instead, so a
+// superseded call (a newer openBundle() already in progress) doesn't write this bundle's prices
+// onto the new one's rows once the fetch resolves.
+async function loadPrices(resolved: ResolvedGame[], { force = false, gen = openBundleGuard.current() }: { force?: boolean; gen?: number } = {}) {
+  setPriceStatusSig('');
   try {
     const prices = await postPrices({ gids: resolved.map(g => g.gid), country: resolveRegion(getStoredRegion()), force });
-    for (const g of resolved) {
-      const row = rowMap.get(g.appid);
-      const info = prices[g.gid];
-      if (!row || !info) continue;
-      applyPriceInfo(row, info, discountPct);
-      markRowChanged(g.appid);
-      if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
-    }
+    if (openBundleGuard.isStale(gen)) return;
+    // batch() — same reasoning as streamGameDetails/streamBatcher.ts above and library.tsx's
+    // loadWishlistPrices: `resolved` has no per-item await between iterations, so without this
+    // every mutateRow call here would trigger its own @vates/data-table-solid re-sort/re-filter/
+    // re-paginate instead of just one at the end of the loop.
+    batch(() => {
+      for (const g of resolved) {
+        const info = prices[g.gid];
+        if (!info) continue;
+        const row = mutateRow(g.appid, draft => applyPriceInfo(draft, info, discountPct));
+        if (!row) continue;
+        if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
+      }
+    });
   } catch (err) {
+    if (openBundleGuard.isStale(gen)) return;
     console.warn('[bundles] price lookup failed:', (err as Error).message);
     // Without this, a failed request (rate limited, transient upstream error) left every
     // price-ish cell stuck on its "…" loading placeholder forever — indistinguishable from
@@ -749,17 +908,36 @@ async function loadPrices(resolved: ResolvedGame[], { force = false } = {}) {
     // means "we tried and it didn't work", same as the "no data" state these columns already
     // render for a genuinely missing price — and a status line makes the failure visible
     // rather than only a console warning nobody but a developer would see.
-    for (const g of resolved) {
-      const row = rowMap.get(g.appid);
-      if (!row) continue;
-      nullMissingPriceFields(row);
-      markRowChanged(g.appid);
-      if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
-    }
-    priceStatusEl.textContent = `Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`;
-  } finally {
-    if (table) table.setData(visibleRowsForTable());
+    batch(() => {
+      for (const g of resolved) {
+        const row = mutateRow(g.appid, draft => nullMissingPriceFields(draft));
+        if (!row) continue;
+        if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
+      }
+    });
+    setPriceStatusSig(`Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`);
   }
+}
+
+// Tears down whatever bundle table/rows are currently on screen (a real open one, or a partial
+// one from a resolve that never finished) — shared by openBundle's own genuine-new-bundle reset
+// and openBundleById's "the deep link failed, there's no bundle to show" cleanup, which used to
+// each carry their own near-identical copy of this same block (the latter's copy was a strict
+// subset, missing setRefreshPricesHidden/setRowsStore/rowStore.reset/currentResolvedGames —
+// harmless in practice since those only matter once a bundle has actually started resolving,
+// but there's no reason for the two copies to be able to drift like that). Mirrors library.js's
+// own named `resetTableState`.
+function resetBundleTableState() {
+  if (unpersistView) { unpersistView(); unpersistView = null; }
+  if (disposeTable) { disposeTable(); disposeTable = null; }
+  table = null;
+  tableContainer.innerHTML = '';
+  setResetViewHidden(true);
+  setShareViewHidden(true);
+  setRefreshPricesHidden(true);
+  setRowsStore([]);
+  rowStore.reset();
+  currentResolvedGames = [];
 }
 
 // `preserveGameParam`: true only for the initial page-load deep link (init() below) — a
@@ -771,35 +949,25 @@ async function loadPrices(resolved: ResolvedGame[], { force = false } = {}) {
 // one case that reopens the *same* bundle in place and does pass this, so the open game — same
 // bundle, same rows, same order, just re-priced — stays open across it.
 async function openBundle(bundle: Bundle, { preserveGameParam = false, restoreShot = null }: { preserveGameParam?: boolean; restoreShot?: string | null } = {}) {
+  const gen = openBundleGuard.next();
   if (!preserveGameParam) {
     if (isPanelOpen()) panelClose(); // onClose (see initPanel above) clears `?game=` itself
     else setPanelParam(null); // no panel open, but a leftover `?game=` from before should still go
   }
-  activeBundleId = bundle.id;
-  renderBundleList();
+  setActiveBundleIdSig(bundle.id);
   renderBundleNav();
   setListCollapsed(true);
   setBundleParam(bundle.id);
 
-  detailCard.hidden = false;
-  detailTitleEl.textContent = bundle.title;
-  detailMetaEl.textContent = `${bundle.page?.name || 'Unknown shop'} · ${bundle.counts?.games ?? '?'} games · ${fmtExpiry(bundle.expiry)}`;
-  renderDetailLinks(bundle);
-  detailStatusEl.textContent = 'Resolving games to Steam…';
-  priceStatusEl.textContent = '';
-  unresolvedSection.hidden = true;
-  unresolvedListEl.innerHTML = '';
+  setDetailHidden(false);
+  setDetailTitleSig(bundle.title);
+  setDetailMetaSig(`${bundle.page?.name || 'Unknown shop'} · ${bundle.counts?.games ?? '?'} games · ${fmtExpiry(bundle.expiry)}`);
+  setDetailLinksSig({ details: bundle.details, url: bundle.url });
+  setDetailStatusSig('Resolving games to Steam…');
+  setPriceStatusSig('');
+  setUnresolvedGamesSig([]);
 
-  if (unpersistView) { unpersistView(); unpersistView = null; }
-  if (table) { table.destroy(); table = null; }
-  tableContainer.innerHTML = '';
-  resetViewBtn.hidden = true;
-  shareViewBtn.hidden = true;
-  refreshPricesBtn.hidden = true;
-  rows = [];
-  rowMap = new Map();
-  rowCache.reset();
-  currentResolvedGames = [];
+  resetBundleTableState();
 
   const games = flattenBundleGames(bundle);
 
@@ -814,23 +982,38 @@ async function openBundle(bundle: Bundle, { preserveGameParam = false, restoreSh
     if (!res.ok) throw new Error(data.error || 'Resolution failed');
     appidsByGid = data.appids;
   } catch (err) {
-    detailStatusEl.textContent = `Error: ${(err as Error).message}`;
-    renderUnresolvedList(games);
+    if (openBundleGuard.isStale(gen)) return; // stale — a newer openBundle() call has since taken over
+    setDetailStatusSig(`Error: ${(err as Error).message}`);
+    setUnresolvedGamesSig(games);
     return;
   }
+  if (openBundleGuard.isStale(gen)) return; // stale — a newer openBundle() call has since taken over disposeTable/table/rowIndex/panelRows
 
   const resolved = [];
   const unresolved = [];
+  // rowIndex/panelRows below (and the table itself, via DataTableView's own `rowKey: 'appid'`)
+  // are all keyed by Steam appid, not ITAD gid — but flattenBundleGames only dedupes by *gid*,
+  // and two distinct ITAD game ids occasionally do resolve to the same Steam appid (an observed
+  // ITAD data-quality case, not expected to be common). A second row for an appid already seen
+  // can't be shown as its own row either way, so it's dropped here rather than silently
+  // colliding in rowIndex later (which used to leave the earlier row's `loading: true` flag
+  // never cleared — mutateRow could never reach it once its Map slot was overwritten by the
+  // later duplicate — so it just vanished from the table with no trace). `games`' own order
+  // (from flattenBundleGames) is already cheapest-tier-first, so keeping the first occurrence
+  // here is the same "keep first occurrence" convention that function already uses for gid.
+  const seenAppids = new Set<number>();
   for (const g of games) {
     const appid = appidsByGid[g.gid];
-    if (appid) resolved.push({ ...g, appid });
-    else unresolved.push(g);
+    if (!appid) { unresolved.push(g); continue; }
+    if (seenAppids.has(appid)) continue;
+    seenAppids.add(appid);
+    resolved.push({ ...g, appid });
   }
-  renderUnresolvedList(unresolved);
+  setUnresolvedGamesSig(unresolved);
   currentResolvedGames = resolved;
 
   if (resolved.length === 0) {
-    detailStatusEl.textContent = 'No games in this bundle could be matched to a Steam listing.';
+    setDetailStatusSig('No games in this bundle could be matched to a Steam listing.');
     return;
   }
 
@@ -838,7 +1021,7 @@ async function openBundle(bundle: Bundle, { preserveGameParam = false, restoreSh
   // source resolves") rather than `null` ("no data"), so this literal is cast to Game[] — the
   // same "permissive at the edges, assembled from several async sources" convention types.ts's
   // own header describes.
-  rows = resolved.map(g => ({
+  const initialRows = resolved.map(g => ({
     appid: g.appid,
     name: g.title,
     tierPrice: g.tierPrice,
@@ -855,32 +1038,49 @@ async function openBundle(bundle: Bundle, { preserveGameParam = false, restoreSh
     languages: undefined, hasDemo: undefined,
     loading: true, details: null,
   })) as unknown as Game[];
-  rowMap = new Map(rows.map(r => [r.appid, r]));
+  setRowsStore(initialRows);
+  rowStore.load(initialRows);
 
-  table = createDataTable(tableContainer, {
-    data: [],
-    columns: BUNDLE_COLUMNS,
-    rowKey: 'appid',
-    initialViewState: { pageSize: 50, visibleCols: DEFAULT_VISIBLE, sorts: DEFAULT_SORT },
-    // The table's own click handler hands back whatever object is currently in
-    // `rowCache` for this row — a copy, not `rowMap`'s canonical one (see
-    // `visibleRowsForTable`'s comment above). Looking the canonical row back up by appid
-    // before opening it means the panel (and anything that mutates whatever object it opened,
-    // like `onRefresh` below) always operates on the same object `rowMap` does, not a
-    // disconnected copy that further updates would silently stop reaching.
-    onRowClick: row => openGame(rowMap.get(row.appid) ?? (row as Game)),
+  // @vates/data-table-solid: `createTableState` builds the reactive state (fed by the
+  // `tableData` accessor above), `DataTableView` renders it — mounted by hand via Solid's own
+  // `render()`. `createTableState` itself needs its own `createRoot` — it isn't called from
+  // inside `render()`'s own tree, and without one every memo/effect it creates internally
+  // warns "created outside a createRoot ... will never be disposed" (and genuinely leaks
+  // across bundle opens) — `disposeTableState` disposes those; `disposeTable` (below) combines
+  // it with `render()`'s own unmount fn, replacing the vanilla table's single
+  // `table.destroy()` with the two disposals this needs.
+  let disposeTableState!: () => void;
+  const ts = createRoot(dispose => {
+    disposeTableState = dispose;
+    return createTableState<Game>(tableData, BUNDLE_COLUMNS as unknown as ColumnDef<Game>[], {
+      initialViewState: { pageSize: 50, visibleCols: DEFAULT_VISIBLE, sorts: DEFAULT_SORT },
+    });
   });
+  table = ts;
+  const disposeView = render(() => DataTableView<Game>({
+    table: ts,
+    rowKey: 'appid',
+    // `row` here is already the canonical store-proxied object (rowsStore itself, not a copy —
+    // unlike the old rowCache-backed table, there's no separate cache to look past), but look it
+    // back up via getRow anyway for the same appid-indirection every other call site uses, and
+    // as a safety net for a row somehow not part of this bundle's own store.
+    onRowClick: row => openGame(getRow(row.appid) ?? (row as Game)),
+  }), tableContainer);
+  disposeTable = () => { disposeView(); disposeTableState(); };
   // Loads whatever URL param / stored pref should win (see restoreTableView's own comment) on
   // top of the construction-time default view just applied above, then persists every
   // subsequent change locally.
   restoreTableView(table, TABLE_VIEW_PREF_KEY, TABLE_VIEW_PARAM);
-  unpersistView = bindViewPersistence(table, TABLE_VIEW_PREF_KEY);
-  resetViewBtn.hidden = false;
-  shareViewBtn.hidden = false;
-  refreshPricesBtn.hidden = false;
+  // tableViewPrefs.ts's own bindViewPersistence needs `table.onViewChange`, which the Solid
+  // table doesn't have (unlike the vanilla one library.ts still uses) — reconstructed locally
+  // via a createEffect that re-reads getViewState() (tracking every signal it touches) instead.
+  unpersistView = bindSolidViewPersistence(ts, TABLE_VIEW_PREF_KEY);
+  setResetViewHidden(false);
+  setShareViewHidden(false);
+  setRefreshPricesHidden(false);
 
-  detailStatusEl.textContent = `0 / ${resolved.length} games loaded…`;
-  // Early attempt — rowMap is populated (just above) well before the stream below finishes, so
+  setDetailStatusSig(`0 / ${resolved.length} games loaded…`);
+  // Early attempt — rowIndex/rowsStore are populated (just above) well before the stream below finishes, so
   // a `?game=` that's part of this bundle can open right away as a real, progressively-filling
   // row instead of waiting for every game in the bundle to finish loading first; the lightbox
   // needs actual media data though, so `restorePanelFromUrl` is tried again once the stream
@@ -889,7 +1089,8 @@ async function openBundle(bundle: Bundle, { preserveGameParam = false, restoreSh
   if (preserveGameParam) restorePanelFromUrl(restoreShot);
   // Independent calls — Steam pricing has nothing to do with the rating/HLTB/tags pipeline —
   // run concurrently rather than one after the other.
-  await Promise.all([streamGameDetails(resolved.map(g => g.appid)), loadPrices(resolved)]);
+  await Promise.all([streamGameDetails(resolved.map(g => g.appid), gen), loadPrices(resolved, { gen })]);
+  if (openBundleGuard.isStale(gen)) return; // stale — a newer openBundle() call has since taken over
   if (preserveGameParam) restorePanelFromUrl(restoreShot);
 }
 
@@ -899,7 +1100,7 @@ async function openBundle(bundle: Bundle, { preserveGameParam = false, restoreSh
 // a picker on this page — this just shows a read-only readout of whatever it currently resolves to.
 function updateBundlesRegionLabel() {
   const code = resolveRegion(getStoredRegion());
-  bundlesRegionValueEl.textContent = COUNTRY_OPTIONS.find(c => c.code === code)?.label ?? code;
+  setRegionLabel(COUNTRY_OPTIONS.find(c => c.code === code)?.label ?? code);
 }
 updateBundlesRegionLabel();
 
@@ -913,7 +1114,8 @@ window.addEventListener(REGION_CHANGED_EVENT, () => {
   // never touches whatever bundle is currently open in the detail view below it. Re-open it
   // the same way a `?bundle=` deep link does, so its prices actually pick up the new country
   // instead of staying stuck on whatever was loaded before.
-  const reopening = activeBundleId != null;
+  const activeId = activeBundleIdSig();
+  const reopening = activeId != null;
   // Skip the list's own re-expand when we're about to reopen the still-active bundle right
   // after — it's already collapsed (a bundle is open) and openBundle() will just collapse it
   // again once the reopen resolves, so expanding it here only produces a pointless flicker.
@@ -922,7 +1124,7 @@ window.addEventListener(REGION_CHANGED_EVENT, () => {
   // Same bundle, same rows, same order, just re-priced — whatever game is open should stay
   // open across this, not get closed the way a genuine new bundle open otherwise would (see
   // openBundle's own comment).
-  if (reopening && activeBundleId != null) openBundleById(activeBundleId, { preserveGameParam: true });
+  if (activeId != null) openBundleById(activeId, { preserveGameParam: true });
 });
 sortSelect.addEventListener('change', () => loadBundles());
 expiredCheckbox.addEventListener('change', () => loadBundles());
@@ -939,14 +1141,14 @@ shareViewBtn.addEventListener('click', () => shareTableView(table!, TABLE_VIEW_P
 // reason to make a user step through every game's own panel "↻ Refresh" one at a time when
 // the whole batch is a single cheap POST /api/prices call anyway.
 refreshPricesBtn.addEventListener('click', async () => {
-  if (currentResolvedGames.length === 0 || refreshPricesBtn.disabled) return;
-  refreshPricesBtn.disabled = true;
-  refreshPricesBtn.textContent = 'Refreshing…';
+  if (currentResolvedGames.length === 0 || refreshPricesDisabled()) return;
+  setRefreshPricesDisabled(true);
+  setRefreshPricesLabel('Refreshing…');
   try {
     await loadPrices(currentResolvedGames, { force: true });
   } finally {
-    refreshPricesBtn.disabled = false;
-    refreshPricesBtn.textContent = '↻ Refresh prices';
+    setRefreshPricesDisabled(false);
+    setRefreshPricesLabel('↻ Refresh prices');
   }
 });
 
@@ -961,15 +1163,25 @@ function setBundleParam(id: number | null) {
   const params = new URLSearchParams(location.search);
   if (id == null) params.delete('bundle');
   else params.set('bundle', String(id));
-  history.replaceState(null, '', `?${params}`);
+  // `bundle` isn't in urlState.ts's own PARAM_ORDER (page-specific, no other page has it) —
+  // reorderUrlParams still appends it after every known param, same "byte-identical regardless
+  // of write order" guarantee `game`/`shot`/`bv` etc. already get.
+  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
 }
 
 // There's no single-bundle-fetch endpoint upstream (see findBundleById's own comment in
 // lib/itad.js) — a deep link always goes straight to GET /api/bundles/:id (a bounded
 // server-side search) rather than trying to find the id in whatever's already loaded in
-// `bundles`, which may not even include it (a different sort/page, or not loaded yet at all on
-// initial page load — this runs concurrently with loadBundles(), not after it).
+// `bundlesSig()`, which may not even include it (a different sort/page, or not loaded yet at
+// all on initial page load — this runs concurrently with loadBundles(), not after it).
 async function openBundleById(id: number, { preserveGameParam = false, restoreShot = null }: { preserveGameParam?: boolean; restoreShot?: string | null } = {}) {
+  // Takes its own generation before the id-lookup fetch — a *different* concurrent
+  // openBundleById()/openBundle() call finishing first (e.g. two rapid `?bundle=` deep links,
+  // or a list click racing a still-in-flight deep link) must win over this one's own catch
+  // block below, the same way two concurrent openBundle() calls already needed openBundleGuard
+  // for. Only checked in the catch: the success path already hands off to openBundle(), which
+  // takes its own fresh generation and manages the same race for everything it touches.
+  const gen = openBundleGuard.next();
   try {
     const qs = new URLSearchParams({ country: resolveRegion(getStoredRegion()) });
     const res = await fetch(`/api/bundles/${id}?${qs}`);
@@ -977,22 +1189,19 @@ async function openBundleById(id: number, { preserveGameParam = false, restoreSh
     if (!res.ok) throw new Error(data.error || 'Bundle not found');
     await openBundle(data.bundle, { preserveGameParam, restoreShot });
   } catch (err) {
+    if (openBundleGuard.isStale(gen)) return; // stale — a newer open has since taken over
     // Same UI slot a normally-opened bundle would use — there's no other sensible place to
     // surface "the bundle this link pointed at doesn't exist (anymore)". The invalid id is
     // dropped from the URL so a refresh doesn't repeat the same failed lookup.
-    detailCard.hidden = false;
-    detailTitleEl.textContent = 'Bundle not found';
-    detailMetaEl.textContent = '';
-    detailLinksEl.innerHTML = '';
-    detailStatusEl.textContent = (err as Error).message;
-    priceStatusEl.textContent = '';
-    unresolvedSection.hidden = true;
-    if (unpersistView) { unpersistView(); unpersistView = null; }
-    if (table) { table.destroy(); table = null; }
-    tableContainer.innerHTML = '';
-    resetViewBtn.hidden = true;
-    shareViewBtn.hidden = true;
-    activeBundleId = null;
+    setDetailHidden(false);
+    setDetailTitleSig('Bundle not found');
+    setDetailMetaSig('');
+    setDetailLinksSig(null);
+    setDetailStatusSig((err as Error).message);
+    setPriceStatusSig('');
+    setUnresolvedGamesSig([]);
+    resetBundleTableState();
+    setActiveBundleIdSig(null);
     renderBundleNav();
     setBundleParam(null);
     // No bundle ended up open, so this is back to being a plain browsing state — re-expand the
@@ -1008,8 +1217,8 @@ async function init() {
     const res = await fetch('/api/health');
     const data = await res.json();
     if (!data.itadConfigured) {
-      notConfiguredCard.hidden = false;
-      browseCard.hidden = true;
+      setNotConfiguredHidden(false);
+      setBrowseHidden(true);
       return;
     }
   } catch { /* if health itself fails, fall through and let loadBundles surface the real error */ }
