@@ -1,19 +1,25 @@
 'use strict';
 
+import { createSignal, createRoot, createEffect, For, Show } from 'solid-js';
+import { createStore } from 'solid-js/store';
+import { render } from 'solid-js/web';
 import { esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, normalizeInput } from '/utils.ts';
 import { renderOwnersHtml } from '/ownerListHtml.ts';
-import { FILTER_DIMS, parseUrlState, reorderUrlParams } from '/urlState.ts';
-import { updateNavLink } from '/nav.ts';
+import { FILTER_DIMS, parseUrlState, reorderUrlParams, setPanelParam, setLightboxParam } from '/urlState.ts';
+import { updateNavLink } from '/nav.tsx';
+import { renderPanelNav as renderPanelNavShared, stepGameList } from '/panelNav.ts';
+import { bindPanelKeyboardShortcuts } from '/panelKeyboard.ts';
 import { renderAccountChipsGrouped, bindAccountRefresh, addRecent, renderRecentsBar, bindRecentsBar } from '/accountsBar.ts';
 import { initGameSearch, addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.ts';
-import { openLightbox, isLightboxOpen } from '/lightbox.ts';
+import { openLightbox, isLightboxOpen } from '/lightbox.tsx';
+import { createRowStore } from '/rowStore.ts';
 import {
   panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,
   pickRandomFrom, clearAllRandomQueues, panelHandleEscape,
   renderPanelBody,
-} from '/panel.ts';
+} from '/panel.tsx';
 import { initPageShell } from '/pageShell.ts';
-import type { PanelOptions } from '/panel.ts';
+import type { PanelOptions } from '/panel.tsx';
 import type { Game, GameDetails, Achievements, GameMeta } from '/types.ts';
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -25,7 +31,26 @@ type Account = { steamid: string; personaname?: string; profileurl?: string };
 // (a comma-joined list of slot indices; standalone lookups never get one).
 type GameRow = Game & { groupKey?: string | null };
 
-let games: GameRow[] = [];     // flat: { appid, name, groupKey, loading, details }
+// `games`/`setGames` — a real Solid store, replacing the plain
+// mutated-in-place array `rowCache.ts` used to paper over for `<For>`'s own reference-keying (see
+// `bundles.tsx`'s own conversion for the full "why a store, why produce()" story). Kept the same
+// name `games` rather than renaming to `gamesStore` — a store array reads exactly like a plain
+// array everywhere in this file that only ever *reads* it (`.find`/`.filter`/`.length`/etc.), so
+// the only real edits are at the handful of sites that used to *reassign* (`games = ...`) or
+// *index-mutate* (`games[idx].field = x`) it — those now go through `setGames`/`mutateRow` below.
+// `rowStore` (see rowStore.ts) is the O(1) appid -> array index lookup `mutateRow` needs, plus
+// the same deliberately plain, never-store-linked per-appid map bundles.tsx/library.tsx both
+// needed once panel.tsx turned out to mutate whatever `Game` object it's given directly
+// (news/DLC/price loaders) — `getRow`/`openPanel` are this page's own "one normalization point"
+// pair, mirroring `bundles.tsx`'s `getRow`/`openGame`.
+const [games, setGames] = createStore<GameRow[]>([]);     // flat: { appid, name, groupKey, loading, details }
+const rowStore = createRowStore<GameRow>((idx, updater) => setGames(idx, updater));
+function getRow(appid: number): GameRow | undefined {
+  return rowStore.getRow(appid);
+}
+function mutateRow(appid: number, fn: (draft: GameRow) => void): GameRow | undefined {
+  return rowStore.mutateRow(appid, fn);
+}
 let groups: ServerGroup[] = [];    // [{ userIndices, games }] — ordered, from server
 let slots: Account[][] = [];     // [[{steamid, personaname, profileurl}, ...], ...] — one entry per logical player
 let playtime: Record<string, Record<string, number>> = {};  // { [appid]: { [steamId]: minutes } } — per-account playtime for common games
@@ -34,6 +59,12 @@ const DEFAULT_SORT_COL = 'score';
 const DEFAULT_SORT_DIR = -1;
 let sortCol: string = DEFAULT_SORT_COL;
 let sortDir: number = DEFAULT_SORT_DIR;
+// `sortCol`/`sortDir` stay plain mutable data, same "a signal only drives rendering" convention
+// `activeFilters`/`allOpts`/etc. below already use — they're read from `sortedGames` (called from
+// plenty of non-JSX places too) which has no reason to become reactive itself. `sortRev` is the
+// one dedicated bump signal; every JSX read that depends on it (`SortableTh` below) calls
+// `sortRev()` directly within its own accessor, same idiom `filterRev()`'s own callers use.
+const [sortRev, bumpSortRev] = createSignal(0);
 
 // null at the default sort — omitted from the URL entirely rather than writing out `-score`
 // on every search, since that's what a bare search already sorts by.
@@ -44,7 +75,14 @@ function sortUrlParam(): string | null {
 let runId = 0;           // increments on each search to cancel stale updates
 let streamController: AbortController | null = null; // AbortController for the active detail stream
 let refreshDebounceTimer: ReturnType<typeof setTimeout> | undefined;
-let activeGame: GameRow | null = null;
+// Drive the progress bar/text in ResultsView below — replaces `updateProgress`'s old direct
+// `#prog-bar`/`#prog-text` DOM writes now that this page's results view is real JSX.
+const [progressLoaded, setProgressLoaded] = createSignal(0);
+const [progressTotal, setProgressTotal] = createSignal(0);
+// A signal, not a plain variable, because GameTableRow (below) reads it directly inside its own
+// JSX (the row's `active` class) — every other read/write in this file is plain imperative code,
+// where a signal getter/setter behaves exactly like the old bare variable did.
+const [activeGameSig, setActiveGameSig] = createSignal<GameRow | null>(null);
 let randomGroupKey: string | null = null;      // groupKey of the active random session, or null (queues themselves live in panel.js)
 // Achievement list cache for standalone lookups only (see loadAchievements) — keyed by
 // appid, no per-account progress since a standalone game has no steamids at all.
@@ -63,11 +101,32 @@ let nameFilter = '';
 // viewport at first render so a phone starts collapsed (results visible immediately
 // instead of pushed ~2 screens down by Tag/Genre/Category/etc.) while desktop keeps
 // today's always-expanded panel. Once a user actually clicks the toggle it's a plain
-// user preference for the rest of the session, surviving renderFilterPanel()'s full
-// DOM rebuild on every filter change since it lives here, not in the DOM itself. The
-// toggle button that flips this is itself only shown on mobile via CSS (see
-// .filter-toggle-btn in style.css), so the variable has no effect on desktop.
-let filterPanelCollapsed = typeof matchMedia === 'function' && matchMedia('(max-width: 768px)').matches;
+// user preference for the rest of the session. A real signal (unlike `activeFilters`/
+// `allOpts`/etc. below) since it's read directly inside FilterPanelView's own JSX in three
+// places (`hidden`, the button label, `aria-expanded`) with no other non-JSX consumer —
+// there's no reason to route it through the `filterRev` bump signal below instead. The toggle
+// button that flips this is itself only shown on mobile via CSS (see .filter-toggle-btn in
+// style.css), so the signal has no effect on desktop.
+const [filterPanelCollapsed, setFilterPanelCollapsed] = createSignal(
+  typeof matchMedia === 'function' && matchMedia('(max-width: 768px)').matches
+);
+
+// A bump signal, not the filter state itself (see FilterPanelView/FilterDim below, near the
+// rest of the filtering code, for the full reasoning) — every mutation of `activeFilters`/
+// `allOpts`/`filterSearch`/`nameFilter` above calls this right after.
+const [filterRev, bumpFilterRev] = createSignal(0);
+function markFiltersChanged() { bumpFilterRev(v => v + 1); }
+
+// Keyboard shortcuts modal — same signal + createEffect shape as library.tsx's own conversion.
+const shortcutsModalEl = document.getElementById('shortcuts-modal')!;
+const shortcutsBackdropEl = document.getElementById('shortcuts-backdrop')!;
+const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
+createRoot(() => {
+  createEffect(() => {
+    shortcutsModalEl.classList.toggle('open', shortcutsOpen());
+    shortcutsBackdropEl.classList.toggle('open', shortcutsOpen());
+  });
+});
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
@@ -93,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
       else activeFilters[k].add(val);
       refreshTable();
       updateFilterUrl();
-      renderFilterPanel();
+      markFiltersChanged();
       renderPanel();
     },
     onRefresh: async game => {
@@ -120,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // panel only to immediately reopen the same game once a refresh/restore completes —
     // see its own `panelClose({ preserveUrl: true })` call.
     onClose: ({ preserveUrl } = {}) => {
-      activeGame = null;
+      setActiveGameSig(null);
       randomGroupKey = null;
       refreshTable(); // remove active row highlight
       updateTitle();
@@ -132,6 +191,9 @@ document.addEventListener('DOMContentLoaded', () => {
     lightbox: { onParamChange: setLightboxParam, onGameNav: navigateLightboxGame },
     panel: panelOptions,
   });
+
+  mountFilterPanel();
+  render(() => <AlertsView />, document.getElementById('alerts')!);
 
   document.getElementById('add-btn')!.addEventListener('click', () => addPlayerSlot());
   document.getElementById('search-btn')!.addEventListener('click', () => findCommonGames());
@@ -158,15 +220,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   renderRecentsBar(document.getElementById('recents-bar')!, RECENTS_KEY);
 
-  document.getElementById('results')!.addEventListener('click', e => {
-    const randomBtn = (e.target as Element).closest('.group-random-btn') as HTMLElement | null;
-    if (randomBtn) { pickRandom(randomBtn.dataset.group!); return; }
-    const row = (e.target as Element).closest('tr.game-row') as HTMLElement | null;
-    if (!row || (e.target as Element).closest('a')) return;
-    const appid = Number(row.dataset.appid);
-    const game = games.find(g => g.appid === appid);
-    if (game) openPanel(game);
-  });
+  // Row clicks and each group's 🎲 button are now bound directly in GameTableRow/GameGroupSection
+  // (below) — no delegated `#results` click listener needed anymore now that both are real JSX.
 
   document.getElementById('shortcuts-backdrop')!.addEventListener('click', closeShortcuts);
   document.querySelector('.shortcuts-close')!.addEventListener('click', closeShortcuts);
@@ -181,54 +236,33 @@ document.addEventListener('DOMContentLoaded', () => {
   bindRecentGamesBar(document.getElementById('recent-games-bar')!, (appid, name) => openStandaloneGame(appid, name));
   renderRecentGamesBar(document.getElementById('recent-games-bar')!);
 
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-      // panelHandleEscape (panel.js) owns the lightbox-close/fullscreen-guard logic shared by
-      // all three pages — delegate to it whenever the lightbox is open so this page can't drift
-      // from the other two the way bundles.js once did (see its own comment).
-      if (isLightboxOpen()) { panelHandleEscape(); return; }
-      if (document.getElementById('shortcuts-modal')!.classList.contains('open')) { closeShortcuts(); return; }
-      panelClose(); return; // onClose (see initPanel above) handles the URL/state cleanup
-    }
-    // The lightbox owns the keyboard while open (its own arrows/Home/End/f/space/m,
-    // wired in lightbox.js's own listener) — every other page-level shortcut below is
-    // blocked rather than firing invisibly behind it. This used to let ↑/↓ page games
-    // while the lightbox stayed open on the new game's first shot, with no visible sign
-    // the game had actually changed (see the lightbox's own caption for that fix).
-    if (isLightboxOpen()) return;
-    if (e.key === '?') { e.preventDefault(); toggleShortcuts(); return; }
-    const tag = document.activeElement?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-    if (e.key === '/') {
-      e.preventDefault();
-      (document.querySelector('#user-inputs input[type="text"]') as HTMLInputElement | null)?.focus();
-      return;
-    }
-    if (e.key === 'Enter') {
+  bindPanelKeyboardShortcuts({
+    isLightboxOpen,
+    isPanelOpen: () => !!activeGameSig(),
+    panelClose,
+    panelStepHero,
+    shortcuts: { isOpen: shortcutsOpen, toggle: toggleShortcuts, close: closeShortcuts },
+    focusSearchInput: () => (document.querySelector('#user-inputs input[type="text"]') as HTMLInputElement | null)?.focus(),
+    onEnterOnFocusedRow: () => {
       const row = (document.activeElement as HTMLElement | null)?.closest('tr.game-row') as HTMLElement | null;
-      if (row) {
-        const game = games.find(g => g.appid === Number(row.dataset.appid));
-        if (game) { openPanel(game); return; }
-      }
-    }
-    if (!activeGame) return;
-    const ag = activeGame;
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      if (panelStepHero(e.key === 'ArrowRight' ? 1 : -1, { wrap: true })) e.preventDefault();
-      return;
-    }
-    if (ag.standalone) return; // no group to page through or randomize within — see renderPanelNav
-    if (e.key === 'r' || e.key === 'R') {
-      e.preventDefault();
-      pickRandom(ag.groupKey!);
-      return;
-    }
-    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-    e.preventDefault();
-    const list = sortedGames(ag.groupKey!);
-    const idx = list.findIndex(g => g.appid === ag.appid);
-    const next = (idx + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
-    openPanel(list[next]);
+      const game = row && games.find(g => g.appid === Number(row.dataset.appid));
+      if (!game) return false;
+      openPanel(game);
+      return true;
+    },
+    // No group to page through or randomize within for a standalone lookup — see renderPanelNav.
+    pickRandom: () => {
+      const ag = activeGameSig();
+      if (ag && !ag.standalone) pickRandom(ag.groupKey!);
+    },
+    stepGame: dir => {
+      const ag = activeGameSig();
+      if (!ag || ag.standalone) return false;
+      const next = stepGameList(true, () => sortedGames(ag.groupKey!), ag, dir);
+      if (!next) return false;
+      openPanel(next);
+      return true;
+    },
   });
 
   fetch('/api/health').then(r => r.json()).then(d => {
@@ -259,14 +293,15 @@ function loadFromUrl() {
   } else {
     addPlayerSlot();
     addPlayerSlot();
-    games = [];
+    setGames([]);
+    rowStore.reset();
     slots = [];
     for (const s of Object.values(activeFilters)) s.clear();
     for (const s of Object.values(allOpts)) s.clear();
     for (const k of Object.keys(filterSearch)) filterSearch[k as FilterDimKey] = '';
     nameFilter = '';
-    document.getElementById('filter-panel')!.innerHTML = '';
-    document.getElementById('results')!.innerHTML = '';
+    markFiltersChanged(); // FilterPanelView (mounted once, see below) hides itself once allOpts is empty
+    clearResults();
     document.getElementById('how-it-works')!.hidden = false;
     const accountsBarEl = document.getElementById('accounts-bar')!;
     accountsBarEl.hidden = true;
@@ -374,15 +409,18 @@ function getSlots(): string[][] {
 
 // ── Alerts ─────────────────────────────────────────────────────────────────
 
-function clearAlerts() { document.getElementById('alerts')!.innerHTML = ''; }
+const [alertState, setAlertState] = createSignal<{ msg: string; type: string } | null>(null);
 
-function showAlert(msg: string, type = 'error') {
-  const el = document.createElement('div');
-  el.className = `alert alert-${type}`;
-  el.textContent = msg;
-  const box = document.getElementById('alerts')!;
-  box.innerHTML = '';
-  box.appendChild(el);
+function clearAlerts() { setAlertState(null); }
+
+function showAlert(msg: string, type = 'error') { setAlertState({ msg, type }); }
+
+function AlertsView() {
+  return (
+    <Show when={alertState()}>
+      {a => <div class={`alert alert-${a().type}`}>{a().msg}</div>}
+    </Show>
+  );
 }
 
 // ── Main search flow ───────────────────────────────────────────────────────
@@ -404,6 +442,7 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
   if (restoreSort) {
     sortCol = restoreSort.col;
     sortDir = restoreSort.dir;
+    bumpSortRev(v => v + 1);
   }
 
   const thisRun = ++runId;
@@ -420,14 +459,13 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
       for (const v of vals) activeFilters[k as FilterDimKey].add(v);
     }
   }
+  markFiltersChanged(); // reflect the clears/restores above — FilterPanelView is mounted once, see below
   const accountsBarEl = document.getElementById('accounts-bar')!;
   accountsBarEl.hidden = true;
   accountsBarEl.innerHTML = '';
   document.getElementById('how-it-works')!.hidden = true;
-  document.getElementById('filter-panel')!.innerHTML = '';
   (document.getElementById('search-btn') as HTMLButtonElement).disabled = true;
-  document.getElementById('results')!.innerHTML =
-    `<div style="padding:16px 0;color:var(--text1)"><span class="spinner"></span>${refreshIds ? 'Refreshing' : 'Fetching'} Steam libraries…</div>`;
+  clearResults(`<div style="padding:16px 0;color:var(--text1)"><span class="spinner"></span>${refreshIds ? 'Refreshing' : 'Fetching'} Steam libraries…</div>`);
 
   try {
     const res = await fetch('/api/common-games', {
@@ -440,10 +478,12 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
 
     if (thisRun !== runId) return;
     groups = data.groups || [];
-    games = groups.flatMap(g => {
+    const initialGames = groups.flatMap(g => {
       const key = g.userIndices.join(',');
       return g.games.map(game => ({ ...game, groupKey: key, loading: true, details: null })) as GameRow[];
     });
+    setGames(initialGames);
+    rowStore.load(initialGames);
     slots = data.slots || [];
     playtime = data.playtime || {};
     lastPlayed = data.lastPlayed || {};
@@ -487,7 +527,7 @@ async function findCommonGames({ pushState = true, restoreFilters = null, restor
   } catch (err) {
     if (thisRun !== runId) return;
     showAlert(err instanceof Error ? err.message : String(err));
-    document.getElementById('results')!.innerHTML = '';
+    clearResults();
   } finally {
     (document.getElementById('search-btn') as HTMLButtonElement).disabled = false;
   }
@@ -500,13 +540,17 @@ async function refreshGameDetails(game: Game) {
     const res = await fetch(`/api/game-details/${game.appid}?refresh=1`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Refresh failed');
-    game.details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags, demo: data.demo, protondb: data.protondb };
+    const details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags, demo: data.demo, protondb: data.protondb };
+    // `game` may not be one of this comparison's own store-backed rows (a standalone lookup
+    // isn't) — mutateRow returns undefined for those, so fall back to mutating the plain
+    // standalone object directly, same as before this row data was store-backed.
+    const updated = mutateRow(game.appid, draft => { draft.details = details; });
+    if (!updated) game.details = details;
+    const g = updated ?? game;
     // Standalone lookups (see openStandaloneGame) aren't part of the loaded comparison table —
     // feeding their tags/genres/categories into the table's filter option pool would make the
     // filter card spuriously appear (or gain new options) with no comparison ever having run.
-    if (!game.standalone && (game.details.meta || game.details.tags)) updateFilterOptions(game.details.meta, game.details.tags);
-    const tr = document.querySelector<HTMLTableRowElement>(`tr.game-row[data-appid="${game.appid}"]`);
-    if (tr) syncRow(tr, game);
+    if (!g.standalone && (g.details?.meta || g.details?.tags)) updateFilterOptions(g.details.meta, g.details.tags);
     refreshTable();
   } catch (err) {
     showAlert(err instanceof Error ? err.message : String(err));
@@ -524,8 +568,6 @@ async function loadAllDetails(thisRun: number) {
 
   updateProgress(0, games.length);
   let loaded = 0;
-
-  const idxByAppid = new Map(games.map((g, i) => [g.appid, i]));
 
   let res;
   try {
@@ -564,18 +606,15 @@ async function loadAllDetails(thisRun: number) {
         if (data.done) return;
         if (thisRun !== runId) { reader.cancel(); return; }
 
-        const idx = idxByAppid.get(data.appid);
-        if (idx === undefined) continue;
-
-        const g = games[idx];
-        g.details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags, demo: data.demo, protondb: data.protondb };
-        g.loading = false;
+        const g = mutateRow(data.appid, draft => {
+          draft.details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags, demo: data.demo, protondb: data.protondb };
+          draft.loading = false;
+        });
+        if (!g) continue;
         loaded++;
         updateProgress(loaded, games.length);
         if (g.details?.meta || g.details?.tags) updateFilterOptions(g.details.meta, g.details.tags);
-        if (activeGame?.appid === g.appid) renderPanel();
-        const tr = document.querySelector<HTMLTableRowElement>(`tr.game-row[data-appid="${data.appid}"]`);
-        if (tr) syncRow(tr, g);
+        if (activeGameSig()?.appid === g.appid) renderPanel();
         clearTimeout(refreshDebounceTimer);
         refreshDebounceTimer = setTimeout(refreshTable, 150);
       }
@@ -597,8 +636,9 @@ function slotDisplayName(i: number): string {
 // again in browser history/tab search. Falls back to the slot names, then the bare app name
 // when nothing's loaded at all (see loadFromUrl's empty branch and renderPage below).
 function updateTitle() {
-  if (activeGame) {
-    document.title = `${activeGame.name} — Steam Common Games`;
+  const ag = activeGameSig();
+  if (ag) {
+    document.title = `${ag.name} — Steam Common Games`;
     return;
   }
   if (slots.length) {
@@ -638,89 +678,190 @@ function groupSlotsHtml(slotIndices: number[]): string {
     .join(', ');
 }
 
+// The one place `#results`' innerHTML is ever set — always disposes the previous search's
+// mounted `ResultsView` root first, so "never clear/replace #results without disposing" is
+// structural (every call site funnels through here) rather than a comment convention each
+// direct `innerHTML =` site had to remember on its own (which is exactly how two of them ended
+// up leaking group mounts before this — see CHANGELOG).
+let disposeResultsView: (() => void) | null = null;
+function disposeGroupMounts() {
+  disposeResultsView?.();
+  disposeResultsView = null;
+  groupMounts.clear();
+}
+function clearResults(html = ''): void {
+  disposeGroupMounts();
+  document.getElementById('results')!.innerHTML = html;
+}
+
 function renderPage() {
+  updateTitle();
+  updateLibraryExplorerLink();
+  // Reset before the fresh mount below reads them — without this, a new search would
+  // momentarily render with whatever progress values the *previous* search left behind, until
+  // loadAllDetails' own updateProgress(0, ...) call catches up a moment later.
+  setProgressLoaded(0);
+  setProgressTotal(games.length);
+  clearResults();
+  disposeResultsView = render(() => <ResultsView />, document.getElementById('results')!);
+}
+
+// ── Results view — one real Solid root per search (mounted/disposed by renderPage/clearResults
+// above), replacing what used to be a hand-built HTML template string rebuilt from scratch on
+// every search plus a manual `querySelectorAll('thead th[data-col]')` sort-header rebind. `<For>`
+// is reference-keyed on `groups` (a plain array, snapshotted once per mount, same "games/groups
+// stay plain" convention `filterRev`'s own comment above describes) — group membership/order
+// only ever changes via a brand-new search, which already gets a brand-new mount.
+function ResultsView() {
   const sortedSlotIndices = [...slots.keys()].sort((a, b) =>
     slotDisplayName(a).toLowerCase().localeCompare(slotDisplayName(b).toLowerCase())
   );
   const playerList = sortedSlotIndices.map(i => slotHtml(i)).join(', ');
-
-  updateTitle();
-  updateLibraryExplorerLink();
-
-  const groupSections = groups.map(group => {
-    const key = group.userIndices.join(',');
-    const usersHtml = groupSlotsHtml(group.userIndices);
-    const count = group.games.length;
-    return `
-      <div class="game-group" id="group-${key}">
-        <div class="group-header">
-          <span class="group-title">${usersHtml}</span>
-          <span class="group-meta">${count} game${count !== 1 ? 's' : ''}</span>
-          <button type="button" class="group-random-btn" data-group="${key}" aria-label="Pick a random game from this group" title="Pick a random game">🎲</button>
+  // filterRev()-gated, same idiom FilterPanelView's own accessors above use — the raw counts
+  // this reads (`games`/`activeFilters`/`nameFilter`) are all plain data with no signal of their
+  // own.
+  const resultsCountText = () => {
+    filterRev();
+    const filtersActive = hasActiveFilters();
+    const filtered = filtersActive ? games.filter(g => gameMatchesFilters(g, filtersActive)).length : games.length;
+    const gameLabel = slots.length === 1 ? 'games' : 'shared games';
+    return filtersActive ? `${filtered} / ${games.length} ${gameLabel}` : `${games.length} ${gameLabel}`;
+  };
+  return (
+    <>
+      <div class="results-header">
+        <h2 id="results-count">{resultsCountText()}</h2>
+        <Show when={playerList}>
+          <div class="results-meta" innerHTML={`${slots.length === 1 ? 'library of' : 'across'} ${playerList}`} />
+        </Show>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-text" id="prog-text">
+          {progressLoaded() >= progressTotal() ? `All ${progressTotal()} details loaded` : `Loading details… ${progressLoaded()} / ${progressTotal()}`}
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th class="td-thumb"></th>
-              ${thHtml('name', 'Game')}
-              ${thHtml('score', 'Score')}
-              ${thHtml('main', 'Main Story')}
-              ${thHtml('extra', 'Main + Extra')}
-            </tr></thead>
-            <tbody id="tbody-${key}">
-              ${sortedGames(key).map(rowHtml).join('')}
-            </tbody>
-          </table>
+        <div class="progress-bar-bg">
+          <div
+            class="progress-bar"
+            id="prog-bar"
+            style={{
+              width: `${progressTotal() ? Math.round(progressLoaded() / progressTotal() * 100) : 0}%`,
+              background: progressLoaded() >= progressTotal() ? '#a3cf4e' : undefined,
+            }}
+          />
         </div>
-      </div>`;
-  }).join('');
+      </div>
+      <For each={groups}>{group => <GameGroupSection group={group} />}</For>
+    </>
+  );
+}
 
-  document.getElementById('results')!.innerHTML = `
-    <div class="results-header">
-      <h2 id="results-count">${games.length} ${slots.length === 1 ? 'games' : 'shared games'}</h2>
-      ${playerList ? `<div class="results-meta">${slots.length === 1 ? 'library of' : 'across'} ${playerList}</div>` : ''}
+// One table per ownership group. Owns its own row-list signal (`rows`/`setRows`), registered
+// into `groupMounts` on mount so `refreshTable` (debounced during the SSE detail stream — see
+// its own comment) can push a freshly sorted/filtered list into just this group without
+// re-sorting/re-filtering every group on every single streamed event. `count`/`usersHtml` are
+// the group's raw membership — static for this mount, unaffected by filters — unlike `rows`'
+// own length, which does reflect the current filters and drives this group's visibility.
+function GameGroupSection(props: { group: ServerGroup }) {
+  const key = props.group.userIndices.join(',');
+  const count = props.group.games.length;
+  const usersHtml = groupSlotsHtml(props.group.userIndices);
+  const [rows, setRows] = createSignal<GameRow[]>(sortedGames(key));
+  groupMounts.set(key, { setRows });
+  return (
+    <div class="game-group" id={`group-${key}`} style={{ display: rows().length === 0 ? 'none' : undefined }}>
+      <div class="group-header">
+        <span class="group-title" innerHTML={usersHtml} />
+        <span class="group-meta">{count} game{count !== 1 ? 's' : ''}</span>
+        <button
+          type="button"
+          class="group-random-btn"
+          aria-label="Pick a random game from this group"
+          title="Pick a random game"
+          onClick={() => pickRandom(key)}
+        >🎲</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th class="td-thumb" />
+            <SortableTh col="name" label="Game" />
+            <SortableTh col="score" label="Score" />
+            <SortableTh col="main" label="Main Story" />
+            <SortableTh col="extra" label="Main + Extra" />
+          </tr></thead>
+          <tbody>
+            <For each={rows()}>{game => <GameTableRow game={game} />}</For>
+          </tbody>
+        </table>
+      </div>
     </div>
-    <div class="progress-wrap">
-      <div class="progress-text" id="prog-text">Loading details… 0 / ${games.length}</div>
-      <div class="progress-bar-bg"><div class="progress-bar" id="prog-bar" style="width:0%"></div></div>
-    </div>
-    ${groupSections}`;
-
-  document.querySelectorAll<HTMLElement>('thead th[data-col]').forEach(th => {
-    th.addEventListener('click', () => {
-      const col = th.dataset.col;
-      if (sortCol === col) sortDir = -sortDir;
-      else { sortCol = col!; sortDir = col === 'name' ? 1 : -1; }
-      refreshTable();
-      updateFilterUrl();
-    });
-  });
+  );
 }
 
-function thHtml(col: string, label: string): string {
-  const active = sortCol === col ? ' active' : '';
-  const icon = sortCol === col ? (sortDir > 0 ? '↑' : '↓') : '↕';
-  return `<th class="sortable${active}" data-col="${col}">
-    <div class="th-inner">${label}<span class="sort-icon">${icon}</span></div>
-  </th>`;
+// Replaces the old `thHtml` string-builder + the manual `querySelectorAll('thead th[data-col]')`
+// click-rebind `renderPage` used to redo on every search. `sortCol`/`sortDir` stay the plain
+// module-level variables `sortedGames` already reads (see `sortRev`'s own comment above) —
+// `isActive`/`icon` are `sortRev()`-gated accessors, same idiom `FilterDim`'s own `isChecked`
+// above uses for `activeFilters`.
+function SortableTh(props: { col: string; label: string }) {
+  const isActive = () => { sortRev(); return sortCol === props.col; };
+  const icon = () => { sortRev(); return sortCol === props.col ? (sortDir > 0 ? '↑' : '↓') : '↕'; };
+  return (
+    <th
+      classList={{ sortable: true, active: isActive() }}
+      onClick={() => {
+        if (sortCol === props.col) sortDir = -sortDir;
+        else { sortCol = props.col; sortDir = props.col === 'name' ? 1 : -1; }
+        bumpSortRev(v => v + 1);
+        updateFilterUrl();
+      }}
+    >
+      <div class="th-inner">{props.label}<span class="sort-icon">{icon()}</span></div>
+    </th>
+  );
 }
 
-function rowHtml(game: GameRow): string {
-  return `<tr class="game-row" tabindex="0" data-appid="${game.appid}">${rowCells(game)}</tr>`;
+// Row identity/reference discipline is the `games` store itself (see its own comment above) —
+// `<For>` is reference-keyed, but since each array item is a store-proxied object, this
+// component's own per-cell JSX reads update independently of whether `<For>` re-invokes the row
+// at all, the same mechanism `@vates/data-table-solid`'s per-cell rendering uses (confirmed by
+// reading its source — see bundles.tsx's own comment). No rowCache.ts-style reference-copy
+// trick needed; this page no longer imports that file.
+function GameTableRow(props: { game: GameRow }) {
+  const g = () => props.game;
+  return (
+    <tr
+      class="game-row"
+      classList={{ active: activeGameSig()?.appid === g().appid }}
+      tabIndex={0}
+      data-appid={g().appid}
+      onClick={e => { if ((e.target as Element).closest('a')) return; openPanel(g()); }}
+    >
+      <td class="td-thumb">
+        <img
+          class="game-thumb"
+          src={g().details?.meta?.capsule ?? ''}
+          alt=""
+          loading="lazy"
+          width={120}
+          height={45}
+          onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
+        />
+      </td>
+      <td class="td-name">{g().name}</td>
+      <td class="td-score" innerHTML={renderScoreCell(g())} />
+      <td class="td-hltb" innerHTML={renderMainCell(g())} />
+      <td class="td-hltb" innerHTML={renderExtraCell(g())} />
+    </tr>
+  );
 }
+
+interface GroupMount { setRows: (rows: GameRow[]) => void; }
+let groupMounts = new Map<string, GroupMount>();
 
 function updateProgress(loaded: number, total: number) {
-  const bar = document.getElementById('prog-bar');
-  const txt = document.getElementById('prog-text');
-  if (!bar || !txt) return;
-  const pct = total ? Math.round((loaded / total) * 100) : 0;
-  bar.style.width = `${pct}%`;
-  if (loaded >= total) {
-    txt.textContent = `All ${total} details loaded`;
-    bar.style.background = '#a3cf4e';
-  } else {
-    txt.textContent = `Loading details… ${loaded} / ${total}`;
-  }
+  setProgressLoaded(loaded);
+  setProgressTotal(total);
 }
 
 // ── Side panel ─────────────────────────────────────────────────────────────
@@ -765,10 +906,10 @@ async function loadAchievements(game: Game, { force = false }: { force?: boolean
   if (!game.standalone) return;
   if (!force) {
     const cached = achievementsCache.get(game.appid);
-    if (cached) { game.achievements = cached; if (activeGame === game) renderPanelBody(game); return; }
+    if (cached) { game.achievements = cached; if (activeGameSig() === game) renderPanelBody(game); return; }
   }
   game.achievementsLoading = true;
-  if (activeGame === game) renderPanelBody(game);
+  if (activeGameSig() === game) renderPanelBody(game);
   try {
     const res = await fetch(`/api/achievements/${game.appid}${force ? '?refresh=1' : ''}`);
     const data = await res.json();
@@ -778,7 +919,7 @@ async function loadAchievements(game: Game, { force = false }: { force?: boolean
     game.achievements = null;
   } finally {
     game.achievementsLoading = false;
-    if (activeGame === game) renderPanelBody(game); // no-op if the user moved on mid-fetch
+    if (activeGameSig() === game) renderPanelBody(game); // no-op if the user moved on mid-fetch
   }
 }
 
@@ -790,11 +931,11 @@ async function fetchStandaloneDetails(game: Game) {
     game.details = { rating: data.rating, hltb: data.hltb, meta: data.meta, tags: data.tags, demo: data.demo, protondb: data.protondb };
     game.loading = false;
     if (game.details.meta?.name) game.name = game.details.meta.name;
-    if (activeGame === game) { renderPanelBody(game); updateTitle(); } // no-op if the user moved on mid-fetch
+    if (activeGameSig() === game) { renderPanelBody(game); updateTitle(); } // no-op if the user moved on mid-fetch
     addRecentGame(game.appid, game.name, game.details.meta?.capsule || null);
     renderRecentGamesBar(document.getElementById('recent-games-bar')!);
   } catch (err) {
-    if (activeGame === game) showAlert(err instanceof Error ? err.message : String(err));
+    if (activeGameSig() === game) showAlert(err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -820,7 +961,7 @@ function buildOwnersHtml(g: Game): string {
 
 function pickRandom(groupKey: string) {
   const list = sortedGames(groupKey);
-  const pick = pickRandomFrom(list, groupKey, activeGame?.appid ?? -1);
+  const pick = pickRandomFrom(list, groupKey, activeGameSig()?.appid ?? -1);
   if (!pick) return;
   const game = list.find(g => g.appid === pick.appid);
   if (!game) return;
@@ -833,66 +974,43 @@ function openPanel(game: GameRow, { isRandom = false, keepHistory = false }: { i
     randomGroupKey = null;
     clearAllRandomQueues();
   }
-  activeGame = game;
-  panelOpen(game, { keepHistory }); // shared: renders hero+body, opens the panel, focuses it
+  // Always open against the plain panelRows copy, never a `games` store proxy — see that store's
+  // own comment for why (panel.tsx's lazy loaders mutate whatever object they're given directly,
+  // which a Solid store blocks). A `game` not in panelRows (a standalone lookup) falls through to
+  // whatever was actually passed, unchanged from before.
+  const resolved = getRow(game.appid) ?? game;
+  setActiveGameSig(resolved);
+  panelOpen(resolved, { keepHistory }); // shared: renders hero+body, opens the panel, focuses it
   updateTitle();
   renderPanelNav();
   refreshTable(); // re-render rows so the active highlight appears
-  document.getElementById(`tbody-${game.groupKey}`)?.querySelector(`tr.game-row[data-appid="${game.appid}"]`)?.scrollIntoView({ block: 'nearest' });
+  document.getElementById(`tbody-${resolved.groupKey}`)?.querySelector(`tr.game-row[data-appid="${resolved.appid}"]`)?.scrollIntoView({ block: 'nearest' });
   // Standalone lookups are restorable too (see restorePanelFromUrl's fallback to
   // openStandaloneGame below), so `?game=` is set unconditionally.
-  setPanelParam(game.appid);
+  setPanelParam(resolved.appid);
 }
 
 // Lightbox's own ↑/↓ handler (see initLightbox below) — same game-list step the
 // document keydown handler above does when the lightbox is closed, but also jumps
 // straight into the new game's lightbox at shot 0 rather than leaving the lightbox
-// closed behind it. No-ops with no group to page through, same guard as above.
+// closed behind it. No-ops with no group to page through, same guard as above. `stepGameList`
+// (panelNav.ts, shared with library.tsx/bundles.tsx) does the "current index, wrap around"
+// arithmetic; `table: true` since this page has no @vates table instance to guard against —
+// see panelNav.ts's own comment on why that param is only ever checked for truthiness.
 function navigateLightboxGame(dir: number) {
-  if (!activeGame || activeGame.standalone) return;
-  const ag = activeGame;
-  const list = sortedGames(ag.groupKey!);
-  const idx = list.findIndex(g => g.appid === ag.appid);
-  const next = list[(idx + dir + list.length) % list.length];
+  const ag = activeGameSig();
+  const next = stepGameList(true, () => sortedGames(ag!.groupKey!), ag, dir as 1 | -1);
+  if (!next) return;
   openPanel(next);
-  openLightbox(next, 0);
+  // sortedGames() reads off the `games` store, so `next` may be a store proxy — resolve to the
+  // same plain panelRows copy openPanel just opened the panel with, same reasoning as its own
+  // comment above.
+  openLightbox(getRow(next.appid) ?? next, 0);
 }
 
-function openShortcuts() {
-  document.getElementById('shortcuts-modal')!.classList.add('open');
-  document.getElementById('shortcuts-backdrop')!.classList.add('open');
-}
-
-function closeShortcuts() {
-  document.getElementById('shortcuts-modal')!.classList.remove('open');
-  document.getElementById('shortcuts-backdrop')!.classList.remove('open');
-}
-
-function toggleShortcuts() {
-  if (document.getElementById('shortcuts-modal')!.classList.contains('open')) closeShortcuts();
-  else openShortcuts();
-}
-
-function setPanelParam(appid: number | string | null) {
-  const params = new URLSearchParams(location.search);
-  params.delete('shot');
-  if (appid == null) {
-    params.delete('game');
-  } else {
-    params.set('game', String(appid));
-  }
-  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
-}
-
-function setLightboxParam(idx: string | null) {
-  const params = new URLSearchParams(location.search);
-  if (idx == null) {
-    params.delete('shot');
-  } else {
-    params.set('shot', idx);
-  }
-  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
-}
+function openShortcuts() { setShortcutsOpen(true); }
+function closeShortcuts() { setShortcutsOpen(false); }
+function toggleShortcuts() { setShortcutsOpen(!shortcutsOpen()); }
 
 function restorePanelFromUrl(restoreShot: string | null = null) {
   const params = new URLSearchParams(location.search);
@@ -900,135 +1018,61 @@ function restorePanelFromUrl(restoreShot: string | null = null) {
   if (!appid) return;
   const game = games.find(g => g.appid === appid);
   if (game) {
-    if (activeGame?.appid !== appid) openPanel(game);
+    if (activeGameSig()?.appid !== appid) openPanel(game);
     const shotParam = restoreShot ?? params.get('shot');
-    if (shotParam !== null && !game.loading) openLightbox(game, shotParam);
+    if (shotParam !== null && !game.loading) openLightbox(getRow(appid) ?? game, shotParam);
     return;
   }
   // Not (yet) part of the loaded comparison — e.g. a game nobody in it owns, or no
   // comparison loaded at all. Fetch it directly instead of silently giving up, same as
   // library.js's equivalent fallback — its name isn't known yet (see openStandaloneGame),
   // so the panel opens with a placeholder title until the fetch resolves it.
-  if (activeGame?.appid === appid) return; // already open / fetch already in flight
+  if (activeGameSig()?.appid === appid) return; // already open / fetch already in flight
   openStandaloneGame(appid);
 }
 
+// Builds the panel's prev/next/random nav bar (`#panel-nav`, shared markup/CSS/keys with
+// library.tsx/bundles.tsx — see panelNav.ts/CLAUDE.md's panel.tsx bullet) from sortedGames()'s
+// current search/filter/sort order for the active game's group. Empty for a standalone lookup
+// (see openStandaloneGame above) — there's no natural list to page through, same as
+// library.tsx's/bundles.tsx's own version of this function. `table: true` since this page has no
+// @vates table instance — see panelNav.ts's own comment on why that param is only ever checked
+// for truthiness.
 function renderPanelNav() {
-  const nav = document.getElementById('panel-nav');
-  if (!nav || !activeGame) return;
-  // A standalone lookup (see openStandaloneGame above) isn't part of any group — there's no
-  // natural "next game" to page through, so there's no nav to show.
-  if (activeGame.standalone) { nav.innerHTML = ''; return; }
-  const ag = activeGame;
-  const groupKey = ag.groupKey!;
-  const list = sortedGames(groupKey);
-  const idx = list.findIndex(g => g.appid === ag.appid);
-  nav.innerHTML = `
-    <button class="panel-nav-btn" id="panel-prev" aria-label="Previous game" title="Previous game (↑)">↑</button>
-    <span class="panel-nav-pos" aria-live="polite">${idx + 1} / ${list.length}</span>
-    <button class="panel-nav-btn" id="panel-next" aria-label="Next game" title="Next game (↓)">↓</button>
-    <button class="panel-nav-btn panel-nav-reroll" id="panel-reroll" aria-label="Pick a random game" title="Pick a random game (R)">🎲<span class="panel-nav-kbd">R</span></button>
-  `;
-  document.getElementById('panel-prev')!.addEventListener('click', () => {
-    openPanel(list[(idx - 1 + list.length) % list.length]);
-  });
-  document.getElementById('panel-next')!.addEventListener('click', () => {
-    openPanel(list[(idx + 1) % list.length]);
-  });
-  document.getElementById('panel-reroll')!.addEventListener('click', () => {
-    pickRandom(groupKey);
+  const ag = activeGameSig();
+  if (!ag) return;
+  renderPanelNavShared({
+    table: true,
+    game: ag,
+    getGameList: () => sortedGames(ag.groupKey!),
+    onOpen: openPanel,
+    onReroll: () => pickRandom(ag.groupKey!),
   });
 }
 
 function renderPanel() {
-  if (!activeGame) return;
+  const ag = activeGameSig();
+  if (!ag) return;
   renderPanelNav();
-  renderPanelBody(activeGame); // shared: rebuilds hero + body from panel.js
+  renderPanelBody(ag); // shared: rebuilds hero + body from panel.js
 }
 
+// Pushes a freshly sorted/filtered row list into each group's own signal (see GameGroupSection
+// above) — the sort-header active/icon state and the results-count text don't need any
+// handling here anymore, both being real reactive JSX now (`SortableTh`'s `sortRev()`,
+// `ResultsView`'s `resultsCountText()`), and neither does a group's own show/hide-when-empty
+// toggle, which now falls straight out of its `style` binding once `setRows` updates `rows()`.
 function refreshTable() {
-  document.querySelectorAll<HTMLElement>('thead th[data-col]').forEach(th => {
-    const col = th.dataset.col;
-    const active = col === sortCol;
-    th.classList.toggle('active', active);
-    const icon = th.querySelector('.sort-icon');
-    if (icon) icon.textContent = active ? (sortDir > 0 ? '↑' : '↓') : '↕';
-  });
   const filtersActive = hasActiveFilters();
   for (const group of groups) {
     const key = group.userIndices.join(',');
-    const tbody = document.getElementById(`tbody-${key}`);
-    if (!tbody) continue;
-    reconcileTbody(tbody, sortedGames(key, filtersActive));
-    const groupEl = document.getElementById(`group-${key}`);
-    if (groupEl) groupEl.style.display = tbody.childElementCount === 0 ? 'none' : '';
+    const gm = groupMounts.get(key);
+    if (!gm) continue;
+    gm.setRows(sortedGames(key, filtersActive));
   }
-
-  const countEl = document.getElementById('results-count');
-  if (countEl) {
-    const filtered = filtersActive ? games.filter(g => gameMatchesFilters(g, filtersActive)).length : games.length;
-    const gameLabel = slots.length === 1 ? 'games' : 'shared games';
-    countEl.textContent = filtersActive
-      ? `${filtered} / ${games.length} ${gameLabel}`
-      : `${games.length} ${gameLabel}`;
-  }
-  if (activeGame) renderPanelNav();
+  if (activeGameSig()) renderPanelNav();
 }
 
-// Reconcile a tbody's rows against a desired ordered game list.
-// Reuses existing <tr> nodes (moves/updates them) rather than replacing innerHTML,
-// so in-flight click events always target a live DOM node.
-function reconcileTbody(tbody: HTMLElement, desired: GameRow[]) {
-  // Index existing rows by appid for O(1) lookup.
-  const existing = new Map<number, HTMLTableRowElement>();
-  for (const tr of tbody.querySelectorAll<HTMLTableRowElement>('tr.game-row')) {
-    existing.set(Number(tr.dataset.appid), tr);
-  }
-
-  // Insert/move rows into the correct order.
-  for (let i = 0; i < desired.length; i++) {
-    const game = desired[i];
-    let tr = existing.get(game.appid);
-    if (!tr) {
-      tr = document.createElement('tr');
-      tr.className = 'game-row';
-      tr.dataset.appid = String(game.appid);
-    }
-    syncRow(tr, game); // always sync content and active state
-    // Move to the correct position if needed (insertBefore is a no-op when the
-    // node is already in the right place in the same parent).
-    const current = tbody.children[i];
-    if (current !== tr) tbody.insertBefore(tr, current ?? null);
-    existing.delete(game.appid);
-  }
-
-  // Remove rows that are no longer in the desired list.
-  for (const tr of existing.values()) tr.remove();
-}
-
-// Render the five <td> cells for a new <tr> (active class is set by syncRow).
-function rowCells(game: Game) {
-  const thumb = game.details?.meta?.capsule ?? '';
-  return `<td class="td-thumb"><img class="game-thumb" src="${esc(thumb)}" alt="" loading="lazy" width="120" height="45" onerror="this.style.visibility='hidden'"></td>
-    <td class="td-name">${esc(game.name)}</td>
-    <td class="td-score">${renderScoreCell(game)}</td>
-    <td class="td-hltb">${renderMainCell(game)}</td>
-    <td class="td-hltb">${renderExtraCell(game)}</td>`;
-}
-
-// Update an existing <tr>'s cells and active state in place.
-function syncRow(tr: HTMLTableRowElement, game: Game) {
-  tr.classList.toggle('active', activeGame?.appid === game.appid);
-  const cells = tr.cells;
-  if (!cells.length) { tr.innerHTML = rowCells(game); return; }
-
-  const capsule = game.details?.meta?.capsule;
-  if (capsule) { const img = cells[0].querySelector('img'); if (img && img.src !== capsule) { img.src = capsule; img.style.visibility = ''; } }
-  cells[1].innerHTML = esc(game.name);
-  cells[2].innerHTML = renderScoreCell(game);
-  cells[3].innerHTML = renderMainCell(game);
-  cells[4].innerHTML = renderExtraCell(game);
-}
 
 // ── Sorting ────────────────────────────────────────────────────────────────
 
@@ -1095,183 +1139,175 @@ function gameMatchesFilters(game: Game, filtersActive = hasActiveFilters()) {
   });
 }
 
+// `activeFilters`/`allOpts`/`filterSearch`/`nameFilter` all stay plain
+// mutable data — same "games/groups stay plain, a signal only drives rendering" convention step 1
+// used for the comparison tables — since they're read from plenty of non-JSX places
+// (gameMatchesFilters, updateFilterUrl, the panel's isTagActive/onTagClick options) that have no
+// reason to become reactive. `filterRev` is the one dedicated signal, bumped by
+// `markFiltersChanged()` right after any of that plain data is mutated — every read inside
+// FilterPanelView/FilterDim below that depends on it calls `filterRev()` directly within its own
+// JSX (not hoisted into a top-level `const` first), per the pilot's retrospective.
 function updateFilterOptions(meta: GameMeta | null | undefined, tags: string[] | null | undefined) {
   const KEYS = FILTER_DIMS.map(d => d.key);
-  const newByKey: Record<string, string[]> = Object.fromEntries(KEYS.map(k => [k, []]));
+  let changed = false;
   for (const key of KEYS) {
     const vals = key === 'tags' ? (tags || []) : (meta?.[key] || []);
     for (const v of vals) {
-      if (!allOpts[key].has(v)) { allOpts[key].add(v); newByKey[key].push(v); }
+      if (!allOpts[key].has(v)) { allOpts[key].add(v); changed = true; }
     }
   }
-  if (KEYS.every(k => !newByKey[k].length)) return;
+  // A real Solid <For> re-renders only the dimension(s) that actually gained new options (or a
+  // brand-new dimension's whole subtree, on its first option) without touching any other
+  // dimension's DOM — the old "surgical append vs. full rebuild, plus manually save/restore
+  // search-input focus" dance existed purely to fake that same behavior by hand over raw
+  // `innerHTML` rebuilds, and isn't needed anymore.
+  if (changed) markFiltersChanged();
+}
 
-  const panelEl = document.getElementById('filter-panel')!;
-  const needsNewDim = KEYS.some(k =>
-    newByKey[k].length > 0 && !panelEl.querySelector(`input[data-search-dim="${k}"]`)
+function FilterDim(props: { dim: typeof FILTER_DIMS[number] }) {
+  const options = () => {
+    filterRev();
+    const key = props.dim.key;
+    const q = foldStr(filterSearch[key]);
+    return [...allOpts[key]].sort().filter(v => !q || foldStr(v).includes(q));
+  };
+  const isChecked = (v: string) => { filterRev(); return activeFilters[props.dim.key].has(v); };
+  return (
+    <div class="filter-dim">
+      <div class="filter-dim-title">{props.dim.label}</div>
+      <input
+        class="filter-search"
+        type="search"
+        placeholder="Search…"
+        data-search-dim={props.dim.key}
+        // Deliberately not read through filterRev() the way nameFilterValue() (FilterPanelView)
+        // is — unlike nameFilter, nothing ever mutates `filterSearch[key]` except this same
+        // input's own onInput below (the DOM's own value already reflects that), and the one
+        // thing that does clear it (a fresh search) also clears `allOpts` to empty first, which
+        // tears down and recreates this whole FilterDim once options exist again — so this value
+        // is always fresh at the point a new instance actually reads it.
+        value={filterSearch[props.dim.key]}
+        onInput={e => {
+          filterSearch[props.dim.key] = e.currentTarget.value;
+          markFiltersChanged();
+        }}
+      />
+      <div class="filter-opts">
+        <For each={options()}>
+          {v => (
+            <label class="filter-opt">
+              <input
+                type="checkbox"
+                data-dim={props.dim.key}
+                value={v}
+                checked={isChecked(v)}
+                onChange={e => {
+                  if (e.currentTarget.checked) activeFilters[props.dim.key].add(v);
+                  else activeFilters[props.dim.key].delete(v);
+                  refreshTable();
+                  updateFilterUrl();
+                  markFiltersChanged();
+                }}
+              />
+              {' ' + v}
+            </label>
+          )}
+        </For>
+      </div>
+    </div>
   );
-
-  if (needsNewDim || !panelEl.querySelector('.card')) {
-    // Full rebuild needed — preserve focus in search inputs
-    const focused = document.activeElement as HTMLInputElement | null;
-    const focusedDim = focused?.dataset?.searchDim;
-    const selStart = focused?.selectionStart;
-    const selEnd = focused?.selectionEnd;
-    renderFilterPanel();
-    if (focusedDim) {
-      const el = panelEl.querySelector<HTMLInputElement>(`input[data-search-dim="${focusedDim}"]`);
-      if (el) { el.focus(); try { el.setSelectionRange(selStart ?? null, selEnd ?? null); } catch {} }
-    }
-    return;
-  }
-
-  // Surgical: append new options into existing dimension containers
-  for (const key of KEYS) {
-    if (!newByKey[key].length) continue;
-    const optsContainer = panelEl
-      .querySelector(`input[data-search-dim="${key}"]`)
-      ?.closest('.filter-dim')
-      ?.querySelector('.filter-opts');
-    if (!optsContainer) continue;
-
-    for (const v of newByKey[key]) {
-      const label = document.createElement('label');
-      label.className = 'filter-opt';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.dataset.dim = key;
-      cb.value = v;
-      label.appendChild(cb);
-      label.appendChild(document.createTextNode(' ' + v));
-
-      if (filterSearch[key] && !foldStr(v).includes(foldStr(filterSearch[key]))) {
-        label.style.display = 'none';
-      }
-
-      // Insert in sorted position
-      const existing = [...optsContainer.querySelectorAll('.filter-opt')];
-      const after = existing.find(el => (el.querySelector('input')?.value ?? '').localeCompare(v) > 0);
-      if (after) optsContainer.insertBefore(label, after);
-      else optsContainer.appendChild(label);
-
-      cb.addEventListener('change', () => {
-        if (cb.checked) activeFilters[key].add(v);
-        else activeFilters[key].delete(v);
-        refreshTable();
-        updateFilterUrl();
-        renderFilterPanel();
-      });
-    }
-  }
 }
 
-function applySearch(dim: string, query: string) {
-  const q = foldStr(query);
-  const inp = document.querySelector(`input[data-search-dim="${dim}"]`);
-  if (!inp) return;
-  inp.closest('.filter-dim')!.querySelectorAll<HTMLElement>('.filter-opt').forEach(label => {
-    const val = label.querySelector('input')?.value ?? '';
-    label.style.display = !q || foldStr(val).includes(q) ? '' : 'none';
-  });
+function FilterPanelView() {
+  const activeDims = () => { filterRev(); return FILTER_DIMS.filter(d => allOpts[d.key].size > 0); };
+  const totalActive = () => {
+    filterRev();
+    return FILTER_DIMS.reduce((n, d) => n + activeFilters[d.key].size, 0) + (nameFilter ? 1 : 0);
+  };
+  const chips = () => {
+    filterRev();
+    return FILTER_DIMS.flatMap(d => [...activeFilters[d.key]].sort().map(v => ({ dim: d, val: v })));
+  };
+  // `nameFilter` itself is plain data (see the comment above `updateFilterOptions`) — this is the
+  // one place that needs a `filterRev()`-gated read of it, so the input's own `value` resets when
+  // "Clear all" sets `nameFilter = ''` elsewhere. Without it, this binding has no signal
+  // dependency at all and only ever applies once, at mount (same class of bug as `checked`/
+  // `hidden` below and in FilterDim — a JSX attribute only re-runs when something it reads
+  // during evaluation is itself a signal).
+  const nameFilterValue = () => { filterRev(); return nameFilter; };
+  return (
+    <Show when={activeDims().length > 0}>
+      <div class="card">
+        <div class="filter-header">
+          <h2>Filter<Show when={totalActive() > 0}><span class="filter-badge">{totalActive()}</span></Show></h2>
+          <div class="filter-header-actions">
+            <Show when={totalActive() > 0}>
+              <button
+                class="btn btn-ghost btn-sm"
+                onClick={() => {
+                  for (const s of Object.values(activeFilters)) s.clear();
+                  nameFilter = '';
+                  refreshTable();
+                  updateFilterUrl();
+                  markFiltersChanged();
+                }}
+              >Clear all</button>
+            </Show>
+            <button
+              class="btn btn-ghost btn-sm filter-toggle-btn"
+              aria-expanded={!filterPanelCollapsed()}
+              onClick={() => setFilterPanelCollapsed(v => !v)}
+            >{filterPanelCollapsed() ? 'Filters ▾' : 'Filters ▴'}</button>
+          </div>
+        </div>
+        <Show when={chips().length > 0}>
+          <div class="filter-chips">
+            <For each={chips()}>
+              {chip => (
+                <span class="filter-chip">
+                  <span class="filter-chip-label">{chip.dim.label}: {chip.val}</span>
+                  <span
+                    class="filter-chip-x"
+                    onClick={() => {
+                      activeFilters[chip.dim.key].delete(chip.val);
+                      refreshTable();
+                      updateFilterUrl();
+                      markFiltersChanged();
+                    }}
+                  >×</span>
+                </span>
+              )}
+            </For>
+          </div>
+        </Show>
+        <div class="filter-body" hidden={filterPanelCollapsed()}>
+          <div class="filter-name-row">
+            <input
+              class="filter-search filter-name-input"
+              type="search"
+              placeholder="Search by name…"
+              value={nameFilterValue()}
+              onInput={e => {
+                nameFilter = e.currentTarget.value;
+                refreshTable();
+                updateFilterUrl();
+                markFiltersChanged();
+              }}
+            />
+          </div>
+          <div class="filter-dims">
+            <For each={activeDims()}>{d => <FilterDim dim={d} />}</For>
+          </div>
+        </div>
+      </div>
+    </Show>
+  );
 }
 
-function renderFilterPanel() {
-  const activeDims = FILTER_DIMS.filter(d => allOpts[d.key].size > 0);
-  if (!activeDims.length) return;
-
-  const totalActive = FILTER_DIMS.reduce((n, d) => n + activeFilters[d.key].size, 0) + (nameFilter ? 1 : 0);
-
-  const chips = FILTER_DIMS.flatMap(d =>
-    [...activeFilters[d.key]].sort().map(v => `
-      <span class="filter-chip" data-chip-dim="${d.key}" data-chip-val="${esc(v)}">
-        <span class="filter-chip-label">${esc(d.label)}: ${esc(v)}</span>
-        <span class="filter-chip-x">×</span>
-      </span>`)
-  ).join('');
-
-  document.getElementById('filter-panel')!.innerHTML = `
-    <div class="card">
-      <div class="filter-header">
-        <h2>Filter${totalActive ? `<span class="filter-badge">${totalActive}</span>` : ''}</h2>
-        <div class="filter-header-actions">
-          ${totalActive ? '<button class="btn btn-ghost btn-sm" id="clear-filters-btn">Clear all</button>' : ''}
-          <button class="btn btn-ghost btn-sm filter-toggle-btn" id="filter-toggle-btn" aria-expanded="${!filterPanelCollapsed}">${filterPanelCollapsed ? 'Filters ▾' : 'Filters ▴'}</button>
-        </div>
-      </div>
-      ${chips ? `<div class="filter-chips">${chips}</div>` : ''}
-      <div class="filter-body"${filterPanelCollapsed ? ' hidden' : ''}>
-        <div class="filter-name-row">
-          <input class="filter-search filter-name-input" type="search" id="name-filter-input" placeholder="Search by name…" value="${esc(nameFilter)}">
-        </div>
-        <div class="filter-dims">
-          ${activeDims.map(d => `
-            <div class="filter-dim">
-              <div class="filter-dim-title">${d.label}</div>
-              <input class="filter-search" type="search" placeholder="Search…" data-search-dim="${d.key}" value="${esc(filterSearch[d.key])}">
-              <div class="filter-opts">
-                ${[...allOpts[d.key]].sort().map(v => `
-                  <label class="filter-opt">
-                    <input type="checkbox" data-dim="${d.key}" value="${esc(v)}"${activeFilters[d.key].has(v) ? ' checked' : ''}>
-                    ${esc(v)}
-                  </label>
-                `).join('')}
-              </div>
-            </div>`).join('')}
-        </div>
-      </div>
-    </div>`;
-
-  document.getElementById('filter-toggle-btn')!.addEventListener('click', () => {
-    filterPanelCollapsed = !filterPanelCollapsed;
-    renderFilterPanel();
-  });
-
-  const nameInput = document.getElementById('name-filter-input') as HTMLInputElement | null;
-  if (nameInput) {
-    nameInput.addEventListener('input', () => {
-      nameFilter = nameInput.value;
-      refreshTable();
-      updateFilterUrl();
-    });
-  }
-
-  document.getElementById('filter-panel')!.querySelectorAll<HTMLInputElement>('input[data-dim]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const dim = cb.dataset.dim as FilterDimKey;
-      if (cb.checked) activeFilters[dim].add(cb.value);
-      else activeFilters[dim].delete(cb.value);
-      refreshTable();
-      updateFilterUrl();
-      renderFilterPanel();
-    });
-  });
-
-  document.getElementById('filter-panel')!.querySelectorAll<HTMLInputElement>('input[data-search-dim]').forEach(inp => {
-    const dim = inp.dataset.searchDim as FilterDimKey;
-    applySearch(dim, filterSearch[dim]);
-    inp.addEventListener('input', () => {
-      filterSearch[dim] = inp.value;
-      applySearch(dim, inp.value);
-    });
-  });
-
-  document.getElementById('filter-panel')!.querySelectorAll<HTMLElement>('.filter-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      activeFilters[chip.dataset.chipDim as FilterDimKey].delete(chip.dataset.chipVal!);
-      refreshTable();
-      updateFilterUrl();
-      renderFilterPanel();
-    });
-  });
-
-  const clearBtn = document.getElementById('clear-filters-btn');
-  if (clearBtn) {
-    clearBtn.addEventListener('click', () => {
-      for (const s of Object.values(activeFilters)) s.clear();
-      nameFilter = '';
-      refreshTable();
-      updateFilterUrl();
-      renderFilterPanel();
-    });
-  }
+// Mounted once (see the DOMContentLoaded handler above) rather than rebuilt per search — every
+// search/reset/tag-click/checkbox path above just mutates the plain filter data and calls
+// `markFiltersChanged()`; the `<Show>`s inside FilterPanelView already hide the whole card once
+// `allOpts` goes back to empty, so there's nothing left for those callers to clear by hand.
+function mountFilterPanel() {
+  render(() => <FilterPanelView />, document.getElementById('filter-panel')!);
 }
