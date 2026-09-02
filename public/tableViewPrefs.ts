@@ -1,4 +1,4 @@
-// Shared "share/persist/reset a @vates/data-table-vanilla view via prefs.js + a one-shot URL
+// Shared "share/persist/reset a @vates/data-table-solid view via prefs.js + a one-shot URL
 // param" logic — extracted verbatim from library.js's and bundles.js's own near-identical
 // copies (see CLAUDE.md's Library Explorer / Bundles sections for the "share on demand, not
 // live-synced" reasoning). Both pages call these the same way: a `table` instance, the prefs.js
@@ -7,12 +7,16 @@
 import { getPref, setPref } from './prefs.ts';
 import { reorderUrlParams } from './urlState.ts';
 
-// The @vates/data-table-vanilla instance these operate on — only the view-state surface the
-// page code actually uses, rather than importing the package's own (internal) types.
+// The @vates/data-table-solid instance these operate on — only the view-state surface the page
+// code actually uses, rather than importing the package's own (internal) types. `onViewChange` is
+// optional: `@vates/data-table-solid` has no equivalent (both pages reconstruct that behavior
+// locally instead — see their own `bindSolidViewPersistence`, a `createEffect`-based
+// reconstruction) — restoreTableView/shareTableView/resetTableView never touch it, so requiring
+// it on every DataTableLike would fail typecheck for a table that only ever calls those three.
 interface DataTableLike {
   setViewState(view: object): void;
   getViewState(): object;
-  onViewChange(cb: (view: object) => void): () => void;
+  onViewChange?(cb: (view: object) => void): () => void;
 }
 
 // An incoming param (from a shared/bookmarked link) always wins over the stored default, but
@@ -39,7 +43,7 @@ export function restoreTableView(table: DataTableLike, prefKey: string, paramNam
 // effect table interaction has; the URL stays untouched until explicitly shared. Returns the
 // unsubscribe function (same shape onViewChange itself returns).
 export function bindViewPersistence(table: DataTableLike, prefKey: string): () => void {
-  return table.onViewChange(view => setPref(prefKey, view));
+  return table.onViewChange!(view => setPref(prefKey, view));
 }
 
 // Snapshots the table's current view into `paramName` and copies the resulting link to the

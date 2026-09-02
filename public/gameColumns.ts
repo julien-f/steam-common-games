@@ -1,7 +1,7 @@
 'use strict';
 
 // Shared game-table building blocks for the Library Explorer (public/library.js) and Bundles
-// (public/bundles.js) pages — both build a `@vates/data-table-vanilla` table over a list of
+// (public/bundles.js) pages — both build a `@vates/data-table-solid` table over a list of
 // games, and the overwhelming majority of what a "game" column even means (score, HLTB,
 // release date, genres/tags, platform/ProtonDB compatibility, and — for Wishlist/Bundles —
 // price) is identical between them. This used to be two separate, hand-maintained copies (see
@@ -34,10 +34,12 @@ import {
   compareMissingLast, bucketNumericRange, bucketDatePart, formatNumericRange, formatDatePart,
   bucketLogRange, formatLogRange,
 } from '@vates/data-table-core';
-// Type-only import from the vanilla adapter (the one exporting `ColumnDef` with its DOM
-// `render` callback) — no runtime dependency added, the pages import their column lists
-// from here, not from the adapter.
-import type { ColumnDef } from '@vates/data-table-vanilla';
+// Type-only import from the Solid adapter (the one exporting `ColumnDef` with its DOM `render`
+// callback — structurally identical to the vanilla adapter's own, per @vates/data-table-core;
+// both bundles.tsx and library.tsx are Solid-based now, so this is the more accurate source to
+// name even though nothing here actually depends on Solid) — no runtime dependency added, the
+// pages import their column lists from here, not from the adapter.
+import type { ColumnDef } from '@vates/data-table-solid';
 import { scoreColor, dealRecordTier, DEAL_RECORD_TIERS, formatMoney } from '/utils.ts';
 
 // Rows are assembled in the still-untyped library.js/bundles.js from several independent async
@@ -662,7 +664,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = [
   { key: 'type',             label: 'Type',         groupable: true, format: v => v ? String(v) : 'Unknown', category: 'Classification' },
   // Estimated, not authoritative — see computeProductionTier's doc comment (public/utils.js)
   // and CLAUDE.md's AAA/AA/Indie section. The label spells out "(est.)" rather than relying on
-  // a hover tooltip, since @vates/data-table-vanilla has no per-column header-tooltip option to
+  // a hover tooltip, since @vates/data-table-solid has no per-column header-tooltip option to
   // hang a caveat on. Hidden by default — a secondary number, not the primary thing most
   // searches here care about, and one that's explicitly a best-effort guess on top of that.
   { key: 'productionTier',   label: 'Production Tier (est.)', groupable: true, format: fmt.str,
