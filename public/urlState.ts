@@ -18,7 +18,7 @@ export const FILTER_DIMS: FilterDim[] = [
 // different position, making two visits to an identical state look like different history
 // entries and cluttering the query string with no benefit.
 //
-// `lv`/`wv`/`bv` (Library/Wishlist/Bundles table view — a JSON-encoded @vates/data-table-vanilla
+// `lv`/`wv`/`bv` (Library/Wishlist/Bundles table view — a JSON-encoded @vates/data-table-solid
 // view snapshot) replace the older `view`/`wview` names: short, and shared across all three via
 // tableViewPrefs.js's own restoreTableView/shareTableView/resetTableView. Unlike the old names,
 // these are no longer written automatically on every table interaction — only by the table's own
@@ -36,6 +36,28 @@ export function reorderUrlParams(params: URLSearchParams): URLSearchParams {
     if (!PARAM_ORDER.includes(key)) ordered.append(key, value);
   }
   return ordered;
+}
+
+// `?game=<appid>` / `&shot=<idx>` — the panel/lightbox deep-link params every page with a side
+// panel writes on open/close/step. Extracted once `app.tsx`/`library.tsx`/`bundles.tsx` turned
+// out to each carry a near-identical hand-copy (bundles.tsx's own copies had drifted from the
+// other two: they skipped `reorderUrlParams` entirely, so `?game=`/`?shot=`'s position in the
+// URL could differ from the canonical order the rest of the app enforces). Always
+// `history.replaceState`, never pushed — opening/closing a game or stepping a lightbox shot
+// isn't its own back/forward-navigable step on any of the three pages.
+export function setPanelParam(appid: number | string | null): void {
+  const params = new URLSearchParams(location.search);
+  params.delete('shot');
+  if (appid == null) params.delete('game');
+  else params.set('game', String(appid));
+  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
+}
+
+export function setLightboxParam(idx: number | string | null): void {
+  const params = new URLSearchParams(location.search);
+  if (idx == null) params.delete('shot');
+  else params.set('shot', String(idx));
+  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
 }
 
 export interface UrlState {

@@ -1,3 +1,5 @@
+import { createSignal, For } from 'solid-js';
+import { render } from 'solid-js/web';
 import { prefsPopoverPanelHtml, initPrefsPopover } from './prefsPopover.ts';
 
 export type NavPageKey = 'compare' | 'library' | 'bundles' | 'about';
@@ -9,12 +11,26 @@ export type NavPageKey = 'compare' | 'library' | 'bundles' | 'about';
 // page-specific JS of its own, so importing `initNav` from this file (which pulls in
 // prefsPopover.js/region.js/prefs.js in turn, solely for this file's own popover) is all it
 // loads.
+//
+// Converted to a real Solid component (`initNav`/`updateNavLink`
+// keep their exact old plain-function signatures — no changes needed on any of the four host
+// pages beyond the `.ts` → `.tsx` import path, same "thin surface, host pages untouched"
+// convention `panelMount.ts`/`lightboxMount.ts` already established). `prefsPopover.ts` itself
+// stays plain TS/untouched — its `prefsPopoverPanelHtml()` still returns a raw HTML string,
+// spliced in below via Solid's own `innerHTML` prop rather than converting that file too; a
+// `<select>` populated once from a static option list has no real list/conditional shape worth a
+// JSX rewrite on its own.
 const NAV_PAGES: { key: NavPageKey; href: string; label: string }[] = [
   { key: 'compare', href: '/', label: 'Comparison' },
   { key: 'library', href: '/library.html', label: 'Library Explorer' },
   { key: 'bundles', href: '/bundles.html', label: 'Bundles' },
   { key: 'about', href: '/about.html', label: 'About' },
 ];
+
+// `updateNavLink` (below) used to mutate a rendered <a>'s `.href` directly via `querySelector`;
+// now it just writes this signal, and the <a>'s own `href` attribute reads it reactively — no
+// direct DOM poke needed, and it can never race a re-render the way a raw mutation could.
+const [hrefOverrides, setHrefOverrides] = createSignal<Partial<Record<NavPageKey, string>>>({});
 
 // `current` is the active page's key. Every other page renders as a plain link (a static href
 // by default — see updateNavLink below for the two that carry state); the active page itself
@@ -24,21 +40,29 @@ const NAV_PAGES: { key: NavPageKey; href: string; label: string }[] = [
 // A ⚙ "Preferences" popover sits at the end of the same bar — a place to manage a preference
 // independent of whatever page happens to be open, rather than each page needing its own UI for
 // it (this replaced Bundles' and the Wishlist tab's own inline region pickers). This file owns
-// only the popover's shell — the `<details>`/`<summary>` toggle and its open/close mechanics;
+// only the popover's shell — the `<details>`/`<summary>` toggle and its open/close mechanics —
 // what's actually inside the panel (today, just region) is prefsPopover.js's job, so this file
 // stays about page navigation regardless of how many preferences land in that panel later.
 export function initNav(current: NavPageKey) {
   const el = document.getElementById('site-nav');
   if (!el) return;
-  el.innerHTML = NAV_PAGES.map(p => p.key === current
-    ? `<span class="site-nav-link active" aria-current="page">${p.label}</span>`
-    : `<a class="site-nav-link" data-nav-key="${p.key}" href="${p.href}">${p.label}</a>`
-  ).join('') + `
-    <details class="site-nav-prefs">
-      <summary class="site-nav-link site-nav-prefs-btn" aria-label="Preferences">⚙</summary>
-      ${prefsPopoverPanelHtml()}
-    </details>
-  `;
+  render(() => (
+    <>
+      <For each={NAV_PAGES}>
+        {p => p.key === current
+          ? <span class="site-nav-link active" aria-current="page">{p.label}</span>
+          : <a class="site-nav-link" data-nav-key={p.key} href={hrefOverrides()[p.key] ?? p.href}>{p.label}</a>
+        }
+      </For>
+      <details class="site-nav-prefs">
+        <summary class="site-nav-link site-nav-prefs-btn" aria-label="Preferences">⚙</summary>
+        <div innerHTML={prefsPopoverPanelHtml()} />
+      </details>
+    </>
+  ), el);
+  // Both run synchronously right after render() returns — render() mounts its DOM tree
+  // synchronously, so `#nav-region-select`/`.site-nav-prefs` already exist by this point, same
+  // ordering the old innerHTML-then-wire-up version relied on.
   initPrefsPopover();
   bindPrefsPopoverClose();
 }
@@ -61,9 +85,8 @@ function bindPrefsPopoverClose() {
 // currently-loaded player along (see updateLibraryExplorerLink in app.js / updateBackLink in
 // library.js), so following the link keeps showing that player instead of landing on a bare
 // empty page. A no-op if that link isn't rendered on the current page (e.g. `library` on the
-// Comparison page itself, where it's the active label, not a link) or `#site-nav` isn't in the
-// page's markup at all.
+// Comparison page itself, where it's the active label, not a link — `hrefOverrides` is simply
+// never read for it) or `#site-nav`/`initNav` hasn't run at all.
 export function updateNavLink(key: NavPageKey, href: string) {
-  const link = document.querySelector(`#site-nav a[data-nav-key="${key}"]`) as HTMLAnchorElement | null;
-  if (link) link.href = href;
+  setHrefOverrides(prev => ({ ...prev, [key]: href }));
 }

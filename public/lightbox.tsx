@@ -4,6 +4,15 @@ import { buildMediaItems, resolveShotIndex } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
 import type { Game } from './types.ts';
 import type Hls from 'hls.js';
+// Pulled into its own plain-TS module (no JSX) so test/lightbox.test.js can still import it
+// directly — Node's test runner strips TypeScript syntax natively but has no JSX transform,
+// so it can no longer `require()` this file itself once it contains real JSX. Re-exported
+// below so this stays the one public entry point for it either way.
+import { fmtTime } from './lightboxTime.ts';
+export { fmtTime } from './lightboxTime.ts';
+
+import { createSignal, createEffect, createRoot, batch } from 'solid-js';
+import { render } from 'solid-js/web';
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 
@@ -17,11 +26,19 @@ const LB_VOL_ICON   = `<svg viewBox="0 0 14 12" width="16" height="14" fill="non
 const LB_MUTE_ICON  = `<svg viewBox="0 0 14 12" width="16" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><polygon points="1,4 5,4 8,1 8,11 5,8 1,8" fill="currentColor" stroke="none"/><line x1="10.5" y1="4" x2="13.5" y2="8" stroke-linecap="round"/><line x1="13.5" y1="4" x2="10.5" y2="8" stroke-linecap="round"/></svg>`;
 
 // ── State ──────────────────────────────────────────────────────────────────
-
-let lightboxShots: MediaItem[] = [];
-let lightboxIdx   = 0;
+// Converted from plain module-level variables to Solid signals for
+// the state that actually needs to trigger the (still deliberately imperative — see the
+// header comment above `renderLightbox` further down) per-step render: `shots`/`idx`/
+// `gameName`. Zoom/pan (`lbZoom`/`lbPanX`/`lbPanY`) and the slide-direction flag (`lbLastDir`)
+// stay plain variables, unchanged — nothing in JSX ever reads them (they only ever drive a
+// direct `img.style.transform`/animation-class write inside already-imperative gesture code),
+// so making them signals would add Solid overhead for zero reactive benefit, the same
+// reasoning `panel.tsx`'s own hero zoom-equivalent state would have gotten if this file had
+// any (it doesn't).
+const [shots, setShots] = createSignal<MediaItem[]>([]);
+const [idx, setIdx] = createSignal(0);
+const [gameName, setGameName] = createSignal('');
 let lbZoom = 1, lbPanX = 0, lbPanY = 0, lbLastDir = 0, lbVcTimer: ReturnType<typeof setTimeout> | undefined;
-let lightboxGameName = '';
 
 type LbVideo = HTMLVideoElement & { _hls?: { destroy: () => void } | null; _hlsToken?: number };
 type LbFlashEl = HTMLElement & { _flashTimer?: ReturnType<typeof setTimeout> };
@@ -48,9 +65,10 @@ export function initLightbox({ onParamChange, onGameNav }: { onParamChange?: (sh
   _onGameNav = onGameNav ?? null;
   document.addEventListener('fullscreenchange', syncLightboxFullscreenBtn);
   document.addEventListener('webkitfullscreenchange', syncLightboxFullscreenBtn);
+  mountLightboxDom();
 }
 
-export function isLightboxOpen() { return lightboxShots.length > 0; }
+export function isLightboxOpen() { return shots().length > 0; }
 
 // ── Fullscreen button sync ─────────────────────────────────────────────────
 
@@ -141,7 +159,7 @@ function hideLbError() {
 // Re-attempts loading whatever shot is currently shown, from the Retry button.
 function retryCurrentShot() {
   hideLbError();
-  const shot = lightboxShots[lightboxIdx];
+  const shot = shots()[idx()];
   if (!shot) return;
   if (shot.type === 'video') {
     const vid = document.querySelector<LbVideo>('#screenshot-lightbox .lb-video')!;
@@ -221,13 +239,8 @@ function flashSeek(side: 'left' | 'right') {
   flash._flashTimer = setTimeout(() => el.classList.remove('lb-seek-flash--show'), 500);
 }
 
-// ── Time formatting ────────────────────────────────────────────────────────
-
-export function fmtTime(s: number) {
-  if (!isFinite(s) || s < 0) return '0:00';
-  const m = Math.floor(s / 60);
-  return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-}
+// `fmtTime` itself now lives in `./lightboxTime.ts` (see the import at the top of this file)
+// and is re-exported below.
 
 function lbScrubGradient(pct: number) {
   return `linear-gradient(to right, var(--accent) ${pct}%, rgba(255,255,255,0.25) ${pct}%)`;
@@ -283,49 +296,60 @@ function getFocusable(lb: HTMLElement): HTMLElement[] {
 }
 
 // ── DOM creation ───────────────────────────────────────────────────────────
-
-function createLightboxDom() {
-  const lb = document.createElement('div');
-  lb.id = 'screenshot-lightbox';
-  lb.setAttribute('role', 'dialog');
-  lb.setAttribute('aria-modal', 'true');
-  lb.setAttribute('aria-label', 'Screenshot viewer');
-  lb.innerHTML = `
-    <div class="lb-backdrop"></div>
-    <button class="lb-btn lb-prev" aria-label="Previous screenshot">&#8249;</button>
-    <img class="lb-img" src="" alt="Screenshot">
-    <video class="lb-video" playsinline></video>
-    <button class="lb-btn lb-next" aria-label="Next screenshot">&#8250;</button>
-    <div class="lb-error" style="display:none" role="alert">
-      <p class="lb-error-msg"></p>
-      <button class="lb-error-retry">Retry</button>
-    </div>
-    <div class="lb-seek-flash lb-seek-flash-left" aria-hidden="true">⏪ ${LB_TOUCH_SEEK_SECONDS}s</div>
-    <div class="lb-seek-flash lb-seek-flash-right" aria-hidden="true">${LB_TOUCH_SEEK_SECONDS}s ⏩</div>
-    <div class="lb-vctrls" style="display:none">
-      <button class="lb-vc-btn lb-vc-play" aria-label="Play">${LB_PLAY_ICON}</button>
-      <span class="lb-vc-time">0:00</span>
-      <input class="lb-vc-scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek">
-      <span class="lb-vc-dur">0:00</span>
-      <button class="lb-vc-btn lb-vc-mute" aria-label="Mute">${LB_VOL_ICON}</button>
-    </div>
-    <div class="lb-toolbar">
-      <div class="lb-caption" aria-hidden="true"></div>
-      <div class="lb-toolbar-row">
-        <div class="lb-toolbar-left">
-          <button class="lb-fullscreen" aria-label="Enter fullscreen">${LB_FS_ENTER}</button>
-          <button class="lb-share" aria-label="Copy link to this screenshot">${LB_LINK_ICON}</button>
-        </div>
-        <div class="lb-counter" aria-live="polite" aria-atomic="true"></div>
-        <div class="lb-toolbar-right">
-          <button class="lb-close" aria-label="Close lightbox">&#215;</button>
+// A real Solid component now (was a hand-built innerHTML template assigned once to a
+// lazily-created singleton element). Mounted exactly once via `mountLightboxDom` below
+// (called from `initLightbox`, same "once per page" lifetime the old lazy-singleton getter
+// amounted to in practice — nothing about creating this ~20-node tree eagerly instead of on
+// first open is expensive enough to matter). Every class/id is preserved verbatim, so
+// `style.css` and every `document.getElementById('screenshot-lightbox')`/`.lb-*` selector
+// used throughout the rest of this file (the wiring functions below, all of which are
+// unchanged) keeps working exactly as before — this conversion only touches how the markup
+// itself is produced and mounted, not how the rest of the file finds or manipulates it.
+function LightboxDom() {
+  return (
+    <div id="screenshot-lightbox" role="dialog" aria-modal="true" aria-label="Screenshot viewer">
+      <div class="lb-backdrop" />
+      <button class="lb-btn lb-prev" aria-label="Previous screenshot">&#8249;</button>
+      <img class="lb-img" src="" alt="Screenshot" />
+      <video class="lb-video" playsinline />
+      <button class="lb-btn lb-next" aria-label="Next screenshot">&#8250;</button>
+      <div class="lb-error" style={{ display: 'none' }} role="alert">
+        <p class="lb-error-msg" />
+        <button class="lb-error-retry">Retry</button>
+      </div>
+      <div class="lb-seek-flash lb-seek-flash-left" aria-hidden="true">⏪ {LB_TOUCH_SEEK_SECONDS}s</div>
+      <div class="lb-seek-flash lb-seek-flash-right" aria-hidden="true">{LB_TOUCH_SEEK_SECONDS}s ⏩</div>
+      <div class="lb-vctrls" style={{ display: 'none' }}>
+        <button class="lb-vc-btn lb-vc-play" aria-label="Play" innerHTML={LB_PLAY_ICON} />
+        <span class="lb-vc-time">0:00</span>
+        <input class="lb-vc-scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek" />
+        <span class="lb-vc-dur">0:00</span>
+        <button class="lb-vc-btn lb-vc-mute" aria-label="Mute" innerHTML={LB_VOL_ICON} />
+      </div>
+      <div class="lb-toolbar">
+        <div class="lb-caption" aria-hidden="true" />
+        <div class="lb-toolbar-row">
+          <div class="lb-toolbar-left">
+            <button class="lb-fullscreen" aria-label="Enter fullscreen" innerHTML={LB_FS_ENTER} />
+            <button class="lb-share" aria-label="Copy link to this screenshot" innerHTML={LB_LINK_ICON} />
+          </div>
+          <div class="lb-counter" aria-live="polite" aria-atomic="true" />
+          <div class="lb-toolbar-right">
+            <button class="lb-close" aria-label="Close lightbox">&#215;</button>
+          </div>
         </div>
       </div>
-    </div>`;
-  return lb;
+    </div>
+  );
 }
 
 // ── Event wiring ───────────────────────────────────────────────────────────
+// Unchanged from the original file (still plain imperative addEventListener wiring against
+// `lb.querySelector(...)`, not JSX event props) — these bind once, to a singleton element
+// that (like the original) never gets torn down/rebuilt, so there's no fine-grained-vs-coarse
+// reactivity question to answer here the way panel.tsx had for its own repeatedly-rebuilt
+// body: the actual per-shot update logic lives in `renderLightbox` below (now a `createEffect`
+// triggered by the `shots`/`idx`/`gameName` signals above), not in these handlers.
 
 function wireButtons(lb: HTMLElement) {
   lb.querySelector('.lb-backdrop')!.addEventListener('click', closeLightbox);
@@ -354,7 +378,7 @@ function wireButtons(lb: HTMLElement) {
 
 function wireKeyboard(lb: HTMLElement) {
   document.addEventListener('keydown', e => {
-    if (!lightboxShots.length) return;
+    if (!shots().length) return;
     const onScrub = (e.target as HTMLElement | null)?.classList.contains('lb-vc-scrub');
 
     // Focus trap
@@ -388,9 +412,9 @@ function wireKeyboard(lb: HTMLElement) {
         stepLightbox(dir);
       }
     }
-    if (!onScrub && (e.key === 'Home' || e.key === 'End') && lightboxShots.length > 1) {
+    if (!onScrub && (e.key === 'Home' || e.key === 'End') && shots().length > 1) {
       e.preventDefault();
-      gotoLightbox(e.key === 'Home' ? 0 : lightboxShots.length - 1);
+      gotoLightbox(e.key === 'Home' ? 0 : shots().length - 1);
     }
     if (!onScrub && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && _onGameNav) {
       e.preventDefault();
@@ -589,40 +613,48 @@ function wireVideoControls(lb: HTMLElement) {
   lb.addEventListener('touchstart', () => { showLbChrome(); schedHideLbChrome(); }, { passive: true });
 }
 
-// ── Singleton getter ────────────────────────────────────────────────────────
-
-function getLightbox() {
-  let lb = document.getElementById('screenshot-lightbox');
-  if (lb) return lb;
-  lb = createLightboxDom();
-  document.body.appendChild(lb);
+// ── Mount ────────────────────────────────────────────────────────────────
+// Replaces the original lazy-singleton `getLightbox()` — mounted eagerly, once, from
+// `initLightbox` (called once per page from pageShell.ts), same "exists exactly once for the
+// page's whole lifetime" shape the lazy getter amounted to in practice (nothing else ever
+// unmounts it), just created up front instead of on first open — negligible cost for a
+// ~20-node static tree, and it means every other function in this file can keep using a bare
+// `document.getElementById('screenshot-lightbox')`/`.lb-*` lookup exactly as before, with no
+// "has it been created yet" guard needed anywhere.
+function mountLightboxDom() {
+  render(() => <LightboxDom />, document.body);
+  const lb = document.getElementById('screenshot-lightbox')!;
   wireButtons(lb);
   wireKeyboard(lb);
   wireMouseHandlers(lb);
   wireTouchHandlers(lb);
   wireVideoControls(lb);
-  return lb;
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
 export function openLightbox(game: Game, idxOrShotId: number | string) {
   _lbPrevFocus = document.activeElement;
-  lightboxGameName = game.name || '';
-  lightboxShots = buildMediaItems(game.appid, game.details?.meta);
-  lightboxIdx = resolveShotIndex(lightboxShots, idxOrShotId);
-  renderLightbox();
-  const lb = getLightbox();
+  const newShots = buildMediaItems(game.appid, game.details?.meta);
+  // Batched: setShots alone would otherwise let the render effect below run once with the new
+  // (possibly shorter) shots list but the previous game's stale idx, indexing past the end of
+  // the new list.
+  batch(() => {
+    setGameName(game.name || '');
+    setShots(newShots);
+    setIdx(resolveShotIndex(newShots, idxOrShotId));
+  });
+  const lb = document.getElementById('screenshot-lightbox')!;
   lb.classList.add('open');
   document.body.classList.add('lb-open');
   lb.querySelector<HTMLElement>('.lb-close')!.focus();
-  _onLightboxParamChange?.(lightboxShots[lightboxIdx].shotId);
+  _onLightboxParamChange?.(newShots[idx()].shotId);
 }
 
 export function closeLightbox() {
-  lightboxShots = [];
+  setShots([]);
   clearTimeout(lbVcTimer);
-  const lb = getLightbox();
+  const lb = document.getElementById('screenshot-lightbox')!;
   stopHls(lb.querySelector<LbVideo>('.lb-video'));
   lb.classList.remove('open', 'lb--loading', 'lb-idle');
   document.body.classList.remove('lb-open');
@@ -636,24 +668,39 @@ export function closeLightbox() {
 
 export function stepLightbox(dir: number) {
   lbLastDir = dir;
-  lightboxIdx = (lightboxIdx + dir + lightboxShots.length) % lightboxShots.length;
-  renderLightbox();
-  _onLightboxParamChange?.(lightboxShots[lightboxIdx].shotId);
+  const list = shots();
+  const next = (idx() + dir + list.length) % list.length;
+  setIdx(next);
+  _onLightboxParamChange?.(list[next].shotId);
 }
 
 // Absolute jump (Home/End) — still animates in the right direction rather
 // than always sliding one way, same as a multi-step stepLightbox would.
-function gotoLightbox(idx: number) {
-  if (idx === lightboxIdx) return;
-  lbLastDir = idx > lightboxIdx ? 1 : -1;
-  lightboxIdx = idx;
-  renderLightbox();
-  _onLightboxParamChange?.(lightboxShots[lightboxIdx].shotId);
+function gotoLightbox(target: number) {
+  if (target === idx()) return;
+  lbLastDir = target > idx() ? 1 : -1;
+  setIdx(target);
+  _onLightboxParamChange?.(shots()[target].shotId);
 }
 
+// The actual per-shot render — deliberately kept as a plain imperative function (called from
+// inside a `createEffect` below, not decomposed into fine-grained JSX bindings) rather than
+// converted the way `panel.tsx`'s own body was. Unlike that file, there's no template shape
+// to gain from JSX here: every line below is either a targeted, already-hand-optimized DOM
+// write (avoiding image flicker, restarting HLS/animation state correctly, preloading
+// adjacent shots) or a side effect (network fetches, timers) — the same imperative style the
+// original file used, now just re-triggered by a Solid effect instead of being called
+// manually after mutating plain module variables.
 function renderLightbox() {
-  const lb = getLightbox();
-  const shot = lightboxShots[lightboxIdx];
+  const list = shots();
+  // Defensively clamped, same idiom panel.tsx's own hero index uses — every current write path
+  // (openLightbox's batch(), stepLightbox's modulo, gotoLightbox's explicit target) already
+  // keeps idx() in bounds, so this never actually fires today; it's a backstop against a future
+  // write path (e.g. a "remove current shot" action) reintroducing an out-of-bounds `list[i]`.
+  const i = Math.max(0, Math.min(idx(), list.length - 1));
+  const name = gameName();
+  const lb = document.getElementById('screenshot-lightbox')!;
+  const shot = list[i];
   const img  = lb.querySelector<HTMLImageElement>('.lb-img')!;
   const vid  = lb.querySelector<LbVideo>('.lb-video')!;
   const vc   = lb.querySelector<HTMLElement>('.lb-vctrls')!;
@@ -667,10 +714,10 @@ function renderLightbox() {
   // lightbox stayed open (e.g. via the panel's ↑/↓ nav) had no on-screen confirmation
   // it had actually happened, especially when the new shot looked similar to the old one.
   const caption = lb.querySelector<HTMLElement>('.lb-caption')!;
-  caption.textContent = lightboxGameName;
-  caption.style.display = lightboxGameName ? '' : 'none';
-  const label = `${lightboxGameName ? lightboxGameName + ' — ' : ''}` +
-    `${shot.type === 'video' ? 'Video' : 'Screenshot'} ${lightboxIdx + 1} of ${lightboxShots.length}`;
+  caption.textContent = name;
+  caption.style.display = name ? '' : 'none';
+  const label = `${name ? name + ' — ' : ''}` +
+    `${shot.type === 'video' ? 'Video' : 'Screenshot'} ${i + 1} of ${list.length}`;
   if (shot.type === 'video') {
     img.style.display = 'none';
     lb.classList.remove('lb--loading');
@@ -715,14 +762,14 @@ function renderLightbox() {
     full.src = shot.main!;
     schedHideLbChrome();
   }
-  lb.querySelector('.lb-counter')!.textContent = `${lightboxIdx + 1} / ${lightboxShots.length}`;
-  lb.querySelector<HTMLButtonElement>('.lb-prev')!.disabled = lightboxShots.length <= 1;
-  lb.querySelector<HTMLButtonElement>('.lb-next')!.disabled = lightboxShots.length <= 1;
+  lb.querySelector('.lb-counter')!.textContent = `${i + 1} / ${list.length}`;
+  lb.querySelector<HTMLButtonElement>('.lb-prev')!.disabled = list.length <= 1;
+  lb.querySelector<HTMLButtonElement>('.lb-next')!.disabled = list.length <= 1;
   // Preload prev and next images so navigation feels instant; for a video,
   // warm its poster the same way and prime its HLS manifest in the HTTP
   // cache so stepping onto it doesn't pay the full fetch latency cold.
   for (const offset of [-1, 1]) {
-    const adjacent = lightboxShots[(lightboxIdx + offset + lightboxShots.length) % lightboxShots.length];
+    const adjacent = list[(i + offset + list.length) % list.length];
     if (!adjacent) continue;
     const preloadSrc = adjacent.type === 'video' ? adjacent.thumb : adjacent.main;
     if (preloadSrc && preloadSrc !== shot.main) {
@@ -745,10 +792,29 @@ function renderLightbox() {
   // Drop stale preloads (keep only prev/next)
   const keep = new Set<string>(
     [-1, 1].map(o => {
-      const s = lightboxShots[(lightboxIdx + o + lightboxShots.length) % lightboxShots.length];
+      const s = list[(i + o + list.length) % list.length];
       const src = s && (s.type === 'video' ? s.thumb : s.main);
       return src ?? '';
     }).filter(src => src !== '')
   );
   lb.querySelectorAll<HTMLImageElement>('.lb-preload').forEach(el => { if (!keep.has(el.dataset.src ?? '')) el.remove(); });
 }
+
+// The one Solid-driven trigger for the whole file: re-runs `renderLightbox()` whenever
+// `shots`/`idx`/`gameName` change (opening, closing, stepping, or a game switch via
+// `onGameNav` all funnel through one of those three signals) — replacing every explicit
+// `renderLightbox()` call the original file made right after mutating its own plain
+// variables. Created once at module load (outside any component), same as `panel.tsx`'s own
+// top-level `createRoot` block of effects — this module has page-lifetime scope, never torn
+// down, so it's never explicitly disposed. Guarded on `shots().length` so it doesn't run
+// `renderLightbox()` (which indexes into `shots()[idx()]`) while the lightbox is closed and
+// empty.
+// Wrapped in `createRoot` — like `panel.tsx`'s own top-level effects, this has page-lifetime
+// scope (never torn down), so without a root it would warn "created outside a createRoot ...
+// will never be disposed" (same fix panel.tsx's own top-level effects needed).
+createRoot(() => {
+  createEffect(() => {
+    const list = shots(); idx(); gameName();
+    if (list.length) renderLightbox();
+  });
+});

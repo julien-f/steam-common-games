@@ -9,10 +9,12 @@
 // real ES import) — enabling it would also collide with Vite's own "publicDir" convention,
 // since our whole frontend source directory happens to be named public/ too.
 const { defineConfig } = require('vite');
+const solidPlugin = require('vite-plugin-solid');
 const path = require('node:path');
 
 module.exports = defineConfig({
   root: 'public',
+  plugins: [solidPlugin()],
   publicDir: false,
   server: {
     // Local dev: `npm run dev:web` serves public/ (now TypeScript, which the plain
