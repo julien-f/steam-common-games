@@ -65,6 +65,7 @@ export function initNav(current: NavPageKey) {
   // ordering the old innerHTML-then-wire-up version relied on.
   initPrefsPopover();
   bindPrefsPopoverClose();
+  bindPrefsPopoverPosition();
 }
 
 // `<details>` has no built-in "close on outside click" or "close on Escape" — added by hand
@@ -79,6 +80,41 @@ function bindPrefsPopoverClose() {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && details.open) details.open = false;
   });
+}
+
+// Anchors the panel to the ⚙ button's own live position (`.site-nav-prefs-panel` is
+// `position: fixed`, see its own comment in style.css) instead of a CSS-only anchor, so it opens
+// right where the button actually is rather than centered under the whole nav bar. Clamped to
+// stay fully on-screen with a margin (matching `max-width: calc(100vw - 24px)`'s own 12px-a-side
+// budget), so a button near either edge — or alone on its own wrapped row — still gets a panel
+// that opens nearby without running off-screen, replacing the old "always center under the nav
+// bar" fallback that traded button-proximity away entirely to guarantee that.
+const PREFS_PANEL_MARGIN = 12;
+function positionPrefsPanel(details: HTMLDetailsElement, panel: HTMLElement) {
+  const btnRect = details.querySelector('summary')!.getBoundingClientRect();
+  const panelWidth = panel.getBoundingClientRect().width;
+  // Right-align to the button by default (the ⚙ is typically the last item in the bar), then
+  // clamp within [margin, viewport width - panelWidth - margin] so it can never hang off either
+  // edge regardless of where the button itself ended up.
+  const maxLeft = window.innerWidth - panelWidth - PREFS_PANEL_MARGIN;
+  const left = Math.min(Math.max(btnRect.right - panelWidth, PREFS_PANEL_MARGIN), Math.max(maxLeft, PREFS_PANEL_MARGIN));
+  panel.style.left = `${left}px`;
+  panel.style.top = `${btnRect.bottom + 4}px`;
+}
+
+function bindPrefsPopoverPosition() {
+  const details = document.querySelector('.site-nav-prefs') as HTMLDetailsElement;
+  const panel = document.querySelector('.site-nav-prefs-panel') as HTMLElement;
+  const reposition = () => { if (details.open) positionPrefsPanel(details, panel); };
+  // 'toggle' fires on both open and close; positionPrefsPanel only runs while actually open.
+  // Computed fresh on every open (not just once) since the button's own position can change
+  // between opens (e.g. the nav bar rewrapping after a viewport resize while closed).
+  details.addEventListener('toggle', reposition);
+  // Kept in sync while open too — a resize (rotating a phone) or scroll (rare for a fixed-position
+  // ⚙ in the page header, but cheap to handle) would otherwise leave the panel anchored to where
+  // the button used to be.
+  window.addEventListener('resize', reposition);
+  window.addEventListener('scroll', reposition, true);
 }
 
 // Repoints one nav link's href — backs the Comparison <-> Library Explorer links carrying the
