@@ -76,6 +76,13 @@ const [moreLinksOpen, setMoreLinksOpen] = createSignal(false); // whether the he
 // stale copy of a game's details.
 const [panelHistory, setPanelHistory] = createSignal<{ appid: number; name: string }[]>([]);
 
+// Which subnav button (a section id, or 'top' for Overview) is currently highlighted —
+// see PanelSubnav/updateSubnavScrollSpy below. A signal now (previously an imperative
+// classList.toggle() pass over the subnav's DOM buttons) specifically so PanelSubnav's own
+// button elements can react to it in place via `classList`, without needing to be told
+// which one is active by a caller reaching back into the DOM after the fact.
+const [activeSubnavTarget, setActiveSubnavTarget] = createSignal('top');
+
 function panelShuffle(arr: { appid: number }[]) {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -174,26 +181,27 @@ function initSubnavScrollSpy() {
 
 // Buttons are walked in DOM order, which the body below keeps identical to the physical
 // top-to-bottom order of the sections themselves (Owners right after the tag cloud,
-// then HLTB/News/Achievements — see subnavItems below) — so the *last* button whose
+// then HLTB/News/Achievements — see getSubnavSections below) — so the *last* button whose
 // section has scrolled up to (or past) the sticky header counts as "current", same idea as
 // a scrollspy TOC. None qualifying means we're still above the first section, i.e. still
-// looking at the Overview (glance grid/description) itself.
+// looking at the Overview (glance grid/description) itself. Only computes *which* target is
+// current and writes it to `activeSubnavTarget` — PanelSubnav's own `classList` bindings
+// react to that signal, so this function no longer touches the DOM beyond reading it.
 function updateSubnavScrollSpy() {
   const nav = document.querySelector('.panel-subnav');
   if (!nav) return;
   const body = document.getElementById('panel-body')!;
   const headerH = document.querySelector('.panel-header-sticky')?.getBoundingClientRect().height ?? 0;
   const threshold = body.getBoundingClientRect().top + headerH + 8;
-  const buttons = [...nav.querySelectorAll<HTMLElement>('.panel-subnav-btn')];
+  const targets = [...nav.querySelectorAll<HTMLElement>('.panel-subnav-btn')].map(btn => btn.dataset.target);
   let activeTarget = 'top';
-  for (const btn of buttons) {
-    const target = btn.dataset.target;
+  for (const target of targets) {
     if (target === undefined || target === 'top') continue;
     const el = document.getElementById(target);
     if (!el || el.getBoundingClientRect().top > threshold) continue;
     activeTarget = target;
   }
-  buttons.forEach(btn => btn.classList.toggle('active', btn.dataset.target === activeTarget));
+  setActiveSubnavTarget(activeTarget);
 }
 
 export function isPanelOpen() { return panelGame() != null; }
@@ -1326,21 +1334,213 @@ function PanelHero(): JSX.Element {
   );
 }
 
+// A sticky jump-nav for the sections below the fold. Listed in the same physical
+// top-to-bottom order the sections themselves appear in PanelRest's own return below
+// (Owners right after the tag cloud, ahead of the collapsibles) so scroll-spy highlighting
+// (see updateSubnavScrollSpy) always lights up left-to-right. Each condition mirrors its
+// own *Section function's exact gating logic (loading skeleton and "couldn't load" states
+// count as "has a section to jump to", same as the original file's own
+// `newsSectionHtml`/`achievementsSectionHtml` non-empty-string checks — not just "has real
+// content") rather than checking a rendered `<Component/>` call's own truthiness (always
+// truthy regardless of what it renders to, including `null`). `hasHltb` mirrors the same
+// gating PanelRest's own `hltbDetail` uses — a small, accepted duplication (see PanelRest's
+// own comment on `ownersHtml`/`hltbDetail`) rather than plumbing PanelRest's *content*
+// through here just to answer "does the section exist".
+function getSubnavSections(g: Game): { label: string; target: string }[] {
+  const h = g.details?.hltb;
+  const meta = g.details?.meta;
+  const hasOwners = !!panelOptions.getOwnersHtml?.(g);
+  const hasHltb = !g.loading && !!h && !!(h.main || h.extra || h.completionist);
+  const hasNews = !!(g.newsLoading || (g.newsError && !g.news) || (g.news && g.news.length));
+  const hasAchievements = !!panelOptions.showAchievements && !!(g.achievementsLoading || g.achievements !== undefined);
+  const hasDlc = !!(meta?.dlc && meta.dlc.length);
+  return [
+    hasOwners && { label: 'Owners', target: 'panel-section-owners' },
+    hasHltb && { label: 'HLTB', target: 'panel-section-hltb' },
+    hasNews && { label: 'News', target: 'panel-section-news' },
+    hasAchievements && { label: 'Achievements', target: 'panel-section-achievements' },
+    hasDlc && { label: 'DLC', target: 'panel-section-dlc' },
+  ].filter((it): it is { label: string; target: string } => !!it);
+}
+
+// The section jump-nav, split out as its own always-mounted component (a sibling of
+// PanelRest's own coarse block within PanelHeader below, not nested inside it) specifically
+// so its DOM node has a lifecycle independent of `revision`/`moreLinksOpen`/`panelRefreshing`/
+// `panelHistory` changing. It used to be built as plain JSX inline in PanelRest, which is
+// torn down and recreated in full on every one of those — including every time an unrelated
+// async section (news/achievements/price/DLC) finished loading elsewhere in the panel — which
+// visibly flashed this button row's active-tab highlight off and back on each time (confirmed
+// live via a MutationObserver: `.panel-subnav` was removed/re-added several times in the tens
+// of milliseconds right after opening a game). Mounting it here instead, with the active tab
+// itself now a signal (`activeSubnavTarget`) rather than an external classList patch, means an
+// unrelated section resolving updates at most this component's own `items` memo — via `<For>`'s
+// keyed diffing and `classList`, not a wholesale rebuild — while the DOM node itself never goes
+// away for as long as this component instance stays mounted.
+function PanelSubnav(): JSX.Element {
+  const items = createMemo(() => {
+    revision();
+    const g = panelGame();
+    return g ? getSubnavSections(g) : [];
+  });
+
+  // Reset to Overview whenever the open game itself changes (a fresh row click, prev/next/
+  // random, a DLC hop) — the scroll position and active tab from whatever game was open
+  // before aren't meaningful for a different one.
+  createEffect(() => {
+    panelGame();
+    setActiveSubnavTarget('top');
+  });
+  // Re-run the scroll-spy whenever the section list changes (a section appearing/disappearing
+  // shifts where the other anchors sit). PanelRest's own re-renders (its content growing as
+  // news/achievements/etc. load in) can shift those same anchors without necessarily changing
+  // *this* item list, so it also re-queues the scroll-spy itself — see PanelRest below.
+  createEffect(() => {
+    items();
+    queueMicrotask(updateSubnavScrollSpy);
+  });
+
+  return (
+    <Show when={items().length >= 2}>
+      <div class="panel-subnav">
+        <button type="button" class="panel-subnav-btn" classList={{ active: activeSubnavTarget() === 'top' }} data-target="top" onClick={() => jumpToPanelSection('top')}>Overview</button>
+        <For each={items()}>{it => (
+          <button type="button" class="panel-subnav-btn" classList={{ active: activeSubnavTarget() === it.target }} data-target={it.target} onClick={() => jumpToPanelSection(it.target)}>{it.label}</button>
+        )}</For>
+      </div>
+    </Show>
+  );
+}
+
+// The sticky header: back button, title/release-date/ownership badge, icon links, and the
+// section jump-nav. Mounted once (a plain literal child of PanelBody, like PanelHero), for
+// the same reason PanelSubnav above needs to be: `<PanelSubnav/>` is written here as a bare
+// sibling of the coarse `{}` block below, not nested inside it, so its own component instance
+// (and the signal/memo it owns) survives that block's re-renders untouched — see PanelSubnav's
+// own comment for the bug this fixes. Everything else in this header has no comparable
+// external-DOM-patch concern, so it stays one coarse block, same convention PanelRest below
+// uses for the rest of the body.
+function PanelHeader(): JSX.Element {
+  return (
+    <Show when={panelGame()}>
+      <div class="panel-header-sticky">
+        {(() => {
+          const g = panelGame();
+          revision(); moreLinksOpen(); panelRefreshing(); panelHistory();
+          if (!g) return null;
+          const meta = g.details?.meta;
+
+          const storeUrl = `https://store.steampowered.com/app/${g.appid}`;
+          const itadUrl = `https://isthereanydeal.com/steam/app/${g.appid}`;
+
+          // Computed as a plain boolean first (not by checking the rendered element's own
+          // truthiness — a `<Component/>` call is a truthy value regardless of what it
+          // renders to, including `null`) so metaLine's separator and baseGameSection itself
+          // can never disagree about whether there's actually a base game to show.
+          const hasBaseGame = !g.loading && !!meta?.fullgame;
+          const baseGameSection = hasBaseGame ? <BaseGameLink game={g} /> : null;
+          // Release date and "DLC for X" folded onto one line ("<date> · DLC for X") since
+          // both are short, secondary metadata about the same thing.
+          const metaLine = (meta?.releaseDate || baseGameSection) ? (
+            <div class="panel-release">{meta?.releaseDate}{meta?.releaseDate && baseGameSection ? <span class="panel-meta-sep"> · </span> : null}{baseGameSection}</div>
+          ) : null;
+
+          // "In library" / "On wishlist" status — passive, same convention as the Price card
+          // (panel.tsx doesn't fetch anything itself; it just renders whatever the host page
+          // already resolved). See the original file's own comment (preserved in git
+          // history) for the full "why 'In library' not 'In your library'" reasoning.
+          const ownershipRow = (g.inLibrary == null && g.onWishlist == null) ? null : (
+            <div class="panel-ownership-row">
+              <Show when={g.inLibrary}><span class="panel-ownership-badge owned">✓ In library</span></Show>
+              <Show when={g.onWishlist}><span class="panel-ownership-badge wishlisted">☆ On wishlist</span></Show>
+            </div>
+          );
+
+          // Store and ITAD are the two links everyone wants at a glance and stay directly in
+          // the row — Workshop/Website are each conditional, tucked into a single "⋯ More"
+          // menu instead (see the original file's own comment, preserved in git history, for
+          // the full reasoning).
+          const moreLinkItems = [
+            !g.loading && (meta?.categories || []).includes('Steam Workshop') &&
+              { icon: '🛠️', label: 'Steam Workshop', href: `https://steamcommunity.com/app/${g.appid}/workshop/` },
+            meta?.website && { icon: '🌐', label: 'Official Website', href: meta.website },
+            { icon: '🔎', label: 'More Like This (Steam)', href: `https://store.steampowered.com/recommended/morelike/app/${g.appid}/` },
+          ].filter((it): it is { icon: string; label: string; href: string } => !!it);
+          const moreLinksOpenNow = moreLinksOpen();
+          const moreLinks = moreLinkItems.length ? (
+            <div class="panel-icon-more">
+              <button type="button" class="panel-icon-link panel-icon-more-btn" aria-haspopup="true" aria-expanded={moreLinksOpenNow ? 'true' : 'false'} title="More links" aria-label="More links" onClick={() => setMoreLinksOpen(!moreLinksOpenNow)}>⋯</button>
+              <Show when={moreLinksOpenNow}>
+                <div class="panel-icon-more-menu">
+                  <For each={moreLinkItems}>{it => <a class="panel-icon-more-item" href={safeHref(it.href) || undefined} target="_blank" rel="noopener">{it.icon} {it.label}</a>}</For>
+                </div>
+              </Show>
+            </div>
+          ) : null;
+
+          const refreshing = panelRefreshing();
+          const refreshBtn = (panelOptions.onRefresh && !g.loading) ? (
+            <button
+              type="button"
+              class={`panel-refresh-btn${refreshing ? ' is-refreshing' : ''}`}
+              disabled={refreshing}
+              title="Refresh rating, HLTB &amp; store details for this game"
+              aria-label="Refresh details"
+              onClick={handlePanelRefresh}
+            >↻</button>
+          ) : null;
+
+          // "← Back" only appears once a DLC hop is actually in progress — a plain
+          // table-row click never gets this button, only a game reached by following a DLC
+          // link (or by going back through more than one of them) does.
+          const hist = panelHistory();
+          const backBtn = hist.length ? (
+            <button type="button" class="panel-back-btn" title={`Back to ${hist[hist.length - 1].name}`} onClick={panelGoBack}>
+              &#8249; {hist[hist.length - 1].name}
+            </button>
+          ) : null;
+
+          return (
+            <>
+              {backBtn}
+              <div class="panel-title-row">
+                <div>
+                  <div class="panel-title" id="panel-title">{g.name}</div>
+                  {metaLine}
+                  {ownershipRow}
+                </div>
+                <div class="panel-icon-links">
+                  <a class="panel-icon-link" href={storeUrl} target="_blank" rel="noopener" title="Steam Store" aria-label="Steam Store">🛒</a>
+                  <a class="panel-icon-link" href={itadUrl} target="_blank" rel="noopener" title="IsThereAnyDeal" aria-label="IsThereAnyDeal">$</a>
+                  {moreLinks}
+                  <span class="panel-icon-divider" role="separator" aria-hidden="true" />
+                  <button type="button" class="panel-icon-link panel-copy-link-btn" title="Copy link to this game" aria-label="Copy link to this game" onClick={copyPanelLink}>🔗</button>
+                  {refreshBtn}
+                </div>
+              </div>
+            </>
+          );
+        })()}
+        <PanelSubnav />
+      </div>
+    </Show>
+  );
+}
+
 // ── The rest of the panel body ───────────────────────────────────────────────
 // Unlike the hero above, this is deliberately one coarse reactive block, re-computed in
 // full on every `revision`/`panelGame` change — the same "rebuild the whole thing" behavior
 // the original innerHTML-based renderPanelBody had, just expressed as a fresh JSX tree each
-// time instead of a fresh HTML string. Nothing here needs finer-grained isolation the way
-// the hero does (stepping media is by far the most frequent single interaction).
+// time instead of a fresh HTML string. The header/subnav above are the one deliberate
+// exception (see their own comments for why); nothing here needs that same finer-grained
+// isolation (stepping media, handled by the hero above, is by far the most frequent single
+// interaction — an unrelated section loading here has no comparable external-DOM-patch or
+// visible-flash concern the way the subnav's active-tab highlight did).
 function PanelRest(): JSX.Element {
   const g = panelGame();
   if (!g) return null;
   const h = g.details?.hltb;
   const meta = g.details?.meta;
 
-  const storeUrl = `https://store.steampowered.com/app/${g.appid}`;
-  const itadUrl = `https://isthereanydeal.com/steam/app/${g.appid}`;
-  const releaseDate = meta?.releaseDate;
   const description = meta?.description;
   // `description` (Steam's `short_description`) can carry literal HTML entities as plain
   // text (e.g. "Baldur's Gate..." legitimately has "&amp;" for "Dungeons & Dragons"), and
@@ -1406,39 +1606,10 @@ function PanelRest(): JSX.Element {
     ]} />
   );
 
-  const refreshing = panelRefreshing();
-  const refreshBtn = (panelOptions.onRefresh && !g.loading) ? (
-    <button
-      type="button"
-      class={`panel-refresh-btn${refreshing ? ' is-refreshing' : ''}`}
-      disabled={refreshing}
-      title="Refresh rating, HLTB &amp; store details for this game"
-      aria-label="Refresh details"
-      onClick={handlePanelRefresh}
-    >↻</button>
-  ) : null;
-
-  // Computed as a plain boolean first (not by checking the rendered element's own
-  // truthiness — a `<Component/>` call is a truthy value regardless of what it renders to,
-  // including `null`) so metaLine's separator and baseGameSection itself can never disagree
-  // about whether there's actually a base game to show.
-  const hasBaseGame = !g.loading && !!g.details?.meta?.fullgame;
-  const baseGameSection = hasBaseGame ? <BaseGameLink game={g} /> : null;
   const priceSection = g.loading ? null : <PriceSection game={g} />;
   const dlcSection = g.loading ? null : <DlcSection game={g} />;
   const newsSection = <NewsSection game={g} />;
   const achievementsSection = <AchievementsSection game={g} />;
-
-  // "In library" / "On wishlist" status — passive, same convention as the Price card
-  // (panel.tsx doesn't fetch anything itself; it just renders whatever the host page already
-  // resolved). See the original file's own comment (preserved in git history) for the full
-  // "why 'In library' not 'In your library'" reasoning.
-  const ownershipRow = (g.inLibrary == null && g.onWishlist == null) ? null : (
-    <div class="panel-ownership-row">
-      <Show when={g.inLibrary}><span class="panel-ownership-badge owned">✓ In library</span></Show>
-      <Show when={g.onWishlist}><span class="panel-ownership-badge wishlisted">☆ On wishlist</span></Show>
-    </div>
-  );
 
   // A free demo is a "try before you buy" call to action, not supplementary info like
   // Website/Workshop below.
@@ -1448,75 +1619,11 @@ function PanelRest(): JSX.Element {
     </a>
   ) : null;
 
-  // Store and ITAD are the two links everyone wants at a glance and stay directly in the
-  // row — Workshop/Website are each conditional, tucked into a single "⋯ More" menu instead
-  // (see the original file's own comment, preserved in git history, for the full reasoning).
-  const moreLinkItems = [
-    !g.loading && (meta?.categories || []).includes('Steam Workshop') &&
-      { icon: '🛠️', label: 'Steam Workshop', href: `https://steamcommunity.com/app/${g.appid}/workshop/` },
-    meta?.website && { icon: '🌐', label: 'Official Website', href: meta.website },
-    { icon: '🔎', label: 'More Like This (Steam)', href: `https://store.steampowered.com/recommended/morelike/app/${g.appid}/` },
-  ].filter((it): it is { icon: string; label: string; href: string } => !!it);
-  const moreLinksOpenNow = moreLinksOpen();
-  const moreLinks = moreLinkItems.length ? (
-    <div class="panel-icon-more">
-      <button type="button" class="panel-icon-link panel-icon-more-btn" aria-haspopup="true" aria-expanded={moreLinksOpenNow ? 'true' : 'false'} title="More links" aria-label="More links" onClick={() => setMoreLinksOpen(!moreLinksOpenNow)}>⋯</button>
-      <Show when={moreLinksOpenNow}>
-        <div class="panel-icon-more-menu">
-          <For each={moreLinkItems}>{it => <a class="panel-icon-more-item" href={safeHref(it.href) || undefined} target="_blank" rel="noopener">{it.icon} {it.label}</a>}</For>
-        </div>
-      </Show>
-    </div>
-  ) : null;
-
-  // "← Back" only appears once a DLC hop is actually in progress — a plain table-row click
-  // never gets this button, only a game reached by following a DLC link (or by going back
-  // through more than one of them) does.
-  const hist = panelHistory();
-  const backBtn = hist.length ? (
-    <button type="button" class="panel-back-btn" title={`Back to ${hist[hist.length - 1].name}`} onClick={panelGoBack}>
-      &#8249; {hist[hist.length - 1].name}
-    </button>
-  ) : null;
-
-  // A sticky jump-nav for the sections below the fold — see the original file's own comment
-  // (preserved in git history) for the full reasoning. Listed in the same order the sections
-  // actually appear below (Owners right after the tag cloud, ahead of the collapsibles) so
-  // scroll-spy highlighting (see updateSubnavScrollSpy) always lights up left-to-right.
-  // Each condition below mirrors its own *Section function's exact gating logic (loading
-  // skeleton and "couldn't load" states count as "has a section to jump to", same as the
-  // original file's own `newsSectionHtml`/`achievementsSectionHtml` non-empty-string checks
-  // — not just "has real content"), computed as plain booleans rather than by checking a
-  // rendered `<Component/>` call's own truthiness (always truthy regardless of what it
-  // renders to, including `null` — see hasBaseGame's own comment above for the same pitfall).
-  const hasNewsSection = g.newsLoading || (g.newsError && !g.news) || !!(g.news && g.news.length);
-  const hasAchievementsSection = !!panelOptions.showAchievements && (g.achievementsLoading || g.achievements !== undefined);
-  const hasDlcSection = !!(meta?.dlc && meta.dlc.length);
-  const subnavItems = [
-    ownersHtml && { label: 'Owners', target: 'panel-section-owners' },
-    hltbDetail && { label: 'HLTB', target: 'panel-section-hltb' },
-    hasNewsSection && { label: 'News', target: 'panel-section-news' },
-    hasAchievementsSection && { label: 'Achievements', target: 'panel-section-achievements' },
-    hasDlcSection && { label: 'DLC', target: 'panel-section-dlc' },
-  ].filter((it): it is { label: string; target: string } => !!it);
-  const subnav = subnavItems.length < 2 ? null : (
-    <div class="panel-subnav">
-      <button type="button" class="panel-subnav-btn" data-target="top" onClick={() => jumpToPanelSection('top')}>Overview</button>
-      <For each={subnavItems}>{it => <button type="button" class="panel-subnav-btn" data-target={it.target} onClick={() => jumpToPanelSection(it.target)}>{it.label}</button>}</For>
-    </div>
-  );
-
-  // Release date and "DLC for X" folded onto one line ("<date> · DLC for X") since both are
-  // short, secondary metadata about the same thing.
-  const metaLine = (releaseDate || baseGameSection) ? (
-    <div class="panel-release">{releaseDate}{releaseDate && baseGameSection ? <span class="panel-meta-sep"> · </span> : null}{baseGameSection}</div>
-  ) : null;
-
-  // Re-run the scroll-spy once the subnav (and every section it targets) has actually
-  // rendered — a re-render triggered mid-scroll (toggling a collapsible, the refresh
-  // button) shouldn't leave the old subnav's active button highlighted, or none at all,
-  // until the next scroll event fires. Queued as a microtask so it runs after Solid has
-  // actually patched the DOM for this render.
+  // Re-run the scroll-spy once this content has actually rendered — a re-render triggered by
+  // a section's own data arriving (or a collapsible toggling) can shift where the section
+  // anchors below sit, even when PanelSubnav's own item list doesn't itself change. Queued as
+  // a microtask so it runs after Solid has actually patched the DOM for this render. (See
+  // PanelSubnav's own comment for the complementary call keyed off its item list instead.)
   queueMicrotask(updateSubnavScrollSpy);
 
   // DLC is the one collapsible card whose fetch is normally gated behind an actual click
@@ -1531,25 +1638,6 @@ function PanelRest(): JSX.Element {
 
   return (
     <>
-      <div class="panel-header-sticky">
-        {backBtn}
-        <div class="panel-title-row">
-          <div>
-            <div class="panel-title" id="panel-title">{g.name}</div>
-            {metaLine}
-            {ownershipRow}
-          </div>
-          <div class="panel-icon-links">
-            <a class="panel-icon-link" href={storeUrl} target="_blank" rel="noopener" title="Steam Store" aria-label="Steam Store">🛒</a>
-            <a class="panel-icon-link" href={itadUrl} target="_blank" rel="noopener" title="IsThereAnyDeal" aria-label="IsThereAnyDeal">$</a>
-            {moreLinks}
-            <span class="panel-icon-divider" role="separator" aria-hidden="true" />
-            <button type="button" class="panel-icon-link panel-copy-link-btn" title="Copy link to this game" aria-label="Copy link to this game" onClick={copyPanelLink}>🔗</button>
-            {refreshBtn}
-          </div>
-        </div>
-        {subnav}
-      </div>
       {demoBanner}
       <GlanceGrid game={g} />
       {priceSection}
@@ -1572,6 +1660,7 @@ function PanelBody(): JSX.Element {
   return (
     <>
       <PanelHero />
+      <PanelHeader />
       {(() => {
         // Every signal `PanelRest`'s own top-level body reads (as a plain `const x =
         // someSignal();` capture, not a call written directly inside one of its returned
@@ -1579,17 +1668,17 @@ function PanelBody(): JSX.Element {
         // called once per mount and is itself *not* a reactive scope; only genuine JSX `{}`
         // expressions get their own tracked effect. `PanelRest` is invoked via a plain
         // component call (`<PanelRest/>` → `createComponent`), so a signal it only reads at
-        // its own top level (`moreLinksOpen`/`panelRefreshing`/`panelHistory`, alongside
-        // `panelGame` itself) would otherwise never cause this to re-run — confirmed live:
-        // before this fix, the "⋯ More links" button's own click handler correctly flipped
-        // `moreLinksOpen`, but nothing ever re-rendered off it (0 DOM mutations, verified via
-        // a MutationObserver), because `moreLinksOpenNow` had already been resolved to a
-        // plain boolean before PanelRest's JSX ever referenced it. `expandedSections`/
+        // its own top level (alongside `panelGame` itself) would otherwise never cause this
+        // to re-run. `moreLinksOpen`/`panelRefreshing`/`panelHistory` used to need listing
+        // here too, back when PanelRest also built the sticky header — now that the header
+        // (and the section jump-nav within it) is `PanelHeader` above, mounted once and
+        // independent of this block, PanelRest itself no longer reads any of those three, so
+        // they're dropped from this list along with it. `expandedSections`/
         // `revealedAchievements`/`achievementsFilter` don't need to be listed here — every
         // place that reads them (CollapsibleCard's own `expanded()`, an achievement row's own
         // `spoiler()`/`revealed()`) calls the signal directly inside its own JSX expression,
         // which Solid does track independently, regardless of this outer scope.
-        revision(); panelGame(); moreLinksOpen(); panelRefreshing(); panelHistory();
+        revision(); panelGame();
         return <PanelRest />;
       })()}
     </>
