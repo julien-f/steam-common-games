@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- CLAUDE.md's Working style/Git workflow sections integrated with updates from the author's personal cross-project template: implementation now always waits for explicit go-ahead, even a trivial/obvious edit (previously trivial edits could proceed directly); Working style gained a "favor the smallest change that satisfies the request, flag when more thorough work would pay off" guideline; Git workflow now allows a dedicated branch + merge commit for a complex, multi-concern feature spanning more than one commit (e.g. the Solid migration), while everything else still commits directly to `main`.
 - A fresh clone now requires `npm run build` before `npm start` will serve a working frontend — the Express static fallback serves `public/` raw, and browsers won't parse the TypeScript sources (previously plain JS). Use `npm run dev:web` for development instead.
 - De-duplicated logic that `library.js`/`bundles.js` (and, for the owner list, `app.js`) each carried their own near-identical copy of, into shared modules:
   - `public/tableViewPrefs.js` — the `?lv=`/`?wv=`/`?bv=` table-view restore/persist/share/reset logic. Along the way, `bundles.js`'s copy is fixed to route its writes through `reorderUrlParams` the same way `library.js`'s always did (`urlState.js`'s `PARAM_ORDER` now also lists `bv`).

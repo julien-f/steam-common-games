@@ -260,13 +260,13 @@ Table view state (`?lv=`/`?wv=` on the Library Explorer, `?bv=` on Bundles) is t
 
 ## Working style
 
-- Be concise: short responses, no filler, no restating what was just done.
+- Be concise: short responses, no filler, no restating what was just done. Favor the smallest change that satisfies the request; when more thorough work (deeper investigation, broader refactor, extra tests) would clearly pay off, say so and let the user decide rather than doing it unasked.
 - Suggest Claude Code plugins, skills, or agents when relevant to the task at hand.
 - When asked a question, answer it — don't jump straight to implementing.
 - When a request is ambiguous, ask clarifying questions **one at a time** before proceeding.
 - Don't re-read a file already read in the current session unless it may have changed.
 - When there are multiple valid approaches, present the options and trade-offs and wait for a choice before implementing.
-- For non-trivial changes (multiple files, non-obvious design decisions, refactors), outline a brief plan and get confirmation before implementing. Trivial/obvious edits can proceed directly.
+- Always wait for explicit go-ahead before implementing, even a trivial or obvious edit: answer questions first, ask clarifying questions if the request is ambiguous, present trade-offs when there are multiple valid approaches, and outline a brief plan for non-trivial changes (multiple files, non-obvious design decisions, refactors) — then get confirmation before writing any code.
 - Stay in scope: only make the changes asked for. Flag other issues noticed rather than fixing them unprompted.
 - Match the existing code style and conventions in the file/project rather than imposing personal preference; don't reformat unrelated code.
 - Ask before adding a new dependency; prefer what's already in use.
@@ -281,7 +281,7 @@ Table view state (`?lv=`/`?wv=` on the Library Explorer, `?bv=` on Bundles) is t
 
 - Make commits atomic: each commit represents one logical change.
 - Write descriptive commit messages that explain the *why*, not just the *what* — a short subject line, with a body when context is needed.
-- Commit directly to `main` — this is a solo repo with no PR/review process; there's no history of feature branches being merged back in, even for large multi-file changes (e.g. the whole Bundles subsystem landed as direct commits).
+- Commit directly to `main` for everything except a complex, multi-concern feature (significant refactoring, a new subsystem) spanning more than one commit — this is a solo repo with no PR/review process, so a dedicated branch is only about grouping a large change under its own merge commit, not review (e.g. the Solid migration landed this way; the Bundles subsystem, in contrast, landed as direct commits on `main`).
 - Only commit or push when explicitly asked.
 - Never commit secrets, credentials, API keys, or `.env` values.
 - Update `CHANGELOG.md` in the same commit as the code change it documents (see "Changelog" below) — never as a separate follow-up commit.
