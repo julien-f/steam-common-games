@@ -1,8 +1,13 @@
-import { esc } from './utils.ts';
-
-// Shared by the comparison page (app.js) and the Library Explorer (library.js): renders
-// the "accounts bar" of resolved-account chips under a search form, plus a locally
-// remembered "recent searches" row above it. An ES module, importing `esc()` from utils.js.
+// Shared by the comparison page (app.tsx) and the Library Explorer (library.tsx): the pure,
+// JSX-free logic behind the "accounts bar" of resolved-account chips under a search form, plus
+// a locally remembered "recent searches" row above it. The actual rendering/mounting is
+// `accountsBar.tsx` (a real Solid component now — see its own header comment); this file stays
+// plain `.ts` specifically so Node's test runner (no JSX transform) can still cover it directly,
+// same reasoning as `lightboxTime.ts`'s split from `lightbox.tsx`/`panelNav.ts`'s split from
+// `panel.tsx`'s `PanelNav`. Nothing here builds an HTML string or touches the DOM — a chip's
+// safe-URL/status/count fields used to be interpolated into an HTML string by hand (needing
+// `esc()` everywhere), now they're just plain data a JSX component reads directly, since JSX
+// escapes text/attribute values on its own.
 
 // personastate values per Steam's docs: 0 Offline, 1 Online, 2 Busy, 3 Away, 4 Snooze,
 // 5 Looking to trade, 6 Looking to play. `gameextrainfo` (present while in-game) takes
@@ -21,14 +26,25 @@ export interface AccountChipPlayer {
 
 export const ACCOUNT_STATE_LABELS = ['Offline', 'Online', 'Busy', 'Away', 'Snooze', 'Looking to trade', 'Looking to play'];
 
-// The identity (avatar + name, linking out to the profile) is its own <a> nested inside
-// the chip <div> rather than the whole chip being one big link — the chip also holds a
-// <button> (per-account refresh), and interactive content nested inside an <a> is
-// invalid HTML / fights click-target handling.
-export function accountChipHtml(p: AccountChipPlayer, countLabel: string): string {
-  const name = esc(p.personaname || p.steamid);
-  const safeUrl = /^https?:\/\//i.test(p.profileurl || '') ? p.profileurl : '';
-  const safeAvatar = /^https?:\/\//i.test(p.avatarmedium || '') ? p.avatarmedium : '';
+// One account chip's worth of derived display data — everything `AccountChip`
+// (`accountsBar.tsx`) needs to render, computed once so the component itself stays pure JSX
+// with no inline branching logic to keep in sync with what's tested here.
+export interface AccountChipView {
+  steamid: string;
+  name: string;
+  safeUrl: string;
+  safeAvatar: string;
+  isPrivate: boolean;
+  count: number | undefined;
+  countLabel: string;
+  statusClass: 'ingame' | 'online' | 'offline';
+  statusTitle: string;
+}
+
+export function computeAccountChipView(p: AccountChipPlayer, countLabel: string): AccountChipView {
+  const name = p.personaname || p.steamid;
+  const safeUrl = /^https?:\/\//i.test(p.profileurl || '') ? p.profileurl! : '';
+  const safeAvatar = /^https?:\/\//i.test(p.avatarmedium || '') ? p.avatarmedium! : '';
   const isPrivate = p.communityvisibilitystate !== undefined && p.communityvisibilitystate !== 3;
   const count: number | undefined = typeof p.gameCount === 'number' ? p.gameCount : p.itemCount;
 
@@ -43,65 +59,7 @@ export function accountChipHtml(p: AccountChipPlayer, countLabel: string): strin
     : (p.personastate != null ? (ACCOUNT_STATE_LABELS[p.personastate] || 'Offline') : 'Offline');
   const statusTitle = `${statusLabel} (as of this search)`;
 
-  const identityInner = `
-    <span class="account-avatar-wrap">
-      ${safeAvatar ? `<img class="account-avatar" src="${esc(safeAvatar)}" alt="" width="28" height="28">` : ''}
-      <span class="account-status account-status-${statusClass}" title="${esc(statusTitle)}"></span>
-    </span>
-    <span class="account-meta">
-      <span class="account-name">${name}</span>
-      ${typeof count === 'number' ? `<span class="account-count">${count.toLocaleString()} ${countLabel}</span>` : ''}
-    </span>
-  `;
-  const identity = safeUrl
-    ? `<a class="account-identity" href="${esc(safeUrl)}" target="_blank" rel="noopener">${identityInner}</a>`
-    : `<span class="account-identity">${identityInner}</span>`;
-
-  return `
-    <div class="account-chip">
-      ${identity}
-      ${isPrivate ? '<span class="account-private" title="Profile is private — results for this account may be empty or incomplete">🔒 Private</span>' : ''}
-      <button type="button" class="account-refresh-btn" data-steamid="${esc(p.steamid)}"
-        title="Refresh just this account">↻</button>
-    </div>
-  `;
-}
-
-// Flat row of chips — one group's worth of accounts (the Library Explorer's single
-// Family group, or the comparison page when there's only one slot).
-export function renderAccountChips(containerEl: HTMLElement, players: AccountChipPlayer[] | null | undefined, countLabel: string) {
-  if (!players || players.length === 0) { containerEl.hidden = true; containerEl.innerHTML = ''; return; }
-  containerEl.innerHTML = players.map(p => accountChipHtml(p, countLabel)).join('');
-  containerEl.hidden = false;
-}
-
-// Chips clustered into labelled groups — the comparison page's per-slot view, since a
-// search there can compare several separate slots (each possibly itself a multi-account
-// Family). `groups`: [{ label, players }]. `label` is omitted (no heading rendered) for
-// a single-group search, where per-slot labeling would just be noise.
-export function renderAccountChipsGrouped(containerEl: HTMLElement, groups: { label?: string; players: AccountChipPlayer[] }[] | null | undefined, countLabel: string) {
-  const nonEmpty = (groups || []).filter(g => g.players && g.players.length > 0);
-  if (nonEmpty.length === 0) { containerEl.hidden = true; containerEl.innerHTML = ''; return; }
-  containerEl.innerHTML = nonEmpty.map(g => `
-    <div class="slot-accounts">
-      ${g.label ? `<span class="slot-label">${esc(g.label)}</span>` : ''}
-      ${g.players.map(p => accountChipHtml(p, countLabel)).join('')}
-    </div>
-  `).join('');
-  containerEl.hidden = false;
-}
-
-// Delegated rather than per-chip, since chips are wholesale replaced on every render.
-// `onRefresh(steamid, btnEl)` is responsible for re-running the search with that one
-// account force-refreshed and re-rendering the bar (which naturally resets the button).
-export function bindAccountRefresh(containerEl: HTMLElement, onRefresh: (steamid: string, btnEl: HTMLButtonElement) => void) {
-  containerEl.addEventListener('click', e => {
-    const btn = (e.target as Element).closest('.account-refresh-btn') as HTMLButtonElement | null;
-    if (!btn || btn.disabled) return;
-    btn.disabled = true;
-    btn.textContent = '⋯';
-    onRefresh(btn.dataset.steamid ?? '', btn);
-  });
+  return { steamid: p.steamid, name, safeUrl, safeAvatar, isPrivate, count, countLabel, statusClass, statusTitle };
 }
 
 // ── Recent searches (localStorage) ──────────────────────────────────────────
@@ -113,15 +71,15 @@ export function bindAccountRefresh(containerEl: HTMLElement, onRefresh: (steamid
 // identifier string for the Library Explorer, a whole slots array for the comparison
 // page) and is never inspected here. `players` is a lightweight display snapshot
 // (steamid/personaname/avatarmedium) — always **one array per slot/group**, even for a
-// single-group search, so recentChipHtml below always knows slot boundaries: a Library
-// Explorer search (or a one-slot comparison-page search) passes a one-element array.
+// single-group search, so computeRecentChipView below always knows slot boundaries: a
+// Library Explorer search (or a one-slot comparison-page search) passes a one-element array.
 // Without that grouping, a comparison of two 2-account Families and a plain 4-account
 // comparison would render as the exact same "A + B + C + D" label.
 
 export const MAX_RECENTS = 10;
 
 // One entry in a "Recent:" row. `players` is an array of groups (see addRecent above);
-// pre-grouping entries read from localStorage have a flat array instead, so recentChipHtml
+// pre-grouping entries read from localStorage have a flat array instead, so computeRecentChipView
 // normalizes element-by-element. `data` is opaque host-page replay data.
 export interface RecentEntry {
   id: string;
@@ -157,6 +115,7 @@ export function removeRecent(storageKey: string, id: string) {
   saveRecents(storageKey, loadRecents(storageKey).filter(r => r.id !== id));
 }
 
+// One recent-search chip's worth of derived display data (`RecentChip` in accountsBar.tsx).
 // "+" joins accounts merged within one slot/group, ", " separates distinct slots/groups —
 // same convention as the accounts bar's own "N accounts merged" labeling, so a Family
 // merge and a multi-player comparison never look identical here either. Each element of
@@ -164,47 +123,17 @@ export function removeRecent(storageKey: string, id: string) {
 // assumed to already be one — entries written before this grouping existed have a flat
 // array of player objects, not an array of groups, and this is the only thing standing
 // between reading one of those out of localStorage and a hard crash on every page load.
-export function recentChipHtml(entry: RecentEntry): string {
+export interface RecentChipView {
+  label: string;
+  safeAvatar: string;
+}
+
+export function computeRecentChipView(entry: RecentEntry): RecentChipView {
   const groups = (entry.players || []).map(g => Array.isArray(g) ? g : [g]);
-  const label = esc(groups.length
+  const label = groups.length
     ? groups.map(g => g.map(p => p.personaname || p.steamid).join(' + ')).join(', ')
-    : entry.id);
+    : entry.id;
   const avatarUrl = groups[0]?.[0]?.avatarmedium;
-  const safeAvatar = /^https?:\/\//i.test(avatarUrl || '') ? avatarUrl : '';
-  return `
-    <span class="recent-chip">
-      <button type="button" class="recent-chip-btn" data-id="${esc(entry.id)}" title="Load ${label}">
-        ${safeAvatar ? `<img class="recent-chip-avatar" src="${esc(safeAvatar)}" alt="">` : ''}
-        ${label}
-      </button>
-      <button type="button" class="recent-chip-remove" data-id="${esc(entry.id)}" title="Remove from recent">×</button>
-    </span>
-  `;
-}
-
-export function renderRecentsBar(containerEl: HTMLElement, storageKey: string) {
-  const recents = loadRecents(storageKey);
-  if (recents.length === 0) { containerEl.hidden = true; containerEl.innerHTML = ''; return; }
-  containerEl.innerHTML = `
-    <span class="recents-label">Recent:</span>
-    ${recents.map(recentChipHtml).join('')}
-    <button type="button" class="recents-clear">Clear</button>
-  `;
-  containerEl.hidden = false;
-}
-
-// `onLoad(data)` replays a remembered search; re-rendering the bar after removal/clear
-// is handled here since it's always the same follow-up regardless of the host page.
-export function bindRecentsBar(containerEl: HTMLElement, storageKey: string, onLoad: (data: unknown) => void) {
-  containerEl.addEventListener('click', e => {
-    const loadBtn = (e.target as Element).closest('.recent-chip-btn') as HTMLElement | null;
-    if (loadBtn) {
-      const entry = loadRecents(storageKey).find(r => r.id === loadBtn.dataset.id);
-      if (entry) onLoad(entry.data);
-      return;
-    }
-    const removeBtn = (e.target as Element).closest('.recent-chip-remove') as HTMLElement | null;
-    if (removeBtn) { removeRecent(storageKey, removeBtn.dataset.id ?? ''); renderRecentsBar(containerEl, storageKey); return; }
-    if ((e.target as Element).closest('.recents-clear')) { saveRecents(storageKey, []); renderRecentsBar(containerEl, storageKey); }
-  });
+  const safeAvatar = /^https?:\/\//i.test(avatarUrl || '') ? avatarUrl! : '';
+  return { label, safeAvatar };
 }

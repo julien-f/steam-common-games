@@ -9,7 +9,8 @@ import { bindPanelKeyboardShortcuts } from '/panelKeyboard.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from '/priceLoading.ts';
 import { COUNTRY_OPTIONS, getStoredRegion, setStoredRegion, resolveRegion, REGION_CHANGED_EVENT } from '/region.ts';
 import { updateNavLink } from '/nav.tsx';
-import { renderAccountChips, bindAccountRefresh, addRecent, renderRecentsBar, bindRecentsBar } from '/accountsBar.ts';
+import { addRecent } from '/accountsBar.ts';
+import { renderAccountChips, bindAccountRefresh, renderRecentsBar, bindRecentsBar } from '/accountsBar.tsx';
 import { initGameSearch, addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.ts';
 import { openLightbox, isLightboxOpen } from '/lightbox.tsx';
 import {

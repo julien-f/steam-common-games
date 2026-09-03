@@ -9,7 +9,8 @@ import { FILTER_DIMS, parseUrlState, reorderUrlParams, setPanelParam, setLightbo
 import { updateNavLink } from '/nav.tsx';
 import { stepGameList } from '/panelNav.ts';
 import { bindPanelKeyboardShortcuts } from '/panelKeyboard.ts';
-import { renderAccountChipsGrouped, bindAccountRefresh, addRecent, renderRecentsBar, bindRecentsBar } from '/accountsBar.ts';
+import { addRecent } from '/accountsBar.ts';
+import { renderAccountChipsGrouped, bindAccountRefresh, renderRecentsBar, bindRecentsBar } from '/accountsBar.tsx';
 import { initGameSearch, addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.ts';
 import { openLightbox, isLightboxOpen } from '/lightbox.tsx';
 import { createRowStore } from '/rowStore.ts';
