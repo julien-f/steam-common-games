@@ -1,23 +1,24 @@
-import { esc } from './utils.ts';
-
-export interface GameSearchResult {
-  appid: number;
-  name: string;
-  tinyImage: string | null;
-}
-
-// Shared "look up any game" widget — used by both the comparison page (app.js) and the
-// Library Explorer (library.js) to open the shared game detail side panel (panel.js) for an
-// arbitrary Steam game, independent of anyone's library or wishlist. An ES module, importing
-// `esc()` from utils.js, same as accountsBar.js.
+// Shared "look up any game" widget — used by both the comparison page (app.tsx) and the
+// Library Explorer (library.tsx) to open the shared game detail side panel (panel.tsx) for an
+// arbitrary Steam game, independent of anyone's library or wishlist. The pure, JSX-free logic
+// lives here; the actual rendering/mounting (`initGameSearch`, the recent-games bar) is
+// `gameSearch.tsx` — same split as `panelNav.ts`/`accountsBar.ts` and their own `.tsx`
+// counterparts, kept plain `.ts` specifically so Node's test runner (no JSX transform) can still
+// cover it directly.
 //
-// initGameSearch({ inputEl, resultsEl, onSelect }):
+// initGameSearch({ inputEl, resultsEl, onSelect }) (gameSearch.tsx):
 //  - inputEl:   the text input the user types a name, appid, or store URL into
 //  - resultsEl: container the dropdown of name-search matches renders into (hidden when empty)
 //  - onSelect({ appid, name }): called when the user picks a result, or presses Enter with a
 //    raw appid/store URL typed in (name is '' in that case — the caller derives it from store
 //    metadata once /api/game-details resolves, same as it already does for wishlist rows with
 //    no name of their own)
+
+export interface GameSearchResult {
+  appid: number;
+  name: string;
+  tinyImage: string | null;
+}
 
 export const GAME_SEARCH_DEBOUNCE_MS = 300;
 export const GAME_SEARCH_MIN_CHARS = 2;
@@ -31,135 +32,30 @@ export function parseDirectAppid(raw: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
-// `active`: true for the result currently highlighted via ArrowUp/ArrowDown (not hover —
-// hover is native `:hover`/`:focus-visible` CSS, this is the keyboard roving selection).
-// `id` + `role="option"` back `inputEl`'s `aria-activedescendant` in initGameSearch below;
-// `tabindex="-1"` keeps real DOM focus on the input the whole time, same combobox pattern
-// as a native `<select>`'s listbox — arrow keys move the highlight, not focus itself.
-export function gameSearchResultHtml(r: GameSearchResult, active: boolean): string {
-  const thumb = r.tinyImage
-    ? `<img class="game-search-thumb" src="${esc(r.tinyImage)}" alt="" loading="lazy">`
-    : '<span class="game-search-thumb game-search-thumb--empty"></span>';
-  return `
-    <button type="button" id="game-search-opt-${r.appid}" role="option" aria-selected="${active}" tabindex="-1"
-      class="game-search-result${active ? ' active' : ''}" data-appid="${r.appid}" data-name="${esc(r.name)}">
-      ${thumb}
-      <span class="game-search-name">${esc(r.name)}</span>
-    </button>
-  `;
+// One search-result row's worth of derived display data (`GameSearchResultBtn` in
+// gameSearch.tsx). `active`: true for the result currently highlighted via ArrowUp/ArrowDown
+// (not hover — hover is native `:hover`/`:focus-visible` CSS, this is the keyboard roving
+// selection) — passed straight through rather than recomputed, since only the caller
+// (`initGameSearch`) knows the current `activeIdx`.
+export interface GameSearchResultView {
+  appid: number;
+  name: string;
+  safeThumb: string;
+  active: boolean;
 }
 
-export function initGameSearch({ inputEl, resultsEl, onSelect }: {
-  inputEl: HTMLInputElement;
-  resultsEl: HTMLElement;
-  onSelect: (game: GameSearchResult) => void;
-}) {
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  let lastResults: GameSearchResult[] = [];
-  let activeFetch = 0; // guards against a slower earlier request clobbering a faster later one
-  let activeIdx = -1;  // ArrowUp/ArrowDown highlight; -1 = none yet (Enter falls back to the top match)
-
-  resultsEl.setAttribute('role', 'listbox');
-  inputEl.setAttribute('aria-autocomplete', 'list');
-  inputEl.setAttribute('aria-expanded', 'false');
-  if (resultsEl.id) inputEl.setAttribute('aria-controls', resultsEl.id);
-
-  function renderResults() {
-    resultsEl.innerHTML = lastResults.map((r, i) => gameSearchResultHtml(r, i === activeIdx)).join('');
-    if (activeIdx >= 0) inputEl.setAttribute('aria-activedescendant', `game-search-opt-${lastResults[activeIdx].appid}`);
-    else inputEl.removeAttribute('aria-activedescendant');
-  }
-
-  function showResults(results: GameSearchResult[]) {
-    lastResults = results;
-    activeIdx = -1;
-    if (!results.length) { hideResults(); return; }
-    renderResults();
-    resultsEl.hidden = false;
-    inputEl.setAttribute('aria-expanded', 'true');
-  }
-
-  function hideResults() {
-    lastResults = [];
-    activeIdx = -1;
-    resultsEl.hidden = true;
-    resultsEl.innerHTML = '';
-    inputEl.setAttribute('aria-expanded', 'false');
-    inputEl.removeAttribute('aria-activedescendant');
-  }
-
-  // dir: 1 (ArrowDown) or -1 (ArrowUp). Wraps at both ends, same `(idx + dir + len) % len`
-  // convention panel.js/library.js use for prev/next game paging — except the very first
-  // press, which has no current index to offset from: ArrowDown starts at the top result,
-  // ArrowUp starts at the bottom one, matching most native combobox widgets.
-  function moveActive(dir: number) {
-    if (!lastResults.length) return;
-    activeIdx = activeIdx === -1
-      ? (dir > 0 ? 0 : lastResults.length - 1)
-      : (activeIdx + dir + lastResults.length) % lastResults.length;
-    renderResults();
-    resultsEl.querySelector('.game-search-result.active')?.scrollIntoView({ block: 'nearest' });
-  }
-
-  async function runSearch(term: string) {
-    const fetchId = ++activeFetch;
-    try {
-      const res = await fetch(`/api/search-games?q=${encodeURIComponent(term)}`);
-      const data = await res.json();
-      if (fetchId !== activeFetch) return; // a newer keystroke's request already landed
-      showResults(res.ok ? (data.results || []) : []);
-    } catch {
-      if (fetchId === activeFetch) hideResults();
-    }
-  }
-
-  function pick(game: GameSearchResult) {
-    hideResults();
-    inputEl.value = game.name || '';
-    onSelect(game);
-  }
-
-  inputEl.addEventListener('input', () => {
-    if (debounceTimer != null) clearTimeout(debounceTimer);
-    const term = inputEl.value.trim();
-    // A raw appid/URL doesn't need a name search — hide any stale dropdown instead.
-    if (term.length < GAME_SEARCH_MIN_CHARS || parseDirectAppid(term) != null) { hideResults(); return; }
-    debounceTimer = setTimeout(() => runSearch(term), GAME_SEARCH_DEBOUNCE_MS);
-  });
-
-  inputEl.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { hideResults(); return; }
-    if (e.key === 'ArrowDown') { if (lastResults.length) e.preventDefault(); moveActive(1); return; }
-    if (e.key === 'ArrowUp')   { if (lastResults.length) e.preventDefault(); moveActive(-1); return; }
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-    const term = inputEl.value.trim();
-    if (!term) return;
-    const directAppid = parseDirectAppid(term);
-    if (directAppid != null) { pick({ appid: directAppid, name: '', tinyImage: null }); return; }
-    if (activeIdx >= 0 && lastResults[activeIdx]) { pick(lastResults[activeIdx]); return; }
-    if (lastResults.length) pick(lastResults[0]); // no arrow-key highlight yet — same as clicking the top match
-  });
-
-  resultsEl.addEventListener('click', e => {
-    const btn = (e.target as Element).closest('.game-search-result') as HTMLElement | null;
-    if (!btn) return;
-    pick({ appid: Number(btn.dataset.appid), name: btn.dataset.name ?? '', tinyImage: null });
-  });
-
-  // Dismiss the dropdown on outside click, same convention as recentsBar-style widgets.
-  document.addEventListener('click', e => {
-    if (e.target !== inputEl && !resultsEl.contains(e.target as Node)) hideResults();
-  });
+export function computeGameSearchResultView(r: GameSearchResult, active: boolean): GameSearchResultView {
+  const safeThumb = /^https?:\/\//i.test(r.tinyImage || '') ? r.tinyImage! : '';
+  return { appid: r.appid, name: r.name, safeThumb, active };
 }
 
 // ── Recently looked-up games (localStorage) ─────────────────────────────────
-// Unlike accountsBar.js's "Recent:" row (namespaced per page — a Library Explorer player
+// Unlike accountsBar.ts's "Recent:" row (namespaced per page — a Library Explorer player
 // search and a comparison-page search aren't interchangeable), a game looked up via this
 // box means the same thing regardless of which page it was looked up from, so both pages
 // read/write one shared, un-namespaced list. Purely a client-side convenience — never sent
-// to the server. Callers (see openStandaloneGame in app.js, openStandaloneLookup in
-// library.js) call `addRecentGame` once a game's real name/thumbnail is known (resolved
+// to the server. Callers (see openStandaloneGame in app.tsx, openStandaloneLookup in
+// library.tsx) call `addRecentGame` once a game's real name/thumbnail is known (resolved
 // from store metadata, or already on hand for a game that turned out to already be loaded)
 // — never with the `App <appid>` placeholder a fetch-in-flight game opens with.
 
@@ -197,45 +93,14 @@ export function removeRecentGame(appid: number) {
   saveRecentGames(loadRecentGames().filter(g => g.appid !== appid));
 }
 
-export function recentGameChipHtml(entry: RecentGame): string {
-  const label = esc(entry.name || `App ${entry.appid}`);
-  const safeThumb = /^https?:\/\//i.test(entry.tinyImage || '') ? entry.tinyImage : '';
-  return `
-    <span class="recent-chip">
-      <button type="button" class="recent-chip-btn" data-appid="${entry.appid}" title="Look up ${label}">
-        ${safeThumb ? `<img class="recent-chip-avatar" src="${esc(safeThumb)}" alt="">` : ''}
-        ${label}
-      </button>
-      <button type="button" class="recent-chip-remove" data-appid="${entry.appid}" title="Remove from recent">×</button>
-    </span>
-  `;
+// One recent-game chip's worth of derived display data (`RecentGameChip` in gameSearch.tsx).
+export interface RecentGameChipView {
+  label: string;
+  safeThumb: string;
 }
 
-export function renderRecentGamesBar(containerEl: HTMLElement) {
-  const recents = loadRecentGames();
-  if (recents.length === 0) { containerEl.hidden = true; containerEl.innerHTML = ''; return; }
-  containerEl.innerHTML = `
-    <span class="recents-label">Recently looked up:</span>
-    ${recents.map(recentGameChipHtml).join('')}
-    <button type="button" class="recents-clear">Clear</button>
-  `;
-  containerEl.hidden = false;
-}
-
-// `onLoad(appid, name)` opens the remembered game — same shape as bindRecentsBar in
-// accountsBar.js, but keyed directly on the appid rather than an opaque id/data pair since
-// a game is always just its appid.
-export function bindRecentGamesBar(containerEl: HTMLElement, onLoad: (appid: number, name: string) => void) {
-  containerEl.addEventListener('click', e => {
-    const loadBtn = (e.target as Element).closest('.recent-chip-btn') as HTMLElement | null;
-    if (loadBtn) {
-      const appid = Number(loadBtn.dataset.appid);
-      const entry = loadRecentGames().find(g => g.appid === appid);
-      if (entry) onLoad(entry.appid, entry.name);
-      return;
-    }
-    const removeBtn = (e.target as Element).closest('.recent-chip-remove') as HTMLElement | null;
-    if (removeBtn) { removeRecentGame(Number(removeBtn.dataset.appid)); renderRecentGamesBar(containerEl); return; }
-    if ((e.target as Element).closest('.recents-clear')) { saveRecentGames([]); renderRecentGamesBar(containerEl); }
-  });
+export function computeRecentGameChipView(entry: RecentGame): RecentGameChipView {
+  const label = entry.name || `App ${entry.appid}`;
+  const safeThumb = /^https?:\/\//i.test(entry.tinyImage || '') ? entry.tinyImage! : '';
+  return { label, safeThumb };
 }

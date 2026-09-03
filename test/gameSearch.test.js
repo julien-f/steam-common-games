@@ -4,8 +4,8 @@ const { test, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   GAME_SEARCH_DEBOUNCE_MS, GAME_SEARCH_MIN_CHARS, RECENT_GAMES_KEY, MAX_RECENT_GAMES,
-  parseDirectAppid, gameSearchResultHtml, loadRecentGames, saveRecentGames, addRecentGame,
-  removeRecentGame, recentGameChipHtml, renderRecentGamesBar, bindRecentGamesBar,
+  parseDirectAppid, computeGameSearchResultView, loadRecentGames, saveRecentGames, addRecentGame,
+  removeRecentGame, computeRecentGameChipView,
 } = require('../public/gameSearch.ts');
 
 // Same localStorage-stub convention as accountsBar.test.js/region.test.js/prefs.test.js.
@@ -18,29 +18,16 @@ function makeMemoryLocalStorage() {
   };
 }
 
-// Same minimal fake-DOM shape as accountsBar.test.js — enough for innerHTML/hidden and the
-// `e.target.closest('.some-class')` delegation pattern, no jsdom needed.
-function fakeContainer() {
-  return {
-    hidden: false,
-    innerHTML: '',
-    _handlers: [],
-    addEventListener(type, fn) { this._handlers.push(fn); },
-    click(target) { this._handlers.forEach(fn => fn({ target })); },
-  };
-}
-function fakeButton(cls, dataset = {}) {
-  return { dataset, closest(sel) { return sel === `.${cls}` ? this : null; } };
-}
-
 beforeEach(() => {
   global.localStorage = makeMemoryLocalStorage();
 });
 
-// `initGameSearch` itself (the debounced fetch/keyboard-nav widget) isn't covered here — it
-// needs a real input/results element pair plus fetch/timer mocking for meaningful coverage,
-// disproportionate to its risk next to the pure logic below. The pure pieces it's built from
-// (parseDirectAppid, gameSearchResultHtml, the recent-games list) are what's tested.
+// `initGameSearch` itself (the debounced fetch/keyboard-nav widget, gameSearch.tsx) isn't
+// covered here — it needs a real input/results element pair plus fetch/timer mocking for
+// meaningful coverage, disproportionate to its risk next to the pure logic below, and its
+// rendering is real JSX now besides (same "verified live, not unit-tested" precedent every
+// other Solid-converted module in this codebase already follows). The pure pieces it's built
+// from (parseDirectAppid, computeGameSearchResultView, the recent-games list) are what's tested.
 
 // ── parseDirectAppid ─────────────────────────────────────────────────────────
 
@@ -65,24 +52,27 @@ test('parseDirectAppid: returns null for a non-numeric string that merely contai
   assert.equal(parseDirectAppid('Portal 2'), null);
 });
 
-// ── gameSearchResultHtml ─────────────────────────────────────────────────────
+// ── computeGameSearchResultView ──────────────────────────────────────────────
 
-test('gameSearchResultHtml: escapes the name and marks the active result', () => {
-  const html = gameSearchResultHtml({ appid: 620, name: '<b>Portal 2</b>' }, true);
-  assert.ok(html.includes('&lt;b&gt;Portal 2&lt;/b&gt;'));
-  assert.ok(html.includes('class="game-search-result active"'));
-  assert.ok(html.includes('aria-selected="true"'));
+test('computeGameSearchResultView: passes the name and active flag through', () => {
+  const v = computeGameSearchResultView({ appid: 620, name: 'Portal 2', tinyImage: null }, true);
+  assert.equal(v.name, 'Portal 2');
+  assert.equal(v.active, true);
 });
 
-test('gameSearchResultHtml: renders a placeholder thumb when tinyImage is absent', () => {
-  const html = gameSearchResultHtml({ appid: 620, name: 'Portal 2' }, false);
-  assert.ok(html.includes('game-search-thumb--empty'));
-  assert.ok(!html.includes('<img'));
+test('computeGameSearchResultView: safeThumb is empty when tinyImage is absent', () => {
+  const v = computeGameSearchResultView({ appid: 620, name: 'Portal 2', tinyImage: null }, false);
+  assert.equal(v.safeThumb, '');
 });
 
-test('gameSearchResultHtml: renders an <img> thumb when tinyImage is present', () => {
-  const html = gameSearchResultHtml({ appid: 620, name: 'Portal 2', tinyImage: 'https://x/y.jpg' }, false);
-  assert.ok(html.includes('<img class="game-search-thumb" src="https://x/y.jpg"'));
+test('computeGameSearchResultView: keeps a real https tinyImage', () => {
+  const v = computeGameSearchResultView({ appid: 620, name: 'Portal 2', tinyImage: 'https://x/y.jpg' }, false);
+  assert.equal(v.safeThumb, 'https://x/y.jpg');
+});
+
+test('computeGameSearchResultView: drops a non-https tinyImage instead of exposing it', () => {
+  const v = computeGameSearchResultView({ appid: 620, name: 'Portal 2', tinyImage: 'javascript:x' }, false);
+  assert.equal(v.safeThumb, '');
 });
 
 // ── Recent games list ────────────────────────────────────────────────────────
@@ -127,66 +117,21 @@ test('removeRecentGame: removes only the matching appid', () => {
   assert.deepEqual(loadRecentGames().map(g => g.appid), [400]);
 });
 
-// ── recentGameChipHtml ───────────────────────────────────────────────────────
+// ── computeRecentGameChipView ─────────────────────────────────────────────────
 
-test('recentGameChipHtml: falls back to "App <appid>" when name is missing', () => {
-  const html = recentGameChipHtml({ appid: 620 });
-  assert.ok(html.includes('App 620'));
+test('computeRecentGameChipView: falls back to "App <appid>" when name is missing', () => {
+  const v = computeRecentGameChipView({ appid: 620, name: '', tinyImage: null });
+  assert.equal(v.label, 'App 620');
 });
 
-test('recentGameChipHtml: drops a non-https thumbnail instead of rendering it', () => {
-  const html = recentGameChipHtml({ appid: 620, name: 'Portal 2', tinyImage: 'javascript:x' });
-  assert.ok(!html.includes('javascript:'));
+test('computeRecentGameChipView: drops a non-https thumbnail instead of exposing it', () => {
+  const v = computeRecentGameChipView({ appid: 620, name: 'Portal 2', tinyImage: 'javascript:x' });
+  assert.equal(v.safeThumb, '');
 });
 
-test('recentGameChipHtml: escapes the name', () => {
-  const html = recentGameChipHtml({ appid: 620, name: '<b>x</b>' });
-  assert.ok(html.includes('&lt;b&gt;x&lt;/b&gt;'));
-});
-
-// ── renderRecentGamesBar / bindRecentGamesBar ────────────────────────────────
-
-test('renderRecentGamesBar: hides the container when there is no history', () => {
-  const el = fakeContainer();
-  renderRecentGamesBar(el);
-  assert.equal(el.hidden, true);
-});
-
-test('renderRecentGamesBar: renders a chip per entry plus a Clear button', () => {
-  addRecentGame(620, 'Portal 2', null);
-  const el = fakeContainer();
-  renderRecentGamesBar(el);
-  assert.equal(el.hidden, false);
-  assert.ok(el.innerHTML.includes('Portal 2'));
-  assert.ok(el.innerHTML.includes('recents-clear'));
-});
-
-test('bindRecentGamesBar: clicking a chip calls onLoad with its appid and name', () => {
-  addRecentGame(620, 'Portal 2', null);
-  const el = fakeContainer();
-  const loaded = [];
-  bindRecentGamesBar(el, (appid, name) => loaded.push([appid, name]));
-  el.click(fakeButton('recent-chip-btn', { appid: '620' }));
-  assert.deepEqual(loaded, [[620, 'Portal 2']]);
-});
-
-test('bindRecentGamesBar: clicking remove deletes just that entry and re-renders', () => {
-  addRecentGame(620, 'Portal 2', null);
-  addRecentGame(400, 'Portal', null);
-  const el = fakeContainer();
-  bindRecentGamesBar(el, () => {});
-  el.click(fakeButton('recent-chip-remove', { appid: '620' }));
-  assert.deepEqual(loadRecentGames().map(g => g.appid), [400]);
-  assert.ok(el.innerHTML.includes('Portal') && !el.innerHTML.includes('Portal 2'));
-});
-
-test('bindRecentGamesBar: clicking Clear empties the whole list and re-renders hidden', () => {
-  addRecentGame(620, 'Portal 2', null);
-  const el = fakeContainer();
-  bindRecentGamesBar(el, () => {});
-  el.click(fakeButton('recents-clear'));
-  assert.deepEqual(loadRecentGames(), []);
-  assert.equal(el.hidden, true);
+test('computeRecentGameChipView: keeps a real https thumbnail', () => {
+  const v = computeRecentGameChipView({ appid: 620, name: 'Portal 2', tinyImage: 'https://x/y.jpg' });
+  assert.equal(v.safeThumb, 'https://x/y.jpg');
 });
 
 test('GAME_SEARCH_DEBOUNCE_MS/GAME_SEARCH_MIN_CHARS: exported as the expected constants', () => {

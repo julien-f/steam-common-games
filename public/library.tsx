@@ -11,7 +11,8 @@ import { COUNTRY_OPTIONS, getStoredRegion, setStoredRegion, resolveRegion, REGIO
 import { updateNavLink } from '/nav.tsx';
 import { addRecent } from '/accountsBar.ts';
 import { renderAccountChips, bindAccountRefresh, renderRecentsBar, bindRecentsBar } from '/accountsBar.tsx';
-import { initGameSearch, addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.ts';
+import { addRecentGame } from '/gameSearch.ts';
+import { initGameSearch, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.tsx';
 import { openLightbox, isLightboxOpen } from '/lightbox.tsx';
 import {
   panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,

@@ -11,7 +11,8 @@ import { stepGameList } from '/panelNav.ts';
 import { bindPanelKeyboardShortcuts } from '/panelKeyboard.ts';
 import { addRecent } from '/accountsBar.ts';
 import { renderAccountChipsGrouped, bindAccountRefresh, renderRecentsBar, bindRecentsBar } from '/accountsBar.tsx';
-import { initGameSearch, addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.ts';
+import { addRecentGame } from '/gameSearch.ts';
+import { initGameSearch, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.tsx';
 import { openLightbox, isLightboxOpen } from '/lightbox.tsx';
 import { createRowStore } from '/rowStore.ts';
 import {
