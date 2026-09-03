@@ -3,7 +3,7 @@
 import { formatMoney, computeSteamdbRating, computeProductionTier, discountPct } from '/utils.ts';
 import { reorderUrlParams, setPanelParam, setLightboxParam } from '/urlState.ts';
 import { restoreTableView, shareTableView, resetTableView } from '/tableViewPrefs.ts';
-import { renderPanelNav as renderPanelNavShared, stepGameList } from '/panelNav.ts';
+import { stepGameList } from '/panelNav.ts';
 import { bindPanelKeyboardShortcuts } from '/panelKeyboard.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields } from '/priceLoading.ts';
 import { COUNTRY_OPTIONS, TIMEZONE_COUNTRY, detectCountry, getStoredRegion, setStoredRegion, resolveRegion, REGION_CHANGED_EVENT } from '/region.ts';
@@ -11,7 +11,7 @@ import { openLightbox, isLightboxOpen } from '/lightbox.tsx';
 import {
   panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,
   pickRandomFrom, clearRandomQueue, panelHandleEscape,
-  renderPanelBody,
+  renderPanelBody, bumpPanelNav,
 } from '/panel.tsx';
 import { initPageShell } from '/pageShell.ts';
 import { setPref } from '/prefs.ts';
@@ -373,12 +373,12 @@ const detailBatcher = createStreamBatcher<DetailEvent>({
   apply: event => {
     const row = mutateRow(event.appid, draft => applyDetailsEvent(draft, event));
     if (!row) return;
-    // renderPanelNav too, not just renderPanelBody — the nav bar's list/position (see
+    // bumpPanelNav() too, not just renderPanelBody — the nav bar's list/position (see
     // getGameList) only includes non-loading rows, so a panel opened via a `?game=` deep
     // link (which opens the row immediately, before the stream starts — see openBundle's
     // early restorePanelFromUrl call) would otherwise be stuck showing "0 / 0" and a stale,
     // empty nav-button list until every game in the bundle finished loading, not just this one.
-    if (isPanelOpen() && getPanelGame()?.appid === row.appid) { renderPanelBody(row); renderPanelNav(row); }
+    if (isPanelOpen() && getPanelGame()?.appid === row.appid) { renderPanelBody(row); bumpPanelNav(); }
   },
   isStale: gen => openBundleGuard.isStale(gen),
 });
@@ -418,6 +418,11 @@ initPageShell({
   panel: {
     inertSelector: '.bundles-page',
     showAchievements: true,
+    // `table` is reassigned whenever a bundle is (re)opened, so `hasTable` reads it fresh on
+    // every nav recompute rather than capturing today's value. `getGameList`/`pickRandomGame`
+    // already ignore the `game` argument PanelNav (panel.tsx) passes — this page has only one
+    // flat list (the open bundle's own resolved rows), unlike the comparison page's per-group one.
+    nav: { hasTable: () => !!table, getGameList, onOpen: openGame, onReroll: pickRandomGame },
     // Every row here is always batch-priced by loadPrices (see its own comment) — never a
     // per-game fetch of panel.js's own, which would just duplicate that same call.
     pricesHandledByHost: true,
@@ -481,14 +486,6 @@ async function loadAchievements(game: Game, { force = false } = {}) {
   }
 }
 
-// Builds the panel's prev/next/random nav bar (`#panel-nav`, shared markup/CSS/keys with
-// library.js/app.js — see panelNav.js/CLAUDE.md's panel.js bullet) from getGameList()'s current
-// search/filter/sort order. Empty for a standalone lookup (see openStandaloneGame below) —
-// there's no natural list to page through, same as library.js's own version of this function.
-function renderPanelNav(game: Game) {
-  renderPanelNavShared({ table, game, getGameList, onOpen: openGame, onReroll: pickRandomGame });
-}
-
 function openGame(game: Game, { isRandom = false, keepHistory = false } = {}) {
   if (!isRandom) clearRandomQueue(RANDOM_QUEUE_KEY);
   // Always open against the plain panelRows copy, never a rowsStore proxy — see that map's own
@@ -497,7 +494,7 @@ function openGame(game: Game, { isRandom = false, keepHistory = false } = {}) {
   // lookup) falls through to whatever was actually passed, unchanged from before.
   const resolved = getRow(game.appid) ?? game;
   panelOpen(resolved, { keepHistory });
-  renderPanelNav(resolved);
+  bumpPanelNav(); // no table yet, or a standalone lookup, both render no nav — see panel.tsx's PanelNav
   setPanelParam(resolved.appid);
   loadAchievements(resolved);
 }
@@ -518,7 +515,7 @@ function navigateLightboxGame(dir: number) {
 
 function pickRandomGame() {
   const current = getPanelGame();
-  if (!table || !current || current.standalone) return; // see renderPanelNav
+  if (!table || !current || current.standalone) return; // see panel.tsx's PanelNav
   const pick = pickRandomFrom(getGameList(), RANDOM_QUEUE_KEY, current.appid);
   if (pick) openGame(pick as Game, { isRandom: true });
 }

@@ -4,7 +4,7 @@ import { esc, formatMoney, fmtLastPlayed, computeSteamdbRating, computeProductio
 import { renderOwnersHtml } from '/ownerListHtml.ts';
 import { reorderUrlParams, setPanelParam, setLightboxParam } from '/urlState.ts';
 import { restoreTableView, shareTableView, resetTableView } from '/tableViewPrefs.ts';
-import { renderPanelNav as renderPanelNavShared, stepGameList } from '/panelNav.ts';
+import { stepGameList } from '/panelNav.ts';
 import { bindPanelKeyboardShortcuts } from '/panelKeyboard.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from '/priceLoading.ts';
 import { COUNTRY_OPTIONS, getStoredRegion, setStoredRegion, resolveRegion, REGION_CHANGED_EVENT } from '/region.ts';
@@ -15,7 +15,7 @@ import { openLightbox, isLightboxOpen } from '/lightbox.tsx';
 import {
   panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,
   pickRandomFrom, clearRandomQueue, panelHandleEscape,
-  renderPanelBody,
+  renderPanelBody, bumpPanelNav,
 } from '/panel.tsx';
 import { initPageShell } from '/pageShell.ts';
 import { setPref } from '/prefs.ts';
@@ -404,6 +404,11 @@ initPageShell({
     inertSelector: '.lib-page',
     showAchievements: true,
     getOwnersHtml: buildLibraryOwnersHtml,
+    // `table` is reassigned whenever the table itself is (re)built (a Load/tab switch), so
+    // `hasTable` reads it fresh on every nav recompute rather than capturing today's value.
+    // `getGameList`/`pickRandomGame` already ignore the `game` argument PanelNav (panel.tsx)
+    // passes — this page has only one flat list, unlike the comparison page's per-group one.
+    nav: { hasTable: () => !!table, getGameList, onOpen: openGame, onReroll: pickRandomGame },
     // Only the Wishlist tab's own loadWishlistPrices batch-prices its rows — the Library tab's
     // rows are owned games with no price columns/batch of their own, same as the comparison
     // page, so they fall through to panel.js's own per-game loadPrice instead. A function (not a
@@ -572,13 +577,6 @@ function refreshOpenGameOwnership() {
   renderPanelBody(game);
 }
 
-// A standalone lookup (see openStandaloneLookup below) isn't part of the loaded library/
-// wishlist table — with no table yet (a bare lookup with no player loaded) or no natural list
-// to page through, panelNav.js's renderPanelNav renders no nav.
-function renderPanelNav(game: Game) {
-  renderPanelNavShared({ table, game, getGameList, onOpen: openGame, onReroll: pickRandomGame });
-}
-
 function openGame(game: Game, { isRandom = false, keepHistory = false }: { isRandom?: boolean; keepHistory?: boolean } = {}) {
   if (!isRandom) clearRandomQueue(randomQueueKey());
   // Always open against the plain panelRows copy, never a rowsStore proxy — see that map's own
@@ -589,7 +587,7 @@ function openGame(game: Game, { isRandom = false, keepHistory = false }: { isRan
   applyOwnershipFlags(resolved);
   panelOpen(resolved, { keepHistory });
   updateTitle();
-  renderPanelNav(resolved);
+  bumpPanelNav(); // no table yet, or a standalone lookup, both render no nav — see panel.tsx's PanelNav
   setPanelParam(resolved.appid);
   loadAchievements(resolved);
 }
@@ -658,7 +656,7 @@ async function loadAchievements(game: Game, { force = false }: { force?: boolean
 }
 
 function pickRandomGame() {
-  if (!table || getPanelGame()?.standalone) return; // see renderPanelNav
+  if (!table || getPanelGame()?.standalone) return; // see panel.tsx's PanelNav
   const pick = pickRandomFrom(getGameList(), randomQueueKey(), getPanelGame()?.appid ?? 0);
   if (pick) openGame(pick as Game, { isRandom: true });
 }
@@ -786,7 +784,7 @@ const detailBatcher = createStreamBatcher<DetailsEvent>({
   apply: event => {
     const row = mutateRow(event.appid, draft => applyDetailsEvent(draft, event));
     if (!row) return;
-    if (isPanelOpen() && getPanelGame()?.appid === row.appid) { renderPanelBody(row); renderPanelNav(row); }
+    if (isPanelOpen() && getPanelGame()?.appid === row.appid) { renderPanelBody(row); bumpPanelNav(); }
   },
   isStale: gen => loadGuard.isStale(gen),
   onFlush: () => { updateLastPlayedTooltip(); updateStatus(); },

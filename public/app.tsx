@@ -7,7 +7,7 @@ import { esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, normali
 import { renderOwnersHtml } from '/ownerListHtml.ts';
 import { FILTER_DIMS, parseUrlState, reorderUrlParams, setPanelParam, setLightboxParam } from '/urlState.ts';
 import { updateNavLink } from '/nav.tsx';
-import { renderPanelNav as renderPanelNavShared, stepGameList } from '/panelNav.ts';
+import { stepGameList } from '/panelNav.ts';
 import { bindPanelKeyboardShortcuts } from '/panelKeyboard.ts';
 import { renderAccountChipsGrouped, bindAccountRefresh, addRecent, renderRecentsBar, bindRecentsBar } from '/accountsBar.ts';
 import { initGameSearch, addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.ts';
@@ -16,7 +16,7 @@ import { createRowStore } from '/rowStore.ts';
 import {
   panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,
   pickRandomFrom, clearAllRandomQueues, panelHandleEscape,
-  renderPanelBody,
+  renderPanelBody, bumpPanelNav,
 } from '/panel.tsx';
 import { initPageShell } from '/pageShell.ts';
 import type { PanelOptions } from '/panel.tsx';
@@ -145,6 +145,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // section hidden for those, same as before this was turned on at all.
     showAchievements: true,
     getOwnersHtml: buildOwnersHtml,
+    // This page has no `@vates/data-table-*` instance at all (see panelNav.ts's own comment on
+    // why `hasTable` is a plain boolean rather than a real table check), and `getGameList`/
+    // `onReroll` both need the *currently open* game, not a page-wide list — a comparison can
+    // span several groups, and paging/rerolling only ever makes sense within whichever group the
+    // open game itself belongs to.
+    nav: {
+      hasTable: () => true,
+      getGameList: game => sortedGames((game as GameRow).groupKey!),
+      onOpen: openPanel,
+      onReroll: game => pickRandom((game as GameRow).groupKey!),
+    },
     isTagActive: (dim, val) => activeFilters[dim as FilterDimKey].has(val),
     onTagClick: (dim, val) => {
       const k = dim as FilterDimKey;
@@ -250,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
       openPanel(game);
       return true;
     },
-    // No group to page through or randomize within for a standalone lookup — see renderPanelNav.
+    // No group to page through or randomize within for a standalone lookup — see PanelNav (panel.tsx).
     pickRandom: () => {
       const ag = activeGameSig();
       if (ag && !ag.standalone) pickRandom(ag.groupKey!);
@@ -982,7 +993,7 @@ function openPanel(game: GameRow, { isRandom = false, keepHistory = false }: { i
   setActiveGameSig(resolved);
   panelOpen(resolved, { keepHistory }); // shared: renders hero+body, opens the panel, focuses it
   updateTitle();
-  renderPanelNav();
+  bumpPanelNav();
   refreshTable(); // re-render rows so the active highlight appears
   document.getElementById(`tbody-${resolved.groupKey}`)?.querySelector(`tr.game-row[data-appid="${resolved.appid}"]`)?.scrollIntoView({ block: 'nearest' });
   // Standalone lookups are restorable too (see restorePanelFromUrl's fallback to
@@ -1031,29 +1042,10 @@ function restorePanelFromUrl(restoreShot: string | null = null) {
   openStandaloneGame(appid);
 }
 
-// Builds the panel's prev/next/random nav bar (`#panel-nav`, shared markup/CSS/keys with
-// library.tsx/bundles.tsx — see panelNav.ts/CLAUDE.md's panel.tsx bullet) from sortedGames()'s
-// current search/filter/sort order for the active game's group. Empty for a standalone lookup
-// (see openStandaloneGame above) — there's no natural list to page through, same as
-// library.tsx's/bundles.tsx's own version of this function. `table: true` since this page has no
-// @vates table instance — see panelNav.ts's own comment on why that param is only ever checked
-// for truthiness.
-function renderPanelNav() {
-  const ag = activeGameSig();
-  if (!ag) return;
-  renderPanelNavShared({
-    table: true,
-    game: ag,
-    getGameList: () => sortedGames(ag.groupKey!),
-    onOpen: openPanel,
-    onReroll: () => pickRandom(ag.groupKey!),
-  });
-}
-
 function renderPanel() {
   const ag = activeGameSig();
   if (!ag) return;
-  renderPanelNav();
+  bumpPanelNav(); // panel.tsx's own PanelNav recomputes off sortedGames(ag.groupKey!) via the `nav` option
   renderPanelBody(ag); // shared: rebuilds hero + body from panel.js
 }
 
@@ -1070,7 +1062,7 @@ function refreshTable() {
     if (!gm) continue;
     gm.setRows(sortedGames(key, filtersActive));
   }
-  if (activeGameSig()) renderPanelNav();
+  if (activeGameSig()) bumpPanelNav();
 }
 
 

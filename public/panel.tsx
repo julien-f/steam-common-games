@@ -5,10 +5,27 @@ import { openLightbox, closeLightbox, isLightboxOpen } from './lightbox.tsx';
 import { buildMediaItems } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
 import { getStoredRegion, resolveRegion } from './region.ts';
+import { computePanelNavState } from './panelNav.ts';
 import type { Game } from './types.ts';
 
 import { createSignal, createEffect, createMemo, For, Show, type JSX } from 'solid-js';
 import { render } from 'solid-js/web';
+
+// Prev/next/random nav-bar wiring (`#panel-nav`, see PanelNav below) — optional since a
+// standalone lookup page could in principle mount the panel with nothing to page through, though
+// all three current host pages do supply it. `getGameList`/`onOpen`/`onReroll` all take the
+// currently-open `game` explicitly rather than closing over it, since app.tsx's own list is
+// scoped to whichever comparison group `game` belongs to (`sortedGames(game.groupKey!)`) —
+// library.ts's/bundles.tsx's implementations simply ignore the parameter, having only one flat
+// list. `hasTable` replaces the old bare `table: unknown` truthiness param panelNav.js's
+// `renderPanelNav` used to take (see panelNav.ts's own comment on why `computePanelNavState`
+// only needs a boolean now).
+export interface PanelNavOptions {
+  hasTable: () => boolean;
+  getGameList: (game: Game) => Game[];
+  onOpen: (game: Game) => void;
+  onReroll: (game: Game) => void;
+}
 
 // Host-page options passed to initPanel. All optional — a page supplies only the hooks it
 // needs; the field names mirror exactly what panel.tsx reads off panelOptions below.
@@ -24,6 +41,7 @@ export interface PanelOptions {
   enableTagFilters?: boolean;
   gameHref?: (appid: string | number) => string;
   getOwnersHtml?: (game: Game) => string;
+  nav?: PanelNavOptions;
 }
 
 // ── Shared game side panel ──────────────────────────────────────────────────
@@ -83,6 +101,16 @@ const [panelHistory, setPanelHistory] = createSignal<{ appid: number; name: stri
 // which one is active by a caller reaching back into the DOM after the fact.
 const [activeSubnavTarget, setActiveSubnavTarget] = createSignal('top');
 
+// Bump-only "please recompute the nav bar" signal — same "signal only drives rendering, plain
+// mutable data holds the actual value" idiom `sortRev`/`filterRev` already use elsewhere in this
+// codebase (see app.tsx's own comment). `PanelNav`'s state depends on `panelOptions.nav`'s
+// `getGameList()` result, which lives outside Solid's reactivity entirely (a host page's table/
+// row list, mutated directly) — hosts call `bumpPanelNav()` at exactly the points they used to
+// call the old `renderPanelNav(row)`: after opening a game, and whenever the underlying list
+// itself might have changed shape (a stream event, the table finishing construction).
+const [navRev, setNavRev] = createSignal(0);
+export function bumpPanelNav() { setNavRev(v => v + 1); }
+
 function panelShuffle(arr: { appid: number }[]) {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -138,6 +166,7 @@ export function initPanel(options: PanelOptions = {}) {
 
   const panelBodyEl = document.getElementById('panel-body')!;
   render(() => <PanelBody />, panelBodyEl);
+  render(() => <PanelNav />, document.getElementById('panel-nav')!);
 
   panelBodyEl.addEventListener('wheel', e => {
     const strip = (e.target as Element).closest?.('.panel-filmstrip') as HTMLElement | null;
@@ -536,7 +565,6 @@ export function panelClose({ preserveUrl = false } = {}) {
     const el = document.querySelector(panelOptions.inertSelector);
     if (el) (el as HTMLElement & { inert: boolean }).inert = false;
   }
-  document.getElementById('panel-nav')?.replaceChildren();
   panelPrevFocus?.focus();
   panelPrevFocus = null;
   // Every close path funnels through here — the backdrop click and × button are bound
@@ -1408,6 +1436,34 @@ function PanelSubnav(): JSX.Element {
         )}</For>
       </div>
     </Show>
+  );
+}
+
+// The prev/next/random nav bar (`#panel-nav`), mounted separately from `PanelBody`/`#panel-body`
+// (see initPanel below) into its own static container every host page's markup already has —
+// unlike PanelSubnav above, there's no "which section" state living on this component that a
+// PanelRest rebuild could clobber; it's split out purely because it targets a different DOM node
+// entirely, not for a reactivity-isolation reason. Recomputed off `panelGame()` (a real signal)
+// plus `navRev()` (a bump signal — see its own comment above for why the underlying list can't
+// be tracked directly) via the same pure `computePanelNavState` a `stepGameList`(panelNav.ts)
+// caller elsewhere already uses for the lightbox's own cross-game ↑/↓ stepping.
+function PanelNav(): JSX.Element {
+  const state = createMemo(() => {
+    navRev();
+    const g = panelGame();
+    const nav = panelOptions.nav;
+    if (!g || !nav) return null;
+    return computePanelNavState(nav.hasTable(), g, () => nav.getGameList(g));
+  });
+  return (
+    <Show when={state()}>{s => (
+      <>
+        <button type="button" class="panel-nav-btn" id="panel-prev" aria-label="Previous game" title="Previous game (↑)" onClick={() => panelOptions.nav!.onOpen(s().prevGame)}>↑</button>
+        <span class="panel-nav-pos" aria-live="polite">{s().idx + 1} / {s().total}</span>
+        <button type="button" class="panel-nav-btn" id="panel-next" aria-label="Next game" title="Next game (↓)" onClick={() => panelOptions.nav!.onOpen(s().nextGame)}>↓</button>
+        <button type="button" class="panel-nav-btn panel-nav-reroll" id="panel-reroll" aria-label="Pick a random game" title="Pick a random game (R)" onClick={() => panelOptions.nav!.onReroll(panelGame()!)}>🎲<span class="panel-nav-kbd">R</span></button>
+      </>
+    )}</Show>
   );
 }
 
