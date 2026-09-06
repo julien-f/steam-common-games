@@ -1,4 +1,6 @@
 import { esc } from './utils.ts';
+import { peekMyOwnershipStatus, onMyOwnershipReady } from './myOwnership.ts';
+import type { OwnershipStatus } from './myOwnership.ts';
 
 export interface GameSearchResult {
   appid: number;
@@ -31,12 +33,25 @@ export function parseDirectAppid(raw: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
+// Small "I already own/wishlisted this" markers next to a result — same `myOwnership.ts`
+// status the side panel's own ownership badge shows, so a lookup reports the same thing
+// whether it's opened from this dropdown or already open in the panel. `peekMyOwnershipStatus`
+// never blocks (a search result list re-renders on every keystroke) — see its own comment for
+// what `null` means here (no `myAccount` pinned, or the fetch simply hasn't landed yet).
+function ownershipMarkersHtml(status: OwnershipStatus | null): string {
+  if (!status) return '';
+  const marks: string[] = [];
+  if (status.inLibrary) marks.push('<span class="game-search-badge owned" title="Owned">✓</span>');
+  if (status.onWishlist) marks.push('<span class="game-search-badge wishlisted" title="On wishlist">☆</span>');
+  return marks.join('');
+}
+
 // `active`: true for the result currently highlighted via ArrowUp/ArrowDown (not hover —
 // hover is native `:hover`/`:focus-visible` CSS, this is the keyboard roving selection).
 // `id` + `role="option"` back `inputEl`'s `aria-activedescendant` in initGameSearch below;
 // `tabindex="-1"` keeps real DOM focus on the input the whole time, same combobox pattern
 // as a native `<select>`'s listbox — arrow keys move the highlight, not focus itself.
-export function gameSearchResultHtml(r: GameSearchResult, active: boolean): string {
+export function gameSearchResultHtml(r: GameSearchResult, active: boolean, ownership: OwnershipStatus | null = null): string {
   const thumb = r.tinyImage
     ? `<img class="game-search-thumb" src="${esc(r.tinyImage)}" alt="" loading="lazy">`
     : '<span class="game-search-thumb game-search-thumb--empty"></span>';
@@ -45,6 +60,7 @@ export function gameSearchResultHtml(r: GameSearchResult, active: boolean): stri
       class="game-search-result${active ? ' active' : ''}" data-appid="${r.appid}" data-name="${esc(r.name)}">
       ${thumb}
       <span class="game-search-name">${esc(r.name)}</span>
+      ${ownershipMarkersHtml(ownership)}
     </button>
   `;
 }
@@ -58,6 +74,7 @@ export function initGameSearch({ inputEl, resultsEl, onSelect }: {
   let lastResults: GameSearchResult[] = [];
   let activeFetch = 0; // guards against a slower earlier request clobbering a faster later one
   let activeIdx = -1;  // ArrowUp/ArrowDown highlight; -1 = none yet (Enter falls back to the top match)
+  let unsubOwnershipReady: (() => void) | null = null;
 
   resultsEl.setAttribute('role', 'listbox');
   inputEl.setAttribute('aria-autocomplete', 'list');
@@ -65,9 +82,19 @@ export function initGameSearch({ inputEl, resultsEl, onSelect }: {
   if (resultsEl.id) inputEl.setAttribute('aria-controls', resultsEl.id);
 
   function renderResults() {
-    resultsEl.innerHTML = lastResults.map((r, i) => gameSearchResultHtml(r, i === activeIdx)).join('');
+    resultsEl.innerHTML = lastResults.map((r, i) => gameSearchResultHtml(r, i === activeIdx, peekMyOwnershipStatus(r.appid))).join('');
     if (activeIdx >= 0) inputEl.setAttribute('aria-activedescendant', `game-search-opt-${lastResults[activeIdx].appid}`);
     else inputEl.removeAttribute('aria-activedescendant');
+    // A peek above returning null for any shown result means either "no myAccount pinned" or
+    // "still loading" — onMyOwnershipReady fires once (only) when the latter resolves, so the
+    // still-showing dropdown picks up real ownership markers instead of staying blank for
+    // whatever was on screen when the fetch kicked off. Re-subscribing on every render (rather
+    // than once) means a fresh search that landed before the previous one's fetch resolved
+    // isn't left watching a stale listener for a dropdown it no longer owns.
+    unsubOwnershipReady?.();
+    unsubOwnershipReady = lastResults.some(r => peekMyOwnershipStatus(r.appid) === null)
+      ? onMyOwnershipReady(() => { if (!resultsEl.hidden) renderResults(); })
+      : null;
   }
 
   function showResults(results: GameSearchResult[]) {
@@ -86,6 +113,8 @@ export function initGameSearch({ inputEl, resultsEl, onSelect }: {
     resultsEl.innerHTML = '';
     inputEl.setAttribute('aria-expanded', 'false');
     inputEl.removeAttribute('aria-activedescendant');
+    unsubOwnershipReady?.();
+    unsubOwnershipReady = null;
   }
 
   // dir: 1 (ArrowDown) or -1 (ArrowUp). Wraps at both ends, same `(idx + dir + len) % len`

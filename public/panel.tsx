@@ -5,6 +5,7 @@ import { openLightbox, closeLightbox, isLightboxOpen } from './lightbox.tsx';
 import { buildMediaItems } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
 import { getStoredRegion, resolveRegion } from './region.ts';
+import { getMyOwnershipStatus } from './myOwnership.ts';
 import type { Game } from './types.ts';
 
 import { createSignal, createEffect, createMemo, For, Show, type JSX } from 'solid-js';
@@ -342,6 +343,22 @@ async function loadPrice(game: Game, { force = false } = {}) {
   }
 }
 
+// "In library"/"On wishlist" — see myOwnership.ts for why this is checked against `myAccount`
+// rather than whatever host page/account is currently loaded, and its own module-level caching
+// (one pair of owned/wishlist appid sets per pinned myAccount, not one fetch per game). Always
+// re-checked on every open rather than "only once per game this session" the way loadPrice/
+// loadNews guard themselves — myOwnership.ts's own cache already makes a repeat check for the
+// same myAccount effectively free, and unlike price/news this genuinely can change mid-session
+// (picking a different myAccount on Home), so skipping a recheck here would leave a game
+// reopened after that switch still showing the previous account's stale status.
+async function loadOwnership(game: Game) {
+  const status = await getMyOwnershipStatus(game.appid);
+  if (panelGame() !== game) return; // the panel moved on to a different game while this awaited
+  game.inLibrary = status?.inLibrary ?? null;
+  game.onWishlist = status?.onWishlist ?? null;
+  renderPanelBody(game);
+}
+
 // News is deliberately NOT part of the host pages' rating/HLTB/meta/tags fetch (see
 // server.js's newsLimit comment for why) — it's kept entirely off `game.details` (which
 // app.ts/library.ts freely reassign wholesale whenever fresh rating/HLTB/etc. lands) and
@@ -509,6 +526,7 @@ export function panelOpen(game: Game, { keepHistory = false } = {}) {
   document.getElementById('panel-body')!.scrollTop = 0;
   loadNews(game); // no-op (see loadNews) if this game's news was already fetched this session
   loadPrice(game); // no-op (see loadPrice) if this game is priced by the host, or already loaded
+  loadOwnership(game); // see loadOwnership — always rechecked, but myOwnership.ts's own cache makes a repeat check free
   document.getElementById('game-panel')!.classList.add('open');
   ((document.getElementById('panel-hero')?.querySelector('.panel-hero-img') ?? document.getElementById('panel-close')!) as HTMLElement).focus();
 }
@@ -1424,10 +1442,12 @@ function PanelRest(): JSX.Element {
   const newsSection = <NewsSection game={g} />;
   const achievementsSection = <AchievementsSection game={g} />;
 
-  // "In library" / "On wishlist" status — passive, same convention as the Price card
-  // (panel.tsx doesn't fetch anything itself; it just renders whatever the host page already
-  // resolved). See the original file's own comment (preserved in git history) for the full
-  // "why 'In library' not 'In your library'" reasoning.
+  // "In library" / "On wishlist" status — unlike the Price card, this one *is* fetched by
+  // panel.tsx itself now (see loadOwnership below), against `myAccount` specifically rather
+  // than whatever host page/account happens to be currently loaded — so it means the same
+  // thing ("do *I* own this") no matter which route opened the game. See the original file's
+  // own comment (preserved in git history) for the "why 'In library' not 'In your library'"
+  // reasoning this label wording still follows.
   const ownershipRow = (g.inLibrary == null && g.onWishlist == null) ? null : (
     <div class="panel-ownership-row">
       <Show when={g.inLibrary}><span class="panel-ownership-badge owned">✓ In library</span></Show>

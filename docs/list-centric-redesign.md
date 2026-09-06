@@ -171,5 +171,5 @@ Implementation sequencing was resolved by an implementation plan (see the git hi
 
 - **Row-selection-based add/remove-to-list** — `ListRoute.tsx` can view any list kind but has no UI yet to select rows and add/remove them to/from a manual list (deferred per `@vates/data-table-solid`'s own built-in selection support, per earlier discussion — never actually wired up to `listsStore.ts`'s `setListAppids`).
 - **Folder/list tree polish** — `HomeRoute.tsx`'s rename/move/delete uses plain `window.prompt`/`window.confirm`, not drag-and-drop; no move-between-folders UI at all yet (`listsStore.ts`'s `moveFolder`/`moveList` are unused by any UI so far); no trash/restore UI for soft-deleted lists.
-- **Ownership badges and achievements** on `ListRoute.tsx` — not ported from `library.tsx` yet.
+- **Achievements** on `ListRoute.tsx` — not ported from `library.tsx` yet. (Ownership badges are done — see `myOwnership.ts`, shown in the side panel and the "look up any game" dropdown regardless of route, keyed off `myAccount` rather than `ListRoute.tsx` specifically.)
 - **Live reactivity to `currentAccount` changing** while a route is already open — `accountsStore.ts` is a plain module with no Solid signal of its own; every route reads it once per mount today.

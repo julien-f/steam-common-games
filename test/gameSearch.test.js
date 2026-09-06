@@ -60,3 +60,31 @@ test('GAME_SEARCH_DEBOUNCE_MS/GAME_SEARCH_MIN_CHARS: exported as the expected co
   assert.equal(GAME_SEARCH_DEBOUNCE_MS, 300);
   assert.equal(GAME_SEARCH_MIN_CHARS, 2);
 });
+
+test('gameSearchResultHtml: no ownership markers when the ownership arg is omitted/null', () => {
+  const html = gameSearchResultHtml({ appid: 620, name: 'Portal 2' }, false);
+  assert.ok(!html.includes('game-search-badge'));
+});
+
+test('gameSearchResultHtml: renders an owned marker', () => {
+  const html = gameSearchResultHtml({ appid: 620, name: 'Portal 2' }, false, { inLibrary: true, onWishlist: false });
+  assert.ok(html.includes('game-search-badge owned'));
+  assert.ok(!html.includes('game-search-badge wishlisted'));
+});
+
+test('gameSearchResultHtml: renders a wishlisted marker', () => {
+  const html = gameSearchResultHtml({ appid: 620, name: 'Portal 2' }, false, { inLibrary: false, onWishlist: true });
+  assert.ok(!html.includes('game-search-badge owned'));
+  assert.ok(html.includes('game-search-badge wishlisted'));
+});
+
+test('gameSearchResultHtml: renders both markers when both are true', () => {
+  const html = gameSearchResultHtml({ appid: 620, name: 'Portal 2' }, false, { inLibrary: true, onWishlist: true });
+  assert.ok(html.includes('game-search-badge owned'));
+  assert.ok(html.includes('game-search-badge wishlisted'));
+});
+
+test('gameSearchResultHtml: no markers when both are false', () => {
+  const html = gameSearchResultHtml({ appid: 620, name: 'Portal 2' }, false, { inLibrary: false, onWishlist: false });
+  assert.ok(!html.includes('game-search-badge'));
+});

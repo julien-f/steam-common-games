@@ -539,7 +539,13 @@ a.account-identity:hover .account-name { color: var(--accent2); }
 .game-search-result:hover, .game-search-result:focus-visible, .game-search-result.active { background: var(--bg1); }
 .game-search-thumb { width: 46px; height: 22px; object-fit: cover; border-radius: 3px; flex-shrink: 0; }
 .game-search-thumb--empty { background: var(--bg0); }
-.game-search-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.game-search-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Owned/wishlisted markers (myOwnership.ts) — same colors as the panel's own
+   .panel-ownership-badge, just a bare icon rather than a labeled pill (a dropdown row has far
+   less room than the panel's ownership section). */
+.game-search-badge { flex-shrink: 0; font-size: 12px; }
+.game-search-badge.owned { color: #2ecc71; }
+.game-search-badge.wishlisted { color: #f1c40f; }
 
 /* App shell's own nav-bar search box (AppShell.tsx) — same look as .game-search-wrap's input,
    but sized to sit inline in the nav bar rather than fill a page section. */
