@@ -4,34 +4,45 @@
 //
 // **Current scope**: every kind ('owned', 'wishlist', 'bundle', 'recent', 'user') is wired up
 // for real now (Phase 5 steps 1-2, 4, 6, and 7). This is deliberately narrower than the full plan
-// on a few more axes though: ownership cross-referencing (in-library/on-wishlist badges) and
-// achievements are not ported yet (both need a second background fetch this first pass omits);
-// 'recent'/'user' have no dedicated extra columns — plain CORE_COLUMNS, no owned/wishlist/bundle
-// extras. A 'user' list resolves via listResolve.ts's resolveGameList/createDefaultFetchers; a
-// manual list, or a dynamic one using any op other than group-by-membership, renders as one flat
-// table (flattened via flattenCombineResult when needed, same as when it's resolved as someone
-// *else's* combine source) — but group-by-membership renders one real table PER group instead
-// (see buildGroupTables below), generalizing the old Comparison page's "one table per owner set,
-// most owners to fewest" layout. Still open: row-selection-based add/remove-to-list, and the
-// combine setup dialog to actually *create* a dynamic list (Home's "+ New list" only creates
-// manual lists today, so a group-by-membership list is only reachable by hand-editing prefs for
-// now) — see docs/list-centric-redesign.md's own open-questions list. Per-group tables also skip
-// view persistence entirely (a single list only has room for one stored `tableView`, and dividing
-// that across however many groups a combine happens to produce isn't solved here yet) — each
-// group table just uses the construction-time default view. `currentAccount` is
-// read once per mount, not live-reactive to being changed elsewhere while this route stays open
-// — accountsStore.ts is a plain module with no Solid signal of its own yet, so there's nothing
-// to subscribe to reactively here until one exists (a real follow-up, not an oversight); a
-// bundle's own unresolved ("Not on Steam") games and its detail card (title/expiry/outbound
-// links) aren't rendered here either — only the resolved games' table, the actual point of
-// this generic viewer.
+// on a few more axes though: ownership cross-referencing (in-library/on-wishlist badges — done
+// in the side panel/gameSearch.ts's dropdown via myOwnership.ts, but not surfaced as its own
+// table column here) and achievements are not ported yet (both need a second background fetch
+// this first pass omits); 'recent'/'user' have no dedicated extra columns — plain CORE_COLUMNS,
+// no owned/wishlist/bundle extras. A 'user' list resolves via listResolve.ts's
+// resolveGameList/createDefaultFetchers; a manual list, or a dynamic one using any op other than
+// group-by-membership, renders as one flat table (flattened via flattenCombineResult when
+// needed, same as when it's resolved as someone *else's* combine source) — but
+// group-by-membership renders one real table PER group instead (see buildGroupTables below),
+// generalizing the old Comparison page's "one table per owner set, most owners to fewest"
+// layout. Per-group tables also skip view persistence entirely (a single list only has room for
+// one stored `tableView`, and dividing that across however many groups a combine happens to
+// produce isn't solved here yet) — each group table just uses the construction-time default
+// view, and (see the selection toolbar below) skips row-selection too: selection is only wired
+// up on the single-table path, since every real use case for it (saving some games from an
+// Owned/Wishlist/bundle/recent/manual-list view into another list) is there already, and
+// spreading one selection across N independent per-group tables is a bigger problem than this
+// first pass solves. `currentAccount` is read once per mount, not live-reactive to being changed
+// elsewhere while this route stays open — accountsStore.ts is a plain module with no Solid
+// signal of its own yet, so there's nothing to subscribe to reactively here until one exists (a
+// real follow-up, not an oversight); a bundle's own unresolved ("Not on Steam") games and its
+// detail card (title/expiry/outbound links) aren't rendered here either — only the resolved
+// games' table, the actual point of this generic viewer.
+//
+// Row-selection-based add/remove-to-list: any kind's table can select rows (`selectable: true`
+// on the single-table path) and add them to an existing manual list, or a brand-new one created
+// on the spot — the one piece of `listsStore.ts`'s already-built manual-list CRUD
+// (`addAppidsToList`/`removeAppidsFromList`, both thin wrappers over `setListAppids` built on
+// `combine.ts`'s own `union`/`subtract`) that had no UI calling it until now. "Remove from this
+// list" only shows when the list actually being viewed is itself a manual one (`kind === 'user'
+// && userList.kind === 'manual'`) — removing from a dynamic list makes no sense, its contents
+// are a computed formula, not a stored array.
 //
 // Ported from library.tsx's loadLibrary/loadWishlist/streamGameDetails/buildTable et al., but
 // NOT a copy-paste: every mutable variable that used to be module-level there (table, rowsStore,
 // loadGuard, total/loaded, …) is now local to this component's own closure, created fresh on
 // each mount and torn down on unmount via onCleanup — library.tsx's page loads exactly once, but
 // a router-driven route mounts/unmounts every time its path is navigated to/away from.
-import { onMount, onCleanup, createSignal, createRoot, createEffect, batch } from 'solid-js';
+import { onMount, onCleanup, createSignal, createRoot, createEffect, batch, For, Show } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { useParams, useLocation } from '@solidjs/router';
@@ -62,7 +73,7 @@ import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields 
 import { getStoredRegion, resolveRegion } from './region.ts';
 import { registerRouteKeyboardHandlers } from './AppShell.tsx';
 import type { Game, Rating, Hltb, GameMeta, ProtonDb, GameList } from './types.ts';
-import { getList, setListTableView } from './listsStore.ts';
+import { getList, getLists, createList, addAppidsToList, removeAppidsFromList, setListTableView } from './listsStore.ts';
 import { resolveGameList, flattenCombineResult, createDefaultFetchers } from './listResolve.ts';
 import type { MembershipGroup } from './combine.ts';
 
@@ -239,7 +250,63 @@ export default function ListRoute() {
   let table: TableState<Game> | null = null;
   let disposeTable: (() => void) | null = null;
   let unsyncView: (() => void) | null = null;
-  let userList: GameList | null = null; // set only for kind === 'user' — its own per-list tableView, not a shared pref key
+  // Set only for kind === 'user' — its own per-list tableView, not a shared pref key. A signal
+  // (not a plain variable, unlike most of this component's other imperative state) specifically
+  // because the selection toolbar's JSX reads it reactively: /lists/:listId is one route
+  // *definition* shared across every list id (see the createEffect at the bottom of this file),
+  // so navigating between two user lists reuses this component instance without a remount —
+  // a plain `let` wouldn't tell the already-mounted JSX that "the list being viewed" changed.
+  const [userList, setUserList] = createSignal<GameList | null>(null);
+
+  // ── Row-selection-based add/remove-to-list (see this file's own header comment) ────────────
+  const [selectedRows, setSelectedRows] = createSignal<Game[]>([]);
+  const [manualLists, setManualLists] = createSignal<GameList[]>(getLists().filter(l => l.kind === 'manual'));
+  const NEW_LIST_OPTION = '__new__';
+  const [addTarget, setAddTarget] = createSignal('');
+  const [selectionActionStatus, setSelectionActionStatus] = createSignal('');
+
+  function refreshManualLists(): void { setManualLists(getLists().filter(l => l.kind === 'manual')); }
+
+  async function handleAddSelectedToList(): Promise<void> {
+    const target = addTarget();
+    const rows = selectedRows();
+    if (!target || rows.length === 0) return;
+    const appids = rows.map(r => r.appid);
+    if (target === NEW_LIST_OPTION) {
+      const name = window.prompt('New list name?');
+      if (!name) return;
+      const list = createList({ name, kind: 'manual', appids });
+      refreshManualLists();
+      setSelectionActionStatus(`Added ${appids.length} game(s) to new list "${list.name}".`);
+    } else {
+      const list = getList(target);
+      addAppidsToList(target, appids);
+      setSelectionActionStatus(`Added ${appids.length} game(s) to "${list?.name ?? 'list'}".`);
+    }
+    setAddTarget('');
+    table?.selection.clear();
+  }
+
+  // Only ever called while viewing a manual list (`kind === 'user' && userList().kind ===
+  // 'manual'` — see the JSX below), so `userList()` is always set here. Re-resolves the whole
+  // route afterward (`load()`) rather than just splicing the removed rows out of `rowsStore`
+  // directly — this is a genuine re-fetch-worthy state change (the list's own stored contents
+  // changed), and `load()` already correctly handles every other piece of teardown/rebuild this
+  // needs (table/rowsStore/stream), so re-deriving it by hand here would just be a second,
+  // easier-to-drift-out-of-sync copy of that same logic. The status message is set *after*
+  // `load()` resolves, not before — `load()`'s own reset (`setSelectionActionStatus('')`, same
+  // as `setSelectedRows([])`, right at its top) runs synchronously the moment it's called and
+  // would otherwise wipe out this exact message in the same tick it was set, before Solid ever
+  // gets a chance to render it (confirmed live: the message never appeared until this was fixed).
+  async function handleRemoveSelectedFromList(): Promise<void> {
+    const list = userList();
+    const rows = selectedRows();
+    if (!list || rows.length === 0) return;
+    const appids = rows.map(r => r.appid);
+    removeAppidsFromList(list.id, appids);
+    await load();
+    setSelectionActionStatus(`Removed ${appids.length} game(s) from "${list.name}".`);
+  }
   // group-by-membership mode: one real table per group instead of the single `table` above (see
   // buildGroupTables) — all sharing the one `rowsStore`/`rowStore` above (every game belongs to
   // exactly one group, so there's no overlap to worry about), one shared detail stream, and each
@@ -509,7 +576,9 @@ export default function ListRoute() {
     let streamTargets: { appid: number }[];
     let resolvedBundleGames: ResolvedGame[] | null = null;
     let pendingGroups: MembershipGroup[] | null = null;
-    userList = null;
+    setUserList(null);
+    setSelectedRows([]); // a fresh load means a fresh table — nothing carries a prior selection over
+    setSelectionActionStatus('');
 
     if (kind === 'user') {
       // A manual list, or a dynamic one using any op other than group-by-membership, renders as
@@ -519,7 +588,7 @@ export default function ListRoute() {
       // real per-group tables further down, once the shared rowsStore/stream have loaded.
       const list = getList(params.listId!);
       if (!list) { setStatusText('This list no longer exists.'); return; }
-      userList = list;
+      setUserList(list);
       setStatusText('Resolving list…');
       const isGroupMode = list.kind === 'dynamic' && list.op === 'group-by-membership';
       let appids: Set<number>;
@@ -623,22 +692,29 @@ export default function ListRoute() {
       let disposeTableState!: () => void;
       const ts = createRoot(dispose => {
         disposeTableState = dispose;
-        return createTableState<Game>(tableData, columns, {
+        const state = createTableState<Game>(tableData, columns, {
           initialViewState: { pageSize: 50, visibleCols: defaultVisible, sorts: sort },
         });
+        // Mirrors this table's own selection into a component-level signal so the JSX selection
+        // toolbar below stays correct regardless of which load() constructed the table it's
+        // currently reading from — disposed alongside the table itself (same createRoot), so a
+        // later reload's own fresh table doesn't fight this effect over who last wrote the signal.
+        createEffect(() => setSelectedRows(state.selection.rows()));
+        return state;
       });
       table = ts;
       const disposeView = render(() => DataTableView<Game>({
         table: ts,
         rowKey: 'appid',
+        selectable: true,
         onRowClick: row => openGame(rowStore.getRow(row.appid) ?? row),
       }), tableContainer);
       disposeTable = () => { disposeView(); disposeTableState(); };
-      if (userList) {
+      if (userList()) {
         // A user list's view lives on the list itself (GameList.tableView), not a shared pref
         // key — every user list keeps its own, unlike the fixed system kinds above which share
         // one key regardless of instance (see docs/list-centric-redesign.md's storage schema).
-        const list = userList;
+        const list = userList()!;
         table.setViewState(list.tableView ?? {});
         unsyncView = (() => {
           let dispose: (() => void) | null = null;
@@ -655,6 +731,15 @@ export default function ListRoute() {
     }
 
     updateStatus();
+
+    // An empty result set was practically unreachable before row-selection-based remove-from-
+    // list existed (a bundle already early-returns its own "no games matched" message above;
+    // every other kind just happened to always have at least one row) — now that "Remove from
+    // this list" can genuinely empty a manual list out from under the route currently viewing
+    // it, streamGameDetails needs its own guard too: the server 400s a `games: []` stream
+    // request outright ("Provide at least one game"), confirmed live the first time this path
+    // was actually reachable through the UI.
+    if (streamTargets.length === 0) { setStatusText('No games to show.'); return; }
 
     if (kind === 'wishlist') loadWishlistPrices(streamTargets, gen); // runs concurrently, not awaited
     if (kind === 'bundle' && resolvedBundleGames) loadBundlePrices(resolvedBundleGames, gen); // ditto
@@ -691,6 +776,27 @@ export default function ListRoute() {
     <div class="list-route">
       <div class="list-status">{statusText()}</div>
       {(kind === 'wishlist' || kind === 'bundle') && <div class="price-status">{priceStatusText()}</div>}
+      <Show when={selectedRows().length > 0}>
+        <div class="selection-toolbar">
+          <span class="selection-count">{selectedRows().length} selected</span>
+          <select value={addTarget()} onChange={e => setAddTarget(e.currentTarget.value)}>
+            <option value="">Add to list…</option>
+            <For each={manualLists().filter(l => l.id !== userList()?.id)}>
+              {l => <option value={l.id}>{l.name}</option>}
+            </For>
+            <option value={NEW_LIST_OPTION}>+ Create new list…</option>
+          </select>
+          <button type="button" disabled={!addTarget()} onClick={handleAddSelectedToList}>Add</button>
+          <Show when={kind === 'user' && userList()?.kind === 'manual'}>
+            <button type="button" onClick={handleRemoveSelectedFromList}>Remove from this list</button>
+          </Show>
+          <button type="button" onClick={() => table?.selection.clear()}>Clear selection</button>
+        </div>
+      </Show>
+      {/* Outside the selection-gated block above on purpose — "Add"/"Remove" both clear the
+          selection right after acting (Add explicitly; Remove via load()'s own reset), and the
+          whole point of this message is to confirm what just happened *after* that clears. */}
+      {selectionActionStatus() && <div class="selection-status">{selectionActionStatus()}</div>}
       <div ref={tableContainer} class="table-container"></div>
       <div ref={groupsContainer} class="list-groups"></div>
     </div>

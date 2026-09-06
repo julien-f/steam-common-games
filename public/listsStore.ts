@@ -13,6 +13,7 @@
 // accountsStore.ts calls isAccountReferenced() from here (rather than duplicating this file's
 // source-scanning logic) to decide whether removing a recent account must soft-remove instead.
 import { getPref, setPref } from './prefs.ts';
+import { union, subtract } from './combine.ts';
 import type { Folder, GameList, ListRef, CombineOp } from './types.ts';
 
 const LISTS_KEY = 'lists';
@@ -258,6 +259,23 @@ export function setListAppids(id: string, appids: number[]): void {
   list.appids = appids;
   list.updatedAt = Date.now();
   writeLists(lists);
+}
+
+// Row-selection-based add/remove (ListRoute.tsx) — thin wrappers over setListAppids built on
+// the same set arithmetic (combine.ts's union/subtract) a dynamic list's own resolve uses, just
+// applied to a manual list's stored array instead of a live combine. Same no-op-if-missing-or-
+// not-manual guard as setListAppids (redundant with its own check, but avoids reading `.appids`
+// off a dynamic list, which doesn't have one).
+export function addAppidsToList(id: string, appids: number[]): void {
+  const list = readLists().find(l => l.id === id);
+  if (!list || list.kind !== 'manual') return;
+  setListAppids(id, [...union([new Set(list.appids), new Set(appids)])]);
+}
+
+export function removeAppidsFromList(id: string, appids: number[]): void {
+  const list = readLists().find(l => l.id === id);
+  if (!list || list.kind !== 'manual') return;
+  setListAppids(id, [...subtract([new Set(list.appids), new Set(appids)])]);
 }
 
 // Edits a dynamic list's formula in place (same id/folder position) — the "Edit sources"

@@ -131,6 +131,56 @@ test('setListAppids: no-ops on a dynamic list', () => {
   assert.equal(getList(l.id).appids, undefined);
 });
 
+// ── addAppidsToList / removeAppidsFromList (row-selection-based add/remove-to-list) ───────────
+
+test('addAppidsToList: unions new appids into a manual list, deduping against what is already there', () => {
+  const { createList, addAppidsToList, getList } = store();
+  const l = createList({ name: 'Backlog', kind: 'manual', appids: [1, 2] });
+  addAppidsToList(l.id, [2, 3]);
+  assert.deepEqual([...getList(l.id).appids].sort(), [1, 2, 3]);
+});
+
+test('addAppidsToList: adding to an empty manual list just sets it', () => {
+  const { createList, addAppidsToList, getList } = store();
+  const l = createList({ name: 'Backlog', kind: 'manual' });
+  addAppidsToList(l.id, [10, 20]);
+  assert.deepEqual([...getList(l.id).appids].sort(), [10, 20]);
+});
+
+test('addAppidsToList: no-ops on a dynamic list', () => {
+  const { createList, addAppidsToList, getList } = store();
+  const l = createList({ name: 'Combo', kind: 'dynamic', op: 'union', sources: [] });
+  addAppidsToList(l.id, [1]);
+  assert.equal(getList(l.id).appids, undefined);
+});
+
+test('addAppidsToList: no-ops on a missing list id', () => {
+  const { addAppidsToList, getList } = store();
+  addAppidsToList('does-not-exist', [1]);
+  assert.equal(getList('does-not-exist'), undefined);
+});
+
+test('removeAppidsFromList: subtracts appids from a manual list', () => {
+  const { createList, removeAppidsFromList, getList } = store();
+  const l = createList({ name: 'Backlog', kind: 'manual', appids: [1, 2, 3] });
+  removeAppidsFromList(l.id, [2]);
+  assert.deepEqual([...getList(l.id).appids].sort(), [1, 3]);
+});
+
+test('removeAppidsFromList: removing an appid not in the list is a harmless no-op on the contents', () => {
+  const { createList, removeAppidsFromList, getList } = store();
+  const l = createList({ name: 'Backlog', kind: 'manual', appids: [1, 2] });
+  removeAppidsFromList(l.id, [999]);
+  assert.deepEqual([...getList(l.id).appids].sort(), [1, 2]);
+});
+
+test('removeAppidsFromList: no-ops on a dynamic list', () => {
+  const { createList, removeAppidsFromList, getList } = store();
+  const l = createList({ name: 'Combo', kind: 'dynamic', op: 'union', sources: [] });
+  removeAppidsFromList(l.id, [1]);
+  assert.equal(getList(l.id).appids, undefined);
+});
+
 test('renameList/moveList: update name/parentId independently', () => {
   const { createFolder, createList, renameList, moveList, getList } = store();
   const folder = createFolder('Folder');

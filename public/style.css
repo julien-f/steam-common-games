@@ -1881,6 +1881,40 @@ kbd {
 .price-status { font-size: 13px; color: var(--text1); margin-bottom: 10px; }
 .price-status:empty { display: none; }
 
+/* Row-selection-based add/remove-to-list (ListRoute.tsx) */
+.selection-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+.selection-count { font-size: 13px; font-weight: 600; color: var(--text0); }
+.selection-toolbar select {
+  background: var(--bg0);
+  color: var(--text0);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.selection-toolbar button {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--text0);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.selection-toolbar button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
+.selection-toolbar button:disabled { opacity: 0.5; cursor: not-allowed; }
+.selection-status { font-size: 13px; color: var(--accent2); margin-bottom: 10px; }
+
 .table-container { margin-bottom: 18px; }
 
 .list-groups { display: flex; flex-direction: column; gap: 28px; }
