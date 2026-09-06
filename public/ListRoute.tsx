@@ -2,13 +2,18 @@
 // and the implementation plan's Phase 4/5. Registered for /lists/owned, /lists/wishlist,
 // /lists/bundle/:bundleId, /lists/recent, and the generic /lists/:listId (see AppRoot.tsx).
 //
-// **Current scope**: the 'owned', 'wishlist', 'bundle', and 'recent' kinds are wired up for real
-// (Phase 5 steps 1-2, 4, and 6) — 'user' still renders a "not yet available" placeholder until
-// its own later Phase 5 step (7) lands. This is deliberately narrower than the full plan on a
-// few more axes too: ownership cross-referencing (in-library/on-wishlist badges) and
+// **Current scope**: every kind ('owned', 'wishlist', 'bundle', 'recent', 'user') is wired up
+// for real now (Phase 5 steps 1-2, 4, 6, and 7). This is deliberately narrower than the full plan
+// on a few more axes though: ownership cross-referencing (in-library/on-wishlist badges) and
 // achievements are not ported yet (both need a second background fetch this first pass omits);
-// a recently-looked-up game (the 'recent' kind) has no dedicated view state — its columns are
-// plain CORE_COLUMNS, no owned/wishlist/bundle extras. `currentAccount` is
+// 'recent'/'user' have no dedicated extra columns — plain CORE_COLUMNS, no owned/wishlist/bundle
+// extras. A 'user' list resolves via listResolve.ts's resolveGameList/createDefaultFetchers and
+// renders as one flat table even when it's a dynamic list with group-by-membership structure
+// (flattened via flattenCombineResult, same as when it's resolved as someone *else's* combine
+// source) — real per-group rendering, row-selection-based add/remove-to-list, and the combine
+// setup dialog to actually *create* a dynamic list are all still open (Home's "+ New list" only
+// creates manual lists today, so a dynamic list is only reachable by hand-editing prefs for now).
+// `currentAccount` is
 // read once per mount, not live-reactive to being changed elsewhere while this route stays open
 // — accountsStore.ts is a plain module with no Solid signal of its own yet, so there's nothing
 // to subscribe to reactively here until one exists (a real follow-up, not an oversight); a
@@ -51,7 +56,9 @@ import { fetchBundleById, resolveBundleGames, type ResolvedGame } from './bundle
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from './priceLoading.ts';
 import { getStoredRegion, resolveRegion } from './region.ts';
 import { registerRouteKeyboardHandlers } from './AppShell.tsx';
-import type { Game, Rating, Hltb, GameMeta, ProtonDb } from './types.ts';
+import type { Game, Rating, Hltb, GameMeta, ProtonDb, GameList } from './types.ts';
+import { getList, setListTableView } from './listsStore.ts';
+import { resolveGameList, flattenCombineResult, createDefaultFetchers } from './listResolve.ts';
 
 type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user';
 
@@ -225,6 +232,7 @@ export default function ListRoute() {
   let table: TableState<Game> | null = null;
   let disposeTable: (() => void) | null = null;
   let unsyncView: (() => void) | null = null;
+  let userList: GameList | null = null; // set only for kind === 'user' — its own per-list tableView, not a shared pref key
   let total = 0;
   let loaded = 0;
 
@@ -412,8 +420,6 @@ export default function ListRoute() {
   }
 
   async function load(): Promise<void> {
-    if (kind === 'user') return; // still lands in a later Phase 5 step
-
     const gen = loadGuard.next();
 
     if (disposeTable) { disposeTable(); disposeTable = null; }
@@ -427,8 +433,35 @@ export default function ListRoute() {
     let initialRows: Game[];
     let streamTargets: { appid: number }[];
     let resolvedBundleGames: ResolvedGame[] | null = null;
+    userList = null;
 
-    if (kind === 'recent') {
+    if (kind === 'user') {
+      // Manual and dynamic lists both render as one flat table here — a dynamic list's own
+      // group-by-membership structure (if it has any) is flattened via flattenCombineResult,
+      // same as when it's resolved as someone *else's* combine source (listResolve.ts). Real
+      // per-group rendering for group-by-membership, and the combine setup dialog to actually
+      // *create* a dynamic list, are still a later step — Home's "+ New list" only creates
+      // manual lists for now, so this path is reachable today only for those, but resolves a
+      // dynamic list correctly too if one is ever created by hand-editing prefs.
+      const list = getList(params.listId!);
+      if (!list) { setStatusText('This list no longer exists.'); return; }
+      userList = list;
+      setStatusText('Resolving list…');
+      let appids: Set<number>;
+      try {
+        const result = await resolveGameList(list, createDefaultFetchers());
+        if (loadGuard.isStale(gen)) return;
+        appids = flattenCombineResult(result);
+      } catch (err) {
+        if (loadGuard.isStale(gen)) return;
+        setStatusText(`Error: ${(err as Error).message}`);
+        return;
+      }
+      initialRows = [...appids].map(appid => ({
+        appid, name: '', loading: true, details: null,
+      })) as unknown as Game[];
+      streamTargets = [...appids].map(appid => ({ appid }));
+    } else if (kind === 'recent') {
       const recents = loadRecentGames();
       initialRows = recents.map(g => ({
         appid: g.appid, name: g.name || `App ${g.appid}`, capsule: g.tinyImage || undefined,
@@ -495,12 +528,12 @@ export default function ListRoute() {
     const columns = (
       kind === 'wishlist' ? WISHLIST_COLUMNS
         : kind === 'bundle' ? BUNDLE_COLUMNS
-        : kind === 'recent' ? RECENT_COLUMNS
+        : kind === 'recent' || kind === 'user' ? RECENT_COLUMNS
         : OWNED_COLUMNS
     ) as unknown as ColumnDef<Game>[];
     const defaultVisible = kind === 'wishlist' ? WISHLIST_DEFAULT_VISIBLE
       : kind === 'bundle' ? BUNDLE_DEFAULT_VISIBLE
-      : kind === 'recent' ? RECENT_DEFAULT_VISIBLE
+      : kind === 'recent' || kind === 'user' ? RECENT_DEFAULT_VISIBLE
       : OWNED_DEFAULT_VISIBLE;
     const sort = kind === 'bundle' ? BUNDLE_DEFAULT_SORT : DEFAULT_SORT;
 
@@ -518,8 +551,24 @@ export default function ListRoute() {
       onRowClick: row => openGame(rowStore.getRow(row.appid) ?? row),
     }), tableContainer);
     disposeTable = () => { disposeView(); disposeTableState(); };
-    restoreTableView(table, viewPrefKey(), viewParamName());
-    unsyncView = bindSolidViewPersistence(table, viewPrefKey());
+    if (userList) {
+      // A user list's view lives on the list itself (GameList.tableView), not a shared pref key
+      // — every user list keeps its own, unlike the fixed system kinds above which share one key
+      // regardless of instance (see docs/list-centric-redesign.md's storage schema).
+      const list = userList;
+      table.setViewState(list.tableView ?? {});
+      unsyncView = (() => {
+        let dispose: (() => void) | null = null;
+        createRoot(d => {
+          dispose = d;
+          createEffect(() => setListTableView(list.id, ts.getViewState()));
+        });
+        return () => dispose?.();
+      })();
+    } else {
+      restoreTableView(table, viewPrefKey(), viewParamName());
+      unsyncView = bindSolidViewPersistence(table, viewPrefKey());
+    }
 
     updateStatus();
 
@@ -555,20 +604,9 @@ export default function ListRoute() {
 
   return (
     <div class="list-route">
-      {kind === 'user' && (
-        <div class="route-placeholder">
-          <h2>List route (stub)</h2>
-          <p>kind: {kind}, path: {location.pathname}</p>
-          <p>This list kind lands in a later Phase 5 step.</p>
-        </div>
-      )}
-      {kind !== 'user' && (
-        <>
-          <div class="list-status">{statusText()}</div>
-          {(kind === 'wishlist' || kind === 'bundle') && <div class="price-status">{priceStatusText()}</div>}
-          <div ref={tableContainer} class="table-container"></div>
-        </>
-      )}
+      <div class="list-status">{statusText()}</div>
+      {(kind === 'wishlist' || kind === 'bundle') && <div class="price-status">{priceStatusText()}</div>}
+      <div ref={tableContainer} class="table-container"></div>
     </div>
   );
 }
