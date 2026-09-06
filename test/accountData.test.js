@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   membersFromAccountId, fetchAccountOwnedGames, fetchAccountWishlistItems,
-  fetchAccountOwnedAppids, fetchAccountWishlistAppids,
+  fetchAccountOwnedAppids, fetchAccountWishlistAppids, resolveAccountSummary,
 } = require('../public/accountData.ts');
 
 function withFetch(t, handler) {
@@ -117,4 +117,71 @@ test('fetchAccountWishlistAppids: resolves an accountId straight to a flat appid
   const appids = await fetchAccountWishlistAppids('1+2');
   assert.deepEqual(seenBody.members, ['1', '2']);
   assert.deepEqual(appids, new Set([620]));
+});
+
+// ── resolveAccountSummary ────────────────────────────────────────────────────────────────────
+
+test('resolveAccountSummary: a single account resolves members/label/avatar/both counts', async (t) => {
+  withFetch(t, async (url) => {
+    if (url === '/api/common-games') {
+      return {
+        ok: true,
+        json: async () => ({
+          groups: [{ games: [{ appid: 440, name: 'TF2' }] }],
+          slots: [[{ steamid: '1', personaname: 'Alice', avatarmedium: 'https://x/a.jpg' }]],
+          playtime: {}, lastPlayed: {},
+        }),
+      };
+    }
+    return { ok: true, json: async () => ({ items: [{ appid: 620, priority: 1, dateAdded: null }] }) };
+  });
+
+  const summary = await resolveAccountSummary(['alice']);
+  assert.deepEqual(summary.members, ['1']);
+  assert.equal(summary.label, 'Alice');
+  assert.equal(summary.avatarUrl, 'https://x/a.jpg');
+  assert.equal(summary.ownedCount, 1);
+  assert.equal(summary.wishlistCount, 1);
+});
+
+test('resolveAccountSummary: a multi-member Family sorts members, joins the label, and has no single avatar', async (t) => {
+  withFetch(t, async (url) => {
+    if (url === '/api/common-games') {
+      return {
+        ok: true,
+        json: async () => ({
+          groups: [],
+          slots: [[{ steamid: '2', personaname: 'Bob' }, { steamid: '1', personaname: 'Alice' }]],
+          playtime: {}, lastPlayed: {},
+        }),
+      };
+    }
+    return { ok: true, json: async () => ({ items: [] }) };
+  });
+
+  const summary = await resolveAccountSummary(['bob', 'alice']);
+  assert.deepEqual(summary.members, ['1', '2']);
+  assert.equal(summary.label, 'Bob + Alice');
+  assert.equal(summary.avatarUrl, null);
+});
+
+test('resolveAccountSummary: throws with the server error message when the account itself fails to resolve', async (t) => {
+  withFetch(t, async () => ({ ok: false, json: async () => ({ error: 'profile not found' }) }));
+  await assert.rejects(() => resolveAccountSummary(['ghost']), /profile not found/);
+});
+
+test('resolveAccountSummary: a failed/private wishlist just yields wishlistCount 0, doesn\'t fail the whole resolve', async (t) => {
+  withFetch(t, async (url) => {
+    if (url === '/api/common-games') {
+      return {
+        ok: true,
+        json: async () => ({ groups: [], slots: [[{ steamid: '1', personaname: 'Alice' }]], playtime: {}, lastPlayed: {} }),
+      };
+    }
+    return { ok: false, json: async () => ({ error: 'private profile' }) };
+  });
+
+  const summary = await resolveAccountSummary(['alice']);
+  assert.equal(summary.wishlistCount, 0);
+  assert.equal(summary.label, 'Alice');
 });
