@@ -106,6 +106,24 @@ test('GET /api/health: configured=false when STEAM_API_KEY is absent', async (t)
   assert.equal(res.body.configured, false);
 });
 
+// ── SPA fallback (public/index.html serves every client-routed path) ───────────
+
+test('GET /some/client-side/route: 200 with the app shell HTML, not a 404', async () => {
+  const res = await api.get('/lists/owned');
+  assert.equal(res.status, 200);
+  assert.match(res.headers['content-type'], /html/);
+});
+
+test('GET /api/nonexistent-route: still 404s — the SPA fallback never shadows /api/*', async () => {
+  const res = await api.get('/api/nonexistent-route');
+  assert.equal(res.status, 404);
+});
+
+test('GET /some/path/that/looks/like/an/asset.js: 404s instead of being rewritten to the app shell', async () => {
+  const res = await api.get('/some/path/that/looks/like/an/asset.js');
+  assert.equal(res.status, 404);
+});
+
 // ── GET /api/metrics ───────────────────────────────────────────────────────────
 
 test('GET /api/metrics: 200 with a since timestamp and per-group/label request counts', async (t) => {

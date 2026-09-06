@@ -1,13 +1,17 @@
 'use strict';
 
-// Builds public/'s four HTML entry points into dist/ — a real bundled/hashed production
-// build in place of the hand-rolled import-map + /vendor/* static-route resolution this app
-// used before the frontend moved to TypeScript/Vite (both retired once nothing resolved
-// through them anymore — see server.js's own STATIC_DIR comment). publicDir is
-// disabled: public/ has no passthrough static assets left once hls.js moved from a vendored
-// public/hls.min.js to a real npm dependency (both dev and this build now resolve it as a
-// real ES import) — enabling it would also collide with Vite's own "publicDir" convention,
-// since our whole frontend source directory happens to be named public/ too.
+// Builds public/'s single HTML entry (the SPA shell — see public/App.tsx/AppShell.tsx)
+// into dist/ — a real bundled/hashed production build in place of the hand-rolled import-map
+// + /vendor/* static-route resolution this app used before the frontend moved to
+// TypeScript/Vite (both retired once nothing resolved through them anymore — see server.js's
+// own STATIC_DIR comment). Used to be four separate HTML entry points (one full page reload
+// per page navigation); collapsed to one during the list-centric redesign (see
+// docs/list-centric-redesign.md) once client-side routing (@solidjs/router) took over
+// navigation between what used to be separate pages. publicDir is disabled: public/ has no
+// passthrough static assets left once hls.js moved from a vendored public/hls.min.js to a
+// real npm dependency (both dev and this build now resolve it as a real ES import) —
+// enabling it would also collide with Vite's own "publicDir" convention, since our whole
+// frontend source directory happens to be named public/ too.
 const { defineConfig } = require('vite');
 const solidPlugin = require('vite-plugin-solid');
 const path = require('node:path');
@@ -31,9 +35,6 @@ module.exports = defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'public/index.html'),
-        library: path.resolve(__dirname, 'public/library.html'),
-        bundles: path.resolve(__dirname, 'public/bundles.html'),
-        about: path.resolve(__dirname, 'public/about.html'),
       },
     },
   },

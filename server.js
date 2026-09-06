@@ -856,6 +856,19 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   if (!res.writableEnded) res.end();
 });
 
+// SPA fallback: any GET that isn't an /api/* call and doesn't look like a static-asset request
+// (no dot-extension in its path) falls through to the app shell, letting the client-side
+// router (see public/App.tsx) render the right view from the URL — needed once navigation
+// between what used to be separate pages (Comparison/Library Explorer/Bundles/About) became
+// client-side routing instead of real page loads (see docs/list-centric-redesign.md). Placed
+// after every route above and after the static-file middleware (line 113) so real API calls
+// and real asset files are still served first; a path that looks like an asset (has a file
+// extension) but genuinely doesn't exist still 404s via Express's default handler instead of
+// being silently rewritten into the shell.
+app.get(/^\/(?!api\/)(?!.*\.[a-zA-Z0-9]+$).*/, (_req, res) => {
+  res.sendFile(path.join(STATIC_DIR, 'index.html'));
+});
+
 if (require.main === module) {
   if (!process.env.STEAM_API_KEY) {
     console.error('Error: STEAM_API_KEY is not set.');

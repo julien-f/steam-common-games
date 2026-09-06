@@ -13,6 +13,7 @@
     "cache:clear": "node scripts/cache-clear.js"
   },
   "dependencies": {
+    "@solidjs/router": "^1.0.0",
     "@vates/data-table-core": "^0.13.0",
     "@vates/data-table-solid": "^0.13.0",
     "dotenv": "^17.4.2",
