@@ -10,7 +10,8 @@ import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields 
 import { COUNTRY_OPTIONS, getStoredRegion, setStoredRegion, resolveRegion, REGION_CHANGED_EVENT } from '/region.ts';
 import { updateNavLink } from '/nav.tsx';
 import { renderAccountChips, bindAccountRefresh, addRecent, renderRecentsBar, bindRecentsBar } from '/accountsBar.ts';
-import { initGameSearch, addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.ts';
+import { initGameSearch } from '/gameSearch.ts';
+import { addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/recentGames.ts';
 import { openLightbox, isLightboxOpen } from '/lightbox.tsx';
 import {
   panelOpen, panelClose, isPanelOpen, getPanelGame, panelStepHero,

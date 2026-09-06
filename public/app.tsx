@@ -10,7 +10,8 @@ import { updateNavLink } from '/nav.tsx';
 import { renderPanelNav as renderPanelNavShared, stepGameList } from '/panelNav.ts';
 import { bindPanelKeyboardShortcuts } from '/panelKeyboard.ts';
 import { renderAccountChipsGrouped, bindAccountRefresh, addRecent, renderRecentsBar, bindRecentsBar } from '/accountsBar.ts';
-import { initGameSearch, addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/gameSearch.ts';
+import { initGameSearch } from '/gameSearch.ts';
+import { addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from '/recentGames.ts';
 import { openLightbox, isLightboxOpen } from '/lightbox.tsx';
 import { createRowStore } from '/rowStore.ts';
 import {
