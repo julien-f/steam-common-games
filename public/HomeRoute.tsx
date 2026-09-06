@@ -8,10 +8,11 @@
 // **Current scope, deliberately trimmed for a first pass**: folder/list reorganizing (rename/
 // move/delete) uses plain `window.prompt`/`window.confirm` dialogs rather than a polished drag-
 // and-drop tree UI — real functionality (backed by the fully-built `listsStore.ts`), minimal
-// chrome. Clicking a user list navigates to `/lists/:listId`, which still renders `ListRoute.tsx`'s
-// placeholder until Phase 5 step 7 wires up dynamic/manual list resolution + combine. No trash/
-// restore UI for soft-deleted lists yet either (`listsStore.ts`'s `restoreList`/`getLists({
-// includeDeleted: true })` are ready for it, just not surfaced here).
+// chrome. No trash/restore UI for soft-deleted lists yet (`listsStore.ts`'s `restoreList`/
+// `getLists({ includeDeleted: true })` are ready for it, just not surfaced here). The combine
+// form below can pick any recent account's Owned/Wishlist, Recently Looked Up, or any existing
+// user list as a source — bundles are deliberately not offered as a source yet (would need its
+// own bundle-picker UI, not just a checkbox).
 import { createSignal, createEffect, createMemo, For, Show } from 'solid-js';
 import { A } from '@solidjs/router';
 import {
@@ -23,7 +24,20 @@ import {
   getFolders, getLists, createFolder, createList, renameFolder, renameList,
   deleteFolder, deleteList,
 } from './listsStore.ts';
-import type { AccountSlot, Folder, GameList } from './types.ts';
+import type { AccountSlot, Folder, GameList, ListRef, CombineOp } from './types.ts';
+
+interface SourceOption {
+  key: string;
+  label: string;
+  ref: ListRef;
+}
+
+const COMBINE_OPS: { value: CombineOp; label: string }[] = [
+  { value: 'union', label: 'Union (games in any source)' },
+  { value: 'intersect', label: 'Intersect (games in every source)' },
+  { value: 'subtract', label: 'Subtract (first source minus the rest)' },
+  { value: 'group-by-membership', label: 'Group by membership (one table per combination)' },
+];
 
 interface TreeRow {
   type: 'folder' | 'list';
@@ -118,6 +132,57 @@ export default function HomeRoute() {
     if (!name) return;
     createList({ name, kind: 'manual' });
     refreshTree();
+  }
+
+  // ── Combine setup (creating a dynamic list) ───────────────────────────────────────────────
+  const [combineOpen, setCombineOpen] = createSignal(false);
+  const [combineName, setCombineName] = createSignal('');
+  const [combineOp, setCombineOp] = createSignal<CombineOp>('union');
+  const [combineSelected, setCombineSelected] = createSignal<Set<string>>(new Set());
+  const [combineError, setCombineError] = createSignal('');
+
+  // Every source a combine can currently be built from — any recent account's Owned/Wishlist,
+  // Recently Looked Up, or any existing user list. Not a bundle (would need its own bundle-
+  // picker UI, not just a checkbox) — see this file's own header comment.
+  function sourceOptions(): SourceOption[] {
+    const opts: SourceOption[] = [];
+    for (const acc of recents()) {
+      const label = acc.label || acc.rawInputs.join(' + ');
+      opts.push({ key: `account-owned:${acc.id}`, label: `${label} — Owned`, ref: { kind: 'account-owned', accountId: acc.id } });
+      opts.push({ key: `account-wishlist:${acc.id}`, label: `${label} — Wishlist`, ref: { kind: 'account-wishlist', accountId: acc.id } });
+    }
+    opts.push({ key: 'recent-games', label: 'Recently Looked Up', ref: { kind: 'recent-games' } });
+    for (const list of lists()) {
+      opts.push({ key: `user:${list.id}`, label: list.name, ref: { kind: 'user', listId: list.id } });
+    }
+    return opts;
+  }
+
+  function toggleCombineSource(key: string): void {
+    setCombineSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
+
+  function handleCreateCombine(e: Event): void {
+    e.preventDefault();
+    setCombineError('');
+    const name = combineName().trim();
+    if (!name) { setCombineError('Name is required.'); return; }
+    const selected = combineSelected();
+    const sources = sourceOptions().filter(o => selected.has(o.key)).map(o => o.ref);
+    if (sources.length < 2) { setCombineError('Pick at least 2 sources.'); return; }
+    try {
+      createList({ name, kind: 'dynamic', op: combineOp(), sources });
+      refreshTree();
+      setCombineOpen(false);
+      setCombineName('');
+      setCombineSelected(new Set<string>());
+    } catch (err) {
+      setCombineError((err as Error).message);
+    }
   }
 
   function handleRenameFolder(folder: Folder): void {
@@ -236,7 +301,43 @@ export default function HomeRoute() {
         <div class="tree-actions">
           <button type="button" onClick={handleNewFolder}>+ New folder</button>
           <button type="button" onClick={handleNewList}>+ New list</button>
+          <button type="button" onClick={() => setCombineOpen(v => !v)}>
+            {combineOpen() ? 'Cancel combine' : '+ New combined list'}
+          </button>
         </div>
+
+        <Show when={combineOpen()}>
+          <form class="combine-form" onSubmit={handleCreateCombine}>
+            <input
+              type="text"
+              placeholder="Combined list name…"
+              value={combineName()}
+              onInput={e => setCombineName(e.currentTarget.value)}
+            />
+            <select value={combineOp()} onChange={e => setCombineOp(e.currentTarget.value as CombineOp)}>
+              <For each={COMBINE_OPS}>{op => <option value={op.value}>{op.label}</option>}</For>
+            </select>
+            <p>Pick at least 2 sources:</p>
+            <ul class="combine-sources">
+              <For each={sourceOptions()}>
+                {opt => (
+                  <li>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={combineSelected().has(opt.key)}
+                        onChange={() => toggleCombineSource(opt.key)}
+                      />
+                      {opt.label}
+                    </label>
+                  </li>
+                )}
+              </For>
+            </ul>
+            {combineError() && <p class="error">{combineError()}</p>}
+            <button type="submit">Create combined list</button>
+          </form>
+        </Show>
         <Show when={treeRows().length > 0} fallback={<p>No lists yet — create one above.</p>}>
           <ul class="list-tree">
             <For each={treeRows()}>
