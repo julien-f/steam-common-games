@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+A list-centric redesign of the whole frontend (accounts, user-organized game lists, a docked side panel, a single canonical per-game link) is proposed but not yet implemented — see `docs/list-centric-redesign.md`. Everything below describes the app as it exists today.
+
 ## Running the app
 
 ```bash
