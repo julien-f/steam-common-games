@@ -1,6 +1,6 @@
 # List-centric redesign (design proposal)
 
-**Status: proposed, not yet implemented.** This document describes a target design agreed on in discussion, not the current state of the app — see `CLAUDE.md` for what's actually built today. Once implementation begins, update `CLAUDE.md`'s own Architecture section (and delete or shrink this doc accordingly) rather than maintaining both as separate sources of truth long-term.
+**Status: mostly implemented, on the `list-centric-redesign` branch, not yet merged to `main`.** Every route/list kind described below is real and verified against live data. What's left before this can merge: real per-group table rendering for the `group-by-membership` combine mode (currently flattened to one table — see `ListRoute.tsx`'s own header comment), the combine setup dialog to actually *create* a dynamic list from the UI (`HomeRoute.tsx`'s "+ New list" only creates manual lists today), then deleting `public/app.tsx`/the old Comparison-page logic once `group-by-membership` fully covers what it did. See `CLAUDE.md`'s own top-of-file note for the exact current state. Once those land and this merges, fold this doc's content into `CLAUDE.md`'s own Architecture section (and delete or shrink this doc) rather than maintaining both as separate sources of truth long-term.
 
 ## Motivation
 
@@ -167,4 +167,11 @@ Pref keys: `schemaVersion`, `myAccount`, `currentAccount`, `recentAccounts`, `li
 
 ## Open questions / not yet decided
 
-- Implementation sequencing — what gets replaced first, whether existing shared modules (`panel.tsx`, `gameColumns.ts`, `rowStore.ts`, etc.) need any interface changes to support the docked-panel/list-viewer shape and the move to a router-driven SPA shell, and how much of `app.tsx`/`library.tsx`/`bundles.tsx` can be deleted outright vs. needs logic salvaged into the new routes. Deliberately deferred to a dedicated planning session once we're ready to start building, rather than decided in the abstract.
+Implementation sequencing was resolved by an implementation plan (see the git history on the `list-centric-redesign` branch) and is done except for the items below — this list is now the actual remaining work, not abstract design questions:
+
+- **Real per-group rendering for `group-by-membership`** — currently flattened to one table by `flattenCombineResult` regardless of combine mode; this is the one piece standing between the new app and deleting `app.tsx`'s old multi-slot comparison page for good.
+- **The combine setup dialog** — creating a *dynamic* list from the UI at all. `HomeRoute.tsx`'s "+ New list" only ever creates a manual (empty, hand-populated) list today; a dynamic list is only reachable by hand-editing the stored `lists` array.
+- **Row-selection-based add/remove-to-list** — `ListRoute.tsx` can view any list kind but has no UI yet to select rows and add/remove them to/from a manual list (deferred per `@vates/data-table-solid`'s own built-in selection support, per earlier discussion — never actually wired up to `listsStore.ts`'s `setListAppids`).
+- **Folder/list tree polish** — `HomeRoute.tsx`'s rename/move/delete uses plain `window.prompt`/`window.confirm`, not drag-and-drop; no move-between-folders UI at all yet (`listsStore.ts`'s `moveFolder`/`moveList` are unused by any UI so far); no trash/restore UI for soft-deleted lists.
+- **Ownership badges and achievements** on `ListRoute.tsx` — not ported from `library.tsx` yet.
+- **Live reactivity to `currentAccount` changing** while a route is already open — `accountsStore.ts` is a plain module with no Solid signal of its own; every route reads it once per mount today.
