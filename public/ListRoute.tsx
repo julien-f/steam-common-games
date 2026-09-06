@@ -7,13 +7,18 @@
 // on a few more axes though: ownership cross-referencing (in-library/on-wishlist badges) and
 // achievements are not ported yet (both need a second background fetch this first pass omits);
 // 'recent'/'user' have no dedicated extra columns — plain CORE_COLUMNS, no owned/wishlist/bundle
-// extras. A 'user' list resolves via listResolve.ts's resolveGameList/createDefaultFetchers and
-// renders as one flat table even when it's a dynamic list with group-by-membership structure
-// (flattened via flattenCombineResult, same as when it's resolved as someone *else's* combine
-// source) — real per-group rendering, row-selection-based add/remove-to-list, and the combine
-// setup dialog to actually *create* a dynamic list are all still open (Home's "+ New list" only
-// creates manual lists today, so a dynamic list is only reachable by hand-editing prefs for now).
-// `currentAccount` is
+// extras. A 'user' list resolves via listResolve.ts's resolveGameList/createDefaultFetchers; a
+// manual list, or a dynamic one using any op other than group-by-membership, renders as one flat
+// table (flattened via flattenCombineResult when needed, same as when it's resolved as someone
+// *else's* combine source) — but group-by-membership renders one real table PER group instead
+// (see buildGroupTables below), generalizing the old Comparison page's "one table per owner set,
+// most owners to fewest" layout. Still open: row-selection-based add/remove-to-list, and the
+// combine setup dialog to actually *create* a dynamic list (Home's "+ New list" only creates
+// manual lists today, so a group-by-membership list is only reachable by hand-editing prefs for
+// now) — see docs/list-centric-redesign.md's own open-questions list. Per-group tables also skip
+// view persistence entirely (a single list only has room for one stored `tableView`, and dividing
+// that across however many groups a combine happens to produce isn't solved here yet) — each
+// group table just uses the construction-time default view. `currentAccount` is
 // read once per mount, not live-reactive to being changed elsewhere while this route stays open
 // — accountsStore.ts is a plain module with no Solid signal of its own yet, so there's nothing
 // to subscribe to reactively here until one exists (a real follow-up, not an oversight); a
@@ -59,6 +64,7 @@ import { registerRouteKeyboardHandlers } from './AppShell.tsx';
 import type { Game, Rating, Hltb, GameMeta, ProtonDb, GameList } from './types.ts';
 import { getList, setListTableView } from './listsStore.ts';
 import { resolveGameList, flattenCombineResult, createDefaultFetchers } from './listResolve.ts';
+import type { MembershipGroup } from './combine.ts';
 
 type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user';
 
@@ -223,6 +229,7 @@ export default function ListRoute() {
   const kind = kindFromPath(location.pathname, params);
 
   let tableContainer!: HTMLDivElement;
+  let groupsContainer!: HTMLDivElement;
   const [statusText, setStatusText] = createSignal('');
   const [priceStatusText, setPriceStatusText] = createSignal('');
 
@@ -233,16 +240,31 @@ export default function ListRoute() {
   let disposeTable: (() => void) | null = null;
   let unsyncView: (() => void) | null = null;
   let userList: GameList | null = null; // set only for kind === 'user' — its own per-list tableView, not a shared pref key
+  // group-by-membership mode: one real table per group instead of the single `table` above (see
+  // buildGroupTables) — all sharing the one `rowsStore`/`rowStore` above (every game belongs to
+  // exactly one group, so there's no overlap to worry about), one shared detail stream, and each
+  // group's own createTableState fed by a filtered view into that shared store.
+  let groupTables: { key: string; appids: Set<number>; table: TableState<Game>; disposeTable: () => void }[] = [];
+  let activeGroupKey: string | null = null; // whichever group the currently-open game belongs to, for prev/next/random
   let total = 0;
   let loaded = 0;
 
   function tableData(): Game[] { return rowsStore.filter(r => !r.loading); }
-  function getGameList(): Game[] { return table ? table.processedData() : []; }
-  // Scoped by specific id, not just kind — kind alone would collide between two different
-  // bundles/user lists navigated between without a remount (see the createEffect below).
+
+  // In group mode there's no single `table` — prev/next/random operate on whichever group the
+  // currently-open game belongs to (activeGroupKey, kept in sync by renderPanelNav below).
+  function activeTable(): TableState<Game> | null {
+    if (groupTables.length) return groupTables.find(g => g.key === activeGroupKey)?.table ?? null;
+    return table;
+  }
+  function getGameList(): Game[] { const t = activeTable(); return t ? t.processedData() : []; }
+
+  // Scoped by specific id (and, in group mode, the active group) — kind/listId alone would
+  // collide between two different bundles/user lists/groups navigated between without a remount
+  // (see the createEffect below).
   function randomQueueKey(): string {
     if (kind === 'bundle') return `list-route:bundle:${params.bundleId}`;
-    if (kind === 'user') return `list-route:user:${params.listId}`;
+    if (kind === 'user') return `list-route:user:${params.listId}:${activeGroupKey ?? ''}`;
     return `list-route:${kind}`;
   }
 
@@ -252,7 +274,11 @@ export default function ListRoute() {
   }
 
   function renderPanelNav(game: Game): void {
-    renderPanelNavShared({ table, game, getGameList, onOpen: openGame, onReroll: pickRandomGame });
+    if (groupTables.length) {
+      const owning = groupTables.find(g => g.appids.has(game.appid));
+      activeGroupKey = owning?.key ?? null;
+    }
+    renderPanelNavShared({ table: activeTable(), game, getGameList, onOpen: openGame, onReroll: pickRandomGame });
   }
 
   function openGame(game: Game, { isRandom = false, keepHistory = false }: { isRandom?: boolean; keepHistory?: boolean } = {}): void {
@@ -264,14 +290,15 @@ export default function ListRoute() {
   }
 
   function pickRandomGame(): void {
-    if (!table || getPanelGame()?.standalone) return;
+    if (!activeTable() || getPanelGame()?.standalone) return;
     const pick = pickRandomFrom(getGameList(), randomQueueKey(), getPanelGame()?.appid ?? 0);
     if (pick) openGame(pick as Game, { isRandom: true });
   }
 
   function stepGame(dir: 1 | -1): boolean {
-    if (!table) return false;
-    const next = stepGameList(table, getGameList, getPanelGame(), dir);
+    const t = activeTable();
+    if (!t) return false;
+    const next = stepGameList(t, getGameList, getPanelGame(), dir);
     if (!next) return false;
     openGame(next);
     return true;
@@ -419,39 +446,92 @@ export default function ListRoute() {
     return 'lv';
   }
 
+  // Real per-group tables for a group-by-membership dynamic list — generalizes the old
+  // Comparison page's "one table per owner set, most owners to fewest" layout (already sorted
+  // that way by combine.ts's groupByMembership). Each group gets its own createTableState fed by
+  // a filtered view into the one shared rowsStore (every game belongs to exactly one group, so
+  // there's no overlap), and its own DOM container appended to groupsContainer — mounted
+  // imperatively (document.createElement + render()) rather than via a reactive <For>, matching
+  // the single-table path's own imperative construction just above.
+  function buildGroupTables(groups: MembershipGroup[]): void {
+    groupsContainer.innerHTML = '';
+    groupTables = groups.map(group => {
+      const appidSet = new Set(group.appids);
+
+      const heading = document.createElement('h3');
+      heading.className = 'list-group-heading';
+      heading.textContent = `${group.keys.join(' + ')} (${group.appids.length})`;
+      const container = document.createElement('div');
+      container.className = 'table-container';
+      groupsContainer.appendChild(heading);
+      groupsContainer.appendChild(container);
+
+      let disposeTableState!: () => void;
+      const ts = createRoot(dispose => {
+        disposeTableState = dispose;
+        return createTableState<Game>(
+          () => rowsStore.filter(r => !r.loading && appidSet.has(r.appid)),
+          RECENT_COLUMNS as unknown as ColumnDef<Game>[],
+          { initialViewState: { pageSize: 50, visibleCols: RECENT_DEFAULT_VISIBLE, sorts: DEFAULT_SORT } },
+        );
+      });
+      const disposeView = render(() => DataTableView<Game>({
+        table: ts,
+        rowKey: 'appid',
+        onRowClick: row => openGame(rowStore.getRow(row.appid) ?? row),
+      }), container);
+
+      return {
+        key: group.keys.join(' '),
+        appids: appidSet,
+        table: ts,
+        disposeTable: () => { disposeView(); disposeTableState(); },
+      };
+    });
+  }
+
   async function load(): Promise<void> {
     const gen = loadGuard.next();
 
     if (disposeTable) { disposeTable(); disposeTable = null; }
     table = null;
+    groupTables.forEach(g => g.disposeTable());
+    groupTables = [];
+    activeGroupKey = null;
     setRowsStore([]);
     rowStore.reset();
     total = 0;
     loaded = 0;
     tableContainer.innerHTML = '';
+    groupsContainer.innerHTML = '';
 
     let initialRows: Game[];
     let streamTargets: { appid: number }[];
     let resolvedBundleGames: ResolvedGame[] | null = null;
+    let pendingGroups: MembershipGroup[] | null = null;
     userList = null;
 
     if (kind === 'user') {
-      // Manual and dynamic lists both render as one flat table here — a dynamic list's own
-      // group-by-membership structure (if it has any) is flattened via flattenCombineResult,
-      // same as when it's resolved as someone *else's* combine source (listResolve.ts). Real
-      // per-group rendering for group-by-membership, and the combine setup dialog to actually
-      // *create* a dynamic list, are still a later step — Home's "+ New list" only creates
-      // manual lists for now, so this path is reachable today only for those, but resolves a
-      // dynamic list correctly too if one is ever created by hand-editing prefs.
+      // A manual list, or a dynamic one using any op other than group-by-membership, renders as
+      // one flat table (flattened via flattenCombineResult, same as when it's resolved as
+      // someone *else's* combine source). group-by-membership instead keeps its raw
+      // MembershipGroup[] result (stashed in pendingGroups) for buildGroupTables to render as
+      // real per-group tables further down, once the shared rowsStore/stream have loaded.
       const list = getList(params.listId!);
       if (!list) { setStatusText('This list no longer exists.'); return; }
       userList = list;
       setStatusText('Resolving list…');
+      const isGroupMode = list.kind === 'dynamic' && list.op === 'group-by-membership';
       let appids: Set<number>;
       try {
         const result = await resolveGameList(list, createDefaultFetchers());
         if (loadGuard.isStale(gen)) return;
-        appids = flattenCombineResult(result);
+        if (isGroupMode && Array.isArray(result)) {
+          pendingGroups = result;
+          appids = new Set(result.flatMap(g => g.appids));
+        } else {
+          appids = flattenCombineResult(result);
+        }
       } catch (err) {
         if (loadGuard.isStale(gen)) return;
         setStatusText(`Error: ${(err as Error).message}`);
@@ -525,49 +605,53 @@ export default function ListRoute() {
     rowStore.load(initialRows);
     total = initialRows.length;
 
-    const columns = (
-      kind === 'wishlist' ? WISHLIST_COLUMNS
-        : kind === 'bundle' ? BUNDLE_COLUMNS
-        : kind === 'recent' || kind === 'user' ? RECENT_COLUMNS
-        : OWNED_COLUMNS
-    ) as unknown as ColumnDef<Game>[];
-    const defaultVisible = kind === 'wishlist' ? WISHLIST_DEFAULT_VISIBLE
-      : kind === 'bundle' ? BUNDLE_DEFAULT_VISIBLE
-      : kind === 'recent' || kind === 'user' ? RECENT_DEFAULT_VISIBLE
-      : OWNED_DEFAULT_VISIBLE;
-    const sort = kind === 'bundle' ? BUNDLE_DEFAULT_SORT : DEFAULT_SORT;
-
-    let disposeTableState!: () => void;
-    const ts = createRoot(dispose => {
-      disposeTableState = dispose;
-      return createTableState<Game>(tableData, columns, {
-        initialViewState: { pageSize: 50, visibleCols: defaultVisible, sorts: sort },
-      });
-    });
-    table = ts;
-    const disposeView = render(() => DataTableView<Game>({
-      table: ts,
-      rowKey: 'appid',
-      onRowClick: row => openGame(rowStore.getRow(row.appid) ?? row),
-    }), tableContainer);
-    disposeTable = () => { disposeView(); disposeTableState(); };
-    if (userList) {
-      // A user list's view lives on the list itself (GameList.tableView), not a shared pref key
-      // — every user list keeps its own, unlike the fixed system kinds above which share one key
-      // regardless of instance (see docs/list-centric-redesign.md's storage schema).
-      const list = userList;
-      table.setViewState(list.tableView ?? {});
-      unsyncView = (() => {
-        let dispose: (() => void) | null = null;
-        createRoot(d => {
-          dispose = d;
-          createEffect(() => setListTableView(list.id, ts.getViewState()));
-        });
-        return () => dispose?.();
-      })();
+    if (pendingGroups) {
+      buildGroupTables(pendingGroups);
     } else {
-      restoreTableView(table, viewPrefKey(), viewParamName());
-      unsyncView = bindSolidViewPersistence(table, viewPrefKey());
+      const columns = (
+        kind === 'wishlist' ? WISHLIST_COLUMNS
+          : kind === 'bundle' ? BUNDLE_COLUMNS
+          : kind === 'recent' || kind === 'user' ? RECENT_COLUMNS
+          : OWNED_COLUMNS
+      ) as unknown as ColumnDef<Game>[];
+      const defaultVisible = kind === 'wishlist' ? WISHLIST_DEFAULT_VISIBLE
+        : kind === 'bundle' ? BUNDLE_DEFAULT_VISIBLE
+        : kind === 'recent' || kind === 'user' ? RECENT_DEFAULT_VISIBLE
+        : OWNED_DEFAULT_VISIBLE;
+      const sort = kind === 'bundle' ? BUNDLE_DEFAULT_SORT : DEFAULT_SORT;
+
+      let disposeTableState!: () => void;
+      const ts = createRoot(dispose => {
+        disposeTableState = dispose;
+        return createTableState<Game>(tableData, columns, {
+          initialViewState: { pageSize: 50, visibleCols: defaultVisible, sorts: sort },
+        });
+      });
+      table = ts;
+      const disposeView = render(() => DataTableView<Game>({
+        table: ts,
+        rowKey: 'appid',
+        onRowClick: row => openGame(rowStore.getRow(row.appid) ?? row),
+      }), tableContainer);
+      disposeTable = () => { disposeView(); disposeTableState(); };
+      if (userList) {
+        // A user list's view lives on the list itself (GameList.tableView), not a shared pref
+        // key — every user list keeps its own, unlike the fixed system kinds above which share
+        // one key regardless of instance (see docs/list-centric-redesign.md's storage schema).
+        const list = userList;
+        table.setViewState(list.tableView ?? {});
+        unsyncView = (() => {
+          let dispose: (() => void) | null = null;
+          createRoot(d => {
+            dispose = d;
+            createEffect(() => setListTableView(list.id, ts.getViewState()));
+          });
+          return () => dispose?.();
+        })();
+      } else {
+        restoreTableView(table, viewPrefKey(), viewParamName());
+        unsyncView = bindSolidViewPersistence(table, viewPrefKey());
+      }
     }
 
     updateStatus();
@@ -599,6 +683,7 @@ export default function ListRoute() {
     if (isPanelOpen()) panelClose();
     loadGuard.next(); // invalidate any still-in-flight fetch/stream from this mount
     if (disposeTable) disposeTable();
+    groupTables.forEach(g => g.disposeTable());
     if (unsyncView) unsyncView();
   });
 
@@ -607,6 +692,7 @@ export default function ListRoute() {
       <div class="list-status">{statusText()}</div>
       {(kind === 'wishlist' || kind === 'bundle') && <div class="price-status">{priceStatusText()}</div>}
       <div ref={tableContainer} class="table-container"></div>
+      <div ref={groupsContainer} class="list-groups"></div>
     </div>
   );
 }
