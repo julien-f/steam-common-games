@@ -13,7 +13,7 @@
 // form below can pick any recent account's Owned/Wishlist, Recently Looked Up, or any existing
 // user list as a source — bundles are deliberately not offered as a source yet (would need its
 // own bundle-picker UI, not just a checkbox).
-import { createSignal, createEffect, createMemo, For, Show } from 'solid-js';
+import { createSignal, createEffect, createMemo, For, Index, Show } from 'solid-js';
 import { A } from '@solidjs/router';
 import {
   getMyAccount, setMyAccount, getCurrentAccount, setCurrentAccount,
@@ -253,16 +253,22 @@ export default function HomeRoute() {
         </Show>
 
         <form onSubmit={e => { e.preventDefault(); resolveAndSetCurrent(); }}>
-          <For each={resolveInputs()}>
+          {/* <Index>, not <For> — <For> keys each item by the value itself (`===` on the
+              array element), which is exactly wrong for a list of strings the user is actively
+              typing into: changing "a" to "ab" makes the old and new values two *different*
+              strings, so <For> would tear down and recreate that index's whole <input> on every
+              keystroke, dropping focus mid-word. <Index> keys by array position instead — typing
+              updates the same DOM node in place, the same fix Solid's own docs give for this. */}
+          <Index each={resolveInputs()}>
             {(value, i) => (
               <input
                 type="text"
-                value={value}
+                value={value()}
                 placeholder="Steam name, profile URL, or 64-bit ID…"
-                onInput={e => setResolveInputs(prev => prev.map((v, idx) => idx === i() ? e.currentTarget.value : v))}
+                onInput={e => setResolveInputs(prev => prev.map((v, idx) => idx === i ? e.currentTarget.value : v))}
               />
             )}
-          </For>
+          </Index>
           <button type="button" onClick={() => setResolveInputs(prev => [...prev, ''])}>+ Add Steam Family account</button>
           <button type="submit" disabled={resolving()}>{resolving() ? 'Resolving…' : 'Set as current account'}</button>
         </form>
