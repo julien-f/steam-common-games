@@ -2,11 +2,13 @@
 // and the implementation plan's Phase 4/5. Registered for /lists/owned, /lists/wishlist,
 // /lists/bundle/:bundleId, /lists/recent, and the generic /lists/:listId (see AppRoot.tsx).
 //
-// **Current scope**: the 'owned', 'wishlist', and 'bundle' kinds are wired up for real (Phase 5
-// steps 1-2 and 4) — 'recent'/'user' still render a "not yet available" placeholder until their
-// own later Phase 5 steps land. This is deliberately narrower than the full plan on a few more
-// axes too: ownership cross-referencing (in-library/on-wishlist badges) and achievements are not
-// ported yet (both need a second background fetch this first pass omits); `currentAccount` is
+// **Current scope**: the 'owned', 'wishlist', 'bundle', and 'recent' kinds are wired up for real
+// (Phase 5 steps 1-2, 4, and 6) — 'user' still renders a "not yet available" placeholder until
+// its own later Phase 5 step (7) lands. This is deliberately narrower than the full plan on a
+// few more axes too: ownership cross-referencing (in-library/on-wishlist badges) and
+// achievements are not ported yet (both need a second background fetch this first pass omits);
+// a recently-looked-up game (the 'recent' kind) has no dedicated view state — its columns are
+// plain CORE_COLUMNS, no owned/wishlist/bundle extras. `currentAccount` is
 // read once per mount, not live-reactive to being changed elsewhere while this route stays open
 // — accountsStore.ts is a plain module with no Solid signal of its own yet, so there's nothing
 // to subscribe to reactively here until one exists (a real follow-up, not an oversight); a
@@ -44,6 +46,7 @@ import { setPanelParam } from './urlState.ts';
 import { setPref } from './prefs.ts';
 import { getCurrentAccount } from './accountsStore.ts';
 import { fetchAccountOwnedGames, fetchAccountWishlistItems } from './accountData.ts';
+import { loadRecentGames } from './recentGames.ts';
 import { fetchBundleById, resolveBundleGames, type ResolvedGame } from './bundleData.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from './priceLoading.ts';
 import { getStoredRegion, resolveRegion } from './region.ts';
@@ -90,6 +93,12 @@ const WISHLIST_DATE_ADDED_COLUMN: ColumnDef<Record<string, any>> =
 
 const OWNED_COLUMNS = insertColumnsAfter(CORE_COLUMNS, 'hltbCompletionist', PLAYTIME_COLUMN, LAST_PLAYED_COLUMN);
 const OWNED_DEFAULT_VISIBLE = ['capsule', 'name', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres', 'playtime'];
+
+// 'recent' (the "Recently Looked Up" system list) is just plain CORE_COLUMNS — a recent lookup
+// isn't necessarily owned or wishlisted, so none of owned's Played/Last Played or wishlist's
+// price cluster apply here.
+const RECENT_COLUMNS = CORE_COLUMNS;
+const RECENT_DEFAULT_VISIBLE = ['capsule', 'name', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
 
 const WISHLIST_COLUMNS = insertColumnsAfter(
   insertColumnsAfter(
@@ -392,16 +401,18 @@ export default function ListRoute() {
   function viewPrefKey(): string {
     if (kind === 'wishlist') return 'wishlistListView';
     if (kind === 'bundle') return 'bundleListView';
+    if (kind === 'recent') return 'recentListView';
     return 'ownedListView';
   }
   function viewParamName(): string {
     if (kind === 'wishlist') return 'wv';
     if (kind === 'bundle') return 'bv';
+    if (kind === 'recent') return 'rv';
     return 'lv';
   }
 
   async function load(): Promise<void> {
-    if (kind !== 'owned' && kind !== 'wishlist' && kind !== 'bundle') return; // recent/user land in later Phase 5 steps
+    if (kind === 'user') return; // still lands in a later Phase 5 step
 
     const gen = loadGuard.next();
 
@@ -417,7 +428,14 @@ export default function ListRoute() {
     let streamTargets: { appid: number }[];
     let resolvedBundleGames: ResolvedGame[] | null = null;
 
-    if (kind === 'bundle') {
+    if (kind === 'recent') {
+      const recents = loadRecentGames();
+      initialRows = recents.map(g => ({
+        appid: g.appid, name: g.name || `App ${g.appid}`, capsule: g.tinyImage || undefined,
+        loading: true, details: null,
+      })) as unknown as Game[];
+      streamTargets = recents;
+    } else if (kind === 'bundle') {
       setStatusText('Resolving games to Steam…');
       try {
         const bundle = await fetchBundleById(Number(params.bundleId));
@@ -475,9 +493,15 @@ export default function ListRoute() {
     total = initialRows.length;
 
     const columns = (
-      kind === 'wishlist' ? WISHLIST_COLUMNS : kind === 'bundle' ? BUNDLE_COLUMNS : OWNED_COLUMNS
+      kind === 'wishlist' ? WISHLIST_COLUMNS
+        : kind === 'bundle' ? BUNDLE_COLUMNS
+        : kind === 'recent' ? RECENT_COLUMNS
+        : OWNED_COLUMNS
     ) as unknown as ColumnDef<Game>[];
-    const defaultVisible = kind === 'wishlist' ? WISHLIST_DEFAULT_VISIBLE : kind === 'bundle' ? BUNDLE_DEFAULT_VISIBLE : OWNED_DEFAULT_VISIBLE;
+    const defaultVisible = kind === 'wishlist' ? WISHLIST_DEFAULT_VISIBLE
+      : kind === 'bundle' ? BUNDLE_DEFAULT_VISIBLE
+      : kind === 'recent' ? RECENT_DEFAULT_VISIBLE
+      : OWNED_DEFAULT_VISIBLE;
     const sort = kind === 'bundle' ? BUNDLE_DEFAULT_SORT : DEFAULT_SORT;
 
     let disposeTableState!: () => void;
@@ -531,14 +555,14 @@ export default function ListRoute() {
 
   return (
     <div class="list-route">
-      {kind !== 'owned' && kind !== 'wishlist' && kind !== 'bundle' && (
+      {kind === 'user' && (
         <div class="route-placeholder">
           <h2>List route (stub)</h2>
           <p>kind: {kind}, path: {location.pathname}</p>
           <p>This list kind lands in a later Phase 5 step.</p>
         </div>
       )}
-      {(kind === 'owned' || kind === 'wishlist' || kind === 'bundle') && (
+      {kind !== 'user' && (
         <>
           <div class="list-status">{statusText()}</div>
           {(kind === 'wishlist' || kind === 'bundle') && <div class="price-status">{priceStatusText()}</div>}
