@@ -1,0 +1,303 @@
+'use strict';
+
+const { test, beforeEach } = require('node:test');
+const assert = require('node:assert/strict');
+
+function makeMemoryLocalStorage() {
+  const store = new Map();
+  return {
+    getItem: k => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: k => store.delete(k),
+  };
+}
+
+beforeEach(() => {
+  global.localStorage = makeMemoryLocalStorage();
+  delete require.cache[require.resolve('../public/prefs.ts')];
+  delete require.cache[require.resolve('../public/listsStore.ts')];
+});
+
+function store() {
+  return require('../public/listsStore.ts');
+}
+
+// ── Folders ──────────────────────────────────────────────────────────────────────────────────
+
+test('createFolder: adds a root folder with order 0', () => {
+  const { createFolder, getFolders } = store();
+  const f = createFolder('Favorites');
+  assert.equal(f.parentId, null);
+  assert.equal(f.order, 0);
+  assert.deepEqual(getFolders(), [f]);
+});
+
+test('createFolder: siblings get increasing order, folders and lists share the same numbering', () => {
+  const { createFolder, createList } = store();
+  const f1 = createFolder('A');
+  const l1 = createList({ name: 'B', kind: 'manual' });
+  const f2 = createFolder('C');
+  assert.deepEqual([f1.order, l1.order, f2.order], [0, 1, 2]);
+});
+
+test('renameFolder: updates the name in place, leaves order/id untouched', () => {
+  const { createFolder, renameFolder, getFolder } = store();
+  const f = createFolder('Old name');
+  renameFolder(f.id, 'New name');
+  const updated = getFolder(f.id);
+  assert.equal(updated.name, 'New name');
+  assert.equal(updated.order, f.order);
+});
+
+test('moveFolder: reparents and reorders to the end of the new parent', () => {
+  const { createFolder, moveFolder, getFolder } = store();
+  const root2 = createFolder('Root 2');
+  const child = createFolder('Child');
+  moveFolder(child.id, root2.id);
+  assert.equal(getFolder(child.id).parentId, root2.id);
+});
+
+test('moveFolder: refuses to move a folder into itself', () => {
+  const { createFolder, moveFolder } = store();
+  const f = createFolder('A');
+  assert.throws(() => moveFolder(f.id, f.id), /itself/);
+});
+
+test('moveFolder: refuses to move a folder into its own descendant', () => {
+  const { createFolder, moveFolder } = store();
+  const grandparent = createFolder('Grandparent');
+  const parent = createFolder('Parent', grandparent.id);
+  const child = createFolder('Child', parent.id);
+  assert.throws(() => moveFolder(grandparent.id, child.id), /descendant/);
+});
+
+test('deleteFolder("promote"): moves child folders and lists up to the deleted folder\'s parent', () => {
+  const { createFolder, createList, deleteFolder, getFolder, getList, getFolders } = store();
+  const root = createFolder('Root');
+  const mid = createFolder('Mid', root.id);
+  const childFolder = createFolder('ChildFolder', mid.id);
+  const childList = createList({ name: 'ChildList', kind: 'manual', parentId: mid.id });
+
+  deleteFolder(mid.id, 'promote');
+
+  assert.equal(getFolders().some(f => f.id === mid.id), false);
+  assert.equal(getFolder(childFolder.id).parentId, root.id);
+  assert.equal(getList(childList.id).parentId, root.id);
+});
+
+test('deleteFolder("delete"): recursively deletes child folders and applies deleteList\'s soft-delete rule to child lists', () => {
+  const { createFolder, createList, deleteFolder, getFolders, getList, getLists } = store();
+  const mid = createFolder('Mid');
+  const childFolder = createFolder('ChildFolder', mid.id);
+  const plainList = createList({ name: 'PlainList', kind: 'manual', parentId: mid.id });
+  // A list still referenced by a dynamic list outside the folder must survive as soft-deleted.
+  const referenced = createList({ name: 'Referenced', kind: 'manual', parentId: mid.id });
+  createList({
+    name: 'Watcher', kind: 'dynamic', op: 'union',
+    sources: [{ kind: 'user', listId: referenced.id }],
+  });
+
+  deleteFolder(mid.id, 'delete');
+
+  assert.equal(getFolders().some(f => f.id === mid.id || f.id === childFolder.id), false);
+  assert.equal(getLists().some(l => l.id === plainList.id), false);
+  assert.equal(getList(referenced.id)?.deletedAt !== undefined, true);
+});
+
+// ── List CRUD ────────────────────────────────────────────────────────────────────────────────
+
+test('createList: manual list stores appids, defaults to root/order 0', () => {
+  const { createList } = store();
+  const l = createList({ name: 'Backlog', kind: 'manual', appids: [10, 20] });
+  assert.equal(l.kind, 'manual');
+  assert.deepEqual(l.appids, [10, 20]);
+  assert.equal(l.parentId, null);
+});
+
+test('setListAppids: replaces a manual list\'s appids and bumps updatedAt', async () => {
+  const { createList, setListAppids, getList } = store();
+  const l = createList({ name: 'Backlog', kind: 'manual', appids: [1] });
+  await new Promise(r => setTimeout(r, 2));
+  setListAppids(l.id, [1, 2, 3]);
+  const updated = getList(l.id);
+  assert.deepEqual(updated.appids, [1, 2, 3]);
+  assert.ok(updated.updatedAt >= l.updatedAt);
+});
+
+test('setListAppids: no-ops on a dynamic list', () => {
+  const { createList, setListAppids, getList } = store();
+  const l = createList({ name: 'Combo', kind: 'dynamic', op: 'union', sources: [] });
+  setListAppids(l.id, [1, 2]);
+  assert.equal(getList(l.id).appids, undefined);
+});
+
+test('renameList/moveList: update name/parentId independently', () => {
+  const { createFolder, createList, renameList, moveList, getList } = store();
+  const folder = createFolder('Folder');
+  const l = createList({ name: 'Old', kind: 'manual' });
+  renameList(l.id, 'New');
+  moveList(l.id, folder.id);
+  const updated = getList(l.id);
+  assert.equal(updated.name, 'New');
+  assert.equal(updated.parentId, folder.id);
+});
+
+test('reorderSiblings: rewrites order for interleaved folders/lists at one parent, ignores refs from elsewhere', () => {
+  const { createFolder, createList, reorderSiblings, getFolder, getList } = store();
+  const f1 = createFolder('F1');
+  const l1 = createList({ name: 'L1', kind: 'manual' });
+  const f2 = createFolder('F2');
+  const elsewhere = createList({ name: 'Elsewhere', kind: 'manual', parentId: f1.id });
+
+  reorderSiblings(null, [
+    { kind: 'folder', id: f2.id },
+    { kind: 'list', id: l1.id },
+    { kind: 'folder', id: f1.id },
+    { kind: 'list', id: elsewhere.id }, // wrong parentId — must be ignored
+  ]);
+
+  assert.equal(getFolder(f2.id).order, 0);
+  assert.equal(getList(l1.id).order, 1);
+  assert.equal(getFolder(f1.id).order, 2);
+  assert.equal(getList(elsewhere.id).order, 0); // untouched — still its original order
+});
+
+// ── Cycle detection ──────────────────────────────────────────────────────────────────────────
+
+test('createList: rejects a dynamic list whose sources reference itself indirectly (would-be self-ref via a fresh id is impossible; covered by updateDynamicList below), but accepts a valid multi-source combine', () => {
+  const { createList } = store();
+  const a = createList({ name: 'A', kind: 'manual', appids: [1] });
+  const b = createList({ name: 'B', kind: 'manual', appids: [2] });
+  const combo = createList({
+    name: 'Combo', kind: 'dynamic', op: 'union',
+    sources: [{ kind: 'user', listId: a.id }, { kind: 'user', listId: b.id }],
+  });
+  assert.equal(combo.sources.length, 2);
+});
+
+test('updateDynamicList: rejects a direct cycle (A depends on B, B depends on A)', () => {
+  const { createList, updateDynamicList } = store();
+  const a = createList({ name: 'A', kind: 'dynamic', op: 'union', sources: [] });
+  const b = createList({
+    name: 'B', kind: 'dynamic', op: 'union',
+    sources: [{ kind: 'user', listId: a.id }],
+  });
+  assert.throws(() => updateDynamicList(a.id, 'union', [{ kind: 'user', listId: b.id }]), /cycle/i);
+});
+
+test('updateDynamicList: rejects a multi-hop cycle (A -> B -> C -> A)', () => {
+  const { createList, updateDynamicList } = store();
+  const a = createList({ name: 'A', kind: 'dynamic', op: 'union', sources: [] });
+  const b = createList({
+    name: 'B', kind: 'dynamic', op: 'union',
+    sources: [{ kind: 'user', listId: a.id }],
+  });
+  const c = createList({
+    name: 'C', kind: 'dynamic', op: 'union',
+    sources: [{ kind: 'user', listId: b.id }],
+  });
+  assert.throws(() => updateDynamicList(a.id, 'union', [{ kind: 'user', listId: c.id }]), /cycle/i);
+});
+
+test('updateDynamicList: a non-cyclic edit (e.g. adding an unrelated list) succeeds', () => {
+  const { createList, updateDynamicList, getList } = store();
+  const a = createList({ name: 'A', kind: 'manual', appids: [1] });
+  const b = createList({ name: 'B', kind: 'manual', appids: [2] });
+  const combo = createList({
+    name: 'Combo', kind: 'dynamic', op: 'union',
+    sources: [{ kind: 'user', listId: a.id }],
+  });
+  updateDynamicList(combo.id, 'intersect', [{ kind: 'user', listId: a.id }, { kind: 'user', listId: b.id }]);
+  const updated = getList(combo.id);
+  assert.equal(updated.op, 'intersect');
+  assert.equal(updated.sources.length, 2);
+});
+
+test('createList/updateDynamicList: non-user source kinds (account/bundle/recent-games) never trigger cycle detection', () => {
+  const { createList } = store();
+  const combo = createList({
+    name: 'Combo', kind: 'dynamic', op: 'union',
+    sources: [{ kind: 'account-owned', accountId: 'acc1' }, { kind: 'bundle', bundleId: 'b1' }, { kind: 'recent-games' }],
+  });
+  assert.equal(combo.sources.length, 3);
+});
+
+// ── Soft-delete / restore ────────────────────────────────────────────────────────────────────
+
+test('deleteList: hard-removes a list nothing references', () => {
+  const { createList, deleteList, getList } = store();
+  const l = createList({ name: 'Standalone', kind: 'manual' });
+  const result = deleteList(l.id);
+  assert.equal(result.softDeleted, false);
+  assert.equal(getList(l.id), undefined);
+});
+
+test('deleteList: soft-deletes a list still referenced by a dynamic list, hides it from getLists() by default', () => {
+  const { createList, deleteList, getList, getLists } = store();
+  const source = createList({ name: 'Source', kind: 'manual', appids: [1] });
+  createList({ name: 'Watcher', kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: source.id }] });
+
+  const result = deleteList(source.id);
+  assert.equal(result.softDeleted, true);
+  assert.ok(getList(source.id).deletedAt);
+  assert.equal(getLists().some(l => l.id === source.id), false);
+  assert.equal(getLists({ includeDeleted: true }).some(l => l.id === source.id), true);
+});
+
+test('restoreList: clears deletedAt and brings the list back into getLists()', () => {
+  const { createList, deleteList, restoreList, getLists } = store();
+  const source = createList({ name: 'Source', kind: 'manual', appids: [1] });
+  createList({ name: 'Watcher', kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: source.id }] });
+  deleteList(source.id);
+
+  restoreList(source.id);
+  assert.equal(getLists().some(l => l.id === source.id), true);
+});
+
+test('sweepDeletedLists: purges a soft-deleted list once its last reference is gone, leaves a still-referenced one', () => {
+  const { createList, deleteList, updateDynamicList, sweepDeletedLists, getLists } = store();
+  const source = createList({ name: 'Source', kind: 'manual', appids: [1] });
+  const stillReferenced = createList({ name: 'StillReferenced', kind: 'manual', appids: [2] });
+  const watcher = createList({
+    name: 'Watcher', kind: 'dynamic', op: 'union',
+    sources: [{ kind: 'user', listId: source.id }, { kind: 'user', listId: stillReferenced.id }],
+  });
+  deleteList(source.id);
+  deleteList(stillReferenced.id);
+
+  // Drop the watcher's reference to `source` only — `stillReferenced` stays referenced.
+  updateDynamicList(watcher.id, 'union', [{ kind: 'user', listId: stillReferenced.id }]);
+
+  const removed = sweepDeletedLists();
+  assert.equal(removed, 1);
+  const all = getLists({ includeDeleted: true });
+  assert.equal(all.some(l => l.id === source.id), false);
+  assert.equal(all.some(l => l.id === stillReferenced.id), true);
+});
+
+// ── freezeToSnapshot ─────────────────────────────────────────────────────────────────────────
+
+test('freezeToSnapshot: converts a dynamic list to manual with the given appids, drops op/sources', () => {
+  const { createList, freezeToSnapshot, getList } = store();
+  const combo = createList({ name: 'Combo', kind: 'dynamic', op: 'union', sources: [] });
+  const frozen = freezeToSnapshot(combo.id, [1, 2, 3]);
+  assert.equal(frozen.kind, 'manual');
+  assert.deepEqual(frozen.appids, [1, 2, 3]);
+  assert.equal(frozen.op, undefined);
+  assert.equal(frozen.sources, undefined);
+  assert.equal(getList(combo.id).kind, 'manual');
+});
+
+// ── isAccountReferenced (used by accountsStore.ts) ───────────────────────────────────────────
+
+test('isAccountReferenced: true only while a dynamic list references that accountId', () => {
+  const { createList, isAccountReferenced, updateDynamicList } = store();
+  assert.equal(isAccountReferenced('acc1'), false);
+  const watcher = createList({
+    name: 'Watcher', kind: 'dynamic', op: 'union',
+    sources: [{ kind: 'account-owned', accountId: 'acc1' }],
+  });
+  assert.equal(isAccountReferenced('acc1'), true);
+  updateDynamicList(watcher.id, 'union', []);
+  assert.equal(isAccountReferenced('acc1'), false);
+});

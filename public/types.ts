@@ -140,3 +140,63 @@ export interface PriceFields {
   lowM3: number | null;
   priceCurrency: string | null;
 }
+
+// ── List-centric redesign (see docs/list-centric-redesign.md) ──────────────────────────────
+// These back accountsStore.ts/listsStore.ts/combine.ts/listResolve.ts — see that doc for the
+// full design rationale (why accounts are pinned explicitly rather than "whichever is
+// current", why soft-delete/restore exists, why cycles are rejected at save time, etc.).
+
+// A resolved account identity — "myAccount"/"currentAccount" are full objects of this shape
+// (not just an id reference) so clearing recentAccounts can never orphan either of them.
+export interface AccountSlot {
+  id: string; // canonical: sorted-joined member steam64 ids (stable identity, incl. Family unions)
+  members: string[]; // resolved steam64 ids, sorted
+  rawInputs: string[]; // original typed identifiers (vanity name/URL/id), same order as entered
+  label?: string; // last-known display name(s) ("PersonaName" or "A + B" for a Family) — cached
+                  // for instant recents rendering before a fresh fetch resolves
+  avatarUrl?: string; // last-known avatar, same reason
+  lastUsedAt: number;
+  removedAt?: number; // soft-removed from the recents UI, kept while referenced by a dynamic list
+}
+
+// A node in the user's list-organizing tree — flat arrays keyed by parentId, not a nested
+// structure, so rename/move/reorder is a single-item mutation rather than a tree walk.
+export interface Folder {
+  id: string;
+  name: string;
+  parentId: string | null; // null = root
+  order: number; // sibling order — shared numbering space with GameList at the same parentId
+  createdAt: number;
+}
+
+export type CombineOp = 'union' | 'intersect' | 'subtract' | 'group-by-membership';
+
+// Points at any list-shaped data source a dynamic list can combine, or the tree can hold a
+// shortcut to (not used for that yet — see the design doc's "tree scope" decision). Account-
+// scoped refs always pin an explicit accountId, never "whichever account is current", so a
+// saved "Alice ∩ Bob" comparison keeps meaning that regardless of what currentAccount becomes.
+export interface ListRef {
+  kind: 'account-owned' | 'account-wishlist' | 'bundle' | 'recent-games' | 'user';
+  accountId?: string; // AccountSlot.id
+  bundleId?: string;
+  listId?: string; // → GameList.id
+}
+
+// A user-created list — either a stored, directly-editable set of appids ('manual'), or a
+// stored formula recomputed live every time it's opened ('dynamic'). Lives in the same
+// Folder/GameList tree via parentId/order.
+export interface GameList {
+  id: string;
+  name: string;
+  parentId: string | null;
+  order: number;
+  createdAt: number;
+  updatedAt: number;
+  kind: 'manual' | 'dynamic';
+  appids?: number[]; // kind: 'manual'
+  op?: CombineOp; // kind: 'dynamic'
+  sources?: ListRef[]; // kind: 'dynamic'
+  tableView?: object; // persisted per-list (not shared across lists), same shape tableViewPrefs.ts stores
+  deletedAt?: number; // soft-deleted — hidden from the tree/pickers, kept for dynamic-list
+                      // resolution + restore as long as something still references it
+}
