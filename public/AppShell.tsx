@@ -52,11 +52,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
 
   onMount(() => {
     initLightbox({});
-    // inertSelector still applies here (Phase 3 removes it along with the rest of the panel's
-    // modal mechanics — see the implementation plan) — `.app-content` is this shell's
-    // equivalent of each legacy page's own root container class.
     initPanel({
-      inertSelector: '.app-content',
       onNavigateGame: (appid: number) => navigate(`/game/${appid}`),
     });
     initGameSearch({
@@ -109,13 +105,17 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       </nav>
       <div id="app-recent-games" class="recents-bar" hidden></div>
 
-      <main class="app-content">{props.children}</main>
+      <div class="app-body">
+        <main class="app-content">{props.children}</main>
 
-      <div id="panel-backdrop" class="panel-backdrop"></div>
-      <div id="game-panel" class="game-panel" role="dialog" aria-modal="true" aria-labelledby="panel-title">
-        <button id="panel-close" class="panel-close" aria-label="Close">×</button>
-        <div id="panel-nav" class="panel-nav"></div>
-        <div id="panel-body" class="panel-body"></div>
+        {/* Docked, not modal — role="complementary" rather than "dialog"/aria-modal, since the
+            rest of the page stays fully interactive while this is open (see panel.tsx's own
+            comment and docs/list-centric-redesign.md). */}
+        <div id="game-panel" class="game-panel" role="complementary" aria-labelledby="panel-title">
+          <button id="panel-close" class="panel-close" aria-label="Close">×</button>
+          <div id="panel-nav" class="panel-nav"></div>
+          <div id="panel-body" class="panel-body"></div>
+        </div>
       </div>
     </div>
   );

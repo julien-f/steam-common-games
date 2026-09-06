@@ -402,7 +402,6 @@ initPageShell({
   page: 'library',
   lightbox: { onParamChange: setLightboxParam, onGameNav: navigateLightboxGame },
   panel: {
-    inertSelector: '.lib-page',
     showAchievements: true,
     getOwnersHtml: buildLibraryOwnersHtml,
     // Only the Wishlist tab's own loadWishlistPrices batch-prices its rows — the Library tab's

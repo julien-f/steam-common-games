@@ -646,39 +646,52 @@ a.account-identity:hover .account-name { color: var(--accent2); }
 tbody tr.game-row { cursor: pointer; }
 tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 
-/* Side panel backdrop */
-.panel-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.45);
-  z-index: 100;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s;
+/* App shell layout (list-centric redesign, see docs/list-centric-redesign.md and AppShell.tsx)
+   — `.app-body` holds the routed content and the side panel as two flex siblings, so the panel
+   docks next to whatever's showing instead of overlaying it. */
+.app-body {
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
 }
-.panel-backdrop.open { opacity: 1; pointer-events: auto; }
+.app-content {
+  flex: 1;
+  min-width: 0;
+}
 
-/* Side panel drawer */
+/* Side panel — docked, not modal: a sibling column, not an overlay. No backdrop at all (see
+   AppShell.tsx) — closing is always an explicit action (the ×, Escape, or swipe), never a
+   click outside. Hidden entirely (not just visually) until a game is open, so the content
+   column gets the full width back; falls back to a full-screen overlay only on narrow
+   viewports (see the max-width query below) — a layout fallback, not a return to modal
+   semantics, since there's still no backdrop/click-outside-dismiss even there. */
 .game-panel {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
+  display: none;
+  position: relative; /* .panel-nav below pins to this via position:absolute — see its own comment */
   width: 380px;
   max-width: 100vw;
   background: var(--bg1);
   border-left: 1px solid var(--border);
-  z-index: 101;
-  display: flex;
   flex-direction: column;
-  transform: translateX(100%);
-  transition: transform 0.25s ease;
+  flex-shrink: 0;
   overflow: hidden;
 }
-.game-panel.open { transform: translateX(0); box-shadow: -8px 0 32px rgba(0,0,0,0.4); }
+.game-panel.open { display: flex; }
 
 @media (min-width: 1400px) {
   .game-panel { width: min(480px, 30vw); }
+}
+
+@media (max-width: 768px) {
+  /* No room for a docked two-column layout at this width — the panel becomes a full-screen
+     overlay instead. Still non-modal: no backdrop, no click-outside-dismiss, just a layout
+     fallback. */
+  .game-panel.open {
+    position: fixed;
+    inset: 0;
+    z-index: 101;
+    width: 100vw;
+  }
 }
 
 @media (max-width: 768px) {
@@ -699,7 +712,6 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   .td-hltb { min-width: 60px; }
   .family-row { padding-left: 20px; }
   .family-hint { padding-left: 20px; }
-  .game-panel { width: 100vw; }
   /* Prevent iOS Safari from zooming on input focus */
   .user-row input, .filter-search, .filter-name-input { font-size: 16px; }
   /* Move the Steam Family button below the input+remove row */
@@ -876,7 +888,8 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
    between the hero and the body, which meant reaching it on desktop required
    scrolling back up past the hero every time) — one behavior instead of two, and it
    keeps prev/next/random reachable without the trip. `.game-panel` is `position:
-   fixed`, so this `position: absolute` pins to its bottom edge without needing any
+   relative` (previously `fixed`, before the panel became a docked column — see its own
+   comment), so this `position: absolute` still pins to its bottom edge without needing any
    DOM change. `:empty` hides it entirely for standalone lookups (no group/list to
    page through) rather than showing an empty floating bar. */
 .panel-nav {

@@ -133,7 +133,6 @@ createRoot(() => {
 
 document.addEventListener('DOMContentLoaded', () => {
   const panelOptions: PanelOptions = {
-    inertSelector: '.container',
     enableTagFilters: true,
     // Achievements are opt-in per host page (see panel.ts's achievementsHtml). Unlike the
     // Library Explorer, a comparison group has no single well-defined "player" to fetch

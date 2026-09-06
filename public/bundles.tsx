@@ -416,7 +416,6 @@ initPageShell({
   page: 'bundles',
   lightbox: { onParamChange: setLightboxParam, onGameNav: navigateLightboxGame },
   panel: {
-    inertSelector: '.bundles-page',
     showAchievements: true,
     // Every row here is always batch-priced by loadPrices (see its own comment) — never a
     // per-game fetch of panel.js's own, which would just duplicate that same call.

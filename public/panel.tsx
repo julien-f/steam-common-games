@@ -18,7 +18,6 @@ export interface PanelOptions {
   onRefresh?: (game: Game) => void;
   onNavigateGame?: (appid: number, name: string) => void;
   onClose?: (opts?: { preserveUrl?: boolean }) => void;
-  inertSelector?: string;
   pricesHandledByHost?: boolean | ((game: Game) => boolean);
   showAchievements?: boolean;
   enableTagFilters?: boolean;
@@ -38,10 +37,17 @@ export interface PanelOptions {
 // Every exported function below keeps its exact original name/signature (every host page's
 // import is untouched by this conversion) — the one
 // deliberate behavior difference is internal: `panelOptions.onClose` still exists because
-// panelClose() itself is called from more places than just the host's own code (the backdrop
-// click, × button, and swipe-to-close all call it directly) — a host that needs to run cleanup
-// on every close (not just the ones it explicitly triggers) should do it there rather than in a
-// wrapper around panelClose(), which those other paths would silently bypass.
+// panelClose() itself is called from more places than just the host's own code (the × button
+// and swipe-to-close both call it directly) — a host that needs to run cleanup on every close
+// (not just the ones it explicitly triggers) should do it there rather than in a wrapper around
+// panelClose(), which those other paths would silently bypass.
+//
+// Docked, not modal (see docs/list-centric-redesign.md and style.css's own "App shell layout"
+// comment): the panel is a sibling column next to whatever list/content is showing, not an
+// overlay — no backdrop element, no click-outside-to-close, no `inert`-toggling of the
+// background (there's nothing to make inert; the rest of the page stays fully interactive
+// while the panel is open). `.open` still gates visibility (hidden entirely when no game is
+// open, shown as a column when one is), it just means something different in the CSS now.
 //
 // Reactivity model: `panelGame`/`heroIdx`/`moreLinksOpen`/`panelHistory`/`expandedSections`/
 // `revealedAchievements`/`achievementsFilter`/`panelRefreshing` are all real Solid signals now —
@@ -126,7 +132,6 @@ export function clearAllRandomQueues() {
 export function initPanel(options: PanelOptions = {}) {
   panelOptions = options;
 
-  document.getElementById('panel-backdrop')!.addEventListener('click', () => panelClose());
   document.getElementById('panel-close')!.addEventListener('click', () => panelClose());
 
   const panelBodyEl = document.getElementById('panel-body')!;
@@ -505,36 +510,26 @@ export function panelOpen(game: Game, { keepHistory = false } = {}) {
   loadNews(game); // no-op (see loadNews) if this game's news was already fetched this session
   loadPrice(game); // no-op (see loadPrice) if this game is priced by the host, or already loaded
   document.getElementById('game-panel')!.classList.add('open');
-  document.getElementById('panel-backdrop')!.classList.add('open');
-  if (panelOptions.inertSelector) {
-    const el = document.querySelector(panelOptions.inertSelector);
-    if (el) (el as HTMLElement & { inert: boolean }).inert = true;
-  }
   ((document.getElementById('panel-hero')?.querySelector('.panel-hero-img') ?? document.getElementById('panel-close')!) as HTMLElement).focus();
 }
 
 // `preserveUrl`: threaded through to `onClose` unchanged — for a host that clears
 // `?game=`/`&shot=` there, this lets a caller that's about to reopen the same game right
 // after (e.g. a forced-refresh reload) close the panel's DOM state without losing the
-// deep link it'll restore from once the reload completes. Not used by the backdrop
-// click/× button/swipe paths below, which always want the default (URL cleared).
+// deep link it'll restore from once the reload completes. Not used by the × button/swipe
+// paths below, which always want the default (URL cleared).
 export function panelClose({ preserveUrl = false } = {}) {
   if (!panelGame()) return;
   setPanelGame(null);
   setPanelHistory([]); // closing the panel ends whatever DLC browsing trail was in progress
   document.getElementById('game-panel')!.classList.remove('open');
-  document.getElementById('panel-backdrop')!.classList.remove('open');
-  if (panelOptions.inertSelector) {
-    const el = document.querySelector(panelOptions.inertSelector);
-    if (el) (el as HTMLElement & { inert: boolean }).inert = false;
-  }
   document.getElementById('panel-nav')?.replaceChildren();
   panelPrevFocus?.focus();
   panelPrevFocus = null;
-  // Every close path funnels through here — the backdrop click and × button are bound
-  // straight to this function (see initPanel above), and swipe-to-close calls it directly
-  // too — so this is the one place host-specific close cleanup (clearing `?game=`/`&shot=`
-  // from the URL, resetting the host's own "active game" state) can hook in without every
+  // Every close path funnels through here — the × button is bound straight to this function
+  // (see initPanel above), and swipe-to-close calls it directly too — so this is the one place
+  // host-specific close cleanup (clearing `?game=`/`&shot=` from the URL, resetting the host's
+  // own "active game" state) can hook in without every
   // host having to remember to wrap all of those paths itself.
   panelOptions.onClose?.({ preserveUrl });
 }
