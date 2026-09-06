@@ -3,8 +3,9 @@
 // listsStore.ts/combine.ts modules and real data: every "impure" dependency (fetching an
 // account's owned/wishlist games, a bundle's games, the recent-games list, and looking up
 // another GameList by id) is injected via ListResolveFetchers rather than imported directly, so
-// this module — and its tests — never need a real network/localStorage. Phase 4 wires the real
-// implementations in (accountData.ts/bundleData.ts/recentGames.ts/listsStore.ts's own getList).
+// this module — and its tests — never need a real network/localStorage. createDefaultFetchers
+// below wires the real implementations in (accountData.ts/bundleData.ts/recentGames.ts/
+// listsStore.ts's own getList) for actual routes to use.
 //
 // listsStore.ts already rejects a cycle at save/edit time (wouldCreateCycle) — the visited-set
 // check below is a defensive backstop in case that's ever bypassed (a hand-edited localStorage
@@ -13,6 +14,10 @@
 // answer" principle.
 import type { GameList, ListRef, CombineOp } from './types.ts';
 import { combine, type LabeledSet, type CombineResult } from './combine.ts';
+import { fetchAccountOwnedAppids, fetchAccountWishlistAppids } from './accountData.ts';
+import { fetchBundleAppids } from './bundleData.ts';
+import { loadRecentGames } from './recentGames.ts';
+import { getList } from './listsStore.ts';
 
 export interface ListResolveFetchers {
   accountOwned(accountId: string): Promise<Set<number>>;
@@ -108,4 +113,19 @@ export function flattenCombineResult(result: CombineResult): Set<number> {
   const flat = new Set<number>();
   for (const group of result) for (const id of group.appids) flat.add(id);
   return flat;
+}
+
+// The real ListResolveFetchers, wiring the injectable seam above to actual network calls
+// (accountData.ts/bundleData.ts), localStorage (recentGames.ts), and listsStore.ts's own
+// synchronous getList — what real routes (Phase 5) construct and pass to resolveRef/
+// resolveGameList. Tests keep using their own mocked fetchers (see listResolve.test.js), so
+// this module itself never needs a real network/localStorage.
+export function createDefaultFetchers(): ListResolveFetchers {
+  return {
+    accountOwned: fetchAccountOwnedAppids,
+    accountWishlist: fetchAccountWishlistAppids,
+    bundle: fetchBundleAppids,
+    recentGames: async () => new Set(loadRecentGames().map(g => g.appid)),
+    getList,
+  };
 }
