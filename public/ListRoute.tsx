@@ -35,7 +35,7 @@ import { createRowStore } from './rowStore.ts';
 import { createStaleGuard } from './staleGuard.ts';
 import { createStreamBatcher } from './streamBatcher.ts';
 import {
-  panelOpen, isPanelOpen, getPanelGame, pickRandomFrom, clearRandomQueue, renderPanelBody,
+  panelOpen, panelClose, isPanelOpen, getPanelGame, pickRandomFrom, clearRandomQueue, renderPanelBody,
 } from './panel.tsx';
 import { setPanelParam } from './urlState.ts';
 import { setPref } from './prefs.ts';
@@ -398,6 +398,10 @@ export default function ListRoute() {
   });
 
   onCleanup(() => {
+    // The panel's own nav bar (renderPanelNav) points at *this* mount's table/getGameList —
+    // leaving the route without closing it would leave the panel open on a stale game with a
+    // prev/next list that no longer exists once disposeTable runs just below.
+    if (isPanelOpen()) panelClose();
     loadGuard.next(); // invalidate any still-in-flight fetch/stream from this mount
     if (disposeTable) disposeTable();
     if (unsyncView) unsyncView();
