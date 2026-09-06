@@ -2,14 +2,17 @@
 // and the implementation plan's Phase 4/5. Registered for /lists/owned, /lists/wishlist,
 // /lists/bundle/:bundleId, /lists/recent, and the generic /lists/:listId (see AppRoot.tsx).
 //
-// **Current scope**: only the 'owned' and 'wishlist' kinds are wired up for real (Phase 5 steps
-// 1-2) — bundle/recent/user kinds render a "not yet available" placeholder until their own
-// Phase 5 steps land. This is deliberately narrower than the full plan on one more axis too:
-// ownership cross-referencing (in-library/on-wishlist badges) and achievements are not ported
-// yet (both need a second background fetch this first pass omits); `currentAccount` is read
-// once per mount, not live-reactive to being changed elsewhere while this route stays open —
-// accountsStore.ts is a plain module with no Solid signal of its own yet, so there's nothing to
-// subscribe to reactively here until one exists (a real follow-up, not an oversight).
+// **Current scope**: the 'owned', 'wishlist', and 'bundle' kinds are wired up for real (Phase 5
+// steps 1-2 and 4) — 'recent'/'user' still render a "not yet available" placeholder until their
+// own later Phase 5 steps land. This is deliberately narrower than the full plan on a few more
+// axes too: ownership cross-referencing (in-library/on-wishlist badges) and achievements are not
+// ported yet (both need a second background fetch this first pass omits); `currentAccount` is
+// read once per mount, not live-reactive to being changed elsewhere while this route stays open
+// — accountsStore.ts is a plain module with no Solid signal of its own yet, so there's nothing
+// to subscribe to reactively here until one exists (a real follow-up, not an oversight); a
+// bundle's own unresolved ("Not on Steam") games and its detail card (title/expiry/outbound
+// links) aren't rendered here either — only the resolved games' table, the actual point of
+// this generic viewer.
 //
 // Ported from library.tsx's loadLibrary/loadWishlist/streamGameDetails/buildTable et al., but
 // NOT a copy-paste: every mutable variable that used to be module-level there (table, rowsStore,
@@ -26,9 +29,9 @@ import { bucketDatePart, formatDatePart } from '@vates/data-table-core';
 import {
   fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareDateMissingLast,
   withMissingGroup, formatMissingGroup, halfDecadeBucket, formatHalfDecadeBucket,
-  protonDbValue, TYPE_LABELS,
+  protonDbValue, TYPE_LABELS, priceTierBucket, formatPriceTier, compareNumMissingLast,
 } from './gameColumns.ts';
-import { computeSteamdbRating, computeProductionTier, discountPct, fmtLastPlayed } from './utils.ts';
+import { computeSteamdbRating, computeProductionTier, discountPct, fmtLastPlayed, formatMoney } from './utils.ts';
 import { restoreTableView } from './tableViewPrefs.ts';
 import { renderPanelNav as renderPanelNavShared, stepGameList } from './panelNav.ts';
 import { createRowStore } from './rowStore.ts';
@@ -41,6 +44,7 @@ import { setPanelParam } from './urlState.ts';
 import { setPref } from './prefs.ts';
 import { getCurrentAccount } from './accountsStore.ts';
 import { fetchAccountOwnedGames, fetchAccountWishlistItems } from './accountData.ts';
+import { fetchBundleById, resolveBundleGames, type ResolvedGame } from './bundleData.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from './priceLoading.ts';
 import { getStoredRegion, resolveRegion } from './region.ts';
 import { registerRouteKeyboardHandlers } from './AppShell.tsx';
@@ -98,6 +102,42 @@ const WISHLIST_DEFAULT_VISIBLE = [
   'capsule', 'name', 'dateAdded', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres', 'hasDemo',
   'bestDealPrice', 'bestDealCut',
 ];
+
+function renderAddonBadge(v: unknown): Node {
+  if (v === undefined) return document.createTextNode('…');
+  const span = document.createElement('span');
+  span.className = 'status-badge';
+  span.style.background = v ? '#8b4513' : 'var(--accent)';
+  span.style.color = v ? '#fff' : '#0b1620';
+  span.textContent = v ? 'Add-on' : 'Base';
+  return span;
+}
+
+// A `null` tier price means "no single fixed price" (in practice, a pick-and-mix "Build Your
+// Own" tier), not free — an actual free/pay-what-you-want tier is a real `{amount: 0}`.
+function renderTierPrice(v: unknown, row: Record<string, any>): Node {
+  if (v === undefined) return document.createTextNode('…');
+  if (v == null) return document.createTextNode('Varies');
+  if (v === 0) return document.createTextNode('Free');
+  return document.createTextNode(formatMoney(Number(v), row.tierCurrency));
+}
+
+const TIER_PRICE_COLUMN: ColumnDef<Record<string, any>> = {
+  key: 'tierPrice', label: 'Tier Price', type: 'number', groupable: true,
+  format: v => v == null ? 'Varies' : v === 0 ? 'Free' : Number(v).toFixed(2), render: renderTierPrice,
+  compare: compareNumMissingLast, defaultSortDir: 'asc',
+  groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier, 'Varies'), keepVisibleWhenGrouped: true,
+  category: 'Pricing',
+};
+const ADDON_COLUMN: ColumnDef<Record<string, any>> =
+  { key: 'addon', label: 'Add-on', groupable: true, format: v => v ? 'Add-on' : 'Base', render: renderAddonBadge, category: 'Classification' };
+
+const BUNDLE_COLUMNS = insertColumnsAfter(
+  insertColumnsAfter(CORE_COLUMNS, 'name', TIER_PRICE_COLUMN, ADDON_COLUMN),
+  'addon', ...PRICE_COLUMNS,
+);
+const BUNDLE_DEFAULT_VISIBLE = ['capsule', 'name', 'tierPrice', 'bestDealPrice', 'bestDealCut', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
+const BUNDLE_DEFAULT_SORT: SortEntry[] = [{ key: 'tierPrice', dir: 'asc' }, { key: 'steamdbRating', dir: 'desc' }];
 
 const DEFAULT_SORT: SortEntry[] = [{ key: 'steamdbRating', dir: 'desc' }];
 const MAX_PRICE_LOOKUP_GAMES = 500; // mirrors the server's own cap — see loadWishlistPrices below
@@ -181,7 +221,13 @@ export default function ListRoute() {
 
   function tableData(): Game[] { return rowsStore.filter(r => !r.loading); }
   function getGameList(): Game[] { return table ? table.processedData() : []; }
-  function randomQueueKey(): string { return `list-route:${kind}`; }
+  // Scoped by specific id, not just kind — kind alone would collide between two different
+  // bundles/user lists navigated between without a remount (see the createEffect below).
+  function randomQueueKey(): string {
+    if (kind === 'bundle') return `list-route:bundle:${params.bundleId}`;
+    if (kind === 'user') return `list-route:user:${params.listId}`;
+    return `list-route:${kind}`;
+  }
 
   function updateStatus(): void {
     if (total === 0) { setStatusText(''); return; }
@@ -313,16 +359,51 @@ export default function ListRoute() {
     }
   }
 
-  function viewPrefKey(): string { return kind === 'wishlist' ? 'wishlistListView' : 'ownedListView'; }
-  function viewParamName(): string { return kind === 'wishlist' ? 'wv' : 'lv'; }
+  // Bundle prices are looked up by ITAD gid (already known upfront from the bundle's own
+  // resolved games), not appid — mirrors bundles.tsx's own loadPrices. No chunking: unlike a
+  // wishlist, a single bundle's game list never runs past the server's own cap.
+  async function loadBundlePrices(resolved: ResolvedGame[], gen: number): Promise<void> {
+    setPriceStatusText('');
+    try {
+      const prices = await postPrices({ gids: resolved.map(g => g.gid), country: resolveRegion(getStoredRegion()) });
+      if (loadGuard.isStale(gen)) return;
+      batch(() => {
+        for (const g of resolved) {
+          const info = prices[g.gid];
+          if (!info) continue;
+          const row = rowStore.mutateRow(g.appid, draft => applyPriceInfo(draft, info, discountPct));
+          if (!row) continue;
+          if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
+        }
+      });
+    } catch (err) {
+      if (loadGuard.isStale(gen)) return;
+      batch(() => {
+        for (const g of resolved) {
+          const row = rowStore.mutateRow(g.appid, draft => nullMissingPriceFields(draft));
+          if (!row) continue;
+          if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
+        }
+      });
+      setPriceStatusText(`Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`);
+    }
+  }
+
+  function viewPrefKey(): string {
+    if (kind === 'wishlist') return 'wishlistListView';
+    if (kind === 'bundle') return 'bundleListView';
+    return 'ownedListView';
+  }
+  function viewParamName(): string {
+    if (kind === 'wishlist') return 'wv';
+    if (kind === 'bundle') return 'bv';
+    return 'lv';
+  }
 
   async function load(): Promise<void> {
-    if (kind !== 'owned' && kind !== 'wishlist') return; // bundle/recent/user land in later Phase 5 steps
-    const account = getCurrentAccount();
-    if (!account) { setStatusText('No account selected — pick one from Home once it exists.'); return; }
+    if (kind !== 'owned' && kind !== 'wishlist' && kind !== 'bundle') return; // recent/user land in later Phase 5 steps
 
     const gen = loadGuard.next();
-    setStatusText(kind === 'wishlist' ? 'Fetching wishlist…' : 'Fetching library…');
 
     if (disposeTable) { disposeTable(); disposeTable = null; }
     table = null;
@@ -334,45 +415,76 @@ export default function ListRoute() {
 
     let initialRows: Game[];
     let streamTargets: { appid: number }[];
-    try {
-      if (kind === 'owned') {
-        const games = await fetchAccountOwnedGames(account.members);
+    let resolvedBundleGames: ResolvedGame[] | null = null;
+
+    if (kind === 'bundle') {
+      setStatusText('Resolving games to Steam…');
+      try {
+        const bundle = await fetchBundleById(Number(params.bundleId));
         if (loadGuard.isStale(gen)) return;
-        initialRows = games.map(g => ({
-          appid: g.appid, name: g.name,
-          playtime: g.playtimeMinutes / 60, lastPlayed: fmtLastPlayed(g.lastPlayedUnix),
-          loading: true, details: null,
-        })) as unknown as Game[];
-        streamTargets = games;
-      } else {
-        const items = await fetchAccountWishlistItems(account.members);
+        const { resolved } = await resolveBundleGames(bundle);
         if (loadGuard.isStale(gen)) return;
-        initialRows = items.map(item => ({
-          appid: item.appid, name: '', priority: item.priority, dateAdded: item.dateAdded,
+        if (resolved.length === 0) { setStatusText('No games in this bundle could be matched to a Steam listing.'); return; }
+        resolvedBundleGames = resolved;
+        initialRows = resolved.map(g => ({
+          appid: g.appid, name: g.title, tierPrice: g.tierPrice, tierCurrency: g.tierCurrency, addon: g.addon,
           steamRegular: undefined, bestDealPrice: undefined, bestDealShop: undefined, bestDealUrl: undefined,
           bestDealCut: undefined, lowAll: undefined, lowY1: undefined, lowM3: undefined, priceCurrency: undefined,
           loading: true, details: null,
         })) as unknown as Game[];
-        streamTargets = items;
+        streamTargets = resolved;
+      } catch (err) {
+        if (loadGuard.isStale(gen)) return;
+        setStatusText(`Error: ${(err as Error).message}`);
+        return;
       }
-    } catch (err) {
-      if (loadGuard.isStale(gen)) return;
-      setStatusText(`Error: ${(err as Error).message}`);
-      return;
+    } else {
+      const account = getCurrentAccount();
+      if (!account) { setStatusText('No account selected — pick one from Home once it exists.'); return; }
+      setStatusText(kind === 'wishlist' ? 'Fetching wishlist…' : 'Fetching library…');
+      try {
+        if (kind === 'owned') {
+          const games = await fetchAccountOwnedGames(account.members);
+          if (loadGuard.isStale(gen)) return;
+          initialRows = games.map(g => ({
+            appid: g.appid, name: g.name,
+            playtime: g.playtimeMinutes / 60, lastPlayed: fmtLastPlayed(g.lastPlayedUnix),
+            loading: true, details: null,
+          })) as unknown as Game[];
+          streamTargets = games;
+        } else {
+          const items = await fetchAccountWishlistItems(account.members);
+          if (loadGuard.isStale(gen)) return;
+          initialRows = items.map(item => ({
+            appid: item.appid, name: '', priority: item.priority, dateAdded: item.dateAdded,
+            steamRegular: undefined, bestDealPrice: undefined, bestDealShop: undefined, bestDealUrl: undefined,
+            bestDealCut: undefined, lowAll: undefined, lowY1: undefined, lowM3: undefined, priceCurrency: undefined,
+            loading: true, details: null,
+          })) as unknown as Game[];
+          streamTargets = items;
+        }
+      } catch (err) {
+        if (loadGuard.isStale(gen)) return;
+        setStatusText(`Error: ${(err as Error).message}`);
+        return;
+      }
     }
 
     setRowsStore(initialRows);
     rowStore.load(initialRows);
     total = initialRows.length;
 
-    const columns = (kind === 'wishlist' ? WISHLIST_COLUMNS : OWNED_COLUMNS) as unknown as ColumnDef<Game>[];
-    const defaultVisible = kind === 'wishlist' ? WISHLIST_DEFAULT_VISIBLE : OWNED_DEFAULT_VISIBLE;
+    const columns = (
+      kind === 'wishlist' ? WISHLIST_COLUMNS : kind === 'bundle' ? BUNDLE_COLUMNS : OWNED_COLUMNS
+    ) as unknown as ColumnDef<Game>[];
+    const defaultVisible = kind === 'wishlist' ? WISHLIST_DEFAULT_VISIBLE : kind === 'bundle' ? BUNDLE_DEFAULT_VISIBLE : OWNED_DEFAULT_VISIBLE;
+    const sort = kind === 'bundle' ? BUNDLE_DEFAULT_SORT : DEFAULT_SORT;
 
     let disposeTableState!: () => void;
     const ts = createRoot(dispose => {
       disposeTableState = dispose;
       return createTableState<Game>(tableData, columns, {
-        initialViewState: { pageSize: 50, visibleCols: defaultVisible, sorts: DEFAULT_SORT },
+        initialViewState: { pageSize: 50, visibleCols: defaultVisible, sorts: sort },
       });
     });
     table = ts;
@@ -388,14 +500,24 @@ export default function ListRoute() {
     updateStatus();
 
     if (kind === 'wishlist') loadWishlistPrices(streamTargets, gen); // runs concurrently, not awaited
+    if (kind === 'bundle' && resolvedBundleGames) loadBundlePrices(resolvedBundleGames, gen); // ditto
     await streamGameDetails(streamTargets, gen);
   }
 
   onMount(() => {
     const unregister = registerRouteKeyboardHandlers({ pickRandom: pickRandomGame, stepGame });
-    load();
     onCleanup(unregister);
   });
+
+  // A plain createEffect, not onMount — /lists/bundle/:bundleId (and, once wired, the generic
+  // /lists/:listId) are each one route *definition* shared across every id, so navigating from
+  // one bundle/list to another under the same pattern reuses this component instance rather
+  // than remounting it (same concern GameRoute.tsx's own createEffect handles for
+  // /game/:appid). params.bundleId/params.listId are read reactively inside load() itself (via
+  // the outer `params` object) — referencing bundleId here is what makes this effect re-run on
+  // a param-only navigation; 'owned'/'wishlist' have no such param and so only ever run once,
+  // identically to the old onMount-based call.
+  createEffect(() => { params.bundleId; params.listId; load(); });
 
   onCleanup(() => {
     // The panel's own nav bar (renderPanelNav) points at *this* mount's table/getGameList —
@@ -409,17 +531,17 @@ export default function ListRoute() {
 
   return (
     <div class="list-route">
-      {kind !== 'owned' && kind !== 'wishlist' && (
+      {kind !== 'owned' && kind !== 'wishlist' && kind !== 'bundle' && (
         <div class="route-placeholder">
           <h2>List route (stub)</h2>
           <p>kind: {kind}, path: {location.pathname}</p>
           <p>This list kind lands in a later Phase 5 step.</p>
         </div>
       )}
-      {(kind === 'owned' || kind === 'wishlist') && (
+      {(kind === 'owned' || kind === 'wishlist' || kind === 'bundle') && (
         <>
           <div class="list-status">{statusText()}</div>
-          {kind === 'wishlist' && <div class="price-status">{priceStatusText()}</div>}
+          {(kind === 'wishlist' || kind === 'bundle') && <div class="price-status">{priceStatusText()}</div>}
           <div ref={tableContainer} class="table-container"></div>
         </>
       )}

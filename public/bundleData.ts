@@ -57,7 +57,7 @@ export async function fetchBundleById(id: number, { country }: { country?: strin
   const res = await fetch(`/api/bundles/${id}${qs}`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Bundle lookup failed');
-  return data;
+  return data.bundle; // GET /api/bundles/:id wraps it as { bundle: {...} }
 }
 
 // gid -> Steam appid, or null when that game has no "app/" (store page) listing — a "sub"

@@ -60,9 +60,9 @@ test('flattenBundleGames: no tiers at all yields an empty list', () => {
 
 // ── fetchBundleById ──────────────────────────────────────────────────────────────────────────
 
-test('fetchBundleById: fetches GET /api/bundles/:id, with an optional country param', async (t) => {
+test('fetchBundleById: fetches GET /api/bundles/:id, with an optional country param, and unwraps the { bundle } response', async (t) => {
   let seenUrl;
-  withFetch(t, async url => { seenUrl = url; return { ok: true, json: async () => ({ id: 42, title: 'Bundle' }) }; });
+  withFetch(t, async url => { seenUrl = url; return { ok: true, json: async () => ({ bundle: { id: 42, title: 'Bundle' } }) }; });
 
   const bundle = await fetchBundleById(42, { country: 'US' });
   assert.equal(seenUrl, '/api/bundles/42?country=US');
@@ -71,7 +71,7 @@ test('fetchBundleById: fetches GET /api/bundles/:id, with an optional country pa
 
 test('fetchBundleById: no country param when omitted', async (t) => {
   let seenUrl;
-  withFetch(t, async url => { seenUrl = url; return { ok: true, json: async () => ({ id: 1 }) }; });
+  withFetch(t, async url => { seenUrl = url; return { ok: true, json: async () => ({ bundle: { id: 1 } }) }; });
   await fetchBundleById(1);
   assert.equal(seenUrl, '/api/bundles/1');
 });
@@ -127,7 +127,7 @@ test('fetchBundleAppids: fetches the bundle, resolves it, returns just the flat 
   withFetch(t, async (url, opts) => {
     calls.push(url);
     if (url.startsWith('/api/bundles/42')) {
-      return { ok: true, json: async () => ({ id: 42, tiers: [{ price: null, games: [game('a')], addon: false }] }) };
+      return { ok: true, json: async () => ({ bundle: { id: 42, tiers: [{ price: null, games: [game('a')], addon: false }] } }) };
     }
     return { ok: true, json: async () => ({ appids: { a: 440 } }) };
   });
