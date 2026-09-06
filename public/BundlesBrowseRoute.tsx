@@ -80,7 +80,7 @@ export default function BundlesBrowseRoute() {
 
   return (
     <div class="bundles-browse-route">
-      <div class="bundle-controls">
+      <div class="bundles-controls">
         <select value={sort()} onChange={e => { setSort(e.currentTarget.value); load(); }}>
           <option value="-publish">Newest</option>
           <option value="-games">Most games</option>
@@ -91,7 +91,7 @@ export default function BundlesBrowseRoute() {
           Include expired
         </label>
       </div>
-      <div class="bundle-status">{statusText()}</div>
+      <div class="bundles-status">{statusText()}</div>
       <div class="bundle-list">
         <For each={bundles()}>
           {bundle => {

@@ -482,7 +482,7 @@ export default function ListRoute() {
       }), container);
 
       return {
-        key: group.keys.join(' '),
+        key: group.keys.join(' '),
         appids: appidSet,
         table: ts,
         disposeTable: () => { disposeView(); disposeTableState(); },

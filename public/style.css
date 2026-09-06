@@ -14,6 +14,29 @@
   --r: 6px;
 }
 
+/* Themes @vates/data-table-solid's own internals (its portaled column/filter/group submenus
+   render onto <body>, outside .table-container entirely, so this has to live on html:root —
+   an actual DOM ancestor of the portal — for the custom properties to inherit; a page-scoped
+   selector with higher specificity wouldn't reach a portal mounted as a sibling of <body>).
+   Ported verbatim from the legacy library.html/bundles.html inline <style> blocks (see
+   docs/list-centric-redesign.md) — both carried this identical block; it's now the one
+   shared copy every list route's table draws from instead of two duplicates. */
+html:root {
+  --color-background-primary: #17212b;
+  --color-background-secondary: #2a475e;
+  --color-text-primary: #c6d4df;
+  --color-text-secondary: #8f98a0;
+  --color-text-tertiary: #4c6b8a;
+  --color-border-secondary: #3d5068;
+  --color-border-tertiary: #2a3f57;
+  --color-background-info: #0d2640;
+  --color-text-info: #66c0f4;
+  --color-border-info: #1a4070;
+  --color-background-warning: #2a1900;
+  --color-text-warning: #e8a040;
+  --color-border-warning: #4a2c00;
+}
+
 body {
   background: var(--bg0);
   color: var(--text0);
@@ -256,6 +279,12 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
   background-position: left top, right top, left top, right top;
   background-attachment: local, local, scroll, scroll;
 }
+
+/* Darkens the data-table library's own header row a shade further than its themed
+   --color-background-secondary default, matching the plain <table>'s thead th above.
+   Ported from the legacy pages' `#table-container .dt-th` rule — `.table-container` is
+   the new markup's equivalent wrapper (see ListRoute.tsx). */
+.table-container .dt-th { background: #0f1923 !important; }
 
 table { width: 100%; border-collapse: collapse; }
 
@@ -512,6 +541,23 @@ a.account-identity:hover .account-name { color: var(--accent2); }
 .game-search-thumb--empty { background: var(--bg0); }
 .game-search-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* App shell's own nav-bar search box (AppShell.tsx) — same look as .game-search-wrap's input,
+   but sized to sit inline in the nav bar rather than fill a page section. */
+.app-search-wrap { position: relative; flex: 1 1 220px; max-width: 320px; }
+.app-search-wrap > input {
+  width: 100%;
+  padding: 7px 12px;
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text0);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.app-search-wrap > input:focus { border-color: var(--accent); }
+.app-search-wrap > input::placeholder { color: var(--text2); }
+
 /* How it works */
 .how-it-works { margin-bottom: 18px; }
 .how-steps {
@@ -647,11 +693,18 @@ tbody tr.game-row { cursor: pointer; }
 tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 
 /* App shell layout (list-centric redesign, see docs/list-centric-redesign.md and AppShell.tsx)
-   — `.app-body` holds the routed content and the side panel as two flex siblings, so the panel
-   docks next to whatever's showing instead of overlaying it. */
+   — `.app-shell` is the root column (nav bar, then the recents bar, then the body filling
+   whatever's left); `.app-body` holds the routed content and the side panel as two flex
+   siblings, so the panel docks next to whatever's showing instead of overlaying it. */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
 .app-body {
   display: flex;
   align-items: stretch;
+  flex: 1;
   min-height: 0;
 }
 .app-content {
@@ -1799,3 +1852,277 @@ kbd {
 }
 .shortcuts-row:last-child { margin-bottom: 0; }
 .shortcuts-row span { margin-left: 4px; }
+
+/* ── List-centric redesign routes (see docs/list-centric-redesign.md) ─────────────────────── */
+
+/* Wide page layout for the two routes built around a big data table — same 1600px cap the
+   legacy Library Explorer/Bundles pages used (`.lib-page`/`.bundles-page`), just renamed to
+   match the new route components. `.container`'s narrower 1100px stays right for every other
+   route (Home, the game route, About). */
+.list-route,
+.bundles-browse-route {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 36px 20px 60px;
+}
+
+.list-status,
+.bundles-status {
+  font-size: 13px;
+  color: var(--text1);
+  margin-bottom: 10px;
+}
+.price-status { font-size: 13px; color: var(--text1); margin-bottom: 10px; }
+.price-status:empty { display: none; }
+
+.table-container { margin-bottom: 18px; }
+
+.list-groups { display: flex; flex-direction: column; gap: 28px; }
+.list-group-heading {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text0);
+  margin-bottom: 10px;
+}
+
+/* ── Bundles browse route ──────────────────────────────────────────────────────────────────── */
+
+.bundles-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--text1);
+}
+.bundles-controls select {
+  background: var(--bg1);
+  color: var(--text0);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.bundles-controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+
+.bundle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+  margin-bottom: 18px;
+}
+.bundle-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 10px 14px;
+  color: var(--text0);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.bundle-item:hover, .bundle-item:focus-visible { border-color: var(--accent); background: var(--bg1); outline: none; }
+.bundle-item-title { flex: 2; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bundle-item-shop { flex: 1; color: var(--text1); font-size: 12px; }
+.bundle-item-price { flex: 0 0 auto; font-weight: 600; color: var(--accent2); white-space: nowrap; }
+.bundle-item-count { flex: 0 0 auto; color: var(--text1); font-size: 12px; white-space: nowrap; }
+.bundle-item-expiry { flex: 0 0 auto; color: var(--text1); font-size: 12px; white-space: nowrap; }
+
+@media (max-width: 768px) {
+  .bundle-item { flex-wrap: wrap; gap: 4px 14px; }
+  .bundle-item-title { flex: 1 1 100%; }
+}
+
+/* ── Home route: account picker + folder/list tree ─────────────────────────────────────────── */
+
+.home-route {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 36px 20px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.home-route h2 { font-size: 13px; font-weight: 600; color: var(--text1); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 12px; }
+.home-route h3 { font-size: 12px; font-weight: 600; color: var(--text1); text-transform: uppercase; letter-spacing: 0.6px; margin: 14px 0 8px; }
+
+.home-account {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 22px 24px;
+}
+.account-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.account-header img { border-radius: 50%; flex-shrink: 0; }
+.account-label { font-size: 15px; font-weight: 600; color: var(--text0); }
+.account-counts { font-size: 12px; color: var(--text1); margin-top: 2px; }
+
+.home-account form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.home-account form input[type="text"] {
+  flex: 1 1 240px;
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 9px 12px;
+  color: var(--text0);
+  font-size: 13px;
+}
+.home-account form input[type="text"]:focus { border-color: var(--accent); outline: none; }
+.home-account form button { padding: 9px 14px; border: 1px solid var(--border); border-radius: var(--r); background: transparent; color: var(--text0); font-size: 13px; cursor: pointer; }
+.home-account form button[type="submit"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.home-account form button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.error { color: #ff8888; font-size: 12.5px; margin: 6px 0; }
+
+.recent-accounts { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.recent-accounts li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 6px 10px;
+}
+.recent-accounts li > button:first-child { flex: 1; text-align: left; background: none; border: none; color: var(--text0); font-size: 13px; cursor: pointer; padding: 2px 0; }
+.recent-accounts li > button:first-child:hover { color: var(--accent2); }
+.recent-accounts button {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text1);
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.recent-accounts button:hover { border-color: var(--accent); color: var(--accent2); }
+
+.home-fixed-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.home-fixed-links a {
+  flex: 1 1 140px;
+  text-align: center;
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px;
+  color: var(--text0);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: border-color 0.15s, color 0.15s;
+}
+.home-fixed-links a:hover { border-color: var(--accent); color: var(--accent2); }
+
+.home-tree {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 22px 24px;
+}
+.tree-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.tree-actions button {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--text0);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.tree-actions button:hover { border-color: var(--accent); color: var(--accent2); }
+
+.combine-form {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.combine-form input[type="text"],
+.combine-form select {
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 8px 10px;
+  color: var(--text0);
+  font-size: 13px;
+}
+.combine-form input[type="text"]:focus,
+.combine-form select:focus { border-color: var(--accent); outline: none; }
+.combine-form p { font-size: 12px; color: var(--text1); }
+.combine-sources { list-style: none; display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
+.combine-sources label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text0); cursor: pointer; }
+.combine-form button[type="submit"] {
+  align-self: flex-start;
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--r);
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.list-tree { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.list-tree li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: var(--r);
+}
+.list-tree li:hover { background: var(--bg2); }
+.list-tree a { flex: 1; color: var(--text0); text-decoration: none; font-size: 13px; }
+.list-tree a:hover { color: var(--accent2); }
+.list-tree span { flex: 1; color: var(--text0); font-size: 13px; }
+.list-tree button {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text1);
+  font-size: 11px;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.list-tree button:hover { border-color: var(--accent); color: var(--accent2); }
+
+/* ── Game route: canonical standalone /game/:appid ─────────────────────────────────────────── */
+
+.game-route {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 36px 20px 60px;
+}
+.game-route .status { font-size: 13px; color: var(--text1); }

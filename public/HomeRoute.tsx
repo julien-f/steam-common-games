@@ -285,7 +285,7 @@ export default function HomeRoute() {
               )}
             </For>
           </ul>
-          <button type="button" onClick={() => { clearRecentAccounts(); refreshAccounts(); }}>Clear all</button>
+          <button type="button" class="recents-clear" onClick={() => { clearRecentAccounts(); refreshAccounts(); }}>Clear all</button>
         </Show>
       </section>
 
