@@ -829,7 +829,7 @@ export default function ListRoute() {
     } else if (kind === 'bundle') {
       setStatusText('Resolving games to Steam…');
       try {
-        const bundle = await fetchBundleById(Number(params.bundleId));
+        const bundle = await fetchBundleById(Number(params.bundleId), { country: resolveRegion(getStoredRegion()) });
         if (loadGuard.isStale(gen)) return;
         setBundleTitle(bundle.title);
         const { resolved } = await resolveBundleGames(bundle);
