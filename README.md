@@ -34,13 +34,14 @@ The full list of available settings is in `default.env`.
 ## Development
 
 ```bash
-npm run dev:web    # Vite dev server on :5173 — HMR, TS sources, /api proxied to :3000
-npm run dev        # Express backend on :3000, restarts on file changes
-npm test           # run unit tests
-npm run typecheck  # strict tsc over public/*.ts
+npm run dev:frontend    # Vite dev server on :5173 — HMR, TS sources, /api proxied to :3000
+npm run dev:backend     # Express backend on :3000, restarts on file changes
+npm run dev             # both of the above at once (concurrently), Ctrl+C stops both
+npm test                # run unit tests
+npm run typecheck       # strict tsc over public/*.ts
 ```
 
-The frontend is TypeScript; run both `dev:web` and `dev` for development and use `http://localhost:5173`. `npm run build` + `npm start` serves the bundled production frontend on `:3000`.
+The frontend is TypeScript; run `npm run dev` (or `dev:frontend`/`dev:backend` separately) and use `http://localhost:5173`. `npm run build` + `npm start` serves the bundled production frontend on `:3000`.
 
 Application data is stored in `db.sqlite` (gitignored); currently this is all cache tables. Run `npm run cache:clear` to wipe the cache entries without deleting the database file itself.
 
