@@ -1,4 +1,3 @@
-import { esc } from './utils.ts';
 import { getPref, setPref } from './prefs.ts';
 
 // Recently looked-up games — carved out of gameSearch.ts (see docs/list-centric-redesign.md's
@@ -45,47 +44,4 @@ export function addRecentGame(appid: number, name: string, tinyImage?: string | 
 
 export function removeRecentGame(appid: number): void {
   saveRecentGames(loadRecentGames().filter(g => g.appid !== appid));
-}
-
-export function recentGameChipHtml(entry: RecentGame): string {
-  const label = esc(entry.name || `App ${entry.appid}`);
-  const safeThumb = /^https?:\/\//i.test(entry.tinyImage || '') ? entry.tinyImage : '';
-  return `
-    <span class="recent-chip">
-      <button type="button" class="recent-chip-btn" data-appid="${entry.appid}" title="Look up ${label}">
-        ${safeThumb ? `<img class="recent-chip-avatar" src="${esc(safeThumb)}" alt="">` : ''}
-        ${label}
-      </button>
-      <button type="button" class="recent-chip-remove" data-appid="${entry.appid}" title="Remove from recent">×</button>
-    </span>
-  `;
-}
-
-export function renderRecentGamesBar(containerEl: HTMLElement): void {
-  const recents = loadRecentGames();
-  if (recents.length === 0) { containerEl.hidden = true; containerEl.innerHTML = ''; return; }
-  containerEl.innerHTML = `
-    <span class="recents-label">Recently looked up:</span>
-    ${recents.map(recentGameChipHtml).join('')}
-    <button type="button" class="recents-clear">Clear</button>
-  `;
-  containerEl.hidden = false;
-}
-
-// `onLoad(appid, name)` opens the remembered game — same shape as bindRecentsBar in
-// accountsBar.ts, but keyed directly on the appid rather than an opaque id/data pair since a
-// game is always just its appid.
-export function bindRecentGamesBar(containerEl: HTMLElement, onLoad: (appid: number, name: string) => void): void {
-  containerEl.addEventListener('click', e => {
-    const loadBtn = (e.target as Element).closest('.recent-chip-btn') as HTMLElement | null;
-    if (loadBtn) {
-      const appid = Number(loadBtn.dataset.appid);
-      const entry = loadRecentGames().find(g => g.appid === appid);
-      if (entry) onLoad(entry.appid, entry.name);
-      return;
-    }
-    const removeBtn = (e.target as Element).closest('.recent-chip-remove') as HTMLElement | null;
-    if (removeBtn) { removeRecentGame(Number(removeBtn.dataset.appid)); renderRecentGamesBar(containerEl); return; }
-    if ((e.target as Element).closest('.recents-clear')) { saveRecentGames([]); renderRecentGamesBar(containerEl); }
-  });
 }

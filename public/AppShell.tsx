@@ -15,7 +15,7 @@ import { initLightbox, isLightboxOpen } from './lightbox.tsx';
 import { initPanel, isPanelOpen, panelClose, panelStepHero } from './panel.tsx';
 import { bindPanelKeyboardShortcuts } from './panelKeyboard.ts';
 import { initGameSearch } from './gameSearch.ts';
-import { addRecentGame, renderRecentGamesBar, bindRecentGamesBar } from './recentGames.ts';
+import { addRecentGame } from './recentGames.ts';
 
 // Route-specific keyboard behavior (pickRandom/stepGame/onEnterOnFocusedRow) can't be hardcoded
 // at the shell level — different routes have different "list" contexts, or none at all (Home,
@@ -54,12 +54,9 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       resultsEl: document.getElementById('app-search-results') as HTMLElement,
       onSelect: game => {
         addRecentGame(game.appid, game.name, game.tinyImage);
-        renderRecentGamesBar(document.getElementById('app-recent-games')!);
         navigate(`/game/${game.appid}`);
       },
     });
-    renderRecentGamesBar(document.getElementById('app-recent-games')!);
-    bindRecentGamesBar(document.getElementById('app-recent-games')!, appid => navigate(`/game/${appid}`));
 
     bindPanelKeyboardShortcuts({
       isLightboxOpen,
@@ -97,7 +94,6 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           <div innerHTML={prefsPopoverPanelHtml()} />
         </details>
       </nav>
-      <div id="app-recent-games" class="recents-bar" hidden></div>
 
       <div class="app-body">
         <main class="app-content">{props.children}</main>

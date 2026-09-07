@@ -482,27 +482,6 @@ a.account-identity:hover .account-name { color: var(--accent2); }
   background: rgba(228,168,46,0.1); border: 1px solid rgba(228,168,46,0.3); color: #e4c46e;
 }
 
-/* Recent searches bar — locally-remembered past searches, shown above the accounts bar */
-.recents-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
-.recents-label { font-size: 12px; color: var(--text1); }
-.recent-chip {
-  display: flex; align-items: center; gap: 6px;
-  padding: 3px 4px 3px 4px;
-  background: transparent; border: 1px solid var(--border); border-radius: 999px;
-}
-.recent-chip-btn {
-  display: flex; align-items: center; gap: 6px;
-  background: transparent; border: none; padding: 0 2px; cursor: pointer;
-  color: var(--text1); font-size: 12px;
-}
-.recent-chip-btn:hover { color: var(--accent2); }
-.recent-chip-avatar { width: 18px; height: 18px; border-radius: 50%; display: block; }
-.recent-chip-remove {
-  flex-shrink: 0; width: 16px; height: 16px; padding: 0;
-  background: transparent; border: none; border-radius: 50%;
-  color: var(--text1); font-size: 12px; line-height: 1; cursor: pointer;
-}
-.recent-chip-remove:hover { color: #cc5050; }
 .recents-clear { font-size: 12px; color: var(--text1); background: none; border: none; cursor: pointer; padding: 0; }
 .recents-clear:hover { color: var(--accent2); }
 
