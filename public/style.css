@@ -1983,40 +1983,57 @@ kbd {
 }
 .bundles-controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 
-.bundle-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 260px;
-  overflow-y: auto;
-  margin-bottom: 18px;
-}
-.bundle-item {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  text-align: left;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  padding: 10px 14px;
-  color: var(--text0);
-  font: inherit;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-.bundle-item:hover, .bundle-item:focus-visible { border-color: var(--accent); background: var(--bg1); outline: none; }
-.bundle-item-title { flex: 2; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bundle-item-shop { flex: 1; color: var(--text1); font-size: 12px; }
-.bundle-item-price { flex: 0 0 auto; font-weight: 600; color: var(--accent2); white-space: nowrap; }
-.bundle-item-count { flex: 0 0 auto; color: var(--text1); font-size: 12px; white-space: nowrap; }
-.bundle-item-expiry { flex: 0 0 auto; color: var(--text1); font-size: 12px; white-space: nowrap; }
+/* The bundle list itself is a @vates/data-table-solid table now (see BundlesBrowseRoute.tsx's own
+   header comment for why the hand-rolled `.bundle-item` row list it replaced couldn't align its
+   columns), so it needs no list/row styles of its own beyond `.table-container` above — only the
+   few cell renderers below. */
 
-@media (max-width: 768px) {
-  .bundle-item { flex-wrap: wrap; gap: 4px 14px; }
-  .bundle-item-title { flex: 1 1 100%; }
+/* Cover block — four of the bundle's game banners in a 2×2 grid (ITAD has no bundle-level image
+   of its own). Fixed tracks rather than a flex row, so a bundle with only two or three games
+   carrying artwork still occupies the same block as every other row instead of collapsing.
+   Each banner is a little over half its native 145×55, so they stay sharp on a hidpi display. */
+.bundle-covers { display: grid; grid-template-columns: repeat(2, 80px); gap: 3px; }
+.bundle-cover {
+  display: block;
+  width: 80px;
+  height: 30px;
+  object-fit: cover;
+  border-radius: 2px;
+  background: var(--bg2); /* placeholder while lazy-loading, and for a hidden/failed image */
 }
+
+/* Shop chip. Only the hue comes from the shop name (BundlesBrowseRoute.tsx's renderShop sets
+   --shop-hue via bundleRows.ts's shopHue) — saturation/lightness are fixed here precisely so no
+   hash can land on an unreadable color against this theme's dark ground. */
+.shop-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: hsl(var(--shop-hue) 60% 72%);
+  background: hsl(var(--shop-hue) 60% 72% / 0.12);
+  border: 1px solid hsl(var(--shop-hue) 60% 72% / 0.35);
+}
+
+/* Published/Ends cells: date on the first line, its time under it, smaller and dimmed. Stacked
+   rather than one "2026-09-04 20:35" line so the column costs only the date's width — the rows are
+   already tall enough for a second line, the cover grid above having set the row height anyway. */
+.bundle-datetime { display: flex; flex-direction: column; line-height: 1.35; }
+.bundle-datetime-time { font-size: 11px; color: var(--text1); }
+
+/* "in 3d"/"in 11h"/"ended", sharing the Ends cell's second line with the time rather than widening
+   the first — its color is set inline per row from scoreColor's own tiers (see renderEnds), so
+   only the typography lives here. */
+.bundle-ends-rel { margin-left: 6px; font-weight: 600; white-space: nowrap; }
+
+/* Dims an expired bundle's whole row. The table library has no per-row class hook, so the row is
+   reached through the marker its Bundle cell carries (renderBundleTitle) — which means dimming
+   stops if that column is hidden, an acceptable degradation for a column nobody hides. Only
+   reachable at all with "Include expired" on; every row is Active otherwise. */
+.dt-tr:has(.bundle-expired) { opacity: 0.45; }
+.dt-tr:has(.bundle-expired):hover { opacity: 0.8; }
 
 /* ── Home route: account picker + folder/list tree ─────────────────────────────────────────── */
 
