@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Routine dependency bumps: `express-rate-limit` 8.6.2 → 8.7.0, `hls.js` 1.5.13 → 1.7.2, `morgan` 1.11.0 → 1.12.0. No code changes needed; `hls.js`'s usage in `lightbox.tsx` (`isSupported`/`Events.ERROR`/`Events.MANIFEST_PARSED`/`loadSource`/`attachMedia`/`destroy`) is stable, long-standing API.
+
 ### Removed
 
 - Unused `@types/express` devDependency — `tsconfig.json` only typechecks `public/**` (the backend is intentionally out of scope, per this file's own architecture section), and nothing anywhere referenced its types via JSDoc either. Left over from the frontend's TypeScript conversion.
