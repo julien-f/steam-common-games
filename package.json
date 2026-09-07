@@ -17,7 +17,7 @@
     "@vates/data-table-core": "^0.13.0",
     "@vates/data-table-solid": "^0.13.0",
     "dotenv": "^17.4.2",
-    "express": "^4.18.2",
+    "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
     "hls.js": "^1.7.2",
     "solid-js": "^1.9.15"
