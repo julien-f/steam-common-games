@@ -10,6 +10,7 @@
 import { createSignal, For, onMount } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { getStoredRegion, resolveRegion } from './region.ts';
+import { setBrowsedBundles } from './bundleBrowseStore.ts';
 
 const BUNDLES_PAGE_SIZE = 20;
 
@@ -67,7 +68,10 @@ export default function BundlesBrowseRoute() {
       const res = await fetch(`/api/bundles?${qs}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load bundles');
-      setBundles(reset ? data.bundles : [...bundles(), ...data.bundles]);
+      const next = reset ? data.bundles : [...bundles(), ...data.bundles];
+      setBundles(next);
+      // Feeds /lists/bundle/:bundleId's prev/next nav — see bundleBrowseStore.ts's own comment.
+      setBrowsedBundles(next.map((b: BundleListItem) => ({ id: b.id, title: b.title })));
       offset += data.bundles.length;
       setStatusText(bundles().length ? `${bundles().length} bundles` : 'No current bundles');
       setLoadMoreHidden(data.bundles.length < BUNDLES_PAGE_SIZE);

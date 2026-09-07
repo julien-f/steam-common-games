@@ -1925,6 +1925,33 @@ kbd {
   margin-bottom: 10px;
 }
 
+/* Bundle detail header (ListRoute.tsx, kind === 'bundle' only) — title + ‹/› nav through
+   whatever's currently in bundleBrowseStore.ts (the last-loaded /bundles list), plus a link back
+   to the browse route. There's otherwise nothing on this route naming which bundle is open at
+   all. */
+.bundle-detail-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.bundle-detail-titlebar { display: flex; align-items: center; gap: 10px; }
+.bundle-detail-nav { display: flex; gap: 4px; }
+.bundle-detail-nav button {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--text0);
+  font-size: 14px;
+  cursor: pointer;
+}
+.bundle-detail-nav button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
+.bundle-detail-nav button:disabled { opacity: 0.35; cursor: default; }
+.bundle-detail-title { font-size: 18px; font-weight: 700; color: var(--text0); }
+
 /* ── Bundles browse route ──────────────────────────────────────────────────────────────────── */
 
 .bundles-controls {

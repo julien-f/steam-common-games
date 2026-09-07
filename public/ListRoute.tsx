@@ -45,7 +45,7 @@
 import { onMount, onCleanup, createSignal, createRoot, createEffect, batch, For, Show } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { render } from 'solid-js/web';
-import { useParams, useLocation } from '@solidjs/router';
+import { useParams, useLocation, useNavigate } from '@solidjs/router';
 import { createTableState, DataTableView } from '@vates/data-table-solid';
 import type { ColumnDef, SortEntry, TableState } from '@vates/data-table-solid';
 import { bucketDatePart, formatDatePart } from '@vates/data-table-core';
@@ -69,6 +69,7 @@ import { getCurrentAccount } from './accountsStore.ts';
 import { fetchAccountOwnedGames, fetchAccountWishlistItems } from './accountData.ts';
 import { loadRecentGames } from './recentGames.ts';
 import { fetchBundleById, resolveBundleGames, type ResolvedGame } from './bundleData.ts';
+import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from './priceLoading.ts';
 import { getStoredRegion, resolveRegion } from './region.ts';
 import { registerRouteKeyboardHandlers } from './AppShell.tsx';
@@ -237,12 +238,16 @@ function bindSolidViewPersistence(ts: TableState<Game>, prefKey: string): () => 
 export default function ListRoute() {
   const params = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const kind = kindFromPath(location.pathname, params);
 
   let tableContainer!: HTMLDivElement;
   let groupsContainer!: HTMLDivElement;
   const [statusText, setStatusText] = createSignal('');
   const [priceStatusText, setPriceStatusText] = createSignal('');
+  // kind === 'bundle' only — the open bundle's own title, for the header below (nothing else on
+  // this route otherwise names which bundle is loaded at all).
+  const [bundleTitle, setBundleTitle] = createSignal('');
 
   const [rowsStore, setRowsStore] = createStore<Game[]>([]);
   const rowStore = createRowStore<Game>((idx, updater) => setRowsStore(idx, updater));
@@ -333,6 +338,26 @@ export default function ListRoute() {
     if (kind === 'bundle') return `list-route:bundle:${params.bundleId}`;
     if (kind === 'user') return `list-route:user:${params.listId}:${activeGroupKey ?? ''}`;
     return `list-route:${kind}`;
+  }
+
+  // ‹/› bundle-to-bundle nav (kind === 'bundle' only) — steps through whatever's currently in
+  // bundleBrowseStore.ts (the last-loaded /bundles list), same "no auto-load-more, no wraparound,
+  // disable at either end or when the open bundle isn't part of that list at all (e.g. a fresh
+  // deep link)" behavior bundles.tsx's own renderBundleNav had. Re-reads the store fresh on every
+  // call rather than caching the index, so it stays correct as the store itself changes (a
+  // "Load more" on /bundles while this route is open elsewhere) — cheap, a bundle list is never
+  // more than a few hundred entries.
+  function bundleNavIndex(): number {
+    return getBrowsedBundles().findIndex(b => b.id === Number(params.bundleId));
+  }
+  function prevBundleId(): number | null {
+    const idx = bundleNavIndex();
+    return idx > 0 ? getBrowsedBundles()[idx - 1].id : null;
+  }
+  function nextBundleId(): number | null {
+    const list = getBrowsedBundles();
+    const idx = bundleNavIndex();
+    return idx !== -1 && idx < list.length - 1 ? list[idx + 1].id : null;
   }
 
   function updateStatus(): void {
@@ -622,6 +647,7 @@ export default function ListRoute() {
       try {
         const bundle = await fetchBundleById(Number(params.bundleId));
         if (loadGuard.isStale(gen)) return;
+        setBundleTitle(bundle.title);
         const { resolved } = await resolveBundleGames(bundle);
         if (loadGuard.isStale(gen)) return;
         if (resolved.length === 0) { setStatusText('No games in this bundle could be matched to a Steam listing.'); return; }
@@ -774,6 +800,18 @@ export default function ListRoute() {
 
   return (
     <div class="list-route">
+      <Show when={kind === 'bundle'}>
+        <div class="bundle-detail-header">
+          <div class="bundle-detail-titlebar">
+            <div class="bundle-detail-nav">
+              <button type="button" disabled={prevBundleId() == null} onClick={() => { const id = prevBundleId(); if (id != null) navigate(`/lists/bundle/${id}`); }}>‹</button>
+              <button type="button" disabled={nextBundleId() == null} onClick={() => { const id = nextBundleId(); if (id != null) navigate(`/lists/bundle/${id}`); }}>›</button>
+            </div>
+            <span class="bundle-detail-title">{bundleTitle()}</span>
+          </div>
+          <a class="btn btn-ghost btn-sm" href="/bundles">← All bundles</a>
+        </div>
+      </Show>
       <div class="list-status">{statusText()}</div>
       {(kind === 'wishlist' || kind === 'bundle') && <div class="price-status">{priceStatusText()}</div>}
       <Show when={selectedRows().length > 0}>
