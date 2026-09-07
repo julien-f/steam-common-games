@@ -615,9 +615,10 @@ function wireVideoControls(lb: HTMLElement) {
 
 // ── Mount ────────────────────────────────────────────────────────────────
 // Replaces the original lazy-singleton `getLightbox()` — mounted eagerly, once, from
-// `initLightbox` (called once per page from pageShell.ts), same "exists exactly once for the
-// page's whole lifetime" shape the lazy getter amounted to in practice (nothing else ever
-// unmounts it), just created up front instead of on first open — negligible cost for a
+// `initLightbox` (called once for the whole app, from AppShell.tsx's own `onMount` — see
+// docs/list-centric-redesign.md), same "exists exactly once for the app's whole lifetime" shape
+// the lazy getter amounted to in practice (nothing else ever unmounts it), just created up front
+// instead of on first open — negligible cost for a
 // ~20-node static tree, and it means every other function in this file can keep using a bare
 // `document.getElementById('screenshot-lightbox')`/`.lb-*` lookup exactly as before, with no
 // "has it been created yet" guard needed anywhere.

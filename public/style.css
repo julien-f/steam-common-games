@@ -78,14 +78,14 @@ body {
   cursor: default;
 }
 
-/* ⚙ Preferences popover (public/nav.js's initNav/initNavPrefs) — a native <details> for a free,
-   accessible open/close toggle; outside-click/Escape closing is added by hand in nav.js since
-   <details> has no built-in support for either. */
+/* ⚙ Preferences popover (public/AppShell.tsx) — a native <details> for a free, accessible
+   open/close toggle; outside-click/Escape closing is added by hand (bindPrefsPopoverClose)
+   since <details> has no built-in support for either. */
 .site-nav-prefs-btn { cursor: pointer; list-style: none; }
 .site-nav-prefs-btn::-webkit-details-marker { display: none; }
 .site-nav-prefs-panel {
-  /* `position: fixed` with `top`/`left` computed in JS (positionPrefsPanel, nav.tsx) rather than
-     anchored via CSS at all — an earlier version anchored under the whole nav bar (centered via
+  /* `position: fixed` with `top`/`left` computed in JS (positionPrefsPanel, AppShell.tsx) rather
+     than anchored via CSS at all — an earlier version anchored under the whole nav bar (centered via
      `left: 50%` on `.site-nav`, its positioning root) specifically because `.site-nav`'s
      flex-wrap can put the ⚙ button on its own row at an x-position that shifts with viewport
      width, and anchoring the panel to the button directly used to mean it could run off-screen

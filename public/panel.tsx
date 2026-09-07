@@ -23,17 +23,25 @@ export interface PanelOptions {
   showAchievements?: boolean;
   enableTagFilters?: boolean;
   gameHref?: (appid: string | number) => string;
-  getOwnersHtml?: (game: Game) => string;
 }
 
 // ── Shared game side panel ──────────────────────────────────────────────────
-// Used by all three pages (app.ts/library.ts/bundles.tsx, imported directly).
-// A real Solid component now (converted from the original
-// panel.ts's hand-rolled innerHTML rebuilds): `initPanel(options)` mounts it once into the
-// static `#panel-body` element every page's own markup already has; `panelOpen(game)`/
-// `panelClose()` show/hide it exactly as before. Anything page-specific — the "Owned by"
-// section, tag-click filtering, the nav bar's list of games — is still left to the host page
-// via options or by wrapping panelOpen/panelClose with its own extra logic, unchanged.
+// Mounted once by AppShell.tsx's single `initPanel(options)` call (see docs/list-centric-
+// redesign.md), not per-route — GameRoute.tsx/ListRoute.tsx (the only two callers of
+// `panelOpen` now) just open/close it, they never configure it themselves. This used to be
+// used by three separate pages (app.tsx/library.tsx/bundles.tsx), each supplying its own
+// `initPanel` options — that per-page option-supplying shape is why `PanelOptions` still
+// exists as a real interface (a global single-instance app has no *structural* need for one),
+// though only `onNavigateGame` is actually passed today; the rest (`onTagClick`/`isTagActive`/
+// `enableTagFilters`, `pricesHandledByHost`, `gameHref`) are dead weight from that era with no
+// current caller — left in place rather than ripped out, since removing them touches more of
+// this file for a change genuinely out of scope for the pass that noticed it (see this file's
+// git history/CHANGELOG for the specifics). A real Solid component now (converted from the
+// original panel.ts's hand-rolled innerHTML rebuilds): `initPanel(options)` mounts it once into
+// the static `#panel-body` element every page's own markup already has; `panelOpen(game)`/
+// `panelClose()` show/hide it exactly as before. Anything page-specific — tag-click filtering,
+// the nav bar's list of games — is still left to the host page via options or by wrapping
+// panelOpen/panelClose with its own extra logic, unchanged.
 //
 // Every exported function below keeps its exact original name/signature (every host page's
 // import is untouched by this conversion) — the one
@@ -92,8 +100,8 @@ function panelShuffle(arr: { appid: number }[]) {
   return a;
 }
 
-// Rejects anything but a plain http(s) URL — same guard accountsBar.ts/app.ts already apply
-// to profile URLs. JSX text/attribute interpolation escapes on its own, so this guard is the
+// Rejects anything but a plain http(s) URL — the same guard the now-deleted accountsBar.ts/
+// app.tsx used to apply to profile URLs. JSX text/attribute interpolation escapes on its own, so this guard is the
 // one XSS-relevant check still needed: a developer-supplied `meta.website` or a news item's
 // `url` (both flow through unfiltered from Steam's own APIs — see lib/steam.js) could
 // otherwise be a `javascript:`/`data:` URI that runs script when clicked instead of
@@ -1364,8 +1372,6 @@ function PanelRest(): JSX.Element {
   // exactly as safe as that plain-text insert was.
   const decodedDescription = description ? new DOMParser().parseFromString(description, 'text/html').body.textContent || '' : '';
 
-  const ownersHtml = panelOptions.getOwnersHtml?.(g) ?? '';
-
   // The glance strip already carries HLTB's "All PlayStyles" number (see GlanceGrid above)
   // — this is just the fuller Main/Extra/Completionist breakdown beneath it, once, not a
   // second copy of the headline figure. Collapsed by default like achievements/news, EXCEPT
@@ -1508,7 +1514,6 @@ function PanelRest(): JSX.Element {
   const hasAchievementsSection = !!panelOptions.showAchievements && (g.achievementsLoading || g.achievements !== undefined);
   const hasDlcSection = !!(meta?.dlc && meta.dlc.length);
   const subnavItems = [
-    ownersHtml && { label: 'Owners', target: 'panel-section-owners' },
     hltbDetail && { label: 'HLTB', target: 'panel-section-hltb' },
     hasNewsSection && { label: 'News', target: 'panel-section-news' },
     hasAchievementsSection && { label: 'Achievements', target: 'panel-section-achievements' },
@@ -1572,9 +1577,6 @@ function PanelRest(): JSX.Element {
         <div class="panel-desc panel-card" id="panel-desc">{decodedDescription}</div>
       </Show>
       {cloud}
-      <Show when={ownersHtml}>
-        <div id="panel-section-owners" innerHTML={ownersHtml} />
-      </Show>
       {hltbDetail}
       {newsSection}
       {achievementsSection}

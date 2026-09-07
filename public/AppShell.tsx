@@ -1,19 +1,13 @@
 // The persistent app shell — nav bar, ⚙ Preferences popover, global "look up any game" search,
 // the shared side panel + lightbox (mounted once, not per-route) — passed as @solidjs/router's
-// `root` (see AppRoot.tsx) so it wraps every route instead of remounting on each navigation. This
-// replaces pageShell.ts's per-page `initPageShell({page, lightbox, panel})` call, which the
-// legacy pages (app.tsx/library.tsx/bundles.tsx) still use unchanged until they're deleted (see
-// docs/list-centric-redesign.md's implementation plan, Phase 7) — pageShell.ts itself is left
-// alone for now rather than touched, since retiring it only makes sense once nothing still
-// calls it.
-//
-// nav.tsx (the legacy pages' own nav bar) is also left untouched here rather than reworked in
-// place — this shell needs a genuinely different (router-aware `<A>`-based) nav, and rewriting
-// nav.tsx's exports out from under four still-live pages would break them well before they're
-// due to be deleted. The ⚙ Preferences popover's outside-click/position bindings below are
-// necessarily a second, temporary copy of nav.tsx's own bindPrefsPopoverClose/
-// bindPrefsPopoverPosition for exactly that reason — consolidate the two once nav.tsx is
-// deleted in Phase 7.
+// `root` (see AppRoot.tsx) so it wraps every route instead of remounting on each navigation.
+// This is the app's one nav bar/shell now that the legacy pages (app.tsx/library.tsx/
+// bundles.tsx) and the two modules that existed purely to bootstrap them per-page
+// (pageShell.ts's `initPageShell`, and nav.tsx's own `initNav`/cross-page `<nav>`) are all
+// deleted (Phase 7, see docs/list-centric-redesign.md) — this file's own ⚙ Preferences popover
+// open/close/position bindings below (`bindPrefsPopoverClose`/`bindPrefsPopoverPosition`) used
+// to be a deliberate, temporary duplicate of nav.tsx's identically-named pair for exactly that
+// transition period; now that nav.tsx is gone, these are just the one real implementation.
 import { onMount, onCleanup, For, type JSX } from 'solid-js';
 import { A, useNavigate, type RouteSectionProps } from '@solidjs/router';
 import { prefsPopoverPanelHtml, initPrefsPopover } from './prefsPopover.ts';
@@ -121,10 +115,15 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
   );
 }
 
-// Same two small helpers as nav.tsx's own bindPrefsPopoverClose/bindPrefsPopoverPosition —
-// `<details>` has no built-in "close on outside click/Escape", and the panel is anchored to the
-// ⚙ button's own live position rather than a CSS-only anchor (see nav.tsx's own comment for why:
-// `.site-nav`'s flex-wrap re-centers on wrap, which a CSS-only anchor can't reliably follow).
+// `<details>` has no built-in "close on outside click/Escape", so it's added by hand; the panel
+// is anchored to the ⚙ button's own live position (`position: fixed`, computed here) rather
+// than a CSS-only anchor, since `.site-nav`'s flex-wrap re-centers its items as a group once
+// they wrap onto more than one line, which a CSS-only anchor can't reliably follow — confirmed
+// live on a real Galaxy S10 (Firefox) as the panel running off-screen to the left before this
+// fix, not just in an emulated-width check (this reasoning, and both functions themselves,
+// used to also exist as a separate, deliberately duplicated copy in the now-deleted nav.tsx,
+// back when the legacy pages still needed its own nav bar's identical popover to work the same
+// way during the transition — see this file's own top-of-file comment).
 function bindPrefsPopoverClose(): void {
   const details = document.querySelector('.site-nav-prefs') as HTMLDetailsElement;
   const onClick = (e: MouseEvent) => {
