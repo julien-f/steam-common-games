@@ -426,57 +426,24 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
 .player-slot:has(.family-row) .family-hint { display: block; }
 
 /*
- * Accounts bar / recent searches — shared by the comparison page and Library
- * Explorer (rendering logic lives in public/accountsBar.js). One chip per
- * resolved Steam account: avatar, persona name, online/in-game status dot,
- * a per-account count, an optional private-profile badge, and a refresh icon.
+ * One resolved Steam account's identity, as shown on Home's Account card (HomeRoute.tsx):
+ * avatar with an online/in-game status dot, persona name, a per-account count, and an
+ * optional private-profile badge. What's left of the deleted pages' accounts bar — the chip/
+ * slot-box/refresh-button rules around these went with `accountsBar.ts` itself (Phase 7, see
+ * docs/list-centric-redesign.md); these are the pieces Home's own card reuses rather than
+ * restating, since a member row there is the same avatar/name/status/count it always was.
  */
-.accounts-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-/* Comparison page only — clusters a slot's account chip(s) under a "Player N" /
-   "N accounts merged" label, since (unlike the Library Explorer) a search can compare
-   several separate slots, each possibly itself a multi-account Steam Family merge. Each
-   slot gets its own bounding box on its own row (flex-basis 100%) rather than flowing
-   inline with the next slot's chips — a shared border is what actually tells apart
-   "these chips are merged into one library" (inside one box) from "these are being
-   compared" (separate boxes), since the two can otherwise look like the same flat row of
-   chips with a small label sprinkled in between. */
-.slot-accounts {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-  flex: 1 1 100%;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  background: var(--bg2);
-}
-.slot-label { font-size: 12px; font-weight: 600; color: var(--text1); }
-.account-chip {
-  display: flex; align-items: center; gap: 6px;
-  padding: 5px 6px 5px 5px;
-  background: var(--bg3); border: 1px solid var(--border); border-radius: 999px;
-  color: var(--text0);
-}
-.account-identity {
-  display: flex; align-items: center; gap: 8px;
-  color: var(--text0); text-decoration: none;
-}
-a.account-identity:hover .account-name { color: var(--accent2); }
-.account-refresh-btn {
-  flex-shrink: 0; width: 20px; height: 20px; padding: 0;
-  background: transparent; border: 1px solid var(--border); border-radius: 50%;
-  color: var(--text1); font-size: 11px; line-height: 1; cursor: pointer;
-}
-.account-refresh-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.account-refresh-btn:disabled { cursor: default; opacity: 0.6; }
 .account-avatar-wrap { position: relative; flex-shrink: 0; width: 28px; height: 28px; }
 .account-avatar { width: 28px; height: 28px; border-radius: 50%; display: block; }
 .account-status {
   position: absolute; right: -1px; bottom: -1px; width: 9px; height: 9px;
-  border-radius: 50%; border: 2px solid var(--bg3);
+  /* Ring drawn in the surface the avatar sits on — Home's Account card (--bg1) is the only
+     place these render now that the accounts bar's own --bg3 chip is gone. */
+  border-radius: 50%; border: 2px solid var(--bg1);
 }
 .account-status-offline { background: var(--text2); }
 .account-status-online  { background: #57cbde; }
 .account-status-ingame  { background: #a3cf4e; }
-.account-meta { display: flex; flex-direction: column; line-height: 1.25; }
 .account-name { font-size: 13px; font-weight: 500; }
 .account-count { font-size: 11px; color: var(--text1); }
 .account-private {
