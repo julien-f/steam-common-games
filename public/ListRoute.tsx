@@ -60,7 +60,7 @@ import {
   OWNERSHIP_STATUS_COLUMN,
 } from './gameColumns.ts';
 import { computeSteamdbRating, computeProductionTier, discountPct, fmtLastPlayed, formatMoney } from './utils.ts';
-import { restoreTableView } from './tableViewPrefs.ts';
+import { restoreTableView, shareTableView, resetTableView } from './tableViewPrefs.ts';
 import { renderPanelNav as renderPanelNavShared, stepGameList } from './panelNav.ts';
 import { createRowStore } from './rowStore.ts';
 import { createStaleGuard } from './staleGuard.ts';
@@ -68,7 +68,7 @@ import { createStreamBatcher } from './streamBatcher.ts';
 import {
   panelOpen, panelClose, isPanelOpen, getPanelGame, pickRandomFrom, clearRandomQueue, renderPanelBody,
 } from './panel.tsx';
-import { setPanelParam } from './urlState.ts';
+import { setPanelParam, reorderUrlParams } from './urlState.ts';
 import { setPref } from './prefs.ts';
 import { getCurrentAccount } from './accountsStore.ts';
 import { fetchAccountOwnedGames, fetchAccountWishlistItems } from './accountData.ts';
@@ -276,6 +276,12 @@ export default function ListRoute() {
   // so navigating between two user lists reuses this component instance without a remount —
   // a plain `let` wouldn't tell the already-mounted JSX that "the list being viewed" changed.
   const [userList, setUserList] = createSignal<GameList | null>(null);
+  // True once load() has built the single-table path below (owned/wishlist/bundle/recent/user),
+  // false while loading and permanently false for a group-by-membership list, which renders N
+  // per-group tables instead of one — see this file's own header comment on why view persistence
+  // (and so "🔗 Share view"/"Reset view" below) doesn't apply there. Gates that toolbar's own
+  // <Show> rather than leaving it visible-but-broken against a `table` that doesn't exist yet/at all.
+  const [tableReady, setTableReady] = createSignal(false);
 
   // ── Row-selection-based add/remove-to-list (see this file's own header comment) ────────────
   const [selectedRows, setSelectedRows] = createSignal<Game[]>([]);
@@ -697,17 +703,43 @@ export default function ListRoute() {
     }
   }
 
+  // Unused for kind === 'user' (its view lives on the list itself, see handleResetView below) —
+  // kept total anyway so a stray call never returns undefined.
   function viewPrefKey(): string {
     if (kind === 'wishlist') return 'wishlistListView';
     if (kind === 'bundle') return 'bundleListView';
     if (kind === 'recent') return 'recentListView';
     return 'ownedListView';
   }
+  // One shared param name regardless of kind — only one list/table is ever on screen per route,
+  // so there's no risk of two kinds' snapshots colliding in the same URL (see urlState.ts's own
+  // comment on `tv`).
   function viewParamName(): string {
-    if (kind === 'wishlist') return 'wv';
-    if (kind === 'bundle') return 'bv';
-    if (kind === 'recent') return 'rv';
-    return 'lv';
+    return 'tv';
+  }
+
+  // "🔗 Share view"/"Reset view" — see tableViewPrefs.ts for the share-on-demand-only reasoning
+  // (a link written to the live URL goes stale the moment the table changes again). A user list's
+  // view is persisted on the list itself (GameList.tableView, see the single-table branch of
+  // load() below), not through prefs.ts, so its own reset goes around resetTableView rather than
+  // through it — reusing that shared helper here would clear the wrong (shared, kind-generic)
+  // pref key instead of this specific list's own stored view.
+  function handleShareView(btn: HTMLElement): void {
+    if (!table) return;
+    shareTableView(table, viewParamName(), btn);
+  }
+  function handleResetView(): void {
+    if (!table) return;
+    const list = userList();
+    if (list) {
+      table.setViewState({});
+      setListTableView(list.id, {});
+      const urlParams = new URLSearchParams(location.search);
+      urlParams.delete(viewParamName());
+      history.replaceState(null, '', `?${reorderUrlParams(urlParams)}`);
+    } else {
+      resetTableView(table, viewPrefKey(), viewParamName());
+    }
   }
 
   // Real per-group tables for a group-by-membership dynamic list — generalizes the old
@@ -769,6 +801,7 @@ export default function ListRoute() {
 
     const gen = loadGuard.next();
 
+    setTableReady(false);
     if (disposeTable) { disposeTable(); disposeTable = null; }
     table = null;
     groupTables.forEach(g => g.disposeTable());
@@ -924,8 +957,23 @@ export default function ListRoute() {
         // A user list's view lives on the list itself (GameList.tableView), not a shared pref
         // key — every user list keeps its own, unlike the fixed system kinds above which share
         // one key regardless of instance (see docs/list-centric-redesign.md's storage schema).
+        // Mirrors tableViewPrefs.ts's own restoreTableView (an incoming `?tv=` param — see
+        // handleShareView above — wins, is seeded as the new stored default, then stripped from
+        // the URL) but persists via setListTableView rather than a prefs.ts key, so it can't
+        // reuse that helper directly — same reasoning handleResetView gives on the reset side.
         const list = userList()!;
-        table.setViewState(list.tableView ?? {});
+        const urlParams = new URLSearchParams(location.search);
+        const raw = urlParams.get(viewParamName());
+        let initialView = list.tableView ?? {};
+        if (raw) {
+          try {
+            initialView = JSON.parse(raw);
+            setListTableView(list.id, initialView);
+            urlParams.delete(viewParamName());
+            history.replaceState(null, '', `?${reorderUrlParams(urlParams)}`);
+          } catch { /* malformed param — fall through to the stored view */ }
+        }
+        table.setViewState(initialView);
         unsyncView = (() => {
           let dispose: (() => void) | null = null;
           createRoot(d => {
@@ -938,6 +986,7 @@ export default function ListRoute() {
         restoreTableView(table, viewPrefKey(), viewParamName());
         unsyncView = bindSolidViewPersistence(table, viewPrefKey());
       }
+      setTableReady(true);
     }
 
     updateStatus();
@@ -1041,6 +1090,12 @@ export default function ListRoute() {
           selection right after acting (Add explicitly; Remove via load()'s own reset), and the
           whole point of this message is to confirm what just happened *after* that clears. */}
       {selectionActionStatus() && <div class="selection-status">{selectionActionStatus()}</div>}
+      <Show when={tableReady()}>
+        <div class="list-view-actions">
+          <button type="button" class="btn btn-ghost btn-sm" onClick={e => handleShareView(e.currentTarget)}>🔗 Share view</button>
+          <button type="button" class="btn btn-ghost btn-sm" onClick={handleResetView}>Reset view</button>
+        </div>
+      </Show>
       <div ref={tableContainer} class="table-container"></div>
       <div ref={groupsContainer} class="list-groups"></div>
     </div>

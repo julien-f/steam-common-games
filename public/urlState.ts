@@ -18,12 +18,14 @@ export const FILTER_DIMS: FilterDim[] = [
 // different position, making two visits to an identical state look like different history
 // entries and cluttering the query string with no benefit.
 //
-// `lv`/`wv`/`bv` (Library/Wishlist/Bundles table view — a JSON-encoded @vates/data-table-solid
-// view snapshot) replace the older `view`/`wview` names: short, and shared across all three via
-// tableViewPrefs.js's own restoreTableView/shareTableView/resetTableView. Unlike the old names,
-// these are no longer written automatically on every table interaction — only by the table's own
-// "Share view" button — see library.js/bundles.js.
-const PARAM_ORDER = ['u', 'tab', 'sort', 'game', 'shot', 'name', ...FILTER_DIMS.map(d => d.param), 'lv', 'wv', 'bv'];
+// `tv` (table view — a JSON-encoded @vates/data-table-solid view snapshot) is one shared param
+// name for every list kind (Owned/Wishlist/Bundle/Recent/a user list), not one per kind — unlike
+// the old separate Library/Bundles pages, each `/lists/...` route only ever has one table on
+// screen at a time, so there's never a moment where two of these could coexist in the same URL
+// the way e.g. `game`/`shot` can. See tableViewPrefs.ts's own restoreTableView/shareTableView/
+// resetTableView and ListRoute.tsx's viewParamName. Unlike most other params here, it's not
+// written automatically on every table interaction — only by the table's own "🔗 Share view" button.
+const PARAM_ORDER = ['u', 'tab', 'sort', 'game', 'shot', 'name', ...FILTER_DIMS.map(d => d.param), 'tv'];
 
 export function reorderUrlParams(params: URLSearchParams): URLSearchParams {
   const ordered = new URLSearchParams();

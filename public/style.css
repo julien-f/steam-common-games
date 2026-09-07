@@ -1906,6 +1906,13 @@ kbd {
 .selection-toolbar button:disabled { opacity: 0.5; cursor: not-allowed; }
 .selection-status { font-size: 13px; color: var(--accent2); margin-bottom: 10px; }
 
+.list-view-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
 .table-container { margin-bottom: 18px; }
 
 .list-groups { display: flex; flex-direction: column; gap: 28px; }
