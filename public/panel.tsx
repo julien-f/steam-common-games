@@ -1573,7 +1573,10 @@ function PanelRest(): JSX.Element {
         {backBtn}
         <div class="panel-title-row">
           <div>
-            <div class="panel-title" id="panel-title">{g.name}</div>
+            {/* The `App <appid>` fallback is presentational only — a game looked up by bare appid
+                has no name at all until store metadata resolves one, and nothing persists this
+                string as if it were a real title (see ListRoute.tsx's recents mapping). */}
+            <div class="panel-title" id="panel-title">{g.name || `App ${g.appid}`}</div>
             {metaLine}
             {ownershipRow}
           </div>

@@ -35,11 +35,28 @@ export function saveRecentGames(list: RecentGame[]): void {
 }
 
 // Moves this game to the front, refreshing its cached name/thumbnail, rather than appending a
-// duplicate.
+// duplicate. An empty `name`/`tinyImage` never overwrites one already stored: a lookup by bare
+// appid or store URL knows no name at all (gameSearch.ts's `pick({ appid, name: '' })`), and
+// letting that blank out an entry whose real name was resolved on an earlier visit would leave
+// the "Recently Looked Up" list showing nothing for a game it had already identified.
 export function addRecentGame(appid: number, name: string, tinyImage?: string | null): void {
-  const rest = loadRecentGames().filter(g => g.appid !== appid);
-  rest.unshift({ appid, name, tinyImage: tinyImage || null });
+  const list = loadRecentGames();
+  const existing = list.find(g => g.appid === appid);
+  const rest = list.filter(g => g.appid !== appid);
+  rest.unshift({ appid, name: name || existing?.name || '', tinyImage: tinyImage || existing?.tinyImage || null });
   saveRecentGames(rest.slice(0, MAX_RECENT_GAMES));
+}
+
+// Fills in a stored entry's name/thumbnail *without* moving it to the front — for a game whose
+// real name only became known after it was already recorded (an appid/URL lookup, whose name
+// resolves from store metadata a moment later). addRecentGame would reorder the list, which is
+// wrong here: nothing was looked up again, an existing entry just learned its own name.
+export function renameRecentGame(appid: number, name: string, tinyImage?: string | null): void {
+  const list = loadRecentGames();
+  const idx = list.findIndex(g => g.appid === appid);
+  if (idx === -1) return;
+  list[idx] = { appid, name: name || list[idx].name, tinyImage: tinyImage || list[idx].tinyImage };
+  saveRecentGames(list);
 }
 
 export function removeRecentGame(appid: number): void {

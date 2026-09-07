@@ -78,3 +78,50 @@ test('addRecentGame/removeRecentGame: coexist with other prefs keys in the same 
   addRecentGame(620, 'Portal 2', null);
   assert.equal(getPref('region'), 'DE');
 });
+
+// ── Empty name/thumbnail never clobbers a resolved one ───────────────────────
+
+test('addRecentGame: an empty name keeps the name already stored (bare-appid lookup of a known game)', () => {
+  const { addRecentGame, loadRecentGames } = mod();
+  addRecentGame(440, 'Team Fortress 2', 'https://cdn/tf2.jpg');
+  addRecentGame(440, '', null);
+  assert.deepEqual(loadRecentGames(), [{ appid: 440, name: 'Team Fortress 2', tinyImage: 'https://cdn/tf2.jpg' }]);
+});
+
+test('addRecentGame: a real name still overwrites an older one, and still moves the entry to the front', () => {
+  const { addRecentGame, loadRecentGames } = mod();
+  addRecentGame(440, 'Old Name', null);
+  addRecentGame(620, 'Portal 2', null);
+  addRecentGame(440, 'Team Fortress 2', 'https://cdn/tf2.jpg');
+  assert.deepEqual(loadRecentGames().map(g => [g.appid, g.name]), [[440, 'Team Fortress 2'], [620, 'Portal 2']]);
+});
+
+test('addRecentGame: an entry recorded with no name at all stores an empty one rather than a placeholder', () => {
+  const { addRecentGame, loadRecentGames } = mod();
+  addRecentGame(108600, '', null);
+  assert.deepEqual(loadRecentGames(), [{ appid: 108600, name: '', tinyImage: null }]);
+});
+
+test('renameRecentGame: fills in a name without moving the entry to the front', () => {
+  const { addRecentGame, renameRecentGame, loadRecentGames } = mod();
+  addRecentGame(108600, '', null);
+  addRecentGame(620, 'Portal 2', null);
+  renameRecentGame(108600, 'Project Zomboid', 'https://cdn/pz.jpg');
+  assert.deepEqual(loadRecentGames(), [
+    { appid: 620, name: 'Portal 2', tinyImage: null },
+    { appid: 108600, name: 'Project Zomboid', tinyImage: 'https://cdn/pz.jpg' },
+  ]);
+});
+
+test('renameRecentGame: an empty name/thumbnail leaves what is already stored alone', () => {
+  const { addRecentGame, renameRecentGame, loadRecentGames } = mod();
+  addRecentGame(440, 'Team Fortress 2', 'https://cdn/tf2.jpg');
+  renameRecentGame(440, '', null);
+  assert.deepEqual(loadRecentGames(), [{ appid: 440, name: 'Team Fortress 2', tinyImage: 'https://cdn/tf2.jpg' }]);
+});
+
+test('renameRecentGame: a game that is not in the list is left out of it, not added', () => {
+  const { renameRecentGame, loadRecentGames } = mod();
+  renameRecentGame(440, 'Team Fortress 2', null);
+  assert.deepEqual(loadRecentGames(), []);
+});

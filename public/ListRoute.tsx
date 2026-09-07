@@ -74,7 +74,7 @@ import { setPanelParam, reorderUrlParams } from './urlState.ts';
 import { setPref } from './prefs.ts';
 import { getCurrentAccount } from './accountsStore.ts';
 import { fetchAccountOwnedGames, fetchAccountWishlistItems } from './accountData.ts';
-import { loadRecentGames, addRecentGame } from './recentGames.ts';
+import { loadRecentGames, addRecentGame, renameRecentGame } from './recentGames.ts';
 import { fetchBundleById, resolveBundleGames, type ResolvedGame, type FlatGame } from './bundleData.ts';
 import {
   bundleTierSummary, bundleUrgency, shopHue, fmtBundleDateFriendly, type BundleTierSummary,
@@ -488,7 +488,9 @@ export default function ListRoute() {
   async function openStandaloneInPlace(appid: number): Promise<void> {
     const token = ++standaloneLookupToken;
     if (!Number.isInteger(appid) || appid <= 0) { setStatusText('Invalid game id.'); return; }
-    const game = { appid, name: `App ${appid}`, loading: true, details: null, standalone: true } as Game;
+    // No `App <appid>` placeholder in the data — panel.tsx's own title renders that fallback, so
+    // the empty name here stays honest ("not resolved yet") for everything else that reads it.
+    const game = { appid, name: '', loading: true, details: null, standalone: true } as Game;
     openGame(game);
     try {
       const res = await fetch(`/api/game-details/${appid}`);
@@ -499,7 +501,10 @@ export default function ListRoute() {
       game.loading = false;
       if (data.meta?.name) game.name = data.meta.name;
       if (getPanelGame() === game) renderPanelBody(game);
-      addRecentGame(game.appid, game.name, data.meta?.capsule || null);
+      // `data.meta?.name`, not `game.name` — the latter falls back to this function's own
+      // `App <appid>` placeholder, which must never reach the stored recents list as if it were
+      // a real title (see load()'s recents mapping below).
+      addRecentGame(game.appid, data.meta?.name || '', data.meta?.capsule || null);
     } catch (err) {
       if (token !== standaloneLookupToken) return;
       if (getPanelGame() === game) setStatusText(`Lookup failed: ${(err as Error).message}`);
@@ -562,11 +567,20 @@ export default function ListRoute() {
 
   const detailBatcher = createStreamBatcher<DetailsEvent>({
     apply: event => {
+      const hadName = !!rowStore.getRow(event.appid)?.name;
       const row = rowStore.mutateRow(event.appid, draft => applyDetailsEvent(draft, event));
       if (!row) return;
+      const capsule = (row as { capsule?: string | null }).capsule ?? null;
       if (pendingRecentFocus === event.appid) {
-        addRecentGame(row.appid, row.name, (row as { capsule?: string | null }).capsule ?? null);
+        addRecentGame(row.appid, row.name, capsule);
         pendingRecentFocus = null;
+      } else if (kind === 'recent' && !hadName && row.name) {
+        // This row was already in the stored recents list, but recorded without a name (a bare
+        // appid/store-URL lookup — see load()'s own comment above). Now that store metadata has
+        // resolved one, write it back so the next visit doesn't start out nameless again.
+        // renameRecentGame, not addRecentGame: nothing was looked up here, so the entry must keep
+        // its place in the list rather than jumping to the front on every visit.
+        renameRecentGame(row.appid, row.name, capsule);
       }
       // renderPanelBody reads straight off `row` (the plain panelRows copy mutateRow already
       // updated synchronously above), so it's always current regardless of batching. renderPanelNav
@@ -920,8 +934,15 @@ export default function ListRoute() {
     } else if (kind === 'recent') {
       setBaseTitle('Recently Looked Up');
       const recents = loadRecentGames();
+      // `g.name` verbatim, *not* `g.name || \`App ${g.appid}\``: a game looked up by bare appid or
+      // store URL is recorded with no name at all (nothing client-side knows one yet), and baking
+      // the placeholder in here made it look like a real name to applyDetailsEvent's own
+      // `if (!row.name)` guard — so the row kept reading "App 108600" forever, even once store
+      // metadata had streamed in with the real title. The placeholder is presentational only now
+      // (panel.tsx's title falls back to it); a still-nameless row is `loading` and filtered out
+      // of the table anyway until its details event lands.
       initialRows = recents.map(g => ({
-        appid: g.appid, name: g.name || `App ${g.appid}`, capsule: g.tinyImage || undefined,
+        appid: g.appid, name: g.name, capsule: g.tinyImage || undefined,
         loading: true, details: null,
       })) as unknown as Game[];
       streamTargets = recents;
