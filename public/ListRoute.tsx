@@ -48,7 +48,7 @@
 // loadGuard, total/loaded, …) is now local to this component's own closure, created fresh on
 // each mount and torn down on unmount via onCleanup — library.tsx's page loads exactly once, but
 // a router-driven route mounts/unmounts every time its path is navigated to/away from.
-import { onMount, onCleanup, createSignal, createRoot, createEffect, batch, For, Show } from 'solid-js';
+import { onMount, onCleanup, createSignal, createRoot, createEffect, on, batch, For, Show } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { useParams, useLocation, useNavigate } from '@solidjs/router';
@@ -526,6 +526,9 @@ export default function ListRoute() {
     updateStatus();
     pendingRecentFocus = appid;
     openGame(rowStore.getRow(appid)!);
+    // No ownership stamping call here — the row this just added is picked up by the rowsStore
+    // effect above, which is the whole point of driving it off the row list rather than the
+    // call sites that build one.
     streamGameDetails([{ appid }], loadGuard.current());
   }
 
@@ -675,20 +678,23 @@ export default function ListRoute() {
     }
   }
 
-  // Stamps `inLibrary`/`onWishlist` onto every row from myOwnership.ts's own owned/wishlist
-  // appid sets, checked against `currentAccount` (whichever account's list this route itself
-  // loaded — see myOwnership.ts's own comment) — unlike loadWishlistPrices/loadBundlePrices
-  // above, this is never a per-row fetch: myOwnership.ts already loads (and caches) the whole
-  // sets once per loaded account, so checking membership for every row here costs nothing extra.
-  // `peekMyOwnershipStatus` is a synchronous, non-blocking peek that can return null for "no
-  // currentAccount loaded" *or* "still loading" (see its own comment in myOwnership.ts) —
-  // indistinguishable here, so this just stamps whatever's already resolved immediately, then
-  // re-stamps once via onMyOwnershipReady for whichever rows peeked null the first time around
-  // (a no-op forever if no currentAccount is ever loaded, same as the panel's own "no badge at
-  // all" behavior in that case).
-  function stampMyOwnership(items: { appid: number }[]) {
+  // Stamps `inLibrary`/`onWishlist` onto every row currently in `rowsStore`, from myOwnership.ts's
+  // own owned/wishlist appid sets, checked against `currentAccount` (whichever account's list this
+  // route itself loaded — see myOwnership.ts's own comment) — unlike loadWishlistPrices/
+  // loadBundlePrices above, this is never a per-row fetch: myOwnership.ts already loads (and
+  // caches) the whole sets once per loaded account, so checking membership for every row here
+  // costs nothing extra. `peekMyOwnershipStatus` is a synchronous, non-blocking peek that can
+  // return null for "no currentAccount loaded" *or* "still loading" (see its own comment in
+  // myOwnership.ts) — indistinguishable here, so this just stamps whatever's already resolved,
+  // leaving whichever rows peeked null to the onMyOwnershipReady re-stamp below (a no-op forever
+  // if no currentAccount is ever loaded, same as the panel's own "no badge at all" behavior).
+  //
+  // Reads `rowsStore` live rather than taking the row list as an argument: the two things that
+  // trigger a stamp (a row appearing, the sets landing) each happen at a moment the *other* one's
+  // caller can't see, so both have to look at whatever's actually there when they run.
+  function stampMyOwnership(): void {
     batch(() => {
-      for (const item of items) {
+      for (const item of rowsStore) {
         const status = peekMyOwnershipStatus(item.appid);
         if (!status) continue;
         const row = rowStore.mutateRow(item.appid, draft => {
@@ -699,11 +705,28 @@ export default function ListRoute() {
       }
     });
   }
-  function loadMyOwnership(items: { appid: number }[], gen: number): void {
-    stampMyOwnership(items);
+
+  // Whether "do I own this" is a genuine question for this kind at all — an Owned/Wishlist list's
+  // own rows are trivially owned/wishlisted, the same reason OWNERSHIP_STATUS_COLUMN is only part
+  // of BUNDLE_COLUMNS/RECENT_COLUMNS.
+  const stampsOwnership = kind === 'bundle' || kind === 'recent' || kind === 'user';
+
+  // Driven off the row list itself, not called once per load: rows can appear *after* a load has
+  // finished (openOrAddRecentGame prepends the game a nav-bar lookup just found), and a stamping
+  // pass that only ever ran over load()'s own row list left exactly those rows with no ✓/☆ marker
+  // — confirmed live, and a bug class that comes back the next time another path adds a row.
+  // `on(() => rowsStore.length)` tracks *only* the row count (its callback body runs untracked),
+  // so this stays off the detail stream's own per-row mutations, which never add or remove a row.
+  createEffect(on(() => rowsStore.length, () => { if (stampsOwnership) stampMyOwnership(); }));
+
+  // The owned/wishlist sets are usually still in flight when a load's own first stamp runs, so
+  // re-stamp once they land. One-shot per load (onMyOwnershipReady forgets its listeners once it
+  // fires), guarded by this load's own generation so a superseded load can't stamp over a newer one.
+  function loadMyOwnership(gen: number): void {
+    stampMyOwnership();
     onMyOwnershipReady(() => {
       if (loadGuard.isStale(gen)) return;
-      stampMyOwnership(items);
+      stampMyOwnership();
     });
   }
 
@@ -1081,7 +1104,7 @@ export default function ListRoute() {
 
     if (kind === 'wishlist') loadWishlistPrices(streamTargets, gen); // runs concurrently, not awaited
     if (kind === 'bundle' && resolvedBundleGames) loadBundlePrices(resolvedBundleGames, gen); // ditto
-    if (kind === 'bundle' || kind === 'recent' || kind === 'user') loadMyOwnership(streamTargets, gen); // ditto
+    if (stampsOwnership) loadMyOwnership(gen); // ditto
     await streamGameDetails(streamTargets, gen);
   }
 
