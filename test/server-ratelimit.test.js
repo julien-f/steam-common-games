@@ -7,6 +7,7 @@
 process.env.STEAM_API_KEY = 'test-key';
 process.env.NODE_ENV = 'test';
 process.env.RATE_LIMIT_ENABLED = 'true';
+process.env.SEARCH_RATE_LIMIT_MAX = '2';
 process.env.DETAILS_RATE_LIMIT_MAX = '3';
 process.env.GAME_SEARCH_RATE_LIMIT_MAX = '2';
 process.env.ITAD_API_KEY = 'test-itad-key';
@@ -105,6 +106,51 @@ test('game search limiter: counts cache misses but never counts cache hits', asy
   const cached = await api.get('/api/search-games?q=cached term');
   assert.equal(cached.status, 200, 'a cache hit must bypass the limiter');
   assert.deepEqual(cached.body.results, [{ appid: 900, name: 'Pre-cached', tinyImage: null }]);
+});
+
+// Regression test for the bug reported live: switching between a handful of already-loaded
+// accounts used to burn the whole per-minute search budget, since searchLimit's original skip()
+// was just rateLimitBypassed() — every request counted, cache hit or not (unlike every other
+// limiter in this file). searchLimit is shared by POST /api/common-games and POST /api/wishlist
+// (see server.js), so this exercises the skip across both call shapes against one shared budget,
+// the way they really share it.
+test('search limiter: counts cache misses but never counts cache hits (common-games + wishlist)', async (t) => {
+  _reset();
+  const CACHED_COMMON = '76561198000000099';
+  const CACHED_WISHLIST = '76561198000000199';
+  const calledIds = new Set();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const idMatch = url.match(/steamid=(\d+)/) || url.match(/steamids=([\d,]+)/);
+    if (idMatch) idMatch[1].split(',').forEach(id => calledIds.add(id));
+    if (url.includes('GetOwnedGames')) return { ok: true, json: async () => ({ response: { games: [] } }) };
+    if (url.includes('GetWishlist')) return { ok: true, json: async () => ({ response: {} }) };
+    if (url.includes('GetPlayerSummaries')) return { ok: true, json: async () => ({ response: { players: [] } }) };
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  // Pre-cache one account fully on each route — these should always be served.
+  setCache(`player:${CACHED_COMMON}`, { steamid: CACHED_COMMON, personaname: 'Cached', profileurl: '' });
+  setCache(`games:${CACHED_COMMON}`, []);
+  setCache(`player:${CACHED_WISHLIST}`, { steamid: CACHED_WISHLIST, personaname: 'Cached', profileurl: '' });
+  setCache(`wishlist:${CACHED_WISHLIST}`, []);
+
+  // Two uncached searches, one per route, consume the shared budget (max = 2).
+  const miss1 = await api.post('/api/common-games').send({ slots: [['76561198000000001']] });
+  assert.equal(miss1.status, 200, 'first miss should succeed within budget');
+  const miss2 = await api.post('/api/wishlist').send({ members: ['76561198000000002'] });
+  assert.equal(miss2.status, 200, 'second miss should succeed within budget');
+
+  // A third uncached search, on either route, is over budget → 429.
+  const over = await api.post('/api/common-games').send({ slots: [['76561198000000003']] });
+  assert.equal(over.status, 429, 'a cache miss past the budget should be rate limited');
+
+  // The fully-cached accounts are still served even though the budget is exhausted, and make no
+  // upstream call at all.
+  const cachedCommon = await api.post('/api/common-games').send({ slots: [[CACHED_COMMON]] });
+  assert.equal(cachedCommon.status, 200, 'a fully-cached account (common-games) must bypass the limiter');
+  const cachedWishlist = await api.post('/api/wishlist').send({ members: [CACHED_WISHLIST] });
+  assert.equal(cachedWishlist.status, 200, 'a fully-cached account (wishlist) must bypass the limiter');
+  assert.ok(!calledIds.has(CACHED_COMMON) && !calledIds.has(CACHED_WISHLIST), 'cache hits must not fetch upstream');
 });
 
 // Regression test for the bug reported live: reloading the Bundles page a handful of times (or

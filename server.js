@@ -43,6 +43,10 @@ const rateLimitBypassed = () =>
 
 const isForceRefresh = (req) => req.query.refresh === '1' || req.query.refresh === 'true';
 
+// Used by searchLimit's skip below (a raw Steam64 id needs no resolve: cache check at all,
+// same short-circuit resolveSteamId itself uses) and by achievementsLimit's further down.
+const STEAM64_RE = /^7656119\d{10}$/;
+
 // Wraps rateLimit() so every limiter also records when it actually rejects a request — the
 // inbound counterpart to lib/metrics.js's outbound statusCounts. `handler` only runs once a
 // request is actually over budget (not on every request, and not on a skip), so this is a
@@ -112,14 +116,60 @@ if (usingDist) {
 }
 app.use(express.static(STATIC_DIR));
 
-// Stricter limit for searches — each uncached user triggers Steam API calls
+// Stricter limit for searches — each uncached user triggers Steam API calls. Shared by
+// POST /api/common-games and POST /api/wishlist below (their body shapes never overlap:
+// common-games sends slots/users, wishlist sends members), same "cache hits don't count"
+// rule detailsLimit/gameSearchLimit/etc. already apply — a re-search for accounts already
+// sitting fully in cache (resolve/player/games/wishlist) makes no upstream call at all, so it
+// shouldn't spend this tighter budget the way a genuinely new/stale search does. Switching
+// between a handful of already-loaded accounts used to burn the whole per-minute budget on
+// requests that never touched Steam.
 const searchLimit = namedRateLimit('search', {
   windowMs: 60 * 1000,
   max: SEARCH_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many searches. Please wait a minute and try again.' },
-  skip: () => rateLimitBypassed(),
+  skip: (req) => {
+    if (rateLimitBypassed()) return true;
+    // A full refresh always re-fetches every account, so it must always count — same rule
+    // isForceRefresh gets elsewhere in this file. A per-account refreshIds (the accounts bar's
+    // own "↻") forces at least those accounts regardless of cache state, so it must count too
+    // — no need to reason about which specific ids they are.
+    if (req.body?.refresh === true) return false;
+    const refreshIds = req.body?.refreshIds;
+    if (Array.isArray(refreshIds) && refreshIds.length > 0) return false;
+
+    let rawIdentifiers;
+    let isWishlist;
+    if (Array.isArray(req.body?.slots))        { rawIdentifiers = req.body.slots.flat(); isWishlist = false; }
+    else if (Array.isArray(req.body?.users))   { rawIdentifiers = req.body.users;        isWishlist = false; }
+    else if (Array.isArray(req.body?.members)) { rawIdentifiers = req.body.members;      isWishlist = true; }
+    else return false; // let the route's own validation reject it
+
+    if (!rawIdentifiers.every(u => typeof u === 'string' && u.trim().length > 0)) return false;
+
+    // Mirrors resolveSteamId's own cache key/short-circuit exactly — a raw Steam64 id needs no
+    // resolution at all, so it's never an upstream call regardless of cache state; anything else
+    // not yet in resolve: hasn't been resolved yet, so it must count.
+    const resolvedIds = new Set();
+    for (const raw of rawIdentifiers) {
+      const id = raw.trim();
+      if (STEAM64_RE.test(id)) { resolvedIds.add(id); continue; }
+      const hit = getCached(`resolve:${id}`);
+      if (hit === undefined) return false;
+      resolvedIds.add(hit);
+    }
+
+    // Every identifier now resolves to a known Steam64 id — the route's remaining upstream work
+    // is just getPlayerSummaries + getOwnedGames (common-games) or getWishlist (wishlist) per
+    // id, mirroring their own cache keys.
+    for (const id of resolvedIds) {
+      if (getCached(`player:${id}`) === undefined) return false;
+      if (isWishlist ? getCached(`wishlist:${id}`) === undefined : getCached(`games:${id}`) === undefined) return false;
+    }
+    return true;
+  },
 });
 
 // The details limit exists to throttle upstream Steam/HLTB calls. Cache hits make
@@ -186,8 +236,6 @@ const gameSearchLimit = namedRateLimit('gameSearch', {
     return getCached(`search:${term}`) !== undefined;
   },
 });
-
-const STEAM64_RE = /^7656119\d{10}$/;
 
 // Schema is per-appid (one call regardless of how many accounts are loaded); player progress
 // is per (steamid, appid) — skip only once every one of those is already cached, same
