@@ -1,4 +1,4 @@
-# Steam Common Games
+# steam.isonoe.net
 
 Find games shared across multiple Steam libraries, with ratings and completion times.
 

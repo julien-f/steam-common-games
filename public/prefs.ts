@@ -9,7 +9,7 @@
 // account pulls down) without needing to know every individual key up front. This is purely a
 // local-storage convenience, though — it does NOT mean sync itself works on the whole blob (see
 // setPref below).
-export const PREFS_STORAGE_KEY = 'steam-common-games:prefs';
+export const PREFS_STORAGE_KEY = 'steam.isonoe.net:prefs';
 
 function readPrefsBlob(): Record<string, unknown> {
   try {

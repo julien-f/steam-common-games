@@ -32,7 +32,7 @@ test('loadRecentGames: returns [] when nothing was ever stored', () => {
 });
 
 test('loadRecentGames: returns [] when the stored prefs blob is corrupt (same fallback prefs.ts already gives)', () => {
-  global.localStorage.setItem('steam-common-games:prefs', '{not json');
+  global.localStorage.setItem('steam.isonoe.net:prefs', '{not json');
   assert.deepEqual(mod().loadRecentGames(), []);
 });
 

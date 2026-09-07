@@ -10,7 +10,7 @@ export default function AboutRoute() {
       <div class="card">
         <h2>About</h2>
         <p class="card-subtitle">
-          Steam Common Games compares Steam libraries across players and helps you browse a single library,
+          steam.isonoe.net compares Steam libraries across players and helps you browse a single library,
           with ratings, playtime, and completion-time estimates. It's a small personal project, not affiliated
           with or endorsed by Valve, Steam, or HowLongToBeat.
         </p>

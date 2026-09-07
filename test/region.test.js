@@ -118,7 +118,7 @@ test('setStoredRegion/getStoredRegion: round-trips AUTO_COUNTRY itself', () => {
 });
 
 test('getStoredRegion: falls back to AUTO_COUNTRY for an unrecognized stored value', () => {
-  global.localStorage.setItem('steam-common-games:prefs', JSON.stringify({ region: 'ZZ' }));
+  global.localStorage.setItem('steam.isonoe.net:prefs', JSON.stringify({ region: 'ZZ' }));
   assert.equal(getStoredRegion(), AUTO_COUNTRY);
 });
 

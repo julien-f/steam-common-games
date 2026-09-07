@@ -925,7 +925,7 @@ if (require.main === module) {
     process.exit(1);
   }
   app.listen(PORT, HOST, () => {
-    console.log(`\nSteam Common Games → http://${HOST}:${PORT}\n`);
+    console.log(`\nsteam.isonoe.net → http://${HOST}:${PORT}\n`);
   });
 }
 
