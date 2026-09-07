@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Removed
+
+- Unused `@types/express` devDependency — `tsconfig.json` only typechecks `public/**` (the backend is intentionally out of scope, per this file's own architecture section), and nothing anywhere referenced its types via JSDoc either. Left over from the frontend's TypeScript conversion.
+
 ### Added
 
 - List-centric redesign: `/lists/bundle/:bundleId` (`ListRoute.tsx`) got a small bundle-detail header it never had — the bundle's title plus `‹`/`›` buttons that step to the previous/next bundle in whatever list was last browsed on `/bundles`, and a "← All bundles" link back — porting `bundles.tsx`'s old `renderBundleNav` behavior (steps through the currently-loaded list only, no auto-"Load more", no wraparound, both buttons disable at either end or when the open bundle isn't part of that list at all, e.g. a fresh `?bundle=`-less deep link). New `public/bundleBrowseStore.ts` — plain module-level state (not a signal; nothing here needs to be reactive) holding the last list `BundlesBrowseRoute.tsx` fetched/appended, read by `ListRoute.tsx`'s new `bundleNavIndex`/`prevBundleId`/`nextBundleId`. Before this, the only way to move from one bundle's game table to another was back out to `/bundles` and pick again, with no on-page indication of which bundle was even open. Full suite (606) and typecheck clean.
