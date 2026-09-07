@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Home's account resolve input (`HomeRoute.tsx`) now strips a pasted `steamcommunity.com/profiles/<id>` or `.../id/<vanity>` URL down to the bare identifier via `normalizeInput` (`utils.ts`) before sending it to `/api/common-games`/`/api/wishlist` — a regression from the list-centric redesign: `app.tsx` used to call this on every typed input before it was deleted, and nothing in the new SPA picked the call back up, so a pasted profile URL (vanity or numeric) was sent to the server verbatim and failed to resolve (the server only special-cases a bare 17-digit SteamID64; anything else, URL included, was passed straight through to Steam's `ResolveVanityURL`, which can't resolve a URL). `normalizeInput` itself was unchanged and still unit-tested throughout — only the call site was missing.
+
 ### Changed
 
 - Renamed the `dev` npm script to `dev:backend` and `dev:web` to `dev:frontend` (matching CLAUDE.md's own "frontend"/"backend" terminology), and added a new composite `dev` script (`concurrently`, new devDependency) that runs both at once and stops both on Ctrl+C — previously each had to be started in its own terminal by hand. Updated `README.md`/`CLAUDE.md` references accordingly.

@@ -20,6 +20,7 @@ import {
   getRecentAccounts, removeRecentAccount, clearRecentAccounts,
 } from './accountsStore.ts';
 import { resolveAccountSummary, fetchAccountOwnedGames, fetchAccountWishlistItems } from './accountData.ts';
+import { normalizeInput } from './utils.ts';
 import {
   getFolders, getLists, createFolder, createList, renameFolder, renameList,
   deleteFolder, deleteList,
@@ -79,7 +80,7 @@ export default function HomeRoute() {
   });
 
   async function resolveAndSetCurrent(): Promise<void> {
-    const trimmed = resolveInputs().map(s => s.trim()).filter(Boolean);
+    const trimmed = resolveInputs().map(s => normalizeInput(s.trim())).filter(Boolean);
     if (trimmed.length === 0) return;
     setResolving(true);
     setResolveError('');
