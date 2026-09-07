@@ -145,6 +145,51 @@ export function renderDemoBadge(v: unknown): Node {
   return span;
 }
 
+// Appends bare ✓/☆ markers after the name text when `row.inLibrary`/`row.onWishlist` are set,
+// and colors (+ bolds, for Owned) the whole cell — name text included, not just the badge —
+// using the *exact same* `OWNERSHIP_STATUS_TIERS` (below) `OWNERSHIP_STATUS_COLUMN`'s own cell
+// derives its color/bold from, rather than a second, separately-maintained copy of "green+bold
+// for owned, yellow for wishlisted" (a first draft of this function did exactly that, as a CSS
+// class, and the bold weight quietly went missing from it — the tier list didn't exist yet for
+// this function to share). Just inline rather than a labeled pill, unlike the panel's own
+// `.panel-ownership-badge`/gameSearch.ts's `.game-search-badge` — a table row has even less room
+// than a dropdown row. Owned wins over Wishlisted when both are true (only one color/weight can
+// apply to the cell, unlike the two badges below, which both still show) — matching
+// `OWNERSHIP_STATUS_TIERS`'s own "Owned & Wishlisted" tier already being green, not some third
+// mixed color. A no-op everywhere `inLibrary`/`onWishlist` are never populated — the Library/
+// Wishlist tabs' own rows, where "do I own this" is trivially always true/false and not worth
+// flagging — since this only renders whatever's already on the row (ListRoute.tsx's
+// loadMyOwnership is what actually populates them, for the bundle/recent/user lists where the
+// question is a genuine one). Falls straight through to a plain text node when neither applies
+// (`computeOwnershipStatus` returns `null`/`'Not Owned'`, neither of which has a tier `color`),
+// so the common case renders identically to `fmt.str` before this existed.
+export function renderNameCell(v: unknown, row: Row): Node {
+  const nameText = fmt.str(v);
+  const status = computeOwnershipStatus(row);
+  const tier = status ? OWNERSHIP_STATUS_TIERS.find(t => t.label === status) : null;
+  if (!tier?.color) return document.createTextNode(nameText);
+  const wrap = document.createElement('span');
+  wrap.className = 'game-name-cell';
+  wrap.style.color = tier.color;
+  if (tier.bold) wrap.style.fontWeight = '700';
+  wrap.appendChild(document.createTextNode(nameText));
+  if (row.inLibrary) {
+    const b = document.createElement('span');
+    b.className = 'name-status-badge owned';
+    b.title = 'In library'; // not "In your library" — see panel.tsx's own ownership badge/git history for why
+    b.textContent = '✓';
+    wrap.appendChild(b);
+  }
+  if (row.onWishlist) {
+    const b = document.createElement('span');
+    b.className = 'name-status-badge wishlisted';
+    b.title = 'On wishlist'; // not "On your wishlist" — ditto
+    b.textContent = '☆';
+    wrap.appendChild(b);
+  }
+  return wrap;
+}
+
 // Ignores `value` and reads `row.capsule` directly — `value` is forced to null on this column
 // (see CORE_COLUMNS below) so the raw image URL never surfaces in full-text search matches.
 export function renderThumb(_value: unknown, row: Row): Node {
@@ -518,6 +563,65 @@ export const PRICE_STATUS_COLUMN: ColumnDef<Row> = {
   compare: comparePriceStatus, defaultSortDir: 'desc', category: 'Pricing',
 };
 
+// "Is this appid owned/wishlisted by currentAccount" (whichever account's list is actually on
+// screen — see myOwnership.ts's own comment) — turns its `inLibrary`/`onWishlist` fields
+// (stamped onto a row by ListRoute.tsx's own loadMyOwnership, from the sets myOwnership.ts
+// already loads once per loaded account — no per-row fetch of its own) into one categorical
+// column, same shape as PRICE_STATUS_COLUMN above. Labeled "Ownership Status", not "My Status"
+// — this app has no real login, so `currentAccount` isn't a verified "this is you" identity,
+// just whichever account happens to be loaded (a friend's, just as easily as your own); claiming
+// it's personally "mine" in a column header overstates that relationship the same way an earlier
+// version of the *other* ownership badge in this app (panel.tsx's, plain "In library"/"On
+// wishlist") was deliberately kept free of "your"/"my" wording for. `null` (rendered "—") covers
+// both "no account loaded" and "still loading" — same ambiguity myOwnership.ts's own
+// peekMyOwnershipStatus already accepts, for the same reason: a synchronous cell render can't
+// await, and loadMyOwnership re-stamps every row once the real sets land. Not part of
+// CORE_COLUMNS — an Owned/Wishlist list's own rows are always trivially 'Owned'/'Wishlisted', so
+// this only earns a place on ListRoute.tsx's BUNDLE_COLUMNS/RECENT_COLUMNS (which 'user' also
+// uses), where it's a genuine question — and even there it's hidden by default (not part of
+// either kind's own *_DEFAULT_VISIBLE list): renderNameCell below already surfaces the same
+// information (color + a ✓/☆ badge) right on the Name column everyone already looks at, so this
+// dedicated column is a secondary, sort/group/filter-only view onto the same fact rather than
+// something worth defaulting to visible.
+export function computeOwnershipStatus(row: Row): string | null {
+  if (row.inLibrary == null && row.onWishlist == null) return null;
+  if (row.inLibrary && row.onWishlist) return 'Owned & Wishlisted';
+  if (row.inLibrary) return 'Owned';
+  if (row.onWishlist) return 'Wishlisted';
+  return 'Not Owned';
+}
+// Single source of truth for both this column's sort order/visual styling AND renderNameCell's
+// own name-cell coloring below — same "one tier list, multiple renderers pull from it" shape as
+// DEAL_RECORD_TIERS/PRICE_STATUS_TIERS above, for the same reason: a color/bold fact restated in
+// two places is a color/bold fact that can silently drift apart between them (confirmed live:
+// renderNameCell's own first draft colored the name text but left off the bold weight
+// OWNERSHIP_STATUS_COLUMN's cell already had for the exact same "Owned" status).
+export const OWNERSHIP_STATUS_TIERS: { label: string; color?: string; icon?: string; bold?: boolean }[] = [
+  { label: 'Not Owned' },
+  { label: 'Wishlisted', color: '#f1c40f', icon: ' ☆' },
+  { label: 'Owned', color: '#2ecc71', icon: ' ✓', bold: true },
+  { label: 'Owned & Wishlisted', color: '#2ecc71', icon: ' ✓', bold: true },
+];
+export const OWNERSHIP_STATUS_ORDER = OWNERSHIP_STATUS_TIERS.map(t => t.label);
+export const compareOwnershipStatus = compareMissingLast((a, b) =>
+  OWNERSHIP_STATUS_ORDER.indexOf(String(a)) - OWNERSHIP_STATUS_ORDER.indexOf(String(b)));
+export function renderOwnershipStatus(v: unknown): Node {
+  if (v == null) return document.createTextNode('—');
+  const sv = String(v);
+  const tier = OWNERSHIP_STATUS_TIERS.find(t => t.label === sv);
+  if (!tier?.color) return document.createTextNode(sv); // 'Not Owned' — plain text
+  const span = document.createElement('span');
+  span.style.color = tier.color;
+  if (tier.bold) span.style.fontWeight = '700';
+  span.textContent = sv + tier.icon!;
+  return span;
+}
+export const OWNERSHIP_STATUS_COLUMN: ColumnDef<Row> = {
+  key: 'ownershipStatus', label: 'Ownership Status', groupable: true,
+  value: computeOwnershipStatus, format: v => v == null ? '—' : String(v), render: renderOwnershipStatus,
+  compare: compareOwnershipStatus, defaultSortDir: 'desc',
+};
+
 // Inserts `newColumns` right after the column keyed `afterKey`, rather than always appending at
 // the very end — used by every page below to layer its own page-specific columns onto
 // CORE_COLUMNS/PRICE_COLUMNS in the section they actually belong to (e.g. Wishlist Rank right
@@ -561,7 +665,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = [
   // `format: fmt.str` handles a still-streaming-in name (Wishlist/Bundles rows only know a
   // placeholder name until store metadata resolves) the same way every other loading cell does;
   // harmless for the Library tab, whose owned-game names are always known upfront.
-  { key: 'name',             label: 'Name',            filterable: false, groupable: false, format: fmt.str },
+  { key: 'name',             label: 'Name',            filterable: false, groupable: false, format: fmt.str, render: renderNameCell },
 
   // ── Scores & reviews ────────────────────────────────────────────────────────
   // The default-visible score: a Bayesian-shrinkage formula adapted from SteamDB's own (see

@@ -16,22 +16,44 @@ import { initPanel, isPanelOpen, panelClose, panelStepHero } from './panel.tsx';
 import { bindPanelKeyboardShortcuts } from './panelKeyboard.ts';
 import { initGameSearch } from './gameSearch.ts';
 import { addRecentGame } from './recentGames.ts';
+import { setPanelParam } from './urlState.ts';
 
-// Route-specific keyboard behavior (pickRandom/stepGame/onEnterOnFocusedRow) can't be hardcoded
-// at the shell level — different routes have different "list" contexts, or none at all (Home,
-// About, the Bundles browse screen). Each mounted route registers its own handlers here; the
-// shell's one bindPanelKeyboardShortcuts call below always delegates through this indirection,
-// defaulting to a no-op when nothing is registered rather than each route needing to rebind the
-// whole document-level keydown listener itself.
-interface RouteKeyboardHandlers {
+// Route-specific behavior (keyboard shortcuts, and now "open this looked-up game") can't be
+// hardcoded at the shell level — different routes have different "list" contexts, or none at all
+// (Home, About, the Bundles browse screen). Each mounted route registers its own handlers here;
+// the shell delegates through this indirection, defaulting to a no-op/fallback when nothing is
+// registered rather than each route needing to rebind the whole document-level keydown listener
+// itself, or the shell needing to know which routes are "list-shaped" at all.
+//
+// `openGame(appid)`: only ListRoute registers this (every one of its kinds can place a looked-up
+// game somewhere sensible — its own row if it has one, otherwise a standalone panel docked to
+// that same route — see ListRoute's own comment on `handleOpenGameRequest`), so it always returns
+// true there. Home/BundlesBrowseRoute/AboutRoute never register it — there's no list/table for a
+// game to be "in the context of" on those routes — so `openGameGlobally` below falls through to
+// navigating to `/game/:appid` (the Recently Looked Up list) instead.
+//
+// `onGameClose()`: only ListRoute's `recent` kind registers this — closing the panel there
+// should strip `:appid` back to the bare `/game` address (that kind's own address IS the
+// focused game, not a `?game=` query param — see ListRoute's own comment on `handleOpenGameRequest`),
+// which the shell's own generic `setPanelParam(null)` call below doesn't know how to do (it only
+// ever touches the query string). Driven straight off `initPanel`'s `onClose` — the one place
+// every close path (× button, Escape, swipe-to-close) already funnels through — rather than a
+// route-local reactive effect watching `isPanelOpen()`: a first attempt at exactly that
+// (`ListRoute.tsx`'s own `createEffect`) never actually observed the panel-closed transition live
+// (confirmed via console logging — the effect re-ran for unrelated reasons but never once with
+// `isPanelOpen() === false`, root cause not tracked down), so this goes through the same
+// already-proven-reliable synchronous callback `setPanelParam(null)` itself relies on instead.
+interface RouteHandlers {
   pickRandom?: () => void;
   stepGame?: (dir: 1 | -1) => boolean;
   onEnterOnFocusedRow?: () => boolean;
+  openGame?: (appid: number) => boolean;
+  onGameClose?: () => void;
 }
-let routeKeyboardHandlers: RouteKeyboardHandlers = {};
-export function registerRouteKeyboardHandlers(handlers: RouteKeyboardHandlers): () => void {
-  routeKeyboardHandlers = handlers;
-  return () => { routeKeyboardHandlers = {}; };
+let routeHandlers: RouteHandlers = {};
+export function registerRouteHandlers(handlers: RouteHandlers): () => void {
+  routeHandlers = handlers;
+  return () => { routeHandlers = {}; };
 }
 
 const NAV_LINKS: { href: string; label: string; end?: boolean }[] = [
@@ -44,17 +66,31 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
   let searchInputEl!: HTMLInputElement;
   const navigate = useNavigate();
 
+  // The one place a game-lookup, from anywhere in the shell, gets routed to wherever it belongs
+  // — the currently mounted route's own registered handler if it has one (ListRoute: opens the
+  // game in place, never navigating away from whatever list/page is on screen), or `/game/:appid`
+  // (the Recently Looked Up list) as the fallback for a route with no game/list context of its
+  // own at all (Home, Bundles browse, About) — see registerRouteHandlers's own comment above.
+  function openGameGlobally(appid: number): void {
+    if (routeHandlers.openGame?.(appid)) return;
+    navigate(`/game/${appid}`);
+  }
+
   onMount(() => {
     initLightbox({});
     initPanel({
-      onNavigateGame: (appid: number) => navigate(`/game/${appid}`),
+      onClose: () => {
+        routeHandlers.onGameClose?.();
+        setPanelParam(null);
+      },
+      onNavigateGame: openGameGlobally,
     });
     initGameSearch({
       inputEl: searchInputEl,
       resultsEl: document.getElementById('app-search-results') as HTMLElement,
       onSelect: game => {
         addRecentGame(game.appid, game.name, game.tinyImage);
-        navigate(`/game/${game.appid}`);
+        openGameGlobally(game.appid);
       },
     });
 
@@ -63,10 +99,10 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       isPanelOpen,
       panelClose,
       panelStepHero,
-      pickRandom: () => routeKeyboardHandlers.pickRandom?.(),
-      stepGame: dir => routeKeyboardHandlers.stepGame?.(dir) ?? false,
+      pickRandom: () => routeHandlers.pickRandom?.(),
+      stepGame: dir => routeHandlers.stepGame?.(dir) ?? false,
       focusSearchInput: () => searchInputEl.focus(),
-      onEnterOnFocusedRow: () => routeKeyboardHandlers.onEnterOnFocusedRow?.() ?? false,
+      onEnterOnFocusedRow: () => routeHandlers.onEnterOnFocusedRow?.() ?? false,
     });
 
     initPrefsPopover();

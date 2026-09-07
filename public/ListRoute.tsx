@@ -1,6 +1,10 @@
 // The generic list viewer — table + docked panel for a list, per docs/list-centric-redesign.md
 // and the implementation plan's Phase 4/5. Registered for /lists/owned, /lists/wishlist,
-// /lists/bundle/:bundleId, /lists/recent, and the generic /lists/:listId (see AppRoot.tsx).
+// /lists/bundle/:bundleId, the generic /lists/:listId, and /game/:appid? (see AppRoot.tsx) — the
+// last of these is the "Recently Looked Up" system list's own address (kind 'recent' below),
+// folding in what used to be a separate, mostly-empty GameRoute.tsx: `params.appid`, when given,
+// is opened the same way a live in-route lookup is (see handleOpenGameRequest/
+// openOrAddRecentGame below), not treated as a special standalone-only view.
 //
 // **Current scope**: every kind ('owned', 'wishlist', 'bundle', 'recent', 'user') is wired up
 // for real now (Phase 5 steps 1-2, 4, 6, and 7). This is deliberately narrower than the full plan
@@ -53,6 +57,7 @@ import {
   fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareDateMissingLast,
   withMissingGroup, formatMissingGroup, halfDecadeBucket, formatHalfDecadeBucket,
   protonDbValue, TYPE_LABELS, priceTierBucket, formatPriceTier, compareNumMissingLast,
+  OWNERSHIP_STATUS_COLUMN,
 } from './gameColumns.ts';
 import { computeSteamdbRating, computeProductionTier, discountPct, fmtLastPlayed, formatMoney } from './utils.ts';
 import { restoreTableView } from './tableViewPrefs.ts';
@@ -67,24 +72,27 @@ import { setPanelParam } from './urlState.ts';
 import { setPref } from './prefs.ts';
 import { getCurrentAccount } from './accountsStore.ts';
 import { fetchAccountOwnedGames, fetchAccountWishlistItems } from './accountData.ts';
-import { loadRecentGames } from './recentGames.ts';
+import { loadRecentGames, addRecentGame } from './recentGames.ts';
 import { fetchBundleById, resolveBundleGames, type ResolvedGame } from './bundleData.ts';
 import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from './priceLoading.ts';
 import { getStoredRegion, resolveRegion } from './region.ts';
-import { registerRouteKeyboardHandlers } from './AppShell.tsx';
+import { registerRouteHandlers } from './AppShell.tsx';
 import type { Game, Rating, Hltb, GameMeta, ProtonDb, GameList } from './types.ts';
 import { getList, getLists, createList, addAppidsToList, removeAppidsFromList, setListTableView } from './listsStore.ts';
 import { resolveGameList, flattenCombineResult, createDefaultFetchers } from './listResolve.ts';
 import type { MembershipGroup } from './combine.ts';
+import { peekMyOwnershipStatus, onMyOwnershipReady } from './myOwnership.ts';
 
 type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user';
 
-function kindFromPath(pathname: string, params: { bundleId?: string; listId?: string }): ListKind {
+// /game (bare) and /game/:appid both live here, kind 'recent' either way — see this file's own
+// header comment and AppRoot.tsx.
+function kindFromPath(pathname: string, params: { bundleId?: string; listId?: string; appid?: string }): ListKind {
   if (pathname === '/lists/owned') return 'owned';
   if (pathname === '/lists/wishlist') return 'wishlist';
   if (params.bundleId) return 'bundle';
-  if (pathname === '/lists/recent') return 'recent';
+  if (pathname === '/game' || pathname.startsWith('/game/')) return 'recent';
   return 'user';
 }
 
@@ -119,10 +127,14 @@ const WISHLIST_DATE_ADDED_COLUMN: ColumnDef<Record<string, any>> =
 const OWNED_COLUMNS = insertColumnsAfter(CORE_COLUMNS, 'hltbCompletionist', PLAYTIME_COLUMN, LAST_PLAYED_COLUMN);
 const OWNED_DEFAULT_VISIBLE = ['capsule', 'name', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres', 'playtime'];
 
-// 'recent' (the "Recently Looked Up" system list) is just plain CORE_COLUMNS — a recent lookup
-// isn't necessarily owned or wishlisted, so none of owned's Played/Last Played or wishlist's
-// price cluster apply here.
-const RECENT_COLUMNS = CORE_COLUMNS;
+// 'recent' (the "Recently Looked Up" system list) is CORE_COLUMNS plus OWNERSHIP_STATUS_COLUMN
+// (gameColumns.ts) — a recent lookup isn't necessarily owned or wishlisted (that's exactly the
+// point of the column), so none of owned's Played/Last Played or wishlist's price cluster apply
+// here. Hidden by default (not in RECENT_DEFAULT_VISIBLE below) — CORE_COLUMNS' own Name column
+// already renders the same status inline (color + a ✓/☆ badge, see gameColumns.ts's
+// renderNameCell), so this dedicated column is there for sort/group/filter, not a default-visible
+// restatement of what the Name column right next to it already shows.
+const RECENT_COLUMNS = insertColumnsAfter(CORE_COLUMNS, 'name', OWNERSHIP_STATUS_COLUMN);
 const RECENT_DEFAULT_VISIBLE = ['capsule', 'name', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
 
 const WISHLIST_COLUMNS = insertColumnsAfter(
@@ -166,8 +178,10 @@ const TIER_PRICE_COLUMN: ColumnDef<Record<string, any>> = {
 const ADDON_COLUMN: ColumnDef<Record<string, any>> =
   { key: 'addon', label: 'Add-on', groupable: true, format: v => v ? 'Add-on' : 'Base', render: renderAddonBadge, category: 'Classification' };
 
+// OWNERSHIP_STATUS_COLUMN hidden by default here too, same reasoning as RECENT_DEFAULT_VISIBLE
+// above — the Name column right next to it already shows the same status inline.
 const BUNDLE_COLUMNS = insertColumnsAfter(
-  insertColumnsAfter(CORE_COLUMNS, 'name', TIER_PRICE_COLUMN, ADDON_COLUMN),
+  insertColumnsAfter(CORE_COLUMNS, 'name', OWNERSHIP_STATUS_COLUMN, TIER_PRICE_COLUMN, ADDON_COLUMN),
   'addon', ...PRICE_COLUMNS,
 );
 const BUNDLE_DEFAULT_VISIBLE = ['capsule', 'name', 'tierPrice', 'bestDealPrice', 'bestDealCut', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
@@ -320,6 +334,26 @@ export default function ListRoute() {
   let activeGroupKey: string | null = null; // whichever group the currently-open game belongs to, for prev/next/random
   let total = 0;
   let loaded = 0;
+  // kind === 'recent' only: the one row addRecentGame should persist once its data streams in —
+  // set by openOrAddRecentGame right before kicking off that row's own stream call, cleared once
+  // the matching event lands (see the detailBatcher below). Every *other* 'recent' row (already
+  // in the persisted list before this mount) deliberately does NOT get re-persisted just because
+  // its rating/HLTB/etc. happened to stream in again — that would bump its recency/order on
+  // every visit to /game, not only when it's the one actually just looked up.
+  let pendingRecentFocus: number | null = null;
+  // kind === 'recent' only: whether load()'s full rebuild (below) has already run once for this
+  // mount. /game/:appid? is one route *definition* shared across every appid (see the
+  // createEffect at the bottom of this file), so navigating from /game/440 to /game/620 re-runs
+  // load() without remounting the component — without this flag, that would re-fetch and
+  // re-stream the *entire* recents list from scratch just to focus one more game already sitting
+  // right there in rowsStore. Only 'recent' needs this: every other kind's own path/query
+  // segment that can change without a remount (bundleId, listId) genuinely does warrant a full
+  // reload (a different bundle/list is different data), unlike a same-list appid focus change.
+  let hasLoadedOnce = false;
+  // Guards a standalone-in-place lookup (openStandaloneInPlace) the same way GameRoute.tsx's own
+  // `currentToken` used to — a slower earlier lookup resolving after a faster later one started
+  // must not clobber it.
+  let standaloneLookupToken = 0;
 
   function tableData(): Game[] { return rowsStore.filter(r => !r.loading); }
 
@@ -378,7 +412,15 @@ export default function ListRoute() {
     const resolved = rowStore.getRow(game.appid) ?? game;
     panelOpen(resolved, { keepHistory });
     renderPanelNav(resolved);
-    setPanelParam(resolved.appid);
+    // 'recent' is the one kind whose address IS the focused game (see this file's own header
+    // comment) — a row click/prev-next/random pick here updates the path, not a `?game=` query
+    // param, so the address bar always matches whatever the panel is actually showing. This
+    // re-triggers load()'s own createEffect, but harmlessly: the panel is already open by the
+    // time this runs (right above), and load()'s fast path (see its own comment) checks the
+    // panel's current game before doing anything, so the re-entry is a no-op rather than a
+    // second open. Every other kind keeps the existing `?game=` contextual param instead.
+    if (kind === 'recent') navigate(`/game/${resolved.appid}`, { replace: true });
+    else setPanelParam(resolved.appid);
   }
 
   function pickRandomGame(): void {
@@ -396,14 +438,112 @@ export default function ListRoute() {
     return true;
   }
 
+  // Opens `appid` as a standalone panel docked to *this* route, without adding it to the route's
+  // own table — used when a game looked up from here (nav search, a DLC/base-game link inside
+  // the open panel) isn't one of this list's own rows. Ported from GameRoute.tsx's own
+  // single-game fetch (this route is its only remaining caller now that a lookup with no route
+  // of its own falls through to /game instead — see AppShell.tsx's openGameGlobally); `openGame`
+  // already resolves `rowStore.getRow(appid) ?? game` and no-ops the nav bar for
+  // `game.standalone` (panelNav.ts), so there's no extra plumbing needed here beyond that.
+  async function openStandaloneInPlace(appid: number): Promise<void> {
+    const token = ++standaloneLookupToken;
+    if (!Number.isInteger(appid) || appid <= 0) { setStatusText('Invalid game id.'); return; }
+    const game = { appid, name: `App ${appid}`, loading: true, details: null, standalone: true } as Game;
+    openGame(game);
+    try {
+      const res = await fetch(`/api/game-details/${appid}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Lookup failed');
+      if (token !== standaloneLookupToken) return; // a newer lookup has since taken over
+      game.details = data;
+      game.loading = false;
+      if (data.meta?.name) game.name = data.meta.name;
+      if (getPanelGame() === game) renderPanelBody(game);
+      addRecentGame(game.appid, game.name, data.meta?.capsule || null);
+    } catch (err) {
+      if (token !== standaloneLookupToken) return;
+      if (getPanelGame() === game) setStatusText(`Lookup failed: ${(err as Error).message}`);
+    }
+  }
+
+  // kind === 'recent' only: opens `appid` within the recent-games list itself — an existing row
+  // (full prev/next/random, same as clicking it) or, for a lookup not seen before, a freshly
+  // prepended row that streams in alongside the rest of the list via the same batched
+  // /api/game-details/stream every other row here uses (rather than the one-off single-game
+  // fetch openStandaloneInPlace uses for every other kind) — since here the lookup IS meant to
+  // become a real row, not a standalone aside. Used both by load()'s own params.appid handling
+  // (a fresh /game/:appid navigation) and by handleOpenGameRequest (a lookup made while already
+  // sitting on this route) — same behavior either way, since /game/:appid *is* this route now.
+  function openOrAddRecentGame(appid: number): void {
+    const existing = rowStore.getRow(appid);
+    if (existing) { openGame(existing); return; }
+    if (!Number.isInteger(appid) || appid <= 0) { setStatusText('Invalid game id.'); return; }
+    const placeholder = { appid, name: '', loading: true, details: null } as unknown as Game;
+    const rows = [placeholder, ...rowsStore];
+    setRowsStore(rows);
+    rowStore.load(rows);
+    total++;
+    updateStatus();
+    pendingRecentFocus = appid;
+    openGame(rowStore.getRow(appid)!);
+    streamGameDetails([{ appid }], loadGuard.current());
+  }
+
+  // Registered with the shell (see onMount below) so a game looked up from the nav-bar search
+  // box, or a DLC/base-game link inside an already-open panel, opens right here instead of
+  // navigating away — every kind can place it somewhere sensible, so this always returns true;
+  // the shell's own fallback (navigating to /game/:appid) is only ever reached from a route with
+  // no game/list context at all (Home, Bundles browse, About — see AppShell.tsx's own comment).
+  function handleOpenGameRequest(appid: number): boolean {
+    // 'recent' is the one kind whose address IS the focused game (/game/:appid, not a query
+    // param — see this file's own header comment) — navigating (rather than calling
+    // openOrAddRecentGame directly) is what keeps the URL correct; load()'s own fast path below
+    // (hasLoadedOnce) is what keeps that navigation cheap; it re-runs load() but, once already
+    // mounted on this kind, that just calls straight back into openOrAddRecentGame instead of
+    // refetching the whole recents list.
+    if (kind === 'recent') { navigate(`/game/${appid}`, { replace: true }); return true; }
+    const existing = rowStore.getRow(appid);
+    if (existing) openGame(existing);
+    else openStandaloneInPlace(appid);
+    return true;
+  }
+
+  // Registered with the shell too (see onMount below), called from `initPanel`'s own `onClose` —
+  // the direct counterpart to handleOpenGameRequest's own navigate() above, so closing the panel
+  // strips `:appid` back off the address the same way opening one put it there. kind === 'recent'
+  // only; every other kind's `?game=` clearing is handled generically by the shell itself
+  // (setPanelParam(null), called unconditionally alongside this).
+  function handleGameClose(): void {
+    if (kind === 'recent' && params.appid) navigate('/game', { replace: true });
+  }
+
   const detailBatcher = createStreamBatcher<DetailsEvent>({
     apply: event => {
       const row = rowStore.mutateRow(event.appid, draft => applyDetailsEvent(draft, event));
       if (!row) return;
-      if (isPanelOpen() && getPanelGame()?.appid === row.appid) { renderPanelBody(row); renderPanelNav(row); }
+      if (pendingRecentFocus === event.appid) {
+        addRecentGame(row.appid, row.name, (row as { capsule?: string | null }).capsule ?? null);
+        pendingRecentFocus = null;
+      }
+      // renderPanelBody reads straight off `row` (the plain panelRows copy mutateRow already
+      // updated synchronously above), so it's always current regardless of batching. renderPanelNav
+      // is NOT called here, though, even for this exact row — apply() runs inside flushNow()'s own
+      // batch(), and renderPanelNav's own list comes from the *table's* processedData(), a Solid
+      // memo derived from rowsStore; batch() defers that recomputation until the batch itself
+      // returns, so a read here would still see this row (and anything else applied earlier in
+      // this same flush) as it was *before* this flush — for a flush that's just this one row
+      // (exactly the case a fresh single-game lookup hits), that means an empty list, a "0 / 0"
+      // position stuck on screen, and a crash on Previous/Next (confirmed live before this fix:
+      // `list[(idx - 1 + list.length) % list.length]` with `idx = -1, list = []` reads `list[NaN]`,
+      // and onOpen(undefined) throws). onFlush below runs right after the batch instead.
+      if (isPanelOpen() && getPanelGame()?.appid === row.appid) renderPanelBody(row);
     },
     isStale: gen => loadGuard.isStale(gen),
-    onFlush: () => updateStatus(),
+    onFlush: () => {
+      updateStatus();
+      const g = getPanelGame();
+      if (g) renderPanelNav(g);
+    },
   });
 
   async function streamGameDetails(games: { appid: number }[], gen: number): Promise<void> {
@@ -495,6 +635,38 @@ export default function ListRoute() {
     }
   }
 
+  // Stamps `inLibrary`/`onWishlist` onto every row from myOwnership.ts's own owned/wishlist
+  // appid sets, checked against `currentAccount` (whichever account's list this route itself
+  // loaded — see myOwnership.ts's own comment) — unlike loadWishlistPrices/loadBundlePrices
+  // above, this is never a per-row fetch: myOwnership.ts already loads (and caches) the whole
+  // sets once per loaded account, so checking membership for every row here costs nothing extra.
+  // `peekMyOwnershipStatus` is a synchronous, non-blocking peek that can return null for "no
+  // currentAccount loaded" *or* "still loading" (see its own comment in myOwnership.ts) —
+  // indistinguishable here, so this just stamps whatever's already resolved immediately, then
+  // re-stamps once via onMyOwnershipReady for whichever rows peeked null the first time around
+  // (a no-op forever if no currentAccount is ever loaded, same as the panel's own "no badge at
+  // all" behavior in that case).
+  function stampMyOwnership(items: { appid: number }[]) {
+    batch(() => {
+      for (const item of items) {
+        const status = peekMyOwnershipStatus(item.appid);
+        if (!status) continue;
+        const row = rowStore.mutateRow(item.appid, draft => {
+          draft.inLibrary = status.inLibrary;
+          draft.onWishlist = status.onWishlist;
+        });
+        if (row && isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
+      }
+    });
+  }
+  function loadMyOwnership(items: { appid: number }[], gen: number): void {
+    stampMyOwnership(items);
+    onMyOwnershipReady(() => {
+      if (loadGuard.isStale(gen)) return;
+      stampMyOwnership(items);
+    });
+  }
+
   // Bundle prices are looked up by ITAD gid (already known upfront from the bundle's own
   // resolved games), not appid — mirrors bundles.tsx's own loadPrices. No chunking: unlike a
   // wishlist, a single bundle's game list never runs past the server's own cap.
@@ -583,6 +755,18 @@ export default function ListRoute() {
   }
 
   async function load(): Promise<void> {
+    if (kind === 'recent' && hasLoadedOnce) {
+      // Guarded by "is this appid already the open panel's game" — openGame() above navigates
+      // here too (to keep the address bar in sync with a row click/prev-next/random pick made
+      // *within* this already-loaded list), which re-runs this same effect right after the panel
+      // was already opened; without this check that re-entry would call openOrAddRecentGame a
+      // second time for a game that's already showing.
+      const focusAppid = params.appid ? Number(params.appid) : null;
+      if (focusAppid != null && getPanelGame()?.appid !== focusAppid) openOrAddRecentGame(focusAppid);
+      else if (focusAppid == null && isPanelOpen()) panelClose();
+      return;
+    }
+
     const gen = loadGuard.next();
 
     if (disposeTable) { disposeTable(); disposeTable = null; }
@@ -757,6 +941,28 @@ export default function ListRoute() {
     }
 
     updateStatus();
+    hasLoadedOnce = true;
+
+    // Opens whatever this load's own URL says should be open — params.appid (a /game/:appid
+    // navigation) for 'recent', or a route-local ?game= query param for every other kind (see
+    // handleOpenGameRequest's own comment for why these are two different mechanisms: 'recent'
+    // rows come from the same path the game itself lives at, everything else is contextual state
+    // layered on top of a route that already has its own identity). Placed after the table/rows
+    // are built (openGame/openOrAddRecentGame both need rowStore/table to already exist) and
+    // before the streamTargets-empty early return below, since a first-ever /game/:appid lookup
+    // can arrive with an otherwise-empty recents list. Only the *first* load needs to do this
+    // here — a later appid-only change is handled by load()'s own fast path above instead.
+    if (kind === 'recent') {
+      if (params.appid) openOrAddRecentGame(Number(params.appid));
+    } else {
+      const gameParam = new URLSearchParams(location.search).get('game');
+      if (gameParam) {
+        const focusAppid = Number(gameParam);
+        const existing = rowStore.getRow(focusAppid);
+        if (existing) openGame(existing);
+        else openStandaloneInPlace(focusAppid);
+      }
+    }
 
     // An empty result set was practically unreachable before row-selection-based remove-from-
     // list existed (a bundle already early-returns its own "no games matched" message above;
@@ -769,23 +975,23 @@ export default function ListRoute() {
 
     if (kind === 'wishlist') loadWishlistPrices(streamTargets, gen); // runs concurrently, not awaited
     if (kind === 'bundle' && resolvedBundleGames) loadBundlePrices(resolvedBundleGames, gen); // ditto
+    if (kind === 'bundle' || kind === 'recent' || kind === 'user') loadMyOwnership(streamTargets, gen); // ditto
     await streamGameDetails(streamTargets, gen);
   }
 
   onMount(() => {
-    const unregister = registerRouteKeyboardHandlers({ pickRandom: pickRandomGame, stepGame });
+    const unregister = registerRouteHandlers({ pickRandom: pickRandomGame, stepGame, openGame: handleOpenGameRequest, onGameClose: handleGameClose });
     onCleanup(unregister);
   });
 
-  // A plain createEffect, not onMount — /lists/bundle/:bundleId (and, once wired, the generic
-  // /lists/:listId) are each one route *definition* shared across every id, so navigating from
-  // one bundle/list to another under the same pattern reuses this component instance rather
-  // than remounting it (same concern GameRoute.tsx's own createEffect handles for
-  // /game/:appid). params.bundleId/params.listId are read reactively inside load() itself (via
-  // the outer `params` object) — referencing bundleId here is what makes this effect re-run on
-  // a param-only navigation; 'owned'/'wishlist' have no such param and so only ever run once,
-  // identically to the old onMount-based call.
-  createEffect(() => { params.bundleId; params.listId; load(); });
+  // A plain createEffect, not onMount — /lists/bundle/:bundleId, the generic /lists/:listId, and
+  // /game/:appid? are each one route *definition* shared across every id, so navigating from one
+  // bundle/list/game to another under the same pattern reuses this component instance rather
+  // than remounting it. params.bundleId/params.listId/params.appid are read reactively inside
+  // load() itself (via the outer `params` object) — referencing them here is what makes this
+  // effect re-run on a param-only navigation; 'owned'/'wishlist' have no such param and so only
+  // ever run once, identically to the old onMount-based call.
+  createEffect(() => { params.bundleId; params.listId; params.appid; load(); });
 
   onCleanup(() => {
     // The panel's own nav bar (renderPanelNav) points at *this* mount's table/getGameList —

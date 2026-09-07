@@ -300,7 +300,7 @@ export default function HomeRoute() {
         <A href="/lists/owned">Owned</A>
         <A href="/lists/wishlist">Wishlist</A>
         <A href="/bundles">Bundles</A>
-        <A href="/lists/recent">Recently Looked Up</A>
+        <A href="/game">Recently Looked Up</A>
       </section>
 
       <section class="home-tree">

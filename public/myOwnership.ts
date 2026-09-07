@@ -1,18 +1,25 @@
-// "Is this game owned/wishlisted by *me*" — used by panel.tsx (the ownership badge under a
-// game's title) and gameSearch.ts (a small owned/wishlisted marker on each dropdown result), so
-// both show the same status regardless of which route/list opened the game (see
+// "Is this game owned/wishlisted by whichever account is currently loaded" — used by panel.tsx
+// (the ownership badge under a game's title, which links back to /lists/owned or
+// /lists/wishlist) and gameSearch.ts (a small owned/wishlisted marker on each dropdown result),
+// so both show the same status regardless of which route/list opened the game (see
 // docs/list-centric-redesign.md — this was one of the "genuine follow-up polish" items left
 // open when the redesign first went functionally complete).
 //
-// Deliberately keyed off `myAccount` (accountsStore.ts), not `currentAccount` — the same
-// distinction the legacy library.tsx page's own ownership badge already drew ("your" would
-// misattribute whoever's actually loaded, since this app can browse any Steam account's
-// library/wishlist, not just the person using the app's own). `currentAccount` can be a friend's
-// account being browsed; `myAccount` is the one pinned "this is me" identity, so it's the only
-// one that answers "do *I* own this" correctly no matter which account's list is on screen.
-// Returns `null` throughout when no `myAccount` is pinned yet — same as the legacy page's own
-// "no badge at all" behavior, rather than guessing off `currentAccount`.
-import { getMyAccount } from './accountsStore.ts';
+// Keyed off `currentAccount` (accountsStore.ts), not `myAccount` — this used to be the other way
+// around (a badge answering "do *I* own this" no matter which account's list was on screen), but
+// that made the panel's own "In library"/"On wishlist" badge unlinkable to anything: `myAccount`
+// and `currentAccount` can be two different accounts entirely (e.g. checking a friend's
+// wishlist), so a badge based on `myAccount` had no single correct `/lists/owned`/
+// `/lists/wishlist` destination to send a click to. `currentAccount` is exactly "whichever
+// account's list is actually on screen" — the same account those two routes themselves read —
+// so a status based on it always has one unambiguous place to link to, and it's shown at all
+// only when it's actually true for what's currently loaded, matching the plain (no "your"/"my")
+// wording those routes and this badge already use. `myAccount`/"★ star as mine" (accountsStore.ts
+// /HomeRoute.tsx) is no longer read by this file — left in place unused rather than removed,
+// in case it's wanted for something else later.
+// Returns `null` throughout when no `currentAccount` is loaded yet — same as the legacy page's
+// own "no badge at all" behavior.
+import { getCurrentAccount } from './accountsStore.ts';
 import { fetchAccountOwnedAppids, fetchAccountWishlistAppids } from './accountData.ts';
 
 export interface OwnershipStatus {
@@ -23,7 +30,7 @@ export interface OwnershipStatus {
 // A factory, not a bare module-level singleton — same "testable cache" shape as
 // `staleGuard.ts`'s `createStaleGuard`/`streamBatcher.ts`'s `createStreamBatcher`/
 // `lib/dedup.js`'s `createDedup`, for the same reason: this file's real state (the cached
-// owned/wishlist appid sets, keyed by whichever `myAccount` they were fetched for) needs a
+// owned/wishlist appid sets, keyed by whichever `currentAccount` they were fetched for) needs a
 // clean instance per test, and this repo's usual "delete require.cache between tests" pattern
 // only resets a *stateless* module (one with no top-level mutable state at all, like
 // accountsStore.ts/prefs.ts) — confirmed live not to reset a module-level `let` here, since
@@ -45,10 +52,10 @@ export function createMyOwnershipCache() {
     listeners.forEach(fn => fn());
   }
 
-  // Starts (or reuses) the two fetches for whatever `myAccount` currently is. Returns false
-  // with no fetch at all when nothing is pinned — the "no badge" case throughout this module.
+  // Starts (or reuses) the two fetches for whatever `currentAccount` currently is. Returns false
+  // with no fetch at all when nothing is loaded — the "no badge" case throughout this module.
   function ensureLoading(): boolean {
-    const account = getMyAccount();
+    const account = getCurrentAccount();
     if (!account) {
       cachedAccountId = null;
       ownedPromise = wishlistPromise = null;
@@ -69,7 +76,7 @@ export function createMyOwnershipCache() {
   }
 
   // Async — waits for both sets to resolve (a fresh session's first check). `null` = no
-  // `myAccount` pinned; otherwise always resolves, even if one/both fetches failed
+  // `currentAccount` loaded; otherwise always resolves, even if one/both fetches failed
   // (owned-empty rather than blocking the whole status on e.g. a private wishlist).
   async function getMyOwnershipStatus(appid: number): Promise<OwnershipStatus | null> {
     if (!ensureLoading()) return null;
@@ -79,8 +86,8 @@ export function createMyOwnershipCache() {
 
   // Sync, non-blocking peek — for gameSearch.ts's dropdown, which re-renders many result rows
   // per keystroke and can't await per row. Starts loading as a side effect if not already in
-  // flight; returns `null` for "no myAccount pinned" *or* "still loading" (indistinguishable to
-  // a caller that can't await — see onMyOwnershipReady below for the way to tell "still
+  // flight; returns `null` for "no currentAccount loaded" *or* "still loading" (indistinguishable
+  // to a caller that can't await — see onMyOwnershipReady below for the way to tell "still
   // loading" apart and re-render once it lands).
   function peekMyOwnershipStatus(appid: number): OwnershipStatus | null {
     if (!ensureLoading()) return null;
@@ -89,7 +96,7 @@ export function createMyOwnershipCache() {
   }
 
   // One-shot "both sets just became available" notification — fires once (then forgets every
-  // registered listener) the next time both halves of the *current* myAccount's fetch land.
+  // registered listener) the next time both halves of the *current* currentAccount's fetch land.
   // Lets gameSearch.ts's dropdown, which rendered a peek of `null` (still loading) for its
   // currently-shown results, re-render once real data exists instead of just leaving the
   // dropdown's ownership markers permanently blank for whatever was on screen at load time.

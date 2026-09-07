@@ -47,6 +47,18 @@ export function reorderUrlParams(params: URLSearchParams): URLSearchParams {
 // isn't its own back/forward-navigable step on any of the three pages.
 export function setPanelParam(appid: number | string | null): void {
   const params = new URLSearchParams(location.search);
+  // A close (appid == null) with neither param already present is a genuine no-op — bail out
+  // before touching history at all, rather than always calling replaceState regardless. This
+  // matters beyond just avoiding a pointless history entry: AppShell.tsx's shell-level
+  // `initPanel({ onClose })` calls this unconditionally on every panel close, including on
+  // ListRoute.tsx's 'recent' kind (/game/:appid), which never writes `game` as a query param at
+  // all (its own reactive effect strips the appid from the *path* instead, see that file's own
+  // comment) — without this check, this would still unconditionally rewrite the URL to
+  // `pathname + '?'` (a bare, pointless trailing `?`, since reordering an empty params object
+  // still stringifies to `''`), racing that effect's own `navigate()` call with a `pathname` it
+  // read before that navigation had actually taken effect (confirmed live: closing the panel on
+  // /game/620 briefly produced `/game/620?` instead of the intended bare /game).
+  if (appid == null && !params.has('game') && !params.has('shot')) return;
   params.delete('shot');
   if (appid == null) params.delete('game');
   else params.set('game', String(appid));

@@ -38,7 +38,7 @@ A **list** is a named set of appids. Game display data (rating/HLTB/tags/price/e
 
 ### Kinds
 
-- **System lists** (read-only, never stored — always live-derived): *Owned* and *Wishlist* for `currentAccount`; one per browsed *Bundle*; **Recently Looked Up** (`/lists/recent`) — the existing shared "recently looked up games" search history, promoted from a dropdown-only convenience to a full browsable/sortable/filterable list like any other. It's global, not account-scoped (pure local search history), and usable as a combine source like anything else (`ListRef.kind: 'recent-games'`). It's a fourth fixed link on Home alongside Owned/Wishlist/Bundles. The global search dropdown still shows recent items directly as a quick-access convenience while typing — that's unchanged, just a second view onto the same data.
+- **System lists** (read-only, never stored — always live-derived): *Owned* and *Wishlist* for `currentAccount`; one per browsed *Bundle*; **Recently Looked Up** (`/game`, and `/game/:appid` when a specific lookup is also focused — see "Global game search" below) — the existing shared "recently looked up games" search history, promoted from a dropdown-only convenience to a full browsable/sortable/filterable list like any other. It's global, not account-scoped (pure local search history), and usable as a combine source like anything else (`ListRef.kind: 'recent-games'`). It's a fourth fixed link on Home alongside Owned/Wishlist/Bundles. The global search dropdown still shows recent items directly as a quick-access convenience while typing — that's unchanged, just a second view onto the same data.
 - **User lists** (stored, full CRUD):
   - **`manual`** — a stored `appids[]`, directly editable (add/remove games, per-row or via bulk selection — row selection UI defers entirely to whatever `@vates/data-table-solid` already provides, not a bespoke mechanism).
   - **`dynamic`** — stored as a formula (`op` + `sources: ListRef[]`) over other lists, recomputed live every time it's opened. Editable after creation too — an "Edit sources" action reopens the same setup dialog used at creation, pre-filled, saving in place (same id/folder position). One-way **"freeze to snapshot"** converts a dynamic list to manual (copies current contents, drops the formula).
@@ -86,20 +86,21 @@ Routing stays **path-based for "which page/list," query params for state within 
 /lists/owned              Owned (currentAccount)
 /lists/wishlist           Wishlist (currentAccount)
 /lists/bundle/:bundleId   a specific bundle's games
-/lists/recent              Recently Looked Up (global, not account-scoped)
 /lists/:listId            a specific user list
 /bundles                  browse/discover bundles
-/game/:appid              canonical single-game link
+/game/:appid?             Recently Looked Up — :appid optional, also this game's canonical link
 /about                    About
 ```
 
-**Server requirement**: since these are real paths, not hash routes, a cold visit or shared link (e.g. `/game/440`) must be served the app shell rather than 404ing. `server.js` needs a catch-all fallback — serve `dist/index.html` for any unmatched non-`/api`, non-asset path — placed *after* the API routes and static-file serving. Vite's dev server already does this by default for a single-entry app, so it's a production-only `server.js` change. Route-matching order also needs care: `/lists/owned`/`/lists/wishlist`/`/lists/bundle/:id`/`/lists/recent` must be matched before the generic `/lists/:listId`, or a reserved word could theoretically collide with a real list id (unlikely with uuid list ids, but the router config should make the fixed routes take precedence explicitly rather than relying on that).
+**Server requirement**: since these are real paths, not hash routes, a cold visit or shared link (e.g. `/game/440`) must be served the app shell rather than 404ing. `server.js` needs a catch-all fallback — serve `dist/index.html` for any unmatched non-`/api`, non-asset path — placed *after* the API routes and static-file serving. Vite's dev server already does this by default for a single-entry app, so it's a production-only `server.js` change. Route-matching order also needs care: `/lists/owned`/`/lists/wishlist`/`/lists/bundle/:id` must be matched before the generic `/lists/:listId`, or a reserved word could theoretically collide with a real list id (unlikely with uuid list ids, but the router config should make the fixed routes take precedence explicitly rather than relying on that).
 
-A route-local `?game=` param (on a `/lists/...` route) is a *separate, contextual* concern from `/game/:appid`'s canonical link — it captures "where am I in this specific list" (for prev/next/restoring position on reload), not a shareable identity for the game.
+**`/game/:appid?` is both the Recently Looked Up list's own address and the canonical single-game link** — not two separate routes. `:appid`, when present, is opened the same way a live lookup made while already on this route is (a real row in the recent-games table, not a lesser standalone view) — see `ListRoute.tsx`'s own comments (`handleOpenGameRequest`/`openOrAddRecentGame`). A route-local `?game=` param on every *other* `/lists/...` route is a separate, contextual concern from this — it captures "where am I in this specific list" (for prev/next/restoring position on reload, and for a lookup that isn't one of that list's own rows — see `openStandaloneInPlace`), not a shareable identity for the game the way `/game/:appid` is.
+
+Looking up a game (the nav-bar search box, or a DLC/base-game link inside an open panel) never navigates away from a route that already has a list/game context of its own — it opens in place there (a real row if the appid is already loaded, a standalone panel via `?game=` otherwise). Only a route with no such context at all (Home, Bundles browse, About) navigates, to `/game/:appid` — see `AppShell.tsx`'s `openGameGlobally`.
 
 ### Global game search
 
-The "look up any game" search box moves from being duplicated per-page (today's `gameSearch.ts` on Library/Bundles) to a **single nav-bar-level search**, part of the persistent shell, always resolving to `/game/:appid`.
+The "look up any game" search box moves from being duplicated per-page (today's `gameSearch.ts` on Library/Bundles) to a **single nav-bar-level search**, part of the persistent shell — opening in place on whatever route/list is currently on screen, falling back to `/game/:appid` only from a route with no list context of its own (see the routing section above).
 
 ## Panel: docked, not modal
 
@@ -172,3 +173,4 @@ Implementation sequencing was resolved by an implementation plan (see the git hi
 - **Folder/list tree polish** — `HomeRoute.tsx`'s rename/move/delete uses plain `window.prompt`/`window.confirm`, not drag-and-drop; no move-between-folders UI at all yet (`listsStore.ts`'s `moveFolder`/`moveList` are unused by any UI so far); no trash/restore UI for soft-deleted lists.
 - **Achievements** on `ListRoute.tsx` — not ported from `library.tsx` yet. (Ownership badges are done — see `myOwnership.ts`, shown in the side panel and the "look up any game" dropdown regardless of route, keyed off `myAccount` rather than `ListRoute.tsx` specifically.)
 - **Live reactivity to `currentAccount` changing** while a route is already open — `accountsStore.ts` is a plain module with no Solid signal of its own; every route reads it once per mount today.
+- **`?game=` restore-on-reload is `ListRoute.tsx`-only** — reloading `/lists/owned?game=440` (or any other `/lists/...` route) reopens that game; reloading e.g. `/?game=440` after a Home-side lookup does not, since Home/`BundlesBrowseRoute`/`AboutRoute` have no game/list context to restore into and never register anything with `AppShell.tsx`'s route-handler registry. In practice this is rarely reachable — `openGameGlobally` only ever sends a lookup made from one of those routes to `/game/:appid` in the first place, never to `?game=` on the route itself.

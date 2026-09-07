@@ -10,6 +10,7 @@ import type { Game } from './types.ts';
 
 import { createSignal, createEffect, createMemo, For, Show, type JSX } from 'solid-js';
 import { render } from 'solid-js/web';
+import { A } from '@solidjs/router';
 
 // Host-page options passed to initPanel. All optional — a page supplies only the hooks it
 // needs; the field names mirror exactly what panel.tsx reads off panelOptions below.
@@ -27,8 +28,8 @@ export interface PanelOptions {
 
 // ── Shared game side panel ──────────────────────────────────────────────────
 // Mounted once by AppShell.tsx's single `initPanel(options)` call (see docs/list-centric-
-// redesign.md), not per-route — GameRoute.tsx/ListRoute.tsx (the only two callers of
-// `panelOpen` now) just open/close it, they never configure it themselves. This used to be
+// redesign.md), not per-route — ListRoute.tsx (the only caller of `panelOpen` now) just
+// opens/closes it, it never configures it itself. This used to be
 // used by three separate pages (app.tsx/library.tsx/bundles.tsx), each supplying its own
 // `initPanel` options — that per-page option-supplying shape is why `PanelOptions` still
 // exists as a real interface (a global single-instance app has no *structural* need for one),
@@ -257,16 +258,18 @@ async function handlePanelRefresh() {
 }
 
 // The 🔗 button beside Store/ITAD in the header — copies a link back to this exact game.
-// Deliberately just `?game=<appid>` on the current page's own path, not the full current
-// URL (which may carry `u=`/filters/sort/tab/view from whatever search led here) — someone
-// sharing "check out this game" almost always means the game itself, not "reproduce my
-// exact search too", and each host page's own `?game=` handling (see restorePanelFromUrl in
-// app.ts, the standalone-lookup fallback in library.ts) already knows how to open just that.
+// Always `/game/<appid>` (the canonical, single, shareable link — see
+// docs/list-centric-redesign.md's routing section and ListRoute.tsx's `recent` kind), never
+// whatever route/list happened to have this game open (which may carry `u=`/filters/sort/a
+// route-local `?game=` from whatever search led here) — someone sharing "check out this game"
+// almost always means the game itself, not "reproduce my exact search too", and a route-local
+// link wouldn't even resolve for a recipient who doesn't already have that same list loaded
+// (an account's Owned/Wishlist, a specific bundle), unlike /game/<appid>, which works for anyone.
 function copyPanelLink(e: MouseEvent) {
   const game = panelGame();
   if (!game || !navigator.clipboard?.writeText) return;
   const btn = e.currentTarget as HTMLElement;
-  const url = `${location.origin}${location.pathname}?game=${game.appid}`;
+  const url = `${location.origin}/game/${game.appid}`;
   navigator.clipboard.writeText(url).then(() => flashCopyLinkBtn(btn), () => {});
 }
 
@@ -351,14 +354,15 @@ async function loadPrice(game: Game, { force = false } = {}) {
   }
 }
 
-// "In library"/"On wishlist" — see myOwnership.ts for why this is checked against `myAccount`
-// rather than whatever host page/account is currently loaded, and its own module-level caching
-// (one pair of owned/wishlist appid sets per pinned myAccount, not one fetch per game). Always
-// re-checked on every open rather than "only once per game this session" the way loadPrice/
-// loadNews guard themselves — myOwnership.ts's own cache already makes a repeat check for the
-// same myAccount effectively free, and unlike price/news this genuinely can change mid-session
-// (picking a different myAccount on Home), so skipping a recheck here would leave a game
-// reopened after that switch still showing the previous account's stale status.
+// "In library"/"On wishlist" — see myOwnership.ts for why this is checked against
+// `currentAccount` (whichever account's list is actually on screen), and its own module-level
+// caching (one pair of owned/wishlist appid sets per loaded account, not one fetch per game).
+// Always re-checked on every open rather than "only once per game this session" the way
+// loadPrice/loadNews guard themselves — myOwnership.ts's own cache already makes a repeat check
+// for the same currentAccount effectively free, and unlike price/news this genuinely can change
+// mid-session (a fresh account search, or picking a different one), so skipping a recheck here
+// would leave a game reopened after that switch still showing the previous account's stale
+// status.
 async function loadOwnership(game: Game) {
   const status = await getMyOwnershipStatus(game.appid);
   if (panelGame() !== game) return; // the panel moved on to a different game while this awaited
@@ -1449,15 +1453,18 @@ function PanelRest(): JSX.Element {
   const achievementsSection = <AchievementsSection game={g} />;
 
   // "In library" / "On wishlist" status — unlike the Price card, this one *is* fetched by
-  // panel.tsx itself now (see loadOwnership below), against `myAccount` specifically rather
-  // than whatever host page/account happens to be currently loaded — so it means the same
-  // thing ("do *I* own this") no matter which route opened the game. See the original file's
-  // own comment (preserved in git history) for the "why 'In library' not 'In your library'"
-  // reasoning this label wording still follows.
+  // panel.tsx itself now (see loadOwnership below), against `currentAccount` (whichever
+  // account's list is actually on screen — see myOwnership.ts's own comment for why this used
+  // to be `myAccount` and isn't anymore) rather than a separately pinned identity, so it always
+  // has exactly one unambiguous /lists/owned or /lists/wishlist to link to. See the original
+  // file's own comment (preserved in git history) for the "why 'In library' not 'In your
+  // library'" reasoning this label wording still follows. Links to `?game=<appid>` on that list
+  // (not the bare route) so landing there also reopens this exact game, same as `copyPanelLink`'s
+  // own `/game/<appid>` link opens a specific game rather than just a list.
   const ownershipRow = (g.inLibrary == null && g.onWishlist == null) ? null : (
     <div class="panel-ownership-row">
-      <Show when={g.inLibrary}><span class="panel-ownership-badge owned">✓ In library</span></Show>
-      <Show when={g.onWishlist}><span class="panel-ownership-badge wishlisted">☆ On wishlist</span></Show>
+      <Show when={g.inLibrary}><A class="panel-ownership-badge owned" href={`/lists/owned?game=${g.appid}`}>✓ In library</A></Show>
+      <Show when={g.onWishlist}><A class="panel-ownership-badge wishlisted" href={`/lists/wishlist?game=${g.appid}`}>☆ On wishlist</A></Show>
     </div>
   );
 

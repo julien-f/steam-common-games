@@ -33,11 +33,12 @@ export function parseDirectAppid(raw: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
-// Small "I already own/wishlisted this" markers next to a result — same `myOwnership.ts`
-// status the side panel's own ownership badge shows, so a lookup reports the same thing
-// whether it's opened from this dropdown or already open in the panel. `peekMyOwnershipStatus`
-// never blocks (a search result list re-renders on every keystroke) — see its own comment for
-// what `null` means here (no `myAccount` pinned, or the fetch simply hasn't landed yet).
+// Small "already owned/wishlisted" markers next to a result — same `myOwnership.ts` status
+// (checked against `currentAccount`, whichever account's list is actually on screen) the side
+// panel's own ownership badge shows, so a lookup reports the same thing whether it's opened from
+// this dropdown or already open in the panel. `peekMyOwnershipStatus` never blocks (a search
+// result list re-renders on every keystroke) — see its own comment for what `null` means here
+// (no `currentAccount` loaded, or the fetch simply hasn't landed yet).
 function ownershipMarkersHtml(status: OwnershipStatus | null): string {
   if (!status) return '';
   const marks: string[] = [];
@@ -85,8 +86,8 @@ export function initGameSearch({ inputEl, resultsEl, onSelect }: {
     resultsEl.innerHTML = lastResults.map((r, i) => gameSearchResultHtml(r, i === activeIdx, peekMyOwnershipStatus(r.appid))).join('');
     if (activeIdx >= 0) inputEl.setAttribute('aria-activedescendant', `game-search-opt-${lastResults[activeIdx].appid}`);
     else inputEl.removeAttribute('aria-activedescendant');
-    // A peek above returning null for any shown result means either "no myAccount pinned" or
-    // "still loading" — onMyOwnershipReady fires once (only) when the latter resolves, so the
+    // A peek above returning null for any shown result means either "no currentAccount loaded"
+    // or "still loading" — onMyOwnershipReady fires once (only) when the latter resolves, so the
     // still-showing dropdown picks up real ownership markers instead of staying blank for
     // whatever was on screen when the fetch kicked off. Re-subscribing on every render (rather
     // than once) means a fresh search that landed before the previous one's fetch resolved

@@ -21,7 +21,7 @@ beforeEach(() => {
 // "delete require.cache between tests" pattern, which only resets a *stateless* module (see
 // myOwnership.ts's own comment on why that pattern doesn't reset a module-level `let` here).
 const { createMyOwnershipCache } = require('../public/myOwnership.ts');
-const { setMyAccount } = require('../public/accountsStore.ts');
+const { setCurrentAccount } = require('../public/accountsStore.ts');
 
 function makeAccount(id, overrides = {}) {
   return { id, members: [id], rawInputs: [id], lastUsedAt: 0, ...overrides };
@@ -52,14 +52,14 @@ function fakeAccountFetch({ ownedAppids = [], wishlistAppids = [], failWishlist 
   };
 }
 
-test('getMyOwnershipStatus: null when no myAccount is pinned', async () => {
+test('getMyOwnershipStatus: null when no currentAccount is loaded', async () => {
   const { getMyOwnershipStatus } = createMyOwnershipCache();
   assert.equal(await getMyOwnershipStatus(440), null);
 });
 
-test('getMyOwnershipStatus: resolves inLibrary/onWishlist against myAccount', async (t) => {
+test('getMyOwnershipStatus: resolves inLibrary/onWishlist against currentAccount', async (t) => {
   withFetch(t, fakeAccountFetch({ ownedAppids: [440, 620], wishlistAppids: [620, 730] }));
-  setMyAccount(makeAccount('1'));
+  setCurrentAccount(makeAccount('1'));
 
   const { getMyOwnershipStatus } = createMyOwnershipCache();
   assert.deepEqual(await getMyOwnershipStatus(440), { inLibrary: true, onWishlist: false });
@@ -70,19 +70,19 @@ test('getMyOwnershipStatus: resolves inLibrary/onWishlist against myAccount', as
 
 test('getMyOwnershipStatus: a failed wishlist fetch still resolves inLibrary, wishlisted false rather than throwing', async (t) => {
   withFetch(t, fakeAccountFetch({ ownedAppids: [440], failWishlist: true }));
-  setMyAccount(makeAccount('1'));
+  setCurrentAccount(makeAccount('1'));
 
   const { getMyOwnershipStatus } = createMyOwnershipCache();
   assert.deepEqual(await getMyOwnershipStatus(440), { inLibrary: true, onWishlist: false });
 });
 
-test('getMyOwnershipStatus: only fetches once per pinned account — a second appid check reuses the cached sets', async (t) => {
+test('getMyOwnershipStatus: only fetches once per loaded account — a second appid check reuses the cached sets', async (t) => {
   let commonGamesCalls = 0;
   withFetch(t, async (url, opts) => {
     if (url === '/api/common-games') { commonGamesCalls++; }
     return fakeAccountFetch({ ownedAppids: [440] })(url, opts);
   });
-  setMyAccount(makeAccount('1'));
+  setCurrentAccount(makeAccount('1'));
 
   const { getMyOwnershipStatus } = createMyOwnershipCache();
   await getMyOwnershipStatus(440);
@@ -91,7 +91,7 @@ test('getMyOwnershipStatus: only fetches once per pinned account — a second ap
   assert.equal(commonGamesCalls, 1);
 });
 
-test('getMyOwnershipStatus: switching myAccount refetches against the new account', async (t) => {
+test('getMyOwnershipStatus: switching currentAccount refetches against the new account', async (t) => {
   let seenSlots = [];
   withFetch(t, async (url, opts) => {
     if (url === '/api/common-games') {
@@ -105,10 +105,10 @@ test('getMyOwnershipStatus: switching myAccount refetches against the new accoun
 
   const { getMyOwnershipStatus } = createMyOwnershipCache();
 
-  setMyAccount(makeAccount('1'));
+  setCurrentAccount(makeAccount('1'));
   assert.deepEqual(await getMyOwnershipStatus(440), { inLibrary: true, onWishlist: false });
 
-  setMyAccount(makeAccount('2'));
+  setCurrentAccount(makeAccount('2'));
   assert.deepEqual(await getMyOwnershipStatus(440), { inLibrary: false, onWishlist: false });
   assert.deepEqual(await getMyOwnershipStatus(620), { inLibrary: true, onWishlist: false });
   assert.deepEqual(seenSlots, ['1', '2']); // cached per account — one /api/common-games call each, not one per appid check
@@ -127,7 +127,7 @@ test('peekMyOwnershipStatus: null (not blocking) before the fetch resolves, then
     }
     return { ok: true, json: async () => ({ items: [] }) };
   });
-  setMyAccount(makeAccount('1'));
+  setCurrentAccount(makeAccount('1'));
 
   const { peekMyOwnershipStatus } = createMyOwnershipCache();
   assert.equal(peekMyOwnershipStatus(440), null); // still loading
@@ -137,7 +137,7 @@ test('peekMyOwnershipStatus: null (not blocking) before the fetch resolves, then
   assert.deepEqual(peekMyOwnershipStatus(440), { inLibrary: true, onWishlist: false });
 });
 
-test('peekMyOwnershipStatus: null when no myAccount is pinned, with no fetch attempted', async (t) => {
+test('peekMyOwnershipStatus: null when no currentAccount is loaded, with no fetch attempted', async (t) => {
   let called = false;
   withFetch(t, async () => { called = true; return { ok: true, json: async () => ({}) }; });
 
@@ -148,7 +148,7 @@ test('peekMyOwnershipStatus: null when no myAccount is pinned, with no fetch att
 
 test('onMyOwnershipReady: fires once both sets have landed, not before', async (t) => {
   withFetch(t, fakeAccountFetch({ ownedAppids: [440], wishlistAppids: [620] }));
-  setMyAccount(makeAccount('1'));
+  setCurrentAccount(makeAccount('1'));
 
   const { getMyOwnershipStatus, onMyOwnershipReady } = createMyOwnershipCache();
   let fired = 0;
@@ -159,7 +159,7 @@ test('onMyOwnershipReady: fires once both sets have landed, not before', async (
 
 test('onMyOwnershipReady: the unsubscribe function prevents a later firing', async (t) => {
   withFetch(t, fakeAccountFetch({ ownedAppids: [440] }));
-  setMyAccount(makeAccount('1'));
+  setCurrentAccount(makeAccount('1'));
 
   const { getMyOwnershipStatus, onMyOwnershipReady } = createMyOwnershipCache();
   let fired = 0;

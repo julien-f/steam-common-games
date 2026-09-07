@@ -526,6 +526,18 @@ a.account-identity:hover .account-name { color: var(--accent2); }
 .game-search-badge.owned { color: #2ecc71; }
 .game-search-badge.wishlisted { color: #f1c40f; }
 
+/* Same markers, inline in the bundle/recent-list table's Name cell (gameColumns.ts's
+   renderNameCell) rather than a dropdown row — same colors as .game-search-badge above. The
+   cell's own color/bold (name text included) is set inline by renderNameCell itself, from
+   OWNERSHIP_STATUS_TIERS (gameColumns.ts) — not here, so there's one shared source for it
+   instead of a second, separately-maintained CSS copy that a tier's styling (e.g. Owned's bold
+   weight) could go missing from without anyone noticing, same as it briefly did between this
+   file and OWNERSHIP_STATUS_COLUMN's own cell. */
+.game-name-cell { display: inline-flex; align-items: center; gap: 4px; }
+.name-status-badge { flex-shrink: 0; font-size: 12px; }
+.name-status-badge.owned { color: #2ecc71; }
+.name-status-badge.wishlisted { color: #f1c40f; }
+
 /* App shell's own nav-bar search box (AppShell.tsx) — same look as .game-search-wrap's input,
    but sized to sit inline in the nav bar rather than fill a page section. */
 .app-search-wrap { position: relative; flex: 1 1 220px; max-width: 320px; }
@@ -2163,12 +2175,3 @@ kbd {
   white-space: nowrap;
 }
 .list-tree button:hover { border-color: var(--accent); color: var(--accent2); }
-
-/* ── Game route: canonical standalone /game/:appid ─────────────────────────────────────────── */
-
-.game-route {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 36px 20px 60px;
-}
-.game-route .status { font-size: 13px; color: var(--text1); }
