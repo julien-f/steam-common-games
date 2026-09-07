@@ -1220,12 +1220,16 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 
 /* "In your library" / "On your wishlist" status — sits right under the title, inside the
    sticky header, so it's visible the instant the panel opens with no scrolling. Plain small
-   pills, not the demo banner's solid CTA fill — this is a status readout, not a call to action. */
+   pills, not the demo banner's solid CTA fill — this is a status readout, not a call to action.
+   Each pill *is* a link (to /lists/owned|wishlist for the same game), but deliberately not
+   underlined: the pill shape already reads as clickable, and an underline through a 11px badge
+   just makes the status itself harder to read. */
 .panel-ownership-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .panel-ownership-badge {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 2px 8px; border-radius: 999px;
   font-size: 11px; font-weight: 700;
+  text-decoration: none;
 }
 .panel-ownership-badge.owned { background: rgba(241, 196, 15, 0.16); color: #f1c40f; }
 .panel-ownership-badge.wishlisted { background: rgba(46, 204, 113, 0.16); color: #2ecc71; }

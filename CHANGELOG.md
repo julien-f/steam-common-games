@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The side panel's "✓ In library"/"☆ On wishlist" badges are no longer underlined — they became `<A>` links (to `/lists/owned`/`/lists/wishlist` for the same game) without a `text-decoration` reset, and an underline drawn through an 11px pill made the status itself harder to read. The pill shape already reads as clickable.
+
 ### Added
 
 - A bundle's detail header now shows "View on IsThereAnyDeal ↗" (ITAD's own page for it, `Bundle.details`) and "Get this bundle ↗" (the real shop/affiliate purchase link exactly as ITAD returned it, `Bundle.url`, never rewritten or stripped of tracking params) — another gap from `bundles.tsx`'s deletion (`renderDetailLinks`) that `ListRoute.tsx` never picked back up. Both links open in a new tab (`target="_blank" rel="noopener"`, matching every other outbound link in the app). Verified live (Playwright): both resolve to real URLs (ITAD's bundle page, Humble Bundle's affiliate link) for an actual loaded bundle.
