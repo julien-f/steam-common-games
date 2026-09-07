@@ -6,6 +6,7 @@ import { buildMediaItems } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
 import { getStoredRegion, resolveRegion } from './region.ts';
 import { getMyOwnershipStatus } from './myOwnership.ts';
+import { setGameTitle } from './pageTitle.ts';
 import type { Game } from './types.ts';
 
 import { createSignal, createEffect, createMemo, For, Show, type JSX } from 'solid-js';
@@ -174,6 +175,16 @@ export function initPanel(options: PanelOptions = {}) {
   initPanelSwipe();
   initHeroSwipe();
   initSubnavScrollSpy();
+
+  // The one place document.title's "a game is open" layer is driven from (see pageTitle.ts) —
+  // reads `revision()` too, not just `panelGame()`, so a standalone lookup's placeholder title
+  // (`App <appid>`, before store metadata resolves the real name) gets picked up once the row
+  // mutates and re-renders, same as every other panel-body field that depends on `revision`.
+  createEffect(() => {
+    revision();
+    const game = panelGame();
+    setGameTitle(game ? game.name : null);
+  });
 }
 
 // Highlights whichever subnav button corresponds to the section currently scrolled to the

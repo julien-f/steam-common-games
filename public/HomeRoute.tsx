@@ -13,7 +13,7 @@
 // form below can pick any recent account's Owned/Wishlist, Recently Looked Up, or any existing
 // user list as a source — bundles are deliberately not offered as a source yet (would need its
 // own bundle-picker UI, not just a checkbox).
-import { createSignal, createEffect, createMemo, For, Index, Show } from 'solid-js';
+import { createSignal, createEffect, createMemo, onCleanup, For, Index, Show } from 'solid-js';
 import { A } from '@solidjs/router';
 import {
   getMyAccount, setMyAccount, getCurrentAccount, setCurrentAccount,
@@ -25,6 +25,7 @@ import {
   getFolders, getLists, createFolder, createList, renameFolder, renameList,
   deleteFolder, deleteList,
 } from './listsStore.ts';
+import { setBaseTitle } from './pageTitle.ts';
 import type { AccountSlot, Folder, GameList, ListRef, CombineOp } from './types.ts';
 
 interface SourceOption {
@@ -78,6 +79,13 @@ export default function HomeRoute() {
     fetchAccountOwnedGames(members).then(g => setCounts(c => ({ ...c, owned: g.length })), () => setCounts(c => ({ ...c, owned: 0 })));
     fetchAccountWishlistItems(members).then(items => setCounts(c => ({ ...c, wishlist: items.length })), () => setCounts(c => ({ ...c, wishlist: 0 })));
   });
+
+  // document.title's per-route "base" layer (see pageTitle.ts) — whichever account is currently
+  // loaded, same fallback-to-bare-app-name-when-none convention the old comparison page's own
+  // updateTitle() used. The side panel's own game-open title takes over on top of this when a
+  // game is opened from here, same as every other route.
+  createEffect(() => setBaseTitle(currentAccount()?.label ?? null));
+  onCleanup(() => setBaseTitle(null));
 
   async function resolveAndSetCurrent(): Promise<void> {
     const trimmed = resolveInputs().map(s => normalizeInput(s.trim())).filter(Boolean);

@@ -78,6 +78,7 @@ import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from './priceLoading.ts';
 import { getStoredRegion, resolveRegion } from './region.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
+import { setBaseTitle } from './pageTitle.ts';
 import type { Game, Rating, Hltb, GameMeta, ProtonDb, GameList } from './types.ts';
 import { getList, getLists, createList, addAppidsToList, removeAppidsFromList, setListTableView } from './listsStore.ts';
 import { resolveGameList, flattenCombineResult, createDefaultFetchers } from './listResolve.ts';
@@ -835,6 +836,7 @@ export default function ListRoute() {
       const list = getList(params.listId!);
       if (!list) { setStatusText('This list no longer exists.'); return; }
       setUserList(list);
+      setBaseTitle(list.name);
       setStatusText('Resolving list…');
       const isGroupMode = list.kind === 'dynamic' && list.op === 'group-by-membership';
       let appids: Set<number>;
@@ -857,6 +859,7 @@ export default function ListRoute() {
       })) as unknown as Game[];
       streamTargets = [...appids].map(appid => ({ appid }));
     } else if (kind === 'recent') {
+      setBaseTitle('Recently Looked Up');
       const recents = loadRecentGames();
       initialRows = recents.map(g => ({
         appid: g.appid, name: g.name || `App ${g.appid}`, capsule: g.tinyImage || undefined,
@@ -869,6 +872,7 @@ export default function ListRoute() {
         const bundle = await fetchBundleById(Number(params.bundleId), { country: resolveRegion(getStoredRegion()) });
         if (loadGuard.isStale(gen)) return;
         setBundleTitle(bundle.title);
+        setBaseTitle(bundle.title);
         setBundleLinks({ details: bundle.details, url: bundle.url });
         const { resolved } = await resolveBundleGames(bundle);
         if (loadGuard.isStale(gen)) return;
@@ -889,6 +893,8 @@ export default function ListRoute() {
     } else {
       const account = getCurrentAccount();
       if (!account) { setStatusText('No account selected — pick one from Home once it exists.'); return; }
+      const listLabel = kind === 'wishlist' ? 'Wishlist' : 'Library';
+      setBaseTitle(account.label ? `${account.label}'s ${listLabel}` : listLabel);
       setStatusText(kind === 'wishlist' ? 'Fetching wishlist…' : 'Fetching library…');
       try {
         if (kind === 'owned') {
@@ -1052,6 +1058,7 @@ export default function ListRoute() {
     // leaving the route without closing it would leave the panel open on a stale game with a
     // prev/next list that no longer exists once disposeTable runs just below.
     if (isPanelOpen()) panelClose();
+    setBaseTitle(null); // this route's own document.title context — see load()'s setBaseTitle calls
     loadGuard.next(); // invalidate any still-in-flight fetch/stream from this mount
     if (disposeTable) disposeTable();
     groupTables.forEach(g => g.disposeTable());

@@ -1,6 +1,12 @@
 // /about — ported verbatim from the legacy about.html (no logic of its own there either, just
 // static content) as part of the SPA route table (see docs/list-centric-redesign.md).
+import { onMount, onCleanup } from 'solid-js';
+import { setBaseTitle } from './pageTitle.ts';
+
 export default function AboutRoute() {
+  onMount(() => setBaseTitle('About'));
+  onCleanup(() => setBaseTitle(null));
+
   return (
     <div class="container">
       <header>

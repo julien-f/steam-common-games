@@ -7,10 +7,11 @@
 // you want" picker, not the bundle detail view too. No `?bundle=` deep-link/list-collapse/
 // region-reopen-in-place state to carry over either; those are legacy-page-specific polish, not
 // core browsing behavior.
-import { createSignal, For, onMount } from 'solid-js';
+import { createSignal, For, onMount, onCleanup } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { getStoredRegion, resolveRegion } from './region.ts';
 import { setBrowsedBundles } from './bundleBrowseStore.ts';
+import { setBaseTitle } from './pageTitle.ts';
 
 const BUNDLES_PAGE_SIZE = 20;
 
@@ -81,6 +82,8 @@ export default function BundlesBrowseRoute() {
   }
 
   onMount(() => load());
+  onMount(() => setBaseTitle('Bundles'));
+  onCleanup(() => setBaseTitle(null));
 
   return (
     <div class="bundles-browse-route">
