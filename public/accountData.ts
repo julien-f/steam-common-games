@@ -26,13 +26,69 @@ export interface AccountWishlistItem {
   dateAdded: string | null;
 }
 
+// One member account of a slot, as /api/common-games returns it (a raw Steam
+// GetPlayerSummaries player object plus the server's own `gameCount`) — only the fields this
+// module reads. Everything is optional: a profile the API knows nothing about still comes back
+// as a bare `{ steamid, personaname, profileurl: '' }` placeholder (see getPlayerSummaries in
+// lib/steam.js).
+export interface RawAccountPlayer {
+  steamid: string;
+  personaname?: string;
+  profileurl?: string;
+  avatarmedium?: string;
+  communityvisibilitystate?: number;
+  personastate?: number;
+  gameextrainfo?: string;
+  gameCount?: number;
+}
+
 // The shape of /api/common-games' success response, as read below — only the fields this
 // module touches (it always resolves a single slot, so `slots[0]`).
 interface CommonGamesResponse {
   groups: { games: { appid: number; name: string }[] }[];
-  slots: { steamid: string }[][];
+  slots: RawAccountPlayer[][];
   playtime: Record<number, Record<string, number>>;
   lastPlayed: Record<number, Record<string, number>>;
+}
+
+// personastate values per Steam's docs: 0 Offline, 1 Online, 2 Busy, 3 Away, 4 Snooze,
+// 5 Looking to trade, 6 Looking to play. `gameextrainfo` (present while in-game) takes
+// priority over all of them.
+export const ACCOUNT_STATE_LABELS = ['Offline', 'Online', 'Busy', 'Away', 'Snooze', 'Looking to trade', 'Looking to play'];
+
+// One member account's worth of display-ready data — everything Home's Account card renders,
+// derived once here so the component itself stays plain JSX with no branching of its own to
+// keep in sync with what's unit-tested.
+export interface AccountPlayer {
+  steamid: string;
+  name: string;
+  profileUrl: string;   // '' when Steam returned no (or a non-http) profile URL — don't render a link
+  avatarUrl: string;    // '' likewise
+  isPrivate: boolean;   // communityvisibilitystate !== 3 — a private/friends-only profile
+  gameCount: number | null;
+  statusClass: 'ingame' | 'online' | 'offline';
+  statusLabel: string;
+}
+
+// `personastate`/`gameextrainfo` ride on the same `player:` cache entry as everything else here,
+// which sits on the library cache tier (LIBRARY_CACHE_TTL_MINUTES, default 6h — see CLAUDE.md) —
+// a TTL sized for library/wishlist contents, not second-to-second presence. So the status is real
+// data, just not live; the Account card's own tooltip says "as of the last refresh" rather than
+// implying a real-time presence a 6h-old cache can't back up.
+export function toAccountPlayer(p: RawAccountPlayer): AccountPlayer {
+  const httpOnly = (url: string | undefined): string => (/^https?:\/\//i.test(url || '') ? url! : '');
+  return {
+    steamid: p.steamid,
+    name: p.personaname || p.steamid,
+    profileUrl: httpOnly(p.profileurl),
+    avatarUrl: httpOnly(p.avatarmedium),
+    isPrivate: p.communityvisibilitystate !== undefined && p.communityvisibilitystate !== 3,
+    gameCount: typeof p.gameCount === 'number' ? p.gameCount : null,
+    statusClass: p.gameextrainfo ? 'ingame' : p.personastate ? 'online' : 'offline',
+    statusLabel: p.gameextrainfo
+      ? `Playing ${p.gameextrainfo}`
+      : (p.personastate != null ? (ACCOUNT_STATE_LABELS[p.personastate] || 'Offline') : 'Offline'),
+  };
 }
 
 // The shape of /api/wishlist's success response, as read below.
@@ -40,10 +96,19 @@ interface WishlistResponse {
   items: { appid: number; priority: number; dateAdded: string | null }[];
 }
 
+// One /api/common-games call's worth of everything this module reads from it: the slot's unioned
+// library *and* its member accounts' own display data. They come back in the same response, so a
+// caller that needs both (Home's Account card — owned count plus a per-member profile link/status/
+// game count) gets them for one request rather than two identical POSTs.
+export interface AccountOverview {
+  games: AccountLibraryGame[];
+  players: AccountPlayer[];
+}
+
 // Fetches one account's owned games (its members' libraries unioned, same Family-simulation
 // /api/common-games already does server-side for a single slot) with per-game playtime/last-
-// played summed/maxed across members.
-export async function fetchAccountOwnedGames(members: string[], { refresh = false }: { refresh?: boolean } = {}): Promise<AccountLibraryGame[]> {
+// played summed/maxed across members, plus its member accounts' display data.
+export async function fetchAccountOverview(members: string[], { refresh = false }: { refresh?: boolean } = {}): Promise<AccountOverview> {
   const res = await fetch('/api/common-games', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -54,7 +119,7 @@ export async function fetchAccountOwnedGames(members: string[], { refresh = fals
 
   const allGames = data.groups.flatMap(g => g.games);
   const slotSteamIds = data.slots[0].map(p => p.steamid);
-  return allGames.map(game => {
+  const games = allGames.map(game => {
     const pt = data.playtime?.[game.appid] ?? {};
     const lp = data.lastPlayed?.[game.appid] ?? {};
     return {
@@ -64,6 +129,13 @@ export async function fetchAccountOwnedGames(members: string[], { refresh = fals
       lastPlayedUnix: Math.max(0, ...slotSteamIds.map(id => lp[id] || 0)),
     };
   });
+  return { games, players: data.slots[0].map(toAccountPlayer) };
+}
+
+// The owned-games half of fetchAccountOverview on its own — what every caller that doesn't care
+// about the member accounts themselves (listResolve.ts's fetchers, ListRoute's owned list) uses.
+export async function fetchAccountOwnedGames(members: string[], opts: { refresh?: boolean } = {}): Promise<AccountLibraryGame[]> {
+  return (await fetchAccountOverview(members, opts)).games;
 }
 
 // Fetches one account's wishlist (its members' wishlists unioned, same as /api/wishlist does

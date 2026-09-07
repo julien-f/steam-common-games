@@ -19,7 +19,8 @@ import {
   getMyAccount, setMyAccount, getCurrentAccount, setCurrentAccount,
   getRecentAccounts, removeRecentAccount, clearRecentAccounts,
 } from './accountsStore.ts';
-import { resolveAccountSummary, fetchAccountOwnedGames, fetchAccountWishlistItems } from './accountData.ts';
+import { resolveAccountSummary, fetchAccountOverview, fetchAccountWishlistItems } from './accountData.ts';
+import type { AccountPlayer } from './accountData.ts';
 import { normalizeInput } from './utils.ts';
 import {
   getFolders, getLists, createFolder, createList, renameFolder, renameList,
@@ -41,6 +42,13 @@ const COMBINE_OPS: { value: CombineOp; label: string }[] = [
   { value: 'group-by-membership', label: 'Group by membership (one table per combination)' },
 ];
 
+// `personastate`/`gameextrainfo` ride on the same 6h library cache tier as the rest of an
+// account's data (see toAccountPlayer in accountData.ts) — real data, just not live — so the
+// tooltip says "as of the last refresh" rather than implying real-time presence.
+function statusTitle(p: AccountPlayer): string {
+  return `${p.statusLabel} (as of the last refresh)`;
+}
+
 interface TreeRow {
   type: 'folder' | 'list';
   item: Folder | GameList;
@@ -55,6 +63,10 @@ export default function HomeRoute() {
   const [resolveError, setResolveError] = createSignal('');
   const [resolving, setResolving] = createSignal(false);
   const [counts, setCounts] = createSignal<{ owned: number | null; wishlist: number | null }>({ owned: null, wishlist: null });
+  // The current account's member accounts as Steam itself describes them (persona name, profile
+  // URL, presence, profile visibility, per-member game count) — see the counts effect below for
+  // why this rides along on the same fetch rather than being stored on AccountSlot.
+  const [players, setPlayers] = createSignal<AccountPlayer[]>([]);
 
   const [folders, setFoldersSig] = createSignal<Folder[]>(getFolders());
   const [lists, setListsSig] = createSignal<GameList[]>(getLists());
@@ -69,16 +81,29 @@ export default function HomeRoute() {
     setListsSig(getLists());
   }
 
-  // Counts aren't stored on AccountSlot itself (they'd go stale) — refetched live whenever
-  // currentAccount changes, including on initial mount for whatever was already stored.
+  // Counts and per-member profile data aren't stored on AccountSlot itself (they'd go stale —
+  // AccountSlot only caches a label/avatar so recents can render instantly) — refetched live
+  // whenever currentAccount changes, including on initial mount for whatever was already stored.
+  // fetchAccountOverview, not fetchAccountOwnedGames: the owned count and the member accounts'
+  // own display data come back in the same /api/common-games response, so asking for both costs
+  // one request rather than two identical POSTs.
   createEffect(() => {
     const account = currentAccount();
-    if (!account) { setCounts({ owned: null, wishlist: null }); return; }
+    if (!account) { setCounts({ owned: null, wishlist: null }); setPlayers([]); return; }
     setCounts({ owned: null, wishlist: null });
+    setPlayers([]);
     const members = account.members;
-    fetchAccountOwnedGames(members).then(g => setCounts(c => ({ ...c, owned: g.length })), () => setCounts(c => ({ ...c, owned: 0 })));
+    fetchAccountOverview(members).then(
+      ({ games, players: ps }) => { setCounts(c => ({ ...c, owned: games.length })); setPlayers(ps); },
+      () => setCounts(c => ({ ...c, owned: 0 })),
+    );
     fetchAccountWishlistItems(members).then(items => setCounts(c => ({ ...c, wishlist: items.length })), () => setCounts(c => ({ ...c, wishlist: 0 })));
   });
+
+  // Only meaningful for a single-account slot — a Steam Family has no one persona/presence/
+  // profile to speak for the whole slot, so its members are listed individually instead (see the
+  // Account card below).
+  const solePlayer = createMemo(() => (players().length === 1 ? players()[0] : null));
 
   // document.title's per-route "base" layer (see pageTitle.ts) — whichever account is currently
   // loaded, same fallback-to-bare-app-name-when-none convention the old comparison page's own
@@ -247,18 +272,82 @@ export default function HomeRoute() {
     <div class="home-route">
       <section class="home-account">
         <h2>Account</h2>
+        {/* The header speaks for the slot as a whole — one avatar/name/presence for a plain
+            single account, or just the joined label plus a per-member list below for a Steam
+            Family, where no single persona/profile/presence describes the whole thing. Everything
+            beyond the label/avatar comes from `players()` (fetched live, see the effect above),
+            not from the stored AccountSlot, so it can't show a stale persona or presence. */}
         <Show when={currentAccount()} fallback={<p>No account selected yet.</p>}>
           {account => (
             <div class="account-header">
-              <Show when={account().avatarUrl}>{url => <img src={url()} alt="" width="48" height="48" />}</Show>
+              <Show when={solePlayer()?.avatarUrl || account().avatarUrl}>
+                {url => (
+                  <span class="account-avatar-wrap account-avatar-lg">
+                    <img class="account-avatar" src={url()} alt="" width="48" height="48" />
+                    <Show when={solePlayer()}>
+                      {p => <span class={`account-status account-status-${p().statusClass}`} title={statusTitle(p())} />}
+                    </Show>
+                  </span>
+                )}
+              </Show>
               <div>
-                <div class="account-label">{account().label || account().rawInputs.join(' + ')}</div>
+                <div class="account-label">
+                  <Show
+                    when={solePlayer()?.profileUrl}
+                    fallback={solePlayer()?.name || account().label || account().rawInputs.join(' + ')}
+                  >
+                    {url => (
+                      <a class="account-profile-link" href={url()} target="_blank" rel="noopener noreferrer" title={`Steam ID ${solePlayer()!.steamid}`}>
+                        {solePlayer()!.name} <span class="account-profile-arrow">↗</span>
+                      </a>
+                    )}
+                  </Show>
+                  <Show when={solePlayer()?.isPrivate}>
+                    <span class="account-private" title="This Steam profile isn't public — some data may be missing or empty">🔒 Private</span>
+                  </Show>
+                </div>
                 <div class="account-counts">
                   Owned: {counts().owned ?? '…'} · Wishlisted: {counts().wishlist ?? '…'}
+                  <Show when={solePlayer()}>{p => <> · <span title={statusTitle(p())}>{p().statusLabel}</span></>}</Show>
+                  <Show when={players().length > 1}>{` · ${players().length} accounts merged`}</Show>
                 </div>
               </div>
             </div>
           )}
+        </Show>
+
+        {/* A Steam Family (several accounts unioned into one slot) — one row per member, since
+            the header above can only speak for the slot as a whole. */}
+        <Show when={players().length > 1}>
+          <ul class="account-members">
+            <For each={players()}>
+              {p => (
+                <li>
+                  <Show when={p.avatarUrl}>
+                    {url => (
+                      <span class="account-avatar-wrap">
+                        <img class="account-avatar" src={url()} alt="" width="28" height="28" />
+                        <span class={`account-status account-status-${p.statusClass}`} title={statusTitle(p)} />
+                      </span>
+                    )}
+                  </Show>
+                  <Show when={p.profileUrl} fallback={<span class="account-name">{p.name}</span>}>
+                    {url => (
+                      <a class="account-name account-profile-link" href={url()} target="_blank" rel="noopener noreferrer" title={`Steam ID ${p.steamid}`}>
+                        {p.name} <span class="account-profile-arrow">↗</span>
+                      </a>
+                    )}
+                  </Show>
+                  <span class="account-count" title={statusTitle(p)}>
+                    {p.gameCount == null ? '' : `${p.gameCount} games · `}{p.statusLabel}
+                  </span>
+                  <Show when={p.isPrivate}>
+                    <span class="account-private" title="This Steam profile isn't public — some data may be missing or empty">🔒 Private</span>
+                  </Show>
+                </li>
+              )}
+            </For>
+          </ul>
         </Show>
 
         <form onSubmit={e => { e.preventDefault(); resolveAndSetCurrent(); }}>

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const {
   membersFromAccountId, fetchAccountOwnedGames, fetchAccountWishlistItems,
   fetchAccountOwnedAppids, fetchAccountWishlistAppids, resolveAccountSummary,
+  fetchAccountOverview, toAccountPlayer,
 } = require('../public/accountData.ts');
 
 function withFetch(t, handler) {
@@ -184,4 +185,76 @@ test('resolveAccountSummary: a failed/private wishlist just yields wishlistCount
   const summary = await resolveAccountSummary(['alice']);
   assert.equal(summary.wishlistCount, 0);
   assert.equal(summary.label, 'Alice');
+});
+
+// ── toAccountPlayer / fetchAccountOverview ───────────────────────────────────
+
+test('toAccountPlayer: maps a full player object onto display-ready fields', () => {
+  assert.deepEqual(toAccountPlayer({
+    steamid: '1', personaname: 'Alice', profileurl: 'https://steamcommunity.com/id/alice/',
+    avatarmedium: 'https://cdn/a.jpg', communityvisibilitystate: 3, personastate: 1, gameCount: 42,
+  }), {
+    steamid: '1', name: 'Alice', profileUrl: 'https://steamcommunity.com/id/alice/',
+    avatarUrl: 'https://cdn/a.jpg', isPrivate: false, gameCount: 42,
+    statusClass: 'online', statusLabel: 'Online',
+  });
+});
+
+test('toAccountPlayer: gameextrainfo outranks personastate for the status', () => {
+  const p = toAccountPlayer({ steamid: '1', personastate: 3, gameextrainfo: 'Team Fortress 2' });
+  assert.equal(p.statusClass, 'ingame');
+  assert.equal(p.statusLabel, 'Playing Team Fortress 2');
+});
+
+test('toAccountPlayer: a non-offline personastate maps to its own label', () => {
+  assert.equal(toAccountPlayer({ steamid: '1', personastate: 3 }).statusLabel, 'Away');
+  assert.equal(toAccountPlayer({ steamid: '1', personastate: 3 }).statusClass, 'online');
+});
+
+test('toAccountPlayer: a missing/0 personastate is Offline', () => {
+  assert.equal(toAccountPlayer({ steamid: '1' }).statusLabel, 'Offline');
+  assert.equal(toAccountPlayer({ steamid: '1', personastate: 0 }).statusClass, 'offline');
+});
+
+test('toAccountPlayer: communityvisibilitystate other than 3 is private; absent is not', () => {
+  assert.equal(toAccountPlayer({ steamid: '1', communityvisibilitystate: 1 }).isPrivate, true);
+  assert.equal(toAccountPlayer({ steamid: '1' }).isPrivate, false);
+});
+
+test('toAccountPlayer: drops a non-http profile/avatar URL and falls back to the steamid for a name', () => {
+  const p = toAccountPlayer({ steamid: '76561198000000000', profileurl: 'javascript:alert(1)', avatarmedium: 'data:image/png;base64,x' });
+  assert.equal(p.profileUrl, '');
+  assert.equal(p.avatarUrl, '');
+  assert.equal(p.name, '76561198000000000');
+});
+
+test('toAccountPlayer: a missing gameCount is null, not 0', () => {
+  assert.equal(toAccountPlayer({ steamid: '1' }).gameCount, null);
+  assert.equal(toAccountPlayer({ steamid: '1', gameCount: 0 }).gameCount, 0);
+});
+
+test('fetchAccountOverview: returns the slot library and its member accounts from one call', async (t) => {
+  let calls = 0;
+  withFetch(t, async () => {
+    calls++;
+    return {
+      ok: true,
+      json: async () => ({
+        groups: [{ games: [{ appid: 440, name: 'Team Fortress 2' }] }],
+        slots: [[
+          { steamid: '1', personaname: 'Alice', profileurl: 'https://steamcommunity.com/id/alice/', gameCount: 1 },
+          { steamid: '2', personaname: 'Bob', gameCount: 0 },
+        ]],
+        playtime: { 440: { 1: 10 } },
+        lastPlayed: {},
+      }),
+    };
+  });
+
+  const { games, players } = await fetchAccountOverview(['1', '2']);
+  assert.equal(calls, 1);
+  assert.deepEqual(games, [{ appid: 440, name: 'Team Fortress 2', playtimeMinutes: 10, lastPlayedUnix: 0 }]);
+  assert.deepEqual(players.map(p => p.name), ['Alice', 'Bob']);
+  assert.equal(players[0].profileUrl, 'https://steamcommunity.com/id/alice/');
+  assert.equal(players[1].profileUrl, '');
 });
