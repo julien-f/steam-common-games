@@ -165,6 +165,9 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
   font-weight: 500;
   transition: background 0.15s, color 0.15s;
   white-space: nowrap;
+  text-decoration: none; /* .btn started out button-only; ListRoute.tsx's "← All bundles" is the
+    first <a class="btn ..."> and would otherwise keep the browser's default underline. */
+  display: inline-block;
 }
 .btn-remove {
   flex-shrink: 0;
@@ -1935,6 +1938,16 @@ kbd {
   flex-wrap: wrap;
   margin-bottom: 12px;
 }
+.bundle-detail-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bundle-detail-outlink {
+  font-size: 13px;
+  color: var(--text1);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+.bundle-detail-outlink:hover { color: var(--accent2); border-bottom-color: var(--accent2); }
 .bundle-detail-titlebar { display: flex; align-items: center; gap: 10px; }
 .bundle-detail-nav { display: flex; gap: 4px; }
 .bundle-detail-nav button {

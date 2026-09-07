@@ -262,6 +262,10 @@ export default function ListRoute() {
   // kind === 'bundle' only — the open bundle's own title, for the header below (nothing else on
   // this route otherwise names which bundle is loaded at all).
   const [bundleTitle, setBundleTitle] = createSignal('');
+  // kind === 'bundle' only, alongside bundleTitle above — ITAD's own page for this bundle
+  // (`details`) and the real shop/affiliate purchase link exactly as ITAD returned it (`url`,
+  // never rewritten or stripped of tracking params — see CLAUDE.md's Bundles section on why).
+  const [bundleLinks, setBundleLinks] = createSignal<{ details: string | null; url: string | null }>({ details: null, url: null });
 
   const [rowsStore, setRowsStore] = createStore<Game[]>([]);
   const rowStore = createRowStore<Game>((idx, updater) => setRowsStore(idx, updater));
@@ -865,6 +869,7 @@ export default function ListRoute() {
         const bundle = await fetchBundleById(Number(params.bundleId), { country: resolveRegion(getStoredRegion()) });
         if (loadGuard.isStale(gen)) return;
         setBundleTitle(bundle.title);
+        setBundleLinks({ details: bundle.details, url: bundle.url });
         const { resolved } = await resolveBundleGames(bundle);
         if (loadGuard.isStale(gen)) return;
         if (resolved.length === 0) { setStatusText('No games in this bundle could be matched to a Steam listing.'); return; }
@@ -1064,7 +1069,15 @@ export default function ListRoute() {
             </div>
             <span class="bundle-detail-title">{bundleTitle()}</span>
           </div>
-          <a class="btn btn-ghost btn-sm" href="/bundles">← All bundles</a>
+          <div class="bundle-detail-actions">
+            <Show when={bundleLinks().details}>
+              {details => <a class="bundle-detail-outlink" href={details()} target="_blank" rel="noopener">View on IsThereAnyDeal ↗</a>}
+            </Show>
+            <Show when={bundleLinks().url}>
+              {url => <a class="btn btn-primary btn-sm" href={url()} target="_blank" rel="noopener">Get this bundle ↗</a>}
+            </Show>
+            <a class="btn btn-ghost btn-sm" href="/bundles">← All bundles</a>
+          </div>
         </div>
       </Show>
       <div class="list-status">{statusText()}</div>
