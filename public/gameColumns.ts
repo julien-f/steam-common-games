@@ -146,17 +146,19 @@ export function renderDemoBadge(v: unknown): Node {
 }
 
 // Appends bare ✓/☆ markers after the name text when `row.inLibrary`/`row.onWishlist` are set,
-// and colors (+ bolds, for Owned) the whole cell — name text included, not just the badge —
+// and colors (+ bolds, for Wishlisted) the whole cell — name text included, not just the badge —
 // using the *exact same* `OWNERSHIP_STATUS_TIERS` (below) `OWNERSHIP_STATUS_COLUMN`'s own cell
-// derives its color/bold from, rather than a second, separately-maintained copy of "green+bold
-// for owned, yellow for wishlisted" (a first draft of this function did exactly that, as a CSS
+// derives its color/bold from, rather than a second, separately-maintained copy of "yellow+bold
+// for wishlisted, green for owned" (a first draft of this function did exactly that, as a CSS
 // class, and the bold weight quietly went missing from it — the tier list didn't exist yet for
 // this function to share). Just inline rather than a labeled pill, unlike the panel's own
 // `.panel-ownership-badge`/gameSearch.ts's `.game-search-badge` — a table row has even less room
-// than a dropdown row. Owned wins over Wishlisted when both are true (only one color/weight can
+// than a dropdown row. Wishlisted wins over Owned when both are true (only one color/weight can
 // apply to the cell, unlike the two badges below, which both still show) — matching
-// `OWNERSHIP_STATUS_TIERS`'s own "Owned & Wishlisted" tier already being green, not some third
-// mixed color. A no-op everywhere `inLibrary`/`onWishlist` are never populated — the Library/
+// `OWNERSHIP_STATUS_TIERS`'s own "Owned & Wishlisted" tier already being bold, not some third
+// mixed treatment. Wishlisted outranks Owned here deliberately: on a browse page ("should I buy
+// this") a wishlisted game is the actionable signal worth the stronger highlight, while owning it
+// already is just a heads-up. A no-op everywhere `inLibrary`/`onWishlist` are never populated — the Library/
 // Wishlist tabs' own rows, where "do I own this" is trivially always true/false and not worth
 // flagging — since this only renders whatever's already on the row (ListRoute.tsx's
 // loadMyOwnership is what actually populates them, for the bundle/recent/user lists where the
@@ -596,11 +598,27 @@ export function computeOwnershipStatus(row: Row): string | null {
 // two places is a color/bold fact that can silently drift apart between them (confirmed live:
 // renderNameCell's own first draft colored the name text but left off the bold weight
 // OWNERSHIP_STATUS_COLUMN's cell already had for the exact same "Owned" status).
+// Wishlisted is green and bold, Owned is plain yellow — on a page about buying things, "this is
+// something I actually want" is the positive, actionable signal (green, the stronger highlight);
+// "I already own this" is a caution against a duplicate purchase, not a call to action, so it
+// gets the warning color (yellow) instead — a deliberate swap from the green=owned/yellow=
+// wishlisted pairing this app used everywhere before (checkmark reading as green/affirmative,
+// star reading as yellow/aspirational is the more natural pairing in isolation, e.g. a profile
+// summary), which stopped fitting once the context became specifically "should I buy this".
+// `.game-search-badge`/`.name-status-badge`/`.panel-ownership-badge` (style.css) and
+// gameSearch.ts's dropdown all follow this same swapped pairing now too, rather than leaving
+// those standalone badges on the old colors — the checkmark right next to this tier's own
+// yellow-highlighted name text is the same fact and needs to read the same color, and the other
+// two badges are the same icons in different places elsewhere in the app; one meaning per color
+// throughout, not a second, place-specific convention. "Owned & Wishlisted" uses Owned's warning
+// color, not Wishlisted's green — already owning it is what actually matters for a buy decision
+// regardless of wishlist status — but keeps the bold weight, since it's still the most
+// information any one status carries.
 export const OWNERSHIP_STATUS_TIERS: { label: string; color?: string; icon?: string; bold?: boolean }[] = [
   { label: 'Not Owned' },
-  { label: 'Wishlisted', color: '#f1c40f', icon: ' ☆' },
-  { label: 'Owned', color: '#2ecc71', icon: ' ✓', bold: true },
-  { label: 'Owned & Wishlisted', color: '#2ecc71', icon: ' ✓', bold: true },
+  { label: 'Wishlisted', color: '#2ecc71', icon: ' ☆', bold: true },
+  { label: 'Owned', color: '#f1c40f', icon: ' ✓' },
+  { label: 'Owned & Wishlisted', color: '#f1c40f', icon: ' ✓', bold: true },
 ];
 export const OWNERSHIP_STATUS_ORDER = OWNERSHIP_STATUS_TIERS.map(t => t.label);
 export const compareOwnershipStatus = compareMissingLast((a, b) =>
