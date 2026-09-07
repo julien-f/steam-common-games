@@ -28,9 +28,11 @@
 // first pass solves. `currentAccount` is read once per mount, not live-reactive to being changed
 // elsewhere while this route stays open — accountsStore.ts is a plain module with no Solid
 // signal of its own yet, so there's nothing to subscribe to reactively here until one exists (a
-// real follow-up, not an oversight); a bundle's own unresolved ("Not on Steam") games and its
-// detail card (title/expiry/outbound links) aren't rendered here either — only the resolved
-// games' table, the actual point of this generic viewer.
+// real follow-up, not an oversight). A bundle's detail card (shop/dates/counts/tiers/note/outbound
+// links) and its unresolved ("not on Steam") games — both listed here as unported for a while —
+// are rendered now; the games table is still the point of this generic viewer, but a table holding
+// only the games that resolved to a Steam listing was quietly passing itself off as the whole
+// bundle.
 //
 // Row-selection-based add/remove-to-list: any kind's table can select rows (`selectable: true`
 // on the single-table path) and add them to an existing manual list, or a brand-new one created
@@ -59,7 +61,7 @@ import {
   protonDbValue, TYPE_LABELS, priceTierBucket, formatPriceTier, compareNumMissingLast,
   OWNERSHIP_STATUS_COLUMN,
 } from './gameColumns.ts';
-import { computeSteamdbRating, computeProductionTier, discountPct, fmtLastPlayed, formatMoney } from './utils.ts';
+import { computeSteamdbRating, computeProductionTier, discountPct, fmtLastPlayed, formatMoney, scoreColor } from './utils.ts';
 import { restoreTableView, shareTableView, resetTableView } from './tableViewPrefs.ts';
 import { renderPanelNav as renderPanelNavShared, stepGameList } from './panelNav.ts';
 import { createRowStore } from './rowStore.ts';
@@ -73,7 +75,10 @@ import { setPref } from './prefs.ts';
 import { getCurrentAccount } from './accountsStore.ts';
 import { fetchAccountOwnedGames, fetchAccountWishlistItems } from './accountData.ts';
 import { loadRecentGames, addRecentGame } from './recentGames.ts';
-import { fetchBundleById, resolveBundleGames, type ResolvedGame } from './bundleData.ts';
+import { fetchBundleById, resolveBundleGames, type ResolvedGame, type FlatGame } from './bundleData.ts';
+import {
+  bundleTierSummary, bundleUrgency, shopHue, fmtBundleDateFriendly, type BundleTierSummary,
+} from './bundleRows.ts';
 import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from './priceLoading.ts';
 import { getStoredRegion, resolveRegion } from './region.ts';
@@ -267,6 +272,23 @@ export default function ListRoute() {
   // (`details`) and the real shop/affiliate purchase link exactly as ITAD returned it (`url`,
   // never rewritten or stripped of tracking params — see CLAUDE.md's Bundles section on why).
   const [bundleLinks, setBundleLinks] = createSignal<{ details: string | null; url: string | null }>({ details: null, url: null });
+  // kind === 'bundle' only — everything else the bundle response already carries, for the detail
+  // card below the header. All of it rides on the one fetch the route already makes; none of it
+  // costs a request. `itadCount` is ITAD's own game count for the bundle, which is NOT the same as
+  // the table's row count (see unresolvedGames below), so the card shows both rather than letting
+  // the smaller number pass itself off as the whole bundle.
+  const [bundleMeta, setBundleMeta] = createSignal<{
+    shop: string | null; publish: string | null; expiry: string | null; note: string | null;
+    itadCount: number | null; tiers: BundleTierSummary[];
+  } | null>(null);
+  // The bundle's games that have no Steam listing at all (a course, an asset pack, a shop-exclusive
+  // key). resolveBundleGames has always returned these; this route used to drop them on the floor,
+  // so a 13-game bundle could render as a 3-row table with nothing saying where the rest went.
+  const [unresolvedGames, setUnresolvedGames] = createSignal<FlatGame[]>([]);
+  const [unresolvedOpen, setUnresolvedOpen] = createSignal(false);
+  // How many of the bundle's games made it into the table. `total` (the plain counter updateStatus
+  // reads) is the same number, but it isn't reactive — the hero card's Games tile needs a signal.
+  const [bundleResolvedCount, setBundleResolvedCount] = createSignal(0);
 
   const [rowsStore, setRowsStore] = createStore<Game[]>([]);
   const rowStore = createRowStore<Game>((idx, updater) => setRowsStore(idx, updater));
@@ -407,7 +429,14 @@ export default function ListRoute() {
 
   function updateStatus(): void {
     if (total === 0) { setStatusText(''); return; }
-    setStatusText(loaded >= total ? `${total} games` : `${loaded} / ${total} games loaded…`);
+    if (loaded < total) { setStatusText(`${loaded} / ${total} games loaded…`); return; }
+    // A finished bundle says nothing here: its hero card's Games tile already carries the count
+    // (and the "N of M on Steam" split — a bundle's table only holds the games that resolved to a
+    // Steam listing). Two lines of gray text one under the other, saying the same thing about the
+    // same subject, was most of why the old flat facts line read as noise. `.list-status:empty` is
+    // display:none, so this collapses rather than leaving a gap.
+    if (kind === 'bundle') { setStatusText(''); return; }
+    setStatusText(`${total} games`);
   }
 
   function renderPanelNav(game: Game): void {
@@ -816,6 +845,13 @@ export default function ListRoute() {
     rowStore.reset();
     total = 0;
     loaded = 0;
+    // Bundle-detail state belongs to the bundle being left — stepping ‹/› to the next one reuses
+    // this component instance, so a stale card/"not on Steam" list would otherwise sit there
+    // describing the previous bundle until the new fetch resolved.
+    setBundleMeta(null);
+    setUnresolvedGames([]);
+    setUnresolvedOpen(false);
+    setBundleResolvedCount(0);
     tableContainer.innerHTML = '';
     groupsContainer.innerHTML = '';
 
@@ -874,8 +910,18 @@ export default function ListRoute() {
         setBundleTitle(bundle.title);
         setBaseTitle(bundle.title);
         setBundleLinks({ details: bundle.details, url: bundle.url });
-        const { resolved } = await resolveBundleGames(bundle);
+        setBundleMeta({
+          shop: bundle.page?.name || null,
+          publish: bundle.publish,
+          expiry: bundle.expiry,
+          note: bundle.note,
+          itadCount: bundle.counts?.games ?? null,
+          tiers: bundleTierSummary(bundle),
+        });
+        const { resolved, unresolved } = await resolveBundleGames(bundle);
         if (loadGuard.isStale(gen)) return;
+        setUnresolvedGames(unresolved);
+        setBundleResolvedCount(resolved.length);
         if (resolved.length === 0) { setStatusText('No games in this bundle could be matched to a Steam listing.'); return; }
         resolvedBundleGames = resolved;
         initialRows = resolved.map(g => ({
@@ -1067,24 +1113,114 @@ export default function ListRoute() {
 
   return (
     <div class="list-route">
+      {/* One hero card for the whole bundle: identity + outbound links on top, then the facts
+          ITAD gives us as labelled tiles. It used to be three loose blocks of same-sized gray text
+          (header, a middot-joined facts line, then the status line) with no hierarchy — "ends in
+          11h", the one fact you act on, read exactly like "published". Tiles give each fact a
+          label so its value doesn't have to explain itself, and the tier prices became chips
+          because a middot was separating facts *and* tier prices at once, which parsed as one flat
+          list of five things. The status line's count folds in here as the Games tile (see
+          updateStatus). Shop chip and countdown reuse BundlesBrowseRoute's own shopHue/
+          bundleUrgency + CSS classes, so a bundle reads the same here as in the picker you arrived
+          from. */}
       <Show when={kind === 'bundle'}>
-        <div class="bundle-detail-header">
-          <div class="bundle-detail-titlebar">
-            <div class="bundle-detail-nav">
-              <button type="button" disabled={prevBundleId() == null} onClick={() => { const id = prevBundleId(); if (id != null) navigate(`/lists/bundle/${id}`); }}>‹</button>
-              <button type="button" disabled={nextBundleId() == null} onClick={() => { const id = nextBundleId(); if (id != null) navigate(`/lists/bundle/${id}`); }}>›</button>
+        <div class="bundle-hero">
+          <div class="bundle-detail-header">
+            <div class="bundle-detail-titlebar">
+              <div class="bundle-detail-nav">
+                <button type="button" disabled={prevBundleId() == null} onClick={() => { const id = prevBundleId(); if (id != null) navigate(`/lists/bundle/${id}`); }}>‹</button>
+                <button type="button" disabled={nextBundleId() == null} onClick={() => { const id = nextBundleId(); if (id != null) navigate(`/lists/bundle/${id}`); }}>›</button>
+              </div>
+              <span class="bundle-detail-title">{bundleTitle()}</span>
+              <Show when={bundleMeta()?.shop}>
+                {shop => <span class="shop-chip" style={{ '--shop-hue': String(shopHue(shop())) }}>{shop()}</span>}
+              </Show>
             </div>
-            <span class="bundle-detail-title">{bundleTitle()}</span>
+            <div class="bundle-detail-actions">
+              <Show when={bundleLinks().details}>
+                {details => <a class="bundle-detail-outlink" href={details()} target="_blank" rel="noopener">View on IsThereAnyDeal ↗</a>}
+              </Show>
+              <Show when={bundleLinks().url}>
+                {url => <a class="btn btn-primary btn-sm" href={url()} target="_blank" rel="noopener">Get this bundle ↗</a>}
+              </Show>
+              <a class="btn btn-ghost btn-sm" href="/bundles">← All bundles</a>
+            </div>
           </div>
-          <div class="bundle-detail-actions">
-            <Show when={bundleLinks().details}>
-              {details => <a class="bundle-detail-outlink" href={details()} target="_blank" rel="noopener">View on IsThereAnyDeal ↗</a>}
-            </Show>
-            <Show when={bundleLinks().url}>
-              {url => <a class="btn btn-primary btn-sm" href={url()} target="_blank" rel="noopener">Get this bundle ↗</a>}
-            </Show>
-            <a class="btn btn-ghost btn-sm" href="/bundles">← All bundles</a>
-          </div>
+          <Show when={bundleMeta()}>
+            {meta => (
+              <>
+                <div class="bundle-hero-stats">
+                  <Show when={meta().expiry}>
+                    {expiry => {
+                      const urgency = bundleUrgency(expiry());
+                      const ended = urgency?.tier === 'ended';
+                      return (
+                        <div class="bundle-stat">
+                          <span class="bundle-stat-label">Ends</span>
+                          <span class="bundle-stat-value">
+                            {ended ? 'Ended ' : ''}{fmtBundleDateFriendly(expiry(), { time: true })}
+                          </span>
+                          <Show when={urgency && urgency.label && !ended}>
+                            <span
+                              class="bundle-stat-sub bundle-ends-rel"
+                              style={{ color: urgency!.tier === 'urgent' ? scoreColor(20) : urgency!.tier === 'soon' ? scoreColor(55) : 'var(--text1)' }}
+                            >⏳ {urgency!.label}</span>
+                          </Show>
+                        </div>
+                      );
+                    }}
+                  </Show>
+                  {/* "N of M" whenever some of the bundle's games have no Steam listing at all —
+                      the table only holds the ones that do. M is what this route can actually
+                      enumerate (rows + the "not on Steam" list below), which isn't necessarily
+                      ITAD's own counts.games: flattenBundleGames dedupes a game listed in several
+                      tiers, and resolveBundleGames drops a second game mapping to an appid already
+                      seen. ITAD's own number is the tile's tooltip rather than a second visible
+                      count competing with this one. */}
+                  <Show when={bundleResolvedCount() > 0}>
+                    <div class="bundle-stat">
+                      <span class="bundle-stat-label">Games</span>
+                      <span class="bundle-stat-value" title={meta().itadCount != null ? `IsThereAnyDeal lists ${meta().itadCount} in this bundle` : undefined}>
+                        {unresolvedGames().length > 0
+                          ? `${bundleResolvedCount()} of ${bundleResolvedCount() + unresolvedGames().length}`
+                          : bundleResolvedCount()}
+                      </span>
+                      <Show when={unresolvedGames().length > 0}>
+                        <span class="bundle-stat-sub">on Steam</span>
+                      </Show>
+                    </div>
+                  </Show>
+                  <Show when={meta().tiers.length > 0}>
+                    <div class="bundle-stat">
+                      <span class="bundle-stat-label">{meta().tiers.length === 1 ? 'Tier' : 'Tiers'}</span>
+                      <span class="bundle-tier-chips">
+                        <For each={meta().tiers}>
+                          {tier => (
+                            <span class="bundle-tier-chip" title={`${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} at this tier`}>
+                              {tier.price == null ? 'Varies' : formatMoney(tier.price, tier.currency)}
+                            </span>
+                          )}
+                        </For>
+                      </span>
+                    </div>
+                  </Show>
+                  <Show when={meta().publish}>
+                    {publish => (
+                      <div class="bundle-stat">
+                        <span class="bundle-stat-label">Published</span>
+                        {/* Date only — the hour matters for a deadline, not for when a bundle
+                            went live, and the table's own Published column still carries it. */}
+                        <span class="bundle-stat-value">{fmtBundleDateFriendly(publish())}</span>
+                      </div>
+                    )}
+                  </Show>
+                </div>
+                <Show when={meta().note}>
+                  {note => <div class="bundle-hero-note">{note()}</div>}
+                </Show>
+              </>
+            )}
+          </Show>
         </div>
       </Show>
       <div class="list-status">{statusText()}</div>
@@ -1118,6 +1254,32 @@ export default function ListRoute() {
       </Show>
       <div ref={tableContainer} class="table-container"></div>
       <div ref={groupsContainer} class="list-groups"></div>
+      {/* The bundle's games with no Steam listing at all (a course, an asset pack, a shop-exclusive
+          key) — there's nothing for the table to show about them (no rating/HLTB/price/ownership),
+          but dropping them silently made the table look like the whole bundle. Collapsed by
+          default, with the count in the summary, so nothing is hidden even when it's closed —
+          which matters: for a bundle of courses these can be the *majority* of what you're buying. */}
+      <Show when={kind === 'bundle' && unresolvedGames().length > 0}>
+        <div class="unresolved-games">
+          <button type="button" class="unresolved-summary" aria-expanded={unresolvedOpen()} onClick={() => setUnresolvedOpen(!unresolvedOpen())}>
+            {unresolvedOpen() ? '▾' : '▸'} {unresolvedGames().length} more in this bundle, not on Steam
+          </button>
+          <Show when={unresolvedOpen()}>
+            <ul class="unresolved-list">
+              <For each={unresolvedGames()}>
+                {game => (
+                  <li>
+                    <a href={`https://isthereanydeal.com/game/${game.slug}/info/`} target="_blank" rel="noopener">{game.title}</a>
+                    <Show when={game.type}>
+                      <span class="unresolved-type">{game.type}</span>
+                    </Show>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Show>
+        </div>
+      </Show>
     </div>
   );
 }

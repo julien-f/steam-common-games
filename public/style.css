@@ -1872,6 +1872,9 @@ kbd {
   color: var(--text1);
   margin-bottom: 10px;
 }
+/* A finished bundle blanks this line (its hero card's Games tile carries the count instead — see
+   ListRoute.tsx's updateStatus), so it has to collapse rather than leave 10px of nothing. */
+.list-status:empty, .bundles-status:empty { display: none; }
 .price-status { font-size: 13px; color: var(--text1); margin-bottom: 10px; }
 .price-status:empty { display: none; }
 
@@ -1962,6 +1965,92 @@ kbd {
 .bundle-detail-nav button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
 .bundle-detail-nav button:disabled { opacity: 0.35; cursor: default; }
 .bundle-detail-title { font-size: 18px; font-weight: 700; color: var(--text0); }
+
+/* The hero card wrapping all of the above plus the bundle's own facts. An earlier version was
+   three loose blocks of same-sized gray text (header, a middot-joined facts line, the status
+   line) — no hierarchy, so "ends in 11h" read exactly like "published", and the middot separated
+   facts *and* tier prices at once, which parsed as one flat list. Now: identity and links on top,
+   a divider, then labelled tiles. */
+.bundle-hero {
+  border: 1px solid var(--border);
+  background: var(--bg1);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.bundle-hero .bundle-detail-header { margin-bottom: 0; }
+.bundle-hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+/* Label above value, so a value never has to explain itself in its own text ("ends 2026-09-25"
+   becomes ENDS / Sep 25, 20:00) and every tile's values line up on one baseline across the row. */
+.bundle-stat { display: flex; flex-direction: column; gap: 2px; }
+.bundle-stat-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text1);
+}
+.bundle-stat-value { font-size: 14px; color: var(--text0); }
+.bundle-stat-sub { font-size: 11px; color: var(--text1); }
+/* Overrides .bundle-ends-rel's own inline-beside-the-time metrics (shared with the browse table's
+   Ends cell) — here the countdown is its own line under the date, not a suffix. */
+.bundle-stat-sub.bundle-ends-rel { margin-left: 0; }
+
+/* Tier prices as chips rather than middot-joined text: the middot was doing double duty as both
+   the fact separator and the tier separator, so "13 games · tiers $5 · $15 · $25" read as five
+   siblings. Each chip's title carries how many games that tier unlocks. */
+.bundle-tier-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.bundle-tier-chip {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg2);
+  font-size: 12.5px;
+  color: var(--text0);
+  white-space: nowrap;
+}
+
+/* ITAD's own note ("Keys expire. Please redeem before …") — often the most human thing on the
+   page, so it sits on its own line rather than being folded in among the tiles. */
+.bundle-hero-note {
+  margin-top: 12px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text1);
+}
+
+/* The bundle's games with no Steam listing (ListRoute.tsx) — collapsed by default, but the count
+   stays visible in the toggle so the table never passes itself off as the whole bundle. */
+.unresolved-games { margin-bottom: 24px; }
+.unresolved-summary {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text1);
+  cursor: pointer;
+}
+.unresolved-summary:hover { color: var(--accent2); }
+.unresolved-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 4px 18px;
+}
+.unresolved-list li { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+.unresolved-list a { color: var(--text0); text-decoration: none; }
+.unresolved-list a:hover { color: var(--accent2); }
+.unresolved-type { font-size: 11px; color: var(--text1); text-transform: capitalize; }
 
 /* ── Bundles browse route ──────────────────────────────────────────────────────────────────── */
 

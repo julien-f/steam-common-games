@@ -87,6 +87,32 @@ export function fmtBundleTimePart(iso: string | null | undefined): string {
   return d ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}` : '';
 }
 
+// "Sep 25, 20:00" (or "25 sept., 20:00", "9月25日 20:00", …) — the bundle detail card's own format,
+// deliberately not the table's ISO one. A card is prose-shaped and read one bundle at a time,
+// where `2026-09-25 20:00` looks like a log line; a table column is scanned down a page against
+// its own sort, where ISO's fixed width and year-first ordering are the point.
+//
+// Formatting is `Intl.DateTimeFormat`'s, not hand-assembled: month name, field order, separators
+// and 12-vs-24-hour clock are all the viewer's own locale conventions, which is not something to
+// reimplement (and not something the app could get right for a viewer it never asked). `locale`
+// defaults to the runtime's own — it exists so tests can pin one rather than asserting against
+// whatever locale the test runner happens to have.
+//
+// The year is omitted for the current year, since a bundle ending this year saying so is noise —
+// but an archived 2024 bundle must still say 2024.
+export function fmtBundleDateFriendly(
+  iso: string | null | undefined,
+  { time = false, now = Date.now(), locale }: { time?: boolean; now?: number; locale?: string } = {},
+): string {
+  const d = parseBundleDate(iso);
+  if (!d) return '—';
+  const sameYear = d.getFullYear() === new Date(now).getFullYear();
+  const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+  if (!sameYear) opts.year = 'numeric';
+  if (time) { opts.hour = '2-digit'; opts.minute = '2-digit'; }
+  return d.toLocaleString(locale, opts);
+}
+
 // The flat one-line form, still what the column's own `format` returns — it's the text the table's
 // search matches against and the fallback whenever a cell isn't rendered through `render`.
 export function fmtBundleDateTime(iso: string | null | undefined): string {
@@ -126,6 +152,22 @@ export function shopHue(name: string): number {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
   return Math.abs(hash) % 360;
+}
+
+export interface BundleTierSummary { price: number | null; currency: string | null; gameCount: number }
+
+// One entry per tier, cheapest first (ITAD's tiers are observed to always be price-ascending), for
+// the bundle detail card's "$5 · $15 · $25" line. `gameCount` is that tier's *own* game list as
+// ITAD returns it — pricier tiers include everything the cheaper ones unlock, so these deliberately
+// don't sum to the bundle's total; the card labels them as tiers, not as a partition. A `null`
+// price is a pick-and-mix ("Build Your Own") tier, rendered "Varies" like everywhere else, never
+// as free. Kept here (pure, unit-tested) rather than inline in ListRoute.tsx's JSX.
+export function bundleTierSummary(bundle: { tiers?: { price?: PriceAmount | null; games?: unknown[] | null }[] | null }): BundleTierSummary[] {
+  return (bundle.tiers || []).map(tier => ({
+    price: tier.price ? tier.price.amount : null,
+    currency: tier.price ? tier.price.currency : null,
+    gameCount: (tier.games || []).length,
+  }));
 }
 
 export interface BundleUrgency { tier: 'ended' | 'urgent' | 'soon' | 'later'; label: string }

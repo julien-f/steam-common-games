@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   cheapestTierPrice, fmtBundleDateTime, fmtBundleDatePart, fmtBundleTimePart, toBundleRow,
-  bundleCovers, shopHue, bundleUrgency,
+  bundleCovers, shopHue, bundleUrgency, bundleTierSummary, fmtBundleDateFriendly,
 } = require('../public/bundleRows.ts');
 
 const HOUR = 3600000;
@@ -143,6 +143,74 @@ test('bundleCovers: empty for a bundle with no games/tiers at all', () => {
 test('bundleCovers: honors an explicit max', () => {
   const b = bundle({ tiers: [{ price: null, games: [withBanner('a'), withBanner('b'), withBanner('c')] }] });
   assert.equal(bundleCovers(b, 2).length, 2);
+});
+
+// ── fmtBundleDateFriendly ────────────────────────────────────────────────────────────────────
+
+// Pinned to one locale here so the assertions are stable wherever the suite runs; the app itself
+// passes no locale, so a viewer gets their own conventions (field order, month name, 12h vs 24h).
+test('fmtBundleDateFriendly: locale-formatted, with the time only when asked', () => {
+  const iso = '2026-09-25T20:00:00Z';
+  const now = Date.parse('2026-09-07T12:00:00Z');
+  const d = new Date(iso);
+  assert.equal(
+    fmtBundleDateFriendly(iso, { now, locale: 'en-US' }),
+    d.toLocaleString('en-US', { month: 'short', day: 'numeric' }),
+  );
+  assert.equal(
+    fmtBundleDateFriendly(iso, { time: true, now, locale: 'en-US' }),
+    d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+  );
+});
+
+test('fmtBundleDateFriendly: shows the year only when it is not the current one', () => {
+  const now = Date.parse('2026-09-07T12:00:00Z');
+  assert.ok(!fmtBundleDateFriendly('2026-09-25T20:00:00Z', { now, locale: 'en-US' }).includes('2026'));
+  assert.ok(fmtBundleDateFriendly('2024-12-31T20:00:00Z', { now, locale: 'en-US' }).includes('2024'));
+});
+
+test('fmtBundleDateFriendly: follows the given locale rather than a hardcoded format', () => {
+  const iso = '2026-09-25T20:00:00Z';
+  const now = Date.parse('2026-09-07T12:00:00Z');
+  const us = fmtBundleDateFriendly(iso, { time: true, now, locale: 'en-US' });
+  const fr = fmtBundleDateFriendly(iso, { time: true, now, locale: 'fr-FR' });
+  assert.notEqual(us, fr, 'two locales with different month names/clocks should not format alike');
+});
+
+test('fmtBundleDateFriendly: missing/unparseable dates render as an em dash', () => {
+  for (const v of [null, undefined, '', 'not a date']) {
+    assert.equal(fmtBundleDateFriendly(v, { locale: 'en-US' }), '—');
+  }
+});
+
+// ── bundleTierSummary ────────────────────────────────────────────────────────────────────────
+
+test('bundleTierSummary: one entry per tier, in order, with that tier\'s own game count', () => {
+  const b = bundle({ tiers: [
+    { price: { amount: 5, currency: 'USD' }, games: [withBanner('a')] },
+    { price: { amount: 15, currency: 'USD' }, games: [withBanner('a'), withBanner('b'), withBanner('c')] },
+  ] });
+  assert.deepEqual(bundleTierSummary(b), [
+    { price: 5, currency: 'USD', gameCount: 1 },
+    // Deliberately not deduped against the cheaper tier: a pricier tier includes everything below
+    // it, and the card presents these as tiers, not as a partition that should sum to the total.
+    { price: 15, currency: 'USD', gameCount: 3 },
+  ]);
+});
+
+test('bundleTierSummary: a pick-and-mix tier keeps a null price (rendered "Varies", never Free)', () => {
+  const b = bundle({ tiers: [{ price: null, games: [withBanner('a')] }] });
+  assert.deepEqual(bundleTierSummary(b), [{ price: null, currency: null, gameCount: 1 }]);
+});
+
+test('bundleTierSummary: a real zero-amount tier is a price, not a missing one', () => {
+  const b = bundle({ tiers: [{ price: { amount: 0, currency: 'EUR' }, games: [] }] });
+  assert.deepEqual(bundleTierSummary(b), [{ price: 0, currency: 'EUR', gameCount: 0 }]);
+});
+
+test('bundleTierSummary: empty for a bundle with no tiers', () => {
+  assert.deepEqual(bundleTierSummary(bundle({ tiers: [] })), []);
+  assert.deepEqual(bundleTierSummary(bundle({ tiers: undefined })), []);
 });
 
 // ── shopHue ──────────────────────────────────────────────────────────────────────────────────

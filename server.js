@@ -316,9 +316,8 @@ const bundlesListLimit = namedRateLimit('bundlesList', {
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
     const sort = typeof req.query.sort === 'string' && req.query.sort ? req.query.sort : '-publish';
     const expired = req.query.expired === '1' || req.query.expired === 'true';
-    // Mirrors getBundles' own cache key exactly (lib/itad.js) — `mature` is always `false` here
-    // since GET /api/bundles never accepts it as a query param.
-    return getCached(`itad-bundles:${country}:${sort}:${expired}:false:${offset}:${limit}`) !== undefined;
+    // Mirrors getBundles' own cache key exactly (lib/itad.js).
+    return getCached(`itad-bundles:${country}:${sort}:${expired}:${offset}:${limit}`) !== undefined;
   },
 });
 

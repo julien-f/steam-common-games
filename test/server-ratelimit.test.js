@@ -163,7 +163,7 @@ test('bundles list limiter: counts cache misses but never counts cache hits', as
   _reset();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => [{ id: 1, title: 'Bundle' }] }));
 
-  setCache('itad-bundles:US:-publish:false:false:100:20', [{ id: 99, title: 'Pre-cached Page' }]);
+  setCache('itad-bundles:US:-publish:false:100:20', [{ id: 99, title: 'Pre-cached Page' }]);
 
   // Two uncached pages consume the budget (max = 2).
   for (const offset of [0, 20]) {

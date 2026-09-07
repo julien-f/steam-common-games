@@ -22,12 +22,18 @@ export interface BundleTier {
 }
 
 // One bundle as ITAD's /bundles/v1 (via GET /api/bundles or GET /api/bundles/:id) returns it —
-// only the fields read here.
+// only the fields read here. `publish`/`note` were passed through by the server all along but
+// weren't declared, so nothing could reach them; the bundle detail card (ListRoute.tsx) shows
+// both. `isMature` is deliberately still not declared: the app no longer filters on it (see
+// getBundles in lib/itad.js) and doesn't label with it either — the flag proved inaccurate on the
+// very bundle it was hiding, so surfacing it would spread that inaccuracy rather than inform.
 export interface Bundle {
   id: number; title: string;
   page: { name?: string } | null;
   counts: { games?: number } | null;
+  publish: string | null;
   expiry: string | null;
+  note: string | null;
   url: string | null; details: string | null;
   tiers: BundleTier[];
 }

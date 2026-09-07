@@ -51,6 +51,19 @@ test('getBundles: returns and caches the bundle list', async (t) => {
   assert.equal(calls, 2, 'a different country is a different cache key');
 });
 
+// ITAD's `mature` is an *include* switch, not an "only mature" filter, and this app never hides a
+// bundle from whoever's browsing — see getBundles' own comment for what the old `mature=false`
+// default actually cost (measured live: 33 of 35 active bundles, one of them an ordinary Humble
+// narrative-games bundle). Asserted on the outgoing request rather than the response, since the
+// filtering happens upstream.
+test('getBundles: always asks ITAD to include mature-flagged bundles', async (t) => {
+  _reset();
+  let requested = null;
+  t.mock.method(globalThis, 'fetch', async (url) => { requested = new URL(url); return { ok: true, json: async () => [] }; });
+  await getBundles({ country: 'US', offset: 0, limit: 20 });
+  assert.equal(requested.searchParams.get('mature'), 'true');
+});
+
 // Simulates paginated GET /bundles/v1 responses for findBundleById — `active`/`expired` are
 // flat arrays of bundle objects; each fetch slices out one 50-item page based on offset.
 function makeBundlesPager({ active = [], expired = [] } = {}) {
@@ -78,6 +91,19 @@ test('findBundleById: pages through active bundles before falling back to expire
   t.mock.method(globalThis, 'fetch', makeBundlesPager({ active: page1, expired: [...page1, target] }));
   const result = await findBundleById(999, { country: 'US' });
   assert.equal(result?.title, 'Expired Target');
+});
+
+// The deep-link path inherits getBundles' mature handling — a link to a mature-flagged bundle has
+// to resolve, not 404 (it used to, and the old comment defending that was circular: the app's own
+// UI couldn't link to one only because the list was hiding them too).
+test('findBundleById: includes mature-flagged bundles in its search', async (t) => {
+  _reset();
+  const requested = [];
+  const pager = makeBundlesPager({ active: [{ id: 42, title: 'Found Me' }] });
+  t.mock.method(globalThis, 'fetch', async (url) => { requested.push(new URL(url)); return pager(url); });
+  await findBundleById(42, { country: 'US' });
+  assert.ok(requested.length > 0, 'expected at least one upstream page fetch');
+  for (const u of requested) assert.equal(u.searchParams.get('mature'), 'true');
 });
 
 test('findBundleById: returns null when the id is never found within the search budget', async (t) => {
