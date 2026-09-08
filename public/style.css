@@ -1900,20 +1900,19 @@ kbd {
   margin-bottom: 10px;
 }
 
-/* Bundle detail header (ListRoute.tsx, kind === 'bundle' only) — title + ‹/› nav through
-   whatever's currently in bundleBrowseStore.ts (the last-loaded /bundles list), plus a link back
-   to the browse route. There's otherwise nothing on this route naming which bundle is open at
-   all. */
-.bundle-detail-header {
+/* Every list route's hero card (ListHero.tsx) — the title row (optional ‹/› lead, the list's
+   name as the page's <h1>, then kind/shop/account chips) plus its right-hand actions. Used to be
+   bundle-only markup named after that one kind; every other list opened with no name on screen at
+   all, only in <title>. */
+.list-hero-header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 12px;
 }
-.bundle-detail-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.bundle-detail-outlink {
+.list-hero-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.list-hero-outlink {
   font-size: 13px;
   color: var(--text1);
   text-decoration: none;
@@ -1921,10 +1920,10 @@ kbd {
   white-space: nowrap;
   transition: color 0.15s, border-color 0.15s;
 }
-.bundle-detail-outlink:hover { color: var(--accent2); border-bottom-color: var(--accent2); }
-.bundle-detail-titlebar { display: flex; align-items: center; gap: 10px; }
-.bundle-detail-nav { display: flex; gap: 4px; }
-.bundle-detail-nav button {
+.list-hero-outlink:hover { color: var(--accent2); border-bottom-color: var(--accent2); }
+.list-hero-titlebar { display: flex; align-items: center; gap: 10px; }
+.list-hero-nav { display: flex; gap: 4px; }
+.list-hero-nav button {
   padding: 4px 10px;
   border: 1px solid var(--border);
   border-radius: var(--r);
@@ -1933,24 +1932,40 @@ kbd {
   font-size: 14px;
   cursor: pointer;
 }
-.bundle-detail-nav button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
-.bundle-detail-nav button:disabled { opacity: 0.35; cursor: default; }
-.bundle-detail-title { font-size: 18px; font-weight: 700; color: var(--text0); }
+.list-hero-nav button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
+.list-hero-nav button:disabled { opacity: 0.35; cursor: default; }
+/* An <h1>, so a list route has a real document heading rather than a styled <span> — hence the
+   explicit margin/size reset over the browser's own h1 metrics. */
+.list-hero-title { margin: 0; font-size: 18px; font-weight: 700; color: var(--text0); }
 
-/* The hero card wrapping all of the above plus the bundle's own facts. An earlier version was
-   three loose blocks of same-sized gray text (header, a middot-joined facts line, the status
-   line) — no hierarchy, so "ends in 11h" read exactly like "published", and the middot separated
-   facts *and* tier prices at once, which parsed as one flat list. Now: identity and links on top,
-   a divider, then labelled tiles. */
-.bundle-hero {
+/* Chips trailing the title: what kind of list this is (Manual/Union/Intersect/…) and, for the
+   account-scoped kinds, whose account is on screen. The shop chip a bundle shows here is
+   .shop-chip, shared with the browse table's own cells. */
+.list-hero-chip {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg2);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text1);
+  white-space: nowrap;
+}
+.list-hero-account { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text0); }
+
+/* The card wrapping all of the above plus the list's own facts as tiles. The bundle version of
+   this was three loose blocks of same-sized gray text (header, a middot-joined facts line, the
+   status line) — no hierarchy, so "ends in 11h" read exactly like "published", and the middot
+   separated facts *and* tier prices at once, which parsed as one flat list. Now: identity and
+   actions on top, a divider, then labelled tiles. */
+.list-hero {
   border: 1px solid var(--border);
   background: var(--bg1);
   border-radius: var(--r);
   padding: 14px 16px;
   margin-bottom: 16px;
 }
-.bundle-hero .bundle-detail-header { margin-bottom: 0; }
-.bundle-hero-stats {
+.list-hero-stats {
   display: flex;
   flex-wrap: wrap;
   gap: 12px 32px;
@@ -1960,19 +1975,19 @@ kbd {
 }
 /* Label above value, so a value never has to explain itself in its own text ("ends 2026-09-25"
    becomes ENDS / Sep 25, 20:00) and every tile's values line up on one baseline across the row. */
-.bundle-stat { display: flex; flex-direction: column; gap: 2px; }
-.bundle-stat-label {
+.list-stat { display: flex; flex-direction: column; gap: 2px; }
+.list-stat-label {
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text1);
 }
-.bundle-stat-value { font-size: 14px; color: var(--text0); }
-.bundle-stat-sub { font-size: 11px; color: var(--text1); }
+.list-stat-value { font-size: 14px; color: var(--text0); }
+.list-stat-sub { font-size: 11px; color: var(--text1); }
 /* Overrides .bundle-ends-rel's own inline-beside-the-time metrics (shared with the browse table's
    Ends cell) — here the countdown is its own line under the date, not a suffix. */
-.bundle-stat-sub.bundle-ends-rel { margin-left: 0; }
+.list-stat-sub .bundle-ends-rel { margin-left: 0; }
 
 /* Tier prices as chips rather than middot-joined text: the middot was doing double duty as both
    the fact separator and the tier separator, so "13 games · tiers $5 · $15 · $25" read as five
@@ -1990,7 +2005,7 @@ kbd {
 
 /* ITAD's own note ("Keys expire. Please redeem before …") — often the most human thing on the
    page, so it sits on its own line rather than being folded in among the tiles. */
-.bundle-hero-note {
+.list-hero-note {
   margin-top: 12px;
   font-size: 13px;
   font-style: italic;

@@ -48,7 +48,7 @@
 // loadGuard, total/loaded, …) is now local to this component's own closure, created fresh on
 // each mount and torn down on unmount via onCleanup — library.tsx's page loads exactly once, but
 // a router-driven route mounts/unmounts every time its path is navigated to/away from.
-import { onMount, onCleanup, createSignal, createRoot, createEffect, on, batch, For, Show } from 'solid-js';
+import { onMount, onCleanup, createSignal, createRoot, createEffect, on, batch, For, Show, type JSX } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { useParams, useLocation, useNavigate } from '@solidjs/router';
@@ -85,9 +85,11 @@ import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from './priceLoading.ts';
 import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
+import { ListHero, type HeroTile } from './ListHero.tsx';
+import { opLabel } from './listLabels.ts';
 import { setBaseTitle } from './pageTitle.ts';
-import type { Game, Rating, Hltb, GameMeta, ProtonDb, GameList } from './types.ts';
-import { getList, getLists, createList, addAppidsToList, removeAppidsFromList, setListTableView } from './listsStore.ts';
+import type { AccountSlot, Game, Rating, Hltb, GameMeta, ProtonDb, GameList } from './types.ts';
+import { getList, getLists, getFolders, createList, addAppidsToList, removeAppidsFromList, setListTableView } from './listsStore.ts';
 import { resolveGameList, flattenCombineResult, createDefaultFetchers } from './listResolve.ts';
 import type { MembershipGroup } from './combine.ts';
 import { peekMyOwnershipStatus, onMyOwnershipReady } from './myOwnership.ts';
@@ -311,9 +313,21 @@ export default function ListRoute() {
     setRefreshing(true);
     try { await load({ refresh: true }); } finally { setRefreshing(false); }
   }
-  // kind === 'bundle' only — the open bundle's own title, for the header below (nothing else on
-  // this route otherwise names which bundle is loaded at all).
-  const [bundleTitle, setBundleTitle] = createSignal('');
+  // The list's own name — the hero card's <h1> (see ListHero.tsx) *and* the document title, set
+  // through one function since they were always the same string; before the card existed, only
+  // <title> ever received it, so a loaded list said its own name nowhere on screen. Empty means
+  // nothing has been named yet (a load that failed before resolving one — a deleted user list,
+  // an account-less Owned route), which renders no card at all rather than an unnamed one.
+  const [heroTitle, setHeroTitle] = createSignal('');
+  function setListTitle(title: string): void {
+    setHeroTitle(title);
+    setBaseTitle(title);
+  }
+  // Owned/wishlist kinds only — whose account is on screen, for the hero's account chip. Read off
+  // the AccountSlot's own cached label/avatar (accountsStore.ts) rather than the fetch: a wishlist
+  // response carries no player data at all, so anything richer (presence, the 🔒 Private badge
+  // Home's account card shows) would be available on one of these two kinds and not the other.
+  const [heroAccount, setHeroAccount] = createSignal<AccountSlot | null>(null);
   // kind === 'bundle' only, alongside bundleTitle above — ITAD's own page for this bundle
   // (`details`) and the real shop/affiliate purchase link exactly as ITAD returned it (`url`,
   // never rewritten or stripped of tracking params — see CLAUDE.md's Bundles section on why).
@@ -355,6 +369,9 @@ export default function ListRoute() {
   // (and so "🔗 Share view"/"Reset view" below) doesn't apply there. Gates that toolbar's own
   // <Show> rather than leaving it visible-but-broken against a `table` that doesn't exist yet/at all.
   const [tableReady, setTableReady] = createSignal(false);
+  // How many per-group tables a group-by-membership list rendered (0 for every other kind/op) —
+  // groupTables itself is a plain array, so the hero's Groups tile needs a signal.
+  const [groupCount, setGroupCount] = createSignal(0);
 
   // ── Row-selection-based add/remove-to-list (see this file's own header comment) ────────────
   const [selectedRows, setSelectedRows] = createSignal<Game[]>([]);
@@ -473,16 +490,16 @@ export default function ListRoute() {
     return idx !== -1 && idx < list.length - 1 ? list[idx + 1].id : null;
   }
 
+  // Progress only. A finished list says nothing here: its hero card's Games tile carries the
+  // count (and, for a bundle, the "N of M on Steam" split — a bundle's table only holds the games
+  // that resolved to a Steam listing). Two lines of gray text one under the other, saying the same
+  // thing about the same subject, was most of why the old flat facts line read as noise; that
+  // reasoning was already applied to bundles when they got a hero card, and now applies to every
+  // kind for the same reason. `.list-status:empty` is display:none, so this collapses rather than
+  // leaving a gap.
   function updateStatus(): void {
-    if (total === 0) { setStatusText(''); return; }
-    if (loaded < total) { setStatusText(`${loaded} / ${total} games loaded…`); return; }
-    // A finished bundle says nothing here: its hero card's Games tile already carries the count
-    // (and the "N of M on Steam" split — a bundle's table only holds the games that resolved to a
-    // Steam listing). Two lines of gray text one under the other, saying the same thing about the
-    // same subject, was most of why the old flat facts line read as noise. `.list-status:empty` is
-    // display:none, so this collapses rather than leaving a gap.
-    if (kind === 'bundle') { setStatusText(''); return; }
-    setStatusText(`${total} games`);
+    if (total > 0 && loaded < total) { setStatusText(`${loaded} / ${total} games loaded…`); return; }
+    setStatusText('');
   }
 
   function renderPanelNav(game: Game): void {
@@ -950,6 +967,7 @@ export default function ListRoute() {
         disposeTable: () => { disposeView(); disposeTableState(); },
       };
     });
+    setGroupCount(groupTables.length);
   }
 
   async function load({ refresh = false }: { refresh?: boolean } = {}): Promise<void> {
@@ -972,6 +990,7 @@ export default function ListRoute() {
     table = null;
     groupTables.forEach(g => g.disposeTable());
     groupTables = [];
+    setGroupCount(0);
     activeGroupKey = null;
     setRowsStore([]);
     rowStore.reset();
@@ -984,6 +1003,12 @@ export default function ListRoute() {
     setUnresolvedGames([]);
     setUnresolvedOpen(false);
     setBundleResolvedCount(0);
+    // Same reasoning one kind over: the hero describes the list being left until the new one has
+    // resolved its own name/account, so it's cleared rather than left standing (setBaseTitle is
+    // deliberately untouched — <title> keeps naming the last real list until the next one loads,
+    // rather than flashing back to the bare app name on every ‹/› step).
+    setHeroTitle('');
+    setHeroAccount(null);
     tableContainer.innerHTML = '';
     groupsContainer.innerHTML = '';
 
@@ -1004,7 +1029,7 @@ export default function ListRoute() {
       const list = getList(params.listId!);
       if (!list) { setStatusText('This list no longer exists.'); return; }
       setUserList(list);
-      setBaseTitle(list.name);
+      setListTitle(list.name);
       setStatusText('Resolving list…');
       const isGroupMode = list.kind === 'dynamic' && list.op === 'group-by-membership';
       let appids: Set<number>;
@@ -1027,7 +1052,7 @@ export default function ListRoute() {
       })) as unknown as Game[];
       streamTargets = [...appids].map(appid => ({ appid }));
     } else if (kind === 'recent') {
-      setBaseTitle('Recently Looked Up');
+      setListTitle('Recently Looked Up');
       const recents = loadRecentGames();
       // `g.name` verbatim, *not* `g.name || \`App ${g.appid}\``: a game looked up by bare appid or
       // store URL is recorded with no name at all (nothing client-side knows one yet), and baking
@@ -1046,8 +1071,7 @@ export default function ListRoute() {
       try {
         const bundle = await fetchBundleById(Number(params.bundleId), { country: resolveRegion(getStoredRegion()) });
         if (loadGuard.isStale(gen)) return;
-        setBundleTitle(bundle.title);
-        setBaseTitle(bundle.title);
+        setListTitle(bundle.title);
         setBundleLinks({ details: bundle.details, url: bundle.url });
         setBundleMeta({
           shop: bundle.page?.name || null,
@@ -1091,12 +1115,17 @@ export default function ListRoute() {
       const overrideState = getAccountOverrideState();
       const linkPending = overrideState.state === 'resolving' || overrideState.state === 'error';
       const account = linkPending ? null : getEffectiveCurrentAccount();
+      // Named before the account is known, so an account-less (or still-resolving-a-`?u=`-link)
+      // route still says which list you're on rather than rendering no hero at all; refined to
+      // "<account>'s Library" just below once there is one.
+      const listLabel = kind === 'wishlist' ? 'Wishlist' : 'Library';
+      setListTitle(listLabel);
       if (!account) {
         setStatusText(accountOverrideStatusText(overrideState) ?? 'No account selected — pick one from Home.');
         return;
       }
-      const listLabel = kind === 'wishlist' ? 'Wishlist' : 'Library';
-      setBaseTitle(account.label ? `${account.label}'s ${listLabel}` : listLabel);
+      setHeroAccount(account);
+      setListTitle(account.label ? `${account.label}'s ${listLabel}` : listLabel);
       setStatusText(kind === 'wishlist' ? 'Fetching wishlist…' : 'Fetching library…');
       try {
         if (kind === 'owned') {
@@ -1254,6 +1283,193 @@ export default function ListRoute() {
     restorePendingShot(); // now that the open game's screenshots/videos have actually arrived
   }
 
+  // ── The hero card's content (see ListHero.tsx) ────────────────────────────────────────────
+  // One accessor per piece rather than one big model object: `kind` is fixed for the whole mount,
+  // so each is a straight switch on it, and every reactive read (the row count, the cache ages,
+  // the resolved list/bundle) stays inside the accessor that actually needs it — the card is
+  // rebuilt per piece as those land, not wholesale.
+
+  // "Folder A / Folder B" for a user list that lives in one, null at the tree root. Walked here
+  // rather than stored on the list: parentId is the only structural link listsStore.ts keeps (see
+  // its own module comment on why the tree is flat arrays, not a nested structure).
+  function folderPathLabel(list: GameList): string | null {
+    const folders = getFolders();
+    const names: string[] = [];
+    let parentId = list.parentId;
+    while (parentId) {
+      const folder = folders.find(f => f.id === parentId);
+      if (!folder) break;
+      names.unshift(folder.name);
+      parentId = folder.parentId;
+    }
+    return names.length ? names.join(' / ') : null;
+  }
+
+  // Which region's prices are on screen and how stale they are (wishlist/bundle kinds). Stated,
+  // never editable here — the ⚙ Preferences popover owns the setting, and a second control would
+  // be one more thing to keep in sync.
+  function priceTile(): HeroTile {
+    return {
+      label: 'Prices',
+      value: regionLabel(regionCode()),
+      sub: priceFetchedAt() === undefined ? undefined : `Updated ${fmtAge(priceFetchedAt())}`,
+      title: 'Prices are shown for this region — change it in ⚙ Preferences',
+    };
+  }
+
+  function bundleHeroTiles(): HeroTile[] {
+    const meta = bundleMeta();
+    if (!meta) return [];
+    const tiles: HeroTile[] = [];
+    if (meta.expiry) {
+      const urgency = bundleUrgency(meta.expiry);
+      const ended = urgency?.tier === 'ended';
+      tiles.push({
+        label: 'Ends',
+        value: `${ended ? 'Ended ' : ''}${fmtBundleDateFriendly(meta.expiry, { time: true })}`,
+        sub: urgency && urgency.label && !ended
+          ? (
+            <span
+              class="bundle-ends-rel"
+              style={{ color: urgency.tier === 'urgent' ? scoreColor(20) : urgency.tier === 'soon' ? scoreColor(55) : 'var(--text1)' }}
+            >⏳ {urgency.label}</span>
+          )
+          : undefined,
+      });
+    }
+    // "N of M" whenever some of the bundle's games have no Steam listing at all — the table only
+    // holds the ones that do. M is what this route can actually enumerate (rows + the "not on
+    // Steam" list below), which isn't necessarily ITAD's own counts.games: flattenBundleGames
+    // dedupes a game listed in several tiers, and resolveBundleGames drops a second game mapping
+    // to an appid already seen. ITAD's own number is the tile's tooltip rather than a second
+    // visible count competing with this one.
+    if (bundleResolvedCount() > 0) {
+      const unresolved = unresolvedGames().length;
+      tiles.push({
+        label: 'Games',
+        value: unresolved > 0 ? `${bundleResolvedCount()} of ${bundleResolvedCount() + unresolved}` : bundleResolvedCount(),
+        sub: unresolved > 0 ? 'on Steam' : undefined,
+        title: meta.itadCount != null ? `IsThereAnyDeal lists ${meta.itadCount} in this bundle` : undefined,
+      });
+    }
+    if (meta.tiers.length > 0) {
+      tiles.push({
+        label: meta.tiers.length === 1 ? 'Tier' : 'Tiers',
+        value: (
+          <span class="bundle-tier-chips">
+            <For each={meta.tiers}>
+              {tier => (
+                <span class="bundle-tier-chip" title={`${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} at this tier`}>
+                  {tier.price == null ? 'Varies' : formatMoney(tier.price, tier.currency)}
+                </span>
+              )}
+            </For>
+          </span>
+        ),
+      });
+    }
+    // Date only — the hour matters for a deadline, not for when a bundle went live, and the
+    // browse table's own Published column still carries it.
+    if (meta.publish) tiles.push({ label: 'Published', value: fmtBundleDateFriendly(meta.publish) });
+    tiles.push(priceTile());
+    return tiles;
+  }
+
+  function heroTiles(): HeroTile[] {
+    if (kind === 'bundle') return bundleHeroTiles();
+    const tiles: HeroTile[] = [{ label: 'Games', value: rowsStore.length }];
+    if (kind === 'owned' || kind === 'wishlist') {
+      tiles.push({
+        label: 'Updated',
+        value: fmtAge(fetchedAt()),
+        title: "How old the server's cached copy of this account's list is — ↻ Refresh forces a fresh fetch",
+      });
+    }
+    if (kind === 'wishlist') tiles.push(priceTile());
+    const list = userList();
+    if (list) {
+      const folder = folderPathLabel(list);
+      if (folder) tiles.push({ label: 'Folder', value: `📁 ${folder}` });
+      if (list.kind === 'dynamic') {
+        tiles.push({ label: 'Sources', value: (list.sources ?? []).length });
+        if (groupCount() > 0) tiles.push({ label: 'Groups', value: groupCount() });
+      }
+      // "Edited", not "Updated": this is when the list's own definition last changed, which for a
+      // dynamic list says nothing about how fresh its resolved contents are (those are recomputed
+      // on every open) — unlike the owned/wishlist tile above, which is exactly a data age.
+      tiles.push({ label: 'Edited', value: fmtAge(list.updatedAt), title: `Created ${fmtAge(list.createdAt)}` });
+    }
+    return tiles;
+  }
+
+  // What sort of list this is, when the name/route doesn't already say — a user list's manual/
+  // dynamic nature and, for a dynamic one, which combine op produced what's on screen. A bundle
+  // shows its shop chip instead; owned/wishlist show whose account it is.
+  function heroKindLabel(): string | null {
+    const list = userList();
+    if (!list) return null;
+    return list.kind === 'manual' ? 'Manual list' : opLabel(list.op);
+  }
+
+  function heroNote(): JSX.Element | undefined {
+    // ITAD's own editorial note ("Keys expire. Please redeem before …") — often the most human
+    // thing on the page.
+    if (kind === 'bundle') return bundleMeta()?.note || undefined;
+    // Recently Looked Up is pure local search history (recentGames.ts) — worth saying outright,
+    // since every other list here is either someone's Steam data or a list they built on purpose.
+    if (kind === 'recent') return 'Games you looked up in this browser — local search history, never sent anywhere.';
+    return undefined;
+  }
+
+  function accountChipLabel(account: AccountSlot): string {
+    return account.label || account.rawInputs.join(' + ');
+  }
+
+  // Built once per mount, not per render: `kind` never changes under a mounted route, and every
+  // button/link inside reads its own signals, so nothing here needs rebuilding when they change.
+  // `undefined` (rather than an empty fragment) for the kinds with no actions at all, so
+  // ListHero renders no action row for them instead of an empty one.
+  const heroLead: JSX.Element | undefined = kind !== 'bundle' ? undefined : (
+    <div class="list-hero-nav">
+      <button type="button" disabled={prevBundleId() == null} onClick={() => { const id = prevBundleId(); if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`)); }}>‹</button>
+      <button type="button" disabled={nextBundleId() == null} onClick={() => { const id = nextBundleId(); if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`)); }}>›</button>
+    </div>
+  );
+
+  const heroActions: JSX.Element | undefined = (kind === 'recent' || kind === 'user') ? undefined : (
+    <>
+      {kind === 'bundle' && (
+        <>
+          <Show when={bundleLinks().details}>
+            {details => <a class="list-hero-outlink" href={details()} target="_blank" rel="noopener">View on IsThereAnyDeal ↗</a>}
+          </Show>
+          <Show when={bundleLinks().url}>
+            {url => <a class="btn btn-primary btn-sm" href={url()} target="_blank" rel="noopener">Get this bundle ↗</a>}
+          </Show>
+          <a class="btn btn-ghost btn-sm" href="/bundles">← All bundles</a>
+        </>
+      )}
+      {(kind === 'owned' || kind === 'wishlist') && (
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          disabled={refreshing()}
+          title="Re-fetch this list from Steam, bypassing the server's cache"
+          onClick={handleRefreshList}
+        >{refreshing() ? '↻ Refreshing…' : '↻ Refresh'}</button>
+      )}
+      {(kind === 'wishlist' || kind === 'bundle') && (
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          disabled={refreshingPrices()}
+          title="Re-fetch current prices and historical lows for every game in this list"
+          onClick={handleRefreshPrices}
+        >{refreshingPrices() ? '↻ Refreshing prices…' : '↻ Refresh prices'}</button>
+      )}
+    </>
+  );
+
   onMount(() => {
     const unregister = registerRouteHandlers({ pickRandom: pickRandomGame, stepGame, openGame: handleOpenGameRequest, onGameClose: handleGameClose, refreshGame });
     onCleanup(unregister);
@@ -1326,147 +1542,66 @@ export default function ListRoute() {
 
   return (
     <div class="list-route">
-      {/* One hero card for the whole bundle: identity + outbound links on top, then the facts
-          ITAD gives us as labelled tiles. It used to be three loose blocks of same-sized gray text
-          (header, a middot-joined facts line, then the status line) with no hierarchy — "ends in
-          11h", the one fact you act on, read exactly like "published". Tiles give each fact a
-          label so its value doesn't have to explain itself, and the tier prices became chips
-          because a middot was separating facts *and* tier prices at once, which parsed as one flat
-          list of five things. The status line's count folds in here as the Games tile (see
-          updateStatus). Shop chip and countdown reuse BundlesBrowseRoute's own shopHue/
-          bundleUrgency + CSS classes, so a bundle reads the same here as in the picker you arrived
-          from. */}
-      <Show when={kind === 'bundle'}>
-        <div class="bundle-hero">
-          <div class="bundle-detail-header">
-            <div class="bundle-detail-titlebar">
-              <div class="bundle-detail-nav">
-                <button type="button" disabled={prevBundleId() == null} onClick={() => { const id = prevBundleId(); if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`)); }}>‹</button>
-                <button type="button" disabled={nextBundleId() == null} onClick={() => { const id = nextBundleId(); if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`)); }}>›</button>
-              </div>
-              <span class="bundle-detail-title">{bundleTitle()}</span>
-              <Show when={bundleMeta()?.shop}>
-                {shop => <span class="shop-chip" style={{ '--shop-hue': String(shopHue(shop())) }}>{shop()}</span>}
-              </Show>
-            </div>
-            <div class="bundle-detail-actions">
-              <Show when={bundleLinks().details}>
-                {details => <a class="bundle-detail-outlink" href={details()} target="_blank" rel="noopener">View on IsThereAnyDeal ↗</a>}
-              </Show>
-              <Show when={bundleLinks().url}>
-                {url => <a class="btn btn-primary btn-sm" href={url()} target="_blank" rel="noopener">Get this bundle ↗</a>}
-              </Show>
-              <a class="btn btn-ghost btn-sm" href="/bundles">← All bundles</a>
-            </div>
-          </div>
-          <Show when={bundleMeta()}>
-            {meta => (
-              <>
-                <div class="bundle-hero-stats">
-                  <Show when={meta().expiry}>
-                    {expiry => {
-                      const urgency = bundleUrgency(expiry());
-                      const ended = urgency?.tier === 'ended';
-                      return (
-                        <div class="bundle-stat">
-                          <span class="bundle-stat-label">Ends</span>
-                          <span class="bundle-stat-value">
-                            {ended ? 'Ended ' : ''}{fmtBundleDateFriendly(expiry(), { time: true })}
-                          </span>
-                          <Show when={urgency && urgency.label && !ended}>
-                            <span
-                              class="bundle-stat-sub bundle-ends-rel"
-                              style={{ color: urgency!.tier === 'urgent' ? scoreColor(20) : urgency!.tier === 'soon' ? scoreColor(55) : 'var(--text1)' }}
-                            >⏳ {urgency!.label}</span>
-                          </Show>
-                        </div>
-                      );
-                    }}
-                  </Show>
-                  {/* "N of M" whenever some of the bundle's games have no Steam listing at all —
-                      the table only holds the ones that do. M is what this route can actually
-                      enumerate (rows + the "not on Steam" list below), which isn't necessarily
-                      ITAD's own counts.games: flattenBundleGames dedupes a game listed in several
-                      tiers, and resolveBundleGames drops a second game mapping to an appid already
-                      seen. ITAD's own number is the tile's tooltip rather than a second visible
-                      count competing with this one. */}
-                  <Show when={bundleResolvedCount() > 0}>
-                    <div class="bundle-stat">
-                      <span class="bundle-stat-label">Games</span>
-                      <span class="bundle-stat-value" title={meta().itadCount != null ? `IsThereAnyDeal lists ${meta().itadCount} in this bundle` : undefined}>
-                        {unresolvedGames().length > 0
-                          ? `${bundleResolvedCount()} of ${bundleResolvedCount() + unresolvedGames().length}`
-                          : bundleResolvedCount()}
-                      </span>
-                      <Show when={unresolvedGames().length > 0}>
-                        <span class="bundle-stat-sub">on Steam</span>
-                      </Show>
-                    </div>
-                  </Show>
-                  <Show when={meta().tiers.length > 0}>
-                    <div class="bundle-stat">
-                      <span class="bundle-stat-label">{meta().tiers.length === 1 ? 'Tier' : 'Tiers'}</span>
-                      <span class="bundle-tier-chips">
-                        <For each={meta().tiers}>
-                          {tier => (
-                            <span class="bundle-tier-chip" title={`${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} at this tier`}>
-                              {tier.price == null ? 'Varies' : formatMoney(tier.price, tier.currency)}
-                            </span>
-                          )}
-                        </For>
-                      </span>
-                    </div>
-                  </Show>
-                  <Show when={meta().publish}>
-                    {publish => (
-                      <div class="bundle-stat">
-                        <span class="bundle-stat-label">Published</span>
-                        {/* Date only — the hour matters for a deadline, not for when a bundle
-                            went live, and the table's own Published column still carries it. */}
-                        <span class="bundle-stat-value">{fmtBundleDateFriendly(publish())}</span>
-                      </div>
-                    )}
-                  </Show>
-                </div>
-                <Show when={meta().note}>
-                  {note => <div class="bundle-hero-note">{note()}</div>}
+      {/* One card per list, whatever kind it is (ListHero.tsx) — identity + actions on top, then
+          the facts this kind has as labelled tiles. Everything in it rides on fetches the route
+          already makes; none of it costs a request. Before it existed only bundles had one, and
+          every other kind opened with two or three unlabelled gray lines ("Updated 3h ago", "104
+          games", the region readout) that never even said which list — or, for Owned/Wishlist,
+          whose account — was on screen. */}
+      <Show when={heroTitle()}>
+        <ListHero
+          title={heroTitle()}
+          lead={heroLead}
+          chips={
+            <>
+              {kind === 'bundle' && (
+                <Show when={bundleMeta()?.shop}>
+                  {/* Same shopHue/.shop-chip as the browse table's own cells, so a bundle reads
+                      the same here as in the picker you arrived from. */}
+                  {shop => <span class="shop-chip" style={{ '--shop-hue': String(shopHue(shop())) }}>{shop()}</span>}
                 </Show>
-              </>
-            )}
-          </Show>
-        </div>
+              )}
+              <Show when={heroKindLabel()}>
+                {label => <span class="list-hero-chip">{label()}</span>}
+              </Show>
+              <Show when={heroAccount()}>
+                {account => (
+                  <span class="list-hero-account">
+                    <Show when={account().avatarUrl}>
+                      {url => (
+                        <span class="account-avatar-wrap">
+                          <img class="account-avatar" src={url()} alt="" width="28" height="28" />
+                        </span>
+                      )}
+                    </Show>
+                    {/* /profiles/<steam64> rather than the vanity URL Steam itself returns: the
+                        AccountSlot carries no profile URL (see setHeroAccount's own comment), and
+                        this form resolves for every account either way. A Family has no one
+                        profile to link to, so it stays plain text with a merge count instead. */}
+                    <Show
+                      when={account().members.length === 1}
+                      fallback={<span>{accountChipLabel(account())} <span class="account-count">({account().members.length} accounts merged)</span></span>}
+                    >
+                      <a
+                        class="account-profile-link"
+                        href={`https://steamcommunity.com/profiles/${account().members[0]}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Steam ID ${account().members[0]}`}
+                      >{accountChipLabel(account())} <span class="account-profile-arrow">↗</span></a>
+                    </Show>
+                  </span>
+                )}
+              </Show>
+            </>
+          }
+          actions={heroActions}
+          tiles={heroTiles()}
+          note={heroNote()}
+        />
       </Show>
-      {(kind === 'owned' || kind === 'wishlist') && (
-        <div class="account-updated">
-          Updated {fmtAge(fetchedAt())}
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            disabled={refreshing()}
-            title="Re-fetch this list from Steam, bypassing the server's cache"
-            onClick={handleRefreshList}
-          >{refreshing() ? '↻ Refreshing…' : '↻ Refresh'}</button>
-        </div>
-      )}
       <div class="list-status">{statusText()}</div>
-      {(kind === 'wishlist' || kind === 'bundle') && (
-        <>
-          <div class="account-updated">
-            <Show when={priceFetchedAt() !== undefined}>
-              <span>Prices updated {fmtAge(priceFetchedAt())}</span>
-            </Show>
-            <span class="region-readout" title="Change it in ⚙ Preferences">Prices in {regionLabel(regionCode())}</span>
-            <button
-              type="button"
-              class="btn btn-ghost btn-sm"
-              disabled={refreshingPrices()}
-              title="Re-fetch current prices and historical lows for every game in this list"
-              onClick={handleRefreshPrices}
-            >{refreshingPrices() ? '↻ Refreshing prices…' : '↻ Refresh prices'}</button>
-          </div>
-          <div class="price-status">{priceStatusText()}</div>
-        </>
-      )}
+      {(kind === 'wishlist' || kind === 'bundle') && <div class="price-status">{priceStatusText()}</div>}
       <Show when={selectedRows().length > 0}>
         <div class="selection-toolbar">
           <span class="selection-count">{selectedRows().length} selected</span>
