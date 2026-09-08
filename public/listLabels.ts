@@ -10,7 +10,7 @@
 // and its tests never touch localStorage. createDefaultNaming() at the bottom wires the real
 // stores in for routes to use — the same seam listResolve.ts's own createDefaultFetchers() is.
 import type { CombineOp, GameList, ListRef } from './types.ts';
-import { getRecentAccounts, getMyAccount, getEffectiveCurrentAccount } from './accountsStore.ts';
+import { getRecentAccounts, getMyAccount, getEffectiveCurrentAccount, accountDisplayLabel } from './accountsStore.ts';
 import { getLists } from './listsStore.ts';
 import { membersFromAccountId } from './accountData.ts';
 
@@ -143,7 +143,7 @@ export function createDefaultNaming(): ListNaming {
         getEffectiveCurrentAccount(),
       ];
       const match = known.find(a => a?.id === accountId);
-      if (match) return { label: match.label || match.rawInputs.join(' + '), identifiers: match.members };
+      if (match) return { label: accountDisplayLabel(match), identifiers: match.members };
       // Not on record any more, but an accountId is self-describing enough to still open: it *is*
       // the member steam64 ids. Named by id rather than reported as missing outright.
       const members = membersFromAccountId(accountId);

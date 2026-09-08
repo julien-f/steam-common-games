@@ -18,7 +18,7 @@ import { A, useLocation, useNavigate } from '@solidjs/router';
 import {
   getMyAccount, setMyAccount, getEffectiveCurrentAccount, setCurrentAccount,
   getRecentAccounts, removeRecentAccount, clearRecentAccounts,
-  getAccountOverride, ACCOUNT_CHANGED_EVENT,
+  getAccountOverride, accountDisplayLabel, ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
 import { getAccountOverrideState, clearAccountOverride, accountOverrideStatusText } from './accountOverride.ts';
 import { withAccountParam, urlWithoutAccountParam } from './urlState.ts';
@@ -352,7 +352,7 @@ export default function HomeRoute() {
             <Show when={overrideAccount()}>
               {account => (
                 <p class="account-override-status">
-                  Exploring <strong>{account().label || account().rawInputs.join(' + ')}</strong> from this
+                  Exploring <strong>{accountDisplayLabel(account())}</strong> from this
                   link — your own current account is unchanged.
                   <button type="button" class="account-override-adopt" onClick={() => pickAccount(account())}>
                     Set as my current account
@@ -390,7 +390,7 @@ export default function HomeRoute() {
                 <div class="account-label">
                   <Show
                     when={solePlayer()?.profileUrl}
-                    fallback={solePlayer()?.name || account().label || account().rawInputs.join(' + ')}
+                    fallback={solePlayer()?.name || accountDisplayLabel(account())}
                   >
                     {url => (
                       <a class="account-profile-link" href={url()} target="_blank" rel="noopener noreferrer" title={`Steam ID ${solePlayer()!.steamid}`}>
@@ -487,7 +487,7 @@ export default function HomeRoute() {
               {account => (
                 <li>
                   <button type="button" onClick={() => selectAccount(account)}>
-                    {myAccount()?.id === account.id ? '★ ' : ''}{account.label || account.rawInputs.join(' + ')}
+                    {myAccount()?.id === account.id ? '★ ' : ''}{accountDisplayLabel(account)}
                   </button>
                   <button type="button" title="Set as my account" onClick={[toggleMyAccount, account]}>
                     {myAccount()?.id === account.id ? '☆ unstar' : '★ star as mine'}

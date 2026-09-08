@@ -21,6 +21,16 @@ export function accountIdFor(members: string[]): string {
   return [...members].sort().join('+');
 }
 
+// How an account names itself on screen: its last-known Steam persona/Family label, falling back
+// to whatever the user actually typed, and finally to the resolved member ids (a `?u=` link's
+// account can carry no label at all until its resolve lands). One helper rather than the
+// `label || rawInputs.join(' + ')` expression hand-repeated per surface — the nav bar's account
+// chip, Home's recents list and a dynamic list's formula all have to name the same account the
+// same way.
+export function accountDisplayLabel(account: AccountSlot): string {
+  return account.label || account.rawInputs.join(' + ') || account.members.join(' + ');
+}
+
 function readRecents(): AccountSlot[] {
   return getPref<AccountSlot[]>(RECENT_ACCOUNTS_KEY, []);
 }

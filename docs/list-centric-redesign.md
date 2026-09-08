@@ -110,6 +110,17 @@ Looking up a game (the nav-bar search box, or a DLC/base-game link inside an ope
 
 The "look up any game" search box moves from being duplicated per-page (today's `gameSearch.ts` on Library/Bundles) to a **single nav-bar-level search**, part of the persistent shell — opening in place on whatever route/list is currently on screen, falling back to `/game/:appid` only from a route with no list context of its own (see the routing section above).
 
+### The account chip
+
+The nav bar carries **who the app is currently showing** (`AccountChip.tsx`), for the same reason every list route carries a hero card: outside Home, nothing on screen said whose library was on screen — not even while a `?u=` link was being explored — and reaching Owned/Wishlist from any other route meant a round trip through Home.
+
+- Avatar + label off `getEffectiveCurrentAccount()`, re-read on `ACCOUNT_CHANGED_EVENT`, so a `?u=` link resolving after mount updates it in place. A 🔗 marker (and a note in its popover) says outright when a link's account is showing rather than the stored one.
+- **Owned and Wishlist render inline beside the chip on a wide viewport, and inside its popover on a narrow one** — they're the two most-visited destinations in the app, worth permanent nav space wherever there's room, and the popover has to carry them for the width where there isn't. Every link carries `?u=` along (`withAccountParam`), or clicking "Owned" while exploring a link would quietly show the stored account's library instead.
+- The popover also switches between recent accounts (same explicit-pick semantics as Home's picker: storing the account consumes the `?u=` override, param and all) and links to Home. It stays deliberately thin next to Home's own account section — no resolving a new identifier, ★ starring, per-account refresh, counts, Family member rows or removal — so it's a nav affordance rather than a second, half-implemented copy of that screen.
+- Both nav popovers (this one and ⚙ Preferences) share `navPopover.ts`'s `bindNavPopover`: `<details>` has no built-in outside-click/Escape close, and the panel is positioned in JS because `.site-nav`'s flex-wrap moves its triggers with viewport width (see that module's own comment for the Galaxy S10 case that ruled out a CSS-only anchor).
+
+**Still Home-only**: the folder/list tree. Jumping between user lists means going back to Home; a switcher popover or a persistent rail is the open question there.
+
 ## Panel: docked, not modal
 
 The side panel becomes a **docked split view**, not an overlay:

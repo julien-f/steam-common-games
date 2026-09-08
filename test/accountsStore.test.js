@@ -218,3 +218,21 @@ test('setAccountOverride: never throws when window is undefined (Node/test envir
   const { setAccountOverride } = store();
   assert.doesNotThrow(() => setAccountOverride(makeAccount('theirs')));
 });
+
+// ── accountDisplayLabel ──────────────────────────────────────────────────────
+
+test('accountDisplayLabel: prefers the cached Steam label', () => {
+  const { accountDisplayLabel } = store();
+  assert.equal(accountDisplayLabel(makeAccount('1', { label: 'Alice', rawInputs: ['alice_url'] })), 'Alice');
+});
+
+test('accountDisplayLabel: falls back to what the user typed, joined for a Family', () => {
+  const { accountDisplayLabel } = store();
+  assert.equal(accountDisplayLabel({ id: 'a+b', members: ['a', 'b'], rawInputs: ['alice', 'bob'], lastUsedAt: 0 }), 'alice + bob');
+});
+
+test('accountDisplayLabel: falls back to the member ids when nothing else is known', () => {
+  // A `?u=` link's account before its resolve lands carries neither a label nor typed inputs.
+  const { accountDisplayLabel } = store();
+  assert.equal(accountDisplayLabel({ id: 'a+b', members: ['a', 'b'], rawInputs: [], lastUsedAt: 0 }), 'a + b');
+});

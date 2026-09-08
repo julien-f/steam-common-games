@@ -4,10 +4,10 @@
 // This is the app's one nav bar/shell now that the legacy pages (app.tsx/library.tsx/
 // bundles.tsx) and the two modules that existed purely to bootstrap them per-page
 // (pageShell.ts's `initPageShell`, and nav.tsx's own `initNav`/cross-page `<nav>`) are all
-// deleted (Phase 7, see docs/list-centric-redesign.md) — this file's own ⚙ Preferences popover
-// open/close/position bindings below (`bindPrefsPopoverClose`/`bindPrefsPopoverPosition`) used
-// to be a deliberate, temporary duplicate of nav.tsx's identically-named pair for exactly that
-// transition period; now that nav.tsx is gone, these are just the one real implementation.
+// deleted (Phase 7, see docs/list-centric-redesign.md). The ⚙ Preferences popover's own
+// open/close/position mechanics used to live here as a deliberate, temporary duplicate of
+// nav.tsx's identically-named pair for exactly that transition period; they're now navPopover.ts's
+// `bindNavPopover`, shared with the account chip's own popover (AccountChip.tsx).
 import { onMount, onCleanup, createEffect, createSignal, For, type JSX } from 'solid-js';
 import { A, useNavigate, useLocation, type RouteSectionProps } from '@solidjs/router';
 import { prefsPopoverPanelHtml, initPrefsPopover } from './prefsPopover.ts';
@@ -20,6 +20,8 @@ import { setPanelParam, setLightboxParam, withAccountParam } from './urlState.ts
 import { syncAccountOverrideFromUrl } from './accountOverride.ts';
 import type { Game } from './types.ts';
 import { ShortcutsModal } from './ShortcutsModal.tsx';
+import { AccountChip } from './AccountChip.tsx';
+import { bindNavPopover } from './navPopover.ts';
 
 // Route-specific behavior (keyboard shortcuts, and now "open this looked-up game") can't be
 // hardcoded at the shell level — different routes have different "list" contexts, or none at all
@@ -68,6 +70,8 @@ const NAV_LINKS: { href: string; label: string; end?: boolean }[] = [
 
 export function AppShell(props: RouteSectionProps): JSX.Element {
   let searchInputEl!: HTMLInputElement;
+  let prefsDetailsEl!: HTMLDetailsElement;
+  let prefsWrapEl!: HTMLDivElement;
   // The `?` shortcuts dialog — see ShortcutsModal.tsx. State lives here because
   // bindPanelKeyboardShortcuts' own `shortcuts` option needs it (that option has been supported
   // all along; nothing has passed it since the pages that owned the old static dialog markup
@@ -146,9 +150,9 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
     });
 
     initPrefsPopover();
-    bindPrefsPopoverClose();
-    const stopPositioning = bindPrefsPopoverPosition();
-    onCleanup(stopPositioning);
+    // The panel is inside the innerHTML prefsPopoverPanelHtml() renders, so it's looked up under
+    // the wrapper rather than ref'd directly.
+    onCleanup(bindNavPopover(prefsDetailsEl, prefsWrapEl.querySelector('.site-nav-prefs-panel') as HTMLElement));
   });
 
   return (
@@ -165,12 +169,13 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           <input ref={searchInputEl} id="app-search-input" type="text" placeholder="Look up any game…" autocomplete="off" />
           <div id="app-search-results" class="game-search-results" hidden />
         </div>
-        <details class="site-nav-prefs">
+        <AccountChip />
+        <details class="site-nav-prefs site-nav-popover" ref={prefsDetailsEl}>
           <summary class="site-nav-link site-nav-prefs-btn" aria-label="Preferences">⚙</summary>
           {/* eslint-disable-next-line solid/no-innerhtml -- prefsPopoverPanelHtml() is this app's
               own static markup for the popover's contents (prefsPopover.ts, which then wires the
               region <select> up imperatively); no external input reaches it. */}
-          <div innerHTML={prefsPopoverPanelHtml()} />
+          <div ref={prefsWrapEl} innerHTML={prefsPopoverPanelHtml()} />
         </details>
       </nav>
 
@@ -191,49 +196,4 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       <ShortcutsModal open={shortcutsOpen()} onClose={() => setShortcutsOpen(false)} />
     </div>
   );
-}
-
-// `<details>` has no built-in "close on outside click/Escape", so it's added by hand; the panel
-// is anchored to the ⚙ button's own live position (`position: fixed`, computed here) rather
-// than a CSS-only anchor, since `.site-nav`'s flex-wrap re-centers its items as a group once
-// they wrap onto more than one line, which a CSS-only anchor can't reliably follow — confirmed
-// live on a real Galaxy S10 (Firefox) as the panel running off-screen to the left before this
-// fix, not just in an emulated-width check (this reasoning, and both functions themselves,
-// used to also exist as a separate, deliberately duplicated copy in the now-deleted nav.tsx,
-// back when the legacy pages still needed its own nav bar's identical popover to work the same
-// way during the transition — see this file's own top-of-file comment).
-function bindPrefsPopoverClose(): void {
-  const details = document.querySelector('.site-nav-prefs') as HTMLDetailsElement;
-  const onClick = (e: MouseEvent) => {
-    if (details.open && !details.contains(e.target as Node)) details.open = false;
-  };
-  const onKeydown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && details.open) details.open = false;
-  };
-  document.addEventListener('click', onClick);
-  document.addEventListener('keydown', onKeydown);
-}
-
-const PREFS_PANEL_MARGIN = 12;
-function positionPrefsPanel(details: HTMLDetailsElement, panel: HTMLElement): void {
-  const btnRect = details.querySelector('summary')!.getBoundingClientRect();
-  const panelWidth = panel.getBoundingClientRect().width;
-  const maxLeft = window.innerWidth - panelWidth - PREFS_PANEL_MARGIN;
-  const left = Math.min(Math.max(btnRect.right - panelWidth, PREFS_PANEL_MARGIN), Math.max(maxLeft, PREFS_PANEL_MARGIN));
-  panel.style.left = `${left}px`;
-  panel.style.top = `${btnRect.bottom + 4}px`;
-}
-
-function bindPrefsPopoverPosition(): () => void {
-  const details = document.querySelector('.site-nav-prefs') as HTMLDetailsElement;
-  const panel = document.querySelector('.site-nav-prefs-panel') as HTMLElement;
-  const reposition = () => { if (details.open) positionPrefsPanel(details, panel); };
-  details.addEventListener('toggle', reposition);
-  window.addEventListener('resize', reposition);
-  window.addEventListener('scroll', reposition, true);
-  return () => {
-    details.removeEventListener('toggle', reposition);
-    window.removeEventListener('resize', reposition);
-    window.removeEventListener('scroll', reposition, true);
-  };
 }

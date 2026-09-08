@@ -78,35 +78,37 @@ body {
   cursor: default;
 }
 
-/* ⚙ Preferences popover (public/AppShell.tsx) — a native <details> for a free, accessible
-   open/close toggle; outside-click/Escape closing is added by hand (bindPrefsPopoverClose)
-   since <details> has no built-in support for either. */
+/* Nav-bar popovers — the ⚙ Preferences panel (AppShell.tsx) and the account chip's
+   (AccountChip.tsx). Both are native <details> for a free, accessible open/close toggle;
+   outside-click/Escape closing and the panel's own placement are added by hand in
+   navPopover.ts's bindNavPopover, since <details> has neither. */
 .site-nav-prefs-btn { cursor: pointer; list-style: none; }
 .site-nav-prefs-btn::-webkit-details-marker { display: none; }
-.site-nav-prefs-panel {
-  /* `position: fixed` with `top`/`left` computed in JS (positionPrefsPanel, AppShell.tsx) rather
-     than anchored via CSS at all — an earlier version anchored under the whole nav bar (centered via
-     `left: 50%` on `.site-nav`, its positioning root) specifically because `.site-nav`'s
-     flex-wrap can put the ⚙ button on its own row at an x-position that shifts with viewport
-     width, and anchoring the panel to the button directly used to mean it could run off-screen
-     (confirmed live on a real Galaxy S10/Firefox). That traded away anchoring near the button
-     the user actually clicked, for guaranteed on-screen placement — the JS version keeps both:
-     it anchors to the ⚙ button's own live position, then clamps within the viewport with a
-     margin, recomputed on every open/resize/scroll while open, so it never needs to fall back to
-     a fixed, button-independent position at all. */
+.site-nav-popover-panel {
+  /* `position: fixed` with `top`/`left` computed in JS (navPopover.ts) rather than anchored via
+     CSS at all — an earlier version anchored under the whole nav bar (centered via `left: 50%` on
+     `.site-nav`, its positioning root) specifically because `.site-nav`'s flex-wrap can put a
+     trigger on its own row at an x-position that shifts with viewport width, and anchoring the
+     panel to the trigger directly used to mean it could run off-screen (confirmed live on a real
+     Galaxy S10/Firefox). That traded away anchoring near the button the user actually clicked,
+     for guaranteed on-screen placement — the JS version keeps both: it anchors to the trigger's
+     own live position, then clamps within the viewport with a margin, recomputed on every
+     open/resize/scroll while open, so it never needs to fall back to a fixed,
+     trigger-independent position at all. */
   position: fixed;
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--r);
   padding: 10px 12px;
-  /* A fixed width (not just min-width) — a bare <select> otherwise sizes itself off its widest
-     <option> text (here, the long "Auto-detect (Europe / Germany (EUR))" entry), which grew
-     this panel wide enough to overflow the viewport on its own. `max-width` is the safety net
-     for anything narrower still (down to the ~320px floor this app otherwise targets). */
-  width: 200px;
+  /* A fixed width (not just min-width) per panel — the prefs panel's bare <select> otherwise
+     sizes itself off its widest <option> text (the long "Auto-detect (Europe / Germany (EUR))"
+     entry), which grew it wide enough to overflow the viewport on its own. `max-width` is the
+     safety net for anything narrower still (down to the ~320px floor this app otherwise
+     targets). */
   max-width: calc(100vw - 24px);
   z-index: 20;
 }
+.site-nav-prefs-panel { width: 200px; }
 .site-nav-prefs-row { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text1); }
 .site-nav-prefs-row select {
   width: 100%;
@@ -114,6 +116,50 @@ body {
   background: var(--bg3); color: var(--text0);
   border: 1px solid var(--border); border-radius: 4px;
   font-size: 13px;
+}
+
+/* Account chip (AccountChip.tsx) — who the app is currently showing, plus that account's
+   Owned/Wishlist lists, from every route. The two list links are inline here on a wide viewport
+   and inside the popover on a narrow one (see the 768px block below): they're the app's two
+   most-visited destinations, worth permanent nav space wherever there's room for it. */
+.site-nav-account { display: flex; align-items: center; gap: 4px; }
+.account-chip-links { display: flex; gap: 4px; }
+.account-chip-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer; list-style: none;
+  max-width: 180px;
+}
+.account-chip-btn::-webkit-details-marker { display: none; }
+.account-chip-avatar { width: 20px; height: 20px; border-radius: 50%; display: block; flex-shrink: 0; }
+.account-chip-avatar--empty { background: var(--bg0); }
+.account-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-chip-explore { font-size: 11px; flex-shrink: 0; }
+.account-chip-panel { width: 240px; display: flex; flex-direction: column; gap: 8px; }
+.account-chip-note { font-size: 12px; color: var(--text1); line-height: 1.5; }
+.account-chip-note strong { color: var(--text0); }
+.account-chip-action {
+  display: block; margin-top: 4px; padding: 0;
+  background: none; border: none; cursor: pointer;
+  color: var(--accent2); font-size: 12px; text-align: left;
+}
+.account-chip-section {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text2);
+}
+.account-chip-recents { display: flex; flex-direction: column; gap: 2px; list-style: none; }
+.account-chip-recent {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 5px 6px; background: none; border: none; border-radius: 4px; cursor: pointer;
+  color: var(--text0); font-size: 13px; text-align: left;
+}
+.account-chip-recent:hover { background: var(--bg1); }
+/* The popover's own copies of Owned/Wishlist exist for the narrow layout below, where the inline
+   pair is hidden — showing both at once would just be the same two links twice. */
+.account-chip-panel-links { display: none; gap: 10px; }
+.account-chip-panel-link { color: var(--accent2); text-decoration: none; font-size: 13px; }
+.account-chip-panel-link:hover { text-decoration: underline; }
+@media (max-width: 768px) {
+  .account-chip-links { display: none; }
+  .account-chip-panel-links { display: flex; }
 }
 
 /* Header */
