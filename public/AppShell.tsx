@@ -16,7 +16,7 @@ import { initPanel, isPanelOpen, panelClose, panelStepHero } from './panel.tsx';
 import { bindPanelKeyboardShortcuts } from './panelKeyboard.ts';
 import { initGameSearch } from './gameSearch.ts';
 import { addRecentGame } from './recentGames.ts';
-import { setPanelParam, withAccountParam } from './urlState.ts';
+import { setPanelParam, setLightboxParam, withAccountParam } from './urlState.ts';
 import { syncAccountOverrideFromUrl } from './accountOverride.ts';
 import type { Game } from './types.ts';
 
@@ -91,7 +91,16 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
   }
 
   onMount(() => {
-    initLightbox({});
+    initLightbox({
+      // `&shot=<id>` deep links: the lightbox reports every open/step/close, and this writes it
+      // next to the panel's own `?game=`. Wiring this back is what makes a copied link reopen the
+      // exact screenshot again — `setLightboxParam` had no caller at all since the redesign, so
+      // the param was parsed and ordered but never written.
+      onParamChange: shot => setLightboxParam(shot),
+      // ↑/↓ inside the lightbox steps to the previous/next game in whatever list is on screen,
+      // same handler the panel's own ↑/↓ uses.
+      onGameNav: dir => { routeHandlers.stepGame?.(dir === 1 ? 1 : -1); },
+    });
     initPanel({
       onClose: () => {
         routeHandlers.onGameClose?.();

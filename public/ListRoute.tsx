@@ -67,6 +67,7 @@ import { renderPanelNav as renderPanelNavShared, stepGameList } from './panelNav
 import { createRowStore } from './rowStore.ts';
 import { createStaleGuard } from './staleGuard.ts';
 import { createStreamBatcher } from './streamBatcher.ts';
+import { openLightbox } from './lightbox.tsx';
 import {
   panelOpen, panelClose, isPanelOpen, getPanelGame, pickRandomFrom, clearRandomQueue, renderPanelBody,
 } from './panel.tsx';
@@ -506,6 +507,11 @@ export default function ListRoute() {
     // second open. Every other kind keeps the existing `?game=` contextual param instead.
     if (kind === 'recent') navigate(withAccountParam(`/game/${resolved.appid}`), { replace: true });
     else setPanelParam(resolved.appid);
+    // A `&shot=` deep link into a row whose details are already loaded (a revisit, or this
+    // route's own fast path for an appid-only navigation) never reaches the post-stream replay
+    // below, so try here too — restorePendingShot is a no-op when there's nothing pending or no
+    // media yet.
+    restorePendingShot();
   }
 
   function pickRandomGame(): void {
@@ -530,6 +536,21 @@ export default function ListRoute() {
   // of its own falls through to /game instead — see AppShell.tsx's openGameGlobally); `openGame`
   // already resolves `rowStore.getRow(appid) ?? game` and no-ops the nav bar for
   // `game.standalone` (panelNav.ts), so there's no extra plumbing needed here beyond that.
+  // A `&shot=<id>` deep link, captured at load time and applied once the open game actually has
+  // media to index into. Two steps, because opening the panel is what *clears* `shot` from the
+  // live URL (setPanelParam) and because a row's screenshots only exist after its details have
+  // streamed in — so the value is read up front and replayed afterwards, the same shape the
+  // deleted pages' own restorePanelFromUrl used.
+  let pendingShot: string | null = null;
+  function restorePendingShot(): void {
+    if (!pendingShot) return;
+    const game = getPanelGame();
+    if (!game || !game.details) return; // no media yet — a later call replays it
+    const shot = pendingShot;
+    pendingShot = null;
+    openLightbox(game, shot);
+  }
+
   async function openStandaloneInPlace(appid: number): Promise<void> {
     const token = ++standaloneLookupToken;
     if (!Number.isInteger(appid) || appid <= 0) { setStatusText('Invalid game id.'); return; }
@@ -550,6 +571,7 @@ export default function ListRoute() {
       // `App <appid>` placeholder, which must never reach the stored recents list as if it were
       // a real title (see load()'s recents mapping below).
       addRecentGame(game.appid, data.meta?.name || '', data.meta?.capsule || null);
+      restorePendingShot();
     } catch (err) {
       if (token !== standaloneLookupToken) return;
       if (getPanelGame() === game) setStatusText(`Lookup failed: ${(err as Error).message}`);
@@ -638,7 +660,14 @@ export default function ListRoute() {
       // position stuck on screen, and a crash on Previous/Next (confirmed live before this fix:
       // `list[(idx - 1 + list.length) % list.length]` with `idx = -1, list = []` reads `list[NaN]`,
       // and onOpen(undefined) throws). onFlush below runs right after the batch instead.
-      if (isPanelOpen() && getPanelGame()?.appid === row.appid) renderPanelBody(row);
+      if (isPanelOpen() && getPanelGame()?.appid === row.appid) {
+        renderPanelBody(row);
+        // A `&shot=` deep link waits on *this* row's media, not the whole stream: replaying it
+        // only once every game in the list had finished meant a 115-game wishlist sat for ~20
+        // seconds with the panel open and the screenshot the link pointed at still closed
+        // (measured live before this call existed).
+        restorePendingShot();
+      }
     },
     isStale: gen => loadGuard.isStale(gen),
     onFlush: () => {
@@ -1187,6 +1216,12 @@ export default function ListRoute() {
     // before the streamTargets-empty early return below, since a first-ever /game/:appid lookup
     // can arrive with an otherwise-empty recents list. Only the *first* load needs to do this
     // here — a later appid-only change is handled by load()'s own fast path above instead.
+    // Only ever *set* by a load, never cleared: opening the panel strips `shot` from the live
+    // URL (setPanelParam), and this route re-runs load() for reasons of its own (an appid-only
+    // navigation, an account change) — a later pass reading the by-then-stripped URL would
+    // otherwise wipe a value the first pass hasn't replayed yet. Cleared only by the replay.
+    const shotParam = new URLSearchParams(location.search).get('shot');
+    if (shotParam) pendingShot = shotParam;
     if (kind === 'recent') {
       if (params.appid) openOrAddRecentGame(Number(params.appid));
     } else {
@@ -1212,6 +1247,8 @@ export default function ListRoute() {
     if (kind === 'bundle' && resolvedBundleGames) loadBundlePrices(resolvedBundleGames, gen); // ditto
     if (stampsOwnership) loadMyOwnership(gen); // ditto
     await streamGameDetails(streamTargets, gen);
+    if (loadGuard.isStale(gen)) return;
+    restorePendingShot(); // now that the open game's screenshots/videos have actually arrived
   }
 
   onMount(() => {
