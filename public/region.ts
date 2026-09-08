@@ -122,6 +122,16 @@ export function getStoredRegion(): string {
 // Wishlist tab dropped their own inline pickers once that existed), but this stays a plain
 // broadcast rather than nav.js reaching into those pages directly, so any future picker (or a
 // synced update from a future Steam-auth account) needs to know nothing about who's listening.
+// Display label for an already-resolved region code (i.e. what resolveRegion returned, never
+// AUTO_COUNTRY) — backs the read-only "Prices in ⟨region⟩" readouts next to the app's price
+// tables, which state which region's prices are on screen without offering a second place to
+// change it (the ⚙ Preferences popover owns that). Falls back to the bare code for a region
+// that isn't in the curated list: detectCountry only ever returns codes from it, but a code
+// stored by an older/other version of the app shouldn't render as nothing.
+export function regionLabel(code: string): string {
+  return COUNTRY_OPTIONS.find(c => c.code === code)?.label ?? code;
+}
+
 export const REGION_CHANGED_EVENT = 'scg:region-changed';
 
 export function setStoredRegion(value: string): void {

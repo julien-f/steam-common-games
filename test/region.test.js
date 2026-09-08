@@ -4,7 +4,7 @@ const { test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   COUNTRY_OPTIONS, TIMEZONE_COUNTRY, detectCountry, AUTO_COUNTRY,
-  REGION_CHANGED_EVENT, getStoredRegion, setStoredRegion, resolveRegion,
+  REGION_CHANGED_EVENT, getStoredRegion, setStoredRegion, resolveRegion, regionLabel,
 } = require('../public/region.ts');
 
 // region.js reads a handful of global-scoped APIs live on every call (no module-level state of
@@ -144,4 +144,10 @@ test('resolveRegion: passes a real country code straight through', () => {
 test('resolveRegion: resolves AUTO_COUNTRY to a live detectCountry() result', () => {
   stubTimeZone('Asia/Tokyo');
   assert.equal(resolveRegion(AUTO_COUNTRY), 'JP');
+});
+
+test('regionLabel: resolves a curated code to its label, and passes an unknown one through', () => {
+  assert.equal(regionLabel('DE'), 'Europe / Germany (EUR)');
+  assert.equal(regionLabel('US'), 'United States (USD)');
+  assert.equal(regionLabel('ZZ'), 'ZZ');
 });

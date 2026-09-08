@@ -2121,6 +2121,9 @@ kbd {
    Server-side caching runs for weeks (default.env's LIBRARY_CACHE_TTL_MINUTES), so how old the
    data is gets stated outright, with the control that fixes it sitting right next to the fact. */
 .bundles-updated { font-size: 11px; color: var(--text2); }
+/* Which region's prices are on screen — stated, never editable here: the ⚙ Preferences popover
+   owns the setting, and a second control would be one more thing to keep in sync. */
+.region-readout { font-size: 11px; color: var(--text2); }
 .account-updated {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   font-size: 11px; color: var(--text2); margin-top: 4px;

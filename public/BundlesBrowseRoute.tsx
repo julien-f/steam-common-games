@@ -34,7 +34,7 @@ import {
   toBundleRow, fmtBundleDateTime, fmtBundleDatePart, fmtBundleTimePart, bundleUrgency, shopHue,
   type BundleListItem, type BundleRow,
 } from './bundleRows.ts';
-import { getStoredRegion, resolveRegion } from './region.ts';
+import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { setBrowsedBundles } from './bundleBrowseStore.ts';
 import { restoreTableView, shareTableView, resetTableView } from './tableViewPrefs.ts';
 import { createStaleGuard } from './staleGuard.ts';
@@ -286,6 +286,15 @@ export default function BundlesBrowseRoute() {
     }
   }
 
+  // See ListRoute's own listener — the ⚙ popover broadcasts, and every surface showing prices
+  // has to react or silently keep showing the previous region's.
+  const [regionCode, setRegionCode] = createSignal(resolveRegion(getStoredRegion()));
+  onMount(() => {
+    const onRegionChange = () => { setRegionCode(resolveRegion(getStoredRegion())); void load(); };
+    window.addEventListener(REGION_CHANGED_EVENT, onRegionChange);
+    onCleanup(() => window.removeEventListener(REGION_CHANGED_EVENT, onRegionChange));
+  });
+
   onMount(() => load());
   onMount(() => setBaseTitle('Bundles'));
   onCleanup(() => setBaseTitle(null));
@@ -303,6 +312,7 @@ export default function BundlesBrowseRoute() {
         <Show when={fetchedAt() !== undefined}>
           <span class="bundles-updated">Updated {fmtAge(fetchedAt())}</span>
         </Show>
+        <span class="region-readout" title="Change it in ⚙ Preferences">Prices in {regionLabel(regionCode())}</span>
         <button
           type="button"
           class="btn btn-ghost btn-sm"

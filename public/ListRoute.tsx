@@ -82,7 +82,7 @@ import {
 } from './bundleRows.ts';
 import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from './priceLoading.ts';
-import { getStoredRegion, resolveRegion } from './region.ts';
+import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
 import { setBaseTitle } from './pageTitle.ts';
 import type { Game, Rating, Hltb, GameMeta, ProtonDb, GameList } from './types.ts';
@@ -283,6 +283,10 @@ export default function ListRoute() {
   // anyway, so per-row refreshing would add friction with no matching benefit. Re-prices whatever
   // is currently loaded — no re-resolution and no re-streaming of ratings/HLTB/tags.
   const [refreshingPrices, setRefreshingPrices] = createSignal(false);
+  // Which region's prices are on screen. Read-only here on purpose — the ⚙ Preferences popover
+  // is the one place it's changed (a second control would be a second thing to keep in sync);
+  // this just says which one is in effect, since the currency alone doesn't identify it.
+  const [regionCode, setRegionCode] = createSignal(resolveRegion(getStoredRegion()));
   // Oldest price write time seen across this load's price calls (a wishlist chunks into several),
   // null once anything in the batch was fetched fresh. `undefined` = nothing loaded yet, which
   // renders no readout at all rather than a premature "just now".
@@ -1213,6 +1217,21 @@ export default function ListRoute() {
   onMount(() => {
     const unregister = registerRouteHandlers({ pickRandom: pickRandomGame, stepGame, openGame: handleOpenGameRequest, onGameClose: handleGameClose, refreshGame });
     onCleanup(unregister);
+
+    // The region preference lives in the nav bar's ⚙ popover, which knows nothing about who's
+    // showing prices — it just broadcasts. Without this listener (lost with bundles.tsx/
+    // library.tsx, which both had one) picking a new region left every price on screen in the
+    // old currency until something else happened to reload, with no indication anything was
+    // stale. A wishlist only needs its prices re-fetched; a bundle needs a full reload, because
+    // its Tier Price comes from the bundle fetch itself (fetchBundleById's own `country`), not
+    // from the price lookup.
+    const onRegionChange = () => {
+      setRegionCode(resolveRegion(getStoredRegion()));
+      if (kind === 'wishlist') void loadWishlistPrices(rowsStore.map(r => ({ appid: r.appid })), loadGuard.current());
+      else if (kind === 'bundle') void load();
+    };
+    window.addEventListener(REGION_CHANGED_EVENT, onRegionChange);
+    onCleanup(() => window.removeEventListener(REGION_CHANGED_EVENT, onRegionChange));
   });
 
   // A plain createEffect, not onMount — /lists/bundle/:bundleId, the generic /lists/:listId, and
@@ -1392,6 +1411,7 @@ export default function ListRoute() {
             <Show when={priceFetchedAt() !== undefined}>
               <span>Prices updated {fmtAge(priceFetchedAt())}</span>
             </Show>
+            <span class="region-readout" title="Change it in ⚙ Preferences">Prices in {regionLabel(regionCode())}</span>
             <button
               type="button"
               class="btn btn-ghost btn-sm"
