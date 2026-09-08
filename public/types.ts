@@ -91,6 +91,9 @@ export interface Game extends PriceFields {
   dlcPartial?: ({ appid: number; name: string; capsule: string; releaseDate: string; comingSoon: boolean } | undefined)[];
   // achievements (library.js) — undefined = not fetched, null = failed
   achievements?: Achievements | null;
+  // Which account `achievements` was fetched for (achievementsAccountKey of its members, '' for
+  // none) — progress is per account, so a result is only reusable while this still matches.
+  achievementsAccountId?: string;
   achievementsLoading?: boolean;
   // When the oldest of this game's cached details (rating/HLTB/store metadata/tags/ProtonDB) was
   // written server-side, epoch ms — null when they were fetched fresh, undefined before any

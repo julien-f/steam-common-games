@@ -6,6 +6,8 @@ import { buildMediaItems } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
 import { getStoredRegion, resolveRegion } from './region.ts';
 import { getMyOwnershipStatus } from './myOwnership.ts';
+import { getEffectiveCurrentAccount } from './accountsStore.ts';
+import { achievementsAccountKey, achievementsRequestUrl, achievementsSteamUrl } from './achievementsRequest.ts';
 import { setGameTitle } from './pageTitle.ts';
 import { withAccountParam } from './urlState.ts';
 import type { Game } from './types.ts';
@@ -23,7 +25,6 @@ export interface PanelOptions {
   onNavigateGame?: (appid: number, name: string) => void;
   onClose?: (opts?: { preserveUrl?: boolean }) => void;
   pricesHandledByHost?: boolean | ((game: Game) => boolean);
-  showAchievements?: boolean;
   enableTagFilters?: boolean;
   gameHref?: (appid: string | number) => string;
 }
@@ -258,6 +259,7 @@ async function handlePanelRefresh() {
       panelOptions.onRefresh(game),
       loadNews(game, { force: true }),
       loadPrice(game, { force: true }), // no-op (see loadPrice) if this game is priced by the host instead
+      loadAchievements(game, { force: true }),
       game.dlc !== undefined ? loadDlc(game, { force: true }) : null,
     ]);
     // Explicit, rather than relying on loadNews/loadPrice/loadDlc's own renderPanelBody calls
@@ -412,6 +414,56 @@ async function loadNews(game: Game, { force = false } = {}) {
   }
 }
 
+// Achievements — the same lazy, once-per-game shape as news above, and for the same reason:
+// nothing outside this panel shows them (no table column, nothing to sort or filter on), so
+// fetching them for every game in a whole loaded list would be paying for games nobody opens.
+//
+// Unlike news, the result is per *account*: `achievements.achievements[].achieved` is one
+// specific slot's progress. So the fetch follows `getEffectiveCurrentAccount()` (a `?u=` link
+// being explored beats the stored account, matching the ownership badges right above it in this
+// same panel), and the account it was fetched for is remembered on the game object alongside the
+// result — switching accounts re-fetches instead of showing the previous account's progress as
+// if it were yours. With no account at all the list itself is still fetched and shown: names,
+// descriptions, icons and community rarity are store metadata, and the panel already renders
+// that case without claiming any progress (`playerCount: 0`).
+//
+// This used to live in the host page (the deleted library.tsx) purely because only the host knew
+// which accounts were loaded — with one app-wide current account that's no longer true, and the
+// `showAchievements` opt-in that went with it is gone too: it existed to keep the section off the
+// old comparison page, whose owner *groups* had no single account to ask about.
+async function loadAchievements(game: Game, { force = false } = {}) {
+  const members = getEffectiveCurrentAccount()?.members ?? [];
+  const accountKey = achievementsAccountKey(members);
+  // Already loaded (or already failed) for this same account this session.
+  if (game.achievements !== undefined && game.achievementsAccountId === accountKey && !force) return;
+  // The detail stream already told us this game has no achievements at all — the route would
+  // answer the same thing from its own short-circuit, but only after a round trip, and "no
+  // achievements" is a large share of any real library.
+  if (game.details?.meta?.achievementCount === 0) {
+    // The same empty payload the route itself would return here — NOT `null`, which this panel
+    // renders as "Couldn't load achievements." rather than "This game has no achievements."
+    game.achievements = { achievements: [], total: 0, unlocked: 0, private: false, playerCount: members.length, steamUrl: null };
+    game.achievementsAccountId = accountKey;
+    if (panelGame() === game) renderPanelBody(game);
+    return;
+  }
+  game.achievementsLoading = true;
+  if (panelGame() === game) renderPanelBody(game);
+  try {
+    const res = await fetch(achievementsRequestUrl(game.appid, members, { force }));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Achievements lookup failed');
+    data.steamUrl = achievementsSteamUrl(game.appid, members);
+    game.achievements = data;
+  } catch {
+    game.achievements = null;
+  } finally {
+    game.achievementsAccountId = accountKey;
+    game.achievementsLoading = false;
+    if (panelGame() === game) renderPanelBody(game); // no-op if the panel moved on mid-fetch
+  }
+}
+
 // DLC list — like news/achievements, kept off `game.details` and fetched lazily by
 // panel.tsx itself, but unlike those two it's not even fetched on panelOpen: the DLC card's
 // collapsed header only needs `game.details.meta.dlc`'s bare appid *count* (already present
@@ -549,6 +601,7 @@ export function panelOpen(game: Game, { keepHistory = false } = {}) {
   panelPrevFocus = document.activeElement as HTMLElement | null;
   document.getElementById('panel-body')!.scrollTop = 0;
   loadNews(game); // no-op (see loadNews) if this game's news was already fetched this session
+  loadAchievements(game); // no-op (see loadAchievements) if already fetched for this account
   loadPrice(game); // no-op (see loadPrice) if this game is priced by the host, or already loaded
   loadOwnership(game); // see loadOwnership — always rechecked, but myOwnership.ts's own cache makes a repeat check free
   document.getElementById('game-panel')!.classList.add('open');
@@ -866,10 +919,8 @@ function setAchievementsFilterFor(appid: number, filter: string) {
   setAchievementsFilter(next);
 }
 
-// Achievements section — opt-in via panelOptions.showAchievements (only the Library
-// Explorer sets it; the comparison page's groups have no single well-defined "player" to
-// fetch progress for). `g.achievements` is loaded and attached by the host page itself
-// (library.ts), asynchronously and separately from the rating/HLTB/tags SSE stream, since
+// Achievements section. `g.achievements` is loaded by loadAchievements above, asynchronously
+// and separately from the rating/HLTB/tags SSE stream, since
 // the achievement *list* only depends on the appid but progress depends on which account(s)
 // are currently loaded — `g` carries `achievementsLoading` while that fetch is in flight,
 // then either `achievements` (the server's `{ achievements, total, unlocked, private,
@@ -879,7 +930,6 @@ function setAchievementsFilterFor(appid: number, filter: string) {
 // below.
 function AchievementsSection(props: { game: Game }): JSX.Element {
   const g = props.game;
-  if (!panelOptions.showAchievements) return null;
   if (g.achievementsLoading) {
     return (
       <div class="panel-section" id="panel-section-achievements">
@@ -1537,7 +1587,7 @@ function PanelRest(): JSX.Element {
   // rendered `<Component/>` call's own truthiness (always truthy regardless of what it
   // renders to, including `null` — see hasBaseGame's own comment above for the same pitfall).
   const hasNewsSection = g.newsLoading || (g.newsError && !g.news) || !!(g.news && g.news.length);
-  const hasAchievementsSection = !!panelOptions.showAchievements && (g.achievementsLoading || g.achievements !== undefined);
+  const hasAchievementsSection = g.achievementsLoading || g.achievements !== undefined;
   const hasDlcSection = !!(meta?.dlc && meta.dlc.length);
   const subnavItems = [
     hltbDetail && { label: 'HLTB', target: 'panel-section-hltb' },
