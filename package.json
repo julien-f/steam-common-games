@@ -11,7 +11,8 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test": "DB_FILE= node --test test/*.test.js test/*.test.ts",
-    "cache:clear": "node scripts/cache-clear.js"
+    "cache:clear": "node scripts/cache-clear.js",
+    "lint": "eslint public"
   },
   "dependencies": {
     "@solidjs/router": "^1.0.0",
@@ -27,7 +28,13 @@
     "node": ">=22.13.0"
   },
   "devDependencies": {
+    "@babel/core": "^8.0.1",
+    "@babel/eslint-parser": "^8.0.1",
+    "@babel/plugin-syntax-jsx": "^8.0.1",
+    "@babel/preset-typescript": "^8.0.1",
     "concurrently": "^10.0.5",
+    "eslint": "^10.10.0",
+    "eslint-plugin-solid": "^0.17.0",
     "morgan": "^1.12.0",
     "supertest": "^7.2.2",
     "typescript": "^7.0.2",

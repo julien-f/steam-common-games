@@ -49,7 +49,7 @@
 // each mount and torn down on unmount via onCleanup — library.tsx's page loads exactly once, but
 // a router-driven route mounts/unmounts every time its path is navigated to/away from.
 import { onMount, onCleanup, createSignal, createRoot, createEffect, on, batch, For, Show, type JSX } from 'solid-js';
-import { createStore } from 'solid-js/store';
+import { createStore, produce } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { A, useParams, useLocation, useNavigate } from '@solidjs/router';
 import { createTableState, DataTableView } from '@vates/data-table-solid';
@@ -69,7 +69,7 @@ import { createStaleGuard } from './staleGuard.ts';
 import { createStreamBatcher } from './streamBatcher.ts';
 import { openLightbox } from './lightbox.tsx';
 import {
-  panelOpen, panelClose, isPanelOpen, getPanelGame, pickRandomFrom, clearRandomQueue, clearAllRandomQueues, renderPanelBody,
+  panelOpen, panelClose, isPanelOpen, getPanelGame, pickRandomFrom, clearRandomQueue, clearAllRandomQueues,
 } from './panel.tsx';
 import { setPanelParam, urlWithParams, withAccountParam } from './urlState.ts';
 import { setPref } from './prefs.ts';
@@ -351,7 +351,14 @@ export default function ListRoute() {
   const [bundleResolvedCount, setBundleResolvedCount] = createSignal(0);
 
   const [rowsStore, setRowsStore] = createStore<Game[]>([]);
-  const rowStore = createRowStore<Game>((idx, updater) => setRowsStore(idx, updater));
+  const rowStore = createRowStore<Game>(rowsStore, (idx, updater) => setRowsStore(idx, updater));
+  // Games opened as a standalone aside rather than as one of this list's own rows (a nav-bar
+  // lookup, or a DLC/base-game hop out of the open panel — see openStandaloneInPlace). Their data
+  // arrives asynchronously and the panel renders it per field, so they need to live in a store
+  // just as much as a table row does: a plain `game.details = data` write would reach nothing.
+  // Keyed by appid rather than an array — nothing lists or orders these, they're only ever looked
+  // up by the one appid being opened.
+  const [standaloneRows, setStandaloneRows] = createStore<Record<number, Game>>({});
   const loadGuard = createStaleGuard();
   let table: TableState<Game> | null = null;
   let disposeTable: (() => void) | null = null;
@@ -516,10 +523,13 @@ export default function ListRoute() {
     renderPanelNavShared({ table: activeTable(), game, getGameList, onOpen: openGame, onReroll: pickRandomGame });
   }
 
-  function openGame(game: Game, { isRandom = false, keepHistory = false }: { isRandom?: boolean; keepHistory?: boolean } = {}): void {
+  function openGame(game: Game, { isRandom = false }: { isRandom?: boolean } = {}): void {
     if (!isRandom) clearRandomQueue(randomQueueKey());
-    const resolved = rowStore.getRow(game.appid) ?? game;
-    panelOpen(resolved, { keepHistory });
+    const resolved = rowStore.getRow(game.appid) ?? standaloneRows[game.appid] ?? game;
+    // No "keep the panel's DLC trail" flag to pass: panel.tsx tracks its own hops now (see
+    // `pendingHopAppid` there), which is the only way the `/game/:appid` path — where the open
+    // happens a whole route navigation later, from load() — could preserve one at all.
+    panelOpen(resolved);
     renderPanelNav(resolved);
     // 'recent' is the one kind whose address IS the focused game (see this file's own header
     // comment) — a row click/prev-next/random pick here updates the path, not a `?game=` query
@@ -579,21 +589,23 @@ export default function ListRoute() {
     if (!Number.isInteger(appid) || appid <= 0) { setStatusText('Invalid game id.'); return; }
     // No `App <appid>` placeholder in the data — panel.tsx's own title renders that fallback, so
     // the empty name here stays honest ("not resolved yet") for everything else that reads it.
-    const game = { appid, name: '', loading: true, details: null, standalone: true } as Game;
+    setStandaloneRows(appid, { appid, name: '', loading: true, details: null, standalone: true } as Game);
+    const game = standaloneRows[appid];
     openGame(game);
     try {
       const res = await fetch(`/api/game-details/${appid}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Lookup failed');
       if (token !== standaloneLookupToken) return; // a newer lookup has since taken over
-      game.details = data;
-      game.loading = false;
-      if (data.meta?.name) game.name = data.meta.name;
-      if (getPanelGame() === game) renderPanelBody(game);
-      // `data.meta?.name`, not `game.name` — the latter falls back to this function's own
+      setStandaloneRows(appid, produce(draft => {
+        draft.details = data;
+        draft.loading = false;
+        if (data.meta?.name) draft.name = data.meta.name;
+      }));
+      // `data.meta?.name`, not `game.name` — the latter falls back to panel.tsx's own
       // `App <appid>` placeholder, which must never reach the stored recents list as if it were
       // a real title (see load()'s recents mapping below).
-      addRecentGame(game.appid, data.meta?.name || '', data.meta?.capsule || null);
+      addRecentGame(appid, data.meta?.name || '', data.meta?.capsule || null);
       restorePendingShot();
     } catch (err) {
       if (token !== standaloneLookupToken) return;
@@ -613,7 +625,7 @@ export default function ListRoute() {
     const existing = rowStore.getRow(appid);
     if (existing) { openGame(existing); return; }
     if (!Number.isInteger(appid) || appid <= 0) { setStatusText('Invalid game id.'); return; }
-    const placeholder = { appid, name: '', loading: true, details: null } as unknown as Game;
+    const placeholder: Game = { appid, name: '', loading: true, details: null };
     const rows = [placeholder, ...rowsStore];
     setRowsStore(rows);
     rowStore.load(rows);
@@ -672,19 +684,18 @@ export default function ListRoute() {
         // its place in the list rather than jumping to the front on every visit.
         renameRecentGame(row.appid, row.name, capsule);
       }
-      // renderPanelBody reads straight off `row` (the plain panelRows copy mutateRow already
-      // updated synchronously above), so it's always current regardless of batching. renderPanelNav
-      // is NOT called here, though, even for this exact row — apply() runs inside flushNow()'s own
-      // batch(), and renderPanelNav's own list comes from the *table's* processedData(), a Solid
-      // memo derived from rowsStore; batch() defers that recomputation until the batch itself
-      // returns, so a read here would still see this row (and anything else applied earlier in
-      // this same flush) as it was *before* this flush — for a flush that's just this one row
-      // (exactly the case a fresh single-game lookup hits), that means an empty list, a "0 / 0"
-      // position stuck on screen, and a crash on Previous/Next (confirmed live before this fix:
-      // `list[(idx - 1 + list.length) % list.length]` with `idx = -1, list = []` reads `list[NaN]`,
-      // and onOpen(undefined) throws). onFlush below runs right after the batch instead.
+      // The open panel needs no notification of the mutation above — it reads this row's fields
+      // straight off the store. renderPanelNav is NOT called here either, even for this exact
+      // row: apply() runs inside flushNow()'s own batch(), and renderPanelNav's own list comes
+      // from the *table's* processedData(), a Solid memo derived from rowsStore; batch() defers
+      // that recomputation until the batch itself returns, so a read here would still see this row
+      // (and anything else applied earlier in this same flush) as it was *before* this flush — for
+      // a flush that's just this one row (exactly the case a fresh single-game lookup hits), that
+      // means an empty list, a "0 / 0" position stuck on screen, and a crash on Previous/Next
+      // (confirmed live before this fix: `list[(idx - 1 + list.length) % list.length]` with
+      // `idx = -1, list = []` reads `list[NaN]`, and onOpen(undefined) throws). onFlush below runs
+      // right after the batch instead.
       if (isPanelOpen() && getPanelGame()?.appid === row.appid) {
-        renderPanelBody(row);
         // A `&shot=` deep link waits on *this* row's media, not the whole stream: replaying it
         // only once every game in the list had finished meant a 115-game wishlist sat for ~20
         // seconds with the panel open and the screenshot the link pointed at still closed
@@ -750,9 +761,7 @@ export default function ListRoute() {
     if (!configured) {
       batch(() => {
         for (const item of items) {
-          const row = rowStore.mutateRow(item.appid, draft => nullAllPriceFields(draft));
-          if (!row) continue;
-          if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
+          rowStore.mutateRow(item.appid, draft => nullAllPriceFields(draft));
         }
       });
       return;
@@ -773,18 +782,14 @@ export default function ListRoute() {
           for (const appid of chunk) {
             const info = prices[appid];
             if (!info) continue;
-            const row = rowStore.mutateRow(appid, draft => applyPriceInfo(draft, info, discountPct));
-            if (!row) continue;
-            if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
+            rowStore.mutateRow(appid, draft => applyPriceInfo(draft, info, discountPct));
           }
         });
       } catch (err) {
         if (loadGuard.isStale(gen)) return;
         batch(() => {
           for (const appid of chunk) {
-            const row = rowStore.mutateRow(appid, draft => nullMissingPriceFields(draft));
-            if (!row) continue;
-            if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
+            rowStore.mutateRow(appid, draft => nullMissingPriceFields(draft));
           }
         });
         setPriceStatusText(`Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`);
@@ -795,15 +800,17 @@ export default function ListRoute() {
   // Backs the side panel's own "↻ Refresh" button, registered with the shell (see AppShell.tsx's
   // `refreshGame`) — force-refetches this one game's rating/HLTB/store metadata/tags and writes
   // them onto its store-backed row. Not every open game is one of this route's rows (a standalone
-  // lookup isn't), so `mutateRow` returning undefined falls back to mutating the plain object the
-  // panel holds, exactly as the deleted library.tsx's own onRefresh did.
+  // lookup isn't), so `mutateRow` returning undefined means it's a standalone one instead, which
+  // has its own store (see standaloneRows).
   async function refreshGame(game: Game): Promise<void> {
     try {
       const res = await fetch(`/api/game-details/${game.appid}?refresh=1`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Refresh failed');
       const updated = rowStore.mutateRow(game.appid, draft => applyDetailsEvent(draft, data));
-      if (!updated) applyDetailsEvent(game, data);
+      if (!updated && standaloneRows[game.appid]) {
+        setStandaloneRows(game.appid, produce(draft => applyDetailsEvent(draft, data)));
+      }
     } catch (err) {
       setStatusText(`Refresh failed: ${(err as Error).message}`);
     }
@@ -828,11 +835,10 @@ export default function ListRoute() {
       for (const item of rowsStore) {
         const status = peekMyOwnershipStatus(item.appid);
         if (!status) continue;
-        const row = rowStore.mutateRow(item.appid, draft => {
+        rowStore.mutateRow(item.appid, draft => {
           draft.inLibrary = status.inLibrary;
           draft.onWishlist = status.onWishlist;
         });
-        if (row && isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
       }
     });
   }
@@ -874,18 +880,14 @@ export default function ListRoute() {
         for (const g of resolved) {
           const info = prices[g.gid];
           if (!info) continue;
-          const row = rowStore.mutateRow(g.appid, draft => applyPriceInfo(draft, info, discountPct));
-          if (!row) continue;
-          if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
+          rowStore.mutateRow(g.appid, draft => applyPriceInfo(draft, info, discountPct));
         }
       });
     } catch (err) {
       if (loadGuard.isStale(gen)) return;
       batch(() => {
         for (const g of resolved) {
-          const row = rowStore.mutateRow(g.appid, draft => nullMissingPriceFields(draft));
-          if (!row) continue;
-          if (isPanelOpen() && getPanelGame() === row) renderPanelBody(row);
+          rowStore.mutateRow(g.appid, draft => nullMissingPriceFields(draft));
         }
       });
       setPriceStatusText(`Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`);
@@ -1062,7 +1064,7 @@ export default function ListRoute() {
       }
       initialRows = [...appids].map(appid => ({
         appid, name: '', loading: true, details: null,
-      })) as unknown as Game[];
+      }));
       streamTargets = [...appids].map(appid => ({ appid }));
     } else if (kind === 'recent') {
       setListTitle('Recently Looked Up');
@@ -1077,7 +1079,7 @@ export default function ListRoute() {
       initialRows = recents.map(g => ({
         appid: g.appid, name: g.name, capsule: g.tinyImage || undefined,
         loading: true, details: null,
-      })) as unknown as Game[];
+      }));
       streamTargets = recents;
     } else if (kind === 'bundle') {
       setStatusText('Resolving games to Steam…');
@@ -1105,7 +1107,7 @@ export default function ListRoute() {
           steamRegular: undefined, bestDealPrice: undefined, bestDealShop: undefined, bestDealUrl: undefined,
           bestDealCut: undefined, lowAll: undefined, lowY1: undefined, lowM3: undefined, priceCurrency: undefined,
           loading: true, details: null,
-        })) as unknown as Game[];
+        }));
         streamTargets = resolved;
       } catch (err) {
         if (loadGuard.isStale(gen)) return;
@@ -1149,7 +1151,7 @@ export default function ListRoute() {
             appid: g.appid, name: g.name,
             playtime: g.playtimeMinutes / 60, lastPlayed: fmtLastPlayed(g.lastPlayedUnix),
             loading: true, details: null,
-          })) as unknown as Game[];
+          }));
           streamTargets = games;
         } else {
           const { items, fetchedAt: at } = await fetchAccountWishlist(account.members, { refresh });
@@ -1160,7 +1162,7 @@ export default function ListRoute() {
             steamRegular: undefined, bestDealPrice: undefined, bestDealShop: undefined, bestDealUrl: undefined,
             bestDealCut: undefined, lowAll: undefined, lowY1: undefined, lowM3: undefined, priceCurrency: undefined,
             loading: true, details: null,
-          })) as unknown as Game[];
+          }));
           streamTargets = items;
         }
       } catch (err) {
@@ -1686,8 +1688,8 @@ export default function ListRoute() {
           <button type="button" class="btn btn-ghost btn-sm" onClick={handleResetView}>Reset view</button>
         </div>
       </Show>
-      <div ref={tableContainer} class="table-container"></div>
-      <div ref={groupsContainer} class="list-groups"></div>
+      <div ref={tableContainer} class="table-container" />
+      <div ref={groupsContainer} class="list-groups" />
       {/* The bundle's games with no Steam listing at all (a course, an asset pack, a shop-exclusive
           key) — there's nothing for the table to show about them (no rating/HLTB/price/ownership),
           but dropping them silently made the table look like the whole bundle. Collapsed by

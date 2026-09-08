@@ -1,9 +1,11 @@
-// Shared frontend types. Deliberately permissive at the edges (row/game objects are
-// assembled from several independent async sources — the game-details stream, price
-// lookups, ownership checks — each mutating different fields), so the interfaces keep
-// every field optional and add an index signature: strictness is enforced on the pure
-// functions that consume these, not by pretending the row objects are fully formed at
-// any single point in time.
+import type { ProductionTier } from './utils.ts';
+
+// Shared frontend types. A row/game object is assembled from several independent async sources
+// (the game-details stream, price lookups, per-list fields), so most fields are optional — but
+// every one of them is *declared*: this interface used to end in an `[key: string]: unknown`
+// index signature, which made a typo'd field name compile as valid and turned every read of a
+// real field into `unknown`. Optional means "not filled in yet"; unknown-to-the-type means
+// "nobody checks", which is what that index signature actually bought.
 
 export interface Rating {
   score: number;
@@ -73,38 +75,83 @@ export interface Game extends PriceFields {
   name: string;
   loading: boolean;
   details: GameDetails | null;
-  // panel-adjacent state
-  news?: NewsItem[] | null;
-  newsLoading?: boolean;
-  newsError?: boolean;
-  // standalone-lookup flag (see gameSearch.js) — true for a game opened from the
-  // "look up any game" box that isn't a loaded row/comparison game
+
+  // ── The flattened projection of `details` the table reads ─────────────────────────────────
+  // One field per sortable/filterable/groupable column (see gameColumns.ts's own `key`s, plus
+  // each list kind's own columns in ListRoute.tsx) — `details` itself is nested, and the table
+  // addresses a row by flat key. All written in one place, applyDetailsEvent (ListRoute.tsx), so
+  // they're `undefined` until that row's details have streamed in and never partially filled.
+  // These used to be undeclared, covered by an `[key: string]: unknown` index signature on this
+  // interface: that made every one of them an `unknown` read *and* made a typo'd write
+  // (`row.hltbMian = …`) compile silently. Declaring them is what turns both into typecheck
+  // failures — the same reason `ReadonlyGame` below exists for the read paths.
+  capsule?: string | null;
+  score?: number | null;
+  positivePct?: number | null;
+  steamdbRating?: number | null;
+  reviewsTotal?: number | null;
+  hltbMain?: number | null;
+  hltbExtra?: number | null;
+  hltbCompletionist?: number | null;
+  hltbAll?: number | null;
+  metacritic?: number | null;
+  releaseDate?: string | null;
+  comingSoon?: boolean;
+  genres?: string[];
+  developers?: string[];
+  publishers?: string[];
+  categories?: string[];
+  tags?: string[];
+  platforms?: string[];
+  languages?: string[];
+  protondb?: string | null;
+  protondbPending?: boolean;
+  achievementCount?: number | null;
+  dlcCount?: number | null;
+  hasDemo?: boolean;
+  type?: string | null;
+  productionTier?: ProductionTier | null;
+
+  // ── Per-list-kind fields, set when the row is built rather than by the details stream ──────
+  // An owned list knows playtime, a wishlist knows rank/date-added, a bundle knows which tier
+  // unlocks the game — each only exists on that kind's own rows, and only that kind inserts the
+  // column that reads it (see ListRoute.tsx's OWNED_/WISHLIST_/BUNDLE_ column sets).
+  playtime?: number;
+  lastPlayed?: string;
+  priority?: number;
+  dateAdded?: string | null;
+  tierPrice?: number | null;
+  tierCurrency?: string | null;
+  addon?: boolean;
+
+  // standalone-lookup flag (see gameSearch.ts) — true for a game opened from the
+  // "look up any game" box that isn't one of the loaded rows
   standalone?: boolean;
-  // ownership status (library.js) — null = "not resolved yet"
+  // Ownership status for whichever account is loaded, stamped onto every row by the host route
+  // for the table's own ✓/☆ name-cell markers (see gameColumns.ts). `null` = "not resolved yet".
+  // The side panel does NOT read these — it has its own `ownership` resource (panel.tsx), so a
+  // standalone lookup that was never a row still gets a badge; both go through myOwnership.ts's
+  // one cached pair of sets.
   inLibrary?: boolean | null;
   onWishlist?: boolean | null;
-  // panel's own lazy single-game price fetch (see loadPrice, panel.js)
-  priceLoading?: boolean;
-  // DLC list (see loadDlc, panel.js) — undefined = not fetched, null = failed
-  dlc?: { appid: number; name: string; capsule: string; releaseDate: string; comingSoon: boolean }[] | null;
-  dlcLoading?: boolean;
-  dlcPartial?: ({ appid: number; name: string; capsule: string; releaseDate: string; comingSoon: boolean } | undefined)[];
-  // achievements (library.js) — undefined = not fetched, null = failed
-  achievements?: Achievements | null;
-  // Which account `achievements` was fetched for (achievementsAccountKey of its members, '' for
-  // none) — progress is per account, so a result is only reusable while this still matches.
-  achievementsAccountId?: string;
-  // Which members of the current account own this game, and their own playtime — see panel.tsx's
-  // loadOwners/OwnersSection. `undefined` before it's resolved, `[]` for a game nobody owns.
-  owners?: import('./accountData.ts').GameOwner[];
-  achievementsLoading?: boolean;
   // When the oldest of this game's cached details (rating/HLTB/store metadata/tags/ProtonDB) was
   // written server-side, epoch ms — null when they were fetched fresh, undefined before any
   // details have arrived. Shown only in the panel refresh button's tooltip; see server.js's
   // fetchGameDetails for why it isn't on screen.
   detailsFetchedAt?: number | null;
-  [key: string]: unknown;
 }
+
+// A row as everything outside its own store sees it: readable, not writable. The side panel, the
+// table's column renderers and the panel-nav helpers all take this, so a `game.field = x` write
+// outside the store that owns the row is a typecheck failure rather than a silent no-op — which
+// is what it would be, since a row is a Solid store row (see rowStore.ts) and the whole app
+// renders it per field. The only legitimate writers are `rowStore.mutateRow`'s `produce` draft
+// (typed as plain `Game`) and whoever builds a row in the first place.
+//
+// Not deep: `Readonly` stops `g.details = …`, not `g.details.rating = …`. `details` is only ever
+// replaced wholesale (see applyDetailsEvent in ListRoute.tsx), so the shallow version covers the
+// writes that actually happen without a hand-rolled DeepReadonly over every nested type.
+export type ReadonlyGame = Readonly<Game>;
 
 // A single official news/announcement item (see extractNews in lib/steam.js).
 export interface NewsItem {
@@ -139,17 +186,20 @@ export interface Achievements {
   _sortedAchievements?: Achievement[];
 }
 
-// IsThereAnyDeal-backed price fields, set by priceLoading.js's applyPriceInfo.
+// IsThereAnyDeal-backed price fields, set by priceLoading.ts's applyPriceInfo. Optional because
+// `undefined` is a real, load-bearing state distinct from `null`: "nothing has looked this price
+// up (yet)", which renders as a loading placeholder and is what nullMissingPriceFields keys off
+// after a failed batch, versus "looked up, no data", which renders as "—".
 export interface PriceFields {
-  steamRegular: number | null;
-  bestDealPrice: number | null;
-  bestDealCut: number | null;
-  bestDealShop: string | null;
-  bestDealUrl: string | null;
-  lowAll: number | null;
-  lowY1: number | null;
-  lowM3: number | null;
-  priceCurrency: string | null;
+  steamRegular?: number | null;
+  bestDealPrice?: number | null;
+  bestDealCut?: number | null;
+  bestDealShop?: string | null;
+  bestDealUrl?: string | null;
+  lowAll?: number | null;
+  lowY1?: number | null;
+  lowM3?: number | null;
+  priceCurrency?: string | null;
 }
 
 // ── List-centric redesign (see docs/list-centric-redesign.md) ──────────────────────────────

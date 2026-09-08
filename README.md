@@ -39,6 +39,7 @@ npm run dev:backend     # Express backend on :3000, restarts on file changes
 npm run dev             # both of the above at once (concurrently), Ctrl+C stops both
 npm test                # run unit tests
 npm run typecheck       # strict tsc over public/*.ts
+npm run lint            # eslint-plugin-solid over public/*.ts(x)
 ```
 
 The frontend is TypeScript; run `npm run dev` (or `dev:frontend`/`dev:backend` separately) and use `http://localhost:5173`. `npm run build` + `npm start` serves the bundled production frontend on `:3000`.

@@ -1,20 +1,26 @@
 'use strict';
 
-import { fmtAge, fmtPlaytime, formatMoney, scoreColor, dealRecordTier, DEAL_RECORD_TIERS, discountPct, fmtH, fmtLastPlayed, computeSteamdbRating } from './utils.ts';
+import { fmtAge, fmtPlaytime, formatMoney, scoreColor, dealRecordTier, DEAL_RECORD_TIERS, fmtH, fmtLastPlayed, computeSteamdbRating } from './utils.ts';
 import { openLightbox, closeLightbox, isLightboxOpen } from './lightbox.tsx';
 import { buildMediaItems } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
-import { getStoredRegion, resolveRegion } from './region.ts';
 import { getMyOwnershipStatus, getOwnersFor } from './myOwnership.ts';
+import type { OwnershipStatus } from './myOwnership.ts';
 import { sortOwners, ownerMeterPct } from './ownerList.ts';
 import type { GameOwner } from './accountData.ts';
-import { getEffectiveCurrentAccount } from './accountsStore.ts';
-import { achievementsAccountKey, achievementsRequestUrl, achievementsSteamUrl } from './achievementsRequest.ts';
+import { ACCOUNT_CHANGED_EVENT, getEffectiveCurrentAccount } from './accountsStore.ts';
+import { achievementsAccountKey } from './achievementsRequest.ts';
+import {
+  peekNews, fetchNews, peekAchievements, fetchAchievements, peekPrice, fetchPrice, peekDlc, fetchDlc,
+} from './panelData.ts';
+import type { DlcEntry, PanelAchievements, PanelDlc, PanelNews, PanelPrice } from './panelData.ts';
+import { nextHopHistory } from './panelHistory.ts';
+import type { PanelHistoryEntry } from './panelHistory.ts';
 import { setGameTitle } from './pageTitle.ts';
 import { withAccountParam } from './urlState.ts';
-import type { Game } from './types.ts';
+import type { Game, PriceFields, ReadonlyGame } from './types.ts';
 
-import { createSignal, createEffect, createMemo, For, Show, type JSX } from 'solid-js';
+import { createSignal, createEffect, createMemo, createResource, createRoot, For, Show, type JSX } from 'solid-js';
 import { render } from 'solid-js/web';
 import { A } from '@solidjs/router';
 
@@ -23,10 +29,9 @@ import { A } from '@solidjs/router';
 export interface PanelOptions {
   onTagClick?: (dim: string, val: string) => void;
   isTagActive?: (dim: string, val: string) => boolean;
-  onRefresh?: (game: Game) => void;
+  onRefresh?: (game: ReadonlyGame) => void;
   onNavigateGame?: (appid: number, name: string) => void;
   onClose?: (opts?: { preserveUrl?: boolean }) => void;
-  pricesHandledByHost?: boolean | ((game: Game) => boolean);
   enableTagFilters?: boolean;
 }
 
@@ -38,10 +43,11 @@ export interface PanelOptions {
 // `initPanel` options — that per-page option-supplying shape is why `PanelOptions` still
 // exists as a real interface (a global single-instance app has no *structural* need for one),
 // though only `onNavigateGame` is actually passed today; the rest (`onTagClick`/`isTagActive`/
-// `enableTagFilters`, `pricesHandledByHost`) are dead weight from that era with no
-// current caller — left in place rather than ripped out, since removing them touches more of
-// this file for a change genuinely out of scope for the pass that noticed it (see this file's
-// git history/CHANGELOG for the specifics). A real Solid component now (converted from the
+// `enableTagFilters`) are dead weight from that era with no current caller — left in place rather
+// than ripped out, since removing them touches more of this file for a change genuinely out of
+// scope for the pass that noticed it (see this file's git history/CHANGELOG for the specifics).
+// `pricesHandledByHost` did go: its one reader was the old `loadPrice`, and the price resource's
+// own source answers the same question off the row itself ("has anything already priced this?"). A real Solid component now (converted from the
 // original panel.ts's hand-rolled innerHTML rebuilds): `initPanel(options)` mounts it once into
 // the static `#panel-body` element every page's own markup already has; `panelOpen(game)`/
 // `panelClose()` show/hide it exactly as before. Anything page-specific — tag-click filtering,
@@ -63,38 +69,54 @@ export interface PanelOptions {
 // while the panel is open). `.open` still gates visibility (hidden entirely when no game is
 // open, shown as a column when one is), it just means something different in the CSS now.
 //
-// Reactivity model: `panelGame`/`heroIdx`/`moreLinksOpen`/`panelHistory`/`expandedSections`/
-// `revealedAchievements`/`achievementsFilter`/`panelRefreshing` are all real Solid signals now —
-// panel.tsx's own click handlers (attached directly per-element via JSX `onClick`, not the old
-// delegated `closest()` dispatch off one listener) call their setters directly, so the relevant
-// piece of the body re-renders with no external "please re-render" call needed. The one signal
-// that IS an external "please re-render" bump is `revision`: host pages mutate a `Game` object's
-// fields directly (score, HLTB, price, etc. — `row.field = x`), which Solid has no way to see on
-// its own (they're plain objects, not a store), so `renderPanelBody(game)` — still exported,
-// still called the same way at every existing mutation site across all three pages — bumps
-// `revision`, which is read (alongside `panelGame` itself) inside the one big reactive body
-// expression below, forcing a full re-read of every field off the current game object. This is
-// the same "mutate, then explicitly notify" convention this codebase already used everywhere
-// before Solid; only the notify step's *implementation* changed.
+// Reactivity model — three kinds of state, no "please re-render" call anywhere:
+//
+//  1. The panel's own UI state (`panelGame`/`heroIdx`/`moreLinksOpen`/`panelHistory`/
+//     `expandedSections`/`revealedAchievements`/`achievementsFilter`/`panelRefreshing`) — plain
+//     signals, set directly by this file's own click handlers.
+//  2. The open game's data — read straight off the game object, which is a Solid *store* row
+//     owned by whichever route loaded it (see rowStore.ts). A field written as the details
+//     stream lands patches only what renders that field.
+//  3. Everything the panel fetches for itself (news, achievements, owners, ownership, price,
+//     DLC) — a `createResource` each, keyed on whichever game is open (see "Per-game async
+//     data" below), with the fetching itself in panelData.ts.
+//
+// This replaced a `revision` counter signal and an exported `renderPanelBody(game)` that bumped
+// it: host routes (and this file's own loaders) mutated plain `Game` objects, which Solid cannot
+// see, so ~30 call sites had to announce every write, and each announcement re-rendered the
+// entire panel body. See CLAUDE.md's "Frontend reactivity" section for the full story — and note
+// what the shape below is *for*: `npm run lint`'s `solid/reactivity` rule is what keeps a plain
+// `const x = someSignal()` / `const g = props.game.field` capture from quietly reintroducing the
+// same class of bug.
 let panelOptions: PanelOptions = {};
-const [panelGame, setPanelGame] = createSignal<Game | null>(null);
+const [panelGame, setPanelGame] = createSignal<ReadonlyGame | null>(null);
 const [heroIdx, setHeroIdx] = createSignal(0);
-const [revision, setRevision] = createSignal(0);
 let panelPrevFocus: HTMLElement | null = null;
 const [panelRefreshing, setPanelRefreshing] = createSignal(false); // true while the host's onRefresh() is in flight
 const [moreLinksOpen, setMoreLinksOpen] = createSignal(false); // whether the header's "⋯" overflow menu (News/Workshop/Website) is open
 
-// Stack of {appid, name} for games navigated away from via a DLC link or "Part of <Base
-// Game>" link click (see navigateToGame/panelGoBack below) — NOT touched by an ordinary
-// panel open (a table row click, a search-box pick, prev/next/random) since those aren't
-// part of any such browsing trail; panelOpen() below clears it unless told to keep it
-// (`keepHistory: true`), which only navigateToGame/panelGoBack ever pass through the host's
-// onNavigateGame callback.
-// Holds plain {appid, name} pairs rather than full game objects — going back re-opens via
-// the same host mechanism (panelOptions.onNavigateGame) a fresh lookup would use, same
-// dedup-with-already-loaded-rows behavior included, rather than panel.ts caching its own
-// stale copy of a game's details.
-const [panelHistory, setPanelHistory] = createSignal<{ appid: number; name: string }[]>([]);
+// Stack of {appid, name} for games navigated away from via a DLC link or "DLC for <Base Game>"
+// link click (see navigateToGame/panelGoBack below) — NOT touched by an ordinary panel open (a
+// table row click, a search-box pick, prev/next/random), since those aren't part of any such
+// browsing trail. Holds plain {appid, name} pairs rather than full game objects — going back
+// re-opens via the same host mechanism (panelOptions.onNavigateGame) a fresh lookup would use,
+// same dedup-with-already-loaded-rows behavior included, rather than panel.tsx caching its own
+// stale copy of a game's details. The push/pop rule itself is nextHopHistory (panelHistory.ts).
+const [panelHistory, setPanelHistory] = createSignal<PanelHistoryEntry[]>([]);
+
+// The appid of a hop this panel itself started — set by navigateToGame/panelGoBack right before
+// handing off to the host's own opener, and consumed by the next panelOpen, which is what keeps
+// that open from clearing the trail those two just pushed to or popped from.
+//
+// Module state rather than a `panelOpen({ keepHistory })` argument, which is what this replaced:
+// the host may take a whole route navigation to get there (`onNavigateGame` → AppShell's
+// openGameGlobally → `/game/:appid` for the recents list, where the actual open happens later
+// from that route's own load()), and no argument survives that. It's also the only place in the
+// app that knows the answer — every other opener starts a fresh trail — so asking three modules
+// to thread a boolean back here was both fragile and, for the `/game/:appid` path, impossible:
+// the trail was silently wiped on every hop, so "← Back" never appeared at all and panelGoBack
+// was unreachable.
+let pendingHopAppid: number | null = null;
 
 function panelShuffle(arr: { appid: number }[]) {
   const a = arr.slice();
@@ -179,12 +201,18 @@ export function initPanel(options: PanelOptions = {}) {
   initHeroSwipe();
   initSubnavScrollSpy();
 
-  // The one place document.title's "a game is open" layer is driven from (see pageTitle.ts) —
-  // reads `revision()` too, not just `panelGame()`, so a standalone lookup's placeholder title
-  // (`App <appid>`, before store metadata resolves the real name) gets picked up once the row
-  // mutates and re-renders, same as every other panel-body field that depends on `revision`.
+  // accountsStore.ts is deliberately a plain module with no reactivity of its own, so its change
+  // event is what makes `currentMembers()` (and with it the achievements/owners/ownership
+  // resources, all keyed on `appid:account`) react to picking a different account or following a
+  // `?u=` link — rather than only re-checking on the next panel open. Registered here, not at
+  // module scope, since panel.tsx is imported by Node unit tests too, which have no `window`.
+  window.addEventListener(ACCOUNT_CHANGED_EVENT, () => setAccountRev(r => r + 1));
+
+  // The one place document.title's "a game is open" layer is driven from (see pageTitle.ts).
+  // `game.name` is read inside the effect, so a standalone lookup's placeholder title
+  // (`App <appid>`, before store metadata resolves the real one) is replaced as soon as the
+  // store row's `name` is written — the effect subscribes to that one field.
   createEffect(() => {
-    revision();
     const game = panelGame();
     setGameTitle(game ? game.name : null);
   });
@@ -192,9 +220,8 @@ export function initPanel(options: PanelOptions = {}) {
 
 // Highlights whichever subnav button corresponds to the section currently scrolled to the
 // top of the visible body, instead of the subnav being a static row of jump-links with no
-// sense of "where am I". Bound once to #panel-body (a stable element across re-renders)
-// rather than the subnav itself, which the reactive body below still rebuilds on every
-// `revision`/`panelGame` change.
+// sense of "where am I". Bound once to #panel-body (a stable element across every render)
+// rather than to the subnav, which is rebuilt whenever the panel moves to a different game.
 function initSubnavScrollSpy() {
   document.getElementById('panel-body')!.addEventListener('scroll', () => {
     requestAnimationFrame(updateSubnavScrollSpy);
@@ -253,20 +280,21 @@ async function handlePanelRefresh() {
   if (!game || panelRefreshing() || !panelOptions.onRefresh) return;
   setPanelRefreshing(true);
   try {
-    // DLC is only force-refetched if it was ever actually loaded (i.e. the card was expanded
-    // at some point this session) — no reason to kick off a fetch for a card nobody's opened
-    // just because the refresh button was clicked.
+    // Each `refetch()` re-runs that resource's fetcher with `refetching` set, which is what its
+    // fetcher reads as "force" (bypass both this app's session cache and the server's own TTL).
+    // A refetch of a resource whose source is currently null — price, for a game its list
+    // already priced — is a no-op by construction, no extra check needed here.
+    //
+    // DLC is only force-refetched if it was ever actually loaded (i.e. the card was expanded at
+    // some point this session): no reason to kick off a fetch for a card nobody's opened just
+    // because the refresh button was clicked.
     await Promise.all([
       panelOptions.onRefresh(game),
-      loadNews(game, { force: true }),
-      loadPrice(game, { force: true }), // no-op (see loadPrice) if this game is priced by the host instead
-      loadAchievements(game, { force: true }),
-      game.dlc !== undefined ? loadDlc(game, { force: true }) : null,
+      panelData.refetchNews(),
+      panelData.refetchPrice(),
+      panelData.refetchAchievements(),
+      peekDlc(game.appid) !== undefined ? panelData.refetchDlc() : null,
     ]);
-    // Explicit, rather than relying on loadNews/loadPrice/loadDlc's own renderPanelBody calls
-    // above to happen to cover onRefresh's mutation too — onRefresh's field writes need their
-    // own re-render regardless of whether any of those other three calls did anything this time.
-    if (panelGame() === game) renderPanelBody(game);
   } finally {
     setPanelRefreshing(false);
   }
@@ -300,249 +328,170 @@ function flashCopyLinkBtn(btn: HTMLElement) {
   }, 1500);
 }
 
-// Whether this game's price is someone else's job to fetch. `panelOptions.pricesHandledByHost`
-// is either a plain boolean (bundles.tsx: every row is always batch-priced by loadPrices) or a
-// function of the game (library.ts: only the Wishlist tab's own loadWishlistPrices batches
-// prices — its Library tab rows are owned games with no price columns/batch of their own, same
-// as the comparison page). Checked purely at fetch-decision time, not by racing against
-// whether that host's own batch call has actually resolved yet — a host that says it handles
-// pricing is trusted to do so on its own schedule, so loadPrice below never fires for it
-// regardless of timing, which is what keeps this from ever duplicating that host's own batched
-// /api/prices call (see CLAUDE.md's "one page-level control, not per-game" reasoning for why
-// that matters). Pages that never set the option at all (app.ts) always fall through to
-// loadPrice — nothing else there ever prices a row.
-function pricesHandledByHost(game: Game) {
-  const opt = panelOptions.pricesHandledByHost;
-  return typeof opt === 'function' ? !!opt(game) : !!opt;
+// Which collapsible sections (HLTB breakdown, news, achievements — anything built with
+// CollapsibleCard() below) are expanded, keyed `${appid}:${section}` so each game/section
+// pair remembers its own choice independently, and which individual hidden achievements
+// have been click-revealed (keyed `${appid}:${apiname}`). Re-opening a game later in the
+// same session remembers prior choices; never cleared (a handful of strings per game
+// touched is negligible, and a page reload resets it anyway). Solid signals (each holding a Set,
+// replaced wholesale on every toggle) rather than plain module-level Sets, so a CollapsibleCard's
+// own expanded/collapsed chevron reacts to a toggle on its own.
+const [expandedSections, setExpandedSections] = createSignal<Set<string>>(new Set());
+const [revealedAchievements, setRevealedAchievements] = createSignal<Set<string>>(new Set());
+// Which achievement list filter ('all' | 'unlocked' | 'locked') each game is currently
+// showing — same per-appid, never-cleared-this-session shape as expandedSections above.
+// Defaults to 'all' (map lookup miss) for any appid never touched.
+const [achievementsFilter, setAchievementsFilter] = createSignal<Map<number, string>>(new Map());
+
+function isSectionExpanded(appid: number, section: string) { return expandedSections().has(`${appid}:${section}`); }
+
+function toggleSection(appid: number, section: string) {
+  const key = `${appid}:${section}`;
+  const wasExpanded = expandedSections().has(key);
+  const next = new Set(expandedSections());
+  if (wasExpanded) next.delete(key); else next.add(key);
+  setExpandedSections(next);
 }
 
-// Lazily resolved once per session (like library.ts's/bundles.tsx's own itadConfiguredPromise)
-// rather than per-call — a plain GET /api/health, cheap to over-share across every game this
-// fetches a price for.
-let panelItadConfiguredPromise: Promise<boolean> | null = null;
-function isItadConfigured() {
-  if (!panelItadConfiguredPromise) {
-    panelItadConfiguredPromise = fetch('/api/health').then(r => r.json()).then(d => !!d.itadConfigured).catch(() => false);
-  }
-  return panelItadConfiguredPromise;
-}
-
-// Prices a single game via the shared POST /api/prices route (appids: [appid], same route
-// bundles.tsx/library.ts batch through) — only for a game nothing else already prices (see
-// pricesHandledByHost above). Mirrors loadNews's shape: fetched once per game per session
-// (`game.priceLoading` guards a fast reopen from firing a second concurrent request for the
-// same game), and a stale resolve for a game the panel has since moved on from just updates
-// the (now background) game object without forcing a re-render.
-async function loadPrice(game: Game, { force = false } = {}) {
-  if (pricesHandledByHost(game)) return;
-  if (game.bestDealPrice !== undefined && !force) return; // already loaded (or already tried) this session
-  if (game.priceLoading) return; // already in flight
-  game.priceLoading = true;
-  if (panelGame() === game) renderPanelBody(game);
-  try {
-    if (!(await isItadConfigured())) { game.bestDealPrice = null; return; }
-    const country = resolveRegion(getStoredRegion());
-    const qs = new URLSearchParams({ country });
-    if (force) qs.set('refresh', '1');
-    const res = await fetch(`/api/prices?${qs}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ appids: [game.appid] }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Price lookup failed');
-    const info = data.prices[game.appid];
-    game.steamRegular  = info?.steamRegular?.amount ?? null;
-    game.bestDealPrice = info?.bestDeal?.price?.amount ?? null;
-    game.bestDealShop  = info?.bestDeal?.shop          ?? null;
-    game.bestDealUrl   = info?.bestDeal?.url           ?? null;
-    game.bestDealCut   = discountPct(game.bestDealPrice, game.steamRegular);
-    game.lowAll        = info?.lowAll?.amount          ?? null;
-    game.lowY1         = info?.lowY1?.amount           ?? null;
-    game.lowM3         = info?.lowM3?.amount           ?? null;
-    game.priceCurrency = info?.steamRegular?.currency ?? info?.bestDeal?.price?.currency ?? info?.lowAll?.currency ?? info?.lowY1?.currency ?? info?.lowM3?.currency ?? null;
-  } catch {
-    game.bestDealPrice = game.bestDealPrice ?? null; // leave the card on "no data" rather than stuck "…" forever
-  } finally {
-    game.priceLoading = false;
-    if (panelGame() === game) renderPanelBody(game); // no-op if the panel moved on mid-fetch
-  }
-}
-
-// "In library"/"On wishlist" — see myOwnership.ts for why this is checked against
-// `currentAccount` (whichever account's list is actually on screen), and its own module-level
-// caching (one pair of owned/wishlist appid sets per loaded account, not one fetch per game).
-// Always re-checked on every open rather than "only once per game this session" the way
-// loadPrice/loadNews guard themselves — myOwnership.ts's own cache already makes a repeat check
-// for the same currentAccount effectively free, and unlike price/news this genuinely can change
-// mid-session (a fresh account search, or picking a different one), so skipping a recheck here
-// would leave a game reopened after that switch still showing the previous account's stale
-// status.
-async function loadOwnership(game: Game) {
-  const status = await getMyOwnershipStatus(game.appid);
-  if (panelGame() !== game) return; // the panel moved on to a different game while this awaited
-  game.inLibrary = status?.inLibrary ?? null;
-  game.onWishlist = status?.onWishlist ?? null;
-  renderPanelBody(game);
-}
-
-// News is deliberately NOT part of the host pages' rating/HLTB/meta/tags fetch (see
-// server.js's newsLimit comment for why) — it's kept entirely off `game.details` (which
-// app.ts/library.ts freely reassign wholesale whenever fresh rating/HLTB/etc. lands) and
-// fetched here instead, once per game, lazily, the same on-demand shape achievements
-// already use. `game.news`/`game.newsLoading` persist on the game/row object itself, so a
-// game already opened once in this session doesn't refetch on a later reopen.
-async function loadNews(game: Game, { force = false } = {}) {
-  if (game.news !== undefined && !force) return; // already loaded this session
-  game.newsLoading = true;
-  game.newsError = false;
-  if (panelGame() === game) renderPanelBody(game);
-  try {
-    const res = await fetch(`/api/game-news/${game.appid}${force ? '?refresh=1' : ''}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'News lookup failed');
-    game.news = data.news;
-  } catch {
-    game.newsError = true;
-    // Keep whatever was last successfully loaded rather than wiping it on a failed forced
-    // refresh; null only the first time (nothing to fall back to). NewsSection below shows an
-    // explicit "couldn't load" message instead of silently hiding the section whenever
-    // there's no fallback data to show in its place.
-    game.news = game.news ?? null;
-  } finally {
-    game.newsLoading = false;
-    if (panelGame() === game) renderPanelBody(game); // no-op if the panel moved on mid-fetch
-  }
-}
-
-// "Owned by" — which members of the current account own this game, and how much each has played
-// it. Restored after the list-centric redesign deleted it along with ownerListHtml.ts: it's the
-// only per-member view in the app, and for a merged Steam Family it answers "whose copy is this,
-// and has anyone actually played it" — a question the summed playtime on the table row flattens
-// away entirely. Costs no request of its own (myOwnership.ts already holds this from the same
-// /api/common-games response its ✓/☆ markers come from), so it's just an await.
-async function loadOwners(game: Game) {
-  const owners = await getOwnersFor(game.appid);
-  if (panelGame() !== game) return; // the panel moved on while this awaited
-  game.owners = owners;
-  renderPanelBody(game);
-}
-
-// Achievements — the same lazy, once-per-game shape as news above, and for the same reason:
-// nothing outside this panel shows them (no table column, nothing to sort or filter on), so
-// fetching them for every game in a whole loaded list would be paying for games nobody opens.
+// ── Per-game async data ──────────────────────────────────────────────────────
+// News, achievements, "Owned by", ownership status, price and DLC — everything the panel
+// fetches for itself, as six `createResource`s keyed on whichever game is open. The fetching
+// and session-caching itself lives in panelData.ts; this is only the reactive wiring.
 //
-// Unlike news, the result is per *account*: `achievements.achievements[].achieved` is one
-// specific slot's progress. So the fetch follows `getEffectiveCurrentAccount()` (a `?u=` link
-// being explored beats the stored account, matching the ownership badges right above it in this
-// same panel), and the account it was fetched for is remembered on the game object alongside the
-// result — switching accounts re-fetches instead of showing the previous account's progress as
-// if it were yours. With no account at all the list itself is still fetched and shown: names,
-// descriptions, icons and community rarity are store metadata, and the panel already renders
-// that case without claiming any progress (`playerCount: 0`).
+// This replaced six hand-rolled `loadX(game)` functions that each set a `game.xLoading` flag,
+// awaited a fetch, wrote the result onto the `Game` object, and called `renderPanelBody(game)`
+// behind an `if (panelGame() === game)` staleness guard. A resource keyed on the open game
+// gives all four of those for free: `.loading` is the flag, the value is the result, a
+// superseded response is discarded rather than needing the guard, and — since a resource is a
+// signal — whatever reads it re-renders on its own with no "please re-render" bump. See
+// CLAUDE.md's "Frontend reactivity" section for the whole story.
 //
-// This used to live in the host page (the deleted library.tsx) purely because only the host knew
-// which accounts were loaded — with one app-wide current account that's no longer true, and the
-// `showAchievements` opt-in that went with it is gone too: it existed to keep the section off the
-// old comparison page, whose owner *groups* had no single account to ask about.
-async function loadAchievements(game: Game, { force = false } = {}) {
-  const members = getEffectiveCurrentAccount()?.members ?? [];
-  const accountKey = achievementsAccountKey(members);
-  // Already loaded (or already failed) for this same account this session.
-  if (game.achievements !== undefined && game.achievementsAccountId === accountKey && !force) return;
-  // The detail stream already told us this game has no achievements at all — the route would
-  // answer the same thing from its own short-circuit, but only after a round trip, and "no
-  // achievements" is a large share of any real library.
-  if (game.details?.meta?.achievementCount === 0) {
-    // The same empty payload the route itself would return here — NOT `null`, which this panel
-    // renders as "Couldn't load achievements." rather than "This game has no achievements."
-    game.achievements = { achievements: [], total: 0, unlocked: 0, private: false, playerCount: members.length, steamUrl: null };
-    game.achievementsAccountId = accountKey;
-    if (panelGame() === game) renderPanelBody(game);
-    return;
-  }
-  game.achievementsLoading = true;
-  if (panelGame() === game) renderPanelBody(game);
-  try {
-    const res = await fetch(achievementsRequestUrl(game.appid, members, { force }));
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Achievements lookup failed');
-    data.steamUrl = achievementsSteamUrl(game.appid, members);
-    game.achievements = data;
-  } catch {
-    game.achievements = null;
-  } finally {
-    game.achievementsAccountId = accountKey;
-    game.achievementsLoading = false;
-    if (panelGame() === game) renderPanelBody(game); // no-op if the panel moved on mid-fetch
-  }
+// `createRoot`: these are computations, so they need an owner, and there is no component to own
+// them — the panel is a module-level singleton whose data outlives every render of it (an
+// in-flight fetch survives a close/reopen). One explicit, never-disposed root at module scope is
+// exactly that lifetime, and keeps the resources readable from the plain module functions below
+// (panelOpen, handlePanelRefresh) the same way the signals above already are.
+//
+// Every source below resolves to a *primitive* (an appid, or an `appid:account` string) rather
+// than an object literal: `createResource` memoizes its source with `===`, so an object would
+// refetch every time the source merely recomputed — e.g. `dlcSource` re-runs whenever any
+// section anywhere is expanded/collapsed, and must not turn that into a fresh DLC fetch.
+const [accountRev, setAccountRev] = createSignal(0);
+
+// The account whose progress/ownership the panel is answering for — `getEffectiveCurrentAccount`
+// is a plain non-reactive module (accountsStore.ts, deliberately), so its own change event is
+// what makes this reactive; `initPanel` subscribes. Bumping this re-keys the three
+// account-specific resources below, so switching accounts (or following a `?u=` link) re-fetches
+// instead of leaving another account's progress on screen.
+function currentMembers(): string[] {
+  accountRev();
+  return getEffectiveCurrentAccount()?.members ?? [];
 }
 
-// DLC list — like news/achievements, kept off `game.details` and fetched lazily by
-// panel.tsx itself, but unlike those two it's not even fetched on panelOpen: the DLC card's
-// collapsed header only needs `game.details.meta.dlc`'s bare appid *count* (already present
-// for free, see extractAppDetails in lib/steam.js), so the name/capsule-resolving fetch
-// itself is deferred until the card is actually expanded (see toggleSection below).
-// `game.dlc`/`game.dlcLoading` persist on the game object, so re-expanding later in the same
-// session doesn't refetch.
-//
-// Each DLC appid is resolved through the exact same `GET /api/game-details/:appid` every
-// other single-game lookup already goes through (`fetchStandaloneDetails`, the "look up any
-// game" search box, prev/next/random) — not a bespoke batch endpoint. A DLC appid isn't
-// fundamentally different from any other appid the app looks up, so it shouldn't need its
-// own rate-limit policy or its own cap on how many get resolved at once: it's subject to the
-// same `detailsLimit` per-minute budget as any other burst of game lookups (e.g. rapidly
-// opening many panels), and the same cache/dedup/circuit-breaker underneath. A DLC entry
-// that fails to resolve (delisted, or simply rate-limited this time) is just dropped from
-// the list rather than surfaced as an error — the rest is still worth showing. Only `meta`
-// is used for display here, but resolving the full response (rating/HLTB/tags/ProtonDB too)
-// is a feature, not waste: it warms that DLC's own cache, so clicking into its panel next
-// (see navigateToGame) opens instantly instead of re-fetching everything from scratch.
-//
-// A base game can have dozens of DLC entries (e.g. Stellaris), each its own network
-// round-trip subject to the same rate limiter as everything else — waiting for every single
-// one to settle before showing anything (the original `Promise.allSettled` shape) meant the
-// card sat on its loading skeleton for however long the *slowest* entry took, even though
-// most had already resolved. `game.dlcPartial` holds the in-progress array (one slot per
-// `dlcIds` index, filled in as each fetch resolves) so DlcSection can render what's already
-// available immediately and stream the rest in, rather than an all-or-nothing reveal.
-// `game.dlc` itself is still only assigned once every entry has settled — every other spot
-// that reads it (the refresh gate above, `toggleSection`'s expand-fetch, the "already loaded"
-// early-return below) keeps treating "loaded" as "fully loaded", unchanged.
-type DlcEntry = { appid: number; name: string; capsule: string; releaseDate: string; comingSoon: boolean };
-async function loadDlc(game: Game, { force = false } = {}) {
-  if (game.dlc !== undefined && !force) return; // already loaded (or already failed) this session
-  const dlcIds = game.details?.meta?.dlc || [];
-  if (!dlcIds.length) { game.dlc = []; return; }
-  game.dlcLoading = true;
-  // Seed partial slots from the previous complete list (keyed by appid) so a force-refresh
-  // keeps showing the old entries in place while each is re-fetched, instead of the list
-  // shrinking back down to empty and refilling.
-  const prevById = new Map((game.dlc || []).map(d => [d.appid, d]));
-  const partial: (DlcEntry | undefined)[] = dlcIds.map(id => prevById.get(id));
-  game.dlcPartial = partial;
-  if (panelGame() === game) renderPanelBody(game);
-  try {
-    await Promise.all(dlcIds.map(async (id: number, i: number) => {
-      try {
-        const res = await fetch(`/api/game-details/${id}${force ? '?refresh=1' : ''}`);
-        const data = await res.json();
-        partial[i] = (res.ok && data.meta)
-          ? { appid: id, name: data.meta.name, capsule: data.meta.capsule, releaseDate: data.meta.releaseDate, comingSoon: data.meta.comingSoon }
-          : undefined; // delisted, or just failed/rate-limited this time
-      } catch {
-        partial[i] = undefined;
-      }
-      if (panelGame() === game) renderPanelBody(game); // stream this entry in as soon as it resolves
-    }));
-    game.dlc = partial.filter((d): d is DlcEntry => d != null);
-  } catch {
-    game.dlc = game.dlc ?? null; // leave the card's body empty rather than surfacing an error for a non-essential feature
-  } finally {
-    game.dlcLoading = false;
-    game.dlcPartial = undefined;
-    if (panelGame() === game) renderPanelBody(game); // no-op if the panel moved on mid-fetch
-  }
+const panelData = createRoot(() => {
+  const openAppid = createMemo(() => panelGame()?.appid ?? null);
+  // Shared by the three account-specific resources — achievementsAccountKey is just "sort the
+  // member ids and join them", which is as much the right cache key for owners/ownership as it
+  // is for achievements.
+  const appidAndAccount = createMemo(() => {
+    const appid = openAppid();
+    return appid == null ? null : `${appid}:${achievementsAccountKey(currentMembers())}`;
+  });
+
+  // A plain `refetch()` from the refresh button is always a forced one; the source-driven initial
+  // load passes `refetching: false`. That's the only distinction any of these fetchers needs.
+  const isForced = (info: { refetching: boolean | unknown }) => info.refetching !== false;
+
+  const [news, { refetch: refetchNews }] = createResource<PanelNews, number>(openAppid, (appid, info) => {
+    const force = isForced(info);
+    const cached = peekNews(appid);
+    // Returning the cached value rather than a promise resolves the resource synchronously —
+    // no `pending` tick, so reopening a game paints its real News card instead of flashing the
+    // loading skeleton at it again.
+    return !force && cached !== undefined ? cached : fetchNews(appid, { force });
+  });
+
+  const [achievements, { refetch: refetchAchievements }] = createResource<PanelAchievements, string>(appidAndAccount, (_key, info) => {
+    // Read off the current game rather than packed into the source key: the key only has to
+    // change when the *identity* of what's being fetched changes (this appid, this account), and
+    // a resource fetcher runs untracked, so reading the game here subscribes to nothing.
+    const g = panelGame();
+    if (!g) return null;
+    const members = currentMembers();
+    const force = isForced(info);
+    const cached = peekAchievements(g.appid, members);
+    if (!force && cached !== undefined) return cached;
+    return fetchAchievements(g.appid, members, { force, achievementCount: g.details?.meta?.achievementCount });
+  });
+
+  // Both of these are free in practice — myOwnership.ts already holds the current account's
+  // owned/wishlist sets (and per-member playtimes) from one fetch shared with the ✓/☆ markers on
+  // every table row, so these await a resolved promise rather than making a request.
+  const [owners] = createResource<GameOwner[], string>(appidAndAccount, () => {
+    const appid = openAppid();
+    return appid == null ? [] : getOwnersFor(appid);
+  });
+
+  const [ownership] = createResource<OwnershipStatus | null, string>(appidAndAccount, () => {
+    const appid = openAppid();
+    return appid == null ? null : getMyOwnershipStatus(appid);
+  });
+
+  // Only for a game whose price nothing else has already loaded: a wishlist/bundle list batches
+  // every row's prices in one call, and those rows carry the result in their own price fields
+  // (which is what `bestDealPrice !== undefined` detects) for the table's price columns to render
+  // — the panel reads those directly instead of duplicating the request. Checked as the resource
+  // *source*, so a row that gets priced by its list later simply stops being a candidate.
+  const priceSource = createMemo(() => {
+    const g = panelGame();
+    if (!g || g.bestDealPrice !== undefined) return null;
+    return g.appid;
+  });
+
+  const [price, { refetch: refetchPrice }] = createResource<PanelPrice, number>(priceSource, (appid, info) => {
+    const force = isForced(info);
+    const cached = peekPrice(appid);
+    return !force && cached !== undefined ? cached : fetchPrice(appid, { force });
+  });
+
+  // DLC is the one card whose fetch is gated behind actually expanding it (see panelData.ts's
+  // fetchDlc) — expressed here as "this game's card is expanded" being part of the source, so
+  // expanding it *is* what starts the fetch. That also covers the case the old code needed a
+  // separate kick-off for: `expandedSections` remembers "DLC is expanded" per appid for the whole
+  // session, so a game reopened later renders its card already open, with no click left to happen
+  // — the source is already truthy on the first render, so the fetch just runs.
+  const dlcSource = createMemo(() => {
+    const g = panelGame();
+    if (!g) return null;
+    const ids = g.details?.meta?.dlc;
+    if (!ids || !ids.length) return null;
+    return isSectionExpanded(g.appid, 'dlc') ? g.appid : null;
+  });
+
+  // The in-progress list, streamed in one entry at a time (see fetchDlc's `onPartial`) — a
+  // resource is one value per fetch, so the partial state is its own signal alongside it rather
+  // than something forced through `mutate`. Tagged with the appid it belongs to, so a partial
+  // list can never be shown under a different game.
+  const [dlcPartial, setDlcPartial] = createSignal<{ appid: number; entries: (DlcEntry | undefined)[] } | null>(null);
+
+  const [dlc, { refetch: refetchDlc }] = createResource<PanelDlc, number>(dlcSource, (appid, info) => {
+    const force = isForced(info);
+    const cached = peekDlc(appid);
+    if (!force && cached !== undefined) return cached;
+    const ids = panelGame()?.details?.meta?.dlc ?? [];
+    return fetchDlc(appid, ids, { force, onPartial: entries => setDlcPartial({ appid, entries }) });
+  });
+
+  return { news, refetchNews, achievements, refetchAchievements, owners, ownership, price, refetchPrice, dlc, refetchDlc, dlcPartial };
+});
+
+// The price fields backing the Price card: whatever the host route already loaded onto the row
+// (see `priceSource` above), else this panel's own lookup. Both are the same `PriceFields` shape
+// — priceLoading.ts's `applyPriceInfo` fills either one — so nothing downstream cares which it
+// got. `undefined` means "no price data for this game at all" (nothing loaded it, and this panel
+// isn't looking it up either), which renders as no card.
+function panelPriceFields(game: ReadonlyGame): PriceFields | null | undefined {
+  return game.bestDealPrice !== undefined ? game : panelData.price();
 }
 
 // Clicking a DLC entry in the expanded card (see DlcSection), or the "Part of <Base Game>"
@@ -556,21 +505,13 @@ async function loadDlc(game: Game, { force = false } = {}) {
 function navigateToGame(appid: number, name: string) {
   const game = panelGame();
   if (!game || !panelOptions.onNavigateGame) return;
-  // If the target is whatever's already sitting on top of the stack, this is a
-  // there-and-back-again hop (e.g. base game → DLC → the same base game's own "Part of"
-  // link) reached via a forward link rather than the explicit ← Back button — collapse it
-  // by popping instead of pushing, so bouncing between a base game and its DLC entries
-  // doesn't grow a stack of duplicate consecutive appids.
-  const hist = panelHistory();
-  if (hist.length && hist[hist.length - 1].appid === appid) {
-    setPanelHistory(hist.slice(0, -1));
-  } else {
-    setPanelHistory([...hist, { appid: game.appid, name: game.name }]);
-  }
+  // See nextHopHistory (panelHistory.ts) for the push-vs-pop rule.
+  setPanelHistory(hist => nextHopHistory(hist, { appid: game.appid, name: game.name }, appid));
+  pendingHopAppid = appid;
   panelOptions.onNavigateGame(appid, name);
 }
 
-// The header's "← Back" button (see renderPanelBody) — pops the trail and reopens whatever
+// The header's "← Back" button (see PanelRest) — pops the trail and reopens whatever
 // was on top the same way navigateToGame opens a DLC/base-game link, just in the other
 // direction. Popping before calling onNavigateGame (rather than after) means the callback
 // only ever needs to know "keep whatever's left in the stack", identical in both directions.
@@ -579,6 +520,7 @@ function panelGoBack() {
   if (!hist.length || !panelOptions.onNavigateGame) return;
   const prev = hist[hist.length - 1];
   setPanelHistory(hist.slice(0, -1));
+  pendingHopAppid = prev.appid;
   panelOptions.onNavigateGame(prev.appid, prev.name);
 }
 
@@ -604,21 +546,23 @@ export function panelStepHero(dir: number, { wrap = false } = {}) {
   return true;
 }
 
-// `keepHistory`: true only when this open is a DLC/base-game navigation hop (forward via
-// navigateToGame, or backward via panelGoBack) — every other opener (table row, search pick,
-// prev/next/random) leaves it false, which starts a fresh browsing trail.
-export function panelOpen(game: Game, { keepHistory = false } = {}) {
-  if (!keepHistory) setPanelHistory([]);
+export function panelOpen(game: ReadonlyGame) {
+  // Every opener (a table row, a search-box pick, prev/next/random, a deep link) starts a fresh
+  // browsing trail — except the DLC/base-game hop this panel started itself, which arrives here
+  // with `pendingHopAppid` armed (see its own comment above). Consumed either way: if some
+  // *other* game opens first, that hop never completed and the trail it belonged to is stale.
+  const isHop = pendingHopAppid === game.appid;
+  pendingHopAppid = null;
+  if (!isHop) setPanelHistory([]);
   setPanelGame(game);
   setHeroIdx(0);
   setMoreLinksOpen(false);
   panelPrevFocus = document.activeElement as HTMLElement | null;
   document.getElementById('panel-body')!.scrollTop = 0;
-  loadNews(game); // no-op (see loadNews) if this game's news was already fetched this session
-  loadAchievements(game); // no-op (see loadAchievements) if already fetched for this account
-  loadOwners(game); // see loadOwners — free, myOwnership.ts already has the data
-  loadPrice(game); // no-op (see loadPrice) if this game is priced by the host, or already loaded
-  loadOwnership(game); // see loadOwnership — always rechecked, but myOwnership.ts's own cache makes a repeat check free
+  // No load* calls here: news/achievements/owners/ownership/price are resources keyed on the
+  // open game (see "Per-game async data" above), so setting `panelGame` above is itself what
+  // starts whichever of them this game still needs — and what makes a reopen free when it
+  // doesn't.
   document.getElementById('game-panel')!.classList.add('open');
   ((document.getElementById('panel-hero')?.querySelector('.panel-hero-img') ?? document.getElementById('panel-close')!) as HTMLElement).focus();
 }
@@ -631,7 +575,11 @@ export function panelOpen(game: Game, { keepHistory = false } = {}) {
 export function panelClose({ preserveUrl = false } = {}) {
   if (!panelGame()) return;
   setPanelGame(null);
-  setPanelHistory([]); // closing the panel ends whatever DLC browsing trail was in progress
+  // Closing the panel ends whatever DLC browsing trail was in progress — including a hop that
+  // was handed off but never opened (a bad appid, a failed lookup), which must not be left armed
+  // to attach a stale trail to some later, unrelated open of that same game.
+  setPanelHistory([]);
+  pendingHopAppid = null;
   document.getElementById('game-panel')!.classList.remove('open');
   document.getElementById('panel-nav')?.replaceChildren();
   panelPrevFocus?.focus();
@@ -642,14 +590,6 @@ export function panelClose({ preserveUrl = false } = {}) {
   // own "active game" state) can hook in without every
   // host having to remember to wrap all of those paths itself.
   panelOptions.onClose?.({ preserveUrl });
-}
-
-// Bumps `revision` — the "a host page mutated this game object's fields directly, please
-// re-read them" notify step (see this file's own header comment for the full reasoning).
-// Still exported under its original name/signature: every existing call site across all
-// three host pages (`row.field = x; renderPanelBody(row)`) is unchanged.
-export function renderPanelBody(_game: Game) {
-  setRevision(r => r + 1);
 }
 
 // Scrolls #panel-body so `target` (a section id, or the literal 'top') sits just below the
@@ -708,19 +648,18 @@ const TAG_KIND_META = {
 };
 
 function TagCloud(props: { groups: { kind: TagKind; dim: string | null; items?: string[] | null }[] }): JSX.Element {
-  const present = props.groups.filter(gr => gr.items?.length);
-  if (!present.length) return null;
-  const seenKinds = new Set<TagKind>();
-  const pills = present.flatMap(({ kind, dim, items }) => {
+  const present = createMemo(() => props.groups.filter(gr => gr.items?.length));
+  const pills = createMemo(() => present().flatMap(({ kind, dim, items }) => {
     const values = kind === 'tags' ? [...items!] : [...items!].sort((a, b) => a.localeCompare(b));
-    seenKinds.add(kind);
     return values.map(v => ({ kind, dim, v }));
-  });
+  }));
+  const seenKinds = createMemo(() => [...new Set(present().map(gr => gr.kind))]);
   return (
+    <Show when={present().length}>
     <div class="panel-section panel-section--meta panel-card">
       <div class="panel-section-title">Tags &amp; details</div>
       <div class="panel-tags">
-        <For each={pills}>
+        <For each={pills()}>
           {({ kind, dim, v }) => {
             const dot = <span class="panel-tag-dot" style={{ background: TAG_KIND_META[kind].color }} />;
             if (dim) {
@@ -736,7 +675,7 @@ function TagCloud(props: { groups: { kind: TagKind; dim: string | null; items?: 
         </For>
       </div>
       <div class="panel-tag-legend">
-        <For each={[...seenKinds]}>
+        <For each={seenKinds()}>
           {k => (
             <span class="panel-tag-legend-item">
               <span class="panel-tag-dot" style={{ background: TAG_KIND_META[k].color }} />{TAG_KIND_META[k].label}
@@ -745,6 +684,7 @@ function TagCloud(props: { groups: { kind: TagKind; dim: string | null; items?: 
         </For>
       </div>
     </div>
+    </Show>
   );
 }
 
@@ -758,121 +698,87 @@ function TagCloud(props: { groups: { kind: TagKind; dim: string | null; items?: 
 // ProtonDB's provisional-tier case below) — dims the whole chip so it doesn't read as equally
 // certain as a normal chip of the same color/value.
 function GlanceChip(props: { href?: string | null; value: string | number | null; color?: string | null; caption: JSX.Element; faded?: boolean }): JSX.Element {
-  const inner = (
+  const inner = () => (
     <span class="panel-glance-sub">
       <span class="panel-glance-num" style={props.color ? { color: props.color } : undefined}>{String(props.value)}</span>
       <span class="panel-glance-val">{props.caption}</span>
     </span>
   );
-  const style = props.faded ? { opacity: .65 } : undefined;
-  return props.href
-    ? <a class="panel-glance-chip" href={props.href} target="_blank" rel="noopener" style={style}>{inner}</a>
-    : <div class="panel-glance-chip panel-glance-chip--static" style={style}>{inner}</div>;
+  const style = () => props.faded ? { opacity: .65 } : undefined;
+  return (
+    <Show when={props.href} fallback={<div class="panel-glance-chip panel-glance-chip--static" style={style()}>{inner()}</div>}>
+      {href => <a class="panel-glance-chip" href={href()} target="_blank" rel="noopener" style={style()}>{inner()}</a>}
+    </Show>
+  );
 }
 
-function GlanceGrid(props: { game: Game }): JSX.Element {
-  const g = props.game;
-  if (g.loading) {
-    return (
+function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
+  const details = () => props.game.details;
+  const reviewsUrl = () => `https://store.steampowered.com/app/${props.game.appid}/#app_reviews_hash`;
+  const protondbUrl = () => `https://www.protondb.com/app/${props.game.appid}`;
+
+  // Every chip stays in the grid even when its source has no data for this game — a missing
+  // weighted rating or ProtonDB tier is itself informative, and a chip that vanishes instead makes
+  // the 2×2 grid reflow into a lopsided 3-chip layout. Each still links out where a useful
+  // destination exists, same as the HLTB search fallback. The rating link points at the game's
+  // Steam reviews (the actual source of the underlying data) rather than SteamDB, since the
+  // number/caption is this app's own weighted rating, not SteamDB's.
+  const ratingChip = () => {
+    const r = details()?.rating;
+    if (!r) return <GlanceChip href={reviewsUrl()} value="—" caption={<><b>Weighted</b> · no rating</>} />;
+    const pct = r.total ? Math.round(r.positive / r.total * 100) : 0;
+    const steamdbRating = Math.round(computeSteamdbRating(r.positive, r.total) ?? 0);
+    return <GlanceChip href={reviewsUrl()} value={steamdbRating} color={scoreColor(steamdbRating)} caption={<><b>Weighted</b> · {pct}% of {fmtCompactCount(r.total)}</>} />;
+  };
+
+  const mcChip = () => {
+    const mc = details()?.meta?.metacritic;
+    return mc
+      ? <GlanceChip href={mc.url} value={mc.score} color={scoreColor(mc.score)} caption={<><b>Metacritic</b> · critic score</>} />
+      : <GlanceChip value="—" caption={<><b>Metacritic</b> · no score</>} />;
+  };
+
+  const hltbChip = () => {
+    const h = details()?.hltb;
+    // A matched HLTB entry can still have no submitted completion times (all: null, e.g. a very
+    // new/obscure game) — that's a real page with no data, not a failed search, so it still links
+    // straight to the page rather than a generic search.
+    if (!h?.id) return <GlanceChip href={`https://howlongtobeat.com/?q=${encodeURIComponent(props.game.name)}`} value="—" caption={<><b>HLTB</b> · search</>} />;
+    const hltbUrl = `https://howlongtobeat.com/game/${h.id}`;
+    return h.all
+      ? <GlanceChip href={hltbUrl} value={`${h.all}h`} caption={<><b>HLTB</b> · all playstyles</>} />
+      : <GlanceChip href={hltbUrl} value="—" caption={<><b>HLTB</b> · no data</>} />;
+  };
+
+  const protonChip = () => {
+    const pd = details()?.protondb;
+    if (!pd?.tier) return <GlanceChip href={protondbUrl()} value="—" caption={<><b>Linux/Deck</b> · no reports</>} />;
+    const color = PROTON_TIER_COLORS[pd.tier] || '#52525b';
+    // Kept short (no "reports"/"confidence" words) — the glance chip's one-line caption truncates
+    // rather than wraps, and "strong · 336" already reads fine without them.
+    const detail = [pd.confidence, pd.total ? fmtCompactCount(pd.total) : ''].filter(Boolean).join(' · ');
+    // pd.pending: too few reports for ProtonDB itself to be confident, showing its provisionalTier
+    // instead of nothing (see extractProtonDb, lib/steam.js) — faded, with a "?" and a
+    // "provisional" caption suffix, so it doesn't read as an equally-confirmed tier.
+    const value = pd.pending ? `${capitalize(pd.tier)} ?` : capitalize(pd.tier);
+    return <GlanceChip href={protondbUrl()} value={value} color={color} faded={pd.pending} caption={<><b>Linux/Deck</b>{detail ? ` · ${detail}` : ''}{pd.pending ? ' · provisional' : ''}</>} />;
+  };
+
+  return (
+    <Show when={props.game.loading} fallback={
+      <Show when={details()}>
+        <div class="panel-glance">{ratingChip()}{mcChip()}{hltbChip()}{protonChip()}</div>
+      </Show>
+    }>
       <div class="panel-glance">
         <For each={[0, 1, 2, 3]}>
           {() => <div class="panel-glance-chip panel-glance-chip--sk"><span class="sk" style={{ width: '100%', height: '32px', 'border-radius': '6px' }} /></div>}
         </For>
       </div>
-    );
-  }
-  if (!g.details) return null;
-  const r = g.details.rating;
-  const mc = g.details.meta?.metacritic;
-  const h = g.details.hltb;
-  const pd = g.details.protondb;
-  const reviewsUrl = `https://store.steampowered.com/app/${g.appid}/#app_reviews_hash`;
-  const protondbUrl = `https://www.protondb.com/app/${g.appid}`;
-
-  // Every chip stays in the grid even when its source has no data for this game —
-  // a missing weighted rating or ProtonDB tier is itself informative, and a chip that
-  // vanishes instead makes the 2×2 grid reflow into a lopsided 3-chip layout. Each
-  // still links out where a useful destination exists, same as the HLTB search fallback.
-  // The link points at the game's Steam reviews (the actual source of the underlying
-  // data) rather than SteamDB, since the number/caption is this app's own weighted
-  // rating, not SteamDB's.
-  let ratingChip: JSX.Element;
-  if (r) {
-    const pct = r.total ? Math.round(r.positive / r.total * 100) : 0;
-    const steamdbRating = Math.round(computeSteamdbRating(r.positive, r.total) ?? 0);
-    ratingChip = <GlanceChip href={reviewsUrl} value={steamdbRating} color={scoreColor(steamdbRating)} caption={<><b>Weighted</b> · {pct}% of {fmtCompactCount(r.total)}</>} />;
-  } else {
-    ratingChip = <GlanceChip href={reviewsUrl} value="—" caption={<><b>Weighted</b> · no rating</>} />;
-  }
-
-  const mcChip = mc
-    ? <GlanceChip href={mc.url} value={mc.score} color={scoreColor(mc.score)} caption={<><b>Metacritic</b> · critic score</>} />
-    : <GlanceChip value="—" caption={<><b>Metacritic</b> · no score</>} />;
-
-  let hltbChip: JSX.Element;
-  if (h?.id) {
-    // A matched HLTB entry can still have no submitted completion times (all: null,
-    // e.g. a very new/obscure game) — that's a real page with no data, not a failed
-    // search, so it still links straight to the page rather than a generic search.
-    const hltbUrl = `https://howlongtobeat.com/game/${h.id}`;
-    hltbChip = h.all
-      ? <GlanceChip href={hltbUrl} value={`${h.all}h`} caption={<><b>HLTB</b> · all playstyles</>} />
-      : <GlanceChip href={hltbUrl} value="—" caption={<><b>HLTB</b> · no data</>} />;
-  } else {
-    hltbChip = <GlanceChip href={`https://howlongtobeat.com/?q=${encodeURIComponent(g.name)}`} value="—" caption={<><b>HLTB</b> · search</>} />;
-  }
-
-  let protonChip: JSX.Element;
-  if (pd?.tier) {
-    const color = PROTON_TIER_COLORS[pd.tier] || '#52525b';
-    // Kept short (no "reports"/"confidence" words) — the glance chip's one-line caption
-    // truncates rather than wraps, and "strong · 336" already reads fine without them.
-    const detail = [pd.confidence, pd.total ? fmtCompactCount(pd.total) : ''].filter(Boolean).join(' · ');
-    // pd.pending: too few reports for ProtonDB itself to be confident, showing its
-    // provisionalTier instead of nothing (see extractProtonDb, lib/steam.js) — faded, with a
-    // "?" and a "provisional" caption suffix, so it doesn't read as an equally-confirmed tier.
-    const value = pd.pending ? `${capitalize(pd.tier)} ?` : capitalize(pd.tier);
-    protonChip = <GlanceChip href={protondbUrl} value={value} color={color} faded={pd.pending} caption={<><b>Linux/Deck</b>{detail ? ` · ${detail}` : ''}{pd.pending ? ' · provisional' : ''}</>} />;
-  } else {
-    protonChip = <GlanceChip href={protondbUrl} value="—" caption={<><b>Linux/Deck</b> · no reports</>} />;
-  }
-
-  return <div class="panel-glance">{ratingChip}{mcChip}{hltbChip}{protonChip}</div>;
+    </Show>
+  );
 }
 
-// Which collapsible sections (HLTB breakdown, news, achievements — anything built with
-// CollapsibleCard() below) are expanded, keyed `${appid}:${section}` so each game/section
-// pair remembers its own choice independently, and which individual hidden achievements
-// have been click-revealed (keyed `${appid}:${apiname}`). Re-opening a game later in the
-// same session remembers prior choices; never cleared (a handful of strings per game
-// touched is negligible, and a page reload resets it anyway). Real Solid signals now (each
-// holding a Set, replaced wholesale on every toggle) rather than plain module-level Sets, so
-// a CollapsibleCard's own expanded/collapsed chevron reacts on its own without an external
-// renderPanelBody() bump.
-const [expandedSections, setExpandedSections] = createSignal<Set<string>>(new Set());
-const [revealedAchievements, setRevealedAchievements] = createSignal<Set<string>>(new Set());
-// Which achievement list filter ('all' | 'unlocked' | 'locked') each game is currently
-// showing — same per-appid, never-cleared-this-session shape as expandedSections above.
-// Defaults to 'all' (map lookup miss) for any appid never touched.
-const [achievementsFilter, setAchievementsFilter] = createSignal<Map<number, string>>(new Map());
-
-function isSectionExpanded(appid: number, section: string) { return expandedSections().has(`${appid}:${section}`); }
-
-function toggleSection(appid: number, section: string) {
-  const key = `${appid}:${section}`;
-  const wasExpanded = expandedSections().has(key);
-  const next = new Set(expandedSections());
-  if (wasExpanded) next.delete(key); else next.add(key);
-  setExpandedSections(next);
-  // DLC is the one collapsible card whose contents aren't already loaded by the time it's
-  // rendered (news/achievements are fetched as soon as the panel opens, whether or not
-  // their card ever gets expanded) — see loadDlc's own comment for why. Kick the fetch off
-  // only on the first actual expand, and only for the game the chip belongs to (a stale
-  // click on a chip from a re-render that's already moved on shouldn't fetch for the wrong
-  // game — matching the currently open game, not just any appid, guards that).
-  const game = panelGame();
-  if (!wasExpanded && section === 'dlc' && game?.appid === appid) loadDlc(game);
-}
 
 // Shared "one card, expand-in-place" shape used by HLTB breakdown, news, and achievements:
 // a full-width chip (glance-grid numeral + caption, same template as GlanceChip) as the
@@ -893,14 +799,14 @@ function CollapsibleCard(props: {
   linkHref?: string | null; linkTitle: string;
 }): JSX.Element {
   const expanded = () => isSectionExpanded(props.appid, props.section);
-  const numSpan = props.num != null
+  const numSpan = () => props.num != null
     ? <span class="panel-glance-num" style={props.numColor ? { color: props.numColor } : undefined}>{props.num}</span>
     : props.icon ? <span class="panel-achievements-icon">{props.icon}</span> : null;
   return (
     <div class="panel-achievements-card">
       <div class="panel-achievements-card-header">
         <button type="button" class="panel-achievements-chip panel-collapsible-chip" aria-expanded={expanded() ? 'true' : 'false'} onClick={() => toggleSection(props.appid, props.section)}>
-          {numSpan}
+          {numSpan()}
           <span class="panel-glance-val">{props.val}</span>
           <span class="panel-achievements-chevron">{expanded() ? '▾' : '▸'}</span>
         </button>
@@ -934,105 +840,73 @@ function setAchievementsFilterFor(appid: number, filter: string) {
   setAchievementsFilter(next);
 }
 
-// Achievements section. `g.achievements` is loaded by loadAchievements above, asynchronously
-// and separately from the rating/HLTB/tags SSE stream, since
-// the achievement *list* only depends on the appid but progress depends on which account(s)
-// are currently loaded — `g` carries `achievementsLoading` while that fetch is in flight,
-// then either `achievements` (the server's `{ achievements, total, unlocked, private,
-// playerCount, steamUrl }` shape) or nothing at all (fetch never ran/failed). The list itself
-// is still fetched and shown with zero accounts loaded (`playerCount: 0`, no `steamUrl`) —
-// only the achieved/unlocktime/progress-summary parts need an account, gated by `hasProgress`
-// below.
-function AchievementsSection(props: { game: Game }): JSX.Element {
-  const g = props.game;
-  if (g.achievementsLoading) {
-    return (
-      <div class="panel-section" id="panel-section-achievements">
-        <div class="panel-section-title">Achievements</div>
-        <div class="panel-achievements"><span class="sk" style={{ width: '100%', height: '48px', 'border-radius': '6px' }} /></div>
-      </div>
-    );
-  }
-  const data = g.achievements;
-  // `undefined` means the fetch hasn't been attempted (or finished) yet — nothing to show
-  // and no failure to report either, so stay silent same as before. `null` (see library.ts's
-  // loadAchievements) means it was attempted and failed — that's worth a visible message
-  // rather than silently looking identical to a game with no achievements at all.
-  if (data === undefined) return null;
-  if (data === null) {
-    return (
-      <div class="panel-section" id="panel-section-achievements">
-        <div class="panel-section-title">Achievements</div>
-        <div class="panel-no-data">Couldn't load achievements.</div>
-      </div>
-    );
-  }
-  if (!data.total) {
-    return (
-      <div class="panel-section" id="panel-section-achievements">
-        <div class="panel-section-title">Achievements</div>
-        <div class="panel-no-data">This game has no achievements.</div>
-      </div>
-    );
-  }
-  // With no player loaded (data.playerCount === 0 — a standalone "look up any game" lookup,
-  // see loadAchievements in library.ts), `data.unlocked` is always 0 by construction, not a
-  // real "nobody's unlocked anything" result — the list itself (names/descriptions/icons/
-  // rarity) is still real store metadata worth showing, just without any progress claim on
-  // top of it. `hasProgress` gates every place that would otherwise imply real unlock data.
-  const hasProgress = data.playerCount > 0;
-  const pct = hasProgress ? Math.round((data.unlocked / data.total) * 100) : null;
+// Achievements section, off the `achievements` resource (see "Per-game async data" above):
+// fetched separately from the rating/HLTB/tags stream, since the achievement *list* only depends
+// on the appid but progress depends on which account is loaded. The list itself is still fetched
+// and shown with zero accounts loaded (`playerCount: 0`, no `steamUrl`) — only the
+// achieved/unlocktime/progress-summary parts need an account, gated by `hasProgress` below.
+function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
+  // `undefined` means the fetch hasn't been attempted yet — nothing to show and no failure to
+  // report either, so stay silent. `null` means it was attempted and failed — that's worth a
+  // visible message rather than silently looking identical to a game with no achievements at all.
+  const data = () => panelData.achievements();
+  // With no player loaded (`playerCount === 0` — a standalone "look up any game" lookup),
+  // `unlocked` is always 0 by construction, not a real "nobody's unlocked anything" result — the
+  // list itself (names/descriptions/icons/rarity) is still real store metadata worth showing,
+  // just without any progress claim on top of it. `hasProgress` gates every place that would
+  // otherwise imply real unlock data.
+  const hasProgress = () => (data()?.playerCount ?? 0) > 0;
+  const pct = () => { const d = data(); return d && hasProgress() ? Math.round((d.unlocked / d.total) * 100) : null; };
 
-  // Sorted once per fetch and cached on the data object itself (a fresh object every
-  // fetch/refresh, so this never goes stale) rather than re-sorting the full list on every
-  // render.
-  const sorted = data._sortedAchievements ??= data.achievements
-    .slice()
-    .sort((a, b) => Number(b.achieved) - Number(a.achieved));
-  // 'unlocked'/'locked' only make sense with real progress loaded — filtering by achieved
-  // status when nobody's loaded would just be "everything" vs. "nothing" either way.
-  // Both kept as reactive accessors, not resolved to plain values here: `bodyContent` below is
-  // a plain JSX value built once per AchievementsSection call, so `achievementsFilter()` has to
-  // be read from directly inside a JSX `{}` expression (via these) to be tracked at all — same
-  // reasoning as PanelBody's own comment on `moreLinksOpen`/`revealedAchievements`. `createMemo`
-  // rather than a bare thunk since `visible()` is read from two separate JSX spots below (the
-  // `<Show>` and the `<For>`) in the same render — a memo shares one `sorted.filter()` pass
-  // across both instead of each read re-running it.
-  const filter = createMemo(() => hasProgress ? (achievementsFilter().get(g.appid) || 'all') : 'all');
-  const visible = createMemo(() => { const f = filter(); return f === 'all' ? sorted : sorted.filter(a => (f === 'unlocked') === !!a.achieved); });
+  // Sorted once per fetch and cached on the payload itself (a fresh object every fetch/refresh,
+  // so this never goes stale) rather than re-sorting the full list on every render.
+  const sorted = createMemo(() => {
+    const d = data();
+    if (!d) return [];
+    return d._sortedAchievements ??= d.achievements.slice().sort((a, b) => Number(b.achieved) - Number(a.achieved));
+  });
+  // 'unlocked'/'locked' only make sense with real progress loaded — filtering by achieved status
+  // when nobody's loaded would just be "everything" vs. "nothing" either way. `createMemo` rather
+  // than a bare thunk since `visible()` is read from two separate JSX spots below (the `<Show>`
+  // and the `<For>`) in the same render — a memo shares one `filter()` pass across both instead
+  // of each read re-running it.
+  const filter = createMemo(() => hasProgress() ? (achievementsFilter().get(props.game.appid) || 'all') : 'all');
+  const visible = createMemo(() => filter() === 'all'
+    ? sorted()
+    : sorted().filter(a => (filter() === 'unlocked') === !!a.achieved));
 
-  const bodyContent = (
+  const body = (
     <>
-      <Show when={hasProgress}>
+      <Show when={hasProgress()}>
         <div class="panel-achievements-filter">
           <For each={['all', 'unlocked', 'locked']}>
-            {f => <button type="button" class={`panel-achievements-filter-btn${filter() === f ? ' active' : ''}`} onClick={() => setAchievementsFilterFor(g.appid, f)}>{f === 'all' ? 'All' : f === 'unlocked' ? 'Unlocked' : 'Locked'}</button>}
+            {opt => <button type="button" class={`panel-achievements-filter-btn${filter() === opt ? ' active' : ''}`} onClick={() => setAchievementsFilterFor(props.game.appid, opt)}>{opt === 'all' ? 'All' : opt === 'unlocked' ? 'Unlocked' : 'Locked'}</button>}
           </For>
         </div>
       </Show>
-      <Show when={!hasProgress}><div class="panel-no-data">Load a player above to see who's unlocked what.</div></Show>
-      <Show when={hasProgress && data.private}><div class="panel-no-data">Progress unavailable — profile may be private.</div></Show>
+      <Show when={!hasProgress()}><div class="panel-no-data">Load a player above to see who's unlocked what.</div></Show>
+      <Show when={hasProgress() && data()?.private}><div class="panel-no-data">Progress unavailable — profile may be private.</div></Show>
       <Show when={!visible().length}><div class="panel-no-data">No achievements match this filter.</div></Show>
       <For each={visible()}>
-        {(a: any) => {
+        {a => {
           // A hidden achievement not yet unlocked keeps its name/description a surprise by
-          // default, same as Steam's own profile pages — the schema still carries the real
-          // text either way (whether it's still a spoiler depends on which account(s) are
-          // loaded, not on the shared/cached schema), this just withholds it client-side
-          // until clicked, rather than never sending it at all.
-          const revealed = () => revealedAchievements().has(`${g.appid}:${a.apiname}`);
+          // default, same as Steam's own profile pages — the schema still carries the real text
+          // either way (whether it's still a spoiler depends on which account is loaded, not on
+          // the shared/cached schema), this just withholds it client-side until clicked, rather
+          // than never sending it at all.
+          const revealed = () => revealedAchievements().has(`${props.game.appid}:${a.apiname}`);
           const spoiler = () => a.hidden && !a.achieved && !revealed();
           const name = () => spoiler() ? 'Hidden achievement' : (a.name || a.apiname);
           const desc = () => spoiler() ? 'Click to reveal' : (a.description || '');
           const icon = a.achieved ? a.icon : (a.icongray || a.icon);
           // Unlock date is real data the server already returns (`unlocktime`, seconds since
-          // epoch) but otherwise has nowhere to show — surfaced as a plain hover tooltip
-          // rather than a fifth line of on-card text.
+          // epoch) but otherwise has nowhere to show — surfaced as a plain hover tooltip rather
+          // than a fifth line of on-card text.
           const title = a.achieved && a.unlocktime ? `Unlocked ${fmtLastPlayed(a.unlocktime)}` : '';
           // Rarity isn't a spoiler — it's shown even for a still-hidden achievement, same as
           // Steam's own profile pages. Fixed to 1 decimal only when it's not a whole number.
           const rarityLabel = a.globalPct == null ? null : fmtRarity(a.globalPct);
-          const onSpoilerActivate = (e: MouseEvent | KeyboardEvent) => { if (spoiler()) { e.preventDefault(); revealAchievement(g.appid, a.apiname); } };
+          const onSpoilerActivate = (e: MouseEvent | KeyboardEvent) => { if (spoiler()) { e.preventDefault(); revealAchievement(props.game.appid, a.apiname); } };
           return (
             <div
               class={`panel-achievement-row${a.achieved ? ' unlocked' : ''}${spoiler() ? ' panel-achievement--spoiler' : ''}`}
@@ -1058,34 +932,46 @@ function AchievementsSection(props: { game: Game }): JSX.Element {
   );
 
   return (
-    <div class="panel-section" id="panel-section-achievements">
-      <CollapsibleCard
-        appid={g.appid}
-        section="achievements"
-        num={hasProgress ? `${pct}%` : '—'}
-        numColor={hasProgress ? scoreColor(pct!) : null}
-        val={<><b>Achievements</b> · {hasProgress ? `${data.unlocked} / ${data.total} unlocked` : `${data.total} total`}</>}
-        body={bodyContent}
-        linkHref={data.steamUrl}
-        linkTitle="View achievements on Steam"
-      />
-    </div>
+    <Show when={panelData.achievements.loading} fallback={
+      <Show when={data() !== undefined}>
+        <div class="panel-section" id="panel-section-achievements">
+          <Show when={data()} fallback={<><div class="panel-section-title">Achievements</div><div class="panel-no-data">Couldn't load achievements.</div></>}>
+            {d => (
+              <Show when={d().total} fallback={<><div class="panel-section-title">Achievements</div><div class="panel-no-data">This game has no achievements.</div></>}>
+                <CollapsibleCard
+                  appid={props.game.appid}
+                  section="achievements"
+                  num={hasProgress() ? `${pct()}%` : '—'}
+                  numColor={hasProgress() ? scoreColor(pct()!) : null}
+                  val={<><b>Achievements</b> · {hasProgress() ? `${d().unlocked} / ${d().total} unlocked` : `${d().total} total`}</>}
+                  body={body}
+                  linkHref={d().steamUrl}
+                  linkTitle="View achievements on Steam"
+                />
+              </Show>
+            )}
+          </Show>
+        </div>
+      </Show>
+    }>
+      <div class="panel-section" id="panel-section-achievements">
+        <div class="panel-section-title">Achievements</div>
+        <div class="panel-achievements"><span class="sk" style={{ width: '100%', height: '48px', 'border-radius': '6px' }} /></div>
+      </div>
+    </Show>
   );
 }
 
-// Recent news/announcements (patch notes, event posts) — a handful of headlines, each
-// linking straight to the full post, plus a link to the game's full news hub on the Steam
-// store for anything older than what's shown here. Dates use the same plain-ISO convention
-// as fmtLastPlayed/the table's date columns rather than a relative "3 days ago" string.
 // The "Owned by" card — one row per member of the current account who owns this game: name,
 // when they last played it, and their own playtime with a meter relative to the most-played
 // member. Renders nothing at all when nobody in the account owns it, when no account is loaded,
-// or before loadOwners has resolved.
+// or before the `owners` resource has resolved. Takes no `game` prop — that resource is already
+// keyed on whichever game is open, so there'd be nothing for one to do.
 //
 // Deliberately shown even for a single-account slot, where it's one row: "owned, never played"
 // is itself worth seeing, and it's the only place last-played shows up in the panel.
-function OwnersSection(props: { game: Game }): JSX.Element {
-  const owners = (): GameOwner[] => props.game.owners ?? [];
+function OwnersSection(): JSX.Element {
+  const owners = (): GameOwner[] => panelData.owners() ?? [];
   const sorted = createMemo(() => sortOwners(owners()));
   const maxMinutes = createMemo(() => Math.max(...sorted().map(o => o.minutes), 1));
   return (
@@ -1123,55 +1009,55 @@ function OwnersSection(props: { game: Game }): JSX.Element {
   );
 }
 
-function NewsSection(props: { game: Game }): JSX.Element {
-  const g = props.game;
-  if (g.newsLoading) {
-    return (
+// Recent news/announcements (patch notes, event posts) — a handful of headlines, each
+// linking straight to the full post, plus a link to the game's full news hub on the Steam
+// store for anything older than what's shown here. Dates use the same plain-ISO convention
+// as fmtLastPlayed/the table's date columns rather than a relative "3 days ago" string.
+function NewsSection(props: { game: ReadonlyGame }): JSX.Element {
+  const items = () => panelData.news();
+  return (
+    <Show when={panelData.news.loading} fallback={
+      // A failed fetch with nothing to fall back on (`null` — see panelData.ts's fetchNews, which
+      // keeps a previous successful load rather than wiping it) is worth a visible message rather
+      // than silently looking identical to a game with no news at all.
+      <Show when={items() === null || items()?.length}>
+        <div class="panel-section" id="panel-section-news">
+          <Show when={items()} fallback={<><div class="panel-section-title">News</div><div class="panel-no-data">Couldn't load news.</div></>}>
+            {list => (
+              <CollapsibleCard
+                appid={props.game.appid}
+                section="news"
+                icon="📰"
+                // Spelling out "more on Steam" here (not just relying on the ↗ icon's title
+                // tooltip) makes it explicit that this list is a preview, not the full history.
+                val={<><b>News</b> · more on Steam</>}
+                body={
+                  <div class="panel-collapsible-body-pad">
+                    <div class="panel-news">
+                      <For each={list()}>
+                        {n => (
+                          <a class="panel-news-item" href={safeHref(n.url) || undefined} target="_blank" rel="noopener">
+                            <span class="panel-news-title">{n.title}</span>
+                            <span class="panel-news-meta">{fmtLastPlayed(n.date)}{n.feedLabel ? ` · ${n.feedLabel}` : ''}</span>
+                          </a>
+                        )}
+                      </For>
+                    </div>
+                  </div>
+                }
+                linkHref={`https://store.steampowered.com/news/app/${props.game.appid}`}
+                linkTitle="View all news on Steam"
+              />
+            )}
+          </Show>
+        </div>
+      </Show>
+    }>
       <div class="panel-section" id="panel-section-news">
         <div class="panel-section-title">News</div>
         <span class="sk" style={{ display: 'block', width: '100%', height: '48px', 'border-radius': '6px' }} />
       </div>
-    );
-  }
-  const items = g.news;
-  // `newsError` with nothing to fall back on (no prior successful load) is worth a visible
-  // message rather than silently looking identical to a game with no news at all.
-  if (g.newsError && !items) {
-    return (
-      <div class="panel-section" id="panel-section-news">
-        <div class="panel-section-title">News</div>
-        <div class="panel-no-data">Couldn't load news.</div>
-      </div>
-    );
-  }
-  if (!items || !items.length) return null;
-  return (
-    <div class="panel-section" id="panel-section-news">
-      <CollapsibleCard
-        appid={g.appid}
-        section="news"
-        icon="📰"
-        // Spelling out "more on Steam" here (not just relying on the ↗ icon's title tooltip)
-        // makes it explicit that this list is a preview, not the full history.
-        val={<><b>News</b> · more on Steam</>}
-        body={
-          <div class="panel-collapsible-body-pad">
-            <div class="panel-news">
-              <For each={items}>
-                {n => (
-                  <a class="panel-news-item" href={safeHref(n.url) || undefined} target="_blank" rel="noopener">
-                    <span class="panel-news-title">{n.title}</span>
-                    <span class="panel-news-meta">{fmtLastPlayed(n.date)}{n.feedLabel ? ` · ${n.feedLabel}` : ''}</span>
-                  </a>
-                )}
-              </For>
-            </div>
-          </div>
-        }
-        linkHref={`https://store.steampowered.com/news/app/${g.appid}`}
-        linkTitle="View all news on Steam"
-      />
-    </div>
+    </Show>
   );
 }
 
@@ -1182,89 +1068,99 @@ function NewsSection(props: { game: Game }): JSX.Element {
 // lows, every other shop) this card deliberately leaves out. See the original panel.ts's own
 // (much longer) header comment — preserved in git history — for the full "where do these
 // numbers come from" reasoning; unchanged by this conversion.
-function PriceSection(props: { game: Game }): JSX.Element {
-  const g = props.game;
-  if (g.priceLoading) {
+function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
+  // Either the host route's own batched prices (already on the row) or this panel's own lookup —
+  // see panelPriceFields. `undefined` means nothing priced this game and nothing is going to.
+  const p = () => panelPriceFields(props.game);
+  // Narrowed to "has a price": `bestDealPrice` is nullable on the row shape, and everything
+  // below (the amount, the record tier, the lows it's compared against) only exists when it isn't
+  // null — one check here rather than a non-null assertion at each use.
+  const deal = () => {
+    const v = p();
+    return v && v.bestDealPrice != null ? (v as PriceFields & { bestDealPrice: number }) : null;
+  };
+  // dealRecordTier (public/utils.ts) is the single shared source of this tier/color/icon logic.
+  const rec = () => { const d = deal(); return d ? dealRecordTier(d.bestDealPrice, d) : null; };
+  const shopUrl = () => safeHref(deal()?.bestDealUrl);
+  const tooltip = () => {
+    const shop = deal()?.bestDealShop;
+    return shop ? `${shop}${rec() ? ` — ${rec()!.tooltipLabel}` : ''}` : '';
+  };
+
+  // Historical lows (all-time/1yr/3mo) — see the original file's own (much longer) comment,
+  // preserved in git history, for the full "why collapse equal-amount tiers" reasoning.
+  const lowGroups = createMemo(() => {
+    const d = deal();
+    const groups: { amount: number; tiers: typeof DEAL_RECORD_TIERS[number][] }[] = [];
+    if (!d) return groups;
+    for (const t of [...DEAL_RECORD_TIERS].reverse()) {
+      const amount = d[t.low];
+      if (amount == null || amount === d.bestDealPrice) continue;
+      const last = groups[groups.length - 1];
+      if (last && last.amount === amount) last.tiers.unshift(t);
+      else groups.push({ amount, tiers: [t] });
+    }
+    return groups;
+  });
+
+  const line = () => {
+    const d = deal()!;
+    // `0` (the best deal genuinely isn't any cheaper than Steam) is treated the same as `null`/
+    // undefined (no discount to show) — "if any" per the spec, not a flat "-0%" reading as noise.
+    // The shop name, and — unlike the table cell, which stays tooltip-only since it's
+    // space-constrained — the *whole rest of the card* doubles as the buy link (see the original
+    // file's own comment, preserved in git history, for the full reasoning).
     return (
+      <>
+        <span class="panel-price-amount" style={{ ...(rec() ? { color: rec()!.color } : {}), ...(rec()?.bold ? { 'font-weight': 700 } : {}) }}>
+          {formatMoney(d.bestDealPrice, d.priceCurrency)}{rec() ? ' ' + rec()!.icon : ''}
+        </span>
+        <Show when={d.bestDealCut}>
+          <><span class="panel-price-sep">·</span><span class="panel-price-discount">-{d.bestDealCut}%</span></>
+        </Show>
+        <Show when={d.bestDealShop}>
+          <><span class="panel-price-sep">·</span><span class="panel-price-shop">{shopUrl() ? 'Buy at ' : 'at '}{d.bestDealShop}{shopUrl() ? ' ↗' : ''}</span></>
+        </Show>
+      </>
+    );
+  };
+
+  return (
+    <Show when={panelData.price.loading} fallback={
+      <Show when={p() !== undefined}>
+        <div class="panel-section panel-card" id="panel-section-price">
+          <div class="panel-section-title">Price <a href={`https://isthereanydeal.com/steam/app/${props.game.appid}`} target="_blank" rel="noopener">IsThereAnyDeal ↗</a></div>
+          <Show when={deal()} fallback={<div class="panel-no-data">No pricing data available.</div>}>
+            <Show when={shopUrl()} fallback={<div class="panel-price-line" title={tooltip() || undefined}>{line()}</div>}>
+              {url => <a class="panel-price-line panel-price-line--link" href={url()} target="_blank" rel="noopener" title={tooltip() || undefined}>{line()}</a>}
+            </Show>
+            <Show when={lowGroups().length}>
+              <div class="panel-price-lows">
+                <For each={lowGroups()}>
+                  {({ amount, tiers }, i) => {
+                    const icons = tiers.map(t => t.icon).join('');
+                    const label = tiers.map(t => t.statusLabel).join(' / ');
+                    const lowColor = tiers[0].color; // rarest tier in the group leads the color too
+                    const money = () => formatMoney(amount, deal()?.priceCurrency ?? null);
+                    return (
+                      <>
+                        <Show when={i() > 0}><span class="panel-price-sep">·</span></Show>
+                        <span class="panel-price-low" title={`${label}: ${money()}`} style={{ color: lowColor }}>{money()} {icons}</span>
+                      </>
+                    );
+                  }}
+                </For>
+              </div>
+            </Show>
+          </Show>
+        </div>
+      </Show>
+    }>
       <div class="panel-section panel-card" id="panel-section-price">
         <div class="panel-section-title">Price</div>
         <span class="sk" style={{ display: 'block', width: '100%', height: '32px', 'border-radius': '6px' }} />
       </div>
-    );
-  }
-  if (g.bestDealPrice === undefined) return null; // never priced (or not loaded yet)
-
-  const itadUrl = `https://isthereanydeal.com/steam/app/${g.appid}`;
-  const titleEl = <div class="panel-section-title">Price <a href={itadUrl} target="_blank" rel="noopener">IsThereAnyDeal ↗</a></div>;
-
-  if (g.bestDealPrice == null) {
-    return <div class="panel-section panel-card" id="panel-section-price">{titleEl}<div class="panel-no-data">No pricing data available.</div></div>;
-  }
-
-  // dealRecordTier (public/utils.ts) is the single shared source of this tier/color/icon logic.
-  const rec = dealRecordTier(g.bestDealPrice, g);
-  const color = rec ? rec.color : null;
-  const boldStyle = rec?.bold ? { 'font-weight': 700 } : {};
-  const badge = rec ? ' ' + rec.icon : '';
-  const tooltip = g.bestDealShop ? `${g.bestDealShop}${rec ? ` — ${rec.tooltipLabel}` : ''}` : '';
-
-  // `0` (the best deal genuinely isn't any cheaper than Steam) is treated the same as `null`/
-  // undefined (no discount to show) — "if any" per the spec, not a flat "-0%" reading as noise.
-  const discountEl = g.bestDealCut
-    ? <><span class="panel-price-sep">·</span><span class="panel-price-discount">-{g.bestDealCut}%</span></>
-    : null;
-
-  // The shop name, and — unlike the table cell, which stays tooltip-only since it's
-  // space-constrained — the *whole rest of the card* doubles as the buy link (see the
-  // original file's own comment, preserved in git history, for the full reasoning).
-  const shopUrl = safeHref(g.bestDealUrl);
-  const shopEl = g.bestDealShop
-    ? <><span class="panel-price-sep">·</span><span class="panel-price-shop">{shopUrl ? 'Buy at ' : 'at '}{g.bestDealShop}{shopUrl ? ' ↗' : ''}</span></>
-    : null;
-  const lineInner = (
-    <>
-      <span class="panel-price-amount" style={{ ...(color ? { color } : {}), ...boldStyle }}>{formatMoney(g.bestDealPrice, g.priceCurrency)}{badge}</span>
-      {discountEl}
-      {shopEl}
-    </>
-  );
-  const lineEl = shopUrl
-    ? <a class="panel-price-line panel-price-line--link" href={shopUrl} target="_blank" rel="noopener" title={tooltip || undefined}>{lineInner}</a>
-    : <div class="panel-price-line" title={tooltip || undefined}>{lineInner}</div>;
-
-  // Historical lows (all-time/1yr/3mo) — see the original file's own (much longer) comment,
-  // preserved in git history, for the full "why collapse equal-amount tiers" reasoning.
-  const presentTiers = [...DEAL_RECORD_TIERS].reverse().filter(t => (g as any)[t.low] != null && (g as any)[t.low] !== g.bestDealPrice);
-  const lowGroups: { amount: number; tiers: typeof DEAL_RECORD_TIERS[number][] }[] = [];
-  for (const t of presentTiers) {
-    const amount = (g as any)[t.low] as number; // filtered non-null above
-    const last = lowGroups[lowGroups.length - 1];
-    if (last && last.amount === amount) last.tiers.unshift(t);
-    else lowGroups.push({ amount, tiers: [t] });
-  }
-
-  return (
-    <div class="panel-section panel-card" id="panel-section-price">
-      {titleEl}
-      {lineEl}
-      <Show when={lowGroups.length}>
-        <div class="panel-price-lows">
-          <For each={lowGroups}>
-            {({ amount, tiers }, i) => {
-              const icons = tiers.map(t => t.icon).join('');
-              const label = tiers.map(t => t.statusLabel).join(' / ');
-              const lowColor = tiers[0].color; // rarest tier in the group leads the color too
-              return (
-                <>
-                  <Show when={i() > 0}><span class="panel-price-sep">·</span></Show>
-                  <span class="panel-price-low" title={`${label}: ${formatMoney(amount, g.priceCurrency)}`} style={{ color: lowColor }}>{formatMoney(amount, g.priceCurrency)} {icons}</span>
-                </>
-              );
-            }}
-          </For>
-        </div>
-      </Show>
-    </div>
+    </Show>
   );
 }
 
@@ -1273,19 +1169,23 @@ function PriceSection(props: { game: Game }): JSX.Element {
 // appdetails response, see extractAppDetails in lib/steam.js). Same real-`<a href>` /
 // intercepted-click treatment as a DLC entry, just walking the base-game/DLC relationship
 // in the other direction via the same navigateToGame.
-function BaseGameLink(props: { game: Game }): JSX.Element {
-  const fg = props.game.details?.meta?.fullgame;
-  if (!fg) return null;
+function BaseGameLink(props: { game: ReadonlyGame }): JSX.Element {
+  const fg = () => props.game.details?.meta?.fullgame;
   const onClick = (e: MouseEvent) => {
-    if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    const base = fg();
+    if (!base || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
-    navigateToGame(fg.appid, fg.name || '');
+    navigateToGame(base.appid, base.name || '');
   };
-  return <>DLC for <a class="panel-basegame-link" href={withAccountParam(`/game/${fg.appid}`)} onClick={onClick}>{fg.name || `App ${fg.appid}`}</a></>;
+  return (
+    <Show when={fg()}>
+      {base => <>DLC for <a class="panel-basegame-link" href={withAccountParam(`/game/${base().appid}`)} onClick={onClick}>{base().name || `App ${base().appid}`}</a></>}
+    </Show>
+  );
 }
 
-// DLC — a base game's downloadable content, collapsed by default (see loadDlc above for
-// why it's the one card whose body isn't already loaded by render time). The collapsed
+// DLC — a base game's downloadable content, collapsed by default (see panelData.ts's fetchDlc
+// for why it's the one card whose body isn't already loaded by render time). The collapsed
 // header's count comes straight from `meta.dlc` (the bare appid list, free — see
 // extractAppDetails in lib/steam.js) so it's shown immediately even before the card is ever
 // expanded; only the expanded body's names/capsules depend on the lazy fetch. Each entry is
@@ -1321,45 +1221,52 @@ function DlcItem(props: { d: DlcEntry }): JSX.Element {
   );
 }
 
-function DlcSection(props: { game: Game }): JSX.Element {
-  const g = props.game;
-  const dlcIds = g.details?.meta?.dlc;
-  if (!dlcIds || !dlcIds.length) return null;
+function DlcSection(props: { game: ReadonlyGame }): JSX.Element {
+  const dlcIds = () => props.game.details?.meta?.dlc ?? [];
+  // Whichever entries have already resolved, for the streamed-in-as-they-land state below —
+  // tagged with the appid they belong to, so a partial list is never shown under another game.
+  const loaded = () => {
+    const partial = panelData.dlcPartial();
+    return (partial?.appid === props.game.appid ? partial.entries : []).filter((d): d is DlcEntry => d != null);
+  };
+  const skeleton = <div class="panel-collapsible-body-pad"><span class="sk" style={{ display: 'block', width: '100%', height: '48px', 'border-radius': '6px' }} /></div>;
 
-  let body: JSX.Element = <div class="panel-collapsible-body-pad"><span class="sk" style={{ display: 'block', width: '100%', height: '48px', 'border-radius': '6px' }} /></div>;
-  if (g.dlcLoading) {
-    // Stream in whichever entries have already resolved instead of holding the whole card on
-    // its skeleton until every single one settles (see loadDlc's own comment).
-    const loaded = (g.dlcPartial || []).filter((d): d is DlcEntry => d != null);
-    const remaining = dlcIds.length - loaded.length;
-    if (loaded.length) {
-      body = (
+  const body = () => {
+    if (panelData.dlc.loading) {
+      // Stream in whichever entries have already resolved instead of holding the whole card on
+      // its skeleton until every single one settles (see panelData.ts's fetchDlc).
+      const done = loaded();
+      if (!done.length) return skeleton;
+      const remaining = dlcIds().length - done.length;
+      return (
         <div class="panel-dlc-list">
-          <For each={loaded}>{d => <DlcItem d={d} />}</For>
+          <For each={done}>{d => <DlcItem d={d} />}</For>
           <Show when={remaining}>{n => <div class="panel-dlc-loading-more">Loading {n()} more…</div>}</Show>
         </div>
       );
     }
-  } else if (g.dlc === null) {
-    body = <div class="panel-collapsible-body-pad"><div class="panel-no-data">Couldn't load DLC details.</div></div>;
-  } else if (g.dlc) {
-    body = g.dlc.length
-      ? <div class="panel-dlc-list"><For each={sortDlcByRelease(g.dlc)}>{d => <DlcItem d={d} />}</For></div>
+    const entries = panelData.dlc();
+    if (entries === null) return <div class="panel-collapsible-body-pad"><div class="panel-no-data">Couldn't load DLC details.</div></div>;
+    if (!entries) return skeleton;
+    return entries.length
+      ? <div class="panel-dlc-list"><For each={sortDlcByRelease(entries)}>{d => <DlcItem d={d} />}</For></div>
       : <div class="panel-collapsible-body-pad"><div class="panel-no-data">No DLC details available.</div></div>;
-  }
+  };
 
   return (
-    <div class="panel-section" id="panel-section-dlc">
-      <CollapsibleCard
-        appid={g.appid}
-        section="dlc"
-        icon="📦"
-        val={<><b>DLC</b> · {dlcIds.length} available</>}
-        body={body}
-        linkHref={`https://store.steampowered.com/dlc/${g.appid}/`}
-        linkTitle="View all DLC on Steam"
-      />
-    </div>
+    <Show when={dlcIds().length}>
+      <div class="panel-section" id="panel-section-dlc">
+        <CollapsibleCard
+          appid={props.game.appid}
+          section="dlc"
+          icon="📦"
+          val={<><b>DLC</b> · {dlcIds().length} available</>}
+          body={body()}
+          linkHref={`https://store.steampowered.com/dlc/${props.game.appid}/`}
+          linkTitle="View all DLC on Steam"
+        />
+      </div>
+    </Show>
   );
 }
 
@@ -1407,15 +1314,13 @@ function HeroMain(props: { items: MediaItem[] }): JSX.Element {
 }
 
 function PanelHero(): JSX.Element {
-  // Reads `revision()` too, not just `panelGame()` — a standalone "look up any game" open
-  // (or a DLC/base-game navigation hop) shows the panel immediately against a bare skeleton
-  // object (`{loading: true, details: null}`), *then* asynchronously fetches and mutates that
-  // *same* object once real metadata (screenshots/videos) arrives, notifying via
-  // `renderPanelBody`/`revision` — not a new `panelGame()` reference. Without reading
-  // `revision()` here too, this component's own JSX expressions (the only place `items()` is
-  // actually called reactively) never re-run for that case, and the hero stays stuck on
-  // whatever media (often none) was available at the very first render — confirmed live.
-  const items = () => { revision(); const g = panelGame(); return g ? buildMediaItems(g.appid, g.details?.meta) : []; };
+  // `g.details?.meta` is read here, inside an accessor, rather than captured once — a standalone
+  // "look up any game" open (or a DLC/base-game navigation hop) shows the panel immediately
+  // against a bare skeleton row (`{loading: true, details: null}`) and fills in real metadata
+  // (screenshots/videos) asynchronously, without ever replacing the row object itself. Reading
+  // the field through the store row is what makes the hero pick that up; it used to need a
+  // `revision()` read here for the same reason, back when the row was a plain object.
+  const items = () => { const g = panelGame(); return g ? buildMediaItems(g.appid, g.details?.meta) : []; };
   const idx = () => Math.max(0, Math.min(heroIdx(), items().length - 1));
   const hasMany = () => items().length > 1;
   let filmstripEl: HTMLDivElement | undefined;
@@ -1478,254 +1383,318 @@ function PanelHero(): JSX.Element {
 }
 
 // ── The rest of the panel body ───────────────────────────────────────────────
-// Unlike the hero above, this is deliberately one coarse reactive block, re-computed in
-// full on every `revision`/`panelGame` change — the same "rebuild the whole thing" behavior
-// the original innerHTML-based renderPanelBody had, just expressed as a fresh JSX tree each
-// time instead of a fresh HTML string. Nothing here needs finer-grained isolation the way
-// the hero does (stepping media is by far the most frequent single interaction).
-function PanelRest(): JSX.Element {
-  const g = panelGame();
-  if (!g) return null;
-  const h = g.details?.hltb;
-  const meta = g.details?.meta;
+// Split into small components, each reading only the fields it renders — a game object is a
+// Solid store row now (see rowStore.ts), so a field written as data streams in patches just the
+// text node that shows it. This used to be one coarse block that re-read every field of the game
+// and rebuilt the entire subtree on every `revision` bump: ~6 full teardowns per open (five
+// async loaders, most bumping on start and finish), each throwing away hover state, keyboard
+// focus and the scroll-spy's `active` class. See CLAUDE.md's "Frontend reactivity" section.
 
-  const storeUrl = `https://store.steampowered.com/app/${g.appid}`;
-  const itadUrl = `https://isthereanydeal.com/steam/app/${g.appid}`;
-  const releaseDate = meta?.releaseDate;
-  const description = meta?.description;
-  // `description` (Steam's `short_description`) can carry literal HTML entities as plain
-  // text (e.g. "Baldur's Gate..." legitimately has "&amp;" for "Dungeons & Dragons"), and
-  // JSX text interpolation doesn't decode entities on its own — decoding it inertly via a
-  // DOMParser document that's never attached to the page (runs no scripts, loads no
-  // resources) and then rendering the decoded *text* (never raw markup/innerHTML) is what
-  // the original file did too; preserved verbatim here since JSX interpolation is already
-  // exactly as safe as that plain-text insert was.
-  const decodedDescription = description ? new DOMParser().parseFromString(description, 'text/html').body.textContent || '' : '';
+// The HLTB Main/Extra/Completionist breakdown. The glance strip above already carries HLTB's
+// "All PlayStyles" number (see GlanceGrid), so this is the fuller breakdown beneath it, not a
+// second copy of the headline figure.
+function HltbSection(props: { game: ReadonlyGame }): JSX.Element {
+  const h = () => props.game.details?.hltb;
+  const present = () => {
+    const x = h();
+    return !props.game.loading && !!x && !!(x.main || x.extra || x.completionist);
+  };
+  const parts = () => {
+    const x = h();
+    return [x?.main && 'Main Story', x?.extra && 'Main + Extra', x?.completionist && 'Completionist'].filter(Boolean);
+  };
 
-  // The glance strip already carries HLTB's "All PlayStyles" number (see GlanceGrid above)
-  // — this is just the fuller Main/Extra/Completionist breakdown beneath it, once, not a
-  // second copy of the headline figure. Collapsed by default like achievements/news, EXCEPT
-  // when `all` itself is missing — then this breakdown is the only duration data the panel
-  // has at all, so hiding it behind a click would bury the one piece of HLTB info actually
-  // available for this game.
-  let hltbDetail: JSX.Element = null;
-  if (!g.loading && h && (h.main || h.extra || h.completionist)) {
-    if (!isSectionExpanded(g.appid, 'hltb') && h.all == null) {
-      const next = new Set(expandedSections());
-      next.add(`${g.appid}:hltb`);
-      setExpandedSections(next);
-    }
-    const parts = [h.main && 'Main Story', h.extra && 'Main + Extra', h.completionist && 'Completionist'].filter(Boolean);
-    hltbDetail = (
+  // Collapsed by default like achievements/news, EXCEPT when `all` itself is missing — then this
+  // breakdown is the only duration data the panel has at all, so hiding it behind a click would
+  // bury the one piece of HLTB info actually available for this game. An effect, not a write
+  // during render: a signal write inside a tracked scope is exactly the "changing state while
+  // deriving from it" mistake the store conversion is meant to make impossible.
+  createEffect(() => {
+    const x = h();
+    if (!present() || x?.all != null) return;
+    const key = `${props.game.appid}:hltb`;
+    if (expandedSections().has(key)) return;
+    setExpandedSections(prev => new Set(prev).add(key));
+  });
+
+  return (
+    <Show when={present()}>
       <div class="panel-section" id="panel-section-hltb">
         <CollapsibleCard
-          appid={g.appid}
+          appid={props.game.appid}
           section="hltb"
           icon="⏱️"
-          val={<><b>How Long To Beat</b> · {parts.join(', ')}</>}
+          val={<><b>How Long To Beat</b> · {parts().join(', ')}</>}
           body={
             <div class="panel-collapsible-body-pad">
               <div class="panel-hltb">
-                <Show when={h.main}>{v => <div class="panel-hltb-item"><div class="panel-hltb-label">Main Story</div><div class="panel-hltb-val">{fmtH(v())}</div></div>}</Show>
-                <Show when={h.extra}>{v => <div class="panel-hltb-item"><div class="panel-hltb-label">Main + Extra</div><div class="panel-hltb-val">{fmtH(v())}</div></div>}</Show>
-                <Show when={h.completionist}>{v => <div class="panel-hltb-item"><div class="panel-hltb-label">Completionist</div><div class="panel-hltb-val">{fmtH(v())}</div></div>}</Show>
+                <Show when={h()?.main}>{v => <div class="panel-hltb-item"><div class="panel-hltb-label">Main Story</div><div class="panel-hltb-val">{fmtH(v())}</div></div>}</Show>
+                <Show when={h()?.extra}>{v => <div class="panel-hltb-item"><div class="panel-hltb-label">Main + Extra</div><div class="panel-hltb-val">{fmtH(v())}</div></div>}</Show>
+                <Show when={h()?.completionist}>{v => <div class="panel-hltb-item"><div class="panel-hltb-label">Completionist</div><div class="panel-hltb-val">{fmtH(v())}</div></div>}</Show>
               </div>
             </div>
           }
-          linkHref={h.id ? `https://howlongtobeat.com/game/${h.id}` : null}
+          linkHref={h()?.id ? `https://howlongtobeat.com/game/${h()!.id}` : null}
           linkTitle="View on HowLongToBeat"
         />
       </div>
-    );
-  }
+    </Show>
+  );
+}
 
-  // The caller passes each of the four TagKind literals; narrowing back to TagKind (not a
-  // bare string) is what lets the TagCloud call below type-check its `kind` field.
+// Same list of names in the same order — a developer list that's identical to the publisher list
+// is folded into one "Developer/Publisher" group rather than shown twice. Takes both arrays as
+// parameters rather than closing over them, so the element comparison reads its own arguments
+// rather than a captured reactive read (which `solid/reactivity` rightly can't tell apart from a
+// stale snapshot).
+function sameNames(a: string[], b: string[]): boolean {
+  return a.length > 0 && a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+// Tags/genres/categories/developer-publisher, as one cloud (see TagCloud above).
+function TagCloudSection(props: { game: ReadonlyGame }): JSX.Element {
+  const meta = () => props.game.details?.meta;
+  // The caller passes each of the four TagKind literals; narrowing back to TagKind (not a bare
+  // string) is what lets the TagCloud call below type-check its `kind` field.
   const tagDim = (key: string) => panelOptions.enableTagFilters ? (key as TagKind) : null;
-  const devs = meta?.developers || [];
-  const pubs = meta?.publishers || [];
-  const sameDevPub = devs.length > 0 && devs.length === pubs.length && devs.every((d, i) => d === pubs[i]);
-  const cloud = g.loading ? null : (
-    <TagCloud groups={[
-      { kind: 'tags', dim: tagDim('tags'), items: g.details?.tags },
-      { kind: 'genres', dim: tagDim('genres'), items: meta?.genres },
-      { kind: 'categories', dim: tagDim('categories'), items: meta?.categories },
-      { kind: 'devpub', dim: tagDim('developers'), items: devs },
+  const groups = createMemo(() => {
+    const devs = meta()?.developers || [];
+    const pubs = meta()?.publishers || [];
+    const sameDevPub = sameNames(devs, pubs);
+    return [
+      { kind: 'tags' as const, dim: tagDim('tags'), items: props.game.details?.tags },
+      { kind: 'genres' as const, dim: tagDim('genres'), items: meta()?.genres },
+      { kind: 'categories' as const, dim: tagDim('categories'), items: meta()?.categories },
+      { kind: 'devpub' as const, dim: tagDim('developers'), items: devs },
       ...(sameDevPub ? [] : [{ kind: 'devpub' as const, dim: tagDim('publishers'), items: pubs }]),
-    ]} />
+    ];
+  });
+  return (
+    <Show when={!props.game.loading}>
+      <TagCloud groups={groups()} />
+    </Show>
   );
+}
 
-  const refreshing = panelRefreshing();
-  const refreshBtn = (panelOptions.onRefresh && !g.loading) ? (
-    <button
-      type="button"
-      class={`panel-refresh-btn${refreshing ? ' is-refreshing' : ''}`}
-      disabled={refreshing}
-      title={`Refresh rating, HLTB & store details for this game${g.detailsFetchedAt === undefined ? '' : ` — last fetched ${fmtAge(g.detailsFetchedAt)}`}`}
-      aria-label="Refresh details"
-      onClick={handlePanelRefresh}
-    >↻</button>
-  ) : null;
-
-  // Computed as a plain boolean first (not by checking the rendered element's own
-  // truthiness — a `<Component/>` call is a truthy value regardless of what it renders to,
-  // including `null`) so metaLine's separator and baseGameSection itself can never disagree
-  // about whether there's actually a base game to show.
-  const hasBaseGame = !g.loading && !!g.details?.meta?.fullgame;
-  const baseGameSection = hasBaseGame ? <BaseGameLink game={g} /> : null;
-  const priceSection = g.loading ? null : <PriceSection game={g} />;
-  const dlcSection = g.loading ? null : <DlcSection game={g} />;
-  const newsSection = <NewsSection game={g} />;
-  const achievementsSection = <AchievementsSection game={g} />;
-
-  // "In library" / "On wishlist" status — unlike the Price card, this one *is* fetched by
-  // panel.tsx itself now (see loadOwnership below), against `currentAccount` (whichever
-  // account's list is actually on screen — see myOwnership.ts's own comment for why this used
-  // to be `myAccount` and isn't anymore) rather than a separately pinned identity, so it always
-  // has exactly one unambiguous /lists/owned or /lists/wishlist to link to. See the original
-  // file's own comment (preserved in git history) for the "why 'In library' not 'In your
-  // library'" reasoning this label wording still follows. Links to `?game=<appid>` on that list
-  // (not the bare route) so landing there also reopens this exact game, same as `copyPanelLink`'s
-  // own `/game/<appid>` link opens a specific game rather than just a list.
-  // withAccountParam: these badges answer "does the account currently on screen have this",
-  // which is the `?u=` link's account when one is being explored (see myOwnership.ts /
-  // accountsStore.ts's own `?u=` section) — so the list they link to has to be that same
-  // account's, not the visitor's own stored one. `copyPanelLink` above deliberately does NOT do
-  // this: that link is the game's canonical shareable address, and carrying whichever account
-  // the sender happened to be exploring into it would make it explore that account for everyone
-  // it's shared with.
-  const ownershipRow = (g.inLibrary == null && g.onWishlist == null) ? null : (
-    <div class="panel-ownership-row">
-      <Show when={g.inLibrary}><A class="panel-ownership-badge owned" href={withAccountParam(`/lists/owned?game=${g.appid}`)}>✓ In library</A></Show>
-      <Show when={g.onWishlist}><A class="panel-ownership-badge wishlisted" href={withAccountParam(`/lists/wishlist?game=${g.appid}`)}>☆ On wishlist</A></Show>
-    </div>
-  );
-
-  // A free demo is a "try before you buy" call to action, not supplementary info like
-  // Website/Workshop below.
-  const demoBanner = (!g.loading && g.details?.demo) ? (
-    <a class="panel-demo-banner" href={safeHref(`https://store.steampowered.com/app/${g.details.demo}`) || undefined} target="_blank" rel="noopener">
-      <span class="panel-demo-banner-icon">🎮</span> Try the Free Demo
-    </a>
-  ) : null;
-
-  // Store and ITAD are the two links everyone wants at a glance and stay directly in the
-  // row — Workshop/Website are each conditional, tucked into a single "⋯ More" menu instead
-  // (see the original file's own comment, preserved in git history, for the full reasoning).
-  const moreLinkItems = [
-    !g.loading && (meta?.categories || []).includes('Steam Workshop') &&
-      { icon: '🛠️', label: 'Steam Workshop', href: `https://steamcommunity.com/app/${g.appid}/workshop/` },
-    meta?.website && { icon: '🌐', label: 'Official Website', href: meta.website },
-    { icon: '🔎', label: 'More Like This (Steam)', href: `https://store.steampowered.com/recommended/morelike/app/${g.appid}/` },
+// Store and ITAD are the two links everyone wants at a glance and stay directly in the header
+// row — Workshop/Website are each conditional, tucked into a single "⋯ More" menu instead (see
+// the original file's own comment, preserved in git history, for the full reasoning).
+function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
+  const items = () => [
+    !props.game.loading && (props.game.details?.meta?.categories || []).includes('Steam Workshop') &&
+      { icon: '🛠️', label: 'Steam Workshop', href: `https://steamcommunity.com/app/${props.game.appid}/workshop/` },
+    props.game.details?.meta?.website && { icon: '🌐', label: 'Official Website', href: props.game.details.meta.website },
+    { icon: '🔎', label: 'More Like This (Steam)', href: `https://store.steampowered.com/recommended/morelike/app/${props.game.appid}/` },
   ].filter((it): it is { icon: string; label: string; href: string } => !!it);
-  const moreLinksOpenNow = moreLinksOpen();
-  const moreLinks = moreLinkItems.length ? (
-    <div class="panel-icon-more">
-      <button type="button" class="panel-icon-link panel-icon-more-btn" aria-haspopup="true" aria-expanded={moreLinksOpenNow ? 'true' : 'false'} title="More links" aria-label="More links" onClick={() => setMoreLinksOpen(!moreLinksOpenNow)}>⋯</button>
-      <Show when={moreLinksOpenNow}>
-        <div class="panel-icon-more-menu">
-          <For each={moreLinkItems}>{it => <a class="panel-icon-more-item" href={safeHref(it.href) || undefined} target="_blank" rel="noopener">{it.icon} {it.label}</a>}</For>
-        </div>
-      </Show>
-    </div>
-  ) : null;
 
-  // "← Back" only appears once a DLC hop is actually in progress — a plain table-row click
-  // never gets this button, only a game reached by following a DLC link (or by going back
-  // through more than one of them) does.
-  const hist = panelHistory();
-  const backBtn = hist.length ? (
-    <button type="button" class="panel-back-btn" title={`Back to ${hist[hist.length - 1].name}`} onClick={panelGoBack}>
-      &#8249; {hist[hist.length - 1].name}
-    </button>
-  ) : null;
-
-  // A sticky jump-nav for the sections below the fold — see the original file's own comment
-  // (preserved in git history) for the full reasoning. Listed in the same order the sections
-  // actually appear below (Owners right after the tag cloud, ahead of the collapsibles) so
-  // scroll-spy highlighting (see updateSubnavScrollSpy) always lights up left-to-right.
-  // Each condition below mirrors its own *Section function's exact gating logic (loading
-  // skeleton and "couldn't load" states count as "has a section to jump to", same as the
-  // original file's own `newsSectionHtml`/`achievementsSectionHtml` non-empty-string checks
-  // — not just "has real content"), computed as plain booleans rather than by checking a
-  // rendered `<Component/>` call's own truthiness (always truthy regardless of what it
-  // renders to, including `null` — see hasBaseGame's own comment above for the same pitfall).
-  const hasNewsSection = g.newsLoading || (g.newsError && !g.news) || !!(g.news && g.news.length);
-  const hasAchievementsSection = g.achievementsLoading || g.achievements !== undefined;
-  const hasDlcSection = !!(meta?.dlc && meta.dlc.length);
-  const subnavItems = [
-    !!(g.owners && g.owners.length) && { label: 'Owned by', target: 'panel-section-owners' },
-    hltbDetail && { label: 'HLTB', target: 'panel-section-hltb' },
-    hasNewsSection && { label: 'News', target: 'panel-section-news' },
-    hasAchievementsSection && { label: 'Achievements', target: 'panel-section-achievements' },
-    hasDlcSection && { label: 'DLC', target: 'panel-section-dlc' },
-  ].filter((it): it is { label: string; target: string } => !!it);
-  const subnav = subnavItems.length < 2 ? null : (
-    <div class="panel-subnav">
-      <button type="button" class="panel-subnav-btn" data-target="top" onClick={() => jumpToPanelSection('top')}>Overview</button>
-      <For each={subnavItems}>{it => <button type="button" class="panel-subnav-btn" data-target={it.target} onClick={() => jumpToPanelSection(it.target)}>{it.label}</button>}</For>
-    </div>
+  return (
+    <Show when={items().length}>
+      <div class="panel-icon-more">
+        <button type="button" class="panel-icon-link panel-icon-more-btn" aria-haspopup="true" aria-expanded={moreLinksOpen() ? 'true' : 'false'} title="More links" aria-label="More links" onClick={() => setMoreLinksOpen(!moreLinksOpen())}>⋯</button>
+        <Show when={moreLinksOpen()}>
+          <div class="panel-icon-more-menu">
+            <For each={items()}>{it => <a class="panel-icon-more-item" href={safeHref(it.href) || undefined} target="_blank" rel="noopener">{it.icon} {it.label}</a>}</For>
+          </div>
+        </Show>
+      </div>
+    </Show>
   );
+}
+
+function RefreshButton(props: { game: ReadonlyGame }): JSX.Element {
+  const age = () => props.game.detailsFetchedAt === undefined ? '' : ` — last fetched ${fmtAge(props.game.detailsFetchedAt)}`;
+  return (
+    <Show when={panelOptions.onRefresh && !props.game.loading}>
+      <button
+        type="button"
+        class={`panel-refresh-btn${panelRefreshing() ? ' is-refreshing' : ''}`}
+        disabled={panelRefreshing()}
+        title={`Refresh rating, HLTB & store details for this game${age()}`}
+        aria-label="Refresh details"
+        onClick={handlePanelRefresh}
+      >↻</button>
+    </Show>
+  );
+}
+
+// "In library" / "On wishlist" status — unlike the Price card, this one *is* fetched by panel.tsx
+// itself (the `ownership` resource above), against `currentAccount` (whichever account's list is
+// actually on screen — see myOwnership.ts's own comment for why this used to be `myAccount` and
+// isn't anymore) rather than a separately pinned identity, so it always has exactly one
+// unambiguous /lists/owned or /lists/wishlist to link to. See the original file's own comment
+// (preserved in git history) for the "why 'In library' not 'In your library'" reasoning this
+// label wording still follows. Links to `?game=<appid>` on that list (not the bare route) so
+// landing there also reopens this exact game, same as `copyPanelLink`'s own `/game/<appid>` link
+// opens a specific game rather than just a list.
+//
+// withAccountParam: these badges answer "does the account currently on screen have this", which
+// is the `?u=` link's account when one is being explored (see myOwnership.ts / accountsStore.ts's
+// own `?u=` section) — so the list they link to has to be that same account's, not the visitor's
+// own stored one. `copyPanelLink` above deliberately does NOT do this: that link is the game's
+// canonical shareable address, and carrying whichever account the sender happened to be exploring
+// into it would make it explore that account for everyone it's shared with.
+//
+// Read off the resource, not off `g.inLibrary`/`g.onWishlist`: those two fields still exist, but
+// they're the *table's* copy of this, stamped onto every row by the host route for its ✓/☆
+// name-cell markers (see gameColumns.ts) — a standalone lookup or a DLC hop is never one of those
+// rows and would have no badge at all. The resource answers for any open game, and both go
+// through myOwnership.ts's one cached pair of sets, so they can't disagree.
+function OwnershipRow(props: { game: ReadonlyGame }): JSX.Element {
+  const own = () => panelData.ownership();
+  return (
+    <Show when={own()?.inLibrary || own()?.onWishlist}>
+      <div class="panel-ownership-row">
+        <Show when={own()?.inLibrary}><A class="panel-ownership-badge owned" href={withAccountParam(`/lists/owned?game=${props.game.appid}`)}>✓ In library</A></Show>
+        <Show when={own()?.onWishlist}><A class="panel-ownership-badge wishlisted" href={withAccountParam(`/lists/wishlist?game=${props.game.appid}`)}>☆ On wishlist</A></Show>
+      </div>
+    </Show>
+  );
+}
+
+// A sticky jump-nav for the sections below the fold — see the original file's own comment
+// (preserved in git history) for the full reasoning. Listed in the same order the sections
+// actually appear below (Owners right after the tag cloud, ahead of the collapsibles) so
+// scroll-spy highlighting (see updateSubnavScrollSpy) always lights up left-to-right.
+function PanelSubnav(props: { game: ReadonlyGame }): JSX.Element {
+  // Each condition counts a section only once it has *confirmed* content (or a confirmed
+  // failure, which renders its own "couldn't load" card) — deliberately NOT while its fetch is
+  // still in flight, even though the loading skeleton is on screen by then. A still-pending
+  // section isn't a jump target yet, and counting one makes this list non-monotonic: News would
+  // be true while `news.loading`, then false again for a game whose news resolves empty. Through
+  // the `< 2` gate below, that took the whole bar — Overview button included — down with it, so
+  // the bar flashed in and out as the panel's own fetches settled (measured live: visible at
+  // 4104ms, gone at 4126ms, for a game with no news/HLTB/DLC). Every term here now only ever
+  // goes absent → present as a game loads, so the bar appears at most once per open and never
+  // disappears.
+  //
+  // Each mirrors its own section component's gating, computed as a plain boolean rather than by
+  // checking a rendered `<Component/>` call's own truthiness (always truthy regardless of what it
+  // renders to, including `null`).
+  const items = createMemo(() => {
+    const g = props.game;
+    const h = g.details?.hltb;
+    const news = panelData.news();
+    return [
+      !!panelData.owners()?.length && { label: 'Owned by', target: 'panel-section-owners' },
+      !g.loading && !!h && !!(h.main || h.extra || h.completionist) && { label: 'HLTB', target: 'panel-section-hltb' },
+      (news === null || !!news?.length) && { label: 'News', target: 'panel-section-news' },
+      panelData.achievements() !== undefined && { label: 'Achievements', target: 'panel-section-achievements' },
+      !!g.details?.meta?.dlc?.length && { label: 'DLC', target: 'panel-section-dlc' },
+    ].filter((it): it is { label: string; target: string } => !!it);
+  });
+
+  // Re-run the scroll-spy whenever the set of buttons changes, since a newly rendered button
+  // starts out without the `active` class the spy assigns imperatively (it has to measure where
+  // each section actually sits). Queued as a microtask so it runs after Solid has patched the
+  // DOM. Nothing else needs this anymore: the buttons themselves are no longer thrown away and
+  // rebuilt every time some unrelated field of the game changes.
+  createEffect(() => {
+    items();
+    queueMicrotask(updateSubnavScrollSpy);
+  });
+
+  return (
+    <Show when={items().length >= 2}>
+      <div class="panel-subnav">
+        <button type="button" class="panel-subnav-btn" data-target="top" onClick={() => jumpToPanelSection('top')}>Overview</button>
+        <For each={items()}>{it => <button type="button" class="panel-subnav-btn" data-target={it.target} onClick={() => jumpToPanelSection(it.target)}>{it.label}</button>}</For>
+      </div>
+    </Show>
+  );
+}
+
+function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
+  // The one deliberate capture of a "reactive variable" in this file: `props.game` is the game
+  // *object*, and PanelBody renders this component under a `keyed` <Show>, so a different game
+  // means a new PanelRest rather than a new value for this prop. The object itself is a Solid
+  // store row, so every `g.field` read below is still tracked individually — capturing the row
+  // is not the same thing as capturing a field of it.
+  // eslint-disable-next-line solid/reactivity
+  const g = props.game;
+  const meta = () => g.details?.meta;
+
+  // `description` (Steam's `short_description`) can carry literal HTML entities as plain text
+  // (e.g. "Baldur's Gate..." legitimately has "&amp;" for "Dungeons & Dragons"), and JSX text
+  // interpolation doesn't decode entities on its own — decoding it inertly via a DOMParser
+  // document that's never attached to the page (runs no scripts, loads no resources) and then
+  // rendering the decoded *text* (never raw markup/innerHTML) is what the original file did too;
+  // preserved verbatim here since JSX interpolation is already exactly as safe as that
+  // plain-text insert was.
+  const description = () => meta()?.description;
+  const decodedDescription = () => {
+    const d = description();
+    return d ? new DOMParser().parseFromString(d, 'text/html').body.textContent || '' : '';
+  };
+
+  // "← Back" only appears once a DLC hop is actually in progress — a plain table-row click never
+  // gets this button, only a game reached by following a DLC link (or by going back through more
+  // than one of them) does.
+  const back = () => { const hist = panelHistory(); return hist.length ? hist[hist.length - 1] : null; };
 
   // Release date and "DLC for X" folded onto one line ("<date> · DLC for X") since both are
-  // short, secondary metadata about the same thing.
-  const metaLine = (releaseDate || baseGameSection) ? (
-    <div class="panel-release">{releaseDate}{releaseDate && baseGameSection ? <span class="panel-meta-sep"> · </span> : null}{baseGameSection}</div>
-  ) : null;
-
-  // Re-run the scroll-spy once the subnav (and every section it targets) has actually
-  // rendered — a re-render triggered mid-scroll (toggling a collapsible, the refresh
-  // button) shouldn't leave the old subnav's active button highlighted, or none at all,
-  // until the next scroll event fires. Queued as a microtask so it runs after Solid has
-  // actually patched the DOM for this render.
-  queueMicrotask(updateSubnavScrollSpy);
-
-  // DLC is the one collapsible card whose fetch is normally gated behind an actual click
-  // (see toggleSection/loadDlc above) — but `expandedSections` remembers "DLC is expanded"
-  // per appid for the rest of the session, independent of any one game *object*. Navigating
-  // to a game via a DLC link (or back, or prev/next/random) always creates/looks up a fresh
-  // game object with its own never-yet-fetched `dlc` — so if that appid's card was expanded
-  // at some earlier point this session, it renders open here too but with nothing loaded to
-  // show, and no click is ever going to happen to trigger the fetch since it's already
-  // open. Kick it off here instead whenever that mismatch shows up.
-  if (!g.loading && g.dlc === undefined && !g.dlcLoading && isSectionExpanded(g.appid, 'dlc')) queueMicrotask(() => loadDlc(g));
+  // short, secondary metadata about the same thing. `hasBaseGame` is a plain boolean rather than
+  // the rendered element's own truthiness (a `<Component/>` call is truthy regardless of what it
+  // renders to, including `null`) so the separator and the link itself can never disagree about
+  // whether there's a base game to show.
+  const releaseDate = () => meta()?.releaseDate;
+  const hasBaseGame = () => !g.loading && !!meta()?.fullgame;
 
   return (
     <>
       <div class="panel-header-sticky">
-        {backBtn}
+        <Show when={back()}>
+          {prev => (
+            <button type="button" class="panel-back-btn" title={`Back to ${prev().name}`} onClick={panelGoBack}>
+              &#8249; {prev().name}
+            </button>
+          )}
+        </Show>
         <div class="panel-title-row">
           <div>
             {/* The `App <appid>` fallback is presentational only — a game looked up by bare appid
                 has no name at all until store metadata resolves one, and nothing persists this
                 string as if it were a real title (see ListRoute.tsx's recents mapping). */}
             <div class="panel-title" id="panel-title">{g.name || `App ${g.appid}`}</div>
-            {metaLine}
-            {ownershipRow}
+            <Show when={releaseDate() || hasBaseGame()}>
+              <div class="panel-release">
+                {releaseDate()}
+                <Show when={releaseDate() && hasBaseGame()}><span class="panel-meta-sep"> · </span></Show>
+                <Show when={hasBaseGame()}><BaseGameLink game={g} /></Show>
+              </div>
+            </Show>
+            <OwnershipRow game={g} />
           </div>
           <div class="panel-icon-links">
-            <a class="panel-icon-link" href={storeUrl} target="_blank" rel="noopener" title="Steam Store" aria-label="Steam Store">🛒</a>
-            <a class="panel-icon-link" href={itadUrl} target="_blank" rel="noopener" title="IsThereAnyDeal" aria-label="IsThereAnyDeal">$</a>
-            {moreLinks}
+            <a class="panel-icon-link" href={`https://store.steampowered.com/app/${g.appid}`} target="_blank" rel="noopener" title="Steam Store" aria-label="Steam Store">🛒</a>
+            <a class="panel-icon-link" href={`https://isthereanydeal.com/steam/app/${g.appid}`} target="_blank" rel="noopener" title="IsThereAnyDeal" aria-label="IsThereAnyDeal">$</a>
+            <MoreLinks game={g} />
             <span class="panel-icon-divider" role="separator" aria-hidden="true" />
             <button type="button" class="panel-icon-link panel-copy-link-btn" title="Copy link to this game" aria-label="Copy link to this game" onClick={copyPanelLink}>🔗</button>
-            {refreshBtn}
+            <RefreshButton game={g} />
           </div>
         </div>
-        {subnav}
+        <PanelSubnav game={g} />
       </div>
-      {demoBanner}
-      <GlanceGrid game={g} />
-      {priceSection}
-      <Show when={description}>
-        <div class="panel-desc panel-card" id="panel-desc">{decodedDescription}</div>
+      {/* A free demo is a "try before you buy" call to action, not supplementary info like the
+          Website/Workshop links tucked into "⋯ More". */}
+      <Show when={!g.loading && g.details?.demo}>
+        {demo => (
+          <a class="panel-demo-banner" href={safeHref(`https://store.steampowered.com/app/${demo().appid}`) || undefined} target="_blank" rel="noopener">
+            <span class="panel-demo-banner-icon">🎮</span> Try the Free Demo
+          </a>
+        )}
       </Show>
-      {cloud}
-      <OwnersSection game={g} />
-      {hltbDetail}
-      {newsSection}
-      {achievementsSection}
-      {dlcSection}
+      <GlanceGrid game={g} />
+      <Show when={!g.loading}><PriceSection game={g} /></Show>
+      <Show when={description()}>
+        <div class="panel-desc panel-card" id="panel-desc">{decodedDescription()}</div>
+      </Show>
+      <TagCloudSection game={g} />
+      <OwnersSection />
+      <HltbSection game={g} />
+      <NewsSection game={g} />
+      <AchievementsSection game={g} />
+      <Show when={!g.loading}><DlcSection game={g} /></Show>
     </>
   );
 }
@@ -1734,26 +1703,13 @@ function PanelBody(): JSX.Element {
   return (
     <>
       <PanelHero />
-      {(() => {
-        // Every signal `PanelRest`'s own top-level body reads (as a plain `const x =
-        // someSignal();` capture, not a call written directly inside one of its returned
-        // JSX `{}` expressions) needs to be read here too — a Solid component function is
-        // called once per mount and is itself *not* a reactive scope; only genuine JSX `{}`
-        // expressions get their own tracked effect. `PanelRest` is invoked via a plain
-        // component call (`<PanelRest/>` → `createComponent`), so a signal it only reads at
-        // its own top level (`moreLinksOpen`/`panelRefreshing`/`panelHistory`, alongside
-        // `panelGame` itself) would otherwise never cause this to re-run — confirmed live:
-        // before this fix, the "⋯ More links" button's own click handler correctly flipped
-        // `moreLinksOpen`, but nothing ever re-rendered off it (0 DOM mutations, verified via
-        // a MutationObserver), because `moreLinksOpenNow` had already been resolved to a
-        // plain boolean before PanelRest's JSX ever referenced it. `expandedSections`/
-        // `revealedAchievements`/`achievementsFilter` don't need to be listed here — every
-        // place that reads them (CollapsibleCard's own `expanded()`, an achievement row's own
-        // `spoiler()`/`revealed()`) calls the signal directly inside its own JSX expression,
-        // which Solid does track independently, regardless of this outer scope.
-        revision(); panelGame(); moreLinksOpen(); panelRefreshing(); panelHistory();
-        return <PanelRest />;
-      })()}
+      {/* `keyed`, so the body below is rebuilt when the panel moves to a *different game* — and
+          only then. Every field of the game itself is read reactively off the store row (see
+          PanelRest), so data streaming in for the game already on screen patches the one thing it
+          changed instead of re-rendering anything. */}
+      <Show when={panelGame()} keyed>
+        {game => <PanelRest game={game} />}
+      </Show>
     </>
   );
 }

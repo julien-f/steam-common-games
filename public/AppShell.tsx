@@ -163,10 +163,13 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
         </For>
         <div class="app-search-wrap">
           <input ref={searchInputEl} id="app-search-input" type="text" placeholder="Look up any game…" autocomplete="off" />
-          <div id="app-search-results" class="game-search-results" hidden></div>
+          <div id="app-search-results" class="game-search-results" hidden />
         </div>
         <details class="site-nav-prefs">
           <summary class="site-nav-link site-nav-prefs-btn" aria-label="Preferences">⚙</summary>
+          {/* eslint-disable-next-line solid/no-innerhtml -- prefsPopoverPanelHtml() is this app's
+              own static markup for the popover's contents (prefsPopover.ts, which then wires the
+              region <select> up imperatively); no external input reaches it. */}
           <div innerHTML={prefsPopoverPanelHtml()} />
         </details>
       </nav>
@@ -179,8 +182,8 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
             comment and docs/list-centric-redesign.md). */}
         <div id="game-panel" class="game-panel" role="complementary" aria-labelledby="panel-title">
           <button id="panel-close" class="panel-close" aria-label="Close">×</button>
-          <div id="panel-nav" class="panel-nav"></div>
-          <div id="panel-body" class="panel-body"></div>
+          <div id="panel-nav" class="panel-nav" />
+          <div id="panel-body" class="panel-body" />
         </div>
       </div>
 

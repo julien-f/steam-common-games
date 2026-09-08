@@ -50,7 +50,7 @@ export const SHORTCUT_SECTIONS: Section[] = [
 export function ShortcutsModal(props: { open: boolean; onClose: () => void }): JSX.Element {
   return (
     <>
-      <div class={`shortcuts-backdrop${props.open ? ' open' : ''}`} onClick={props.onClose} />
+      <div class={`shortcuts-backdrop${props.open ? ' open' : ''}`} onClick={() => props.onClose()} />
       <div
         class={`shortcuts-modal${props.open ? ' open' : ''}`}
         role="dialog"
@@ -60,7 +60,7 @@ export function ShortcutsModal(props: { open: boolean; onClose: () => void }): J
       >
         <div class="shortcuts-header">
           <span class="shortcuts-title">Keyboard shortcuts</span>
-          <button type="button" class="shortcuts-close" aria-label="Close" onClick={props.onClose}>×</button>
+          <button type="button" class="shortcuts-close" aria-label="Close" onClick={() => props.onClose()}>×</button>
         </div>
         <div class="shortcuts-body">
           <For each={SHORTCUT_SECTIONS}>

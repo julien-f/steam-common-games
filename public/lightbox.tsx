@@ -320,17 +320,27 @@ function LightboxDom() {
       <div class="lb-seek-flash lb-seek-flash-left" aria-hidden="true">⏪ {LB_TOUCH_SEEK_SECONDS}s</div>
       <div class="lb-seek-flash lb-seek-flash-right" aria-hidden="true">{LB_TOUCH_SEEK_SECONDS}s ⏩</div>
       <div class="lb-vctrls" style={{ display: 'none' }}>
+        {/* eslint-disable-next-line solid/no-innerhtml -- a module-level literal SVG string
+            from the top of this file, not data: nothing here comes from a game, a user, or an
+            API response. Solid's JSX can't express a raw SVG child any other way. */}
         <button class="lb-vc-btn lb-vc-play" aria-label="Play" innerHTML={LB_PLAY_ICON} />
         <span class="lb-vc-time">0:00</span>
         <input class="lb-vc-scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek" />
         <span class="lb-vc-dur">0:00</span>
+        {/* eslint-disable-next-line solid/no-innerhtml -- a module-level literal SVG string
+            from the top of this file, not data: nothing here comes from a game, a user, or an
+            API response. Solid's JSX can't express a raw SVG child any other way. */}
         <button class="lb-vc-btn lb-vc-mute" aria-label="Mute" innerHTML={LB_VOL_ICON} />
       </div>
       <div class="lb-toolbar">
         <div class="lb-caption" aria-hidden="true" />
         <div class="lb-toolbar-row">
           <div class="lb-toolbar-left">
+            {/* eslint-disable-next-line solid/no-innerhtml -- module-level literal SVG strings
+                (see the top of this file); no external input reaches these. */}
             <button class="lb-fullscreen" aria-label="Enter fullscreen" innerHTML={LB_FS_ENTER} />
+            {/* eslint-disable-next-line solid/no-innerhtml -- module-level literal SVG strings
+                (see the top of this file); no external input reaches these. */}
             <button class="lb-share" aria-label="Copy link to this screenshot" innerHTML={LB_LINK_ICON} />
           </div>
           <div class="lb-counter" aria-live="polite" aria-atomic="true" />
