@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`POST /api/game-details/stream` dispatched every requested game at once, so its "did the client disconnect?" check could never fire and one request could monopolize the upstream queues.** `validated.map(async …)` starts all callbacks in the same synchronous tick: `closed` is false for every one of them by construction, and all of them — up to `STREAM_MAX_GAMES`, each fanning out to rating + metadata + tags + demo + ProtonDB + HLTB — land on `lib/steam.js`'s shared FIFO semaphores immediately. So navigating away mid-load left thousands of fetches running for nobody, and everyone else's requests queued behind them. Replaced with a bounded worker pool (`STREAM_CONCURRENCY`, default 16) pulling from a shared cursor and re-checking `closed` before each appid, so a disconnect stops the work within about one appid per worker and one request can never queue more than 16 items at a time. Not a throughput change — the per-host semaphores still set the real pace. New test asserts both properties.
+
 ### Added
 
 - **A global outbound budget per third-party service** (`OUTBOUND_HOURLY_MAX`/`OUTBOUND_DAILY_MAX`, enforced in `trackedFetch` — the one point every outbound call in the app already passes through). Every other limit in the app is per-IP, which protects the app from any one client but not its *keys*: a Steam or ITAD quota doesn't care how many clients spent it, and neither does a retry loop in this app's own code. Past a ceiling, calls to that service fail as an ordinary upstream error (502, no new error path in any route) until the window rolls over — a far better failure than an exhausted or revoked key. Warned once per window rather than per refused call; refused calls aren't counted as requests they never made; current usage exposed as `budgets` on `GET /api/metrics`. Defaults sized well above normal traffic (5000/hour, 50000/day per service); `0` disables.

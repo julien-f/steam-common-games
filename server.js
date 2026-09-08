@@ -27,6 +27,7 @@ const DETAILS_RATE_LIMIT_MAX = Number(process.env.DETAILS_RATE_LIMIT_MAX);
 const GAME_SEARCH_RATE_LIMIT_MAX = Number(process.env.GAME_SEARCH_RATE_LIMIT_MAX);
 const ACHIEVEMENTS_RATE_LIMIT_MAX = Number(process.env.ACHIEVEMENTS_RATE_LIMIT_MAX);
 const STREAM_MAX_GAMES = Number(process.env.STREAM_MAX_GAMES);
+const STREAM_CONCURRENCY = Number(process.env.STREAM_CONCURRENCY);
 const BUNDLES_RATE_LIMIT_MAX = Number(process.env.BUNDLES_RATE_LIMIT_MAX);
 // Optional feature — see ITAD_API_KEY's comment in default.env. Checked once here rather than
 // duplicated across every /api/bundles* route handler.
@@ -904,20 +905,35 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
     if (!closed && !res.writableEnded) res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
-  await Promise.allSettled(validated.map(async appid => {
-    if (closed) return;
-    try {
-      const result = await fetchGameDetails(appid);
-      send({ appid, ...result });
-    } catch (err) {
-      // fetchGameDetails resolves every sub-fetch via Promise.allSettled internally and should
-      // never itself reject — this is a defensive backstop, not an expected path, so unlike
-      // the per-field failures it already logs (see logErr above) this used to vanish with
-      // no trace at all if it ever did fire.
-      console.error(`[bug:stream]`, `appid ${appid}:`, err.stack || err.message);
-      send({ appid, rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null });
+  // A bounded worker pool, not `validated.map(...)`. Mapping dispatched every appid
+  // synchronously, which made the `closed` check useless (nothing can have closed yet at that
+  // instant) and queued the whole request — up to STREAM_MAX_GAMES, each fanning out to rating +
+  // metadata + tags + demo + ProtonDB + HLTB — onto lib/steam.js's semaphores up front. Two
+  // consequences, both real: navigating away left every remaining fetch to run to completion for
+  // nobody, and one request could park thousands of items in a shared FIFO queue that every other
+  // user's requests then waited behind. Pulling from a shared cursor instead means at most
+  // STREAM_CONCURRENCY appids are ever in flight for one request, and `closed` is re-checked
+  // before each one — so a disconnect stops the work within one appid per worker.
+  let next = 0;
+  const worker = async () => {
+    while (!closed) {
+      const i = next++;
+      if (i >= validated.length) return;
+      const appid = validated[i];
+      try {
+        const result = await fetchGameDetails(appid);
+        send({ appid, ...result });
+      } catch (err) {
+        // fetchGameDetails resolves every sub-fetch via Promise.allSettled internally and should
+        // never itself reject — this is a defensive backstop, not an expected path, so unlike
+        // the per-field failures it already logs (see logErr above) this used to vanish with
+        // no trace at all if it ever did fire.
+        console.error(`[bug:stream]`, `appid ${appid}:`, err.stack || err.message);
+        send({ appid, rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null });
+      }
     }
-  }));
+  };
+  await Promise.allSettled(Array.from({ length: Math.min(STREAM_CONCURRENCY, validated.length) }, worker));
 
   send({ done: true });
   if (!res.writableEnded) res.end();

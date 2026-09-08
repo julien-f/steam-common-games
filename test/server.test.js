@@ -1412,3 +1412,43 @@ test('POST /api/wishlist: fetchedAt comes from the wishlist entries', async (t) 
   assert.equal(res.status, 200);
   assert.equal(typeof res.body.fetchedAt, 'number');
 });
+
+test('POST /api/game-details/stream: caps in-flight appids and stops fetching once the client disconnects', async (t) => {
+  _reset();
+  let inFlight = 0, maxInFlight = 0, started = 0;
+  let release;
+  const gate = new Promise(r => { release = r; });
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (!String(url).includes('appreviews')) return { ok: true, json: async () => ({}) };
+    started++;
+    inFlight++;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    await gate;
+    inFlight--;
+    return { ok: true, json: async () => ({ query_summary: { review_score_desc: 'x', total_positive: 1, total_negative: 0, total_reviews: 1 } }) };
+  });
+
+  const server = http.createServer(app).listen(0);
+  await new Promise(r => server.once('listening', r));
+  const port = server.address().port;
+  const payload = JSON.stringify({ games: Array.from({ length: 200 }, (_, i) => ({ appid: i + 1 })) });
+  const req = http.request({ host: '127.0.0.1', port, path: '/api/game-details/stream', method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } });
+  req.write(payload);
+  req.end();
+  await new Promise(r => req.once('response', r));
+
+  // Far fewer than the 200 requested are ever in flight at once — the whole list used to be
+  // dispatched synchronously, straight onto lib/steam.js's shared semaphore queues.
+  assert.ok(maxInFlight <= Number(process.env.STREAM_CONCURRENCY || 16), `maxInFlight=${maxInFlight}`);
+
+  req.destroy();
+  await new Promise(r => setTimeout(r, 50));
+  const startedAtDisconnect = started;
+  release();
+  await new Promise(r => setTimeout(r, 100));
+  // A disconnect stops the pool within roughly one appid per worker, rather than working
+  // through the remaining 190-odd games for a client that has gone.
+  assert.ok(started - startedAtDisconnect <= Number(process.env.STREAM_CONCURRENCY || 16), `kept going: ${started - startedAtDisconnect}`);
+  server.close();
+});
