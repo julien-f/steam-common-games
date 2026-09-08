@@ -693,6 +693,23 @@ export default function ListRoute() {
     }
   }
 
+  // Backs the side panel's own "↻ Refresh" button, registered with the shell (see AppShell.tsx's
+  // `refreshGame`) — force-refetches this one game's rating/HLTB/store metadata/tags and writes
+  // them onto its store-backed row. Not every open game is one of this route's rows (a standalone
+  // lookup isn't), so `mutateRow` returning undefined falls back to mutating the plain object the
+  // panel holds, exactly as the deleted library.tsx's own onRefresh did.
+  async function refreshGame(game: Game): Promise<void> {
+    try {
+      const res = await fetch(`/api/game-details/${game.appid}?refresh=1`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Refresh failed');
+      const updated = rowStore.mutateRow(game.appid, draft => applyDetailsEvent(draft, data));
+      if (!updated) applyDetailsEvent(game, data);
+    } catch (err) {
+      setStatusText(`Refresh failed: ${(err as Error).message}`);
+    }
+  }
+
   // Stamps `inLibrary`/`onWishlist` onto every row currently in `rowsStore`, from myOwnership.ts's
   // own owned/wishlist appid sets, checked against `currentAccount` (whichever account's list this
   // route itself loaded — see myOwnership.ts's own comment) — unlike loadWishlistPrices/
@@ -1148,7 +1165,7 @@ export default function ListRoute() {
   }
 
   onMount(() => {
-    const unregister = registerRouteHandlers({ pickRandom: pickRandomGame, stepGame, openGame: handleOpenGameRequest, onGameClose: handleGameClose });
+    const unregister = registerRouteHandlers({ pickRandom: pickRandomGame, stepGame, openGame: handleOpenGameRequest, onGameClose: handleGameClose, refreshGame });
     onCleanup(unregister);
   });
 

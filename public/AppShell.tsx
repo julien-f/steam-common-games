@@ -18,6 +18,7 @@ import { initGameSearch } from './gameSearch.ts';
 import { addRecentGame } from './recentGames.ts';
 import { setPanelParam, withAccountParam } from './urlState.ts';
 import { syncAccountOverrideFromUrl } from './accountOverride.ts';
+import type { Game } from './types.ts';
 
 // Route-specific behavior (keyboard shortcuts, and now "open this looked-up game") can't be
 // hardcoded at the shell level — different routes have different "list" contexts, or none at all
@@ -50,6 +51,7 @@ interface RouteHandlers {
   onEnterOnFocusedRow?: () => boolean;
   openGame?: (appid: number) => boolean;
   onGameClose?: () => void;
+  refreshGame?: (game: Game) => Promise<void>;
 }
 let routeHandlers: RouteHandlers = {};
 export function registerRouteHandlers(handlers: RouteHandlers): () => void {
@@ -96,6 +98,12 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
         setPanelParam(null);
       },
       onNavigateGame: openGameGlobally,
+      // The panel's own "↻ Refresh" button (force-refreshes this game's details, news, price and
+      // DLC). Delegated to the mounted route rather than implemented here: the refreshed details
+      // have to land on that route's own store-backed row, not just on the panel's plain copy.
+      // Only ListRoute registers it — which covers every case, since a game panel only ever opens
+      // there (`openGameGlobally` navigates to /game/:appid, which *is* ListRoute).
+      onRefresh: game => routeHandlers.refreshGame?.(game),
     });
     initGameSearch({
       inputEl: searchInputEl,
