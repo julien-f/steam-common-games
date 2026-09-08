@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **A global outbound budget per third-party service** (`OUTBOUND_HOURLY_MAX`/`OUTBOUND_DAILY_MAX`, enforced in `trackedFetch` — the one point every outbound call in the app already passes through). Every other limit in the app is per-IP, which protects the app from any one client but not its *keys*: a Steam or ITAD quota doesn't care how many clients spent it, and neither does a retry loop in this app's own code. Past a ceiling, calls to that service fail as an ordinary upstream error (502, no new error path in any route) until the window rolls over — a far better failure than an exhausted or revoked key. Warned once per window rather than per refused call; refused calls aren't counted as requests they never made; current usage exposed as `budgets` on `GET /api/metrics`. Defaults sized well above normal traffic (5000/hour, 50000/day per service); `0` disables.
+
 ### Changed
 
 - **Cache TTLs raised substantially now that every tier has a refresh button and states its own age.** Owned games/profile/wishlist 6 hours → **7 days**, store metadata/HLTB/tags/ProtonDB 60 → **180 days**, review scores 30 → **90 days**, Steam ID resolution 90 → **180 days**, game-name search 1 → **7 days**, news 6 hours → **1 day**, ITAD bundles/prices 2 → **4 hours**. Steam's store endpoints are rate-limited hard enough (`storeLimit`: ~4 req/s for the whole process) that a cold load of a large library takes minutes — which is exactly what these TTLs exist to avoid repeating, and shortening them buys freshness nobody asked for at that price. `default.env` now documents the refresh affordance backing each tier.
