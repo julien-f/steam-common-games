@@ -110,6 +110,8 @@ Looking up a game (the nav-bar search box, or a DLC/base-game link inside an ope
 
 The "look up any game" search box moves from being duplicated per-page (today's `gameSearch.ts` on Library/Bundles) to a **single nav-bar-level search**, part of the persistent shell — opening in place on whatever route/list is currently on screen, falling back to `/game/:appid` only from a route with no list context of its own (see the routing section above).
 
+Focusing or clicking that box while it's **empty** shows the recently looked-up games in the same dropdown, under a heading, with a sticky "See all recently looked up →" row leading to `/game` — the convention every store and browser search bar already uses, so getting back to a game just looked at costs no typing and no second widget competing for nav-bar width. They're `GameSearchResult`-shaped like any search match, so the roving ArrowUp/ArrowDown selection, the ownership markers and `onSelect` all apply unchanged; the heading and "see all" row are `role="presentation"`, outside the listbox's own option semantics. `gameSearch.ts` takes the list and the "see all" destination as options (`recents`/`onSeeAllRecents`) rather than importing `recentGames.ts` — it stays the combobox/debounce UI it was carved down to, and the route stays the shell's business.
+
 ### The account chip
 
 The nav bar carries **who the app is currently showing** (`AccountChip.tsx`), for the same reason every list route carries a hero card: outside Home, nothing on screen said whose library was on screen — not even while a `?u=` link was being explored — and reaching Owned/Wishlist from any other route meant a round trip through Home.

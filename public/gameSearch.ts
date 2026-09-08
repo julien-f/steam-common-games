@@ -20,6 +20,11 @@ export interface GameSearchResult {
 //    raw appid/store URL typed in (name is '' in that case — the caller derives it from store
 //    metadata once /api/game-details resolves, same as it already does for wishlist rows with
 //    no name of their own)
+//  - recents(): optional — recently looked-up games, shown in the same dropdown whenever the box
+//    is focused/clicked while empty, so getting back to a game just looked at costs no typing and
+//    no separate widget. Picked exactly like a search match (same shape, same onSelect).
+//  - onSeeAllRecents(): optional — the "see all" row under that list; the caller decides where
+//    that goes (the /game route, for the app shell)
 
 export const GAME_SEARCH_DEBOUNCE_MS = 300;
 export const GAME_SEARCH_MIN_CHARS = 2;
@@ -66,16 +71,47 @@ export function gameSearchResultHtml(r: GameSearchResult, active: boolean, owner
   `;
 }
 
-export function initGameSearch({ inputEl, resultsEl, onSelect }: {
+// The dropdown's non-option chrome, for the recents view below: a section heading, and a
+// trailing "see all" row. Both carry `role="presentation"` so they stay out of the listbox's own
+// option semantics (`resultsEl` is the listbox; only `.game-search-result` buttons are options,
+// and only those take part in the ArrowUp/ArrowDown roving selection), and the "see all" row
+// keeps `tabindex="-1"` for the same reason every option does — real DOM focus stays on the input.
+export function gameSearchSectionHtml(label: string): string {
+  return `<div class="game-search-section" role="presentation">${esc(label)}</div>`;
+}
+
+export function gameSearchMoreHtml(label: string): string {
+  return `<button type="button" class="game-search-more" role="presentation" tabindex="-1">${esc(label)}</button>`;
+}
+
+// Should the dropdown show recently looked-up games rather than search matches? Only for a
+// genuinely empty box: one or more characters typed means the user is searching, and a
+// half-typed term (below GAME_SEARCH_MIN_CHARS) showing an unrelated recents list instead of
+// simply nothing would read as a broken search, not as a shortcut.
+export function shouldShowRecents(rawValue: string): boolean {
+  return rawValue.trim() === '';
+}
+
+export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAllRecents }: {
   inputEl: HTMLInputElement;
   resultsEl: HTMLElement;
   onSelect: (game: GameSearchResult) => void;
+  // Recently looked-up games, shown when the box is focused but empty — the storage behind them
+  // (recentGames.ts) is injected rather than imported so this file stays the combobox/debounce UI
+  // it was carved down to, and so the caller owns what "see all" means (a route to navigate to,
+  // which this module knows nothing about).
+  recents?: () => GameSearchResult[];
+  onSeeAllRecents?: () => void;
 }) {
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let lastResults: GameSearchResult[] = [];
   let activeFetch = 0; // guards against a slower earlier request clobbering a faster later one
   let activeIdx = -1;  // ArrowUp/ArrowDown highlight; -1 = none yet (Enter falls back to the top match)
   let unsubOwnershipReady: (() => void) | null = null;
+  // Whether what's currently in the dropdown is the recents list rather than search matches —
+  // the results themselves are the same `GameSearchResult` shape either way (and pick the same
+  // way), so this only drives the heading/"see all" chrome around them.
+  let showingRecents = false;
 
   resultsEl.setAttribute('role', 'listbox');
   inputEl.setAttribute('aria-autocomplete', 'list');
@@ -83,7 +119,10 @@ export function initGameSearch({ inputEl, resultsEl, onSelect }: {
   if (resultsEl.id) inputEl.setAttribute('aria-controls', resultsEl.id);
 
   function renderResults() {
-    resultsEl.innerHTML = lastResults.map((r, i) => gameSearchResultHtml(r, i === activeIdx, peekMyOwnershipStatus(r.appid))).join('');
+    const options = lastResults.map((r, i) => gameSearchResultHtml(r, i === activeIdx, peekMyOwnershipStatus(r.appid))).join('');
+    resultsEl.innerHTML = showingRecents
+      ? gameSearchSectionHtml('Recently looked up') + options + gameSearchMoreHtml('See all recently looked up →')
+      : options;
     if (activeIdx >= 0) inputEl.setAttribute('aria-activedescendant', `game-search-opt-${lastResults[activeIdx].appid}`);
     else inputEl.removeAttribute('aria-activedescendant');
     // A peek above returning null for any shown result means either "no currentAccount loaded"
@@ -98,9 +137,10 @@ export function initGameSearch({ inputEl, resultsEl, onSelect }: {
       : null;
   }
 
-  function showResults(results: GameSearchResult[]) {
+  function showResults(results: GameSearchResult[], { recent = false }: { recent?: boolean } = {}) {
     lastResults = results;
     activeIdx = -1;
+    showingRecents = recent;
     if (!results.length) { hideResults(); return; }
     renderResults();
     resultsEl.hidden = false;
@@ -110,6 +150,7 @@ export function initGameSearch({ inputEl, resultsEl, onSelect }: {
   function hideResults() {
     lastResults = [];
     activeIdx = -1;
+    showingRecents = false;
     resultsEl.hidden = true;
     resultsEl.innerHTML = '';
     inputEl.setAttribute('aria-expanded', 'false');
@@ -149,9 +190,28 @@ export function initGameSearch({ inputEl, resultsEl, onSelect }: {
     onSelect(game);
   }
 
+  // Recently looked-up games in the same dropdown, on an empty box — the convention every store
+  // and browser search bar already uses, so it costs no nav-bar space of its own and needs no
+  // second widget. Returns whether there was anything to show.
+  function showRecents(): boolean {
+    const list = recents?.() ?? [];
+    if (!list.length) return false;
+    showResults(list, { recent: true });
+    return true;
+  }
+
+  // Both events, not just focus: clicking an already-focused box (after Escape closed the
+  // dropdown, say) fires no focus event, and "click the search box, see my recents" is exactly
+  // the gesture this is for.
+  const openRecentsIfEmpty = () => { if (shouldShowRecents(inputEl.value)) showRecents(); };
+  inputEl.addEventListener('focus', openRecentsIfEmpty);
+  inputEl.addEventListener('click', openRecentsIfEmpty);
+
   inputEl.addEventListener('input', () => {
     if (debounceTimer != null) clearTimeout(debounceTimer);
     const term = inputEl.value.trim();
+    // Cleared back to empty — that's the recents view again, not just an empty dropdown.
+    if (shouldShowRecents(inputEl.value)) { if (!showRecents()) hideResults(); return; }
     // A raw appid/URL doesn't need a name search — hide any stale dropdown instead.
     if (term.length < GAME_SEARCH_MIN_CHARS || parseDirectAppid(term) != null) { hideResults(); return; }
     debounceTimer = setTimeout(() => runSearch(term), GAME_SEARCH_DEBOUNCE_MS);
@@ -172,6 +232,11 @@ export function initGameSearch({ inputEl, resultsEl, onSelect }: {
   });
 
   resultsEl.addEventListener('click', e => {
+    if ((e.target as Element).closest('.game-search-more')) {
+      hideResults();
+      onSeeAllRecents?.();
+      return;
+    }
     const btn = (e.target as Element).closest('.game-search-result') as HTMLElement | null;
     if (!btn) return;
     pick({ appid: Number(btn.dataset.appid), name: btn.dataset.name ?? '', tinyImage: null });
@@ -186,3 +251,6 @@ export function initGameSearch({ inputEl, resultsEl, onSelect }: {
 // The "recently looked up games" storage/widget that used to live here moved to
 // recentGames.ts (see docs/list-centric-redesign.md's Phase 1) — it's not combobox/debounce UI,
 // and needed to be repointed at a new pref key to back the "Recently Looked Up" system list.
+// This file shows that list again (the `recents` option above), but only ever as data handed in
+// by the caller — the storage still isn't this module's, and neither is the route its "see all"
+// row leads to.

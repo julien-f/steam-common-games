@@ -15,7 +15,7 @@ import { initLightbox, isLightboxOpen } from './lightbox.tsx';
 import { initPanel, isPanelOpen, panelClose, panelStepHero } from './panel.tsx';
 import { bindPanelKeyboardShortcuts } from './panelKeyboard.ts';
 import { initGameSearch } from './gameSearch.ts';
-import { addRecentGame } from './recentGames.ts';
+import { addRecentGame, loadRecentGames } from './recentGames.ts';
 import { setPanelParam, setLightboxParam, withAccountParam } from './urlState.ts';
 import { syncAccountOverrideFromUrl } from './accountOverride.ts';
 import type { Game } from './types.ts';
@@ -131,6 +131,12 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
         addRecentGame(game.appid, game.name, game.tinyImage);
         openGameGlobally(game.appid);
       },
+      // Focusing the empty box shows what was looked up recently, and "see all" opens that same
+      // list as a real route (/game — the Recently Looked Up system list, whose own store this
+      // dropdown is reading). Read on each open rather than captured once: a lookup made a moment
+      // ago has to be at the top of the list the next time the box is focused.
+      recents: loadRecentGames,
+      onSeeAllRecents: () => navigate(withAccountParam('/game', location.search)),
     });
 
     bindPanelKeyboardShortcuts({

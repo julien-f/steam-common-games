@@ -529,6 +529,22 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
 /* Owned/wishlisted markers (myOwnership.ts) — same colors as the panel's own
    .panel-ownership-badge, just a bare icon rather than a labeled pill (a dropdown row has far
    less room than the panel's ownership section). */
+/* Recently-looked-up chrome in the same dropdown (gameSearch.ts's `recents` option) — a heading
+   above the list and a "see all" row under it, both non-options: only .game-search-result takes
+   part in the listbox's roving ArrowUp/ArrowDown selection. */
+.game-search-section {
+  padding: 6px 10px 4px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text2);
+}
+.game-search-more {
+  display: block; width: 100%;
+  padding: 7px 10px; border: none; border-top: 1px solid var(--border);
+  cursor: pointer; color: var(--accent2); font-size: 12px; text-align: left;
+  /* Sticky, and opaque rather than transparent: the recents list can be taller than the
+     dropdown's own max-height, and a "see all" row scrolled out of sight is one nobody finds. */
+  position: sticky; bottom: 0; background: var(--bg3);
+}
+.game-search-more:hover { background: var(--bg1); }
 .game-search-badge { flex-shrink: 0; font-size: 12px; }
 .game-search-badge.owned { color: #f1c40f; }
 .game-search-badge.wishlisted { color: #2ecc71; }

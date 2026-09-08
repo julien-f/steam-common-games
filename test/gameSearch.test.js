@@ -4,6 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   GAME_SEARCH_DEBOUNCE_MS, GAME_SEARCH_MIN_CHARS, parseDirectAppid, gameSearchResultHtml,
+  gameSearchSectionHtml, gameSearchMoreHtml, shouldShowRecents,
 } = require('../public/gameSearch.ts');
 
 // `initGameSearch` itself (the debounced fetch/keyboard-nav widget) isn't covered here — it
@@ -87,4 +88,29 @@ test('gameSearchResultHtml: renders both markers when both are true', () => {
 test('gameSearchResultHtml: no markers when both are false', () => {
   const html = gameSearchResultHtml({ appid: 620, name: 'Portal 2' }, false, { inLibrary: false, onWishlist: false });
   assert.ok(!html.includes('game-search-badge'));
+});
+
+// ── recents chrome (the "recently looked up" view of the same dropdown) ──────
+
+test('shouldShowRecents: only for a genuinely empty box', () => {
+  assert.equal(shouldShowRecents(''), true);
+  assert.equal(shouldShowRecents('   '), true);
+  // A half-typed term is a search in progress, not a request for recents.
+  assert.equal(shouldShowRecents('p'), false);
+  assert.equal(shouldShowRecents('Portal'), false);
+});
+
+test('gameSearchSectionHtml: escapes its label and stays out of the listbox options', () => {
+  const html = gameSearchSectionHtml('Recently <looked> up');
+  assert.ok(html.includes('Recently &lt;looked&gt; up'));
+  assert.ok(html.includes('role="presentation"'));
+  assert.ok(!html.includes('role="option"'));
+});
+
+test('gameSearchMoreHtml: renders a non-option, non-focusable row', () => {
+  const html = gameSearchMoreHtml('See all →');
+  assert.ok(html.includes('class="game-search-more"'));
+  assert.ok(html.includes('role="presentation"'));
+  // Real DOM focus stays on the input, same as every option row.
+  assert.ok(html.includes('tabindex="-1"'));
 });
