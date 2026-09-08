@@ -266,6 +266,10 @@ export default function ListRoute() {
   let groupsContainer!: HTMLDivElement;
   const [statusText, setStatusText] = createSignal('');
   const [priceStatusText, setPriceStatusText] = createSignal('');
+  // kind === 'bundle' only: the currently open bundle's Steam-resolved games, kept at component
+  // scope (not load()-local) so "↻ Refresh prices" can re-price exactly what's loaded without
+  // re-resolving the bundle. Reset by load() itself on every (re)load.
+  let resolvedBundleGames: ResolvedGame[] | null = null;
   // Owned/wishlist kinds only: how old the server's cached copy of this account's list is (epoch
   // ms, null = fetched fresh), and whether a forced re-fetch is in flight — the "Updated <when>
   // ↻ Refresh" line below. Steam data is cached server-side for weeks (default.env's
@@ -273,6 +277,22 @@ export default function ListRoute() {
   // and forcing past it is one click from the list itself instead of only from Home.
   const [fetchedAt, setFetchedAt] = createSignal<number | null>(null);
   const [refreshing, setRefreshing] = createSignal(false);
+  // The page-level "↻ Refresh prices" button (wishlist/bundle kinds). Deliberately one control
+  // for the whole list rather than per-game: pricing is fetched as a single batched ITAD call
+  // anyway, so per-row refreshing would add friction with no matching benefit. Re-prices whatever
+  // is currently loaded — no re-resolution and no re-streaming of ratings/HLTB/tags.
+  const [refreshingPrices, setRefreshingPrices] = createSignal(false);
+  async function handleRefreshPrices(): Promise<void> {
+    setRefreshingPrices(true);
+    try {
+      const gen = loadGuard.current();
+      if (kind === 'bundle' && resolvedBundleGames) await loadBundlePrices(resolvedBundleGames, gen, true);
+      else if (kind === 'wishlist') await loadWishlistPrices(rowsStore.map(r => ({ appid: r.appid })), gen, true);
+    } finally {
+      setRefreshingPrices(false);
+    }
+  }
+
   async function handleRefreshList(): Promise<void> {
     setRefreshing(true);
     try { await load({ refresh: true }); } finally { setRefreshing(false); }
@@ -658,7 +678,7 @@ export default function ListRoute() {
     .then(data => !!data.itadConfigured)
     .catch(() => false);
 
-  async function loadWishlistPrices(items: { appid: number }[], gen: number): Promise<void> {
+  async function loadWishlistPrices(items: { appid: number }[], gen: number, force = false): Promise<void> {
     setPriceStatusText('');
     const configured = await itadConfiguredPromise;
     if (loadGuard.isStale(gen)) return;
@@ -679,7 +699,7 @@ export default function ListRoute() {
       if (loadGuard.isStale(gen)) return;
       const chunk = appids.slice(i, i + MAX_PRICE_LOOKUP_GAMES);
       try {
-        const prices = await postPrices({ appids: chunk, country });
+        const prices = await postPrices({ appids: chunk, country, force });
         if (loadGuard.isStale(gen)) return;
         batch(() => {
           for (const appid of chunk) {
@@ -776,10 +796,10 @@ export default function ListRoute() {
   // Bundle prices are looked up by ITAD gid (already known upfront from the bundle's own
   // resolved games), not appid — mirrors bundles.tsx's own loadPrices. No chunking: unlike a
   // wishlist, a single bundle's game list never runs past the server's own cap.
-  async function loadBundlePrices(resolved: ResolvedGame[], gen: number): Promise<void> {
+  async function loadBundlePrices(resolved: ResolvedGame[], gen: number, force = false): Promise<void> {
     setPriceStatusText('');
     try {
-      const prices = await postPrices({ gids: resolved.map(g => g.gid), country: resolveRegion(getStoredRegion()) });
+      const prices = await postPrices({ gids: resolved.map(g => g.gid), country: resolveRegion(getStoredRegion()), force });
       if (loadGuard.isStale(gen)) return;
       batch(() => {
         for (const g of resolved) {
@@ -923,7 +943,7 @@ export default function ListRoute() {
 
     let initialRows: Game[];
     let streamTargets: { appid: number }[];
-    let resolvedBundleGames: ResolvedGame[] | null = null;
+    resolvedBundleGames = null;
     let pendingGroups: MembershipGroup[] | null = null;
     setUserList(null);
     setSelectedRows([]); // a fresh load means a fresh table — nothing carries a prior selection over
@@ -1353,7 +1373,20 @@ export default function ListRoute() {
         </div>
       )}
       <div class="list-status">{statusText()}</div>
-      {(kind === 'wishlist' || kind === 'bundle') && <div class="price-status">{priceStatusText()}</div>}
+      {(kind === 'wishlist' || kind === 'bundle') && (
+        <>
+          <div class="account-updated">
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              disabled={refreshingPrices()}
+              title="Re-fetch current prices and historical lows for every game in this list"
+              onClick={handleRefreshPrices}
+            >{refreshingPrices() ? '↻ Refreshing prices…' : '↻ Refresh prices'}</button>
+          </div>
+          <div class="price-status">{priceStatusText()}</div>
+        </>
+      )}
       <Show when={selectedRows().length > 0}>
         <div class="selection-toolbar">
           <span class="selection-count">{selectedRows().length} selected</span>
