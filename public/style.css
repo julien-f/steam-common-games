@@ -1729,6 +1729,15 @@ body.lb-open { overflow: hidden; }
 .footer-link { color: var(--text1); text-decoration: none; }
 .footer-link:hover { color: var(--accent2); }
 
+/* The one-line hint pointing at the modal below — the only thing on screen that advertises the
+   keyboard shortcuts exist at all. */
+.app-footer {
+  padding: 10px 16px 16px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text2);
+}
+
 /* Keyboard shortcuts modal */
 kbd {
   font-family: inherit;

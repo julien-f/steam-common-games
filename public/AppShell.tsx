@@ -8,7 +8,7 @@
 // open/close/position bindings below (`bindPrefsPopoverClose`/`bindPrefsPopoverPosition`) used
 // to be a deliberate, temporary duplicate of nav.tsx's identically-named pair for exactly that
 // transition period; now that nav.tsx is gone, these are just the one real implementation.
-import { onMount, onCleanup, createEffect, For, type JSX } from 'solid-js';
+import { onMount, onCleanup, createEffect, createSignal, For, type JSX } from 'solid-js';
 import { A, useNavigate, useLocation, type RouteSectionProps } from '@solidjs/router';
 import { prefsPopoverPanelHtml, initPrefsPopover } from './prefsPopover.ts';
 import { initLightbox, isLightboxOpen } from './lightbox.tsx';
@@ -19,6 +19,7 @@ import { addRecentGame } from './recentGames.ts';
 import { setPanelParam, setLightboxParam, withAccountParam } from './urlState.ts';
 import { syncAccountOverrideFromUrl } from './accountOverride.ts';
 import type { Game } from './types.ts';
+import { ShortcutsModal } from './ShortcutsModal.tsx';
 
 // Route-specific behavior (keyboard shortcuts, and now "open this looked-up game") can't be
 // hardcoded at the shell level — different routes have different "list" contexts, or none at all
@@ -67,6 +68,11 @@ const NAV_LINKS: { href: string; label: string; end?: boolean }[] = [
 
 export function AppShell(props: RouteSectionProps): JSX.Element {
   let searchInputEl!: HTMLInputElement;
+  // The `?` shortcuts dialog — see ShortcutsModal.tsx. State lives here because
+  // bindPanelKeyboardShortcuts' own `shortcuts` option needs it (that option has been supported
+  // all along; nothing has passed it since the pages that owned the old static dialog markup
+  // were deleted, so `?` silently did nothing).
+  const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -132,6 +138,11 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       stepGame: dir => routeHandlers.stepGame?.(dir) ?? false,
       focusSearchInput: () => searchInputEl.focus(),
       onEnterOnFocusedRow: () => routeHandlers.onEnterOnFocusedRow?.() ?? false,
+      shortcuts: {
+        isOpen: shortcutsOpen,
+        toggle: () => setShortcutsOpen(v => !v),
+        close: () => setShortcutsOpen(false),
+      },
     });
 
     initPrefsPopover();
@@ -172,6 +183,9 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           <div id="panel-body" class="panel-body"></div>
         </div>
       </div>
+
+      <footer class="app-footer">Press <kbd>?</kbd> for keyboard shortcuts</footer>
+      <ShortcutsModal open={shortcutsOpen()} onClose={() => setShortcutsOpen(false)} />
     </div>
   );
 }
