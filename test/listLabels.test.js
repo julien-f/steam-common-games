@@ -1,0 +1,168 @@
+'use strict';
+
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const {
+  describeListRef, describeSources, formatFormula, opLabel, OP_LABELS, OP_SYMBOLS, OP_DESCRIPTIONS,
+} = require('../public/listLabels.ts');
+
+// The injected half of ListNaming (see listLabels.ts) — the real one reads accountsStore.ts/
+// listsStore.ts, which is exactly what these tests don't want to need.
+function makeNaming({ accounts = {}, lists = {} } = {}) {
+  return {
+    account: id => accounts[id] ?? null,
+    list: id => lists[id] ?? null,
+  };
+}
+
+const NAMING = makeNaming({
+  accounts: {
+    acc1: { label: 'Alice', identifiers: ['76561190000000001'] },
+    fam: { label: 'Alice + Bob', identifiers: ['76561190000000001', '76561190000000002'] },
+  },
+  lists: {
+    l1: { name: 'Co-op night', deleted: false },
+    gone: { name: 'Old comparison', deleted: true },
+  },
+});
+
+function dynamicList(op, sources) {
+  return { id: 'd', name: 'd', parentId: null, order: 0, createdAt: 0, updatedAt: 0, kind: 'dynamic', op, sources };
+}
+
+// ── describeListRef ──────────────────────────────────────────────────────────────────────────
+
+test('describeListRef: an account source names the account and links to that account, not the current one', () => {
+  assert.deepEqual(describeListRef({ kind: 'account-owned', accountId: 'acc1' }, NAMING), {
+    label: 'Alice — Owned',
+    href: '/lists/owned?u=76561190000000001',
+  });
+  assert.deepEqual(describeListRef({ kind: 'account-wishlist', accountId: 'acc1' }, NAMING), {
+    label: 'Alice — Wishlist',
+    href: '/lists/wishlist?u=76561190000000001',
+  });
+});
+
+test('describeListRef: a Family comma-joins its identifiers into the one ?u= value', () => {
+  const desc = describeListRef({ kind: 'account-owned', accountId: 'fam' }, NAMING);
+  assert.equal(desc.label, 'Alice + Bob — Owned');
+  assert.equal(desc.href, '/lists/owned?u=76561190000000001%2C76561190000000002');
+});
+
+test('describeListRef: an account the naming has never heard of is reported, not linked', () => {
+  const desc = describeListRef({ kind: 'account-owned', accountId: 'nope' }, NAMING);
+  assert.equal(desc.label, 'nope — Owned');
+  assert.equal(desc.href, null);
+  assert.match(desc.problem, /no longer one of your accounts/);
+});
+
+test('describeListRef: bundles are named by id (no client-side title without an ITAD fetch) but still link', () => {
+  assert.deepEqual(describeListRef({ kind: 'bundle', bundleId: '16538' }, NAMING), {
+    label: 'Bundle 16538',
+    href: '/lists/bundle/16538',
+  });
+});
+
+test('describeListRef: recent-games points at the Recently Looked Up route', () => {
+  assert.deepEqual(describeListRef({ kind: 'recent-games' }, NAMING), {
+    label: 'Recently Looked Up',
+    href: '/game',
+  });
+});
+
+test('describeListRef: a user-list source takes its own name and address', () => {
+  assert.deepEqual(describeListRef({ kind: 'user', listId: 'l1' }, NAMING), {
+    label: 'Co-op night',
+    href: '/lists/l1',
+    problem: undefined,
+  });
+});
+
+test('describeListRef: a soft-deleted source list still resolves, and says why it is still here', () => {
+  const desc = describeListRef({ kind: 'user', listId: 'gone' }, NAMING);
+  assert.equal(desc.label, 'Old comparison');
+  assert.equal(desc.href, '/lists/gone');
+  assert.match(desc.problem, /deleted, and kept only because this formula uses it/);
+});
+
+test('describeListRef: a hard-deleted source list is a named hole, not a silent omission', () => {
+  const desc = describeListRef({ kind: 'user', listId: 'never-existed' }, NAMING);
+  assert.equal(desc.label, 'A list that no longer exists');
+  assert.equal(desc.href, null);
+  assert.match(desc.problem, /deleted/);
+});
+
+test('describeListRef: a ref saved without its id is reported rather than rendered as a real source', () => {
+  for (const ref of [{ kind: 'account-owned' }, { kind: 'bundle' }, { kind: 'user' }]) {
+    const desc = describeListRef(ref, NAMING);
+    assert.equal(desc.href, null, ref.kind);
+    assert.match(desc.problem, /names no /, ref.kind);
+  }
+});
+
+// ── describeSources / formatFormula ──────────────────────────────────────────────────────────
+
+test('describeSources: one description per source, in the list\'s own order', () => {
+  const list = dynamicList('intersect', [
+    { kind: 'account-owned', accountId: 'acc1' },
+    { kind: 'user', listId: 'l1' },
+  ]);
+  assert.deepEqual(describeSources(list, NAMING).map(d => d.label), ['Alice — Owned', 'Co-op night']);
+});
+
+test('describeSources: a manual list has no sources to describe', () => {
+  const manual = { id: 'm', name: 'm', parentId: null, order: 0, createdAt: 0, updatedAt: 0, kind: 'manual', appids: [1, 2] };
+  assert.deepEqual(describeSources(manual, NAMING), []);
+});
+
+test('formatFormula: joins sources with the op symbol', () => {
+  assert.equal(
+    formatFormula(dynamicList('intersect', [
+      { kind: 'account-owned', accountId: 'acc1' },
+      { kind: 'account-owned', accountId: 'fam' },
+    ]), NAMING),
+    'Alice — Owned ∩ Alice + Bob — Owned',
+  );
+  assert.equal(
+    formatFormula(dynamicList('subtract', [
+      { kind: 'account-wishlist', accountId: 'acc1' },
+      { kind: 'user', listId: 'l1' },
+    ]), NAMING),
+    'Alice — Wishlist ∖ Co-op night',
+  );
+});
+
+test('formatFormula: group-by-membership has no infix meaning, so it joins with + and says what it did', () => {
+  assert.equal(
+    formatFormula(dynamicList('group-by-membership', [
+      { kind: 'account-owned', accountId: 'acc1' },
+      { kind: 'recent-games' },
+    ]), NAMING),
+    'Alice — Owned + Recently Looked Up — grouped by membership',
+  );
+});
+
+test('formatFormula: defaults a missing op to union, same as resolveGameList does', () => {
+  const list = dynamicList(undefined, [{ kind: 'recent-games' }, { kind: 'user', listId: 'l1' }]);
+  assert.equal(formatFormula(list, NAMING), 'Recently Looked Up ∪ Co-op night');
+});
+
+test('formatFormula: nothing to show for a manual list, or a dynamic one with no sources saved', () => {
+  const manual = { id: 'm', name: 'm', parentId: null, order: 0, createdAt: 0, updatedAt: 0, kind: 'manual', appids: [1] };
+  assert.equal(formatFormula(manual, NAMING), null);
+  assert.equal(formatFormula(dynamicList('union', []), NAMING), null);
+});
+
+// ── op wording ───────────────────────────────────────────────────────────────────────────────
+
+test('opLabel: every op is named, and an absent one reads as union', () => {
+  assert.equal(opLabel('group-by-membership'), 'Grouped by membership');
+  assert.equal(opLabel(undefined), 'Union');
+});
+
+test('every op has a label, a description and a join symbol', () => {
+  const ops = ['union', 'intersect', 'subtract', 'group-by-membership'];
+  assert.deepEqual(Object.keys(OP_LABELS), ops);
+  assert.deepEqual(Object.keys(OP_DESCRIPTIONS), ops);
+  assert.deepEqual(Object.keys(OP_SYMBOLS), ops);
+});

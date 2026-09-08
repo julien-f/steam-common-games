@@ -2003,13 +2003,53 @@ kbd {
   white-space: nowrap;
 }
 
-/* ITAD's own note ("Keys expire. Please redeem before …") — often the most human thing on the
-   page, so it sits on its own line rather than being folded in among the tiles. */
+/* Prose under the tiles: ITAD's own bundle note ("Keys expire. Please redeem before …") — often
+   the most human thing on the page — or a dynamic list's formula, both on their own line rather
+   than folded in among the tiles. */
 .list-hero-note {
   margin-top: 12px;
   font-size: 13px;
   font-style: italic;
   color: var(--text1);
+}
+
+/* A dynamic list's formula — its sources, each linked and carrying what it contributed, joined by
+   the op's own symbol. Not italic (it overrides .list-hero-note's prose styling): it's a row of
+   values and names, read like the tiles above it rather than like the bundle note it shares a
+   slot with. */
+.list-formula {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-style: normal;
+  color: var(--text0);
+}
+.list-formula-source {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg2);
+  white-space: nowrap;
+}
+.list-formula-source a { color: inherit; text-decoration: none; }
+.list-formula-source a:hover { color: var(--accent2); }
+/* Same amber "heads up, not an error" palette as .account-private/.account-override-status: a
+   dangling source doesn't break the list, it just contributes nothing. */
+.list-formula-source.has-problem { border-color: rgba(228,168,46,0.4); color: #e4c46e; }
+.list-formula-count { font-size: 11px; color: var(--text1); }
+.list-formula-op { color: var(--text1); }
+.list-formula-result { font-weight: 600; }
+.list-formula-problems {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  font-style: normal;
+  font-size: 12px;
+  color: #e4c46e;
 }
 
 /* The bundle's games with no Steam listing (ListRoute.tsx) — collapsed by default, but the count

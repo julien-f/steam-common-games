@@ -30,6 +30,7 @@ import {
   deleteFolder, deleteList,
 } from './listsStore.ts';
 import { setBaseTitle } from './pageTitle.ts';
+import { describeListRef, createDefaultNaming, OP_LABELS, OP_DESCRIPTIONS } from './listLabels.ts';
 import type { AccountSlot, Folder, GameList, ListRef, CombineOp } from './types.ts';
 
 interface SourceOption {
@@ -38,12 +39,11 @@ interface SourceOption {
   ref: ListRef;
 }
 
-const COMBINE_OPS: { value: CombineOp; label: string }[] = [
-  { value: 'union', label: 'Union (games in any source)' },
-  { value: 'intersect', label: 'Intersect (games in every source)' },
-  { value: 'subtract', label: 'Subtract (first source minus the rest)' },
-  { value: 'group-by-membership', label: 'Group by membership (one table per combination)' },
-];
+// Wording comes from listLabels.ts, shared with the hero card that later has to name the very
+// same op back to the user on the list's own page (ListRoute.tsx) — two hand-maintained copies
+// were one edit from disagreeing about what a combine does.
+const COMBINE_OPS: { value: CombineOp; label: string }[] = (Object.keys(OP_LABELS) as CombineOp[])
+  .map(op => ({ value: op, label: `${OP_LABELS[op]} (${OP_DESCRIPTIONS[op]})` }));
 
 // `personastate`/`gameextrainfo` ride on the same 6h library cache tier as the rest of an
 // account's data (see toAccountPlayer in accountData.ts) — real data, just not live — so the
@@ -238,18 +238,24 @@ export default function HomeRoute() {
   // Every source a combine can currently be built from — any recent account's Owned/Wishlist,
   // Recently Looked Up, or any existing user list. Not a bundle (would need its own bundle-
   // picker UI, not just a checkbox) — see this file's own header comment.
+  // Every ref this form can offer, named through the same describeListRef the list's own page
+  // uses for its formula afterward — so a source picked here as "Alice — Owned" reads identically
+  // once the list is saved and opened.
   function sourceOptions(): SourceOption[] {
-    const opts: SourceOption[] = [];
-    for (const acc of recents()) {
-      const label = acc.label || acc.rawInputs.join(' + ');
-      opts.push({ key: `account-owned:${acc.id}`, label: `${label} — Owned`, ref: { kind: 'account-owned', accountId: acc.id } });
-      opts.push({ key: `account-wishlist:${acc.id}`, label: `${label} — Wishlist`, ref: { kind: 'account-wishlist', accountId: acc.id } });
-    }
-    opts.push({ key: 'recent-games', label: 'Recently Looked Up', ref: { kind: 'recent-games' } });
-    for (const list of lists()) {
-      opts.push({ key: `user:${list.id}`, label: list.name, ref: { kind: 'user', listId: list.id } });
-    }
-    return opts;
+    const naming = createDefaultNaming();
+    const refs: ListRef[] = [
+      ...recents().flatMap((acc): ListRef[] => [
+        { kind: 'account-owned', accountId: acc.id },
+        { kind: 'account-wishlist', accountId: acc.id },
+      ]),
+      { kind: 'recent-games' },
+      ...lists().map((list): ListRef => ({ kind: 'user', listId: list.id })),
+    ];
+    return refs.map(ref => ({
+      key: [ref.kind, ref.accountId ?? ref.listId].filter(Boolean).join(':'),
+      label: describeListRef(ref, naming).label,
+      ref,
+    }));
   }
 
   function toggleCombineSource(key: string): void {

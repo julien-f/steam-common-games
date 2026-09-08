@@ -2,7 +2,9 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveRef, resolveGameList, flattenCombineResult, ListCycleError } = require('../public/listResolve.ts');
+const {
+  resolveRef, resolveGameList, resolveListWithSources, flattenCombineResult, ListCycleError,
+} = require('../public/listResolve.ts');
 
 function set(...ids) {
   return new Set(ids);
@@ -133,4 +135,72 @@ test('flattenCombineResult: a Set passes through unchanged', () => {
 test('flattenCombineResult: MembershipGroup[] flattens to the union of every group\'s appids', () => {
   const groups = [{ keys: ['a', 'b'], appids: [1, 2] }, { keys: ['a'], appids: [2, 3] }];
   assert.deepEqual(flattenCombineResult(groups), set(1, 2, 3));
+});
+
+// ── resolveListWithSources — what each source contributed ────────────────────────────────────
+
+test('resolveListWithSources: reports each source\'s combine key and appid count, in the list\'s own order', async () => {
+  const fetchers = makeFetchers({
+    accountOwned: async () => set(1, 2, 3),
+    accountWishlist: async () => set(3, 4),
+  });
+  const list = dynamicList('d', 'intersect', [
+    { kind: 'account-owned', accountId: 'acc1' },
+    { kind: 'account-wishlist', accountId: 'acc1' },
+  ]);
+
+  const { result, sources } = await resolveListWithSources(list, fetchers);
+  assert.deepEqual(result, set(3));
+  assert.deepEqual(sources, [
+    { key: 'account-owned:acc1', count: 3 },
+    { key: 'account-wishlist:acc1', count: 2 },
+  ]);
+});
+
+test('resolveListWithSources: the keys match the ones combine puts on a group-by-membership group', async () => {
+  const fetchers = makeFetchers({
+    accountOwned: async () => set(1, 2),
+    recentGames: async () => set(2),
+  });
+  const list = dynamicList('d', 'group-by-membership', [
+    { kind: 'account-owned', accountId: 'acc1' },
+    { kind: 'recent-games' },
+  ]);
+
+  const { result, sources } = await resolveListWithSources(list, fetchers);
+  const keys = new Set(sources.map(s => s.key));
+  for (const group of result) {
+    for (const key of group.keys) assert.ok(keys.has(key), key);
+  }
+});
+
+test('resolveListWithSources: a nested user list counts as the size of what it resolved to', async () => {
+  const inner = dynamicList('inner', 'union', [{ kind: 'account-owned', accountId: 'acc1' }, { kind: 'recent-games' }]);
+  const fetchers = makeFetchers({
+    accountOwned: async () => set(1, 2),
+    recentGames: async () => set(3),
+    lists: [['inner', inner]],
+  });
+  const outer = dynamicList('outer', 'union', [{ kind: 'user', listId: 'inner' }, { kind: 'account-wishlist', accountId: 'acc1' }]);
+
+  const { sources } = await resolveListWithSources(outer, fetchers);
+  assert.deepEqual(sources, [
+    { key: 'list:inner', count: 3 },
+    { key: 'account-wishlist:acc1', count: 0 },
+  ]);
+});
+
+test('resolveListWithSources: a manual list has no sources, just its stored appids', async () => {
+  const { result, sources } = await resolveListWithSources(manualList('m', [7, 8]), makeFetchers());
+  assert.deepEqual(result, set(7, 8));
+  assert.deepEqual(sources, []);
+});
+
+test('resolveListWithSources: a dangling source contributes 0 rather than failing the resolve', async () => {
+  const list = dynamicList('d', 'union', [{ kind: 'user', listId: 'gone' }, { kind: 'recent-games' }]);
+  const fetchers = makeFetchers({ recentGames: async () => set(5) });
+
+  const { result, sources } = await resolveListWithSources(list, fetchers);
+  assert.deepEqual(result, set(5));
+  assert.deepEqual(sources, [{ key: 'list:gone', count: 0 }, { key: 'recent-games', count: 1 }]);
 });

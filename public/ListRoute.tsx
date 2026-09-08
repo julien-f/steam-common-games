@@ -51,7 +51,7 @@
 import { onMount, onCleanup, createSignal, createRoot, createEffect, on, batch, For, Show, type JSX } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { render } from 'solid-js/web';
-import { useParams, useLocation, useNavigate } from '@solidjs/router';
+import { A, useParams, useLocation, useNavigate } from '@solidjs/router';
 import { createTableState, DataTableView } from '@vates/data-table-solid';
 import type { ColumnDef, SortEntry, TableState } from '@vates/data-table-solid';
 import { bucketDatePart, formatDatePart } from '@vates/data-table-core';
@@ -86,11 +86,11 @@ import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields 
 import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
 import { ListHero, type HeroTile } from './ListHero.tsx';
-import { opLabel } from './listLabels.ts';
+import { describeSources, createDefaultNaming, opLabel, OP_SYMBOLS, type RefDescription } from './listLabels.ts';
 import { setBaseTitle } from './pageTitle.ts';
 import type { AccountSlot, Game, Rating, Hltb, GameMeta, ProtonDb, GameList } from './types.ts';
 import { getList, getLists, getFolders, createList, addAppidsToList, removeAppidsFromList, setListTableView } from './listsStore.ts';
-import { resolveGameList, flattenCombineResult, createDefaultFetchers } from './listResolve.ts';
+import { resolveListWithSources, flattenCombineResult, createDefaultFetchers } from './listResolve.ts';
 import type { MembershipGroup } from './combine.ts';
 import { peekMyOwnershipStatus, onMyOwnershipReady } from './myOwnership.ts';
 
@@ -363,6 +363,12 @@ export default function ListRoute() {
   // so navigating between two user lists reuses this component instance without a remount —
   // a plain `let` wouldn't tell the already-mounted JSX that "the list being viewed" changed.
   const [userList, setUserList] = createSignal<GameList | null>(null);
+  // kind === 'user', dynamic lists only — one entry per source in the list's own `sources[]`
+  // order: how it reads (describeSources), how many appids it contributed, and its combine.ts key
+  // (which is how a group-by-membership group's own keys map back to a readable name). Backs the
+  // hero's formula line and the per-group table headings; empty until the resolve lands, which is
+  // what keeps a half-built "A ∪ = 0" off the screen in the meantime.
+  const [listSources, setListSources] = createSignal<{ key: string; count: number; desc: RefDescription }[]>([]);
   // True once load() has built the single-table path below (owned/wishlist/bundle/recent/user),
   // false while loading and permanently false for a group-by-membership list, which renders N
   // per-group tables instead of one — see this file's own header comment on why view persistence
@@ -937,9 +943,13 @@ export default function ListRoute() {
     groupTables = groups.map(group => {
       const appidSet = new Set(group.appids);
 
+      // combine.ts keys a group by its sources' own internal keys ("account-owned:76561…"), which
+      // is what this heading used to print verbatim; listSources() maps each back to the name the
+      // hero's formula line uses for the same source.
+      const names = new Map(listSources().map(source => [source.key, source.desc.label]));
       const heading = document.createElement('h3');
       heading.className = 'list-group-heading';
-      heading.textContent = `${group.keys.join(' + ')} (${group.appids.length})`;
+      heading.textContent = `${group.keys.map(key => names.get(key) ?? key).join(' + ')} (${group.appids.length})`;
       const container = document.createElement('div');
       container.className = 'table-container';
       groupsContainer.appendChild(heading);
@@ -1009,6 +1019,7 @@ export default function ListRoute() {
     // rather than flashing back to the bare app name on every ‹/› step).
     setHeroTitle('');
     setHeroAccount(null);
+    setListSources([]);
     tableContainer.innerHTML = '';
     groupsContainer.innerHTML = '';
 
@@ -1034,8 +1045,10 @@ export default function ListRoute() {
       const isGroupMode = list.kind === 'dynamic' && list.op === 'group-by-membership';
       let appids: Set<number>;
       try {
-        const result = await resolveGameList(list, createDefaultFetchers());
+        const { result, sources } = await resolveListWithSources(list, createDefaultFetchers());
         if (loadGuard.isStale(gen)) return;
+        const described = describeSources(list, createDefaultNaming());
+        setListSources(sources.map((source, i) => ({ ...source, desc: described[i] })));
         if (isGroupMode && Array.isArray(result)) {
           pendingGroups = result;
           appids = new Set(result.flatMap(g => g.appids));
@@ -1411,6 +1424,48 @@ export default function ListRoute() {
     return list.kind === 'manual' ? 'Manual list' : opLabel(list.op);
   }
 
+  // A dynamic list's formula, as the sources that built it — each linked to its own address, each
+  // carrying what it contributed ("Alice — Owned 343 ∪ Alice — Wishlist 115 = 458"). Nothing else
+  // in the app says what a dynamic list is made of: its contents are recomputed on every open, so
+  // a page showing 458 rows under a name someone chose months ago was otherwise unexplainable
+  // without going back to Home and reading the combine form.
+  function formulaNote(list: GameList): JSX.Element | undefined {
+    const sources = listSources();
+    if (!sources.length) return undefined;
+    const symbol = OP_SYMBOLS[list.op ?? 'union'];
+    const problems = sources.filter(source => source.desc.problem);
+    return (
+      <>
+        <div class="list-formula">
+          <For each={sources}>
+            {(source, i) => (
+              <>
+                {i() > 0 && <span class="list-formula-op">{symbol}</span>}
+                <span class="list-formula-source" classList={{ 'has-problem': source.desc.problem != null }}>
+                  <Show when={source.desc.href} fallback={<span>{source.desc.label}</span>}>
+                    {href => <A href={withAccountParam(href())}>{source.desc.label}</A>}
+                  </Show>
+                  <span class="list-formula-count">{source.count}</span>
+                </span>
+              </>
+            )}
+          </For>
+          {/* The result is this list's own row count — for group-by-membership that's the union
+              across its groups, which is exactly what the "+" join above claims. */}
+          <span class="list-formula-op">=</span>
+          <span class="list-formula-result">{rowsStore.length}</span>
+        </div>
+        <Show when={problems.length > 0}>
+          <ul class="list-formula-problems">
+            <For each={problems}>
+              {problem => <li>⚠ {problem.desc.label} — {problem.desc.problem}. It counts as no games; the rest of the formula still applies.</li>}
+            </For>
+          </ul>
+        </Show>
+      </>
+    );
+  }
+
   function heroNote(): JSX.Element | undefined {
     // ITAD's own editorial note ("Keys expire. Please redeem before …") — often the most human
     // thing on the page.
@@ -1418,6 +1473,8 @@ export default function ListRoute() {
     // Recently Looked Up is pure local search history (recentGames.ts) — worth saying outright,
     // since every other list here is either someone's Steam data or a list they built on purpose.
     if (kind === 'recent') return 'Games you looked up in this browser — local search history, never sent anywhere.';
+    const list = userList();
+    if (list?.kind === 'dynamic') return formulaNote(list);
     return undefined;
   }
 

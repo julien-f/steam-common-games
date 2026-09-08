@@ -82,6 +82,21 @@ export async function resolveRef(
   }
 }
 
+// What each of a dynamic list's own sources contributed, in `sources[]` order — its combine.ts
+// key (so a MembershipGroup's keys can be mapped back to the ref that produced them) and how
+// many appids it resolved to. Computed by every resolve anyway; it used to be thrown away with
+// the intermediate LabeledSet[], so "63 ∩ 41 → 12" cost nothing to report but was unavailable
+// to anything but the combine itself. Empty for a manual list.
+export interface ResolvedSource {
+  key: string;
+  count: number;
+}
+
+export interface ResolvedList {
+  result: CombineResult;
+  sources: ResolvedSource[];
+}
+
 // Resolves a whole GameList. A manual list is just its stored appids; a dynamic list resolves
 // every source (recursing through resolveRef) and combines them per its own op — returning a
 // flat Set for union/intersect/subtract, or MembershipGroup[] for group-by-membership (see
@@ -94,7 +109,21 @@ export async function resolveGameList(
   visited: Set<string> = new Set(),
   depth = 0,
 ): Promise<CombineResult> {
-  if (list.kind === 'manual') return new Set(list.appids ?? []);
+  return (await resolveListWithSources(list, fetchers, visited, depth)).result;
+}
+
+// The same resolve, keeping what each source contributed (see ResolvedSource) — what a route
+// displaying the list at the top level calls, since that's the only place a formula is shown.
+// A nested source's own resolve goes through resolveGameList/resolveRef above and drops this:
+// how *its* sources divided up is irrelevant to the list depending on it, the same reasoning
+// flattenCombineResult applies to its group structure.
+export async function resolveListWithSources(
+  list: GameList,
+  fetchers: ListResolveFetchers,
+  visited: Set<string> = new Set(),
+  depth = 0,
+): Promise<ResolvedList> {
+  if (list.kind === 'manual') return { result: new Set(list.appids ?? []), sources: [] };
 
   const sources = list.sources ?? [];
   const labeled: LabeledSet[] = await Promise.all(sources.map(async (ref, i) => ({
@@ -102,7 +131,10 @@ export async function resolveGameList(
     appids: await resolveRef(ref, fetchers, visited, depth + 1),
   })));
   const op: CombineOp = list.op ?? 'union';
-  return combine(op, labeled);
+  return {
+    result: combine(op, labeled),
+    sources: labeled.map(l => ({ key: l.key, count: l.appids.size })),
+  };
 }
 
 // Flattens either shape a combine can produce into one plain union set — used whenever a
