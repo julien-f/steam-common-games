@@ -14,11 +14,14 @@
 // user list as a source — bundles are deliberately not offered as a source yet (would need its
 // own bundle-picker UI, not just a checkbox).
 import { createSignal, createEffect, createMemo, onCleanup, For, Index, Show } from 'solid-js';
-import { A } from '@solidjs/router';
+import { A, useLocation, useNavigate } from '@solidjs/router';
 import {
-  getMyAccount, setMyAccount, getCurrentAccount, setCurrentAccount,
+  getMyAccount, setMyAccount, getEffectiveCurrentAccount, setCurrentAccount,
   getRecentAccounts, removeRecentAccount, clearRecentAccounts,
+  getAccountOverride, ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
+import { getAccountOverrideState, clearAccountOverride, accountOverrideStatusText } from './accountOverride.ts';
+import { withAccountParam, urlWithoutAccountParam } from './urlState.ts';
 import { resolveAccountSummary, fetchAccountOverview, fetchAccountWishlistItems } from './accountData.ts';
 import type { AccountPlayer } from './accountData.ts';
 import { normalizeInput } from './utils.ts';
@@ -56,8 +59,16 @@ interface TreeRow {
 }
 
 export default function HomeRoute() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [myAccount, setMyAccountSig] = createSignal<AccountSlot | null>(getMyAccount());
-  const [currentAccount, setCurrentAccountSig] = createSignal<AccountSlot | null>(getCurrentAccount());
+  // The *effective* current account — a `?u=` link's override when one is being explored,
+  // the stored preference otherwise (see accountsStore.ts's own `?u=` section). Everything
+  // below (the account card, the counts/players fetch, the document title) reads this, so a
+  // shared link renders exactly as a picked account does; only the picker itself (recents,
+  // ★ starring) still deals in stored accounts.
+  const [currentAccount, setCurrentAccountSig] = createSignal<AccountSlot | null>(getEffectiveCurrentAccount());
+  const [overrideState, setOverrideState] = createSignal(getAccountOverrideState());
   const [recents, setRecentsSig] = createSignal<AccountSlot[]>(getRecentAccounts());
   const [resolveInputs, setResolveInputs] = createSignal<string[]>(['']);
   const [resolveError, setResolveError] = createSignal('');
@@ -73,13 +84,22 @@ export default function HomeRoute() {
 
   function refreshAccounts(): void {
     setMyAccountSig(getMyAccount());
-    setCurrentAccountSig(getCurrentAccount());
+    setCurrentAccountSig(getEffectiveCurrentAccount());
+    setOverrideState(getAccountOverrideState());
     setRecentsSig(getRecentAccounts());
   }
   function refreshTree(): void {
     setFoldersSig(getFolders());
     setListsSig(getLists());
   }
+
+  // A `?u=` override resolves asynchronously, after this route has already mounted (AppShell.tsx
+  // kicks it off), so the account card can't just read it once — accountsStore.ts broadcasts
+  // every change to the effective account (and accountOverride.ts every change to how it should
+  // be described), and this re-reads both. Same "plain module + window event, subscriber owns
+  // the signal" shape region.ts/REGION_CHANGED_EVENT already uses elsewhere in the app.
+  window.addEventListener(ACCOUNT_CHANGED_EVENT, refreshAccounts);
+  onCleanup(() => window.removeEventListener(ACCOUNT_CHANGED_EVENT, refreshAccounts));
 
   // Counts and per-member profile data aren't stored on AccountSlot itself (they'd go stale —
   // AccountSlot only caches a label/avatar so recents can render instantly) — refetched live
@@ -99,6 +119,10 @@ export default function HomeRoute() {
     );
     fetchAccountWishlistItems(members).then(items => setCounts(c => ({ ...c, wishlist: items.length })), () => setCounts(c => ({ ...c, wishlist: 0 })));
   });
+
+  // The resolved slot a `?u=` link is currently showing, or null when there's no override (or
+  // it hasn't resolved yet / failed) — what the "Exploring …" note and its adopt button read.
+  const overrideAccount = createMemo(() => (overrideState().state === 'ready' ? getAccountOverride() : null));
 
   // Only meaningful for a single-account slot — a Steam Family has no one persona/presence/
   // profile to speak for the whole slot, so its members are listed individually instead (see the
@@ -127,8 +151,7 @@ export default function HomeRoute() {
         avatarUrl: summary.avatarUrl ?? undefined,
         lastUsedAt: Date.now(),
       };
-      setCurrentAccount(account);
-      refreshAccounts();
+      pickAccount(account);
       setResolveInputs(['']);
     } catch (err) {
       setResolveError((err as Error).message);
@@ -138,7 +161,22 @@ export default function HomeRoute() {
   }
 
   function selectAccount(account: AccountSlot): void {
+    pickAccount(account);
+  }
+
+  // The one place an *explicit* account pick lands — a fresh resolve, a recents click, or
+  // adopting whatever a `?u=` link was showing. Beyond storing it, this consumes the override:
+  // the param has served its purpose once the user has chosen, so it's dropped from state and
+  // stripped from the URL (replaceState) rather than left there to keep overriding the very
+  // preference that was just set. See docs/list-centric-redesign.md's `?u=` section.
+  function pickAccount(account: AccountSlot): void {
+    clearAccountOverride();
     setCurrentAccount(account);
+    // Through the router (replacing, not pushing), not a bare history.replaceState — see
+    // urlWithoutAccountParam's own comment: the router's location signal is what every
+    // withAccountParam-built href is derived from, so stripping the param behind the router's
+    // back leaves all of them pointed at an account the URL no longer names.
+    navigate(urlWithoutAccountParam(location.pathname, location.search), { replace: true });
     refreshAccounts();
   }
 
@@ -152,6 +190,14 @@ export default function HomeRoute() {
     e.stopPropagation();
     removeRecentAccount(id);
     refreshAccounts();
+  }
+
+  // The fixed list links have to carry a `?u=` override along (`withAccountParam`) or clicking
+  // "Owned" while exploring a shared link would quietly show the *stored* account's library
+  // instead. Built off the router's own reactive `location.search`, so each href updates itself
+  // the moment an explicit pick strips the param (pickAccount above).
+  function accountLink(path: string): string {
+    return withAccountParam(path, location.search);
   }
 
   function handleNewFolder(): void {
@@ -272,6 +318,39 @@ export default function HomeRoute() {
     <div class="home-route">
       <section class="home-account">
         <h2>Account</h2>
+
+        {/* A `?u=` link being explored — see accountsStore.ts's own `?u=` section. Said out loud
+            rather than left implicit: the account card below is showing someone the *link*
+            picked, not the visitor's own stored account, and that difference is invisible
+            otherwise. The adopt button is the only way this ever becomes their stored account
+            (pickAccount, which also strips the now-redundant param). */}
+        <Show when={overrideState().state !== 'none'}>
+          <div class="account-override">
+            <Show when={accountOverrideStatusText(overrideState())}>
+              {text => <p class="account-override-status">{text()}</p>}
+            </Show>
+            <Show when={overrideAccount()}>
+              {account => (
+                <p class="account-override-status">
+                  Exploring <strong>{account().label || account().rawInputs.join(' + ')}</strong> from this
+                  link — your own current account is unchanged.
+                  <button type="button" class="account-override-adopt" onClick={() => pickAccount(account())}>
+                    Set as my current account
+                  </button>
+                </p>
+              )}
+            </Show>
+            {/* An old Comparison-page link (`?u=alice&u=bob`) — a shape with no single route
+                anymore. urlState.ts's AccountParam.extraSlots explains why the extras are
+                reported rather than silently unioned into one Family or dropped. */}
+            <Show when={overrideState().extraSlots > 0}>
+              <p class="account-override-status">
+                This link lists {overrideState().extraSlots + 1} accounts to compare. Showing the first;
+                combine each account's Owned list into a new list below to compare them.
+              </p>
+            </Show>
+          </div>
+        </Show>
         {/* The header speaks for the slot as a whole — one avatar/name/presence for a plain
             single account, or just the joined label plus a per-member list below for a Steam
             Family, where no single persona/profile/presence describes the whole thing. Everything
@@ -394,10 +473,10 @@ export default function HomeRoute() {
       </section>
 
       <section class="home-fixed-links">
-        <A href="/lists/owned">Owned</A>
-        <A href="/lists/wishlist">Wishlist</A>
-        <A href="/bundles">Bundles</A>
-        <A href="/game">Recently Looked Up</A>
+        <A href={accountLink('/lists/owned')}>Owned</A>
+        <A href={accountLink('/lists/wishlist')}>Wishlist</A>
+        <A href={accountLink('/bundles')}>Bundles</A>
+        <A href={accountLink('/game')}>Recently Looked Up</A>
       </section>
 
       <section class="home-tree">

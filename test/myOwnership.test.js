@@ -14,6 +14,9 @@ function makeMemoryLocalStorage() {
 
 beforeEach(() => {
   global.localStorage = makeMemoryLocalStorage();
+  // Unlike currentAccount (a pref, wiped with localStorage above), the `?u=` override is
+  // module-level state in accountsStore.ts — cleared by hand so it can't leak between tests.
+  setAccountOverride(null);
 });
 
 // createMyOwnershipCache() is imported fresh (not re-required) per test — it's a factory
@@ -21,7 +24,7 @@ beforeEach(() => {
 // "delete require.cache between tests" pattern, which only resets a *stateless* module (see
 // myOwnership.ts's own comment on why that pattern doesn't reset a module-level `let` here).
 const { createMyOwnershipCache } = require('../public/myOwnership.ts');
-const { setCurrentAccount } = require('../public/accountsStore.ts');
+const { setCurrentAccount, setAccountOverride } = require('../public/accountsStore.ts');
 
 function makeAccount(id, overrides = {}) {
   return { id, members: [id], rawInputs: [id], lastUsedAt: 0, ...overrides };
@@ -167,4 +170,29 @@ test('onMyOwnershipReady: the unsubscribe function prevents a later firing', asy
   unsub();
   await getMyOwnershipStatus(440);
   assert.equal(fired, 0);
+});
+
+test('getMyOwnershipStatus: a ?u= override is what ownership answers for, not the stored account', async (t) => {
+  // Owned games differ per account, so the answer says which one was actually asked about.
+  withFetch(t, async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    const member = (body.slots ? body.slots[0] : body.members)[0];
+    if (url === '/api/common-games') {
+      return {
+        ok: true,
+        json: async () => ({
+          groups: [{ games: (member === '1' ? [440] : [620]).map(appid => ({ appid, name: `App ${appid}` })) }],
+          slots: [[{ steamid: member }]],
+          playtime: {}, lastPlayed: {},
+        }),
+      };
+    }
+    return { ok: true, json: async () => ({ items: [] }) };
+  });
+  setCurrentAccount(makeAccount('1'));
+  setAccountOverride(makeAccount('2'));
+
+  const { getMyOwnershipStatus } = createMyOwnershipCache();
+  assert.deepEqual(await getMyOwnershipStatus(620), { inLibrary: true, onWishlist: false });
+  assert.deepEqual(await getMyOwnershipStatus(440), { inLibrary: false, onWishlist: false });
 });

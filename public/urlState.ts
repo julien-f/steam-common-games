@@ -82,10 +82,18 @@ export interface UrlState {
   nameFilter: string;
   filters: Record<string, string[]>;
 }
+// One `u=` value per slot, comma-joined identifiers within it (a Steam Family) — see the
+// URL/sharing section in CLAUDE.md. Shared by parseUrlState and parseAccountParam below so the
+// two can never disagree about what a `u=` value means (whitespace handling, empty entries).
+function parseSlots(params: URLSearchParams): string[][] {
+  return params.getAll('u')
+    .map(s => s.split(',').map(v => v.trim()).filter(Boolean))
+    .filter(slot => slot.length > 0);
+}
+
 export function parseUrlState(search: string): UrlState {
   const params = new URLSearchParams(search);
-  const slots = params.getAll('u')
-    .map(s => s.split(',').map(v => v.trim()).filter(Boolean));
+  const slots = parseSlots(params);
   const sortParam = params.get('sort');
   return {
     slots,
@@ -98,4 +106,66 @@ export function parseUrlState(search: string): UrlState {
     nameFilter: params.get('name') ?? '',
     filters:    Object.fromEntries(FILTER_DIMS.map(d => [d.key, params.getAll(d.param)])),
   };
+}
+
+// ── `?u=` — the account-override param ───────────────────────────────────────────────────────
+
+// The raw `u=` values exactly as they sit in a URL, for forwarding across an internal
+// navigation (see withAccountParam below). Kept separate from parseAccountParam's resolved
+// view: forwarding must pass the identifiers through untouched (they're what the *user* shared),
+// not a re-serialized version of whatever this app made of them.
+export function accountParamValues(search: string): string[] {
+  return new URLSearchParams(search).getAll('u');
+}
+
+export interface AccountParam {
+  // The identifiers to resolve as the account being explored — one slot's worth (a plain
+  // account, or several comma-joined identifiers for a Steam Family).
+  identifiers: string[];
+  // Any *further* slots the link carried. A `?u=alice&u=bob` link is an old Comparison-page URL
+  // ("compare alice against bob"), a shape the list-centric app has no single route for anymore
+  // — a comparison is a dynamic list combining two accounts' Owned lists now (see
+  // docs/list-centric-redesign.md). Rather than silently unioning those identifiers into one
+  // Family (right games, wrong meaning) or dropping them with no explanation, the first slot is
+  // honored as the explored account and the rest are surfaced here so the UI can say so.
+  extraSlots: string[][];
+}
+
+export function parseAccountParam(search: string): AccountParam {
+  const slots = parseSlots(new URLSearchParams(search));
+  return { identifiers: slots[0] ?? [], extraSlots: slots.slice(1) };
+}
+
+// Carries whatever `u=` the current URL holds onto `path`, so the account being explored via a
+// shared link survives clicking around the app instead of evaporating on the first navigation
+// (the stored `currentAccount` is sticky by nature; an override has to be made sticky by hand).
+// `path` may carry its own query (`/lists/owned?game=440`) — its params win over the ones
+// carried over, and the result goes through reorderUrlParams like every other URL this app
+// writes. Returns `path` untouched when there's no `u=` to carry, so every call site can use
+// this unconditionally rather than branching on whether an override happens to be active.
+export function withAccountParam(path: string, search: string = location.search): string {
+  const values = accountParamValues(search);
+  if (values.length === 0) return path;
+  const [pathname, ownQuery] = path.split('?');
+  const params = new URLSearchParams(ownQuery ?? '');
+  if (!params.has('u')) values.forEach(v => params.append('u', v));
+  return `${pathname}?${reorderUrlParams(params)}`;
+}
+
+// The current URL with `u=` stripped back out — what an explicit account pick navigates to,
+// since the override the param carried is redundant once the user has chosen (see
+// accountsStore.ts's `?u=` section and docs/list-centric-redesign.md).
+//
+// Returns a URL for the *caller* to navigate to (replacing, never pushing — consuming the param
+// isn't its own back/forward-navigable step) rather than calling history.replaceState itself
+// like setPanelParam above does. That's deliberate: a raw replaceState is invisible to
+// @solidjs/router's own location signal, so every href built with withAccountParam would keep
+// showing the stripped param until something unrelated re-rendered it (confirmed live — Home's
+// Owned/Wishlist links stayed pointed at the old `?u=` after adopting the account). Going
+// through the router's navigate() instead updates that signal, and every such href with it.
+export function urlWithoutAccountParam(pathname: string, search: string): string {
+  const params = new URLSearchParams(search);
+  params.delete('u');
+  const qs = reorderUrlParams(params).toString();
+  return qs ? `${pathname}?${qs}` : pathname;
 }

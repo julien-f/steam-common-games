@@ -2,7 +2,10 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { FILTER_DIMS, parseUrlState, reorderUrlParams } = require('../public/urlState.ts');
+const {
+  FILTER_DIMS, parseUrlState, reorderUrlParams,
+  parseAccountParam, accountParamValues, withAccountParam, urlWithoutAccountParam,
+} = require('../public/urlState.ts');
 
 // ── parseUrlState — slots ─────────────────────────────────────────────────────
 
@@ -120,4 +123,67 @@ test('reorderUrlParams: appends unknown params after every known one, preserving
 
 test('reorderUrlParams: empty input yields empty output', () => {
   assert.equal(reorderUrlParams(new URLSearchParams()).toString(), '');
+});
+
+// ── ?u= — the account-override param ──────────────────────────────────────────
+
+test('parseAccountParam: a single identifier is the explored account, with no extra slots', () => {
+  assert.deepEqual(parseAccountParam('?u=alice'), { identifiers: ['alice'], extraSlots: [] });
+});
+
+test('parseAccountParam: comma-joined identifiers are one account (a Steam Family)', () => {
+  assert.deepEqual(parseAccountParam('?u=alice,bob_family'), { identifiers: ['alice', 'bob_family'], extraSlots: [] });
+});
+
+test('parseAccountParam: an old multi-slot comparison link honors the first slot and reports the rest', () => {
+  const { identifiers, extraSlots } = parseAccountParam('?u=alice&u=bob&u=carol,dave');
+  assert.deepEqual(identifiers, ['alice']);
+  assert.deepEqual(extraSlots, [['bob'], ['carol', 'dave']]);
+});
+
+test('parseAccountParam: no u= param (or an empty one) yields no identifiers', () => {
+  assert.deepEqual(parseAccountParam('?game=440'), { identifiers: [], extraSlots: [] });
+  assert.deepEqual(parseAccountParam('?u='), { identifiers: [], extraSlots: [] });
+});
+
+test('accountParamValues: returns the raw values, untouched, for forwarding', () => {
+  assert.deepEqual(accountParamValues('?u=alice,bob&game=440&u=carol'), ['alice,bob', 'carol']);
+  assert.deepEqual(accountParamValues('?game=440'), []);
+});
+
+test('withAccountParam: carries every u= value onto a bare path', () => {
+  assert.equal(withAccountParam('/lists/owned', '?u=alice'), '/lists/owned?u=alice');
+  assert.equal(withAccountParam('/game/440', '?u=alice&u=bob'), '/game/440?u=alice&u=bob');
+});
+
+test('withAccountParam: merges into a path that has its own query, in canonical param order', () => {
+  assert.equal(withAccountParam('/lists/owned?game=440', '?u=alice'), '/lists/owned?u=alice&game=440');
+});
+
+test("withAccountParam: a path's own u= wins over the one being carried over", () => {
+  assert.equal(withAccountParam('/lists/owned?u=bob', '?u=alice'), '/lists/owned?u=bob');
+});
+
+test('withAccountParam: returns the path untouched when there is no u= to carry', () => {
+  assert.equal(withAccountParam('/lists/owned', '?game=440'), '/lists/owned');
+  assert.equal(withAccountParam('/lists/owned?game=440', ''), '/lists/owned?game=440');
+});
+
+test('urlWithoutAccountParam: strips u= and keeps the rest of the query in canonical order', () => {
+  assert.equal(
+    urlWithoutAccountParam('/lists/owned', '?u=alice&game=440&tag=Indie'),
+    '/lists/owned?game=440&tag=Indie',
+  );
+});
+
+test('urlWithoutAccountParam: strips every value of a repeated u=', () => {
+  assert.equal(urlWithoutAccountParam('/', '?u=alice&u=bob'), '/');
+});
+
+test('urlWithoutAccountParam: yields the bare pathname rather than a lone "?" when nothing else is left', () => {
+  assert.equal(urlWithoutAccountParam('/lists/owned', '?u=alice'), '/lists/owned');
+});
+
+test('urlWithoutAccountParam: a URL with no u= at all comes back unchanged', () => {
+  assert.equal(urlWithoutAccountParam('/lists/owned', '?game=440'), '/lists/owned?game=440');
 });

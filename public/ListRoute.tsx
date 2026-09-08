@@ -70,9 +70,10 @@ import { createStreamBatcher } from './streamBatcher.ts';
 import {
   panelOpen, panelClose, isPanelOpen, getPanelGame, pickRandomFrom, clearRandomQueue, renderPanelBody,
 } from './panel.tsx';
-import { setPanelParam, reorderUrlParams } from './urlState.ts';
+import { setPanelParam, reorderUrlParams, withAccountParam } from './urlState.ts';
 import { setPref } from './prefs.ts';
-import { getCurrentAccount } from './accountsStore.ts';
+import { getEffectiveCurrentAccount, ACCOUNT_CHANGED_EVENT } from './accountsStore.ts';
+import { getAccountOverrideState, accountOverrideStatusText } from './accountOverride.ts';
 import { fetchAccountOwnedGames, fetchAccountWishlistItems } from './accountData.ts';
 import { loadRecentGames, addRecentGame, renameRecentGame } from './recentGames.ts';
 import { fetchBundleById, resolveBundleGames, type ResolvedGame, type FlatGame } from './bundleData.ts';
@@ -459,7 +460,7 @@ export default function ListRoute() {
     // time this runs (right above), and load()'s fast path (see its own comment) checks the
     // panel's current game before doing anything, so the re-entry is a no-op rather than a
     // second open. Every other kind keeps the existing `?game=` contextual param instead.
-    if (kind === 'recent') navigate(`/game/${resolved.appid}`, { replace: true });
+    if (kind === 'recent') navigate(withAccountParam(`/game/${resolved.appid}`), { replace: true });
     else setPanelParam(resolved.appid);
   }
 
@@ -549,7 +550,7 @@ export default function ListRoute() {
     // (hasLoadedOnce) is what keeps that navigation cheap; it re-runs load() but, once already
     // mounted on this kind, that just calls straight back into openOrAddRecentGame instead of
     // refetching the whole recents list.
-    if (kind === 'recent') { navigate(`/game/${appid}`, { replace: true }); return true; }
+    if (kind === 'recent') { navigate(withAccountParam(`/game/${appid}`), { replace: true }); return true; }
     const existing = rowStore.getRow(appid);
     if (existing) openGame(existing);
     else openStandaloneInPlace(appid);
@@ -562,7 +563,7 @@ export default function ListRoute() {
   // only; every other kind's `?game=` clearing is handled generically by the shell itself
   // (setPanelParam(null), called unconditionally alongside this).
   function handleGameClose(): void {
-    if (kind === 'recent' && params.appid) navigate('/game', { replace: true });
+    if (kind === 'recent' && params.appid) navigate(withAccountParam('/game'), { replace: true });
   }
 
   const detailBatcher = createStreamBatcher<DetailsEvent>({
@@ -981,8 +982,25 @@ export default function ListRoute() {
         return;
       }
     } else {
-      const account = getCurrentAccount();
-      if (!account) { setStatusText('No account selected — pick one from Home once it exists.'); return; }
+      // The *effective* account — a `?u=` link's override when one is being explored, the
+      // stored currentAccount otherwise (see accountsStore.ts's own `?u=` section).
+      //
+      // A `?u=` link is authoritative for these two lists, so while it's still resolving — and
+      // if it fails outright — the stored account is deliberately NOT loaded in its place. That
+      // matters both ways: a cold visit to /lists/owned?u=alice would otherwise fetch and stream
+      // the *stored* account's whole library first (this route's own load effect runs right
+      // after AppShell.tsx's has only just started the resolve) and throw it away moments later
+      // when the override landed and reloaded; and on a failure — a private or unknown profile,
+      // confirmed live — it would quietly show someone else's library under a URL that names a
+      // specific account. Either way there's nothing here yet, and the override's own status
+      // text says which of the two it is; only a genuinely account-less app points at Home.
+      const overrideState = getAccountOverrideState();
+      const linkPending = overrideState.state === 'resolving' || overrideState.state === 'error';
+      const account = linkPending ? null : getEffectiveCurrentAccount();
+      if (!account) {
+        setStatusText(accountOverrideStatusText(overrideState) ?? 'No account selected — pick one from Home.');
+        return;
+      }
       const listLabel = kind === 'wishlist' ? 'Wishlist' : 'Library';
       setBaseTitle(account.label ? `${account.label}'s ${listLabel}` : listLabel);
       setStatusText(kind === 'wishlist' ? 'Fetching wishlist…' : 'Fetching library…');
@@ -1141,7 +1159,32 @@ export default function ListRoute() {
   // load() itself (via the outer `params` object) — referencing them here is what makes this
   // effect re-run on a param-only navigation; 'owned'/'wishlist' have no such param and so only
   // ever run once, identically to the old onMount-based call.
-  createEffect(() => { params.bundleId; params.listId; params.appid; load(); });
+  // `accountRev` is what makes the two account-scoped kinds re-load when the effective account
+  // changes under them — a `?u=` link resolving after this route mounted (the common case: a
+  // cold visit to /lists/owned?u=alice), or an account picked/adopted on Home. accountsStore.ts
+  // is a plain module with no Solid signal of its own, so this subscribes to its window
+  // broadcast and bumps a signal the load effect below reads — the same shape HomeRoute.tsx uses
+  // for its own account card. Only 'owned'/'wishlist' read it: every other kind's data has
+  // nothing to do with which account is current (a bundle, the recents list, a user list's own
+  // pinned account refs), so they must not reload on an unrelated account change.
+  const [accountRev, setAccountRev] = createSignal(0);
+  // Every other kind keeps its rows, but the ✓/☆ ownership stamps on them belong to the account
+  // that was current when they were computed — loadMyOwnership's own one-shot re-stamp has
+  // already fired by then, so without this a bundle/recents/user list would keep showing the
+  // previous account's ownership. Re-stamping is safe at any time: peek returns null until the
+  // new account's sets land, so nothing is cleared in the meantime, then everything is rewritten.
+  const onAccountChanged = () => {
+    setAccountRev(r => r + 1);
+    if (stampsOwnership) loadMyOwnership(loadGuard.current());
+  };
+  window.addEventListener(ACCOUNT_CHANGED_EVENT, onAccountChanged);
+  onCleanup(() => window.removeEventListener(ACCOUNT_CHANGED_EVENT, onAccountChanged));
+
+  createEffect(() => {
+    params.bundleId; params.listId; params.appid;
+    if (kind === 'owned' || kind === 'wishlist') accountRev();
+    load();
+  });
 
   onCleanup(() => {
     // The panel's own nav bar (renderPanelNav) points at *this* mount's table/getGameList —
@@ -1172,8 +1215,8 @@ export default function ListRoute() {
           <div class="bundle-detail-header">
             <div class="bundle-detail-titlebar">
               <div class="bundle-detail-nav">
-                <button type="button" disabled={prevBundleId() == null} onClick={() => { const id = prevBundleId(); if (id != null) navigate(`/lists/bundle/${id}`); }}>‹</button>
-                <button type="button" disabled={nextBundleId() == null} onClick={() => { const id = nextBundleId(); if (id != null) navigate(`/lists/bundle/${id}`); }}>›</button>
+                <button type="button" disabled={prevBundleId() == null} onClick={() => { const id = prevBundleId(); if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`)); }}>‹</button>
+                <button type="button" disabled={nextBundleId() == null} onClick={() => { const id = nextBundleId(); if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`)); }}>›</button>
               </div>
               <span class="bundle-detail-title">{bundleTitle()}</span>
               <Show when={bundleMeta()?.shop}>

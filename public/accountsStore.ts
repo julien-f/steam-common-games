@@ -48,6 +48,54 @@ export function getCurrentAccount(): AccountSlot | null {
 export function setCurrentAccount(account: AccountSlot | null): void {
   setPref(CURRENT_ACCOUNT_KEY, account);
   if (account) upsertRecentAccount(account);
+  notifyAccountChanged();
+}
+
+// ── The `?u=` override ───────────────────────────────────────────────────────────────────────
+
+// `?u=` is a URL *override*, not a "consume and adopt" param (unlike the `?tv=` table-view one):
+// present in the URL, it takes precedence over the stored `currentAccount` everywhere the
+// current account is read, but it never overwrites the stored preference — opening someone
+// else's shared link shouldn't silently change your own default account. See
+// docs/list-centric-redesign.md's own `?u=` section, and accountOverride.ts for the URL-parsing/
+// resolving half of this (kept out of here so this file stays plain AccountSlot state with no
+// fetching of its own).
+//
+// Deliberately in-memory only, never through prefs.ts: it's per-load display state belonging to
+// one shared link, and persisting it would be exactly the silent adoption the override exists to
+// avoid. It's also deliberately kept out of `recentAccounts` for the same reason — browsing
+// someone's library from a link isn't the same act as picking an account for yourself.
+let accountOverride: AccountSlot | null = null;
+
+export function getAccountOverride(): AccountSlot | null {
+  return accountOverride;
+}
+
+export function setAccountOverride(account: AccountSlot | null): void {
+  if (accountOverride?.id === account?.id) return; // no real change — don't wake every listener
+  accountOverride = account;
+  notifyAccountChanged();
+}
+
+// "Whichever account the app is currently showing" — the override when a `?u=` link is being
+// explored, the stored preference otherwise. Every read of the current account outside
+// HomeRoute's own account *picker* goes through this rather than getCurrentAccount(), so a
+// shared link is honored on every route (the Owned/Wishlist lists, the panel's ownership badges,
+// Home's own account header) rather than only wherever the param happened to be parsed.
+export function getEffectiveCurrentAccount(): AccountSlot | null {
+  return accountOverride ?? getCurrentAccount();
+}
+
+// Broadcast on any change to what getEffectiveCurrentAccount() returns — a `?u=` override
+// resolving/clearing, or an explicit account pick. A plain window CustomEvent, the same
+// mechanism region.ts's REGION_CHANGED_EVENT already uses (and for the same reason): this file
+// is deliberately a plain module with no Solid reactivity of its own, so a route that needs to
+// react subscribes to this and bumps a signal of its own, and nothing here needs to know who's
+// listening. Guarded for a `window`-less environment (Node unit tests), same as region.ts.
+export const ACCOUNT_CHANGED_EVENT = 'scg:account-changed';
+
+export function notifyAccountChanged(): void {
+  try { window.dispatchEvent(new CustomEvent(ACCOUNT_CHANGED_EVENT)); } catch { /* no window (tests) */ }
 }
 
 // ── recentAccounts ───────────────────────────────────────────────────────────────────────────

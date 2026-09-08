@@ -17,9 +17,14 @@
 // wording those routes and this badge already use. `myAccount`/"★ star as mine" (accountsStore.ts
 // /HomeRoute.tsx) is no longer read by this file — left in place unused rather than removed,
 // in case it's wanted for something else later.
-// Returns `null` throughout when no `currentAccount` is loaded yet — same as the legacy page's
+//
+// Read via getEffectiveCurrentAccount(), so a `?u=` link being explored is what these badges
+// answer for (see accountsStore.ts's own `?u=` section) — "whichever account's list is on
+// screen" is exactly what that override changes — and the badges' own /lists/owned and
+// /lists/wishlist links carry the param along (panel.tsx) so clicking one stays on that account.
+// Returns `null` throughout when no account is loaded at all — same as the legacy page's
 // own "no badge at all" behavior.
-import { getCurrentAccount } from './accountsStore.ts';
+import { getEffectiveCurrentAccount } from './accountsStore.ts';
 import { fetchAccountOwnedAppids, fetchAccountWishlistAppids } from './accountData.ts';
 
 export interface OwnershipStatus {
@@ -55,7 +60,7 @@ export function createMyOwnershipCache() {
   // Starts (or reuses) the two fetches for whatever `currentAccount` currently is. Returns false
   // with no fetch at all when nothing is loaded — the "no badge" case throughout this module.
   function ensureLoading(): boolean {
-    const account = getCurrentAccount();
+    const account = getEffectiveCurrentAccount();
     if (!account) {
       cachedAccountId = null;
       ownedPromise = wishlistPromise = null;

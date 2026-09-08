@@ -21,6 +21,7 @@
 // counterpart does in a game table.
 import { createSignal, createEffect, onMount, onCleanup, Show } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
+import { withAccountParam } from './urlState.ts';
 import { createTableState, DataTableView } from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
 import { bucketDatePart, formatDatePart, bucketNumericRange, formatNumericRange } from '@vates/data-table-core';
@@ -296,7 +297,7 @@ export default function BundlesBrowseRoute() {
         <DataTableView<BundleRow>
           table={table}
           rowKey="id"
-          onRowClick={row => navigate(`/lists/bundle/${row.id}`)}
+          onRowClick={row => navigate(withAccountParam(`/lists/bundle/${row.id}`))}
         />
       </div>
       <Show when={moreAvailable()}>

@@ -2159,6 +2159,26 @@ kbd {
 .home-account form button[type="submit"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 .home-account form button:disabled { opacity: 0.6; cursor: not-allowed; }
 
+/* A `?u=` link's account override (HomeRoute) — deliberately called out rather than styled
+   like ordinary body text: the account card right below it is showing someone the *link's*
+   account, not the visitor's own, and nothing else on the page says so. Same amber
+   "heads up, not an error" palette as .account-private's own private-profile badge. */
+.account-override {
+  background: rgba(228,168,46,0.08);
+  border: 1px solid rgba(228,168,46,0.3);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+.account-override-status { font-size: 12.5px; color: var(--text0); margin: 0; }
+.account-override-status + .account-override-status { margin-top: 6px; }
+.account-override-adopt {
+  margin-left: 8px; padding: 3px 9px;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: transparent; color: var(--text0); font-size: 12px; cursor: pointer;
+}
+.account-override-adopt:hover { border-color: var(--accent); color: var(--accent2); }
+
 .error { color: #ff8888; font-size: 12.5px; margin: 6px 0; }
 
 .recent-accounts { list-style: none; display: flex; flex-direction: column; gap: 6px; }

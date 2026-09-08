@@ -7,6 +7,7 @@ import type { MediaItem } from './mediaItems.ts';
 import { getStoredRegion, resolveRegion } from './region.ts';
 import { getMyOwnershipStatus } from './myOwnership.ts';
 import { setGameTitle } from './pageTitle.ts';
+import { withAccountParam } from './urlState.ts';
 import type { Game } from './types.ts';
 
 import { createSignal, createEffect, createMemo, For, Show, type JSX } from 'solid-js';
@@ -1472,10 +1473,17 @@ function PanelRest(): JSX.Element {
   // library'" reasoning this label wording still follows. Links to `?game=<appid>` on that list
   // (not the bare route) so landing there also reopens this exact game, same as `copyPanelLink`'s
   // own `/game/<appid>` link opens a specific game rather than just a list.
+  // withAccountParam: these badges answer "does the account currently on screen have this",
+  // which is the `?u=` link's account when one is being explored (see myOwnership.ts /
+  // accountsStore.ts's own `?u=` section) — so the list they link to has to be that same
+  // account's, not the visitor's own stored one. `copyPanelLink` above deliberately does NOT do
+  // this: that link is the game's canonical shareable address, and carrying whichever account
+  // the sender happened to be exploring into it would make it explore that account for everyone
+  // it's shared with.
   const ownershipRow = (g.inLibrary == null && g.onWishlist == null) ? null : (
     <div class="panel-ownership-row">
-      <Show when={g.inLibrary}><A class="panel-ownership-badge owned" href={`/lists/owned?game=${g.appid}`}>✓ In library</A></Show>
-      <Show when={g.onWishlist}><A class="panel-ownership-badge wishlisted" href={`/lists/wishlist?game=${g.appid}`}>☆ On wishlist</A></Show>
+      <Show when={g.inLibrary}><A class="panel-ownership-badge owned" href={withAccountParam(`/lists/owned?game=${g.appid}`)}>✓ In library</A></Show>
+      <Show when={g.onWishlist}><A class="panel-ownership-badge wishlisted" href={withAccountParam(`/lists/wishlist?game=${g.appid}`)}>☆ On wishlist</A></Show>
     </div>
   );
 

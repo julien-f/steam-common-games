@@ -8,15 +8,16 @@
 // open/close/position bindings below (`bindPrefsPopoverClose`/`bindPrefsPopoverPosition`) used
 // to be a deliberate, temporary duplicate of nav.tsx's identically-named pair for exactly that
 // transition period; now that nav.tsx is gone, these are just the one real implementation.
-import { onMount, onCleanup, For, type JSX } from 'solid-js';
-import { A, useNavigate, type RouteSectionProps } from '@solidjs/router';
+import { onMount, onCleanup, createEffect, For, type JSX } from 'solid-js';
+import { A, useNavigate, useLocation, type RouteSectionProps } from '@solidjs/router';
 import { prefsPopoverPanelHtml, initPrefsPopover } from './prefsPopover.ts';
 import { initLightbox, isLightboxOpen } from './lightbox.tsx';
 import { initPanel, isPanelOpen, panelClose, panelStepHero } from './panel.tsx';
 import { bindPanelKeyboardShortcuts } from './panelKeyboard.ts';
 import { initGameSearch } from './gameSearch.ts';
 import { addRecentGame } from './recentGames.ts';
-import { setPanelParam } from './urlState.ts';
+import { setPanelParam, withAccountParam } from './urlState.ts';
+import { syncAccountOverrideFromUrl } from './accountOverride.ts';
 
 // Route-specific behavior (keyboard shortcuts, and now "open this looked-up game") can't be
 // hardcoded at the shell level — different routes have different "list" contexts, or none at all
@@ -65,6 +66,15 @@ const NAV_LINKS: { href: string; label: string; end?: boolean }[] = [
 export function AppShell(props: RouteSectionProps): JSX.Element {
   let searchInputEl!: HTMLInputElement;
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // `?u=` (the account-override param — see accountOverride.ts/accountsStore.ts) is resolved
+  // here, once for the whole app, rather than per route: the shell outlives every navigation, so
+  // a shared link is honored identically on all of them (Home's account header, the Owned/
+  // Wishlist lists, the panel's ownership badges) and stays resolved while clicking between
+  // them. This effect runs on every URL change — syncFromUrl itself is keyed on the identifiers,
+  // so an unrelated param write (a panel `?game=`, a lightbox `&shot=`) costs nothing.
+  createEffect(() => syncAccountOverrideFromUrl(location.search));
 
   // The one place a game-lookup, from anywhere in the shell, gets routed to wherever it belongs
   // — the currently mounted route's own registered handler if it has one (ListRoute: opens the
@@ -73,7 +83,9 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
   // own at all (Home, Bundles browse, About) — see registerRouteHandlers's own comment above.
   function openGameGlobally(appid: number): void {
     if (routeHandlers.openGame?.(appid)) return;
-    navigate(`/game/${appid}`);
+    // withAccountParam: a `?u=` link being explored has to survive this navigation, or looking
+    // up a game from Home would silently drop back to the stored account (see urlState.ts).
+    navigate(withAccountParam(`/game/${appid}`, location.search));
   }
 
   onMount(() => {
@@ -116,7 +128,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       <nav id="site-nav" class="site-nav">
         <For each={NAV_LINKS}>
           {link => (
-            <A href={link.href} end={link.end} class="site-nav-link" activeClass="active">
+            <A href={withAccountParam(link.href, location.search)} end={link.end} class="site-nav-link" activeClass="active">
               {link.label}
             </A>
           )}
