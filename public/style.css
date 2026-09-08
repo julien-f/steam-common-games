@@ -2120,6 +2120,7 @@ kbd {
 /* "Updated <when> ↻ Refresh" — on Home's Account card and above the owned/wishlist lists.
    Server-side caching runs for weeks (default.env's LIBRARY_CACHE_TTL_MINUTES), so how old the
    data is gets stated outright, with the control that fixes it sitting right next to the fact. */
+.bundles-updated { font-size: 11px; color: var(--text2); }
 .account-updated {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   font-size: 11px; color: var(--text2); margin-top: 4px;

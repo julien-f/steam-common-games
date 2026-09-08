@@ -29,7 +29,7 @@ import {
   fmt, compareDateMissingLast, compareNumMissingLast, withMissingGroup, formatMissingGroup,
   priceTierBucket, formatPriceTier,
 } from './gameColumns.ts';
-import { formatMoney, scoreColor } from './utils.ts';
+import { fmtAge, formatMoney, scoreColor } from './utils.ts';
 import {
   toBundleRow, fmtBundleDateTime, fmtBundleDatePart, fmtBundleTimePart, bundleUrgency, shopHue,
   type BundleListItem, type BundleRow,
@@ -235,6 +235,14 @@ export default function BundlesBrowseRoute() {
   // including whatever filter/sort/search the user has applied here.
   createEffect(() => setBrowsedBundles(table.processedData().map(b => ({ id: b.id, title: b.title }))));
 
+  // Oldest page write time across this load (a load pulls several pages), null once any page was
+  // fetched fresh; undefined = nothing loaded yet, which renders no readout rather than a
+  // premature "just now".
+  const [fetchedAt, setFetchedAt] = createSignal<number | null | undefined>(undefined);
+  function noteFetchedAt(at: number | null): void {
+    setFetchedAt(prev => (prev === undefined || at === null || prev === null ? at : Math.min(prev, at)));
+  }
+
   async function fetchPage(force = false): Promise<BundleListItem[]> {
     const qs = new URLSearchParams({
       country: resolveRegion(getStoredRegion()),
@@ -247,12 +255,13 @@ export default function BundlesBrowseRoute() {
     const res = await fetch(`/api/bundles?${qs}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to load bundles');
+    noteFetchedAt(data.fetchedAt ?? null);
     return data.bundles as BundleListItem[];
   }
 
   async function load({ append = false, refresh = false }: { append?: boolean; refresh?: boolean } = {}): Promise<void> {
     const gen = loadGuard.next();
-    if (!append) { offset = 0; setRows([]); }
+    if (!append) { offset = 0; setRows([]); setFetchedAt(undefined); }
     setLoading(true);
     setStatusText(append ? 'Loading more bundles…' : 'Loading bundles…');
     try {
@@ -291,6 +300,9 @@ export default function BundlesBrowseRoute() {
         {/* Bundle listings are cached server-side (BUNDLES_CACHE_TTL_MINUTES), and a bundle can go
             live or expire at any time — so "this list is out of date" gets a control rather than a
             wait. */}
+        <Show when={fetchedAt() !== undefined}>
+          <span class="bundles-updated">Updated {fmtAge(fetchedAt())}</span>
+        </Show>
         <button
           type="button"
           class="btn btn-ghost btn-sm"

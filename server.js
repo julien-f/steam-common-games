@@ -16,7 +16,7 @@ const { getMetrics, recordLimiterTrip } = require('./lib/metrics');
 const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker, getSemaphoreStats } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
-const { getBundles, findBundleById, resolveSteamAppIds, resolveItadIds, getSteamShopId, getPrices, extractPriceInfo } = require('./lib/itad');
+const { getBundles, bundlesCacheKey, findBundleById, resolveSteamAppIds, resolveItadIds, getSteamShopId, getPrices, extractPriceInfo } = require('./lib/itad');
 
 const HOST = process.env.HOST;
 const PORT = process.env.PORT;
@@ -332,8 +332,7 @@ const bundlesListLimit = namedRateLimit('bundlesList', {
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
     const sort = typeof req.query.sort === 'string' && req.query.sort ? req.query.sort : '-publish';
     const expired = req.query.expired === '1' || req.query.expired === 'true';
-    // Mirrors getBundles' own cache key exactly (lib/itad.js).
-    return getCached(`itad-bundles:${country}:${sort}:${expired}:${offset}:${limit}`) !== undefined;
+    return getCached(bundlesCacheKey({ country, offset, limit, sort, expired })) !== undefined;
   },
 });
 
@@ -577,6 +576,12 @@ function fetchGameDetails(appid, { force = false } = {}) {
       if (demoRes.status     === 'rejected') logErr('demo',     demoRes.reason);
       if (protondbRes.status === 'rejected') logErr('protondb', protondbRes.reason);
       return {
+        // Age of the oldest of this game's cached sources — the panel's ↻ puts it in its own
+        // tooltip rather than on screen: these tiers run to months, and for a game whose store
+        // page genuinely hasn't changed since 2013 a prominent "5 months ago" would invite
+        // clicks that spend the app's most rate-limited upstream (storeLimit) to re-fetch data
+        // that was already right. Available to whoever wonders; not advertised to everyone.
+        fetchedAt: oldestCachedAt([`rating:${appid}`, `hltb:${appid}`, `meta:${appid}`, `browse:${appid}`, `protondb:${appid}`]),
         rating:   ratingRes.status   === 'fulfilled' ? ratingRes.value   : null,
         hltb:     hltbRes.status     === 'fulfilled' ? hltbRes.value     : null,
         meta:     metaRes.status     === 'fulfilled' ? metaRes.value     : null,
@@ -621,7 +626,10 @@ app.get('/api/bundles', bundlesListLimit, async (req, res) => {
     // equivalent (findBundleById walks up to BUNDLE_SEARCH_MAX_PAGES pages, so forcing it would
     // cost several upstream calls to answer one deep link).
     const bundles = await getBundles({ country, offset, limit, sort, expired, force: isForceRefresh(req) });
-    res.json({ bundles, offset, limit });
+    // Age of this page of the list, for the "Updated <when>" beside the browse page's own ↻ —
+    // a bundle going live or expiring is exactly what that button is for, and that question is
+    // unanswerable without knowing how old the list on screen is.
+    res.json({ bundles, offset, limit, fetchedAt: getCachedAt(bundlesCacheKey({ country, offset, limit, sort, expired })) ?? null });
   } catch (err) {
     const status = routeErrorStatus('bundles', err);
     res.status(status).json({ error: err.message });
@@ -732,7 +740,11 @@ app.post('/api/prices', pricesLimit, async (req, res) => {
     ]);
     const out = {};
     for (const [key, gid] of gidByKey) out[key] = extractPriceInfo(gid ? prices.get(gid) : null, shopId);
-    res.json({ prices: out });
+    // How old the oldest price in this batch is — the "Updated <when>" beside the caller's own
+    // "↻ Refresh prices". Prices are the shortest-lived data the app shows and the most
+    // consequential to act on (someone clicks through to a shop from these), so how old they are
+    // is worth stating rather than implying.
+    res.json({ prices: out, fetchedAt: oldestCachedAt(gidsToPrice.map(gid => `itad-price:${country}:${gid}`)) });
   } catch (err) {
     const status = routeErrorStatus('prices', err);
     res.status(status).json({ error: err.message });

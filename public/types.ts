@@ -92,6 +92,11 @@ export interface Game extends PriceFields {
   // achievements (library.js) — undefined = not fetched, null = failed
   achievements?: Achievements | null;
   achievementsLoading?: boolean;
+  // When the oldest of this game's cached details (rating/HLTB/store metadata/tags/ProtonDB) was
+  // written server-side, epoch ms — null when they were fetched fresh, undefined before any
+  // details have arrived. Shown only in the panel refresh button's tooltip; see server.js's
+  // fetchGameDetails for why it isn't on screen.
+  detailsFetchedAt?: number | null;
   [key: string]: unknown;
 }
 

@@ -1158,7 +1158,22 @@ test('GET /api/bundles: 200 with bundle list, defaults applied', async (t) => {
   });
   const res = await api.get('/api/bundles');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, { bundles, offset: 0, limit: 20 });
+  // fetchedAt is the age of this page of the list — a real timestamp here, since the fetch above
+  // wrote its own cache entry (see the "Updated <when>" readout on the browse page).
+  assert.deepEqual({ ...res.body, fetchedAt: undefined }, { bundles, offset: 0, limit: 20, fetchedAt: undefined });
+  assert.equal(typeof res.body.fetchedAt, 'number');
+});
+
+test('POST /api/prices: reports fetchedAt for the batch', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url).includes('/service/shops/')) return { ok: true, json: async () => [{ id: 61, title: 'Steam' }] };
+    return { ok: true, json: async () => [{ id: 'g1', deals: [], historyLow: { all: null, y1: null, m3: null } }] };
+  });
+  const res = await api.post('/api/prices').send({ gids: ['g1'] });
+  assert.equal(res.status, 200);
+  assert.equal(typeof res.body.fetchedAt, 'number');
 });
 
 test('GET /api/bundles: clamps limit and validates country', async (t) => {

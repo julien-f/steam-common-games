@@ -1,6 +1,6 @@
 'use strict';
 
-import { formatMoney, scoreColor, dealRecordTier, DEAL_RECORD_TIERS, discountPct, fmtH, fmtLastPlayed, computeSteamdbRating } from './utils.ts';
+import { fmtAge, formatMoney, scoreColor, dealRecordTier, DEAL_RECORD_TIERS, discountPct, fmtH, fmtLastPlayed, computeSteamdbRating } from './utils.ts';
 import { openLightbox, closeLightbox, isLightboxOpen } from './lightbox.tsx';
 import { buildMediaItems } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
@@ -1447,7 +1447,7 @@ function PanelRest(): JSX.Element {
       type="button"
       class={`panel-refresh-btn${refreshing ? ' is-refreshing' : ''}`}
       disabled={refreshing}
-      title="Refresh rating, HLTB &amp; store details for this game"
+      title={`Refresh rating, HLTB & store details for this game${g.detailsFetchedAt === undefined ? '' : ` — last fetched ${fmtAge(g.detailsFetchedAt)}`}`}
       aria-label="Refresh details"
       onClick={handlePanelRefresh}
     >↻</button>

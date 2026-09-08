@@ -199,12 +199,13 @@ const MAX_PRICE_LOOKUP_GAMES = 500; // mirrors the server's own cap — see load
 
 // The shape of one `data:` line in /api/game-details/stream's SSE response.
 interface DetailsEvent {
-  appid: number; done?: boolean;
+  appid: number; done?: boolean; fetchedAt?: number | null;
   rating: Rating | null; hltb: Hltb | null; meta: GameMeta | null; tags: string[] | null;
   demo: { appid: number } | null; protondb: ProtonDb | null;
 }
 
 function applyDetailsEvent(row: Game, event: DetailsEvent) {
+  row.detailsFetchedAt = event.fetchedAt ?? null;
   row.capsule           = event.meta?.capsule ?? null;
   if (!row.name) row.name = event.meta?.name || '';
   row.score             = event.rating?.score ?? null;
@@ -282,8 +283,16 @@ export default function ListRoute() {
   // anyway, so per-row refreshing would add friction with no matching benefit. Re-prices whatever
   // is currently loaded — no re-resolution and no re-streaming of ratings/HLTB/tags.
   const [refreshingPrices, setRefreshingPrices] = createSignal(false);
+  // Oldest price write time seen across this load's price calls (a wishlist chunks into several),
+  // null once anything in the batch was fetched fresh. `undefined` = nothing loaded yet, which
+  // renders no readout at all rather than a premature "just now".
+  const [priceFetchedAt, setPriceFetchedAt] = createSignal<number | null | undefined>(undefined);
+  function notePriceFetchedAt(at: number | null): void {
+    setPriceFetchedAt(prev => (prev === undefined || at === null || prev === null ? at : Math.min(prev, at)));
+  }
   async function handleRefreshPrices(): Promise<void> {
     setRefreshingPrices(true);
+    setPriceFetchedAt(undefined);
     try {
       const gen = loadGuard.current();
       if (kind === 'bundle' && resolvedBundleGames) await loadBundlePrices(resolvedBundleGames, gen, true);
@@ -699,7 +708,10 @@ export default function ListRoute() {
       if (loadGuard.isStale(gen)) return;
       const chunk = appids.slice(i, i + MAX_PRICE_LOOKUP_GAMES);
       try {
-        const prices = await postPrices({ appids: chunk, country, force });
+        const { prices, fetchedAt: at } = await postPrices({ appids: chunk, country, force });
+        // A wishlist is chunked across several calls, so the readout takes the oldest of them —
+        // same "never claim data is fresher than its stalest part" rule as the account routes'.
+        notePriceFetchedAt(at);
         if (loadGuard.isStale(gen)) return;
         batch(() => {
           for (const appid of chunk) {
@@ -799,7 +811,8 @@ export default function ListRoute() {
   async function loadBundlePrices(resolved: ResolvedGame[], gen: number, force = false): Promise<void> {
     setPriceStatusText('');
     try {
-      const prices = await postPrices({ gids: resolved.map(g => g.gid), country: resolveRegion(getStoredRegion()), force });
+      const { prices, fetchedAt: at } = await postPrices({ gids: resolved.map(g => g.gid), country: resolveRegion(getStoredRegion()), force });
+      notePriceFetchedAt(at);
       if (loadGuard.isStale(gen)) return;
       batch(() => {
         for (const g of resolved) {
@@ -1376,6 +1389,9 @@ export default function ListRoute() {
       {(kind === 'wishlist' || kind === 'bundle') && (
         <>
           <div class="account-updated">
+            <Show when={priceFetchedAt() !== undefined}>
+              <span>Prices updated {fmtAge(priceFetchedAt())}</span>
+            </Show>
             <button
               type="button"
               class="btn btn-ghost btn-sm"
