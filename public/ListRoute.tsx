@@ -69,7 +69,7 @@ import { createStaleGuard } from './staleGuard.ts';
 import { createStreamBatcher } from './streamBatcher.ts';
 import { openLightbox } from './lightbox.tsx';
 import {
-  panelOpen, panelClose, isPanelOpen, getPanelGame, pickRandomFrom, clearRandomQueue, renderPanelBody,
+  panelOpen, panelClose, isPanelOpen, getPanelGame, pickRandomFrom, clearRandomQueue, clearAllRandomQueues, renderPanelBody,
 } from './panel.tsx';
 import { setPanelParam, urlWithParams, withAccountParam } from './urlState.ts';
 import { setPref } from './prefs.ts';
@@ -1216,6 +1216,9 @@ export default function ListRoute() {
     // before the streamTargets-empty early return below, since a first-ever /game/:appid lookup
     // can arrive with an otherwise-empty recents list. Only the *first* load needs to do this
     // here — a later appid-only change is handled by load()'s own fast path above instead.
+    // This list is being rebuilt, so its own random-pick history no longer describes its
+    // contents — a re-roll should be able to land on anything in the new list again.
+    clearRandomQueue(randomQueueKey());
     // Only ever *set* by a load, never cleared: opening the panel strips `shot` from the live
     // URL (setPanelParam), and this route re-runs load() for reasons of its own (an appid-only
     // navigation, an account change) — a later pass reading the by-then-stripped URL would
@@ -1295,6 +1298,10 @@ export default function ListRoute() {
   const onAccountChanged = () => {
     setAccountRev(r => r + 1);
     if (stampsOwnership) loadMyOwnership(loadGuard.current());
+    // Every account-scoped list's contents change at once, so no list's "already shuffled
+    // through these" history means anything any more — panel.tsx exported clearAllRandomQueues
+    // for exactly this and had no caller since the redesign.
+    clearAllRandomQueues();
   };
   window.addEventListener(ACCOUNT_CHANGED_EVENT, onAccountChanged);
   onCleanup(() => window.removeEventListener(ACCOUNT_CHANGED_EVENT, onAccountChanged));

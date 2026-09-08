@@ -28,7 +28,6 @@ export interface PanelOptions {
   onClose?: (opts?: { preserveUrl?: boolean }) => void;
   pricesHandledByHost?: boolean | ((game: Game) => boolean);
   enableTagFilters?: boolean;
-  gameHref?: (appid: string | number) => string;
 }
 
 // ── Shared game side panel ──────────────────────────────────────────────────
@@ -39,7 +38,7 @@ export interface PanelOptions {
 // `initPanel` options — that per-page option-supplying shape is why `PanelOptions` still
 // exists as a real interface (a global single-instance app has no *structural* need for one),
 // though only `onNavigateGame` is actually passed today; the rest (`onTagClick`/`isTagActive`/
-// `enableTagFilters`, `pricesHandledByHost`, `gameHref`) are dead weight from that era with no
+// `enableTagFilters`, `pricesHandledByHost`) are dead weight from that era with no
 // current caller — left in place rather than ripped out, since removing them touches more of
 // this file for a change genuinely out of scope for the pass that noticed it (see this file's
 // git history/CHANGELOG for the specifics). A real Solid component now (converted from the
@@ -1282,7 +1281,7 @@ function BaseGameLink(props: { game: Game }): JSX.Element {
     e.preventDefault();
     navigateToGame(fg.appid, fg.name || '');
   };
-  return <>DLC for <a class="panel-basegame-link" href={panelOptions.gameHref?.(fg.appid) ?? '#'} onClick={onClick}>{fg.name || `App ${fg.appid}`}</a></>;
+  return <>DLC for <a class="panel-basegame-link" href={withAccountParam(`/game/${fg.appid}`)} onClick={onClick}>{fg.name || `App ${fg.appid}`}</a></>;
 }
 
 // DLC — a base game's downloadable content, collapsed by default (see loadDlc above for
@@ -1290,10 +1289,13 @@ function BaseGameLink(props: { game: Game }): JSX.Element {
 // header's count comes straight from `meta.dlc` (the bare appid list, free — see
 // extractAppDetails in lib/steam.js) so it's shown immediately even before the card is ever
 // expanded; only the expanded body's names/capsules depend on the lazy fetch. Each entry is
-// a real `<a href>` (panelOptions.gameHref, host-supplied so the URL matches whichever page
-// this is) rather than a plain button, so ctrl/cmd/shift-click and middle-click open it in a
-// new tab the normal way — a plain click navigates within this panel instead via
-// navigateToGame.
+// a real `<a href>` — `/game/<appid>`, the app's canonical single-game link (see
+// docs/list-centric-redesign.md's routing section) — rather than a plain button, so
+// ctrl/cmd/shift-click and middle-click open it in a new tab the normal way, while a plain click
+// navigates within this panel instead via navigateToGame. This used to be a host-supplied
+// `panelOptions.gameHref` (each of the three deleted pages had its own URL shape); with one
+// canonical link for every route there's nothing left for a host to decide, and nobody had
+// passed it since the redesign — so these were `href="#"`, and middle-click opened nothing.
 function sortDlcByRelease(list: DlcEntry[]) {
   const sortKey = (d: DlcEntry) => {
     const t = d.releaseDate ? Date.parse(d.releaseDate) : NaN;
@@ -1312,7 +1314,7 @@ function DlcItem(props: { d: DlcEntry }): JSX.Element {
     navigateToGame(props.d.appid, props.d.name);
   };
   return (
-    <a class="panel-dlc-item" href={panelOptions.gameHref?.(props.d.appid) ?? '#'} onClick={onClick}>
+    <a class="panel-dlc-item" href={withAccountParam(`/game/${props.d.appid}`)} onClick={onClick}>
       <img class="panel-dlc-capsule" src={props.d.capsule} alt="" loading="lazy" />
       <span class="panel-dlc-name">{props.d.name}</span>
     </a>
