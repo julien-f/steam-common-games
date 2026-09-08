@@ -70,7 +70,7 @@ import { createStreamBatcher } from './streamBatcher.ts';
 import {
   panelOpen, panelClose, isPanelOpen, getPanelGame, pickRandomFrom, clearRandomQueue, renderPanelBody,
 } from './panel.tsx';
-import { setPanelParam, reorderUrlParams, withAccountParam } from './urlState.ts';
+import { setPanelParam, urlWithParams, withAccountParam } from './urlState.ts';
 import { setPref } from './prefs.ts';
 import { getEffectiveCurrentAccount, ACCOUNT_CHANGED_EVENT } from './accountsStore.ts';
 import { getAccountOverrideState, accountOverrideStatusText } from './accountOverride.ts';
@@ -856,7 +856,7 @@ export default function ListRoute() {
       setListTableView(list.id, {});
       const urlParams = new URLSearchParams(location.search);
       urlParams.delete(viewParamName());
-      history.replaceState(null, '', `?${reorderUrlParams(urlParams)}`);
+      history.replaceState(null, '', urlWithParams(urlParams));
     } else {
       resetTableView(table, viewPrefKey(), viewParamName());
     }
@@ -1139,7 +1139,7 @@ export default function ListRoute() {
             initialView = JSON.parse(raw);
             setListTableView(list.id, initialView);
             urlParams.delete(viewParamName());
-            history.replaceState(null, '', `?${reorderUrlParams(urlParams)}`);
+            history.replaceState(null, '', urlWithParams(urlParams));
           } catch { /* malformed param — fall through to the stored view */ }
         }
         table.setViewState(initialView);

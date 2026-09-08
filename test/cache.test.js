@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { getCached, getCachedAt, setCache, getCacheStats, getCacheEntryCounts, _reset } = require('../lib/cache');
-const { LIBRARY_CACHE_TTL_MS } = require('../lib/config');
+const { LIBRARY_CACHE_TTL_MS, BUNDLES_CACHE_TTL_MS } = require('../lib/config');
 
 // ── getCached ─────────────────────────────────────────────────────────────────
 
@@ -103,4 +103,31 @@ test('getCachedAt: undefined for a missing key, and for an expired one', () => {
   _reset([['games:old', { value: ['a'], ts: Date.now() - LIBRARY_CACHE_TTL_MS - 1000 }]]);
   assert.equal(getCachedAt('games:missing'), undefined);
   assert.equal(getCachedAt('games:old'), undefined);
+});
+
+// ── group routing ─────────────────────────────────────────────────────────────
+
+test('ITAD identity mappings outlive the bundle/price tier they used to share', () => {
+  // Written well past BUNDLES_CACHE_TTL_MS ago: a bundle listing that old is gone, while the
+  // appid↔gid mapping — which nothing about time invalidates — is still there.
+  const old = Date.now() - BUNDLES_CACHE_TTL_MS - 1000;
+  _reset([
+    ['itad-bundles:US:-publish:false:0:20', { value: [{ id: 1 }], ts: old }],
+    ['itad-appid:some-gid', { value: 440, ts: old }],
+    ['itad-gid:440', { value: 'some-gid', ts: old }],
+    ['itad-shop:steam', { value: 61, ts: old }],
+  ]);
+  assert.equal(getCached('itad-bundles:US:-publish:false:0:20'), undefined);
+  assert.equal(getCached('itad-appid:some-gid'), 440);
+  assert.equal(getCached('itad-gid:440'), 'some-gid');
+  assert.equal(getCached('itad-shop:steam'), 61);
+});
+
+test('getCacheEntryCounts: lists the itad-ids group separately from bundles', () => {
+  _reset();
+  setCache('itad-appid:g', 1);
+  setCache('itad-bundles:k', []);
+  const counts = getCacheEntryCounts();
+  assert.equal(counts['itad-ids'], 1);
+  assert.equal(counts.bundles, 1);
 });

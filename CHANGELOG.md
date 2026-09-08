@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **ITAD's identity mappings no longer expire every two hours along with its bundle and price data.** `itad-shop:`, `itad-appid:` and `itad-gid:` (the Steam shop id, and both directions of the gid↔appid resolution) shared the `bundles` cache tier on the reasoning that over-invalidating them was cheap. It isn't: nothing about them is time-sensitive — a game's Steam listing doesn't move — yet every 2 hours the whole mapping was thrown away and re-resolved from scratch on the next bundle open or wishlist price load. They get their own `cache_itad_ids` table and `ITAD_ID_CACHE_TTL_MINUTES` (180 days); `itad-bundles:`/`itad-price:` keep the short tier, where they belong. Shows up as a separate `itad-ids` group in `GET /api/metrics`' `cacheHits`/`cacheEntries`. Cache schema version 6 — the cache wipes itself once on first start.
+
 ### Fixed
 
 - **The bundle list had no refresh at all** — `GET /api/bundles` never read `refresh`, so a bundle that had just gone live (or just expired) was invisible until `BUNDLES_CACHE_TTL_MINUTES` ran out, with nothing the user could do. The browse page gets a ↻ next to "Include expired", `getBundles` gains `{ force }`, and `bundlesListLimit` stops skipping a forced request (a forced call is never a cache hit — the same rule the other limiters already apply). `GET /api/bundles/:id` deliberately gets no equivalent: `findBundleById` walks up to `BUNDLE_SEARCH_MAX_PAGES` pages, so forcing it would spend several upstream calls answering one deep link, and the list ↻ already covers a stale list.

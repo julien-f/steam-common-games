@@ -40,6 +40,18 @@ export function reorderUrlParams(params: URLSearchParams): URLSearchParams {
   return ordered;
 }
 
+// A `history.replaceState`-ready URL for `params`: `<path>?a=1` while anything is left, the bare
+// path once nothing is. Every URL-writing function here goes through this rather than a plain
+// `?${reorderUrlParams(params)}` template, which leaves a bare trailing `?` in the address bar
+// the moment the last param is deleted (closing a game panel, consuming a one-shot `?tv=` link)
+// — cosmetic in isolation, but it sticks around in whatever the user copies or bookmarks next,
+// and it makes two visits to an identical state serialize differently, exactly what
+// reorderUrlParams above exists to prevent.
+export function urlWithParams(params: URLSearchParams, pathname: string = location.pathname): string {
+  const qs = reorderUrlParams(params).toString();
+  return qs ? `${pathname}?${qs}` : pathname;
+}
+
 // `?game=<appid>` / `&shot=<idx>` — the panel/lightbox deep-link params every page with a side
 // panel writes on open/close/step. Extracted once `app.tsx`/`library.tsx`/`bundles.tsx` turned
 // out to each carry a near-identical hand-copy (bundles.tsx's own copies had drifted from the
@@ -56,22 +68,23 @@ export function setPanelParam(appid: number | string | null): void {
   // ListRoute.tsx's 'recent' kind (/game/:appid), which never writes `game` as a query param at
   // all (its own reactive effect strips the appid from the *path* instead, see that file's own
   // comment) — without this check, this would still unconditionally rewrite the URL to
-  // `pathname + '?'` (a bare, pointless trailing `?`, since reordering an empty params object
-  // still stringifies to `''`), racing that effect's own `navigate()` call with a `pathname` it
-  // read before that navigation had actually taken effect (confirmed live: closing the panel on
-  // /game/620 briefly produced `/game/620?` instead of the intended bare /game).
+  // whatever `pathname` it read *before* that navigation had actually taken effect, racing that
+  // effect's own `navigate()` call and putting the appid straight back (confirmed live: closing
+  // the panel on /game/620 briefly produced /game/620 again instead of the intended bare /game;
+  // back when this wrote a bare `?${...}` template rather than going through urlWithParams
+  // above, it showed up as a pointless `/game/620?` too).
   if (appid == null && !params.has('game') && !params.has('shot')) return;
   params.delete('shot');
   if (appid == null) params.delete('game');
   else params.set('game', String(appid));
-  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
+  history.replaceState(null, '', urlWithParams(params));
 }
 
 export function setLightboxParam(idx: number | string | null): void {
   const params = new URLSearchParams(location.search);
   if (idx == null) params.delete('shot');
   else params.set('shot', String(idx));
-  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
+  history.replaceState(null, '', urlWithParams(params));
 }
 
 export interface UrlState {
@@ -166,6 +179,5 @@ export function withAccountParam(path: string, search: string = location.search)
 export function urlWithoutAccountParam(pathname: string, search: string): string {
   const params = new URLSearchParams(search);
   params.delete('u');
-  const qs = reorderUrlParams(params).toString();
-  return qs ? `${pathname}?${qs}` : pathname;
+  return urlWithParams(params, pathname);
 }

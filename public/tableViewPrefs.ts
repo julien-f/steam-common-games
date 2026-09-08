@@ -5,7 +5,7 @@
 // key that page's view is stored under, and the URL param name that page's "🔗 Share view"
 // button writes to (`lv`/`wv` for library.js, `bv` for bundles.js).
 import { getPref, setPref } from './prefs.ts';
-import { reorderUrlParams } from './urlState.ts';
+import { urlWithParams } from './urlState.ts';
 
 // The @vates/data-table-solid instance these operate on — only the view-state surface the page
 // code actually uses, rather than importing the package's own (internal) types. `onViewChange` is
@@ -32,7 +32,7 @@ export function restoreTableView(table: DataTableLike, prefKey: string, paramNam
       table.setViewState(view);
       setPref(prefKey, view);
       params.delete(paramName);
-      history.replaceState(null, '', `?${reorderUrlParams(params)}`);
+      history.replaceState(null, '', urlWithParams(params));
       return;
     } catch { /* malformed param — fall through to the stored default */ }
   }
@@ -55,8 +55,7 @@ export function bindViewPersistence(table: DataTableLike, prefKey: string): () =
 export function shareTableView(table: DataTableLike, paramName: string, btn: HTMLElement): void {
   const params = new URLSearchParams(location.search);
   params.set(paramName, JSON.stringify(table.getViewState()));
-  const qs = reorderUrlParams(params).toString();
-  const url = `${location.origin}${location.pathname}${qs ? `?${qs}` : ''}`;
+  const url = `${location.origin}${urlWithParams(params)}`;
   if (navigator.clipboard?.writeText) navigator.clipboard.writeText(url).then(() => flashShareViewBtn(btn), () => {});
 }
 
@@ -74,5 +73,5 @@ export function resetTableView(table: DataTableLike, prefKey: string, paramName:
   setPref(prefKey, {});
   const params = new URLSearchParams(location.search);
   params.delete(paramName);
-  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
+  history.replaceState(null, '', urlWithParams(params));
 }

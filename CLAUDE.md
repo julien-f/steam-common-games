@@ -204,7 +204,8 @@ The Library Explorer's Wishlist tab shows the same IsThereAnyDeal-backed price c
 | `games:`, `player:`, `wishlist:` | `LIBRARY_CACHE_TTL_MINUTES` | 6 hours | Changes when users buy games / edit their wishlist |
 | `search:` | `SEARCH_CACHE_TTL_MINUTES` | 1 day | Game name → appid search results — much shorter than the other game-details tiers since new games ship regularly |
 | `news:` | `NEWS_CACHE_TTL_MINUTES` | 6 hours | Recent news/announcements for a game — changes far more often than store metadata (patch notes, event posts), so it shares the library tier's cadence rather than the 60-day META one above |
-| `itad-bundles:`, `itad-shop:`, `itad-appid:`, `itad-gid:`, `itad-price:` | `BUNDLES_CACHE_TTL_MINUTES` | 2 hours | IsThereAnyDeal bundle listings, the Steam shop id, appid↔gid resolutions (near-permanent in reality, but cheap to over-invalidate alongside the shorter-lived bundle/price data — see the Bundles section above), and per-region price lookups |
+| `itad-bundles:`, `itad-price:` | `BUNDLES_CACHE_TTL_MINUTES` | 2 hours | IsThereAnyDeal bundle listings and per-region price lookups — the time-sensitive half (a bundle goes live/expires; a sale starts/ends), both refreshable on demand from the UI |
+| `itad-shop:`, `itad-appid:`, `itad-gid:` | `ITAD_ID_CACHE_TTL_MINUTES` | 180 days | ITAD identity mappings — the Steam shop id and both directions of the gid↔appid resolution. Nothing about them is time-sensitive, so they get their own tier rather than being re-resolved every couple of hours as a side effect of sharing a table with bundle/price data |
 
 Run `npm run cache:clear` to wipe all cache entries without deleting the database file.
 
