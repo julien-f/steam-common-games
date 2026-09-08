@@ -25,7 +25,8 @@
 // Returns `null` throughout when no account is loaded at all — same as the legacy page's
 // own "no badge at all" behavior.
 import { getEffectiveCurrentAccount } from './accountsStore.ts';
-import { fetchAccountOwnedAppids, fetchAccountWishlistAppids } from './accountData.ts';
+import { fetchAccountOwnedData, fetchAccountWishlistAppids } from './accountData.ts';
+import type { GameOwner } from './accountData.ts';
 
 export interface OwnershipStatus {
   inLibrary: boolean;
@@ -47,6 +48,10 @@ export function createMyOwnershipCache() {
   let ownedPromise: Promise<Set<number>> | null = null;
   let wishlistPromise: Promise<Set<number>> | null = null;
   let ownedSet: Set<number> | null = null;
+  // appid → per-member playtime for the current account, from the very same response ownedSet
+  // comes out of (see fetchAccountOwnedData) — so the panel's "Owned by" card costs no request
+  // of its own. Empty map rather than null once the fetch has failed, same as ownedSet.
+  let ownersMap: Map<number, GameOwner[]> = new Map();
   let wishlistSet: Set<number> | null = null;
   let readyListeners: (() => void)[] = [];
 
@@ -71,9 +76,10 @@ export function createMyOwnershipCache() {
     cachedAccountId = account.id;
     ownedSet = null;
     wishlistSet = null;
-    ownedPromise = fetchAccountOwnedAppids(account.id)
-      .catch(() => new Set<number>())
-      .then(s => { ownedSet = s; notifyReady(); return s; });
+    ownersMap = new Map();
+    ownedPromise = fetchAccountOwnedData(account.id)
+      .catch(() => ({ appids: new Set<number>(), owners: new Map<number, GameOwner[]>() }))
+      .then(({ appids, owners }) => { ownedSet = appids; ownersMap = owners; notifyReady(); return appids; });
     wishlistPromise = fetchAccountWishlistAppids(account.id)
       .catch(() => new Set<number>())
       .then(s => { wishlistSet = s; notifyReady(); return s; });
@@ -100,6 +106,16 @@ export function createMyOwnershipCache() {
     return { inLibrary: ownedSet.has(appid), onWishlist: wishlistSet.has(appid) };
   }
 
+  // Who — among the current account's members — owns this game, and how much each has played it.
+  // Same account source and same fetch as the ✓/☆ markers above, so the panel's "Owned by" card
+  // stays consistent with its ownership badges by construction. `[]` for a game nobody in the
+  // account owns, or with no account loaded at all (the card renders nothing either way).
+  async function getOwnersFor(appid: number): Promise<GameOwner[]> {
+    if (!ensureLoading()) return [];
+    await ownedPromise!;
+    return ownersMap.get(appid) ?? [];
+  }
+
   // One-shot "both sets just became available" notification — fires once (then forgets every
   // registered listener) the next time both halves of the *current* currentAccount's fetch land.
   // Lets gameSearch.ts's dropdown, which rendered a peek of `null` (still loading) for its
@@ -110,10 +126,11 @@ export function createMyOwnershipCache() {
     return () => { readyListeners = readyListeners.filter(fn => fn !== cb); };
   }
 
-  return { getMyOwnershipStatus, peekMyOwnershipStatus, onMyOwnershipReady };
+  return { getMyOwnershipStatus, peekMyOwnershipStatus, getOwnersFor, onMyOwnershipReady };
 }
 
 const defaultCache = createMyOwnershipCache();
 export const getMyOwnershipStatus = defaultCache.getMyOwnershipStatus;
 export const peekMyOwnershipStatus = defaultCache.peekMyOwnershipStatus;
+export const getOwnersFor = defaultCache.getOwnersFor;
 export const onMyOwnershipReady = defaultCache.onMyOwnershipReady;

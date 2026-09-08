@@ -20,6 +20,16 @@ export interface AccountLibraryGame {
   lastPlayedUnix: number;  // max across members; 0 = never played
 }
 
+// One member account's stake in one game, for the panel's "Owned by" card. Derived from the
+// per-member playtime/lastPlayed maps /api/common-games already returns alongside the games
+// themselves — the summed/maxed numbers on AccountLibraryGame above are all a table row needs,
+// but they flatten away exactly the per-member breakdown a merged Steam Family wants to see.
+export interface GameOwner {
+  name: string;         // persona name, or the steamid when Steam knows no name for it
+  minutes: number;      // this member's own playtime
+  lastPlayedSec: number; // 0 = owns it, never launched it
+}
+
 export interface AccountWishlistItem {
   appid: number;
   priority: number;
@@ -93,6 +103,10 @@ interface WishlistResponse {
 export interface AccountOverview {
   games: AccountLibraryGame[];
   players: AccountPlayer[];
+  // appid → which members of this slot own it, and how much each has played. Only ever more
+  // than one entry for a Steam Family; a single-account slot still gets its own entry, which is
+  // what makes "never played" visible on a game you own.
+  owners: Map<number, GameOwner[]>;
   // When the server's cached copy of this account's owned games was written (epoch ms), or null
   // when it was fetched fresh for this very request. Surfaced as the Account card's "Updated
   // <when>" readout — see lib/cache.js's getCachedAt.
@@ -129,7 +143,20 @@ export async function fetchAccountOverview(members: string[], { refresh = false 
       lastPlayedUnix: Math.max(0, ...slotSteamIds.map(id => lp[id] || 0)),
     };
   });
-  return { games, players: data.slots[0].map(toAccountPlayer), fetchedAt: data.fetchedAt ?? null };
+  const nameById = new Map(data.slots[0].map(p => [p.steamid, p.personaname || p.steamid]));
+  const owners = new Map<number, GameOwner[]>();
+  for (const game of allGames) {
+    const pt = data.playtime?.[game.appid] ?? {};
+    const lp = data.lastPlayed?.[game.appid] ?? {};
+    // Membership comes from the playtime map rather than the slot's full member list: the
+    // response only carries an entry for a member who actually owns the game, which is exactly
+    // the distinction this card exists to show for a Family.
+    const entries = slotSteamIds
+      .filter(id => id in pt || id in lp)
+      .map(id => ({ name: nameById.get(id) ?? id, minutes: pt[id] || 0, lastPlayedSec: lp[id] || 0 }));
+    if (entries.length) owners.set(game.appid, entries);
+  }
+  return { games, players: data.slots[0].map(toAccountPlayer), owners, fetchedAt: data.fetchedAt ?? null };
 }
 
 // The owned-games half of fetchAccountOverview on its own — what every caller that doesn't care
@@ -160,8 +187,15 @@ export async function fetchAccountWishlistItems(members: string[], opts: { refre
 // listResolve.ts's ListResolveFetchers.accountOwned/accountWishlist — just the flat appid set,
 // resolving accountId back to members via membersFromAccountId above.
 export async function fetchAccountOwnedAppids(accountId: string): Promise<Set<number>> {
-  const games = await fetchAccountOwnedGames(membersFromAccountId(accountId));
-  return new Set(games.map(g => g.appid));
+  return (await fetchAccountOwnedData(accountId)).appids;
+}
+
+// Both halves of what myOwnership.ts keeps per account — the owned-appid set behind the ✓/☆
+// markers, and the per-member breakdown behind the panel's "Owned by" card — from one request,
+// since /api/common-games returns both in the same response.
+export async function fetchAccountOwnedData(accountId: string): Promise<{ appids: Set<number>; owners: Map<number, GameOwner[]> }> {
+  const { games, owners } = await fetchAccountOverview(membersFromAccountId(accountId));
+  return { appids: new Set(games.map(g => g.appid)), owners };
 }
 
 export interface ResolvedAccountSummary {

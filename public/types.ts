@@ -94,6 +94,9 @@ export interface Game extends PriceFields {
   // Which account `achievements` was fetched for (achievementsAccountKey of its members, '' for
   // none) — progress is per account, so a result is only reusable while this still matches.
   achievementsAccountId?: string;
+  // Which members of the current account own this game, and their own playtime — see panel.tsx's
+  // loadOwners/OwnersSection. `undefined` before it's resolved, `[]` for a game nobody owns.
+  owners?: import('./accountData.ts').GameOwner[];
   achievementsLoading?: boolean;
   // When the oldest of this game's cached details (rating/HLTB/store metadata/tags/ProtonDB) was
   // written server-side, epoch ms — null when they were fetched fresh, undefined before any

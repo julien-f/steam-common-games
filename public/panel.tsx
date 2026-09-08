@@ -1,11 +1,13 @@
 'use strict';
 
-import { fmtAge, formatMoney, scoreColor, dealRecordTier, DEAL_RECORD_TIERS, discountPct, fmtH, fmtLastPlayed, computeSteamdbRating } from './utils.ts';
+import { fmtAge, fmtPlaytime, formatMoney, scoreColor, dealRecordTier, DEAL_RECORD_TIERS, discountPct, fmtH, fmtLastPlayed, computeSteamdbRating } from './utils.ts';
 import { openLightbox, closeLightbox, isLightboxOpen } from './lightbox.tsx';
 import { buildMediaItems } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
 import { getStoredRegion, resolveRegion } from './region.ts';
-import { getMyOwnershipStatus } from './myOwnership.ts';
+import { getMyOwnershipStatus, getOwnersFor } from './myOwnership.ts';
+import { sortOwners, ownerMeterPct } from './ownerList.ts';
+import type { GameOwner } from './accountData.ts';
 import { getEffectiveCurrentAccount } from './accountsStore.ts';
 import { achievementsAccountKey, achievementsRequestUrl, achievementsSteamUrl } from './achievementsRequest.ts';
 import { setGameTitle } from './pageTitle.ts';
@@ -414,6 +416,19 @@ async function loadNews(game: Game, { force = false } = {}) {
   }
 }
 
+// "Owned by" — which members of the current account own this game, and how much each has played
+// it. Restored after the list-centric redesign deleted it along with ownerListHtml.ts: it's the
+// only per-member view in the app, and for a merged Steam Family it answers "whose copy is this,
+// and has anyone actually played it" — a question the summed playtime on the table row flattens
+// away entirely. Costs no request of its own (myOwnership.ts already holds this from the same
+// /api/common-games response its ✓/☆ markers come from), so it's just an await.
+async function loadOwners(game: Game) {
+  const owners = await getOwnersFor(game.appid);
+  if (panelGame() !== game) return; // the panel moved on while this awaited
+  game.owners = owners;
+  renderPanelBody(game);
+}
+
 // Achievements — the same lazy, once-per-game shape as news above, and for the same reason:
 // nothing outside this panel shows them (no table column, nothing to sort or filter on), so
 // fetching them for every game in a whole loaded list would be paying for games nobody opens.
@@ -602,6 +617,7 @@ export function panelOpen(game: Game, { keepHistory = false } = {}) {
   document.getElementById('panel-body')!.scrollTop = 0;
   loadNews(game); // no-op (see loadNews) if this game's news was already fetched this session
   loadAchievements(game); // no-op (see loadAchievements) if already fetched for this account
+  loadOwners(game); // see loadOwners — free, myOwnership.ts already has the data
   loadPrice(game); // no-op (see loadPrice) if this game is priced by the host, or already loaded
   loadOwnership(game); // see loadOwnership — always rechecked, but myOwnership.ts's own cache makes a repeat check free
   document.getElementById('game-panel')!.classList.add('open');
@@ -1062,6 +1078,52 @@ function AchievementsSection(props: { game: Game }): JSX.Element {
 // linking straight to the full post, plus a link to the game's full news hub on the Steam
 // store for anything older than what's shown here. Dates use the same plain-ISO convention
 // as fmtLastPlayed/the table's date columns rather than a relative "3 days ago" string.
+// The "Owned by" card — one row per member of the current account who owns this game: name,
+// when they last played it, and their own playtime with a meter relative to the most-played
+// member. Renders nothing at all when nobody in the account owns it, when no account is loaded,
+// or before loadOwners has resolved.
+//
+// Deliberately shown even for a single-account slot, where it's one row: "owned, never played"
+// is itself worth seeing, and it's the only place last-played shows up in the panel.
+function OwnersSection(props: { game: Game }): JSX.Element {
+  const owners = (): GameOwner[] => props.game.owners ?? [];
+  const sorted = createMemo(() => sortOwners(owners()));
+  const maxMinutes = createMemo(() => Math.max(...sorted().map(o => o.minutes), 1));
+  return (
+    <Show when={sorted().length > 0}>
+      <div class="panel-section panel-card" id="panel-section-owners">
+        <div class="panel-section-title">Owned by <span class="panel-section-subtitle">most recently played first</span></div>
+        <div class="panel-owners">
+          <For each={sorted()}>
+            {o => {
+              const lastPlayed = fmtLastPlayed(o.lastPlayedSec);
+              const playtime = fmtPlaytime(o.minutes);
+              // Steam's `rtime_last_played` is genuinely 0 for plenty of owned-and-played games
+              // (confirmed live on a game with 477h on it), so a bare "never played" — what the
+              // pre-redesign card said, and a bug carried over in the original port — would flatly
+              // contradict the playtime printed right underneath it. Only claim "never played"
+              // when there's no playtime either.
+              const lastPlayedText = lastPlayed || (o.minutes > 0 ? 'last played unknown' : 'never played');
+              return (
+                <div class="panel-owner">
+                  <div class="panel-owner-top">
+                    <span class="panel-owner-name">{o.name}</span>
+                    <span class="panel-owner-lastplayed">{lastPlayedText}</span>
+                  </div>
+                  <div class="panel-owner-meter-track">
+                    <div class="panel-owner-meter-fill" style={{ width: `${ownerMeterPct(o.minutes, maxMinutes())}%` }} />
+                  </div>
+                  <span class="panel-owner-playtime">{playtime ? `${playtime} played` : 'not played'}</span>
+                </div>
+              );
+            }}
+          </For>
+        </div>
+      </div>
+    </Show>
+  );
+}
+
 function NewsSection(props: { game: Game }): JSX.Element {
   const g = props.game;
   if (g.newsLoading) {
@@ -1590,6 +1652,7 @@ function PanelRest(): JSX.Element {
   const hasAchievementsSection = g.achievementsLoading || g.achievements !== undefined;
   const hasDlcSection = !!(meta?.dlc && meta.dlc.length);
   const subnavItems = [
+    !!(g.owners && g.owners.length) && { label: 'Owned by', target: 'panel-section-owners' },
     hltbDetail && { label: 'HLTB', target: 'panel-section-hltb' },
     hasNewsSection && { label: 'News', target: 'panel-section-news' },
     hasAchievementsSection && { label: 'Achievements', target: 'panel-section-achievements' },
@@ -1656,6 +1719,7 @@ function PanelRest(): JSX.Element {
         <div class="panel-desc panel-card" id="panel-desc">{decodedDescription}</div>
       </Show>
       {cloud}
+      <OwnersSection game={g} />
       {hltbDetail}
       {newsSection}
       {achievementsSection}
