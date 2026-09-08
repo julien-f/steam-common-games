@@ -40,6 +40,7 @@ import { restoreTableView, shareTableView, resetTableView } from './tableViewPre
 import { createStaleGuard } from './staleGuard.ts';
 import { setPref } from './prefs.ts';
 import { setBaseTitle } from './pageTitle.ts';
+import { ListHero, type HeroTile } from './ListHero.tsx';
 
 const PAGE_SIZE = 50;      // ITAD's own max per page (lib/itad.js's getBundles `limit`)
 // How many pages load() fetches back-to-back before handing over to the "Load more" button. The
@@ -295,36 +296,70 @@ export default function BundlesBrowseRoute() {
     onCleanup(() => window.removeEventListener(REGION_CHANGED_EVENT, onRegionChange));
   });
 
+  // The same hero card every list route now opens with (ListHero.tsx) — this route is the one you
+  // arrive at a bundle *from*, so a loose toolbar here next to a real card there was a visible
+  // seam between two adjacent screens. Deliberately thin: no bundle count (the table's own
+  // toolbar already renders "37 / 37 rows", and unlike a fixed tile it follows the filters) and
+  // no derived stats beyond the one below, since the Ends/Shop columns already group and filter.
+  function heroTiles(): HeroTile[] {
+    const tiles: HeroTile[] = [];
+    if (fetchedAt() !== undefined) {
+      tiles.push({
+        label: 'Updated',
+        value: fmtAge(fetchedAt()),
+        title: "How old the server's cached copy of this list is — a bundle can go live or expire at any time",
+      });
+    }
+    tiles.push({
+      label: 'Prices',
+      value: regionLabel(regionCode()),
+      title: 'Prices are shown for this region — change it in ⚙ Preferences',
+    });
+    // The one thing this page can say that nothing else does at a glance: the Ends column shows
+    // each row's own countdown, but finding the ones about to go means sorting by it first.
+    // Counted off processedData rather than the raw list, so it agrees with whatever filter/search
+    // is applied — a "3 ending soon" that includes rows the table isn't showing is worse than
+    // nothing. Absent at zero rather than showing a reassuring "0" nobody asked about.
+    const endingSoon = table.processedData().filter(row => bundleUrgency(row.expiry)?.tier === 'urgent').length;
+    if (endingSoon > 0) {
+      tiles.push({
+        label: 'Ending soon',
+        value: <span style={{ color: scoreColor(20) }}>{endingSoon}</span>,
+        sub: 'within 48h',
+      });
+    }
+    return tiles;
+  }
+
   onMount(() => load());
   onMount(() => setBaseTitle('Bundles'));
   onCleanup(() => setBaseTitle(null));
 
   return (
     <div class="bundles-browse-route">
-      <div class="bundles-controls">
-        <label>
-          <input type="checkbox" checked={includeExpired()} onChange={e => { setIncludeExpired(e.currentTarget.checked); load(); }} />
-          Include expired
-        </label>
-        {/* Bundle listings are cached server-side (BUNDLES_CACHE_TTL_MINUTES), and a bundle can go
-            live or expire at any time — so "this list is out of date" gets a control rather than a
-            wait. */}
-        <Show when={fetchedAt() !== undefined}>
-          <span class="bundles-updated">Updated {fmtAge(fetchedAt())}</span>
-        </Show>
-        <span class="region-readout" title="Change it in ⚙ Preferences">Prices in {regionLabel(regionCode())}</span>
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm"
-          disabled={loading()}
-          title="Re-fetch the bundle list from IsThereAnyDeal, bypassing the server's cache"
-          onClick={() => load({ refresh: true })}
-        >↻ Refresh</button>
-      </div>
-      <div class="list-view-actions">
-        <button type="button" class="btn btn-ghost btn-sm" onClick={e => shareTableView(table, VIEW_PARAM, e.currentTarget)}>🔗 Share view</button>
-        <button type="button" class="btn btn-ghost btn-sm" onClick={() => resetTableView(table, VIEW_PREF_KEY, VIEW_PARAM)}>Reset view</button>
-      </div>
+      <ListHero
+        title="Bundles"
+        actions={
+          <>
+            {/* A data-scope control, not a view one — it round-trips to ITAD (see load()) — so it
+                sits with ↻ Refresh rather than with the table-view buttons. */}
+            <label class="bundles-expired-toggle">
+              <input type="checkbox" checked={includeExpired()} onChange={e => { setIncludeExpired(e.currentTarget.checked); load(); }} />
+              Include expired
+            </label>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              disabled={loading()}
+              title="Re-fetch the bundle list from IsThereAnyDeal, bypassing the server's cache"
+              onClick={() => load({ refresh: true })}
+            >↻ Refresh</button>
+            <button type="button" class="btn btn-ghost btn-sm" onClick={e => shareTableView(table, VIEW_PARAM, e.currentTarget)}>🔗 Share view</button>
+            <button type="button" class="btn btn-ghost btn-sm" onClick={() => resetTableView(table, VIEW_PREF_KEY, VIEW_PARAM)}>Reset view</button>
+          </>
+        }
+        tiles={heroTiles()}
+      />
       <Show when={statusText()}><div class="bundles-status">{statusText()}</div></Show>
       <div class="table-container">
         <DataTableView<BundleRow>

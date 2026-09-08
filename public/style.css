@@ -2080,23 +2080,18 @@ kbd {
 
 /* ── Bundles browse route ──────────────────────────────────────────────────────────────────── */
 
-.bundles-controls {
+/* "Include expired" — the one control on this route that reaches ITAD rather than the table, so
+   it sits in the hero card's action row next to ↻ Refresh (see BundlesBrowseRoute.tsx). The rest
+   of what used to be a `.bundles-controls` toolbar here (a pre-table sort <select>, the
+   "Updated <when>" and region readouts) is either gone with server-side sorting or a hero tile. */
+.bundles-expired-toggle {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 10px;
+  gap: 6px;
   font-size: 13px;
   color: var(--text1);
+  cursor: pointer;
 }
-.bundles-controls select {
-  background: var(--bg1);
-  color: var(--text0);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  padding: 6px 10px;
-  font-size: 13px;
-}
-.bundles-controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 
 /* The bundle list itself is a @vates/data-table-solid table now (see BundlesBrowseRoute.tsx's own
    header comment for why the hand-rolled `.bundle-item` row list it replaced couldn't align its
@@ -2181,13 +2176,10 @@ kbd {
   font-size: 15px; font-weight: 600; color: var(--text0);
 }
 .account-counts { font-size: 12px; color: var(--text1); margin-top: 2px; }
-/* "Updated <when> ↻ Refresh" — on Home's Account card and above the owned/wishlist lists.
-   Server-side caching runs for weeks (default.env's LIBRARY_CACHE_TTL_MINUTES), so how old the
-   data is gets stated outright, with the control that fixes it sitting right next to the fact. */
-.bundles-updated { font-size: 11px; color: var(--text2); }
-/* Which region's prices are on screen — stated, never editable here: the ⚙ Preferences popover
-   owns the setting, and a second control would be one more thing to keep in sync. */
-.region-readout { font-size: 11px; color: var(--text2); }
+/* "Updated <when> ↻ Refresh" on Home's Account card. Server-side caching runs for weeks
+   (default.env's LIBRARY_CACHE_TTL_MINUTES), so how old the data is gets stated outright, with the
+   control that fixes it sitting right next to the fact. Every *list* says it as a hero tile
+   instead (ListHero.tsx), which is where `.bundles-updated`/`.region-readout` went. */
 .account-updated {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   font-size: 11px; color: var(--text2); margin-top: 4px;
