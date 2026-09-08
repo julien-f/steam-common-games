@@ -325,6 +325,7 @@ const bundlesListLimit = namedRateLimit('bundlesList', {
   ...itadRateLimitOpts,
   skip: (req) => {
     if (rateLimitBypassed()) return true;
+    if (isForceRefresh(req)) return false; // force-refresh always re-fetches, so it must always count
     const country = parseCountry(req);
     const offset = Math.max(0, Number(req.query.offset) || 0);
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
@@ -613,7 +614,12 @@ app.get('/api/bundles', bundlesListLimit, async (req, res) => {
   const sort = typeof req.query.sort === 'string' && req.query.sort ? req.query.sort : '-publish';
   const expired = req.query.expired === '1' || req.query.expired === 'true';
   try {
-    const bundles = await getBundles({ country, offset, limit, sort, expired });
+    // ?refresh=1 backs the browse page's own "↻ Refresh" — a bundle can go live or expire at any
+    // time, so "the list I'm looking at is out of date" needs an answer that isn't "wait out the
+    // TTL". Only this page of the list is forced; GET /api/bundles/:id deliberately has no
+    // equivalent (findBundleById walks up to BUNDLE_SEARCH_MAX_PAGES pages, so forcing it would
+    // cost several upstream calls to answer one deep link).
+    const bundles = await getBundles({ country, offset, limit, sort, expired, force: isForceRefresh(req) });
     res.json({ bundles, offset, limit });
   } catch (err) {
     const status = routeErrorStatus('bundles', err);

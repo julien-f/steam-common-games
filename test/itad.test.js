@@ -272,3 +272,17 @@ test('extractPriceInfo: all fields null for a missing entry or a shop with no St
   const noSteam = { ...PRICE_ENTRY, deals: [PRICE_ENTRY.deals[1]] };
   assert.equal(extractPriceInfo(noSteam, 61).steamRegular, null);
 });
+
+test('getBundles: { force: true } bypasses the cache and re-fetches', async (t) => {
+  _reset();
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    calls++;
+    return { ok: true, json: async () => [{ id: 1, title: 'B' }] };
+  });
+  await getBundles({ country: 'US' });
+  await getBundles({ country: 'US' });
+  assert.equal(calls, 1, 'second call served from cache');
+  await getBundles({ country: 'US', force: true });
+  assert.equal(calls, 2, 'forced call re-fetches');
+});

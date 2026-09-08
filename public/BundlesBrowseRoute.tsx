@@ -235,7 +235,7 @@ export default function BundlesBrowseRoute() {
   // including whatever filter/sort/search the user has applied here.
   createEffect(() => setBrowsedBundles(table.processedData().map(b => ({ id: b.id, title: b.title }))));
 
-  async function fetchPage(): Promise<BundleListItem[]> {
+  async function fetchPage(force = false): Promise<BundleListItem[]> {
     const qs = new URLSearchParams({
       country: resolveRegion(getStoredRegion()),
       sort: FETCH_SORT,
@@ -243,13 +243,14 @@ export default function BundlesBrowseRoute() {
       offset: String(offset),
       limit: String(PAGE_SIZE),
     });
+    if (force) qs.set('refresh', '1');
     const res = await fetch(`/api/bundles?${qs}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to load bundles');
     return data.bundles as BundleListItem[];
   }
 
-  async function load({ append = false }: { append?: boolean } = {}): Promise<void> {
+  async function load({ append = false, refresh = false }: { append?: boolean; refresh?: boolean } = {}): Promise<void> {
     const gen = loadGuard.next();
     if (!append) { offset = 0; setRows([]); }
     setLoading(true);
@@ -258,7 +259,7 @@ export default function BundlesBrowseRoute() {
       const collected: BundleRow[] = [];
       let reachedEnd = false;
       for (let page = 0; page < (append ? 1 : MAX_AUTO_PAGES); page++) {
-        const bundles = await fetchPage();
+        const bundles = await fetchPage(refresh);
         if (loadGuard.isStale(gen)) return;
         collected.push(...bundles.map(b => toBundleRow(b)));
         offset += bundles.length;
@@ -287,6 +288,16 @@ export default function BundlesBrowseRoute() {
           <input type="checkbox" checked={includeExpired()} onChange={e => { setIncludeExpired(e.currentTarget.checked); load(); }} />
           Include expired
         </label>
+        {/* Bundle listings are cached server-side (BUNDLES_CACHE_TTL_MINUTES), and a bundle can go
+            live or expire at any time — so "this list is out of date" gets a control rather than a
+            wait. */}
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          disabled={loading()}
+          title="Re-fetch the bundle list from IsThereAnyDeal, bypassing the server's cache"
+          onClick={() => load({ refresh: true })}
+        >↻ Refresh</button>
       </div>
       <div class="list-view-actions">
         <button type="button" class="btn btn-ghost btn-sm" onClick={e => shareTableView(table, VIEW_PARAM, e.currentTarget)}>🔗 Share view</button>
