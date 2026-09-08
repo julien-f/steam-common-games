@@ -1333,3 +1333,15 @@ test('getGameNews: caches result — second call skips fetch', async (t) => {
   assert.equal(fetchMock.mock.callCount(), 1);
 });
 
+
+test('resolveSteamId: caches a failed lookup and re-throws it without a second upstream call', async (t) => {
+  _reset();
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    calls++;
+    return { ok: true, json: async () => ({ response: { success: 42 } }) };
+  });
+  await assert.rejects(() => resolveSteamId('nope'), /Cannot find Steam account/);
+  await assert.rejects(() => resolveSteamId('nope'), /Cannot find Steam account/);
+  assert.equal(calls, 1, 'the cached miss answered the second call');
+});

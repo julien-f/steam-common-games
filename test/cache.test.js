@@ -131,3 +131,23 @@ test('getCacheEntryCounts: lists the itad-ids group separately from bundles', ()
   assert.equal(counts['itad-ids'], 1);
   assert.equal(counts.bundles, 1);
 });
+
+// ── per-entry TTL (cached misses) ─────────────────────────────────────────────
+
+test('setCache: ttlMs overrides the group TTL for that one entry', () => {
+  _reset();
+  setCache('meta:1', null, { ttlMs: 50 });
+  setCache('meta:2', { name: 'Portal' });
+  // Both sit in the meta group (TTL measured in months), but the first carries its own expiry.
+  _reset([
+    ['meta:1', { value: null, ts: Date.now() - 1000, expires: Date.now() - 500 }],
+    ['meta:2', { value: { name: 'Portal' }, ts: Date.now() - 1000 }],
+  ]);
+  assert.equal(getCached('meta:1'), undefined, 'per-entry expiry applies');
+  assert.deepEqual(getCached('meta:2'), { name: 'Portal' }, 'group TTL still applies to the rest');
+});
+
+test('getCachedAt: honours a per-entry expiry too', () => {
+  _reset([['meta:3', { value: null, ts: Date.now() - 1000, expires: Date.now() - 500 }]]);
+  assert.equal(getCachedAt('meta:3'), undefined);
+});

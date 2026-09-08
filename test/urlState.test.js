@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   FILTER_DIMS, parseUrlState, reorderUrlParams,
-  parseAccountParam, accountParamValues, withAccountParam, urlWithoutAccountParam,
+  parseAccountParam, accountParamValues, withAccountParam, urlWithoutAccountParam, urlWithParams,
 } = require('../public/urlState.ts');
 
 // ── parseUrlState — slots ─────────────────────────────────────────────────────
@@ -123,6 +123,20 @@ test('reorderUrlParams: appends unknown params after every known one, preserving
 
 test('reorderUrlParams: empty input yields empty output', () => {
   assert.equal(reorderUrlParams(new URLSearchParams()).toString(), '');
+});
+
+// ── urlWithParams ───────────────────────────────────────────────────────────
+
+test('urlWithParams: appends the query in canonical order', () => {
+  const params = new URLSearchParams('?game=440&u=alice');
+  assert.equal(urlWithParams(params, '/lists/owned'), '/lists/owned?u=alice&game=440');
+});
+
+test('urlWithParams: yields the bare pathname rather than a lone "?" once nothing is left', () => {
+  const params = new URLSearchParams('?game=440');
+  params.delete('game');
+  assert.equal(urlWithParams(params, '/lists/owned'), '/lists/owned');
+  assert.equal(urlWithParams(new URLSearchParams(), '/'), '/');
 });
 
 // ── ?u= — the account-override param ──────────────────────────────────────────
