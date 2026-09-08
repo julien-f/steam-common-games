@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  membersFromAccountId, fetchAccountOwnedGames, fetchAccountWishlistItems,
+  membersFromAccountId, fetchAccountOwnedGames, fetchAccountWishlistItems, fetchAccountWishlist,
   fetchAccountOwnedAppids, fetchAccountWishlistAppids, resolveAccountSummary,
   fetchAccountOverview, toAccountPlayer,
 } = require('../public/accountData.ts');
@@ -196,24 +196,13 @@ test('toAccountPlayer: maps a full player object onto display-ready fields', () 
   }), {
     steamid: '1', name: 'Alice', profileUrl: 'https://steamcommunity.com/id/alice/',
     avatarUrl: 'https://cdn/a.jpg', isPrivate: false, gameCount: 42,
-    statusClass: 'online', statusLabel: 'Online',
   });
 });
 
-test('toAccountPlayer: gameextrainfo outranks personastate for the status', () => {
+test('toAccountPlayer: presence is deliberately not mapped — see accountData.ts', () => {
   const p = toAccountPlayer({ steamid: '1', personastate: 3, gameextrainfo: 'Team Fortress 2' });
-  assert.equal(p.statusClass, 'ingame');
-  assert.equal(p.statusLabel, 'Playing Team Fortress 2');
-});
-
-test('toAccountPlayer: a non-offline personastate maps to its own label', () => {
-  assert.equal(toAccountPlayer({ steamid: '1', personastate: 3 }).statusLabel, 'Away');
-  assert.equal(toAccountPlayer({ steamid: '1', personastate: 3 }).statusClass, 'online');
-});
-
-test('toAccountPlayer: a missing/0 personastate is Offline', () => {
-  assert.equal(toAccountPlayer({ steamid: '1' }).statusLabel, 'Offline');
-  assert.equal(toAccountPlayer({ steamid: '1', personastate: 0 }).statusClass, 'offline');
+  assert.equal('statusClass' in p, false);
+  assert.equal('statusLabel' in p, false);
 });
 
 test('toAccountPlayer: communityvisibilitystate other than 3 is private; absent is not', () => {
@@ -257,4 +246,20 @@ test('fetchAccountOverview: returns the slot library and its member accounts fro
   assert.deepEqual(players.map(p => p.name), ['Alice', 'Bob']);
   assert.equal(players[0].profileUrl, 'https://steamcommunity.com/id/alice/');
   assert.equal(players[1].profileUrl, '');
+});
+
+test('fetchAccountOverview/fetchAccountWishlist: surface the server\'s fetchedAt', async (t) => {
+  withFetch(t, async (url) => ({
+    ok: true,
+    json: async () => (String(url).includes('wishlist')
+      ? { items: [{ appid: 2, priority: 1, dateAdded: null }], fetchedAt: 5678 }
+      : { groups: [{ games: [{ appid: 1, name: 'A' }] }], slots: [[{ steamid: '1' }]], playtime: {}, lastPlayed: {}, fetchedAt: 1234 }),
+  }));
+  assert.equal((await fetchAccountOverview(['1'])).fetchedAt, 1234);
+  assert.equal((await fetchAccountWishlist(['1'])).fetchedAt, 5678);
+});
+
+test('fetchAccountOverview: a response with no fetchedAt (fetched fresh) is null, not undefined', async (t) => {
+  withFetch(t, async () => ({ ok: true, json: async () => ({ groups: [], slots: [[]], playtime: {}, lastPlayed: {} }) }));
+  assert.equal((await fetchAccountOverview(['1'])).fetchedAt, null);
 });

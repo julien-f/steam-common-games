@@ -1371,3 +1371,44 @@ test('POST /api/prices: 200 by appids — resolves to gids first, then prices, k
   });
   assert.deepEqual(res.body.prices['500'], { steamRegular: null, lowAll: null, lowY1: null, lowM3: null, bestDeal: null });
 });
+
+// ── fetchedAt (how old the served data is) ────────────────────────────────────
+
+test('POST /api/common-games: fetchedAt is null on a fresh fetch, then the cache write time', async (t) => {
+  _reset();
+  const GAME = { appid: 400, name: 'Portal' };
+  t.mock.method(globalThis, 'fetch', makeLibraryFetch([GAME], []));
+
+  const fresh = await api.post('/api/common-games').send({ slots: [[ID1]] });
+  assert.equal(fresh.status, 200);
+  // The library was fetched during this very request, so the entry it wrote is "just now" —
+  // reported as a real timestamp, not null (null only happens when a key isn't cached at all).
+  assert.equal(typeof fresh.body.fetchedAt, 'number');
+
+  const cached = await api.post('/api/common-games').send({ slots: [[ID1]] });
+  assert.equal(cached.body.fetchedAt, fresh.body.fetchedAt);
+});
+
+test('POST /api/common-games: fetchedAt reports the OLDEST account in the slot', async (t) => {
+  _reset();
+  const old = Date.now() - 60 * 60 * 1000;
+  _reset([
+    [`games:${ID1}`, { value: [{ appid: 400, name: 'Portal', playtime_forever: 0 }], ts: old }],
+    [`games:${ID2}`, { value: [{ appid: 400, name: 'Portal', playtime_forever: 0 }], ts: Date.now() }],
+    [`player:${ID1}`, { value: { steamid: ID1, personaname: 'A', profileurl: '' }, ts: Date.now() }],
+    [`player:${ID2}`, { value: { steamid: ID2, personaname: 'B', profileurl: '' }, ts: Date.now() }],
+  ]);
+  t.mock.method(globalThis, 'fetch', makeLibraryFetch([], []));
+
+  const res = await api.post('/api/common-games').send({ slots: [[ID1, ID2]] });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.fetchedAt, old);
+});
+
+test('POST /api/wishlist: fetchedAt comes from the wishlist entries', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeWishlistFetch([{ appid: 400, priority: 1 }], []));
+  const res = await api.post('/api/wishlist').send({ members: [ID1] });
+  assert.equal(res.status, 200);
+  assert.equal(typeof res.body.fetchedAt, 'number');
+});

@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeInput, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier, dealRecordTier } = require('../public/utils.ts');
+const { normalizeInput, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier, dealRecordTier, fmtAge } = require('../public/utils.ts');
 
 // ── normalizeInput ────────────────────────────────────────────────────────────
 
@@ -336,4 +336,29 @@ test('dealRecordTier: <= not < — a price equal to the historical low still cou
 test('dealRecordTier: a missing individual low is skipped in favor of a matching one further down the list', () => {
   const rec = dealRecordTier(20, { lowAll: null, lowY1: null, lowM3: 20 });
   assert.equal(rec.tier, '3mo');
+});
+
+// ── fmtAge ────────────────────────────────────────────────────────────────────
+
+test('fmtAge: null (nothing cached — fetched fresh) reads as just now', () => {
+  assert.equal(fmtAge(null), 'just now');
+  assert.equal(fmtAge(undefined), 'just now');
+});
+
+test('fmtAge: under a minute, in either direction, is just now', () => {
+  const now = 1_700_000_000_000;
+  assert.equal(fmtAge(now - 30_000, now), 'just now');
+  // A small clock skew between server and browser must never read as "in the future".
+  assert.equal(fmtAge(now + 30_000, now), 'just now');
+});
+
+test('fmtAge: steps through minutes, hours, days and months', () => {
+  const now = 1_700_000_000_000;
+  const min = 60_000, hour = 60 * min, day = 24 * hour;
+  assert.equal(fmtAge(now - 5 * min, now), '5 min ago');
+  assert.equal(fmtAge(now - 3 * hour, now), '3h ago');
+  assert.equal(fmtAge(now - day, now), '1 day ago');
+  assert.equal(fmtAge(now - 6 * day, now), '6 days ago');
+  assert.equal(fmtAge(now - 45 * day, now), '1 month ago');
+  assert.equal(fmtAge(now - 70 * day, now), '2 months ago');
 });

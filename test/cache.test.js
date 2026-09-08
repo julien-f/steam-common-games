@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { getCached, setCache, getCacheStats, getCacheEntryCounts, _reset } = require('../lib/cache');
+const { getCached, getCachedAt, setCache, getCacheStats, getCacheEntryCounts, _reset } = require('../lib/cache');
 const { LIBRARY_CACHE_TTL_MS } = require('../lib/config');
 
 // ── getCached ─────────────────────────────────────────────────────────────────
@@ -87,4 +87,20 @@ test('getCacheStats: entries is the sum of every group in getCacheEntryCounts', 
 
   assert.equal(getCacheStats().entries, Object.values(getCacheEntryCounts()).reduce((a, b) => a + b, 0));
   assert.equal(getCacheStats().entries, 3);
+});
+
+// ── getCachedAt ───────────────────────────────────────────────────────────────
+
+test('getCachedAt: returns the write time of a cached entry', () => {
+  _reset();
+  const before = Date.now();
+  setCache('games:when', ['a']);
+  const at = getCachedAt('games:when');
+  assert.ok(at >= before && at <= Date.now());
+});
+
+test('getCachedAt: undefined for a missing key, and for an expired one', () => {
+  _reset([['games:old', { value: ['a'], ts: Date.now() - LIBRARY_CACHE_TTL_MS - 1000 }]]);
+  assert.equal(getCachedAt('games:missing'), undefined);
+  assert.equal(getCachedAt('games:old'), undefined);
 });

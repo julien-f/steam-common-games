@@ -176,6 +176,25 @@ export function fmtLastPlayed(epochSec: number | null | undefined): string {
   return new Date(epochSec * 1000).toISOString().slice(0, 10);
 }
 
+// "how long ago was this fetched", for the "Updated <when>" readouts next to the app's ↻ Refresh
+// buttons. Deliberately coarse — the point is "is what I'm looking at from today or from last
+// month", not a precise duration — and it never says "in the future" for a small clock skew
+// between the server (which produces these timestamps) and the browser: anything under a minute,
+// in either direction, is "just now". `null` (nothing cached — fetched fresh this request) is
+// also "just now", which is exactly what it means.
+export function fmtAge(fetchedAt: number | null | undefined, now: number = Date.now()): string {
+  if (fetchedAt == null) return 'just now';
+  const mins = Math.floor((now - fetchedAt) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`;
+  const months = Math.floor(days / 30);
+  return `${months} month${months === 1 ? '' : 's'} ago`;
+}
+
 export function foldStr(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }

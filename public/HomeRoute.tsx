@@ -24,7 +24,7 @@ import { getAccountOverrideState, clearAccountOverride, accountOverrideStatusTex
 import { withAccountParam, urlWithoutAccountParam } from './urlState.ts';
 import { resolveAccountSummary, fetchAccountOverview, fetchAccountWishlistItems } from './accountData.ts';
 import type { AccountPlayer } from './accountData.ts';
-import { normalizeInput } from './utils.ts';
+import { normalizeInput, fmtAge } from './utils.ts';
 import {
   getFolders, getLists, createFolder, createList, renameFolder, renameList,
   deleteFolder, deleteList,
@@ -48,9 +48,6 @@ const COMBINE_OPS: { value: CombineOp; label: string }[] = [
 // `personastate`/`gameextrainfo` ride on the same 6h library cache tier as the rest of an
 // account's data (see toAccountPlayer in accountData.ts) — real data, just not live — so the
 // tooltip says "as of the last refresh" rather than implying real-time presence.
-function statusTitle(p: AccountPlayer): string {
-  return `${p.statusLabel} (as of the last refresh)`;
-}
 
 interface TreeRow {
   type: 'folder' | 'list';
@@ -78,6 +75,11 @@ export default function HomeRoute() {
   // URL, presence, profile visibility, per-member game count) — see the counts effect below for
   // why this rides along on the same fetch rather than being stored on AccountSlot.
   const [players, setPlayers] = createSignal<AccountPlayer[]>([]);
+  // How old the server's cached copy of the current account's data is (epoch ms, null = fetched
+  // fresh), and whether a forced re-fetch is in flight — see the Account card's "Updated <when>"
+  // line below.
+  const [fetchedAt, setFetchedAt] = createSignal<number | null>(null);
+  const [refreshing, setRefreshing] = createSignal(false);
 
   const [folders, setFoldersSig] = createSignal<Folder[]>(getFolders());
   const [lists, setListsSig] = createSignal<GameList[]>(getLists());
@@ -107,17 +109,29 @@ export default function HomeRoute() {
   // fetchAccountOverview, not fetchAccountOwnedGames: the owned count and the member accounts'
   // own display data come back in the same /api/common-games response, so asking for both costs
   // one request rather than two identical POSTs.
-  createEffect(() => {
-    const account = currentAccount();
-    if (!account) { setCounts({ owned: null, wishlist: null }); setPlayers([]); return; }
+  // Extracted from the effect below so the card's own ↻ can re-run it with `refresh: true`,
+  // which forces the server past its library-tier cache for this account (owned games, wishlist
+  // and profile alike) rather than waiting out a TTL now measured in weeks.
+  function loadAccountData(account: AccountSlot, { refresh = false }: { refresh?: boolean } = {}): void {
     setCounts({ owned: null, wishlist: null });
     setPlayers([]);
+    if (refresh) { setRefreshing(true); setFetchedAt(null); }
     const members = account.members;
-    fetchAccountOverview(members).then(
-      ({ games, players: ps }) => { setCounts(c => ({ ...c, owned: games.length })); setPlayers(ps); },
+    const owned = fetchAccountOverview(members, { refresh }).then(
+      ({ games, players: ps, fetchedAt: at }) => { setCounts(c => ({ ...c, owned: games.length })); setPlayers(ps); setFetchedAt(at); },
       () => setCounts(c => ({ ...c, owned: 0 })),
     );
-    fetchAccountWishlistItems(members).then(items => setCounts(c => ({ ...c, wishlist: items.length })), () => setCounts(c => ({ ...c, wishlist: 0 })));
+    const wishlist = fetchAccountWishlistItems(members, { refresh }).then(
+      items => setCounts(c => ({ ...c, wishlist: items.length })),
+      () => setCounts(c => ({ ...c, wishlist: 0 })),
+    );
+    void Promise.allSettled([owned, wishlist]).then(() => setRefreshing(false));
+  }
+
+  createEffect(() => {
+    const account = currentAccount();
+    if (!account) { setCounts({ owned: null, wishlist: null }); setPlayers([]); setFetchedAt(null); return; }
+    loadAccountData(account);
   });
 
   // The resolved slot a `?u=` link is currently showing, or null when there's no override (or
@@ -363,9 +377,6 @@ export default function HomeRoute() {
                 {url => (
                   <span class="account-avatar-wrap account-avatar-lg">
                     <img class="account-avatar" src={url()} alt="" width="48" height="48" />
-                    <Show when={solePlayer()}>
-                      {p => <span class={`account-status account-status-${p().statusClass}`} title={statusTitle(p())} />}
-                    </Show>
                   </span>
                 )}
               </Show>
@@ -387,8 +398,21 @@ export default function HomeRoute() {
                 </div>
                 <div class="account-counts">
                   Owned: {counts().owned ?? '…'} · Wishlisted: {counts().wishlist ?? '…'}
-                  <Show when={solePlayer()}>{p => <> · <span title={statusTitle(p())}>{p().statusLabel}</span></>}</Show>
                   <Show when={players().length > 1}>{` · ${players().length} accounts merged`}</Show>
+                </div>
+                {/* Steam data is cached server-side for a long time (see default.env's
+                    LIBRARY_CACHE_TTL_MINUTES), so the age of what's on screen is stated outright
+                    rather than left to be guessed at, with the ↻ that forces a re-fetch right
+                    next to it. */}
+                <div class="account-updated">
+                  Updated {fmtAge(fetchedAt())}
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm"
+                    disabled={refreshing()}
+                    title="Re-fetch this account's games, wishlist and profile from Steam"
+                    onClick={() => loadAccountData(account(), { refresh: true })}
+                  >{refreshing() ? '↻ Refreshing…' : '↻ Refresh'}</button>
                 </div>
               </div>
             </div>
@@ -406,7 +430,6 @@ export default function HomeRoute() {
                     {url => (
                       <span class="account-avatar-wrap">
                         <img class="account-avatar" src={url()} alt="" width="28" height="28" />
-                        <span class={`account-status account-status-${p.statusClass}`} title={statusTitle(p)} />
                       </span>
                     )}
                   </Show>
@@ -417,9 +440,9 @@ export default function HomeRoute() {
                       </a>
                     )}
                   </Show>
-                  <span class="account-count" title={statusTitle(p)}>
-                    {p.gameCount == null ? '' : `${p.gameCount} games · `}{p.statusLabel}
-                  </span>
+                  <Show when={p.gameCount != null}>
+                    <span class="account-count">{p.gameCount} games</span>
+                  </Show>
                   <Show when={p.isPrivate}>
                     <span class="account-private" title="This Steam profile isn't public — some data may be missing or empty">🔒 Private</span>
                   </Show>

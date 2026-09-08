@@ -61,7 +61,7 @@ import {
   protonDbValue, TYPE_LABELS, priceTierBucket, formatPriceTier, compareNumMissingLast,
   OWNERSHIP_STATUS_COLUMN,
 } from './gameColumns.ts';
-import { computeSteamdbRating, computeProductionTier, discountPct, fmtLastPlayed, formatMoney, scoreColor } from './utils.ts';
+import { computeSteamdbRating, computeProductionTier, discountPct, fmtAge, fmtLastPlayed, formatMoney, scoreColor } from './utils.ts';
 import { restoreTableView, shareTableView, resetTableView } from './tableViewPrefs.ts';
 import { renderPanelNav as renderPanelNavShared, stepGameList } from './panelNav.ts';
 import { createRowStore } from './rowStore.ts';
@@ -74,7 +74,7 @@ import { setPanelParam, reorderUrlParams, withAccountParam } from './urlState.ts
 import { setPref } from './prefs.ts';
 import { getEffectiveCurrentAccount, ACCOUNT_CHANGED_EVENT } from './accountsStore.ts';
 import { getAccountOverrideState, accountOverrideStatusText } from './accountOverride.ts';
-import { fetchAccountOwnedGames, fetchAccountWishlistItems } from './accountData.ts';
+import { fetchAccountOverview, fetchAccountWishlist } from './accountData.ts';
 import { loadRecentGames, addRecentGame, renameRecentGame } from './recentGames.ts';
 import { fetchBundleById, resolveBundleGames, type ResolvedGame, type FlatGame } from './bundleData.ts';
 import {
@@ -266,6 +266,17 @@ export default function ListRoute() {
   let groupsContainer!: HTMLDivElement;
   const [statusText, setStatusText] = createSignal('');
   const [priceStatusText, setPriceStatusText] = createSignal('');
+  // Owned/wishlist kinds only: how old the server's cached copy of this account's list is (epoch
+  // ms, null = fetched fresh), and whether a forced re-fetch is in flight — the "Updated <when>
+  // ↻ Refresh" line below. Steam data is cached server-side for weeks (default.env's
+  // LIBRARY_CACHE_TTL_MINUTES), so the age of what's on screen is stated rather than guessed at,
+  // and forcing past it is one click from the list itself instead of only from Home.
+  const [fetchedAt, setFetchedAt] = createSignal<number | null>(null);
+  const [refreshing, setRefreshing] = createSignal(false);
+  async function handleRefreshList(): Promise<void> {
+    setRefreshing(true);
+    try { await load({ refresh: true }); } finally { setRefreshing(false); }
+  }
   // kind === 'bundle' only — the open bundle's own title, for the header below (nothing else on
   // this route otherwise names which bundle is loaded at all).
   const [bundleTitle, setBundleTitle] = createSignal('');
@@ -875,7 +886,7 @@ export default function ListRoute() {
     });
   }
 
-  async function load(): Promise<void> {
+  async function load({ refresh = false }: { refresh?: boolean } = {}): Promise<void> {
     if (kind === 'recent' && hasLoadedOnce) {
       // Guarded by "is this appid already the open panel's game" — openGame() above navigates
       // here too (to keep the address bar in sync with a row click/prev-next/random pick made
@@ -1023,8 +1034,9 @@ export default function ListRoute() {
       setStatusText(kind === 'wishlist' ? 'Fetching wishlist…' : 'Fetching library…');
       try {
         if (kind === 'owned') {
-          const games = await fetchAccountOwnedGames(account.members);
+          const { games, fetchedAt: at } = await fetchAccountOverview(account.members, { refresh });
           if (loadGuard.isStale(gen)) return;
+          setFetchedAt(at);
           initialRows = games.map(g => ({
             appid: g.appid, name: g.name,
             playtime: g.playtimeMinutes / 60, lastPlayed: fmtLastPlayed(g.lastPlayedUnix),
@@ -1032,8 +1044,9 @@ export default function ListRoute() {
           })) as unknown as Game[];
           streamTargets = games;
         } else {
-          const items = await fetchAccountWishlistItems(account.members);
+          const { items, fetchedAt: at } = await fetchAccountWishlist(account.members, { refresh });
           if (loadGuard.isStale(gen)) return;
+          setFetchedAt(at);
           initialRows = items.map(item => ({
             appid: item.appid, name: '', priority: item.priority, dateAdded: item.dateAdded,
             steamRegular: undefined, bestDealPrice: undefined, bestDealShop: undefined, bestDealUrl: undefined,
@@ -1327,6 +1340,18 @@ export default function ListRoute() {
           </Show>
         </div>
       </Show>
+      {(kind === 'owned' || kind === 'wishlist') && (
+        <div class="account-updated">
+          Updated {fmtAge(fetchedAt())}
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            disabled={refreshing()}
+            title="Re-fetch this list from Steam, bypassing the server's cache"
+            onClick={handleRefreshList}
+          >{refreshing() ? '↻ Refreshing…' : '↻ Refresh'}</button>
+        </div>
+      )}
       <div class="list-status">{statusText()}</div>
       {(kind === 'wishlist' || kind === 'bundle') && <div class="price-status">{priceStatusText()}</div>}
       <Show when={selectedRows().length > 0}>

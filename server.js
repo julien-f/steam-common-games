@@ -10,7 +10,7 @@ const path = require('path');
 const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 
-const { getCached, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
+const { getCached, getCachedAt, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
 const { getMetrics, recordLimiterTrip } = require('./lib/metrics');
 const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker, getSemaphoreStats } = require('./lib/steam');
@@ -73,6 +73,20 @@ function namedRateLimit(name, opts) {
 // (isClientError), everything unmarked is logged too, on the assumption that an error
 // nobody bothered to mark expected is probably a bug worth being able to find later. Logs
 // the full stack, not just the message, since a bug needs its source line to be traceable.
+// The oldest write time across a set of cache keys, or null if any of them isn't cached (a
+// fresh fetch this request just made writes its own entry, so that case is rare) — what the
+// `fetchedAt` field on /api/common-games and /api/wishlist reports. Oldest, not newest, so the
+// UI's "Updated <when>" never claims data is fresher than its stalest part.
+function oldestCachedAt(keys) {
+  let oldest = null;
+  for (const key of keys) {
+    const ts = getCachedAt(key);
+    if (ts === undefined) return null;
+    if (oldest === null || ts < oldest) oldest = ts;
+  }
+  return oldest;
+}
+
 function routeErrorStatus(route, err) {
   if (err.isClientError) return 400;
   // Circuit-open errors (lib/steam.js's fetchStoreApi, while steam-store is blocked) are an
@@ -451,7 +465,7 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
       }
     }
 
-    res.json({ groups, slots: playerSlots, playtime, lastPlayed });
+    res.json({ groups, slots: playerSlots, playtime, lastPlayed, fetchedAt: oldestCachedAt(uniqueIds.map(id => `games:${id}`)) });
   } catch (err) {
     const status = routeErrorStatus('common-games', err);
     res.status(status).json({ error: err.message });
@@ -507,7 +521,7 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
       itemCount: lists[i].length,
     }));
 
-    res.json({ items, players });
+    res.json({ items, players, fetchedAt: oldestCachedAt(ids.map(id => `wishlist:${id}`)) });
   } catch (err) {
     const status = routeErrorStatus('wishlist', err);
     res.status(status).json({ error: err.message });
