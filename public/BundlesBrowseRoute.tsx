@@ -1,5 +1,5 @@
 // /bundles — browse/discover current Steam bundles via IsThereAnyDeal (see
-// docs/list-centric-redesign.md and the implementation plan's Phase 5 step 5). Opening a bundle
+// docs/dev/frontend.md). Opening a bundle
 // here always navigates to /lists/bundle/:bundleId (ListRoute.tsx's `bundle` kind) rather than
 // rendering the resolved game table inline the way the legacy bundles.tsx page did — this route
 // is only ever the "which bundle do you want" picker, not the bundle detail view too.

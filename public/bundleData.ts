@@ -1,8 +1,8 @@
 // Bundle fetch/flatten/resolve pipeline — the ITAD-backed data layer behind a bundle's games
-// (see docs/list-centric-redesign.md's implementation plan, Phase 4 step 2), extracted from
+// (see docs/dev/frontend.md), extracted from
 // bundles.tsx's own inline logic so it's usable both by the new BundlesBrowseRoute/ListRoute
 // (bundle kind) and by listResolve.ts's `bundle` ListRef case, decoupled from bundles.tsx's
-// bespoke table UI (which stays local to that legacy page until Phase 7 deletes it).
+// bespoke table UI, which went away with that page.
 
 export interface PriceAmount { amount: number; currency: string }
 

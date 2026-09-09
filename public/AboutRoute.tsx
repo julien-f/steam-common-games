@@ -1,5 +1,5 @@
 // /about — ported verbatim from the legacy about.html (no logic of its own there either, just
-// static content) as part of the SPA route table (see docs/list-centric-redesign.md).
+// static content) as part of the SPA route table (see docs/dev/frontend.md).
 import { onMount, onCleanup } from 'solid-js';
 import { setBaseTitle } from './pageTitle.ts';
 

@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 
 // Same localStorage-stub convention as prefs.test.js — recentGames.ts is now backed by
 // prefs.ts's shared blob rather than its own standalone localStorage key (see
-// docs/list-centric-redesign.md's Phase 1), so clear both modules' require caches per test.
+// docs/dev/lists-and-accounts.md), so clear both modules' require caches per test.
 function makeMemoryLocalStorage() {
   const store = new Map();
   return {

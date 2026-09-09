@@ -19,7 +19,7 @@
    an actual DOM ancestor of the portal — for the custom properties to inherit; a page-scoped
    selector with higher specificity wouldn't reach a portal mounted as a sibling of <body>).
    Ported verbatim from the legacy library.html/bundles.html inline <style> blocks (see
-   docs/list-centric-redesign.md) — both carried this identical block; it's now the one
+   docs/dev/frontend.md) — both carried this identical block; it's now the one
    shared copy every list route's table draws from instead of two duplicates. */
 html:root {
   --color-background-primary: #17212b;
@@ -475,8 +475,8 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
  * One resolved Steam account's identity, as shown on Home's Account card (HomeRoute.tsx):
  * avatar, persona name, a per-account count, and an
  * optional private-profile badge. What's left of the deleted pages' accounts bar — the chip/
- * slot-box/refresh-button rules around these went with `accountsBar.ts` itself (Phase 7, see
- * docs/list-centric-redesign.md); these are the pieces Home's own card reuses rather than
+ * slot-box/refresh-button rules around these went with `accountsBar.ts` itself (see
+ * docs/dev/frontend.md); these are the pieces Home's own card reuses rather than
  * restating, since a member row there is the same avatar/name/count it always was.
  */
 .account-avatar-wrap { position: relative; flex-shrink: 0; width: 28px; height: 28px; }
@@ -712,7 +712,7 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
 tbody tr.game-row { cursor: pointer; }
 tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 
-/* App shell layout (list-centric redesign, see docs/list-centric-redesign.md and AppShell.tsx)
+/* App shell layout (see docs/dev/frontend.md and AppShell.tsx)
    — `.app-shell` is the root column (nav bar, then the recents bar, then the body filling
    whatever's left); `.app-body` holds the routed content and the side panel as two flex
    siblings, so the panel docks next to whatever's showing instead of overlaying it. */
@@ -1886,7 +1886,7 @@ kbd {
 .shortcuts-row:last-child { margin-bottom: 0; }
 .shortcuts-row span { margin-left: 4px; }
 
-/* ── List-centric redesign routes (see docs/list-centric-redesign.md) ─────────────────────── */
+/* ── List route styles (see docs/dev/frontend.md) ─────────────────────── */
 
 /* Wide page layout for the two routes built around a big data table — same 1600px cap the
    legacy Library Explorer/Bundles pages used (`.lib-page`/`.bundles-page`), just renamed to

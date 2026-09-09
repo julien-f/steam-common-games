@@ -1,4 +1,4 @@
-// AccountSlot CRUD — myAccount/currentAccount/recentAccounts (see docs/list-centric-redesign.md).
+// AccountSlot CRUD — myAccount/currentAccount/recentAccounts (see docs/dev/lists-and-accounts.md).
 // Backed by prefs.ts's 'myAccount'/'currentAccount'/'recentAccounts' keys, same one-blob
 // convention every other preference here uses. myAccount/currentAccount are stored as full
 // AccountSlot objects, not id references into recentAccounts, so clearing/removing recents can
@@ -67,7 +67,7 @@ export function setCurrentAccount(account: AccountSlot | null): void {
 // present in the URL, it takes precedence over the stored `currentAccount` everywhere the
 // current account is read, but it never overwrites the stored preference — opening someone
 // else's shared link shouldn't silently change your own default account. See
-// docs/list-centric-redesign.md's own `?u=` section, and accountOverride.ts for the URL-parsing/
+// docs/dev/lists-and-accounts.md's own `?u=` section, and accountOverride.ts for the URL-parsing/
 // resolving half of this (kept out of here so this file stays plain AccountSlot state with no
 // fetching of its own).
 //

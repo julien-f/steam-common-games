@@ -1,62 +1,44 @@
 # steam.isonoe.net
 
-Find games shared across multiple Steam libraries, with ratings and completion times.
+Explore Steam libraries as lists of games — one account's owned games or wishlist, a bundle, or a list you build yourself — with ratings, completion times and current prices in one sortable table.
 
-For each shared game it shows:
-- **Score** — Wilson score lower bound (same formula as SteamDB)
-- **Main Story** and **Main + Extra** hours from HowLongToBeat
+Combine lists to answer the questions Steam can't: what two friends both own, what's on your wishlist but already owned by someone in your family, what a bundle adds that you don't have yet. Steam Families are supported as a single merged account.
 
-Results are grouped by who shares each game (e.g. all 3 players, or just 2 of 3), so you can see the full picture when libraries partially overlap.
-
-**Steam Family sharing** is supported: click `+` next to any player to add a family member — their libraries are merged before the comparison so shared games show up correctly.
+- [What the app does](docs/user/features.md) — the full feature tour
+- [Configuration](docs/user/configuration.md) — every setting
 
 ## Setup
 
 ```bash
 echo "STEAM_API_KEY=your_key_here" > .env   # only required setting
 npm install
-npm run build          # build the frontend (TypeScript) to dist/
+npm run build          # bundle the frontend to dist/
 npm start              # http://127.0.0.1:3000
 ```
 
-Get a Steam API key at <https://steamcommunity.com/dev/apikey>.
-
-## Configuration
-
-`default.env` (committed to the repo) contains all settings with their defaults and documentation. Create a `.env` file with only the values you want to override — `STEAM_API_KEY` is the only required one:
-
-```
-STEAM_API_KEY=your_key_here
-```
-
-The full list of available settings is in `default.env`.
+Get a Steam API key at <https://steamcommunity.com/dev/apikey>. An optional `ITAD_API_KEY` ([get one](https://isthereanydeal.com/apps/new/)) enables bundle browsing and price columns; everything else works without it. All settings and their defaults are documented in `default.env` — put overrides in `.env`.
 
 ## Development
 
 ```bash
-npm run dev:frontend    # Vite dev server on :5173 — HMR, TS sources, /api proxied to :3000
-npm run dev:backend     # Express backend on :3000, restarts on file changes
-npm run dev             # both of the above at once (concurrently), Ctrl+C stops both
-npm test                # run unit tests
-npm run typecheck       # strict tsc over public/*.ts
-npm run lint            # eslint-plugin-solid over public/*.ts(x)
+npm run dev             # Vite on :58991 + Express on :3000, together
+npm test                # Node's test runner
+npm run typecheck       # tsc --noEmit over public/
+npm run lint            # eslint-plugin-solid over public/
 ```
 
-The frontend is TypeScript; run `npm run dev` (or `dev:frontend`/`dev:backend` separately) and use `http://localhost:5173`. `npm run build` + `npm start` serves the bundled production frontend on `:3000`.
+Open `http://localhost:58991` in dev (not `:3000` — that serves the last `npm run build`).
 
-Application data is stored in `db.sqlite` (gitignored); currently this is all cache tables. Run `npm run cache:clear` to wipe the cache entries without deleting the database file itself.
+Application data lives in `db.sqlite` (gitignored); today it holds only cache tables. `npm run cache:clear` empties them without deleting the file.
 
-## Architecture
+## Documentation
 
-- **`server.js`** — Express routes
-- **`lib/cache.js`** — Disk-persistent cache with TTL
-- **`lib/config.js`** — Shared TTL constants
-- **`lib/dedup.js`** — In-flight request deduplicator
-- **`lib/steam.js`** — Steam API + Wilson score rating
-- **`lib/hltb.js`** — HowLongToBeat search (direct API, no npm package)
-- **`lib/groupGames.js`** — Groups libraries by owner set
-- **`public/index.html`** — Frontend shell (vanilla TS, no framework)
-- **`public/app.ts`** — Main frontend logic
-- **`public/types.ts`** — Shared frontend types
-- **`public/utils.ts`** — Shared utilities (also unit-tested in Node)
-- **`public/style.css`** — Page styles
+- [docs/dev/architecture.md](docs/dev/architecture.md) — backend, build, API routes, request flow
+- [docs/dev/frontend.md](docs/dev/frontend.md) — the SPA: routes, modules, reactivity, table, panel
+- [docs/dev/lists-and-accounts.md](docs/dev/lists-and-accounts.md) — the account/list data model
+- [docs/dev/integrations.md](docs/dev/integrations.md) — Steam, HLTB, IsThereAnyDeal, ProtonDB
+- [docs/dev/data.md](docs/dev/data.md) — database, cache tiers, refresh paths
+- [docs/dev/observability.md](docs/dev/observability.md) — metrics endpoint and log warnings
+- [docs/dev/decisions.md](docs/dev/decisions.md) — computed ratings and heuristics
+
+`CLAUDE.md` holds the working conventions for this repo (style, git and development workflow).

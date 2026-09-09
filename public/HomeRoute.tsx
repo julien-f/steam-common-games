@@ -1,5 +1,5 @@
-// Home — account picker/header and the folder/list tree (see docs/list-centric-redesign.md and
-// the implementation plan's Phase 5 step 8), the last of the core routes. `accountsStore.ts`/
+// Home — account picker/header and the folder/list tree (see docs/dev/lists-and-accounts.md).
+// `accountsStore.ts`/
 // `listsStore.ts` are both plain modules with no Solid reactivity of their own — every mutation
 // here goes through their exported functions and then explicitly re-reads them into a local
 // signal (`refreshAccounts`/`refreshTree`), the same "mutate, then explicitly notify" pattern
@@ -182,7 +182,7 @@ export default function HomeRoute() {
   // adopting whatever a `?u=` link was showing. Beyond storing it, this consumes the override:
   // the param has served its purpose once the user has chosen, so it's dropped from state and
   // stripped from the URL (replaceState) rather than left there to keep overriding the very
-  // preference that was just set. See docs/list-centric-redesign.md's `?u=` section.
+  // preference that was just set. See docs/dev/lists-and-accounts.md's `?u=` section.
   function pickAccount(account: AccountSlot): void {
     clearAccountOverride();
     setCurrentAccount(account);

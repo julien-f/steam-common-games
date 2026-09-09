@@ -1,5 +1,5 @@
 // `fmtTime` pulled out of lightbox.tsx into its own plain-TS module — Node's test runner
-// strips TypeScript syntax natively (see CLAUDE.md) but has no JSX transform at all, so a test
+// strips TypeScript syntax natively (see docs/dev/architecture.md) but has no JSX transform at all, so a test
 // can no longer `require()` lightbox.tsx directly once it contains real JSX.
 // This is the one export test/lightbox.test.js needs; everything else in that file is DOM/Solid-
 // dependent and has no test of its own.

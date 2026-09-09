@@ -1,13 +1,13 @@
 import { getPref, setPref } from './prefs.ts';
 
-// Recently looked-up games — carved out of gameSearch.ts (see docs/list-centric-redesign.md's
-// Phase 1) so this storage layer is separate from that file's combobox/debounce UI, and so it
+// Recently looked-up games — carved out of gameSearch.ts (see docs/dev/frontend.md) so this
+// storage layer is separate from that file's combobox/debounce UI, and so it
 // can back a new first-class, browsable "Recently Looked Up" system list (/game, see
 // ListRoute.tsx) rather than only ever being a dropdown convenience feed. Repointed at prefs.ts's
 // shared blob (the 'recentGames' key) instead of its own standalone localStorage key — one more
 // preference the same future per-key server sync (see prefs.ts) can reach, same reasoning every other
 // preference here already follows. No migration from the old standalone key: this whole feature
-// is part of a full frontend replacement (see docs/list-centric-redesign.md's own "no migration"
+// is part of a full frontend replacement (see docs/dev/lists-and-accounts.md's own "no migration"
 // decision) — an existing user's recent-games history just resets once.
 //
 // Unlike accountsStore.ts's recentAccounts (namespaced per account, uncapped, soft-removable

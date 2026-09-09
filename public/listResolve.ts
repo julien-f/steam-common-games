@@ -1,5 +1,5 @@
 // ListRef resolution — given a ListRef (or a whole GameList), resolves it to a set of appids
-// (see docs/list-centric-redesign.md). This is the integration seam between the pure
+// (see docs/dev/lists-and-accounts.md). This is the integration seam between the pure
 // listsStore.ts/combine.ts modules and real data: every "impure" dependency (fetching an
 // account's owned/wishlist games, a bundle's games, the recent-games list, and looking up
 // another GameList by id) is injected via ListResolveFetchers rather than imported directly, so
@@ -149,7 +149,7 @@ export function flattenCombineResult(result: CombineResult): Set<number> {
 
 // The real ListResolveFetchers, wiring the injectable seam above to actual network calls
 // (accountData.ts/bundleData.ts), localStorage (recentGames.ts), and listsStore.ts's own
-// synchronous getList — what real routes (Phase 5) construct and pass to resolveRef/
+// synchronous getList — what real routes construct and pass to resolveRef/
 // resolveGameList. Tests keep using their own mocked fetchers (see listResolve.test.js), so
 // this module itself never needs a real network/localStorage.
 export function createDefaultFetchers(): ListResolveFetchers {

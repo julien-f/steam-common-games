@@ -1,6 +1,6 @@
 // SPA entry point — mounts @solidjs/router's <Router> (with AppShell as its persistent `root`,
 // see AppShell.tsx) into #app, replacing the four separate HTML entries' per-page bootstrap
-// (see docs/list-centric-redesign.md and the implementation plan's Phase 2).
+// (see docs/dev/frontend.md).
 //
 // Route order matters: /lists/owned, /lists/wishlist, and /lists/bundle/:bundleId are registered
 // before the generic /lists/:listId — @solidjs/router ranks routes by segment specificity (a

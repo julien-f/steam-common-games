@@ -85,7 +85,7 @@ export function describeListRef(ref: ListRef, naming: ListNaming): RefDescriptio
         };
       }
       // `?u=`: the source pins an explicit accountId (never "whichever account is current" — see
-      // docs/list-centric-redesign.md), so its link has to open that same account.
+      // docs/dev/lists-and-accounts.md), so its link has to open that same account.
       const path = ref.kind === 'account-owned' ? '/lists/owned' : '/lists/wishlist';
       return { label: `${account.label} — ${which}`, href: `${path}?u=${encodeURIComponent(account.identifiers.join(','))}` };
     }

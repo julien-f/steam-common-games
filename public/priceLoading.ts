@@ -1,7 +1,7 @@
 // Shared "apply an ITAD /api/prices response to a row" logic — extracted from library.js's
 // loadWishlistPrices and bundles.js's loadPrices, which map the identical response shape onto
 // the identical set of row fields and fall back to the identical "don't leave it stuck on its
-// loading placeholder forever" null-out on failure (see CLAUDE.md's Bundles/Wishlist-pricing
+// loading placeholder forever" null-out on failure (see docs/dev/integrations.md
 // sections). Chunking (library.js only — a wishlist can run past the server's batch cap, a
 // bundle's game list never does) and the no-ITAD-configured check (library.js only — bundles.js
 // hides its whole page instead) stay local to each caller, since neither is actually shared.

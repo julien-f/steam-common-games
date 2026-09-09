@@ -111,7 +111,7 @@ app.use(express.json());
 // serving public/ directly otherwise — but that fallback no longer serves a working frontend
 // on its own: public/'s entry points are TypeScript (`<script type="module" src="/app.ts">`
 // etc.), which a plain express.static + browser can't execute, so a fresh clone needs
-// `npm run build` before `npm start` actually works (see README/CLAUDE.md). This still exists
+// `npm run build` before `npm start` actually works (see README.md). This still exists
 // so `npm start` needs no special-casing depending on whether dist/ has been built yet, and so
 // the backend's own API routes work either way for direct API consumers.
 const DIST_DIR = path.join(__dirname, 'dist');
@@ -309,7 +309,7 @@ app.get('/api/metrics', (_req, res) => {
 // tailored to that route's own cache-key shape — mirroring detailsLimit/achievementsLimit's own
 // "cache hits don't count" skip, not just a shared always-counts limiter. Without this, simply
 // reloading the Bundles page a handful of times (every reload re-requests the list, and
-// re-opens whatever bundle is deep-linked — see the `?bundle=` section in CLAUDE.md) burns the
+// re-opens whatever bundle is deep-linked — see docs/dev/integrations.md) burns the
 // whole per-minute budget on requests that never actually hit ITAD, and once burned, real
 // upstream calls (a newly-opened bundle) start 429ing with no visible explanation. Named
 // generically (not `bundlesRateLimitOpts`) since `pricesLimit` below also backs the Library
@@ -595,7 +595,7 @@ function fetchGameDetails(appid, { force = false } = {}) {
 
 // Backs the "look up any game" search box (both pages) — resolves a typed name to a short
 // list of candidate appids, independent of anyone's library/wishlist. See lib/steam.js's
-// searchStoreGames for the upstream endpoint and CLAUDE.md for its compliance note.
+// searchStoreGames for the upstream endpoint and docs/dev/integrations.md's trust tiers.
 app.get('/api/search-games', gameSearchLimit, async (req, res) => {
   const term = normalizeSearchTerm(req.query.q);
   if (term.length < 2) return res.json({ results: [] });
@@ -609,7 +609,7 @@ app.get('/api/search-games', gameSearchLimit, async (req, res) => {
 });
 
 // Backs the Bundles page's bundle list — a thin, cached proxy over ITAD's GET /bundles/v1.
-// See lib/itad.js and CLAUDE.md for the upstream API and caching notes.
+// See lib/itad.js and docs/dev/integrations.md and docs/dev/data.md.
 app.get('/api/bundles', bundlesListLimit, async (req, res) => {
   if (!isItadConfigured()) {
     return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
@@ -724,7 +724,7 @@ app.post('/api/prices', pricesLimit, async (req, res) => {
   // ?refresh=1 backs the page-level "↻ Refresh prices" button (bundles.js/library.js) — force
   // only the price lookup itself, not the appid↔gid resolution above: that's an identity
   // mapping, not price data, and near-permanent in practice (same reasoning as the panel's own
-  // ↻ Refresh never touching `resolve:` — see the "Refresh" section in CLAUDE.md), so refreshing
+  // ↻ Refresh never touching `resolve:` — see docs/dev/data.md), so refreshing
   // it on every price refresh would just be an extra upstream call for nothing.
   const force = isForceRefresh(req);
   try {
@@ -955,7 +955,7 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
 // (no dot-extension in its path) falls through to the app shell, letting the client-side
 // router (see public/App.tsx) render the right view from the URL — needed once navigation
 // between what used to be separate pages (Comparison/Library Explorer/Bundles/About) became
-// client-side routing instead of real page loads (see docs/list-centric-redesign.md). Placed
+// client-side routing instead of real page loads (see docs/dev/architecture.md). Placed
 // after every route above and after the static-file middleware (line 113) so real API calls
 // and real asset files are still served first; a path that looks like an asset (has a file
 // extension) but genuinely doesn't exist still 404s via Express's default handler instead of

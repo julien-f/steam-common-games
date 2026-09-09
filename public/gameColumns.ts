@@ -785,7 +785,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = [
   // failed to load or Steam's response omitted the field.
   { key: 'type',             label: 'Type',         groupable: true, format: v => v ? String(v) : 'Unknown', category: 'Classification' },
   // Estimated, not authoritative — see computeProductionTier's doc comment (public/utils.js)
-  // and CLAUDE.md's AAA/AA/Indie section. The label spells out "(est.)" rather than relying on
+  // and docs/dev/decisions.md. The label spells out "(est.)" rather than relying on
   // a hover tooltip, since @vates/data-table-solid has no per-column header-tooltip option to
   // hang a caveat on. Hidden by default — a secondary number, not the primary thing most
   // searches here care about, and one that's explicitly a best-effort guess on top of that.

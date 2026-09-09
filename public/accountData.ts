@@ -1,6 +1,6 @@
 // Account-scoped game data — owned games and wishlist, for a resolved AccountSlot. Clean,
 // minimal fetch functions against the existing /api/common-games and /api/wishlist endpoints
-// (see docs/list-centric-redesign.md's implementation plan, Phase 4 step 1) rather than a
+// (see docs/dev/lists-and-accounts.md) rather than a
 // mechanical copy of library.tsx's loadLibrary/loadWishlist, which are large UI-orchestration
 // functions (row-building, table wiring, URL/history updates, accounts-bar rendering) — none of
 // that belongs here; ListRoute.tsx owns the equivalent orchestration generically, for any list
@@ -208,11 +208,11 @@ export interface ResolvedAccountSummary {
 }
 
 // Home's "pick an account" resolve step — there's no standalone "just resolve an identifier"
-// endpoint (see CLAUDE.md's Request-flow section), so this is the one place a raw typed
+// endpoint (see docs/dev/architecture.md's Request flow section), so this is the one place a raw typed
 // identifier (vanity name/URL/steamid) actually becomes a resolved AccountSlot, via the same
 // /api/common-games call every owned-games fetch already makes. Runs the wishlist count
 // alongside it (Promise.all) rather than lazily, so the account header can show both counts as
-// soon as an account is picked, per docs/list-centric-redesign.md.
+// soon as an account is picked, per docs/dev/lists-and-accounts.md.
 export async function resolveAccountSummary(rawInputs: string[]): Promise<ResolvedAccountSummary> {
   const [ownedRes, wishlistRes] = await Promise.all([
     fetch('/api/common-games', {

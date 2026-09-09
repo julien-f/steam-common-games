@@ -37,7 +37,7 @@ export function computeSteamdbRating(positive: number, total: number): number | 
 // signal, so this leans on the only things that correlate with it at all: launch price
 // (`priceInitial`, whole cents, USD — see isFree/priceInitial in lib/steam.js's
 // extractAppDetails), review volume as a reach proxy, and Metacritic presence as a "got
-// professional press coverage at all" signal. It's a heuristic, not fact — see CLAUDE.md's
+// professional press coverage at all" signal. It's a heuristic, not fact — see docs/dev/decisions.md's
 // AAA/AA/Indie section for the tradeoffs and known misclassifications (cheap AAA
 // remasters/rereleases, prestige-priced small-studio sim games, veteran-founded small studios
 // with high polish — none of these have any data-side tell). Returns null, not a tier, when

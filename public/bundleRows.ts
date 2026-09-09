@@ -141,7 +141,7 @@ export function bundleCovers(bundle: BundleListItem, max = 4): string[] {
 
 // A stable hue (0-359) for a shop name, so each shop's chip keeps one consistent color. Hashed
 // from the name rather than looked up in a hand-maintained {shop: color} map, for the same reason
-// the Production Tier heuristic refuses a publisher allowlist (see CLAUDE.md): ITAD lists shops
+// the Production Tier heuristic refuses a publisher allowlist (see docs/dev/decisions.md): ITAD lists shops
 // this app has never heard of, and a map would silently fall back to one shared default color for
 // every one of them. The cost is that a shop ITAD spells two ways (observed live:
 // "GreenManGaming" and "GreenMan Gaming") gets two colors — but those genuinely are two distinct

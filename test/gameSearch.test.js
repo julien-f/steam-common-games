@@ -12,7 +12,7 @@ const {
 // disproportionate to its risk next to the pure logic below. The pure pieces it's built from
 // (parseDirectAppid, gameSearchResultHtml) are what's tested. The "recently looked up games"
 // storage/widget this file used to also cover moved to recentGames.test.js, alongside the
-// module it now lives in (recentGames.ts) — see docs/list-centric-redesign.md's Phase 1.
+// module it now lives in (recentGames.ts) — see docs/dev/lists-and-accounts.md.
 
 // ── parseDirectAppid ─────────────────────────────────────────────────────────
 

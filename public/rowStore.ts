@@ -10,7 +10,7 @@
 // they were handed via plain `game.field = x` writes, which a store proxy rejects outright. Those
 // loaders are `createResource`s now (see panelData.ts) and write to no row at all, so the panel
 // takes the real store row, the two-copies-kept-in-sync bookkeeping is gone, and a field written
-// here reaches the panel with no "please re-render" bump in between. See CLAUDE.md's "Frontend
+// here reaches the panel with no "please re-render" bump in between. See docs/dev/frontend.md's "Frontend
 // reactivity" section.
 import { produce } from 'solid-js/store';
 

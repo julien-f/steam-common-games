@@ -1,5 +1,5 @@
-// The generic list viewer — table + docked panel for a list, per docs/list-centric-redesign.md
-// and the implementation plan's Phase 4/5. Registered for /lists/owned, /lists/wishlist,
+// The generic list viewer — table + docked panel for a list, per docs/dev/frontend.md.
+// Registered for /lists/owned, /lists/wishlist,
 // /lists/bundle/:bundleId, the generic /lists/:listId, and /game/:appid? (see AppRoot.tsx) — the
 // last of these is the "Recently Looked Up" system list's own address (kind 'recent' below),
 // folding in what used to be a separate, mostly-empty GameRoute.tsx: `params.appid`, when given,
@@ -7,8 +7,7 @@
 // openOrAddRecentGame below), not treated as a special standalone-only view.
 //
 // **Current scope**: every kind ('owned', 'wishlist', 'bundle', 'recent', 'user') is wired up
-// for real now (Phase 5 steps 1-2, 4, 6, and 7). This is deliberately narrower than the full plan
-// on a few more axes though: ownership cross-referencing (in-library/on-wishlist badges — done
+// for real. It stays narrower than the design on a few axes though: ownership cross-referencing (in-library/on-wishlist badges — done
 // in the side panel/gameSearch.ts's dropdown via myOwnership.ts, but not surfaced as its own
 // table column here) and achievements are not ported yet (both need a second background fetch
 // this first pass omits); 'recent'/'user' have no dedicated extra columns — plain CORE_COLUMNS,
@@ -330,7 +329,7 @@ export default function ListRoute() {
   const [heroAccount, setHeroAccount] = createSignal<AccountSlot | null>(null);
   // kind === 'bundle' only, alongside bundleTitle above — ITAD's own page for this bundle
   // (`details`) and the real shop/affiliate purchase link exactly as ITAD returned it (`url`,
-  // never rewritten or stripped of tracking params — see CLAUDE.md's Bundles section on why).
+  // never rewritten or stripped of tracking params — see docs/dev/integrations.md on why).
   const [bundleLinks, setBundleLinks] = createSignal<{ details: string | null; url: string | null }>({ details: null, url: null });
   // kind === 'bundle' only — everything else the bundle response already carries, for the detail
   // card below the header. All of it rides on the one fetch the route already makes; none of it
@@ -1215,7 +1214,7 @@ export default function ListRoute() {
       if (userList()) {
         // A user list's view lives on the list itself (GameList.tableView), not a shared pref
         // key — every user list keeps its own, unlike the fixed system kinds above which share
-        // one key regardless of instance (see docs/list-centric-redesign.md's storage schema).
+        // one key regardless of instance (see docs/dev/lists-and-accounts.md's storage schema).
         // Mirrors tableViewPrefs.ts's own restoreTableView (an incoming `?tv=` param — see
         // handleShareView above — wins, is seeded as the new stored default, then stripped from
         // the URL) but persists via setListTableView rather than a prefs.ts key, so it can't

@@ -96,7 +96,7 @@ export interface UrlState {
   filters: Record<string, string[]>;
 }
 // One `u=` value per slot, comma-joined identifiers within it (a Steam Family) — see the
-// URL/sharing section in CLAUDE.md. Shared by parseUrlState and parseAccountParam below so the
+// URL & sharing section in docs/dev/frontend.md. Shared by parseUrlState and parseAccountParam below so the
 // two can never disagree about what a `u=` value means (whitespace handling, empty entries).
 function parseSlots(params: URLSearchParams): string[][] {
   return params.getAll('u')
@@ -138,7 +138,7 @@ export interface AccountParam {
   // Any *further* slots the link carried. A `?u=alice&u=bob` link is an old Comparison-page URL
   // ("compare alice against bob"), a shape the list-centric app has no single route for anymore
   // — a comparison is a dynamic list combining two accounts' Owned lists now (see
-  // docs/list-centric-redesign.md). Rather than silently unioning those identifiers into one
+  // docs/dev/lists-and-accounts.md). Rather than silently unioning those identifiers into one
   // Family (right games, wrong meaning) or dropping them with no explanation, the first slot is
   // honored as the explored account and the rest are surfaced here so the UI can say so.
   extraSlots: string[][];
@@ -167,7 +167,7 @@ export function withAccountParam(path: string, search: string = location.search)
 
 // The current URL with `u=` stripped back out — what an explicit account pick navigates to,
 // since the override the param carried is redundant once the user has chosen (see
-// accountsStore.ts's `?u=` section and docs/list-centric-redesign.md).
+// accountsStore.ts's `?u=` section and docs/dev/lists-and-accounts.md).
 //
 // Returns a URL for the *caller* to navigate to (replacing, never pushing — consuming the param
 // isn't its own back/forward-navigable step) rather than calling history.replaceState itself

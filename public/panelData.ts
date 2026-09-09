@@ -11,7 +11,7 @@
 // (rowStore.ts's old `panelRows` map), and since a plain object's field writes are invisible to
 // Solid, showing anything they fetched needed an explicit `renderPanelBody()` bump — which
 // re-rendered the entire panel body, not the one field that changed. Keeping this data off the
-// row entirely is what let all of that go; see CLAUDE.md's "Frontend reactivity" section.
+// row entirely is what let all of that go; see docs/dev/frontend.md's Reactivity section.
 //
 // Each result is cached for the session, keyed by appid (plus the account, where the result is
 // account-specific), so reopening a game already seen doesn't refetch — the same guarantee the

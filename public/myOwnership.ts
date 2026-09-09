@@ -2,7 +2,7 @@
 // (the ownership badge under a game's title, which links back to /lists/owned or
 // /lists/wishlist) and gameSearch.ts (a small owned/wishlisted marker on each dropdown result),
 // so both show the same status regardless of which route/list opened the game (see
-// docs/list-centric-redesign.md — this was one of the "genuine follow-up polish" items left
+// docs/dev/lists-and-accounts.md — this was one of the "genuine follow-up polish" items left
 // open when the redesign first went functionally complete).
 //
 // Keyed off `currentAccount` (accountsStore.ts), not `myAccount` — this used to be the other way

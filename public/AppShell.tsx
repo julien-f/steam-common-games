@@ -4,7 +4,7 @@
 // This is the app's one nav bar/shell now that the legacy pages (app.tsx/library.tsx/
 // bundles.tsx) and the two modules that existed purely to bootstrap them per-page
 // (pageShell.ts's `initPageShell`, and nav.tsx's own `initNav`/cross-page `<nav>`) are all
-// deleted (Phase 7, see docs/list-centric-redesign.md). The ⚙ Preferences popover's own
+// deleted (see docs/dev/frontend.md). The ⚙ Preferences popover's own
 // open/close/position mechanics used to live here as a deliberate, temporary duplicate of
 // nav.tsx's identically-named pair for exactly that transition period; they're now navPopover.ts's
 // `bindNavPopover`, shared with the account chip's own popover (AccountChip.tsx).
@@ -190,7 +190,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
 
         {/* Docked, not modal — role="complementary" rather than "dialog"/aria-modal, since the
             rest of the page stays fully interactive while this is open (see panel.tsx's own
-            comment and docs/list-centric-redesign.md). */}
+            comment and docs/dev/frontend.md). */}
         <div id="game-panel" class="game-panel" role="complementary" aria-labelledby="panel-title">
           <button id="panel-close" class="panel-close" aria-label="Close">×</button>
           <div id="panel-nav" class="panel-nav" />

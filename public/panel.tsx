@@ -37,7 +37,7 @@ export interface PanelOptions {
 
 // ── Shared game side panel ──────────────────────────────────────────────────
 // Mounted once by AppShell.tsx's single `initPanel(options)` call (see docs/list-centric-
-// redesign.md), not per-route — ListRoute.tsx (the only caller of `panelOpen` now) just
+// docs/dev/frontend.md), not per-route — ListRoute.tsx (the only caller of `panelOpen` now) just
 // opens/closes it, it never configures it itself. This used to be
 // used by three separate pages (app.tsx/library.tsx/bundles.tsx), each supplying its own
 // `initPanel` options — that per-page option-supplying shape is why `PanelOptions` still
@@ -62,7 +62,7 @@ export interface PanelOptions {
 // (not just the ones it explicitly triggers) should do it there rather than in a wrapper around
 // panelClose(), which those other paths would silently bypass.
 //
-// Docked, not modal (see docs/list-centric-redesign.md and style.css's own "App shell layout"
+// Docked, not modal (see docs/dev/frontend.md and style.css's own "App shell layout"
 // comment): the panel is a sibling column next to whatever list/content is showing, not an
 // overlay — no backdrop element, no click-outside-to-close, no `inert`-toggling of the
 // background (there's nothing to make inert; the rest of the page stays fully interactive
@@ -84,7 +84,7 @@ export interface PanelOptions {
 // This replaced a `revision` counter signal and an exported `renderPanelBody(game)` that bumped
 // it: host routes (and this file's own loaders) mutated plain `Game` objects, which Solid cannot
 // see, so ~30 call sites had to announce every write, and each announcement re-rendered the
-// entire panel body. See CLAUDE.md's "Frontend reactivity" section for the full story — and note
+// entire panel body. See docs/dev/frontend.md's Reactivity section for the full story — and note
 // what the shape below is *for*: `npm run lint`'s `solid/reactivity` rule is what keeps a plain
 // `const x = someSignal()` / `const g = props.game.field` capture from quietly reintroducing the
 // same class of bug.
@@ -302,7 +302,7 @@ async function handlePanelRefresh() {
 
 // The 🔗 button beside Store/ITAD in the header — copies a link back to this exact game.
 // Always `/game/<appid>` (the canonical, single, shareable link — see
-// docs/list-centric-redesign.md's routing section and ListRoute.tsx's `recent` kind), never
+// docs/dev/frontend.md's routing section and ListRoute.tsx's `recent` kind), never
 // whatever route/list happened to have this game open (which may carry `u=`/filters/sort/a
 // route-local `?game=` from whatever search led here) — someone sharing "check out this game"
 // almost always means the game itself, not "reproduce my exact search too", and a route-local
@@ -364,7 +364,7 @@ function toggleSection(appid: number, section: string) {
 // gives all four of those for free: `.loading` is the flag, the value is the result, a
 // superseded response is discarded rather than needing the guard, and — since a resource is a
 // signal — whatever reads it re-renders on its own with no "please re-render" bump. See
-// CLAUDE.md's "Frontend reactivity" section for the whole story.
+// docs/dev/frontend.md's Reactivity section for the whole story.
 //
 // `createRoot`: these are computations, so they need an owner, and there is no component to own
 // them — the panel is a module-level singleton whose data outlives every render of it (an
@@ -1190,7 +1190,7 @@ function BaseGameLink(props: { game: ReadonlyGame }): JSX.Element {
 // extractAppDetails in lib/steam.js) so it's shown immediately even before the card is ever
 // expanded; only the expanded body's names/capsules depend on the lazy fetch. Each entry is
 // a real `<a href>` — `/game/<appid>`, the app's canonical single-game link (see
-// docs/list-centric-redesign.md's routing section) — rather than a plain button, so
+// docs/dev/frontend.md's routing section) — rather than a plain button, so
 // ctrl/cmd/shift-click and middle-click open it in a new tab the normal way, while a plain click
 // navigates within this panel instead via navigateToGame. This used to be a host-supplied
 // `panelOptions.gameHref` (each of the three deleted pages had its own URL shape); with one
@@ -1388,7 +1388,7 @@ function PanelHero(): JSX.Element {
 // text node that shows it. This used to be one coarse block that re-read every field of the game
 // and rebuilt the entire subtree on every `revision` bump: ~6 full teardowns per open (five
 // async loaders, most bumping on start and finish), each throwing away hover state, keyboard
-// focus and the scroll-spy's `active` class. See CLAUDE.md's "Frontend reactivity" section.
+// focus and the scroll-spy's `active` class. See docs/dev/frontend.md's Reactivity section.
 
 // The HLTB Main/Extra/Completionist breakdown. The glance strip above already carries HLTB's
 // "All PlayStyles" number (see GlanceGrid), so this is the fuller breakdown beneath it, not a

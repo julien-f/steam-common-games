@@ -202,7 +202,7 @@ export interface PriceFields {
   priceCurrency?: string | null;
 }
 
-// ── List-centric redesign (see docs/list-centric-redesign.md) ──────────────────────────────
+// ── List-centric redesign (see docs/dev/lists-and-accounts.md) ──────────────────────────────
 // These back accountsStore.ts/listsStore.ts/combine.ts/listResolve.ts — see that doc for the
 // full design rationale (why accounts are pinned explicitly rather than "whichever is
 // current", why soft-delete/restore exists, why cycles are rejected at save time, etc.).

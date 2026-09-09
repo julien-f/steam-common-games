@@ -1,4 +1,4 @@
-// Folder/GameList CRUD — the user's organizable list tree (see docs/list-centric-redesign.md).
+// Folder/GameList CRUD — the user's organizable list tree (see docs/dev/lists-and-accounts.md).
 // Flat arrays keyed by parentId, not a nested structure, so rename/move/reorder is a single-item
 // mutation rather than a tree walk. Backed by prefs.ts's 'folders'/'lists' keys, same one-blob
 // convention every other preference here uses.

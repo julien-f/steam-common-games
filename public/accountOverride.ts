@@ -1,12 +1,12 @@
 // The `?u=` half of "which account is the app showing" — parsing the param out of the URL,
 // resolving its identifiers to a real AccountSlot, and handing that to accountsStore.ts as an
 // override of the stored `currentAccount` (see that file's own `?u=` section for the "override,
-// never adopt" rule itself, and docs/list-centric-redesign.md for the design).
+// never adopt" rule itself, and docs/dev/lists-and-accounts.md for the design).
 //
 // Kept separate from accountsStore.ts on purpose: that file is plain AccountSlot state over
 // prefs.ts with no fetching of its own, while resolving an identifier means a real
 // /api/common-games round trip (accountData.ts's resolveAccountSummary — there's no standalone
-// "just resolve this identifier" endpoint, see CLAUDE.md's Request-flow section). This module is
+// "just resolve this identifier" endpoint, see docs/dev/architecture.md's Request flow section). This module is
 // the policy layer between the two, and it's the one place the param is read; every consumer
 // asks accountsStore.ts's getEffectiveCurrentAccount() instead of parsing the URL itself.
 //
@@ -66,7 +66,7 @@ export function createAccountOverrideSync() {
   // Drops the override and forgets the synced param, so a subsequent syncFromUrl for a URL the
   // `u=` has just been stripped from is a no-op rather than a second clear. Called when the user
   // explicitly picks an account (HomeRoute) — at which point the param is redundant and gets
-  // stripped from the URL via replaceState, per docs/list-centric-redesign.md.
+  // stripped from the URL via replaceState, per docs/dev/lists-and-accounts.md.
   function clear(): void {
     guard.next(); // any in-flight resolve is now irrelevant
     syncedKey = '';

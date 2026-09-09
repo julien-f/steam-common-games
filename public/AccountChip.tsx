@@ -1,5 +1,5 @@
 // The nav bar's account chip — who the app is currently showing, and one-click access to that
-// account's Owned/Wishlist lists from every route (see docs/list-centric-redesign.md).
+// account's Owned/Wishlist lists from every route (see docs/dev/frontend.md).
 //
 // Two problems it exists to fix, both consequences of Home having been the only place any of
 // this lived: getting to Owned/Wishlist from anywhere else meant a round trip through Home, and

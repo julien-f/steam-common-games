@@ -1,6 +1,6 @@
 // Shared "share/persist/reset a @vates/data-table-solid view via prefs.js + a one-shot URL
 // param" logic — extracted verbatim from library.js's and bundles.js's own near-identical
-// copies (see CLAUDE.md's Library Explorer / Bundles sections for the "share on demand, not
+// copies (see docs/dev/frontend.md's table section for the "share on demand, not
 // live-synced" reasoning). Both pages call these the same way: a `table` instance, the prefs.js
 // key that page's view is stored under, and the URL param name that page's "🔗 Share view"
 // button writes to (`lv`/`wv` for library.js, `bv` for bundles.js).

@@ -249,7 +249,7 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
 }
 
 // The "recently looked up games" storage/widget that used to live here moved to
-// recentGames.ts (see docs/list-centric-redesign.md's Phase 1) — it's not combobox/debounce UI,
+// recentGames.ts (see docs/dev/frontend.md) — it's not combobox/debounce UI,
 // and needed to be repointed at a new pref key to back the "Recently Looked Up" system list.
 // This file shows that list again (the `recents` option above), but only ever as data handed in
 // by the caller — the storage still isn't this module's, and neither is the route its "see all"
