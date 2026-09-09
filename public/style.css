@@ -1191,7 +1191,7 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 .panel-refresh-btn:hover:not(:disabled), .panel-copy-link-btn:hover { border-color: var(--accent); color: var(--accent2); }
 .panel-refresh-btn:disabled { opacity: 0.6; cursor: default; }
 .panel-refresh-btn.is-refreshing { animation: spin 0.75s linear infinite; }
-/* Brief post-click feedback (see flashCopyLinkBtn in panel.js) — green rather than the
+/* Brief post-click feedback (see clipboard.ts's copyWithFeedback) — green rather than the
    hover accent, so "copied" reads as a distinct confirmation, not just a hover state. */
 .panel-copy-link-btn--copied { border-color: #15803d; color: #15803d; }
 

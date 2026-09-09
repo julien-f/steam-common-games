@@ -6,6 +6,7 @@
 // button writes to (`lv`/`wv` for library.js, `bv` for bundles.js).
 import { getPref, setPref } from './prefs.ts';
 import { urlWithParams } from './urlState.ts';
+import { copyWithFeedback } from './clipboard.ts';
 
 // The @vates/data-table-solid instance these operate on — only the view-state surface the page
 // code actually uses, rather than importing the package's own (internal) types. `onViewChange` is
@@ -56,13 +57,7 @@ export function shareTableView(table: DataTableLike, paramName: string, btn: HTM
   const params = new URLSearchParams(location.search);
   params.set(paramName, JSON.stringify(table.getViewState()));
   const url = `${location.origin}${urlWithParams(params)}`;
-  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(url).then(() => flashShareViewBtn(btn), () => {});
-}
-
-function flashShareViewBtn(btn: HTMLElement): void {
-  const prevText = btn.textContent;
-  btn.textContent = '✓ Copied!';
-  setTimeout(() => { btn.textContent = prevText; }, 1500);
+  copyWithFeedback(btn, url);
 }
 
 // Clears both the stored default and whatever's currently in `paramName`, then blanks the

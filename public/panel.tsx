@@ -18,6 +18,7 @@ import { nextHopHistory } from './panelHistory.ts';
 import type { PanelHistoryEntry } from './panelHistory.ts';
 import { setGameTitle } from './pageTitle.ts';
 import { withAccountParam } from './urlState.ts';
+import { copyWithFeedback } from './clipboard.ts';
 import type { Game, PriceFields, ReadonlyGame } from './types.ts';
 
 import { createSignal, createEffect, createMemo, createResource, createRoot, For, Show, type JSX } from 'solid-js';
@@ -310,22 +311,11 @@ async function handlePanelRefresh() {
 // (an account's Owned/Wishlist, a specific bundle), unlike /game/<appid>, which works for anyone.
 function copyPanelLink(e: MouseEvent) {
   const game = panelGame();
-  if (!game || !navigator.clipboard?.writeText) return;
-  const btn = e.currentTarget as HTMLElement;
-  const url = `${location.origin}/game/${game.appid}`;
-  navigator.clipboard.writeText(url).then(() => flashCopyLinkBtn(btn), () => {});
-}
-
-function flashCopyLinkBtn(btn: HTMLElement) {
-  const prevTitle = btn.title;
-  btn.textContent = '✓';
-  btn.title = 'Copied!';
-  btn.classList.add('panel-copy-link-btn--copied');
-  setTimeout(() => {
-    btn.textContent = '🔗';
-    btn.title = prevTitle;
-    btn.classList.remove('panel-copy-link-btn--copied');
-  }, 1500);
+  if (!game) return;
+  copyWithFeedback(e.currentTarget as HTMLElement, `${location.origin}/game/${game.appid}`, {
+    copiedText: '✓',
+    copiedClass: 'panel-copy-link-btn--copied',
+  });
 }
 
 // Which collapsible sections (HLTB breakdown, news, achievements — anything built with
