@@ -4,6 +4,10 @@ Explore Steam libraries as lists of games — one account's owned games or wishl
 
 Combine lists to answer the questions Steam can't: what two friends both own, what's on your wishlist but already owned by someone in your family, what a bundle adds that you don't have yet. Steam Families are supported as a single merged account.
 
+![A bundle's games in the sortable table — tier price, best deal, weighted rating, completion time — with one game's detail panel open beside it](docs/images/list-table-and-panel.png)
+
+[Setup](#setup) · [Development](#development) · [Documentation](#documentation)
+
 - [What the app does](docs/user/features.md) — the full feature tour
 - [Configuration](docs/user/configuration.md) — every setting
 
@@ -33,12 +37,21 @@ Application data lives in `db.sqlite` (gitignored); today it holds only cache ta
 
 ## Documentation
 
-- [docs/dev/architecture.md](docs/dev/architecture.md) — backend, build, API routes, request flow
-- [docs/dev/frontend.md](docs/dev/frontend.md) — the SPA: routes, modules, reactivity, table, panel
-- [docs/dev/lists-and-accounts.md](docs/dev/lists-and-accounts.md) — the account/list data model
-- [docs/dev/integrations.md](docs/dev/integrations.md) — Steam, HLTB, IsThereAnyDeal, ProtonDB
-- [docs/dev/data.md](docs/dev/data.md) — database, cache tiers, refresh paths
-- [docs/dev/observability.md](docs/dev/observability.md) — metrics endpoint and log warnings
-- [docs/dev/decisions.md](docs/dev/decisions.md) — computed ratings and heuristics
+### User
+
+- [features.md](docs/user/features.md) — what the app does, feature by feature, with screenshots
+- [configuration.md](docs/user/configuration.md) — every setting worth setting, and what the rest default to
+
+### Development
+
+- [architecture.md](docs/dev/architecture.md) — backend, build, API routes, request flow
+- [frontend.md](docs/dev/frontend.md) — the SPA: routes, modules, reactivity, table, panel
+- [lists-and-accounts.md](docs/dev/lists-and-accounts.md) — the account/list data model
+- [integrations.md](docs/dev/integrations.md) — Steam, HLTB, IsThereAnyDeal, ProtonDB
+- [data.md](docs/dev/data.md) — database, cache tiers, refresh paths
+- [observability.md](docs/dev/observability.md) — metrics endpoint and log warnings
+- [decisions.md](docs/dev/decisions.md) — computed ratings and heuristics
+
+Screenshots used by the docs live in [docs/images/](docs/images).
 
 `CLAUDE.md` holds the working conventions for this repo (style, git and development workflow).

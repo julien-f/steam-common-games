@@ -13,6 +13,7 @@ Working conventions for this repo. Documentation lives in `docs/` — keep it th
 - [docs/dev/data.md](docs/dev/data.md) — `db.sqlite`, cache tiers and TTLs, the three refresh paths
 - [docs/dev/observability.md](docs/dev/observability.md) — `GET /api/metrics`, outbound budgets, proactive log warnings
 - [docs/dev/decisions.md](docs/dev/decisions.md) — Weighted Rating vs. Wilson score, the Production Tier heuristic
+- [docs/images/](docs/images) — the screenshots the docs embed (see Screenshots below)
 
 Read the relevant one before changing that area. Two are load-bearing enough to call out: **frontend.md's reactivity section** (one reactive source of truth per row; async state in `createResource`; never capture a reactive read into a plain `const` — `npm run lint` enforces the last one), and **integrations.md's trust tiers** (several upstreams are undocumented and unsanctioned; don't scale request volume without revisiting them).
 
@@ -34,6 +35,14 @@ Read the relevant one before changing that area. Two are load-bearing enough to 
 - Prefer a linked doc under `docs/` over growing this file when the detail is substantial (e.g. `docs/list-centric-redesign.md`); link to it from here rather than duplicating its content.
 - Facts specific to one person (role, personal working-style preferences, in-progress session/project context) belong in Claude's own memory, not here — this file is loaded for every session working on the repo, not a place for one contributor's personal notes.
 - Secrets, credentials, and ephemeral state belong in neither — see `default.env`/`.env` above.
+
+## Screenshots
+
+- Committed screenshots live in `docs/images/`, kebab-case, referenced from `README.md` and the user docs. Nothing under `.playwright-mcp/` is committable — it's gitignored scratch.
+- Never shoot a Steam account that isn't the demo one: <https://steamcommunity.com/profiles/76561198070571772/>. Real profiles reach the screenshots through the account card, "Recent accounts", the nav-bar chip and the panel's "Owned by" — back up `localStorage` (`steam.isonoe.net:prefs`), clear it, seed the demo state, and restore the backup afterwards.
+- Demo lists/folders are seeded straight into `localStorage` rather than clicked together, and named so they read as examples ("Couch co-op picks", "Friday shortlist").
+- Capture at 1440×900, downscale to 1200px wide (`magick <in> -resize 1200x -strip <out>`); the side panel is captured as an element shot (`.game-panel`) instead.
+- Re-shoot an image when the UI it shows changes; a screenshot no doc references should be deleted.
 
 ## Git workflow
 

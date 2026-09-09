@@ -2,7 +2,19 @@
 
 Everything the app shows is a **list of games** — an account's owned games, its wishlist, a bundle, games you looked up, or a list you made yourself — and every list opens in the same viewer: a sortable, filterable, groupable table with a detail panel beside it.
 
+![A bundle's games in the table — tier price, best deal, weighted rating, completion time — with one game's detail panel open beside it](../images/list-table-and-panel.png)
+
 There is no account to create and nothing is stored on the server. The accounts you look at, the lists you build and your preferences all live in your own browser.
+
+- [Accounts](#accounts)
+- [Lists](#lists)
+  - [Combining lists](#combining-lists)
+- [Bundles](#bundles)
+- [Prices](#prices)
+- [The game panel](#the-game-panel)
+- [Sharing](#sharing)
+- [Keyboard shortcuts](#keyboard-shortcuts)
+- [How fresh is this?](#how-fresh-is-this)
 
 ## Accounts
 
@@ -21,6 +33,8 @@ A private profile or wishlist looks identical to an empty one from the outside; 
 - **Your own lists** come in two kinds: a **manual** list you add and remove games from, and a **dynamic** list defined as a formula over other lists, recomputed every time you open it. A dynamic list can be **frozen** into a manual one, keeping its current contents and dropping the formula.
 - Lists live in a **folder tree** you can rename, nest and organize.
 
+![The home page: the current account's card, the four always-available lists, and your own folder tree of lists](../images/home-lists.png)
+
 ### Combining lists
 
 Pick two or more lists and an operation:
@@ -32,9 +46,13 @@ Pick two or more lists and an operation:
 
 The result is a live list: save it as dynamic (it re-resolves each time), or freeze it. A dynamic list's page states its formula, names every source, and says what each contributed.
 
+![Two lists combined with group by membership: one table per combination — in both lists, then each list's exclusive games — under the formula that produced them](../images/group-by-membership.png)
+
 ## Bundles
 
 Browse current Steam game bundles (sourced from IsThereAnyDeal, and only available if the app is configured with an ITAD key). Open one and its games become a list like any other, with the bundle's tier price alongside each game's rating, playtime estimates and current best price anywhere. Games in a bundle with no Steam listing are listed separately below the table rather than quietly dropped.
+
+![The bundle browser: current bundles with shop, game count, cheapest tier, publication and end dates](../images/bundles-browse.png)
 
 ## Prices
 
@@ -43,6 +61,8 @@ Wishlist and bundle lists carry price columns: the best deal across every shop I
 ## The game panel
 
 Clicking any row opens a detail panel beside the table — not over it, so the list stays usable and clicking another row just swaps the panel's contents. It carries screenshots and trailers, the weighted rating and review counts, How Long To Beat estimates, achievements, recent news from the developer, current price, DLC and links out. ↻ refetches everything for that one game.
+
+![A game's detail panel: media strip, weighted rating and Metacritic score, How Long To Beat estimate, ProtonDB tier, best price with record-low badges, tags, who owns it, and collapsible HLTB/news/achievements/DLC sections](../images/game-panel.png)
 
 ## Sharing
 

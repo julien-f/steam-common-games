@@ -4,6 +4,15 @@ Every upstream this app talks to, and what is undocumented about each. Cache tie
 
 **Trust tiers.** Steam's keyed `api.steampowered.com` endpoints and the IsThereAnyDeal API are documented and sanctioned. Everything else here — HLTB's search API, Steam's wishlist/store-search/store-browse endpoints, ProtonDB — is undocumented, reached without a key (sometimes with spoofed browser headers), and liable to break or be blocked without notice. Usage is low-volume and non-commercial; don't scale up request volume without revisiting the compliance note on each.
 
+- [HLTB — no npm package](#hltb--no-npm-package)
+- [Wishlist — undocumented endpoint](#wishlist--undocumented-endpoint)
+- [Tags & demo link — Steam's own store browse data, not SteamSpy](#tags--demo-link--steams-own-store-browse-data-not-steamspy)
+- [Looking up an arbitrary game](#looking-up-an-arbitrary-game)
+- [IsThereAnyDeal](#isthereanydeal)
+  - [Currency is passed through, not converted](#currency-is-passed-through-not-converted)
+  - [Price lookups from a Steam appid](#price-lookups-from-a-steam-appid)
+
+
 ## HLTB — no npm package
 
 The `howlongtobeat` npm package was removed (it pulled in a vulnerable `axios`). HLTB is called directly with a two-step auth flow:

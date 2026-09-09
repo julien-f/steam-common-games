@@ -4,6 +4,19 @@ A Solid.js single-page app in `public/`, TypeScript throughout, bundled by Vite.
 
 The data model it renders — accounts, lists, combines, the localStorage schema — is [lists-and-accounts.md](lists-and-accounts.md). This file is the machinery: routes, modules, reactivity, the table, the panel, URL state.
 
+- [Routes](#routes)
+- [Module map](#module-map)
+- [Reactivity](#reactivity)
+- [Rows, streaming, and stale loads](#rows-streaming-and-stale-loads)
+- [The game table](#the-game-table)
+- [Each list kind, in practice](#each-list-kind-in-practice)
+- [Global search and the account chip](#global-search-and-the-account-chip)
+- [The side panel](#the-side-panel)
+- [URL & sharing](#url--sharing)
+- [Preferences](#preferences)
+- [Known gaps](#known-gaps)
+
+
 ## Routes
 
 | Path | What it is |

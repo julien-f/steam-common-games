@@ -4,6 +4,16 @@ The data model the whole frontend is built around: everything the app shows — 
 
 Nothing here is server-side. Accounts, lists, folders and preferences are `localStorage` only (`prefs.ts`), so there is no login and no cross-device sync yet — `prefs.ts`'s per-key setter is the seam a future Steam-auth-backed sync would attach to.
 
+- [Accounts](#accounts)
+  - [`?u=` URL semantics — honored on every route, not just Home](#u-url-semantics--honored-on-every-route-not-just-home)
+- [Lists](#lists)
+  - [Kinds](#kinds)
+  - [Combine](#combine)
+  - [Organization — folders](#organization--folders)
+  - [Soft-delete + restore](#soft-delete--restore)
+- [Storage schema](#storage-schema)
+
+
 ## Accounts
 
 Two account slots, both optional, distinct from any list:
