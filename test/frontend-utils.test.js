@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeInput, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier, dealRecordTier, fmtAge } = require('../public/utils.ts');
+const { normalizeInput, steamVanity, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier, dealRecordTier, fmtAge } = require('../public/utils.ts');
 
 // ── normalizeInput ────────────────────────────────────────────────────────────
 
@@ -29,6 +29,21 @@ test('normalizeInput: returns non-Steam URLs unchanged', () => {
 
 test('normalizeInput: returns plain Steam64 ID unchanged', () => {
   assert.equal(normalizeInput('76561198000000001'), '76561198000000001');
+});
+
+// ── steamVanity ───────────────────────────────────────────────────────────────
+
+test('steamVanity: extracts the custom-URL name from a /id/ profile URL', () => {
+  assert.equal(steamVanity('https://steamcommunity.com/id/gaben/'), 'gaben');
+});
+
+test('steamVanity: a /profiles/<steam64> URL means no custom name was ever set', () => {
+  assert.equal(steamVanity('https://steamcommunity.com/profiles/76561198000000001'), null);
+});
+
+test('steamVanity: no profile URL at all (a profile Steam knew nothing about) is null', () => {
+  assert.equal(steamVanity(''), null);
+  assert.equal(steamVanity(undefined), null);
 });
 
 // ── scoreColor ────────────────────────────────────────────────────────────────

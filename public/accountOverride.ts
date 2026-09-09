@@ -97,6 +97,7 @@ export function createAccountOverrideSync() {
           rawInputs: identifiers,
           label: summary.label,
           avatarUrl: summary.avatarUrl ?? undefined,
+          vanities: summary.vanities,
           lastUsedAt: Date.now(),
         };
         setAccountOverride(account);

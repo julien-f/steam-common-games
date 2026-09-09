@@ -31,7 +31,7 @@ function withFetch(t, handler) {
 
 // A /api/common-games + /api/wishlist responder resolving every requested identifier to one
 // player, mirroring what resolveAccountSummary reads (accountData.ts).
-function fakeResolveFetch({ members = [{ steamid: '1', personaname: 'Alice', avatarmedium: 'a.jpg' }], fail = false } = {}) {
+function fakeResolveFetch({ members = [{ steamid: '1', personaname: 'Alice', avatarmedium: 'a.jpg', profileurl: 'https://steamcommunity.com/id/alice/' }], fail = false } = {}) {
   const calls = [];
   const handler = async (url, opts) => {
     calls.push({ url, body: JSON.parse(opts.body) });
@@ -62,6 +62,7 @@ test('syncFromUrl: resolves ?u= into an override, leaving the stored account unt
   assert.equal(sync.getState().state, 'ready');
   assert.deepEqual(getAccountOverride(), {
     id: '1', members: ['1'], rawInputs: ['alice'], label: 'Alice', avatarUrl: 'a.jpg',
+    vanities: { 1: 'alice' }, // carried onto the slot, so the copyable identifier needs no fetch
     lastUsedAt: getAccountOverride().lastUsedAt,
   });
   assert.equal(getEffectiveCurrentAccount().id, '1');

@@ -1,9 +1,17 @@
 import type { Game } from './types.ts';
 
+// The custom-URL name in a Steam profile URL ('https://steamcommunity.com/id/gaben/' → 'gaben'),
+// or null for anything else — a `/profiles/<steam64>` URL is Steam's own fallback form, which
+// means the account never set one.
+export function steamVanity(profileUrl: string | null | undefined): string | null {
+  const m = (profileUrl || '').match(/steamcommunity\.com\/id\/([^/?\s]+)/);
+  return m ? m[1] : null;
+}
+
 // Extract username/ID from a pasted Steam profile URL
 export function normalizeInput(raw: string): string {
-  const mId  = raw.match(/steamcommunity\.com\/id\/([^/?\s]+)/);
-  if (mId)  return mId[1];
+  const vanity = steamVanity(raw);
+  if (vanity) return vanity;
   const mNum = raw.match(/steamcommunity\.com\/profiles\/(\d+)/);
   if (mNum) return mNum[1];
   return raw;

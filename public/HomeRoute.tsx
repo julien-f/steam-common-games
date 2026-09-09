@@ -18,13 +18,14 @@ import { A, useLocation, useNavigate } from '@solidjs/router';
 import {
   getMyAccount, setMyAccount, getEffectiveCurrentAccount, setCurrentAccount,
   getRecentAccounts, removeRecentAccount, clearRecentAccounts,
-  getAccountOverride, accountDisplayLabel, ACCOUNT_CHANGED_EVENT,
+  getAccountOverride, accountDisplayLabel, accountIdentifiers, ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
 import { getAccountOverrideState, clearAccountOverride, accountOverrideStatusText } from './accountOverride.ts';
 import { withAccountParam, urlWithoutAccountParam } from './urlState.ts';
 import { resolveAccountSummary, fetchAccountOverview, fetchAccountWishlistItems } from './accountData.ts';
 import type { AccountPlayer } from './accountData.ts';
-import { normalizeInput, fmtAge } from './utils.ts';
+import { normalizeInput, steamVanity, fmtAge } from './utils.ts';
+import { CopyButton } from './CopyButton.tsx';
 import {
   getFolders, getLists, createFolder, createList, renameFolder, renameList,
   deleteFolder, deleteList,
@@ -143,6 +144,13 @@ export default function HomeRoute() {
   // Account card below).
   const solePlayer = createMemo(() => (players().length === 1 ? players()[0] : null));
 
+  // What a member copies as: the custom-URL name from the live profile URL when Steam returned
+  // one, else whatever the slot captured at resolve time (a profile the API answered nothing for
+  // still has a stored name), else the steam64 id. See accountsStore.ts's accountIdentifiers.
+  function copyIdentifier(p: AccountPlayer): string {
+    return steamVanity(p.profileUrl) || currentAccount()?.vanities?.[p.steamid] || p.steamid;
+  }
+
   // document.title's per-route "base" layer (see pageTitle.ts) — whichever account is currently
   // loaded, same fallback-to-bare-app-name-when-none convention the old comparison page's own
   // updateTitle() used. The side panel's own game-open title takes over on top of this when a
@@ -163,6 +171,7 @@ export default function HomeRoute() {
         rawInputs: trimmed,
         label: summary.label,
         avatarUrl: summary.avatarUrl ?? undefined,
+        vanities: summary.vanities,
         lastUsedAt: Date.now(),
       };
       pickAccount(account);
@@ -398,6 +407,9 @@ export default function HomeRoute() {
                       </a>
                     )}
                   </Show>
+                  <Show when={solePlayer()}>
+                    {p => <CopyButton text={copyIdentifier(p())} title={`Copy this account's Steam identifier (${copyIdentifier(p())})`} />}
+                  </Show>
                   <Show when={solePlayer()?.isPrivate}>
                     <span class="account-private" title="This Steam profile isn't public — some data may be missing or empty">🔒 Private</span>
                   </Show>
@@ -446,6 +458,7 @@ export default function HomeRoute() {
                       </a>
                     )}
                   </Show>
+                  <CopyButton text={copyIdentifier(p)} title={`Copy this account's Steam identifier (${copyIdentifier(p)})`} />
                   <Show when={p.gameCount != null}>
                     <span class="account-count">{p.gameCount} games</span>
                   </Show>
@@ -489,6 +502,14 @@ export default function HomeRoute() {
                   <button type="button" onClick={() => selectAccount(account)}>
                     {myAccount()?.id === account.id ? '★ ' : ''}{accountDisplayLabel(account)}
                   </button>
+                  {/* From the slot's stored data, not players() — that's only fetched for the
+                      current account, and a recent one's identifier shouldn't need selecting it
+                      first. One per member, so a Family's are all reachable here too. */}
+                  <For each={accountIdentifiers(account)}>
+                    {({ identifier }) => (
+                      <CopyButton text={identifier} title={`Copy this account's Steam identifier (${identifier})`} />
+                    )}
+                  </For>
                   <button type="button" title="Set as my account" onClick={[toggleMyAccount, account]}>
                     {myAccount()?.id === account.id ? '☆ unstar' : '★ star as mine'}
                   </button>

@@ -129,7 +129,7 @@ test('resolveAccountSummary: a single account resolves members/label/avatar/both
         ok: true,
         json: async () => ({
           groups: [{ games: [{ appid: 440, name: 'TF2' }] }],
-          slots: [[{ steamid: '1', personaname: 'Alice', avatarmedium: 'https://x/a.jpg' }]],
+          slots: [[{ steamid: '1', personaname: 'Alice', avatarmedium: 'https://x/a.jpg', profileurl: 'https://steamcommunity.com/id/alice/' }]],
           playtime: {}, lastPlayed: {},
         }),
       };
@@ -143,6 +143,7 @@ test('resolveAccountSummary: a single account resolves members/label/avatar/both
   assert.equal(summary.avatarUrl, 'https://x/a.jpg');
   assert.equal(summary.ownedCount, 1);
   assert.equal(summary.wishlistCount, 1);
+  assert.deepEqual(summary.vanities, { 1: 'alice' });
 });
 
 test('resolveAccountSummary: a multi-member Family sorts members, joins the label, and has no single avatar', async (t) => {
@@ -152,7 +153,10 @@ test('resolveAccountSummary: a multi-member Family sorts members, joins the labe
         ok: true,
         json: async () => ({
           groups: [],
-          slots: [[{ steamid: '2', personaname: 'Bob' }, { steamid: '1', personaname: 'Alice' }]],
+          slots: [[
+            { steamid: '2', personaname: 'Bob', profileurl: 'https://steamcommunity.com/id/bob/' },
+            { steamid: '1', personaname: 'Alice', profileurl: 'https://steamcommunity.com/profiles/1' },
+          ]],
           playtime: {}, lastPlayed: {},
         }),
       };
@@ -164,6 +168,8 @@ test('resolveAccountSummary: a multi-member Family sorts members, joins the labe
   assert.deepEqual(summary.members, ['1', '2']);
   assert.equal(summary.label, 'Bob + Alice');
   assert.equal(summary.avatarUrl, null);
+  // Keyed by steamid, not by position: the response is in the API's order, `members` is sorted.
+  assert.deepEqual(summary.vanities, { 2: 'bob' });
 });
 
 test('resolveAccountSummary: throws with the server error message when the account itself fails to resolve', async (t) => {

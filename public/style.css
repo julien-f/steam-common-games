@@ -142,12 +142,15 @@ body {
   background: none; border: none; cursor: pointer;
   color: var(--accent2); font-size: 12px; text-align: left;
 }
+.account-chip-id { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.account-chip-id code { color: var(--text1); overflow-wrap: anywhere; }
 .account-chip-section {
   font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text2);
 }
 .account-chip-recents { display: flex; flex-direction: column; gap: 2px; list-style: none; }
+.account-chip-recents li { display: flex; align-items: center; gap: 4px; }
 .account-chip-recent {
-  display: flex; align-items: center; gap: 8px; width: 100%;
+  display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
   padding: 5px 6px; background: none; border: none; border-radius: 4px; cursor: pointer;
   color: var(--text0); font-size: 13px; text-align: left;
 }
@@ -242,6 +245,24 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
   background: var(--accent);
   color: #fff;
 }
+
+/* The ⧉ button CopyButton.tsx renders — currently the "copy this account's Steam identifier"
+   ones on Home and in the nav chip. Green "copied" state rather than the hover accent, same
+   reasoning (and color) as .panel-copy-link-btn--copied: a confirmation, not a hover. */
+.copy-btn {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text1);
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.copy-btn:hover { border-color: var(--accent); color: var(--accent2); }
+.copy-btn--copied { border-color: #15803d; color: #15803d; }
 .btn-primary:hover { background: #1490e8; }
 .btn-primary:disabled { background: var(--bg2); color: var(--text2); cursor: not-allowed; }
 
@@ -2312,7 +2333,7 @@ kbd {
 }
 .recent-accounts li > button:first-child { flex: 1; text-align: left; background: none; border: none; color: var(--text0); font-size: 13px; cursor: pointer; padding: 2px 0; }
 .recent-accounts li > button:first-child:hover { color: var(--accent2); }
-.recent-accounts button {
+.recent-accounts button:not(.copy-btn) {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--r);
@@ -2322,7 +2343,7 @@ kbd {
   cursor: pointer;
   white-space: nowrap;
 }
-.recent-accounts button:hover { border-color: var(--accent); color: var(--accent2); }
+.recent-accounts button:not(.copy-btn):hover { border-color: var(--accent); color: var(--accent2); }
 
 .home-fixed-links {
   display: flex;

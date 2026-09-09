@@ -20,11 +20,12 @@ import { createSignal, onCleanup, onMount, For, Show, type JSX } from 'solid-js'
 import { A, useLocation, useNavigate } from '@solidjs/router';
 import {
   getEffectiveCurrentAccount, getAccountOverride, getRecentAccounts, setCurrentAccount,
-  accountDisplayLabel, ACCOUNT_CHANGED_EVENT,
+  accountDisplayLabel, accountIdentifiers, ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
 import { getAccountOverrideState, clearAccountOverride, accountOverrideStatusText } from './accountOverride.ts';
 import { withAccountParam, urlWithoutAccountParam } from './urlState.ts';
 import { bindNavPopover } from './navPopover.ts';
+import { CopyButton } from './CopyButton.tsx';
 import type { AccountSlot } from './types.ts';
 
 export function AccountChip(): JSX.Element {
@@ -136,6 +137,19 @@ export function AccountChip(): JSX.Element {
             </div>
           </Show>
 
+          {/* The identifier to hand to someone else so they can look this account up — shown
+              from the slot's own stored data (this chip fetches nothing). Single accounts only:
+              a Family has one per member, which is Home's account card's job, not a nav
+              popover's. */}
+          <Show when={account()?.members.length === 1 && account()}>
+            {acc => (
+              <div class="account-chip-id">
+                <code>{accountIdentifiers(acc())[0].identifier}</code>
+                <CopyButton text={accountIdentifiers(acc())[0].identifier} title="Copy this account's Steam identifier" />
+              </div>
+            )}
+          </Show>
+
           <Show when={otherRecents().length > 0}>
             <div class="account-chip-section">Switch account</div>
             <ul class="account-chip-recents">
@@ -148,6 +162,13 @@ export function AccountChip(): JSX.Element {
                       </Show>
                       <span class="account-chip-name">{accountDisplayLabel(acc)}</span>
                     </button>
+                    {/* Beside the switch button rather than inside it — nesting a button in a
+                        button is invalid, and copying an identifier shouldn't also switch account. */}
+                    <For each={accountIdentifiers(acc)}>
+                      {({ identifier }) => (
+                        <CopyButton text={identifier} title={`Copy this account's Steam identifier (${identifier})`} />
+                      )}
+                    </For>
                   </li>
                 )}
               </For>

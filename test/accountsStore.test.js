@@ -219,6 +219,24 @@ test('setAccountOverride: never throws when window is undefined (Node/test envir
   assert.doesNotThrow(() => setAccountOverride(makeAccount('theirs')));
 });
 
+// ── accountIdentifiers ───────────────────────────────────────────────────────
+
+test('accountIdentifiers: prefers the stored custom-URL name over the steam64 id', () => {
+  const { accountIdentifiers } = store();
+  const account = makeAccount('1', { vanities: { 1: 'gaben' } });
+  assert.deepEqual(accountIdentifiers(account), [{ steamid: '1', identifier: 'gaben' }]);
+});
+
+test('accountIdentifiers: falls back to the steam64 id per member, including for accounts stored before vanities existed', () => {
+  const { accountIdentifiers } = store();
+  const family = { id: '1+2', members: ['1', '2'], rawInputs: [], vanities: { 2: 'bob' }, lastUsedAt: 0 };
+  assert.deepEqual(accountIdentifiers(family), [
+    { steamid: '1', identifier: '1' },
+    { steamid: '2', identifier: 'bob' },
+  ]);
+  assert.deepEqual(accountIdentifiers(makeAccount('1')), [{ steamid: '1', identifier: '1' }]);
+});
+
 // ── accountDisplayLabel ──────────────────────────────────────────────────────
 
 test('accountDisplayLabel: prefers the cached Steam label', () => {

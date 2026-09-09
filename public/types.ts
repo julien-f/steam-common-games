@@ -216,6 +216,10 @@ export interface AccountSlot {
   label?: string; // last-known display name(s) ("PersonaName" or "A + B" for a Family) — cached
                   // for instant recents rendering before a fresh fetch resolves
   avatarUrl?: string; // last-known avatar, same reason
+  vanities?: Record<string, string>; // steam64 → that member's Steam custom-URL name, for the
+                                     // members that set one — captured at resolve time so the
+                                     // nicest copyable identifier needs no fetch of its own
+                                     // (accountsStore.ts's accountIdentifiers)
   lastUsedAt: number;
   removedAt?: number; // soft-removed from the recents UI, kept while referenced by a dynamic list
 }

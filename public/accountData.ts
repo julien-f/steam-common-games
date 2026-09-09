@@ -5,7 +5,8 @@
 // functions (row-building, table wiring, URL/history updates, accounts-bar rendering) — none of
 // that belongs here; ListRoute.tsx owns the equivalent orchestration generically, for any list
 // kind, not just account-scoped ones.
-//
+import { steamVanity } from './utils.ts';
+
 // An AccountSlot.id is itself the sorted-joined resolved member steam64 ids (see
 // accountsStore.ts's accountIdFor) — so resolving an id back to its members is just splitting
 // on '+', no lookup needed.
@@ -202,6 +203,7 @@ export interface ResolvedAccountSummary {
   members: string[];        // resolved steam64 ids, sorted — becomes AccountSlot.members
   label: string;            // joined persona name(s) ("PersonaName" or "A + B" for a Family)
   avatarUrl: string | null; // a single account's avatar; null for a Family (no one avatar to show)
+  vanities: Record<string, string>; // steam64 → custom-URL name → AccountSlot.vanities
   ownedCount: number;
   wishlistCount: number;    // 0 if the wishlist call fails (e.g. private profile) — owned
                             // resolving is enough to consider the account itself resolved
@@ -229,9 +231,16 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
   const ownedData = await ownedRes.json();
   if (!ownedRes.ok) throw new Error(ownedData.error || 'Failed to resolve account');
 
-  const players: { steamid: string; personaname?: string; avatarmedium?: string }[] = ownedData.slots[0];
+  const players: { steamid: string; personaname?: string; avatarmedium?: string; profileurl?: string }[] = ownedData.slots[0];
   const members = players.map(p => p.steamid).sort();
   const label = players.map(p => p.personaname || p.steamid).join(' + ');
+  // Keyed by steamid rather than a parallel array: `members` is sorted, `players` is in the
+  // order the API answered in, and the two only coincide by luck.
+  const vanities: Record<string, string> = {};
+  for (const p of players) {
+    const vanity = steamVanity(p.profileurl);
+    if (vanity) vanities[p.steamid] = vanity;
+  }
   const avatarUrl = players.length === 1 ? (players[0].avatarmedium || null) : null;
   const ownedCount = ownedData.groups.flatMap((g: { games: unknown[] }) => g.games).length;
 
@@ -241,7 +250,7 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
     wishlistCount = wishlistData.items?.length ?? 0;
   }
 
-  return { members, label, avatarUrl, ownedCount, wishlistCount };
+  return { members, label, avatarUrl, vanities, ownedCount, wishlistCount };
 }
 
 export async function fetchAccountWishlistAppids(accountId: string): Promise<Set<number>> {

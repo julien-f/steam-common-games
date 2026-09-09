@@ -31,6 +31,16 @@ export function accountDisplayLabel(account: AccountSlot): string {
   return account.label || account.rawInputs.join(' + ') || account.members.join(' + ');
 }
 
+// The nicest identifier each member of a slot copies as: its Steam custom-URL name when the
+// account set one, its steam64 id otherwise. Both forms resolve back to the same account — in
+// this app's own account field (utils.ts's normalizeInput) and in a steamcommunity.com URL — but
+// the custom name is the one a person can read out or recognize. Per member rather than one
+// string for the slot: a Family's joined label is nothing any input accepts back.
+// `vanities` is absent on accounts resolved before it was stored, which simply fall back to ids.
+export function accountIdentifiers(account: AccountSlot): { steamid: string; identifier: string }[] {
+  return account.members.map(steamid => ({ steamid, identifier: account.vanities?.[steamid] || steamid }));
+}
+
 function readRecents(): AccountSlot[] {
   return getPref<AccountSlot[]>(RECENT_ACCOUNTS_KEY, []);
 }
