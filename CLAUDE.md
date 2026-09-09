@@ -296,13 +296,12 @@ Table view state (`?lv=`/`?wv=` on the Library Explorer, `?bv=` on Bundles) is t
 
 ## Working style
 
-- Be concise: short responses, no filler, no restating what was just done.
+- Be concise and economical everywhere — responses, code comments, doc prose. No filler, no restating what was just done; favor the smallest change that satisfies the request. When more thorough work (deeper investigation, a broader refactor, extra tests) would clearly pay off, say so and let the user decide.
+  - Code comments: one line, stating the *why*, only when it isn't obvious from the code; skip the comment entirely if the code speaks for itself. (The long explanatory comments already in the tree are deliberate — see "Match the existing code style" below; this bullet is about what to add, not what to go trim.)
+  - Doc prose (this file, `README.md`, `CHANGELOG.md`): short bullets over paragraphs; no preamble, no summary section, lead with the point.
 - Suggest Claude Code plugins, skills, or agents when relevant to the task at hand.
-- When asked a question, answer it — don't jump straight to implementing.
-- When a request is ambiguous, ask clarifying questions **one at a time** before proceeding.
 - Don't re-read a file already read in the current session unless it may have changed.
-- When there are multiple valid approaches, present the options and trade-offs and wait for a choice before implementing.
-- For non-trivial changes (multiple files, non-obvious design decisions, refactors), outline a brief plan and get confirmation before implementing. Trivial/obvious edits can proceed directly.
+- Wait for an explicit go-ahead before implementing, even for a trivial edit. Before that go-ahead: answer the question asked instead of jumping to implementation, ask clarifying questions **one at a time** when the request is ambiguous, present the options and trade-offs when there are several valid approaches, and draft a plan first for non-trivial changes (multiple files, non-obvious design decisions, refactors).
 - Stay in scope: only make the changes asked for. Flag other issues noticed rather than fixing them unprompted.
 - Match the existing code style and conventions in the file/project rather than imposing personal preference; don't reformat unrelated code.
 - Ask before adding a new dependency; prefer what's already in use.
@@ -310,14 +309,15 @@ Table view state (`?lv=`/`?wv=` on the Library Explorer, `?bv=` on Bundles) is t
 ## Knowledge sharing
 
 - Project conventions, workflow rules, and architecture decisions belong in this file (or docs linked from it) — they're version-controlled and apply on every machine/session this repo is worked on from, not just the current one.
+- Prefer a linked doc under `docs/` over growing this file when the detail is substantial (e.g. `docs/list-centric-redesign.md`); link to it from here rather than duplicating its content.
 - Facts specific to one person (role, personal working-style preferences, in-progress session/project context) belong in Claude's own memory, not here — this file is loaded for every session working on the repo, not a place for one contributor's personal notes.
 - Secrets, credentials, and ephemeral state belong in neither — see `default.env`/`.env` above.
 
 ## Git workflow
 
-- Make commits atomic: each commit represents one logical change.
+- Make commits atomic: each commit represents one logical change and passes the tests on its own.
 - Write descriptive commit messages that explain the *why*, not just the *what* — a short subject line, with a body when context is needed.
-- Commit directly to `main` — this is a solo repo with no PR/review process; there's no history of feature branches being merged back in, even for large multi-file changes (e.g. the whole Bundles subsystem landed as direct commits).
+- Ordinary changes commit directly to `main` — this is a solo repo with no PR/review process. A complex feature (multiple concerns, significant refactoring, a new subsystem) spanning more than one commit gets a dedicated branch instead, closed with a merge commit — as the current `list-centric-redesign` branch does. Older large work predates this rule and landed as direct commits (e.g. the whole Bundles subsystem), so the history shows no merged branches yet.
 - Only commit or push when explicitly asked.
 - Never commit secrets, credentials, API keys, or `.env` values.
 - Update `CHANGELOG.md` in the same commit as the code change it documents (see "Changelog" below) — never as a separate follow-up commit.
