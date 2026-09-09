@@ -198,7 +198,7 @@ export function reorderSiblings(parentId: string | null, orderedRefs: { kind: 'f
 // ── List CRUD ────────────────────────────────────────────────────────────────────────────────
 
 export interface CreateListInput {
-  name: string;
+  name?: string; // omitted on a dynamic list = unnamed, labeled from its formula (listLabels.ts)
   parentId?: string | null;
   kind: 'manual' | 'dynamic';
   appids?: number[];
@@ -232,11 +232,14 @@ export function createList(input: CreateListInput): GameList {
   return list;
 }
 
-export function renameList(id: string, name: string): void {
+// `undefined` clears the name — a dynamic list falls back to being labeled by its own formula
+// (listLabels.ts's listDisplayName). Stored as a deleted key rather than an explicit undefined,
+// which JSON wouldn't keep anyway.
+export function renameList(id: string, name: string | undefined): void {
   const lists = readLists();
   const list = lists.find(l => l.id === id);
   if (!list) return;
-  list.name = name;
+  if (name == null) delete list.name; else list.name = name;
   list.updatedAt = Date.now();
   writeLists(lists);
 }
@@ -294,6 +297,10 @@ export function updateDynamicList(id: string, op: CombineOp, sources: ListRef[])
 // One-way: converts a dynamic list to manual, given its currently-resolved appids (the caller
 // resolves those via listResolve.ts before calling this — this module has no fetch/resolve
 // logic of its own). Drops op/sources entirely.
+//
+// A caller freezing an *unnamed* dynamic list should stamp its derived name in (renameList with
+// listDisplayName's result) as part of the same action: a manual list has no formula left to be
+// labeled from, so it would otherwise read as "Untitled list".
 export function freezeToSnapshot(id: string, appids: number[]): GameList {
   const lists = readLists();
   const idx = lists.findIndex(l => l.id === id);

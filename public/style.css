@@ -2410,6 +2410,9 @@ kbd {
 .combine-form input[type="text"]:focus,
 .combine-form select:focus { border-color: var(--accent); outline: none; }
 .combine-form p { font-size: 12px; color: var(--text1); }
+/* A label the app derived rather than one someone typed (an unnamed dynamic list's formula) —
+   dimmed and italic wherever it stands in for a name. */
+.derived-name { font-style: italic; color: var(--text1); }
 .combine-sources { list-style: none; display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
 .combine-sources label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text0); cursor: pointer; }
 .combine-form button[type="submit"] {
@@ -2435,6 +2438,10 @@ kbd {
 .list-tree li:hover { background: var(--bg2); }
 .list-tree a { flex: 1; color: var(--text0); text-decoration: none; font-size: 13px; }
 .list-tree a:hover { color: var(--accent2); }
+/* Beats the generic `.list-tree span` colour rule below, which is more specific than
+   `.derived-name` on its own. */
+.list-tree a .derived-name { color: var(--text1); }
+.list-tree a:hover .derived-name { color: var(--accent2); }
 .list-tree span { flex: 1; color: var(--text0); font-size: 13px; }
 .list-tree button {
   background: transparent;

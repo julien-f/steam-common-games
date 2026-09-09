@@ -120,13 +120,33 @@ export function describeSources(list: GameList, naming: ListNaming): RefDescript
 
 // The whole formula as one plain string ("Alice — Owned ∩ Bob — Owned") — for a tooltip, a test,
 // or anywhere the linked/annotated rendering ListRoute.tsx builds out of describeSources would be
-// overkill. Null for a manual list (there's no formula) or a dynamic one with no sources saved.
-export function formatFormula(list: GameList, naming: ListNaming): string | null {
-  const sources = describeSources(list, naming);
-  if (!sources.length) return null;
-  const op = list.op ?? 'union';
-  const joined = sources.map(s => s.label).join(` ${OP_SYMBOLS[op]} `);
+// overkill. Null for a combine with no sources.
+//
+// Takes op/sources rather than a list, so Home's combine form can name a formula that isn't a
+// saved list yet (its "Will be named…" preview).
+export function formatCombine(op: CombineOp | undefined, sources: ListRef[], naming: ListNaming): string | null {
+  const described = sources.map(ref => describeListRef(ref, naming));
+  if (!described.length) return null;
+  const joined = described.map(s => s.label).join(` ${OP_SYMBOLS[op ?? 'union']} `);
   return op === 'group-by-membership' ? `${joined} — grouped by membership` : joined;
+}
+
+// Null for a manual list (there's no formula) or a dynamic one with no sources saved.
+export function formatFormula(list: GameList, naming: ListNaming): string | null {
+  if (list.kind !== 'dynamic') return null;
+  return formatCombine(list.op, list.sources ?? [], naming);
+}
+
+// What a list is called on screen: its own name when it has one, else its formula — an unnamed
+// dynamic list is labeled by what it does ("Alice — Owned ∩ Bob — Owned"), recomputed on every
+// read so the label follows a source edit or an account rename instead of freezing at creation
+// time (see docs/dev/lists-and-accounts.md's Combine section).
+//
+// The last fallback catches a dynamic list with no sources saved, and a manual one with no name —
+// only reachable by freezing an unnamed dynamic list, which is why freezeToSnapshot's own comment
+// asks its caller to stamp the derived name in first.
+export function listDisplayName(list: GameList, naming: ListNaming): string {
+  return list.name || formatFormula(list, naming) || 'Untitled list';
 }
 
 // The real stores behind ListNaming, for routes. Accounts are looked up across everything the app
@@ -134,7 +154,11 @@ export function formatFormula(list: GameList, naming: ListNaming): string | null
 // alone: a formula can pin an account that was never added to recents — a `?u=` link's, or one
 // soft-removed from recents while still referenced, which removeRecentAccount deliberately keeps
 // (see accountsStore.ts).
-export function createDefaultNaming(): ListNaming {
+//
+// `depth` guards label *length*, not termination — a cyclic formula can't be saved in the first
+// place (listsStore.ts's wouldCreateCycle). One level of nesting is spelled out in parens; deeper
+// than that, an unnamed list is named by its kind rather than growing the label without end.
+export function createDefaultNaming(depth = 0): ListNaming {
   return {
     account(accountId) {
       const known = [
@@ -151,7 +175,12 @@ export function createDefaultNaming(): ListNaming {
     },
     list(listId) {
       const found = getLists({ includeDeleted: true }).find(l => l.id === listId);
-      return found ? { name: found.name, deleted: found.deletedAt != null } : null;
+      if (!found) return null;
+      // An unnamed source list is described by its own formula, parenthesized: a formula reading
+      // "Alice — Owned ∩ Bob — Owned ∖ Demos" would otherwise be unparseable as one term.
+      const name = found.name
+        || (depth < 1 ? `(${listDisplayName(found, createDefaultNaming(depth + 1))})` : 'Untitled combined list');
+      return { name, deleted: found.deletedAt != null };
     },
   };
 }

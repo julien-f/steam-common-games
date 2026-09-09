@@ -192,6 +192,19 @@ test('renameList/moveList: update name/parentId independently', () => {
   assert.equal(updated.parentId, folder.id);
 });
 
+test('createList: a dynamic list can be created with no name at all (labeled by its formula instead)', () => {
+  const { createList, getList } = store();
+  const l = createList({ kind: 'dynamic', op: 'union', sources: [{ kind: 'recent-games' }] });
+  assert.equal('name' in getList(l.id), false);
+});
+
+test('renameList: an undefined name clears the field, rather than storing an empty one', () => {
+  const { createList, renameList, getList } = store();
+  const l = createList({ name: 'Named', kind: 'dynamic', op: 'union', sources: [{ kind: 'recent-games' }] });
+  renameList(l.id, undefined);
+  assert.equal('name' in getList(l.id), false);
+});
+
 test('reorderSiblings: rewrites order for interleaved folders/lists at one parent, ignores refs from elsewhere', () => {
   const { createFolder, createList, reorderSiblings, getFolder, getList } = store();
   const f1 = createFolder('F1');

@@ -31,7 +31,7 @@ import {
   deleteFolder, deleteList,
 } from './listsStore.ts';
 import { setBaseTitle } from './pageTitle.ts';
-import { describeListRef, createDefaultNaming, OP_LABELS, OP_DESCRIPTIONS } from './listLabels.ts';
+import { describeListRef, createDefaultNaming, listDisplayName, formatCombine, OP_LABELS, OP_DESCRIPTIONS } from './listLabels.ts';
 import type { AccountSlot, Folder, GameList, ListRef, CombineOp } from './types.ts';
 
 interface SourceOption {
@@ -267,6 +267,14 @@ export default function HomeRoute() {
     }));
   }
 
+  // What the list would be called with the name field left empty — the same derivation every
+  // surface uses for a saved unnamed list, applied to the not-yet-saved formula on screen.
+  function derivedCombineName(): string | null {
+    const selected = combineSelected();
+    const sources = sourceOptions().filter(o => selected.has(o.key)).map(o => o.ref);
+    return sources.length >= 2 ? formatCombine(combineOp(), sources, createDefaultNaming()) : null;
+  }
+
   function toggleCombineSource(key: string): void {
     setCombineSelected(prev => {
       const next = new Set(prev);
@@ -279,12 +287,13 @@ export default function HomeRoute() {
     e.preventDefault();
     setCombineError('');
     const name = combineName().trim();
-    if (!name) { setCombineError('Name is required.'); return; }
     const selected = combineSelected();
     const sources = sourceOptions().filter(o => selected.has(o.key)).map(o => o.ref);
     if (sources.length < 2) { setCombineError('Pick at least 2 sources.'); return; }
     try {
-      createList({ name, kind: 'dynamic', op: combineOp(), sources });
+      // No name is a valid choice, not a missing field: the list is then labeled by its own
+      // formula everywhere, and follows a later source edit (see listLabels.ts).
+      createList({ name: name || undefined, kind: 'dynamic', op: combineOp(), sources });
       refreshTree();
       setCombineOpen(false);
       setCombineName('');
@@ -292,6 +301,11 @@ export default function HomeRoute() {
     } catch (err) {
       setCombineError((err as Error).message);
     }
+  }
+
+  // A list's on-screen label — its name, or its formula when it has none (listLabels.ts).
+  function listName(list: GameList): string {
+    return listDisplayName(list, createDefaultNaming());
   }
 
   function handleRenameFolder(folder: Folder): void {
@@ -302,9 +316,14 @@ export default function HomeRoute() {
   }
 
   function handleRenameList(list: GameList): void {
-    const name = window.prompt('Rename list', list.name);
-    if (!name) return;
-    renameList(list.id, name);
+    // Cancel (null) and cleared ('') mean different things here: clearing a dynamic list's name
+    // hands it back to being labeled by its formula. A manual list has no formula to fall back
+    // on, so an empty name is treated as a cancel there, as it always was.
+    const name = window.prompt('Rename list', listName(list));
+    if (name == null) return;
+    const trimmed = name.trim();
+    if (!trimmed && list.kind !== 'dynamic') return;
+    renameList(list.id, trimmed || undefined);
     refreshTree();
   }
 
@@ -543,13 +562,18 @@ export default function HomeRoute() {
           <form class="combine-form" onSubmit={handleCreateCombine}>
             <input
               type="text"
-              placeholder="Combined list name…"
+              placeholder="Combined list name (optional)…"
               value={combineName()}
               onInput={e => setCombineName(e.currentTarget.value)}
             />
             <select value={combineOp()} onChange={e => setCombineOp(e.currentTarget.value as CombineOp)}>
               <For each={COMBINE_OPS}>{op => <option value={op.value}>{op.label}</option>}</For>
             </select>
+            {/* Says what leaving the name empty gets you — otherwise "optional" is invisible until
+                after the list is saved. */}
+            <Show when={!combineName().trim() && derivedCombineName()}>
+              {name => <p>Will be named: <span class="derived-name">{name()}</span></p>}
+            </Show>
             <p>Pick at least 2 sources:</p>
             <ul class="combine-sources">
               <For each={sourceOptions()}>
@@ -585,7 +609,8 @@ export default function HomeRoute() {
                   ) : (
                     <>
                       <A href={`/lists/${row.item.id}`}>
-                        {(row.item as GameList).kind === 'dynamic' ? '⚡ ' : '📄 '}{row.item.name}
+                        {(row.item as GameList).kind === 'dynamic' ? '⚡ ' : '📄 '}
+                        <span classList={{ 'derived-name': !row.item.name }}>{listName(row.item as GameList)}</span>
                       </A>
                       <button type="button" onClick={() => handleRenameList(row.item as GameList)}>Rename</button>
                       <button type="button" onClick={() => handleDeleteList(row.item as GameList)}>Delete</button>

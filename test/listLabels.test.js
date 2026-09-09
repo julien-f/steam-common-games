@@ -3,7 +3,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  describeListRef, describeSources, formatFormula, opLabel, OP_LABELS, OP_SYMBOLS, OP_DESCRIPTIONS,
+  describeListRef, describeSources, formatFormula, listDisplayName, opLabel,
+  OP_LABELS, OP_SYMBOLS, OP_DESCRIPTIONS,
 } = require('../public/listLabels.ts');
 
 // The injected half of ListNaming (see listLabels.ts) — the real one reads accountsStore.ts/
@@ -151,6 +152,65 @@ test('formatFormula: nothing to show for a manual list, or a dynamic one with no
   const manual = { id: 'm', name: 'm', parentId: null, order: 0, createdAt: 0, updatedAt: 0, kind: 'manual', appids: [1] };
   assert.equal(formatFormula(manual, NAMING), null);
   assert.equal(formatFormula(dynamicList('union', []), NAMING), null);
+});
+
+// ── listDisplayName ──────────────────────────────────────────────────────────────────────────
+
+test('listDisplayName: a list with a name is called by it, formula or not', () => {
+  const named = { ...dynamicList('union', [{ kind: 'recent-games' }, { kind: 'user', listId: 'l1' }]), name: 'Friday shortlist' };
+  assert.equal(listDisplayName(named, NAMING), 'Friday shortlist');
+});
+
+test('listDisplayName: an unnamed dynamic list is called by its formula', () => {
+  const unnamed = { ...dynamicList('intersect', [
+    { kind: 'account-owned', accountId: 'acc1' },
+    { kind: 'account-owned', accountId: 'fam' },
+  ]), name: undefined };
+  assert.equal(listDisplayName(unnamed, NAMING), 'Alice — Owned ∩ Alice + Bob — Owned');
+});
+
+test('listDisplayName: nothing to derive from (no sources, or a manual list) falls back to a placeholder', () => {
+  assert.equal(listDisplayName({ ...dynamicList('union', []), name: undefined }, NAMING), 'Untitled list');
+  const manual = { id: 'm', parentId: null, order: 0, createdAt: 0, updatedAt: 0, kind: 'manual', appids: [1] };
+  assert.equal(listDisplayName(manual, NAMING), 'Untitled list');
+});
+
+// ── createDefaultNaming (the store-backed half) ──────────────────────────────────────────────
+
+// Same memory-localStorage harness listsStore.test.js uses — this is the one part of this module
+// that does read the real stores, so it's the one part that needs them.
+function freshStores() {
+  const store = new Map();
+  global.localStorage = {
+    getItem: k => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: k => store.delete(k),
+  };
+  for (const mod of ['../public/prefs.ts', '../public/listsStore.ts', '../public/accountsStore.ts', '../public/listLabels.ts']) {
+    delete require.cache[require.resolve(mod)];
+  }
+  return { ...require('../public/listsStore.ts'), ...require('../public/listLabels.ts') };
+}
+
+test('createDefaultNaming: an unnamed dynamic list used as a source reads as its own formula, parenthesized', () => {
+  const { createList, createDefaultNaming, formatFormula } = freshStores();
+  const inner = createList({ kind: 'dynamic', op: 'union', sources: [{ kind: 'recent-games' }, { kind: 'recent-games' }] });
+  const outer = createList({ name: 'Outer', kind: 'dynamic', op: 'intersect', sources: [
+    { kind: 'user', listId: inner.id },
+    { kind: 'recent-games' },
+  ] });
+  assert.equal(
+    formatFormula(outer, createDefaultNaming()),
+    '(Recently Looked Up ∪ Recently Looked Up) ∩ Recently Looked Up',
+  );
+});
+
+test('createDefaultNaming: nesting is capped — an unnamed list two levels down is named by its kind, not spelled out', () => {
+  const { createList, createDefaultNaming, formatFormula } = freshStores();
+  const deep = createList({ kind: 'dynamic', op: 'union', sources: [{ kind: 'recent-games' }, { kind: 'recent-games' }] });
+  const middle = createList({ kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: deep.id }, { kind: 'recent-games' }] });
+  const outer = createList({ name: 'Outer', kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: middle.id }] });
+  assert.equal(formatFormula(outer, createDefaultNaming()), '(Untitled combined list ∪ Recently Looked Up)');
 });
 
 // ── op wording ───────────────────────────────────────────────────────────────────────────────

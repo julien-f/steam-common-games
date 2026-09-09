@@ -45,6 +45,8 @@ Pick two or more lists and an operation:
 - **Subtract** — what's in the first but not the others.
 - **Group by membership** — one table per combination of sources, so you can see what all three accounts share, what only two do, and so on. Combining several accounts' Owned lists this way is how you compare libraries.
 
+Naming the combined list is optional: leave the name empty and it's called by what it does — "Alice — Owned ∩ Bob — Owned" — in your list tree and on its own page, updating by itself if you later change its sources or rename an account. Type a name whenever you'd rather have one.
+
 The result is a live list: save it as dynamic (it re-resolves each time), or freeze it. A dynamic list's page states its formula, names every source, and says what each contributed.
 
 ![Two lists combined with group by membership: one table per combination — in both lists, then each list's exclusive games — under the formula that produced them](../images/group-by-membership.png)

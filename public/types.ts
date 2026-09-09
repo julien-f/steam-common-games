@@ -252,7 +252,10 @@ export interface ListRef {
 // Folder/GameList tree via parentId/order.
 export interface GameList {
   id: string;
-  name: string;
+  // Optional for a dynamic list only: absent means "no name typed", and every surface labels it
+  // from its own formula instead (listLabels.ts's listDisplayName), so the label follows a source
+  // edit or an account rename instead of freezing at creation time.
+  name?: string;
   parentId: string | null;
   order: number;
   createdAt: number;

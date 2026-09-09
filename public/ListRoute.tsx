@@ -85,7 +85,7 @@ import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields 
 import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
 import { ListHero, type HeroTile } from './ListHero.tsx';
-import { describeSources, createDefaultNaming, opLabel, OP_SYMBOLS, type RefDescription } from './listLabels.ts';
+import { describeSources, createDefaultNaming, listDisplayName, opLabel, OP_SYMBOLS, type RefDescription } from './listLabels.ts';
 import { setBaseTitle } from './pageTitle.ts';
 import type { AccountSlot, Game, Rating, Hltb, GameMeta, ProtonDb, GameList } from './types.ts';
 import { getList, getLists, getFolders, createList, addAppidsToList, removeAppidsFromList, setListTableView } from './listsStore.ts';
@@ -1041,7 +1041,7 @@ export default function ListRoute() {
       const list = getList(params.listId!);
       if (!list) { setStatusText('This list no longer exists.'); return; }
       setUserList(list);
-      setListTitle(list.name);
+      setListTitle(listDisplayName(list, createDefaultNaming()));
       setStatusText('Resolving list…');
       const isGroupMode = list.kind === 'dynamic' && list.op === 'group-by-membership';
       let appids: Set<number>;

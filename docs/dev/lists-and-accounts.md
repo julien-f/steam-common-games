@@ -48,7 +48,7 @@ This is all deliberate: opening someone else's shared link shouldn't silently ch
 
 ## Lists
 
-A list is a named set of appids.
+A list is a set of appids, usually named — a dynamic one may have no name of its own (see [Combine](#combine)).
 
 ### Kinds
 
@@ -65,6 +65,8 @@ Creating a dynamic list (or previewing one before saving): pick 2+ source lists 
 - `group-by-membership` — groups rows by which combination of sources each game belongs to (generalizes the old Comparison page's "group by exact owner set" table — an N-way account-Owned-lists combine with this mode reproduces it)
 
 — then land in the list viewer with the **live combined result** and a save bar (save as dynamic by default, or freeze immediately to a static manual list).
+
+**Naming is optional for a dynamic list.** Leave the name empty and it's labeled by its own formula everywhere it appears — the tree, the hero title, `<title>`, and another list's formula that uses it as a source (`listLabels.ts`'s `listDisplayName`, falling back to `formatFormula`). Derived on every read, not stamped in at creation: the label then follows a source edit or an account rename instead of quietly going stale, which is the whole point of a dynamic list. The combine form previews the label it would get, and a derived label renders dimmed/italic (`.derived-name`) so it doesn't read as a name someone chose. An unnamed list used as a *source* is parenthesized (`(Alice — Owned ∪ Alice — Wishlist) ∩ Bob — Owned`) and nesting is capped at one level — deeper, it reads "Untitled combined list" rather than growing without end. Freezing an unnamed dynamic list to manual has to stamp the derived name in, since a manual list has no formula left to be labeled from.
 
 `ListRef`s into account-scoped system lists (`account-owned`/`account-wishlist`) always pin an explicit `accountId` — never "whichever account is currently current" — so a saved "Alice ∩ Bob" comparison keeps meaning that regardless of what `currentAccount` is later set to.
 
@@ -101,7 +103,7 @@ AccountSlot  id (sorted-joined member steam64 ids) · members[] · rawInputs[] �
              vanities? (steam64 → Steam custom-URL name, for the members that set one)
              lastUsedAt · removedAt?
 Folder       id · name · parentId (null = root) · order · createdAt
-GameList     id · name · parentId · order · createdAt · updatedAt
+GameList     id · name? (absent = unnamed, labeled by its formula) · parentId · order · createdAt · updatedAt
              kind 'manual'  → appids[]
              kind 'dynamic' → op + sources[] (ListRef)
              tableView? · deletedAt?
