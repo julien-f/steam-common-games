@@ -1110,6 +1110,21 @@ test('GET /api/achievements/:appid: schema-confirmed zero achievements skips rar
   assert.deepEqual(res.body, { achievements: [], total: 0, unlocked: 0, private: false, playerCount: 1 });
 });
 
+test('GET /api/achievements/:appid: an unreleased game (schema 403, no achievements field in appdetails) answers empty instead of 502', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    // Exactly what a pre-order page returns: no `achievements` key at all, so the route's
+    // achievementCount short-circuit can't fire and the schema fetch is what has to cope.
+    if (url.includes('appdetails')) return { ok: true, json: async () => ({ '400': { success: true, data: {} } }) };
+    if (url.includes('GetSchemaForGame')) return { ok: false, status: 403, text: async () => '{"game":{}}' };
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  const res = await api.get(`/api/achievements/400?steamids=${ID1}`);
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { achievements: [], total: 0, unlocked: 0, private: false, playerCount: 1 });
+});
+
 test('GET /api/achievements/:appid: too many steamids is a 400', async () => {
   const ids = Array.from({ length: 20 }, (_, i) => `7656119800000${String(i).padStart(4, '0')}`).join(',');
   const res = await api.get(`/api/achievements/400?steamids=${ids}`);

@@ -1174,6 +1174,25 @@ test('getGameSchema: throws isUpstream when fetch fails', async (t) => {
   await assert.rejects(() => getGameSchema(400), err => err.isUpstream === true);
 });
 
+test('getGameSchema: returns an empty array (not throw) on a 403 with a JSON body — no schema published for this appid', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: false, status: 403, text: async () => '{"game":{}}',
+  }));
+  assert.deepEqual(await getGameSchema(400), []);
+  // Cached, so an unreleased game doesn't cost an upstream call on every panel open.
+  assert.deepEqual(await getGameSchema(400), []);
+  assert.equal(fetchMock.mock.callCount(), 1);
+});
+
+test('getGameSchema: throws isUpstream on a 403 with an HTML body — a rejected key, not a missing schema', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: false, status: 403, text: async () => '<html><head><title>Forbidden</title></head><body>Access is denied.</body></html>',
+  }));
+  await assert.rejects(() => getGameSchema(400), err => err.isUpstream === true && /key rejected/.test(err.message));
+});
+
 // ── getPlayerAchievements ─────────────────────────────────────────────────────
 
 test('getPlayerAchievements: extracts achieved state and unlocktime', async (t) => {
@@ -1243,8 +1262,10 @@ test('getGlobalAchievementPercentages: maps apiname to percent as a number', asy
 
 test('getGlobalAchievementPercentages: returns null (not throw) on 403 — no stats or unknown appid', async (t) => {
   _reset();
-  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
   assert.equal(await getGlobalAchievementPercentages(400), null);
+  assert.equal(await getGlobalAchievementPercentages(400), null);
+  assert.equal(fetchMock.mock.callCount(), 1, 'the cached miss answered the second call');
 });
 
 test('getGlobalAchievementPercentages: throws isUpstream for a non-403 error', async (t) => {
