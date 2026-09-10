@@ -866,6 +866,10 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   .lb-btn  { width: 40px; height: 52px; font-size: 26px; }
   .lb-prev { left: 4px; }
   .lb-next { right: 4px; }
+  /* The lightbox's only way to change game on touch — vertical swipe is spoken for (down
+     closes) — so back up to a thumb-sized target here. */
+  .lb-toolbar .lb-caption button { width: 34px; height: 34px; }
+  .lb-caption { padding: 0 44px; }
 
   .container { padding: 18px 14px 40px; }
   header { margin-bottom: 20px; }
@@ -1748,15 +1752,29 @@ body.lb-open { overflow: hidden; }
   transition: opacity 0.25s;
 }
 .lb-caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   color: #fff;
   font-size: 14px;
   font-weight: 600;
-  text-align: center;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  padding: 0 48px; /* clears the toolbar buttons on either side at narrow widths */
+}
+.lb-caption-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-  padding: 0 48px; /* clears the toolbar buttons on either side at narrow widths */
+}
+/* The ↑/↓ pair flanking the caption steps the *list*, the axis the edge ‹ › don't cover.
+   Sized down from the toolbar's own round buttons — these sit inside a line of text. */
+.lb-toolbar .lb-caption button {
+  pointer-events: auto; /* .lb-toolbar turns them off; only its interactive groups opt back in */
+  flex: none;
+  width: 28px;
+  height: 28px;
+  font-size: 15px;
 }
 .lb-toolbar-row {
   display: flex;
@@ -1769,7 +1787,11 @@ body.lb-open { overflow: hidden; }
   align-items: center;
   gap: 8px;
   pointer-events: auto;
+  /* Equal-width flanks, so the counter between them lands on the real centre and stacks under
+     the caption above it — `space-between` alone put it wherever the wider group left it. */
+  flex: 1 1 0;
 }
+.lb-toolbar-right { justify-content: flex-end; }
 .lb-toolbar button {
   background: rgba(0,0,0,0.55);
   border: 1px solid rgba(255,255,255,0.15);
@@ -1785,11 +1807,19 @@ body.lb-open { overflow: hidden; }
   font-size: 22px;
 }
 .lb-fullscreen:hover,
-.lb-share:hover { background: rgba(26,159,255,0.5); }
+.lb-share:hover,
+.lb-toolbar .lb-caption button:hover { background: rgba(26,159,255,0.5); }
 .lb-close:hover { background: rgba(200,60,60,0.7); }
-.lb-counter {
+/* One pill, two counters — the list position beside the game name, the media position below it.
+   Same treatment because they answer the same question on different axes (↑/↓ vs ‹ ›); the pill
+   rather than a text-shadow because either can land over a bright screenshot. */
+.lb-counter,
+.lb-caption-pos {
   color: rgba(255,255,255,0.7);
   font-size: 13px;
+  font-weight: 400; /* the caption around it is 600 — the counter is not part of the title */
+  white-space: nowrap;
+  flex: none;
   background: rgba(0,0,0,0.5);
   padding: 3px 10px;
   border-radius: 10px;

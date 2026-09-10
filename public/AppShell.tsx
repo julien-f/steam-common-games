@@ -11,7 +11,7 @@
 import { onMount, onCleanup, createEffect, createSignal, on, For, Show, type JSX } from 'solid-js';
 import { A, useNavigate, useLocation, type RouteSectionProps } from '@solidjs/router';
 import { prefsPopoverPanelHtml, initPrefsPopover } from './prefsPopover.ts';
-import { initLightbox, isLightboxOpen, openLightbox } from './lightbox.tsx';
+import { initLightbox, isLightboxOpen, repointLightboxGame } from './lightbox.tsx';
 import { initPanel, isPanelOpen, getPanelGame, panelClose, panelStepHero } from './panel.tsx';
 import { bindPanelKeyboardShortcuts } from './panelKeyboard.ts';
 import { initGameSearch } from './gameSearch.ts';
@@ -49,8 +49,9 @@ import { bindNavPopover } from './navPopover.ts';
 // `isPanelOpen() === false`, root cause not tracked down), so this goes through the same
 // already-proven-reliable synchronous callback `setPanelParam(null)` itself relies on instead.
 interface RouteHandlers {
-  pickRandom?: () => void;
+  pickRandom?: () => boolean; // true if it actually picked — same idiom as stepGame below
   stepGame?: (dir: 1 | -1) => boolean;
+  gamePosition?: () => { index: number; total: number } | null;
   onEnterOnFocusedRow?: () => boolean;
   openGame?: (appid: number) => boolean;
   onGameClose?: () => void;
@@ -143,17 +144,27 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       // exact screenshot again — `setLightboxParam` had no caller at all since the redesign, so
       // the param was parsed and ordered but never written.
       onParamChange: shot => setLightboxParam(shot),
-      // ↑/↓ inside the lightbox steps to the previous/next game in whatever list is on screen,
-      // same handler the panel's own ↑/↓ uses. Re-pointing the lightbox at the new game is this
-      // callback's job: `openLightbox` snapshots its media list, so stepping the panel behind
-      // the overlay otherwise left the *previous* game's shots on screen and the keys read as
-      // dead. Opening at index 0 (the banner) — buildMediaItems always yields at least that, so
-      // a row whose details haven't streamed in yet still shows something.
+      // ↑/↓ and R inside the lightbox step to another game in whatever list is on screen, using
+      // the same handlers the panel's own ↑/↓/R use. Re-pointing the lightbox at that game is
+      // these callbacks' job — stepping the panel behind the overlay otherwise leaves the
+      // *previous* game's shots on screen and the keys read as dead. Both go through
+      // `repointLightboxGame`, which lands on real media rather than the banner (mediaItems.ts's
+      // `preferredShotIndex`); the shot to pick depends on the one being left, so the lightbox
+      // decides it rather than this callback.
       onGameNav: dir => {
         if (!routeHandlers.stepGame?.(dir === 1 ? 1 : -1)) return;
         const game = getPanelGame();
-        if (game) openLightbox(game, 0);
+        if (game) repointLightboxGame(game);
       },
+      onGameRandom: () => {
+        if (!routeHandlers.pickRandom?.()) return;
+        const game = getPanelGame();
+        if (game) repointLightboxGame(game);
+      },
+      // Which row of the list the open game is, for the lightbox's caption — the counter it
+      // shows otherwise is media-within-this-game, which says nothing about where you are in
+      // the list you're paging through.
+      getGamePosition: () => routeHandlers.gamePosition?.() ?? null,
     });
     initPanel({
       onClose: () => {

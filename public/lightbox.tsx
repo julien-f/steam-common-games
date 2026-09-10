@@ -1,6 +1,6 @@
 'use strict';
 
-import { buildMediaItems, resolveShotIndex } from './mediaItems.ts';
+import { buildMediaItems, resolveShotIndex, preferredShotIndex } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
 import type { Game, ReadonlyGame } from './types.ts';
 import type Hls from 'hls.js';
@@ -57,26 +57,54 @@ const LB_DOUBLE_TAP_DIST = 30;
 
 let _onLightboxParamChange: ((shotId: string | null) => void) | null = null;
 let _onGameNav: ((dir: number) => void) | null = null;
+let _onGameRandom: (() => void) | null = null;
+let _getGamePosition: (() => { index: number; total: number } | null) | null = null;
+// Set when a re-point landed on a banner for want of anything else — see `repointLightboxGame`.
+// Holds the *kind* of shot being left, so the screenshot/trailer that eventually arrives is
+// picked by the same rule the re-point itself would have used.
+let _awaitingMedia: MediaItem['type'] | null = null;
 let _lbPrevFocus: Element | null = null;
 const _lbPrefetchedHls = new Set();
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
-// `onGameNav(dir)`: the host's own prev/next-game step (the same list ↑/↓ pages
-// through on the panel itself) — lets ↑/↓ page games while the lightbox stays open,
-// jumping straight to the new game's own media (see `renderLightbox`'s caption for
-// how the switch is made visible), rather than either doing nothing or silently
-// switching games behind a fullscreen image that never changed. Optional — a host
-// with no group to page through (e.g. a standalone lookup) just no-ops.
-export function initLightbox({ onParamChange, onGameNav }: { onParamChange?: (shotId: string | null) => void; onGameNav?: (dir: number) => void } = {}) {
+// `onGameNav(dir)`/`onGameRandom()`: the host's own prev/next-game step and random pick (the
+// same ones the panel itself offers) — they let ↑/↓ and R page games while the lightbox stays
+// open, jumping straight to the new game's own media (see `renderLightbox`'s caption for how
+// the switch is made visible), rather than either doing nothing or silently switching games
+// behind a fullscreen image that never changed. Both re-point through `repointLightboxGame`.
+// `getGamePosition()`: where the open game sits in that list, for the caption — null when there
+// is no list to page through at all (a standalone lookup), which is also what hides the caption's
+// own ↑/↓ buttons. All optional; a host with none of them just no-ops.
+export function initLightbox({ onParamChange, onGameNav, onGameRandom, getGamePosition }: {
+  onParamChange?: (shotId: string | null) => void;
+  onGameNav?: (dir: number) => void;
+  onGameRandom?: () => void;
+  getGamePosition?: () => { index: number; total: number } | null;
+} = {}) {
   _onLightboxParamChange = onParamChange ?? null;
   _onGameNav = onGameNav ?? null;
+  _onGameRandom = onGameRandom ?? null;
+  _getGamePosition = getGamePosition ?? null;
   document.addEventListener('fullscreenchange', syncLightboxFullscreenBtn);
   document.addEventListener('webkitfullscreenchange', syncLightboxFullscreenBtn);
   mountLightboxDom();
 }
 
 export function isLightboxOpen() { return lbGame() !== null; }
+
+// Every game step from inside the lightbox (↑/↓, R, the caption's own buttons) goes through
+// here. The host's step opens the panel *behind* the overlay, and `panelOpen` focuses that
+// panel's hero image — which drops focus straight out of the lightbox's own trap onto an element
+// the lightbox is covering. Whatever had focus in here keeps it, so holding ↓ on the caption
+// button doesn't walk focus away mid-click; the close button is the fallback, as on a real open.
+function stepGameFromLightbox(step: () => void) {
+  const lb = document.getElementById('screenshot-lightbox')!;
+  const before = document.activeElement;
+  step();
+  if (lb.contains(document.activeElement)) return;
+  ((before && lb.contains(before) ? before : lb.querySelector('.lb-close')) as HTMLElement).focus();
+}
 
 // ── Fullscreen button sync ─────────────────────────────────────────────────
 
@@ -341,7 +369,16 @@ function LightboxDom() {
         <button class="lb-vc-btn lb-vc-mute" aria-label="Mute" innerHTML={LB_VOL_ICON} />
       </div>
       <div class="lb-toolbar">
-        <div class="lb-caption" aria-hidden="true" />
+        {/* The caption doubles as the list stepper: ↑/↓ flanking "<game> · 14 of 343" put the
+            control on the thing it changes, and cover the axis the edge ‹ › don't (they step
+            media within one game). Both buttons are hidden when there's no list to page
+            through — see `_getGamePosition`. */}
+        <div class="lb-caption">
+          <button class="lb-game-prev" aria-label="Previous game">&#8593;</button>
+          <span class="lb-caption-text" />
+          <span class="lb-caption-pos" />
+          <button class="lb-game-next" aria-label="Next game">&#8595;</button>
+        </div>
         <div class="lb-toolbar-row">
           <div class="lb-toolbar-left">
             {/* eslint-disable-next-line solid/no-innerhtml -- module-level literal SVG strings
@@ -385,6 +422,8 @@ function wireButtons(lb: HTMLElement) {
   lb.querySelector('.lb-error-retry')!.addEventListener('click', retryCurrentShot);
   lb.querySelector('.lb-prev')!.addEventListener('click', () => stepLightbox(-1));
   lb.querySelector('.lb-next')!.addEventListener('click', () => stepLightbox(1));
+  lb.querySelector('.lb-game-prev')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav?.(-1)));
+  lb.querySelector('.lb-game-next')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav?.(1)));
   lb.querySelector('.lb-fullscreen')!.addEventListener('click', () => {
     if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
       (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
@@ -436,7 +475,14 @@ function wireKeyboard(lb: HTMLElement) {
     }
     if (!onScrub && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && _onGameNav) {
       e.preventDefault();
-      _onGameNav(e.key === 'ArrowDown' ? 1 : -1);
+      stepGameFromLightbox(() => _onGameNav!(e.key === 'ArrowDown' ? 1 : -1));
+    }
+    // R, the same random pick the panel offers — page-level shortcuts are all blocked while the
+    // lightbox is open (panelKeyboard.ts hands it the keyboard wholesale), so it has to be bound
+    // here to work at all, exactly as ↑/↓ above do.
+    if (!onScrub && (e.key === 'r' || e.key === 'R') && _onGameRandom) {
+      e.preventDefault();
+      stepGameFromLightbox(() => _onGameRandom!());
     }
     if (e.key === 'f' || e.key === 'F') {
       if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
@@ -665,6 +711,8 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
     setLbGame(game);
     setIdx(resolveShotIndex(newShots, idxOrShotId));
   });
+  // A deliberate open supersedes any pending "take the media when it lands" latch.
+  _awaitingMedia = null;
   const lb = document.getElementById('screenshot-lightbox')!;
   lb.classList.add('open');
   document.body.classList.add('lb-open');
@@ -672,8 +720,30 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
   _onLightboxParamChange?.(newShots[idx()].shotId);
 }
 
+// Re-points an already-open lightbox at another game — ↑/↓ and R, via AppShell's `onGameNav`/
+// `onGameRandom`. Separate from `openLightbox` because the shot to land on depends on the one
+// being left, which only this module knows: paging through a list is a browse, so it lands on
+// real media rather than on the banner `openLightbox(game, 0)` used to pick (see
+// `preferredShotIndex`).
+export function repointLightboxGame(game: ReadonlyGame) {
+  const leaving = shots()[idx()]?.type ?? 'image';
+  const next = buildMediaItems(game.appid, game.details?.meta);
+  const target = preferredShotIndex(next, leaving);
+  // A lone banner means this row's details are still streaming — there is nothing else to show
+  // *yet*. Latch the intent so the first real media to arrive is taken (see the effect at the
+  // foot of this file); without it the banner would simply stay up, which is the whole reason
+  // paging through a list used to be unrewarding.
+  _awaitingMedia = next.length === 1 ? leaving : null;
+  batch(() => {
+    setLbGame(game);
+    setIdx(target);
+  });
+  _onLightboxParamChange?.(next[target].shotId);
+}
+
 export function closeLightbox() {
   setLbGame(null);
+  _awaitingMedia = null;
   clearTimeout(lbVcTimer);
   const lb = document.getElementById('screenshot-lightbox')!;
   stopHls(lb.querySelector<LbVideo>('.lb-video'));
@@ -688,6 +758,9 @@ export function closeLightbox() {
 }
 
 export function stepLightbox(dir: number) {
+  // The viewer has taken over: whatever is on screen from here on is their choice, so the latch
+  // must never move it under them.
+  _awaitingMedia = null;
   lbLastDir = dir;
   const list = shots();
   const next = (idx() + dir + list.length) % list.length;
@@ -699,6 +772,8 @@ export function stepLightbox(dir: number) {
 // than always sliding one way, same as a multi-step stepLightbox would.
 function gotoLightbox(target: number) {
   if (target === idx()) return;
+  _awaitingMedia = null; // same reason as stepLightbox's
+
   lbLastDir = target > idx() ? 1 : -1;
   setIdx(target);
   _onLightboxParamChange?.(shots()[target].shotId);
@@ -731,14 +806,26 @@ function renderLightbox() {
   resetLbZoom();
   showLbChrome();
   hideLbError();
-  // Visible game-name caption — previously the game/shot identity only existed as
-  // invisible alt/aria-label text (see `label` below), so switching games while the
-  // lightbox stayed open (e.g. via the panel's ↑/↓ nav) had no on-screen confirmation
-  // it had actually happened, especially when the new shot looked similar to the old one.
+  // Visible game-name caption — the game/shot identity used to exist only as invisible
+  // alt/aria-label text (see `label` below), so switching games while the lightbox stayed open
+  // (↑/↓, R) had no on-screen confirmation it had happened at all, especially when the new shot
+  // looked much like the old one. It carries the position in the list too: `1 / 12` below counts
+  // this game's own media, which says nothing about how far through 343 rows you are.
   const caption = lb.querySelector<HTMLElement>('.lb-caption')!;
-  caption.textContent = name;
-  caption.style.display = name ? '' : 'none';
-  const label = `${name ? name + ' — ' : ''}` +
+  const pos = _getGamePosition?.() ?? null;
+  // The two counters wear the same pill (`.lb-counter` below is the other), one per axis, so
+  // they read as a pair and neither is mistaken for part of the title beside it.
+  const posEl = caption.querySelector<HTMLElement>('.lb-caption-pos')!;
+  posEl.textContent = pos ? `${pos.index + 1} / ${pos.total}` : '';
+  posEl.style.display = pos ? '' : 'none';
+  caption.querySelector<HTMLElement>('.lb-caption-text')!.textContent = name;
+  caption.style.display = name || pos ? '' : 'none';
+  // No list behind the open game (a standalone lookup) means nothing to step to. Hiding them
+  // inline also drops them out of the Tab focus trap — see getFocusable.
+  for (const sel of ['.lb-game-prev', '.lb-game-next']) {
+    caption.querySelector<HTMLElement>(sel)!.style.display = pos ? '' : 'none';
+  }
+  const label = `${name ? name + ' — ' : ''}${pos ? `game ${pos.index + 1} of ${pos.total} — ` : ''}` +
     `${shot.type === 'video' ? 'Video' : 'Screenshot'} ${i + 1} of ${list.length}`;
   if (shot.type === 'video') {
     img.style.display = 'none';
@@ -835,6 +922,23 @@ function renderLightbox() {
 // scope (never torn down), so without a root it would warn "created outside a createRoot ...
 // will never be disposed" (same fix panel.tsx's own top-level effects needed).
 createRoot(() => {
+  // Consumes the `_awaitingMedia` latch (see `repointLightboxGame`): a game paged onto before
+  // its details had streamed in has only its banner to offer, so the moment the real media
+  // lands, take it. Created *before* the render effect below so it runs first within the same
+  // flush — the render then happens once, on the shot actually wanted, rather than painting the
+  // banner and immediately replacing it. Deliberately one-shot and cancelled by any viewer
+  // input (`stepLightbox`/`gotoLightbox`/a fresh open/close), so it can never move an image
+  // out from under someone who is looking at it.
+  createEffect(() => {
+    const list = shots();
+    const leaving = _awaitingMedia;
+    if (!leaving || list.length <= 1) return;
+    _awaitingMedia = null;
+    const target = preferredShotIndex(list, leaving);
+    if (target === 0) return; // trailers but no screenshots — not worth autoplaying unasked
+    setIdx(target);
+    _onLightboxParamChange?.(list[target].shotId);
+  });
   createEffect(() => {
     const list = shots(); idx(); gameName();
     if (list.length) renderLightbox();

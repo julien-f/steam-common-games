@@ -613,10 +613,25 @@ export default function ListRoute() {
     restorePendingShot();
   }
 
-  function pickRandomGame(): void {
-    if (!activeTable() || getPanelGame()?.standalone) return;
+  // Returns whether it actually picked, the same way `stepGame` does — the lightbox re-points
+  // itself at the new game only if there was one (see AppShell's `onGameRandom`).
+  function pickRandomGame(): boolean {
+    if (!activeTable() || getPanelGame()?.standalone) return false;
     const pick = pickRandomFrom(getGameList(), randomQueueKey(), getPanelGame()?.appid ?? 0);
-    if (pick) openGame(pick as Game, { isRandom: true });
+    if (!pick) return false;
+    openGame(pick as Game, { isRandom: true });
+    return true;
+  }
+
+  // Where the open game sits in this route's own processed row order, for the lightbox caption.
+  // Null for a standalone lookup or a game that isn't one of these rows — the same "nothing to
+  // page through here" cases `stepGameList` returns null for.
+  function gamePosition(): { index: number; total: number } | null {
+    const game = getPanelGame();
+    if (!activeTable() || !game || game.standalone) return null;
+    const list = getGameList();
+    const index = list.findIndex(g => g.appid === game.appid);
+    return index === -1 ? null : { index, total: list.length };
   }
 
   function stepGame(dir: 1 | -1): boolean {
@@ -1720,7 +1735,7 @@ export default function ListRoute() {
   );
 
   onMount(() => {
-    const unregister = registerRouteHandlers({ pickRandom: pickRandomGame, stepGame, openGame: handleOpenGameRequest, onGameClose: handleGameClose, refreshGame });
+    const unregister = registerRouteHandlers({ pickRandom: pickRandomGame, stepGame, gamePosition, openGame: handleOpenGameRequest, onGameClose: handleGameClose, refreshGame });
     onCleanup(unregister);
 
     // The region preference lives in the nav bar's ⚙ popover, which knows nothing about who's

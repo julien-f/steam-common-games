@@ -33,3 +33,21 @@ export function resolveShotIndex(shots: MediaItem[], idxOrShotId: number | strin
   }
   return Math.max(0, Math.min(idxOrShotId, shots.length - 1));
 }
+
+// The shot to land on when the lightbox is re-pointed at *another* game (↑/↓, R) rather than
+// opened on one the viewer picked out of the hero themselves. Never the banner when there's
+// anything else: it's Steam's 460×215 header strip — the least rewarding thing to open
+// fullscreen, and the one item with no separate thumbnail to stand in while it loads. A return
+// of 0 therefore means "this game has nothing but its banner", which is also how a caller tells
+// that the details simply haven't streamed in yet.
+//
+// Kind-preserving, so paging on from a trailer keeps landing on trailers — but in that direction
+// only: the lightbox autoplays video, so promoting an image to one would start a trailer
+// unasked on every step through a game that happens to have no screenshots.
+export function preferredShotIndex(shots: MediaItem[], leaving: MediaItem['type']): number {
+  const firstOfType = (type: MediaItem['type']) => shots.findIndex(s => s.type === type && s.shotId !== 'banner');
+  const sameKind = leaving === 'video' ? firstOfType('video') : -1;
+  if (sameKind >= 0) return sameKind;
+  const screenshot = firstOfType('image');
+  return screenshot >= 0 ? screenshot : 0;
+}

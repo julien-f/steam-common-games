@@ -39,6 +39,7 @@ export const SHORTCUT_SECTIONS: Section[] = [
       { keys: ['←', '→'], label: 'Previous / next screenshot (seeks −5s / +5s instead while a video plays)' },
       { keys: ['Shift', '←', '→'], label: 'Previous / next screenshot, even during video playback' },
       { keys: ['↑', '↓'], label: 'Previous / next game' },
+      { keys: ['R'], label: 'Pick a random game from the list' },
       { keys: ['F'], label: 'Toggle fullscreen' },
       { keys: ['Space'], label: 'Play / pause video' },
       { keys: ['M'], label: 'Mute / unmute video' },

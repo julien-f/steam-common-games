@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { buildMediaItems, resolveShotIndex } = require('../public/mediaItems.ts');
+const { buildMediaItems, resolveShotIndex, preferredShotIndex } = require('../public/mediaItems.ts');
 
 // ── buildMediaItems ───────────────────────────────────────────────────────────
 
@@ -99,4 +99,38 @@ test('resolveShotIndex: string shotId resolves to correct index', () => {
 test('resolveShotIndex: unknown string shotId falls back to 0', () => {
   const shots = [{ shotId: 'banner' }, { shotId: 's0' }];
   assert.equal(resolveShotIndex(shots, 'nonexistent'), 0);
+});
+
+// ── preferredShotIndex ────────────────────────────────────────────────────────
+
+const BANNER = { type: 'image', shotId: 'banner' };
+
+test('preferredShotIndex: leaving an image lands on the first screenshot, not the banner', () => {
+  const shots = [BANNER, { type: 'video', shotId: 'v1' }, { type: 'image', shotId: 's0' }, { type: 'image', shotId: 's1' }];
+  assert.equal(preferredShotIndex(shots, 'image'), 2);
+});
+
+test('preferredShotIndex: leaving a video lands on the first video', () => {
+  const shots = [BANNER, { type: 'video', shotId: 'v1' }, { type: 'image', shotId: 's0' }];
+  assert.equal(preferredShotIndex(shots, 'video'), 1);
+});
+
+test('preferredShotIndex: leaving a video falls back to a screenshot when the game has no trailer', () => {
+  const shots = [BANNER, { type: 'image', shotId: 's0' }];
+  assert.equal(preferredShotIndex(shots, 'image'), 1);
+  assert.equal(preferredShotIndex(shots, 'video'), 1);
+});
+
+// The lightbox autoplays video, so an image must never be promoted to one — a game with a
+// trailer but no screenshots stays on its banner rather than starting a trailer unasked.
+test('preferredShotIndex: leaving an image never lands on a video', () => {
+  const shots = [BANNER, { type: 'video', shotId: 'v1' }];
+  assert.equal(preferredShotIndex(shots, 'image'), 0);
+  assert.equal(preferredShotIndex(shots, 'video'), 1);
+});
+
+// 0 is how the caller tells the details haven't streamed in yet — see the latch in lightbox.tsx.
+test('preferredShotIndex: a banner-only game yields 0 whichever kind is being left', () => {
+  assert.equal(preferredShotIndex([BANNER], 'image'), 0);
+  assert.equal(preferredShotIndex([BANNER], 'video'), 0);
 });
