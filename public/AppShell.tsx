@@ -16,7 +16,7 @@ import { initPanel, isPanelOpen, panelClose, panelStepHero } from './panel.tsx';
 import { bindPanelKeyboardShortcuts } from './panelKeyboard.ts';
 import { initGameSearch } from './gameSearch.ts';
 import { addRecentGame, loadRecentGames } from './recentGames.ts';
-import { setPanelParam, setLightboxParam, withAccountParam } from './urlState.ts';
+import { setPanelParam, setLightboxParam, withAccountParam, COMPARE_PATH } from './urlState.ts';
 import { syncAccountOverrideFromUrl } from './accountOverride.ts';
 import type { Game } from './types.ts';
 import { ShortcutsModal } from './ShortcutsModal.tsx';
@@ -62,10 +62,15 @@ export function registerRouteHandlers(handlers: RouteHandlers): () => void {
   return () => { routeHandlers = {}; };
 }
 
-const NAV_LINKS: { href: string; label: string; end?: boolean }[] = [
+// About is deliberately not here: it's a static page nobody visits twice, and the bar was out of
+// room for a destination people do use repeatedly. It moved to the footer, which is where an
+// About link conventionally lives anyway. `noAccountParam` is the Compare link's alone — a
+// comparison names its own players in the URL, and carrying an unrelated account override
+// alongside them would be two different claims about whose games are on screen.
+const NAV_LINKS: { href: string; label: string; end?: boolean; noAccountParam?: boolean }[] = [
   { href: '/', label: 'Home', end: true },
+  { href: COMPARE_PATH, label: 'Compare', noAccountParam: true },
   { href: '/bundles', label: 'Bundles' },
-  { href: '/about', label: 'About' },
 ];
 
 export function AppShell(props: RouteSectionProps): JSX.Element {
@@ -166,7 +171,12 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       <nav id="site-nav" class="site-nav">
         <For each={NAV_LINKS}>
           {link => (
-            <A href={withAccountParam(link.href, location.search)} end={link.end} class="site-nav-link" activeClass="active">
+            <A
+              href={link.noAccountParam ? link.href : withAccountParam(link.href, location.search)}
+              end={link.end}
+              class="site-nav-link"
+              activeClass="active"
+            >
               {link.label}
             </A>
           )}
@@ -198,7 +208,10 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
         </div>
       </div>
 
-      <footer class="app-footer">Press <kbd>?</kbd> for keyboard shortcuts</footer>
+      <footer class="app-footer">
+        <span>Press <kbd>?</kbd> for keyboard shortcuts</span>
+        <A href="/about" class="app-footer-link">About</A>
+      </footer>
       <ShortcutsModal open={shortcutsOpen()} onClose={() => setShortcutsOpen(false)} />
     </div>
   );

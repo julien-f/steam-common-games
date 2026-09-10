@@ -9,6 +9,7 @@ There is no account to create and nothing is stored on the server. The accounts 
 - [Accounts](#accounts)
 - [Lists](#lists)
   - [Combining lists](#combining-lists)
+  - [Comparing libraries](#comparing-libraries)
 - [Bundles](#bundles)
 - [Prices](#prices)
 - [The game panel](#the-game-panel)
@@ -51,6 +52,14 @@ The result is a live list: save it as dynamic (it re-resolves each time), or fre
 
 ![Two lists combined with group by membership: one table per combination — in both lists, then each list's exclusive games — under the formula that produced them](../images/group-by-membership.png)
 
+### Comparing libraries
+
+**Compare** in the nav bar asks for two or more players and shows what they own, grouped by exactly who owns what: everything all of them share first, then each smaller combination, down to what only one of them has. Add several identifiers to one player to compare a whole Steam Family as one library.
+
+Each player is a box you drop accounts into: it offers the accounts you've already looked at as you type, and takes a Steam name, profile URL or 64-bit ID for anyone it doesn't know yet. Put two accounts in the *same* player to compare a Steam Family — or any pair of libraries — as one. Picking an account doesn't add it to your recents or change your current account.
+
+The result is a link. Copy the address and whoever opens it sees the same comparison — it names the players, so it doesn't depend on anything saved in your browser, and it doesn't change the recipient's own account. Switch it to **Intersect** for a single flat table of what everyone owns, or **Save as a list** to keep it in your own list tree, where it re-resolves every time you open it.
+
 ## Bundles
 
 Browse current Steam game bundles (sourced from IsThereAnyDeal, and only available if the app is configured with an ITAD key). Open one and its games become a list like any other, with the bundle's tier price alongside each game's rating, playtime estimates and current best price anywhere. Games in a bundle with no Steam listing are listed separately below the table rather than quietly dropped.
@@ -71,6 +80,7 @@ Clicking any row opens a detail panel beside the table — not over it, so the l
 
 - A game's own link (`/game/<appid>`) opens that game for anyone, whether or not they own it.
 - Add `?u=` to any list link to share the account you're exploring. It never changes the recipient's own default account, and a game link deliberately doesn't carry it.
+- A comparison's link names its players the same way, one `?u=` each — including links made by older versions of this app, which still work.
 - **🔗 Share view** copies a link with your current table layout — columns, sort, grouping, filters — baked in. The recipient gets it as a starting point; it doesn't override their setup permanently.
 
 ## Keyboard shortcuts

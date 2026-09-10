@@ -21,7 +21,7 @@ import {
   getAccountOverride, accountDisplayLabel, accountIdentifiers, ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
 import { getAccountOverrideState, clearAccountOverride, accountOverrideStatusText } from './accountOverride.ts';
-import { withAccountParam, urlWithoutAccountParam } from './urlState.ts';
+import { withAccountParam, urlWithoutAccountParam, parseUrlState, compareUrl, COMPARE_PATH } from './urlState.ts';
 import { resolveAccountSummary, fetchAccountOverview, fetchAccountWishlistItems } from './accountData.ts';
 import type { AccountPlayer } from './accountData.ts';
 import { normalizeInput, steamVanity, fmtAge } from './utils.ts';
@@ -156,6 +156,14 @@ export default function HomeRoute() {
   // updateTitle() used. The side panel's own game-open title takes over on top of this when a
   // game is opened from here, same as every other route.
   createEffect(() => setBaseTitle(currentAccount()?.label ?? null));
+
+  // An old Comparison-page link — `/?u=alice&u=bob`, several slots — used to land here and be
+  // explained away ("showing the first"). It has a real address again, so it's forwarded to it
+  // instead. Replace, not push: the visitor never chose to be on Home.
+  createEffect(() => {
+    const slots = parseUrlState(location.search).slots;
+    if (slots.length > 1) navigate(compareUrl(slots), { replace: true });
+  });
   onCleanup(() => setBaseTitle(null));
 
   async function resolveAndSetCurrent(): Promise<void> {
@@ -388,15 +396,6 @@ export default function HomeRoute() {
                 </p>
               )}
             </Show>
-            {/* An old Comparison-page link (`?u=alice&u=bob`) — a shape with no single route
-                anymore. urlState.ts's AccountParam.extraSlots explains why the extras are
-                reported rather than silently unioned into one Family or dropped. */}
-            <Show when={overrideState().extraSlots > 0}>
-              <p class="account-override-status">
-                This link lists {overrideState().extraSlots + 1} accounts to compare. Showing the first;
-                combine each account's Owned list into a new list below to compare them.
-              </p>
-            </Show>
           </div>
         </Show>
         {/* The header speaks for the slot as a whole — one avatar/name/presence for a plain
@@ -546,6 +545,10 @@ export default function HomeRoute() {
         <A href={accountLink('/lists/wishlist')}>Wishlist</A>
         <A href={accountLink('/bundles')}>Bundles</A>
         <A href={accountLink('/game')}>Recently Looked Up</A>
+        {/* No `?u=`: a comparison names its own players in the URL, and carrying an unrelated
+            account override alongside them would be two different claims about whose games are
+            on screen. */}
+        <A href={COMPARE_PATH}>Compare libraries</A>
       </section>
 
       <section class="home-tree">

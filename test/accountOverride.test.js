@@ -82,10 +82,11 @@ test('syncFromUrl: comma-joined identifiers resolve as one Family account', asyn
   assert.deepEqual(fetchHandler.calls[0].body, { slots: [['alice', 'bob']] });
   assert.equal(getAccountOverride().id, '1+2');
   assert.equal(getAccountOverride().label, 'Alice + Bob');
-  assert.equal(sync.getState().extraSlots, 0);
 });
 
-test('syncFromUrl: an old multi-slot comparison link resolves the first slot and reports the rest', async (t) => {
+test('syncFromUrl: a multi-slot comparison link sets no override at all', async (t) => {
+  // `/lists/compare?u=alice&u=bob` names two players, not an account being explored — honoring
+  // the first would have every comparison quietly declare a current account on the side.
   const fetchHandler = fakeResolveFetch();
   withFetch(t, fetchHandler);
   const sync = createAccountOverrideSync();
@@ -93,9 +94,9 @@ test('syncFromUrl: an old multi-slot comparison link resolves the first slot and
   sync.syncFromUrl('?u=alice&u=bob');
   await settle();
 
-  assert.deepEqual(fetchHandler.calls[0].body, { slots: [['alice']] });
-  assert.equal(sync.getState().extraSlots, 1);
-  assert.equal(getAccountOverride().id, '1');
+  assert.deepEqual(fetchHandler.calls, [], 'nothing is resolved');
+  assert.equal(getAccountOverride(), null);
+  assert.equal(sync.getState().state, 'none');
 });
 
 test('syncFromUrl: an unrelated param write does not re-resolve the same account', async (t) => {
@@ -123,7 +124,7 @@ test('syncFromUrl: clears the override once u= is gone from the URL', async (t) 
   sync.syncFromUrl('?game=440');
 
   assert.equal(getAccountOverride(), null);
-  assert.deepEqual(sync.getState(), { state: 'none', identifiers: [], extraSlots: 0 });
+  assert.deepEqual(sync.getState(), { state: 'none', identifiers: [] });
 });
 
 test('syncFromUrl: a link that cannot be resolved reports the error and leaves no override', async (t) => {
@@ -197,13 +198,13 @@ test('clear: a resolve still in flight cannot land afterward', async (t) => {
 
 test('accountOverrideStatusText: explains a resolving/failed link, and says nothing otherwise', () => {
   assert.equal(
-    accountOverrideStatusText({ state: 'resolving', identifiers: ['alice', 'bob'], extraSlots: 0 }),
+    accountOverrideStatusText({ state: 'resolving', identifiers: ['alice', 'bob'] }),
     'Resolving alice + bob from this link…',
   );
   assert.equal(
-    accountOverrideStatusText({ state: 'error', identifiers: ['nope'], extraSlots: 0, message: 'No such user' }),
+    accountOverrideStatusText({ state: 'error', identifiers: ['nope'], message: 'No such user' }),
     "Couldn't resolve nope from this link: No such user",
   );
-  assert.equal(accountOverrideStatusText({ state: 'none', identifiers: [], extraSlots: 0 }), null);
-  assert.equal(accountOverrideStatusText({ state: 'ready', identifiers: ['alice'], extraSlots: 0 }), null);
+  assert.equal(accountOverrideStatusText({ state: 'none', identifiers: [] }), null);
+  assert.equal(accountOverrideStatusText({ state: 'ready', identifiers: ['alice'] }), null);
 });

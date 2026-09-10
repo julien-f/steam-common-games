@@ -1816,10 +1816,15 @@ body.lb-open { overflow: hidden; }
    keyboard shortcuts exist at all. */
 .app-footer {
   padding: 10px 16px 16px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
   font-size: 11px;
   color: var(--text2);
 }
+.app-footer-link { color: var(--text2); text-decoration: none; }
+.app-footer-link:hover { color: var(--accent2); text-decoration: underline; }
 
 /* Keyboard shortcuts modal */
 kbd {
@@ -1974,6 +1979,117 @@ kbd {
 }
 
 .table-container { margin-bottom: 18px; }
+
+/* The compare route's players form (ComparePlayersForm.tsx) — one row per player, one input per
+   identifier within it. Same card treatment as Home's combine form, since it does the same job
+   one level up: saying what a list is made of before it exists. */
+.compare-form {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.compare-slot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.compare-slot-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text1);
+  min-width: 62px;
+}
+.compare-slot input[type="text"] {
+  flex: 1 1 220px;
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 8px 10px;
+  color: var(--text0);
+  font-size: 13px;
+}
+.compare-slot input[type="text"]:focus { border-color: var(--accent); outline: none; }
+/* A player slot's token input: the chips already in it, the combobox field, and its dropdown of
+   known accounts (ComparePlayersForm.tsx). */
+.compare-tokens {
+  position: relative;
+  flex: 1 1 260px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 5px 8px;
+}
+.compare-tokens:focus-within { border-color: var(--accent); }
+.compare-tokens input[type="text"] {
+  flex: 1 1 160px;
+  min-width: 120px;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 3px 0;
+  color: var(--text0);
+  font-size: 13px;
+}
+.compare-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 4px 2px 4px;
+  font-size: 12px;
+  color: var(--text0);
+}
+.compare-token .account-avatar { border-radius: 50%; }
+.compare-token:not(:has(.account-avatar)) { padding-left: 9px; }
+/* A raw identifier nobody has resolved yet reads as provisional, next to a named account. */
+.compare-token.is-typed .compare-token-label { color: var(--text1); font-style: italic; }
+.compare-token-remove {
+  background: transparent;
+  border: none;
+  color: var(--text1);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 3px;
+  cursor: pointer;
+}
+.compare-token-remove:hover { color: var(--accent2); }
+
+.compare-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  list-style: none;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+}
+.compare-options li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--text0);
+  cursor: pointer;
+}
+.compare-options li.active { background: var(--bg2); color: var(--accent2); }
+.compare-options .account-avatar { border-radius: 50%; }
+.compare-options .account-count { margin-left: auto; }
+.compare-form-hint { font-size: 12px; color: var(--text1); }
+
+.compare-form-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .list-groups { display: flex; flex-direction: column; gap: 28px; }
 .list-group-heading {

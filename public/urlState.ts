@@ -25,7 +25,7 @@ export const FILTER_DIMS: FilterDim[] = [
 // the way e.g. `game`/`shot` can. See tableViewPrefs.ts's own restoreTableView/shareTableView/
 // resetTableView and ListRoute.tsx's viewParamName. Unlike most other params here, it's not
 // written automatically on every table interaction — only by the table's own "🔗 Share view" button.
-const PARAM_ORDER = ['u', 'tab', 'sort', 'game', 'shot', 'name', ...FILTER_DIMS.map(d => d.param), 'tv'];
+const PARAM_ORDER = ['u', 'op', 'tab', 'sort', 'game', 'shot', 'name', ...FILTER_DIMS.map(d => d.param), 'tv'];
 
 export function reorderUrlParams(params: URLSearchParams): URLSearchParams {
   const ordered = new URLSearchParams();
@@ -121,6 +121,39 @@ export function parseUrlState(search: string): UrlState {
   };
 }
 
+// ── `/lists/compare?u=…&u=…` — the comparison address ────────────────────────────────────────
+
+// A comparison is spelled exactly the way the pre-redesign Comparison page spelled it: one `u=`
+// per player slot, comma-joined identifiers within a slot for a Steam Family. That's not
+// nostalgia — those links are out in the wild (the app is deployed), and this is the one shape
+// they can keep working in. `parseUrlState`'s own `slots` is the reader; the functions here are
+// the writer.
+export const COMPARE_PATH = '/lists/compare';
+
+// Grouping by which exact combination of players owns each game is what the old page did, and
+// what a comparison means by default; the other ops are reachable from the same URL.
+export const DEFAULT_COMPARE_OP = 'group-by-membership';
+
+// Sorts members within each slot, then slots by their first member — so one comparison always
+// serializes to one URL regardless of the order its players happened to be typed in, and two
+// visits to "alice vs. bob" are one history entry rather than two. Ported from the old page,
+// which normalized for exactly this reason (plus deduping its own recent searches).
+export function normalizeSlots(slots: string[][]): string[][] {
+  const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+  return slots
+    .map(slot => [...slot].sort(cmp))
+    .sort((a, b) => cmp(a[0], b[0]));
+}
+
+// `op` is this app's own addition, not part of the old convention — omitted for the default, so
+// a URL from the old page and a URL this app writes for the same comparison are the same string.
+export function compareUrl(slots: string[][], op?: string): string {
+  const params = new URLSearchParams();
+  for (const slot of normalizeSlots(slots)) params.append('u', slot.join(','));
+  if (op && op !== DEFAULT_COMPARE_OP) params.set('op', op);
+  return urlWithParams(params, COMPARE_PATH);
+}
+
 // ── `?u=` — the account-override param ───────────────────────────────────────────────────────
 
 // The raw `u=` values exactly as they sit in a URL, for forwarding across an internal
@@ -135,18 +168,15 @@ export interface AccountParam {
   // The identifiers to resolve as the account being explored — one slot's worth (a plain
   // account, or several comma-joined identifiers for a Steam Family).
   identifiers: string[];
-  // Any *further* slots the link carried. A `?u=alice&u=bob` link is an old Comparison-page URL
-  // ("compare alice against bob"), a shape the list-centric app has no single route for anymore
-  // — a comparison is a dynamic list combining two accounts' Owned lists now (see
-  // docs/dev/lists-and-accounts.md). Rather than silently unioning those identifiers into one
-  // Family (right games, wrong meaning) or dropping them with no explanation, the first slot is
-  // honored as the explored account and the rest are surfaced here so the UI can say so.
-  extraSlots: string[][];
 }
 
+// **One slot only.** Several slots is a comparison ("alice vs. bob"), not an account to explore
+// — `/lists/compare` is its address and `parseUrlState`'s `slots` is how that route reads it.
+// Honoring the first slot here as well would have every comparison quietly declare a current
+// account on the side, which is what the nav chip would then claim you were browsing.
 export function parseAccountParam(search: string): AccountParam {
   const slots = parseSlots(new URLSearchParams(search));
-  return { identifiers: slots[0] ?? [], extraSlots: slots.slice(1) };
+  return { identifiers: slots.length === 1 ? slots[0] : [] };
 }
 
 // Carries whatever `u=` the current URL holds onto `path`, so the account being explored via a
@@ -158,7 +188,9 @@ export function parseAccountParam(search: string): AccountParam {
 // this unconditionally rather than branching on whether an override happens to be active.
 export function withAccountParam(path: string, search: string = location.search): string {
   const values = accountParamValues(search);
-  if (values.length === 0) return path;
+  // Nothing to forward, or a comparison's several slots — which is not an account override at
+  // all (see parseAccountParam), so carrying it onto an unrelated route would be noise.
+  if (values.length !== 1) return path;
   const [pathname, ownQuery] = path.split('?');
   const params = new URLSearchParams(ownQuery ?? '');
   if (!params.has('u')) values.forEach(v => params.append('u', v));

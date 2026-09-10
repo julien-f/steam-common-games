@@ -28,15 +28,10 @@ export interface AccountOverrideState {
   //               account shows instead and `message` explains why the link didn't take.
   state: 'none' | 'resolving' | 'ready' | 'error';
   identifiers: string[];
-  // How many *further* slots the link carried beyond the one being honored — always 0 for a
-  // link this app itself produces; nonzero only for an old Comparison-page URL
-  // (`?u=alice&u=bob`), which has no single-route equivalent anymore. See urlState.ts's
-  // AccountParam.extraSlots for why those are surfaced rather than silently unioned or dropped.
-  extraSlots: number;
   message?: string;
 }
 
-const NONE: AccountOverrideState = { state: 'none', identifiers: [], extraSlots: 0 };
+const NONE: AccountOverrideState = { state: 'none', identifiers: [] };
 
 // A factory rather than bare module-level state, same reason myOwnership.ts's
 // createMyOwnershipCache() is one: this module's real content is mutable state (the last
@@ -75,7 +70,10 @@ export function createAccountOverrideSync() {
   }
 
   function syncFromUrl(search: string): void {
-    const { identifiers, extraSlots } = parseAccountParam(search);
+    // Several slots is a comparison, not an account to explore — parseAccountParam returns
+    // nothing for one, so a `/lists/compare` URL leaves the stored account alone (and the nav
+    // chip saying whose lists you'd get by clicking Owned, which is still yours).
+    const { identifiers } = parseAccountParam(search);
     const key = identifiers.join(',');
     if (key === syncedKey) return;
     syncedKey = key;
@@ -87,7 +85,7 @@ export function createAccountOverrideSync() {
     }
     const gen = guard.next();
     setAccountOverride(null); // don't leave a previous link's account showing while this resolves
-    setState({ state: 'resolving', identifiers, extraSlots: extraSlots.length });
+    setState({ state: 'resolving', identifiers });
     resolveAccountSummary(identifiers).then(
       summary => {
         if (guard.isStale(gen)) return;
@@ -101,12 +99,12 @@ export function createAccountOverrideSync() {
           lastUsedAt: Date.now(),
         };
         setAccountOverride(account);
-        setState({ state: 'ready', identifiers, extraSlots: extraSlots.length });
+        setState({ state: 'ready', identifiers });
       },
       (err: Error) => {
         if (guard.isStale(gen)) return;
         setAccountOverride(null);
-        setState({ state: 'error', identifiers, extraSlots: extraSlots.length, message: err.message });
+        setState({ state: 'error', identifiers, message: err.message });
       },
     );
   }

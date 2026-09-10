@@ -2,8 +2,8 @@
 // see AppShell.tsx) into #app, replacing the four separate HTML entries' per-page bootstrap
 // (see docs/dev/frontend.md).
 //
-// Route order matters: /lists/owned, /lists/wishlist, and /lists/bundle/:bundleId are registered
-// before the generic /lists/:listId — @solidjs/router ranks routes by segment specificity (a
+// Route order matters: /lists/owned, /lists/wishlist, /lists/compare and /lists/bundle/:bundleId
+// are registered before the generic /lists/:listId — @solidjs/router ranks routes by segment specificity (a
 // static segment always outranks a dynamic `:param` at the same position) regardless of
 // declaration order, so this isn't strictly load-bearing the way a first-match-wins router would
 // need it to be, but the explicit ordering documents the intent and costs nothing to keep.
@@ -26,6 +26,7 @@ render(() => (
     <Route path="/" component={HomeRoute} />
     <Route path="/lists/owned" component={ListRoute} />
     <Route path="/lists/wishlist" component={ListRoute} />
+    <Route path="/lists/compare" component={ListRoute} />
     <Route path="/lists/bundle/:bundleId" component={ListRoute} />
     <Route path="/lists/:listId" component={ListRoute} />
     <Route path="/bundles" component={BundlesBrowseRoute} />

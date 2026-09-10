@@ -6,8 +6,15 @@
 // is opened the same way a live in-route lookup is (see handleOpenGameRequest/
 // openOrAddRecentGame below), not treated as a special standalone-only view.
 //
-// **Current scope**: every kind ('owned', 'wishlist', 'bundle', 'recent', 'user') is wired up
-// for real. It stays narrower than the design on a few axes though: ownership cross-referencing (in-library/on-wishlist badges — done
+// 'compare' (/lists/compare?u=alice&u=bob) is the odd one out: its list isn't stored anywhere,
+// it's built in memory from the URL's own player slots — one `account-owned` source per slot, fed
+// to the very same resolve/combine/label path a saved dynamic list uses. That's what makes the
+// pre-redesign Comparison page's URLs keep working and its group-per-owner-set table come back
+// (see docs/dev/lists-and-accounts.md's Combine section, and ComparePlayersForm.tsx for the entry
+// point). "Save as a list" is then just createList() with the same formula.
+//
+// **Current scope**: every kind ('owned', 'wishlist', 'bundle', 'recent', 'user', 'compare') is
+// wired up for real. It stays narrower than the design on a few axes though: ownership cross-referencing (in-library/on-wishlist badges — done
 // in the side panel/gameSearch.ts's dropdown via myOwnership.ts, but not surfaced as its own
 // table column here) and achievements are not ported yet (both need a second background fetch
 // this first pass omits); 'recent'/'user' have no dedicated extra columns — plain CORE_COLUMNS,
@@ -70,11 +77,14 @@ import { openLightbox } from './lightbox.tsx';
 import {
   panelOpen, panelClose, isPanelOpen, getPanelGame, pickRandomFrom, clearRandomQueue, clearAllRandomQueues,
 } from './panel.tsx';
-import { setPanelParam, urlWithParams, withAccountParam } from './urlState.ts';
+import {
+  setPanelParam, urlWithParams, withAccountParam, parseUrlState, normalizeSlots, compareUrl,
+  DEFAULT_COMPARE_OP,
+} from './urlState.ts';
 import { setPref } from './prefs.ts';
-import { getEffectiveCurrentAccount, ACCOUNT_CHANGED_EVENT } from './accountsStore.ts';
+import { getEffectiveCurrentAccount, accountIdFor, accountDisplayLabel, ACCOUNT_CHANGED_EVENT } from './accountsStore.ts';
 import { getAccountOverrideState, accountOverrideStatusText } from './accountOverride.ts';
-import { fetchAccountOverview, fetchAccountWishlist } from './accountData.ts';
+import { fetchAccountOverview, fetchAccountWishlist, resolveAccountSummary } from './accountData.ts';
 import { loadRecentGames, addRecentGame, renameRecentGame } from './recentGames.ts';
 import { fetchBundleById, resolveBundleGames, type ResolvedGame, type FlatGame } from './bundleData.ts';
 import {
@@ -85,21 +95,26 @@ import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields 
 import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
 import { ListHero, type HeroTile } from './ListHero.tsx';
-import { describeSources, createDefaultNaming, listDisplayName, opLabel, OP_SYMBOLS, type RefDescription } from './listLabels.ts';
+import { ComparePlayersForm } from './ComparePlayersForm.tsx';
+import {
+  describeSources, createDefaultNaming, listDisplayName, opLabel, OP_LABELS, OP_SYMBOLS,
+  type RefDescription, type ListNaming,
+} from './listLabels.ts';
 import { setBaseTitle } from './pageTitle.ts';
-import type { AccountSlot, Game, Rating, Hltb, GameMeta, ProtonDb, GameList } from './types.ts';
+import type { AccountSlot, Game, Rating, Hltb, GameMeta, ProtonDb, GameList, CombineOp } from './types.ts';
 import { getList, getLists, getFolders, createList, addAppidsToList, removeAppidsFromList, setListTableView } from './listsStore.ts';
 import { resolveListWithSources, flattenCombineResult, createDefaultFetchers } from './listResolve.ts';
 import type { MembershipGroup } from './combine.ts';
 import { peekMyOwnershipStatus, onMyOwnershipReady } from './myOwnership.ts';
 
-type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user';
+type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user' | 'compare';
 
 // /game (bare) and /game/:appid both live here, kind 'recent' either way — see this file's own
 // header comment and AppRoot.tsx.
 function kindFromPath(pathname: string, params: { bundleId?: string; listId?: string; appid?: string }): ListKind {
   if (pathname === '/lists/owned') return 'owned';
   if (pathname === '/lists/wishlist') return 'wishlist';
+  if (pathname === '/lists/compare') return 'compare';
   if (params.bundleId) return 'bundle';
   if (pathname === '/game' || pathname.startsWith('/game/')) return 'recent';
   return 'user';
@@ -375,6 +390,57 @@ export default function ListRoute() {
   // hero's formula line and the per-group table headings; empty until the resolve lands, which is
   // what keeps a half-built "A ∪ = 0" off the screen in the meantime.
   const [listSources, setListSources] = createSignal<{ key: string; count: number; desc: RefDescription }[]>([]);
+  // ── kind === 'compare' ────────────────────────────────────────────────────────────────────
+  // A comparison is a dynamic list that was never saved: the `?u=` slots ARE its formula (one
+  // `account-owned` source per player), so it resolves, groups and explains itself through the
+  // very same listResolve.ts/combine.ts/listLabels.ts path a stored dynamic list does — this
+  // route just builds the GameList in memory instead of reading it from listsStore.ts. Kept in
+  // its own signal rather than in `userList` above, which every store-backed behavior keys off
+  // (per-list view persistence, "remove from this list", the Folder/Edited tiles): a list with no
+  // id has no business reaching any of them.
+  const [compareList, setCompareList] = createSignal<GameList | null>(null);
+  const [compareAccounts, setCompareAccounts] = createSignal<AccountSlot[]>([]);
+  const [editingPlayers, setEditingPlayers] = createSignal(false);
+  // Whichever of the two is on screen — everything that reads a *formula* (the op chip, the
+  // sources/groups tiles, the hero's formula line) applies identically to both.
+  const combineList = (): GameList | null => userList() ?? compareList();
+  // The comparison currently in the URL. Read reactively (not captured), so editing the players
+  // re-runs the load effect below without a remount.
+  const compareSlots = (): string[][] => normalizeSlots(parseUrlState(location.search).slots);
+  function compareOp(): CombineOp {
+    const raw = new URLSearchParams(location.search).get('op');
+    return raw && raw in OP_LABELS ? raw as CombineOp : DEFAULT_COMPARE_OP as CombineOp;
+  }
+  // The comparison a load has already done, in both spellings of it — see load()'s own guard.
+  let loadedCompareKeys = new Set<string>();
+  function compareKey(): string {
+    return `${compareOp()}|${compareSlots().map(slot => slot.join(',')).join('|')}`;
+  }
+  // Names this comparison's own accounts in the formula/group headings. They're resolved from the
+  // URL, so they're typically in no store at all — createDefaultNaming would fall back to naming
+  // them by raw steam64 id.
+  // Turns the comparison on screen into a real stored list, keeping the same formula — the one
+  // step between "I shared a link with a friend" and "this is a list I keep". Deliberately
+  // unnamed: an unnamed dynamic list is labeled by its own formula everywhere (listLabels.ts),
+  // which is already exactly what a comparison is called, and that label keeps following the
+  // accounts if one of them is renamed later.
+  function handleSaveComparison(): void {
+    const list = compareList();
+    if (!list) return;
+    const saved = createList({ kind: 'dynamic', op: list.op, sources: list.sources });
+    navigate(`/lists/${saved.id}`);
+  }
+
+  function compareNaming(): ListNaming {
+    const base = createDefaultNaming();
+    return {
+      ...base,
+      account: id => {
+        const match = compareAccounts().find(a => a.id === id);
+        return match ? { label: accountDisplayLabel(match), identifiers: match.members } : base.account(id);
+      },
+    };
+  }
   // True once load() has built the single-table path below (owned/wishlist/bundle/recent/user),
   // false while loading and permanently false for a group-by-membership list, which renders N
   // per-group tables instead of one — see this file's own header comment on why view persistence
@@ -479,6 +545,7 @@ export default function ListRoute() {
   function randomQueueKey(): string {
     if (kind === 'bundle') return `list-route:bundle:${params.bundleId}`;
     if (kind === 'user') return `list-route:user:${params.listId}:${activeGroupKey ?? ''}`;
+    if (kind === 'compare') return `list-route:compare:${compareKey()}:${activeGroupKey ?? ''}`;
     return `list-route:${kind}`;
   }
 
@@ -845,7 +912,7 @@ export default function ListRoute() {
   // Whether "do I own this" is a genuine question for this kind at all — an Owned/Wishlist list's
   // own rows are trivially owned/wishlisted, the same reason OWNERSHIP_STATUS_COLUMN is only part
   // of BUNDLE_COLUMNS/RECENT_COLUMNS.
-  const stampsOwnership = kind === 'bundle' || kind === 'recent' || kind === 'user';
+  const stampsOwnership = kind === 'bundle' || kind === 'recent' || kind === 'user' || kind === 'compare';
 
   // Driven off the row list itself, not called once per load: rows can appear *after* a load has
   // finished (openOrAddRecentGame prepends the game a nav-bar lookup just found), and a stamping
@@ -897,6 +964,9 @@ export default function ListRoute() {
   // kept total anyway so a stray call never returns undefined.
   function viewPrefKey(): string {
     if (kind === 'wishlist') return 'wishlistListView';
+    // Shared across every comparison, like the bundle key above: a comparison has no stored list
+    // of its own to hang a view on.
+    if (kind === 'compare') return 'compareListView';
     if (kind === 'bundle') return 'bundleListView';
     if (kind === 'recent') return 'recentListView';
     return 'ownedListView';
@@ -993,6 +1063,12 @@ export default function ListRoute() {
       else if (focusAppid == null && isPanelOpen()) panelClose();
       return;
     }
+    // A comparison rewrites its own URL to server-resolved steam64 ids once it has them (below),
+    // which re-runs the load effect; both spellings name the same comparison, so without this the
+    // rewrite would resolve every account and re-stream every game a second time. Explicitly
+    // *not* a general "already loaded this" cache — the set is rebuilt by each real load, so
+    // editing the players back to a previous pair still reloads.
+    if (kind === 'compare' && !refresh && loadedCompareKeys.has(compareKey())) return;
 
     const gen = loadGuard.next();
 
@@ -1029,10 +1105,87 @@ export default function ListRoute() {
     resolvedBundleGames = null;
     let pendingGroups: MembershipGroup[] | null = null;
     setUserList(null);
+    setCompareList(null);
     setSelectedRows([]); // a fresh load means a fresh table — nothing carries a prior selection over
     setSelectionActionStatus('');
 
-    if (kind === 'user') {
+    if (kind === 'compare') {
+      const slots = compareSlots();
+      loadedCompareKeys = new Set([compareKey()]);
+      // Under two players there's nothing to compare — the players form renders in place of the
+      // table (see the JSX below), so this is an empty state, not an error.
+      if (slots.length < 2) { setListTitle('Compare libraries'); return; }
+
+      setListTitle(slots.map(slot => slot.join(' + ')).join(' vs. '));
+      setStatusText('Resolving accounts…');
+      let accounts: AccountSlot[];
+      try {
+        accounts = await Promise.all(slots.map(async identifiers => {
+          const summary = await resolveAccountSummary(identifiers);
+          return {
+            id: accountIdFor(summary.members), members: summary.members, rawInputs: identifiers,
+            label: summary.label, avatarUrl: summary.avatarUrl ?? undefined,
+            vanities: summary.vanities, lastUsedAt: Date.now(),
+          };
+        }));
+      } catch (err) {
+        if (loadGuard.isStale(gen)) return;
+        setStatusText(`Couldn't resolve every player: ${(err as Error).message}`);
+        return;
+      }
+      if (loadGuard.isStale(gen)) return;
+      // Ordered by the same rule the canonical URL below sorts on (an accountId *is* its members'
+      // sorted steam64 ids), so the title, the formula line and the group headings read in the
+      // order the address bar names the players in — not in whatever order they were typed. Those
+      // two orders disagreeing would make one URL render two ways: as typed on the way in, and
+      // re-sorted for anyone opening the link afterwards.
+      accounts.sort((a, b) => a.id.localeCompare(b.id, undefined, { sensitivity: 'base' }));
+      setCompareAccounts(accounts);
+      setListTitle(accounts.map(accountDisplayLabel).join(' vs. '));
+      // Canonicalize the address to the resolved ids, exactly as the old Comparison page did: a
+      // link built from vanity names would otherwise point somewhere else the day one of them is
+      // changed, and two spellings of one comparison would be two history entries. Never stored
+      // in `recentAccounts` — comparing someone isn't picking them as your account, the same rule
+      // a `?u=` override follows (see docs/dev/lists-and-accounts.md).
+      const canonicalSlots = normalizeSlots(accounts.map(a => a.members));
+      const canonical = compareUrl(canonicalSlots, compareOp());
+      loadedCompareKeys.add(`${compareOp()}|${canonicalSlots.map(slot => slot.join(',')).join('|')}`);
+      if (canonical !== location.pathname + location.search) navigate(canonical, { replace: true });
+
+      const list: GameList = {
+        id: '', parentId: null, order: 0, createdAt: 0, updatedAt: 0,
+        kind: 'dynamic', op: compareOp(),
+        sources: accounts.map(account => ({ kind: 'account-owned' as const, accountId: account.id })),
+      };
+      setCompareList(list);
+      setStatusText('Comparing libraries…');
+      let appids: Set<number>;
+      try {
+        const { result, sources } = await resolveListWithSources(list, createDefaultFetchers());
+        if (loadGuard.isStale(gen)) return;
+        const described = describeSources(list, compareNaming());
+        setListSources(sources.map((source, i) => ({
+          ...source,
+          // Every source in a comparison is the same thing — a player's Owned list — so the
+          // shared label's "— Owned" half is pure noise once it's repeated across every group
+          // heading. "Alice + Bob", not "Alice — Owned + Bob — Owned"; the link still points at
+          // that player's own library.
+          desc: { ...described[i], label: accountDisplayLabel(accounts[i]) },
+        })));
+        if (Array.isArray(result)) {
+          pendingGroups = result;
+          appids = new Set(result.flatMap(g => g.appids));
+        } else {
+          appids = flattenCombineResult(result);
+        }
+      } catch (err) {
+        if (loadGuard.isStale(gen)) return;
+        setStatusText(`Error: ${(err as Error).message}`);
+        return;
+      }
+      initialRows = [...appids].map(appid => ({ appid, name: '', loading: true, details: null }));
+      streamTargets = [...appids].map(appid => ({ appid }));
+    } else if (kind === 'user') {
       // A manual list, or a dynamic one using any op other than group-by-membership, renders as
       // one flat table (flattened via flattenCombineResult, same as when it's resolved as
       // someone *else's* combine source). group-by-membership instead keeps its raw
@@ -1181,12 +1334,12 @@ export default function ListRoute() {
       const columns = (
         kind === 'wishlist' ? WISHLIST_COLUMNS
           : kind === 'bundle' ? BUNDLE_COLUMNS
-          : kind === 'recent' || kind === 'user' ? RECENT_COLUMNS
+          : kind === 'recent' || kind === 'user' || kind === 'compare' ? RECENT_COLUMNS
           : OWNED_COLUMNS
       ) as unknown as ColumnDef<Game>[];
       const defaultVisible = kind === 'wishlist' ? WISHLIST_DEFAULT_VISIBLE
         : kind === 'bundle' ? BUNDLE_DEFAULT_VISIBLE
-        : kind === 'recent' || kind === 'user' ? RECENT_DEFAULT_VISIBLE
+        : kind === 'recent' || kind === 'user' || kind === 'compare' ? RECENT_DEFAULT_VISIBLE
         : OWNED_DEFAULT_VISIBLE;
       const sort = kind === 'bundle' ? BUNDLE_DEFAULT_SORT : DEFAULT_SORT;
 
@@ -1391,6 +1544,10 @@ export default function ListRoute() {
 
   function heroTiles(): HeroTile[] {
     if (kind === 'bundle') return bundleHeroTiles();
+    // A comparison that hasn't resolved yet (its empty state, or a player who couldn't be
+    // resolved) has no facts to state — a lone "Games 0" tile reads as a result, not as a
+    // form waiting to be filled in.
+    if (kind === 'compare' && !compareList()) return [];
     const tiles: HeroTile[] = [{ label: 'Games', value: rowsStore.length }];
     if (kind === 'owned' || kind === 'wishlist') {
       tiles.push({
@@ -1400,18 +1557,24 @@ export default function ListRoute() {
       });
     }
     if (kind === 'wishlist') tiles.push(priceTile());
-    const list = userList();
+    const list = combineList();
     if (list) {
-      const folder = folderPathLabel(list);
-      if (folder) tiles.push({ label: 'Folder', value: `📁 ${folder}` });
       if (list.kind === 'dynamic') {
-        tiles.push({ label: 'Sources', value: (list.sources ?? []).length });
+        // A comparison names its sources "Players" — they're people, and calling them sources
+        // would be the data model talking rather than the screen.
+        tiles.push({ label: kind === 'compare' ? 'Players' : 'Sources', value: (list.sources ?? []).length });
         if (groupCount() > 0) tiles.push({ label: 'Groups', value: groupCount() });
       }
+    }
+    // Folder/Edited are facts about a *stored* list — a comparison has neither.
+    const stored = userList();
+    if (stored) {
+      const folder = folderPathLabel(stored);
+      if (folder) tiles.push({ label: 'Folder', value: `📁 ${folder}` });
       // "Edited", not "Updated": this is when the list's own definition last changed, which for a
       // dynamic list says nothing about how fresh its resolved contents are (those are recomputed
       // on every open) — unlike the owned/wishlist tile above, which is exactly a data age.
-      tiles.push({ label: 'Edited', value: fmtAge(list.updatedAt), title: `Created ${fmtAge(list.createdAt)}` });
+      tiles.push({ label: 'Edited', value: fmtAge(stored.updatedAt), title: `Created ${fmtAge(stored.createdAt)}` });
     }
     return tiles;
   }
@@ -1420,7 +1583,7 @@ export default function ListRoute() {
   // dynamic nature and, for a dynamic one, which combine op produced what's on screen. A bundle
   // shows its shop chip instead; owned/wishlist show whose account it is.
   function heroKindLabel(): string | null {
-    const list = userList();
+    const list = combineList();
     if (!list) return null;
     return list.kind === 'manual' ? 'Manual list' : opLabel(list.op);
   }
@@ -1474,7 +1637,7 @@ export default function ListRoute() {
     // Recently Looked Up is pure local search history (recentGames.ts) — worth saying outright,
     // since every other list here is either someone's Steam data or a list they built on purpose.
     if (kind === 'recent') return 'Games you looked up in this browser — local search history, never sent anywhere.';
-    const list = userList();
+    const list = combineList();
     if (list?.kind === 'dynamic') return formulaNote(list);
     return undefined;
   }
@@ -1496,6 +1659,34 @@ export default function ListRoute() {
 
   const heroActions: JSX.Element | undefined = (kind === 'recent' || kind === 'user') ? undefined : (
     <>
+      {kind === 'compare' && (
+        <>
+          {/* Gated on the players in the URL, not on the ones that resolved: a comparison naming
+              a private or misspelled profile is exactly when editing them has to be reachable. */}
+          <Show when={compareSlots().length >= 2}>
+            <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingPlayers(v => !v)}>
+              {editingPlayers() ? 'Cancel' : 'Edit players'}
+            </button>
+          </Show>
+          <Show when={compareList()}>
+            {/* Changing how the comparison is combined is a navigation, not local state: the op is
+                part of the URL, so a "just the games everyone owns" view is as shareable as the
+                grouped one it came from. */}
+            <select
+              value={compareOp()}
+              title="How to combine these players' libraries"
+              onChange={e => navigate(compareUrl(compareSlots(), e.currentTarget.value))}
+            >
+              <For each={Object.keys(OP_LABELS) as CombineOp[]}>
+                {op => <option value={op}>{OP_LABELS[op]}</option>}
+              </For>
+            </select>
+            <button type="button" class="btn btn-ghost btn-sm" title="Keep this comparison as a list of your own" onClick={handleSaveComparison}>
+              Save as a list
+            </button>
+          </Show>
+        </>
+      )}
       {kind === 'bundle' && (
         <>
           <Show when={bundleLinks().details}>
@@ -1583,6 +1774,10 @@ export default function ListRoute() {
   createEffect(() => {
     params.bundleId; params.listId; params.appid;
     if (kind === 'owned' || kind === 'wishlist') accountRev();
+    // A comparison lives entirely in the query string, not the path, so *that* is what has to be
+    // read here for editing the players (or the op) to reload without a remount. load()'s own
+    // guard is what keeps the canonicalizing rewrite from counting as a change.
+    if (kind === 'compare') compareKey();
     load();
   });
 
@@ -1656,6 +1851,20 @@ export default function ListRoute() {
           actions={heroActions}
           tiles={heroTiles()}
           note={heroNote()}
+        />
+      </Show>
+      {/* The players form is this route's empty state (fewer than two players in the URL) and its
+          edit affordance (the hero's "Edit players"), never a third thing — see
+          ComparePlayersForm.tsx on why it lives here rather than on Home. Keyed on the URL's own
+          slots so reopening it after a change starts from what's actually on screen. */}
+      <Show when={kind === 'compare' && (compareSlots().length < 2 || editingPlayers())}>
+        {/* `initialSlots` seeds the form's own draft state and is deliberately not a live
+            mirror of the URL — it's an editing buffer. */}
+        <ComparePlayersForm
+          initialSlots={compareSlots()}
+          submitLabel={compareSlots().length < 2 ? 'Compare libraries' : 'Compare'}
+          onCancel={editingPlayers() ? () => setEditingPlayers(false) : undefined}
+          onSubmit={slots => { setEditingPlayers(false); navigate(compareUrl(slots, compareOp())); }}
         />
       </Show>
       <div class="list-status">{statusText()}</div>
