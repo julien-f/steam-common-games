@@ -2,7 +2,7 @@
 
 import { buildMediaItems, resolveShotIndex } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
-import type { Game } from './types.ts';
+import type { Game, ReadonlyGame } from './types.ts';
 import type Hls from 'hls.js';
 // Pulled into its own plain-TS module (no JSX) so test/lightbox.test.js can still import it
 // directly — Node's test runner strips TypeScript syntax natively but has no JSX transform,
@@ -28,16 +28,24 @@ const LB_MUTE_ICON  = `<svg viewBox="0 0 14 12" width="16" height="14" fill="non
 // ── State ──────────────────────────────────────────────────────────────────
 // Converted from plain module-level variables to Solid signals for
 // the state that actually needs to trigger the (still deliberately imperative — see the
-// header comment above `renderLightbox` further down) per-step render: `shots`/`idx`/
-// `gameName`. Zoom/pan (`lbZoom`/`lbPanX`/`lbPanY`) and the slide-direction flag (`lbLastDir`)
+// header comment above `renderLightbox` further down) per-step render: the open game and
+// `idx`. Zoom/pan (`lbZoom`/`lbPanX`/`lbPanY`) and the slide-direction flag (`lbLastDir`)
 // stay plain variables, unchanged — nothing in JSX ever reads them (they only ever drive a
 // direct `img.style.transform`/animation-class write inside already-imperative gesture code),
 // so making them signals would add Solid overhead for zero reactive benefit, the same
 // reasoning `panel.tsx`'s own hero zoom-equivalent state would have gotten if this file had
 // any (it doesn't).
-const [shots, setShots] = createSignal<MediaItem[]>([]);
+const [lbGame, setLbGame] = createSignal<ReadonlyGame | null>(null);
 const [idx, setIdx] = createSignal(0);
-const [gameName, setGameName] = createSignal('');
+// Derived from the open game on each read, not snapshotted at open time — the same shape, for
+// the same reason, as `PanelHero`'s own `items()` (panel.tsx): a row opened before its details
+// have streamed in has nothing but a banner to offer, and gains its screenshots and videos
+// asynchronously *without the row object ever being replaced*, so only a read through the store
+// proxy sees them arrive. Snapshotting meant such a game showed that lone banner for as long as
+// it stayed open. Plain accessors rather than `createMemo`s: a memo at module level would need
+// its own `createRoot` (see the effect at the foot of this file) to cache two array spreads.
+const shots = () => { const g = lbGame(); return g ? buildMediaItems(g.appid, g.details?.meta) : []; };
+const gameName = () => lbGame()?.name ?? '';
 let lbZoom = 1, lbPanX = 0, lbPanY = 0, lbLastDir = 0, lbVcTimer: ReturnType<typeof setTimeout> | undefined;
 
 type LbVideo = HTMLVideoElement & { _hls?: { destroy: () => void } | null; _hlsToken?: number };
@@ -68,7 +76,7 @@ export function initLightbox({ onParamChange, onGameNav }: { onParamChange?: (sh
   mountLightboxDom();
 }
 
-export function isLightboxOpen() { return shots().length > 0; }
+export function isLightboxOpen() { return lbGame() !== null; }
 
 // ── Fullscreen button sync ─────────────────────────────────────────────────
 
@@ -388,7 +396,7 @@ function wireButtons(lb: HTMLElement) {
 
 function wireKeyboard(lb: HTMLElement) {
   document.addEventListener('keydown', e => {
-    if (!shots().length) return;
+    if (!isLightboxOpen()) return;
     const onScrub = (e.target as HTMLElement | null)?.classList.contains('lb-vc-scrub');
 
     // Focus trap
@@ -650,12 +658,11 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
   // inside the lightbox itself, so closing would restore focus to something already hidden.
   if (!isLightboxOpen()) _lbPrevFocus = document.activeElement;
   const newShots = buildMediaItems(game.appid, game.details?.meta);
-  // Batched: setShots alone would otherwise let the render effect below run once with the new
-  // (possibly shorter) shots list but the previous game's stale idx, indexing past the end of
-  // the new list.
+  // Batched: setLbGame alone would otherwise let the render effect below run once with the new
+  // game's (possibly shorter) media list but the previous game's stale idx, indexing past the
+  // end of the new list.
   batch(() => {
-    setGameName(game.name || '');
-    setShots(newShots);
+    setLbGame(game);
     setIdx(resolveShotIndex(newShots, idxOrShotId));
   });
   const lb = document.getElementById('screenshot-lightbox')!;
@@ -666,7 +673,7 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
 }
 
 export function closeLightbox() {
-  setShots([]);
+  setLbGame(null);
   clearTimeout(lbVcTimer);
   const lb = document.getElementById('screenshot-lightbox')!;
   stopHls(lb.querySelector<LbVideo>('.lb-video'));
@@ -707,10 +714,11 @@ function gotoLightbox(target: number) {
 // manually after mutating plain module variables.
 function renderLightbox() {
   const list = shots();
-  // Defensively clamped, same idiom panel.tsx's own hero index uses — every current write path
-  // (openLightbox's batch(), stepLightbox's modulo, gotoLightbox's explicit target) already
-  // keeps idx() in bounds, so this never actually fires today; it's a backstop against a future
-  // write path (e.g. a "remove current shot" action) reintroducing an out-of-bounds `list[i]`.
+  // Defensively clamped, same idiom panel.tsx's own hero index uses. Every *write* path
+  // (openLightbox's batch(), stepLightbox's modulo, gotoLightbox's explicit target) keeps idx()
+  // in bounds on its own, but the list itself is derived now and can shrink underneath a
+  // perfectly valid index — a ↻ Refresh whose new details carry fewer screenshots than the
+  // previous ones did is enough.
   const i = Math.max(0, Math.min(idx(), list.length - 1));
   const name = gameName();
   const lb = document.getElementById('screenshot-lightbox')!;
