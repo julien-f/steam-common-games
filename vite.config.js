@@ -14,7 +14,6 @@
 // frontend source directory happens to be named public/ too.
 const { defineConfig } = require('vite');
 const solidPlugin = require('vite-plugin-solid');
-const path = require('node:path');
 
 module.exports = defineConfig({
   root: 'public',
@@ -38,10 +37,8 @@ module.exports = defineConfig({
   build: {
     outDir: '../dist',
     emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'public/index.html'),
-      },
-    },
+    // Only chunk over the 500 kB default is hls.js, lazy-imported by lightbox.tsx and never
+    // in the initial load; 600 keeps the warning guarding the ~310 kB entry chunk.
+    chunkSizeWarningLimit: 600,
   },
 });
