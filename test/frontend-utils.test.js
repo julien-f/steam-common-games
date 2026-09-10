@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeInput, steamVanity, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier, dealRecordTier, fmtAge } = require('../public/utils.ts');
+const { normalizeInput, steamVanity, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier, dealRecordTier, fmtAge, isTextEntry } = require('../public/utils.ts');
 
 // ── normalizeInput ────────────────────────────────────────────────────────────
 
@@ -376,4 +376,34 @@ test('fmtAge: steps through minutes, hours, days and months', () => {
   assert.equal(fmtAge(now - 6 * day, now), '6 days ago');
   assert.equal(fmtAge(now - 45 * day, now), '1 month ago');
   assert.equal(fmtAge(now - 70 * day, now), '2 months ago');
+});
+
+// ── isTextEntry ───────────────────────────────────────────────────────────────
+
+test('isTextEntry: a text field, textarea or select swallows keys', () => {
+  assert.equal(isTextEntry({ tagName: 'INPUT', type: 'text' }), true);
+  assert.equal(isTextEntry({ tagName: 'INPUT', type: 'search' }), true);
+  assert.equal(isTextEntry({ tagName: 'INPUT', type: 'number' }), true);
+  assert.equal(isTextEntry({ tagName: 'TEXTAREA' }), true);
+  assert.equal(isTextEntry({ tagName: 'SELECT' }), true);
+});
+
+// The regression this exists for: the game table puts a checkbox on every row, and treating one
+// as text entry killed every page shortcut (R, ↑/↓, /, ?) for as long as focus sat on it.
+test('isTextEntry: a checkbox, radio or button does not', () => {
+  assert.equal(isTextEntry({ tagName: 'INPUT', type: 'checkbox' }), false);
+  assert.equal(isTextEntry({ tagName: 'INPUT', type: 'radio' }), false);
+  assert.equal(isTextEntry({ tagName: 'INPUT', type: 'range' }), false);
+  assert.equal(isTextEntry({ tagName: 'BUTTON' }), false);
+});
+
+test('isTextEntry: contenteditable counts, a plain element does not', () => {
+  assert.equal(isTextEntry({ tagName: 'DIV', isContentEditable: true }), true);
+  assert.equal(isTextEntry({ tagName: 'DIV' }), false);
+  assert.equal(isTextEntry({ tagName: 'IMG' }), false);
+});
+
+test('isTextEntry: no focused element at all', () => {
+  assert.equal(isTextEntry(null), false);
+  assert.equal(isTextEntry(undefined), false);
 });

@@ -17,6 +17,7 @@
 //   conditional on that — same idiom `panelStepHero`'s own boolean return already uses for
 //   ArrowLeft/Right — rather than always firing even when there was nothing to step to.
 import { panelHandleEscape } from './panel.tsx';
+import { isTextEntry } from './utils.ts';
 
 export interface PanelKeyboardOptions {
   isLightboxOpen: () => boolean;
@@ -46,8 +47,7 @@ export function bindPanelKeyboardShortcuts(opts: PanelKeyboardOptions): void {
     // than firing invisibly behind it.
     if (opts.isLightboxOpen()) return;
     if (opts.shortcuts && e.key === '?') { e.preventDefault(); opts.shortcuts.toggle(); return; }
-    const tag = document.activeElement?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (isTextEntry(document.activeElement)) return;
     if (opts.focusSearchInput && e.key === '/') { e.preventDefault(); opts.focusSearchInput(); return; }
     if (opts.onEnterOnFocusedRow && e.key === 'Enter' && opts.onEnterOnFocusedRow()) return;
     if (!opts.isPanelOpen()) return;

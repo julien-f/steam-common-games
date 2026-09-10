@@ -234,3 +234,25 @@ export function renderExtraCell(game: Game): string {
   const h = game.details?.hltb;
   return h ? fmtH(h.extra) : '<span class="dim">—</span>';
 }
+
+// Whether focus is somewhere that genuinely swallows a plain letter or arrow key, and so must
+// suppress the page's own keyboard shortcuts (see panelKeyboard.ts). Deliberately *not* "any
+// <input>", which is what this replaced: the game table puts a selection checkbox on every row,
+// and treating one of those as text entry silently killed every shortcut on the page — R, ↑/↓,
+// `/`, `?` — for as long as focus stayed on it, with nothing on screen to say why. A checkbox,
+// radio or button swallows none of those keys. A <select> does (a letter types ahead through its
+// options, arrows change the value), so it stays blocked.
+// Duck-typed on `tagName`/`type` rather than `instanceof HTMLInputElement`: it keeps this module
+// free of a DOM dependency it otherwise has none of, and an `instanceof` check against the
+// window's own constructors is wrong for an element from another realm anyway.
+const TEXT_ENTRY_INPUT_TYPES = new Set([
+  'text', 'search', 'email', 'url', 'tel', 'password', 'number',
+  'date', 'datetime-local', 'month', 'time', 'week',
+]);
+export function isTextEntry(el: { tagName?: string; type?: string; isContentEditable?: boolean } | null | undefined): boolean {
+  const tag = el?.tagName;
+  if (!tag) return false;
+  if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (tag === 'INPUT') return TEXT_ENTRY_INPUT_TYPES.has(el!.type ?? '');
+  return el!.isContentEditable === true;
+}
