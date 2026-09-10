@@ -49,6 +49,21 @@ const gameName = () => lbGame()?.name ?? '';
 let lbZoom = 1, lbPanX = 0, lbPanY = 0, lbLastDir = 0, lbVcTimer: ReturnType<typeof setTimeout> | undefined;
 
 type LbVideo = HTMLVideoElement & { _hls?: { destroy: () => void } | null; _hlsToken?: number };
+
+// The <video> is kept *out* of the DOM unless a video is actually on screen, and held by
+// reference instead. It used to sit there from page load, which made every page of this app
+// look like a video page to the rest of the browser: media-key routing, Picture-in-Picture
+// affordances, and any extension that arms itself on the mere presence of a media element.
+// Video Speed Controller is the concrete case — it binds keydown in the *capture* phase on
+// `document` and swallows its own shortcuts (`r` among them) as soon as one connected <video>
+// exists anywhere on the page, which silently killed this app's own R/↑/↓ before they were ever
+// dispatched. Detached, none of that sees it; attached, such an extension is armed exactly while
+// a trailer is playing, which is when its owner wants it. Held by reference rather than
+// re-queried because `wireVideoControls` binds to it once at mount, while it is detached.
+let lbVideoEl!: LbVideo;
+let lbVideoAnchor!: Element;
+function attachLbVideo() { if (!lbVideoEl.isConnected) lbVideoAnchor.before(lbVideoEl); }
+function detachLbVideo() { lbVideoEl.remove(); }
 type LbFlashEl = HTMLElement & { _flashTimer?: ReturnType<typeof setTimeout> };
 
 const LB_SEEK_SECONDS = 5;
@@ -198,7 +213,7 @@ function retryCurrentShot() {
   const shot = shots()[idx()];
   if (!shot) return;
   if (shot.type === 'video') {
-    const vid = document.querySelector<LbVideo>('#screenshot-lightbox .lb-video')!;
+    const vid = lbVideoEl;
     playHls(vid, shot.hls);
   } else {
     const img = document.querySelector<HTMLImageElement>('#screenshot-lightbox .lb-img')!;
@@ -310,8 +325,7 @@ function showLbChrome() {
 function schedHideLbChrome() {
   const lb  = document.getElementById('screenshot-lightbox');
   if (!lb) return;
-  const vid = lb.querySelector<HTMLVideoElement>('.lb-video');
-  const isPausedVideo = vid && vid.style.display !== 'none' && vid.paused;
+  const isPausedVideo = lbVideoEl.isConnected && lbVideoEl.paused;
   clearTimeout(lbVcTimer);
   if (!isPausedVideo) lbVcTimer = setTimeout(() => lb.classList.add('lb-idle'), 3000);
 }
@@ -453,7 +467,7 @@ function wireKeyboard(lb: HTMLElement) {
     }
 
     const vc = lb.querySelector<HTMLElement>('.lb-vctrls');
-    const vid = vc && vc.style.display !== 'none' ? lb.querySelector<HTMLVideoElement>('.lb-video') : null;
+    const vid = vc && vc.style.display !== 'none' ? lbVideoEl : null;
 
     if ((!onScrub || e.shiftKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
       e.preventDefault();
@@ -588,7 +602,7 @@ function wireTouchHandlers(lb: HTMLElement) {
     const dx = endX - lbX, dy = endY - lbY;
     const isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
     const showingImg = lb.querySelector<HTMLImageElement>('.lb-img')!.style.display !== 'none';
-    const showingVid = lb.querySelector<HTMLVideoElement>('.lb-video')!.style.display !== 'none';
+    const showingVid = lbVideoEl.isConnected;
     if (isTap && (showingImg || showingVid)) {
       const now = Date.now();
       const tapDist = Math.hypot(endX - lbLastTapX, endY - lbLastTapY);
@@ -603,7 +617,7 @@ function wireTouchHandlers(lb: HTMLElement) {
           // toggles play/pause via the video's own 'click' listener.
           const rect = lb.getBoundingClientRect();
           const frac = (endX - rect.left) / rect.width;
-          const vid = lb.querySelector<HTMLVideoElement>('.lb-video');
+          const vid = lbVideoEl;
           if (frac < 1 / 3) { seekVideo(vid, -LB_TOUCH_SEEK_SECONDS); flashSeek('left'); }
           else if (frac > 2 / 3) { seekVideo(vid, LB_TOUCH_SEEK_SECONDS); flashSeek('right'); }
         }
@@ -621,7 +635,7 @@ function wireTouchHandlers(lb: HTMLElement) {
 }
 
 function wireVideoControls(lb: HTMLElement) {
-  const vid2    = lb.querySelector<HTMLVideoElement>('.lb-video')!;
+  const vid2    = lbVideoEl;
   const vc2     = lb.querySelector<HTMLElement>('.lb-vctrls')!;
   const scrub   = vc2.querySelector<HTMLInputElement>('.lb-vc-scrub')!;
   const timEl   = vc2.querySelector<HTMLElement>('.lb-vc-time')!;
@@ -689,6 +703,9 @@ function wireVideoControls(lb: HTMLElement) {
 function mountLightboxDom() {
   render(() => <LightboxDom />, document.body);
   const lb = document.getElementById('screenshot-lightbox')!;
+  lbVideoEl = lb.querySelector<LbVideo>('.lb-video')!;
+  lbVideoAnchor = lb.querySelector('.lb-next')!; // re-inserted here, keeping the original order
+  detachLbVideo(); // a closed lightbox shows nothing, so it holds no media element
   wireButtons(lb);
   wireKeyboard(lb);
   wireMouseHandlers(lb);
@@ -746,7 +763,8 @@ export function closeLightbox() {
   _awaitingMedia = null;
   clearTimeout(lbVcTimer);
   const lb = document.getElementById('screenshot-lightbox')!;
-  stopHls(lb.querySelector<LbVideo>('.lb-video'));
+  stopHls(lbVideoEl);
+  detachLbVideo();
   lb.classList.remove('open', 'lb--loading', 'lb-idle');
   document.body.classList.remove('lb-open');
   if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
@@ -826,7 +844,7 @@ function renderLightbox() {
   const lb = document.getElementById('screenshot-lightbox')!;
   const shot = list[i];
   const img  = lb.querySelector<HTMLImageElement>('.lb-img')!;
-  const vid  = lb.querySelector<LbVideo>('.lb-video')!;
+  const vid  = lbVideoEl;
   const vc   = lb.querySelector<HTMLElement>('.lb-vctrls')!;
   const dir  = lbLastDir;
   lbLastDir = 0;
@@ -845,6 +863,7 @@ function renderLightbox() {
   if (shot.type === 'video') {
     img.style.display = 'none';
     lb.classList.remove('lb--loading');
+    attachLbVideo();
     vid.style.display = 'block';
     vid.poster = shot.thumb || '';
     vid.setAttribute('aria-label', label);
@@ -854,8 +873,8 @@ function renderLightbox() {
     schedHideLbChrome();
   } else {
     stopHls(vid);
+    detachLbVideo();
     vc.style.display = 'none';
-    vid.style.display = 'none';
     img.style.display = 'block';
     img.alt = label;
     img.onload = null;
