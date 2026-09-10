@@ -83,6 +83,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **The lightbox stopped blinking while a list loads behind it.** Its caption reads the open game's position in the list, which on a list route reaches the table's `processedData()` — a signal recomputed on every batch of streaming rows. Reading it from inside the lightbox's own render subscribed the *whole* render to it, so a list still loading restarted the full-size image load several times a second. The caption is its own render pass now: the position still follows a list as it grows, without touching the image.
+
 - **The lightbox now picks up screenshots that arrive while it's open.** It snapshotted its media list at open time, so a game whose details hadn't streamed in yet had nothing but its banner in that list — and went on showing it for as long as the lightbox stayed open, ←/→ dead, even once the real media had loaded behind it. That's the state every row reached by paging ↑/↓ through a list faster than it loads is in. It holds the open game now and derives the list from it on each read, the same accessor the panel's own hero carousel uses.
 
 - **↑/↓ inside the lightbox now actually shows the next game.** The keys were bound and documented (`?` lists them), and they did step the panel behind the overlay — but the lightbox snapshots its media list when it opens, so it went on showing the *previous* game's screenshots and the keys read as dead. Stepping now re-points it at the new game, opening on its banner (always present, even for a row whose details haven't streamed in yet).

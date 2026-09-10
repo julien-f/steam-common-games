@@ -11,7 +11,7 @@ import type Hls from 'hls.js';
 import { fmtTime } from './lightboxTime.ts';
 export { fmtTime } from './lightboxTime.ts';
 
-import { createSignal, createEffect, createRoot, batch } from 'solid-js';
+import { createSignal, createEffect, createRoot, batch, untrack } from 'solid-js';
 import { render } from 'solid-js/web';
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -779,6 +779,33 @@ function gotoLightbox(target: number) {
   _onLightboxParamChange?.(shots()[target].shotId);
 }
 
+// The caption, rendered on its own rather than as part of `renderLightbox` below. It carries
+// the game/shot identity that used to exist only as invisible alt text (see `label` there), so
+// switching games while the lightbox stays open (↑/↓, R) is visibly confirmed even when the new
+// shot looks much like the old one — plus the position in the *list*, which the `1 / 12` media
+// counter says nothing about. Split out because it's the one part reading the host's list
+// position: that read must stay tracked for the position to follow a list still streaming in,
+// and must not drag a full image reload along with it each time. Two text writes, no media.
+function renderLbCaption() {
+  const lb = document.getElementById('screenshot-lightbox');
+  if (!lb) return;
+  const name = gameName();
+  const pos = _getGamePosition?.() ?? null;
+  const caption = lb.querySelector<HTMLElement>('.lb-caption')!;
+  // The two counters wear the same pill (`.lb-counter` is the other), one per axis, so they read
+  // as a pair and neither is mistaken for part of the title beside it.
+  const posEl = caption.querySelector<HTMLElement>('.lb-caption-pos')!;
+  posEl.textContent = pos ? `${pos.index + 1} / ${pos.total}` : '';
+  posEl.style.display = pos ? '' : 'none';
+  caption.querySelector<HTMLElement>('.lb-caption-text')!.textContent = name;
+  caption.style.display = name || pos ? '' : 'none';
+  // No list behind the open game (a standalone lookup) means nothing to step to. Hiding them
+  // inline also drops them out of the Tab focus trap — see getFocusable.
+  for (const sel of ['.lb-game-prev', '.lb-game-next']) {
+    caption.querySelector<HTMLElement>(sel)!.style.display = pos ? '' : 'none';
+  }
+}
+
 // The actual per-shot render — deliberately kept as a plain imperative function (called from
 // inside a `createEffect` below, not decomposed into fine-grained JSX bindings) rather than
 // converted the way `panel.tsx`'s own body was. Unlike that file, there's no template shape
@@ -806,25 +833,13 @@ function renderLightbox() {
   resetLbZoom();
   showLbChrome();
   hideLbError();
-  // Visible game-name caption — the game/shot identity used to exist only as invisible
-  // alt/aria-label text (see `label` below), so switching games while the lightbox stayed open
-  // (↑/↓, R) had no on-screen confirmation it had happened at all, especially when the new shot
-  // looked much like the old one. It carries the position in the list too: `1 / 12` below counts
-  // this game's own media, which says nothing about how far through 343 rows you are.
-  const caption = lb.querySelector<HTMLElement>('.lb-caption')!;
-  const pos = _getGamePosition?.() ?? null;
-  // The two counters wear the same pill (`.lb-counter` below is the other), one per axis, so
-  // they read as a pair and neither is mistaken for part of the title beside it.
-  const posEl = caption.querySelector<HTMLElement>('.lb-caption-pos')!;
-  posEl.textContent = pos ? `${pos.index + 1} / ${pos.total}` : '';
-  posEl.style.display = pos ? '' : 'none';
-  caption.querySelector<HTMLElement>('.lb-caption-text')!.textContent = name;
-  caption.style.display = name || pos ? '' : 'none';
-  // No list behind the open game (a standalone lookup) means nothing to step to. Hiding them
-  // inline also drops them out of the Tab focus trap — see getFocusable.
-  for (const sel of ['.lb-game-prev', '.lb-game-next']) {
-    caption.querySelector<HTMLElement>(sel)!.style.display = pos ? '' : 'none';
-  }
+  // Untracked, and this is load-bearing: `_getGamePosition` reaches the route's list, which on
+  // a list route is the table's `processedData()` — a signal recomputed on every batch of
+  // streaming rows. Reading it in *this* effect subscribed the whole imperative render below to
+  // it, so a list still loading behind the overlay restarted the image load several times a
+  // second and the lightbox visibly blinked. The caption keeps it live in its own pass instead
+  // (`renderLbCaption`); the alt text here is rebuilt on every step anyway.
+  const pos = untrack(() => _getGamePosition?.() ?? null);
   const label = `${name ? name + ' — ' : ''}${pos ? `game ${pos.index + 1} of ${pos.total} — ` : ''}` +
     `${shot.type === 'video' ? 'Video' : 'Screenshot'} ${i + 1} of ${list.length}`;
   if (shot.type === 'video') {
@@ -942,5 +957,8 @@ createRoot(() => {
   createEffect(() => {
     const list = shots(); idx(); gameName();
     if (list.length) renderLightbox();
+  });
+  createEffect(() => {
+    if (shots().length) renderLbCaption();
   });
 });
