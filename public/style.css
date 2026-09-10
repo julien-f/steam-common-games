@@ -12,6 +12,9 @@
   --accent2: #66c0f4;
   --border: #3d5068;
   --r: 6px;
+  /* The side panel's width, and the gutter `.app-shell.panel-open` reserves for it — one
+     value, since the panel is `position: fixed` and no longer measures the layout itself. */
+  --panel-w: 380px;
 }
 
 /* Themes @vates/data-table-solid's own internals (its portaled column/filter/group submenus
@@ -734,55 +737,124 @@ tbody tr.game-row { cursor: pointer; }
 tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 
 /* App shell layout (see docs/dev/frontend.md and AppShell.tsx)
-   — `.app-shell` is the root column (nav bar, then the recents bar, then the body filling
-   whatever's left); `.app-body` holds the routed content and the side panel as two flex
-   siblings, so the panel docks next to whatever's showing instead of overlaying it. */
+   — `.app-shell` is the root: `.app-scroll` (nav bar, routed content, footer — everything that
+   scrolls together, as one column) plus the side panel, which is fixed and full-height rather
+   than a flex sibling of any of it (see below).
+
+   The shell is locked to the viewport and `.app-scroll` scrolls inside it, rather than the
+   document scrolling as a whole: with the panel now full-height at the right edge, a document
+   scrollbar would sit immediately next to the panel's own — two scrollbars a few pixels apart.
+   This leaves one scrollbar per column, each at the right edge of the thing it scrolls. The nav
+   bar and footer live *inside* that scroller rather than being pinned siblings of it, so they
+   still scroll away with the content the way they did when the document scrolled. */
 .app-shell {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh; /* mobile browser chrome — the vh fallback above stays for older engines */
+  overflow: hidden;
 }
-.app-body {
-  display: flex;
-  align-items: stretch;
+.app-scroll {
   flex: 1;
   min-height: 0;
-}
-.app-content {
-  flex: 1;
   min-width: 0;
+  overflow-y: auto; /* the page's scroller — see .app-shell's comment above */
+  display: flex;
+  flex-direction: column;
+}
+.app-content { flex: 1; } /* pushes the footer to the bottom on a page shorter than the viewport */
+
+@media (min-width: 769px) {
+  /* The panel is out of flow, so the shell reserves its width instead of laying it out: the nav
+     bar and footer shorten along with the content rather than running underneath a panel that
+     now reaches the top of the viewport. Below 769px the panel is full-width, so no gutter. */
+  .app-shell.panel-open { padding-right: var(--panel-w); }
 }
 
-/* Side panel — docked, not modal: a sibling column, not an overlay. No backdrop at all (see
+@media (max-width: 768px) {
+  /* No viewport lock on a phone: the document scrolls again, as it did before the panel became
+     full-height. The twin-scrollbar problem the lock solves is desktop-only — here the panel is
+     a full-screen overlay, never a second column, and touch scrollbars are overlays anyway —
+     while the lock's own cost is real: a document that never scrolls is a browser URL bar that
+     never collapses, on the viewport that can least afford the height. */
+  .app-shell {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+  .app-scroll { overflow-y: visible; }
+}
+
+/* Back to top — one small fixed button rather than a pinned nav bar, since the nav scrolls away
+   with everything else now. Sits inside the content column's own bottom-right corner: `fixed` is
+   viewport-relative and so doesn't see `.app-shell`'s gutter padding, hence the explicit offset
+   while the panel is open. Its z-index is deliberately below the panel's, so the mobile
+   full-screen panel covers it instead of floating a stray button over the game details. */
+.app-to-top {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  color: var(--text1);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.35);
+  transition: border-color 0.15s, color 0.15s, opacity 0.15s;
+}
+.app-to-top:hover { border-color: var(--accent); color: var(--accent2); }
+@media (min-width: 769px) {
+  .app-shell.panel-open .app-to-top { right: calc(var(--panel-w) + 16px); }
+}
+
+/* Side panel — docked, not modal: a column of its own, not an overlay. No backdrop at all (see
    AppShell.tsx) — closing is always an explicit action (the ×, Escape, or swipe), never a
    click outside. Hidden entirely (not just visually) until a game is open, so the content
-   column gets the full width back; falls back to a full-screen overlay only on narrow
-   viewports (see the max-width query below) — a layout fallback, not a return to modal
-   semantics, since there's still no backdrop/click-outside-dismiss even there. */
+   column gets the full width back (`.app-shell.panel-open` above reserves the gutter only
+   while it's open).
+
+   `position: fixed`, spanning the full viewport height, rather than a flex sibling inside
+   `.app-body`: as a sibling it started below the nav bar (a strip of page background above it)
+   and, since nothing in the shell is height-constrained, stretched to the whole *document*
+   height — which meant `.panel-body`'s own scrolling never engaged and `.panel-nav`'s
+   bottom-pinned bar landed at the bottom of the page instead of the panel. Fixed restores both
+   and puts the panel flush with the top of the screen. */
 .game-panel {
   display: none;
-  position: relative; /* .panel-nav below pins to this via position:absolute — see its own comment */
-  width: 380px;
+  position: fixed; /* also .panel-nav's containing block — see its own comment below */
+  top: 0;
+  right: 0;
+  z-index: 100; /* over the content; under the lightbox (1000) and the shortcuts modal (200) */
+  height: 100vh;
+  height: 100dvh; /* mobile browser chrome — the vh fallback above stays for older engines */
+  width: var(--panel-w);
   max-width: 100vw;
   background: var(--bg1);
   border-left: 1px solid var(--border);
   flex-direction: column;
-  flex-shrink: 0;
   overflow: hidden;
 }
 .game-panel.open { display: flex; }
 
 @media (min-width: 1400px) {
-  .game-panel { width: min(480px, 30vw); }
+  :root { --panel-w: min(480px, 30vw); }
 }
 
 @media (max-width: 768px) {
-  /* No room for a docked two-column layout at this width — the panel becomes a full-screen
-     overlay instead. Still non-modal: no backdrop, no click-outside-dismiss, just a layout
-     fallback. */
+  /* No room for a docked two-column layout at this width — the panel spans the full width
+     instead, and the shell reserves no gutter for it. Still non-modal: no backdrop, no
+     click-outside-dismiss, just a layout fallback. */
   .game-panel.open {
-    position: fixed;
-    inset: 0;
     z-index: 101;
     width: 100vw;
   }
@@ -981,10 +1053,9 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 /* Sticky to the bottom of the panel on both desktop and mobile now (previously sat
    between the hero and the body, which meant reaching it on desktop required
    scrolling back up past the hero every time) — one behavior instead of two, and it
-   keeps prev/next/random reachable without the trip. `.game-panel` is `position:
-   relative` (previously `fixed`, before the panel became a docked column — see its own
-   comment), so this `position: absolute` still pins to its bottom edge without needing any
-   DOM change. `:empty` hides it entirely for standalone lookups (no group/list to
+   keeps prev/next/random reachable without the trip. `.game-panel` is `position: fixed`, so
+   this `position: absolute` pins to the bottom edge of the panel — i.e. the bottom of the
+   viewport — without needing any DOM change. `:empty` hides it entirely for standalone lookups (no group/list to
    page through) rather than showing an empty floating bar. */
 .panel-nav {
   position: absolute;

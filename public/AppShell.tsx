@@ -8,11 +8,11 @@
 // open/close/position mechanics used to live here as a deliberate, temporary duplicate of
 // nav.tsx's identically-named pair for exactly that transition period; they're now navPopover.ts's
 // `bindNavPopover`, shared with the account chip's own popover (AccountChip.tsx).
-import { onMount, onCleanup, createEffect, createSignal, For, type JSX } from 'solid-js';
+import { onMount, onCleanup, createEffect, createSignal, on, For, Show, type JSX } from 'solid-js';
 import { A, useNavigate, useLocation, type RouteSectionProps } from '@solidjs/router';
 import { prefsPopoverPanelHtml, initPrefsPopover } from './prefsPopover.ts';
-import { initLightbox, isLightboxOpen } from './lightbox.tsx';
-import { initPanel, isPanelOpen, panelClose, panelStepHero } from './panel.tsx';
+import { initLightbox, isLightboxOpen, openLightbox } from './lightbox.tsx';
+import { initPanel, isPanelOpen, getPanelGame, panelClose, panelStepHero } from './panel.tsx';
 import { bindPanelKeyboardShortcuts } from './panelKeyboard.ts';
 import { initGameSearch } from './gameSearch.ts';
 import { addRecentGame, loadRecentGames } from './recentGames.ts';
@@ -73,8 +73,13 @@ const NAV_LINKS: { href: string; label: string; end?: boolean; noAccountParam?: 
   { href: '/bundles', label: 'Bundles' },
 ];
 
+// Roughly a screenful: far enough down that the nav bar is long gone, so the ↑ button appears
+// only once it has something to offer.
+const TO_TOP_AFTER_PX = 600;
+
 export function AppShell(props: RouteSectionProps): JSX.Element {
   let searchInputEl!: HTMLInputElement;
+  let scrollEl!: HTMLDivElement;
   let prefsDetailsEl!: HTMLDetailsElement;
   let prefsWrapEl!: HTMLDivElement;
   // The `?` shortcuts dialog — see ShortcutsModal.tsx. State lives here because
@@ -82,8 +87,21 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
   // all along; nothing has passed it since the pages that owned the old static dialog markup
   // were deleted, so `?` silently did nothing).
   const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
+  // Whether the page is scrolled far enough down to be worth offering the ↑ button — the nav bar
+  // scrolls away with everything else, so this is the only way back up short of a long drag.
+  const [scrolled, setScrolled] = createSignal(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // `.app-scroll` is the page's scroller, except below 769px, where the shell isn't
+  // viewport-locked and the document scrolls instead (see style.css's `.app-shell`) — so reading
+  // or setting "the page's scroll position" has to cover both. Whichever isn't the live scroller
+  // is already at 0 and ignores the write.
+  const pageScrollTop = () => scrollEl.scrollTop || window.scrollY;
+  function scrollPageToTop(behavior?: ScrollBehavior): void {
+    scrollEl.scrollTo({ top: 0, behavior });
+    window.scrollTo({ top: 0, behavior });
+  }
 
   // `?u=` (the account-override param — see accountOverride.ts/accountsStore.ts) is resolved
   // here, once for the whole app, rather than per route: the shell outlives every navigation, so
@@ -92,6 +110,13 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
   // them. This effect runs on every URL change — syncFromUrl itself is keyed on the identifiers,
   // so an unrelated param write (a panel `?game=`, a lightbox `&shot=`) costs nothing.
   createEffect(() => syncAccountOverrideFromUrl(location.search));
+
+  // Scroll to the top on navigation. The router does this itself (`window.scrollTo(0, 0)` on
+  // every non-hash navigation), which no longer reaches the desktop layout's own scroller — so
+  // without this a route change would land wherever the previous one was scrolled to.
+  // Keyed on the path alone: the panel's `?game=`/`&shot=` params are raw `history.replaceState`
+  // writes (urlState.ts), which never scrolled the window either.
+  createEffect(on(() => location.pathname, () => scrollPageToTop()));
 
   // The one place a game-lookup, from anywhere in the shell, gets routed to wherever it belongs
   // — the currently mounted route's own registered handler if it has one (ListRoute: opens the
@@ -106,6 +131,12 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
   }
 
   onMount(() => {
+    // Capture, because scroll events don't bubble and the scroller differs by viewport width —
+    // the same idiom navPopover.ts uses to follow either one.
+    const onScroll = () => setScrolled(pageScrollTop() > TO_TOP_AFTER_PX);
+    window.addEventListener('scroll', onScroll, true);
+    onCleanup(() => window.removeEventListener('scroll', onScroll, true));
+
     initLightbox({
       // `&shot=<id>` deep links: the lightbox reports every open/step/close, and this writes it
       // next to the panel's own `?game=`. Wiring this back is what makes a copied link reopen the
@@ -113,8 +144,16 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       // the param was parsed and ordered but never written.
       onParamChange: shot => setLightboxParam(shot),
       // ↑/↓ inside the lightbox steps to the previous/next game in whatever list is on screen,
-      // same handler the panel's own ↑/↓ uses.
-      onGameNav: dir => { routeHandlers.stepGame?.(dir === 1 ? 1 : -1); },
+      // same handler the panel's own ↑/↓ uses. Re-pointing the lightbox at the new game is this
+      // callback's job: `openLightbox` snapshots its media list, so stepping the panel behind
+      // the overlay otherwise left the *previous* game's shots on screen and the keys read as
+      // dead. Opening at index 0 (the banner) — buildMediaItems always yields at least that, so
+      // a row whose details haven't streamed in yet still shows something.
+      onGameNav: dir => {
+        if (!routeHandlers.stepGame?.(dir === 1 ? 1 : -1)) return;
+        const game = getPanelGame();
+        if (game) openLightbox(game, 0);
+      },
     });
     initPanel({
       onClose: () => {
@@ -167,51 +206,56 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
   });
 
   return (
-    <div class="app-shell">
-      <nav id="site-nav" class="site-nav">
-        <For each={NAV_LINKS}>
-          {link => (
-            <A
-              href={link.noAccountParam ? link.href : withAccountParam(link.href, location.search)}
-              end={link.end}
-              class="site-nav-link"
-              activeClass="active"
-            >
-              {link.label}
-            </A>
-          )}
-        </For>
-        <div class="app-search-wrap">
-          <input ref={searchInputEl} id="app-search-input" type="text" placeholder="Look up any game…" autocomplete="off" />
-          <div id="app-search-results" class="game-search-results" hidden />
-        </div>
-        <AccountChip />
-        <details class="site-nav-prefs site-nav-popover" ref={prefsDetailsEl}>
-          <summary class="site-nav-link site-nav-prefs-btn" aria-label="Preferences">⚙</summary>
-          {/* eslint-disable-next-line solid/no-innerhtml -- prefsPopoverPanelHtml() is this app's
-              own static markup for the popover's contents (prefsPopover.ts, which then wires the
-              region <select> up imperatively); no external input reaches it. */}
-          <div ref={prefsWrapEl} innerHTML={prefsPopoverPanelHtml()} />
-        </details>
-      </nav>
+    <div class="app-shell" classList={{ 'panel-open': isPanelOpen() }}>
+      <div class="app-scroll" ref={scrollEl}>
+        <nav id="site-nav" class="site-nav">
+          <For each={NAV_LINKS}>
+            {link => (
+              <A
+                href={link.noAccountParam ? link.href : withAccountParam(link.href, location.search)}
+                end={link.end}
+                class="site-nav-link"
+                activeClass="active"
+              >
+                {link.label}
+              </A>
+            )}
+          </For>
+          <div class="app-search-wrap">
+            <input ref={searchInputEl} id="app-search-input" type="text" placeholder="Look up any game…" autocomplete="off" />
+            <div id="app-search-results" class="game-search-results" hidden />
+          </div>
+          <AccountChip />
+          <details class="site-nav-prefs site-nav-popover" ref={prefsDetailsEl}>
+            <summary class="site-nav-link site-nav-prefs-btn" aria-label="Preferences">⚙</summary>
+            {/* eslint-disable-next-line solid/no-innerhtml -- prefsPopoverPanelHtml() is this app's
+                own static markup for the popover's contents (prefsPopover.ts, which then wires the
+                region <select> up imperatively); no external input reaches it. */}
+            <div ref={prefsWrapEl} innerHTML={prefsPopoverPanelHtml()} />
+          </details>
+        </nav>
 
-      <div class="app-body">
         <main class="app-content">{props.children}</main>
 
-        {/* Docked, not modal — role="complementary" rather than "dialog"/aria-modal, since the
-            rest of the page stays fully interactive while this is open (see panel.tsx's own
-            comment and docs/dev/frontend.md). */}
-        <div id="game-panel" class="game-panel" role="complementary" aria-labelledby="panel-title">
-          <button id="panel-close" class="panel-close" aria-label="Close">×</button>
-          <div id="panel-nav" class="panel-nav" />
-          <div id="panel-body" class="panel-body" />
-        </div>
+        <footer class="app-footer">
+          <span>Press <kbd>?</kbd> for keyboard shortcuts</span>
+          <A href="/about" class="app-footer-link">About</A>
+        </footer>
       </div>
 
-      <footer class="app-footer">
-        <span>Press <kbd>?</kbd> for keyboard shortcuts</span>
-        <A href="/about" class="app-footer-link">About</A>
-      </footer>
+      {/* Docked, not modal — role="complementary" rather than "dialog"/aria-modal, since the
+          rest of the page stays fully interactive while this is open (see panel.tsx's own
+          comment and docs/dev/frontend.md). Fixed and full-height, so it sits outside the
+          scrolling column entirely (see style.css's .app-shell). */}
+      <div id="game-panel" class="game-panel" role="complementary" aria-labelledby="panel-title">
+        <button id="panel-close" class="panel-close" aria-label="Close">×</button>
+        <div id="panel-nav" class="panel-nav" />
+        <div id="panel-body" class="panel-body" />
+      </div>
+
+      <Show when={scrolled()}>
+        <button class="app-to-top" title="Back to top" aria-label="Back to top" onClick={() => scrollPageToTop('smooth')}>↑</button>
+      </Show>
       <ShortcutsModal open={shortcutsOpen()} onClose={() => setShortcutsOpen(false)} />
     </div>
   );
