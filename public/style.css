@@ -866,8 +866,8 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   .lb-btn  { width: 40px; height: 52px; font-size: 26px; }
   .lb-prev { left: 4px; }
   .lb-next { right: 4px; }
-  /* The lightbox's only way to change game on touch — vertical swipe is spoken for (down
-     closes) — so back up to a thumb-sized target here. */
+  /* The pointer-friendly way to change game on touch (a vertical swipe is the other) — so
+     back up to a thumb-sized target here. */
   .lb-toolbar .lb-caption button { width: 34px; height: 34px; }
   .lb-caption { padding: 0 44px; }
 
@@ -1833,8 +1833,19 @@ body.lb-open { overflow: hidden; }
   from { transform: translateX(-40px); opacity: 0; }
   to   { transform: translateX(0);     opacity: 1; }
 }
-.lb-img.lb-anim-right { animation: lb-enter-right 0.18s ease-out forwards; }
-.lb-img.lb-anim-left  { animation: lb-enter-left  0.18s ease-out forwards; }
+/* The vertical pair: a game step (↑/↓ or a vertical swipe), not a media one. */
+@keyframes lb-enter-bottom {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes lb-enter-top {
+  from { transform: translateY(-40px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+.lb-img.lb-anim-right  { animation: lb-enter-right  0.18s ease-out forwards; }
+.lb-img.lb-anim-left   { animation: lb-enter-left   0.18s ease-out forwards; }
+.lb-img.lb-anim-bottom { animation: lb-enter-bottom 0.18s ease-out forwards; }
+.lb-img.lb-anim-top    { animation: lb-enter-top    0.18s ease-out forwards; }
 #screenshot-lightbox.lb--loading::after {
   content: '';
   position: absolute;

@@ -10,6 +10,8 @@ import type Hls from 'hls.js';
 // below so this stays the one public entry point for it either way.
 import { fmtTime } from './lightboxTime.ts';
 export { fmtTime } from './lightboxTime.ts';
+import { decideSwipeAxis, resolveSwipe, LB_SWIPE_RESISTANCE } from './lightboxSwipe.ts';
+import type { SwipeAxis } from './lightboxSwipe.ts';
 
 import { createSignal, createEffect, createRoot, batch, untrack } from 'solid-js';
 import { render } from 'solid-js/web';
@@ -47,6 +49,10 @@ const [idx, setIdx] = createSignal(0);
 const shots = () => { const g = lbGame(); return g ? buildMediaItems(g.appid, g.details?.meta) : []; };
 const gameName = () => lbGame()?.name ?? '';
 let lbZoom = 1, lbPanX = 0, lbPanY = 0, lbLastDir = 0, lbVcTimer: ReturnType<typeof setTimeout> | undefined;
+// Which axis `lbLastDir` was a step along, so the enter animation comes from the side the
+// viewer swiped toward: 'x' for media within a game, 'y' for a game step (↑/↓, the caption
+// buttons, a vertical swipe). Reset with `lbLastDir` on every render.
+let lbLastAxis: SwipeAxis = 'x';
 
 type LbVideo = HTMLVideoElement & { _hls?: { destroy: () => void } | null; _hlsToken?: number };
 
@@ -113,9 +119,11 @@ export function isLightboxOpen() { return lbGame() !== null; }
 // panel's hero image — which drops focus straight out of the lightbox's own trap onto an element
 // the lightbox is covering. Whatever had focus in here keeps it, so holding ↓ on the caption
 // button doesn't walk focus away mid-click; the close button is the fallback, as on a real open.
-function stepGameFromLightbox(step: () => void) {
+// `dir` only drives the enter animation's direction — 0 (R, which has no direction) skips it.
+function stepGameFromLightbox(step: () => void, dir = 0) {
   const lb = document.getElementById('screenshot-lightbox')!;
   const before = document.activeElement;
+  if (dir !== 0) { lbLastDir = dir; lbLastAxis = 'y'; }
   step();
   if (lb.contains(document.activeElement)) return;
   ((before && lb.contains(before) ? before : lb.querySelector('.lb-close')) as HTMLElement).focus();
@@ -436,8 +444,8 @@ function wireButtons(lb: HTMLElement) {
   lb.querySelector('.lb-error-retry')!.addEventListener('click', retryCurrentShot);
   lb.querySelector('.lb-prev')!.addEventListener('click', () => stepLightbox(-1));
   lb.querySelector('.lb-next')!.addEventListener('click', () => stepLightbox(1));
-  lb.querySelector('.lb-game-prev')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav?.(-1)));
-  lb.querySelector('.lb-game-next')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav?.(1)));
+  lb.querySelector('.lb-game-prev')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav?.(-1), -1));
+  lb.querySelector('.lb-game-next')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav?.(1), 1));
   lb.querySelector('.lb-fullscreen')!.addEventListener('click', () => {
     if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
       (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
@@ -489,7 +497,8 @@ function wireKeyboard(lb: HTMLElement) {
     }
     if (!onScrub && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && _onGameNav) {
       e.preventDefault();
-      stepGameFromLightbox(() => _onGameNav!(e.key === 'ArrowDown' ? 1 : -1));
+      const dir = e.key === 'ArrowDown' ? 1 : -1;
+      stepGameFromLightbox(() => _onGameNav!(dir), dir);
     }
     // R, the same random pick the panel offers — page-level shortcuts are all blocked while the
     // lightbox is open (panelKeyboard.ts hands it the keyboard wholesale), so it has to be bound
@@ -549,11 +558,40 @@ function wireMouseHandlers(lb: HTMLElement) {
   });
 }
 
+// ── Swipe drag ─────────────────────────────────────────────────────────────
+
+// The media element on screen — the one a swipe drags. Zoom/pan owns `.lb-img`'s transform
+// too, but a drag only ever runs at zoom 1, so the two never write it at once.
+function lbMediaEl(): HTMLElement | null {
+  const img = document.querySelector<HTMLElement>('#screenshot-lightbox .lb-img');
+  if (img && img.style.display !== 'none') return img;
+  return lbVideoEl.isConnected ? lbVideoEl : null;
+}
+
+function setLbDrag(el: HTMLElement, x: number, y: number) {
+  el.style.transition = 'none';
+  el.style.transform = `translate(${x}px, ${y}px)`;
+}
+
+// `animate`: a swipe that didn't commit eases back. A committed one clears instantly instead —
+// `renderLightbox`'s own enter animation takes the element over from there.
+function clearLbDrag(el: HTMLElement, animate: boolean) {
+  el.style.transition = animate ? 'transform 0.2s ease, opacity 0.18s' : '';
+  el.style.transform = '';
+  if (animate) setTimeout(() => { el.style.transition = ''; }, 200);
+}
+
 function wireTouchHandlers(lb: HTMLElement) {
   let lbX = 0, lbY = 0, lbActive = false;
   let pinchStartDist = 0, pinchStartZoom = 1;
   let touchPanning = false, touchPanStartX = 0, touchPanStartY = 0, touchPanOriginX = 0, touchPanOriginY = 0;
   let lbLastTapTime = 0, lbLastTapX = 0, lbLastTapY = 0;
+  // Swipe drag: the axis locked onto (null until the finger has moved far enough to tell), when
+  // it started (for the flick threshold), and what each axis has to step to — the latter read
+  // once per gesture rather than per touchmove, `_getGamePosition` reaching the route's own list
+  // (see `renderLightbox`'s untracked read of it).
+  let dragAxis: SwipeAxis | null = null;
+  let dragStart = 0, dragMediaCount = 0, dragHasGameList = false;
 
   lb.addEventListener('touchstart', e => {
     if (e.touches.length === 2) {
@@ -566,7 +604,14 @@ function wireTouchHandlers(lb: HTMLElement) {
       lbActive = false;
       e.preventDefault();
     } else if (e.touches.length === 1) {
+      // A touch starting on the chrome is operating it, not swiping the media behind it —
+      // dragging the video scrubber sideways otherwise steps to the next shot as well.
+      if ((e.target as Element).closest('.lb-vctrls, .lb-toolbar, .lb-btn')) { lbActive = false; return; }
       lbX = e.touches[0].clientX; lbY = e.touches[0].clientY; lbActive = true;
+      dragAxis = null;
+      dragStart = e.timeStamp;
+      dragMediaCount = shots().length;
+      dragHasGameList = !!_onGameNav && !!_getGamePosition?.();
       if (lbZoom > 1) {
         touchPanning = true;
         touchPanStartX = e.touches[0].clientX; touchPanStartY = e.touches[0].clientY;
@@ -591,6 +636,17 @@ function wireTouchHandlers(lb: HTMLElement) {
       lbPanY = touchPanOriginY + (e.touches[0].clientY - touchPanStartY);
       applyLbTransform();
       e.preventDefault();
+    } else if (e.touches.length === 1 && lbActive && lbZoom === 1) {
+      const dx = e.touches[0].clientX - lbX, dy = e.touches[0].clientY - lbY;
+      dragAxis ??= decideSwipeAxis(dx, dy);
+      if (!dragAxis) return;
+      const el = lbMediaEl();
+      if (!el) return;
+      // Nothing to step to on this axis: the media still follows the finger, damped, so the
+      // gesture reads as resistance rather than as a step that silently didn't happen.
+      const slack = (dragAxis === 'x' ? dragMediaCount > 1 : dragHasGameList) ? 1 : LB_SWIPE_RESISTANCE;
+      setLbDrag(el, dragAxis === 'x' ? dx * slack : 0, dragAxis === 'y' ? dy * slack : 0);
+      e.preventDefault();
     }
   }, { passive: false });
 
@@ -600,6 +656,21 @@ function wireTouchHandlers(lb: HTMLElement) {
     lbActive = false;
     const endX = e.changedTouches[0].clientX, endY = e.changedTouches[0].clientY;
     const dx = endX - lbX, dy = endY - lbY;
+    if (dragAxis) {
+      const action = resolveSwipe({
+        axis: dragAxis, dx, dy, dt: e.timeStamp - dragStart,
+        mediaCount: dragMediaCount, hasGameList: dragHasGameList,
+      });
+      dragAxis = null;
+      const el = lbMediaEl();
+      if (el) clearLbDrag(el, !action);
+      if (action === 'media-prev' || action === 'media-next') stepLightbox(action === 'media-next' ? 1 : -1);
+      else if (action) {
+        const dir = action === 'game-next' ? 1 : -1;
+        stepGameFromLightbox(() => _onGameNav?.(dir), dir);
+      }
+      return;
+    }
     const isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
     const showingImg = lb.querySelector<HTMLImageElement>('.lb-img')!.style.display !== 'none';
     const showingVid = lbVideoEl.isConnected;
@@ -624,14 +695,18 @@ function wireTouchHandlers(lb: HTMLElement) {
       } else {
         lbLastTapTime = now; lbLastTapX = endX; lbLastTapY = endY;
       }
-      return;
     }
-    if (lbZoom > 1) return;
-    if (Math.abs(dx) > Math.abs(dy) * 1.2 && Math.abs(dx) > 50) stepLightbox(dx < 0 ? 1 : -1);
-    else if (dy > 80 && Math.abs(dy) > Math.abs(dx)) closeLightbox();
   }, { passive: true });
 
-  lb.addEventListener('touchcancel', () => { lbActive = false; touchPanning = false; }, { passive: true });
+  lb.addEventListener('touchcancel', () => {
+    lbActive = false;
+    touchPanning = false;
+    if (dragAxis) {
+      dragAxis = null;
+      const el = lbMediaEl();
+      if (el) clearLbDrag(el, true);
+    }
+  }, { passive: true });
 }
 
 function wireVideoControls(lb: HTMLElement) {
@@ -847,7 +922,9 @@ function renderLightbox() {
   const vid  = lbVideoEl;
   const vc   = lb.querySelector<HTMLElement>('.lb-vctrls')!;
   const dir  = lbLastDir;
+  const axis = lbLastAxis;
   lbLastDir = 0;
+  lbLastAxis = 'x';
   resetLbZoom();
   showLbChrome();
   hideLbError();
@@ -880,7 +957,10 @@ function renderLightbox() {
     img.onload = null;
     img.onerror = null;
     if (dir !== 0) {
-      img.className = `lb-img lb-anim-${dir > 0 ? 'right' : 'left'}`;
+      // Named for the side the new shot comes in from, which is the one swiped toward: the
+      // next media enters from the right, the next game from the bottom.
+      const from = axis === 'y' ? (dir > 0 ? 'bottom' : 'top') : (dir > 0 ? 'right' : 'left');
+      img.className = `lb-img lb-anim-${from}`;
       img.addEventListener('animationend', () => { img.className = 'lb-img'; }, { once: true });
     } else {
       img.className = 'lb-img';

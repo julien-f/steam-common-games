@@ -8,7 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- **The lightbox caption is a game stepper, and says where you are in the list.** `↑ Hollow Knight 308 / 343 ↓` — the counter it already showed (`4 / 13`) counts *this game's* media, which tells you nothing about how far through 343 rows you are. The ↑/↓ buttons sit either side of the name they change, covering the axis the edge ‹ › don't, and they're the only way to change game on touch at all: vertical swipe is spoken for, since down closes. Both counters wear the same pill so they read as a pair. Hidden whole when there's no list behind the open game, as for a standalone lookup.
+- **Swipe up and down in the lightbox to change game**, the touch counterpart of ↑/↓ — up for the next game, content following the finger as in any feed. **Both axes now drag the media with the finger** rather than jumping on release: horizontal still pages this game's screenshots and trailers, and either one eases back if the swipe stops short (a quick flick commits on much less distance). An axis with nothing to step to — a lone screenshot, or no list behind the game — drags damped instead of silently doing nothing, and a game step now slides in from the direction it came from, on the keyboard as much as on touch.
+  - **Swipe-down no longer closes the lightbox**, that axis being the game stepper now: the ×, Escape and tapping the backdrop still do.
+  - A touch that starts on the chrome no longer swipes the media behind it — dragging a video's scrubber sideways used to step to the next shot as well.
+
+- **The lightbox caption is a game stepper, and says where you are in the list.** `↑ Hollow Knight 308 / 343 ↓` — the counter it already showed (`4 / 13`) counts *this game's* media, which tells you nothing about how far through 343 rows you are. The ↑/↓ buttons sit either side of the name they change, covering the axis the edge ‹ › don't — and the thumb-sized target for what a vertical swipe does on touch. Both counters wear the same pill so they read as a pair. Hidden whole when there's no list behind the open game, as for a standalone lookup.
 
 - **R picks a random game without leaving the lightbox**, the same pick the panel's own R makes. Page-level shortcuts are all suppressed while the lightbox is open — it takes the keyboard wholesale — so R had to be bound inside it to work there, exactly as ↑/↓ were.
 
