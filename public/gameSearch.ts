@@ -25,6 +25,8 @@ export interface GameSearchResult {
 //    no separate widget. Picked exactly like a search match (same shape, same onSelect).
 //  - onSeeAllRecents(): optional — the "see all" row under that list; the caller decides where
 //    that goes (the /game route, for the app shell)
+//  - onSeeAllResults(term): optional — the analogous trailing row under actual search matches
+//    (not recents), leading to /search?q=<term> for the app shell
 
 export const GAME_SEARCH_DEBOUNCE_MS = 300;
 export const GAME_SEARCH_MIN_CHARS = 2;
@@ -92,7 +94,7 @@ export function shouldShowRecents(rawValue: string): boolean {
   return rawValue.trim() === '';
 }
 
-export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAllRecents }: {
+export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAllRecents, onSeeAllResults }: {
   inputEl: HTMLInputElement;
   resultsEl: HTMLElement;
   onSelect: (game: GameSearchResult) => void;
@@ -102,9 +104,11 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
   // which this module knows nothing about).
   recents?: () => GameSearchResult[];
   onSeeAllRecents?: () => void;
+  onSeeAllResults?: (term: string) => void;
 }) {
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let lastResults: GameSearchResult[] = [];
+  let lastTerm = ''; // the search that produced lastResults, for the "see all results" row's label/target
   let activeFetch = 0; // guards against a slower earlier request clobbering a faster later one
   let activeIdx = -1;  // ArrowUp/ArrowDown highlight; -1 = none yet (Enter falls back to the top match)
   let unsubOwnershipReady: (() => void) | null = null;
@@ -122,7 +126,7 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
     const options = lastResults.map((r, i) => gameSearchResultHtml(r, i === activeIdx, peekMyOwnershipStatus(r.appid))).join('');
     resultsEl.innerHTML = showingRecents
       ? gameSearchSectionHtml('Recently looked up') + options + gameSearchMoreHtml('See all recently looked up →')
-      : options;
+      : options + (onSeeAllResults && lastResults.length ? gameSearchMoreHtml(`See all results for "${lastTerm}" →`) : '');
     if (activeIdx >= 0) inputEl.setAttribute('aria-activedescendant', `game-search-opt-${lastResults[activeIdx].appid}`);
     else inputEl.removeAttribute('aria-activedescendant');
     // A peek above returning null for any shown result means either "no currentAccount loaded"
@@ -178,6 +182,7 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
       const res = await fetch(`/api/search-games?q=${encodeURIComponent(term)}`);
       const data = await res.json();
       if (fetchId !== activeFetch) return; // a newer keystroke's request already landed
+      lastTerm = term;
       showResults(res.ok ? (data.results || []) : []);
     } catch {
       if (fetchId === activeFetch) hideResults();
@@ -233,8 +238,10 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
 
   resultsEl.addEventListener('click', e => {
     if ((e.target as Element).closest('.game-search-more')) {
+      const term = lastTerm;
       hideResults();
-      onSeeAllRecents?.();
+      if (showingRecents) onSeeAllRecents?.();
+      else onSeeAllResults?.(term);
       return;
     }
     const btn = (e.target as Element).closest('.game-search-result') as HTMLElement | null;

@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **`/search?q=<term>` — search for a game by URL**, useful as a browser keyword search (e.g. bookmark `/search?q=%s` in Firefox with a keyword). Shows the matches and opens the closest one in the side panel on arrival; reloading with `?game=` set reopens the same game.
+  - **The page has its own live search box**, debounced, keeping `?q=` in sync as you type — editing it never reopens the panel on its own, only the initial URL landing does, so refining a search doesn't yank the panel around.
+  - **Discoverable from the nav-bar search**: typing an actual query into the existing "Look up any game" box now offers a "See all results for '…' →" row, the same way its empty state already offers "See all recently looked up →".
+  - **Results render in a real table** (`@vates/data-table-solid`, the same one every other list uses), which gets the list keyboard row-navigation for free, and the page now participates in the usual panel/lightbox game navigation — ↑/↓ steps through results, R picks a random one, the panel's own nav buttons work, and the lightbox's own stepping/counter do too.
+  - **↓ from the search box jumps into the table's first row, and ↑ from the first row jumps back** — no more Tabbing back and forth between them.
+  - **The table's focused row now follows panel/lightbox navigation** — stepping to the next/previous/a random game from either one scrolls to and focuses that row too, not just whichever row you last clicked.
+  - Steam's own search endpoint always returns at most 10 matches per call; we were discarding 2 of those for no reason (`extractSearchResults` in `lib/steam.js`) — now shows all 10 at no extra request cost.
+
 - **Swipe up and down in the lightbox to change game**, the touch counterpart of ↑/↓ — up for the next game, content following the finger as in any feed. **Both axes now drag the media with the finger** rather than jumping on release: horizontal still pages this game's screenshots and trailers, and either one eases back if the swipe stops short (a quick flick commits on much less distance). An axis with nothing to step to — a lone screenshot, or no list behind the game — drags damped instead of silently doing nothing, and a game step now slides in from the direction it came from, on the keyboard as much as on touch.
   - **Swipe-down no longer closes the lightbox**, that axis being the game stepper now: the ×, Escape and tapping the backdrop still do.
   - A touch that starts on the chrome no longer swipes the media behind it — dragging a video's scrubber sideways used to step to the next shot as well.

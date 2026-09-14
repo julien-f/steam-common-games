@@ -76,6 +76,10 @@ Clicking any row opens a detail panel beside the table — not over it, so the l
 
 ![A game's detail panel: media strip, weighted rating and Metacritic score, How Long To Beat estimate, ProtonDB tier, best price with record-low badges, tags, who owns it, and collapsible HLTB/news/achievements/DLC sections](../images/game-panel.png)
 
+## Search by URL
+
+`/search?q=<term>` searches by name and opens the closest match in the panel — useful as a browser keyword search. In Firefox: bookmark `https://<your-instance>/search?q=%s`, give it a keyword (e.g. `steam`), then type `steam half-life` in the address bar to jump straight to it. The page has its own search box too, for refining or starting a new search without leaving it — typing there updates the list without reopening the panel until you click a result. The nav bar's own "Look up any game" box also offers a "See all results for…" link into this page once you've typed a query.
+
 ## Sharing
 
 - A game's own link (`/game/<appid>`) opens that game for anyone, whether or not they own it.

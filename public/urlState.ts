@@ -25,7 +25,7 @@ export const FILTER_DIMS: FilterDim[] = [
 // the way e.g. `game`/`shot` can. See tableViewPrefs.ts's own restoreTableView/shareTableView/
 // resetTableView and ListRoute.tsx's viewParamName. Unlike most other params here, it's not
 // written automatically on every table interaction — only by the table's own "🔗 Share view" button.
-const PARAM_ORDER = ['u', 'op', 'tab', 'sort', 'game', 'shot', 'name', ...FILTER_DIMS.map(d => d.param), 'tv'];
+const PARAM_ORDER = ['u', 'op', 'tab', 'sort', 'q', 'game', 'shot', 'name', ...FILTER_DIMS.map(d => d.param), 'tv'];
 
 export function reorderUrlParams(params: URLSearchParams): URLSearchParams {
   const ordered = new URLSearchParams();
@@ -84,6 +84,16 @@ export function setLightboxParam(idx: number | string | null): void {
   const params = new URLSearchParams(location.search);
   if (idx == null) params.delete('shot');
   else params.set('shot', String(idx));
+  history.replaceState(null, '', urlWithParams(params));
+}
+
+// `/search`'s own live search box writes its term here as the user types (debounced by the
+// caller), so the address stays in sync with what's on screen — same shape as setLightboxParam,
+// no equivalent to setPanelParam's no-op guard since there's no racing navigation to worry about.
+export function setSearchQueryParam(term: string): void {
+  const params = new URLSearchParams(location.search);
+  if (term) params.set('q', term);
+  else params.delete('q');
   history.replaceState(null, '', urlWithParams(params));
 }
 

@@ -1086,7 +1086,7 @@ test('getProtonDbStatus: caches the null result of a 404 too', async (t) => {
 
 // ── searchStoreGames ──────────────────────────────────────────────────────────
 
-test('searchStoreGames: extracts appid, name and tinyImage, capped at 8', async (t) => {
+test('searchStoreGames: extracts appid, name and tinyImage, capped at 10', async (t) => {
   _reset();
   const items = Array.from({ length: 12 }, (_, i) => ({
     id: 400 + i, name: `Game ${i}`, tiny_image: `https://example.com/${i}.jpg`,
@@ -1094,7 +1094,7 @@ test('searchStoreGames: extracts appid, name and tinyImage, capped at 8', async 
   t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({ items }) }));
 
   const result = await searchStoreGames('portal');
-  assert.equal(result.length, 8);
+  assert.equal(result.length, 10);
   assert.deepEqual(result[0], { appid: 400, name: 'Game 0', tinyImage: 'https://example.com/0.jpg' });
 });
 

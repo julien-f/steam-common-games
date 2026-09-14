@@ -192,6 +192,9 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       // ago has to be at the top of the list the next time the box is focused.
       recents: loadRecentGames,
       onSeeAllRecents: () => navigate(withAccountParam('/game', location.search)),
+      // Analogous "see all" for actual search matches (not recents) — the full-page results list
+      // with a shareable, editable URL, rather than the dropdown's capped/transient one.
+      onSeeAllResults: term => navigate(withAccountParam(`/search?q=${encodeURIComponent(term)}`, location.search)),
     });
 
     bindPanelKeyboardShortcuts({
