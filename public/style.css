@@ -2100,7 +2100,13 @@ kbd {
 /* /search's own table (SearchRoute.tsx) — hides @vates/data-table-solid's Columns/Sort/Search/
    Filter toolbar: none of it applies to a single, unsortable/unfilterable column, and the
    library's own "Search…" box would sit confusingly right under this page's real one. The
-   row-count line above the table (.dt-active-bar) isn't part of the toolbar and stays. */
+   row-count line above the table (.dt-active-bar) isn't part of the toolbar and stays.
+   Filed as vatesfr/data-table#25, asking for a toolbar-suppression prop (all-or-nothing, or
+   granular per-control flags). 0.14.0 delivered only `showSearch` and an auto-hiding Sort button
+   (Group already auto-hid) — Columns and Filter are still unconditionally rendered regardless of
+   column config (confirmed in the library's own source, neither wrapped in a length check), so
+   even with `showSearch={false}` this table would still show two dead buttons. This blanket rule
+   stays the only way to get an empty toolbar. */
 .search-table .dt-toolbar { display: none; }
 
 /* The library ships no focus styling of its own for a row — needed here since SearchRoute.tsx

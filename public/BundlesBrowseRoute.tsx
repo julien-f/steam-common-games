@@ -22,9 +22,10 @@
 import { createSignal, createEffect, onMount, onCleanup, Show } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { withAccountParam } from './urlState.ts';
-import { createTableState, DataTableView } from '@vates/data-table-solid';
+import {
+  createTableState, DataTableView, bucketDatePart, formatDatePart, bucketNumericRange, formatNumericRange,
+} from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
-import { bucketDatePart, formatDatePart, bucketNumericRange, formatNumericRange } from '@vates/data-table-core';
 import {
   fmt, compareDateMissingLast, compareNumMissingLast, withMissingGroup, formatMissingGroup,
   priceTierBucket, formatPriceTier,

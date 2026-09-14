@@ -141,6 +141,16 @@ export default function SearchRoute() {
   // a separate `scrollIntoView` (rather than letting focus scroll on its own) matches the same
   // idiom panel.tsx's own filmstrip already uses. A rAF, not a plain call: the row may not exist
   // in the DOM yet the instant a fresh search's rows first render.
+  //
+  // Filed as vatesfr/data-table#24, and *mostly* fixed by 0.14.0's `table.focus.moveTo(row)` —
+  // but not for this: `moveTo` deliberately never moves real DOM focus (so an external nav never
+  // steals focus away from itself), only the internal tabindex target + scroll — no visible ring
+  // without a real `.focus()` behind it. This route wants exactly that visible ring even while
+  // the panel holds real focus, so it still has to reach into the DOM directly, still relying on
+  // `dt-tr`/`data-row-key`, undocumented internals #24 itself flagged as such (0.14.0 didn't
+  // change or document either). `ListRoute.tsx`'s `openGame` uses `moveTo` instead — it doesn't
+  // need a visible ring since the row it opens was just clicked, and does benefit from `moveTo`'s
+  // free group-expand/page-jump, which this route's single-page, ungrouped table never needed.
   function focusRow(appid: number): void {
     requestAnimationFrame(() => {
       const row = tableWrapEl?.querySelector<HTMLElement>(`tr.dt-tr[data-row-key="${appid}"]`);

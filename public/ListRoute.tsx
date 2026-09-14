@@ -58,9 +58,8 @@ import { onMount, onCleanup, createSignal, createRoot, createEffect, on, batch, 
 import { createStore, produce } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { A, useParams, useLocation, useNavigate } from '@solidjs/router';
-import { createTableState, DataTableView } from '@vates/data-table-solid';
+import { createTableState, DataTableView, bucketDatePart, formatDatePart } from '@vates/data-table-solid';
 import type { ColumnDef, SortEntry, TableState } from '@vates/data-table-solid';
-import { bucketDatePart, formatDatePart } from '@vates/data-table-core';
 import {
   fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareDateMissingLast,
   withMissingGroup, formatMissingGroup, halfDecadeBucket, formatHalfDecadeBucket,
@@ -597,6 +596,11 @@ export default function ListRoute() {
     // happens a whole route navigation later, from load() — could preserve one at all.
     panelOpen(resolved);
     renderPanelNav(resolved);
+    // Reveals the newly-open game in the table (expands its group, jumps to its page, scrolls it
+    // into view) without stealing real DOM focus from the panel — `@vates/data-table-solid`'s
+    // external focus API (>= 0.14), built for exactly this "external nav just changed the current
+    // row" case. No-ops harmlessly for a standalone lookup not in `activeTable()`'s own data.
+    activeTable()?.focus.moveTo(resolved);
     // 'recent' is the one kind whose address IS the focused game (see this file's own header
     // comment) — a row click/prev-next/random pick here updates the path, not a `?game=` query
     // param, so the address bar always matches whatever the panel is actually showing. This

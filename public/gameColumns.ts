@@ -30,15 +30,13 @@
 // columns a given page shows by default and how it sorts on first load are page-specific
 // decisions, not something to centralize just because the column *definitions* are shared.
 
+// The bucket/compare helpers are `@vates/data-table-core` primitives, but `@vates/data-table-solid`
+// re-exports them (since before this app's 0.13.0 pin) — importing from there instead avoids a
+// second, otherwise-unnecessary direct dependency on core.
 import {
   compareMissingLast, bucketNumericRange, bucketDatePart, formatNumericRange, formatDatePart,
   bucketLogRange, formatLogRange,
-} from '@vates/data-table-core';
-// Type-only import from the Solid adapter (the one exporting `ColumnDef` with its DOM `render`
-// callback — structurally identical to the vanilla adapter's own, per @vates/data-table-core;
-// both bundles.tsx and library.tsx are Solid-based now, so this is the more accurate source to
-// name even though nothing here actually depends on Solid) — no runtime dependency added, the
-// pages import their column lists from here, not from the adapter.
+} from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
 import { scoreColor, dealRecordTier, DEAL_RECORD_TIERS, formatMoney } from '/utils.ts';
 
