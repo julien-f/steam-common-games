@@ -49,6 +49,11 @@ const [idx, setIdx] = createSignal(0);
 const shots = () => { const g = lbGame(); return g ? buildMediaItems(g.appid, g.details?.meta) : []; };
 const gameName = () => lbGame()?.name ?? '';
 let lbZoom = 1, lbPanX = 0, lbPanY = 0, lbLastDir = 0, lbVcTimer: ReturnType<typeof setTimeout> | undefined;
+// Bumped on every renderLightbox() call; a detached Image()'s onload checks it's still current
+// before touching the shared img element, so a slow load from a shot the viewer already
+// navigated away from can't clobber the one currently displayed — img is reused across shots
+// same as videoEl's _hlsToken guard above.
+let lbImgToken = 0;
 // Which axis `lbLastDir` was a step along, so the enter animation comes from the side the
 // viewer swiped toward: 'x' for media within a game, 'y' for a game step (↑/↓, the caption
 // buttons, a vertical swipe). Reset with `lbLastDir` on every render.
@@ -928,6 +933,8 @@ function renderLightbox() {
   resetLbZoom();
   showLbChrome();
   hideLbError();
+  // Invalidate any image preload still in flight from a previous render — see lbImgToken decl.
+  const imgToken = ++lbImgToken;
   // Untracked, and this is load-bearing: `_getGamePosition` reaches the route's list, which on
   // a list route is the table's `processedData()` — a signal recomputed on every batch of
   // streaming rows. Reading it in *this* effect subscribed the whole imperative render below to
@@ -980,8 +987,8 @@ function renderLightbox() {
     const full = new Image();
     // Left at opacity 0 (rather than 1) so the browser's own broken-image
     // icon doesn't show behind the error overlay.
-    full.onload  = () => { img.src = shot.main!; img.style.opacity = '1'; lb.classList.remove('lb--loading'); };
-    full.onerror = () => { img.style.opacity = '0'; lb.classList.remove('lb--loading'); showLbError("Couldn't load this image."); };
+    full.onload  = () => { if (imgToken !== lbImgToken) return; img.src = shot.main!; img.style.opacity = '1'; lb.classList.remove('lb--loading'); };
+    full.onerror = () => { if (imgToken !== lbImgToken) return; img.style.opacity = '0'; lb.classList.remove('lb--loading'); showLbError("Couldn't load this image."); };
     full.src = shot.main!;
     schedHideLbChrome();
   }

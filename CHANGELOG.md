@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **The lightbox could briefly flash the wrong image when stepping through shots/games faster than they loaded.** Its shared `<img>` preloads each shot's full-res image in a detached `Image()` and swaps it in on `onload`, but nothing stopped a slow-to-load shot from several steps back overwriting the one you'd already navigated to once its own load finally finished. A token bumped on every render, checked before the `onload`/`onerror` callbacks touch the DOM, now discards loads that finished after the viewer moved on.
+
 - **"See all recently looked up →" in the nav-bar search now actually opens Recently Looked Up.** The click handler cleared `showingRecents` via `hideResults()` before checking it, so the recents branch never ran and every "more" row click — including this one — fell through to the "see all results" path with whatever stale search term was last typed.
 
 - **The "see all recently looked up"/"see all results" row is reachable by keyboard.** It rendered as `role="presentation"` with no part in the ArrowUp/ArrowDown roving selection, so it could only ever be clicked. It's now a real option — the roving selection's last index — highlighted like any result and activated with Enter.
