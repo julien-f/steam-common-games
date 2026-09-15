@@ -78,7 +78,7 @@ Clicking any row opens a detail panel beside the table — not over it, so the l
 
 ## Search by URL
 
-`/search?q=<term>` searches by name and opens the closest match in the panel — useful as a browser keyword search. In Firefox: bookmark `https://<your-instance>/search?q=%s`, give it a keyword (e.g. `steam`), then type `steam half-life` in the address bar to jump straight to it. The page has its own search box too, for refining or starting a new search without leaving it — typing there updates the list without reopening the panel until you click a result. The nav bar's own "Look up any game" box also offers a "See all results for…" link into this page once you've typed a query.
+`/search?q=<term>` searches by name and opens the closest match in the panel — useful as a browser keyword search. The site publishes an OpenSearch descriptor, so Chrome offers to add it as a search engine on its own (right-click the address bar → manage search engines) — pick it, then type its keyword followed by a game name to jump straight there. Firefox needs a manual bookmark instead: bookmark `https://<your-instance>/search?q=%s`, give it a keyword (e.g. `steam`), then type `steam half-life` in the address bar. The page has its own search box too, for refining or starting a new search without leaving it — typing there updates the list without reopening the panel until you click a result. The nav bar's own "Look up any game" box also offers a "See all results for…" link into this page once you've typed a query.
 
 ## Sharing
 

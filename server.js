@@ -131,6 +131,26 @@ if (usingDist) {
 }
 app.use(express.static(STATIC_DIR));
 
+// OpenSearch descriptor for /search?q=<term> (docs/user/features.md's "Search by URL") — its
+// <link rel="search"> tag in index.html lets Chrome/Firefox offer "add as a search engine" for
+// this instance's own address bar keyword, without whoever sets one up having to hand-type a
+// keyword bookmark. Built from the request's own host rather than a fixed domain, since this is
+// self-hosted and every instance lives at a different one.
+const escapeXml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+app.get('/opensearch.xml', (req, res) => {
+  const host = escapeXml(req.get('host') || '');
+  const origin = `${req.protocol}://${host}`;
+  res.type('application/opensearchdescription+xml').send(
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">\n' +
+    '  <ShortName>Steam Games</ShortName>\n' +
+    `  <Description>Search for a game on ${host}</Description>\n` +
+    '  <InputEncoding>UTF-8</InputEncoding>\n' +
+    `  <Url type="text/html" template="${origin}/search?q={searchTerms}"/>\n` +
+    '</OpenSearchDescription>\n'
+  );
+});
+
 // Stricter limit for searches — each uncached user triggers Steam API calls. Shared by
 // POST /api/common-games and POST /api/wishlist below (their body shapes never overlap:
 // common-games sends slots/users, wishlist sends members), same "cache hits don't count"

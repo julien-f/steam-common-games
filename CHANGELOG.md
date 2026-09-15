@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **An OpenSearch descriptor at `/opensearch.xml`**, referenced from `index.html`, so Chrome offers `/search?q=<term>` as an address-bar search engine on its own — Firefox still needs a manual keyword bookmark (see `docs/user/features.md`).
+
 - **`/search?q=<term>` — search for a game by URL**, useful as a browser keyword search (e.g. bookmark `/search?q=%s` in Firefox with a keyword). Shows the matches and opens the closest one in the side panel on arrival; reloading with `?game=` set reopens the same game.
   - **The page has its own live search box**, debounced, keeping `?q=` in sync as you type — editing it never reopens the panel on its own, only the initial URL landing does, so refining a search doesn't yank the panel around.
   - **Discoverable from the nav-bar search**: typing an actual query into the existing "Look up any game" box now offers a "See all results for '…' →" row, the same way its empty state already offers "See all recently looked up →".

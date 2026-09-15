@@ -106,6 +106,15 @@ test('GET /api/health: configured=false when STEAM_API_KEY is absent', async (t)
   assert.equal(res.body.configured, false);
 });
 
+// ── GET /opensearch.xml ────────────────────────────────────────────────────────
+
+test('GET /opensearch.xml: 200 with a search template built from the request host', async () => {
+  const res = await api.get('/opensearch.xml');
+  assert.equal(res.status, 200);
+  assert.match(res.headers['content-type'], /application\/opensearchdescription\+xml/);
+  assert.match(res.text, /<Url type="text\/html" template="http:\/\/[^"]+\/search\?q=\{searchTerms\}"\/>/);
+});
+
 // ── SPA fallback (public/index.html serves every client-routed path) ───────────
 
 test('GET /some/client-side/route: 200 with the app shell HTML, not a 404', async () => {
