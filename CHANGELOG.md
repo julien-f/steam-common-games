@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - **The table's focused row now follows panel/lightbox navigation** — stepping to the next/previous/a random game from either one scrolls to and focuses that row too, not just whichever row you last clicked.
   - Steam's own search endpoint always returns at most 10 matches per call; we were discarding 2 of those for no reason (`extractSearchResults` in `lib/steam.js`) — now shows all 10 at no extra request cost.
 
+### Fixed
+
+- **"See all recently looked up →" in the nav-bar search now actually opens Recently Looked Up.** The click handler cleared `showingRecents` via `hideResults()` before checking it, so the recents branch never ran and every "more" row click — including this one — fell through to the "see all results" path with whatever stale search term was last typed.
+
 - **Swipe up and down in the lightbox to change game**, the touch counterpart of ↑/↓ — up for the next game, content following the finger as in any feed. **Both axes now drag the media with the finger** rather than jumping on release: horizontal still pages this game's screenshots and trailers, and either one eases back if the swipe stops short (a quick flick commits on much less distance). An axis with nothing to step to — a lone screenshot, or no list behind the game — drags damped instead of silently doing nothing, and a game step now slides in from the direction it came from, on the keyboard as much as on touch.
   - **Swipe-down no longer closes the lightbox**, that axis being the game stepper now: the ×, Escape and tapping the backdrop still do.
   - A touch that starts on the chrome no longer swipes the media behind it — dragging a video's scrubber sideways used to step to the next shot as well.

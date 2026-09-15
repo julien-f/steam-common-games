@@ -239,8 +239,9 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
   resultsEl.addEventListener('click', e => {
     if ((e.target as Element).closest('.game-search-more')) {
       const term = lastTerm;
+      const wasRecents = showingRecents;
       hideResults();
-      if (showingRecents) onSeeAllRecents?.();
+      if (wasRecents) onSeeAllRecents?.();
       else onSeeAllResults?.(term);
       return;
     }
