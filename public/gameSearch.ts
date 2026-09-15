@@ -73,17 +73,18 @@ export function gameSearchResultHtml(r: GameSearchResult, active: boolean, owner
   `;
 }
 
-// The dropdown's non-option chrome, for the recents view below: a section heading, and a
-// trailing "see all" row. Both carry `role="presentation"` so they stay out of the listbox's own
-// option semantics (`resultsEl` is the listbox; only `.game-search-result` buttons are options,
-// and only those take part in the ArrowUp/ArrowDown roving selection), and the "see all" row
-// keeps `tabindex="-1"` for the same reason every option does — real DOM focus stays on the input.
+// The dropdown's trailing "see all" row and, for the recents view, a section heading above it.
+// The heading carries `role="presentation"` (it's not selectable), but the "see all" row is a
+// real option — it takes part in the same ArrowUp/ArrowDown roving selection as the results
+// above it (as the last virtual index, see moveActive/renderResults), so it's reachable without
+// a mouse. `tabindex="-1"` matches every option: real DOM focus stays on the input throughout.
 export function gameSearchSectionHtml(label: string): string {
   return `<div class="game-search-section" role="presentation">${esc(label)}</div>`;
 }
 
-export function gameSearchMoreHtml(label: string): string {
-  return `<button type="button" class="game-search-more" role="presentation" tabindex="-1">${esc(label)}</button>`;
+export function gameSearchMoreHtml(label: string, active = false): string {
+  return `<button type="button" id="game-search-more-opt" role="option" aria-selected="${active}" tabindex="-1"
+    class="game-search-more${active ? ' active' : ''}">${esc(label)}</button>`;
 }
 
 // Should the dropdown show recently looked-up games rather than search matches? Only for a
@@ -122,12 +123,25 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
   inputEl.setAttribute('aria-expanded', 'false');
   if (resultsEl.id) inputEl.setAttribute('aria-controls', resultsEl.id);
 
+  // Whether the trailing "see all" row is shown at all — always for recents (showResults only
+  // gets called with a non-empty recents list), only alongside actual matches otherwise. It's
+  // the roving selection's last virtual index (lastResults.length), one past the real options.
+  function moreRowShown(): boolean {
+    return showingRecents || Boolean(onSeeAllResults && lastResults.length);
+  }
+
   function renderResults() {
+    const moreActive = moreRowShown() && activeIdx === lastResults.length;
     const options = lastResults.map((r, i) => gameSearchResultHtml(r, i === activeIdx, peekMyOwnershipStatus(r.appid))).join('');
+    const moreHtml = !moreRowShown() ? '' : gameSearchMoreHtml(
+      showingRecents ? 'See all recently looked up →' : `See all results for "${lastTerm}" →`,
+      moreActive,
+    );
     resultsEl.innerHTML = showingRecents
-      ? gameSearchSectionHtml('Recently looked up') + options + gameSearchMoreHtml('See all recently looked up →')
-      : options + (onSeeAllResults && lastResults.length ? gameSearchMoreHtml(`See all results for "${lastTerm}" →`) : '');
-    if (activeIdx >= 0) inputEl.setAttribute('aria-activedescendant', `game-search-opt-${lastResults[activeIdx].appid}`);
+      ? gameSearchSectionHtml('Recently looked up') + options + moreHtml
+      : options + moreHtml;
+    if (activeIdx >= 0 && activeIdx < lastResults.length) inputEl.setAttribute('aria-activedescendant', `game-search-opt-${lastResults[activeIdx].appid}`);
+    else if (moreActive) inputEl.setAttribute('aria-activedescendant', 'game-search-more-opt');
     else inputEl.removeAttribute('aria-activedescendant');
     // A peek above returning null for any shown result means either "no currentAccount loaded"
     // or "still loading" — onMyOwnershipReady fires once (only) when the latter resolves, so the
@@ -168,12 +182,13 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
   // press, which has no current index to offset from: ArrowDown starts at the top result,
   // ArrowUp starts at the bottom one, matching most native combobox widgets.
   function moveActive(dir: number) {
-    if (!lastResults.length) return;
+    const total = lastResults.length + (moreRowShown() ? 1 : 0);
+    if (!total) return;
     activeIdx = activeIdx === -1
-      ? (dir > 0 ? 0 : lastResults.length - 1)
-      : (activeIdx + dir + lastResults.length) % lastResults.length;
+      ? (dir > 0 ? 0 : total - 1)
+      : (activeIdx + dir + total) % total;
     renderResults();
-    resultsEl.querySelector('.game-search-result.active')?.scrollIntoView({ block: 'nearest' });
+    resultsEl.querySelector('.game-search-result.active, .game-search-more.active')?.scrollIntoView({ block: 'nearest' });
   }
 
   async function runSearch(term: string) {
@@ -193,6 +208,14 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
     hideResults();
     inputEl.value = game.name || '';
     onSelect(game);
+  }
+
+  function activateMore() {
+    const term = lastTerm;
+    const wasRecents = showingRecents;
+    hideResults();
+    if (wasRecents) onSeeAllRecents?.();
+    else onSeeAllResults?.(term);
   }
 
   // Recently looked-up games in the same dropdown, on an empty box — the convention every store
@@ -228,6 +251,9 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
     if (e.key === 'ArrowUp')   { if (lastResults.length) e.preventDefault(); moveActive(-1); return; }
     if (e.key !== 'Enter') return;
     e.preventDefault();
+    // The "more" row is the roving selection's last virtual index — check it before the
+    // term-empty bail below, since the recents view's "see all" is reachable with an empty box.
+    if (moreRowShown() && activeIdx === lastResults.length) { activateMore(); return; }
     const term = inputEl.value.trim();
     if (!term) return;
     const directAppid = parseDirectAppid(term);
@@ -237,14 +263,7 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
   });
 
   resultsEl.addEventListener('click', e => {
-    if ((e.target as Element).closest('.game-search-more')) {
-      const term = lastTerm;
-      const wasRecents = showingRecents;
-      hideResults();
-      if (wasRecents) onSeeAllRecents?.();
-      else onSeeAllResults?.(term);
-      return;
-    }
+    if ((e.target as Element).closest('.game-search-more')) { activateMore(); return; }
     const btn = (e.target as Element).closest('.game-search-result') as HTMLElement | null;
     if (!btn) return;
     pick({ appid: Number(btn.dataset.appid), name: btn.dataset.name ?? '', tinyImage: null });

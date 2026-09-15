@@ -107,10 +107,19 @@ test('gameSearchSectionHtml: escapes its label and stays out of the listbox opti
   assert.ok(!html.includes('role="option"'));
 });
 
-test('gameSearchMoreHtml: renders a non-option, non-focusable row', () => {
+test('gameSearchMoreHtml: renders a selectable, non-focusable option row', () => {
   const html = gameSearchMoreHtml('See all →');
   assert.ok(html.includes('class="game-search-more"'));
-  assert.ok(html.includes('role="presentation"'));
-  // Real DOM focus stays on the input, same as every option row.
+  assert.ok(!html.includes('game-search-more active'));
+  // A real option — reachable by ArrowUp/ArrowDown as the roving selection's last index.
+  assert.ok(html.includes('role="option"'));
+  assert.ok(html.includes('aria-selected="false"'));
+  // Real DOM focus stays on the input, same as every result option.
   assert.ok(html.includes('tabindex="-1"'));
+});
+
+test('gameSearchMoreHtml: marks the row active when it is the highlighted option', () => {
+  const html = gameSearchMoreHtml('See all →', true);
+  assert.ok(html.includes('class="game-search-more active"'));
+  assert.ok(html.includes('aria-selected="true"'));
 });
