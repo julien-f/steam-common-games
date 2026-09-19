@@ -54,13 +54,21 @@ test('postPrices: sends gids or appids and returns .prices on success', async (t
   let seenBody;
   globalThis.fetch = async (url, opts) => {
     seenBody = JSON.parse(opts.body);
-    return { ok: true, json: async () => ({ prices: { 42: { steamRegular: { amount: 100 } } } }) };
+    return { ok: true, json: async () => ({ prices: { 42: { steamRegular: { amount: 100 } } }, fetchedAt: 1234 }) };
   };
   t.after(() => { globalThis.fetch = restore; });
 
-  const prices = await postPrices({ gids: ['g1'], country: 'US' });
+  const { prices, fetchedAt } = await postPrices({ gids: ['g1'], country: 'US' });
   assert.deepEqual(seenBody, { gids: ['g1'] });
   assert.equal(prices[42].steamRegular.amount, 100);
+  assert.equal(fetchedAt, 1234);
+});
+
+test('postPrices: a response with no fetchedAt (fetched fresh) is null, not undefined', async (t) => {
+  const restore = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ prices: {} }) });
+  t.after(() => { globalThis.fetch = restore; });
+  assert.equal((await postPrices({ appids: [1], country: 'US' })).fetchedAt, null);
 });
 
 test('postPrices: throws with the server error message on a non-2xx response', async (t) => {

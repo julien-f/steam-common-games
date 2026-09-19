@@ -12,6 +12,32 @@
   --accent2: #66c0f4;
   --border: #3d5068;
   --r: 6px;
+  /* The side panel's width, and the gutter `.app-shell.panel-open` reserves for it — one
+     value, since the panel is `position: fixed` and no longer measures the layout itself. */
+  --panel-w: 380px;
+}
+
+/* Themes @vates/data-table-solid's own internals (its portaled column/filter/group submenus
+   render onto <body>, outside .table-container entirely, so this has to live on html:root —
+   an actual DOM ancestor of the portal — for the custom properties to inherit; a page-scoped
+   selector with higher specificity wouldn't reach a portal mounted as a sibling of <body>).
+   Ported verbatim from the legacy library.html/bundles.html inline <style> blocks (see
+   docs/dev/frontend.md) — both carried this identical block; it's now the one
+   shared copy every list route's table draws from instead of two duplicates. */
+html:root {
+  --color-background-primary: #17212b;
+  --color-background-secondary: #2a475e;
+  --color-text-primary: #c6d4df;
+  --color-text-secondary: #8f98a0;
+  --color-text-tertiary: #4c6b8a;
+  --color-border-secondary: #3d5068;
+  --color-border-tertiary: #2a3f57;
+  --color-background-info: #0d2640;
+  --color-text-info: #66c0f4;
+  --color-border-info: #1a4070;
+  --color-background-warning: #2a1900;
+  --color-text-warning: #e8a040;
+  --color-border-warning: #4a2c00;
 }
 
 body {
@@ -55,35 +81,37 @@ body {
   cursor: default;
 }
 
-/* ⚙ Preferences popover (public/nav.js's initNav/initNavPrefs) — a native <details> for a free,
-   accessible open/close toggle; outside-click/Escape closing is added by hand in nav.js since
-   <details> has no built-in support for either. */
+/* Nav-bar popovers — the ⚙ Preferences panel (AppShell.tsx) and the account chip's
+   (AccountChip.tsx). Both are native <details> for a free, accessible open/close toggle;
+   outside-click/Escape closing and the panel's own placement are added by hand in
+   navPopover.ts's bindNavPopover, since <details> has neither. */
 .site-nav-prefs-btn { cursor: pointer; list-style: none; }
 .site-nav-prefs-btn::-webkit-details-marker { display: none; }
-.site-nav-prefs-panel {
-  /* `position: fixed` with `top`/`left` computed in JS (positionPrefsPanel, nav.tsx) rather than
-     anchored via CSS at all — an earlier version anchored under the whole nav bar (centered via
-     `left: 50%` on `.site-nav`, its positioning root) specifically because `.site-nav`'s
-     flex-wrap can put the ⚙ button on its own row at an x-position that shifts with viewport
-     width, and anchoring the panel to the button directly used to mean it could run off-screen
-     (confirmed live on a real Galaxy S10/Firefox). That traded away anchoring near the button
-     the user actually clicked, for guaranteed on-screen placement — the JS version keeps both:
-     it anchors to the ⚙ button's own live position, then clamps within the viewport with a
-     margin, recomputed on every open/resize/scroll while open, so it never needs to fall back to
-     a fixed, button-independent position at all. */
+.site-nav-popover-panel {
+  /* `position: fixed` with `top`/`left` computed in JS (navPopover.ts) rather than anchored via
+     CSS at all — an earlier version anchored under the whole nav bar (centered via `left: 50%` on
+     `.site-nav`, its positioning root) specifically because `.site-nav`'s flex-wrap can put a
+     trigger on its own row at an x-position that shifts with viewport width, and anchoring the
+     panel to the trigger directly used to mean it could run off-screen (confirmed live on a real
+     Galaxy S10/Firefox). That traded away anchoring near the button the user actually clicked,
+     for guaranteed on-screen placement — the JS version keeps both: it anchors to the trigger's
+     own live position, then clamps within the viewport with a margin, recomputed on every
+     open/resize/scroll while open, so it never needs to fall back to a fixed,
+     trigger-independent position at all. */
   position: fixed;
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--r);
   padding: 10px 12px;
-  /* A fixed width (not just min-width) — a bare <select> otherwise sizes itself off its widest
-     <option> text (here, the long "Auto-detect (Europe / Germany (EUR))" entry), which grew
-     this panel wide enough to overflow the viewport on its own. `max-width` is the safety net
-     for anything narrower still (down to the ~320px floor this app otherwise targets). */
-  width: 200px;
+  /* A fixed width (not just min-width) per panel — the prefs panel's bare <select> otherwise
+     sizes itself off its widest <option> text (the long "Auto-detect (Europe / Germany (EUR))"
+     entry), which grew it wide enough to overflow the viewport on its own. `max-width` is the
+     safety net for anything narrower still (down to the ~320px floor this app otherwise
+     targets). */
   max-width: calc(100vw - 24px);
   z-index: 20;
 }
+.site-nav-prefs-panel { width: 200px; }
 .site-nav-prefs-row { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text1); }
 .site-nav-prefs-row select {
   width: 100%;
@@ -91,6 +119,53 @@ body {
   background: var(--bg3); color: var(--text0);
   border: 1px solid var(--border); border-radius: 4px;
   font-size: 13px;
+}
+
+/* Account chip (AccountChip.tsx) — who the app is currently showing, plus that account's
+   Owned/Wishlist lists, from every route. The two list links are inline here on a wide viewport
+   and inside the popover on a narrow one (see the 768px block below): they're the app's two
+   most-visited destinations, worth permanent nav space wherever there's room for it. */
+.site-nav-account { display: flex; align-items: center; gap: 4px; }
+.account-chip-links { display: flex; gap: 4px; }
+.account-chip-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer; list-style: none;
+  max-width: 180px;
+}
+.account-chip-btn::-webkit-details-marker { display: none; }
+.account-chip-avatar { width: 20px; height: 20px; border-radius: 50%; display: block; flex-shrink: 0; }
+.account-chip-avatar--empty { background: var(--bg0); }
+.account-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-chip-explore { font-size: 11px; flex-shrink: 0; }
+.account-chip-panel { width: 240px; display: flex; flex-direction: column; gap: 8px; }
+.account-chip-note { font-size: 12px; color: var(--text1); line-height: 1.5; }
+.account-chip-note strong { color: var(--text0); }
+.account-chip-action {
+  display: block; margin-top: 4px; padding: 0;
+  background: none; border: none; cursor: pointer;
+  color: var(--accent2); font-size: 12px; text-align: left;
+}
+.account-chip-id { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.account-chip-id code { color: var(--text1); overflow-wrap: anywhere; }
+.account-chip-section {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text2);
+}
+.account-chip-recents { display: flex; flex-direction: column; gap: 2px; list-style: none; }
+.account-chip-recents li { display: flex; align-items: center; gap: 4px; }
+.account-chip-recent {
+  display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
+  padding: 5px 6px; background: none; border: none; border-radius: 4px; cursor: pointer;
+  color: var(--text0); font-size: 13px; text-align: left;
+}
+.account-chip-recent:hover { background: var(--bg1); }
+/* The popover's own copies of Owned/Wishlist exist for the narrow layout below, where the inline
+   pair is hidden — showing both at once would just be the same two links twice. */
+.account-chip-panel-links { display: none; gap: 10px; }
+.account-chip-panel-link { color: var(--accent2); text-decoration: none; font-size: 13px; }
+.account-chip-panel-link:hover { text-decoration: underline; }
+@media (max-width: 768px) {
+  .account-chip-links { display: none; }
+  .account-chip-panel-links { display: flex; }
 }
 
 /* Header */
@@ -142,6 +217,9 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
   font-weight: 500;
   transition: background 0.15s, color 0.15s;
   white-space: nowrap;
+  text-decoration: none; /* .btn started out button-only; ListRoute.tsx's "← All bundles" is the
+    first <a class="btn ..."> and would otherwise keep the browser's default underline. */
+  display: inline-block;
 }
 .btn-remove {
   flex-shrink: 0;
@@ -170,6 +248,24 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
   background: var(--accent);
   color: #fff;
 }
+
+/* The ⧉ button CopyButton.tsx renders — currently the "copy this account's Steam identifier"
+   ones on Home and in the nav chip. Green "copied" state rather than the hover accent, same
+   reasoning (and color) as .panel-copy-link-btn--copied: a confirmation, not a hover. */
+.copy-btn {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text1);
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.copy-btn:hover { border-color: var(--accent); color: var(--accent2); }
+.copy-btn--copied { border-color: #15803d; color: #15803d; }
 .btn-primary:hover { background: #1490e8; }
 .btn-primary:disabled { background: var(--bg2); color: var(--text2); cursor: not-allowed; }
 
@@ -256,6 +352,12 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
   background-position: left top, right top, left top, right top;
   background-attachment: local, local, scroll, scroll;
 }
+
+/* Darkens the data-table library's own header row a shade further than its themed
+   --color-background-secondary default, matching the plain <table>'s thead th above.
+   Ported from the legacy pages' `#table-container .dt-th` rule — `.table-container` is
+   the new markup's equivalent wrapper (see ListRoute.tsx). */
+.table-container .dt-th { background: #0f1923 !important; }
 
 table { width: 100%; border-collapse: collapse; }
 
@@ -394,57 +496,15 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
 .player-slot:has(.family-row) .family-hint { display: block; }
 
 /*
- * Accounts bar / recent searches — shared by the comparison page and Library
- * Explorer (rendering logic lives in public/accountsBar.js). One chip per
- * resolved Steam account: avatar, persona name, online/in-game status dot,
- * a per-account count, an optional private-profile badge, and a refresh icon.
+ * One resolved Steam account's identity, as shown on Home's Account card (HomeRoute.tsx):
+ * avatar, persona name, a per-account count, and an
+ * optional private-profile badge. What's left of the deleted pages' accounts bar — the chip/
+ * slot-box/refresh-button rules around these went with `accountsBar.ts` itself (see
+ * docs/dev/frontend.md); these are the pieces Home's own card reuses rather than
+ * restating, since a member row there is the same avatar/name/count it always was.
  */
-.accounts-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-/* Comparison page only — clusters a slot's account chip(s) under a "Player N" /
-   "N accounts merged" label, since (unlike the Library Explorer) a search can compare
-   several separate slots, each possibly itself a multi-account Steam Family merge. Each
-   slot gets its own bounding box on its own row (flex-basis 100%) rather than flowing
-   inline with the next slot's chips — a shared border is what actually tells apart
-   "these chips are merged into one library" (inside one box) from "these are being
-   compared" (separate boxes), since the two can otherwise look like the same flat row of
-   chips with a small label sprinkled in between. */
-.slot-accounts {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-  flex: 1 1 100%;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  background: var(--bg2);
-}
-.slot-label { font-size: 12px; font-weight: 600; color: var(--text1); }
-.account-chip {
-  display: flex; align-items: center; gap: 6px;
-  padding: 5px 6px 5px 5px;
-  background: var(--bg3); border: 1px solid var(--border); border-radius: 999px;
-  color: var(--text0);
-}
-.account-identity {
-  display: flex; align-items: center; gap: 8px;
-  color: var(--text0); text-decoration: none;
-}
-a.account-identity:hover .account-name { color: var(--accent2); }
-.account-refresh-btn {
-  flex-shrink: 0; width: 20px; height: 20px; padding: 0;
-  background: transparent; border: 1px solid var(--border); border-radius: 50%;
-  color: var(--text1); font-size: 11px; line-height: 1; cursor: pointer;
-}
-.account-refresh-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.account-refresh-btn:disabled { cursor: default; opacity: 0.6; }
 .account-avatar-wrap { position: relative; flex-shrink: 0; width: 28px; height: 28px; }
 .account-avatar { width: 28px; height: 28px; border-radius: 50%; display: block; }
-.account-status {
-  position: absolute; right: -1px; bottom: -1px; width: 9px; height: 9px;
-  border-radius: 50%; border: 2px solid var(--bg3);
-}
-.account-status-offline { background: var(--text2); }
-.account-status-online  { background: #57cbde; }
-.account-status-ingame  { background: #a3cf4e; }
-.account-meta { display: flex; flex-direction: column; line-height: 1.25; }
 .account-name { font-size: 13px; font-weight: 500; }
 .account-count { font-size: 11px; color: var(--text1); }
 .account-private {
@@ -453,27 +513,6 @@ a.account-identity:hover .account-name { color: var(--accent2); }
   background: rgba(228,168,46,0.1); border: 1px solid rgba(228,168,46,0.3); color: #e4c46e;
 }
 
-/* Recent searches bar — locally-remembered past searches, shown above the accounts bar */
-.recents-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
-.recents-label { font-size: 12px; color: var(--text1); }
-.recent-chip {
-  display: flex; align-items: center; gap: 6px;
-  padding: 3px 4px 3px 4px;
-  background: transparent; border: 1px solid var(--border); border-radius: 999px;
-}
-.recent-chip-btn {
-  display: flex; align-items: center; gap: 6px;
-  background: transparent; border: none; padding: 0 2px; cursor: pointer;
-  color: var(--text1); font-size: 12px;
-}
-.recent-chip-btn:hover { color: var(--accent2); }
-.recent-chip-avatar { width: 18px; height: 18px; border-radius: 50%; display: block; }
-.recent-chip-remove {
-  flex-shrink: 0; width: 16px; height: 16px; padding: 0;
-  background: transparent; border: none; border-radius: 50%;
-  color: var(--text1); font-size: 12px; line-height: 1; cursor: pointer;
-}
-.recent-chip-remove:hover { color: #cc5050; }
 .recents-clear { font-size: 12px; color: var(--text1); background: none; border: none; cursor: pointer; padding: 0; }
 .recents-clear:hover { color: var(--accent2); }
 
@@ -496,6 +535,11 @@ a.account-identity:hover .account-name { color: var(--accent2); }
 }
 .game-search-wrap > input:focus { border-color: var(--accent); }
 .game-search-wrap > input::placeholder { color: var(--text2); }
+
+/* /search's own copy (SearchRoute.tsx) is this page's primary control, not a nav-bar accessory —
+   same look, more visual weight. */
+.search-page-input { margin-bottom: 16px; }
+.search-page-input > input { padding: 13px 16px; font-size: 16px; }
 .game-search-results {
   position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; right: 0;
   max-height: 280px; overflow-y: auto;
@@ -510,7 +554,58 @@ a.account-identity:hover .account-name { color: var(--accent2); }
 .game-search-result:hover, .game-search-result:focus-visible, .game-search-result.active { background: var(--bg1); }
 .game-search-thumb { width: 46px; height: 22px; object-fit: cover; border-radius: 3px; flex-shrink: 0; }
 .game-search-thumb--empty { background: var(--bg0); }
-.game-search-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.game-search-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Owned/wishlisted markers (myOwnership.ts) — same colors as the panel's own
+   .panel-ownership-badge, just a bare icon rather than a labeled pill (a dropdown row has far
+   less room than the panel's ownership section). */
+/* Recently-looked-up chrome in the same dropdown (gameSearch.ts's `recents` option) — a heading
+   above the list, non-selectable, and a "see all" row under it that *does* take part in the
+   listbox's roving ArrowUp/ArrowDown selection, as its last virtual index. */
+.game-search-section {
+  padding: 6px 10px 4px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text2);
+}
+.game-search-more {
+  display: block; width: 100%;
+  padding: 7px 10px; border: none; border-top: 1px solid var(--border);
+  cursor: pointer; color: var(--accent2); font-size: 12px; text-align: left;
+  /* Sticky, and opaque rather than transparent: the recents list can be taller than the
+     dropdown's own max-height, and a "see all" row scrolled out of sight is one nobody finds. */
+  position: sticky; bottom: 0; background: var(--bg3);
+}
+.game-search-more:hover, .game-search-more.active { background: var(--bg1); }
+.game-search-badge { flex-shrink: 0; font-size: 12px; }
+.game-search-badge.owned { color: #f1c40f; }
+.game-search-badge.wishlisted { color: #2ecc71; }
+
+/* Same markers, inline in the bundle/recent-list table's Name cell (gameColumns.ts's
+   renderNameCell) rather than a dropdown row — same colors as .game-search-badge above. The
+   cell's own color/bold (name text included) is set inline by renderNameCell itself, from
+   OWNERSHIP_STATUS_TIERS (gameColumns.ts) — not here, so there's one shared source for it
+   instead of a second, separately-maintained CSS copy that a tier's styling (e.g. Wishlisted's
+   bold weight) could go missing from without anyone noticing, same as it briefly did between this
+   file and OWNERSHIP_STATUS_COLUMN's own cell. */
+.game-name-cell { display: inline-flex; align-items: center; gap: 4px; }
+.name-status-badge { flex-shrink: 0; font-size: 12px; }
+.name-status-badge.owned { color: #f1c40f; }
+.name-status-badge.wishlisted { color: #2ecc71; }
+
+/* App shell's own nav-bar search box (AppShell.tsx) — same look as .game-search-wrap's input,
+   but sized to sit inline in the nav bar rather than fill a page section. */
+.app-search-wrap { position: relative; flex: 1 1 220px; max-width: 320px; }
+.app-search-wrap > input {
+  width: 100%;
+  padding: 7px 12px;
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text0);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.app-search-wrap > input:focus { border-color: var(--accent); }
+.app-search-wrap > input::placeholder { color: var(--text2); }
 
 /* How it works */
 .how-it-works { margin-bottom: 18px; }
@@ -646,39 +741,128 @@ a.account-identity:hover .account-name { color: var(--accent2); }
 tbody tr.game-row { cursor: pointer; }
 tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 
-/* Side panel backdrop */
-.panel-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.45);
-  z-index: 100;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s;
-}
-.panel-backdrop.open { opacity: 1; pointer-events: auto; }
+/* App shell layout (see docs/dev/frontend.md and AppShell.tsx)
+   — `.app-shell` is the root: `.app-scroll` (nav bar, routed content, footer — everything that
+   scrolls together, as one column) plus the side panel, which is fixed and full-height rather
+   than a flex sibling of any of it (see below).
 
-/* Side panel drawer */
-.game-panel {
+   The shell is locked to the viewport and `.app-scroll` scrolls inside it, rather than the
+   document scrolling as a whole: with the panel now full-height at the right edge, a document
+   scrollbar would sit immediately next to the panel's own — two scrollbars a few pixels apart.
+   This leaves one scrollbar per column, each at the right edge of the thing it scrolls. The nav
+   bar and footer live *inside* that scroller rather than being pinned siblings of it, so they
+   still scroll away with the content the way they did when the document scrolled. */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh; /* mobile browser chrome — the vh fallback above stays for older engines */
+  overflow: hidden;
+}
+.app-scroll {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto; /* the page's scroller — see .app-shell's comment above */
+  display: flex;
+  flex-direction: column;
+}
+.app-content { flex: 1; } /* pushes the footer to the bottom on a page shorter than the viewport */
+
+@media (min-width: 769px) {
+  /* The panel is out of flow, so the shell reserves its width instead of laying it out: the nav
+     bar and footer shorten along with the content rather than running underneath a panel that
+     now reaches the top of the viewport. Below 769px the panel is full-width, so no gutter. */
+  .app-shell.panel-open { padding-right: var(--panel-w); }
+}
+
+@media (max-width: 768px) {
+  /* No viewport lock on a phone: the document scrolls again, as it did before the panel became
+     full-height. The twin-scrollbar problem the lock solves is desktop-only — here the panel is
+     a full-screen overlay, never a second column, and touch scrollbars are overlays anyway —
+     while the lock's own cost is real: a document that never scrolls is a browser URL bar that
+     never collapses, on the viewport that can least afford the height. */
+  .app-shell {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+  .app-scroll { overflow-y: visible; }
+}
+
+/* Back to top — one small fixed button rather than a pinned nav bar, since the nav scrolls away
+   with everything else now. Sits inside the content column's own bottom-right corner: `fixed` is
+   viewport-relative and so doesn't see `.app-shell`'s gutter padding, hence the explicit offset
+   while the panel is open. Its z-index is deliberately below the panel's, so the mobile
+   full-screen panel covers it instead of floating a stray button over the game details. */
+.app-to-top {
   position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  color: var(--text1);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.35);
+  transition: border-color 0.15s, color 0.15s, opacity 0.15s;
+}
+.app-to-top:hover { border-color: var(--accent); color: var(--accent2); }
+@media (min-width: 769px) {
+  .app-shell.panel-open .app-to-top { right: calc(var(--panel-w) + 16px); }
+}
+
+/* Side panel — docked, not modal: a column of its own, not an overlay. No backdrop at all (see
+   AppShell.tsx) — closing is always an explicit action (the ×, Escape, or swipe), never a
+   click outside. Hidden entirely (not just visually) until a game is open, so the content
+   column gets the full width back (`.app-shell.panel-open` above reserves the gutter only
+   while it's open).
+
+   `position: fixed`, spanning the full viewport height, rather than a flex sibling inside
+   `.app-body`: as a sibling it started below the nav bar (a strip of page background above it)
+   and, since nothing in the shell is height-constrained, stretched to the whole *document*
+   height — which meant `.panel-body`'s own scrolling never engaged and `.panel-nav`'s
+   bottom-pinned bar landed at the bottom of the page instead of the panel. Fixed restores both
+   and puts the panel flush with the top of the screen. */
+.game-panel {
+  display: none;
+  position: fixed; /* also .panel-nav's containing block — see its own comment below */
   top: 0;
   right: 0;
-  bottom: 0;
-  width: 380px;
+  z-index: 100; /* over the content; under the lightbox (1000) and the shortcuts modal (200) */
+  height: 100vh;
+  height: 100dvh; /* mobile browser chrome — the vh fallback above stays for older engines */
+  width: var(--panel-w);
   max-width: 100vw;
   background: var(--bg1);
   border-left: 1px solid var(--border);
-  z-index: 101;
-  display: flex;
   flex-direction: column;
-  transform: translateX(100%);
-  transition: transform 0.25s ease;
   overflow: hidden;
 }
-.game-panel.open { transform: translateX(0); box-shadow: -8px 0 32px rgba(0,0,0,0.4); }
+.game-panel.open { display: flex; }
 
 @media (min-width: 1400px) {
-  .game-panel { width: min(480px, 30vw); }
+  :root { --panel-w: min(480px, 30vw); }
+}
+
+@media (max-width: 768px) {
+  /* No room for a docked two-column layout at this width — the panel spans the full width
+     instead, and the shell reserves no gutter for it. Still non-modal: no backdrop, no
+     click-outside-dismiss, just a layout fallback. */
+  .game-panel.open {
+    z-index: 101;
+    width: 100vw;
+  }
 }
 
 @media (max-width: 768px) {
@@ -687,6 +871,10 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   .lb-btn  { width: 40px; height: 52px; font-size: 26px; }
   .lb-prev { left: 4px; }
   .lb-next { right: 4px; }
+  /* The pointer-friendly way to change game on touch (a vertical swipe is the other) — so
+     back up to a thumb-sized target here. */
+  .lb-toolbar .lb-caption button { width: 34px; height: 34px; }
+  .lb-caption { padding: 0 44px; }
 
   .container { padding: 18px 14px 40px; }
   header { margin-bottom: 20px; }
@@ -699,7 +887,6 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   .td-hltb { min-width: 60px; }
   .family-row { padding-left: 20px; }
   .family-hint { padding-left: 20px; }
-  .game-panel { width: 100vw; }
   /* Prevent iOS Safari from zooming on input focus */
   .user-row input, .filter-search, .filter-name-input { font-size: 16px; }
   /* Move the Steam Family button below the input+remove row */
@@ -875,9 +1062,9 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 /* Sticky to the bottom of the panel on both desktop and mobile now (previously sat
    between the hero and the body, which meant reaching it on desktop required
    scrolling back up past the hero every time) — one behavior instead of two, and it
-   keeps prev/next/random reachable without the trip. `.game-panel` is `position:
-   fixed`, so this `position: absolute` pins to its bottom edge without needing any
-   DOM change. `:empty` hides it entirely for standalone lookups (no group/list to
+   keeps prev/next/random reachable without the trip. `.game-panel` is `position: fixed`, so
+   this `position: absolute` pins to the bottom edge of the panel — i.e. the bottom of the
+   viewport — without needing any DOM change. `:empty` hides it entirely for standalone lookups (no group/list to
    page through) rather than showing an empty floating bar. */
 .panel-nav {
   position: absolute;
@@ -1105,7 +1292,7 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 .panel-refresh-btn:hover:not(:disabled), .panel-copy-link-btn:hover { border-color: var(--accent); color: var(--accent2); }
 .panel-refresh-btn:disabled { opacity: 0.6; cursor: default; }
 .panel-refresh-btn.is-refreshing { animation: spin 0.75s linear infinite; }
-/* Brief post-click feedback (see flashCopyLinkBtn in panel.js) — green rather than the
+/* Brief post-click feedback (see clipboard.ts's copyWithFeedback) — green rather than the
    hover accent, so "copied" reads as a distinct confirmation, not just a hover state. */
 .panel-copy-link-btn--copied { border-color: #15803d; color: #15803d; }
 
@@ -1154,15 +1341,19 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 
 /* "In your library" / "On your wishlist" status — sits right under the title, inside the
    sticky header, so it's visible the instant the panel opens with no scrolling. Plain small
-   pills, not the demo banner's solid CTA fill — this is a status readout, not a call to action. */
+   pills, not the demo banner's solid CTA fill — this is a status readout, not a call to action.
+   Each pill *is* a link (to /lists/owned|wishlist for the same game), but deliberately not
+   underlined: the pill shape already reads as clickable, and an underline through a 11px badge
+   just makes the status itself harder to read. */
 .panel-ownership-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .panel-ownership-badge {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 2px 8px; border-radius: 999px;
   font-size: 11px; font-weight: 700;
+  text-decoration: none;
 }
-.panel-ownership-badge.owned { background: rgba(46, 204, 113, 0.16); color: #2ecc71; }
-.panel-ownership-badge.wishlisted { background: rgba(241, 196, 15, 0.16); color: #f1c40f; }
+.panel-ownership-badge.owned { background: rgba(241, 196, 15, 0.16); color: #f1c40f; }
+.panel-ownership-badge.wishlisted { background: rgba(46, 204, 113, 0.16); color: #2ecc71; }
 
 /* --text0/13px, not the --text1/12px caption treatment used elsewhere in the panel — this
    is prose meant to be read, not secondary metadata. Sits directly under the glance grid,
@@ -1566,15 +1757,29 @@ body.lb-open { overflow: hidden; }
   transition: opacity 0.25s;
 }
 .lb-caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   color: #fff;
   font-size: 14px;
   font-weight: 600;
-  text-align: center;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  padding: 0 48px; /* clears the toolbar buttons on either side at narrow widths */
+}
+.lb-caption-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-  padding: 0 48px; /* clears the toolbar buttons on either side at narrow widths */
+}
+/* The ↑/↓ pair flanking the caption steps the *list*, the axis the edge ‹ › don't cover.
+   Sized down from the toolbar's own round buttons — these sit inside a line of text. */
+.lb-toolbar .lb-caption button {
+  pointer-events: auto; /* .lb-toolbar turns them off; only its interactive groups opt back in */
+  flex: none;
+  width: 28px;
+  height: 28px;
+  font-size: 15px;
 }
 .lb-toolbar-row {
   display: flex;
@@ -1587,7 +1792,11 @@ body.lb-open { overflow: hidden; }
   align-items: center;
   gap: 8px;
   pointer-events: auto;
+  /* Equal-width flanks, so the counter between them lands on the real centre and stacks under
+     the caption above it — `space-between` alone put it wherever the wider group left it. */
+  flex: 1 1 0;
 }
+.lb-toolbar-right { justify-content: flex-end; }
 .lb-toolbar button {
   background: rgba(0,0,0,0.55);
   border: 1px solid rgba(255,255,255,0.15);
@@ -1603,11 +1812,19 @@ body.lb-open { overflow: hidden; }
   font-size: 22px;
 }
 .lb-fullscreen:hover,
-.lb-share:hover { background: rgba(26,159,255,0.5); }
+.lb-share:hover,
+.lb-toolbar .lb-caption button:hover { background: rgba(26,159,255,0.5); }
 .lb-close:hover { background: rgba(200,60,60,0.7); }
-.lb-counter {
+/* One pill, two counters — the list position beside the game name, the media position below it.
+   Same treatment because they answer the same question on different axes (↑/↓ vs ‹ ›); the pill
+   rather than a text-shadow because either can land over a bright screenshot. */
+.lb-counter,
+.lb-caption-pos {
   color: rgba(255,255,255,0.7);
   font-size: 13px;
+  font-weight: 400; /* the caption around it is 600 — the counter is not part of the title */
+  white-space: nowrap;
+  flex: none;
   background: rgba(0,0,0,0.5);
   padding: 3px 10px;
   border-radius: 10px;
@@ -1621,8 +1838,19 @@ body.lb-open { overflow: hidden; }
   from { transform: translateX(-40px); opacity: 0; }
   to   { transform: translateX(0);     opacity: 1; }
 }
-.lb-img.lb-anim-right { animation: lb-enter-right 0.18s ease-out forwards; }
-.lb-img.lb-anim-left  { animation: lb-enter-left  0.18s ease-out forwards; }
+/* The vertical pair: a game step (↑/↓ or a vertical swipe), not a media one. */
+@keyframes lb-enter-bottom {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes lb-enter-top {
+  from { transform: translateY(-40px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+.lb-img.lb-anim-right  { animation: lb-enter-right  0.18s ease-out forwards; }
+.lb-img.lb-anim-left   { animation: lb-enter-left   0.18s ease-out forwards; }
+.lb-img.lb-anim-bottom { animation: lb-enter-bottom 0.18s ease-out forwards; }
+.lb-img.lb-anim-top    { animation: lb-enter-top    0.18s ease-out forwards; }
 #screenshot-lightbox.lb--loading::after {
   content: '';
   position: absolute;
@@ -1700,6 +1928,20 @@ body.lb-open { overflow: hidden; }
 }
 .footer-link { color: var(--text1); text-decoration: none; }
 .footer-link:hover { color: var(--accent2); }
+
+/* The one-line hint pointing at the modal below — the only thing on screen that advertises the
+   keyboard shortcuts exist at all. */
+.app-footer {
+  padding: 10px 16px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--text2);
+}
+.app-footer-link { color: var(--text2); text-decoration: none; }
+.app-footer-link:hover { color: var(--accent2); text-decoration: underline; }
 
 /* Keyboard shortcuts modal */
 kbd {
@@ -1786,3 +2028,684 @@ kbd {
 }
 .shortcuts-row:last-child { margin-bottom: 0; }
 .shortcuts-row span { margin-left: 4px; }
+
+/* ── List route styles (see docs/dev/frontend.md) ─────────────────────── */
+
+/* Wide page layout for the two routes built around a big data table — same 1600px cap the
+   legacy Library Explorer/Bundles pages used (`.lib-page`/`.bundles-page`), just renamed to
+   match the new route components. `.container`'s narrower 1100px stays right for every other
+   route (Home, the game route, About). */
+.list-route,
+.bundles-browse-route {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 36px 20px 60px;
+}
+
+.list-status,
+.bundles-status {
+  font-size: 13px;
+  color: var(--text1);
+  margin-bottom: 10px;
+}
+/* A finished bundle blanks this line (its hero card's Games tile carries the count instead — see
+   ListRoute.tsx's updateStatus), so it has to collapse rather than leave 10px of nothing. */
+.list-status:empty, .bundles-status:empty { display: none; }
+.price-status { font-size: 13px; color: var(--text1); margin-bottom: 10px; }
+.price-status:empty { display: none; }
+
+/* Row-selection-based add/remove-to-list (ListRoute.tsx) */
+.selection-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+.selection-count { font-size: 13px; font-weight: 600; color: var(--text0); }
+.selection-toolbar select {
+  background: var(--bg0);
+  color: var(--text0);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.selection-toolbar button {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--text0);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.selection-toolbar button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
+.selection-toolbar button:disabled { opacity: 0.5; cursor: not-allowed; }
+.selection-status { font-size: 13px; color: var(--accent2); margin-bottom: 10px; }
+
+.list-view-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.table-container { margin-bottom: 18px; }
+
+/* /search's own table (SearchRoute.tsx) — hides @vates/data-table-solid's Columns/Sort/Search/
+   Filter toolbar: none of it applies to a single, unsortable/unfilterable column, and the
+   library's own "Search…" box would sit confusingly right under this page's real one. The
+   row-count line above the table (.dt-active-bar) isn't part of the toolbar and stays.
+   Filed as vatesfr/data-table#25, asking for a toolbar-suppression prop (all-or-nothing, or
+   granular per-control flags). 0.14.0 delivered only `showSearch` and an auto-hiding Sort button
+   (Group already auto-hid) — Columns and Filter are still unconditionally rendered regardless of
+   column config (confirmed in the library's own source, neither wrapped in a length check), so
+   even with `showSearch={false}` this table would still show two dead buttons. This blanket rule
+   stays the only way to get an empty toolbar. */
+.search-table .dt-toolbar { display: none; }
+
+/* The library ships no focus styling of its own for a row — needed here since SearchRoute.tsx
+   moves real DOM focus onto a row to keep it in sync with panel/lightbox navigation (its own
+   roving-tabindex "current row" has no separate visual/reactive API, only a real `focus` event —
+   see that file's own comment). Plain :focus, not :focus-visible: a programmatic .focus() call
+   often doesn't satisfy :focus-visible's own heuristics, and this needs to show regardless of
+   whether the last interaction was mouse (the panel's own 🎲/↑/↓ buttons) or keyboard. Same
+   outline treatment as .panel-film-item:focus-visible, offset inward instead of out since this is
+   a table row, not a standalone tile. */
+.search-table .dt-tr:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* The compare route's players form (ComparePlayersForm.tsx) — one row per player, one input per
+   identifier within it. Same card treatment as Home's combine form, since it does the same job
+   one level up: saying what a list is made of before it exists. */
+.compare-form {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.compare-slot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.compare-slot-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text1);
+  min-width: 62px;
+}
+.compare-slot input[type="text"] {
+  flex: 1 1 220px;
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 8px 10px;
+  color: var(--text0);
+  font-size: 13px;
+}
+.compare-slot input[type="text"]:focus { border-color: var(--accent); outline: none; }
+/* A player slot's token input: the chips already in it, the combobox field, and its dropdown of
+   known accounts (ComparePlayersForm.tsx). */
+.compare-tokens {
+  position: relative;
+  flex: 1 1 260px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 5px 8px;
+}
+.compare-tokens:focus-within { border-color: var(--accent); }
+.compare-tokens input[type="text"] {
+  flex: 1 1 160px;
+  min-width: 120px;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 3px 0;
+  color: var(--text0);
+  font-size: 13px;
+}
+.compare-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 4px 2px 4px;
+  font-size: 12px;
+  color: var(--text0);
+}
+.compare-token .account-avatar { border-radius: 50%; }
+.compare-token:not(:has(.account-avatar)) { padding-left: 9px; }
+/* A raw identifier nobody has resolved yet reads as provisional, next to a named account. */
+.compare-token.is-typed .compare-token-label { color: var(--text1); font-style: italic; }
+.compare-token-remove {
+  background: transparent;
+  border: none;
+  color: var(--text1);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 3px;
+  cursor: pointer;
+}
+.compare-token-remove:hover { color: var(--accent2); }
+
+.compare-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  list-style: none;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+}
+.compare-options li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--text0);
+  cursor: pointer;
+}
+.compare-options li.active { background: var(--bg2); color: var(--accent2); }
+.compare-options .account-avatar { border-radius: 50%; }
+.compare-options .account-count { margin-left: auto; }
+.compare-form-hint { font-size: 12px; color: var(--text1); }
+
+.compare-form-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.list-groups { display: flex; flex-direction: column; gap: 28px; }
+.list-group-heading {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text0);
+  margin-bottom: 10px;
+}
+
+/* Every list route's hero card (ListHero.tsx) — the title row (optional ‹/› lead, the list's
+   name as the page's <h1>, then kind/shop/account chips) plus its right-hand actions. Used to be
+   bundle-only markup named after that one kind; every other list opened with no name on screen at
+   all, only in <title>. */
+.list-hero-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.list-hero-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.list-hero-outlink {
+  font-size: 13px;
+  color: var(--text1);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+.list-hero-outlink:hover { color: var(--accent2); border-bottom-color: var(--accent2); }
+.list-hero-titlebar { display: flex; align-items: center; gap: 10px; }
+.list-hero-nav { display: flex; gap: 4px; }
+.list-hero-nav button {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--text0);
+  font-size: 14px;
+  cursor: pointer;
+}
+.list-hero-nav button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
+.list-hero-nav button:disabled { opacity: 0.35; cursor: default; }
+/* An <h1>, so a list route has a real document heading rather than a styled <span> — hence the
+   explicit margin/size reset over the browser's own h1 metrics. */
+.list-hero-title { margin: 0; font-size: 18px; font-weight: 700; color: var(--text0); }
+
+/* Chips trailing the title: what kind of list this is (Manual/Union/Intersect/…) and, for the
+   account-scoped kinds, whose account is on screen. The shop chip a bundle shows here is
+   .shop-chip, shared with the browse table's own cells. */
+.list-hero-chip {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg2);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text1);
+  white-space: nowrap;
+}
+.list-hero-account { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text0); }
+
+/* The card wrapping all of the above plus the list's own facts as tiles. The bundle version of
+   this was three loose blocks of same-sized gray text (header, a middot-joined facts line, the
+   status line) — no hierarchy, so "ends in 11h" read exactly like "published", and the middot
+   separated facts *and* tier prices at once, which parsed as one flat list. Now: identity and
+   actions on top, a divider, then labelled tiles. */
+.list-hero {
+  border: 1px solid var(--border);
+  background: var(--bg1);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.list-hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+/* Label above value, so a value never has to explain itself in its own text ("ends 2026-09-25"
+   becomes ENDS / Sep 25, 20:00) and every tile's values line up on one baseline across the row. */
+.list-stat { display: flex; flex-direction: column; gap: 2px; }
+.list-stat-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text1);
+}
+.list-stat-value { font-size: 14px; color: var(--text0); }
+.list-stat-sub { font-size: 11px; color: var(--text1); }
+/* Overrides .bundle-ends-rel's own inline-beside-the-time metrics (shared with the browse table's
+   Ends cell) — here the countdown is its own line under the date, not a suffix. */
+.list-stat-sub .bundle-ends-rel { margin-left: 0; }
+
+/* Tier prices as chips rather than middot-joined text: the middot was doing double duty as both
+   the fact separator and the tier separator, so "13 games · tiers $5 · $15 · $25" read as five
+   siblings. Each chip's title carries how many games that tier unlocks. */
+.bundle-tier-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.bundle-tier-chip {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg2);
+  font-size: 12.5px;
+  color: var(--text0);
+  white-space: nowrap;
+}
+
+/* Prose under the tiles: ITAD's own bundle note ("Keys expire. Please redeem before …") — often
+   the most human thing on the page — or a dynamic list's formula, both on their own line rather
+   than folded in among the tiles. */
+.list-hero-note {
+  margin-top: 12px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text1);
+}
+
+/* A dynamic list's formula — its sources, each linked and carrying what it contributed, joined by
+   the op's own symbol. Not italic (it overrides .list-hero-note's prose styling): it's a row of
+   values and names, read like the tiles above it rather than like the bundle note it shares a
+   slot with. */
+.list-formula {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-style: normal;
+  color: var(--text0);
+}
+.list-formula-source {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg2);
+  white-space: nowrap;
+}
+.list-formula-source a { color: inherit; text-decoration: none; }
+.list-formula-source a:hover { color: var(--accent2); }
+/* Same amber "heads up, not an error" palette as .account-private/.account-override-status: a
+   dangling source doesn't break the list, it just contributes nothing. */
+.list-formula-source.has-problem { border-color: rgba(228,168,46,0.4); color: #e4c46e; }
+.list-formula-count { font-size: 11px; color: var(--text1); }
+.list-formula-op { color: var(--text1); }
+.list-formula-result { font-weight: 600; }
+.list-formula-problems {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  font-style: normal;
+  font-size: 12px;
+  color: #e4c46e;
+}
+
+/* The bundle's games with no Steam listing (ListRoute.tsx) — collapsed by default, but the count
+   stays visible in the toggle so the table never passes itself off as the whole bundle. */
+.unresolved-games { margin-bottom: 24px; }
+.unresolved-summary {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text1);
+  cursor: pointer;
+}
+.unresolved-summary:hover { color: var(--accent2); }
+.unresolved-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 4px 18px;
+}
+.unresolved-list li { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+.unresolved-list a { color: var(--text0); text-decoration: none; }
+.unresolved-list a:hover { color: var(--accent2); }
+.unresolved-type { font-size: 11px; color: var(--text1); text-transform: capitalize; }
+
+/* ── Bundles browse route ──────────────────────────────────────────────────────────────────── */
+
+/* "Include expired" — the one control on this route that reaches ITAD rather than the table, so
+   it sits in the hero card's action row next to ↻ Refresh (see BundlesBrowseRoute.tsx). The rest
+   of what used to be a `.bundles-controls` toolbar here (a pre-table sort <select>, the
+   "Updated <when>" and region readouts) is either gone with server-side sorting or a hero tile. */
+.bundles-expired-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text1);
+  cursor: pointer;
+}
+
+/* The bundle list itself is a @vates/data-table-solid table now (see BundlesBrowseRoute.tsx's own
+   header comment for why the hand-rolled `.bundle-item` row list it replaced couldn't align its
+   columns), so it needs no list/row styles of its own beyond `.table-container` above — only the
+   few cell renderers below. */
+
+/* Cover block — four of the bundle's game banners in a 2×2 grid (ITAD has no bundle-level image
+   of its own). Fixed tracks rather than a flex row, so a bundle with only two or three games
+   carrying artwork still occupies the same block as every other row instead of collapsing.
+   Each banner is a little over half its native 145×55, so they stay sharp on a hidpi display. */
+.bundle-covers { display: grid; grid-template-columns: repeat(2, 80px); gap: 3px; }
+.bundle-cover {
+  display: block;
+  width: 80px;
+  height: 30px;
+  object-fit: cover;
+  border-radius: 2px;
+  background: var(--bg2); /* placeholder while lazy-loading, and for a hidden/failed image */
+}
+
+/* Shop chip. Only the hue comes from the shop name (BundlesBrowseRoute.tsx's renderShop sets
+   --shop-hue via bundleRows.ts's shopHue) — saturation/lightness are fixed here precisely so no
+   hash can land on an unreadable color against this theme's dark ground. */
+.shop-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: hsl(var(--shop-hue) 60% 72%);
+  background: hsl(var(--shop-hue) 60% 72% / 0.12);
+  border: 1px solid hsl(var(--shop-hue) 60% 72% / 0.35);
+}
+
+/* Published/Ends cells: date on the first line, its time under it, smaller and dimmed. Stacked
+   rather than one "2026-09-04 20:35" line so the column costs only the date's width — the rows are
+   already tall enough for a second line, the cover grid above having set the row height anyway. */
+.bundle-datetime { display: flex; flex-direction: column; line-height: 1.35; }
+.bundle-datetime-time { font-size: 11px; color: var(--text1); }
+
+/* "in 3d"/"in 11h"/"ended", sharing the Ends cell's second line with the time rather than widening
+   the first — its color is set inline per row from scoreColor's own tiers (see renderEnds), so
+   only the typography lives here. */
+.bundle-ends-rel { margin-left: 6px; font-weight: 600; white-space: nowrap; }
+
+/* Dims an expired bundle's whole row. The table library has no per-row class hook, so the row is
+   reached through the marker its Bundle cell carries (renderBundleTitle) — which means dimming
+   stops if that column is hidden, an acceptable degradation for a column nobody hides. Only
+   reachable at all with "Include expired" on; every row is Active otherwise. */
+.dt-tr:has(.bundle-expired) { opacity: 0.45; }
+.dt-tr:has(.bundle-expired):hover { opacity: 0.8; }
+
+/* ── Home route: account picker + folder/list tree ─────────────────────────────────────────── */
+
+.home-route {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 36px 20px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.home-route h2 { font-size: 13px; font-weight: 600; color: var(--text1); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 12px; }
+.home-route h3 { font-size: 12px; font-weight: 600; color: var(--text1); text-transform: uppercase; letter-spacing: 0.6px; margin: 14px 0 8px; }
+
+.home-account {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 22px 24px;
+}
+.account-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.account-header img { border-radius: 50%; flex-shrink: 0; }
+.account-label {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 15px; font-weight: 600; color: var(--text0);
+}
+.account-counts { font-size: 12px; color: var(--text1); margin-top: 2px; }
+/* "Updated <when> ↻ Refresh" on Home's Account card. Server-side caching runs for weeks
+   (default.env's LIBRARY_CACHE_TTL_MINUTES), so how old the data is gets stated outright, with the
+   control that fixes it sitting right next to the fact. Every *list* says it as a hero tile
+   instead (ListHero.tsx), which is where `.bundles-updated`/`.region-readout` went. */
+.account-updated {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 11px; color: var(--text2); margin-top: 4px;
+}
+
+/* The card's own larger avatar, against .account-avatar-wrap's 28px default. */
+.account-avatar-lg, .account-avatar-lg .account-avatar { width: 48px; height: 48px; }
+.account-profile-link { color: inherit; text-decoration: none; }
+.account-profile-link:hover { color: var(--accent2); }
+.account-profile-arrow { color: var(--text1); font-weight: 400; }
+
+/* A Steam Family's member accounts — the header above speaks for the slot as a whole, so each
+   account's own persona/profile link/presence/library size is listed here instead. */
+.account-members { list-style: none; margin: -8px 0 16px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.account-members li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.home-account form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.home-account form input[type="text"] {
+  flex: 1 1 240px;
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 9px 12px;
+  color: var(--text0);
+  font-size: 13px;
+}
+.home-account form input[type="text"]:focus { border-color: var(--accent); outline: none; }
+.home-account form button { padding: 9px 14px; border: 1px solid var(--border); border-radius: var(--r); background: transparent; color: var(--text0); font-size: 13px; cursor: pointer; }
+.home-account form button[type="submit"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.home-account form button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* A `?u=` link's account override (HomeRoute) — deliberately called out rather than styled
+   like ordinary body text: the account card right below it is showing someone the *link's*
+   account, not the visitor's own, and nothing else on the page says so. Same amber
+   "heads up, not an error" palette as .account-private's own private-profile badge. */
+.account-override {
+  background: rgba(228,168,46,0.08);
+  border: 1px solid rgba(228,168,46,0.3);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+.account-override-status { font-size: 12.5px; color: var(--text0); margin: 0; }
+.account-override-status + .account-override-status { margin-top: 6px; }
+.account-override-adopt {
+  margin-left: 8px; padding: 3px 9px;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: transparent; color: var(--text0); font-size: 12px; cursor: pointer;
+}
+.account-override-adopt:hover { border-color: var(--accent); color: var(--accent2); }
+
+.error { color: #ff8888; font-size: 12.5px; margin: 6px 0; }
+
+.recent-accounts { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.recent-accounts li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 6px 10px;
+}
+.recent-accounts li > button:first-child { flex: 1; text-align: left; background: none; border: none; color: var(--text0); font-size: 13px; cursor: pointer; padding: 2px 0; }
+.recent-accounts li > button:first-child:hover { color: var(--accent2); }
+.recent-accounts button:not(.copy-btn) {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text1);
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.recent-accounts button:not(.copy-btn):hover { border-color: var(--accent); color: var(--accent2); }
+
+.home-fixed-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.home-fixed-links a {
+  flex: 1 1 140px;
+  text-align: center;
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px;
+  color: var(--text0);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: border-color 0.15s, color 0.15s;
+}
+.home-fixed-links a:hover { border-color: var(--accent); color: var(--accent2); }
+
+.home-tree {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 22px 24px;
+}
+.tree-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.tree-actions button {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--text0);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.tree-actions button:hover { border-color: var(--accent); color: var(--accent2); }
+
+.combine-form {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.combine-form input[type="text"],
+.combine-form select {
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 8px 10px;
+  color: var(--text0);
+  font-size: 13px;
+}
+.combine-form input[type="text"]:focus,
+.combine-form select:focus { border-color: var(--accent); outline: none; }
+.combine-form p { font-size: 12px; color: var(--text1); }
+/* A label the app derived rather than one someone typed (an unnamed dynamic list's formula) —
+   dimmed and italic wherever it stands in for a name. */
+.derived-name { font-style: italic; color: var(--text1); }
+.combine-sources { list-style: none; display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
+.combine-sources label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text0); cursor: pointer; }
+.combine-form button[type="submit"] {
+  align-self: flex-start;
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--r);
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.list-tree { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.list-tree li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: var(--r);
+}
+.list-tree li:hover { background: var(--bg2); }
+.list-tree a { flex: 1; color: var(--text0); text-decoration: none; font-size: 13px; }
+.list-tree a:hover { color: var(--accent2); }
+/* Beats the generic `.list-tree span` colour rule below, which is more specific than
+   `.derived-name` on its own. */
+.list-tree a .derived-name { color: var(--text1); }
+.list-tree a:hover .derived-name { color: var(--accent2); }
+.list-tree span { flex: 1; color: var(--text0); font-size: 13px; }
+.list-tree button {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text1);
+  font-size: 11px;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.list-tree button:hover { border-color: var(--accent); color: var(--accent2); }

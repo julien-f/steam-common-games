@@ -1,11 +1,12 @@
 // Shared "share/persist/reset a @vates/data-table-solid view via prefs.js + a one-shot URL
 // param" logic — extracted verbatim from library.js's and bundles.js's own near-identical
-// copies (see CLAUDE.md's Library Explorer / Bundles sections for the "share on demand, not
+// copies (see docs/dev/frontend.md's table section for the "share on demand, not
 // live-synced" reasoning). Both pages call these the same way: a `table` instance, the prefs.js
 // key that page's view is stored under, and the URL param name that page's "🔗 Share view"
 // button writes to (`lv`/`wv` for library.js, `bv` for bundles.js).
 import { getPref, setPref } from './prefs.ts';
-import { reorderUrlParams } from './urlState.ts';
+import { urlWithParams } from './urlState.ts';
+import { copyWithFeedback } from './clipboard.ts';
 
 // The @vates/data-table-solid instance these operate on — only the view-state surface the page
 // code actually uses, rather than importing the package's own (internal) types. `onViewChange` is
@@ -32,7 +33,7 @@ export function restoreTableView(table: DataTableLike, prefKey: string, paramNam
       table.setViewState(view);
       setPref(prefKey, view);
       params.delete(paramName);
-      history.replaceState(null, '', `?${reorderUrlParams(params)}`);
+      history.replaceState(null, '', urlWithParams(params));
       return;
     } catch { /* malformed param — fall through to the stored default */ }
   }
@@ -55,15 +56,8 @@ export function bindViewPersistence(table: DataTableLike, prefKey: string): () =
 export function shareTableView(table: DataTableLike, paramName: string, btn: HTMLElement): void {
   const params = new URLSearchParams(location.search);
   params.set(paramName, JSON.stringify(table.getViewState()));
-  const qs = reorderUrlParams(params).toString();
-  const url = `${location.origin}${location.pathname}${qs ? `?${qs}` : ''}`;
-  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(url).then(() => flashShareViewBtn(btn), () => {});
-}
-
-function flashShareViewBtn(btn: HTMLElement): void {
-  const prevText = btn.textContent;
-  btn.textContent = '✓ Copied!';
-  setTimeout(() => { btn.textContent = prevText; }, 1500);
+  const url = `${location.origin}${urlWithParams(params)}`;
+  copyWithFeedback(btn, url);
 }
 
 // Clears both the stored default and whatever's currently in `paramName`, then blanks the
@@ -74,5 +68,5 @@ export function resetTableView(table: DataTableLike, prefKey: string, paramName:
   setPref(prefKey, {});
   const params = new URLSearchParams(location.search);
   params.delete(paramName);
-  history.replaceState(null, '', `?${reorderUrlParams(params)}`);
+  history.replaceState(null, '', urlWithParams(params));
 }

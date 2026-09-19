@@ -1,9 +1,17 @@
 import type { Game } from './types.ts';
 
+// The custom-URL name in a Steam profile URL ('https://steamcommunity.com/id/gaben/' → 'gaben'),
+// or null for anything else — a `/profiles/<steam64>` URL is Steam's own fallback form, which
+// means the account never set one.
+export function steamVanity(profileUrl: string | null | undefined): string | null {
+  const m = (profileUrl || '').match(/steamcommunity\.com\/id\/([^/?\s]+)/);
+  return m ? m[1] : null;
+}
+
 // Extract username/ID from a pasted Steam profile URL
 export function normalizeInput(raw: string): string {
-  const mId  = raw.match(/steamcommunity\.com\/id\/([^/?\s]+)/);
-  if (mId)  return mId[1];
+  const vanity = steamVanity(raw);
+  if (vanity) return vanity;
   const mNum = raw.match(/steamcommunity\.com\/profiles\/(\d+)/);
   if (mNum) return mNum[1];
   return raw;
@@ -37,7 +45,7 @@ export function computeSteamdbRating(positive: number, total: number): number | 
 // signal, so this leans on the only things that correlate with it at all: launch price
 // (`priceInitial`, whole cents, USD — see isFree/priceInitial in lib/steam.js's
 // extractAppDetails), review volume as a reach proxy, and Metacritic presence as a "got
-// professional press coverage at all" signal. It's a heuristic, not fact — see CLAUDE.md's
+// professional press coverage at all" signal. It's a heuristic, not fact — see docs/dev/decisions.md's
 // AAA/AA/Indie section for the tradeoffs and known misclassifications (cheap AAA
 // remasters/rereleases, prestige-priced small-studio sim games, veteran-founded small studios
 // with high polish — none of these have any data-side tell). Returns null, not a tier, when
@@ -176,6 +184,25 @@ export function fmtLastPlayed(epochSec: number | null | undefined): string {
   return new Date(epochSec * 1000).toISOString().slice(0, 10);
 }
 
+// "how long ago was this fetched", for the "Updated <when>" readouts next to the app's ↻ Refresh
+// buttons. Deliberately coarse — the point is "is what I'm looking at from today or from last
+// month", not a precise duration — and it never says "in the future" for a small clock skew
+// between the server (which produces these timestamps) and the browser: anything under a minute,
+// in either direction, is "just now". `null` (nothing cached — fetched fresh this request) is
+// also "just now", which is exactly what it means.
+export function fmtAge(fetchedAt: number | null | undefined, now: number = Date.now()): string {
+  if (fetchedAt == null) return 'just now';
+  const mins = Math.floor((now - fetchedAt) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`;
+  const months = Math.floor(days / 30);
+  return `${months} month${months === 1 ? '' : 's'} ago`;
+}
+
 export function foldStr(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
@@ -206,4 +233,26 @@ export function renderExtraCell(game: Game): string {
   if (game.loading) return '<span class="sk sm"></span>';
   const h = game.details?.hltb;
   return h ? fmtH(h.extra) : '<span class="dim">—</span>';
+}
+
+// Whether focus is somewhere that genuinely swallows a plain letter or arrow key, and so must
+// suppress the page's own keyboard shortcuts (see panelKeyboard.ts). Deliberately *not* "any
+// <input>", which is what this replaced: the game table puts a selection checkbox on every row,
+// and treating one of those as text entry silently killed every shortcut on the page — R, ↑/↓,
+// `/`, `?` — for as long as focus stayed on it, with nothing on screen to say why. A checkbox,
+// radio or button swallows none of those keys. A <select> does (a letter types ahead through its
+// options, arrows change the value), so it stays blocked.
+// Duck-typed on `tagName`/`type` rather than `instanceof HTMLInputElement`: it keeps this module
+// free of a DOM dependency it otherwise has none of, and an `instanceof` check against the
+// window's own constructors is wrong for an element from another realm anyway.
+const TEXT_ENTRY_INPUT_TYPES = new Set([
+  'text', 'search', 'email', 'url', 'tel', 'password', 'number',
+  'date', 'datetime-local', 'month', 'time', 'week',
+]);
+export function isTextEntry(el: { tagName?: string; type?: string; isContentEditable?: boolean } | null | undefined): boolean {
+  const tag = el?.tagName;
+  if (!tag) return false;
+  if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (tag === 'INPUT') return TEXT_ENTRY_INPUT_TYPES.has(el!.type ?? '');
+  return el!.isContentEditable === true;
 }

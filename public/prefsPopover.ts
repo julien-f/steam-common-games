@@ -12,7 +12,7 @@ import { COUNTRY_OPTIONS, AUTO_COUNTRY, detectCountry, getStoredRegion, setStore
 // preference (region.js), same shape the old per-page inline pickers used.
 export function prefsPopoverPanelHtml(): string {
   return `
-    <div class="site-nav-prefs-panel">
+    <div class="site-nav-popover-panel site-nav-prefs-panel">
       <label class="site-nav-prefs-row">Region
         <select id="nav-region-select"></select>
       </label>

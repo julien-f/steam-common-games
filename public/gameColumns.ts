@@ -30,15 +30,13 @@
 // columns a given page shows by default and how it sorts on first load are page-specific
 // decisions, not something to centralize just because the column *definitions* are shared.
 
+// The bucket/compare helpers are `@vates/data-table-core` primitives, but `@vates/data-table-solid`
+// re-exports them (since before this app's 0.13.0 pin) — importing from there instead avoids a
+// second, otherwise-unnecessary direct dependency on core.
 import {
   compareMissingLast, bucketNumericRange, bucketDatePart, formatNumericRange, formatDatePart,
   bucketLogRange, formatLogRange,
-} from '@vates/data-table-core';
-// Type-only import from the Solid adapter (the one exporting `ColumnDef` with its DOM `render`
-// callback — structurally identical to the vanilla adapter's own, per @vates/data-table-core;
-// both bundles.tsx and library.tsx are Solid-based now, so this is the more accurate source to
-// name even though nothing here actually depends on Solid) — no runtime dependency added, the
-// pages import their column lists from here, not from the adapter.
+} from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
 import { scoreColor, dealRecordTier, DEAL_RECORD_TIERS, formatMoney } from '/utils.ts';
 
@@ -143,6 +141,53 @@ export function renderDemoBadge(v: unknown): Node {
   span.style.color = '#0b1620';
   span.textContent = 'Demo';
   return span;
+}
+
+// Appends bare ✓/☆ markers after the name text when `row.inLibrary`/`row.onWishlist` are set,
+// and colors (+ bolds, for Wishlisted) the whole cell — name text included, not just the badge —
+// using the *exact same* `OWNERSHIP_STATUS_TIERS` (below) `OWNERSHIP_STATUS_COLUMN`'s own cell
+// derives its color/bold from, rather than a second, separately-maintained copy of "yellow+bold
+// for wishlisted, green for owned" (a first draft of this function did exactly that, as a CSS
+// class, and the bold weight quietly went missing from it — the tier list didn't exist yet for
+// this function to share). Just inline rather than a labeled pill, unlike the panel's own
+// `.panel-ownership-badge`/gameSearch.ts's `.game-search-badge` — a table row has even less room
+// than a dropdown row. Wishlisted wins over Owned when both are true (only one color/weight can
+// apply to the cell, unlike the two badges below, which both still show) — matching
+// `OWNERSHIP_STATUS_TIERS`'s own "Owned & Wishlisted" tier already being bold, not some third
+// mixed treatment. Wishlisted outranks Owned here deliberately: on a browse page ("should I buy
+// this") a wishlisted game is the actionable signal worth the stronger highlight, while owning it
+// already is just a heads-up. A no-op everywhere `inLibrary`/`onWishlist` are never populated — the Library/
+// Wishlist tabs' own rows, where "do I own this" is trivially always true/false and not worth
+// flagging — since this only renders whatever's already on the row (ListRoute.tsx's
+// loadMyOwnership is what actually populates them, for the bundle/recent/user lists where the
+// question is a genuine one). Falls straight through to a plain text node when neither applies
+// (`computeOwnershipStatus` returns `null`/`'Not Owned'`, neither of which has a tier `color`),
+// so the common case renders identically to `fmt.str` before this existed.
+export function renderNameCell(v: unknown, row: Row): Node {
+  const nameText = fmt.str(v);
+  const status = computeOwnershipStatus(row);
+  const tier = status ? OWNERSHIP_STATUS_TIERS.find(t => t.label === status) : null;
+  if (!tier?.color) return document.createTextNode(nameText);
+  const wrap = document.createElement('span');
+  wrap.className = 'game-name-cell';
+  wrap.style.color = tier.color;
+  if (tier.bold) wrap.style.fontWeight = '700';
+  wrap.appendChild(document.createTextNode(nameText));
+  if (row.inLibrary) {
+    const b = document.createElement('span');
+    b.className = 'name-status-badge owned';
+    b.title = 'In library'; // not "In your library" — see panel.tsx's own ownership badge/git history for why
+    b.textContent = '✓';
+    wrap.appendChild(b);
+  }
+  if (row.onWishlist) {
+    const b = document.createElement('span');
+    b.className = 'name-status-badge wishlisted';
+    b.title = 'On wishlist'; // not "On your wishlist" — ditto
+    b.textContent = '☆';
+    wrap.appendChild(b);
+  }
+  return wrap;
 }
 
 // Ignores `value` and reads `row.capsule` directly — `value` is forced to null on this column
@@ -518,6 +563,81 @@ export const PRICE_STATUS_COLUMN: ColumnDef<Row> = {
   compare: comparePriceStatus, defaultSortDir: 'desc', category: 'Pricing',
 };
 
+// "Is this appid owned/wishlisted by currentAccount" (whichever account's list is actually on
+// screen — see myOwnership.ts's own comment) — turns its `inLibrary`/`onWishlist` fields
+// (stamped onto a row by ListRoute.tsx's own loadMyOwnership, from the sets myOwnership.ts
+// already loads once per loaded account — no per-row fetch of its own) into one categorical
+// column, same shape as PRICE_STATUS_COLUMN above. Labeled "Ownership Status", not "My Status"
+// — this app has no real login, so `currentAccount` isn't a verified "this is you" identity,
+// just whichever account happens to be loaded (a friend's, just as easily as your own); claiming
+// it's personally "mine" in a column header overstates that relationship the same way an earlier
+// version of the *other* ownership badge in this app (panel.tsx's, plain "In library"/"On
+// wishlist") was deliberately kept free of "your"/"my" wording for. `null` (rendered "—") covers
+// both "no account loaded" and "still loading" — same ambiguity myOwnership.ts's own
+// peekMyOwnershipStatus already accepts, for the same reason: a synchronous cell render can't
+// await, and loadMyOwnership re-stamps every row once the real sets land. Not part of
+// CORE_COLUMNS — an Owned/Wishlist list's own rows are always trivially 'Owned'/'Wishlisted', so
+// this only earns a place on ListRoute.tsx's BUNDLE_COLUMNS/RECENT_COLUMNS (which 'user' also
+// uses), where it's a genuine question — and even there it's hidden by default (not part of
+// either kind's own *_DEFAULT_VISIBLE list): renderNameCell below already surfaces the same
+// information (color + a ✓/☆ badge) right on the Name column everyone already looks at, so this
+// dedicated column is a secondary, sort/group/filter-only view onto the same fact rather than
+// something worth defaulting to visible.
+export function computeOwnershipStatus(row: Row): string | null {
+  if (row.inLibrary == null && row.onWishlist == null) return null;
+  if (row.inLibrary && row.onWishlist) return 'Owned & Wishlisted';
+  if (row.inLibrary) return 'Owned';
+  if (row.onWishlist) return 'Wishlisted';
+  return 'Not Owned';
+}
+// Single source of truth for both this column's sort order/visual styling AND renderNameCell's
+// own name-cell coloring below — same "one tier list, multiple renderers pull from it" shape as
+// DEAL_RECORD_TIERS/PRICE_STATUS_TIERS above, for the same reason: a color/bold fact restated in
+// two places is a color/bold fact that can silently drift apart between them (confirmed live:
+// renderNameCell's own first draft colored the name text but left off the bold weight
+// OWNERSHIP_STATUS_COLUMN's cell already had for the exact same "Owned" status).
+// Wishlisted is green and bold, Owned is plain yellow — on a page about buying things, "this is
+// something I actually want" is the positive, actionable signal (green, the stronger highlight);
+// "I already own this" is a caution against a duplicate purchase, not a call to action, so it
+// gets the warning color (yellow) instead — a deliberate swap from the green=owned/yellow=
+// wishlisted pairing this app used everywhere before (checkmark reading as green/affirmative,
+// star reading as yellow/aspirational is the more natural pairing in isolation, e.g. a profile
+// summary), which stopped fitting once the context became specifically "should I buy this".
+// `.game-search-badge`/`.name-status-badge`/`.panel-ownership-badge` (style.css) and
+// gameSearch.ts's dropdown all follow this same swapped pairing now too, rather than leaving
+// those standalone badges on the old colors — the checkmark right next to this tier's own
+// yellow-highlighted name text is the same fact and needs to read the same color, and the other
+// two badges are the same icons in different places elsewhere in the app; one meaning per color
+// throughout, not a second, place-specific convention. "Owned & Wishlisted" uses Owned's warning
+// color, not Wishlisted's green — already owning it is what actually matters for a buy decision
+// regardless of wishlist status — but keeps the bold weight, since it's still the most
+// information any one status carries.
+export const OWNERSHIP_STATUS_TIERS: { label: string; color?: string; icon?: string; bold?: boolean }[] = [
+  { label: 'Not Owned' },
+  { label: 'Wishlisted', color: '#2ecc71', icon: ' ☆', bold: true },
+  { label: 'Owned', color: '#f1c40f', icon: ' ✓' },
+  { label: 'Owned & Wishlisted', color: '#f1c40f', icon: ' ✓', bold: true },
+];
+export const OWNERSHIP_STATUS_ORDER = OWNERSHIP_STATUS_TIERS.map(t => t.label);
+export const compareOwnershipStatus = compareMissingLast((a, b) =>
+  OWNERSHIP_STATUS_ORDER.indexOf(String(a)) - OWNERSHIP_STATUS_ORDER.indexOf(String(b)));
+export function renderOwnershipStatus(v: unknown): Node {
+  if (v == null) return document.createTextNode('—');
+  const sv = String(v);
+  const tier = OWNERSHIP_STATUS_TIERS.find(t => t.label === sv);
+  if (!tier?.color) return document.createTextNode(sv); // 'Not Owned' — plain text
+  const span = document.createElement('span');
+  span.style.color = tier.color;
+  if (tier.bold) span.style.fontWeight = '700';
+  span.textContent = sv + tier.icon!;
+  return span;
+}
+export const OWNERSHIP_STATUS_COLUMN: ColumnDef<Row> = {
+  key: 'ownershipStatus', label: 'Ownership Status', groupable: true,
+  value: computeOwnershipStatus, format: v => v == null ? '—' : String(v), render: renderOwnershipStatus,
+  compare: compareOwnershipStatus, defaultSortDir: 'desc',
+};
+
 // Inserts `newColumns` right after the column keyed `afterKey`, rather than always appending at
 // the very end — used by every page below to layer its own page-specific columns onto
 // CORE_COLUMNS/PRICE_COLUMNS in the section they actually belong to (e.g. Wishlist Rank right
@@ -561,7 +681,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = [
   // `format: fmt.str` handles a still-streaming-in name (Wishlist/Bundles rows only know a
   // placeholder name until store metadata resolves) the same way every other loading cell does;
   // harmless for the Library tab, whose owned-game names are always known upfront.
-  { key: 'name',             label: 'Name',            filterable: false, groupable: false, format: fmt.str },
+  { key: 'name',             label: 'Name',            filterable: false, groupable: false, format: fmt.str, render: renderNameCell },
 
   // ── Scores & reviews ────────────────────────────────────────────────────────
   // The default-visible score: a Bayesian-shrinkage formula adapted from SteamDB's own (see
@@ -663,7 +783,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = [
   // failed to load or Steam's response omitted the field.
   { key: 'type',             label: 'Type',         groupable: true, format: v => v ? String(v) : 'Unknown', category: 'Classification' },
   // Estimated, not authoritative — see computeProductionTier's doc comment (public/utils.js)
-  // and CLAUDE.md's AAA/AA/Indie section. The label spells out "(est.)" rather than relying on
+  // and docs/dev/decisions.md. The label spells out "(est.)" rather than relying on
   // a hover tooltip, since @vates/data-table-solid has no per-column header-tooltip option to
   // hang a caveat on. Hidden by default — a secondary number, not the primary thing most
   // searches here care about, and one that's explicitly a best-effort guess on top of that.

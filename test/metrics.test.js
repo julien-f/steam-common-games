@@ -1,6 +1,8 @@
 'use strict';
 
 const { test } = require('node:test');
+process.env.OUTBOUND_HOURLY_MAX = '5';
+process.env.OUTBOUND_DAILY_MAX = '50';
 const assert = require('node:assert/strict');
 const { trackedFetch, recordLimiterTrip, recordDedupHit, recordCacheEvent, getMetrics, _reset } = require('../lib/metrics');
 
@@ -265,4 +267,36 @@ test('_reset: clears all counters, including rate-limiter trips, dedup hits, and
   } finally {
     globalThis.fetch = restore;
   }
+});
+
+// ── outbound budgets ──────────────────────────────────────────────────────────
+
+test('trackedFetch: refuses calls past the hourly budget, per group', async (t) => {
+  _reset();
+  const restore = globalThis.fetch;
+  globalThis.fetch = async () => ({ status: 200 });
+  t.after(() => { globalThis.fetch = restore; });
+  t.mock.method(console, 'warn', () => {});
+
+  const max = Number(process.env.OUTBOUND_HOURLY_MAX);
+  for (let i = 0; i < max; i++) await trackedFetch('grp', 'label', 'u');
+  await assert.rejects(() => trackedFetch('grp', 'label', 'u'), /budget for grp exhausted/);
+  // A refused call isn't a request this process made, so it must not be counted as one.
+  assert.equal(getMetrics().sinceRestart.groups.grp.label.requests, max);
+  // Budgets are per group — another service is unaffected.
+  await trackedFetch('other', 'label', 'u');
+  assert.equal(getMetrics().sinceRestart.groups.other.label.requests, 1);
+});
+
+test('getMetrics: reports per-group budget usage', async (t) => {
+  _reset();
+  const restore = globalThis.fetch;
+  globalThis.fetch = async () => ({ status: 200 });
+  t.after(() => { globalThis.fetch = restore; });
+
+  await trackedFetch('grp', 'label', 'u');
+  const b = getMetrics().budgets.grp;
+  assert.equal(b.hourUsed, 1);
+  assert.equal(b.dayUsed, 1);
+  assert.equal(b.hourMax, Number(process.env.OUTBOUND_HOURLY_MAX));
 });

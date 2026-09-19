@@ -1,8 +1,8 @@
 'use strict';
 
-import { buildMediaItems, resolveShotIndex } from './mediaItems.ts';
+import { buildMediaItems, resolveShotIndex, preferredShotIndex } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
-import type { Game } from './types.ts';
+import type { Game, ReadonlyGame } from './types.ts';
 import type Hls from 'hls.js';
 // Pulled into its own plain-TS module (no JSX) so test/lightbox.test.js can still import it
 // directly — Node's test runner strips TypeScript syntax natively but has no JSX transform,
@@ -10,8 +10,10 @@ import type Hls from 'hls.js';
 // below so this stays the one public entry point for it either way.
 import { fmtTime } from './lightboxTime.ts';
 export { fmtTime } from './lightboxTime.ts';
+import { decideSwipeAxis, resolveSwipe, LB_SWIPE_RESISTANCE } from './lightboxSwipe.ts';
+import type { SwipeAxis } from './lightboxSwipe.ts';
 
-import { createSignal, createEffect, createRoot, batch } from 'solid-js';
+import { createSignal, createEffect, createRoot, batch, untrack } from 'solid-js';
 import { render } from 'solid-js/web';
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -28,19 +30,51 @@ const LB_MUTE_ICON  = `<svg viewBox="0 0 14 12" width="16" height="14" fill="non
 // ── State ──────────────────────────────────────────────────────────────────
 // Converted from plain module-level variables to Solid signals for
 // the state that actually needs to trigger the (still deliberately imperative — see the
-// header comment above `renderLightbox` further down) per-step render: `shots`/`idx`/
-// `gameName`. Zoom/pan (`lbZoom`/`lbPanX`/`lbPanY`) and the slide-direction flag (`lbLastDir`)
+// header comment above `renderLightbox` further down) per-step render: the open game and
+// `idx`. Zoom/pan (`lbZoom`/`lbPanX`/`lbPanY`) and the slide-direction flag (`lbLastDir`)
 // stay plain variables, unchanged — nothing in JSX ever reads them (they only ever drive a
 // direct `img.style.transform`/animation-class write inside already-imperative gesture code),
 // so making them signals would add Solid overhead for zero reactive benefit, the same
 // reasoning `panel.tsx`'s own hero zoom-equivalent state would have gotten if this file had
 // any (it doesn't).
-const [shots, setShots] = createSignal<MediaItem[]>([]);
+const [lbGame, setLbGame] = createSignal<ReadonlyGame | null>(null);
 const [idx, setIdx] = createSignal(0);
-const [gameName, setGameName] = createSignal('');
+// Derived from the open game on each read, not snapshotted at open time — the same shape, for
+// the same reason, as `PanelHero`'s own `items()` (panel.tsx): a row opened before its details
+// have streamed in has nothing but a banner to offer, and gains its screenshots and videos
+// asynchronously *without the row object ever being replaced*, so only a read through the store
+// proxy sees them arrive. Snapshotting meant such a game showed that lone banner for as long as
+// it stayed open. Plain accessors rather than `createMemo`s: a memo at module level would need
+// its own `createRoot` (see the effect at the foot of this file) to cache two array spreads.
+const shots = () => { const g = lbGame(); return g ? buildMediaItems(g.appid, g.details?.meta) : []; };
+const gameName = () => lbGame()?.name ?? '';
 let lbZoom = 1, lbPanX = 0, lbPanY = 0, lbLastDir = 0, lbVcTimer: ReturnType<typeof setTimeout> | undefined;
+// Bumped on every renderLightbox() call; a detached Image()'s onload checks it's still current
+// before touching the shared img element, so a slow load from a shot the viewer already
+// navigated away from can't clobber the one currently displayed — img is reused across shots
+// same as videoEl's _hlsToken guard above.
+let lbImgToken = 0;
+// Which axis `lbLastDir` was a step along, so the enter animation comes from the side the
+// viewer swiped toward: 'x' for media within a game, 'y' for a game step (↑/↓, the caption
+// buttons, a vertical swipe). Reset with `lbLastDir` on every render.
+let lbLastAxis: SwipeAxis = 'x';
 
 type LbVideo = HTMLVideoElement & { _hls?: { destroy: () => void } | null; _hlsToken?: number };
+
+// The <video> is kept *out* of the DOM unless a video is actually on screen, and held by
+// reference instead. It used to sit there from page load, which made every page of this app
+// look like a video page to the rest of the browser: media-key routing, Picture-in-Picture
+// affordances, and any extension that arms itself on the mere presence of a media element.
+// Video Speed Controller is the concrete case — it binds keydown in the *capture* phase on
+// `document` and swallows its own shortcuts (`r` among them) as soon as one connected <video>
+// exists anywhere on the page, which silently killed this app's own R/↑/↓ before they were ever
+// dispatched. Detached, none of that sees it; attached, such an extension is armed exactly while
+// a trailer is playing, which is when its owner wants it. Held by reference rather than
+// re-queried because `wireVideoControls` binds to it once at mount, while it is detached.
+let lbVideoEl!: LbVideo;
+let lbVideoAnchor!: Element;
+function attachLbVideo() { if (!lbVideoEl.isConnected) lbVideoAnchor.before(lbVideoEl); }
+function detachLbVideo() { lbVideoEl.remove(); }
 type LbFlashEl = HTMLElement & { _flashTimer?: ReturnType<typeof setTimeout> };
 
 const LB_SEEK_SECONDS = 5;
@@ -49,26 +83,56 @@ const LB_DOUBLE_TAP_DIST = 30;
 
 let _onLightboxParamChange: ((shotId: string | null) => void) | null = null;
 let _onGameNav: ((dir: number) => void) | null = null;
+let _onGameRandom: (() => void) | null = null;
+let _getGamePosition: (() => { index: number; total: number } | null) | null = null;
+// Set when a re-point landed on a banner for want of anything else — see `repointLightboxGame`.
+// Holds the *kind* of shot being left, so the screenshot/trailer that eventually arrives is
+// picked by the same rule the re-point itself would have used.
+let _awaitingMedia: MediaItem['type'] | null = null;
 let _lbPrevFocus: Element | null = null;
 const _lbPrefetchedHls = new Set();
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
-// `onGameNav(dir)`: the host's own prev/next-game step (the same list ↑/↓ pages
-// through on the panel itself) — lets ↑/↓ page games while the lightbox stays open,
-// jumping straight to the new game's own media (see `renderLightbox`'s caption for
-// how the switch is made visible), rather than either doing nothing or silently
-// switching games behind a fullscreen image that never changed. Optional — a host
-// with no group to page through (e.g. a standalone lookup) just no-ops.
-export function initLightbox({ onParamChange, onGameNav }: { onParamChange?: (shotId: string | null) => void; onGameNav?: (dir: number) => void } = {}) {
+// `onGameNav(dir)`/`onGameRandom()`: the host's own prev/next-game step and random pick (the
+// same ones the panel itself offers) — they let ↑/↓ and R page games while the lightbox stays
+// open, jumping straight to the new game's own media (see `renderLightbox`'s caption for how
+// the switch is made visible), rather than either doing nothing or silently switching games
+// behind a fullscreen image that never changed. Both re-point through `repointLightboxGame`.
+// `getGamePosition()`: where the open game sits in that list, for the caption — null when there
+// is no list to page through at all (a standalone lookup), which is also what hides the caption's
+// own ↑/↓ buttons. All optional; a host with none of them just no-ops.
+export function initLightbox({ onParamChange, onGameNav, onGameRandom, getGamePosition }: {
+  onParamChange?: (shotId: string | null) => void;
+  onGameNav?: (dir: number) => void;
+  onGameRandom?: () => void;
+  getGamePosition?: () => { index: number; total: number } | null;
+} = {}) {
   _onLightboxParamChange = onParamChange ?? null;
   _onGameNav = onGameNav ?? null;
+  _onGameRandom = onGameRandom ?? null;
+  _getGamePosition = getGamePosition ?? null;
   document.addEventListener('fullscreenchange', syncLightboxFullscreenBtn);
   document.addEventListener('webkitfullscreenchange', syncLightboxFullscreenBtn);
   mountLightboxDom();
 }
 
-export function isLightboxOpen() { return shots().length > 0; }
+export function isLightboxOpen() { return lbGame() !== null; }
+
+// Every game step from inside the lightbox (↑/↓, R, the caption's own buttons) goes through
+// here. The host's step opens the panel *behind* the overlay, and `panelOpen` focuses that
+// panel's hero image — which drops focus straight out of the lightbox's own trap onto an element
+// the lightbox is covering. Whatever had focus in here keeps it, so holding ↓ on the caption
+// button doesn't walk focus away mid-click; the close button is the fallback, as on a real open.
+// `dir` only drives the enter animation's direction — 0 (R, which has no direction) skips it.
+function stepGameFromLightbox(step: () => void, dir = 0) {
+  const lb = document.getElementById('screenshot-lightbox')!;
+  const before = document.activeElement;
+  if (dir !== 0) { lbLastDir = dir; lbLastAxis = 'y'; }
+  step();
+  if (lb.contains(document.activeElement)) return;
+  ((before && lb.contains(before) ? before : lb.querySelector('.lb-close')) as HTMLElement).focus();
+}
 
 // ── Fullscreen button sync ─────────────────────────────────────────────────
 
@@ -162,7 +226,7 @@ function retryCurrentShot() {
   const shot = shots()[idx()];
   if (!shot) return;
   if (shot.type === 'video') {
-    const vid = document.querySelector<LbVideo>('#screenshot-lightbox .lb-video')!;
+    const vid = lbVideoEl;
     playHls(vid, shot.hls);
   } else {
     const img = document.querySelector<HTMLImageElement>('#screenshot-lightbox .lb-img')!;
@@ -274,8 +338,7 @@ function showLbChrome() {
 function schedHideLbChrome() {
   const lb  = document.getElementById('screenshot-lightbox');
   if (!lb) return;
-  const vid = lb.querySelector<HTMLVideoElement>('.lb-video');
-  const isPausedVideo = vid && vid.style.display !== 'none' && vid.paused;
+  const isPausedVideo = lbVideoEl.isConnected && lbVideoEl.paused;
   clearTimeout(lbVcTimer);
   if (!isPausedVideo) lbVcTimer = setTimeout(() => lb.classList.add('lb-idle'), 3000);
 }
@@ -320,17 +383,36 @@ function LightboxDom() {
       <div class="lb-seek-flash lb-seek-flash-left" aria-hidden="true">⏪ {LB_TOUCH_SEEK_SECONDS}s</div>
       <div class="lb-seek-flash lb-seek-flash-right" aria-hidden="true">{LB_TOUCH_SEEK_SECONDS}s ⏩</div>
       <div class="lb-vctrls" style={{ display: 'none' }}>
+        {/* eslint-disable-next-line solid/no-innerhtml -- a module-level literal SVG string
+            from the top of this file, not data: nothing here comes from a game, a user, or an
+            API response. Solid's JSX can't express a raw SVG child any other way. */}
         <button class="lb-vc-btn lb-vc-play" aria-label="Play" innerHTML={LB_PLAY_ICON} />
         <span class="lb-vc-time">0:00</span>
         <input class="lb-vc-scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek" />
         <span class="lb-vc-dur">0:00</span>
+        {/* eslint-disable-next-line solid/no-innerhtml -- a module-level literal SVG string
+            from the top of this file, not data: nothing here comes from a game, a user, or an
+            API response. Solid's JSX can't express a raw SVG child any other way. */}
         <button class="lb-vc-btn lb-vc-mute" aria-label="Mute" innerHTML={LB_VOL_ICON} />
       </div>
       <div class="lb-toolbar">
-        <div class="lb-caption" aria-hidden="true" />
+        {/* The caption doubles as the list stepper: ↑/↓ flanking "<game> · 14 of 343" put the
+            control on the thing it changes, and cover the axis the edge ‹ › don't (they step
+            media within one game). Both buttons are hidden when there's no list to page
+            through — see `_getGamePosition`. */}
+        <div class="lb-caption">
+          <button class="lb-game-prev" aria-label="Previous game">&#8593;</button>
+          <span class="lb-caption-text" />
+          <span class="lb-caption-pos" />
+          <button class="lb-game-next" aria-label="Next game">&#8595;</button>
+        </div>
         <div class="lb-toolbar-row">
           <div class="lb-toolbar-left">
+            {/* eslint-disable-next-line solid/no-innerhtml -- module-level literal SVG strings
+                (see the top of this file); no external input reaches these. */}
             <button class="lb-fullscreen" aria-label="Enter fullscreen" innerHTML={LB_FS_ENTER} />
+            {/* eslint-disable-next-line solid/no-innerhtml -- module-level literal SVG strings
+                (see the top of this file); no external input reaches these. */}
             <button class="lb-share" aria-label="Copy link to this screenshot" innerHTML={LB_LINK_ICON} />
           </div>
           <div class="lb-counter" aria-live="polite" aria-atomic="true" />
@@ -367,6 +449,8 @@ function wireButtons(lb: HTMLElement) {
   lb.querySelector('.lb-error-retry')!.addEventListener('click', retryCurrentShot);
   lb.querySelector('.lb-prev')!.addEventListener('click', () => stepLightbox(-1));
   lb.querySelector('.lb-next')!.addEventListener('click', () => stepLightbox(1));
+  lb.querySelector('.lb-game-prev')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav?.(-1), -1));
+  lb.querySelector('.lb-game-next')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav?.(1), 1));
   lb.querySelector('.lb-fullscreen')!.addEventListener('click', () => {
     if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
       (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
@@ -378,7 +462,7 @@ function wireButtons(lb: HTMLElement) {
 
 function wireKeyboard(lb: HTMLElement) {
   document.addEventListener('keydown', e => {
-    if (!shots().length) return;
+    if (!isLightboxOpen()) return;
     const onScrub = (e.target as HTMLElement | null)?.classList.contains('lb-vc-scrub');
 
     // Focus trap
@@ -396,7 +480,7 @@ function wireKeyboard(lb: HTMLElement) {
     }
 
     const vc = lb.querySelector<HTMLElement>('.lb-vctrls');
-    const vid = vc && vc.style.display !== 'none' ? lb.querySelector<HTMLVideoElement>('.lb-video') : null;
+    const vid = vc && vc.style.display !== 'none' ? lbVideoEl : null;
 
     if ((!onScrub || e.shiftKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
       e.preventDefault();
@@ -418,7 +502,15 @@ function wireKeyboard(lb: HTMLElement) {
     }
     if (!onScrub && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && _onGameNav) {
       e.preventDefault();
-      _onGameNav(e.key === 'ArrowDown' ? 1 : -1);
+      const dir = e.key === 'ArrowDown' ? 1 : -1;
+      stepGameFromLightbox(() => _onGameNav!(dir), dir);
+    }
+    // R, the same random pick the panel offers — page-level shortcuts are all blocked while the
+    // lightbox is open (panelKeyboard.ts hands it the keyboard wholesale), so it has to be bound
+    // here to work at all, exactly as ↑/↓ above do.
+    if (!onScrub && (e.key === 'r' || e.key === 'R') && _onGameRandom) {
+      e.preventDefault();
+      stepGameFromLightbox(() => _onGameRandom!());
     }
     if (e.key === 'f' || e.key === 'F') {
       if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
@@ -471,11 +563,40 @@ function wireMouseHandlers(lb: HTMLElement) {
   });
 }
 
+// ── Swipe drag ─────────────────────────────────────────────────────────────
+
+// The media element on screen — the one a swipe drags. Zoom/pan owns `.lb-img`'s transform
+// too, but a drag only ever runs at zoom 1, so the two never write it at once.
+function lbMediaEl(): HTMLElement | null {
+  const img = document.querySelector<HTMLElement>('#screenshot-lightbox .lb-img');
+  if (img && img.style.display !== 'none') return img;
+  return lbVideoEl.isConnected ? lbVideoEl : null;
+}
+
+function setLbDrag(el: HTMLElement, x: number, y: number) {
+  el.style.transition = 'none';
+  el.style.transform = `translate(${x}px, ${y}px)`;
+}
+
+// `animate`: a swipe that didn't commit eases back. A committed one clears instantly instead —
+// `renderLightbox`'s own enter animation takes the element over from there.
+function clearLbDrag(el: HTMLElement, animate: boolean) {
+  el.style.transition = animate ? 'transform 0.2s ease, opacity 0.18s' : '';
+  el.style.transform = '';
+  if (animate) setTimeout(() => { el.style.transition = ''; }, 200);
+}
+
 function wireTouchHandlers(lb: HTMLElement) {
   let lbX = 0, lbY = 0, lbActive = false;
   let pinchStartDist = 0, pinchStartZoom = 1;
   let touchPanning = false, touchPanStartX = 0, touchPanStartY = 0, touchPanOriginX = 0, touchPanOriginY = 0;
   let lbLastTapTime = 0, lbLastTapX = 0, lbLastTapY = 0;
+  // Swipe drag: the axis locked onto (null until the finger has moved far enough to tell), when
+  // it started (for the flick threshold), and what each axis has to step to — the latter read
+  // once per gesture rather than per touchmove, `_getGamePosition` reaching the route's own list
+  // (see `renderLightbox`'s untracked read of it).
+  let dragAxis: SwipeAxis | null = null;
+  let dragStart = 0, dragMediaCount = 0, dragHasGameList = false;
 
   lb.addEventListener('touchstart', e => {
     if (e.touches.length === 2) {
@@ -488,7 +609,14 @@ function wireTouchHandlers(lb: HTMLElement) {
       lbActive = false;
       e.preventDefault();
     } else if (e.touches.length === 1) {
+      // A touch starting on the chrome is operating it, not swiping the media behind it —
+      // dragging the video scrubber sideways otherwise steps to the next shot as well.
+      if ((e.target as Element).closest('.lb-vctrls, .lb-toolbar, .lb-btn')) { lbActive = false; return; }
       lbX = e.touches[0].clientX; lbY = e.touches[0].clientY; lbActive = true;
+      dragAxis = null;
+      dragStart = e.timeStamp;
+      dragMediaCount = shots().length;
+      dragHasGameList = !!_onGameNav && !!_getGamePosition?.();
       if (lbZoom > 1) {
         touchPanning = true;
         touchPanStartX = e.touches[0].clientX; touchPanStartY = e.touches[0].clientY;
@@ -513,6 +641,17 @@ function wireTouchHandlers(lb: HTMLElement) {
       lbPanY = touchPanOriginY + (e.touches[0].clientY - touchPanStartY);
       applyLbTransform();
       e.preventDefault();
+    } else if (e.touches.length === 1 && lbActive && lbZoom === 1) {
+      const dx = e.touches[0].clientX - lbX, dy = e.touches[0].clientY - lbY;
+      dragAxis ??= decideSwipeAxis(dx, dy);
+      if (!dragAxis) return;
+      const el = lbMediaEl();
+      if (!el) return;
+      // Nothing to step to on this axis: the media still follows the finger, damped, so the
+      // gesture reads as resistance rather than as a step that silently didn't happen.
+      const slack = (dragAxis === 'x' ? dragMediaCount > 1 : dragHasGameList) ? 1 : LB_SWIPE_RESISTANCE;
+      setLbDrag(el, dragAxis === 'x' ? dx * slack : 0, dragAxis === 'y' ? dy * slack : 0);
+      e.preventDefault();
     }
   }, { passive: false });
 
@@ -522,9 +661,24 @@ function wireTouchHandlers(lb: HTMLElement) {
     lbActive = false;
     const endX = e.changedTouches[0].clientX, endY = e.changedTouches[0].clientY;
     const dx = endX - lbX, dy = endY - lbY;
+    if (dragAxis) {
+      const action = resolveSwipe({
+        axis: dragAxis, dx, dy, dt: e.timeStamp - dragStart,
+        mediaCount: dragMediaCount, hasGameList: dragHasGameList,
+      });
+      dragAxis = null;
+      const el = lbMediaEl();
+      if (el) clearLbDrag(el, !action);
+      if (action === 'media-prev' || action === 'media-next') stepLightbox(action === 'media-next' ? 1 : -1);
+      else if (action) {
+        const dir = action === 'game-next' ? 1 : -1;
+        stepGameFromLightbox(() => _onGameNav?.(dir), dir);
+      }
+      return;
+    }
     const isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
     const showingImg = lb.querySelector<HTMLImageElement>('.lb-img')!.style.display !== 'none';
-    const showingVid = lb.querySelector<HTMLVideoElement>('.lb-video')!.style.display !== 'none';
+    const showingVid = lbVideoEl.isConnected;
     if (isTap && (showingImg || showingVid)) {
       const now = Date.now();
       const tapDist = Math.hypot(endX - lbLastTapX, endY - lbLastTapY);
@@ -539,25 +693,29 @@ function wireTouchHandlers(lb: HTMLElement) {
           // toggles play/pause via the video's own 'click' listener.
           const rect = lb.getBoundingClientRect();
           const frac = (endX - rect.left) / rect.width;
-          const vid = lb.querySelector<HTMLVideoElement>('.lb-video');
+          const vid = lbVideoEl;
           if (frac < 1 / 3) { seekVideo(vid, -LB_TOUCH_SEEK_SECONDS); flashSeek('left'); }
           else if (frac > 2 / 3) { seekVideo(vid, LB_TOUCH_SEEK_SECONDS); flashSeek('right'); }
         }
       } else {
         lbLastTapTime = now; lbLastTapX = endX; lbLastTapY = endY;
       }
-      return;
     }
-    if (lbZoom > 1) return;
-    if (Math.abs(dx) > Math.abs(dy) * 1.2 && Math.abs(dx) > 50) stepLightbox(dx < 0 ? 1 : -1);
-    else if (dy > 80 && Math.abs(dy) > Math.abs(dx)) closeLightbox();
   }, { passive: true });
 
-  lb.addEventListener('touchcancel', () => { lbActive = false; touchPanning = false; }, { passive: true });
+  lb.addEventListener('touchcancel', () => {
+    lbActive = false;
+    touchPanning = false;
+    if (dragAxis) {
+      dragAxis = null;
+      const el = lbMediaEl();
+      if (el) clearLbDrag(el, true);
+    }
+  }, { passive: true });
 }
 
 function wireVideoControls(lb: HTMLElement) {
-  const vid2    = lb.querySelector<HTMLVideoElement>('.lb-video')!;
+  const vid2    = lbVideoEl;
   const vc2     = lb.querySelector<HTMLElement>('.lb-vctrls')!;
   const scrub   = vc2.querySelector<HTMLInputElement>('.lb-vc-scrub')!;
   const timEl   = vc2.querySelector<HTMLElement>('.lb-vc-time')!;
@@ -615,15 +773,19 @@ function wireVideoControls(lb: HTMLElement) {
 
 // ── Mount ────────────────────────────────────────────────────────────────
 // Replaces the original lazy-singleton `getLightbox()` — mounted eagerly, once, from
-// `initLightbox` (called once per page from pageShell.ts), same "exists exactly once for the
-// page's whole lifetime" shape the lazy getter amounted to in practice (nothing else ever
-// unmounts it), just created up front instead of on first open — negligible cost for a
+// `initLightbox` (called once for the whole app, from AppShell.tsx's own `onMount` — see
+// docs/dev/frontend.md), same "exists exactly once for the app's whole lifetime" shape
+// the lazy getter amounted to in practice (nothing else ever unmounts it), just created up front
+// instead of on first open — negligible cost for a
 // ~20-node static tree, and it means every other function in this file can keep using a bare
 // `document.getElementById('screenshot-lightbox')`/`.lb-*` lookup exactly as before, with no
 // "has it been created yet" guard needed anywhere.
 function mountLightboxDom() {
   render(() => <LightboxDom />, document.body);
   const lb = document.getElementById('screenshot-lightbox')!;
+  lbVideoEl = lb.querySelector<LbVideo>('.lb-video')!;
+  lbVideoAnchor = lb.querySelector('.lb-next')!; // re-inserted here, keeping the original order
+  detachLbVideo(); // a closed lightbox shows nothing, so it holds no media element
   wireButtons(lb);
   wireKeyboard(lb);
   wireMouseHandlers(lb);
@@ -634,16 +796,20 @@ function mountLightboxDom() {
 // ── Public API ─────────────────────────────────────────────────────────────
 
 export function openLightbox(game: Game, idxOrShotId: number | string) {
-  _lbPrevFocus = document.activeElement;
+  // Only on a real open: this is also how an already-open lightbox is re-pointed at another game
+  // (↑/↓ — see AppShell's onGameNav), and capturing focus again there would remember an element
+  // inside the lightbox itself, so closing would restore focus to something already hidden.
+  if (!isLightboxOpen()) _lbPrevFocus = document.activeElement;
   const newShots = buildMediaItems(game.appid, game.details?.meta);
-  // Batched: setShots alone would otherwise let the render effect below run once with the new
-  // (possibly shorter) shots list but the previous game's stale idx, indexing past the end of
-  // the new list.
+  // Batched: setLbGame alone would otherwise let the render effect below run once with the new
+  // game's (possibly shorter) media list but the previous game's stale idx, indexing past the
+  // end of the new list.
   batch(() => {
-    setGameName(game.name || '');
-    setShots(newShots);
+    setLbGame(game);
     setIdx(resolveShotIndex(newShots, idxOrShotId));
   });
+  // A deliberate open supersedes any pending "take the media when it lands" latch.
+  _awaitingMedia = null;
   const lb = document.getElementById('screenshot-lightbox')!;
   lb.classList.add('open');
   document.body.classList.add('lb-open');
@@ -651,11 +817,34 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
   _onLightboxParamChange?.(newShots[idx()].shotId);
 }
 
+// Re-points an already-open lightbox at another game — ↑/↓ and R, via AppShell's `onGameNav`/
+// `onGameRandom`. Separate from `openLightbox` because the shot to land on depends on the one
+// being left, which only this module knows: paging through a list is a browse, so it lands on
+// real media rather than on the banner `openLightbox(game, 0)` used to pick (see
+// `preferredShotIndex`).
+export function repointLightboxGame(game: ReadonlyGame) {
+  const leaving = shots()[idx()]?.type ?? 'image';
+  const next = buildMediaItems(game.appid, game.details?.meta);
+  const target = preferredShotIndex(next, leaving);
+  // A lone banner means this row's details are still streaming — there is nothing else to show
+  // *yet*. Latch the intent so the first real media to arrive is taken (see the effect at the
+  // foot of this file); without it the banner would simply stay up, which is the whole reason
+  // paging through a list used to be unrewarding.
+  _awaitingMedia = next.length === 1 ? leaving : null;
+  batch(() => {
+    setLbGame(game);
+    setIdx(target);
+  });
+  _onLightboxParamChange?.(next[target].shotId);
+}
+
 export function closeLightbox() {
-  setShots([]);
+  setLbGame(null);
+  _awaitingMedia = null;
   clearTimeout(lbVcTimer);
   const lb = document.getElementById('screenshot-lightbox')!;
-  stopHls(lb.querySelector<LbVideo>('.lb-video'));
+  stopHls(lbVideoEl);
+  detachLbVideo();
   lb.classList.remove('open', 'lb--loading', 'lb-idle');
   document.body.classList.remove('lb-open');
   if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
@@ -667,6 +856,9 @@ export function closeLightbox() {
 }
 
 export function stepLightbox(dir: number) {
+  // The viewer has taken over: whatever is on screen from here on is their choice, so the latch
+  // must never move it under them.
+  _awaitingMedia = null;
   lbLastDir = dir;
   const list = shots();
   const next = (idx() + dir + list.length) % list.length;
@@ -678,9 +870,38 @@ export function stepLightbox(dir: number) {
 // than always sliding one way, same as a multi-step stepLightbox would.
 function gotoLightbox(target: number) {
   if (target === idx()) return;
+  _awaitingMedia = null; // same reason as stepLightbox's
+
   lbLastDir = target > idx() ? 1 : -1;
   setIdx(target);
   _onLightboxParamChange?.(shots()[target].shotId);
+}
+
+// The caption, rendered on its own rather than as part of `renderLightbox` below. It carries
+// the game/shot identity that used to exist only as invisible alt text (see `label` there), so
+// switching games while the lightbox stays open (↑/↓, R) is visibly confirmed even when the new
+// shot looks much like the old one — plus the position in the *list*, which the `1 / 12` media
+// counter says nothing about. Split out because it's the one part reading the host's list
+// position: that read must stay tracked for the position to follow a list still streaming in,
+// and must not drag a full image reload along with it each time. Two text writes, no media.
+function renderLbCaption() {
+  const lb = document.getElementById('screenshot-lightbox');
+  if (!lb) return;
+  const name = gameName();
+  const pos = _getGamePosition?.() ?? null;
+  const caption = lb.querySelector<HTMLElement>('.lb-caption')!;
+  // The two counters wear the same pill (`.lb-counter` is the other), one per axis, so they read
+  // as a pair and neither is mistaken for part of the title beside it.
+  const posEl = caption.querySelector<HTMLElement>('.lb-caption-pos')!;
+  posEl.textContent = pos ? `${pos.index + 1} / ${pos.total}` : '';
+  posEl.style.display = pos ? '' : 'none';
+  caption.querySelector<HTMLElement>('.lb-caption-text')!.textContent = name;
+  caption.style.display = name || pos ? '' : 'none';
+  // No list behind the open game (a standalone lookup) means nothing to step to. Hiding them
+  // inline also drops them out of the Tab focus trap — see getFocusable.
+  for (const sel of ['.lb-game-prev', '.lb-game-next']) {
+    caption.querySelector<HTMLElement>(sel)!.style.display = pos ? '' : 'none';
+  }
 }
 
 // The actual per-shot render — deliberately kept as a plain imperative function (called from
@@ -693,34 +914,40 @@ function gotoLightbox(target: number) {
 // manually after mutating plain module variables.
 function renderLightbox() {
   const list = shots();
-  // Defensively clamped, same idiom panel.tsx's own hero index uses — every current write path
-  // (openLightbox's batch(), stepLightbox's modulo, gotoLightbox's explicit target) already
-  // keeps idx() in bounds, so this never actually fires today; it's a backstop against a future
-  // write path (e.g. a "remove current shot" action) reintroducing an out-of-bounds `list[i]`.
+  // Defensively clamped, same idiom panel.tsx's own hero index uses. Every *write* path
+  // (openLightbox's batch(), stepLightbox's modulo, gotoLightbox's explicit target) keeps idx()
+  // in bounds on its own, but the list itself is derived now and can shrink underneath a
+  // perfectly valid index — a ↻ Refresh whose new details carry fewer screenshots than the
+  // previous ones did is enough.
   const i = Math.max(0, Math.min(idx(), list.length - 1));
   const name = gameName();
   const lb = document.getElementById('screenshot-lightbox')!;
   const shot = list[i];
   const img  = lb.querySelector<HTMLImageElement>('.lb-img')!;
-  const vid  = lb.querySelector<LbVideo>('.lb-video')!;
+  const vid  = lbVideoEl;
   const vc   = lb.querySelector<HTMLElement>('.lb-vctrls')!;
   const dir  = lbLastDir;
+  const axis = lbLastAxis;
   lbLastDir = 0;
+  lbLastAxis = 'x';
   resetLbZoom();
   showLbChrome();
   hideLbError();
-  // Visible game-name caption — previously the game/shot identity only existed as
-  // invisible alt/aria-label text (see `label` below), so switching games while the
-  // lightbox stayed open (e.g. via the panel's ↑/↓ nav) had no on-screen confirmation
-  // it had actually happened, especially when the new shot looked similar to the old one.
-  const caption = lb.querySelector<HTMLElement>('.lb-caption')!;
-  caption.textContent = name;
-  caption.style.display = name ? '' : 'none';
-  const label = `${name ? name + ' — ' : ''}` +
+  // Invalidate any image preload still in flight from a previous render — see lbImgToken decl.
+  const imgToken = ++lbImgToken;
+  // Untracked, and this is load-bearing: `_getGamePosition` reaches the route's list, which on
+  // a list route is the table's `processedData()` — a signal recomputed on every batch of
+  // streaming rows. Reading it in *this* effect subscribed the whole imperative render below to
+  // it, so a list still loading behind the overlay restarted the image load several times a
+  // second and the lightbox visibly blinked. The caption keeps it live in its own pass instead
+  // (`renderLbCaption`); the alt text here is rebuilt on every step anyway.
+  const pos = untrack(() => _getGamePosition?.() ?? null);
+  const label = `${name ? name + ' — ' : ''}${pos ? `game ${pos.index + 1} of ${pos.total} — ` : ''}` +
     `${shot.type === 'video' ? 'Video' : 'Screenshot'} ${i + 1} of ${list.length}`;
   if (shot.type === 'video') {
     img.style.display = 'none';
     lb.classList.remove('lb--loading');
+    attachLbVideo();
     vid.style.display = 'block';
     vid.poster = shot.thumb || '';
     vid.setAttribute('aria-label', label);
@@ -730,14 +957,17 @@ function renderLightbox() {
     schedHideLbChrome();
   } else {
     stopHls(vid);
+    detachLbVideo();
     vc.style.display = 'none';
-    vid.style.display = 'none';
     img.style.display = 'block';
     img.alt = label;
     img.onload = null;
     img.onerror = null;
     if (dir !== 0) {
-      img.className = `lb-img lb-anim-${dir > 0 ? 'right' : 'left'}`;
+      // Named for the side the new shot comes in from, which is the one swiped toward: the
+      // next media enters from the right, the next game from the bottom.
+      const from = axis === 'y' ? (dir > 0 ? 'bottom' : 'top') : (dir > 0 ? 'right' : 'left');
+      img.className = `lb-img lb-anim-${from}`;
       img.addEventListener('animationend', () => { img.className = 'lb-img'; }, { once: true });
     } else {
       img.className = 'lb-img';
@@ -757,8 +987,8 @@ function renderLightbox() {
     const full = new Image();
     // Left at opacity 0 (rather than 1) so the browser's own broken-image
     // icon doesn't show behind the error overlay.
-    full.onload  = () => { img.src = shot.main!; img.style.opacity = '1'; lb.classList.remove('lb--loading'); };
-    full.onerror = () => { img.style.opacity = '0'; lb.classList.remove('lb--loading'); showLbError("Couldn't load this image."); };
+    full.onload  = () => { if (imgToken !== lbImgToken) return; img.src = shot.main!; img.style.opacity = '1'; lb.classList.remove('lb--loading'); };
+    full.onerror = () => { if (imgToken !== lbImgToken) return; img.style.opacity = '0'; lb.classList.remove('lb--loading'); showLbError("Couldn't load this image."); };
     full.src = shot.main!;
     schedHideLbChrome();
   }
@@ -813,8 +1043,28 @@ function renderLightbox() {
 // scope (never torn down), so without a root it would warn "created outside a createRoot ...
 // will never be disposed" (same fix panel.tsx's own top-level effects needed).
 createRoot(() => {
+  // Consumes the `_awaitingMedia` latch (see `repointLightboxGame`): a game paged onto before
+  // its details had streamed in has only its banner to offer, so the moment the real media
+  // lands, take it. Created *before* the render effect below so it runs first within the same
+  // flush — the render then happens once, on the shot actually wanted, rather than painting the
+  // banner and immediately replacing it. Deliberately one-shot and cancelled by any viewer
+  // input (`stepLightbox`/`gotoLightbox`/a fresh open/close), so it can never move an image
+  // out from under someone who is looking at it.
+  createEffect(() => {
+    const list = shots();
+    const leaving = _awaitingMedia;
+    if (!leaving || list.length <= 1) return;
+    _awaitingMedia = null;
+    const target = preferredShotIndex(list, leaving);
+    if (target === 0) return; // trailers but no screenshots — not worth autoplaying unasked
+    setIdx(target);
+    _onLightboxParamChange?.(list[target].shotId);
+  });
   createEffect(() => {
     const list = shots(); idx(); gameName();
     if (list.length) renderLightbox();
+  });
+  createEffect(() => {
+    if (shots().length) renderLbCaption();
   });
 });

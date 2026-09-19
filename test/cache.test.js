@@ -2,8 +2,8 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { getCached, setCache, getCacheStats, getCacheEntryCounts, _reset } = require('../lib/cache');
-const { LIBRARY_CACHE_TTL_MS } = require('../lib/config');
+const { getCached, getCachedAt, setCache, getCacheStats, getCacheEntryCounts, _reset } = require('../lib/cache');
+const { LIBRARY_CACHE_TTL_MS, BUNDLES_CACHE_TTL_MS } = require('../lib/config');
 
 // ── getCached ─────────────────────────────────────────────────────────────────
 
@@ -87,4 +87,67 @@ test('getCacheStats: entries is the sum of every group in getCacheEntryCounts', 
 
   assert.equal(getCacheStats().entries, Object.values(getCacheEntryCounts()).reduce((a, b) => a + b, 0));
   assert.equal(getCacheStats().entries, 3);
+});
+
+// ── getCachedAt ───────────────────────────────────────────────────────────────
+
+test('getCachedAt: returns the write time of a cached entry', () => {
+  _reset();
+  const before = Date.now();
+  setCache('games:when', ['a']);
+  const at = getCachedAt('games:when');
+  assert.ok(at >= before && at <= Date.now());
+});
+
+test('getCachedAt: undefined for a missing key, and for an expired one', () => {
+  _reset([['games:old', { value: ['a'], ts: Date.now() - LIBRARY_CACHE_TTL_MS - 1000 }]]);
+  assert.equal(getCachedAt('games:missing'), undefined);
+  assert.equal(getCachedAt('games:old'), undefined);
+});
+
+// ── group routing ─────────────────────────────────────────────────────────────
+
+test('ITAD identity mappings outlive the bundle/price tier they used to share', () => {
+  // Written well past BUNDLES_CACHE_TTL_MS ago: a bundle listing that old is gone, while the
+  // appid↔gid mapping — which nothing about time invalidates — is still there.
+  const old = Date.now() - BUNDLES_CACHE_TTL_MS - 1000;
+  _reset([
+    ['itad-bundles:US:-publish:false:0:20', { value: [{ id: 1 }], ts: old }],
+    ['itad-appid:some-gid', { value: 440, ts: old }],
+    ['itad-gid:440', { value: 'some-gid', ts: old }],
+    ['itad-shop:steam', { value: 61, ts: old }],
+  ]);
+  assert.equal(getCached('itad-bundles:US:-publish:false:0:20'), undefined);
+  assert.equal(getCached('itad-appid:some-gid'), 440);
+  assert.equal(getCached('itad-gid:440'), 'some-gid');
+  assert.equal(getCached('itad-shop:steam'), 61);
+});
+
+test('getCacheEntryCounts: lists the itad-ids group separately from bundles', () => {
+  _reset();
+  setCache('itad-appid:g', 1);
+  setCache('itad-bundles:k', []);
+  const counts = getCacheEntryCounts();
+  assert.equal(counts['itad-ids'], 1);
+  assert.equal(counts.bundles, 1);
+});
+
+// ── per-entry TTL (cached misses) ─────────────────────────────────────────────
+
+test('setCache: ttlMs overrides the group TTL for that one entry', () => {
+  _reset();
+  setCache('meta:1', null, { ttlMs: 50 });
+  setCache('meta:2', { name: 'Portal' });
+  // Both sit in the meta group (TTL measured in months), but the first carries its own expiry.
+  _reset([
+    ['meta:1', { value: null, ts: Date.now() - 1000, expires: Date.now() - 500 }],
+    ['meta:2', { value: { name: 'Portal' }, ts: Date.now() - 1000 }],
+  ]);
+  assert.equal(getCached('meta:1'), undefined, 'per-entry expiry applies');
+  assert.deepEqual(getCached('meta:2'), { name: 'Portal' }, 'group TTL still applies to the rest');
+});
+
+test('getCachedAt: honours a per-entry expiry too', () => {
+  _reset([['meta:3', { value: null, ts: Date.now() - 1000, expires: Date.now() - 500 }]]);
+  assert.equal(getCachedAt('meta:3'), undefined);
 });

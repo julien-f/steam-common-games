@@ -106,6 +106,33 @@ test('GET /api/health: configured=false when STEAM_API_KEY is absent', async (t)
   assert.equal(res.body.configured, false);
 });
 
+// ── GET /opensearch.xml ────────────────────────────────────────────────────────
+
+test('GET /opensearch.xml: 200 with a search template built from the request host', async () => {
+  const res = await api.get('/opensearch.xml');
+  assert.equal(res.status, 200);
+  assert.match(res.headers['content-type'], /application\/opensearchdescription\+xml/);
+  assert.match(res.text, /<Url type="text\/html" template="http:\/\/[^"]+\/search\?q=\{searchTerms\}"\/>/);
+});
+
+// ── SPA fallback (public/index.html serves every client-routed path) ───────────
+
+test('GET /some/client-side/route: 200 with the app shell HTML, not a 404', async () => {
+  const res = await api.get('/lists/owned');
+  assert.equal(res.status, 200);
+  assert.match(res.headers['content-type'], /html/);
+});
+
+test('GET /api/nonexistent-route: still 404s — the SPA fallback never shadows /api/*', async () => {
+  const res = await api.get('/api/nonexistent-route');
+  assert.equal(res.status, 404);
+});
+
+test('GET /some/path/that/looks/like/an/asset.js: 404s instead of being rewritten to the app shell', async () => {
+  const res = await api.get('/some/path/that/looks/like/an/asset.js');
+  assert.equal(res.status, 404);
+});
+
 // ── GET /api/metrics ───────────────────────────────────────────────────────────
 
 test('GET /api/metrics: 200 with a since timestamp and per-group/label request counts', async (t) => {
@@ -1092,6 +1119,21 @@ test('GET /api/achievements/:appid: schema-confirmed zero achievements skips rar
   assert.deepEqual(res.body, { achievements: [], total: 0, unlocked: 0, private: false, playerCount: 1 });
 });
 
+test('GET /api/achievements/:appid: an unreleased game (schema 403, no achievements field in appdetails) answers empty instead of 502', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    // Exactly what a pre-order page returns: no `achievements` key at all, so the route's
+    // achievementCount short-circuit can't fire and the schema fetch is what has to cope.
+    if (url.includes('appdetails')) return { ok: true, json: async () => ({ '400': { success: true, data: {} } }) };
+    if (url.includes('GetSchemaForGame')) return { ok: false, status: 403, text: async () => '{"game":{}}' };
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  const res = await api.get(`/api/achievements/400?steamids=${ID1}`);
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { achievements: [], total: 0, unlocked: 0, private: false, playerCount: 1 });
+});
+
 test('GET /api/achievements/:appid: too many steamids is a 400', async () => {
   const ids = Array.from({ length: 20 }, (_, i) => `7656119800000${String(i).padStart(4, '0')}`).join(',');
   const res = await api.get(`/api/achievements/400?steamids=${ids}`);
@@ -1140,7 +1182,22 @@ test('GET /api/bundles: 200 with bundle list, defaults applied', async (t) => {
   });
   const res = await api.get('/api/bundles');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, { bundles, offset: 0, limit: 20 });
+  // fetchedAt is the age of this page of the list — a real timestamp here, since the fetch above
+  // wrote its own cache entry (see the "Updated <when>" readout on the browse page).
+  assert.deepEqual({ ...res.body, fetchedAt: undefined }, { bundles, offset: 0, limit: 20, fetchedAt: undefined });
+  assert.equal(typeof res.body.fetchedAt, 'number');
+});
+
+test('POST /api/prices: reports fetchedAt for the batch', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url).includes('/service/shops/')) return { ok: true, json: async () => [{ id: 61, title: 'Steam' }] };
+    return { ok: true, json: async () => [{ id: 'g1', deals: [], historyLow: { all: null, y1: null, m3: null } }] };
+  });
+  const res = await api.post('/api/prices').send({ gids: ['g1'] });
+  assert.equal(res.status, 200);
+  assert.equal(typeof res.body.fetchedAt, 'number');
 });
 
 test('GET /api/bundles: clamps limit and validates country', async (t) => {
@@ -1352,4 +1409,85 @@ test('POST /api/prices: 200 by appids — resolves to gids first, then prices, k
     bestDeal: { price: { amount: 20, amountInt: 2000, currency: 'USD' }, shop: 'Steam', url: null },
   });
   assert.deepEqual(res.body.prices['500'], { steamRegular: null, lowAll: null, lowY1: null, lowM3: null, bestDeal: null });
+});
+
+// ── fetchedAt (how old the served data is) ────────────────────────────────────
+
+test('POST /api/common-games: fetchedAt is null on a fresh fetch, then the cache write time', async (t) => {
+  _reset();
+  const GAME = { appid: 400, name: 'Portal' };
+  t.mock.method(globalThis, 'fetch', makeLibraryFetch([GAME], []));
+
+  const fresh = await api.post('/api/common-games').send({ slots: [[ID1]] });
+  assert.equal(fresh.status, 200);
+  // The library was fetched during this very request, so the entry it wrote is "just now" —
+  // reported as a real timestamp, not null (null only happens when a key isn't cached at all).
+  assert.equal(typeof fresh.body.fetchedAt, 'number');
+
+  const cached = await api.post('/api/common-games').send({ slots: [[ID1]] });
+  assert.equal(cached.body.fetchedAt, fresh.body.fetchedAt);
+});
+
+test('POST /api/common-games: fetchedAt reports the OLDEST account in the slot', async (t) => {
+  _reset();
+  const old = Date.now() - 60 * 60 * 1000;
+  _reset([
+    [`games:${ID1}`, { value: [{ appid: 400, name: 'Portal', playtime_forever: 0 }], ts: old }],
+    [`games:${ID2}`, { value: [{ appid: 400, name: 'Portal', playtime_forever: 0 }], ts: Date.now() }],
+    [`player:${ID1}`, { value: { steamid: ID1, personaname: 'A', profileurl: '' }, ts: Date.now() }],
+    [`player:${ID2}`, { value: { steamid: ID2, personaname: 'B', profileurl: '' }, ts: Date.now() }],
+  ]);
+  t.mock.method(globalThis, 'fetch', makeLibraryFetch([], []));
+
+  const res = await api.post('/api/common-games').send({ slots: [[ID1, ID2]] });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.fetchedAt, old);
+});
+
+test('POST /api/wishlist: fetchedAt comes from the wishlist entries', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeWishlistFetch([{ appid: 400, priority: 1 }], []));
+  const res = await api.post('/api/wishlist').send({ members: [ID1] });
+  assert.equal(res.status, 200);
+  assert.equal(typeof res.body.fetchedAt, 'number');
+});
+
+test('POST /api/game-details/stream: caps in-flight appids and stops fetching once the client disconnects', async (t) => {
+  _reset();
+  let inFlight = 0, maxInFlight = 0, started = 0;
+  let release;
+  const gate = new Promise(r => { release = r; });
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (!String(url).includes('appreviews')) return { ok: true, json: async () => ({}) };
+    started++;
+    inFlight++;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    await gate;
+    inFlight--;
+    return { ok: true, json: async () => ({ query_summary: { review_score_desc: 'x', total_positive: 1, total_negative: 0, total_reviews: 1 } }) };
+  });
+
+  const server = http.createServer(app).listen(0);
+  await new Promise(r => server.once('listening', r));
+  const port = server.address().port;
+  const payload = JSON.stringify({ games: Array.from({ length: 200 }, (_, i) => ({ appid: i + 1 })) });
+  const req = http.request({ host: '127.0.0.1', port, path: '/api/game-details/stream', method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } });
+  req.write(payload);
+  req.end();
+  await new Promise(r => req.once('response', r));
+
+  // Far fewer than the 200 requested are ever in flight at once — the whole list used to be
+  // dispatched synchronously, straight onto lib/steam.js's shared semaphore queues.
+  assert.ok(maxInFlight <= Number(process.env.STREAM_CONCURRENCY || 16), `maxInFlight=${maxInFlight}`);
+
+  req.destroy();
+  await new Promise(r => setTimeout(r, 50));
+  const startedAtDisconnect = started;
+  release();
+  await new Promise(r => setTimeout(r, 100));
+  // A disconnect stops the pool within roughly one appid per worker, rather than working
+  // through the remaining 190-odd games for a client that has gone.
+  assert.ok(started - startedAtDisconnect <= Number(process.env.STREAM_CONCURRENCY || 16), `kept going: ${started - startedAtDisconnect}`);
+  server.close();
 });

@@ -48,13 +48,13 @@ test('setPref: overwriting one key leaves other keys untouched', () => {
 });
 
 test('getPref: falls back gracefully when the stored blob is corrupted JSON', () => {
-  global.localStorage.setItem('steam-common-games:prefs', '{not json');
+  global.localStorage.setItem('steam.isonoe.net:prefs', '{not json');
   const { getPref } = require('../public/prefs.ts');
   assert.equal(getPref('region', 'fallback'), 'fallback');
 });
 
 test('getPref: falls back gracefully when the stored value is not an object', () => {
-  global.localStorage.setItem('steam-common-games:prefs', '"just a string"');
+  global.localStorage.setItem('steam.isonoe.net:prefs', '"just a string"');
   const { getPref } = require('../public/prefs.ts');
   assert.equal(getPref('region', 'fallback'), 'fallback');
 });

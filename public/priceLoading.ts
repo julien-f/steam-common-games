@@ -1,7 +1,7 @@
 // Shared "apply an ITAD /api/prices response to a row" logic — extracted from library.js's
 // loadWishlistPrices and bundles.js's loadPrices, which map the identical response shape onto
 // the identical set of row fields and fall back to the identical "don't leave it stuck on its
-// loading placeholder forever" null-out on failure (see CLAUDE.md's Bundles/Wishlist-pricing
+// loading placeholder forever" null-out on failure (see docs/dev/integrations.md
 // sections). Chunking (library.js only — a wishlist can run past the server's batch cap, a
 // bundle's game list never does) and the no-ITAD-configured check (library.js only — bundles.js
 // hides its whole page instead) stay local to each caller, since neither is actually shared.
@@ -59,9 +59,17 @@ export function nullAllPriceFields(row: PriceFields): void {
   row.priceCurrency = null;
 }
 
+// `fetchedAt` is when the oldest price in this batch was written to the server's cache (epoch
+// ms), or null when it was fetched fresh — backs the "Updated <when>" beside a list's own
+// "↻ Refresh prices", the same shape /api/common-games' own fetchedAt has.
+export interface PriceLookup {
+  prices: Record<string, PriceInfo>;
+  fetchedAt: number | null;
+}
+
 // Exactly one of gids/appids, matching POST /api/prices's own contract. Throws with the
 // server's own error message on a non-2xx response, same as both callers' pre-extraction code.
-export async function postPrices({ gids, appids, country, force = false }: { gids?: string[]; appids?: number[]; country: string; force?: boolean }): Promise<Record<string, PriceInfo>> {
+export async function postPrices({ gids, appids, country, force = false }: { gids?: string[]; appids?: number[]; country: string; force?: boolean }): Promise<PriceLookup> {
   const qs = new URLSearchParams({ country });
   if (force) qs.set('refresh', '1');
   const res = await fetch(`/api/prices?${qs}`, {
@@ -69,7 +77,7 @@ export async function postPrices({ gids, appids, country, force = false }: { gid
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(gids ? { gids } : { appids }),
   });
-  const data: { prices?: Record<string, PriceInfo>; error?: string } = await res.json();
+  const data: { prices?: Record<string, PriceInfo>; fetchedAt?: number | null; error?: string } = await res.json();
   if (!res.ok) throw new Error(data.error || 'Price lookup failed');
-  return data.prices ?? {};
+  return { prices: data.prices ?? {}, fetchedAt: data.fetchedAt ?? null };
 }

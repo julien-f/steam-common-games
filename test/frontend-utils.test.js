@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeInput, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier, dealRecordTier } = require('../public/utils.ts');
+const { normalizeInput, steamVanity, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier, dealRecordTier, fmtAge, isTextEntry } = require('../public/utils.ts');
 
 // ── normalizeInput ────────────────────────────────────────────────────────────
 
@@ -29,6 +29,21 @@ test('normalizeInput: returns non-Steam URLs unchanged', () => {
 
 test('normalizeInput: returns plain Steam64 ID unchanged', () => {
   assert.equal(normalizeInput('76561198000000001'), '76561198000000001');
+});
+
+// ── steamVanity ───────────────────────────────────────────────────────────────
+
+test('steamVanity: extracts the custom-URL name from a /id/ profile URL', () => {
+  assert.equal(steamVanity('https://steamcommunity.com/id/gaben/'), 'gaben');
+});
+
+test('steamVanity: a /profiles/<steam64> URL means no custom name was ever set', () => {
+  assert.equal(steamVanity('https://steamcommunity.com/profiles/76561198000000001'), null);
+});
+
+test('steamVanity: no profile URL at all (a profile Steam knew nothing about) is null', () => {
+  assert.equal(steamVanity(''), null);
+  assert.equal(steamVanity(undefined), null);
 });
 
 // ── scoreColor ────────────────────────────────────────────────────────────────
@@ -336,4 +351,59 @@ test('dealRecordTier: <= not < — a price equal to the historical low still cou
 test('dealRecordTier: a missing individual low is skipped in favor of a matching one further down the list', () => {
   const rec = dealRecordTier(20, { lowAll: null, lowY1: null, lowM3: 20 });
   assert.equal(rec.tier, '3mo');
+});
+
+// ── fmtAge ────────────────────────────────────────────────────────────────────
+
+test('fmtAge: null (nothing cached — fetched fresh) reads as just now', () => {
+  assert.equal(fmtAge(null), 'just now');
+  assert.equal(fmtAge(undefined), 'just now');
+});
+
+test('fmtAge: under a minute, in either direction, is just now', () => {
+  const now = 1_700_000_000_000;
+  assert.equal(fmtAge(now - 30_000, now), 'just now');
+  // A small clock skew between server and browser must never read as "in the future".
+  assert.equal(fmtAge(now + 30_000, now), 'just now');
+});
+
+test('fmtAge: steps through minutes, hours, days and months', () => {
+  const now = 1_700_000_000_000;
+  const min = 60_000, hour = 60 * min, day = 24 * hour;
+  assert.equal(fmtAge(now - 5 * min, now), '5 min ago');
+  assert.equal(fmtAge(now - 3 * hour, now), '3h ago');
+  assert.equal(fmtAge(now - day, now), '1 day ago');
+  assert.equal(fmtAge(now - 6 * day, now), '6 days ago');
+  assert.equal(fmtAge(now - 45 * day, now), '1 month ago');
+  assert.equal(fmtAge(now - 70 * day, now), '2 months ago');
+});
+
+// ── isTextEntry ───────────────────────────────────────────────────────────────
+
+test('isTextEntry: a text field, textarea or select swallows keys', () => {
+  assert.equal(isTextEntry({ tagName: 'INPUT', type: 'text' }), true);
+  assert.equal(isTextEntry({ tagName: 'INPUT', type: 'search' }), true);
+  assert.equal(isTextEntry({ tagName: 'INPUT', type: 'number' }), true);
+  assert.equal(isTextEntry({ tagName: 'TEXTAREA' }), true);
+  assert.equal(isTextEntry({ tagName: 'SELECT' }), true);
+});
+
+// The regression this exists for: the game table puts a checkbox on every row, and treating one
+// as text entry killed every page shortcut (R, ↑/↓, /, ?) for as long as focus sat on it.
+test('isTextEntry: a checkbox, radio or button does not', () => {
+  assert.equal(isTextEntry({ tagName: 'INPUT', type: 'checkbox' }), false);
+  assert.equal(isTextEntry({ tagName: 'INPUT', type: 'radio' }), false);
+  assert.equal(isTextEntry({ tagName: 'INPUT', type: 'range' }), false);
+  assert.equal(isTextEntry({ tagName: 'BUTTON' }), false);
+});
+
+test('isTextEntry: contenteditable counts, a plain element does not', () => {
+  assert.equal(isTextEntry({ tagName: 'DIV', isContentEditable: true }), true);
+  assert.equal(isTextEntry({ tagName: 'DIV' }), false);
+  assert.equal(isTextEntry({ tagName: 'IMG' }), false);
+});
+
+test('isTextEntry: no focused element at all', () => {
+  assert.equal(isTextEntry(null), false);
+  assert.equal(isTextEntry(undefined), false);
 });

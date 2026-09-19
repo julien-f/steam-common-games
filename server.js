@@ -10,13 +10,13 @@ const path = require('path');
 const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 
-const { getCached, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
+const { getCached, getCachedAt, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
 const { getMetrics, recordLimiterTrip } = require('./lib/metrics');
 const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker, getSemaphoreStats } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
-const { getBundles, findBundleById, resolveSteamAppIds, resolveItadIds, getSteamShopId, getPrices, extractPriceInfo } = require('./lib/itad');
+const { getBundles, bundlesCacheKey, findBundleById, resolveSteamAppIds, resolveItadIds, getSteamShopId, getPrices, extractPriceInfo } = require('./lib/itad');
 
 const HOST = process.env.HOST;
 const PORT = process.env.PORT;
@@ -27,6 +27,7 @@ const DETAILS_RATE_LIMIT_MAX = Number(process.env.DETAILS_RATE_LIMIT_MAX);
 const GAME_SEARCH_RATE_LIMIT_MAX = Number(process.env.GAME_SEARCH_RATE_LIMIT_MAX);
 const ACHIEVEMENTS_RATE_LIMIT_MAX = Number(process.env.ACHIEVEMENTS_RATE_LIMIT_MAX);
 const STREAM_MAX_GAMES = Number(process.env.STREAM_MAX_GAMES);
+const STREAM_CONCURRENCY = Number(process.env.STREAM_CONCURRENCY);
 const BUNDLES_RATE_LIMIT_MAX = Number(process.env.BUNDLES_RATE_LIMIT_MAX);
 // Optional feature — see ITAD_API_KEY's comment in default.env. Checked once here rather than
 // duplicated across every /api/bundles* route handler.
@@ -42,6 +43,10 @@ const rateLimitBypassed = () =>
   process.env.NODE_ENV === 'test' && process.env.RATE_LIMIT_ENABLED !== 'true';
 
 const isForceRefresh = (req) => req.query.refresh === '1' || req.query.refresh === 'true';
+
+// Used by searchLimit's skip below (a raw Steam64 id needs no resolve: cache check at all,
+// same short-circuit resolveSteamId itself uses) and by achievementsLimit's further down.
+const STEAM64_RE = /^7656119\d{10}$/;
 
 // Wraps rateLimit() so every limiter also records when it actually rejects a request — the
 // inbound counterpart to lib/metrics.js's outbound statusCounts. `handler` only runs once a
@@ -69,6 +74,20 @@ function namedRateLimit(name, opts) {
 // (isClientError), everything unmarked is logged too, on the assumption that an error
 // nobody bothered to mark expected is probably a bug worth being able to find later. Logs
 // the full stack, not just the message, since a bug needs its source line to be traceable.
+// The oldest write time across a set of cache keys, or null if any of them isn't cached (a
+// fresh fetch this request just made writes its own entry, so that case is rare) — what the
+// `fetchedAt` field on /api/common-games and /api/wishlist reports. Oldest, not newest, so the
+// UI's "Updated <when>" never claims data is fresher than its stalest part.
+function oldestCachedAt(keys) {
+  let oldest = null;
+  for (const key of keys) {
+    const ts = getCachedAt(key);
+    if (ts === undefined) return null;
+    if (oldest === null || ts < oldest) oldest = ts;
+  }
+  return oldest;
+}
+
 function routeErrorStatus(route, err) {
   if (err.isClientError) return 400;
   // Circuit-open errors (lib/steam.js's fetchStoreApi, while steam-store is blocked) are an
@@ -92,7 +111,7 @@ app.use(express.json());
 // serving public/ directly otherwise — but that fallback no longer serves a working frontend
 // on its own: public/'s entry points are TypeScript (`<script type="module" src="/app.ts">`
 // etc.), which a plain express.static + browser can't execute, so a fresh clone needs
-// `npm run build` before `npm start` actually works (see README/CLAUDE.md). This still exists
+// `npm run build` before `npm start` actually works (see README.md). This still exists
 // so `npm start` needs no special-casing depending on whether dist/ has been built yet, and so
 // the backend's own API routes work either way for direct API consumers.
 const DIST_DIR = path.join(__dirname, 'dist');
@@ -112,14 +131,80 @@ if (usingDist) {
 }
 app.use(express.static(STATIC_DIR));
 
-// Stricter limit for searches — each uncached user triggers Steam API calls
+// OpenSearch descriptor for /search?q=<term> (docs/user/features.md's "Search by URL") — its
+// <link rel="search"> tag in index.html lets Chrome/Firefox offer "add as a search engine" for
+// this instance's own address bar keyword, without whoever sets one up having to hand-type a
+// keyword bookmark. Built from the request's own host rather than a fixed domain, since this is
+// self-hosted and every instance lives at a different one.
+const escapeXml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+app.get('/opensearch.xml', (req, res) => {
+  const host = escapeXml(req.get('host') || '');
+  const origin = `${req.protocol}://${host}`;
+  res.type('application/opensearchdescription+xml').send(
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">\n' +
+    '  <ShortName>Steam Games</ShortName>\n' +
+    `  <Description>Search for a game on ${host}</Description>\n` +
+    '  <InputEncoding>UTF-8</InputEncoding>\n' +
+    `  <Url type="text/html" template="${origin}/search?q={searchTerms}"/>\n` +
+    '</OpenSearchDescription>\n'
+  );
+});
+
+// Stricter limit for searches — each uncached user triggers Steam API calls. Shared by
+// POST /api/common-games and POST /api/wishlist below (their body shapes never overlap:
+// common-games sends slots/users, wishlist sends members), same "cache hits don't count"
+// rule detailsLimit/gameSearchLimit/etc. already apply — a re-search for accounts already
+// sitting fully in cache (resolve/player/games/wishlist) makes no upstream call at all, so it
+// shouldn't spend this tighter budget the way a genuinely new/stale search does. Switching
+// between a handful of already-loaded accounts used to burn the whole per-minute budget on
+// requests that never touched Steam.
 const searchLimit = namedRateLimit('search', {
   windowMs: 60 * 1000,
   max: SEARCH_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many searches. Please wait a minute and try again.' },
-  skip: () => rateLimitBypassed(),
+  skip: (req) => {
+    if (rateLimitBypassed()) return true;
+    // A full refresh always re-fetches every account, so it must always count — same rule
+    // isForceRefresh gets elsewhere in this file. A per-account refreshIds (the accounts bar's
+    // own "↻") forces at least those accounts regardless of cache state, so it must count too
+    // — no need to reason about which specific ids they are.
+    if (req.body?.refresh === true) return false;
+    const refreshIds = req.body?.refreshIds;
+    if (Array.isArray(refreshIds) && refreshIds.length > 0) return false;
+
+    let rawIdentifiers;
+    let isWishlist;
+    if (Array.isArray(req.body?.slots))        { rawIdentifiers = req.body.slots.flat(); isWishlist = false; }
+    else if (Array.isArray(req.body?.users))   { rawIdentifiers = req.body.users;        isWishlist = false; }
+    else if (Array.isArray(req.body?.members)) { rawIdentifiers = req.body.members;      isWishlist = true; }
+    else return false; // let the route's own validation reject it
+
+    if (!rawIdentifiers.every(u => typeof u === 'string' && u.trim().length > 0)) return false;
+
+    // Mirrors resolveSteamId's own cache key/short-circuit exactly — a raw Steam64 id needs no
+    // resolution at all, so it's never an upstream call regardless of cache state; anything else
+    // not yet in resolve: hasn't been resolved yet, so it must count.
+    const resolvedIds = new Set();
+    for (const raw of rawIdentifiers) {
+      const id = raw.trim();
+      if (STEAM64_RE.test(id)) { resolvedIds.add(id); continue; }
+      const hit = getCached(`resolve:${id}`);
+      if (hit === undefined) return false;
+      resolvedIds.add(hit);
+    }
+
+    // Every identifier now resolves to a known Steam64 id — the route's remaining upstream work
+    // is just getPlayerSummaries + getOwnedGames (common-games) or getWishlist (wishlist) per
+    // id, mirroring their own cache keys.
+    for (const id of resolvedIds) {
+      if (getCached(`player:${id}`) === undefined) return false;
+      if (isWishlist ? getCached(`wishlist:${id}`) === undefined : getCached(`games:${id}`) === undefined) return false;
+    }
+    return true;
+  },
 });
 
 // The details limit exists to throttle upstream Steam/HLTB calls. Cache hits make
@@ -187,8 +272,6 @@ const gameSearchLimit = namedRateLimit('gameSearch', {
   },
 });
 
-const STEAM64_RE = /^7656119\d{10}$/;
-
 // Schema is per-appid (one call regardless of how many accounts are loaded); player progress
 // is per (steamid, appid) — skip only once every one of those is already cached, same
 // "cache hits don't count" rule as detailsLimit above. Unresolved (non-Steam64, e.g. vanity
@@ -246,7 +329,7 @@ app.get('/api/metrics', (_req, res) => {
 // tailored to that route's own cache-key shape — mirroring detailsLimit/achievementsLimit's own
 // "cache hits don't count" skip, not just a shared always-counts limiter. Without this, simply
 // reloading the Bundles page a handful of times (every reload re-requests the list, and
-// re-opens whatever bundle is deep-linked — see the `?bundle=` section in CLAUDE.md) burns the
+// re-opens whatever bundle is deep-linked — see docs/dev/integrations.md) burns the
 // whole per-minute budget on requests that never actually hit ITAD, and once burned, real
 // upstream calls (a newly-opened bundle) start 429ing with no visible explanation. Named
 // generically (not `bundlesRateLimitOpts`) since `pricesLimit` below also backs the Library
@@ -263,14 +346,13 @@ const bundlesListLimit = namedRateLimit('bundlesList', {
   ...itadRateLimitOpts,
   skip: (req) => {
     if (rateLimitBypassed()) return true;
+    if (isForceRefresh(req)) return false; // force-refresh always re-fetches, so it must always count
     const country = parseCountry(req);
     const offset = Math.max(0, Number(req.query.offset) || 0);
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
     const sort = typeof req.query.sort === 'string' && req.query.sort ? req.query.sort : '-publish';
     const expired = req.query.expired === '1' || req.query.expired === 'true';
-    // Mirrors getBundles' own cache key exactly (lib/itad.js) — `mature` is always `false` here
-    // since GET /api/bundles never accepts it as a query param.
-    return getCached(`itad-bundles:${country}:${sort}:${expired}:false:${offset}:${limit}`) !== undefined;
+    return getCached(bundlesCacheKey({ country, offset, limit, sort, expired })) !== undefined;
   },
 });
 
@@ -404,7 +486,7 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
       }
     }
 
-    res.json({ groups, slots: playerSlots, playtime, lastPlayed });
+    res.json({ groups, slots: playerSlots, playtime, lastPlayed, fetchedAt: oldestCachedAt(uniqueIds.map(id => `games:${id}`)) });
   } catch (err) {
     const status = routeErrorStatus('common-games', err);
     res.status(status).json({ error: err.message });
@@ -460,7 +542,7 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
       itemCount: lists[i].length,
     }));
 
-    res.json({ items, players });
+    res.json({ items, players, fetchedAt: oldestCachedAt(ids.map(id => `wishlist:${id}`)) });
   } catch (err) {
     const status = routeErrorStatus('wishlist', err);
     res.status(status).json({ error: err.message });
@@ -514,6 +596,12 @@ function fetchGameDetails(appid, { force = false } = {}) {
       if (demoRes.status     === 'rejected') logErr('demo',     demoRes.reason);
       if (protondbRes.status === 'rejected') logErr('protondb', protondbRes.reason);
       return {
+        // Age of the oldest of this game's cached sources — the panel's ↻ puts it in its own
+        // tooltip rather than on screen: these tiers run to months, and for a game whose store
+        // page genuinely hasn't changed since 2013 a prominent "5 months ago" would invite
+        // clicks that spend the app's most rate-limited upstream (storeLimit) to re-fetch data
+        // that was already right. Available to whoever wonders; not advertised to everyone.
+        fetchedAt: oldestCachedAt([`rating:${appid}`, `hltb:${appid}`, `meta:${appid}`, `browse:${appid}`, `protondb:${appid}`]),
         rating:   ratingRes.status   === 'fulfilled' ? ratingRes.value   : null,
         hltb:     hltbRes.status     === 'fulfilled' ? hltbRes.value     : null,
         meta:     metaRes.status     === 'fulfilled' ? metaRes.value     : null,
@@ -527,7 +615,7 @@ function fetchGameDetails(appid, { force = false } = {}) {
 
 // Backs the "look up any game" search box (both pages) — resolves a typed name to a short
 // list of candidate appids, independent of anyone's library/wishlist. See lib/steam.js's
-// searchStoreGames for the upstream endpoint and CLAUDE.md for its compliance note.
+// searchStoreGames for the upstream endpoint and docs/dev/integrations.md's trust tiers.
 app.get('/api/search-games', gameSearchLimit, async (req, res) => {
   const term = normalizeSearchTerm(req.query.q);
   if (term.length < 2) return res.json({ results: [] });
@@ -541,7 +629,7 @@ app.get('/api/search-games', gameSearchLimit, async (req, res) => {
 });
 
 // Backs the Bundles page's bundle list — a thin, cached proxy over ITAD's GET /bundles/v1.
-// See lib/itad.js and CLAUDE.md for the upstream API and caching notes.
+// See lib/itad.js and docs/dev/integrations.md and docs/dev/data.md.
 app.get('/api/bundles', bundlesListLimit, async (req, res) => {
   if (!isItadConfigured()) {
     return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
@@ -552,8 +640,16 @@ app.get('/api/bundles', bundlesListLimit, async (req, res) => {
   const sort = typeof req.query.sort === 'string' && req.query.sort ? req.query.sort : '-publish';
   const expired = req.query.expired === '1' || req.query.expired === 'true';
   try {
-    const bundles = await getBundles({ country, offset, limit, sort, expired });
-    res.json({ bundles, offset, limit });
+    // ?refresh=1 backs the browse page's own "↻ Refresh" — a bundle can go live or expire at any
+    // time, so "the list I'm looking at is out of date" needs an answer that isn't "wait out the
+    // TTL". Only this page of the list is forced; GET /api/bundles/:id deliberately has no
+    // equivalent (findBundleById walks up to BUNDLE_SEARCH_MAX_PAGES pages, so forcing it would
+    // cost several upstream calls to answer one deep link).
+    const bundles = await getBundles({ country, offset, limit, sort, expired, force: isForceRefresh(req) });
+    // Age of this page of the list, for the "Updated <when>" beside the browse page's own ↻ —
+    // a bundle going live or expiring is exactly what that button is for, and that question is
+    // unanswerable without knowing how old the list on screen is.
+    res.json({ bundles, offset, limit, fetchedAt: getCachedAt(bundlesCacheKey({ country, offset, limit, sort, expired })) ?? null });
   } catch (err) {
     const status = routeErrorStatus('bundles', err);
     res.status(status).json({ error: err.message });
@@ -648,7 +744,7 @@ app.post('/api/prices', pricesLimit, async (req, res) => {
   // ?refresh=1 backs the page-level "↻ Refresh prices" button (bundles.js/library.js) — force
   // only the price lookup itself, not the appid↔gid resolution above: that's an identity
   // mapping, not price data, and near-permanent in practice (same reasoning as the panel's own
-  // ↻ Refresh never touching `resolve:` — see the "Refresh" section in CLAUDE.md), so refreshing
+  // ↻ Refresh never touching `resolve:` — see docs/dev/data.md), so refreshing
   // it on every price refresh would just be an extra upstream call for nothing.
   const force = isForceRefresh(req);
   try {
@@ -664,7 +760,11 @@ app.post('/api/prices', pricesLimit, async (req, res) => {
     ]);
     const out = {};
     for (const [key, gid] of gidByKey) out[key] = extractPriceInfo(gid ? prices.get(gid) : null, shopId);
-    res.json({ prices: out });
+    // How old the oldest price in this batch is — the "Updated <when>" beside the caller's own
+    // "↻ Refresh prices". Prices are the shortest-lived data the app shows and the most
+    // consequential to act on (someone clicks through to a shop from these), so how old they are
+    // is worth stating rather than implying.
+    res.json({ prices: out, fetchedAt: oldestCachedAt(gidsToPrice.map(gid => `itad-price:${country}:${gid}`)) });
   } catch (err) {
     const status = routeErrorStatus('prices', err);
     res.status(status).json({ error: err.message });
@@ -837,23 +937,51 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
     if (!closed && !res.writableEnded) res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
-  await Promise.allSettled(validated.map(async appid => {
-    if (closed) return;
-    try {
-      const result = await fetchGameDetails(appid);
-      send({ appid, ...result });
-    } catch (err) {
-      // fetchGameDetails resolves every sub-fetch via Promise.allSettled internally and should
-      // never itself reject — this is a defensive backstop, not an expected path, so unlike
-      // the per-field failures it already logs (see logErr above) this used to vanish with
-      // no trace at all if it ever did fire.
-      console.error(`[bug:stream]`, `appid ${appid}:`, err.stack || err.message);
-      send({ appid, rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null });
+  // A bounded worker pool, not `validated.map(...)`. Mapping dispatched every appid
+  // synchronously, which made the `closed` check useless (nothing can have closed yet at that
+  // instant) and queued the whole request — up to STREAM_MAX_GAMES, each fanning out to rating +
+  // metadata + tags + demo + ProtonDB + HLTB — onto lib/steam.js's semaphores up front. Two
+  // consequences, both real: navigating away left every remaining fetch to run to completion for
+  // nobody, and one request could park thousands of items in a shared FIFO queue that every other
+  // user's requests then waited behind. Pulling from a shared cursor instead means at most
+  // STREAM_CONCURRENCY appids are ever in flight for one request, and `closed` is re-checked
+  // before each one — so a disconnect stops the work within one appid per worker.
+  let next = 0;
+  const worker = async () => {
+    while (!closed) {
+      const i = next++;
+      if (i >= validated.length) return;
+      const appid = validated[i];
+      try {
+        const result = await fetchGameDetails(appid);
+        send({ appid, ...result });
+      } catch (err) {
+        // fetchGameDetails resolves every sub-fetch via Promise.allSettled internally and should
+        // never itself reject — this is a defensive backstop, not an expected path, so unlike
+        // the per-field failures it already logs (see logErr above) this used to vanish with
+        // no trace at all if it ever did fire.
+        console.error(`[bug:stream]`, `appid ${appid}:`, err.stack || err.message);
+        send({ appid, rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null });
+      }
     }
-  }));
+  };
+  await Promise.allSettled(Array.from({ length: Math.min(STREAM_CONCURRENCY, validated.length) }, worker));
 
   send({ done: true });
   if (!res.writableEnded) res.end();
+});
+
+// SPA fallback: any GET that isn't an /api/* call and doesn't look like a static-asset request
+// (no dot-extension in its path) falls through to the app shell, letting the client-side
+// router (see public/App.tsx) render the right view from the URL — needed once navigation
+// between what used to be separate pages (Comparison/Library Explorer/Bundles/About) became
+// client-side routing instead of real page loads (see docs/dev/architecture.md). Placed
+// after every route above and after the static-file middleware (line 113) so real API calls
+// and real asset files are still served first; a path that looks like an asset (has a file
+// extension) but genuinely doesn't exist still 404s via Express's default handler instead of
+// being silently rewritten into the shell.
+app.get(/^\/(?!api\/)(?!.*\.[a-zA-Z0-9]+$).*/, (_req, res) => {
+  res.sendFile(path.join(STATIC_DIR, 'index.html'));
 });
 
 if (require.main === module) {
@@ -864,7 +992,7 @@ if (require.main === module) {
     process.exit(1);
   }
   app.listen(PORT, HOST, () => {
-    console.log(`\nSteam Common Games → http://${HOST}:${PORT}\n`);
+    console.log(`\nsteam.isonoe.net → http://${HOST}:${PORT}\n`);
   });
 }
 
