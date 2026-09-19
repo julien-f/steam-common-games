@@ -4,7 +4,9 @@ The application database, the cache tiers over it, and the three user-facing ref
 
 ## Database (`db.sqlite`)
 
-`db.sqlite` is the application database, opened via the built-in `node:sqlite` module (`DatabaseSync`). It currently holds only cache tables, but is intentionally named `db.sqlite` (not `cache.db`) to accommodate non-cache data in the future. WAL mode is enabled for better concurrent write throughput. Cache entries are evicted at startup and lazily on read; every write goes directly to SQLite (no debounced flush). Set `DB_FILE=` (empty) in `.env` to use an in-memory database. Cache TTLs:
+`db.sqlite` is the application database, opened via the built-in `node:sqlite` module (`DatabaseSync`) in `lib/db.js`. It currently holds only cache tables, but is intentionally named `db.sqlite` (not `cache.db`) to accommodate non-cache data in the future. WAL mode is enabled for better concurrent write throughput. Cache entries are evicted at startup and lazily on read; every write goes directly to SQLite (no debounced flush). Set `DB_FILE=` (empty) in `.env` to use an in-memory database. Cache TTLs:
+
+Schema changes go through `lib/db.js`'s `MIGRATIONS` list — an ordered, append-only array of `{ version, up(db) }` steps, applied against the database's `PRAGMA user_version` and never dropping tables. Version 7 is the historical baseline (this repo's schema used to wipe and recreate every cache table on any version mismatch, since cache data is disposable); new migrations start at 8 and must only add, never drop or rewrite in place, so upgrading a live `db.sqlite` never loses cached data or, once it exists, user data. Once a migration has shipped, it's never edited — fix forward with a new one.
 
 | Key prefix | TTL env var | Default | Reason |
 |---|---|---|---|

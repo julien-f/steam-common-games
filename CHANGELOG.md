@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Updated `@babel/core`, `@babel/eslint-parser`, `eslint`, `hls.js` and `morgan` to their latest in-range patch versions, and `dotenv` to 18.0.1 (none of its breaking removals — CLI preloading, `.env.vault` — apply here).
 
+- `db.sqlite`'s schema now upgrades through incremental migrations (`lib/db.js`) instead of dropping and recreating every table on a version bump — a live database's data, cache rows included, survives a schema change.
+
 ### Added
 
 - **An OpenSearch descriptor at `/opensearch.xml`**, referenced from `index.html`, so Chrome offers `/search?q=<term>` as an address-bar search engine on its own — Firefox still needs a manual keyword bookmark (see `docs/user/features.md`).
