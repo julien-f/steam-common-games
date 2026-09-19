@@ -1542,8 +1542,9 @@ test('login flow → GET /api/me: returns the signed-in steamid and empty prefs 
   assert.deepEqual(res.body, { steamid: '76561198000000202', prefs: {} });
 });
 
-test('GET /api/me: 401 when not signed in', async () => {
-  await api.get('/api/me').expect(401);
+test('GET /api/me: 200 with a null steamid/prefs when not signed in — checking status isn\'t an error', async () => {
+  const res = await api.get('/api/me').expect(200);
+  assert.deepEqual(res.body, { steamid: null, prefs: null });
 });
 
 test('PUT /api/me/prefs/:key: saves one key, visible from a later GET /api/me', async (t) => {
@@ -1572,7 +1573,9 @@ test('PUT /api/me/prefs/:key: 401 when not signed in', async () => {
 
 test('POST /auth/logout: session stops working afterwards', async (t) => {
   const agent = await loginAs(t, '76561198000000205');
-  await agent.get('/api/me').expect(200);
+  const before = await agent.get('/api/me').expect(200);
+  assert.equal(before.body.steamid, '76561198000000205');
   await agent.post('/auth/logout').expect(200);
-  await agent.get('/api/me').expect(401);
+  const after = await agent.get('/api/me').expect(200);
+  assert.equal(after.body.steamid, null);
 });

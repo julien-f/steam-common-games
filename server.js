@@ -1036,8 +1036,13 @@ app.post('/auth/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/me', requireAuth, (req, res) => {
-  res.json({ steamid: req.user.steamid, prefs: req.user.prefs });
+// Not behind requireAuth, and always 200 — this is checked unconditionally on every page load
+// (see authStore.ts's initAuth) to answer "is anyone signed in", and since sign-in is optional
+// most visits are anonymous, so that isn't an error condition worth a console-level 401 on
+// every single one of them.
+app.get('/api/me', (req, res) => {
+  const user = getSessionUser(parseCookies(req.headers.cookie)[SESSION_COOKIE]);
+  res.json(user ? { steamid: user.steamid, prefs: user.prefs } : { steamid: null, prefs: null });
 });
 
 // One key per request, never a whole-blob PUT — matches prefs.ts's own per-key setPref, so

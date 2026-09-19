@@ -35,7 +35,50 @@ export function setPref(key: string, value: unknown): void {
     blob[key] = value;
     localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(blob));
   } catch { /* not persisted this session — private browsing, quota, storage unavailable */ }
-  // Sync hook for once Steam auth exists: pushing `key`/`value` to the server happens here,
-  // per-key — deliberately never a whole-blob PUT, so two preferences changing around the same
-  // time (different tabs/devices) can't race each other's writes. No-op today.
+  // Per-key push to the server once signed in (authStore.ts calls setSignedInSteamid on
+  // sign-in/out) — deliberately never a whole-blob PUT, so two preferences changing around the
+  // same time (different tabs/devices) can't race each other's writes.
+  if (signedInSteamid) pushPrefToServer(key, value);
+}
+
+// Set by authStore.ts once GET /api/me resolves (and cleared on sign-out) — kept here, rather
+// than importing authStore.ts, so this module doesn't need to know about auth beyond "should
+// setPref also sync". authStore.ts is the one importing from this file (for the first-login
+// import/merge), not the other way around.
+let signedInSteamid: string | null = null;
+export function setSignedInSteamid(steamid: string | null): void {
+  signedInSteamid = steamid;
+}
+
+// Fire-and-forget — a failed sync leaves the change on this device only, in localStorage,
+// exactly as it worked before server sync existed at all; nothing here is retried, since the
+// next setPref for the same key (or a page reload's own catch-up push) is a fine enough retry
+// for a preference that isn't behind any correctness-critical logic.
+function pushPrefToServer(key: string, value: unknown): Promise<void> {
+  return fetch(`/api/me/prefs/${encodeURIComponent(key)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value }),
+  })
+    .then(() => undefined)
+    .catch(err => console.error(`[prefs] failed to sync "${key}" to the server`, err));
+}
+
+// Every locally stored key/value — used by authStore.ts's first-login import to decide whether
+// this browser or the signed-in account already has data, and to push it all up at once.
+export function getAllPrefs(): Record<string, unknown> {
+  return readPrefsBlob();
+}
+
+// Replaces the whole local blob with the server's — only ever called once, right after signing
+// in, when the account's server-side prefs are adopted in place of (rather than merged with)
+// whatever was in this browser. Never goes through setPref, since there's nothing to push back.
+export function adoptServerPrefs(serverPrefs: Record<string, unknown>): void {
+  try { localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(serverPrefs)); } catch { /* unavailable storage */ }
+}
+
+// The mirror of adoptServerPrefs: pushes every key already in this browser up to the server,
+// for first-login import when the account has nothing saved yet.
+export async function pushAllPrefsToServer(): Promise<void> {
+  await Promise.all(Object.entries(readPrefsBlob()).map(([key, value]) => pushPrefToServer(key, value)));
 }
