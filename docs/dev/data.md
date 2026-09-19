@@ -8,6 +8,8 @@ The application database, the cache tiers over it, and the three user-facing ref
 
 Schema changes go through `lib/db.js`'s `MIGRATIONS` list — an ordered, append-only array of `{ version, up(db) }` steps, applied against the database's `PRAGMA user_version` and never dropping tables. Version 7 is the historical baseline (this repo's schema used to wipe and recreate every cache table on any version mismatch, since cache data is disposable); new migrations start at 8 and must only add, never drop or rewrite in place, so upgrading a live `db.sqlite` never loses cached data or, once it exists, user data. Once a migration has shipped, it's never edited — fix forward with a new one.
 
+Version 8 added the first non-cache tables: `users` (`steamid` primary key, an opaque `prefs` JSON blob, `created_at`/`updated_at`) and `sessions` (`id` — the session cookie's value — `steamid`, `expires_at`), backing Steam OpenID sign-in (`lib/auth.js`; see [architecture.md](architecture.md)'s API routes). Expired sessions are swept on startup, the same "TTL changes take effect on next restart" treatment the cache tiers' own eviction gets.
+
 | Key prefix | TTL env var | Default | Reason |
 |---|---|---|---|
 | `resolve:` | `RESOLVE_CACHE_TTL_MINUTES` | 180 days | Steam ID resolution — essentially permanent. Not unbounded: a custom URL can be renamed and re-claimed by someone else, and no refresh path forces this tier |

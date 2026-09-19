@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Steam sign-in on the backend** (`lib/auth.js`): `GET /auth/steam/login`/`GET /auth/steam/callback` implement Steam OpenID 2.0 sign-in, `POST /auth/logout` ends the session, `GET /api/me` reads the signed-in user's prefs blob, and `PUT /api/me/prefs/:key` writes one key at a time (never a whole-blob PUT, so concurrent writes from different tabs/devices can't clobber each other) into the new `users`/`sessions` tables (see `docs/dev/data.md`). Entirely optional and not yet wired to the frontend — the app still works fully anonymously; the localStorage-to-server sync and sign-in UI are follow-up work.
+
 - **An OpenSearch descriptor at `/opensearch.xml`**, referenced from `index.html`, so Chrome offers `/search?q=<term>` as an address-bar search engine on its own — Firefox still needs a manual keyword bookmark (see `docs/user/features.md`).
 
 - **`/search?q=<term>` — search for a game by URL**, useful as a browser keyword search (e.g. bookmark `/search?q=%s` in Firefox with a keyword). Shows the matches and opens the closest one in the side panel on arrival; reloading with `?game=` set reopens the same game.

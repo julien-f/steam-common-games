@@ -8,6 +8,7 @@ const express = require('express');
 const morgan = require('morgan');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('node:crypto');
 const rateLimit = require('express-rate-limit');
 
 const { getCached, getCachedAt, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
@@ -17,6 +18,8 @@ const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameR
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 const { getBundles, bundlesCacheKey, findBundleById, resolveSteamAppIds, resolveItadIds, getSteamShopId, getPrices, extractPriceInfo } = require('./lib/itad');
+const { SESSION_COOKIE, STATE_COOKIE, parseCookies, serializeCookie, buildLoginUrl, verifySteamAssertion, upsertUser, createSession, destroySession, getSessionUser, setUserPref } = require('./lib/auth');
+const { SESSION_TTL_MS } = require('./lib/config');
 
 const HOST = process.env.HOST;
 const PORT = process.env.PORT;
@@ -969,6 +972,80 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
 
   send({ done: true });
   if (!res.writableEnded) res.end();
+});
+
+// ── Authentication (Steam OpenID) ────────────────────────────────────────────
+// Entirely optional — the app works fully anonymously with localStorage-only prefs (see
+// docs/dev/lists-and-accounts.md); signing in with Steam additionally syncs prefs server-side
+// under the verified steamid, across browsers/devices.
+
+const authLimit = namedRateLimit('auth', {
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => rateLimitBypassed(),
+  message: { error: 'Too many requests. Please wait a minute and try again.' },
+});
+
+function requireAuth(req, res, next) {
+  const user = getSessionUser(parseCookies(req.headers.cookie)[SESSION_COOKIE]);
+  if (!user) return res.status(401).json({ error: 'Not signed in' });
+  req.user = user;
+  next();
+}
+
+app.get('/auth/steam/login', authLimit, (req, res) => {
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const state = crypto.randomBytes(16).toString('hex');
+  res.setHeader('Set-Cookie', serializeCookie(STATE_COOKIE, state, { maxAgeMs: 5 * 60 * 1000, secure: req.protocol === 'https' }));
+  res.redirect(buildLoginUrl(origin, state));
+});
+
+app.get('/auth/steam/callback', authLimit, async (req, res) => {
+  const secure = req.protocol === 'https';
+  const clearState = serializeCookie(STATE_COOKIE, '', {});
+  const { [STATE_COOKIE]: expectedState } = parseCookies(req.headers.cookie);
+  if (!expectedState || req.query.state !== expectedState) {
+    res.setHeader('Set-Cookie', clearState);
+    return res.status(400).send('Login request expired or invalid — please try signing in again.');
+  }
+
+  let steamid;
+  try {
+    steamid = await verifySteamAssertion(req.query);
+  } catch (err) {
+    console.error('[auth] steam assertion verification failed', err.stack || err.message);
+    res.setHeader('Set-Cookie', clearState);
+    return res.status(502).send('Could not verify Steam login — please try again.');
+  }
+  if (!steamid) {
+    res.setHeader('Set-Cookie', clearState);
+    return res.status(400).send('Steam login could not be verified.');
+  }
+
+  upsertUser(steamid);
+  const sessionId = createSession(steamid);
+  res.setHeader('Set-Cookie', [clearState, serializeCookie(SESSION_COOKIE, sessionId, { maxAgeMs: SESSION_TTL_MS, secure })]);
+  res.redirect('/');
+});
+
+app.post('/auth/logout', (req, res) => {
+  destroySession(parseCookies(req.headers.cookie)[SESSION_COOKIE]);
+  res.setHeader('Set-Cookie', serializeCookie(SESSION_COOKIE, '', {}));
+  res.json({ ok: true });
+});
+
+app.get('/api/me', requireAuth, (req, res) => {
+  res.json({ steamid: req.user.steamid, prefs: req.user.prefs });
+});
+
+// One key per request, never a whole-blob PUT — matches prefs.ts's own per-key setPref, so
+// two keys changing around the same time (different tabs/devices) can't clobber each other.
+app.put('/api/me/prefs/:key', authLimit, requireAuth, (req, res) => {
+  if (!('value' in (req.body || {}))) return res.status(400).json({ error: 'body must be { value }' });
+  setUserPref(req.user.steamid, req.params.key, req.body.value);
+  res.json({ ok: true });
 });
 
 // SPA fallback: any GET that isn't an /api/* call and doesn't look like a static-asset request

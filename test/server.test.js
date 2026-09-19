@@ -1491,3 +1491,88 @@ test('POST /api/game-details/stream: caps in-flight appids and stops fetching on
   assert.ok(started - startedAtDisconnect <= Number(process.env.STREAM_CONCURRENCY || 16), `kept going: ${started - startedAtDisconnect}`);
   server.close();
 });
+
+// ── Authentication (Steam OpenID) ────────────────────────────────────────────
+
+// Runs the full login handshake through a cookie-persisting agent and returns it, already
+// signed in as `steamid`. Mocks the one outbound call (the check_authentication POST to Steam).
+async function loginAs(t, steamid) {
+  const agent = supertest.agent(app);
+  const loginRes = await agent.get('/auth/steam/login').expect(302);
+  const returnTo = new URL(new URL(loginRes.headers.location).searchParams.get('openid.return_to'));
+  const state = returnTo.searchParams.get('state');
+
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
+  await agent
+    .get('/auth/steam/callback')
+    .query({ state, 'openid.claimed_id': `https://steamcommunity.com/openid/id/${steamid}` })
+    .expect(302)
+    .expect('Location', '/');
+
+  return agent;
+}
+
+test('GET /auth/steam/login: redirects to Steam with a return_to and state, and sets a state cookie', async () => {
+  const res = await api.get('/auth/steam/login').expect(302);
+  const location = new URL(res.headers.location);
+  assert.equal(location.hostname, 'steamcommunity.com');
+  assert.match(res.headers['set-cookie'][0], /^steam_login_state=/);
+});
+
+test('GET /auth/steam/callback: 400 when the state cookie is missing or does not match', async () => {
+  await api.get('/auth/steam/callback').query({ state: 'nope' }).expect(400);
+});
+
+test('GET /auth/steam/callback: 400 when Steam does not confirm the assertion', async (t) => {
+  const loginRes = await api.get('/auth/steam/login').expect(302);
+  const stateCookie = loginRes.headers['set-cookie'][0];
+  const state = new URL(new URL(loginRes.headers.location).searchParams.get('openid.return_to')).searchParams.get('state');
+
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:false' }));
+  await api
+    .get('/auth/steam/callback')
+    .set('Cookie', stateCookie)
+    .query({ state, 'openid.claimed_id': 'https://steamcommunity.com/openid/id/76561198000000201' })
+    .expect(400);
+});
+
+test('login flow → GET /api/me: returns the signed-in steamid and empty prefs on first login', async (t) => {
+  const agent = await loginAs(t, '76561198000000202');
+  const res = await agent.get('/api/me').expect(200);
+  assert.deepEqual(res.body, { steamid: '76561198000000202', prefs: {} });
+});
+
+test('GET /api/me: 401 when not signed in', async () => {
+  await api.get('/api/me').expect(401);
+});
+
+test('PUT /api/me/prefs/:key: saves one key, visible from a later GET /api/me', async (t) => {
+  const agent = await loginAs(t, '76561198000000203');
+  await agent.put('/api/me/prefs/myAccount').send({ value: { id: '76561198000000203' } }).expect(200);
+  const res = await agent.get('/api/me').expect(200);
+  assert.deepEqual(res.body.prefs, { myAccount: { id: '76561198000000203' } });
+});
+
+test('PUT /api/me/prefs/:key: merges into existing prefs, leaving other keys untouched', async (t) => {
+  const agent = await loginAs(t, '76561198000000206');
+  await agent.put('/api/me/prefs/a').send({ value: 1 }).expect(200);
+  await agent.put('/api/me/prefs/b').send({ value: 2 }).expect(200);
+  const res = await agent.get('/api/me').expect(200);
+  assert.deepEqual(res.body.prefs, { a: 1, b: 2 });
+});
+
+test('PUT /api/me/prefs/:key: 400 when the body has no value field', async (t) => {
+  const agent = await loginAs(t, '76561198000000204');
+  await agent.put('/api/me/prefs/a').send({ notValue: 1 }).expect(400);
+});
+
+test('PUT /api/me/prefs/:key: 401 when not signed in', async () => {
+  await api.put('/api/me/prefs/a').send({ value: 1 }).expect(401);
+});
+
+test('POST /auth/logout: session stops working afterwards', async (t) => {
+  const agent = await loginAs(t, '76561198000000205');
+  await agent.get('/api/me').expect(200);
+  await agent.post('/auth/logout').expect(200);
+  await agent.get('/api/me').expect(401);
+});

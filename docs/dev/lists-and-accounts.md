@@ -2,7 +2,7 @@
 
 The data model the whole frontend is built around: everything the app shows — an account's owned games, its wishlist, a bundle, a saved comparison — is a **list of appids**, rendered through one generic viewer ([frontend.md](frontend.md)'s `ListRoute.tsx`). Game display data (rating/HLTB/tags/price) is never stored on a list; it's resolved live via `game-details/stream`, keyed by appid.
 
-Nothing here is server-side. Accounts, lists, folders and preferences are `localStorage` only (`prefs.ts`), so there is no login and no cross-device sync yet — `prefs.ts`'s per-key setter is the seam a future Steam-auth-backed sync would attach to.
+Accounts, lists, folders and preferences are `localStorage` only (`prefs.ts`) — `prefs.ts`'s per-key setter is the seam a server sync layer would attach to. Steam OpenID sign-in and a server-side prefs store now exist (`lib/auth.js`, `GET /api/me`, `PUT /api/me/prefs` — see [architecture.md](architecture.md)), but the frontend doesn't call them yet: today, signing in with Steam (once the UI for it exists) will just be a way to identify yourself, not a way to sync anything — that wiring, plus the first-login import of whatever's already in `localStorage`, is still to come.
 
 - [Accounts](#accounts)
   - [`?u=` URL semantics — honored on every route, not just Home](#u-url-semantics--honored-on-every-route-not-just-home)
