@@ -2,6 +2,10 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const path = require('node:path');
+const os = require('node:os');
+const fs = require('node:fs');
+const { execFileSync } = require('node:child_process');
 const { DatabaseSync } = require('node:sqlite');
 const { migrate, MIGRATIONS } = require('../lib/db');
 
@@ -76,4 +80,22 @@ test('migrate: version 9 tolerates a user with no prefs at all', () => {
   assert.doesNotThrow(() => migrate(db, MIGRATIONS));
   const rows = db.prepare('SELECT * FROM user_prefs WHERE steamid = ?').all('1');
   assert.deepEqual(rows, []);
+});
+
+test('requiring lib/db picks up default.env\'s DB_FILE even without a shell-level DB_FILE set', () => {
+  // Regression test: lib/db.js used to read process.env.DB_FILE before lib/config.js had loaded
+  // default.env (whichever of lib/db.js's requirers happened to require lib/config first), so it
+  // silently always fell back to ':memory:'. Runs in a fresh process with a clean env and cwd, so
+  // require order isn't influenced by whatever this test file (or npm test's own DB_FILE=) has
+  // already loaded, and default.env's `DB_FILE=db.sqlite` lands in a throwaway directory instead
+  // of the real one.
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'db-test-'));
+  try {
+    const env = { ...process.env };
+    delete env.DB_FILE;
+    execFileSync(process.execPath, ['-e', "require('" + path.join(__dirname, '..', 'lib', 'db').replace(/\\/g, '\\\\') + "')"], { cwd, env });
+    assert.ok(fs.existsSync(path.join(cwd, 'db.sqlite')), 'expected default.env\'s DB_FILE=db.sqlite to be honored, not :memory:');
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
 });

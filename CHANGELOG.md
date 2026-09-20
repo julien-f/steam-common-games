@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`db.sqlite`'s cache no longer persisted between restarts.** `lib/db.js`'s extraction (the incremental-migrations refactor) read `DB_FILE` before `lib/config.js` had loaded `default.env`/`.env`, so it always saw `DB_FILE` unset and silently opened an in-memory database instead. `lib/db.js` now loads `./config` itself before reading `DB_FILE`.
+
 ### Changed
 
 - Updated `@babel/core`, `@babel/eslint-parser`, `eslint`, `hls.js` and `morgan` to their latest in-range patch versions, and `dotenv` to 18.0.1 (none of its breaking removals — CLI preloading, `.env.vault` — apply here).
