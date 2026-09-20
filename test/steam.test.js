@@ -9,7 +9,7 @@ process.env.DB_FILE = '';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker, _resetStoreCircuitBreaker, getSemaphoreStats, createSemaphore } = require('../lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getFriendList, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker, _resetStoreCircuitBreaker, getSemaphoreStats, createSemaphore } = require('../lib/steam');
 const { _reset, setCache } = require('../lib/cache');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
@@ -399,6 +399,50 @@ test('getWishlist: returns empty array (does not throw) when response has no ite
 
   const items = await getWishlist('76561198000000004');
   assert.deepEqual(items, []);
+});
+
+// ── getFriendList ─────────────────────────────────────────────────────────────
+
+test('getFriendList: fetches and returns friend steamids', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ friendslist: { friends: [{ steamid: '76561198000000099', relationship: 'friend', friend_since: 0 }] } }),
+  }));
+
+  const friends = await getFriendList('76561198000000001');
+  assert.deepEqual(friends, ['76561198000000099']);
+});
+
+test('getFriendList: caches result — second call skips fetch', async (t) => {
+  _reset();
+  let fetchCount = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    fetchCount++;
+    return { ok: true, json: async () => ({ friendslist: { friends: [] } }) };
+  });
+
+  await getFriendList('76561198000000002');
+  await getFriendList('76561198000000002');
+  assert.equal(fetchCount, 1, 'second call should be served from cache');
+});
+
+test('getFriendList: returns null (does not throw) on 401 — private friends list', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 401 }));
+
+  const friends = await getFriendList('76561198000000003');
+  assert.equal(friends, null);
+});
+
+test('getFriendList: throws with isUpstream when Steam API returns non-ok', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+
+  await assert.rejects(
+    () => getFriendList('76561198000000004'),
+    err => err.isUpstream === true
+  );
 });
 
 // ── getPlayerSummaries ────────────────────────────────────────────────────────

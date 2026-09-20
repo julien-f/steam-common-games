@@ -14,7 +14,7 @@ const rateLimit = require('express-rate-limit');
 const { getCached, getCachedAt, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
 const { getMetrics, recordLimiterTrip } = require('./lib/metrics');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker, getSemaphoreStats } = require('./lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getFriendList, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker, getSemaphoreStats } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 const { getBundles, bundlesCacheKey, findBundleById, resolveSteamAppIds, resolveItadIds, getSteamShopId, getPrices, extractPriceInfo } = require('./lib/itad');
@@ -29,6 +29,7 @@ const SEARCH_RATE_LIMIT_MAX = Number(process.env.SEARCH_RATE_LIMIT_MAX);
 const DETAILS_RATE_LIMIT_MAX = Number(process.env.DETAILS_RATE_LIMIT_MAX);
 const GAME_SEARCH_RATE_LIMIT_MAX = Number(process.env.GAME_SEARCH_RATE_LIMIT_MAX);
 const ACHIEVEMENTS_RATE_LIMIT_MAX = Number(process.env.ACHIEVEMENTS_RATE_LIMIT_MAX);
+const FRIENDS_RATE_LIMIT_MAX = Number(process.env.FRIENDS_RATE_LIMIT_MAX);
 const STREAM_MAX_GAMES = Number(process.env.STREAM_MAX_GAMES);
 const STREAM_CONCURRENCY = Number(process.env.STREAM_CONCURRENCY);
 const BUNDLES_RATE_LIMIT_MAX = Number(process.env.BUNDLES_RATE_LIMIT_MAX);
@@ -205,6 +206,41 @@ const searchLimit = namedRateLimit('search', {
     for (const id of resolvedIds) {
       if (getCached(`player:${id}`) === undefined) return false;
       if (isWishlist ? getCached(`wishlist:${id}`) === undefined : getCached(`games:${id}`) === undefined) return false;
+    }
+    return true;
+  },
+});
+
+// Separate from searchLimit above rather than sharing it — that limiter's skip keys off
+// `members` to mean "wishlist", and /api/friends also sends `members`, so sharing it would
+// check the wrong cache prefix (wishlist: instead of friends:). Same "cache hits don't count"
+// shape otherwise.
+const friendsLimit = namedRateLimit('friends', {
+  windowMs: 60 * 1000,
+  max: FRIENDS_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many friends lookups. Please wait a minute and try again.' },
+  skip: (req) => {
+    if (rateLimitBypassed()) return true;
+    if (req.body?.refresh === true) return false;
+    const refreshIds = req.body?.refreshIds;
+    if (Array.isArray(refreshIds) && refreshIds.length > 0) return false;
+
+    const rawIdentifiers = req.body?.members;
+    if (!Array.isArray(rawIdentifiers) || !rawIdentifiers.every(u => typeof u === 'string' && u.trim().length > 0)) return false;
+
+    const resolvedIds = new Set();
+    for (const raw of rawIdentifiers) {
+      const id = raw.trim();
+      if (STEAM64_RE.test(id)) { resolvedIds.add(id); continue; }
+      const hit = getCached(`resolve:${id}`);
+      if (hit === undefined) return false;
+      resolvedIds.add(hit);
+    }
+
+    for (const id of resolvedIds) {
+      if (getCached(`friends:${id}`) === undefined) return false;
     }
     return true;
   },
@@ -548,6 +584,49 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
     res.json({ items, players, fetchedAt: oldestCachedAt(ids.map(id => `wishlist:${id}`)) });
   } catch (err) {
     const status = routeErrorStatus('wishlist', err);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+// Friends have no "family" concept in Steam either — unions each member's own friends list,
+// same convention as /api/wishlist. A member whose friends list is private is silently
+// excluded from the union (reported separately in `unavailable`) rather than failing the
+// whole request.
+app.post('/api/friends', friendsLimit, async (req, res) => {
+  const members = req.body.members;
+
+  if (
+    !Array.isArray(members) ||
+    members.length < 1 ||
+    !members.every(u => typeof u === 'string' && u.trim().length > 0)
+  ) {
+    return res.status(400).json({ error: 'Provide at least 1 player' });
+  }
+  if (members.length > MAX_USERS) {
+    return res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
+  }
+
+  const refresh = req.body.refresh === true;
+  const refreshIds = new Set(Array.isArray(req.body.refreshIds) ? req.body.refreshIds : []);
+
+  try {
+    const ids = [...new Set(await Promise.all(members.map(resolveSteamId)))];
+    const lists = await Promise.all(ids.map(id => getFriendList(id, { force: refresh || refreshIds.has(id) })));
+
+    const unavailable = ids.filter((id, i) => lists[i] === null);
+    const friendIds = [...new Set(lists.flat().filter(Boolean))];
+
+    const players = friendIds.length > 0 ? await getPlayerSummaries(friendIds) : [];
+    const friends = players.map(p => ({
+      steamid: p.steamid,
+      personaname: p.personaname,
+      avatar: p.avatarfull || p.avatarmedium || p.avatar || null,
+      profileurl: p.profileurl,
+    }));
+
+    res.json({ friends, unavailable, fetchedAt: oldestCachedAt(ids.map(id => `friends:${id}`)) });
+  } catch (err) {
+    const status = routeErrorStatus('friends', err);
     res.status(status).json({ error: err.message });
   }
 });

@@ -38,7 +38,7 @@ Run the test suite with `npm test` (Node's built-in test runner against `test/*.
 - **`lib/cache.js`** — Persistent cache (`getCached`, `setCache`), disk I/O, process exit hooks.
 - **`lib/config.js`** — TTL constants (`LIBRARY_CACHE_TTL_MS`, `RESOLVE_CACHE_TTL_MS`, `RATING_CACHE_TTL_MS`, `META_CACHE_TTL_MS`, `SEARCH_CACHE_TTL_MS`, `BUNDLES_CACHE_TTL_MS`) shared across modules.
 - **`lib/dedup.js`** — In-flight request deduplicator (`createDedup`): concurrent calls for the same key share one promise. Its in-flight map, and `lib/steam.js`'s per-host rate-limiting semaphores (`storeLimit`/`tagLimit`/`protonLimit`), are process-local state — correct for this app's current single-process deployment, but would need rethinking (e.g. a shared store) before ever running multiple instances/workers, since each would get its own independent map/semaphore and silently multiply real upstream request volume rather than erroring.
-- **`lib/steam.js`** — Steam API calls (`resolveSteamId`, `getOwnedGames`, `getWishlist`, `getPlayerSummaries`, `getGameRating`, `getAppDetails`, `getSteamTags`, `getGameDemo`, `searchStoreGames`, `getGameNews`).
+- **`lib/steam.js`** — Steam API calls (`resolveSteamId`, `getOwnedGames`, `getWishlist`, `getFriendList`, `getPlayerSummaries`, `getGameRating`, `getAppDetails`, `getSteamTags`, `getGameDemo`, `searchStoreGames`, `getGameNews`).
 - **`lib/hltb.js`** — HLTB auth + search (`getHLTB`), plus exported `stringSimilarity` and `levenshtein` for unit testing.
 - **`lib/groupGames.js`** — Groups slot libraries by exact ownership set (`groupByOwnership`).
 - **`lib/itad.js`** — IsThereAnyDeal API calls (`getSteamShopId`, `getBundles`, `resolveSteamAppIds`) backing bundle browsing and every price column. See [integrations.md](integrations.md).
@@ -58,6 +58,7 @@ Run the test suite with `npm test` (Node's built-in test runner against `test/*.
 |---|---|
 | `POST /api/common-games` | Resolve identifiers, fetch + union owned libraries per slot, group by owner set |
 | `POST /api/wishlist` | One account's (or Family's) wishlist |
+| `POST /api/friends` | One account's (or Family's) union of friends, cross-referenceable against another account's own friends client-side |
 | `GET /api/game-details/:appid` | Rating, HLTB, store metadata, tags, ProtonDB for one game |
 | `POST /api/game-details/stream` | The same, for a list of appids, streamed over SSE |
 | `GET /api/game-news/:appid` | That game's own Steam announcements |

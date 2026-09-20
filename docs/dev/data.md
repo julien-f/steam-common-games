@@ -17,7 +17,7 @@ Version 9 replaced `users`' original single `prefs` JSON blob with `user_prefs` 
 | `resolve:` | `RESOLVE_CACHE_TTL_MINUTES` | 180 days | Steam ID resolution — essentially permanent. Not unbounded: a custom URL can be renamed and re-claimed by someone else, and no refresh path forces this tier |
 | `rating:` | `RATING_CACHE_TTL_MINUTES` | 90 days | Steam review scores — drifts slowly |
 | `hltb:`, `meta:`, `browse:`, `tagnames:` | `META_CACHE_TTL_MINUTES` | 180 days | Store metadata, HLTB, tags, demo link — rarely changes for an existing game |
-| `games:`, `player:`, `wishlist:` | `LIBRARY_CACHE_TTL_MINUTES` | 7 days | Changes when users buy games / edit their wishlist — the UI states how old this data is ("Updated <when>", from `getCachedAt` via each route's `fetchedAt`) and offers the ↻ that forces it, so the TTL doesn't have to carry that job |
+| `games:`, `player:`, `wishlist:`, `friends:` | `LIBRARY_CACHE_TTL_MINUTES` | 7 days | Changes when users buy games / edit their wishlist / add friends — the UI states how old this data is ("Updated <when>", from `getCachedAt` via each route's `fetchedAt`) and offers the ↻ that forces it, so the TTL doesn't have to carry that job |
 | `search:` | `SEARCH_CACHE_TTL_MINUTES` | 7 days | Game name → appid search results — the shortest metadata tier, since new games ship regularly |
 | `news:` | `NEWS_CACHE_TTL_MINUTES` | 1 day | Recent news/announcements for a game — changes far more often than store metadata (patch notes, event posts) |
 | `itad-bundles:`, `itad-price:` | `BUNDLES_CACHE_TTL_MINUTES` | 4 hours | IsThereAnyDeal bundle listings and per-region price lookups — the time-sensitive half (a bundle goes live/expires; a sale starts/ends), both refreshable on demand from the UI |

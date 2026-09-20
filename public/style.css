@@ -2535,6 +2535,29 @@ kbd {
 .account-members { list-style: none; margin: -8px 0 16px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .account-members li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
+/* The currently-explored account's friends (AccountFriends.tsx) — same row shape as
+   .account-members above, since both are "one Steam account per row". A <details> rather than
+   always-open: a Family/public profile can easily have 100+ friends, which otherwise dwarfs the
+   rest of the account card — collapsed by default, the count in the summary still says how many
+   without opening it. */
+.account-friends { margin-bottom: 16px; }
+.account-friends summary {
+  cursor: pointer;
+  font-size: 12px; font-weight: 600; color: var(--text1);
+  text-transform: uppercase; letter-spacing: 0.6px;
+  margin: 14px 0 8px;
+}
+.account-friends[open] summary { margin-bottom: 8px; }
+.account-friends-note { font-size: 12px; color: var(--text1); margin: 0 0 8px; }
+.account-friends-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+.account-friends-list li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.account-friends-list li .btn { margin-left: auto; }
+.account-friend-mutual {
+  font-size: 11px; font-weight: 500;
+  padding: 2px 7px; border-radius: 999px;
+  background: rgba(102,192,244,0.1); border: 1px solid rgba(102,192,244,0.3); color: var(--accent2);
+}
+
 .home-account form {
   display: flex;
   flex-wrap: wrap;

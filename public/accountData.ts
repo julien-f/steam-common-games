@@ -199,6 +199,50 @@ export async function fetchAccountOwnedData(accountId: string): Promise<{ appids
   return { appids: new Set(games.map(g => g.appid)), owners };
 }
 
+export interface AccountFriend {
+  steamid: string;
+  name: string;
+  avatarUrl: string;
+  profileUrl: string;
+}
+
+// The shape of /api/friends' success response, as read below.
+interface FriendsResponse {
+  friends: { steamid: string; personaname?: string; avatar?: string | null; profileurl?: string }[];
+  unavailable: string[]; // member steamids whose friends list is private — excluded from `friends`, not "no friends"
+  fetchedAt: number | null;
+}
+
+export interface AccountFriends {
+  friends: AccountFriend[];
+  unavailable: string[];
+  fetchedAt: number | null;
+}
+
+// Fetches one account's friends (its members' own friends lists unioned, same convention
+// fetchAccountWishlist uses). A member whose friends list is private shows up in `unavailable`
+// rather than being silently indistinguishable from "no friends" — see docs/dev/integrations.md's
+// Friends section.
+export async function fetchAccountFriends(members: string[], { refresh = false }: { refresh?: boolean } = {}): Promise<AccountFriends> {
+  const res = await fetch('/api/friends', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ members, refresh }),
+  });
+  const data: FriendsResponse & { error?: string } = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch friends');
+  return {
+    friends: data.friends.map(f => ({
+      steamid: f.steamid,
+      name: f.personaname || f.steamid,
+      avatarUrl: f.avatar || '',
+      profileUrl: f.profileurl || '',
+    })),
+    unavailable: data.unavailable,
+    fetchedAt: data.fetchedAt ?? null,
+  };
+}
+
 export interface ResolvedAccountSummary {
   members: string[];        // resolved steam64 ids, sorted — becomes AccountSlot.members
   label: string;            // joined persona name(s) ("PersonaName" or "A + B" for a Family)

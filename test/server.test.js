@@ -429,6 +429,95 @@ test('POST /api/wishlist: 502 when Steam API returns a server error', async (t) 
   assert.equal(res.status, 502);
 });
 
+// ── POST /api/friends — input validation ──────────────────────────────────────
+
+test('POST /api/friends: 400 when body has no members field', async () => {
+  const res = await api.post('/api/friends').send({});
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/friends: 400 when members is an empty array', async () => {
+  const res = await api.post('/api/friends').send({ members: [] });
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/friends: 400 when a member value is an empty string', async () => {
+  const res = await api.post('/api/friends').send({ members: [''] });
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/friends: 400 when members exceeds MAX_USERS', async () => {
+  // Default MAX_USERS is 10.
+  const members = Array.from({ length: 11 }, (_, i) => `7656119800000000${i}`);
+  const res = await api.post('/api/friends').send({ members });
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /Too many users/);
+});
+
+// ── POST /api/friends — happy path ────────────────────────────────────────────
+
+const FRIEND1 = '76561198000000099';
+
+function makeFriendsFetch(friendIds1 = [], friendIds2 = []) {
+  return async (url) => {
+    if (url.includes('GetFriendList') && url.includes(ID1)) {
+      return { ok: true, json: async () => ({ friendslist: { friends: friendIds1.map(id => ({ steamid: id, relationship: 'friend', friend_since: 0 })) } }) };
+    }
+    if (url.includes('GetFriendList') && url.includes(ID2)) {
+      return { ok: true, json: async () => ({ friendslist: { friends: friendIds2.map(id => ({ steamid: id, relationship: 'friend', friend_since: 0 })) } }) };
+    }
+    if (url.includes('GetPlayerSummaries')) {
+      const ids = url.split('steamids=')[1].split(',');
+      const players = ids.map(id => ({ steamid: id, personaname: id, profileurl: '', avatarfull: '' }));
+      return { ok: true, json: async () => ({ response: { players } }) };
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+}
+
+test('POST /api/friends: 200 with friends for a single account', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeFriendsFetch([FRIEND1]));
+
+  const res = await api.post('/api/friends').send({ members: [ID1] });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.friends.length, 1);
+  assert.equal(res.body.friends[0].steamid, FRIEND1);
+  assert.deepEqual(res.body.unavailable, []);
+});
+
+test('POST /api/friends: unions two accounts, dedupes a shared friend', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeFriendsFetch([FRIEND1], [FRIEND1, '76561198000000098']));
+
+  const res = await api.post('/api/friends').send({ members: [ID1, ID2] });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.friends.length, 2);
+});
+
+test('POST /api/friends: reports a private friends list as unavailable rather than empty', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('GetFriendList') && url.includes(ID1)) return { ok: false, status: 401 };
+    if (url.includes('GetFriendList') && url.includes(ID2)) return { ok: true, json: async () => ({ friendslist: { friends: [{ steamid: FRIEND1 }] } }) };
+    if (url.includes('GetPlayerSummaries')) return { ok: true, json: async () => ({ response: { players: [{ steamid: FRIEND1, personaname: FRIEND1, profileurl: '' }] } }) };
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  const res = await api.post('/api/friends').send({ members: [ID1, ID2] });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.unavailable, [ID1]);
+  assert.equal(res.body.friends.length, 1);
+});
+
+test('POST /api/friends: 502 when Steam API returns a server error', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+
+  const res = await api.post('/api/friends').send({ members: [ID1] });
+  assert.equal(res.status, 502);
+});
+
 // ── GET /api/game-details/:appid — input validation ──────────────────────────
 
 test('GET /api/game-details/abc: 400 for non-numeric appid', async () => {

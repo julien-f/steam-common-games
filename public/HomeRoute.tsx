@@ -26,6 +26,7 @@ import { resolveAccountSummary, fetchAccountOverview, fetchAccountWishlistItems 
 import type { AccountPlayer } from './accountData.ts';
 import { normalizeInput, steamVanity, fmtAge } from './utils.ts';
 import { CopyButton } from './CopyButton.tsx';
+import { AccountFriends } from './AccountFriends.tsx';
 import {
   getFolders, getLists, createFolder, createList, renameFolder, renameList,
   deleteFolder, deleteList,
@@ -487,6 +488,10 @@ export default function HomeRoute() {
               )}
             </For>
           </ul>
+        </Show>
+
+        <Show when={currentAccount()}>
+          {account => <AccountFriends accountId={account().id} myAccountId={myAccount()?.id ?? null} onExplore={pickAccount} />}
         </Show>
 
         <form onSubmit={e => { e.preventDefault(); resolveAndSetCurrent(); }}>

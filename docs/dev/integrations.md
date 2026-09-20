@@ -6,6 +6,7 @@ Every upstream this app talks to, and what is undocumented about each. Cache tie
 
 - [HLTB — no npm package](#hltb--no-npm-package)
 - [Wishlist — undocumented endpoint](#wishlist--undocumented-endpoint)
+- [Friends — documented, keyed endpoint](#friends--documented-keyed-endpoint)
 - [Tags & demo link — Steam's own store browse data, not SteamSpy](#tags--demo-link--steams-own-store-browse-data-not-steamspy)
 - [Looking up an arbitrary game](#looking-up-an-arbitrary-game)
 - [IsThereAnyDeal](#isthereanydeal)
@@ -33,6 +34,10 @@ If HLTB breaks again, recent npm packages (e.g. `howlongtobeat-ts`) tend to reve
 ## Wishlist — undocumented endpoint
 
 `getWishlist` calls `https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid={id}`, which is not listed in Valve's published Web API docs (same unofficial-endpoint situation as HLTB above, though no spoofed headers are needed here — it works with a plain request). A private wishlist, a private profile, and a genuinely empty wishlist are all indistinguishable: each returns `200 OK` with `{"response":{}}` (no `items` key). The app treats a missing `items` key as an empty wishlist rather than surfacing an error, since there's no way to tell those cases apart.
+
+## Friends — documented, keyed endpoint
+
+`getFriendList` calls `https://api.steampowered.com/ISteamUser/GetFriendList/v1/?key={key}&steamid={id}` — a published, key-gated endpoint (the good trust tier from this doc's intro, unlike the wishlist/tags/search endpoints above). It returns only `steamid`s; names/avatars are resolved separately through the same batched `GetPlayerSummaries` call every other player-profile lookup here already uses. A private friends list gets a `401` (not a `200` with an empty list), so — unlike the wishlist's private/empty ambiguity — it's distinguishable: `getFriendList` caches that case as `null` rather than `[]`, and `POST /api/friends` reports those steamids separately as `unavailable` instead of silently treating them as "no friends".
 
 ## Tags & demo link — Steam's own store browse data, not SteamSpy
 
