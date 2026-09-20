@@ -21,7 +21,6 @@ import { syncAccountOverrideFromUrl } from './accountOverride.ts';
 import type { Game } from './types.ts';
 import { ShortcutsModal } from './ShortcutsModal.tsx';
 import { AccountChip } from './AccountChip.tsx';
-import { DataChoiceModal } from './DataChoiceModal.tsx';
 import { initAuth } from './authStore.ts';
 import { bindNavPopover } from './navPopover.ts';
 
@@ -278,7 +277,6 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
         <button class="app-to-top" title="Back to top" aria-label="Back to top" onClick={() => scrollPageToTop('smooth')}>↑</button>
       </Show>
       <ShortcutsModal open={shortcutsOpen()} onClose={() => setShortcutsOpen(false)} />
-      <DataChoiceModal />
     </div>
   );
 }

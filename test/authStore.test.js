@@ -26,6 +26,9 @@ beforeEach(() => {
   delete require.cache[require.resolve('../public/accountData.ts')];
   delete require.cache[require.resolve('../public/authStore.ts')];
   require('../public/accountsStore.ts').setAccountOverride(null);
+  // require.cache deletion above doesn't reach signedInSteamid (a module-level `let`) — see
+  // _resetSignedInSteamid's own comment in prefs.ts.
+  require('../public/prefs.ts')._resetSignedInSteamid();
 });
 
 function auth() {
@@ -33,6 +36,9 @@ function auth() {
 }
 function accounts() {
   return require('../public/accountsStore.ts');
+}
+function prefs() {
+  return require('../public/prefs.ts');
 }
 
 function makeAccount(id) {
@@ -56,6 +62,99 @@ function mockResolveFetch(steamid = '76561198000000201') {
     return { ok: true, json: async () => ({ items: [] }) };
   };
 }
+
+// ── syncPrefsWithServer ───────────────────────────────────────────────────────
+
+const STEAMID = '76561198000000301';
+
+// Matches authStore.ts's own SYNCED_FLAG_PREFIX format — sets up the "this device has already
+// synced with this account before" state so a test can exercise ongoing (not first-sync) merges.
+function markAlreadySynced(steamid = STEAMID) {
+  global.localStorage.setItem(`steam.isonoe.net:prefs-synced:${steamid}`, '1');
+}
+
+// -- first sync (never synced with this account on this browser before) --
+
+test('syncPrefsWithServer (first sync): a local-only key is pushed to the server, nothing adopted', async (t) => {
+  prefs().setPref('region', 'DE');
+  let sent;
+  withFetch(t, async (url, opts) => { sent = { url, body: JSON.parse(opts.body) }; return { ok: true, json: async () => ({ ok: true }) }; });
+
+  const adopted = await auth().syncPrefsWithServer(STEAMID, {});
+
+  assert.equal(adopted, false);
+  assert.equal(sent.url, '/api/me/prefs/region');
+  assert.equal(sent.body.value, 'DE');
+});
+
+test('syncPrefsWithServer (first sync): a server-only key is adopted locally', async (t) => {
+  withFetch(t, async () => { throw new Error('should not push anything'); });
+
+  const adopted = await auth().syncPrefsWithServer(STEAMID, { region: { value: 'GB', updatedAt: 500 } });
+
+  assert.equal(adopted, true);
+  assert.deepEqual(prefs().getAllPrefEntries().region, { value: 'GB', updatedAt: 500 });
+});
+
+test('syncPrefsWithServer (first sync): server always wins a key both sides have, even if local is newer', async (t) => {
+  prefs().setPref('region', 'DE'); // updatedAt = Date.now(), well after 500 — must not matter here
+  let pushed = false;
+  withFetch(t, async () => { pushed = true; return { ok: true, json: async () => ({ ok: true }) }; });
+
+  const adopted = await auth().syncPrefsWithServer(STEAMID, { region: { value: 'GB', updatedAt: 500 } });
+
+  assert.equal(adopted, true, 'server\'s value must be adopted, not the newer-but-untrusted local one');
+  assert.equal(pushed, false, 'local must never push over an existing server key on first sync');
+  assert.equal(prefs().getPref('region'), 'GB');
+});
+
+test('syncPrefsWithServer (first sync): marks this device as synced, so a later call uses ongoing rules', async (t) => {
+  withFetch(t, async () => ({ ok: true, json: async () => ({ ok: true }) }));
+  await auth().syncPrefsWithServer(STEAMID, {});
+  assert.equal(global.localStorage.getItem(`steam.isonoe.net:prefs-synced:${STEAMID}`), '1');
+});
+
+// -- ongoing sync (this device has already synced with this account before) --
+
+test('syncPrefsWithServer (ongoing): local newer than server for the same key pushes, does not adopt', async (t) => {
+  markAlreadySynced();
+  prefs().setPref('region', 'DE'); // updatedAt = Date.now(), well after 500
+  let pushed = false;
+  withFetch(t, async () => { pushed = true; return { ok: true, json: async () => ({ ok: true }) }; });
+
+  const adopted = await auth().syncPrefsWithServer(STEAMID, { region: { value: 'GB', updatedAt: 500 } });
+
+  assert.equal(adopted, false);
+  assert.equal(pushed, true);
+  assert.equal(prefs().getPref('region'), 'DE');
+});
+
+test('syncPrefsWithServer (ongoing): server newer than local for the same key adopts, does not push', async (t) => {
+  markAlreadySynced();
+  const entries = { schemaVersion: 2, region: { value: 'DE', updatedAt: 500 } };
+  global.localStorage.setItem('steam.isonoe.net:prefs', JSON.stringify(entries));
+  let pushed = false;
+  withFetch(t, async () => { pushed = true; return { ok: true, json: async () => ({ ok: true }) }; });
+
+  const adopted = await auth().syncPrefsWithServer(STEAMID, { region: { value: 'GB', updatedAt: 999999999999 } });
+
+  assert.equal(adopted, true);
+  assert.equal(pushed, false);
+  assert.equal(prefs().getPref('region'), 'GB');
+});
+
+test('syncPrefsWithServer (ongoing): equal timestamps on both sides are left alone', async (t) => {
+  markAlreadySynced();
+  const entries = { schemaVersion: 2, region: { value: 'DE', updatedAt: 500 } };
+  global.localStorage.setItem('steam.isonoe.net:prefs', JSON.stringify(entries));
+  let called = false;
+  withFetch(t, async () => { called = true; return { ok: true, json: async () => ({ ok: true }) }; });
+
+  const adopted = await auth().syncPrefsWithServer(STEAMID, { region: { value: 'DE', updatedAt: 500 } });
+
+  assert.equal(adopted, false);
+  assert.equal(called, false);
+});
 
 // ── autoPopulateAccountFromLogin ─────────────────────────────────────────────
 

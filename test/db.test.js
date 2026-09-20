@@ -48,3 +48,32 @@ test('migrate: a failed migration rolls back and leaves user_version unchanged',
   const { user_version } = db.prepare('PRAGMA user_version').get();
   assert.equal(user_version, 1);
 });
+
+test('migrate: version 9 splits an existing users.prefs blob into one user_prefs row per key', () => {
+  const db = new DatabaseSync(':memory:');
+  migrate(db, MIGRATIONS.filter(m => m.version <= 8));
+  db.exec(`
+    INSERT INTO users (steamid, prefs, created_at, updated_at)
+    VALUES ('1', '${JSON.stringify({ region: 'DE', myAccount: { id: '1' } })}', 1000, 5000)
+  `);
+
+  migrate(db, MIGRATIONS);
+
+  // node:sqlite rows are null-prototype objects — spread into plain ones so deepEqual doesn't
+  // trip over the prototype difference.
+  const rows = db.prepare('SELECT key, value, updated_at FROM user_prefs WHERE steamid = ? ORDER BY key').all('1').map(r => ({ ...r }));
+  assert.deepEqual(rows, [
+    { key: 'myAccount', value: JSON.stringify({ id: '1' }), updated_at: 5000 },
+    { key: 'region', value: JSON.stringify('DE'), updated_at: 5000 },
+  ]);
+});
+
+test('migrate: version 9 tolerates a user with no prefs at all', () => {
+  const db = new DatabaseSync(':memory:');
+  migrate(db, MIGRATIONS.filter(m => m.version <= 8));
+  db.exec("INSERT INTO users (steamid, created_at, updated_at) VALUES ('1', 1000, 1000)");
+
+  assert.doesNotThrow(() => migrate(db, MIGRATIONS));
+  const rows = db.prepare('SELECT * FROM user_prefs WHERE steamid = ?').all('1');
+  assert.deepEqual(rows, []);
+});

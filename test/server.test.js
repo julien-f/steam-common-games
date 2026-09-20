@@ -1547,28 +1547,48 @@ test('GET /api/me: 200 with a null steamid/prefs when not signed in — checking
   assert.deepEqual(res.body, { steamid: null, prefs: null });
 });
 
-test('PUT /api/me/prefs/:key: saves one key, visible from a later GET /api/me', async (t) => {
+test('PUT /api/me/prefs/:key: saves one key with its updatedAt, visible from a later GET /api/me', async (t) => {
   const agent = await loginAs(t, '76561198000000203');
-  await agent.put('/api/me/prefs/myAccount').send({ value: { id: '76561198000000203' } }).expect(200);
+  await agent.put('/api/me/prefs/myAccount').send({ value: { id: '76561198000000203' }, updatedAt: 1000 }).expect(200);
   const res = await agent.get('/api/me').expect(200);
-  assert.deepEqual(res.body.prefs, { myAccount: { id: '76561198000000203' } });
+  assert.deepEqual(res.body.prefs, { myAccount: { value: { id: '76561198000000203' }, updatedAt: 1000 } });
 });
 
 test('PUT /api/me/prefs/:key: merges into existing prefs, leaving other keys untouched', async (t) => {
   const agent = await loginAs(t, '76561198000000206');
-  await agent.put('/api/me/prefs/a').send({ value: 1 }).expect(200);
-  await agent.put('/api/me/prefs/b').send({ value: 2 }).expect(200);
+  await agent.put('/api/me/prefs/a').send({ value: 1, updatedAt: 1000 }).expect(200);
+  await agent.put('/api/me/prefs/b').send({ value: 2, updatedAt: 1000 }).expect(200);
   const res = await agent.get('/api/me').expect(200);
-  assert.deepEqual(res.body.prefs, { a: 1, b: 2 });
+  assert.deepEqual(res.body.prefs, { a: { value: 1, updatedAt: 1000 }, b: { value: 2, updatedAt: 1000 } });
 });
 
-test('PUT /api/me/prefs/:key: 400 when the body has no value field', async (t) => {
+test('PUT /api/me/prefs/:key: a newer write wins, and reports applied: true', async (t) => {
+  const agent = await loginAs(t, '76561198000000207');
+  await agent.put('/api/me/prefs/a').send({ value: 'old', updatedAt: 1000 }).expect(200);
+  const res = await agent.put('/api/me/prefs/a').send({ value: 'new', updatedAt: 2000 }).expect(200);
+  assert.equal(res.body.applied, true);
+  const me = await agent.get('/api/me').expect(200);
+  assert.deepEqual(me.body.prefs.a, { value: 'new', updatedAt: 2000 });
+});
+
+test('PUT /api/me/prefs/:key: a stale write is rejected and reports applied: false, without clobbering', async (t) => {
+  const agent = await loginAs(t, '76561198000000208');
+  await agent.put('/api/me/prefs/a').send({ value: 'new', updatedAt: 2000 }).expect(200);
+  const res = await agent.put('/api/me/prefs/a').send({ value: 'stale', updatedAt: 1000 }).expect(200);
+  assert.equal(res.body.applied, false);
+  const me = await agent.get('/api/me').expect(200);
+  assert.deepEqual(me.body.prefs.a, { value: 'new', updatedAt: 2000 });
+});
+
+test('PUT /api/me/prefs/:key: 400 when the body has no value field or a non-numeric updatedAt', async (t) => {
   const agent = await loginAs(t, '76561198000000204');
-  await agent.put('/api/me/prefs/a').send({ notValue: 1 }).expect(400);
+  await agent.put('/api/me/prefs/a').send({ notValue: 1, updatedAt: 1000 }).expect(400);
+  await agent.put('/api/me/prefs/a').send({ value: 1, updatedAt: 'not-a-number' }).expect(400);
+  await agent.put('/api/me/prefs/a').send({ value: 1 }).expect(400);
 });
 
 test('PUT /api/me/prefs/:key: 401 when not signed in', async () => {
-  await api.put('/api/me/prefs/a').send({ value: 1 }).expect(401);
+  await api.put('/api/me/prefs/a').send({ value: 1, updatedAt: 1000 }).expect(401);
 });
 
 test('POST /auth/logout: session stops working afterwards', async (t) => {

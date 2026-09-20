@@ -116,28 +116,52 @@ test('destroySession: the session stops resolving to a user afterwards', () => {
   assert.equal(getSessionUser(sessionId), undefined);
 });
 
-test('setUserPref: sets one key, visible through a fresh session lookup for the same user', () => {
+test('setUserPref: sets one key with its updatedAt, visible through a fresh session lookup', () => {
   const steamid = '76561198000000103';
+  const t1 = 1000;
   upsertUser(steamid);
-  setUserPref(steamid, 'myAccount', { id: steamid });
+  setUserPref(steamid, 'myAccount', { id: steamid }, t1);
   const sessionId = createSession(steamid);
-  assert.deepEqual(getSessionUser(sessionId).prefs, { myAccount: { id: steamid } });
+  assert.deepEqual(getSessionUser(sessionId).prefs, { myAccount: { value: { id: steamid }, updatedAt: t1 } });
 });
 
-test('setUserPref: merges into existing prefs rather than replacing the whole blob', () => {
+test('setUserPref: merges into existing prefs rather than replacing the whole set', () => {
   const steamid = '76561198000000106';
   upsertUser(steamid);
-  setUserPref(steamid, 'a', 1);
-  setUserPref(steamid, 'b', 2);
+  setUserPref(steamid, 'a', 1, 1000);
+  setUserPref(steamid, 'b', 2, 1000);
   const sessionId = createSession(steamid);
-  assert.deepEqual(getSessionUser(sessionId).prefs, { a: 1, b: 2 });
+  assert.deepEqual(getSessionUser(sessionId).prefs, {
+    a: { value: 1, updatedAt: 1000 },
+    b: { value: 2, updatedAt: 1000 },
+  });
+});
+
+test('setUserPref: a newer write replaces an older one for the same key', () => {
+  const steamid = '76561198000000107';
+  upsertUser(steamid);
+  setUserPref(steamid, 'a', 'old', 1000);
+  const applied = setUserPref(steamid, 'a', 'new', 2000);
+  assert.equal(applied, true);
+  const sessionId = createSession(steamid);
+  assert.deepEqual(getSessionUser(sessionId).prefs.a, { value: 'new', updatedAt: 2000 });
+});
+
+test('setUserPref: an older write is rejected and leaves the newer value in place', () => {
+  const steamid = '76561198000000108';
+  upsertUser(steamid);
+  setUserPref(steamid, 'a', 'new', 2000);
+  const applied = setUserPref(steamid, 'a', 'stale', 1000);
+  assert.equal(applied, false);
+  const sessionId = createSession(steamid);
+  assert.deepEqual(getSessionUser(sessionId).prefs.a, { value: 'new', updatedAt: 2000 });
 });
 
 test('upsertUser: logging in again does not reset that user\'s prefs', () => {
   const steamid = '76561198000000104';
   upsertUser(steamid);
-  setUserPref(steamid, 'keep', 'me');
+  setUserPref(steamid, 'keep', 'me', 1000);
   upsertUser(steamid);
   const sessionId = createSession(steamid);
-  assert.deepEqual(getSessionUser(sessionId).prefs, { keep: 'me' });
+  assert.deepEqual(getSessionUser(sessionId).prefs.keep, { value: 'me', updatedAt: 1000 });
 });

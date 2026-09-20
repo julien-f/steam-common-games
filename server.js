@@ -1047,10 +1047,15 @@ app.get('/api/me', (req, res) => {
 
 // One key per request, never a whole-blob PUT — matches prefs.ts's own per-key setPref, so
 // two keys changing around the same time (different tabs/devices) can't clobber each other.
+// `updatedAt` (the device's own clock, not this server's receipt time) is what lets setUserPref
+// apply last-write-wins against whatever's already stored — see its own comment.
 app.put('/api/me/prefs/:key', authLimit, requireAuth, (req, res) => {
-  if (!('value' in (req.body || {}))) return res.status(400).json({ error: 'body must be { value }' });
-  setUserPref(req.user.steamid, req.params.key, req.body.value);
-  res.json({ ok: true });
+  const { value, updatedAt } = req.body || {};
+  if (!('value' in (req.body || {})) || typeof updatedAt !== 'number') {
+    return res.status(400).json({ error: 'body must be { value, updatedAt }' });
+  }
+  const applied = setUserPref(req.user.steamid, req.params.key, value, updatedAt);
+  res.json({ ok: true, applied });
 });
 
 // SPA fallback: any GET that isn't an /api/* call and doesn't look like a static-asset request
