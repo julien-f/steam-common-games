@@ -34,6 +34,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Switching Home's current account again before the previous account's data finished loading could leave the account card showing a mix of the new account's identity with the old account's owned/wishlist counts and profile trivia (member-since, country, real name).** `loadAccountData`'s fetches had no guard against resolving out of order — confirmed live via a delayed-response repro. Each setter now checks `accountsStore.ts`'s `getEffectiveCurrentAccount()` before applying its result, discarding a response that arrives after the account has already changed again.
+
 - **The lightbox could briefly flash the wrong image when stepping through shots/games faster than they loaded.** Its shared `<img>` preloads each shot's full-res image in a detached `Image()` and swaps it in on `onload`, but nothing stopped a slow-to-load shot from several steps back overwriting the one you'd already navigated to once its own load finally finished. A token bumped on every render, checked before the `onload`/`onerror` callbacks touch the DOM, now discards loads that finished after the viewer moved on.
 
 - **"See all recently looked up →" in the nav-bar search now actually opens Recently Looked Up.** The click handler cleared `showingRecents` via `hideResults()` before checking it, so the recents branch never ran and every "more" row click — including this one — fell through to the "see all results" path with whatever stale search term was last typed.

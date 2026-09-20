@@ -119,15 +119,26 @@ export default function HomeRoute() {
     setPlayers([]);
     if (refresh) { setRefreshing(true); setFetchedAt(null); }
     const members = account.members;
+    // Guards every setter below: switching accounts again before this fetch settles (e.g.
+    // adopting a `?u=` override right after landing on it, which fires this same effect for
+    // the previous account first) must not let the *older* response — which can resolve later
+    // — clobber state that already moved on to a different account. Confirmed live: without
+    // this, the header briefly showed one account's owned/wishlist counts alongside a stale
+    // solePlayer() (memberSince/countryCode/realName) from whichever account was current a
+    // moment earlier. Reads accountsStore.ts's own plain `getEffectiveCurrentAccount()`, not the
+    // local `currentAccount` signal — this runs inside async callbacks, well outside any tracked
+    // scope, so a signal read here wouldn't ever see a later update anyway (and would trip
+    // `solid/reactivity`); the plain module accessor always reflects the live value on demand.
+    const isStale = (): boolean => getEffectiveCurrentAccount()?.id !== account.id;
     const owned = fetchAccountOverview(members, { refresh }).then(
-      ({ games, players: ps, fetchedAt: at }) => { setCounts(c => ({ ...c, owned: games.length })); setPlayers(ps); setFetchedAt(at); },
-      () => setCounts(c => ({ ...c, owned: 0 })),
+      ({ games, players: ps, fetchedAt: at }) => { if (isStale()) return; setCounts(c => ({ ...c, owned: games.length })); setPlayers(ps); setFetchedAt(at); },
+      () => { if (!isStale()) setCounts(c => ({ ...c, owned: 0 })); },
     );
     const wishlist = fetchAccountWishlistItems(members, { refresh }).then(
-      items => setCounts(c => ({ ...c, wishlist: items.length })),
-      () => setCounts(c => ({ ...c, wishlist: 0 })),
+      items => { if (!isStale()) setCounts(c => ({ ...c, wishlist: items.length })); },
+      () => { if (!isStale()) setCounts(c => ({ ...c, wishlist: 0 })); },
     );
-    void Promise.allSettled([owned, wishlist]).then(() => setRefreshing(false));
+    void Promise.allSettled([owned, wishlist]).then(() => { if (!isStale()) setRefreshing(false); });
   }
 
   createEffect(() => {
