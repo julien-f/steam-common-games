@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Tag/genre/category/developer/publisher pills in the panel's "Tags & details" section are now clickable**, toggling that value in the game table's own filter (add on click, remove on re-click) instead of just being plain text.
+
 - **"Member since <date>", a country flag, and a real name (when set) on Home's Account card**, for a solo account and each member of a Steam Family — from fields Steam's `GetPlayerSummaries` already returned on every account fetch (`timecreated`/`loccountrycode`/`realname`), just not previously mapped through `toAccountPlayer` (`accountData.ts`). Absent (not shown) for a private profile, or when the field itself is unset — same as Steam itself doesn't return it in either case.
 
 - **That same trivia now also shows on Recent accounts.** Cached onto `AccountSlot` at resolve time (`memberSince`/`countryCode`/`realName`, see `docs/dev/lists-and-accounts.md`), same as `label`/`avatarUrl` already do — no extra fetch to show it there, but it's last-known and only refreshes the next time that account is picked.

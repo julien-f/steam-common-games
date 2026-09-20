@@ -647,6 +647,19 @@ export default function ListRoute() {
     return true;
   }
 
+  // Panel tag/genre/category/developer/publisher pills (panel.tsx's TagCloud) — click adds that
+  // value to the table's own include filter for the matching column, re-clicking removes it.
+  // `setValues` rather than `cycleValue` so a pill click only ever adds/removes from the include
+  // set and never reaches the table filter dropdown's separate exclude state.
+  function onTagClick(dim: string, value: string): void {
+    const t = activeTable();
+    if (!t) return;
+    t.filter.setValues(dim, [value], !t.filter.include()[dim]?.has(value));
+  }
+  function isTagActive(dim: string, value: string): boolean {
+    return activeTable()?.filter.include()[dim]?.has(value) ?? false;
+  }
+
   // Opens `appid` as a standalone panel docked to *this* route, without adding it to the route's
   // own table — used when a game looked up from here (nav search, a DLC/base-game link inside
   // the open panel) isn't one of this list's own rows. Ported from GameRoute.tsx's own
@@ -1739,7 +1752,7 @@ export default function ListRoute() {
   );
 
   onMount(() => {
-    const unregister = registerRouteHandlers({ pickRandom: pickRandomGame, stepGame, gamePosition, openGame: handleOpenGameRequest, onGameClose: handleGameClose, refreshGame });
+    const unregister = registerRouteHandlers({ pickRandom: pickRandomGame, stepGame, gamePosition, openGame: handleOpenGameRequest, onGameClose: handleGameClose, refreshGame, onTagClick, isTagActive });
     onCleanup(unregister);
 
     // The region preference lives in the nav bar's ⚙ popover, which knows nothing about who's

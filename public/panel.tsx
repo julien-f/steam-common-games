@@ -653,9 +653,12 @@ function TagCloud(props: { groups: { kind: TagKind; dim: string | null; items?: 
           {({ kind, dim, v }) => {
             const dot = <span class="panel-tag-dot" style={{ background: TAG_KIND_META[kind].color }} />;
             if (dim) {
-              const active = panelOptions.isTagActive?.(dim, v);
               return (
-                <button class={`panel-tag panel-tag-btn${active ? ' active' : ''}`} onClick={() => panelOptions.onTagClick?.(dim, v)}>
+                <button
+                  class="panel-tag panel-tag-btn"
+                  classList={{ active: !!panelOptions.isTagActive?.(dim, v) }}
+                  onClick={() => panelOptions.onTagClick?.(dim, v)}
+                >
                   {dot}{v}
                 </button>
               );

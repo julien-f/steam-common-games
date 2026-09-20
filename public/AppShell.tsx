@@ -57,6 +57,8 @@ interface RouteHandlers {
   openGame?: (appid: number) => boolean;
   onGameClose?: () => void;
   refreshGame?: (game: Game) => Promise<void>;
+  onTagClick?: (dim: string, value: string) => void;
+  isTagActive?: (dim: string, value: string) => boolean;
 }
 let routeHandlers: RouteHandlers = {};
 export function registerRouteHandlers(handlers: RouteHandlers): () => void {
@@ -184,6 +186,9 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       // Only ListRoute registers it — which covers every case, since a game panel only ever opens
       // there (`openGameGlobally` navigates to /game/:appid, which *is* ListRoute).
       onRefresh: game => routeHandlers.refreshGame?.(game),
+      enableTagFilters: true,
+      onTagClick: (dim, value) => routeHandlers.onTagClick?.(dim, value),
+      isTagActive: (dim, value) => routeHandlers.isTagActive?.(dim, value) ?? false,
     });
     initGameSearch({
       inputEl: searchInputEl,
