@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - `db.sqlite`'s schema now upgrades through incremental migrations (`lib/db.js`) instead of dropping and recreating every table on a version bump — a live database's data, cache rows included, survives a schema change.
 
+### Removed
+
+- `urlState.ts`'s unused `FILTER_DIMS`/`UrlState.filters`/`UrlState.nameFilter` — no reader or writer anywhere in the app.
+
 ### Added
 
 - **"Member since <date>", a country flag, and a real name (when set) on Home's Account card**, for a solo account and each member of a Steam Family — from fields Steam's `GetPlayerSummaries` already returned on every account fetch (`timecreated`/`loccountrycode`/`realname`), just not previously mapped through `toAccountPlayer` (`accountData.ts`). Absent (not shown) for a private profile, or when the field itself is unset — same as Steam itself doesn't return it in either case.
