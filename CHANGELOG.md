@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **A bundle game listed on Steam only as a "sub" (package/license) or "bundle" (an official multi-app Steam bundle), not its own "app" store page, no longer shows up as "not on Steam".** `resolveSteamAppIds` (`lib/itad.js`) now expands those via Steam's own `packagedetails`/`ajaxresolvebundles` endpoints (`resolveSteamPackageAppids`/`resolveSteamBundleAppids`, `lib/steam.js`), falling back to `GET /games/info/v2`'s own `appid` field only if that expansion itself comes up empty. Confirmed live: two genuinely-on-Steam games in "Garbage Dwellers Bundle" (an anthology, a DLC upgrade) were showing as unresolved for exactly this reason.
+
 - **`db.sqlite`'s cache no longer persisted between restarts.** `lib/db.js`'s extraction (the incremental-migrations refactor) read `DB_FILE` before `lib/config.js` had loaded `default.env`/`.env`, so it always saw `DB_FILE` unset and silently opened an in-memory database instead. `lib/db.js` now loads `./config` itself before reading `DB_FILE`.
 
 ### Changed
@@ -21,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `urlState.ts`'s unused `FILTER_DIMS`/`UrlState.filters`/`UrlState.nameFilter` — no reader or writer anywhere in the app.
 
 ### Added
+
+- **A bundle game that maps to a multi-item Steam package (a base game plus its DLC, sold as one SKU — e.g. EVERSPACE - Ultimate Edition) now shows up as one table row per Steam app**, instead of being dropped as unresolved. `resolveBundleGames` (`public/bundleData.ts`) expands a gid that resolved to several appids into that many rows, sharing the rest of the gid's metadata (tier price included).
 
 - **Tag/genre/category/developer/publisher pills in the panel's "Tags & details" section are now clickable**, toggling that value in the game table's own filter (add on click, remove on re-click) instead of just being plain text.
 

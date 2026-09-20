@@ -767,10 +767,12 @@ app.get('/api/bundles/:id', bundlesByIdLimit, async (req, res) => {
   }
 });
 
-// Resolves a bundle's ITAD game ids (uuids, off tiers[].games[].id) to their Steam appid, so
+// Resolves a bundle's ITAD game ids (uuids, off tiers[].games[].id) to their Steam appid(s), so
 // the Bundles page can feed the resolved subset into the same GET /api/game-details/:appid /
-// POST /api/game-details/stream pipeline every other page already uses. Returns null for a
-// gid with no Steam listing — the frontend renders those as the separate "not on Steam" list.
+// POST /api/game-details/stream pipeline every other page already uses. A gid resolves to a
+// plain number (the common case), an array of numbers (a Steam "sub"/"bundle" spanning several
+// apps — see lib/itad.js's resolveSteamAppIds), or null for a gid with no Steam listing at all
+// — the frontend renders those as the separate "not on Steam" list.
 const MAX_BUNDLE_RESOLVE_GAMES = 500;
 app.post('/api/bundles/resolve', bundlesResolveLimit, async (req, res) => {
   if (!isItadConfigured()) {

@@ -9,7 +9,7 @@ process.env.DB_FILE = '';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveSteamId, getOwnedGames, getWishlist, getFriendList, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker, _resetStoreCircuitBreaker, getSemaphoreStats, createSemaphore } = require('../lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getFriendList, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, resolveSteamPackageAppids, resolveSteamBundleAppids, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker, _resetStoreCircuitBreaker, getSemaphoreStats, createSemaphore } = require('../lib/steam');
 const { _reset, setCache } = require('../lib/cache');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
@@ -1048,6 +1048,58 @@ test('getSteamTags and getGameDemo share a single upstream IStoreBrowseService c
   assert.deepEqual(tags, ['Action']);
   assert.equal(demo, 555);
   assert.equal(browseCalls(), 1, 'both calls should share one upstream fetch via cache + dedup');
+});
+
+// ── resolveSteamPackageAppids / resolveSteamBundleAppids ────────────────────────
+
+test('resolveSteamPackageAppids: returns the single appid a Steam "sub" (package) contains', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    assert.ok(String(url).includes('packageids=776544'));
+    return { ok: true, json: async () => ({ 776544: { success: true, data: { apps: [{ id: 2169570, name: 'Redwall' }] } } }) };
+  });
+
+  const result = await resolveSteamPackageAppids(776544);
+  assert.deepEqual(result, [2169570]);
+});
+
+test('resolveSteamPackageAppids: returns null and caches the miss when the package does not exist', async (t) => {
+  _reset();
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => { calls++; return { ok: true, json: async () => ({ 999: { success: false } }) }; });
+
+  const result = await resolveSteamPackageAppids(999);
+  assert.equal(result, null);
+  await resolveSteamPackageAppids(999);
+  assert.equal(calls, 1, 'a confirmed miss should be cached, not re-fetched');
+});
+
+test('resolveSteamPackageAppids: throws isUpstream on a non-ok response', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
+  await assert.rejects(() => resolveSteamPackageAppids(1), err => err.isUpstream === true);
+});
+
+test('resolveSteamBundleAppids: returns every appid a Steam bundle spans', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    assert.ok(String(url).includes('bundleids=4995'));
+    return { ok: true, json: async () => [{ bundleid: 4995, appids: [396750, 688700, 709150] }] };
+  });
+
+  const result = await resolveSteamBundleAppids(4995);
+  assert.deepEqual(result, [396750, 688700, 709150]);
+});
+
+test('resolveSteamBundleAppids: returns null and caches the miss when the bundle id is unknown', async (t) => {
+  _reset();
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => { calls++; return { ok: true, json: async () => [] }; });
+
+  const result = await resolveSteamBundleAppids(999999999);
+  assert.equal(result, null);
+  await resolveSteamBundleAppids(999999999);
+  assert.equal(calls, 1, 'a confirmed miss should be cached, not re-fetched');
 });
 
 // ── getProtonDbStatus ──────────────────────────────────────────────────────────

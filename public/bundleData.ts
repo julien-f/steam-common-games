@@ -66,9 +66,11 @@ export async function fetchBundleById(id: number, { country }: { country?: strin
   return data.bundle; // GET /api/bundles/:id wraps it as { bundle: {...} }
 }
 
-// gid -> Steam appid, or null when that game has no "app/" (store page) listing — a "sub"
-// (package/bundle sub) or unresolved entry, same as no Steam listing at all.
-export async function resolveBundleAppids(gids: string[]): Promise<Record<string, number | null>> {
+// gid -> a Steam appid (the overwhelmingly common case), an array of appids (a Steam "sub"/
+// "bundle" entry that expanded to more than one app — e.g. a base game plus its DLC sold as one
+// SKU, such as EVERSPACE - Ultimate Edition), or null when ITAD has no Steam listing for that
+// game at all. See lib/itad.js's resolveSteamAppIds.
+export async function resolveBundleAppids(gids: string[]): Promise<Record<string, number | number[] | null>> {
   const res = await fetch('/api/bundles/resolve', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -82,7 +84,11 @@ export async function resolveBundleAppids(gids: string[]): Promise<Record<string
 // Flattens + resolves + de-dupes-by-appid a whole bundle in one call — the same steps
 // bundles.tsx's own openBundle does inline today. A second, distinct ITAD game id occasionally
 // resolves to the same Steam appid (an observed ITAD data-quality case) — kept first-occurrence
-// (already cheapest-tier-first, from flattenBundleGames), same rule bundles.tsx applies.
+// (already cheapest-tier-first, from flattenBundleGames), same rule bundles.tsx applies. A gid
+// that resolved to more than one appid (a Steam "sub"/"bundle" spanning several apps) becomes
+// one row per appid, sharing the rest of that gid's metadata (tier price included — the price
+// buys the whole package, not just one of its rows) — each row still gets its own real Steam
+// title from game-details/stream, same as any other resolved row.
 export async function resolveBundleGames(bundle: Bundle): Promise<{ resolved: ResolvedGame[]; unresolved: FlatGame[] }> {
   const games = flattenBundleGames(bundle);
   const appidsByGid = await resolveBundleAppids(games.map(g => g.gid));
@@ -93,9 +99,11 @@ export async function resolveBundleGames(bundle: Bundle): Promise<{ resolved: Re
   for (const g of games) {
     const appid = appidsByGid[g.gid];
     if (!appid) { unresolved.push(g); continue; }
-    if (seenAppids.has(appid)) continue;
-    seenAppids.add(appid);
-    resolved.push({ ...g, appid });
+    for (const id of Array.isArray(appid) ? appid : [appid]) {
+      if (seenAppids.has(id)) continue;
+      seenAppids.add(id);
+      resolved.push({ ...g, appid: id });
+    }
   }
   return { resolved, unresolved };
 }

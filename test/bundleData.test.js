@@ -120,6 +120,32 @@ test('resolveBundleGames: two distinct gids resolving to the same appid keep onl
   assert.equal(resolved[0].gid, 'a');
 });
 
+// A gid resolving to a Steam "sub"/"bundle" spanning several apps (e.g. a base game plus its
+// DLC sold as one SKU) becomes one row per appid, each sharing the gid's own tier price.
+test('resolveBundleGames: a gid resolving to an array of appids becomes one row per appid, sharing the gid\'s tier metadata', async (t) => {
+  const bundle = { tiers: [{ price: { amount: 2999, currency: 'USD' }, games: [game('everspace-ultimate')], addon: false }] };
+  withFetch(t, async () => ({ ok: true, json: async () => ({ appids: { 'everspace-ultimate': [396750, 688700, 709150] } }) }));
+
+  const { resolved, unresolved } = await resolveBundleGames(bundle);
+  assert.deepEqual(unresolved, []);
+  assert.deepEqual(resolved.map(g => g.appid), [396750, 688700, 709150]);
+  assert.ok(resolved.every(g => g.gid === 'everspace-ultimate' && g.tierPrice === 2999));
+});
+
+test('resolveBundleGames: an appid from an expanded array already seen elsewhere is deduped, same as a plain duplicate', async (t) => {
+  const bundle = {
+    tiers: [{ price: { amount: 2999, currency: 'USD' }, games: [game('everspace-base'), game('everspace-ultimate')], addon: false }],
+  };
+  withFetch(t, async () => ({
+    ok: true,
+    json: async () => ({ appids: { 'everspace-base': 396750, 'everspace-ultimate': [396750, 688700] } }),
+  }));
+
+  const { resolved } = await resolveBundleGames(bundle);
+  assert.deepEqual(resolved.map(g => g.appid), [396750, 688700]);
+  assert.equal(resolved[0].gid, 'everspace-base', 'first occurrence (the plain appid) wins the dedup');
+});
+
 // ── fetchBundleAppids ────────────────────────────────────────────────────────────────────────
 
 test('fetchBundleAppids: fetches the bundle, resolves it, returns just the flat appid Set', async (t) => {
