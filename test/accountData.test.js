@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const {
   membersFromAccountId, fetchAccountOwnedGames, fetchAccountWishlistItems, fetchAccountWishlist,
   fetchAccountOwnedAppids, fetchAccountWishlistAppids, resolveAccountSummary,
-  fetchAccountOverview, toAccountPlayer,
+  fetchAccountOverview, toAccountPlayer, fetchAccountFriends,
 } = require('../public/accountData.ts');
 
 function withFetch(t, handler) {
@@ -129,7 +129,10 @@ test('resolveAccountSummary: a single account resolves members/label/avatar/both
         ok: true,
         json: async () => ({
           groups: [{ games: [{ appid: 440, name: 'TF2' }] }],
-          slots: [[{ steamid: '1', personaname: 'Alice', avatarmedium: 'https://x/a.jpg', profileurl: 'https://steamcommunity.com/id/alice/' }]],
+          slots: [[{
+            steamid: '1', personaname: 'Alice', avatarmedium: 'https://x/a.jpg', profileurl: 'https://steamcommunity.com/id/alice/',
+            timecreated: 1433965886, loccountrycode: 'US', realname: 'Alice Smith',
+          }]],
           playtime: {}, lastPlayed: {},
         }),
       };
@@ -144,6 +147,9 @@ test('resolveAccountSummary: a single account resolves members/label/avatar/both
   assert.equal(summary.ownedCount, 1);
   assert.equal(summary.wishlistCount, 1);
   assert.deepEqual(summary.vanities, { 1: 'alice' });
+  assert.equal(summary.memberSince, '2015-06-10');
+  assert.equal(summary.countryCode, 'US');
+  assert.equal(summary.realName, 'Alice Smith');
 });
 
 test('resolveAccountSummary: a multi-member Family sorts members, joins the label, and has no single avatar', async (t) => {
@@ -170,6 +176,10 @@ test('resolveAccountSummary: a multi-member Family sorts members, joins the labe
   assert.equal(summary.avatarUrl, null);
   // Keyed by steamid, not by position: the response is in the API's order, `members` is sorted.
   assert.deepEqual(summary.vanities, { 2: 'bob' });
+  // No one profile speaks for a Family — same reasoning as avatarUrl being null above.
+  assert.equal(summary.memberSince, null);
+  assert.equal(summary.countryCode, null);
+  assert.equal(summary.realName, null);
 });
 
 test('resolveAccountSummary: throws with the server error message when the account itself fails to resolve', async (t) => {
@@ -235,6 +245,48 @@ test('toAccountPlayer: drops a non-http profile/avatar URL and falls back to the
 test('toAccountPlayer: a missing gameCount is null, not 0', () => {
   assert.equal(toAccountPlayer({ steamid: '1' }).gameCount, null);
   assert.equal(toAccountPlayer({ steamid: '1', gameCount: 0 }).gameCount, 0);
+});
+
+// ── fetchAccountFriends ───────────────────────────────────────────────────────
+
+test('fetchAccountFriends: maps friends and passes through memberSince/countryCode/realName', async (t) => {
+  withFetch(t, async (url, opts) => {
+    assert.equal(url, '/api/friends');
+    assert.deepEqual(JSON.parse(opts.body), { members: ['1'], refresh: false });
+    return {
+      ok: true,
+      json: async () => ({
+        friends: [{
+          steamid: '2', personaname: 'Bob', avatar: 'https://x/b.jpg', profileurl: 'https://steamcommunity.com/id/bob/',
+          timecreated: 1433965886, loccountrycode: 'US', realname: 'Bob Smith',
+        }],
+        unavailable: ['3'],
+        fetchedAt: 123,
+      }),
+    };
+  });
+
+  const result = await fetchAccountFriends(['1']);
+  assert.deepEqual(result, {
+    friends: [{
+      steamid: '2', name: 'Bob', avatarUrl: 'https://x/b.jpg', profileUrl: 'https://steamcommunity.com/id/bob/',
+      memberSince: '2015-06-10', countryCode: 'US', realName: 'Bob Smith',
+    }],
+    unavailable: ['3'],
+    fetchedAt: 123,
+  });
+});
+
+test('fetchAccountFriends: a friend Steam returned no name/location for gets empty-string fields, not undefined', async (t) => {
+  withFetch(t, async () => ({
+    ok: true,
+    json: async () => ({ friends: [{ steamid: '2' }], unavailable: [], fetchedAt: null }),
+  }));
+
+  const result = await fetchAccountFriends(['1']);
+  assert.deepEqual(result.friends[0], {
+    steamid: '2', name: '2', avatarUrl: '', profileUrl: '', memberSince: '', countryCode: '', realName: '',
+  });
 });
 
 test('fetchAccountOverview: returns the slot library and its member accounts from one call', async (t) => {

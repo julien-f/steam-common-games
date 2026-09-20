@@ -213,11 +213,14 @@ export interface AccountFriend {
   name: string;
   avatarUrl: string;
   profileUrl: string;
+  memberSince: string; // '' when Steam didn't return one — see AccountSlot's own field
+  countryCode: string;
+  realName: string;
 }
 
 // The shape of /api/friends' success response, as read below.
 interface FriendsResponse {
-  friends: { steamid: string; personaname?: string; avatar?: string | null; profileurl?: string }[];
+  friends: { steamid: string; personaname?: string; avatar?: string | null; profileurl?: string; timecreated?: number; loccountrycode?: string; realname?: string }[];
   unavailable: string[]; // member steamids whose friends list is private — excluded from `friends`, not "no friends"
   fetchedAt: number | null;
 }
@@ -246,6 +249,9 @@ export async function fetchAccountFriends(members: string[], { refresh = false }
       name: f.personaname || f.steamid,
       avatarUrl: f.avatar || '',
       profileUrl: f.profileurl || '',
+      memberSince: fmtLastPlayed(f.timecreated),
+      countryCode: f.loccountrycode || '',
+      realName: f.realname || '',
     })),
     unavailable: data.unavailable,
     fetchedAt: data.fetchedAt ?? null,
@@ -257,6 +263,9 @@ export interface ResolvedAccountSummary {
   label: string;            // joined persona name(s) ("PersonaName" or "A + B" for a Family)
   avatarUrl: string | null; // a single account's avatar; null for a Family (no one avatar to show)
   vanities: Record<string, string>; // steam64 → custom-URL name → AccountSlot.vanities
+  memberSince: string | null; // solo-account trivia, same "null for a Family" reasoning as avatarUrl
+  countryCode: string | null;
+  realName: string | null;
   ownedCount: number;
   wishlistCount: number;    // 0 if the wishlist call fails (e.g. private profile) — owned
                             // resolving is enough to consider the account itself resolved
@@ -284,7 +293,7 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
   const ownedData = await ownedRes.json();
   if (!ownedRes.ok) throw new Error(ownedData.error || 'Failed to resolve account');
 
-  const players: { steamid: string; personaname?: string; avatarmedium?: string; profileurl?: string }[] = ownedData.slots[0];
+  const players: RawAccountPlayer[] = ownedData.slots[0];
   const members = players.map(p => p.steamid).sort();
   const label = players.map(p => p.personaname || p.steamid).join(' + ');
   // Keyed by steamid rather than a parallel array: `members` is sorted, `players` is in the
@@ -294,7 +303,11 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
     const vanity = steamVanity(p.profileurl);
     if (vanity) vanities[p.steamid] = vanity;
   }
-  const avatarUrl = players.length === 1 ? (players[0].avatarmedium || null) : null;
+  const solePlayer = players.length === 1 ? players[0] : null;
+  const avatarUrl = solePlayer?.avatarmedium || null;
+  const memberSince = solePlayer ? fmtLastPlayed(solePlayer.timecreated) || null : null;
+  const countryCode = solePlayer?.loccountrycode || null;
+  const realName = solePlayer?.realname || null;
   const ownedCount = ownedData.groups.flatMap((g: { games: unknown[] }) => g.games).length;
 
   let wishlistCount = 0;
@@ -303,7 +316,7 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
     wishlistCount = wishlistData.items?.length ?? 0;
   }
 
-  return { members, label, avatarUrl, vanities, ownedCount, wishlistCount };
+  return { members, label, avatarUrl, vanities, memberSince, countryCode, realName, ownedCount, wishlistCount };
 }
 
 export async function fetchAccountWishlistAppids(accountId: string): Promise<Set<number>> {

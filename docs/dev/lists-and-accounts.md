@@ -119,6 +119,7 @@ The interfaces themselves are declared in `public/types.ts` — that's the sourc
 ```
 AccountSlot  id (sorted-joined member steam64 ids) · members[] · rawInputs[] · label? · avatarUrl?
              vanities? (steam64 → Steam custom-URL name, for the members that set one)
+             memberSince? · countryCode? · realName? (solo-account trivia, last-known like avatarUrl)
              lastUsedAt · removedAt?
 Folder       id · name · parentId (null = root) · order · createdAt
 GameList     id · name? (absent = unnamed, labeled by its formula) · parentId · order · createdAt · updatedAt

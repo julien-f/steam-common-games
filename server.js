@@ -622,6 +622,9 @@ app.post('/api/friends', friendsLimit, async (req, res) => {
       personaname: p.personaname,
       avatar: p.avatarfull || p.avatarmedium || p.avatar || null,
       profileurl: p.profileurl,
+      timecreated: p.timecreated,
+      loccountrycode: p.loccountrycode,
+      realname: p.realname,
     }));
 
     res.json({ friends, unavailable, fetchedAt: oldestCachedAt(ids.map(id => `friends:${id}`)) });

@@ -181,6 +181,9 @@ export default function HomeRoute() {
         label: summary.label,
         avatarUrl: summary.avatarUrl ?? undefined,
         vanities: summary.vanities,
+        memberSince: summary.memberSince ?? undefined,
+        countryCode: summary.countryCode ?? undefined,
+        realName: summary.realName ?? undefined,
         lastUsedAt: Date.now(),
       };
       pickAccount(account);
@@ -547,6 +550,17 @@ export default function HomeRoute() {
                       <CopyButton text={identifier} title={`Copy this account's Steam identifier (${identifier})`} />
                     )}
                   </For>
+                  {/* Same last-known, cached-at-resolve-time trivia the account card shows —
+                      absent until this entry is next picked, same as label/avatarUrl above it. */}
+                  <Show when={account.realName}>
+                    <span class="account-realname">({account.realName})</span>
+                  </Show>
+                  <Show when={account.memberSince}>
+                    <span class="account-count">Since {account.memberSince}</span>
+                  </Show>
+                  <Show when={account.countryCode}>
+                    <span class="account-count">{countryFlag(account.countryCode)}</span>
+                  </Show>
                   <button type="button" title="Set as my account" onClick={[toggleMyAccount, account]}>
                     {myAccount()?.id === account.id ? '☆ unstar' : '★ star as mine'}
                   </button>

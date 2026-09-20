@@ -220,6 +220,12 @@ export interface AccountSlot {
                                      // members that set one — captured at resolve time so the
                                      // nicest copyable identifier needs no fetch of its own
                                      // (accountsStore.ts's accountIdentifiers)
+  // Last-known solo-account profile trivia — same "cached at resolve time, absent/stale until
+  // next picked" reasoning as label/avatarUrl above. Only ever set for a single-account slot
+  // (like avatarUrl, a Family has no one profile to speak for the whole thing).
+  memberSince?: string; // bare ISO date the account was created
+  countryCode?: string; // ISO 3166-1 alpha-2
+  realName?: string;
   lastUsedAt: number;
   removedAt?: number; // soft-removed from the recents UI, kept while referenced by a dynamic list
 }

@@ -468,7 +468,10 @@ function makeFriendsFetch(friendIds1 = [], friendIds2 = []) {
     }
     if (url.includes('GetPlayerSummaries')) {
       const ids = url.split('steamids=')[1].split(',');
-      const players = ids.map(id => ({ steamid: id, personaname: id, profileurl: '', avatarfull: '' }));
+      const players = ids.map(id => ({
+        steamid: id, personaname: id, profileurl: '', avatarfull: '',
+        timecreated: 1433965886, loccountrycode: 'US', realname: `Real ${id}`,
+      }));
       return { ok: true, json: async () => ({ response: { players } }) };
     }
     throw new Error(`Unexpected fetch: ${url}`);
@@ -483,6 +486,9 @@ test('POST /api/friends: 200 with friends for a single account', async (t) => {
   assert.equal(res.status, 200);
   assert.equal(res.body.friends.length, 1);
   assert.equal(res.body.friends[0].steamid, FRIEND1);
+  assert.equal(res.body.friends[0].timecreated, 1433965886);
+  assert.equal(res.body.friends[0].loccountrycode, 'US');
+  assert.equal(res.body.friends[0].realname, `Real ${FRIEND1}`);
   assert.deepEqual(res.body.unavailable, []);
 });
 

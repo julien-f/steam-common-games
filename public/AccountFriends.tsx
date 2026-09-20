@@ -23,6 +23,9 @@ function toAccountSlot(f: AccountFriend): AccountSlot {
     label: f.name,
     avatarUrl: f.avatarUrl || undefined,
     vanities: vanity ? { [f.steamid]: vanity } : {},
+    memberSince: f.memberSince || undefined,
+    countryCode: f.countryCode || undefined,
+    realName: f.realName || undefined,
     lastUsedAt: Date.now(),
   };
 }
