@@ -199,10 +199,19 @@ test('toAccountPlayer: maps a full player object onto display-ready fields', () 
   assert.deepEqual(toAccountPlayer({
     steamid: '1', personaname: 'Alice', profileurl: 'https://steamcommunity.com/id/alice/',
     avatarmedium: 'https://cdn/a.jpg', communityvisibilitystate: 3, personastate: 1, gameCount: 42,
+    timecreated: 1433965886, loccountrycode: 'US', realname: 'Alice Smith',
   }), {
     steamid: '1', name: 'Alice', profileUrl: 'https://steamcommunity.com/id/alice/',
     avatarUrl: 'https://cdn/a.jpg', isPrivate: false, gameCount: 42,
+    memberSince: '2015-06-10', countryCode: 'US', realName: 'Alice Smith',
   });
+});
+
+test('toAccountPlayer: memberSince/countryCode/realName are empty strings when Steam did not return them (private profile)', () => {
+  const p = toAccountPlayer({ steamid: '1' });
+  assert.equal(p.memberSince, '');
+  assert.equal(p.countryCode, '');
+  assert.equal(p.realName, '');
 });
 
 test('toAccountPlayer: presence is deliberately not mapped — see accountData.ts', () => {

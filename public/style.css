@@ -2515,6 +2515,9 @@ kbd {
   font-size: 15px; font-weight: 600; color: var(--text0);
 }
 .account-counts { font-size: 12px; color: var(--text1); margin-top: 2px; }
+/* Steam's optional "real name" field, next to the persona name it's never a replacement for
+   (plenty of accounts leave it unset) — muted and parenthetical, same weight as .account-count. */
+.account-realname { font-size: 12px; font-weight: 400; color: var(--text1); }
 /* "Updated <when> ↻ Refresh" on Home's Account card. Server-side caching runs for weeks
    (default.env's LIBRARY_CACHE_TTL_MINUTES), so how old the data is gets stated outright, with the
    control that fixes it sitting right next to the fact. Every *list* says it as a hero tile

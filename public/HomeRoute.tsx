@@ -24,7 +24,7 @@ import { getAccountOverrideState, clearAccountOverride, accountOverrideStatusTex
 import { withAccountParam, urlWithoutAccountParam, parseUrlState, compareUrl, COMPARE_PATH } from './urlState.ts';
 import { resolveAccountSummary, fetchAccountOverview, fetchAccountWishlistItems } from './accountData.ts';
 import type { AccountPlayer } from './accountData.ts';
-import { normalizeInput, steamVanity, fmtAge } from './utils.ts';
+import { normalizeInput, steamVanity, fmtAge, countryFlag } from './utils.ts';
 import { CopyButton } from './CopyButton.tsx';
 import { AccountFriends } from './AccountFriends.tsx';
 import {
@@ -426,6 +426,9 @@ export default function HomeRoute() {
                       </a>
                     )}
                   </Show>
+                  <Show when={solePlayer()?.realName}>
+                    {n => <span class="account-realname">({n()})</span>}
+                  </Show>
                   <Show when={solePlayer()}>
                     {p => <CopyButton text={copyIdentifier(p())} title={`Copy this account's Steam identifier (${copyIdentifier(p())})`} />}
                   </Show>
@@ -436,6 +439,8 @@ export default function HomeRoute() {
                 <div class="account-counts">
                   Owned: {counts().owned ?? '…'} · Wishlisted: {counts().wishlist ?? '…'}
                   <Show when={players().length > 1}>{` · ${players().length} accounts merged`}</Show>
+                  <Show when={solePlayer()?.memberSince}>{s => ` · Member since ${s()}`}</Show>
+                  <Show when={solePlayer()?.countryCode}>{c => ` ${countryFlag(c())}`}</Show>
                 </div>
                 {/* Steam data is cached server-side for a long time (see default.env's
                     LIBRARY_CACHE_TTL_MINUTES), so the age of what's on screen is stated outright
@@ -478,8 +483,17 @@ export default function HomeRoute() {
                     )}
                   </Show>
                   <CopyButton text={copyIdentifier(p)} title={`Copy this account's Steam identifier (${copyIdentifier(p)})`} />
+                  <Show when={p.realName}>
+                    <span class="account-realname">({p.realName})</span>
+                  </Show>
                   <Show when={p.gameCount != null}>
                     <span class="account-count">{p.gameCount} games</span>
+                  </Show>
+                  <Show when={p.memberSince}>
+                    <span class="account-count">Since {p.memberSince}</span>
+                  </Show>
+                  <Show when={p.countryCode}>
+                    <span class="account-count">{countryFlag(p.countryCode)}</span>
                   </Show>
                   <Show when={p.isPrivate}>
                     <span class="account-private" title="This Steam profile isn't public — some data may be missing or empty">🔒 Private</span>

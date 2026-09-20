@@ -184,6 +184,17 @@ export function fmtLastPlayed(epochSec: number | null | undefined): string {
   return new Date(epochSec * 1000).toISOString().slice(0, 10);
 }
 
+// A Steam profile's `loccountrycode` (ISO 3166-1 alpha-2, e.g. "US") as a flag emoji — computed
+// from the Unicode regional-indicator formula rather than a hand-maintained per-country lookup
+// table (region.ts's own COUNTRY_OPTIONS is deliberately a curated ~15-country pricing list, not
+// exhaustive, so it can't be reused here for an arbitrary account's country). Returns '' for
+// anything that isn't exactly two letters, rather than rendering a broken/mismatched flag.
+export function countryFlag(code: string | null | undefined): string {
+  if (!code || !/^[A-Za-z]{2}$/.test(code)) return '';
+  const REGIONAL_INDICATOR_A = 0x1F1E6;
+  return [...code.toUpperCase()].map(c => String.fromCodePoint(REGIONAL_INDICATOR_A + c.charCodeAt(0) - 65)).join('');
+}
+
 // "how long ago was this fetched", for the "Updated <when>" readouts next to the app's ↻ Refresh
 // buttons. Deliberately coarse — the point is "is what I'm looking at from today or from last
 // month", not a precise duration — and it never says "in the future" for a small clock skew

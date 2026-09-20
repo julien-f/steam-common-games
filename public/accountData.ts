@@ -5,7 +5,7 @@
 // functions (row-building, table wiring, URL/history updates, accounts-bar rendering) — none of
 // that belongs here; ListRoute.tsx owns the equivalent orchestration generically, for any list
 // kind, not just account-scoped ones.
-import { steamVanity } from './utils.ts';
+import { steamVanity, fmtLastPlayed } from './utils.ts';
 
 // An AccountSlot.id is itself the sorted-joined resolved member steam64 ids (see
 // accountsStore.ts's accountIdFor) — so resolving an id back to its members is just splitting
@@ -49,6 +49,9 @@ export interface RawAccountPlayer {
   avatarmedium?: string;
   communityvisibilitystate?: number;
   gameCount?: number;
+  timecreated?: number;    // Unix seconds; absent for a private profile
+  loccountrycode?: string; // ISO 3166-1 alpha-2, e.g. "US"; absent when unset or profile is private
+  realname?: string;       // absent unless the profile owner set one and made it public
 }
 
 // The shape of /api/common-games' success response, as read below — only the fields this
@@ -71,6 +74,9 @@ export interface AccountPlayer {
   avatarUrl: string;    // '' likewise
   isPrivate: boolean;   // communityvisibilitystate !== 3 — a private/friends-only profile
   gameCount: number | null;
+  memberSince: string;  // bare ISO date the account was created, '' when Steam didn't return one
+  countryCode: string;  // ISO 3166-1 alpha-2, '' when unset
+  realName: string;     // '' when unset — Steam's own realname is optional and privacy-gated
 }
 
 // Presence (`personastate`/`gameextrainfo`) is deliberately NOT mapped here, even though Steam
@@ -88,6 +94,9 @@ export function toAccountPlayer(p: RawAccountPlayer): AccountPlayer {
     avatarUrl: httpOnly(p.avatarmedium),
     isPrivate: p.communityvisibilitystate !== undefined && p.communityvisibilitystate !== 3,
     gameCount: typeof p.gameCount === 'number' ? p.gameCount : null,
+    memberSince: fmtLastPlayed(p.timecreated),
+    countryCode: p.loccountrycode || '',
+    realName: p.realname || '',
   };
 }
 
