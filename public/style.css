@@ -2324,6 +2324,22 @@ kbd {
 }
 .list-stat-value { font-size: 14px; color: var(--text0); }
 .list-stat-sub { font-size: 11px; color: var(--text1); }
+/* A tile that is also a control (`/bundles`' "Ending soon" filter toggle). Button chrome reset so
+   it still reads as one of the tiles beside it, plus a pressed state — the filter it applies is
+   otherwise only visible in the table's own toolbar, several hundred pixels below. */
+.list-stat-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.list-stat-btn:hover .list-stat-label,
+.list-stat-btn:focus-visible .list-stat-label { color: var(--accent2); }
+.list-stat-btn[aria-pressed="true"] .list-stat-label { color: var(--accent); }
+
 /* Overrides .bundle-ends-rel's own inline-beside-the-time metrics (shared with the browse table's
    Ends cell) — here the countdown is its own line under the date, not a suffix. */
 .list-stat-sub .bundle-ends-rel { margin-left: 0; }

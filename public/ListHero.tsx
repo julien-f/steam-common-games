@@ -14,6 +14,7 @@
 // recomputed as its inputs change. That split is on purpose — buttons keep their identity across
 // a count/age change, and a tile's own value can't hold state worth preserving.
 import { For, Show, type JSX } from 'solid-js';
+import { Dynamic } from 'solid-js/web';
 
 export interface HeroTile {
   // Uppercased by CSS — write it in sentence case ("Ends", "Best deal"), not shouting.
@@ -25,6 +26,12 @@ export interface HeroTile {
   // Native tooltip on the value, for the number this tile is deliberately *not* showing
   // (e.g. ITAD's own game count next to the count this route can actually enumerate).
   title?: string;
+  // Makes the tile a real <button> instead of a <div> — for a tile whose number is also a way to
+  // act on it (`/bundles`' "Ending soon", which toggles the table down to those rows). `active`
+  // is its pressed state, read back from whatever the click applied rather than held here, so
+  // undoing it elsewhere (the table's own Clear filters) unpresses the tile.
+  onClick?: () => void;
+  active?: boolean;
 }
 
 export interface ListHeroProps {
@@ -53,13 +60,19 @@ export function ListHero(props: ListHeroProps): JSX.Element {
         <div class="list-hero-stats">
           <For each={props.tiles}>
             {tile => (
-              <div class="list-stat">
+              <Dynamic
+                component={tile.onClick ? 'button' : 'div'}
+                class={tile.onClick ? 'list-stat list-stat-btn' : 'list-stat'}
+                type={tile.onClick ? 'button' : undefined}
+                aria-pressed={tile.onClick ? !!tile.active : undefined}
+                onClick={tile.onClick}
+              >
                 <span class="list-stat-label">{tile.label}</span>
                 <span class="list-stat-value" title={tile.title}>{tile.value}</span>
                 <Show when={tile.sub}>
                   <span class="list-stat-sub">{tile.sub}</span>
                 </Show>
-              </div>
+              </Dynamic>
             )}
           </For>
         </div>

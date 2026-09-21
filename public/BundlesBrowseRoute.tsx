@@ -33,7 +33,7 @@ import {
 import { fmtAge, formatMoney, scoreColor } from './utils.ts';
 import {
   toBundleRow, fmtBundleDateTime, fmtBundleDatePart, fmtBundleTimePart, bundleUrgency, shopHue,
-  type BundleListItem, type BundleRow,
+  bundleEndsIn, compareEndsIn, ENDS_IN, type BundleListItem, type BundleRow,
 } from './bundleRows.ts';
 import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { setBrowsedBundles } from './bundleBrowseStore.ts';
@@ -197,6 +197,15 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     groupValue: withMissingGroup(bucketDatePart('month'), v => v == null || v === ''),
     groupFormat: formatMissingGroup(formatDatePart('month')),
   },
+  // Hidden by default, like Status below: the Ends column already carries each row's own
+  // countdown, so this one exists to filter/group *by* urgency — and it's what the hero card's
+  // "Ending soon" tile toggles. A `value()` accessor rather than a field on BundleRow,
+  // deliberately against this file's flatten-at-fetch rule: the tier is clock-relative, so it has
+  // to be recomputed on each pass rather than frozen at the moment the row was fetched.
+  {
+    key: 'endsIn', label: 'Ends in', type: 'string', groupable: true,
+    value: row => bundleEndsIn(row.expiry), format: fmt.str, compare: compareEndsIn,
+  },
   // Hidden by default: every row is Active unless "Include expired" is on, in which case this is
   // the column to filter/group on to tell the two apart.
   { key: 'status', label: 'Status', type: 'string', groupable: true, format: fmt.str },
@@ -297,6 +306,13 @@ export default function BundlesBrowseRoute() {
     onCleanup(() => window.removeEventListener(REGION_CHANGED_EVENT, onRegionChange));
   });
 
+  // The hero's "Ending soon" tile as a filter toggle over the hidden "Ends in" column — same
+  // include-set-only shape as ListRoute.tsx's panel pills, so it never touches the table filter
+  // dropdown's separate exclude state, and clearing it from there clears the tile's pressed state
+  // with it.
+  const endingSoonOnly = () => table.filter.include().endsIn?.has(ENDS_IN.urgent) ?? false;
+  const toggleEndingSoonOnly = () => table.filter.setValues('endsIn', [ENDS_IN.urgent], !endingSoonOnly());
+
   // The same hero card every list route now opens with (ListHero.tsx) — this route is the one you
   // arrive at a bundle *from*, so a loose toolbar here next to a real card there was a visible
   // seam between two adjacent screens. Deliberately thin: no bundle count (the table's own
@@ -317,16 +333,23 @@ export default function BundlesBrowseRoute() {
       title: 'Prices are shown for this region — change it in ⚙ Preferences',
     });
     // The one thing this page can say that nothing else does at a glance: the Ends column shows
-    // each row's own countdown, but finding the ones about to go means sorting by it first.
+    // each row's own countdown, but finding the ones about to go means sorting by it first — which
+    // is also why this tile is the one that clicks (toggleEndingSoonOnly).
     // Counted off processedData rather than the raw list, so it agrees with whatever filter/search
     // is applied — a "3 ending soon" that includes rows the table isn't showing is worse than
     // nothing. Absent at zero rather than showing a reassuring "0" nobody asked about.
     const endingSoon = table.processedData().filter(row => bundleUrgency(row.expiry)?.tier === 'urgent').length;
-    if (endingSoon > 0) {
+    // Kept on screen while its own filter is on even at a count of zero — otherwise the last
+    // urgent bundle expiring (or a reload dropping it) leaves the table filtered down to nothing
+    // with the control that filtered it gone.
+    if (endingSoon > 0 || endingSoonOnly()) {
       tiles.push({
         label: 'Ending soon',
         value: <span style={{ color: scoreColor(20) }}>{endingSoon}</span>,
-        sub: 'within 48h',
+        sub: endingSoonOnly() ? 'within 48h · only these' : 'within 48h',
+        title: endingSoonOnly() ? 'Showing only these — click to clear' : 'Show only the bundles ending within 48h',
+        active: endingSoonOnly(),
+        onClick: toggleEndingSoonOnly,
       });
     }
     return tiles;

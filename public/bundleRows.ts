@@ -197,6 +197,29 @@ export function bundleUrgency(expiry: string | null | undefined, now: number = D
   return { tier: 'later', label: '' };
 }
 
+// The urgency tier as a plain label — what the browse table's hidden "Ends in" column filters and
+// groups on, and what its hero card's "Ending soon" tile toggles. `Open-ended` is a named bucket
+// rather than the table's generic "(none)": a bundle with no end date is a real case, not missing
+// data.
+export const ENDS_IN = {
+  urgent: 'Within 48h', soon: 'This week', later: 'Later', open: 'Open-ended', ended: 'Ended',
+} as const;
+
+// Soonest-first, for the column's own comparator: alphabetically these order Ended < Later <
+// Open-ended < This week < Within 48h, which says nothing about urgency.
+const ENDS_IN_ORDER: string[] = [ENDS_IN.urgent, ENDS_IN.soon, ENDS_IN.later, ENDS_IN.open, ENDS_IN.ended];
+
+export function bundleEndsIn(expiry: string | null | undefined, now: number = Date.now()): string {
+  const urgency = bundleUrgency(expiry, now);
+  return urgency ? ENDS_IN[urgency.tier] : ENDS_IN.open;
+}
+
+// Values only, no rows — the shape `ColumnDef.compare` takes, which also orders the column's
+// filter checklist and its group headers.
+export function compareEndsIn(a: unknown, b: unknown): number {
+  return ENDS_IN_ORDER.indexOf(String(a)) - ENDS_IN_ORDER.indexOf(String(b));
+}
+
 // `now` is a parameter purely so the Active/Expired split is testable without freezing the clock.
 // A bundle with no expiry at all counts as Active — that's how ITAD represents an open-ended one,
 // not a missing date to guess at.

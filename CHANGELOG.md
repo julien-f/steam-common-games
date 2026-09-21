@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`/bundles`' "Ending soon" tile is now a toggle: click it to show only the bundles ending within 48h, click again to clear.** It filters through a new hidden **Ends in** column (Within 48h / This week / Later / Open-ended / Ended, ordered by urgency rather than alphabetically), so the same split is available from the table's own Filter and Group dropdowns, and clearing the filter there unpresses the tile. The tile stays on screen while its filter is on even at a count of zero, so the control that filtered the table down can't disappear along with the last matching row.
+
 ### Fixed
 
 - **A bundle game listed on Steam only as a "sub" (package/license) or "bundle" (an official multi-app Steam bundle), not its own "app" store page, no longer shows up as "not on Steam".** `resolveSteamAppIds` (`lib/itad.js`) now expands those via Steam's own `packagedetails`/`ajaxresolvebundles` endpoints (`resolveSteamPackageAppids`/`resolveSteamBundleAppids`, `lib/steam.js`), falling back to `GET /games/info/v2`'s own `appid` field only if that expansion itself comes up empty. Confirmed live: two genuinely-on-Steam games in "Garbage Dwellers Bundle" (an anthology, a DLC upgrade) were showing as unresolved for exactly this reason.
