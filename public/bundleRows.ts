@@ -220,6 +220,29 @@ export function compareEndsIn(a: unknown, b: unknown): number {
   return ENDS_IN_ORDER.indexOf(String(a)) - ENDS_IN_ORDER.indexOf(String(b));
 }
 
+// The publish-side counterpart of ENDS_IN, for the browse table's hidden "Age" column and the
+// "New" tile that toggles it — "what appeared since I last looked" is the other half of the
+// browsing question, and the Published column can only answer it by being sorted and read.
+export const BUNDLE_AGE = {
+  fresh: 'Last 24h', week: 'This week', older: 'Older', unknown: 'Unknown',
+} as const;
+
+const BUNDLE_AGE_ORDER: string[] = [BUNDLE_AGE.fresh, BUNDLE_AGE.week, BUNDLE_AGE.older, BUNDLE_AGE.unknown];
+
+export function bundleAge(publish: string | null | undefined, now: number = Date.now()): string {
+  const d = parseBundleDate(publish);
+  if (!d) return BUNDLE_AGE.unknown;
+  const hours = (now - d.getTime()) / 3600000;
+  if (hours < 24) return BUNDLE_AGE.fresh;
+  if (hours < 24 * 7) return BUNDLE_AGE.week;
+  return BUNDLE_AGE.older;
+}
+
+// Newest-first, the direction this column is actually read in — see compareEndsIn.
+export function compareBundleAge(a: unknown, b: unknown): number {
+  return BUNDLE_AGE_ORDER.indexOf(String(a)) - BUNDLE_AGE_ORDER.indexOf(String(b));
+}
+
 // `now` is a parameter purely so the Active/Expired split is testable without freezing the clock.
 // A bundle with no expiry at all counts as Active — that's how ITAD represents an open-ended one,
 // not a missing date to guess at.

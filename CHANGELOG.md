@@ -8,7 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **The "Updated" tile in a list header now re-fetches the list, replacing that header's own ↻ Refresh button** (`/bundles`, Owned and Wishlist). It carries a ↻ beside its value, shows "Refreshing…" while the fetch is in flight, and — on `/bundles` — is rendered even before anything has loaded, so a failed first load still offers a retry. "↻ Refresh prices" is untouched: it's a different fetch, and the Prices tile's own click opens the region setting instead.
+
+- **`/bundles` gained a "New" tile counting the bundles published in the last 7 days, and every tile in that hero card now does something.** New toggles the table down to those rows the same way "Ending soon" does (through a new hidden **Age** column: Last 24h / This week / Older / Unknown), "Updated" re-fetches the list, and "Prices" opens the nav bar's ⚙ Preferences popover — which its tooltip had been pointing at since it was written. A tile with an `onClick` renders as a real `<button aria-pressed>`, and `ListHero` now renders its tiles through `<Index>` rather than `<For>`, so activating one no longer replaces its DOM node and drops the keyboard focus that was on it.
+
 - **`/bundles`' "Ending soon" tile is now a toggle: click it to show only the bundles ending within 48h, click again to clear.** It filters through a new hidden **Ends in** column (Within 48h / This week / Later / Open-ended / Ended, ordered by urgency rather than alphabetically), so the same split is available from the table's own Filter and Group dropdowns, and clearing the filter there unpresses the tile. The tile stays on screen while its filter is on even at a count of zero, so the control that filtered the table down can't disappear along with the last matching row.
+
+### Fixed
+
+- **Refreshing a list no longer tears its header card down and rebuilds it.** `ListRoute.tsx`'s `load()` blanked `heroTitle` on every load, including a ↻ Refresh of the list already on screen, which unmounted the whole card (`<Show when={heroTitle()}>`) — visible as a blink, and now also as the refresh control itself disappearing mid-click. It's only cleared when the list being shown actually changes.
+
+### Removed
+
+- `/bundles`' hidden **Status** column — the new "Ends in" column's `Ended` bucket is the same Active/Expired split, from the same data. `BundleRow.status` stays: it's what `renderBundleTitle` hangs the expired-row dimming class on.
 
 ### Fixed
 

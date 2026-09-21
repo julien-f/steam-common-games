@@ -92,8 +92,9 @@ import {
 import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from './priceLoading.ts';
 import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
+import { openPrefsPopover } from './prefsPopover.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
-import { ListHero, type HeroTile } from './ListHero.tsx';
+import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
 import { ComparePlayersForm } from './ComparePlayersForm.tsx';
 import {
   describeSources, createDefaultNaming, listDisplayName, opLabel, OP_LABELS, OP_SYMBOLS,
@@ -288,8 +289,8 @@ export default function ListRoute() {
   // re-resolving the bundle. Reset by load() itself on every (re)load.
   let resolvedBundleGames: ResolvedGame[] | null = null;
   // Owned/wishlist kinds only: how old the server's cached copy of this account's list is (epoch
-  // ms, null = fetched fresh), and whether a forced re-fetch is in flight — the "Updated <when>
-  // ↻ Refresh" line below. Steam data is cached server-side for weeks (default.env's
+  // ms, null = fetched fresh), and whether a forced re-fetch is in flight — the hero's Updated
+  // tile, which is also the control that forces one (see heroTiles). Steam data is cached server-side for weeks (default.env's
   // LIBRARY_CACHE_TTL_MINUTES), so the age of what's on screen is stated rather than guessed at,
   // and forcing past it is one click from the list itself instead of only from Home.
   const [fetchedAt, setFetchedAt] = createSignal<number | null>(null);
@@ -1126,8 +1127,13 @@ export default function ListRoute() {
     // resolved its own name/account, so it's cleared rather than left standing (setBaseTitle is
     // deliberately untouched — <title> keeps naming the last real list until the next one loads,
     // rather than flashing back to the bare app name on every ‹/› step).
-    setHeroTitle('');
-    setHeroAccount(null);
+    // …but not on a ↻ Refresh of the list already on screen: it re-resolves to the very same
+    // name, and blanking it tears the whole card down (`<Show when={heroTitle()}>`) — taking with
+    // it the Updated tile that is itself one of the ways to ask for this refresh, mid-click.
+    if (!refresh) {
+      setHeroTitle('');
+      setHeroAccount(null);
+    }
     setListSources([]);
     tableContainer.innerHTML = '';
     groupsContainer.innerHTML = '';
@@ -1504,15 +1510,19 @@ export default function ListRoute() {
     return names.length ? names.join(' / ') : null;
   }
 
-  // Which region's prices are on screen and how stale they are (wishlist/bundle kinds). Stated,
-  // never editable here — the ⚙ Preferences popover owns the setting, and a second control would
-  // be one more thing to keep in sync.
+  // Which region's prices are on screen and how stale they are (wishlist/bundle kinds). Still not
+  // editable here — the ⚙ Preferences popover owns the setting, and a second control would be one
+  // more thing to keep in sync — but clicking the tile now opens that popover instead of leaving
+  // its tooltip to send the reader looking for it. The staleness in `sub` is deliberately *not*
+  // wired to "↻ Refresh prices": one tile can't mean two actions, and the region is the tile's
+  // own value.
   function priceTile(): HeroTile {
     return {
       label: 'Prices',
       value: regionLabel(regionCode()),
       sub: priceFetchedAt() === undefined ? undefined : `Updated ${fmtAge(priceFetchedAt())}`,
-      title: 'Prices are shown for this region — change it in ⚙ Preferences',
+      title: 'Prices are shown for this region — click to change it in ⚙ Preferences',
+      onClick: openPrefsPopover,
     };
   }
 
@@ -1584,8 +1594,14 @@ export default function ListRoute() {
     if (kind === 'owned' || kind === 'wishlist') {
       tiles.push({
         label: 'Updated',
-        value: fmtAge(fetchedAt()),
-        title: "How old the server's cached copy of this account's list is — ↻ Refresh forces a fresh fetch",
+        value: refreshTileValue(refreshing() ? 'Refreshing…' : fmtAge(fetchedAt())),
+        title: "How old the server's cached copy of this account's list is — click to force a fresh fetch",
+        // This tile *is* the ↻ Refresh the actions row used to carry: the staleness is stated
+        // here, so this is where the reader already is when they decide to do something about it.
+        // ↻ Refresh prices stays a button — it's a different fetch, and the Prices tile's own
+        // click opens the region setting instead.
+        onClick: handleRefreshList,
+        disabled: refreshing(),
       });
     }
     if (kind === 'wishlist') tiles.push(priceTile());
@@ -1729,15 +1745,6 @@ export default function ListRoute() {
           </Show>
           <a class="btn btn-ghost btn-sm" href="/bundles">← All bundles</a>
         </>
-      )}
-      {(kind === 'owned' || kind === 'wishlist') && (
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm"
-          disabled={refreshing()}
-          title="Re-fetch this list from Steam, bypassing the server's cache"
-          onClick={handleRefreshList}
-        >{refreshing() ? '↻ Refreshing…' : '↻ Refresh'}</button>
       )}
       {(kind === 'wishlist' || kind === 'bundle') && (
         <button

@@ -2339,6 +2339,11 @@ kbd {
 .list-stat-btn:hover .list-stat-label,
 .list-stat-btn:focus-visible .list-stat-label { color: var(--accent2); }
 .list-stat-btn[aria-pressed="true"] .list-stat-label { color: var(--accent); }
+.list-stat-icon { font-size: 11px; color: var(--text1); }
+.list-stat-btn:hover .list-stat-icon,
+.list-stat-btn:focus-visible .list-stat-icon { color: var(--accent2); }
+.list-stat-btn:disabled { cursor: default; }
+.list-stat-btn:disabled .list-stat-label { color: var(--text1); }
 
 /* Overrides .bundle-ends-rel's own inline-beside-the-time metrics (shared with the browse table's
    Ends cell) — here the countdown is its own line under the date, not a suffix. */

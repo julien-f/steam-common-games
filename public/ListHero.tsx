@@ -13,7 +13,13 @@
 // render, reactive internally through whatever signals they read); `tiles` is a plain array
 // recomputed as its inputs change. That split is on purpose — buttons keep their identity across
 // a count/age change, and a tile's own value can't hold state worth preserving.
-import { For, Show, type JSX } from 'solid-js';
+//
+// The tiles render through `<Index>`, not `<For>`: a recompute builds fresh tile objects every
+// time, so `<For>`'s by-reference keying tore every tile's DOM down and rebuilt it on any change
+// — which a clickable tile (see `onClick`) can't afford, since activating one recomputes the
+// array and the button the user was on would be replaced mid-interaction, dropping keyboard
+// focus. `<Index>` keys by position and patches each tile's contents in place instead.
+import { Index, Show, type JSX } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
 
 export interface HeroTile {
@@ -32,6 +38,9 @@ export interface HeroTile {
   // undoing it elsewhere (the table's own Clear filters) unpresses the tile.
   onClick?: () => void;
   active?: boolean;
+  // A tile whose action is momentarily unavailable (a refresh already in flight). Still a button,
+  // so the row doesn't reflow as it flips back and forth.
+  disabled?: boolean;
 }
 
 export interface ListHeroProps {
@@ -58,23 +67,24 @@ export function ListHero(props: ListHeroProps): JSX.Element {
       </div>
       <Show when={props.tiles?.length}>
         <div class="list-hero-stats">
-          <For each={props.tiles}>
+          <Index each={props.tiles}>
             {tile => (
               <Dynamic
-                component={tile.onClick ? 'button' : 'div'}
-                class={tile.onClick ? 'list-stat list-stat-btn' : 'list-stat'}
-                type={tile.onClick ? 'button' : undefined}
-                aria-pressed={tile.onClick ? !!tile.active : undefined}
-                onClick={tile.onClick}
+                component={tile().onClick ? 'button' : 'div'}
+                class={tile().onClick ? 'list-stat list-stat-btn' : 'list-stat'}
+                type={tile().onClick ? 'button' : undefined}
+                aria-pressed={tile().onClick ? !!tile().active : undefined}
+                disabled={tile().onClick ? !!tile().disabled : undefined}
+                onClick={() => tile().onClick?.()}
               >
-                <span class="list-stat-label">{tile.label}</span>
-                <span class="list-stat-value" title={tile.title}>{tile.value}</span>
-                <Show when={tile.sub}>
-                  <span class="list-stat-sub">{tile.sub}</span>
+                <span class="list-stat-label">{tile().label}</span>
+                <span class="list-stat-value" title={tile().title}>{tile().value}</span>
+                <Show when={tile().sub}>
+                  <span class="list-stat-sub">{tile().sub}</span>
                 </Show>
               </Dynamic>
             )}
-          </For>
+          </Index>
         </div>
       </Show>
       <Show when={props.note}>
@@ -82,4 +92,13 @@ export function ListHero(props: ListHeroProps): JSX.Element {
       </Show>
     </div>
   );
+}
+
+// The ↻ a refresh tile needs to advertise itself: a tile carries no chrome of its own, so once
+// the route's own ↻ Refresh button is gone (it did exactly what clicking the tile does), the
+// hover state is otherwise the only hint the tile is a control at all. Composed by the caller
+// into its `value` rather than added here as a prop, so the card stays dumb about what any
+// tile's click means.
+export function refreshTileValue(text: string): JSX.Element {
+  return <>{text} <span class="list-stat-icon">↻</span></>;
 }
