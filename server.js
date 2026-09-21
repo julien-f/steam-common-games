@@ -680,13 +680,20 @@ function fetchGameDetails(appid, { force = false } = {}) {
       if (tagsRes.status     === 'rejected') logErr('tags',     tagsRes.reason);
       if (demoRes.status     === 'rejected') logErr('demo',     demoRes.reason);
       if (protondbRes.status === 'rejected') logErr('protondb', protondbRes.reason);
+      // Age of the oldest of this game's cached sources, which is what the panel's ↻ shows — plus
+      // each source's own age behind it. The aggregate alone was misleading: these tiers run from
+      // 90 to 180 days and are cached per source, so one untouched store page dates the whole
+      // readout, and "5 months ago" says nothing about the rating fetched yesterday. The panel
+      // puts the breakdown in the button's tooltip so the visible figure stays one number.
       return {
-        // Age of the oldest of this game's cached sources — the panel's ↻ puts it in its own
-        // tooltip rather than on screen: these tiers run to months, and for a game whose store
-        // page genuinely hasn't changed since 2013 a prominent "5 months ago" would invite
-        // clicks that spend the app's most rate-limited upstream (storeLimit) to re-fetch data
-        // that was already right. Available to whoever wonders; not advertised to everyone.
         fetchedAt: oldestCachedAt([`rating:${appid}`, `hltb:${appid}`, `meta:${appid}`, `browse:${appid}`, `protondb:${appid}`]),
+        fetchedAts: {
+          rating:   getCachedAt(`rating:${appid}`)   ?? null,
+          hltb:     getCachedAt(`hltb:${appid}`)     ?? null,
+          meta:     getCachedAt(`meta:${appid}`)     ?? null,
+          tags:     getCachedAt(`browse:${appid}`)   ?? null,
+          protondb: getCachedAt(`protondb:${appid}`) ?? null,
+        },
         rating:   ratingRes.status   === 'fulfilled' ? ratingRes.value   : null,
         hltb:     hltbRes.status     === 'fulfilled' ? hltbRes.value     : null,
         meta:     metaRes.status     === 'fulfilled' ? metaRes.value     : null,

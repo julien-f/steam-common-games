@@ -101,7 +101,7 @@ import {
   type RefDescription, type ListNaming,
 } from './listLabels.ts';
 import { setBaseTitle } from './pageTitle.ts';
-import type { AccountSlot, Game, Rating, Hltb, GameMeta, ProtonDb, GameList, CombineOp } from './types.ts';
+import type { AccountSlot, DetailsAges, Game, Rating, Hltb, GameMeta, ProtonDb, GameList, CombineOp } from './types.ts';
 import { getList, getLists, getFolders, createList, addAppidsToList, removeAppidsFromList, setListTableView } from './listsStore.ts';
 import { resolveListWithSources, flattenCombineResult, createDefaultFetchers } from './listResolve.ts';
 import type { MembershipGroup } from './combine.ts';
@@ -216,13 +216,14 @@ const MAX_PRICE_LOOKUP_GAMES = 500; // mirrors the server's own cap — see load
 
 // The shape of one `data:` line in /api/game-details/stream's SSE response.
 interface DetailsEvent {
-  appid: number; done?: boolean; fetchedAt?: number | null;
+  appid: number; done?: boolean; fetchedAt?: number | null; fetchedAts?: DetailsAges | null;
   rating: Rating | null; hltb: Hltb | null; meta: GameMeta | null; tags: string[] | null;
   demo: { appid: number } | null; protondb: ProtonDb | null;
 }
 
 function applyDetailsEvent(row: Game, event: DetailsEvent) {
   row.detailsFetchedAt = event.fetchedAt ?? null;
+  row.detailsFetchedAts = event.fetchedAts ?? null;
   row.capsule           = event.meta?.capsule ?? null;
   if (!row.name) row.name = event.meta?.name || '';
   row.score             = event.rating?.score ?? null;

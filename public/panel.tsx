@@ -19,7 +19,7 @@ import type { PanelHistoryEntry } from './panelHistory.ts';
 import { setGameTitle } from './pageTitle.ts';
 import { withAccountParam } from './urlState.ts';
 import { copyWithFeedback } from './clipboard.ts';
-import type { Game, PriceFields, ReadonlyGame } from './types.ts';
+import type { DetailsAges, Game, PriceFields, ReadonlyGame } from './types.ts';
 
 import { createSignal, createEffect, createMemo, createResource, createRoot, For, Show, type JSX } from 'solid-js';
 import { render } from 'solid-js/web';
@@ -1499,6 +1499,35 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
 // only inside this button's `title`, which a touch device never shows at all: the panel was the
 // one surface stating no data age anywhere on screen, while being the surface a stale rating or
 // playtime estimate is actually read from.
+// What the visible figure is the oldest of, in the order the panel itself reads them. The number
+// on the button is one age for five separately-cached sources whose TTLs run 90–180 days, so it
+// is routinely dated by whichever one nobody has had a reason to re-fetch since — the breakdown
+// is what makes it interpretable, and the tooltip is where it fits without turning a button into
+// a table.
+const DETAILS_SOURCES: [keyof DetailsAges, string][] = [
+  ['rating', 'Reviews'],
+  ['hltb', 'How Long To Beat'],
+  ['meta', 'Store details'],
+  ['tags', 'Tags'],
+  ['protondb', 'ProtonDB'],
+];
+
+function refreshTitle(game: ReadonlyGame): string {
+  const ages = game.detailsFetchedAts;
+  const lines = ages
+    ? DETAILS_SOURCES.filter(([key]) => ages[key] !== undefined).map(([key, label]) => `${label}: ${fmtAge(ages[key])}`)
+    : [];
+  // The price is deliberately conditional: a game whose list already priced it is not re-priced
+  // from here (see panelData's priceSource), which is exactly the case a reader would otherwise
+  // have to discover by clicking and watching nothing happen.
+  const pricedHere = game.bestDealPrice === undefined;
+  return [
+    ...lines,
+    `${lines.length ? '\n' : ''}Click to re-fetch these, plus news, achievements${pricedHere ? ' and price' : ''}.`,
+    ...(pricedHere ? [] : ["The price came from this list — refresh it on the list's own Prices tile."]),
+  ].join('\n');
+}
+
 function RefreshButton(props: { game: ReadonlyGame }): JSX.Element {
   const age = () => props.game.detailsFetchedAt === undefined ? '' : fmtAge(props.game.detailsFetchedAt);
   return (
@@ -1507,7 +1536,7 @@ function RefreshButton(props: { game: ReadonlyGame }): JSX.Element {
         type="button"
         class="panel-refresh-btn"
         disabled={panelRefreshing()}
-        title="How old this game's rating, HLTB and store details are — click to re-fetch them, along with its news, achievements and price"
+        title={refreshTitle(props.game)}
         aria-label="Refresh details"
         onClick={handlePanelRefresh}
       >

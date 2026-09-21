@@ -16,6 +16,7 @@ const http = require('node:http');
 const supertest = require('supertest');
 const { app } = require('../server');
 const { _reset, setCache } = require('../lib/cache');
+const { db } = require('../lib/db');
 const { _resetAuth } = require('../lib/hltb');
 const { _resetStoreCircuitBreaker } = require('../lib/steam');
 
@@ -565,6 +566,33 @@ test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) 
   assert.equal(res.body.demo, 1714800);
   assert.equal(res.body.protondb?.tier, 'gold');
   assert.equal(fetchCalled, false);
+});
+
+test('GET /api/game-details/:appid: dates each source separately, and fetchedAt is the oldest of them', async (t) => {
+  _reset();
+  // Deliberately staggered: the panel's ↻ shows one figure for five sources cached under tiers
+  // of 90-180 days, so an old store page dating the whole readout is the normal case — the
+  // per-source breakdown behind it is what makes that figure interpretable.
+  setCache('rating:402',   { total_reviews: 10, total_positive: 9, review_score_desc: 'Positive' });
+  setCache('hltb:402',     [{ game_id: 1, game_name: 'X', comp_main: 3600 }]);
+  setCache('meta:402',     { name: 'X' });
+  setCache('browse:402',   { tagids: TAG_IDS });
+  setCache('tagnames:all', TAG_NAME_MAP);
+  setCache('protondb:402', { tier: 'gold' });
+  const now = Date.now();
+  // Backdated in place — the only way to get entries of genuinely different ages in one test
+  // (setCache always stamps now). `meta:` lives in cache_meta, `rating:` in its own table.
+  db.prepare('UPDATE cache_meta SET ts = ? WHERE key = ?').run(now - 5 * 86400000, 'meta:402');
+  db.prepare('UPDATE cache_rating SET ts = ? WHERE key = ?').run(now - 86400000, 'rating:402');
+
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('should not fetch'); });
+  const res = await api.get('/api/game-details/402');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.fetchedAts.meta, now - 5 * 86400000);
+  assert.equal(res.body.fetchedAts.rating, now - 86400000);
+  assert.ok(res.body.fetchedAts.hltb > now - 86400000, 'untouched entries keep their own write time');
+  // The visible figure is the oldest of the five, not the newest and not an average.
+  assert.equal(res.body.fetchedAt, now - 5 * 86400000);
 });
 
 test('GET /api/game-details/:appid: 200 fetching fresh rating, HLTB, meta and tags', async (t) => {
