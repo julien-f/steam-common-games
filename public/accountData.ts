@@ -196,16 +196,21 @@ export async function fetchAccountWishlistItems(members: string[], opts: { refre
 
 // listResolve.ts's ListResolveFetchers.accountOwned/accountWishlist — just the flat appid set,
 // resolving accountId back to members via membersFromAccountId above.
-export async function fetchAccountOwnedAppids(accountId: string): Promise<Set<number>> {
-  return (await fetchAccountOwnedData(accountId)).appids;
+export async function fetchAccountOwnedAppids(accountId: string, opts: { refresh?: boolean } = {}): Promise<Set<number>> {
+  return (await fetchAccountOwnedData(accountId, opts)).appids;
 }
 
 // Both halves of what myOwnership.ts keeps per account — the owned-appid set behind the ✓/☆
 // markers, and the per-member breakdown behind the panel's "Owned by" card — from one request,
-// since /api/common-games returns both in the same response.
-export async function fetchAccountOwnedData(accountId: string): Promise<{ appids: Set<number>; owners: Map<number, GameOwner[]> }> {
-  const { games, owners } = await fetchAccountOverview(membersFromAccountId(accountId));
-  return { appids: new Set(games.map(g => g.appid)), owners };
+// since /api/common-games returns both in the same response. `fetchedAt` rides along for the
+// third caller (listResolve.ts's createDefaultFetchers): a comparison or a dynamic list is built
+// out of these sets, and its own hero has to be able to say how old they are.
+export async function fetchAccountOwnedData(
+  accountId: string,
+  opts: { refresh?: boolean } = {},
+): Promise<{ appids: Set<number>; owners: Map<number, GameOwner[]>; fetchedAt: number | null }> {
+  const { games, owners, fetchedAt } = await fetchAccountOverview(membersFromAccountId(accountId), opts);
+  return { appids: new Set(games.map(g => g.appid)), owners, fetchedAt };
 }
 
 export interface AccountFriend {
@@ -319,7 +324,16 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
   return { members, label, avatarUrl, vanities, memberSince, countryCode, realName, ownedCount, wishlistCount };
 }
 
-export async function fetchAccountWishlistAppids(accountId: string): Promise<Set<number>> {
-  const items = await fetchAccountWishlistItems(membersFromAccountId(accountId));
-  return new Set(items.map(i => i.appid));
+export async function fetchAccountWishlistAppids(accountId: string, opts: { refresh?: boolean } = {}): Promise<Set<number>> {
+  return (await fetchAccountWishlistData(accountId, opts)).appids;
+}
+
+// The wishlist counterpart of fetchAccountOwnedData — appids plus the age of the server's copy,
+// for the same reason (see there).
+export async function fetchAccountWishlistData(
+  accountId: string,
+  opts: { refresh?: boolean } = {},
+): Promise<{ appids: Set<number>; fetchedAt: number | null }> {
+  const { items, fetchedAt } = await fetchAccountWishlist(membersFromAccountId(accountId), opts);
+  return { appids: new Set(items.map(i => i.appid)), fetchedAt };
 }

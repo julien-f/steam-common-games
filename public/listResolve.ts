@@ -14,7 +14,7 @@
 // answer" principle.
 import type { GameList, ListRef, CombineOp } from './types.ts';
 import { combine, type LabeledSet, type CombineResult } from './combine.ts';
-import { fetchAccountOwnedAppids, fetchAccountWishlistAppids } from './accountData.ts';
+import { fetchAccountOwnedData, fetchAccountWishlistData } from './accountData.ts';
 import { fetchBundleAppids } from './bundleData.ts';
 import { loadRecentGames } from './recentGames.ts';
 import { getList } from './listsStore.ts';
@@ -147,15 +147,41 @@ export function flattenCombineResult(result: CombineResult): Set<number> {
   return flat;
 }
 
+// `refresh` forces every account fetch this resolve makes past the server's cache — a
+// comparison and a dynamic list are built out of the same cached libraries /lists/owned can
+// re-fetch, and had no way to say so. `onFetchedAt` reports how old each of those copies was
+// (null = fetched fresh for this very request), once per account source, so the route can show
+// one age for the whole list.
+//
+// Both live here rather than on ListResolveFetchers itself: the seam is the *pure* one the
+// resolver and its tests use, and neither forcing a network call nor reporting a cache age
+// means anything to a fake fetcher. Baking them into the real wiring instead leaves
+// resolveRef/resolveGameList — and every test mock — untouched.
+export interface DefaultFetchersOptions {
+  refresh?: boolean;
+  onFetchedAt?: (fetchedAt: number | null) => void;
+}
+
 // The real ListResolveFetchers, wiring the injectable seam above to actual network calls
 // (accountData.ts/bundleData.ts), localStorage (recentGames.ts), and listsStore.ts's own
 // synchronous getList — what real routes construct and pass to resolveRef/
 // resolveGameList. Tests keep using their own mocked fetchers (see listResolve.test.js), so
 // this module itself never needs a real network/localStorage.
-export function createDefaultFetchers(): ListResolveFetchers {
+export function createDefaultFetchers({ refresh = false, onFetchedAt }: DefaultFetchersOptions = {}): ListResolveFetchers {
   return {
-    accountOwned: fetchAccountOwnedAppids,
-    accountWishlist: fetchAccountWishlistAppids,
+    accountOwned: async accountId => {
+      const { appids, fetchedAt } = await fetchAccountOwnedData(accountId, { refresh });
+      onFetchedAt?.(fetchedAt);
+      return appids;
+    },
+    accountWishlist: async accountId => {
+      const { appids, fetchedAt } = await fetchAccountWishlistData(accountId, { refresh });
+      onFetchedAt?.(fetchedAt);
+      return appids;
+    },
+    // No refresh and no age for the other two: GET /api/bundles/:id has no force path at all
+    // (server.js — finding one bundle walks several cached pages, so forcing it costs several
+    // upstream calls), and the recent-games list is this browser's own localStorage.
     bundle: fetchBundleAppids,
     recentGames: async () => new Set(loadRecentGames().map(g => g.appid)),
     getList,

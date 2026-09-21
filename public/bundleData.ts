@@ -58,12 +58,20 @@ export function flattenBundleGames(bundle: Bundle): FlatGame[] {
   return [...seen.values()];
 }
 
-export async function fetchBundleById(id: number, { country }: { country?: string } = {}): Promise<Bundle> {
+// `fetchedAt` is how old the server's cached copy is (epoch ms, null if it couldn't be dated) —
+// stated on the bundle's own hero card. There is no forcing it: finding one bundle means walking
+// several cached list pages, so GET /api/bundles/:id deliberately has no refresh parameter (see
+// server.js). What *is* refreshable on that screen is each game's own details (the panel's ↻)
+// and the whole list's prices (↻ Refresh prices).
+export async function fetchBundleById(
+  id: number,
+  { country }: { country?: string } = {},
+): Promise<{ bundle: Bundle; fetchedAt: number | null }> {
   const qs = country ? `?${new URLSearchParams({ country })}` : '';
   const res = await fetch(`/api/bundles/${id}${qs}`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Bundle lookup failed');
-  return data.bundle; // GET /api/bundles/:id wraps it as { bundle: {...} }
+  return { bundle: data.bundle, fetchedAt: data.fetchedAt ?? null };
 }
 
 // gid -> a Steam appid (the overwhelmingly common case), an array of appids (a Steam "sub"/
@@ -110,7 +118,7 @@ export async function resolveBundleGames(bundle: Bundle): Promise<{ resolved: Re
 
 // listResolve.ts's ListResolveFetchers.bundle — just the flat, resolved appid set.
 export async function fetchBundleAppids(bundleId: string): Promise<Set<number>> {
-  const bundle = await fetchBundleById(Number(bundleId));
+  const { bundle } = await fetchBundleById(Number(bundleId));
   const { resolved } = await resolveBundleGames(bundle);
   return new Set(resolved.map(g => g.appid));
 }

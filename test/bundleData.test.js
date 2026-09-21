@@ -60,13 +60,20 @@ test('flattenBundleGames: no tiers at all yields an empty list', () => {
 
 // ── fetchBundleById ──────────────────────────────────────────────────────────────────────────
 
-test('fetchBundleById: fetches GET /api/bundles/:id, with an optional country param, and unwraps the { bundle } response', async (t) => {
+test('fetchBundleById: fetches GET /api/bundles/:id, with an optional country param, and unwraps the { bundle, fetchedAt } response', async (t) => {
   let seenUrl;
-  withFetch(t, async url => { seenUrl = url; return { ok: true, json: async () => ({ bundle: { id: 42, title: 'Bundle' } }) }; });
+  withFetch(t, async url => { seenUrl = url; return { ok: true, json: async () => ({ bundle: { id: 42, title: 'Bundle' }, fetchedAt: 1700000000000 }) }; });
 
-  const bundle = await fetchBundleById(42, { country: 'US' });
+  const { bundle, fetchedAt } = await fetchBundleById(42, { country: 'US' });
   assert.equal(seenUrl, '/api/bundles/42?country=US');
   assert.equal(bundle.id, 42);
+  // How old the server's cached copy is — the bundle hero's own Updated tile.
+  assert.equal(fetchedAt, 1700000000000);
+});
+
+test('fetchBundleById: a response with no fetchedAt at all reports null, not undefined', async (t) => {
+  withFetch(t, async () => ({ ok: true, json: async () => ({ bundle: { id: 7 } }) }));
+  assert.equal((await fetchBundleById(7)).fetchedAt, null);
 });
 
 test('fetchBundleById: no country param when omitted', async (t) => {

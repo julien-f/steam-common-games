@@ -81,7 +81,9 @@ test('findBundleById: finds a bundle on the first page of active bundles', async
   _reset();
   t.mock.method(globalThis, 'fetch', makeBundlesPager({ active: [{ id: 42, title: 'Found Me' }] }));
   const result = await findBundleById(42, { country: 'US' });
-  assert.equal(result?.title, 'Found Me');
+  assert.equal(result?.bundle?.title, 'Found Me');
+  // The page it was found on, so the route can date what it returns (getCachedAt).
+  assert.equal(result?.cacheKey, 'itad-bundles:US:-publish:false:0:50');
 });
 
 test('findBundleById: pages through active bundles before falling back to expired ones', async (t) => {
@@ -90,7 +92,8 @@ test('findBundleById: pages through active bundles before falling back to expire
   const target = { id: 999, title: 'Expired Target' };
   t.mock.method(globalThis, 'fetch', makeBundlesPager({ active: page1, expired: [...page1, target] }));
   const result = await findBundleById(999, { country: 'US' });
-  assert.equal(result?.title, 'Expired Target');
+  assert.equal(result?.bundle?.title, 'Expired Target');
+  assert.equal(result?.cacheKey, 'itad-bundles:US:-publish:true:50:50');
 });
 
 // The deep-link path inherits getBundles' mature handling — a link to a mature-flagged bundle has

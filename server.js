@@ -756,11 +756,14 @@ app.get('/api/bundles/:id', bundlesByIdLimit, async (req, res) => {
   }
   const country = parseCountry(req);
   try {
-    const bundle = await findBundleById(id, { country });
-    if (!bundle) {
+    const found = await findBundleById(id, { country });
+    if (!found) {
       return res.status(404).json({ error: 'Bundle not found — it may be older than what we search, or already fully expired' });
     }
-    res.json({ bundle });
+    // Age of the cached list page this bundle was found on — the same page cache GET /api/bundles
+    // reports for the browse list. There's no forcing it (see this route's own note above), so
+    // this is stated rather than actionable: it says how old the tiers/dates on screen are.
+    res.json({ bundle: found.bundle, fetchedAt: getCachedAt(found.cacheKey) ?? null });
   } catch (err) {
     const status = routeErrorStatus('bundles-by-id', err);
     res.status(status).json({ error: err.message });

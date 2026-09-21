@@ -293,7 +293,17 @@ export default function ListRoute() {
   // tile, which is also the control that forces one (see heroTiles). Steam data is cached server-side for weeks (default.env's
   // LIBRARY_CACHE_TTL_MINUTES), so the age of what's on screen is stated rather than guessed at,
   // and forcing past it is one click from the list itself instead of only from Home.
-  const [fetchedAt, setFetchedAt] = createSignal<number | null>(null);
+  // `undefined` = this list has no server-cached data age to state at all (nothing loaded yet,
+  // a manual list, the recent list) — which is not the same as `null`, "fetched fresh just now".
+  const [fetchedAt, setFetchedAt] = createSignal<number | null | undefined>(undefined);
+  // A comparison/dynamic list is built from several account fetches, each with its own age:
+  // report the *oldest*, since that's the staleness the reader is actually exposed to. A `null`
+  // (fetched fresh for this request) counts as now rather than winning outright, or one fresh
+  // source would hide three-day-old ones behind a reassuring "just now".
+  function noteFetchedAt(at: number | null): void {
+    const t = at ?? Date.now();
+    setFetchedAt(prev => (prev === undefined || prev === null ? t : Math.min(prev, t)));
+  }
   const [refreshing, setRefreshing] = createSignal(false);
   // The page-level "↻ Refresh prices" button (wishlist/bundle kinds). Deliberately one control
   // for the whole list rather than per-game: pricing is fetched as a single batched ITAD call
@@ -1135,6 +1145,9 @@ export default function ListRoute() {
       setHeroAccount(null);
     }
     setListSources([]);
+    // Every kind that has one re-reports it during this load; a kind that doesn't (manual list,
+    // recents) must not keep showing the previous list's.
+    setFetchedAt(undefined);
     tableContainer.innerHTML = '';
     groupsContainer.innerHTML = '';
 
@@ -1142,8 +1155,13 @@ export default function ListRoute() {
     let streamTargets: { appid: number }[];
     resolvedBundleGames = null;
     let pendingGroups: MembershipGroup[] | null = null;
-    setUserList(null);
-    setCompareList(null);
+    // Not cleared on a ↻ Refresh of the list already on screen, for the same reason heroTitle
+    // isn't (above): these back the hero's own tiles, and emptying them mid-refresh unmounts the
+    // tile strip — including the Updated tile the refresh was just clicked on.
+    if (!refresh) {
+      setUserList(null);
+      setCompareList(null);
+    }
     setSelectedRows([]); // a fresh load means a fresh table — nothing carries a prior selection over
     setSelectionActionStatus('');
 
@@ -1199,7 +1217,7 @@ export default function ListRoute() {
       setStatusText('Comparing libraries…');
       let appids: Set<number>;
       try {
-        const { result, sources } = await resolveListWithSources(list, createDefaultFetchers());
+        const { result, sources } = await resolveListWithSources(list, createDefaultFetchers({ refresh, onFetchedAt: noteFetchedAt }));
         if (loadGuard.isStale(gen)) return;
         const described = describeSources(list, compareNaming());
         setListSources(sources.map((source, i) => ({
@@ -1237,7 +1255,7 @@ export default function ListRoute() {
       const isGroupMode = list.kind === 'dynamic' && list.op === 'group-by-membership';
       let appids: Set<number>;
       try {
-        const { result, sources } = await resolveListWithSources(list, createDefaultFetchers());
+        const { result, sources } = await resolveListWithSources(list, createDefaultFetchers({ refresh, onFetchedAt: noteFetchedAt }));
         if (loadGuard.isStale(gen)) return;
         const described = describeSources(list, createDefaultNaming());
         setListSources(sources.map((source, i) => ({ ...source, desc: described[i] })));
@@ -1274,8 +1292,11 @@ export default function ListRoute() {
     } else if (kind === 'bundle') {
       setStatusText('Resolving games to Steam…');
       try {
-        const bundle = await fetchBundleById(Number(params.bundleId), { country: resolveRegion(getStoredRegion()) });
+        const { bundle, fetchedAt: bundleFetchedAt } = await fetchBundleById(Number(params.bundleId), { country: resolveRegion(getStoredRegion()) });
         if (loadGuard.isStale(gen)) return;
+        // Stated, not actionable — the single-bundle endpoint has no force path (see
+        // fetchBundleById). Still worth saying: a bundle's tiers and end date are read here.
+        noteFetchedAt(bundleFetchedAt);
         setListTitle(bundle.title);
         setBundleLinks({ details: bundle.details, url: bundle.url });
         setBundleMeta({
@@ -1580,6 +1601,17 @@ export default function ListRoute() {
     // Date only — the hour matters for a deadline, not for when a bundle went live, and the
     // browse table's own Published column still carries it.
     if (meta.publish) tiles.push({ label: 'Published', value: fmtBundleDateFriendly(meta.publish) });
+    // The one Updated tile in the app that isn't also its own refresh control: a bundle is found
+    // by walking several cached list pages, so there is no force path to hang on it (see
+    // bundleData.ts's fetchBundleById). Stated anyway — the tiers and the end date above are
+    // read off this copy — with the tooltip naming what *can* be re-fetched here.
+    if (fetchedAt() !== undefined) {
+      tiles.push({
+        label: 'Updated',
+        value: fmtAge(fetchedAt()),
+        title: "How old the server's cached copy of this bundle is. It can't be forced from here — but each game's own details can (the panel's ↻), and so can the prices",
+      });
+    }
     tiles.push(priceTile());
     return tiles;
   }
@@ -1591,11 +1623,17 @@ export default function ListRoute() {
     // form waiting to be filled in.
     if (kind === 'compare' && !compareList()) return [];
     const tiles: HeroTile[] = [{ label: 'Games', value: rowsStore.length }];
-    if (kind === 'owned' || kind === 'wishlist') {
+    // Owned/wishlist state their own fetch's age; a comparison or a dynamic list states the
+    // oldest of the account fetches it was built from (noteFetchedAt), which is why this is
+    // gated on there *being* an age rather than on the kind — a manual list is assembled from
+    // stored appids and has none, and neither does the recent list.
+    if (fetchedAt() !== undefined || refreshing()) {
       tiles.push({
         label: 'Updated',
         value: refreshTileValue(refreshing() ? 'Refreshing…' : fmtAge(fetchedAt())),
-        title: "How old the server's cached copy of this account's list is — click to force a fresh fetch",
+        title: kind === 'owned' || kind === 'wishlist'
+          ? "How old the server's cached copy of this account's list is — click to force a fresh fetch"
+          : "How old the oldest library this list was built from is — click to re-fetch them all",
         // This tile *is* the ↻ Refresh the actions row used to carry: the staleness is stated
         // here, so this is where the reader already is when they decide to do something about it.
         // ↻ Refresh prices stays a button — it's a different fetch, and the Prices tile's own
