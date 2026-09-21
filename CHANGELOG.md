@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **`npm install`/`npm ci` no longer emit 78 `ERESOLVE` peer warnings, and `npm ls` no longer exits non-zero marking `typescript@7.0.2` `invalid`.** The warnings came from `eslint-plugin-solid`'s nested `@typescript-eslint/*` packages, which still peer-require `typescript >=4.8.4 <6.1.0` — a range no published version has widened for TypeScript 7, so no bump silences it. A scoped `overrides` block in `package.json` points those four packages' `typescript` peer at the root's own spec instead. Nothing in the tree actually loads TypeScript through them (the linter parses with `@babel/eslint-parser`, and none of its rules are type-aware), and the resolved tree is unchanged — `package-lock.json` is byte-identical before and after. Full suite (918), typecheck, lint (0 problems) and `npm run build` clean; `npm audit` 0 vulnerabilities.
+
 - Updated `@babel/core`, `@babel/eslint-parser`, `eslint`, `hls.js` and `morgan` to their latest in-range patch versions, and `dotenv` to 18.0.1 (none of its breaking removals — CLI preloading, `.env.vault` — apply here).
 
 - `db.sqlite`'s schema now upgrades through incremental migrations (`lib/db.js`) instead of dropping and recreating every table on a version bump — a live database's data, cache rows included, survives a schema change.
