@@ -41,6 +41,13 @@ export interface HeroTile {
   // A tile whose action is momentarily unavailable (a refresh already in flight). Still a button,
   // so the row doesn't reflow as it flips back and forth.
   disabled?: boolean;
+  // A second action, on the `sub` line — for the one tile that states two facts a reader can act
+  // on separately (Prices: the region its value names, opened with the tile's own click, and how
+  // old those prices are, re-fetched with this one). A tile with one gives up being a button
+  // itself, since the two controls would otherwise have to nest, which HTML doesn't allow.
+  subOnClick?: () => void;
+  subDisabled?: boolean;
+  subTitle?: string;
 }
 
 export interface ListHeroProps {
@@ -70,17 +77,42 @@ export function ListHero(props: ListHeroProps): JSX.Element {
           <Index each={props.tiles}>
             {tile => (
               <Dynamic
-                component={tile().onClick ? 'button' : 'div'}
-                class={tile().onClick ? 'list-stat list-stat-btn' : 'list-stat'}
-                type={tile().onClick ? 'button' : undefined}
-                aria-pressed={tile().onClick ? !!tile().active : undefined}
-                disabled={tile().onClick ? !!tile().disabled : undefined}
-                onClick={() => tile().onClick?.()}
+                component={tile().onClick && !tile().subOnClick ? 'button' : 'div'}
+                class={tile().onClick && !tile().subOnClick ? 'list-stat list-stat-btn' : 'list-stat'}
+                type={tile().onClick && !tile().subOnClick ? 'button' : undefined}
+                aria-pressed={tile().onClick && !tile().subOnClick ? !!tile().active : undefined}
+                disabled={tile().onClick && !tile().subOnClick ? !!tile().disabled : undefined}
+                onClick={tile().subOnClick ? undefined : () => tile().onClick?.()}
               >
                 <span class="list-stat-label">{tile().label}</span>
-                <span class="list-stat-value" title={tile().title}>{tile().value}</span>
+                {/* Two actions means two buttons side by side inside a plain tile — a button
+                    can't contain another one. With one (or none) the whole tile is the control,
+                    which is the bigger, better hit area. */}
+                <Show
+                  when={tile().onClick && tile().subOnClick}
+                  fallback={<span class="list-stat-value" title={tile().title}>{tile().value}</span>}
+                >
+                  <button
+                    type="button"
+                    class="list-stat-value list-stat-btn"
+                    title={tile().title}
+                    disabled={!!tile().disabled}
+                    onClick={() => tile().onClick?.()}
+                  >{tile().value}</button>
+                </Show>
                 <Show when={tile().sub}>
-                  <span class="list-stat-sub">{tile().sub}</span>
+                  <Show
+                    when={tile().subOnClick}
+                    fallback={<span class="list-stat-sub">{tile().sub}</span>}
+                  >
+                    <button
+                      type="button"
+                      class="list-stat-sub list-stat-btn"
+                      title={tile().subTitle}
+                      disabled={!!tile().subDisabled}
+                      onClick={() => tile().subOnClick?.()}
+                    >{tile().sub}</button>
+                  </Show>
                 </Show>
               </Dynamic>
             )}

@@ -93,4 +93,4 @@ Press `?` for the full list. The essentials: `/` focuses search, `Esc` closes wh
 
 ## How fresh is this?
 
-Everything is cached, and every screen that shows cached data says how old it is and offers a ↻ to fetch fresh — per account on the home page, per game in the panel, and per list for prices.
+Everything is cached, and every screen that shows cached data says how old it is — and the age itself is the button that fetches fresh. That's the account card and the friends list on the home page, the "Updated" figure in a list's header (your library, a wishlist, a comparison, a dynamic list, the bundle browser), and the ↻ beside a game's name in the panel. Prices come from a different source, so they carry their own age and their own ↻ on the second line of the "Prices" figure — the first line names the region and opens the setting. One exception: a single bundle's page states its age but can't force a re-fetch — finding one bundle means searching several pages of IsThereAnyDeal's list — so refresh its prices, or an individual game, instead.

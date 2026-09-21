@@ -4,11 +4,17 @@
 // reactivity rules require a primitive resource source, not the AccountSlot object itself.
 import { createResource, createMemo, For, Show, type JSX } from 'solid-js';
 import { fetchAccountFriends, membersFromAccountId, type AccountFriend } from './accountData.ts';
-import { steamVanity } from './utils.ts';
+import { fmtAge, steamVanity } from './utils.ts';
 import type { AccountSlot } from './types.ts';
 
-async function loadFriends(accountId: string): Promise<{ friends: AccountFriend[]; unavailable: string[] }> {
-  return fetchAccountFriends(membersFromAccountId(accountId));
+// `info.refetching` is what the ↻ below sets — the same "a refetch means force" convention the
+// side panel's own resources use (see panelData.ts), bypassing both the server's cache and
+// Steam's copy of a friends list that changes far more often than the long TTL it's cached for.
+async function loadFriends(
+  accountId: string,
+  info: { refetching: boolean | unknown },
+): Promise<{ friends: AccountFriend[]; unavailable: string[]; fetchedAt: number | null }> {
+  return fetchAccountFriends(membersFromAccountId(accountId), { refresh: info.refetching === true });
 }
 
 // A friend as a single-account AccountSlot, built entirely from data this component already has
@@ -31,7 +37,7 @@ function toAccountSlot(f: AccountFriend): AccountSlot {
 }
 
 export function AccountFriends(props: { accountId: string; myAccountId: string | null; onExplore: (account: AccountSlot) => void }): JSX.Element {
-  const [explored] = createResource(() => props.accountId, loadFriends);
+  const [explored, { refetch: refetchExplored }] = createResource(() => props.accountId, loadFriends);
   // Only fetched when exploring somebody else's account — comparing an account's friends against
   // its own friends would mark every single one of them "mutual", which says nothing useful.
   const [mine] = createResource(
@@ -57,6 +63,20 @@ export function AccountFriends(props: { accountId: string; myAccountId: string |
       {data => (
         <details class="account-friends">
           <summary>Friends ({data().friends.length})</summary>
+          {/* Same age-is-the-control shape as the list heroes' Updated tile and the panel's own
+              ↻ — inside the disclosure rather than in its summary, since clicking a button in a
+              <summary> would also toggle the disclosure it sits in. */}
+          <p class="account-friends-meta">
+            <button
+              type="button"
+              class="account-friends-refresh"
+              disabled={explored.loading}
+              title="How old the server's cached copy of this friends list is — click to re-fetch it from Steam"
+              onClick={() => void refetchExplored()}
+            >
+              Updated {explored.loading ? 'Refreshing…' : fmtAge(data().fetchedAt)} <span class="account-friends-refresh-icon">↻</span>
+            </button>
+          </p>
           <Show when={data().unavailable.length > 0}>
             <p class="account-friends-note">
               Friends list is private for {data().unavailable.length} member{data().unavailable.length > 1 ? 's' : ''}.

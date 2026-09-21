@@ -1291,7 +1291,11 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 }
 .panel-refresh-btn:hover:not(:disabled), .panel-copy-link-btn:hover { border-color: var(--accent); color: var(--accent2); }
 .panel-refresh-btn:disabled { opacity: 0.6; cursor: default; }
-.panel-refresh-btn.is-refreshing { animation: spin 0.75s linear infinite; }
+/* Wider than the icon buttons beside it: it carries the details' age as text (see panel.tsx's
+   RefreshButton), so it sizes to its content instead of being a 26px square. */
+.panel-refresh-btn { width: auto; min-width: 26px; padding: 0 7px; gap: 5px; }
+.panel-refresh-age { font-size: 11px; white-space: nowrap; }
+.panel-refresh-icon.is-refreshing { animation: spin 0.75s linear infinite; }
 /* Brief post-click feedback (see clipboard.ts's copyWithFeedback) — green rather than the
    hover accent, so "copied" reads as a distinct confirmation, not just a hover state. */
 .panel-copy-link-btn--copied { border-color: #15803d; color: #15803d; }
@@ -2338,6 +2342,15 @@ kbd {
 }
 .list-stat-btn:hover .list-stat-label,
 .list-stat-btn:focus-visible .list-stat-label { color: var(--accent2); }
+/* A tile carrying two actions (Prices: region + price age) can't be one button, so each half is
+   its own — which means re-stating the sizes `font: inherit` above resets, and hovering the part
+   itself rather than the shared label. */
+.list-stat-value.list-stat-btn { font-size: 14px; color: var(--text0); }
+.list-stat-sub.list-stat-btn { font-size: 11px; color: var(--text1); }
+.list-stat-value.list-stat-btn:hover:not(:disabled),
+.list-stat-value.list-stat-btn:focus-visible,
+.list-stat-sub.list-stat-btn:hover:not(:disabled),
+.list-stat-sub.list-stat-btn:focus-visible { color: var(--accent2); }
 .list-stat-btn[aria-pressed="true"] .list-stat-label { color: var(--accent); }
 .list-stat-icon { font-size: 11px; color: var(--text1); }
 .list-stat-btn:hover .list-stat-icon,
@@ -2547,6 +2560,17 @@ kbd {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   font-size: 11px; color: var(--text2); margin-top: 4px;
 }
+.account-updated-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.account-updated-btn:hover:not(:disabled), .account-updated-btn:focus-visible { color: var(--accent2); }
+.account-updated-btn:disabled { cursor: default; }
 
 /* The card's own larger avatar, against .account-avatar-wrap's 28px default. */
 .account-avatar-lg, .account-avatar-lg .account-avatar { width: 48px; height: 48px; }
@@ -2573,6 +2597,20 @@ kbd {
 }
 .account-friends[open] summary { margin-bottom: 8px; }
 .account-friends-note { font-size: 12px; color: var(--text1); margin: 0 0 8px; }
+.account-friends-meta { margin: 0 0 8px; }
+.account-friends-refresh {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text1);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.account-friends-refresh:hover:not(:disabled), .account-friends-refresh:focus-visible { color: var(--accent2); }
+.account-friends-refresh:disabled { cursor: default; }
+.account-friends-refresh-icon { font-size: 11px; }
 .account-friends-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
 .account-friends-list li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .account-friends-list li .btn { margin-left: auto; }

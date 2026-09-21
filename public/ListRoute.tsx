@@ -285,7 +285,7 @@ export default function ListRoute() {
   const [statusText, setStatusText] = createSignal('');
   const [priceStatusText, setPriceStatusText] = createSignal('');
   // kind === 'bundle' only: the currently open bundle's Steam-resolved games, kept at component
-  // scope (not load()-local) so "↻ Refresh prices" can re-price exactly what's loaded without
+  // scope (not load()-local) so the Prices tile's own refresh can re-price exactly what's loaded without
   // re-resolving the bundle. Reset by load() itself on every (re)load.
   let resolvedBundleGames: ResolvedGame[] | null = null;
   // Owned/wishlist kinds only: how old the server's cached copy of this account's list is (epoch
@@ -305,7 +305,7 @@ export default function ListRoute() {
     setFetchedAt(prev => (prev === undefined || prev === null ? t : Math.min(prev, t)));
   }
   const [refreshing, setRefreshing] = createSignal(false);
-  // The page-level "↻ Refresh prices" button (wishlist/bundle kinds). Deliberately one control
+  // The Prices tile's own refresh (wishlist/bundle kinds). Deliberately one control
   // for the whole list rather than per-game: pricing is fetched as a single batched ITAD call
   // anyway, so per-row refreshing would add friction with no matching benefit. Re-prices whatever
   // is currently loaded — no re-resolution and no re-streaming of ratings/HLTB/tags.
@@ -1531,19 +1531,27 @@ export default function ListRoute() {
     return names.length ? names.join(' / ') : null;
   }
 
-  // Which region's prices are on screen and how stale they are (wishlist/bundle kinds). Still not
-  // editable here — the ⚙ Preferences popover owns the setting, and a second control would be one
-  // more thing to keep in sync — but clicking the tile now opens that popover instead of leaving
-  // its tooltip to send the reader looking for it. The staleness in `sub` is deliberately *not*
-  // wired to "↻ Refresh prices": one tile can't mean two actions, and the region is the tile's
-  // own value.
+  // Which region's prices are on screen and how stale they are (wishlist/bundle kinds) — the one
+  // tile carrying two separate actions, one per fact. The region is still not *edited* here (the
+  // ⚙ Preferences popover owns the setting, and a second control would be one more thing to keep
+  // in sync); clicking the value just opens that popover rather than leaving its tooltip to send
+  // the reader looking for it.
   function priceTile(): HeroTile {
     return {
       label: 'Prices',
       value: regionLabel(regionCode()),
-      sub: priceFetchedAt() === undefined ? undefined : `Updated ${fmtAge(priceFetchedAt())}`,
       title: 'Prices are shown for this region — click to change it in ⚙ Preferences',
       onClick: openPrefsPopover,
+      // The tile's second control, and what replaced the actions row's own "↻ Refresh prices":
+      // prices are a different fetch from the list itself, so they keep their own age and their
+      // own refresh — but here, next to the age, rather than as a button at the other end of the
+      // card. Offered even before anything has priced, so a failed first price load has a retry.
+      sub: refreshingPrices()
+        ? 'Refreshing prices… ↻'
+        : priceFetchedAt() === undefined ? 'Refresh prices ↻' : `Updated ${fmtAge(priceFetchedAt())} ↻`,
+      subTitle: 'Re-fetch current prices and historical lows for every game in this list',
+      subOnClick: handleRefreshPrices,
+      subDisabled: refreshingPrices(),
     };
   }
 
@@ -1636,8 +1644,8 @@ export default function ListRoute() {
           : "How old the oldest library this list was built from is — click to re-fetch them all",
         // This tile *is* the ↻ Refresh the actions row used to carry: the staleness is stated
         // here, so this is where the reader already is when they decide to do something about it.
-        // ↻ Refresh prices stays a button — it's a different fetch, and the Prices tile's own
-        // click opens the region setting instead.
+        // Prices keep their own age and refresh (a different fetch) on the Prices tile's own
+        // sub-line, not here.
         onClick: handleRefreshList,
         disabled: refreshing(),
       });
@@ -1783,15 +1791,6 @@ export default function ListRoute() {
           </Show>
           <a class="btn btn-ghost btn-sm" href="/bundles">← All bundles</a>
         </>
-      )}
-      {(kind === 'wishlist' || kind === 'bundle') && (
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm"
-          disabled={refreshingPrices()}
-          title="Re-fetch current prices and historical lows for every game in this list"
-          onClick={handleRefreshPrices}
-        >{refreshingPrices() ? '↻ Refreshing prices…' : '↻ Refresh prices'}</button>
       )}
     </>
   );

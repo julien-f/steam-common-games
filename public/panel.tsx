@@ -1494,18 +1494,30 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
   );
 }
 
+// How old this game's details are, and the ↻ that fixes it, as one control — the same shape the
+// list heroes' Updated tile has (ListHero.tsx's refreshTileValue). The age used to be readable
+// only inside this button's `title`, which a touch device never shows at all: the panel was the
+// one surface stating no data age anywhere on screen, while being the surface a stale rating or
+// playtime estimate is actually read from.
 function RefreshButton(props: { game: ReadonlyGame }): JSX.Element {
-  const age = () => props.game.detailsFetchedAt === undefined ? '' : ` — last fetched ${fmtAge(props.game.detailsFetchedAt)}`;
+  const age = () => props.game.detailsFetchedAt === undefined ? '' : fmtAge(props.game.detailsFetchedAt);
   return (
     <Show when={panelOptions.onRefresh && !props.game.loading}>
       <button
         type="button"
-        class={`panel-refresh-btn${panelRefreshing() ? ' is-refreshing' : ''}`}
+        class="panel-refresh-btn"
         disabled={panelRefreshing()}
-        title={`Refresh rating, HLTB & store details for this game${age()}`}
+        title="How old this game's rating, HLTB and store details are — click to re-fetch them, along with its news, achievements and price"
         aria-label="Refresh details"
         onClick={handlePanelRefresh}
-      >↻</button>
+      >
+        <Show when={age()}>
+          <span class="panel-refresh-age">{panelRefreshing() ? 'Refreshing…' : age()}</span>
+        </Show>
+        {/* Only the glyph spins — the animation used to be on the button itself, which now has
+            text in it. */}
+        <span class={`panel-refresh-icon${panelRefreshing() ? ' is-refreshing' : ''}`}>↻</span>
+      </button>
     </Show>
   );
 }

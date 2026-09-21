@@ -458,17 +458,19 @@ export default function HomeRoute() {
                 </div>
                 {/* Steam data is cached server-side for a long time (see default.env's
                     LIBRARY_CACHE_TTL_MINUTES), so the age of what's on screen is stated outright
-                    rather than left to be guessed at, with the ↻ that forces a re-fetch right
-                    next to it. */}
+                    rather than left to be guessed at — and the statement *is* the control that
+                    fixes it, the same shape the list heroes' Updated tile and the side panel's
+                    own ↻ now use, rather than a separate button beside the text. */}
                 <div class="account-updated">
-                  Updated {fmtAge(fetchedAt())}
                   <button
                     type="button"
-                    class="btn btn-ghost btn-sm"
+                    class="account-updated-btn"
                     disabled={refreshing()}
-                    title="Re-fetch this account's games, wishlist and profile from Steam"
+                    title="How old the server's cached copy of this account is — click to re-fetch its games, wishlist and profile from Steam"
                     onClick={() => loadAccountData(account(), { refresh: true })}
-                  >{refreshing() ? '↻ Refreshing…' : '↻ Refresh'}</button>
+                  >
+                    Updated {refreshing() ? 'Refreshing…' : fmtAge(fetchedAt())} <span class="account-updated-icon">↻</span>
+                  </button>
                 </div>
               </div>
             </div>
