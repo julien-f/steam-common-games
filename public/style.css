@@ -2100,6 +2100,15 @@ kbd {
   margin-bottom: 10px;
 }
 
+.pref-unsaved-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--accent2);
+  margin-bottom: 10px;
+}
+
 .table-container { margin-bottom: 18px; }
 
 /* /search's own table (SearchRoute.tsx) — hides @vates/data-table-solid's Columns/Sort/Search/

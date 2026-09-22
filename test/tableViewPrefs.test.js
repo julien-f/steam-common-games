@@ -1,8 +1,11 @@
 'use strict';
 
-const { test } = require('node:test');
+const { test, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { restoreTableView, resetTableView, shareTableView } = require('../public/tableViewPrefs.ts');
+const { restoreTableView, resetTableView, shareTableView, saveTableViewToServer, revertTableViewToServer } = require('../public/tableViewPrefs.ts');
+const { setBaseline, getBaseline, resetBaselines } = require('../public/tableViewSync.ts');
+
+beforeEach(() => { resetBaselines(); });
 
 // tableViewPrefs.js reads/writes `location`/`history` and prefs.js's own localStorage-backed
 // store directly — stub the minimal browser globals it touches, same idea prefs.test.js/
@@ -65,6 +68,77 @@ test('resetTableView: blanks the view and clears the URL param', () => {
     resetTableView(table, 'libraryView', 'lv');
     assert.deepEqual(table.getViewState(), {});
     assert.equal(new URLSearchParams(location.search).has('lv'), false);
+  });
+});
+
+test('saveTableViewToServer: pushes the given value and advances the baseline to match', async () => {
+  await withLocation('', async () => {
+    const restore = globalThis.fetch;
+    let sent;
+    globalThis.fetch = async (url, opts) => { sent = { url, body: JSON.parse(opts.body) }; return { ok: true, json: async () => ({}) }; };
+    const before = Date.now();
+    try {
+      saveTableViewToServer('libraryView', { pageSize: 25 });
+    } finally {
+      globalThis.fetch = restore;
+    }
+
+    assert.equal(sent.url, '/api/me/prefs/libraryView');
+    assert.deepEqual(sent.body.value, { pageSize: 25 });
+    const baseline = getBaseline('libraryView');
+    assert.deepEqual(baseline.value, { pageSize: 25 });
+    assert.ok(baseline.updatedAt >= before);
+  });
+});
+
+test('saveTableViewToServer: strips page/searchQuery before pushing and before storing the baseline', async () => {
+  await withLocation('', async () => {
+    const restore = globalThis.fetch;
+    let sent;
+    globalThis.fetch = async (url, opts) => { sent = { url, body: JSON.parse(opts.body) }; return { ok: true, json: async () => ({}) }; };
+    try {
+      saveTableViewToServer('libraryView', { pageSize: 25, page: 3, searchQuery: 'portal' });
+    } finally {
+      globalThis.fetch = restore;
+    }
+
+    assert.deepEqual(sent.body.value, { pageSize: 25 });
+    assert.deepEqual(getBaseline('libraryView').value, { pageSize: 25 });
+  });
+});
+
+test('revertTableViewToServer: live-patches the table and adopts the baseline locally, without re-pushing it', async () => {
+  await withLocation('', async () => {
+    const { getPref, setSignedInSteamid, _resetSignedInSteamid } = require('../public/prefs.ts');
+    const table = fakeTable({ pageSize: 25 });
+    setBaseline('libraryView', { value: { pageSize: 10 }, updatedAt: 42 });
+    setSignedInSteamid('76561198000000001');
+
+    const restore = globalThis.fetch;
+    let called = false;
+    globalThis.fetch = async () => { called = true; return { ok: true, json: async () => ({}) }; };
+    try {
+      revertTableViewToServer(table, 'libraryView');
+    } finally {
+      globalThis.fetch = restore;
+      _resetSignedInSteamid();
+    }
+
+    assert.deepEqual(table.getViewState(), { pageSize: 10 });
+    assert.deepEqual(getPref('libraryView'), { pageSize: 10 });
+    assert.equal(called, false, 'the reverted-to value must not be pushed back as if it were a fresh edit');
+  });
+});
+
+test('revertTableViewToServer: with no baseline saved yet, reverts to an empty view', () => {
+  return withLocation('', () => {
+    const { getPref } = require('../public/prefs.ts');
+    const table = fakeTable({ pageSize: 25 });
+
+    revertTableViewToServer(table, 'libraryView');
+
+    assert.deepEqual(table.getViewState(), {});
+    assert.deepEqual(getPref('libraryView'), {});
   });
 });
 

@@ -4,7 +4,8 @@
 // live-synced" reasoning). Both pages call these the same way: a `table` instance, the prefs.js
 // key that page's view is stored under, and the URL param name that page's "🔗 Share view"
 // button writes to (`lv`/`wv` for library.js, `bv` for bundles.js).
-import { getPref, setPref } from './prefs.ts';
+import { getPref, setPref, adoptPrefEntry, pushPrefToServer } from './prefs.ts';
+import { getBaseline, setBaseline, stripTransientViewFields } from './tableViewSync.ts';
 import { urlWithParams } from './urlState.ts';
 import { copyWithFeedback } from './clipboard.ts';
 
@@ -69,4 +70,38 @@ export function resetTableView(table: DataTableLike, prefKey: string, paramName:
   const params = new URLSearchParams(location.search);
   params.delete(paramName);
   history.replaceState(null, '', urlWithParams(params));
+}
+
+// The two halves of the "unsaved changes" banner (tableViewSync.ts) — a table-view key is never
+// auto-pushed (see prefs.ts's setPref), so the live/local view can sit indefinitely ahead of
+// tableViewSync.ts's `baseline` (this session's best-known copy of what's actually saved) until
+// the user picks one of these.
+//
+// "Save" pushes the current view up unconditionally (the server no longer timestamp-guards a
+// write, see lib/auth.js) and advances the baseline to match, so the banner clears immediately
+// rather than waiting for the next sign-in check to notice. `page`/`searchQuery` are stripped
+// first (tableViewSync.ts's stripTransientViewFields) — otherwise whatever's currently typed into
+// the search box would silently ride along into the saved view the moment something else genuinely
+// unsaved got Saved, even though the banner never counted it as part of the diff.
+export function saveTableViewToServer(prefKey: string, currentValue: object): void {
+  const updatedAt = Date.now();
+  const value = stripTransientViewFields(currentValue);
+  pushPrefToServer(prefKey, value, updatedAt);
+  setBaseline(prefKey, { value, updatedAt });
+}
+
+// "Revert" discards the local view in favor of the baseline instead: live-patches the table
+// directly via setViewState (no reload needed, unlike authStore.ts's adopt-and-reload for every
+// other pref kind) and writes it locally through adoptPrefEntry, bypassing setPref so the
+// reverted-to value isn't immediately treated as a fresh local edit. No baseline saved yet (a
+// brand-new account, or a view never Saved) reverts to an empty view, same fallback
+// restoreTableView's own stored-default path uses. The baseline never carries `page`/
+// `searchQuery` (Save strips them before storing it) — symmetric with Save, Revert doesn't touch
+// them either, so reverting your columns/sort/filters doesn't also reset whatever you're
+// currently searching for or what page you're on.
+export function revertTableViewToServer(table: DataTableLike, prefKey: string): void {
+  const baseline = getBaseline(prefKey);
+  const value = (baseline?.value ?? {}) as object;
+  table.setViewState(value);
+  adoptPrefEntry(prefKey, value, baseline?.updatedAt ?? 0);
 }

@@ -9,6 +9,8 @@
 // account pulls down) without needing to know every individual key up front. This is purely a
 // local-storage convenience, though — it does NOT mean sync itself works on the whole blob (see
 // setPref below).
+import { TABLE_VIEW_PREF_KEYS } from './tableViewKeys.ts';
+
 export const PREFS_STORAGE_KEY = 'steam.isonoe.net:prefs';
 
 export interface PrefEntry {
@@ -71,8 +73,11 @@ export function setPref(key: string, value: unknown): void {
   writeEntries(entries);
   // Per-key push to the server once signed in (authStore.ts calls setSignedInSteamid on
   // sign-in/out) — deliberately never a whole-blob PUT, so two preferences changing around the
-  // same time (different tabs/devices) can't race each other's writes.
-  if (signedInSteamid) pushPrefToServer(key, value, updatedAt);
+  // same time (different tabs/devices) can't race each other's writes. A table-view key is the
+  // one exception: it's never auto-pushed at all, local-only until the user explicitly hits Save
+  // on the "unsaved changes" banner (tableViewSync.ts) — every edit to a table would otherwise
+  // silently overwrite whatever's saved to the account before the user ever saw a diff.
+  if (signedInSteamid && !TABLE_VIEW_PREF_KEYS.includes(key)) pushPrefToServer(key, value, updatedAt);
 }
 
 // Set by authStore.ts once GET /api/me resolves (and cleared on sign-out) — kept here, rather

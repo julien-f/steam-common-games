@@ -39,7 +39,9 @@ import {
 import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { setBrowsedBundles } from './bundleBrowseStore.ts';
 import { openPrefsPopover } from './prefsPopover.ts';
-import { restoreTableView, shareTableView, resetTableView } from './tableViewPrefs.ts';
+import { restoreTableView, shareTableView, resetTableView, saveTableViewToServer, revertTableViewToServer } from './tableViewPrefs.ts';
+import { isUnsaved, summarizeViewDiff } from './tableViewSync.ts';
+import { getAuthUser } from './authStore.ts';
 import { createStaleGuard } from './staleGuard.ts';
 import { setPref } from './prefs.ts';
 import { setBaseTitle } from './pageTitle.ts';
@@ -248,6 +250,13 @@ export default function BundlesBrowseRoute() {
   // table is built in this component's body, so the effect is owned by the component and disposed
   // with it.
   createEffect(() => setPref(VIEW_PREF_KEY, table.getViewState()));
+
+  function handleSaveView(): void {
+    saveTableViewToServer(VIEW_PREF_KEY, table.getViewState());
+  }
+  function handleRevertView(): void {
+    revertTableViewToServer(table, VIEW_PREF_KEY);
+  }
   // Feeds /lists/bundle/:bundleId's prev/next nav (see bundleBrowseStore.ts) — off processedData,
   // not the raw row list, so ‹/› steps through exactly what's on screen in the order it's shown,
   // including whatever filter/sort/search the user has applied here.
@@ -411,6 +420,13 @@ export default function BundlesBrowseRoute() {
         }
         tiles={heroTiles()}
       />
+      <Show when={getAuthUser() && isUnsaved(VIEW_PREF_KEY, table.getViewState())}>
+        <div class="pref-unsaved-banner">
+          Unsaved changes to this view ({summarizeViewDiff(VIEW_PREF_KEY, table.getViewState()).join(', ')}) — differs from what's saved to your account.
+          <button type="button" class="btn btn-ghost btn-sm" onClick={handleSaveView}>Save</button>
+          <button type="button" class="btn btn-ghost btn-sm" onClick={handleRevertView}>Revert</button>
+        </div>
+      </Show>
       <Show when={statusText()}><div class="bundles-status">{statusText()}</div></Show>
       <div class="table-container">
         <DataTableView<BundleRow>

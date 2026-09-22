@@ -156,3 +156,16 @@ test('setPref: does not push anywhere when signed out', async (t) => {
 
   assert.equal(called, false);
 });
+
+test('setPref: never pushes a table-view key, even when signed in — local-only until an explicit Save', async (t) => {
+  const restore = globalThis.fetch;
+  let called = false;
+  globalThis.fetch = async () => { called = true; return { ok: true, json: async () => ({}) }; };
+  t.after(() => { globalThis.fetch = restore; });
+
+  const { setPref, setSignedInSteamid } = require('../public/prefs.ts');
+  setSignedInSteamid('76561198000000001');
+  setPref('ownedListView', { pageSize: 25 });
+
+  assert.equal(called, false);
+});

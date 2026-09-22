@@ -3,6 +3,8 @@
 // (GET /api/me, POST /auth/logout); "signing in" itself is a plain page navigation to
 // /auth/steam/login (AccountChip.tsx), not something this module drives.
 import { getAllPrefEntries, adoptPrefEntry, pushPrefToServer, setSignedInSteamid, type PrefEntry } from './prefs.ts';
+import { TABLE_VIEW_PREF_KEYS } from './tableViewKeys.ts';
+import { setBaseline, clearBaseline, resetBaselines } from './tableViewSync.ts';
 import { getMyAccount, setMyAccount, getCurrentAccount, setCurrentAccount } from './accountsStore.ts';
 import { resolveAccountSummary } from './accountData.ts';
 import type { AccountSlot } from './types.ts';
@@ -35,8 +37,19 @@ function markSyncedBefore(steamid: string): void {
 
 // Merges this device's local prefs against the account's server-side ones. Run on every sign-in
 // check, not just the first, so two devices signed into the same account converge instead of
-// drifting apart after their one and only sync — but a device's *first ever* sync with a given
-// account is treated differently from every sync after it:
+// drifting apart after their one and only sync.
+//
+// A table-view key (TABLE_VIEW_PREF_KEYS) is handled entirely differently from every other pref:
+// it's never adopted or pushed here at all. Its local value is never auto-synced in the first
+// place (prefs.ts's setPref skips the push for these keys), so there's nothing to merge —
+// instead, this just refreshes tableViewSync.ts's `baseline` (this session's best-known copy of
+// the server's value) for the owning route to diff the live table against, showing an explicit
+// Save/Revert "unsaved changes" banner when they differ. A key the server has never saved clears
+// its baseline instead, which isUnsaved/summarizeViewDiff (tableViewSync.ts) treat the same as an
+// empty view.
+//
+// Every other pref (region, ...) keeps the original rule — a device's *first ever* sync with a
+// given account is treated differently from every sync after it:
 //
 //   - First sync: local never overrides a key the server already has, no matter its timestamp —
 //     only server → local for anything both sides have, since a brand-new device's local
@@ -53,14 +66,26 @@ function markSyncedBefore(steamid: string): void {
 // Returns whether anything was adopted from the server — the caller reloads in that case, since
 // every store (accountsStore, listsStore, ...) seeds its in-memory state from localStorage once
 // at load; live-patching each of them to notice an external write isn't worth it for something
-// that, once merged, won't differ again until the next real edit on either side.
+// that, once merged, won't differ again until the next real edit on either side. A table-view key
+// never counts toward this — its owning route live-patches the table directly via Save/Revert, no
+// reload needed.
 //
 // Exported for unit testing (see test/authStore.test.js) — same reasoning as
 // autoPopulateAccountFromLogin's own comment below.
 export async function syncPrefsWithServer(steamid: string, serverEntries: Record<string, PrefEntry>): Promise<boolean> {
   const firstSync = !hasSyncedBefore(steamid);
   const localEntries = getAllPrefEntries();
-  const keys = new Set([...Object.keys(localEntries), ...Object.keys(serverEntries)]);
+
+  // Every table-view key's baseline is refreshed unconditionally — not just the ones this
+  // particular local/server pair happens to both mention — so a key with no local value this
+  // session (a fresh browser) still gets a correct baseline, and one the server has since dropped
+  // still gets its stale in-memory baseline cleared.
+  for (const key of TABLE_VIEW_PREF_KEYS) {
+    const server = serverEntries[key];
+    if (server) setBaseline(key, server); else clearBaseline(key);
+  }
+
+  const keys = new Set([...Object.keys(localEntries), ...Object.keys(serverEntries)].filter(k => !TABLE_VIEW_PREF_KEYS.includes(k)));
   let adopted = false;
   const pushes: Promise<void>[] = [];
 
@@ -118,8 +143,12 @@ export async function initAuth(): Promise<void> {
     const res = await fetch('/api/me');
     const { steamid, prefs } = await res.json() as { steamid: string | null; prefs: Record<string, PrefEntry> | null };
     if (!steamid) { currentUser = null; setSignedInSteamid(null); return; }
-    currentUser = { steamid };
+    // Deliberately set only after syncPrefsWithServer resolves — a component gating its own
+    // "unsaved changes" banner on getAuthUser() reruns once tableViewSync.ts's baselines are
+    // populated, not a tick earlier while they're still empty (which would flash "unsaved" for
+    // any existing local table customization).
     const adopted = await syncPrefsWithServer(steamid, prefs ?? {});
+    currentUser = { steamid };
     setSignedInSteamid(steamid);
     if (adopted) { location.reload(); return; }
     await autoPopulateAccountFromLogin(steamid);
@@ -139,5 +168,6 @@ export async function signOut(): Promise<void> {
   }
   currentUser = null;
   setSignedInSteamid(null);
+  resetBaselines();
   window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 }

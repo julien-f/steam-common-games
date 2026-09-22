@@ -21,14 +21,16 @@ function withFetch(t, handler) {
 beforeEach(() => {
   global.localStorage = makeMemoryLocalStorage();
   delete require.cache[require.resolve('../public/prefs.ts')];
+  delete require.cache[require.resolve('../public/tableViewSync.ts')];
   delete require.cache[require.resolve('../public/listsStore.ts')];
   delete require.cache[require.resolve('../public/accountsStore.ts')];
   delete require.cache[require.resolve('../public/accountData.ts')];
   delete require.cache[require.resolve('../public/authStore.ts')];
   require('../public/accountsStore.ts').setAccountOverride(null);
-  // require.cache deletion above doesn't reach signedInSteamid (a module-level `let`) — see
-  // _resetSignedInSteamid's own comment in prefs.ts.
+  // require.cache deletion above doesn't reach signedInSteamid/the table-view baselines (both
+  // module-level state) — see _resetSignedInSteamid's own comment in prefs.ts.
   require('../public/prefs.ts')._resetSignedInSteamid();
+  require('../public/tableViewSync.ts').resetBaselines();
 });
 
 function auth() {
@@ -39,6 +41,9 @@ function accounts() {
 }
 function prefs() {
   return require('../public/prefs.ts');
+}
+function tableViewSync() {
+  return require('../public/tableViewSync.ts');
 }
 
 function makeAccount(id) {
@@ -154,6 +159,39 @@ test('syncPrefsWithServer (ongoing): equal timestamps on both sides are left alo
 
   assert.equal(adopted, false);
   assert.equal(called, false);
+});
+
+// ── syncPrefsWithServer: table-view keys (baseline tracking, never adopted or pushed) ────
+
+test('syncPrefsWithServer: a table-view key is never adopted or pushed, regardless of what either side has', async (t) => {
+  markAlreadySynced();
+  prefs().setPref('ownedListView', { sorts: [{ key: 'name', dir: 'asc' }] });
+  withFetch(t, async () => { throw new Error('should not push or adopt'); });
+
+  const adopted = await auth().syncPrefsWithServer(STEAMID, {
+    ownedListView: { value: { sorts: [{ key: 'rating', dir: 'desc' }] }, updatedAt: 999999999999 },
+  });
+
+  assert.equal(adopted, false);
+  assert.deepEqual(prefs().getPref('ownedListView'), { sorts: [{ key: 'name', dir: 'asc' }] }, 'local value left untouched');
+});
+
+test('syncPrefsWithServer: a table-view key the server has refreshes its baseline', async (t) => {
+  withFetch(t, async () => { throw new Error('should not push'); });
+
+  const serverEntry = { value: { sorts: [{ key: 'rating', dir: 'desc' }] }, updatedAt: 500 };
+  await auth().syncPrefsWithServer(STEAMID, { ownedListView: serverEntry });
+
+  assert.deepEqual(tableViewSync().getBaseline('ownedListView'), serverEntry);
+});
+
+test('syncPrefsWithServer: a table-view key the server has never saved clears its baseline', async (t) => {
+  tableViewSync().setBaseline('ownedListView', { value: { pageSize: 25 }, updatedAt: 1 });
+  withFetch(t, async () => { throw new Error('should not push'); });
+
+  await auth().syncPrefsWithServer(STEAMID, {});
+
+  assert.equal(tableViewSync().getBaseline('ownedListView'), undefined);
 });
 
 // ── autoPopulateAccountFromLogin ─────────────────────────────────────────────

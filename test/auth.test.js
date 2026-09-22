@@ -137,7 +137,7 @@ test('setUserPref: merges into existing prefs rather than replacing the whole se
   });
 });
 
-test('setUserPref: a newer write replaces an older one for the same key', () => {
+test('setUserPref: a write always replaces whatever was there, regardless of updatedAt ordering', () => {
   const steamid = '76561198000000107';
   upsertUser(steamid);
   setUserPref(steamid, 'a', 'old', 1000);
@@ -147,14 +147,14 @@ test('setUserPref: a newer write replaces an older one for the same key', () => 
   assert.deepEqual(getSessionUser(sessionId).prefs.a, { value: 'new', updatedAt: 2000 });
 });
 
-test('setUserPref: an older write is rejected and leaves the newer value in place', () => {
+test('setUserPref: an "older" updatedAt still overwrites — the server no longer guards on it', () => {
   const steamid = '76561198000000108';
   upsertUser(steamid);
   setUserPref(steamid, 'a', 'new', 2000);
-  const applied = setUserPref(steamid, 'a', 'stale', 1000);
-  assert.equal(applied, false);
+  const applied = setUserPref(steamid, 'a', 'later-but-lower-updatedAt', 1000);
+  assert.equal(applied, true);
   const sessionId = createSession(steamid);
-  assert.deepEqual(getSessionUser(sessionId).prefs.a, { value: 'new', updatedAt: 2000 });
+  assert.deepEqual(getSessionUser(sessionId).prefs.a, { value: 'later-but-lower-updatedAt', updatedAt: 1000 });
 });
 
 test('upsertUser: logging in again does not reset that user\'s prefs', () => {

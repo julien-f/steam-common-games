@@ -67,7 +67,9 @@ import {
   OWNERSHIP_STATUS_COLUMN,
 } from './gameColumns.ts';
 import { computeSteamdbRating, computeProductionTier, discountPct, fmtAge, fmtLastPlayed, formatMoney, scoreColor } from './utils.ts';
-import { restoreTableView, shareTableView, resetTableView } from './tableViewPrefs.ts';
+import { restoreTableView, shareTableView, resetTableView, saveTableViewToServer, revertTableViewToServer } from './tableViewPrefs.ts';
+import { isUnsaved, summarizeViewDiff } from './tableViewSync.ts';
+import { getAuthUser } from './authStore.ts';
 import { renderPanelNav as renderPanelNavShared, stepGameList } from './panelNav.ts';
 import { createRowStore } from './rowStore.ts';
 import { createStaleGuard } from './staleGuard.ts';
@@ -1046,6 +1048,21 @@ export default function ListRoute() {
     }
   }
 
+  // "Unsaved changes" banner — only ever true for a shared, kind-generic view key (never a user
+  // list's own, see viewPrefKey's own comment), so gated the same way handleResetView's own
+  // list/kind-generic split is.
+  function currentViewState(): object {
+    return table?.getViewState() ?? {};
+  }
+  function handleSaveView(): void {
+    if (!table) return;
+    saveTableViewToServer(viewPrefKey(), table.getViewState());
+  }
+  function handleRevertView(): void {
+    if (!table) return;
+    revertTableViewToServer(table, viewPrefKey());
+  }
+
   // Real per-group tables for a group-by-membership dynamic list — generalizes the old
   // Comparison page's "one table per owner set, most owners to fewest" layout (already sorted
   // that way by combine.ts's groupByMembership). Each group gets its own createTableState fed by
@@ -1967,6 +1984,13 @@ export default function ListRoute() {
           selection right after acting (Add explicitly; Remove via load()'s own reset), and the
           whole point of this message is to confirm what just happened *after* that clears. */}
       {selectionActionStatus() && <div class="selection-status">{selectionActionStatus()}</div>}
+      <Show when={tableReady() && !userList() && getAuthUser() && isUnsaved(viewPrefKey(), currentViewState())}>
+        <div class="pref-unsaved-banner">
+          Unsaved changes to this view ({summarizeViewDiff(viewPrefKey(), currentViewState()).join(', ')}) — differs from what's saved to your account.
+          <button type="button" class="btn btn-ghost btn-sm" onClick={handleSaveView}>Save</button>
+          <button type="button" class="btn btn-ghost btn-sm" onClick={handleRevertView}>Revert</button>
+        </div>
+      </Show>
       <Show when={tableReady()}>
         <div class="list-view-actions">
           <button type="button" class="btn btn-ghost btn-sm" onClick={e => handleShareView(e.currentTarget)}>🔗 Share view</button>

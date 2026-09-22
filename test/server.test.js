@@ -1685,7 +1685,7 @@ test('PUT /api/me/prefs/:key: merges into existing prefs, leaving other keys unt
   assert.deepEqual(res.body.prefs, { a: { value: 1, updatedAt: 1000 }, b: { value: 2, updatedAt: 1000 } });
 });
 
-test('PUT /api/me/prefs/:key: a newer write wins, and reports applied: true', async (t) => {
+test('PUT /api/me/prefs/:key: a later write replaces an earlier one, and reports applied: true', async (t) => {
   const agent = await loginAs(t, '76561198000000207');
   await agent.put('/api/me/prefs/a').send({ value: 'old', updatedAt: 1000 }).expect(200);
   const res = await agent.put('/api/me/prefs/a').send({ value: 'new', updatedAt: 2000 }).expect(200);
@@ -1694,13 +1694,13 @@ test('PUT /api/me/prefs/:key: a newer write wins, and reports applied: true', as
   assert.deepEqual(me.body.prefs.a, { value: 'new', updatedAt: 2000 });
 });
 
-test('PUT /api/me/prefs/:key: a stale write is rejected and reports applied: false, without clobbering', async (t) => {
+test('PUT /api/me/prefs/:key: a write always overwrites, even with a lower updatedAt than what is stored', async (t) => {
   const agent = await loginAs(t, '76561198000000208');
   await agent.put('/api/me/prefs/a').send({ value: 'new', updatedAt: 2000 }).expect(200);
-  const res = await agent.put('/api/me/prefs/a').send({ value: 'stale', updatedAt: 1000 }).expect(200);
-  assert.equal(res.body.applied, false);
+  const res = await agent.put('/api/me/prefs/a').send({ value: 'explicit-save', updatedAt: 1000 }).expect(200);
+  assert.equal(res.body.applied, true);
   const me = await agent.get('/api/me').expect(200);
-  assert.deepEqual(me.body.prefs.a, { value: 'new', updatedAt: 2000 });
+  assert.deepEqual(me.body.prefs.a, { value: 'explicit-save', updatedAt: 1000 });
 });
 
 test('PUT /api/me/prefs/:key: 400 when the body has no value field or a non-numeric updatedAt', async (t) => {
