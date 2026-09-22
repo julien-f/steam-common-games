@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **A dynamic list can be shared via a link, without saving it to the recipient's account first.** Its hero card gained a "🔗 Share list" action (next to "Edit sources") that copies a `/lists/shared?f=<formula>` link — the formula lives entirely in a compact URL grammar (`public/listShare.ts`), resolved in memory on arrival the same way `/lists/compare` already builds an unsaved comparison, so it opens for anyone with none of it in their own storage. A `user` source (another saved list used as one of this list's own sources) is inlined recursively at any depth rather than capped at one level, since only the on-screen *label* of a nested list was ever capped, not how deep one can actually resolve. Dynamic lists only for now — a source pointing at a manual list can't be shared yet, and the button disables itself with a reason in that case. Landing on a shared link offers "Save as a list", reconstructing any inlined sources as real saved lists. See `docs/dev/lists-and-accounts.md`/`docs/dev/frontend.md`.
+
 - **A dynamic list's sources and operation can now be edited after creation.** Its hero card gained an "Edit sources" action that reopens the same combine form used at creation (now shared as `public/CombineForm.tsx`), pre-filled, saving in place via `updateDynamicList` (same id/folder position, cycle-checked like every other edit) — previously the only way to change one was to delete it and start over.
 
 ### Removed

@@ -13,7 +13,8 @@ beforeEach(() => { resetBaselines(); });
 
 test('TABLE_VIEW_PREF_KEYS: covers every shared table-view pref key', () => {
   assert.deepEqual([...TABLE_VIEW_PREF_KEYS].sort(), [
-    'bundleListView', 'bundlesBrowseView', 'compareListView', 'ownedListView', 'recentListView', 'wishlistListView',
+    'bundleListView', 'bundlesBrowseView', 'compareListView', 'ownedListView', 'recentListView',
+    'sharedListView', 'wishlistListView',
   ]);
 });
 

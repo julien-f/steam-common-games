@@ -5,5 +5,6 @@
 // (prefs.ts needs the key list; tableViewSync.ts only needs prefs.ts's PrefEntry *type*). A user
 // list's own view lives on the list itself, never through prefs.ts, so it's never a candidate.
 export const TABLE_VIEW_PREF_KEYS: readonly string[] = [
-  'ownedListView', 'wishlistListView', 'bundleListView', 'recentListView', 'compareListView', 'bundlesBrowseView',
+  'ownedListView', 'wishlistListView', 'bundleListView', 'recentListView', 'compareListView', 'sharedListView',
+  'bundlesBrowseView',
 ];

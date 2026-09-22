@@ -102,15 +102,17 @@ import {
   describeSources, createDefaultNaming, listDisplayName, opLabel, OP_LABELS, OP_SYMBOLS,
   type RefDescription, type ListNaming,
 } from './listLabels.ts';
+import { encodeListFormula, decodeListFormula, shareListUrl } from './listShare.ts';
+import { copyWithFeedback } from './clipboard.ts';
 import { setBaseTitle } from './pageTitle.ts';
 import type { AccountSlot, DetailsAges, Game, Rating, Hltb, GameMeta, ProtonDb, GameList, CombineOp, ListRef } from './types.ts';
 import { getList, getLists, getFolders, createList, updateDynamicList, addAppidsToList, removeAppidsFromList, setListTableView } from './listsStore.ts';
-import { resolveListWithSources, flattenCombineResult, createDefaultFetchers } from './listResolve.ts';
+import { resolveListWithSources, flattenCombineResult, createDefaultFetchers, type ListResolveFetchers } from './listResolve.ts';
 import { CombineForm } from './CombineForm.tsx';
 import type { MembershipGroup } from './combine.ts';
 import { peekMyOwnershipStatus, onMyOwnershipReady } from './myOwnership.ts';
 
-type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user' | 'compare';
+type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user' | 'compare' | 'shared';
 
 // /game (bare) and /game/:appid both live here, kind 'recent' either way — see this file's own
 // header comment and AppRoot.tsx.
@@ -118,6 +120,7 @@ function kindFromPath(pathname: string, params: { bundleId?: string; listId?: st
   if (pathname === '/lists/owned') return 'owned';
   if (pathname === '/lists/wishlist') return 'wishlist';
   if (pathname === '/lists/compare') return 'compare';
+  if (pathname === '/lists/shared') return 'shared';
   if (params.bundleId) return 'bundle';
   if (pathname === '/game' || pathname.startsWith('/game/')) return 'recent';
   return 'user';
@@ -404,6 +407,57 @@ export default function ListRoute() {
   // hero's formula line and the per-group table headings; empty until the resolve lands, which is
   // what keeps a half-built "A ∪ = 0" off the screen in the meantime.
   const [listSources, setListSources] = createSignal<{ key: string; count: number; desc: RefDescription }[]>([]);
+  // ── kind === 'shared' ─────────────────────────────────────────────────────────────────────
+  // /lists/shared?f=<formula> — another dynamic list's formula, decoded straight from the URL
+  // (listShare.ts), same "unsaved dynamic list, built in memory" idea `compare` below already
+  // uses. It's parked in the same `compareList` signal (below) rather than a sibling one: both
+  // are "the unsaved dynamic list currently on screen", and everything reading combineList()
+  // already treats them identically. What listShare.ts's decode step inlined as synthetic
+  // GameLists (any `user` source in the shared formula) is kept only long enough to resolve/name
+  // them and to reconstruct real saved lists on "Save as a list" — see sharedFetchers/
+  // sharedNaming/handleSaveShared below.
+  const [sharedSynthetic, setSharedSynthetic] = createSignal<Map<string, GameList>>(new Map());
+  function sharedFormulaParam(): string | null {
+    return new URLSearchParams(location.search).get('f');
+  }
+  function sharedFetchers(base: ListResolveFetchers): ListResolveFetchers {
+    return { ...base, getList: id => sharedSynthetic().get(id) ?? base.getList(id) };
+  }
+  function sharedNaming(): ListNaming {
+    const base = createDefaultNaming();
+    return {
+      ...base,
+      list: id => {
+        const synth = sharedSynthetic().get(id);
+        // Same "(unnamed nested formula)" parenthesizing createDefaultNaming applies to a real
+        // stored list nested one level deep — a synthetic group is always unnamed, so it always
+        // takes this form rather than ever reading as a plain name.
+        return synth ? { name: `(${listDisplayName(synth, sharedNaming())})`, deleted: false } : base.list(id);
+      },
+    };
+  }
+  // Turns a decoded formula's synthetic GameLists into real saved ones, bottom-up: each `g:`
+  // group has to become a real listId before the list depending on it can be saved with a
+  // `{ kind: 'user', listId }` source pointing at it — same reason handleSaveComparison saves in
+  // one call, just generalized from one flat op to a tree.
+  function handleSaveShared(): void {
+    const list = compareList();
+    if (!list) return;
+    const synthetic = sharedSynthetic();
+    const resolved = new Map<string, string>(); // synthetic id → real saved id
+    function saveRef(ref: ListRef): ListRef {
+      if (ref.kind !== 'user' || !ref.listId) return ref;
+      const already = resolved.get(ref.listId);
+      if (already) return { kind: 'user', listId: already };
+      const group = synthetic.get(ref.listId);
+      if (!group) return ref; // not one of ours to reconstruct — leave as-is
+      const saved = createList({ kind: 'dynamic', op: group.op, sources: (group.sources ?? []).map(saveRef) });
+      resolved.set(ref.listId, saved.id);
+      return { kind: 'user', listId: saved.id };
+    }
+    const saved = createList({ kind: 'dynamic', op: list.op, sources: (list.sources ?? []).map(saveRef) });
+    navigate(`/lists/${saved.id}`);
+  }
   // ── kind === 'compare' ────────────────────────────────────────────────────────────────────
   // A comparison is a dynamic list that was never saved: the `?u=` slots ARE its formula (one
   // `account-owned` source per player), so it resolves, groups and explains itself through the
@@ -424,6 +478,28 @@ export default function ListRoute() {
     updateDynamicList(list.id, input.op, input.sources);
     setEditingSources(false);
     void load();
+  }
+  // kind === 'user', dynamic lists only — "Share list" encodes this list's own formula (inlining
+  // any `user` source, recursively — see listShare.ts) into a /lists/shared link and copies it.
+  // `null` while sharing would work (mirrors encodeListFormula's own ok/fail result, computed live
+  // off userList() rather than cached) so the button can disable itself with a reason instead of
+  // failing silently on click — the same "why this source can't be shown as an ordinary one"
+  // spirit describeListRef's own `problem` field already follows.
+  function shareFailure(): string | null {
+    const list = userList();
+    if (!list || list.kind !== 'dynamic') return 'not a dynamic list';
+    const result = encodeListFormula(list, getList);
+    if (result.ok) return null;
+    if (result.reason === 'manual-source') return "can't share — includes a manual list as one of its sources";
+    if (result.reason === 'empty') return "can't share — this list has no sources";
+    return "can't share — its sources are too deeply/cyclically nested";
+  }
+  function handleShareList(btn: HTMLElement): void {
+    const list = userList();
+    if (!list) return;
+    const result = encodeListFormula(list, getList);
+    if (!result.ok) return; // heroActions disables the button in this case — see shareFailure
+    copyWithFeedback(btn, `${window.location.origin}${shareListUrl(result.formula)}`);
   }
   // Whichever of the two is on screen — everything that reads a *formula* (the op chip, the
   // sources/groups tiles, the hero's formula line) applies identically to both.
@@ -570,6 +646,7 @@ export default function ListRoute() {
     if (kind === 'bundle') return `list-route:bundle:${params.bundleId}`;
     if (kind === 'user') return `list-route:user:${params.listId}:${activeGroupKey ?? ''}`;
     if (kind === 'compare') return `list-route:compare:${compareKey()}:${activeGroupKey ?? ''}`;
+    if (kind === 'shared') return `list-route:shared:${sharedFormulaParam() ?? ''}:${activeGroupKey ?? ''}`;
     return `list-route:${kind}`;
   }
 
@@ -969,7 +1046,7 @@ export default function ListRoute() {
   // Whether "do I own this" is a genuine question for this kind at all — an Owned/Wishlist list's
   // own rows are trivially owned/wishlisted, the same reason OWNERSHIP_STATUS_COLUMN is only part
   // of BUNDLE_COLUMNS/RECENT_COLUMNS.
-  const stampsOwnership = kind === 'bundle' || kind === 'recent' || kind === 'user' || kind === 'compare';
+  const stampsOwnership = kind === 'bundle' || kind === 'recent' || kind === 'user' || kind === 'compare' || kind === 'shared';
 
   // Driven off the row list itself, not called once per load: rows can appear *after* a load has
   // finished (openOrAddRecentGame prepends the game a nav-bar lookup just found), and a stamping
@@ -1024,6 +1101,10 @@ export default function ListRoute() {
     // Shared across every comparison, like the bundle key above: a comparison has no stored list
     // of its own to hang a view on.
     if (kind === 'compare') return 'compareListView';
+    // Shared across every /lists/shared link, not per-link — the "kind has no stored list of its
+    // own to hang a view on" reasoning above applies just as much here, and a link is one-off by
+    // nature (a bookmark of *this* view specifically is what "🔗 Share view" is already for).
+    if (kind === 'shared') return 'sharedListView';
     if (kind === 'bundle') return 'bundleListView';
     if (kind === 'recent') return 'recentListView';
     return 'ownedListView';
@@ -1303,6 +1384,44 @@ export default function ListRoute() {
         appid, name: '', loading: true, details: null,
       }));
       streamTargets = [...appids].map(appid => ({ appid }));
+    } else if (kind === 'shared') {
+      // Another dynamic list's formula, decoded straight from ?f= (listShare.ts) — same "resolve
+      // an in-memory dynamic list through the normal listResolve.ts/listLabels.ts path" idea
+      // `compare` above uses, just built from a URL-encoded formula instead of account slots. See
+      // this file's own header comment on the sharedSynthetic/sharedFetchers/sharedNaming trio.
+      const decoded = decodeListFormula(sharedFormulaParam() ?? '');
+      if (!decoded) { setStatusText("This link isn't a valid shared list."); return; }
+      setSharedSynthetic(decoded.synthetic);
+      const list: GameList = {
+        id: '', parentId: null, order: 0, createdAt: 0, updatedAt: 0,
+        kind: 'dynamic', op: decoded.op, sources: decoded.sources,
+      };
+      setCompareList(list);
+      setListTitle(listDisplayName(list, sharedNaming()));
+      setStatusText('Resolving shared list…');
+      const isGroupMode = decoded.op === 'group-by-membership';
+      let appids: Set<number>;
+      try {
+        const fetchers = sharedFetchers(createDefaultFetchers({ refresh, onFetchedAt: noteFetchedAt }));
+        const { result, sources } = await resolveListWithSources(list, fetchers);
+        if (loadGuard.isStale(gen)) return;
+        const described = describeSources(list, sharedNaming());
+        setListSources(sources.map((source, i) => ({ ...source, desc: described[i] })));
+        if (isGroupMode && Array.isArray(result)) {
+          pendingGroups = result;
+          appids = new Set(result.flatMap(g => g.appids));
+        } else {
+          appids = flattenCombineResult(result);
+        }
+      } catch (err) {
+        if (loadGuard.isStale(gen)) return;
+        setStatusText(`Error: ${(err as Error).message}`);
+        return;
+      }
+      initialRows = [...appids].map(appid => ({
+        appid, name: '', loading: true, details: null,
+      }));
+      streamTargets = [...appids].map(appid => ({ appid }));
     } else if (kind === 'recent') {
       setListTitle('Recently Looked Up');
       const recents = loadRecentGames();
@@ -1422,12 +1541,12 @@ export default function ListRoute() {
       const columns = (
         kind === 'wishlist' ? WISHLIST_COLUMNS
           : kind === 'bundle' ? BUNDLE_COLUMNS
-          : kind === 'recent' || kind === 'user' || kind === 'compare' ? RECENT_COLUMNS
+          : kind === 'recent' || kind === 'user' || kind === 'compare' || kind === 'shared' ? RECENT_COLUMNS
           : OWNED_COLUMNS
       ) as unknown as ColumnDef<Game>[];
       const defaultVisible = kind === 'wishlist' ? WISHLIST_DEFAULT_VISIBLE
         : kind === 'bundle' ? BUNDLE_DEFAULT_VISIBLE
-        : kind === 'recent' || kind === 'user' || kind === 'compare' ? RECENT_DEFAULT_VISIBLE
+        : kind === 'recent' || kind === 'user' || kind === 'compare' || kind === 'shared' ? RECENT_DEFAULT_VISIBLE
         : OWNED_DEFAULT_VISIBLE;
       const sort = kind === 'bundle' ? BUNDLE_DEFAULT_SORT : DEFAULT_SORT;
 
@@ -1789,7 +1908,25 @@ export default function ListRoute() {
         <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingSources(v => !v)}>
           {editingSources() ? 'Cancel' : 'Edit sources'}
         </button>
+        {/* Not offered on a `compare`/`shared` list — a comparison is already shareable via its
+            own URL, and a shared link re-shared would just point back at the same page. */}
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          disabled={shareFailure() != null}
+          title={shareFailure() ?? 'Copy a link anyone can open, live and without saving it themselves'}
+          onClick={e => handleShareList(e.currentTarget)}
+        >
+          🔗 Share list
+        </button>
       </Show>
+      {kind === 'shared' && (
+        <Show when={compareList()}>
+          <button type="button" class="btn btn-ghost btn-sm" title="Keep this shared list as one of your own" onClick={handleSaveShared}>
+            Save as a list
+          </button>
+        </Show>
+      )}
       {kind === 'compare' && (
         <>
           {/* Gated on the players in the URL, not on the ones that resolved: a comparison naming
@@ -1891,6 +2028,10 @@ export default function ListRoute() {
     // read here for editing the players (or the op) to reload without a remount. load()'s own
     // guard is what keeps the canonicalizing rewrite from counting as a change.
     if (kind === 'compare') compareKey();
+    // Same reasoning — a shared link's formula lives entirely in ?f=, not the path, so navigating
+    // from one shared link to another (no param change, since /lists/shared has none) has to be
+    // read here too, or this component instance would just keep showing the first one.
+    if (kind === 'shared') sharedFormulaParam();
     load();
   });
 
