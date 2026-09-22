@@ -5,7 +5,7 @@
 // functions (row-building, table wiring, URL/history updates, accounts-bar rendering) — none of
 // that belongs here; ListRoute.tsx owns the equivalent orchestration generically, for any list
 // kind, not just account-scoped ones.
-import { steamVanity } from './utils.ts';
+import { steamVanity, fmtLastPlayed } from './utils.ts';
 
 // An AccountSlot.id is itself the sorted-joined resolved member steam64 ids (see
 // accountsStore.ts's accountIdFor) — so resolving an id back to its members is just splitting
@@ -49,6 +49,9 @@ export interface RawAccountPlayer {
   avatarmedium?: string;
   communityvisibilitystate?: number;
   gameCount?: number;
+  timecreated?: number;    // Unix seconds; absent for a private profile
+  loccountrycode?: string; // ISO 3166-1 alpha-2, e.g. "US"; absent when unset or profile is private
+  realname?: string;       // absent unless the profile owner set one and made it public
 }
 
 // The shape of /api/common-games' success response, as read below — only the fields this
@@ -71,6 +74,9 @@ export interface AccountPlayer {
   avatarUrl: string;    // '' likewise
   isPrivate: boolean;   // communityvisibilitystate !== 3 — a private/friends-only profile
   gameCount: number | null;
+  memberSince: string;  // bare ISO date the account was created, '' when Steam didn't return one
+  countryCode: string;  // ISO 3166-1 alpha-2, '' when unset
+  realName: string;     // '' when unset — Steam's own realname is optional and privacy-gated
 }
 
 // Presence (`personastate`/`gameextrainfo`) is deliberately NOT mapped here, even though Steam
@@ -88,6 +94,9 @@ export function toAccountPlayer(p: RawAccountPlayer): AccountPlayer {
     avatarUrl: httpOnly(p.avatarmedium),
     isPrivate: p.communityvisibilitystate !== undefined && p.communityvisibilitystate !== 3,
     gameCount: typeof p.gameCount === 'number' ? p.gameCount : null,
+    memberSince: fmtLastPlayed(p.timecreated),
+    countryCode: p.loccountrycode || '',
+    realName: p.realname || '',
   };
 }
 
@@ -187,16 +196,71 @@ export async function fetchAccountWishlistItems(members: string[], opts: { refre
 
 // listResolve.ts's ListResolveFetchers.accountOwned/accountWishlist — just the flat appid set,
 // resolving accountId back to members via membersFromAccountId above.
-export async function fetchAccountOwnedAppids(accountId: string): Promise<Set<number>> {
-  return (await fetchAccountOwnedData(accountId)).appids;
+export async function fetchAccountOwnedAppids(accountId: string, opts: { refresh?: boolean } = {}): Promise<Set<number>> {
+  return (await fetchAccountOwnedData(accountId, opts)).appids;
 }
 
 // Both halves of what myOwnership.ts keeps per account — the owned-appid set behind the ✓/☆
 // markers, and the per-member breakdown behind the panel's "Owned by" card — from one request,
-// since /api/common-games returns both in the same response.
-export async function fetchAccountOwnedData(accountId: string): Promise<{ appids: Set<number>; owners: Map<number, GameOwner[]> }> {
-  const { games, owners } = await fetchAccountOverview(membersFromAccountId(accountId));
-  return { appids: new Set(games.map(g => g.appid)), owners };
+// since /api/common-games returns both in the same response. `fetchedAt` rides along for the
+// third caller (listResolve.ts's createDefaultFetchers): a comparison or a dynamic list is built
+// out of these sets, and its own hero has to be able to say how old they are.
+export async function fetchAccountOwnedData(
+  accountId: string,
+  opts: { refresh?: boolean } = {},
+): Promise<{ appids: Set<number>; owners: Map<number, GameOwner[]>; fetchedAt: number | null }> {
+  const { games, owners, fetchedAt } = await fetchAccountOverview(membersFromAccountId(accountId), opts);
+  return { appids: new Set(games.map(g => g.appid)), owners, fetchedAt };
+}
+
+export interface AccountFriend {
+  steamid: string;
+  name: string;
+  avatarUrl: string;
+  profileUrl: string;
+  memberSince: string; // '' when Steam didn't return one — see AccountSlot's own field
+  countryCode: string;
+  realName: string;
+}
+
+// The shape of /api/friends' success response, as read below.
+interface FriendsResponse {
+  friends: { steamid: string; personaname?: string; avatar?: string | null; profileurl?: string; timecreated?: number; loccountrycode?: string; realname?: string }[];
+  unavailable: string[]; // member steamids whose friends list is private — excluded from `friends`, not "no friends"
+  fetchedAt: number | null;
+}
+
+export interface AccountFriends {
+  friends: AccountFriend[];
+  unavailable: string[];
+  fetchedAt: number | null;
+}
+
+// Fetches one account's friends (its members' own friends lists unioned, same convention
+// fetchAccountWishlist uses). A member whose friends list is private shows up in `unavailable`
+// rather than being silently indistinguishable from "no friends" — see docs/dev/integrations.md's
+// Friends section.
+export async function fetchAccountFriends(members: string[], { refresh = false }: { refresh?: boolean } = {}): Promise<AccountFriends> {
+  const res = await fetch('/api/friends', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ members, refresh }),
+  });
+  const data: FriendsResponse & { error?: string } = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch friends');
+  return {
+    friends: data.friends.map(f => ({
+      steamid: f.steamid,
+      name: f.personaname || f.steamid,
+      avatarUrl: f.avatar || '',
+      profileUrl: f.profileurl || '',
+      memberSince: fmtLastPlayed(f.timecreated),
+      countryCode: f.loccountrycode || '',
+      realName: f.realname || '',
+    })),
+    unavailable: data.unavailable,
+    fetchedAt: data.fetchedAt ?? null,
+  };
 }
 
 export interface ResolvedAccountSummary {
@@ -204,6 +268,9 @@ export interface ResolvedAccountSummary {
   label: string;            // joined persona name(s) ("PersonaName" or "A + B" for a Family)
   avatarUrl: string | null; // a single account's avatar; null for a Family (no one avatar to show)
   vanities: Record<string, string>; // steam64 → custom-URL name → AccountSlot.vanities
+  memberSince: string | null; // solo-account trivia, same "null for a Family" reasoning as avatarUrl
+  countryCode: string | null;
+  realName: string | null;
   ownedCount: number;
   wishlistCount: number;    // 0 if the wishlist call fails (e.g. private profile) — owned
                             // resolving is enough to consider the account itself resolved
@@ -231,7 +298,7 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
   const ownedData = await ownedRes.json();
   if (!ownedRes.ok) throw new Error(ownedData.error || 'Failed to resolve account');
 
-  const players: { steamid: string; personaname?: string; avatarmedium?: string; profileurl?: string }[] = ownedData.slots[0];
+  const players: RawAccountPlayer[] = ownedData.slots[0];
   const members = players.map(p => p.steamid).sort();
   const label = players.map(p => p.personaname || p.steamid).join(' + ');
   // Keyed by steamid rather than a parallel array: `members` is sorted, `players` is in the
@@ -241,7 +308,11 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
     const vanity = steamVanity(p.profileurl);
     if (vanity) vanities[p.steamid] = vanity;
   }
-  const avatarUrl = players.length === 1 ? (players[0].avatarmedium || null) : null;
+  const solePlayer = players.length === 1 ? players[0] : null;
+  const avatarUrl = solePlayer?.avatarmedium || null;
+  const memberSince = solePlayer ? fmtLastPlayed(solePlayer.timecreated) || null : null;
+  const countryCode = solePlayer?.loccountrycode || null;
+  const realName = solePlayer?.realname || null;
   const ownedCount = ownedData.groups.flatMap((g: { games: unknown[] }) => g.games).length;
 
   let wishlistCount = 0;
@@ -250,10 +321,19 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
     wishlistCount = wishlistData.items?.length ?? 0;
   }
 
-  return { members, label, avatarUrl, vanities, ownedCount, wishlistCount };
+  return { members, label, avatarUrl, vanities, memberSince, countryCode, realName, ownedCount, wishlistCount };
 }
 
-export async function fetchAccountWishlistAppids(accountId: string): Promise<Set<number>> {
-  const items = await fetchAccountWishlistItems(membersFromAccountId(accountId));
-  return new Set(items.map(i => i.appid));
+export async function fetchAccountWishlistAppids(accountId: string, opts: { refresh?: boolean } = {}): Promise<Set<number>> {
+  return (await fetchAccountWishlistData(accountId, opts)).appids;
+}
+
+// The wishlist counterpart of fetchAccountOwnedData — appids plus the age of the server's copy,
+// for the same reason (see there).
+export async function fetchAccountWishlistData(
+  accountId: string,
+  opts: { refresh?: boolean } = {},
+): Promise<{ appids: Set<number>; fetchedAt: number | null }> {
+  const { items, fetchedAt } = await fetchAccountWishlist(membersFromAccountId(accountId), opts);
+  return { appids: new Set(items.map(i => i.appid)), fetchedAt };
 }

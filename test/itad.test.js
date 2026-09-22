@@ -81,7 +81,9 @@ test('findBundleById: finds a bundle on the first page of active bundles', async
   _reset();
   t.mock.method(globalThis, 'fetch', makeBundlesPager({ active: [{ id: 42, title: 'Found Me' }] }));
   const result = await findBundleById(42, { country: 'US' });
-  assert.equal(result?.title, 'Found Me');
+  assert.equal(result?.bundle?.title, 'Found Me');
+  // The page it was found on, so the route can date what it returns (getCachedAt).
+  assert.equal(result?.cacheKey, 'itad-bundles:US:-publish:false:0:50');
 });
 
 test('findBundleById: pages through active bundles before falling back to expired ones', async (t) => {
@@ -90,7 +92,8 @@ test('findBundleById: pages through active bundles before falling back to expire
   const target = { id: 999, title: 'Expired Target' };
   t.mock.method(globalThis, 'fetch', makeBundlesPager({ active: page1, expired: [...page1, target] }));
   const result = await findBundleById(999, { country: 'US' });
-  assert.equal(result?.title, 'Expired Target');
+  assert.equal(result?.bundle?.title, 'Expired Target');
+  assert.equal(result?.cacheKey, 'itad-bundles:US:-publish:true:50:50');
 });
 
 // The deep-link path inherits getBundles' mature handling — a link to a mature-flagged bundle has
@@ -136,15 +139,103 @@ test('resolveSteamAppIds: resolves, caches, and treats a missing mapping as null
   assert.equal(fetchCalls, callsBefore, 'both gids should now be cached individually');
 });
 
-test('resolveSteamAppIds: a gid listed only as a Steam "sub" (package), not "app", resolves to null', async (t) => {
+// Mocks the three-domain fetch graph resolveSteamAppIds' fallbacks can reach: ITAD's shop
+// lookup (`shopEntries`, keyed by gid), Steam's packagedetails/ajaxresolvebundles (`steam`,
+// keyed by "sub/<id>"/"bundle/<id>"), and ITAD's games/info/v2 (`info`, keyed by gid) —
+// `info`/`steam` entries are optional; a URL with no matching entry falls through to `{ ok:
+// false, status: 404 }` rather than a shape mismatch throwing somewhere unexpected.
+function makeResolveFetch({ shopEntries, steam = {}, info = {} }) {
+  return async (url, opts) => {
+    const u = String(url);
+    if (u.includes('/service/shops/')) return { ok: true, json: async () => SHOPS };
+    if (u.includes('/lookup/shop/')) {
+      const gids = JSON.parse(opts.body);
+      return { ok: true, json: async () => Object.fromEntries(gids.map(g => [g, shopEntries[g] ?? null])) };
+    }
+    if (u.includes('/api/packagedetails')) {
+      const id = new URL(u).searchParams.get('packageids');
+      const key = `sub/${id}`;
+      return key in steam ? { ok: true, json: async () => ({ [id]: steam[key] }) } : { ok: false, status: 404 };
+    }
+    if (u.includes('/actions/ajaxresolvebundles')) {
+      const id = new URL(u).searchParams.get('bundleids');
+      const key = `bundle/${id}`;
+      return key in steam ? { ok: true, json: async () => steam[key] } : { ok: true, json: async () => [] };
+    }
+    if (u.includes('/games/info/')) {
+      const gid = new URL(u).searchParams.get('id');
+      return gid in info ? { ok: true, json: async () => info[gid] } : { ok: true, json: async () => ({}) };
+    }
+    return { ok: false, status: 404 };
+  };
+}
+
+test('resolveSteamAppIds: a gid listed only as a Steam "sub" (single-item package) expands via Steam\'s own packagedetails', async (t) => {
   _reset();
-  t.mock.method(globalThis, 'fetch', async (url, opts) => {
-    if (String(url).includes('/service/shops/')) return { ok: true, json: async () => SHOPS };
-    const gids = JSON.parse(opts.body);
-    return { ok: true, json: async () => Object.fromEntries(gids.map(g => [g, ['sub/1234']])) };
-  });
+  t.mock.method(globalThis, 'fetch', makeResolveFetch({
+    shopEntries: { 'gid-sub-only': ['sub/1234'] },
+    steam: { 'sub/1234': { success: true, data: { apps: [{ id: 292030 }] } } },
+  }));
+  const result = await resolveSteamAppIds(['gid-sub-only']);
+  assert.equal(result.get('gid-sub-only'), 292030);
+});
+
+test('resolveSteamAppIds: a gid listed as a Steam "bundle" spanning several apps resolves to an array', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeResolveFetch({
+    shopEntries: { 'gid-bundle': ['bundle/4995'] },
+    steam: { 'bundle/4995': [{ bundleid: 4995, appids: [396750, 688700, 709150] }] },
+  }));
+  const result = await resolveSteamAppIds(['gid-bundle']);
+  assert.deepEqual(result.get('gid-bundle'), [396750, 688700, 709150]);
+});
+
+test('resolveSteamAppIds: falls back to games/info/v2\'s own appid when the Steam-side sub/bundle expansion comes up empty', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeResolveFetch({
+    shopEntries: { 'gid-sub-only': ['sub/1234'] },
+    steam: { 'sub/1234': { success: false } },
+    info: { 'gid-sub-only': { appid: 292030 } },
+  }));
+  const result = await resolveSteamAppIds(['gid-sub-only']);
+  assert.equal(result.get('gid-sub-only'), 292030);
+});
+
+test('resolveSteamAppIds: still resolves to null when neither the Steam expansion nor the games/info/v2 fallback has an appid', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeResolveFetch({
+    shopEntries: { 'gid-sub-only': ['sub/1234'] },
+    steam: { 'sub/1234': { success: false } },
+    info: { 'gid-sub-only': { title: 'No Steam Listing' } },
+  }));
   const result = await resolveSteamAppIds(['gid-sub-only']);
   assert.equal(result.get('gid-sub-only'), null);
+});
+
+test('resolveSteamAppIds: a failed Steam-side expansion falls back to games/info/v2 rather than throwing', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url, opts) => {
+    const u = String(url);
+    if (u.includes('/api/packagedetails')) throw new Error('network error');
+    return makeResolveFetch({
+      shopEntries: { 'gid-sub-only': ['sub/1234'] },
+      info: { 'gid-sub-only': { appid: 292030 } },
+    })(url, opts);
+  });
+  const result = await resolveSteamAppIds(['gid-sub-only']);
+  assert.equal(result.get('gid-sub-only'), 292030);
+});
+
+test('resolveSteamAppIds: a gid with no shop entry at all never triggers the games/info/v2 fallback', async (t) => {
+  _reset();
+  let infoCalls = 0;
+  t.mock.method(globalThis, 'fetch', async (url, opts) => {
+    if (String(url).includes('/games/info/')) infoCalls++;
+    return makeResolveFetch({ shopEntries: { 'gid-missing': null } })(url, opts);
+  });
+  const result = await resolveSteamAppIds(['gid-missing']);
+  assert.equal(result.get('gid-missing'), null);
+  assert.equal(infoCalls, 0, 'a gid ITAD has no Steam shop entry for at all should not spend a games/info/v2 request');
 });
 
 test('resolveSteamAppIds: throws when the lookup call fails', async (t) => {

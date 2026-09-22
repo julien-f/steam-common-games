@@ -4,7 +4,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   cheapestTierPrice, fmtBundleDateTime, fmtBundleDatePart, fmtBundleTimePart, toBundleRow,
-  bundleCovers, shopHue, bundleUrgency, bundleTierSummary, fmtBundleDateFriendly,
+  bundleCovers, shopHue, bundleUrgency, bundleEndsIn, compareEndsIn, ENDS_IN, bundleAge,
+  compareBundleAge, BUNDLE_AGE, bundleTierSummary, fmtBundleDateFriendly,
 } = require('../public/bundleRows.ts');
 
 const HOUR = 3600000;
@@ -253,6 +254,48 @@ test('bundleUrgency: no expiry (open-ended bundle) and unparseable dates are not
   assert.equal(bundleUrgency(undefined), null);
   assert.equal(bundleUrgency(''), null);
   assert.equal(bundleUrgency('not a date'), null);
+});
+
+// ── bundleEndsIn / compareEndsIn ─────────────────────────────────────────────────────────────
+
+test('bundleEndsIn: one label per urgency tier, and a named bucket for no end date', () => {
+  const now = Date.parse('2026-09-07T12:00:00Z');
+  const at = ms => new Date(now + ms).toISOString();
+  assert.equal(bundleEndsIn(at(-HOUR), now), ENDS_IN.ended);
+  assert.equal(bundleEndsIn(at(6 * HOUR), now), ENDS_IN.urgent);
+  // The 48h boundary the hero tile's own count is drawn at.
+  assert.equal(bundleEndsIn(at(47 * HOUR), now), ENDS_IN.urgent);
+  assert.equal(bundleEndsIn(at(49 * HOUR), now), ENDS_IN.soon);
+  assert.equal(bundleEndsIn(at(6 * DAY), now), ENDS_IN.soon);
+  assert.equal(bundleEndsIn(at(8 * DAY), now), ENDS_IN.later);
+  // An open-ended bundle and an unparseable date are both "no deadline to show", not missing data.
+  assert.equal(bundleEndsIn(null, now), ENDS_IN.open);
+  assert.equal(bundleEndsIn('not a date', now), ENDS_IN.open);
+});
+
+test('compareEndsIn: orders by urgency, not alphabetically', () => {
+  const sorted = [ENDS_IN.ended, ENDS_IN.later, ENDS_IN.open, ENDS_IN.soon, ENDS_IN.urgent].sort(compareEndsIn);
+  assert.deepEqual(sorted, [ENDS_IN.urgent, ENDS_IN.soon, ENDS_IN.later, ENDS_IN.open, ENDS_IN.ended]);
+});
+
+// ── bundleAge / compareBundleAge ─────────────────────────────────────────────────────────────
+
+test('bundleAge: buckets a bundle by how long ago it was published', () => {
+  const now = Date.parse('2026-09-07T12:00:00Z');
+  const ago = ms => new Date(now - ms).toISOString();
+  assert.equal(bundleAge(ago(2 * HOUR), now), BUNDLE_AGE.fresh);
+  // The 24h boundary the hero tile's "New" count is drawn at.
+  assert.equal(bundleAge(ago(23 * HOUR), now), BUNDLE_AGE.fresh);
+  assert.equal(bundleAge(ago(25 * HOUR), now), BUNDLE_AGE.week);
+  assert.equal(bundleAge(ago(6 * DAY), now), BUNDLE_AGE.week);
+  assert.equal(bundleAge(ago(8 * DAY), now), BUNDLE_AGE.older);
+  assert.equal(bundleAge(null, now), BUNDLE_AGE.unknown);
+  assert.equal(bundleAge('not a date', now), BUNDLE_AGE.unknown);
+});
+
+test('compareBundleAge: orders newest-first, not alphabetically', () => {
+  const sorted = [BUNDLE_AGE.older, BUNDLE_AGE.unknown, BUNDLE_AGE.week, BUNDLE_AGE.fresh].sort(compareBundleAge);
+  assert.deepEqual(sorted, [BUNDLE_AGE.fresh, BUNDLE_AGE.week, BUNDLE_AGE.older, BUNDLE_AGE.unknown]);
 });
 
 // ── toBundleRow ──────────────────────────────────────────────────────────────────────────────

@@ -24,8 +24,9 @@ import { getAccountOverrideState, clearAccountOverride, accountOverrideStatusTex
 import { withAccountParam, urlWithoutAccountParam, parseUrlState, compareUrl, COMPARE_PATH } from './urlState.ts';
 import { resolveAccountSummary, fetchAccountOverview, fetchAccountWishlistItems } from './accountData.ts';
 import type { AccountPlayer } from './accountData.ts';
-import { normalizeInput, steamVanity, fmtAge } from './utils.ts';
+import { normalizeInput, steamVanity, fmtAge, countryFlag } from './utils.ts';
 import { CopyButton } from './CopyButton.tsx';
+import { AccountFriends } from './AccountFriends.tsx';
 import {
   getFolders, getLists, createFolder, createList, renameFolder, renameList,
   deleteFolder, deleteList,
@@ -118,15 +119,26 @@ export default function HomeRoute() {
     setPlayers([]);
     if (refresh) { setRefreshing(true); setFetchedAt(null); }
     const members = account.members;
+    // Guards every setter below: switching accounts again before this fetch settles (e.g.
+    // adopting a `?u=` override right after landing on it, which fires this same effect for
+    // the previous account first) must not let the *older* response — which can resolve later
+    // — clobber state that already moved on to a different account. Confirmed live: without
+    // this, the header briefly showed one account's owned/wishlist counts alongside a stale
+    // solePlayer() (memberSince/countryCode/realName) from whichever account was current a
+    // moment earlier. Reads accountsStore.ts's own plain `getEffectiveCurrentAccount()`, not the
+    // local `currentAccount` signal — this runs inside async callbacks, well outside any tracked
+    // scope, so a signal read here wouldn't ever see a later update anyway (and would trip
+    // `solid/reactivity`); the plain module accessor always reflects the live value on demand.
+    const isStale = (): boolean => getEffectiveCurrentAccount()?.id !== account.id;
     const owned = fetchAccountOverview(members, { refresh }).then(
-      ({ games, players: ps, fetchedAt: at }) => { setCounts(c => ({ ...c, owned: games.length })); setPlayers(ps); setFetchedAt(at); },
-      () => setCounts(c => ({ ...c, owned: 0 })),
+      ({ games, players: ps, fetchedAt: at }) => { if (isStale()) return; setCounts(c => ({ ...c, owned: games.length })); setPlayers(ps); setFetchedAt(at); },
+      () => { if (!isStale()) setCounts(c => ({ ...c, owned: 0 })); },
     );
     const wishlist = fetchAccountWishlistItems(members, { refresh }).then(
-      items => setCounts(c => ({ ...c, wishlist: items.length })),
-      () => setCounts(c => ({ ...c, wishlist: 0 })),
+      items => { if (!isStale()) setCounts(c => ({ ...c, wishlist: items.length })); },
+      () => { if (!isStale()) setCounts(c => ({ ...c, wishlist: 0 })); },
     );
-    void Promise.allSettled([owned, wishlist]).then(() => setRefreshing(false));
+    void Promise.allSettled([owned, wishlist]).then(() => { if (!isStale()) setRefreshing(false); });
   }
 
   createEffect(() => {
@@ -180,6 +192,9 @@ export default function HomeRoute() {
         label: summary.label,
         avatarUrl: summary.avatarUrl ?? undefined,
         vanities: summary.vanities,
+        memberSince: summary.memberSince ?? undefined,
+        countryCode: summary.countryCode ?? undefined,
+        realName: summary.realName ?? undefined,
         lastUsedAt: Date.now(),
       };
       pickAccount(account);
@@ -425,6 +440,9 @@ export default function HomeRoute() {
                       </a>
                     )}
                   </Show>
+                  <Show when={solePlayer()?.realName}>
+                    {n => <span class="account-realname">({n()})</span>}
+                  </Show>
                   <Show when={solePlayer()}>
                     {p => <CopyButton text={copyIdentifier(p())} title={`Copy this account's Steam identifier (${copyIdentifier(p())})`} />}
                   </Show>
@@ -435,20 +453,24 @@ export default function HomeRoute() {
                 <div class="account-counts">
                   Owned: {counts().owned ?? '…'} · Wishlisted: {counts().wishlist ?? '…'}
                   <Show when={players().length > 1}>{` · ${players().length} accounts merged`}</Show>
+                  <Show when={solePlayer()?.memberSince}>{s => ` · Member since ${s()}`}</Show>
+                  <Show when={solePlayer()?.countryCode}>{c => ` ${countryFlag(c())}`}</Show>
                 </div>
                 {/* Steam data is cached server-side for a long time (see default.env's
                     LIBRARY_CACHE_TTL_MINUTES), so the age of what's on screen is stated outright
-                    rather than left to be guessed at, with the ↻ that forces a re-fetch right
-                    next to it. */}
+                    rather than left to be guessed at — and the statement *is* the control that
+                    fixes it, the same shape the list heroes' Updated tile and the side panel's
+                    own ↻ now use, rather than a separate button beside the text. */}
                 <div class="account-updated">
-                  Updated {fmtAge(fetchedAt())}
                   <button
                     type="button"
-                    class="btn btn-ghost btn-sm"
+                    class="account-updated-btn"
                     disabled={refreshing()}
-                    title="Re-fetch this account's games, wishlist and profile from Steam"
+                    title="How old the server's cached copy of this account is — click to re-fetch its games, wishlist and profile from Steam"
                     onClick={() => loadAccountData(account(), { refresh: true })}
-                  >{refreshing() ? '↻ Refreshing…' : '↻ Refresh'}</button>
+                  >
+                    Updated {refreshing() ? 'Refreshing…' : fmtAge(fetchedAt())} <span class="account-updated-icon">↻</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -477,8 +499,17 @@ export default function HomeRoute() {
                     )}
                   </Show>
                   <CopyButton text={copyIdentifier(p)} title={`Copy this account's Steam identifier (${copyIdentifier(p)})`} />
+                  <Show when={p.realName}>
+                    <span class="account-realname">({p.realName})</span>
+                  </Show>
                   <Show when={p.gameCount != null}>
                     <span class="account-count">{p.gameCount} games</span>
+                  </Show>
+                  <Show when={p.memberSince}>
+                    <span class="account-count">Since {p.memberSince}</span>
+                  </Show>
+                  <Show when={p.countryCode}>
+                    <span class="account-count">{countryFlag(p.countryCode)}</span>
                   </Show>
                   <Show when={p.isPrivate}>
                     <span class="account-private" title="This Steam profile isn't public — some data may be missing or empty">🔒 Private</span>
@@ -487,6 +518,10 @@ export default function HomeRoute() {
               )}
             </For>
           </ul>
+        </Show>
+
+        <Show when={currentAccount()}>
+          {account => <AccountFriends accountId={account().id} myAccountId={myAccount()?.id ?? null} onExplore={pickAccount} />}
         </Show>
 
         <form onSubmit={e => { e.preventDefault(); resolveAndSetCurrent(); }}>
@@ -528,6 +563,17 @@ export default function HomeRoute() {
                       <CopyButton text={identifier} title={`Copy this account's Steam identifier (${identifier})`} />
                     )}
                   </For>
+                  {/* Same last-known, cached-at-resolve-time trivia the account card shows —
+                      absent until this entry is next picked, same as label/avatarUrl above it. */}
+                  <Show when={account.realName}>
+                    <span class="account-realname">({account.realName})</span>
+                  </Show>
+                  <Show when={account.memberSince}>
+                    <span class="account-count">Since {account.memberSince}</span>
+                  </Show>
+                  <Show when={account.countryCode}>
+                    <span class="account-count">{countryFlag(account.countryCode)}</span>
+                  </Show>
                   <button type="button" title="Set as my account" onClick={[toggleMyAccount, account]}>
                     {myAccount()?.id === account.id ? '☆ unstar' : '★ star as mine'}
                   </button>

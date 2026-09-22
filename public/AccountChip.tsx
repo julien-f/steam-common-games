@@ -26,6 +26,7 @@ import { getAccountOverrideState, clearAccountOverride, accountOverrideStatusTex
 import { withAccountParam, urlWithoutAccountParam } from './urlState.ts';
 import { bindNavPopover } from './navPopover.ts';
 import { CopyButton } from './CopyButton.tsx';
+import { getAuthUser, signOut, AUTH_CHANGED_EVENT } from './authStore.ts';
 import type { AccountSlot } from './types.ts';
 
 export function AccountChip(): JSX.Element {
@@ -41,6 +42,7 @@ export function AccountChip(): JSX.Element {
   const [overrideState, setOverrideState] = createSignal(getAccountOverrideState());
   const [override, setOverride] = createSignal<AccountSlot | null>(getAccountOverride());
   const [recents, setRecents] = createSignal<AccountSlot[]>(getRecentAccounts());
+  const [authUser, setAuthUser] = createSignal(getAuthUser());
 
   // A `?u=` link resolves asynchronously, after the shell has mounted, and an account can be
   // picked from anywhere (Home's picker, this popover). Same "plain module + window event,
@@ -53,6 +55,10 @@ export function AccountChip(): JSX.Element {
   }
   window.addEventListener(ACCOUNT_CHANGED_EVENT, refresh);
   onCleanup(() => window.removeEventListener(ACCOUNT_CHANGED_EVENT, refresh));
+
+  const refreshAuth = () => setAuthUser(getAuthUser());
+  window.addEventListener(AUTH_CHANGED_EVENT, refreshAuth);
+  onCleanup(() => window.removeEventListener(AUTH_CHANGED_EVENT, refreshAuth));
 
   onMount(() => onCleanup(bindNavPopover(detailsEl, panelEl)));
 
@@ -173,6 +179,24 @@ export function AccountChip(): JSX.Element {
                 )}
               </For>
             </ul>
+          </Show>
+
+          {/* Optional — the app works fully anonymously (see docs/dev/lists-and-accounts.md).
+              Signing in with Steam additionally syncs prefs (accounts/lists/settings) to the
+              server, so they follow you to another browser/device. */}
+          <div class="account-chip-section">Steam account</div>
+          <Show
+            when={authUser()}
+            // rel="external" is @solidjs/router's documented escape hatch from its own global
+            // anchor-click interception — without it, this same-origin link was hijacked into a
+            // client-side navigation to a path with no matching route (a blank page, no request
+            // ever reaching the server) instead of the real page load /auth/steam/login needs.
+            fallback={<a href="/auth/steam/login" rel="external" class="account-chip-panel-link">Sign in with Steam</a>}
+          >
+            <p class="account-chip-note">
+              Signed in — your accounts/lists/settings sync to your Steam account.
+              <button type="button" class="account-chip-action" onClick={() => signOut()}>Sign out</button>
+            </p>
           </Show>
 
           <A href={link('/')} class="account-chip-panel-link" onClick={() => { detailsEl.open = false; }}>

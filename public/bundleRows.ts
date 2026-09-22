@@ -197,6 +197,52 @@ export function bundleUrgency(expiry: string | null | undefined, now: number = D
   return { tier: 'later', label: '' };
 }
 
+// The urgency tier as a plain label — what the browse table's hidden "Ends in" column filters and
+// groups on, and what its hero card's "Ending soon" tile toggles. `Open-ended` is a named bucket
+// rather than the table's generic "(none)": a bundle with no end date is a real case, not missing
+// data.
+export const ENDS_IN = {
+  urgent: 'Within 48h', soon: 'This week', later: 'Later', open: 'Open-ended', ended: 'Ended',
+} as const;
+
+// Soonest-first, for the column's own comparator: alphabetically these order Ended < Later <
+// Open-ended < This week < Within 48h, which says nothing about urgency.
+const ENDS_IN_ORDER: string[] = [ENDS_IN.urgent, ENDS_IN.soon, ENDS_IN.later, ENDS_IN.open, ENDS_IN.ended];
+
+export function bundleEndsIn(expiry: string | null | undefined, now: number = Date.now()): string {
+  const urgency = bundleUrgency(expiry, now);
+  return urgency ? ENDS_IN[urgency.tier] : ENDS_IN.open;
+}
+
+// Values only, no rows — the shape `ColumnDef.compare` takes, which also orders the column's
+// filter checklist and its group headers.
+export function compareEndsIn(a: unknown, b: unknown): number {
+  return ENDS_IN_ORDER.indexOf(String(a)) - ENDS_IN_ORDER.indexOf(String(b));
+}
+
+// The publish-side counterpart of ENDS_IN, for the browse table's hidden "Age" column and the
+// "New" tile that toggles it — "what appeared since I last looked" is the other half of the
+// browsing question, and the Published column can only answer it by being sorted and read.
+export const BUNDLE_AGE = {
+  fresh: 'Last 24h', week: 'This week', older: 'Older', unknown: 'Unknown',
+} as const;
+
+const BUNDLE_AGE_ORDER: string[] = [BUNDLE_AGE.fresh, BUNDLE_AGE.week, BUNDLE_AGE.older, BUNDLE_AGE.unknown];
+
+export function bundleAge(publish: string | null | undefined, now: number = Date.now()): string {
+  const d = parseBundleDate(publish);
+  if (!d) return BUNDLE_AGE.unknown;
+  const hours = (now - d.getTime()) / 3600000;
+  if (hours < 24) return BUNDLE_AGE.fresh;
+  if (hours < 24 * 7) return BUNDLE_AGE.week;
+  return BUNDLE_AGE.older;
+}
+
+// Newest-first, the direction this column is actually read in — see compareEndsIn.
+export function compareBundleAge(a: unknown, b: unknown): number {
+  return BUNDLE_AGE_ORDER.indexOf(String(a)) - BUNDLE_AGE_ORDER.indexOf(String(b));
+}
+
 // `now` is a parameter purely so the Active/Expired split is testable without freezing the clock.
 // A bundle with no expiry at all counts as Active — that's how ITAD represents an open-ended one,
 // not a missing date to guess at.

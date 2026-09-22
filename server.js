@@ -8,15 +8,18 @@ const express = require('express');
 const morgan = require('morgan');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('node:crypto');
 const rateLimit = require('express-rate-limit');
 
 const { getCached, getCachedAt, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
 const { getMetrics, recordLimiterTrip } = require('./lib/metrics');
-const { resolveSteamId, getOwnedGames, getWishlist, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker, getSemaphoreStats } = require('./lib/steam');
+const { resolveSteamId, getOwnedGames, getWishlist, getFriendList, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker, getSemaphoreStats } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
 const { getBundles, bundlesCacheKey, findBundleById, resolveSteamAppIds, resolveItadIds, getSteamShopId, getPrices, extractPriceInfo } = require('./lib/itad');
+const { SESSION_COOKIE, STATE_COOKIE, parseCookies, serializeCookie, buildLoginUrl, verifySteamAssertion, upsertUser, createSession, destroySession, getSessionUser, setUserPref } = require('./lib/auth');
+const { SESSION_TTL_MS } = require('./lib/config');
 
 const HOST = process.env.HOST;
 const PORT = process.env.PORT;
@@ -26,6 +29,7 @@ const SEARCH_RATE_LIMIT_MAX = Number(process.env.SEARCH_RATE_LIMIT_MAX);
 const DETAILS_RATE_LIMIT_MAX = Number(process.env.DETAILS_RATE_LIMIT_MAX);
 const GAME_SEARCH_RATE_LIMIT_MAX = Number(process.env.GAME_SEARCH_RATE_LIMIT_MAX);
 const ACHIEVEMENTS_RATE_LIMIT_MAX = Number(process.env.ACHIEVEMENTS_RATE_LIMIT_MAX);
+const FRIENDS_RATE_LIMIT_MAX = Number(process.env.FRIENDS_RATE_LIMIT_MAX);
 const STREAM_MAX_GAMES = Number(process.env.STREAM_MAX_GAMES);
 const STREAM_CONCURRENCY = Number(process.env.STREAM_CONCURRENCY);
 const BUNDLES_RATE_LIMIT_MAX = Number(process.env.BUNDLES_RATE_LIMIT_MAX);
@@ -202,6 +206,41 @@ const searchLimit = namedRateLimit('search', {
     for (const id of resolvedIds) {
       if (getCached(`player:${id}`) === undefined) return false;
       if (isWishlist ? getCached(`wishlist:${id}`) === undefined : getCached(`games:${id}`) === undefined) return false;
+    }
+    return true;
+  },
+});
+
+// Separate from searchLimit above rather than sharing it — that limiter's skip keys off
+// `members` to mean "wishlist", and /api/friends also sends `members`, so sharing it would
+// check the wrong cache prefix (wishlist: instead of friends:). Same "cache hits don't count"
+// shape otherwise.
+const friendsLimit = namedRateLimit('friends', {
+  windowMs: 60 * 1000,
+  max: FRIENDS_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many friends lookups. Please wait a minute and try again.' },
+  skip: (req) => {
+    if (rateLimitBypassed()) return true;
+    if (req.body?.refresh === true) return false;
+    const refreshIds = req.body?.refreshIds;
+    if (Array.isArray(refreshIds) && refreshIds.length > 0) return false;
+
+    const rawIdentifiers = req.body?.members;
+    if (!Array.isArray(rawIdentifiers) || !rawIdentifiers.every(u => typeof u === 'string' && u.trim().length > 0)) return false;
+
+    const resolvedIds = new Set();
+    for (const raw of rawIdentifiers) {
+      const id = raw.trim();
+      if (STEAM64_RE.test(id)) { resolvedIds.add(id); continue; }
+      const hit = getCached(`resolve:${id}`);
+      if (hit === undefined) return false;
+      resolvedIds.add(hit);
+    }
+
+    for (const id of resolvedIds) {
+      if (getCached(`friends:${id}`) === undefined) return false;
     }
     return true;
   },
@@ -549,6 +588,52 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
   }
 });
 
+// Friends have no "family" concept in Steam either — unions each member's own friends list,
+// same convention as /api/wishlist. A member whose friends list is private is silently
+// excluded from the union (reported separately in `unavailable`) rather than failing the
+// whole request.
+app.post('/api/friends', friendsLimit, async (req, res) => {
+  const members = req.body.members;
+
+  if (
+    !Array.isArray(members) ||
+    members.length < 1 ||
+    !members.every(u => typeof u === 'string' && u.trim().length > 0)
+  ) {
+    return res.status(400).json({ error: 'Provide at least 1 player' });
+  }
+  if (members.length > MAX_USERS) {
+    return res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
+  }
+
+  const refresh = req.body.refresh === true;
+  const refreshIds = new Set(Array.isArray(req.body.refreshIds) ? req.body.refreshIds : []);
+
+  try {
+    const ids = [...new Set(await Promise.all(members.map(resolveSteamId)))];
+    const lists = await Promise.all(ids.map(id => getFriendList(id, { force: refresh || refreshIds.has(id) })));
+
+    const unavailable = ids.filter((id, i) => lists[i] === null);
+    const friendIds = [...new Set(lists.flat().filter(Boolean))];
+
+    const players = friendIds.length > 0 ? await getPlayerSummaries(friendIds) : [];
+    const friends = players.map(p => ({
+      steamid: p.steamid,
+      personaname: p.personaname,
+      avatar: p.avatarfull || p.avatarmedium || p.avatar || null,
+      profileurl: p.profileurl,
+      timecreated: p.timecreated,
+      loccountrycode: p.loccountrycode,
+      realname: p.realname,
+    }));
+
+    res.json({ friends, unavailable, fetchedAt: oldestCachedAt(ids.map(id => `friends:${id}`)) });
+  } catch (err) {
+    const status = routeErrorStatus('friends', err);
+    res.status(status).json({ error: err.message });
+  }
+});
+
 const dedupDetails = createDedup();
 
 function fetchGameDetails(appid, { force = false } = {}) {
@@ -595,13 +680,20 @@ function fetchGameDetails(appid, { force = false } = {}) {
       if (tagsRes.status     === 'rejected') logErr('tags',     tagsRes.reason);
       if (demoRes.status     === 'rejected') logErr('demo',     demoRes.reason);
       if (protondbRes.status === 'rejected') logErr('protondb', protondbRes.reason);
+      // Age of the oldest of this game's cached sources, which is what the panel's ↻ shows — plus
+      // each source's own age behind it. The aggregate alone was misleading: these tiers run from
+      // 90 to 180 days and are cached per source, so one untouched store page dates the whole
+      // readout, and "5 months ago" says nothing about the rating fetched yesterday. The panel
+      // puts the breakdown in the button's tooltip so the visible figure stays one number.
       return {
-        // Age of the oldest of this game's cached sources — the panel's ↻ puts it in its own
-        // tooltip rather than on screen: these tiers run to months, and for a game whose store
-        // page genuinely hasn't changed since 2013 a prominent "5 months ago" would invite
-        // clicks that spend the app's most rate-limited upstream (storeLimit) to re-fetch data
-        // that was already right. Available to whoever wonders; not advertised to everyone.
         fetchedAt: oldestCachedAt([`rating:${appid}`, `hltb:${appid}`, `meta:${appid}`, `browse:${appid}`, `protondb:${appid}`]),
+        fetchedAts: {
+          rating:   getCachedAt(`rating:${appid}`)   ?? null,
+          hltb:     getCachedAt(`hltb:${appid}`)     ?? null,
+          meta:     getCachedAt(`meta:${appid}`)     ?? null,
+          tags:     getCachedAt(`browse:${appid}`)   ?? null,
+          protondb: getCachedAt(`protondb:${appid}`) ?? null,
+        },
         rating:   ratingRes.status   === 'fulfilled' ? ratingRes.value   : null,
         hltb:     hltbRes.status     === 'fulfilled' ? hltbRes.value     : null,
         meta:     metaRes.status     === 'fulfilled' ? metaRes.value     : null,
@@ -671,21 +763,26 @@ app.get('/api/bundles/:id', bundlesByIdLimit, async (req, res) => {
   }
   const country = parseCountry(req);
   try {
-    const bundle = await findBundleById(id, { country });
-    if (!bundle) {
+    const found = await findBundleById(id, { country });
+    if (!found) {
       return res.status(404).json({ error: 'Bundle not found — it may be older than what we search, or already fully expired' });
     }
-    res.json({ bundle });
+    // Age of the cached list page this bundle was found on — the same page cache GET /api/bundles
+    // reports for the browse list. There's no forcing it (see this route's own note above), so
+    // this is stated rather than actionable: it says how old the tiers/dates on screen are.
+    res.json({ bundle: found.bundle, fetchedAt: getCachedAt(found.cacheKey) ?? null });
   } catch (err) {
     const status = routeErrorStatus('bundles-by-id', err);
     res.status(status).json({ error: err.message });
   }
 });
 
-// Resolves a bundle's ITAD game ids (uuids, off tiers[].games[].id) to their Steam appid, so
+// Resolves a bundle's ITAD game ids (uuids, off tiers[].games[].id) to their Steam appid(s), so
 // the Bundles page can feed the resolved subset into the same GET /api/game-details/:appid /
-// POST /api/game-details/stream pipeline every other page already uses. Returns null for a
-// gid with no Steam listing — the frontend renders those as the separate "not on Steam" list.
+// POST /api/game-details/stream pipeline every other page already uses. A gid resolves to a
+// plain number (the common case), an array of numbers (a Steam "sub"/"bundle" spanning several
+// apps — see lib/itad.js's resolveSteamAppIds), or null for a gid with no Steam listing at all
+// — the frontend renders those as the separate "not on Steam" list.
 const MAX_BUNDLE_RESOLVE_GAMES = 500;
 app.post('/api/bundles/resolve', bundlesResolveLimit, async (req, res) => {
   if (!isItadConfigured()) {
@@ -969,6 +1066,90 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
 
   send({ done: true });
   if (!res.writableEnded) res.end();
+});
+
+// ── Authentication (Steam OpenID) ────────────────────────────────────────────
+// Entirely optional — the app works fully anonymously with localStorage-only prefs (see
+// docs/dev/lists-and-accounts.md); signing in with Steam additionally syncs prefs server-side
+// under the verified steamid, across browsers/devices.
+
+const authLimit = namedRateLimit('auth', {
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => rateLimitBypassed(),
+  message: { error: 'Too many requests. Please wait a minute and try again.' },
+});
+
+function requireAuth(req, res, next) {
+  const user = getSessionUser(parseCookies(req.headers.cookie)[SESSION_COOKIE]);
+  if (!user) return res.status(401).json({ error: 'Not signed in' });
+  req.user = user;
+  next();
+}
+
+app.get('/auth/steam/login', authLimit, (req, res) => {
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const state = crypto.randomBytes(16).toString('hex');
+  res.setHeader('Set-Cookie', serializeCookie(STATE_COOKIE, state, { maxAgeMs: 5 * 60 * 1000, secure: req.protocol === 'https' }));
+  res.redirect(buildLoginUrl(origin, state));
+});
+
+app.get('/auth/steam/callback', authLimit, async (req, res) => {
+  const secure = req.protocol === 'https';
+  const clearState = serializeCookie(STATE_COOKIE, '', {});
+  const { [STATE_COOKIE]: expectedState } = parseCookies(req.headers.cookie);
+  if (!expectedState || req.query.state !== expectedState) {
+    res.setHeader('Set-Cookie', clearState);
+    return res.status(400).send('Login request expired or invalid — please try signing in again.');
+  }
+
+  let steamid;
+  try {
+    steamid = await verifySteamAssertion(req.query);
+  } catch (err) {
+    console.error('[auth] steam assertion verification failed', err.stack || err.message);
+    res.setHeader('Set-Cookie', clearState);
+    return res.status(502).send('Could not verify Steam login — please try again.');
+  }
+  if (!steamid) {
+    res.setHeader('Set-Cookie', clearState);
+    return res.status(400).send('Steam login could not be verified.');
+  }
+
+  upsertUser(steamid);
+  const sessionId = createSession(steamid);
+  res.setHeader('Set-Cookie', [clearState, serializeCookie(SESSION_COOKIE, sessionId, { maxAgeMs: SESSION_TTL_MS, secure })]);
+  res.redirect('/');
+});
+
+app.post('/auth/logout', (req, res) => {
+  destroySession(parseCookies(req.headers.cookie)[SESSION_COOKIE]);
+  res.setHeader('Set-Cookie', serializeCookie(SESSION_COOKIE, '', {}));
+  res.json({ ok: true });
+});
+
+// Not behind requireAuth, and always 200 — this is checked unconditionally on every page load
+// (see authStore.ts's initAuth) to answer "is anyone signed in", and since sign-in is optional
+// most visits are anonymous, so that isn't an error condition worth a console-level 401 on
+// every single one of them.
+app.get('/api/me', (req, res) => {
+  const user = getSessionUser(parseCookies(req.headers.cookie)[SESSION_COOKIE]);
+  res.json(user ? { steamid: user.steamid, prefs: user.prefs } : { steamid: null, prefs: null });
+});
+
+// One key per request, never a whole-blob PUT — matches prefs.ts's own per-key setPref, so
+// two keys changing around the same time (different tabs/devices) can't clobber each other.
+// `updatedAt` (the device's own clock, not this server's receipt time) is what lets setUserPref
+// apply last-write-wins against whatever's already stored — see its own comment.
+app.put('/api/me/prefs/:key', authLimit, requireAuth, (req, res) => {
+  const { value, updatedAt } = req.body || {};
+  if (!('value' in (req.body || {})) || typeof updatedAt !== 'number') {
+    return res.status(400).json({ error: 'body must be { value, updatedAt }' });
+  }
+  const applied = setUserPref(req.user.steamid, req.params.key, value, updatedAt);
+  res.json({ ok: true, applied });
 });
 
 // SPA fallback: any GET that isn't an /api/* call and doesn't look like a static-asset request

@@ -1291,7 +1291,11 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 }
 .panel-refresh-btn:hover:not(:disabled), .panel-copy-link-btn:hover { border-color: var(--accent); color: var(--accent2); }
 .panel-refresh-btn:disabled { opacity: 0.6; cursor: default; }
-.panel-refresh-btn.is-refreshing { animation: spin 0.75s linear infinite; }
+/* Wider than the icon buttons beside it: it carries the details' age as text (see panel.tsx's
+   RefreshButton), so it sizes to its content instead of being a 26px square. */
+.panel-refresh-btn { width: auto; min-width: 26px; padding: 0 7px; gap: 5px; }
+.panel-refresh-age { font-size: 11px; white-space: nowrap; }
+.panel-refresh-icon.is-refreshing { animation: spin 0.75s linear infinite; }
 /* Brief post-click feedback (see clipboard.ts's copyWithFeedback) — green rather than the
    hover accent, so "copied" reads as a distinct confirmation, not just a hover state. */
 .panel-copy-link-btn--copied { border-color: #15803d; color: #15803d; }
@@ -2029,6 +2033,7 @@ kbd {
 .shortcuts-row:last-child { margin-bottom: 0; }
 .shortcuts-row span { margin-left: 4px; }
 
+
 /* ── List route styles (see docs/dev/frontend.md) ─────────────────────── */
 
 /* Wide page layout for the two routes built around a big data table — same 1600px cap the
@@ -2323,6 +2328,36 @@ kbd {
 }
 .list-stat-value { font-size: 14px; color: var(--text0); }
 .list-stat-sub { font-size: 11px; color: var(--text1); }
+/* A tile that is also a control (`/bundles`' "Ending soon" filter toggle). Button chrome reset so
+   it still reads as one of the tiles beside it, plus a pressed state — the filter it applies is
+   otherwise only visible in the table's own toolbar, several hundred pixels below. */
+.list-stat-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.list-stat-btn:hover .list-stat-label,
+.list-stat-btn:focus-visible .list-stat-label { color: var(--accent2); }
+/* A tile carrying two actions (Prices: region + price age) can't be one button, so each half is
+   its own — which means re-stating the sizes `font: inherit` above resets, and hovering the part
+   itself rather than the shared label. */
+.list-stat-value.list-stat-btn { font-size: 14px; color: var(--text0); }
+.list-stat-sub.list-stat-btn { font-size: 11px; color: var(--text1); }
+.list-stat-value.list-stat-btn:hover:not(:disabled),
+.list-stat-value.list-stat-btn:focus-visible,
+.list-stat-sub.list-stat-btn:hover:not(:disabled),
+.list-stat-sub.list-stat-btn:focus-visible { color: var(--accent2); }
+.list-stat-btn[aria-pressed="true"] .list-stat-label { color: var(--accent); }
+.list-stat-icon { font-size: 11px; color: var(--text1); }
+.list-stat-btn:hover .list-stat-icon,
+.list-stat-btn:focus-visible .list-stat-icon { color: var(--accent2); }
+.list-stat-btn:disabled { cursor: default; }
+.list-stat-btn:disabled .list-stat-label { color: var(--text1); }
+
 /* Overrides .bundle-ends-rel's own inline-beside-the-time metrics (shared with the browse table's
    Ends cell) — here the countdown is its own line under the date, not a suffix. */
 .list-stat-sub .bundle-ends-rel { margin-left: 0; }
@@ -2514,6 +2549,9 @@ kbd {
   font-size: 15px; font-weight: 600; color: var(--text0);
 }
 .account-counts { font-size: 12px; color: var(--text1); margin-top: 2px; }
+/* Steam's optional "real name" field, next to the persona name it's never a replacement for
+   (plenty of accounts leave it unset) — muted and parenthetical, same weight as .account-count. */
+.account-realname { font-size: 12px; font-weight: 400; color: var(--text1); }
 /* "Updated <when> ↻ Refresh" on Home's Account card. Server-side caching runs for weeks
    (default.env's LIBRARY_CACHE_TTL_MINUTES), so how old the data is gets stated outright, with the
    control that fixes it sitting right next to the fact. Every *list* says it as a hero tile
@@ -2522,6 +2560,17 @@ kbd {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   font-size: 11px; color: var(--text2); margin-top: 4px;
 }
+.account-updated-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.account-updated-btn:hover:not(:disabled), .account-updated-btn:focus-visible { color: var(--accent2); }
+.account-updated-btn:disabled { cursor: default; }
 
 /* The card's own larger avatar, against .account-avatar-wrap's 28px default. */
 .account-avatar-lg, .account-avatar-lg .account-avatar { width: 48px; height: 48px; }
@@ -2533,6 +2582,43 @@ kbd {
    account's own persona/profile link/presence/library size is listed here instead. */
 .account-members { list-style: none; margin: -8px 0 16px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .account-members li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* The currently-explored account's friends (AccountFriends.tsx) — same row shape as
+   .account-members above, since both are "one Steam account per row". A <details> rather than
+   always-open: a Family/public profile can easily have 100+ friends, which otherwise dwarfs the
+   rest of the account card — collapsed by default, the count in the summary still says how many
+   without opening it. */
+.account-friends { margin-bottom: 16px; }
+.account-friends summary {
+  cursor: pointer;
+  font-size: 12px; font-weight: 600; color: var(--text1);
+  text-transform: uppercase; letter-spacing: 0.6px;
+  margin: 14px 0 8px;
+}
+.account-friends[open] summary { margin-bottom: 8px; }
+.account-friends-note { font-size: 12px; color: var(--text1); margin: 0 0 8px; }
+.account-friends-meta { margin: 0 0 8px; }
+.account-friends-refresh {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text1);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.account-friends-refresh:hover:not(:disabled), .account-friends-refresh:focus-visible { color: var(--accent2); }
+.account-friends-refresh:disabled { cursor: default; }
+.account-friends-refresh-icon { font-size: 11px; }
+.account-friends-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+.account-friends-list li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.account-friends-list li .btn { margin-left: auto; }
+.account-friend-mutual {
+  font-size: 11px; font-weight: 500;
+  padding: 2px 7px; border-radius: 999px;
+  background: rgba(102,192,244,0.1); border: 1px solid rgba(102,192,244,0.3); color: var(--accent2);
+}
 
 .home-account form {
   display: flex;
@@ -2580,6 +2666,7 @@ kbd {
 .recent-accounts li {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   background: var(--bg2);
   border: 1px solid var(--border);

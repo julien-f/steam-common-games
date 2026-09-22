@@ -16,6 +16,7 @@ const http = require('node:http');
 const supertest = require('supertest');
 const { app } = require('../server');
 const { _reset, setCache } = require('../lib/cache');
+const { db } = require('../lib/db');
 const { _resetAuth } = require('../lib/hltb');
 const { _resetStoreCircuitBreaker } = require('../lib/steam');
 
@@ -429,6 +430,101 @@ test('POST /api/wishlist: 502 when Steam API returns a server error', async (t) 
   assert.equal(res.status, 502);
 });
 
+// ── POST /api/friends — input validation ──────────────────────────────────────
+
+test('POST /api/friends: 400 when body has no members field', async () => {
+  const res = await api.post('/api/friends').send({});
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/friends: 400 when members is an empty array', async () => {
+  const res = await api.post('/api/friends').send({ members: [] });
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/friends: 400 when a member value is an empty string', async () => {
+  const res = await api.post('/api/friends').send({ members: [''] });
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/friends: 400 when members exceeds MAX_USERS', async () => {
+  // Default MAX_USERS is 10.
+  const members = Array.from({ length: 11 }, (_, i) => `7656119800000000${i}`);
+  const res = await api.post('/api/friends').send({ members });
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /Too many users/);
+});
+
+// ── POST /api/friends — happy path ────────────────────────────────────────────
+
+const FRIEND1 = '76561198000000099';
+
+function makeFriendsFetch(friendIds1 = [], friendIds2 = []) {
+  return async (url) => {
+    if (url.includes('GetFriendList') && url.includes(ID1)) {
+      return { ok: true, json: async () => ({ friendslist: { friends: friendIds1.map(id => ({ steamid: id, relationship: 'friend', friend_since: 0 })) } }) };
+    }
+    if (url.includes('GetFriendList') && url.includes(ID2)) {
+      return { ok: true, json: async () => ({ friendslist: { friends: friendIds2.map(id => ({ steamid: id, relationship: 'friend', friend_since: 0 })) } }) };
+    }
+    if (url.includes('GetPlayerSummaries')) {
+      const ids = url.split('steamids=')[1].split(',');
+      const players = ids.map(id => ({
+        steamid: id, personaname: id, profileurl: '', avatarfull: '',
+        timecreated: 1433965886, loccountrycode: 'US', realname: `Real ${id}`,
+      }));
+      return { ok: true, json: async () => ({ response: { players } }) };
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+}
+
+test('POST /api/friends: 200 with friends for a single account', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeFriendsFetch([FRIEND1]));
+
+  const res = await api.post('/api/friends').send({ members: [ID1] });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.friends.length, 1);
+  assert.equal(res.body.friends[0].steamid, FRIEND1);
+  assert.equal(res.body.friends[0].timecreated, 1433965886);
+  assert.equal(res.body.friends[0].loccountrycode, 'US');
+  assert.equal(res.body.friends[0].realname, `Real ${FRIEND1}`);
+  assert.deepEqual(res.body.unavailable, []);
+});
+
+test('POST /api/friends: unions two accounts, dedupes a shared friend', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeFriendsFetch([FRIEND1], [FRIEND1, '76561198000000098']));
+
+  const res = await api.post('/api/friends').send({ members: [ID1, ID2] });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.friends.length, 2);
+});
+
+test('POST /api/friends: reports a private friends list as unavailable rather than empty', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('GetFriendList') && url.includes(ID1)) return { ok: false, status: 401 };
+    if (url.includes('GetFriendList') && url.includes(ID2)) return { ok: true, json: async () => ({ friendslist: { friends: [{ steamid: FRIEND1 }] } }) };
+    if (url.includes('GetPlayerSummaries')) return { ok: true, json: async () => ({ response: { players: [{ steamid: FRIEND1, personaname: FRIEND1, profileurl: '' }] } }) };
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  const res = await api.post('/api/friends').send({ members: [ID1, ID2] });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.unavailable, [ID1]);
+  assert.equal(res.body.friends.length, 1);
+});
+
+test('POST /api/friends: 502 when Steam API returns a server error', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+
+  const res = await api.post('/api/friends').send({ members: [ID1] });
+  assert.equal(res.status, 502);
+});
+
 // ── GET /api/game-details/:appid — input validation ──────────────────────────
 
 test('GET /api/game-details/abc: 400 for non-numeric appid', async () => {
@@ -470,6 +566,33 @@ test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) 
   assert.equal(res.body.demo, 1714800);
   assert.equal(res.body.protondb?.tier, 'gold');
   assert.equal(fetchCalled, false);
+});
+
+test('GET /api/game-details/:appid: dates each source separately, and fetchedAt is the oldest of them', async (t) => {
+  _reset();
+  // Deliberately staggered: the panel's ↻ shows one figure for five sources cached under tiers
+  // of 90-180 days, so an old store page dating the whole readout is the normal case — the
+  // per-source breakdown behind it is what makes that figure interpretable.
+  setCache('rating:402',   { total_reviews: 10, total_positive: 9, review_score_desc: 'Positive' });
+  setCache('hltb:402',     [{ game_id: 1, game_name: 'X', comp_main: 3600 }]);
+  setCache('meta:402',     { name: 'X' });
+  setCache('browse:402',   { tagids: TAG_IDS });
+  setCache('tagnames:all', TAG_NAME_MAP);
+  setCache('protondb:402', { tier: 'gold' });
+  const now = Date.now();
+  // Backdated in place — the only way to get entries of genuinely different ages in one test
+  // (setCache always stamps now). `meta:` lives in cache_meta, `rating:` in its own table.
+  db.prepare('UPDATE cache_meta SET ts = ? WHERE key = ?').run(now - 5 * 86400000, 'meta:402');
+  db.prepare('UPDATE cache_rating SET ts = ? WHERE key = ?').run(now - 86400000, 'rating:402');
+
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('should not fetch'); });
+  const res = await api.get('/api/game-details/402');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.fetchedAts.meta, now - 5 * 86400000);
+  assert.equal(res.body.fetchedAts.rating, now - 86400000);
+  assert.ok(res.body.fetchedAts.hltb > now - 86400000, 'untouched entries keep their own write time');
+  // The visible figure is the oldest of the five, not the newest and not an average.
+  assert.equal(res.body.fetchedAt, now - 5 * 86400000);
 });
 
 test('GET /api/game-details/:appid: 200 fetching fresh rating, HLTB, meta and tags', async (t) => {
@@ -1490,4 +1613,112 @@ test('POST /api/game-details/stream: caps in-flight appids and stops fetching on
   // through the remaining 190-odd games for a client that has gone.
   assert.ok(started - startedAtDisconnect <= Number(process.env.STREAM_CONCURRENCY || 16), `kept going: ${started - startedAtDisconnect}`);
   server.close();
+});
+
+// ── Authentication (Steam OpenID) ────────────────────────────────────────────
+
+// Runs the full login handshake through a cookie-persisting agent and returns it, already
+// signed in as `steamid`. Mocks the one outbound call (the check_authentication POST to Steam).
+async function loginAs(t, steamid) {
+  const agent = supertest.agent(app);
+  const loginRes = await agent.get('/auth/steam/login').expect(302);
+  const returnTo = new URL(new URL(loginRes.headers.location).searchParams.get('openid.return_to'));
+  const state = returnTo.searchParams.get('state');
+
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
+  await agent
+    .get('/auth/steam/callback')
+    .query({ state, 'openid.claimed_id': `https://steamcommunity.com/openid/id/${steamid}` })
+    .expect(302)
+    .expect('Location', '/');
+
+  return agent;
+}
+
+test('GET /auth/steam/login: redirects to Steam with a return_to and state, and sets a state cookie', async () => {
+  const res = await api.get('/auth/steam/login').expect(302);
+  const location = new URL(res.headers.location);
+  assert.equal(location.hostname, 'steamcommunity.com');
+  assert.match(res.headers['set-cookie'][0], /^steam_login_state=/);
+});
+
+test('GET /auth/steam/callback: 400 when the state cookie is missing or does not match', async () => {
+  await api.get('/auth/steam/callback').query({ state: 'nope' }).expect(400);
+});
+
+test('GET /auth/steam/callback: 400 when Steam does not confirm the assertion', async (t) => {
+  const loginRes = await api.get('/auth/steam/login').expect(302);
+  const stateCookie = loginRes.headers['set-cookie'][0];
+  const state = new URL(new URL(loginRes.headers.location).searchParams.get('openid.return_to')).searchParams.get('state');
+
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:false' }));
+  await api
+    .get('/auth/steam/callback')
+    .set('Cookie', stateCookie)
+    .query({ state, 'openid.claimed_id': 'https://steamcommunity.com/openid/id/76561198000000201' })
+    .expect(400);
+});
+
+test('login flow → GET /api/me: returns the signed-in steamid and empty prefs on first login', async (t) => {
+  const agent = await loginAs(t, '76561198000000202');
+  const res = await agent.get('/api/me').expect(200);
+  assert.deepEqual(res.body, { steamid: '76561198000000202', prefs: {} });
+});
+
+test('GET /api/me: 200 with a null steamid/prefs when not signed in — checking status isn\'t an error', async () => {
+  const res = await api.get('/api/me').expect(200);
+  assert.deepEqual(res.body, { steamid: null, prefs: null });
+});
+
+test('PUT /api/me/prefs/:key: saves one key with its updatedAt, visible from a later GET /api/me', async (t) => {
+  const agent = await loginAs(t, '76561198000000203');
+  await agent.put('/api/me/prefs/myAccount').send({ value: { id: '76561198000000203' }, updatedAt: 1000 }).expect(200);
+  const res = await agent.get('/api/me').expect(200);
+  assert.deepEqual(res.body.prefs, { myAccount: { value: { id: '76561198000000203' }, updatedAt: 1000 } });
+});
+
+test('PUT /api/me/prefs/:key: merges into existing prefs, leaving other keys untouched', async (t) => {
+  const agent = await loginAs(t, '76561198000000206');
+  await agent.put('/api/me/prefs/a').send({ value: 1, updatedAt: 1000 }).expect(200);
+  await agent.put('/api/me/prefs/b').send({ value: 2, updatedAt: 1000 }).expect(200);
+  const res = await agent.get('/api/me').expect(200);
+  assert.deepEqual(res.body.prefs, { a: { value: 1, updatedAt: 1000 }, b: { value: 2, updatedAt: 1000 } });
+});
+
+test('PUT /api/me/prefs/:key: a newer write wins, and reports applied: true', async (t) => {
+  const agent = await loginAs(t, '76561198000000207');
+  await agent.put('/api/me/prefs/a').send({ value: 'old', updatedAt: 1000 }).expect(200);
+  const res = await agent.put('/api/me/prefs/a').send({ value: 'new', updatedAt: 2000 }).expect(200);
+  assert.equal(res.body.applied, true);
+  const me = await agent.get('/api/me').expect(200);
+  assert.deepEqual(me.body.prefs.a, { value: 'new', updatedAt: 2000 });
+});
+
+test('PUT /api/me/prefs/:key: a stale write is rejected and reports applied: false, without clobbering', async (t) => {
+  const agent = await loginAs(t, '76561198000000208');
+  await agent.put('/api/me/prefs/a').send({ value: 'new', updatedAt: 2000 }).expect(200);
+  const res = await agent.put('/api/me/prefs/a').send({ value: 'stale', updatedAt: 1000 }).expect(200);
+  assert.equal(res.body.applied, false);
+  const me = await agent.get('/api/me').expect(200);
+  assert.deepEqual(me.body.prefs.a, { value: 'new', updatedAt: 2000 });
+});
+
+test('PUT /api/me/prefs/:key: 400 when the body has no value field or a non-numeric updatedAt', async (t) => {
+  const agent = await loginAs(t, '76561198000000204');
+  await agent.put('/api/me/prefs/a').send({ notValue: 1, updatedAt: 1000 }).expect(400);
+  await agent.put('/api/me/prefs/a').send({ value: 1, updatedAt: 'not-a-number' }).expect(400);
+  await agent.put('/api/me/prefs/a').send({ value: 1 }).expect(400);
+});
+
+test('PUT /api/me/prefs/:key: 401 when not signed in', async () => {
+  await api.put('/api/me/prefs/a').send({ value: 1, updatedAt: 1000 }).expect(401);
+});
+
+test('POST /auth/logout: session stops working afterwards', async (t) => {
+  const agent = await loginAs(t, '76561198000000205');
+  const before = await agent.get('/api/me').expect(200);
+  assert.equal(before.body.steamid, '76561198000000205');
+  await agent.post('/auth/logout').expect(200);
+  const after = await agent.get('/api/me').expect(200);
+  assert.equal(after.body.steamid, null);
 });

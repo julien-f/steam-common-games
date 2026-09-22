@@ -51,7 +51,9 @@ Only report a duplicate that `npm dedupe` can actually collapse. A major-version
 
 ## Known-benign, don't re-flag as broken
 
-`npm install` always warns `ERESOLVE`, and `npm ls --all` marks `typescript@7` `invalid`, because `eslint-plugin-solid`'s nested `@typescript-eslint/utils` peer-requires `typescript >=4.8.4 <6.1.0`. Deliberate, and the reason the linter parses with Babel rather than typescript-eslint — `docs/dev/architecture.md` and `CHANGELOG.md` both cover it. Bumping `eslint-plugin-solid` won't silence it: the constraint is on the nested package.
+`eslint-plugin-solid`'s nested `@typescript-eslint/*` packages peer-require `typescript >=4.8.4 <6.1.0`, which no published version has widened for TypeScript 7. This used to make `npm install`/`npm ci` print ~78 `ERESOLVE` warnings and `npm ls --all` exit non-zero on an `invalid` `typescript@7.0.2`. Fixed by `package.json`'s `overrides` block, which points those four packages' `typescript` peer at the root spec — safe because nothing there loads TypeScript (the linter parses with Babel; no rule is type-aware), and the resolved tree is unchanged.
+
+So both should now be silent. If either comes back, the cause is a *new* package with the same stale peer range, not the old one — add it to `overrides` the same way rather than re-declaring the noise benign. Bumping `eslint-plugin-solid` never silenced it: the constraint is on the nested package.
 
 ## Applying
 

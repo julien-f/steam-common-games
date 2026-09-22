@@ -1,16 +1,3 @@
-export interface FilterDim {
-  key: 'tags' | 'genres' | 'categories' | 'developers' | 'publishers';
-  label: string;
-  param: string;
-}
-export const FILTER_DIMS: FilterDim[] = [
-  { key: 'tags',       label: 'Tag',       param: 'tag'   },
-  { key: 'genres',     label: 'Genre',     param: 'genre' },
-  { key: 'categories', label: 'Category',  param: 'cat'   },
-  { key: 'developers', label: 'Developer', param: 'dev'   },
-  { key: 'publishers', label: 'Publisher', param: 'pub'   },
-];
-
 // Canonical query-param order shared by every URL-writing function on both pages. Applying
 // this before every pushState/replaceState means the same logical state always serializes to
 // the same URL string regardless of the order its pieces happened to be set/mutated in —
@@ -25,7 +12,7 @@ export const FILTER_DIMS: FilterDim[] = [
 // the way e.g. `game`/`shot` can. See tableViewPrefs.ts's own restoreTableView/shareTableView/
 // resetTableView and ListRoute.tsx's viewParamName. Unlike most other params here, it's not
 // written automatically on every table interaction — only by the table's own "🔗 Share view" button.
-const PARAM_ORDER = ['u', 'op', 'tab', 'sort', 'q', 'game', 'shot', 'name', ...FILTER_DIMS.map(d => d.param), 'tv'];
+const PARAM_ORDER = ['u', 'op', 'tab', 'sort', 'q', 'game', 'shot', 'tv'];
 
 export function reorderUrlParams(params: URLSearchParams): URLSearchParams {
   const ordered = new URLSearchParams();
@@ -102,8 +89,6 @@ export interface UrlState {
   game: number | null;
   shot: string | null;
   sort: { col: string; dir: 1 | -1 } | null;
-  nameFilter: string;
-  filters: Record<string, string[]>;
 }
 // One `u=` value per slot, comma-joined identifiers within it (a Steam Family) — see the
 // URL & sharing section in docs/dev/frontend.md. Shared by parseUrlState and parseAccountParam below so the
@@ -126,8 +111,6 @@ export function parseUrlState(search: string): UrlState {
       col: sortParam.startsWith('-') ? sortParam.slice(1) : sortParam,
       dir: sortParam.startsWith('-') ? -1 : 1,
     } : null,
-    nameFilter: params.get('name') ?? '',
-    filters:    Object.fromEntries(FILTER_DIMS.map(d => [d.key, params.getAll(d.param)])),
   };
 }
 

@@ -32,6 +32,13 @@ module.exports = defineConfig({
     strictPort: true,
     proxy: {
       '/api': 'http://127.0.0.1:3000',
+      // Steam OpenID sign-in (lib/auth.js) — a real page navigation, not an /api fetch, so it
+      // needs its own proxy entry. The trailing slash matters: Vite's proxy keys are plain
+      // prefix matches, and '/auth' (no slash) also prefixes '/authStore.ts', this app's own
+      // frontend module — every request for it was silently proxied to the backend instead of
+      // served by Vite, which fell through to server.js's SPA catch-all and served index.html
+      // (text/html) in place of the script, breaking the module load entirely.
+      '/auth/': 'http://127.0.0.1:3000',
     },
   },
   build: {

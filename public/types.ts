@@ -136,9 +136,23 @@ export interface Game extends PriceFields {
   onWishlist?: boolean | null;
   // When the oldest of this game's cached details (rating/HLTB/store metadata/tags/ProtonDB) was
   // written server-side, epoch ms — null when they were fetched fresh, undefined before any
-  // details have arrived. Shown only in the panel refresh button's tooltip; see server.js's
-  // fetchGameDetails for why it isn't on screen.
+  // details have arrived. It's the figure the panel's ↻ shows.
   detailsFetchedAt?: number | null;
+  // The same, per source, since they're cached separately under tiers of 90–180 days: the
+  // aggregate above is only ever as new as the *oldest* of them, so on its own it says nothing
+  // about a rating fetched yesterday behind a store page untouched since 2013. The panel's ↻
+  // breaks it down in its tooltip (see server.js's fetchGameDetails).
+  detailsFetchedAts?: DetailsAges | null;
+}
+
+// Keyed by source, epoch ms, null when that source was fetched fresh for the request that
+// produced it (or has no cache entry of its own).
+export interface DetailsAges {
+  rating?: number | null;
+  hltb?: number | null;
+  meta?: number | null;
+  tags?: number | null;
+  protondb?: number | null;
 }
 
 // A row as everything outside its own store sees it: readable, not writable. The side panel, the
@@ -220,6 +234,12 @@ export interface AccountSlot {
                                      // members that set one — captured at resolve time so the
                                      // nicest copyable identifier needs no fetch of its own
                                      // (accountsStore.ts's accountIdentifiers)
+  // Last-known solo-account profile trivia — same "cached at resolve time, absent/stale until
+  // next picked" reasoning as label/avatarUrl above. Only ever set for a single-account slot
+  // (like avatarUrl, a Family has no one profile to speak for the whole thing).
+  memberSince?: string; // bare ISO date the account was created
+  countryCode?: string; // ISO 3166-1 alpha-2
+  realName?: string;
   lastUsedAt: number;
   removedAt?: number; // soft-removed from the recents UI, kept while referenced by a dynamic list
 }

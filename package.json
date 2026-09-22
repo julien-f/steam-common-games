@@ -26,6 +26,12 @@
   "engines": {
     "node": ">=22.13.0"
   },
+  "overrides": {
+    "@typescript-eslint/utils": { "typescript": "$typescript" },
+    "@typescript-eslint/typescript-estree": { "typescript": "$typescript" },
+    "@typescript-eslint/project-service": { "typescript": "$typescript" },
+    "@typescript-eslint/tsconfig-utils": { "typescript": "$typescript" }
+  },
   "devDependencies": {
     "@babel/core": "^8.0.1",
     "@babel/eslint-parser": "^8.0.1",

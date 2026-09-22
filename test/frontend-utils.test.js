@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeInput, steamVanity, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier, dealRecordTier, fmtAge, isTextEntry } = require('../public/utils.ts');
+const { normalizeInput, steamVanity, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, countryFlag, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier, dealRecordTier, fmtAge, isTextEntry } = require('../public/utils.ts');
 
 // ── normalizeInput ────────────────────────────────────────────────────────────
 
@@ -160,6 +160,21 @@ test('fmtLastPlayed: returns empty string for 0/null/undefined', () => {
 
 test('fmtLastPlayed: formats a Unix timestamp as an ISO date', () => {
   assert.equal(fmtLastPlayed(1751846400), '2025-07-07');
+});
+
+// ── countryFlag ────────────────────────────────────────────────────────────────
+
+test('countryFlag: converts a 2-letter ISO code to its flag emoji', () => {
+  assert.equal(countryFlag('US'), '🇺🇸');
+  assert.equal(countryFlag('fr'), '🇫🇷'); // case-insensitive
+});
+
+test('countryFlag: returns empty string for missing/malformed input', () => {
+  assert.equal(countryFlag(null), '');
+  assert.equal(countryFlag(undefined), '');
+  assert.equal(countryFlag(''), '');
+  assert.equal(countryFlag('USA'), '');
+  assert.equal(countryFlag('1'), '');
 });
 
 // ── renderScoreCell ───────────────────────────────────────────────────────────

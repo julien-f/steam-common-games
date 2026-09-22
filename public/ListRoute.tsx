@@ -92,15 +92,16 @@ import {
 import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from './priceLoading.ts';
 import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
+import { openPrefsPopover } from './prefsPopover.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
-import { ListHero, type HeroTile } from './ListHero.tsx';
+import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
 import { ComparePlayersForm } from './ComparePlayersForm.tsx';
 import {
   describeSources, createDefaultNaming, listDisplayName, opLabel, OP_LABELS, OP_SYMBOLS,
   type RefDescription, type ListNaming,
 } from './listLabels.ts';
 import { setBaseTitle } from './pageTitle.ts';
-import type { AccountSlot, Game, Rating, Hltb, GameMeta, ProtonDb, GameList, CombineOp } from './types.ts';
+import type { AccountSlot, DetailsAges, Game, Rating, Hltb, GameMeta, ProtonDb, GameList, CombineOp } from './types.ts';
 import { getList, getLists, getFolders, createList, addAppidsToList, removeAppidsFromList, setListTableView } from './listsStore.ts';
 import { resolveListWithSources, flattenCombineResult, createDefaultFetchers } from './listResolve.ts';
 import type { MembershipGroup } from './combine.ts';
@@ -215,13 +216,14 @@ const MAX_PRICE_LOOKUP_GAMES = 500; // mirrors the server's own cap — see load
 
 // The shape of one `data:` line in /api/game-details/stream's SSE response.
 interface DetailsEvent {
-  appid: number; done?: boolean; fetchedAt?: number | null;
+  appid: number; done?: boolean; fetchedAt?: number | null; fetchedAts?: DetailsAges | null;
   rating: Rating | null; hltb: Hltb | null; meta: GameMeta | null; tags: string[] | null;
   demo: { appid: number } | null; protondb: ProtonDb | null;
 }
 
 function applyDetailsEvent(row: Game, event: DetailsEvent) {
   row.detailsFetchedAt = event.fetchedAt ?? null;
+  row.detailsFetchedAts = event.fetchedAts ?? null;
   row.capsule           = event.meta?.capsule ?? null;
   if (!row.name) row.name = event.meta?.name || '';
   row.score             = event.rating?.score ?? null;
@@ -284,17 +286,27 @@ export default function ListRoute() {
   const [statusText, setStatusText] = createSignal('');
   const [priceStatusText, setPriceStatusText] = createSignal('');
   // kind === 'bundle' only: the currently open bundle's Steam-resolved games, kept at component
-  // scope (not load()-local) so "↻ Refresh prices" can re-price exactly what's loaded without
+  // scope (not load()-local) so the Prices tile's own refresh can re-price exactly what's loaded without
   // re-resolving the bundle. Reset by load() itself on every (re)load.
   let resolvedBundleGames: ResolvedGame[] | null = null;
   // Owned/wishlist kinds only: how old the server's cached copy of this account's list is (epoch
-  // ms, null = fetched fresh), and whether a forced re-fetch is in flight — the "Updated <when>
-  // ↻ Refresh" line below. Steam data is cached server-side for weeks (default.env's
+  // ms, null = fetched fresh), and whether a forced re-fetch is in flight — the hero's Updated
+  // tile, which is also the control that forces one (see heroTiles). Steam data is cached server-side for weeks (default.env's
   // LIBRARY_CACHE_TTL_MINUTES), so the age of what's on screen is stated rather than guessed at,
   // and forcing past it is one click from the list itself instead of only from Home.
-  const [fetchedAt, setFetchedAt] = createSignal<number | null>(null);
+  // `undefined` = this list has no server-cached data age to state at all (nothing loaded yet,
+  // a manual list, the recent list) — which is not the same as `null`, "fetched fresh just now".
+  const [fetchedAt, setFetchedAt] = createSignal<number | null | undefined>(undefined);
+  // A comparison/dynamic list is built from several account fetches, each with its own age:
+  // report the *oldest*, since that's the staleness the reader is actually exposed to. A `null`
+  // (fetched fresh for this request) counts as now rather than winning outright, or one fresh
+  // source would hide three-day-old ones behind a reassuring "just now".
+  function noteFetchedAt(at: number | null): void {
+    const t = at ?? Date.now();
+    setFetchedAt(prev => (prev === undefined || prev === null ? t : Math.min(prev, t)));
+  }
   const [refreshing, setRefreshing] = createSignal(false);
-  // The page-level "↻ Refresh prices" button (wishlist/bundle kinds). Deliberately one control
+  // The Prices tile's own refresh (wishlist/bundle kinds). Deliberately one control
   // for the whole list rather than per-game: pricing is fetched as a single batched ITAD call
   // anyway, so per-row refreshing would add friction with no matching benefit. Re-prices whatever
   // is currently loaded — no re-resolution and no re-streaming of ratings/HLTB/tags.
@@ -645,6 +657,19 @@ export default function ListRoute() {
     if (!next) return false;
     openGame(next);
     return true;
+  }
+
+  // Panel tag/genre/category/developer/publisher pills (panel.tsx's TagCloud) — click adds that
+  // value to the table's own include filter for the matching column, re-clicking removes it.
+  // `setValues` rather than `cycleValue` so a pill click only ever adds/removes from the include
+  // set and never reaches the table filter dropdown's separate exclude state.
+  function onTagClick(dim: string, value: string): void {
+    const t = activeTable();
+    if (!t) return;
+    t.filter.setValues(dim, [value], !t.filter.include()[dim]?.has(value));
+  }
+  function isTagActive(dim: string, value: string): boolean {
+    return activeTable()?.filter.include()[dim]?.has(value) ?? false;
   }
 
   // Opens `appid` as a standalone panel docked to *this* route, without adding it to the route's
@@ -1113,9 +1138,17 @@ export default function ListRoute() {
     // resolved its own name/account, so it's cleared rather than left standing (setBaseTitle is
     // deliberately untouched — <title> keeps naming the last real list until the next one loads,
     // rather than flashing back to the bare app name on every ‹/› step).
-    setHeroTitle('');
-    setHeroAccount(null);
+    // …but not on a ↻ Refresh of the list already on screen: it re-resolves to the very same
+    // name, and blanking it tears the whole card down (`<Show when={heroTitle()}>`) — taking with
+    // it the Updated tile that is itself one of the ways to ask for this refresh, mid-click.
+    if (!refresh) {
+      setHeroTitle('');
+      setHeroAccount(null);
+    }
     setListSources([]);
+    // Every kind that has one re-reports it during this load; a kind that doesn't (manual list,
+    // recents) must not keep showing the previous list's.
+    setFetchedAt(undefined);
     tableContainer.innerHTML = '';
     groupsContainer.innerHTML = '';
 
@@ -1123,8 +1156,13 @@ export default function ListRoute() {
     let streamTargets: { appid: number }[];
     resolvedBundleGames = null;
     let pendingGroups: MembershipGroup[] | null = null;
-    setUserList(null);
-    setCompareList(null);
+    // Not cleared on a ↻ Refresh of the list already on screen, for the same reason heroTitle
+    // isn't (above): these back the hero's own tiles, and emptying them mid-refresh unmounts the
+    // tile strip — including the Updated tile the refresh was just clicked on.
+    if (!refresh) {
+      setUserList(null);
+      setCompareList(null);
+    }
     setSelectedRows([]); // a fresh load means a fresh table — nothing carries a prior selection over
     setSelectionActionStatus('');
 
@@ -1180,7 +1218,7 @@ export default function ListRoute() {
       setStatusText('Comparing libraries…');
       let appids: Set<number>;
       try {
-        const { result, sources } = await resolveListWithSources(list, createDefaultFetchers());
+        const { result, sources } = await resolveListWithSources(list, createDefaultFetchers({ refresh, onFetchedAt: noteFetchedAt }));
         if (loadGuard.isStale(gen)) return;
         const described = describeSources(list, compareNaming());
         setListSources(sources.map((source, i) => ({
@@ -1218,7 +1256,7 @@ export default function ListRoute() {
       const isGroupMode = list.kind === 'dynamic' && list.op === 'group-by-membership';
       let appids: Set<number>;
       try {
-        const { result, sources } = await resolveListWithSources(list, createDefaultFetchers());
+        const { result, sources } = await resolveListWithSources(list, createDefaultFetchers({ refresh, onFetchedAt: noteFetchedAt }));
         if (loadGuard.isStale(gen)) return;
         const described = describeSources(list, createDefaultNaming());
         setListSources(sources.map((source, i) => ({ ...source, desc: described[i] })));
@@ -1255,8 +1293,11 @@ export default function ListRoute() {
     } else if (kind === 'bundle') {
       setStatusText('Resolving games to Steam…');
       try {
-        const bundle = await fetchBundleById(Number(params.bundleId), { country: resolveRegion(getStoredRegion()) });
+        const { bundle, fetchedAt: bundleFetchedAt } = await fetchBundleById(Number(params.bundleId), { country: resolveRegion(getStoredRegion()) });
         if (loadGuard.isStale(gen)) return;
+        // Stated, not actionable — the single-bundle endpoint has no force path (see
+        // fetchBundleById). Still worth saying: a bundle's tiers and end date are read here.
+        noteFetchedAt(bundleFetchedAt);
         setListTitle(bundle.title);
         setBundleLinks({ details: bundle.details, url: bundle.url });
         setBundleMeta({
@@ -1491,15 +1532,27 @@ export default function ListRoute() {
     return names.length ? names.join(' / ') : null;
   }
 
-  // Which region's prices are on screen and how stale they are (wishlist/bundle kinds). Stated,
-  // never editable here — the ⚙ Preferences popover owns the setting, and a second control would
-  // be one more thing to keep in sync.
+  // Which region's prices are on screen and how stale they are (wishlist/bundle kinds) — the one
+  // tile carrying two separate actions, one per fact. The region is still not *edited* here (the
+  // ⚙ Preferences popover owns the setting, and a second control would be one more thing to keep
+  // in sync); clicking the value just opens that popover rather than leaving its tooltip to send
+  // the reader looking for it.
   function priceTile(): HeroTile {
     return {
       label: 'Prices',
       value: regionLabel(regionCode()),
-      sub: priceFetchedAt() === undefined ? undefined : `Updated ${fmtAge(priceFetchedAt())}`,
-      title: 'Prices are shown for this region — change it in ⚙ Preferences',
+      title: 'Prices are shown for this region — click to change it in ⚙ Preferences',
+      onClick: openPrefsPopover,
+      // The tile's second control, and what replaced the actions row's own "↻ Refresh prices":
+      // prices are a different fetch from the list itself, so they keep their own age and their
+      // own refresh — but here, next to the age, rather than as a button at the other end of the
+      // card. Offered even before anything has priced, so a failed first price load has a retry.
+      sub: refreshingPrices()
+        ? 'Refreshing prices… ↻'
+        : priceFetchedAt() === undefined ? 'Refresh prices ↻' : `Updated ${fmtAge(priceFetchedAt())} ↻`,
+      subTitle: 'Re-fetch current prices and historical lows for every game in this list',
+      subOnClick: handleRefreshPrices,
+      subDisabled: refreshingPrices(),
     };
   }
 
@@ -1557,6 +1610,17 @@ export default function ListRoute() {
     // Date only — the hour matters for a deadline, not for when a bundle went live, and the
     // browse table's own Published column still carries it.
     if (meta.publish) tiles.push({ label: 'Published', value: fmtBundleDateFriendly(meta.publish) });
+    // The one Updated tile in the app that isn't also its own refresh control: a bundle is found
+    // by walking several cached list pages, so there is no force path to hang on it (see
+    // bundleData.ts's fetchBundleById). Stated anyway — the tiers and the end date above are
+    // read off this copy — with the tooltip naming what *can* be re-fetched here.
+    if (fetchedAt() !== undefined) {
+      tiles.push({
+        label: 'Updated',
+        value: fmtAge(fetchedAt()),
+        title: "How old the server's cached copy of this bundle is. It can't be forced from here — but each game's own details can (the panel's ↻), and so can the prices",
+      });
+    }
     tiles.push(priceTile());
     return tiles;
   }
@@ -1568,11 +1632,23 @@ export default function ListRoute() {
     // form waiting to be filled in.
     if (kind === 'compare' && !compareList()) return [];
     const tiles: HeroTile[] = [{ label: 'Games', value: rowsStore.length }];
-    if (kind === 'owned' || kind === 'wishlist') {
+    // Owned/wishlist state their own fetch's age; a comparison or a dynamic list states the
+    // oldest of the account fetches it was built from (noteFetchedAt), which is why this is
+    // gated on there *being* an age rather than on the kind — a manual list is assembled from
+    // stored appids and has none, and neither does the recent list.
+    if (fetchedAt() !== undefined || refreshing()) {
       tiles.push({
         label: 'Updated',
-        value: fmtAge(fetchedAt()),
-        title: "How old the server's cached copy of this account's list is — ↻ Refresh forces a fresh fetch",
+        value: refreshTileValue(refreshing() ? 'Refreshing…' : fmtAge(fetchedAt())),
+        title: kind === 'owned' || kind === 'wishlist'
+          ? "How old the server's cached copy of this account's list is — click to force a fresh fetch"
+          : "How old the oldest library this list was built from is — click to re-fetch them all",
+        // This tile *is* the ↻ Refresh the actions row used to carry: the staleness is stated
+        // here, so this is where the reader already is when they decide to do something about it.
+        // Prices keep their own age and refresh (a different fetch) on the Prices tile's own
+        // sub-line, not here.
+        onClick: handleRefreshList,
+        disabled: refreshing(),
       });
     }
     if (kind === 'wishlist') tiles.push(priceTile());
@@ -1717,29 +1793,11 @@ export default function ListRoute() {
           <a class="btn btn-ghost btn-sm" href="/bundles">← All bundles</a>
         </>
       )}
-      {(kind === 'owned' || kind === 'wishlist') && (
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm"
-          disabled={refreshing()}
-          title="Re-fetch this list from Steam, bypassing the server's cache"
-          onClick={handleRefreshList}
-        >{refreshing() ? '↻ Refreshing…' : '↻ Refresh'}</button>
-      )}
-      {(kind === 'wishlist' || kind === 'bundle') && (
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm"
-          disabled={refreshingPrices()}
-          title="Re-fetch current prices and historical lows for every game in this list"
-          onClick={handleRefreshPrices}
-        >{refreshingPrices() ? '↻ Refreshing prices…' : '↻ Refresh prices'}</button>
-      )}
     </>
   );
 
   onMount(() => {
-    const unregister = registerRouteHandlers({ pickRandom: pickRandomGame, stepGame, gamePosition, openGame: handleOpenGameRequest, onGameClose: handleGameClose, refreshGame });
+    const unregister = registerRouteHandlers({ pickRandom: pickRandomGame, stepGame, gamePosition, openGame: handleOpenGameRequest, onGameClose: handleGameClose, refreshGame, onTagClick, isTagActive });
     onCleanup(unregister);
 
     // The region preference lives in the nav bar's ⚙ popover, which knows nothing about who's

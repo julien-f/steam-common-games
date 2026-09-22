@@ -19,7 +19,7 @@ import type { PanelHistoryEntry } from './panelHistory.ts';
 import { setGameTitle } from './pageTitle.ts';
 import { withAccountParam } from './urlState.ts';
 import { copyWithFeedback } from './clipboard.ts';
-import type { Game, PriceFields, ReadonlyGame } from './types.ts';
+import type { DetailsAges, Game, PriceFields, ReadonlyGame } from './types.ts';
 
 import { createSignal, createEffect, createMemo, createResource, createRoot, For, Show, type JSX } from 'solid-js';
 import { render } from 'solid-js/web';
@@ -653,9 +653,12 @@ function TagCloud(props: { groups: { kind: TagKind; dim: string | null; items?: 
           {({ kind, dim, v }) => {
             const dot = <span class="panel-tag-dot" style={{ background: TAG_KIND_META[kind].color }} />;
             if (dim) {
-              const active = panelOptions.isTagActive?.(dim, v);
               return (
-                <button class={`panel-tag panel-tag-btn${active ? ' active' : ''}`} onClick={() => panelOptions.onTagClick?.(dim, v)}>
+                <button
+                  class="panel-tag panel-tag-btn"
+                  classList={{ active: !!panelOptions.isTagActive?.(dim, v) }}
+                  onClick={() => panelOptions.onTagClick?.(dim, v)}
+                >
                   {dot}{v}
                 </button>
               );
@@ -1491,18 +1494,59 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
   );
 }
 
+// How old this game's details are, and the ↻ that fixes it, as one control — the same shape the
+// list heroes' Updated tile has (ListHero.tsx's refreshTileValue). The age used to be readable
+// only inside this button's `title`, which a touch device never shows at all: the panel was the
+// one surface stating no data age anywhere on screen, while being the surface a stale rating or
+// playtime estimate is actually read from.
+// What the visible figure is the oldest of, in the order the panel itself reads them. The number
+// on the button is one age for five separately-cached sources whose TTLs run 90–180 days, so it
+// is routinely dated by whichever one nobody has had a reason to re-fetch since — the breakdown
+// is what makes it interpretable, and the tooltip is where it fits without turning a button into
+// a table.
+const DETAILS_SOURCES: [keyof DetailsAges, string][] = [
+  ['rating', 'Reviews'],
+  ['hltb', 'How Long To Beat'],
+  ['meta', 'Store details'],
+  ['tags', 'Tags'],
+  ['protondb', 'ProtonDB'],
+];
+
+function refreshTitle(game: ReadonlyGame): string {
+  const ages = game.detailsFetchedAts;
+  const lines = ages
+    ? DETAILS_SOURCES.filter(([key]) => ages[key] !== undefined).map(([key, label]) => `${label}: ${fmtAge(ages[key])}`)
+    : [];
+  // The price is deliberately conditional: a game whose list already priced it is not re-priced
+  // from here (see panelData's priceSource), which is exactly the case a reader would otherwise
+  // have to discover by clicking and watching nothing happen.
+  const pricedHere = game.bestDealPrice === undefined;
+  return [
+    ...lines,
+    `${lines.length ? '\n' : ''}Click to re-fetch these, plus news, achievements${pricedHere ? ' and price' : ''}.`,
+    ...(pricedHere ? [] : ["The price came from this list — refresh it on the list's own Prices tile."]),
+  ].join('\n');
+}
+
 function RefreshButton(props: { game: ReadonlyGame }): JSX.Element {
-  const age = () => props.game.detailsFetchedAt === undefined ? '' : ` — last fetched ${fmtAge(props.game.detailsFetchedAt)}`;
+  const age = () => props.game.detailsFetchedAt === undefined ? '' : fmtAge(props.game.detailsFetchedAt);
   return (
     <Show when={panelOptions.onRefresh && !props.game.loading}>
       <button
         type="button"
-        class={`panel-refresh-btn${panelRefreshing() ? ' is-refreshing' : ''}`}
+        class="panel-refresh-btn"
         disabled={panelRefreshing()}
-        title={`Refresh rating, HLTB & store details for this game${age()}`}
+        title={refreshTitle(props.game)}
         aria-label="Refresh details"
         onClick={handlePanelRefresh}
-      >↻</button>
+      >
+        <Show when={age()}>
+          <span class="panel-refresh-age">{panelRefreshing() ? 'Refreshing…' : age()}</span>
+        </Show>
+        {/* Only the glyph spins — the animation used to be on the button itself, which now has
+            text in it. */}
+        <span class={`panel-refresh-icon${panelRefreshing() ? ' is-refreshing' : ''}`}>↻</span>
+      </button>
     </Show>
   );
 }

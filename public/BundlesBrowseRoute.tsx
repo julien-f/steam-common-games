@@ -33,15 +33,17 @@ import {
 import { fmtAge, formatMoney, scoreColor } from './utils.ts';
 import {
   toBundleRow, fmtBundleDateTime, fmtBundleDatePart, fmtBundleTimePart, bundleUrgency, shopHue,
+  bundleEndsIn, compareEndsIn, ENDS_IN, bundleAge, compareBundleAge, BUNDLE_AGE,
   type BundleListItem, type BundleRow,
 } from './bundleRows.ts';
 import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { setBrowsedBundles } from './bundleBrowseStore.ts';
+import { openPrefsPopover } from './prefsPopover.ts';
 import { restoreTableView, shareTableView, resetTableView } from './tableViewPrefs.ts';
 import { createStaleGuard } from './staleGuard.ts';
 import { setPref } from './prefs.ts';
 import { setBaseTitle } from './pageTitle.ts';
-import { ListHero, type HeroTile } from './ListHero.tsx';
+import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
 
 const PAGE_SIZE = 50;      // ITAD's own max per page (lib/itad.js's getBundles `limit`)
 // How many pages load() fetches back-to-back before handing over to the "Load more" button. The
@@ -190,6 +192,12 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     groupValue: withMissingGroup(bucketDatePart('month'), v => v == null || v === ''),
     groupFormat: formatMissingGroup(formatDatePart('month')),
   },
+  // Hidden by default, the publish-side counterpart of "Ends in" below, and what the hero's "New"
+  // tile toggles.
+  {
+    key: 'age', label: 'Age', type: 'string', groupable: true,
+    value: row => bundleAge(row.publish), format: fmt.str, compare: compareBundleAge,
+  },
   {
     key: 'expiry', label: 'Ends', type: 'date', groupable: true,
     format: v => fmtBundleDateTime(v as string | null), render: renderEnds, compare: compareDateMissingLast,
@@ -197,9 +205,17 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     groupValue: withMissingGroup(bucketDatePart('month'), v => v == null || v === ''),
     groupFormat: formatMissingGroup(formatDatePart('month')),
   },
-  // Hidden by default: every row is Active unless "Include expired" is on, in which case this is
-  // the column to filter/group on to tell the two apart.
-  { key: 'status', label: 'Status', type: 'string', groupable: true, format: fmt.str },
+  // Hidden by default: the Ends column already carries each row's own countdown, so this one
+  // exists to filter/group *by* urgency — and it's what the hero card's "Ending soon" tile
+  // toggles. A `value()` accessor rather than a field on BundleRow,
+  // deliberately against this file's flatten-at-fetch rule: the tier is clock-relative, so it has
+  // to be recomputed on each pass rather than frozen at the moment the row was fetched. Its
+  // `Ended` bucket is also how Active and Expired rows are told apart under "Include expired" —
+  // the hidden Status column that used to be the way to do that said nothing this doesn't.
+  {
+    key: 'endsIn', label: 'Ends in', type: 'string', groupable: true,
+    value: row => bundleEndsIn(row.expiry), format: fmt.str, compare: compareEndsIn,
+  },
 ];
 
 const DEFAULT_VISIBLE = ['covers', 'title', 'shop', 'games', 'price', 'publish', 'expiry'];
@@ -297,6 +313,20 @@ export default function BundlesBrowseRoute() {
     onCleanup(() => window.removeEventListener(REGION_CHANGED_EVENT, onRegionChange));
   });
 
+  // The hero's "Ending soon" tile as a filter toggle over the hidden "Ends in" column — same
+  // include-set-only shape as ListRoute.tsx's panel pills, so it never touches the table filter
+  // dropdown's separate exclude state, and clearing it from there clears the tile's pressed state
+  // with it.
+  const endingSoonOnly = () => table.filter.include().endsIn?.has(ENDS_IN.urgent) ?? false;
+  const toggleEndingSoonOnly = () => table.filter.setValues('endsIn', [ENDS_IN.urgent], !endingSoonOnly());
+  // Same, over the Age column — the other half of the browsing question this page exists for.
+  // A week rather than the tile below's 48h, and both of the column's own sub-week buckets at
+  // once (its checklist is OR within a column): bundles publish in waves, so a 24h window is
+  // empty most days — observed live, the newest of 43 active bundles was 62 hours old.
+  const NEW_WINDOW: string[] = [BUNDLE_AGE.fresh, BUNDLE_AGE.week];
+  const newOnly = () => NEW_WINDOW.every(v => table.filter.include().age?.has(v));
+  const toggleNewOnly = () => table.filter.setValues('age', NEW_WINDOW, !newOnly());
+
   // The same hero card every list route now opens with (ListHero.tsx) — this route is the one you
   // arrive at a bundle *from*, so a loose toolbar here next to a real card there was a visible
   // seam between two adjacent screens. Deliberately thin: no bundle count (the table's own
@@ -304,29 +334,56 @@ export default function BundlesBrowseRoute() {
   // no derived stats beyond the one below, since the Ends/Shop columns already group and filter.
   function heroTiles(): HeroTile[] {
     const tiles: HeroTile[] = [];
-    if (fetchedAt() !== undefined) {
-      tiles.push({
-        label: 'Updated',
-        value: fmtAge(fetchedAt()),
-        title: "How old the server's cached copy of this list is — a bundle can go live or expire at any time",
-      });
-    }
+    // Always rendered, unlike the other tiles: this one *is* the ↻ Refresh control now (the
+    // button that used to sit in the actions row did exactly what clicking it does), so it has to
+    // be there on the paths that have no age to report — mid-load, and after a load that failed
+    // before it ever fetched, which is precisely when a retry is wanted.
+    tiles.push({
+      label: 'Updated',
+      value: refreshTileValue(loading() ? 'Refreshing…' : fetchedAt() === undefined ? '—' : fmtAge(fetchedAt())),
+      title: "How old the server's cached copy of this list is — a bundle can go live or expire at any time. Click to re-fetch",
+      onClick: () => load({ refresh: true }),
+      disabled: loading(),
+    });
     tiles.push({
       label: 'Prices',
       value: regionLabel(regionCode()),
-      title: 'Prices are shown for this region — change it in ⚙ Preferences',
+      title: 'Prices are shown for this region — click to change it in ⚙ Preferences',
+      onClick: openPrefsPopover,
     });
+    // The publish-side twin of the tile below: this is a discovery page, and its default sort is
+    // newest-first precisely because "what appeared since I last looked" is the question — but
+    // nothing counted it. Same rules as that one throughout (processedData, absent at zero unless
+    // its own filter is what emptied it).
+    const fresh = table.processedData().filter(row => NEW_WINDOW.includes(bundleAge(row.publish))).length;
+    if (fresh > 0 || newOnly()) {
+      tiles.push({
+        label: 'New',
+        value: <span style={{ color: scoreColor(80) }}>{fresh}</span>,
+        sub: newOnly() ? 'in the last 7 days · only these' : 'in the last 7 days',
+        title: newOnly() ? 'Showing only these — click to clear' : 'Show only the bundles published in the last 7 days',
+        active: newOnly(),
+        onClick: toggleNewOnly,
+      });
+    }
     // The one thing this page can say that nothing else does at a glance: the Ends column shows
-    // each row's own countdown, but finding the ones about to go means sorting by it first.
+    // each row's own countdown, but finding the ones about to go means sorting by it first — which
+    // is also why this tile is the one that clicks (toggleEndingSoonOnly).
     // Counted off processedData rather than the raw list, so it agrees with whatever filter/search
     // is applied — a "3 ending soon" that includes rows the table isn't showing is worse than
     // nothing. Absent at zero rather than showing a reassuring "0" nobody asked about.
     const endingSoon = table.processedData().filter(row => bundleUrgency(row.expiry)?.tier === 'urgent').length;
-    if (endingSoon > 0) {
+    // Kept on screen while its own filter is on even at a count of zero — otherwise the last
+    // urgent bundle expiring (or a reload dropping it) leaves the table filtered down to nothing
+    // with the control that filtered it gone.
+    if (endingSoon > 0 || endingSoonOnly()) {
       tiles.push({
         label: 'Ending soon',
         value: <span style={{ color: scoreColor(20) }}>{endingSoon}</span>,
-        sub: 'within 48h',
+        sub: endingSoonOnly() ? 'within 48h · only these' : 'within 48h',
+        title: endingSoonOnly() ? 'Showing only these — click to clear' : 'Show only the bundles ending within 48h',
+        active: endingSoonOnly(),
+        onClick: toggleEndingSoonOnly,
       });
     }
     return tiles;
@@ -343,18 +400,11 @@ export default function BundlesBrowseRoute() {
         actions={
           <>
             {/* A data-scope control, not a view one — it round-trips to ITAD (see load()) — so it
-                sits with ↻ Refresh rather than with the table-view buttons. */}
+                leads the actions row rather than sitting with the table-view buttons. */}
             <label class="bundles-expired-toggle">
               <input type="checkbox" checked={includeExpired()} onChange={e => { setIncludeExpired(e.currentTarget.checked); load(); }} />
               Include expired
             </label>
-            <button
-              type="button"
-              class="btn btn-ghost btn-sm"
-              disabled={loading()}
-              title="Re-fetch the bundle list from IsThereAnyDeal, bypassing the server's cache"
-              onClick={() => load({ refresh: true })}
-            >↻ Refresh</button>
             <button type="button" class="btn btn-ghost btn-sm" onClick={e => shareTableView(table, VIEW_PARAM, e.currentTarget)}>🔗 Share view</button>
             <button type="button" class="btn btn-ghost btn-sm" onClick={() => resetTableView(table, VIEW_PREF_KEY, VIEW_PARAM)}>Reset view</button>
           </>

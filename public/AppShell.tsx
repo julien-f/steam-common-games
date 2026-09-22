@@ -21,6 +21,7 @@ import { syncAccountOverrideFromUrl } from './accountOverride.ts';
 import type { Game } from './types.ts';
 import { ShortcutsModal } from './ShortcutsModal.tsx';
 import { AccountChip } from './AccountChip.tsx';
+import { initAuth } from './authStore.ts';
 import { bindNavPopover } from './navPopover.ts';
 
 // Route-specific behavior (keyboard shortcuts, and now "open this looked-up game") can't be
@@ -56,6 +57,8 @@ interface RouteHandlers {
   openGame?: (appid: number) => boolean;
   onGameClose?: () => void;
   refreshGame?: (game: Game) => Promise<void>;
+  onTagClick?: (dim: string, value: string) => void;
+  isTagActive?: (dim: string, value: string) => boolean;
 }
 let routeHandlers: RouteHandlers = {};
 export function registerRouteHandlers(handlers: RouteHandlers): () => void {
@@ -132,6 +135,11 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
   }
 
   onMount(() => {
+    // Fire-and-forget: checks whether a session cookie is already signed in (e.g. having just
+    // landed back from /auth/steam/callback) and reconciles prefs on this browser's first sign-in
+    // for that account — see authStore.ts. Never blocks initial render.
+    void initAuth();
+
     // Capture, because scroll events don't bubble and the scroller differs by viewport width —
     // the same idiom navPopover.ts uses to follow either one.
     const onScroll = () => setScrolled(pageScrollTop() > TO_TOP_AFTER_PX);
@@ -178,6 +186,9 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       // Only ListRoute registers it — which covers every case, since a game panel only ever opens
       // there (`openGameGlobally` navigates to /game/:appid, which *is* ListRoute).
       onRefresh: game => routeHandlers.refreshGame?.(game),
+      enableTagFilters: true,
+      onTagClick: (dim, value) => routeHandlers.onTagClick?.(dim, value),
+      isTagActive: (dim, value) => routeHandlers.isTagActive?.(dim, value) ?? false,
     });
     initGameSearch({
       inputEl: searchInputEl,

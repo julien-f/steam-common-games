@@ -62,7 +62,7 @@ The result is a link. Copy the address and whoever opens it sees the same compar
 
 ## Bundles
 
-Browse current Steam game bundles (sourced from IsThereAnyDeal, and only available if the app is configured with an ITAD key). Open one and its games become a list like any other, with the bundle's tier price alongside each game's rating, playtime estimates and current best price anywhere. Games in a bundle with no Steam listing are listed separately below the table rather than quietly dropped.
+Browse current Steam game bundles (sourced from IsThereAnyDeal, and only available if the app is configured with an ITAD key). Open one and its games become a list like any other, with the bundle's tier price alongside each game's rating, playtime estimates and current best price anywhere. Games in a bundle with no Steam listing are listed separately below the table rather than quietly dropped. The header's counts are clickable: "New" narrows the table to the bundles published in the last week, "Ending soon" to the ones ending within 48 hours, and clicking either again brings the rest back. "Updated" re-fetches the list (it replaces the old ↻ Refresh button — the same is true of the Owned and Wishlist headers), and "Prices" opens the region setting.
 
 ![The bundle browser: current bundles with shop, game count, cheapest tier, publication and end dates](../images/bundles-browse.png)
 
@@ -93,4 +93,4 @@ Press `?` for the full list. The essentials: `/` focuses search, `Esc` closes wh
 
 ## How fresh is this?
 
-Everything is cached, and every screen that shows cached data says how old it is and offers a ↻ to fetch fresh — per account on the home page, per game in the panel, and per list for prices.
+Everything is cached, and every screen that shows cached data says how old it is — and the age itself is the button that fetches fresh. That's the account card and the friends list on the home page, the "Updated" figure in a list's header (your library, a wishlist, a comparison, a dynamic list, the bundle browser), and the ↻ beside a game's name in the panel. Prices come from a different source, so they carry their own age and their own ↻ on the second line of the "Prices" figure — the first line names the region and opens the setting. One exception: a single bundle's page states its age but can't force a re-fetch — finding one bundle means searching several pages of IsThereAnyDeal's list — so refresh its prices, or an individual game, instead.
