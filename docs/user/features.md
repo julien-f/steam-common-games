@@ -43,7 +43,7 @@ Pick two or more lists and an operation:
 
 - **Union** — everything in any of them.
 - **Intersect** — only what they all share.
-- **Subtract** — what's in the first but not the others.
+- **Subtract** — what's in the first but not the others. Pick order sets which source is "first" — the combine form shows your picks as a numbered, reorderable list whenever Subtract is chosen.
 - **Group by membership** — one table per combination of sources, so you can see what all three accounts share, what only two do, and so on. Combining several accounts' Owned lists this way is how you compare libraries.
 
 Naming the combined list is optional: leave the name empty and it's called by what it does — "Alice — Owned ∩ Bob — Owned" — in your list tree and on its own page, updating by itself if you later change its sources or rename an account. Type a name whenever you'd rather have one.

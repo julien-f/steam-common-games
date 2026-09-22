@@ -74,7 +74,7 @@ A list is a set of appids, usually named — a dynamic one may have no name of i
 
 Creating a dynamic list (or previewing one before saving): pick 2+ source lists via a short, non-blocking **setup dialog**, choose an operation —
 
-- `union`, `intersect`, `subtract` — flat resulting list
+- `union`, `intersect`, `subtract` — flat resulting list. Source order matters only for `subtract` (first source minus the union of the rest — `combine.ts`'s `subtract`); the combine form tracks pick order rather than checkbox-list order, and surfaces it as a numbered, reorderable (▲▼) list whenever `subtract` is selected, since it's inert for the other ops.
 - `group-by-membership` — groups rows by which combination of sources each game belongs to (generalizes the old Comparison page's "group by exact owner set" table — an N-way account-Owned-lists combine with this mode reproduces it, and `/lists/compare` below is exactly that combine)
 
 — then land in the list viewer with the **live combined result** and a save bar (save as dynamic by default, or freeze immediately to a static manual list).

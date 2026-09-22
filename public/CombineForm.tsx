@@ -58,7 +58,9 @@ export interface CombineFormProps {
 export function CombineForm(props: CombineFormProps) {
   const [name, setName] = createSignal(props.initialName ?? '');
   const [op, setOp] = createSignal<CombineOp>(props.initialOp ?? 'union');
-  const [selected, setSelected] = createSignal<Set<string>>(new Set((props.initialSources ?? []).map(refKey)));
+  // Pick order, not options()'s fixed enumeration order — significant for `subtract`, where the
+  // first source is the base set the rest are removed from (see combine.ts's subtract).
+  const [selected, setSelected] = createSignal<string[]>((props.initialSources ?? []).map(refKey));
   const [error, setError] = createSignal('');
 
   function showName(): boolean {
@@ -69,17 +71,31 @@ export function CombineForm(props: CombineFormProps) {
     return sourceOptions(props.excludeListId);
   }
 
+  function selectedSources(): ListRef[] {
+    const byKey = new Map(options().map(o => [o.key, o.ref]));
+    return selected().flatMap(key => {
+      const ref = byKey.get(key);
+      return ref ? [ref] : [];
+    });
+  }
+
   // What the list would be called with the name field left empty — the same derivation every
   // surface uses for a saved unnamed list, applied to the not-yet-saved formula on screen.
   function derivedName(): string | null {
-    const sources = options().filter(o => selected().has(o.key)).map(o => o.ref);
+    const sources = selectedSources();
     return sources.length >= 2 ? formatCombine(op(), sources, createDefaultNaming()) : null;
   }
 
   function toggleSource(key: string): void {
+    setSelected(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]));
+  }
+
+  function moveSource(index: number, delta: -1 | 1): void {
     setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      const target = index + delta;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
       return next;
     });
   }
@@ -88,7 +104,7 @@ export function CombineForm(props: CombineFormProps) {
     e.preventDefault();
     setError('');
     const trimmed = name().trim();
-    const sources = options().filter(o => selected().has(o.key)).map(o => o.ref);
+    const sources = selectedSources();
     if (sources.length < 2) { setError('Pick at least 2 sources.'); return; }
     try {
       props.onSubmit({ name: showName() ? (trimmed || undefined) : undefined, op: op(), sources });
@@ -115,6 +131,35 @@ export function CombineForm(props: CombineFormProps) {
       <Show when={showName() && !name().trim() && derivedName()}>
         {label => <p>Will be named: <span class="derived-name">{label()}</span></p>}
       </Show>
+      {/* Order only affects `subtract` (first source minus the rest — see OP_DESCRIPTIONS), so the
+          reorder controls only appear for it; for the other ops pick order is inert. */}
+      <Show when={op() === 'subtract' && selected().length > 0}>
+        <p>{OP_DESCRIPTIONS.subtract[0].toUpperCase()}{OP_DESCRIPTIONS.subtract.slice(1)}:</p>
+        <ol class="combine-sources-ordered">
+          <For each={selected()}>
+            {(key, i) => {
+              const label = () => options().find(o => o.key === key)?.label ?? key;
+              return (
+                <li>
+                  <span class="combine-source-index">{i() + 1}.</span>
+                  <span class="combine-source-label">{label()}</span>
+                  <button type="button" disabled={i() === 0} onClick={() => moveSource(i(), -1)} aria-label="Move up">
+                    ▲
+                  </button>
+                  <button
+                    type="button"
+                    disabled={i() === selected().length - 1}
+                    onClick={() => moveSource(i(), 1)}
+                    aria-label="Move down"
+                  >
+                    ▼
+                  </button>
+                </li>
+              );
+            }}
+          </For>
+        </ol>
+      </Show>
       <p>Pick at least 2 sources:</p>
       <ul class="combine-sources">
         <For each={options()}>
@@ -123,7 +168,7 @@ export function CombineForm(props: CombineFormProps) {
               <label>
                 <input
                   type="checkbox"
-                  checked={selected().has(opt.key)}
+                  checked={selected().includes(opt.key)}
                   onChange={() => toggleSource(opt.key)}
                 />
                 {opt.label}
