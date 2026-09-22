@@ -294,24 +294,6 @@ export function updateDynamicList(id: string, op: CombineOp, sources: ListRef[])
   return updated;
 }
 
-// One-way: converts a dynamic list to manual, given its currently-resolved appids (the caller
-// resolves those via listResolve.ts before calling this — this module has no fetch/resolve
-// logic of its own). Drops op/sources entirely.
-//
-// A caller freezing an *unnamed* dynamic list should stamp its derived name in (renameList with
-// listDisplayName's result) as part of the same action: a manual list has no formula left to be
-// labeled from, so it would otherwise read as "Untitled list".
-export function freezeToSnapshot(id: string, appids: number[]): GameList {
-  const lists = readLists();
-  const idx = lists.findIndex(l => l.id === id);
-  if (idx === -1) throw new Error('List not found');
-  const { op: _op, sources: _sources, ...rest } = lists[idx];
-  const updated: GameList = { ...rest, kind: 'manual', appids, updatedAt: Date.now() };
-  lists[idx] = updated;
-  writeLists(lists);
-  return updated;
-}
-
 export function setListTableView(id: string, tableView: object): void {
   const lists = readLists();
   const list = lists.find(l => l.id === id);

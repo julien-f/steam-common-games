@@ -2766,8 +2766,8 @@ kbd {
 .derived-name { font-style: italic; color: var(--text1); }
 .combine-sources { list-style: none; display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
 .combine-sources label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text0); cursor: pointer; }
+.combine-form-actions { display: flex; align-items: center; gap: 8px; }
 .combine-form button[type="submit"] {
-  align-self: flex-start;
   padding: 8px 16px;
   border: none;
   border-radius: var(--r);
@@ -2777,6 +2777,16 @@ kbd {
   font-weight: 500;
   cursor: pointer;
 }
+.combine-form button[type="button"] {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--text1);
+  font-size: 13px;
+  cursor: pointer;
+}
+.combine-form button[type="button"]:hover { border-color: var(--accent); color: var(--accent2); }
 
 .list-tree { list-style: none; display: flex; flex-direction: column; gap: 2px; }
 .list-tree li {

@@ -32,20 +32,9 @@ import {
   deleteFolder, deleteList,
 } from './listsStore.ts';
 import { setBaseTitle } from './pageTitle.ts';
-import { describeListRef, createDefaultNaming, listDisplayName, formatCombine, OP_LABELS, OP_DESCRIPTIONS } from './listLabels.ts';
+import { createDefaultNaming, listDisplayName } from './listLabels.ts';
+import { CombineForm } from './CombineForm.tsx';
 import type { AccountSlot, Folder, GameList, ListRef, CombineOp } from './types.ts';
-
-interface SourceOption {
-  key: string;
-  label: string;
-  ref: ListRef;
-}
-
-// Wording comes from listLabels.ts, shared with the hero card that later has to name the very
-// same op back to the user on the list's own page (ListRoute.tsx) — two hand-maintained copies
-// were one edit from disagreeing about what a combine does.
-const COMBINE_OPS: { value: CombineOp; label: string }[] = (Object.keys(OP_LABELS) as CombineOp[])
-  .map(op => ({ value: op, label: `${OP_LABELS[op]} (${OP_DESCRIPTIONS[op]})` }));
 
 // `personastate`/`gameextrainfo` ride on the same 6h library cache tier as the rest of an
 // account's data (see toAccountPlayer in accountData.ts) — real data, just not live — so the
@@ -262,68 +251,13 @@ export default function HomeRoute() {
 
   // ── Combine setup (creating a dynamic list) ───────────────────────────────────────────────
   const [combineOpen, setCombineOpen] = createSignal(false);
-  const [combineName, setCombineName] = createSignal('');
-  const [combineOp, setCombineOp] = createSignal<CombineOp>('union');
-  const [combineSelected, setCombineSelected] = createSignal<Set<string>>(new Set());
-  const [combineError, setCombineError] = createSignal('');
 
-  // Every source a combine can currently be built from — any recent account's Owned/Wishlist,
-  // Recently Looked Up, or any existing user list. Not a bundle (would need its own bundle-
-  // picker UI, not just a checkbox) — see this file's own header comment.
-  // Every ref this form can offer, named through the same describeListRef the list's own page
-  // uses for its formula afterward — so a source picked here as "Alice — Owned" reads identically
-  // once the list is saved and opened.
-  function sourceOptions(): SourceOption[] {
-    const naming = createDefaultNaming();
-    const refs: ListRef[] = [
-      ...recents().flatMap((acc): ListRef[] => [
-        { kind: 'account-owned', accountId: acc.id },
-        { kind: 'account-wishlist', accountId: acc.id },
-      ]),
-      { kind: 'recent-games' },
-      ...lists().map((list): ListRef => ({ kind: 'user', listId: list.id })),
-    ];
-    return refs.map(ref => ({
-      key: [ref.kind, ref.accountId ?? ref.listId].filter(Boolean).join(':'),
-      label: describeListRef(ref, naming).label,
-      ref,
-    }));
-  }
-
-  // What the list would be called with the name field left empty — the same derivation every
-  // surface uses for a saved unnamed list, applied to the not-yet-saved formula on screen.
-  function derivedCombineName(): string | null {
-    const selected = combineSelected();
-    const sources = sourceOptions().filter(o => selected.has(o.key)).map(o => o.ref);
-    return sources.length >= 2 ? formatCombine(combineOp(), sources, createDefaultNaming()) : null;
-  }
-
-  function toggleCombineSource(key: string): void {
-    setCombineSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  }
-
-  function handleCreateCombine(e: Event): void {
-    e.preventDefault();
-    setCombineError('');
-    const name = combineName().trim();
-    const selected = combineSelected();
-    const sources = sourceOptions().filter(o => selected.has(o.key)).map(o => o.ref);
-    if (sources.length < 2) { setCombineError('Pick at least 2 sources.'); return; }
-    try {
-      // No name is a valid choice, not a missing field: the list is then labeled by its own
-      // formula everywhere, and follows a later source edit (see listLabels.ts).
-      createList({ name: name || undefined, kind: 'dynamic', op: combineOp(), sources });
-      refreshTree();
-      setCombineOpen(false);
-      setCombineName('');
-      setCombineSelected(new Set<string>());
-    } catch (err) {
-      setCombineError((err as Error).message);
-    }
+  // No name is a valid choice, not a missing field: the list is then labeled by its own formula
+  // everywhere, and follows a later source edit (see listLabels.ts).
+  function handleCreateCombine(input: { name?: string; op: CombineOp; sources: ListRef[] }): void {
+    createList({ name: input.name, kind: 'dynamic', op: input.op, sources: input.sources });
+    refreshTree();
+    setCombineOpen(false);
   }
 
   // A list's on-screen label — its name, or its formula when it has none (listLabels.ts).
@@ -608,41 +542,7 @@ export default function HomeRoute() {
         </div>
 
         <Show when={combineOpen()}>
-          <form class="combine-form" onSubmit={handleCreateCombine}>
-            <input
-              type="text"
-              placeholder="Combined list name (optional)…"
-              value={combineName()}
-              onInput={e => setCombineName(e.currentTarget.value)}
-            />
-            <select value={combineOp()} onChange={e => setCombineOp(e.currentTarget.value as CombineOp)}>
-              <For each={COMBINE_OPS}>{op => <option value={op.value}>{op.label}</option>}</For>
-            </select>
-            {/* Says what leaving the name empty gets you — otherwise "optional" is invisible until
-                after the list is saved. */}
-            <Show when={!combineName().trim() && derivedCombineName()}>
-              {name => <p>Will be named: <span class="derived-name">{name()}</span></p>}
-            </Show>
-            <p>Pick at least 2 sources:</p>
-            <ul class="combine-sources">
-              <For each={sourceOptions()}>
-                {opt => (
-                  <li>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={combineSelected().has(opt.key)}
-                        onChange={() => toggleCombineSource(opt.key)}
-                      />
-                      {opt.label}
-                    </label>
-                  </li>
-                )}
-              </For>
-            </ul>
-            {combineError() && <p class="error">{combineError()}</p>}
-            <button type="submit">Create combined list</button>
-          </form>
+          <CombineForm submitLabel="Create combined list" onSubmit={handleCreateCombine} />
         </Show>
         <Show when={treeRows().length > 0} fallback={<p>No lists yet — create one above.</p>}>
           <ul class="list-tree">

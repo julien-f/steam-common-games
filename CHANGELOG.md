@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **A dynamic list's sources and operation can now be edited after creation.** Its hero card gained an "Edit sources" action that reopens the same combine form used at creation (now shared as `public/CombineForm.tsx`), pre-filled, saving in place via `updateDynamicList` (same id/folder position, cycle-checked like every other edit) — previously the only way to change one was to delete it and start over.
+
+### Removed
+
+- **The unused `freezeToSnapshot` helper** (`public/listsStore.ts`) — it had no UI ever calling it, and converting a dynamic list to manual by copying its current contents into a fresh list already covers the same need without a dedicated one-way action.
+
 ### Changed
 
 - **Editing a table view (columns/sort/filters/grouping) is now local-only until you explicitly Save it — it no longer silently auto-syncs to your account on every change.** Every other synced pref (region, account picks, ...) still auto-pushes as you go, but a table view has a live table on screen that a background sync could otherwise overwrite or force a page reload to refresh. `setPref` (`public/prefs.ts`) now skips the auto-push for a table-view key entirely; instead `public/tableViewSync.ts` tracks a per-key `baseline` (this session's best-known copy of what's actually saved, refreshed on every sign-in check) and the owning route (`ListRoute.tsx`, `BundlesBrowseRoute.tsx`) diffs the live table against it. Whenever they differ, an "unsaved changes" banner replaces the usual Share/Reset-view buttons, naming what changed (e.g. "Unsaved changes to this view (Sort, Filters) — differs from what's saved to your account"), with **Save** (push the current view, unconditionally) and **Revert** (discard back to what's saved, live-patching the table with no reload) actions. The current page and search query are excluded throughout — from the diff, from what Save pushes, and from what Revert touches — since paging or typing a search isn't "a setting" worth syncing (`tableViewSync.ts`'s `stripTransientViewFields`). The server (`setUserPref`, `lib/auth.js`) no longer rejects an "older" `updatedAt` — a write always wins, since the client now decides up front whether it should. See `docs/dev/lists-and-accounts.md`.

@@ -338,19 +338,6 @@ test('sweepDeletedLists: purges a soft-deleted list once its last reference is g
   assert.equal(all.some(l => l.id === stillReferenced.id), true);
 });
 
-// ── freezeToSnapshot ─────────────────────────────────────────────────────────────────────────
-
-test('freezeToSnapshot: converts a dynamic list to manual with the given appids, drops op/sources', () => {
-  const { createList, freezeToSnapshot, getList } = store();
-  const combo = createList({ name: 'Combo', kind: 'dynamic', op: 'union', sources: [] });
-  const frozen = freezeToSnapshot(combo.id, [1, 2, 3]);
-  assert.equal(frozen.kind, 'manual');
-  assert.deepEqual(frozen.appids, [1, 2, 3]);
-  assert.equal(frozen.op, undefined);
-  assert.equal(frozen.sources, undefined);
-  assert.equal(getList(combo.id).kind, 'manual');
-});
-
 // ── isAccountReferenced (used by accountsStore.ts) ───────────────────────────────────────────
 
 test('isAccountReferenced: true only while a dynamic list references that accountId', () => {

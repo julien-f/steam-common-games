@@ -103,9 +103,10 @@ import {
   type RefDescription, type ListNaming,
 } from './listLabels.ts';
 import { setBaseTitle } from './pageTitle.ts';
-import type { AccountSlot, DetailsAges, Game, Rating, Hltb, GameMeta, ProtonDb, GameList, CombineOp } from './types.ts';
-import { getList, getLists, getFolders, createList, addAppidsToList, removeAppidsFromList, setListTableView } from './listsStore.ts';
+import type { AccountSlot, DetailsAges, Game, Rating, Hltb, GameMeta, ProtonDb, GameList, CombineOp, ListRef } from './types.ts';
+import { getList, getLists, getFolders, createList, updateDynamicList, addAppidsToList, removeAppidsFromList, setListTableView } from './listsStore.ts';
 import { resolveListWithSources, flattenCombineResult, createDefaultFetchers } from './listResolve.ts';
+import { CombineForm } from './CombineForm.tsx';
 import type { MembershipGroup } from './combine.ts';
 import { peekMyOwnershipStatus, onMyOwnershipReady } from './myOwnership.ts';
 
@@ -414,6 +415,16 @@ export default function ListRoute() {
   const [compareList, setCompareList] = createSignal<GameList | null>(null);
   const [compareAccounts, setCompareAccounts] = createSignal<AccountSlot[]>([]);
   const [editingPlayers, setEditingPlayers] = createSignal(false);
+  // kind === 'user', dynamic lists only — the hero's "Edit sources" action reopens the same
+  // combine form used at creation, pre-filled from the list's own op/sources.
+  const [editingSources, setEditingSources] = createSignal(false);
+  function handleUpdateDynamicList(input: { op: CombineOp; sources: ListRef[] }): void {
+    const list = userList();
+    if (!list) return;
+    updateDynamicList(list.id, input.op, input.sources);
+    setEditingSources(false);
+    void load();
+  }
   // Whichever of the two is on screen — everything that reads a *formula* (the op chip, the
   // sources/groups tiles, the hero's formula line) applies identically to both.
   const combineList = (): GameList | null => userList() ?? compareList();
@@ -1769,8 +1780,16 @@ export default function ListRoute() {
     </div>
   );
 
-  const heroActions: JSX.Element | undefined = (kind === 'recent' || kind === 'user') ? undefined : (
+  const heroActions: JSX.Element | undefined = kind === 'recent' ? undefined : (
     <>
+      {/* userList() is still null at mount (set once load() resolves it below), so this has to be
+          a reactive Show rather than a plain `kind === 'user' && ...` check — the latter would
+          freeze at "no list yet" forever, since heroActions itself is only built once. */}
+      <Show when={kind === 'user' && userList()?.kind === 'dynamic'}>
+        <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingSources(v => !v)}>
+          {editingSources() ? 'Cancel' : 'Edit sources'}
+        </button>
+      </Show>
       {kind === 'compare' && (
         <>
           {/* Gated on the players in the URL, not on the ones that resolved: a comparison naming
@@ -1959,6 +1978,21 @@ export default function ListRoute() {
           submitLabel={compareSlots().length < 2 ? 'Compare libraries' : 'Compare'}
           onCancel={editingPlayers() ? () => setEditingPlayers(false) : undefined}
           onSubmit={slots => { setEditingPlayers(false); navigate(compareUrl(slots, compareOp())); }}
+        />
+      </Show>
+      {/* The hero's "Edit sources" action reopens the same combine form used at creation
+          (HomeRoute.tsx), pre-filled from this list's own op/sources, saving in place via
+          updateDynamicList (same id/folder position — see docs/dev/lists-and-accounts.md). Name
+          isn't editable here (renaming is Home's Rename action; updateDynamicList takes no name). */}
+      <Show when={kind === 'user' && userList()?.kind === 'dynamic' && editingSources()}>
+        <CombineForm
+          initialOp={userList()!.op}
+          initialSources={userList()!.sources}
+          excludeListId={userList()!.id}
+          showName={false}
+          submitLabel="Save sources"
+          onCancel={() => setEditingSources(false)}
+          onSubmit={handleUpdateDynamicList}
         />
       </Show>
       <div class="list-status">{statusText()}</div>

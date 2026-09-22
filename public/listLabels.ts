@@ -142,9 +142,7 @@ export function formatFormula(list: GameList, naming: ListNaming): string | null
 // read so the label follows a source edit or an account rename instead of freezing at creation
 // time (see docs/dev/lists-and-accounts.md's Combine section).
 //
-// The last fallback catches a dynamic list with no sources saved, and a manual one with no name —
-// only reachable by freezing an unnamed dynamic list, which is why freezeToSnapshot's own comment
-// asks its caller to stamp the derived name in first.
+// The last fallback catches a dynamic list with no sources saved, and a manual one with no name.
 export function listDisplayName(list: GameList, naming: ListNaming): string {
   return list.name || formatFormula(list, naming) || 'Untitled list';
 }
