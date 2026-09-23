@@ -166,3 +166,9 @@ test('shareListUrl: builds a /lists/shared link carrying the formula verbatim (r
   const url = shareListUrl('union:(o:acc1;w:acc2)');
   assert.equal(url, `${SHARED_LIST_PATH}?f=union:(o:acc1;w:acc2)`);
 });
+
+test('encodeListFormula: rejects a `user` source pointing at a ranked list', () => {
+  const ranked = { id: 'r1', parentId: null, order: 0, createdAt: 0, updatedAt: 0, kind: 'ranked', source: { kind: 'recent-games' } };
+  const outer = { op: 'union', sources: [{ kind: 'user', listId: 'r1' }, { kind: 'bundle', bundleId: 'b1' }] };
+  assert.deepEqual(encodeListFormula(outer, makeGetList([ranked])), { ok: false, reason: 'ranked-source' });
+});

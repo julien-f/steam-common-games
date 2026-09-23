@@ -491,6 +491,7 @@ export default function ListRoute() {
     const result = encodeListFormula(list, getList);
     if (result.ok) return null;
     if (result.reason === 'manual-source') return "can't share — includes a manual list as one of its sources";
+    if (result.reason === 'ranked-source') return "can't share — includes a ranked list as one of its sources";
     if (result.reason === 'empty') return "can't share — this list has no sources";
     return "can't share — its sources are too deeply/cyclically nested";
   }

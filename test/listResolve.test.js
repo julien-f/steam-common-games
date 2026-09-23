@@ -204,3 +204,11 @@ test('resolveListWithSources: a dangling source contributes 0 rather than failin
   assert.deepEqual(result, set(5));
   assert.deepEqual(sources, [{ key: 'list:gone', count: 0 }, { key: 'recent-games', count: 1 }]);
 });
+
+test('resolveListWithSources: a ranked list resolves to its one source', async () => {
+  const fetchers = makeFetchers({ lists: [['m1', manualList('m1', [1, 2])]] });
+  const ranked = { id: 'r1', parentId: null, order: 0, createdAt: 0, updatedAt: 0, kind: 'ranked', source: { kind: 'user', listId: 'm1' } };
+  const { result, sources } = await resolveListWithSources(ranked, fetchers);
+  assert.deepEqual(result, set(1, 2));
+  assert.deepEqual(sources, [{ key: 'list:m1', count: 2 }]);
+});

@@ -226,3 +226,9 @@ test('every op has a label, a description and a join symbol', () => {
   assert.deepEqual(Object.keys(OP_DESCRIPTIONS), ops);
   assert.deepEqual(Object.keys(OP_SYMBOLS), ops);
 });
+
+test('a ranked list is described by its one source, and named "Ranking of <source>" when unnamed', () => {
+  const ranked = { id: 'r', parentId: null, order: 0, createdAt: 0, updatedAt: 0, kind: 'ranked', source: { kind: 'account-owned', accountId: 'acc1' } };
+  assert.deepEqual(describeSources(ranked, NAMING).map(s => s.label), ['Alice — Owned']);
+  assert.equal(listDisplayName(ranked, NAMING), 'Ranking of Alice — Owned');
+});

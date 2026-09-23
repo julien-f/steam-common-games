@@ -124,6 +124,13 @@ export async function resolveListWithSources(
   depth = 0,
 ): Promise<ResolvedList> {
   if (list.kind === 'manual') return { result: new Set(list.appids ?? []), sources: [] };
+  // A ranked list's contents are its source's; the order is the ranking's, applied by the route.
+  if (list.kind === 'ranked') {
+    if (!list.source) return { result: new Set(), sources: [] };
+    const key = labelForRef(list.source, 0);
+    const appids = await resolveRef(list.source, fetchers, visited, depth + 1);
+    return { result: appids, sources: [{ key, count: appids.size }] };
+  }
 
   const sources = list.sources ?? [];
   const labeled: LabeledSet[] = await Promise.all(sources.map(async (ref, i) => ({
