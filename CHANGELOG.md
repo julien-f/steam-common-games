@@ -250,6 +250,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Deleting an unnamed list no longer asks to delete "undefined"** — the confirm (and the "hidden instead of deleted" notice) now use the name the tree shows, derived from its formula.
+
 - **Refreshing a list no longer tears its header card down and rebuilds it.** `ListRoute.tsx`'s `load()` blanked `heroTitle` on every load, including a ↻ Refresh of the list already on screen, which unmounted the whole card (`<Show when={heroTitle()}>`) — visible as a blink, and now also as the refresh control itself disappearing mid-click. It's only cleared when the list being shown actually changes.
 
 - **A bundle game listed on Steam only as a "sub" (package/license) or "bundle" (an official multi-app Steam bundle), not its own "app" store page, no longer shows up as "not on Steam".** `resolveSteamAppIds` (`lib/itad.js`) now expands those via Steam's own `packagedetails`/`ajaxresolvebundles` endpoints (`resolveSteamPackageAppids`/`resolveSteamBundleAppids`, `lib/steam.js`), falling back to `GET /games/info/v2`'s own `appid` field only if that expansion itself comes up empty. Confirmed live: two genuinely-on-Steam games in "Garbage Dwellers Bundle" (an anthology, a DLC upgrade) were showing as unresolved for exactly this reason.

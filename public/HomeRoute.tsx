@@ -294,9 +294,9 @@ export default function HomeRoute() {
   }
 
   function handleDeleteList(list: GameList): void {
-    if (!window.confirm(`Delete "${list.name}"?`)) return;
+    if (!window.confirm(`Delete "${listName(list)}"?`)) return;
     const result = deleteList(list.id);
-    if (result.softDeleted) window.alert(`"${list.name}" is still referenced by another list, so it was hidden instead of deleted.`);
+    if (result.softDeleted) window.alert(`"${listName(list)}" is still referenced by another list, so it was hidden instead of deleted.`);
     refreshTree();
   }
 
