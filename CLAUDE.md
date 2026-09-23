@@ -63,7 +63,7 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
 - Write descriptive commit messages that explain the *why*, not just the *what* — a short subject line, with a body when context is needed.
 - **Message format**: a plain imperative subject, no Conventional Commits prefix — the `feat:`/`fix:` prefixes in older history were dropped; don't reintroduce them.
 - Ordinary changes commit directly to `main` — this is a solo repo with no PR/review process. A complex feature (multiple concerns, significant refactoring, a new subsystem) spanning more than one commit gets a dedicated branch instead.
-- Close such a branch with a real merge commit (`git merge --no-ff`), never a fast-forward or a rebase onto `main` — the branch is the unit of work and the merge commit is what shows it. `list-centric-redesign` is the open branch this applies to.
+- Close such a branch with a real merge commit (`git merge --no-ff`), never a fast-forward or a rebase onto `main` — the branch is the unit of work and the merge commit is what shows it.
 - Never commit secrets, credentials, API keys, or `.env` values.
 - If a change is accidentally left out of a commit that was just made, amend that commit (`git commit --amend`) rather than adding a separate fixup commit for it.
 
