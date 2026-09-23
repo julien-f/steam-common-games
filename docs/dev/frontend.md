@@ -27,7 +27,8 @@ The data model it renders — accounts, lists, combines, the localStorage schema
 | `/lists/compare` | A comparison of several accounts' libraries, named by `?u=` |
 | `/lists/shared` | Someone else's dynamic list formula, named by `?f=` |
 | `/lists/bundle/:bundleId` | One bundle's games |
-| `/lists/:listId` | A user list (manual or dynamic) |
+| `/lists/:listId` | A user list (manual, dynamic or ranked) |
+| `/lists/:listId/rank` | A ranked list's one-vs-one compare screen |
 | `/bundles` | Browse/discover bundles — a table of bundles, not of games |
 | `/game/:appid?` | "Recently Looked Up", and the canonical link for one game |
 | `/search` | Search-by-URL — matches for `?q=`, opening the closest one in the panel |
@@ -56,6 +57,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "r" | "g:" formula
 - `AppShell.tsx` — the persistent shell: nav bar (`Home · Compare · Bundles`, with About in the footer — a static page nobody visits twice, traded for a destination people use repeatedly), ⚙ Preferences popover, global game search, the shared panel + lightbox (mounted once, not per route), and the `?u=` resolve effect for the whole app. The Compare link alone opts out of `withAccountParam`: a comparison names its own players, so carrying an account override alongside them would be two claims about whose games are on screen.
 - `AccountChip.tsx` — nav-bar chip saying whose lists are on screen, with Owned/Wishlist links (inline on a wide viewport, in its popover on a narrow one) and a recent-account switcher. Deliberately thinner than Home's account section — a nav affordance, not a second copy of it.
 - `ListRoute.tsx` — the generic list viewer (table + docked panel) behind every `/lists/*` and `/game/*` route; owns per-kind loading, columns, price loading, and the hero card's contents.
+- `RankRoute.tsx` — `/lists/:listId/rank`, a ranked list's compare screen (see [lists-and-accounts.md](lists-and-accounts.md#ranked-lists)).
 - `listShare.ts` — encode/decode for `/lists/shared?f=`'s compact formula grammar (see the Routes section above).
 - `HomeRoute.tsx` — account picker/header plus the folder/list tree and combine form. Also forwards an old Comparison-page link (`/?u=alice&u=bob`) to `/lists/compare`.
 - `ComparePlayersForm.tsx` — the "who is being compared" form (`/lists/compare`'s empty state and its "Edit players" affordance). Each player slot is a **token input**: chips for who's in it, plus a combobox offering the accounts the app already knows (filtered as you type, arrow keys + Enter, `role="combobox"`/`listbox"`) and accepting a raw identifier for anyone it doesn't. Per slot rather than one chip row under the form, because a chip row can only add a *player* — a Steam Family assembled from two known accounts was unbuildable, and it's the one shape the slot model exists for. Blur commits whatever is half-typed rather than dropping it. It owns the draft slots and reads `accountsStore.ts` once at mount; the route decides what a submitted set means.
@@ -72,6 +74,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "r" | "g:" formula
 - `listsStore.ts` — folder/list CRUD, soft-delete, and the two structural-cycle guards (a dynamic list can't depend on itself transitively; a folder can't move into its own descendant).
 - `listResolve.ts` — resolves a `ListRef`/`GameList` to appids, with every impure dependency injected so it and its tests never touch the network or localStorage.
 - `combine.ts` — the pure union/intersect/subtract/group-by-membership engine over resolved sets.
+- `ranking.ts` — the pure binary-insertion engine behind ranked lists.
 - `listLabels.ts` — how an op and a source read on screen, shared by the hero card, Home's combine form, and the tree.
 - `myOwnership.ts` — one cached pair of owned/wishlisted appid sets for the effective account, behind both the panel's badge and the search dropdown's markers.
 - `recentGames.ts` — the recently-looked-up list backing `/game`.
