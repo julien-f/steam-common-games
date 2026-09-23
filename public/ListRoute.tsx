@@ -494,13 +494,22 @@ export default function ListRoute() {
     const excluded = new Set(ranking()?.excluded ?? []);
     return selectedRows().filter(r => r.rank == null && !excluded.has(r.appid)).map(r => r.appid);
   }
+  // The unranked games in the table's current sort (filters included — what's left out is asked
+  // after, in source order), so whatever the user sorted first gets ranked first.
+  function unrankedInTableOrder(): number[] {
+    return (table?.processedData() ?? []).filter(r => r.rank == null).map(r => r.appid);
+  }
   // Handed over as history state rather than in the URL, which a few hundred appids would bloat;
   // it survives a reload of the compare screen and is gone once it's navigated away from.
+  function handleCompare(): void {
+    const list = userList();
+    if (list) navigate(`/lists/${list.id}/rank`, { state: { rankOrder: unrankedInTableOrder() } });
+  }
   function handleCompareSelected(): void {
     const list = userList();
     const focus = selectedUnranked();
     if (!list || !focus.length) return;
-    navigate(`/lists/${list.id}/rank`, { state: { rankFocus: focus } });
+    navigate(`/lists/${list.id}/rank`, { state: { rankFocus: focus, rankOrder: unrankedInTableOrder() } });
   }
   function handleExcludeSelected(): void {
     const state = ranking();
@@ -2061,9 +2070,9 @@ export default function ListRoute() {
         </button>
       </Show>
       <Show when={kind === 'user' && userList()?.kind === 'ranked'}>
-        <A class="btn btn-primary btn-sm" href={`/lists/${userList()!.id}/rank`}>
+        <button type="button" class="btn btn-primary btn-sm" title="Asks about unranked games in the table's current sort order" onClick={handleCompare}>
           {rankingProgress()?.pending === 0 ? 'Compare (all ranked)' : 'Compare'}
-        </A>
+        </button>
         <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingRankedSource(v => !v)}>
           {editingRankedSource() ? 'Cancel' : 'Change source'}
         </button>

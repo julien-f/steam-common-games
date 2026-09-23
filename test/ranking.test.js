@@ -104,21 +104,21 @@ test('a focus asks only about its unranked games, still against the whole rankin
   const source = new Set([1, 2, 3, 4, 5, 6]);
   const { state } = runAll(EMPTY_RANKING, new Set([1, 2, 3, 4]), id => id);
   const focus = new Set([6, 2]);
-  assert.deepEqual(pendingAppids(state, source, focus), [6]);
+  assert.deepEqual(pendingAppids(state, source, { focus }), [6]);
   const { state: done, asked } = (() => {
-    let { state: s, pair } = nextPair(state, source, focus);
+    let { state: s, pair } = nextPair(state, source, { focus });
     let n = 0;
     while (pair) {
       assert.equal(pair.candidate, 6);
       n++;
-      ({ state: s, pair } = answer(s, source, pair.candidate > pair.opponent ? 'candidate' : 'opponent', focus));
+      ({ state: s, pair } = answer(s, source, pair.candidate > pair.opponent ? 'candidate' : 'opponent', { focus }));
     }
     return { state: s, asked: n };
   })();
   assert.ok(asked <= 3);
   assert.deepEqual(done.groups, [[6], [4], [3], [2], [1]]);
   assert.deepEqual(pendingAppids(done, source), [5]);
-  assert.equal(progress(done, source, focus).pending, 0);
+  assert.equal(progress(done, source, { focus }).pending, 0);
 });
 
 test('a focus restarts a mid-way insertion of a game outside it', () => {
@@ -126,8 +126,26 @@ test('a focus restarts a mid-way insertion of a game outside it', () => {
   let { state } = runAll(EMPTY_RANKING, new Set([1, 2]), id => id);
   ({ state } = nextPair(state, source));
   assert.equal(state.cursor.appid, 3);
-  const { state: focused, pair } = nextPair(state, source, new Set([1]));
+  const { state: focused, pair } = nextPair(state, source, { focus: new Set([1]) });
   assert.equal(pair, null);
   assert.equal(focused.cursor, undefined);
   assert.deepEqual(pendingAppids(focused, source), [3]);
+});
+
+test('order asks those games first, then the rest in source order, skipped last', () => {
+  const source = new Set([1, 2, 3, 4, 5]);
+  const state = { groups: [[1]], excluded: [], skipped: [2] };
+  assert.deepEqual(pendingAppids(state, source, { order: [5, 2, 1, 9] }), [5, 3, 4, 2]);
+  assert.deepEqual(pendingAppids(state, source, { order: [5, 4], focus: new Set([3, 4]) }), [4, 3]);
+  assert.equal(nextPair(state, source, { order: [4] }).pair.candidate, 4);
+});
+
+test('the final ranking does not depend on the order games are asked in', () => {
+  const source = new Set([3, 1, 4, 5, 9, 2, 6]);
+  const run = order => {
+    let { state, pair } = nextPair(EMPTY_RANKING, source, { order });
+    while (pair) ({ state, pair } = answer(state, source, pair.candidate > pair.opponent ? 'candidate' : 'opponent', { order }));
+    return state.groups;
+  };
+  assert.deepEqual(run([6, 2, 9]), run([]));
 });

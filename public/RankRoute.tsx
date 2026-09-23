@@ -8,7 +8,9 @@ import { A, useParams, useNavigate, useLocation } from '@solidjs/router';
 import { getList, getRanking, setRanking } from './listsStore.ts';
 import { resolveListWithSources, flattenCombineResult, createDefaultFetchers } from './listResolve.ts';
 import { createDefaultNaming, listDisplayName } from './listLabels.ts';
-import { nextPair, answer, progress, ranks, type RankingState, type RankingPair, type RankingAnswer } from './ranking.ts';
+import {
+  nextPair, answer, progress, ranks, type RankingState, type RankingPair, type RankingAnswer, type RankingOptions,
+} from './ranking.ts';
 import { setBaseTitle } from './pageTitle.ts';
 import { panelOpen, panelClose, isPanelOpen, getPanelGame } from './panel.tsx';
 import { isLightboxOpen } from './lightbox.tsx';
@@ -25,14 +27,20 @@ function headerImage(appid: number): string {
 export default function RankRoute() {
   const params = useParams();
   const navigate = useNavigate();
-  const location = useLocation<{ rankFocus?: number[] } | undefined>();
+  const location = useLocation<{ rankFocus?: number[]; rankOrder?: number[] } | undefined>();
   // The list page's "Compare selected" (history state) — only these games get asked about.
   function focus(): Set<number> | undefined {
     const ids = location.state?.rankFocus;
     return Array.isArray(ids) && ids.length ? new Set(ids) : undefined;
   }
+  // Plus the list page's table sort, which orders the games asked (ranking.ts's RankingOptions).
+  function opts(): RankingOptions {
+    const order = location.state?.rankOrder;
+    return { focus: focus(), order: Array.isArray(order) ? order : undefined };
+  }
+  // Keeps the table order, drops only the selection.
   function compareAll(): void {
-    navigate(location.pathname, { replace: true, state: {} });
+    navigate(location.pathname, { replace: true, state: { rankOrder: location.state?.rankOrder } });
   }
   const [title, setTitle] = createSignal('');
   const [status, setStatus] = createSignal('Resolving list…');
@@ -61,7 +69,7 @@ export default function RankRoute() {
       const { result } = await resolveListWithSources(list, createDefaultFetchers());
       if (token !== loadToken) return;
       const appids = flattenCombineResult(result);
-      const next = nextPair(getRanking(list.id), appids, focus());
+      const next = nextPair(getRanking(list.id), appids, opts());
       setSource(appids);
       setState(next.state);
       setPair(next.pair);
@@ -108,7 +116,7 @@ export default function RankRoute() {
     const current = state();
     const src = source();
     if (!current || !src || !pair()) return;
-    const next = answer(current, src, ans, focus());
+    const next = answer(current, src, ans, opts());
     setUndoStack(stack => [...stack.slice(-(MAX_UNDO - 1)), current]);
     setState(next.state);
     setPair(next.pair);
@@ -122,7 +130,7 @@ export default function RankRoute() {
     const src = source();
     if (!stack.length || !src) return;
     const previous = stack[stack.length - 1];
-    const next = nextPair(previous, src, focus());
+    const next = nextPair(previous, src, opts());
     setUndoStack(stack.slice(0, -1));
     setState(next.state);
     setPair(next.pair);
@@ -181,7 +189,7 @@ export default function RankRoute() {
   function currentProgress() {
     const s = state();
     const src = source();
-    return s && src ? progress(s, src, focus()) : null;
+    return s && src ? progress(s, src, opts()) : null;
   }
 
   function card(appid: number, side: 'candidate' | 'opponent', note: JSX.Element): JSX.Element {

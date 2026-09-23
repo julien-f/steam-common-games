@@ -30,6 +30,14 @@ export interface RankingPair {
 
 export const EMPTY_RANKING: RankingState = { groups: [], excluded: [], skipped: [] };
 
+// How the compare screen was opened from the list page — both only pick *which* game is asked
+// next, never who it's compared against, so each still lands at its right place in the whole
+// ranking (and, answers being consistent, the final order doesn't depend on them).
+export interface RankingOptions {
+  focus?: Set<number>; // "Compare N selected": only these games are asked about
+  order?: number[]; // the table's sort: these are asked first, in this order
+}
+
 function clone(state: RankingState): RankingState {
   return {
     groups: state.groups.map(g => [...g]),
@@ -56,14 +64,13 @@ function isPlaced(state: RankingState, appid: number): boolean {
   return state.groups.some(g => g.includes(appid)) || state.excluded.includes(appid);
 }
 
-// Pending games in the order they'll be asked: source order first, then skipped ones. `focus`
-// (the list page's "Compare selected") narrows which games get asked, never who they're
-// compared against, so each still lands at its right place in the whole ranking.
-export function pendingAppids(state: RankingState, source: Set<number>, focus?: Set<number>): number[] {
+// Pending games in the order they'll be asked: `order` first, then the rest in source order,
+// then skipped ones.
+export function pendingAppids(state: RankingState, source: Set<number>, { focus, order = [] }: RankingOptions = {}): number[] {
   const skipped = new Set(state.skipped);
   const asked = (id: number) => source.has(id) && (!focus || focus.has(id)) && id !== state.cursor?.appid && !isPlaced(state, id);
-  const fresh: number[] = [];
-  for (const id of source) if (!skipped.has(id) && asked(id)) fresh.push(id);
+  const fresh = new Set<number>();
+  for (const id of [...order, ...source]) if (!skipped.has(id) && asked(id)) fresh.add(id);
   const deferred = state.skipped.filter(asked);
   return [...fresh, ...deferred];
 }
@@ -92,13 +99,14 @@ function placeCursor(state: RankingState): void {
 // Brings the state to the next point where an answer is needed — picking the next pending game
 // and placing it outright whenever no live group is left to compare against (e.g. the very
 // first game). Returns that state and the pair to ask, or a null pair once nothing is pending.
-export function nextPair(input: RankingState, source: Set<number>, focus?: Set<number>): { state: RankingState; pair: RankingPair | null } {
+export function nextPair(input: RankingState, source: Set<number>, opts: RankingOptions = {}): { state: RankingState; pair: RankingPair | null } {
+  const { focus } = opts;
   const state = clone(input);
   // An insertion left mid-way outside the focus restarts later rather than being asked now.
   if (state.cursor && (!source.has(state.cursor.appid) || (focus && !focus.has(state.cursor.appid)))) delete state.cursor;
   for (;;) {
     if (!state.cursor) {
-      const next = pendingAppids(state, source, focus)[0];
+      const next = pendingAppids(state, source, opts)[0];
       if (next === undefined) return { state, pair: null };
       state.skipped = state.skipped.filter(id => id !== next);
       state.cursor = { appid: next, lo: 0, hi: state.groups.length };
@@ -113,9 +121,9 @@ export function nextPair(input: RankingState, source: Set<number>, focus?: Set<n
 // Applies one answer to the pair nextPair returned for this same state/source, then advances
 // to the next pair.
 export function answer(
-  input: RankingState, source: Set<number>, ans: RankingAnswer, focus?: Set<number>,
+  input: RankingState, source: Set<number>, ans: RankingAnswer, opts: RankingOptions = {},
 ): { state: RankingState; pair: RankingPair | null } {
-  const { state: current, pair } = nextPair(input, source, focus);
+  const { state: current, pair } = nextPair(input, source, opts);
   if (!pair) return { state: current, pair: null };
   const state = clone(current);
   const cursor = state.cursor as RankingCursor;
@@ -140,7 +148,7 @@ export function answer(
       state.excluded.push(pair.opponent);
       break;
   }
-  return nextPair(state, source, focus);
+  return nextPair(state, source, opts);
 }
 
 // Takes a game out of the ranking (and out of excluded/skipped) so it's asked again.
@@ -178,11 +186,11 @@ export interface RankingProgress {
   remaining: number; // estimated comparisons left
 }
 
-export function progress(state: RankingState, source: Set<number>, focus?: Set<number>): RankingProgress {
+export function progress(state: RankingState, source: Set<number>, { focus }: RankingOptions = {}): RankingProgress {
   const ranked = ranks(state, source).size;
   const excluded = state.excluded.filter(id => source.has(id)).length;
   const hasCursor = !!state.cursor && source.has(state.cursor.appid) && (!focus || focus.has(state.cursor.appid));
-  const queued = pendingAppids(state, source, focus).length;
+  const queued = pendingAppids(state, source, { focus }).length;
   let groups = liveIndices(state, source).length;
   let remaining = hasCursor ? Math.ceil(Math.log2(liveIndices(state, source, state.cursor!.lo, state.cursor!.hi).length + 1)) : 0;
   if (hasCursor) groups++;
