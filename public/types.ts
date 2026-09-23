@@ -123,6 +123,7 @@ export interface Game extends PriceFields {
   tierPrice?: number | null;
   tierCurrency?: string | null;
   addon?: boolean;
+  rank?: number | null; // a ranked list's own rows only — null = not ranked yet / excluded
 
   // standalone-lookup flag (see gameSearch.ts) — true for a game opened from the
   // "look up any game" box that isn't one of the loaded rows
@@ -267,12 +268,14 @@ export interface ListRef {
   listId?: string; // → GameList.id
 }
 
-// A user-created list — either a stored, directly-editable set of appids ('manual'), or a
-// stored formula recomputed live every time it's opened ('dynamic'). Lives in the same
+// A user-created list — either a stored, directly-editable set of appids ('manual'), a
+// stored formula recomputed live every time it's opened ('dynamic'), or one source ordered by
+// one-vs-one answers ('ranked' — its progress lives in its own `ranking:<id>` pref key, see
+// listsStore.ts's getRanking). Lives in the same
 // Folder/GameList tree via parentId/order.
 export interface GameList {
   id: string;
-  // Optional for a dynamic list only: absent means "no name typed", and every surface labels it
+  // Optional for a dynamic/ranked list only: absent means "no name typed", and every surface labels it
   // from its own formula instead (listLabels.ts's listDisplayName), so the label follows a source
   // edit or an account rename instead of freezing at creation time.
   name?: string;
@@ -280,10 +283,11 @@ export interface GameList {
   order: number;
   createdAt: number;
   updatedAt: number;
-  kind: 'manual' | 'dynamic';
+  kind: 'manual' | 'dynamic' | 'ranked';
   appids?: number[]; // kind: 'manual'
   op?: CombineOp; // kind: 'dynamic'
   sources?: ListRef[]; // kind: 'dynamic'
+  source?: ListRef; // kind: 'ranked'
   tableView?: object; // persisted per-list (not shared across lists), same shape tableViewPrefs.ts stores
   deletedAt?: number; // soft-deleted — hidden from the tree/pickers, kept for dynamic-list
                       // resolution + restore as long as something still references it

@@ -32,7 +32,7 @@ export interface EncodableList {
   sources?: ListRef[];
 }
 
-export type EncodeFailureReason = 'manual-source' | 'cycle-or-too-deep' | 'empty';
+export type EncodeFailureReason = 'manual-source' | 'ranked-source' | 'cycle-or-too-deep' | 'empty';
 
 export type EncodeResult =
   | { ok: true; formula: string }
@@ -94,6 +94,7 @@ function encodeSource(
       if (!listId || visited.has(listId)) throw new EncodeError('cycle-or-too-deep');
       const found = getList(listId);
       if (!found) throw new EncodeError('cycle-or-too-deep'); // dangling — nothing to inline
+      if (found.kind === 'ranked') throw new EncodeError('ranked-source'); // an order has no token in the grammar
       if (found.kind !== 'dynamic') throw new EncodeError('manual-source');
       const nextVisited = new Set(visited);
       nextVisited.add(listId);

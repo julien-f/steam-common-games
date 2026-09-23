@@ -70,6 +70,20 @@ A list is a set of appids, usually named — a dynamic one may have no name of i
   - **`manual`** — a stored `appids[]`, directly editable (add/remove games, per-row or via bulk selection — row selection UI defers entirely to whatever `@vates/data-table-solid` already provides, not a bespoke mechanism).
   - **`dynamic`** — stored as a formula (`op` + `sources: ListRef[]`) over other lists, recomputed live every time it's opened. Its own page states that formula in the hero card — each source named (`listLabels.ts`'s `describeListRef`, shared with Home's combine form), linked to its own address, and carrying what it contributed (`Alice — Owned 343 ∪ Alice — Wishlist 115 = 457`, from `resolveListWithSources`' per-source counts), with a dangling source flagged in place rather than silently omitted. Because its contents come from the same server-cached account fetches `/lists/owned` reads, its hero also states how old the oldest of them is and re-resolves them all when clicked (`createDefaultFetchers`'s `refresh`/`onFetchedAt` — the options live on the real wiring, not on the injectable `ListResolveFetchers` seam, which stays pure for the resolver's own tests). Editable after creation too — an "Edit sources" action reopens the same setup dialog used at creation, pre-filled, saving in place (same id/folder position).
 
+  - **`ranked`** — one `source: ListRef`, ordered by one-vs-one answers. Resolves to its source's appids (so as another list's source it's just that set); the order is applied by `ListRoute.tsx` as a Rank column. See [Ranked lists](#ranked-lists).
+
+### Ranked lists
+
+- **Algorithm** — `ranking.ts`: binary insertion over tie groups (`groups: number[][]`, best first), so each new game costs ⌈log₂(k+1)⌉ answers against k groups. Pure, returns a new state per step; the compare screen's undo is a stack of states.
+- **Answers** — prefer candidate/opponent, tie (joins the opponent's group), skip (to the back of `skipped`), exclude either side.
+- **Focus and order** — `nextPair`/`answer`/`progress` take optional `RankingOptions`: `focus` (the list page's "Compare N selected") limits which games become candidates, `order` (the table's current sort — unranked rows of `processedData()`) asks those first, then the rest in source order. Neither affects opponents, which binary search picks, so each game still lands in its right place in the whole ranking and, with consistent answers, the final order is the same. Both are passed to `/lists/:listId/rank` as router history state (`rankFocus`/`rankOrder`), not in the URL — it survives a reload and ends when the screen is left or "Compare all instead" replaces the state. A mid-way insertion of a game outside the focus is dropped and restarts later.
+- **Progress is its own pref key, `ranking:<listId>`** — `{ groups, excluded, skipped, cursor? }` (`cursor` = the game mid-insertion and its `lo`/`hi` gap range). Kept off the `lists` blob because it's written once per answer. Its server push is **debounced** (`prefs.ts`, 3 s, flushed with `keepalive` when the tab is hidden): per-answer PUTs would hit the 20/min limit on `PUT /api/me/prefs/:key`. Dropped (set to `null`) when the list is hard-deleted.
+- **Never pruned to the source** — games outside the current source are filtered at read time (`ranks`/`progress`/`nextPair` take the resolved source set), so a source that briefly fails to load, or a "Change source" and back, loses nothing. The binary search runs over *live* groups only; `cursor.lo/hi` stay indices into the stored `groups`.
+- **UI** — `/lists/:listId/rank` (`RankRoute.tsx`) asks the pairs; the list page adds the Rank column (default sort), a Ranked tile with the remaining-comparisons estimate, "Change source" and Re-rank/Exclude row actions. "🏆 Rank this list" on owned/wishlist/bundle/user lists creates one (not on compare/shared: nothing stable to point at).
+- **Side panel** — the compare screen opens the shell's shared panel (`panelOpen`) with the details it already fetched, and closes it once its game leaves the pair. Its key listener runs in the capture phase, ahead of `panelKeyboard.ts`: an armed I/X + ←/→ wins (`stopImmediatePropagation`), plain ←/→ are left to the panel's media stepping while it's open, and Esc only leaves the screen when no panel/dialog is open to close. `urlState.ts`'s param rewrites keep `history.state`, so a panel/lightbox `?game=`/`&shot=` doesn't drop `rankFocus`.
+- **Not shareable** — `listShare.ts` rejects a ranked list, and a ranked `user` source (`'ranked-source'`): the URL grammar has no token for an order.
+- `listDeps()` (`listsStore.ts`) is what cycle detection and the referenced-by checks walk — a dynamic list's `sources`, a ranked list's `[source]`.
+
 ### Combine
 
 Creating a dynamic list (or previewing one before saving): pick 2+ source lists via a short, non-blocking **setup dialog**, choose an operation —
@@ -129,6 +143,7 @@ Folder       id · name · parentId (null = root) · order · createdAt
 GameList     id · name? (absent = unnamed, labeled by its formula) · parentId · order · createdAt · updatedAt
              kind 'manual'  → appids[]
              kind 'dynamic' → op + sources[] (ListRef)
+             kind 'ranked'  → source (ListRef); progress in pref key ranking:<id>
              tableView? · deletedAt?
 ListRef      kind 'account-owned' | 'account-wishlist' | 'bundle' | 'recent-games' | 'user'
              accountId? (pinned explicitly, never "whichever is current") · bundleId? · listId?
@@ -136,7 +151,7 @@ ListRef      kind 'account-owned' | 'account-wishlist' | 'bundle' | 'recent-game
 
 `Folder` and `GameList` share one `order` numbering per `parentId`, so folders and lists interleave in display order.
 
-Pref keys: `schemaVersion`, `myAccount`, `currentAccount`, `recentAccounts`, `lists`, `folders`, `recentGames` (backs the `recent-games` system list), plus the shared table-view keys for the fixed system kinds (`ownedListView`, `wishlistListView`, `bundleListView`, `compareListView` and `sharedListView` — each shared across all bundles/comparisons/shared links, unlike user lists which each keep their own `tableView` — and `recentListView`), and `bundlesBrowseView` for `/bundles`' own bundle-picker table (a table of bundles, not of games).
+Pref keys: `schemaVersion`, `myAccount`, `currentAccount`, `recentAccounts`, `lists`, `folders`, `recentGames` (backs the `recent-games` system list), `ranking:<listId>` (one per ranked list), plus the shared table-view keys for the fixed system kinds (`ownedListView`, `wishlistListView`, `bundleListView`, `compareListView` and `sharedListView` — each shared across all bundles/comparisons/shared links, unlike user lists which each keep their own `tableView` — and `recentListView`), and `bundlesBrowseView` for `/bundles`' own bundle-picker table (a table of bundles, not of games).
 
 **Cross-tab sync**: not implemented. The design called for a `window` `storage` listener refreshing in-memory state when another tab writes these keys; nothing listens today, so two open tabs can hold divergent state until one reloads.
 

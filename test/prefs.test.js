@@ -169,3 +169,36 @@ test('setPref: never pushes a table-view key, even when signed in — local-only
 
   assert.equal(called, false);
 });
+
+test('setPref: debounces the push of a ranking: key and sends only the latest value', async (t) => {
+  const restore = globalThis.fetch;
+  const seen = [];
+  globalThis.fetch = async (url, opts) => { seen.push({ url, body: JSON.parse(opts.body) }); return { ok: true, json: async () => ({}) }; };
+  t.after(() => { globalThis.fetch = restore; });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+
+  const { setPref, setSignedInSteamid } = require('../public/prefs.ts');
+  setSignedInSteamid('76561198000000001');
+  setPref('ranking:abc', { n: 1 });
+  setPref('ranking:abc', { n: 2 });
+  assert.equal(seen.length, 0);
+
+  t.mock.timers.tick(3000);
+  assert.deepEqual(seen.map(s => [s.url, s.body.value]), [['/api/me/prefs/ranking%3Aabc', { n: 2 }]]);
+});
+
+test('flushPendingPushes: pushes a pending ranking: key immediately', async (t) => {
+  const restore = globalThis.fetch;
+  const seen = [];
+  globalThis.fetch = async (url, opts) => { seen.push({ url, keepalive: opts.keepalive }); return { ok: true, json: async () => ({}) }; };
+  t.after(() => { globalThis.fetch = restore; });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+
+  const { setPref, setSignedInSteamid, flushPendingPushes } = require('../public/prefs.ts');
+  setSignedInSteamid('76561198000000001');
+  setPref('ranking:abc', { n: 1 });
+  flushPendingPushes();
+  assert.deepEqual(seen, [{ url: '/api/me/prefs/ranking%3Aabc', keepalive: true }]);
+  t.mock.timers.tick(3000);
+  assert.equal(seen.length, 1);
+});

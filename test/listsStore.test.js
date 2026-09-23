@@ -351,3 +351,33 @@ test('isAccountReferenced: true only while a dynamic list references that accoun
   updateDynamicList(watcher.id, 'union', []);
   assert.equal(isAccountReferenced('acc1'), false);
 });
+
+// ── Ranked lists ─────────────────────────────────────────────────────────────────────────────
+
+test('createList: a ranked list stores its one source, and counts as referencing it', () => {
+  const { createList, getList, isListReferenced, isAccountReferenced } = store();
+  const src = createList({ name: 'Src', kind: 'manual', appids: [1] });
+  const ranked = createList({ kind: 'ranked', source: { kind: 'user', listId: src.id } });
+  assert.deepEqual(getList(ranked.id).source, { kind: 'user', listId: src.id });
+  assert.equal(isListReferenced(src.id), true);
+  createList({ kind: 'ranked', source: { kind: 'account-owned', accountId: 'acc1' } });
+  assert.equal(isAccountReferenced('acc1'), true);
+});
+
+test('updateRankedSource: rejects a cycle through a ranked list', () => {
+  const { createList, updateRankedSource, CycleError } = store();
+  const ranked = createList({ kind: 'ranked', source: { kind: 'recent-games' } });
+  const dyn = createList({ kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: ranked.id }, { kind: 'recent-games' }] });
+  assert.throws(() => updateRankedSource(ranked.id, { kind: 'user', listId: dyn.id }), CycleError);
+});
+
+test('getRanking/setRanking: empty by default, round-trips, and is dropped with the list', () => {
+  const { createList, getRanking, setRanking, deleteList } = store();
+  const ranked = createList({ kind: 'ranked', source: { kind: 'recent-games' } });
+  assert.deepEqual(getRanking(ranked.id), { groups: [], excluded: [], skipped: [] });
+  setRanking(ranked.id, { groups: [[1]], excluded: [], skipped: [] });
+  assert.deepEqual(getRanking(ranked.id).groups, [[1]]);
+  deleteList(ranked.id);
+  assert.deepEqual(getRanking(ranked.id).groups, []);
+  assert.equal(require('../public/prefs.ts').getPref(`ranking:${ranked.id}`), null);
+});

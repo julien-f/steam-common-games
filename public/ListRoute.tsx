@@ -99,18 +99,22 @@ import { registerRouteHandlers } from './AppShell.tsx';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
 import { ComparePlayersForm } from './ComparePlayersForm.tsx';
 import {
-  describeSources, createDefaultNaming, listDisplayName, opLabel, OP_LABELS, OP_SYMBOLS,
+  describeSources, describeListRef, createDefaultNaming, listDisplayName, opLabel, OP_LABELS, OP_SYMBOLS,
   type RefDescription, type ListNaming,
 } from './listLabels.ts';
 import { encodeListFormula, decodeListFormula, shareListUrl } from './listShare.ts';
 import { copyWithFeedback } from './clipboard.ts';
 import { setBaseTitle } from './pageTitle.ts';
 import type { AccountSlot, DetailsAges, Game, Rating, Hltb, GameMeta, ProtonDb, GameList, CombineOp, ListRef } from './types.ts';
-import { getList, getLists, getFolders, createList, updateDynamicList, addAppidsToList, removeAppidsFromList, setListTableView } from './listsStore.ts';
+import {
+  getList, getLists, getFolders, createList, updateDynamicList, updateRankedSource, addAppidsToList, removeAppidsFromList,
+  setListTableView, getRanking, setRanking,
+} from './listsStore.ts';
+import { ranks, progress, rerank, exclude, type RankingState, type RankingProgress } from './ranking.ts';
 import { resolveListWithSources, flattenCombineResult, createDefaultFetchers, type ListResolveFetchers } from './listResolve.ts';
-import { CombineForm } from './CombineForm.tsx';
+import { CombineForm, sourceOptions, refKey, type SourceOption } from './CombineForm.tsx';
 import type { MembershipGroup } from './combine.ts';
-import { peekMyOwnershipStatus, onMyOwnershipReady } from './myOwnership.ts';
+import { peekMyOwnershipStatus, peekMyPlaytime, onMyOwnershipReady } from './myOwnership.ts';
 
 type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user' | 'compare' | 'shared';
 
@@ -166,6 +170,9 @@ const OWNED_DEFAULT_VISIBLE = ['capsule', 'name', 'steamdbRating', 'hltbAll', 'r
 // restatement of what the Name column right next to it already shows.
 const RECENT_COLUMNS = insertColumnsAfter(CORE_COLUMNS, 'name', OWNERSHIP_STATUS_COLUMN);
 const RECENT_DEFAULT_VISIBLE = ['capsule', 'name', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
+// A user list also gets the current account's Played/Last Played (stamped from myOwnership.ts,
+// the same fetch as the ✓/☆ markers) — hidden by default, there to filter/sort on.
+const USER_COLUMNS = insertColumnsAfter(RECENT_COLUMNS, 'hltbCompletionist', PLAYTIME_COLUMN, LAST_PLAYED_COLUMN);
 
 const WISHLIST_COLUMNS = insertColumnsAfter(
   insertColumnsAfter(
@@ -216,6 +223,13 @@ const BUNDLE_COLUMNS = insertColumnsAfter(
 );
 const BUNDLE_DEFAULT_VISIBLE = ['capsule', 'name', 'tierPrice', 'bestDealPrice', 'bestDealCut', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
 const BUNDLE_DEFAULT_SORT: SortEntry[] = [{ key: 'tierPrice', dir: 'asc' }, { key: 'steamdbRating', dir: 'desc' }];
+
+// A ranked list's own order (ranking.ts) — unranked/excluded games have no rank and sort last.
+const RANK_COLUMN: ColumnDef<Record<string, any>> =
+  { key: 'rank', label: 'Rank', type: 'number', groupable: false, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'asc' };
+const RANKED_COLUMNS = insertColumnsAfter(USER_COLUMNS, 'capsule', RANK_COLUMN);
+const RANKED_DEFAULT_VISIBLE = ['rank', ...RECENT_DEFAULT_VISIBLE];
+const RANKED_DEFAULT_SORT: SortEntry[] = [{ key: 'rank', dir: 'asc' }];
 
 const DEFAULT_SORT: SortEntry[] = [{ key: 'steamdbRating', dir: 'desc' }];
 const MAX_PRICE_LOOKUP_GAMES = 500; // mirrors the server's own cap — see loadWishlistPrices below
@@ -407,6 +421,104 @@ export default function ListRoute() {
   // hero's formula line and the per-group table headings; empty until the resolve lands, which is
   // what keeps a half-built "A ∪ = 0" off the screen in the meantime.
   const [listSources, setListSources] = createSignal<{ key: string; count: number; desc: RefDescription }[]>([]);
+  // kind === 'user', ranked lists only — its resolved source and stored ranking, backing the Rank
+  // column, the Ranked tile and the Re-rank/Exclude row actions.
+  const [rankedSource, setRankedSource] = createSignal<Set<number> | null>(null);
+  const [ranking, setRankingState] = createSignal<RankingState | null>(null);
+  function rankingProgress(): RankingProgress | null {
+    const source = rankedSource();
+    const state = ranking();
+    return source && state ? progress(state, source) : null;
+  }
+  // Rewrites the Rank column in place rather than reloading — nothing else about the rows changed.
+  function applyRanking(state: RankingState): void {
+    const list = userList();
+    const source = rankedSource();
+    if (!list || !source) return;
+    setRanking(list.id, state);
+    setRankingState(state);
+    const rankOf = ranks(state, source);
+    batch(() => {
+      for (const row of rowsStore) rowStore.mutateRow(row.appid, draft => { draft.rank = rankOf.get(row.appid) ?? null; });
+    });
+  }
+  const [editingRankedSource, setEditingRankedSource] = createSignal(false);
+  function rankedSourceOptions(): SourceOption[] {
+    const list = userList();
+    const options = sourceOptions(list?.id);
+    // sourceOptions offers no bundles, so a bundle source is added back to stay selectable.
+    if (list?.source && !options.some(o => o.key === refKey(list.source!))) {
+      options.unshift({ key: refKey(list.source), label: describeListRef(list.source, createDefaultNaming()).label, ref: list.source });
+    }
+    return options;
+  }
+  function handleChangeRankedSource(key: string): void {
+    const list = userList();
+    const option = rankedSourceOptions().find(o => o.key === key);
+    if (!list || !option) return;
+    try {
+      updateRankedSource(list.id, option.ref);
+    } catch (err) {
+      setStatusText((err as Error).message);
+      return;
+    }
+    setEditingRankedSource(false);
+    void load();
+  }
+  // What "Rank this list" ranks — null where there's nothing stable to point at (an unsaved
+  // comparison/shared link, or a ranked list itself).
+  function rankSourceRef(): ListRef | null {
+    if (kind === 'owned' || kind === 'wishlist') {
+      const account = heroAccount();
+      return account ? { kind: kind === 'owned' ? 'account-owned' : 'account-wishlist', accountId: account.id } : null;
+    }
+    if (kind === 'bundle') return params.bundleId ? { kind: 'bundle', bundleId: params.bundleId } : null;
+    const list = userList();
+    return list && list.kind !== 'ranked' ? { kind: 'user', listId: list.id } : null;
+  }
+  function handleRankThisList(): void {
+    const source = rankSourceRef();
+    if (!source) return;
+    navigate(`/lists/${createList({ kind: 'ranked', source }).id}/rank`);
+  }
+  function handleRerankSelected(): void {
+    const state = ranking();
+    if (!state) return;
+    const rows = selectedRows();
+    applyRanking(rows.reduce((s, row) => rerank(s, row.appid), state));
+    setSelectionActionStatus(`${rows.length} game(s) will be asked again on the next Compare.`);
+    table?.selection.clear();
+  }
+  // The selected games still to be ranked — what "Compare selected" asks about.
+  function selectedUnranked(): number[] {
+    const excluded = new Set(ranking()?.excluded ?? []);
+    return selectedRows().filter(r => r.rank == null && !excluded.has(r.appid)).map(r => r.appid);
+  }
+  // The unranked games in the table's current sort (filters included — what's left out is asked
+  // after, in source order), so whatever the user sorted first gets ranked first.
+  function unrankedInTableOrder(): number[] {
+    return (table?.processedData() ?? []).filter(r => r.rank == null).map(r => r.appid);
+  }
+  // Handed over as history state rather than in the URL, which a few hundred appids would bloat;
+  // it survives a reload of the compare screen and is gone once it's navigated away from.
+  function handleCompare(): void {
+    const list = userList();
+    if (list) navigate(`/lists/${list.id}/rank`, { state: { rankOrder: unrankedInTableOrder() } });
+  }
+  function handleCompareSelected(): void {
+    const list = userList();
+    const focus = selectedUnranked();
+    if (!list || !focus.length) return;
+    navigate(`/lists/${list.id}/rank`, { state: { rankFocus: focus, rankOrder: unrankedInTableOrder() } });
+  }
+  function handleExcludeSelected(): void {
+    const state = ranking();
+    if (!state) return;
+    const rows = selectedRows();
+    applyRanking(rows.reduce((s, row) => exclude(s, row.appid), state));
+    setSelectionActionStatus(`Excluded ${rows.length} game(s) from the ranking.`);
+    table?.selection.clear();
+  }
   // ── kind === 'shared' ─────────────────────────────────────────────────────────────────────
   // /lists/shared?f=<formula> — another dynamic list's formula, decoded straight from the URL
   // (listShare.ts), same "unsaved dynamic list, built in memory" idea `compare` below already
@@ -491,6 +603,7 @@ export default function ListRoute() {
     const result = encodeListFormula(list, getList);
     if (result.ok) return null;
     if (result.reason === 'manual-source') return "can't share — includes a manual list as one of its sources";
+    if (result.reason === 'ranked-source') return "can't share — includes a ranked list as one of its sources";
     if (result.reason === 'empty') return "can't share — this list has no sources";
     return "can't share — its sources are too deeply/cyclically nested";
   }
@@ -1034,10 +1147,18 @@ export default function ListRoute() {
     batch(() => {
       for (const item of rowsStore) {
         const status = peekMyOwnershipStatus(item.appid);
-        if (!status) continue;
+        if (status) {
+          rowStore.mutateRow(item.appid, draft => {
+            draft.inLibrary = status.inLibrary;
+            draft.onWishlist = status.onWishlist;
+          });
+        }
+        if (kind !== 'user') continue;
+        const played = peekMyPlaytime(item.appid);
+        if (played === undefined) continue;
         rowStore.mutateRow(item.appid, draft => {
-          draft.inLibrary = status.inLibrary;
-          draft.onWishlist = status.onWishlist;
+          draft.playtime = played?.playtime;
+          draft.lastPlayed = played?.lastPlayed;
         });
       }
     });
@@ -1184,7 +1305,7 @@ export default function ListRoute() {
         disposeTableState = dispose;
         return createTableState<Game>(
           () => rowsStore.filter(r => !r.loading && appidSet.has(r.appid)),
-          RECENT_COLUMNS as unknown as ColumnDef<Game>[],
+          (kind === 'user' ? USER_COLUMNS : RECENT_COLUMNS) as unknown as ColumnDef<Game>[],
           { initialViewState: { pageSize: 50, visibleCols: RECENT_DEFAULT_VISIBLE, sorts: DEFAULT_SORT } },
         );
       });
@@ -1271,6 +1392,8 @@ export default function ListRoute() {
     if (!refresh) {
       setUserList(null);
       setCompareList(null);
+      setRankedSource(null);
+      setRankingState(null);
     }
     setSelectedRows([]); // a fresh load means a fresh table — nothing carries a prior selection over
     setSelectionActionStatus('');
@@ -1380,8 +1503,16 @@ export default function ListRoute() {
         setStatusText(`Error: ${(err as Error).message}`);
         return;
       }
+      let rankOf: Map<number, number> | null = null;
+      if (list.kind === 'ranked') {
+        const state = getRanking(list.id);
+        setRankedSource(appids);
+        setRankingState(state);
+        rankOf = ranks(state, appids);
+      }
       initialRows = [...appids].map(appid => ({
         appid, name: '', loading: true, details: null,
+        ...(rankOf ? { rank: rankOf.get(appid) ?? null } : {}),
       }));
       streamTargets = [...appids].map(appid => ({ appid }));
     } else if (kind === 'shared') {
@@ -1538,17 +1669,21 @@ export default function ListRoute() {
     if (pendingGroups) {
       buildGroupTables(pendingGroups);
     } else {
+      const isRanked = userList()?.kind === 'ranked';
       const columns = (
-        kind === 'wishlist' ? WISHLIST_COLUMNS
+        isRanked ? RANKED_COLUMNS
+          : kind === 'wishlist' ? WISHLIST_COLUMNS
           : kind === 'bundle' ? BUNDLE_COLUMNS
-          : kind === 'recent' || kind === 'user' || kind === 'compare' || kind === 'shared' ? RECENT_COLUMNS
+          : kind === 'user' ? USER_COLUMNS
+          : kind === 'recent' || kind === 'compare' || kind === 'shared' ? RECENT_COLUMNS
           : OWNED_COLUMNS
       ) as unknown as ColumnDef<Game>[];
-      const defaultVisible = kind === 'wishlist' ? WISHLIST_DEFAULT_VISIBLE
+      const defaultVisible = isRanked ? RANKED_DEFAULT_VISIBLE
+        : kind === 'wishlist' ? WISHLIST_DEFAULT_VISIBLE
         : kind === 'bundle' ? BUNDLE_DEFAULT_VISIBLE
         : kind === 'recent' || kind === 'user' || kind === 'compare' || kind === 'shared' ? RECENT_DEFAULT_VISIBLE
         : OWNED_DEFAULT_VISIBLE;
-      const sort = kind === 'bundle' ? BUNDLE_DEFAULT_SORT : DEFAULT_SORT;
+      const sort = isRanked ? RANKED_DEFAULT_SORT : kind === 'bundle' ? BUNDLE_DEFAULT_SORT : DEFAULT_SORT;
 
       let disposeTableState!: () => void;
       const ts = createRoot(dispose => {
@@ -1807,6 +1942,15 @@ export default function ListRoute() {
         tiles.push({ label: kind === 'compare' ? 'Players' : 'Sources', value: (list.sources ?? []).length });
         if (groupCount() > 0) tiles.push({ label: 'Groups', value: groupCount() });
       }
+      const p = list.kind === 'ranked' ? rankingProgress() : null;
+      if (p) {
+        tiles.push({
+          label: 'Ranked',
+          value: `${p.ranked} / ${p.ranked + p.pending}`,
+          sub: p.pending ? `≈ ${p.remaining} comparisons left` : 'Complete',
+          title: p.excluded ? `${p.excluded} excluded` : undefined,
+        });
+      }
     }
     // Folder/Edited are facts about a *stored* list — a comparison has neither.
     const stored = userList();
@@ -1827,6 +1971,7 @@ export default function ListRoute() {
   function heroKindLabel(): string | null {
     const list = combineList();
     if (!list) return null;
+    if (list.kind === 'ranked') return 'Ranked list';
     return list.kind === 'manual' ? 'Manual list' : opLabel(list.op);
   }
 
@@ -1840,9 +1985,11 @@ export default function ListRoute() {
     if (!sources.length) return undefined;
     const symbol = OP_SYMBOLS[list.op ?? 'union'];
     const problems = sources.filter(source => source.desc.problem);
+    const ranked = list.kind === 'ranked';
     return (
       <>
         <div class="list-formula">
+          {ranked && <span class="list-formula-op">Ranking of</span>}
           <For each={sources}>
             {(source, i) => (
               <>
@@ -1858,8 +2005,10 @@ export default function ListRoute() {
           </For>
           {/* The result is this list's own row count — for group-by-membership that's the union
               across its groups, which is exactly what the "+" join above claims. */}
-          <span class="list-formula-op">=</span>
-          <span class="list-formula-result">{rowsStore.length}</span>
+          <Show when={!ranked}>
+            <span class="list-formula-op">=</span>
+            <span class="list-formula-result">{rowsStore.length}</span>
+          </Show>
         </div>
         <Show when={problems.length > 0}>
           <ul class="list-formula-problems">
@@ -1880,7 +2029,7 @@ export default function ListRoute() {
     // since every other list here is either someone's Steam data or a list they built on purpose.
     if (kind === 'recent') return 'Games you looked up in this browser — local search history, never sent anywhere.';
     const list = combineList();
-    if (list?.kind === 'dynamic') return formulaNote(list);
+    if (list?.kind === 'dynamic' || list?.kind === 'ranked') return formulaNote(list);
     return undefined;
   }
 
@@ -1918,6 +2067,19 @@ export default function ListRoute() {
           onClick={e => handleShareList(e.currentTarget)}
         >
           🔗 Share list
+        </button>
+      </Show>
+      <Show when={kind === 'user' && userList()?.kind === 'ranked'}>
+        <button type="button" class="btn btn-primary btn-sm" title="Asks about unranked games in the table's current sort order" onClick={handleCompare}>
+          {rankingProgress()?.pending === 0 ? 'Compare (all ranked)' : 'Compare'}
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingRankedSource(v => !v)}>
+          {editingRankedSource() ? 'Cancel' : 'Change source'}
+        </button>
+      </Show>
+      <Show when={rankSourceRef()}>
+        <button type="button" class="btn btn-ghost btn-sm" title="Create a list ranking these games by comparing them two at a time" onClick={handleRankThisList}>
+          🏆 Rank this list
         </button>
       </Show>
       {kind === 'shared' && (
@@ -2136,6 +2298,19 @@ export default function ListRoute() {
           onSubmit={handleUpdateDynamicList}
         />
       </Show>
+      <Show when={kind === 'user' && userList()?.kind === 'ranked' && editingRankedSource()}>
+        <div class="combine-form">
+          <label>
+            Rank the games of{' '}
+            <select value={refKey(userList()!.source!)} onChange={e => handleChangeRankedSource(e.currentTarget.value)}>
+              <For each={rankedSourceOptions()}>
+                {o => <option value={o.key}>{o.label}</option>}
+              </For>
+            </select>
+          </label>
+          <p>Answers already given are kept, and apply again to any game that's in the new source too.</p>
+        </div>
+      </Show>
       <div class="list-status">{statusText()}</div>
       {(kind === 'wishlist' || kind === 'bundle') && <div class="price-status">{priceStatusText()}</div>}
       <Show when={selectedRows().length > 0}>
@@ -2151,6 +2326,16 @@ export default function ListRoute() {
           <button type="button" disabled={!addTarget()} onClick={handleAddSelectedToList}>Add</button>
           <Show when={kind === 'user' && userList()?.kind === 'manual'}>
             <button type="button" onClick={handleRemoveSelectedFromList}>Remove from this list</button>
+          </Show>
+          <Show when={kind === 'user' && userList()?.kind === 'ranked'}>
+            <button
+              type="button"
+              disabled={!selectedUnranked().length}
+              title={selectedUnranked().length ? 'Ask only about the selected games that are still unranked' : 'All selected games are ranked or excluded — Re-rank them first'}
+              onClick={handleCompareSelected}
+            >Compare {selectedUnranked().length} selected</button>
+            <button type="button" title="Take out of the ranking so the next Compare asks about it again" onClick={handleRerankSelected}>Re-rank</button>
+            <button type="button" title="Leave out of the ranking" onClick={handleExcludeSelected}>Exclude</button>
           </Show>
           <button type="button" onClick={() => table?.selection.clear()}>Clear selection</button>
         </div>

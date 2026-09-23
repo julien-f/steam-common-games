@@ -14,6 +14,7 @@
 // source-scanning logic) to decide whether removing a recent account must soft-remove instead.
 import { getPref, setPref } from './prefs.ts';
 import { union, subtract } from './combine.ts';
+import { EMPTY_RANKING, type RankingState } from './ranking.ts';
 import type { Folder, GameList, ListRef, CombineOp } from './types.ts';
 
 const LISTS_KEY = 'lists';
@@ -63,6 +64,13 @@ export function getList(id: string): GameList | undefined {
   return readLists().find(l => l.id === id);
 }
 
+// What a list is computed from — a dynamic list's sources, a ranked list's one source.
+export function listDeps(list: GameList): ListRef[] {
+  if (list.kind === 'dynamic') return list.sources ?? [];
+  if (list.kind === 'ranked') return list.source ? [list.source] : [];
+  return [];
+}
+
 // ── Cycle detection ──────────────────────────────────────────────────────────────────────────
 
 function userListDeps(sources: ListRef[]): string[] {
@@ -82,8 +90,8 @@ export function wouldCreateCycle(listId: string, sources: ListRef[], lists: Game
     if (visited.has(id)) continue;
     visited.add(id);
     const dep = lists.find(l => l.id === id);
-    if (!dep || dep.kind !== 'dynamic' || !dep.sources) continue;
-    stack.push(...userListDeps(dep.sources));
+    if (!dep) continue;
+    stack.push(...userListDeps(listDeps(dep)));
   }
   return false;
 }
@@ -108,13 +116,12 @@ export function isDescendantFolder(candidateId: string, potentialAncestorId: str
 // ── Referenced-by checks (soft-delete/restore) ──────────────────────────────────────────────
 
 export function isListReferenced(listId: string, lists: GameList[] = readLists()): boolean {
-  return lists.some(l => l.kind === 'dynamic' && !l.deletedAt
-    && (l.sources ?? []).some(s => s.kind === 'user' && s.listId === listId));
+  return lists.some(l => !l.deletedAt && listDeps(l).some(s => s.kind === 'user' && s.listId === listId));
 }
 
 export function isAccountReferenced(accountId: string, lists: GameList[] = readLists()): boolean {
-  return lists.some(l => l.kind === 'dynamic' && !l.deletedAt
-    && (l.sources ?? []).some(s => (s.kind === 'account-owned' || s.kind === 'account-wishlist') && s.accountId === accountId));
+  return lists.some(l => !l.deletedAt
+    && listDeps(l).some(s => (s.kind === 'account-owned' || s.kind === 'account-wishlist') && s.accountId === accountId));
 }
 
 // ── Folder CRUD ──────────────────────────────────────────────────────────────────────────────
@@ -200,10 +207,11 @@ export function reorderSiblings(parentId: string | null, orderedRefs: { kind: 'f
 export interface CreateListInput {
   name?: string; // omitted on a dynamic list = unnamed, labeled from its formula (listLabels.ts)
   parentId?: string | null;
-  kind: 'manual' | 'dynamic';
+  kind: 'manual' | 'dynamic' | 'ranked';
   appids?: number[];
   op?: CombineOp;
   sources?: ListRef[];
+  source?: ListRef;
 }
 
 export function createList(input: CreateListInput): GameList {
@@ -211,9 +219,8 @@ export function createList(input: CreateListInput): GameList {
   const parentId = input.parentId ?? null;
   const lists = readLists();
 
-  if (input.kind === 'dynamic' && wouldCreateCycle(id, input.sources ?? [], lists)) {
-    throw new CycleError();
-  }
+  const deps = input.kind === 'dynamic' ? input.sources ?? [] : input.kind === 'ranked' && input.source ? [input.source] : [];
+  if (wouldCreateCycle(id, deps, lists)) throw new CycleError();
 
   const now = Date.now();
   const list: GameList = {
@@ -224,8 +231,8 @@ export function createList(input: CreateListInput): GameList {
     createdAt: now,
     updatedAt: now,
     kind: input.kind,
-    ...(input.kind === 'manual'
-      ? { appids: input.appids ?? [] }
+    ...(input.kind === 'manual' ? { appids: input.appids ?? [] }
+      : input.kind === 'ranked' ? { source: input.source }
       : { op: input.op ?? 'union', sources: input.sources ?? [] }),
   };
   writeLists([...lists, list]);
@@ -294,6 +301,39 @@ export function updateDynamicList(id: string, op: CombineOp, sources: ListRef[])
   return updated;
 }
 
+// Changes a ranked list's source in place; its ranking is kept, filtered to the new source at
+// read time (ranking.ts), so switching back restores it.
+export function updateRankedSource(id: string, source: ListRef): GameList {
+  const lists = readLists();
+  const idx = lists.findIndex(l => l.id === id);
+  if (idx === -1 || lists[idx].kind !== 'ranked') throw new Error('Ranked list not found');
+  if (wouldCreateCycle(id, [source], lists)) throw new CycleError();
+  const updated: GameList = { ...lists[idx], source, updatedAt: Date.now() };
+  lists[idx] = updated;
+  writeLists(lists);
+  return updated;
+}
+
+// A ranked list's progress, in its own pref key rather than on the list: it's written once per
+// answer, and keeping it out of `lists` means neither those writes nor their (debounced, see
+// prefs.ts) server pushes touch any other list.
+function rankingKey(listId: string): string {
+  return `ranking:${listId}`;
+}
+
+export function getRanking(listId: string): RankingState {
+  return getPref<RankingState | null>(rankingKey(listId), null) ?? EMPTY_RANKING;
+}
+
+export function setRanking(listId: string, state: RankingState): void {
+  setPref(rankingKey(listId), state);
+}
+
+// null rather than a delete: prefs has no key removal, and null syncs to other devices too.
+function dropRanking(listId: string): void {
+  if (getPref(rankingKey(listId)) != null) setPref(rankingKey(listId), null);
+}
+
 export function setListTableView(id: string, tableView: object): void {
   const lists = readLists();
   const list = lists.find(l => l.id === id);
@@ -313,8 +353,9 @@ export function deleteList(id: string): { softDeleted: boolean } {
     writeLists(lists);
     return { softDeleted: true };
   }
-  lists.splice(idx, 1);
+  const [removed] = lists.splice(idx, 1);
   writeLists(lists);
+  if (removed.kind === 'ranked') dropRanking(id);
   return { softDeleted: false };
 }
 
@@ -334,5 +375,6 @@ export function sweepDeletedLists(): number {
   const lists = readLists();
   const kept = lists.filter(l => !l.deletedAt || isListReferenced(l.id, lists));
   if (kept.length !== lists.length) writeLists(kept);
+  for (const l of lists) if (l.kind === 'ranked' && !kept.includes(l)) dropRanking(l.id);
   return lists.length - kept.length;
 }

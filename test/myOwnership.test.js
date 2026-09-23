@@ -196,3 +196,28 @@ test('getMyOwnershipStatus: a ?u= override is what ownership answers for, not th
   assert.deepEqual(await getMyOwnershipStatus(620), { inLibrary: true, onWishlist: false });
   assert.deepEqual(await getMyOwnershipStatus(440), { inLibrary: false, onWishlist: false });
 });
+
+test('peekMyPlaytime: undefined while loading, then summed hours / latest date for owned games, null otherwise', async (t) => {
+  withFetch(t, async url => {
+    if (url === '/api/common-games') {
+      return {
+        ok: true,
+        json: async () => ({
+          groups: [{ games: [{ appid: 620, name: 'Portal 2' }, { appid: 440, name: 'TF2' }] }],
+          slots: [[{ steamid: '1' }, { steamid: '2' }]],
+          playtime: { 620: { 1: 300, 2: 60 } },
+          lastPlayed: { 620: { 1: 1700000000, 2: 1600000000 } },
+        }),
+      };
+    }
+    return { ok: true, json: async () => ({ items: [] }) };
+  });
+  setCurrentAccount(makeAccount('1', { members: ['1', '2'] }));
+
+  const { peekMyPlaytime, getMyOwnershipStatus } = createMyOwnershipCache();
+  assert.equal(peekMyPlaytime(620), undefined);
+  await getMyOwnershipStatus(620);
+  assert.deepEqual(peekMyPlaytime(620), { playtime: 6, lastPlayed: '2023-11-14' });
+  assert.deepEqual(peekMyPlaytime(440), { playtime: 0, lastPlayed: '' });
+  assert.equal(peekMyPlaytime(999), null);
+});

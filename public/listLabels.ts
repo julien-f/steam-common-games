@@ -114,6 +114,7 @@ export function describeListRef(ref: ListRef, naming: ListNaming): RefDescriptio
 }
 
 export function describeSources(list: GameList, naming: ListNaming): RefDescription[] {
+  if (list.kind === 'ranked') return list.source ? [describeListRef(list.source, naming)] : [];
   if (list.kind !== 'dynamic') return [];
   return (list.sources ?? []).map(ref => describeListRef(ref, naming));
 }
@@ -133,6 +134,7 @@ export function formatCombine(op: CombineOp | undefined, sources: ListRef[], nam
 
 // Null for a manual list (there's no formula) or a dynamic one with no sources saved.
 export function formatFormula(list: GameList, naming: ListNaming): string | null {
+  if (list.kind === 'ranked') return list.source ? `Ranking of ${describeListRef(list.source, naming).label}` : null;
   if (list.kind !== 'dynamic') return null;
   return formatCombine(list.op, list.sources ?? [], naming);
 }

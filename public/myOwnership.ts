@@ -27,10 +27,17 @@
 import { getEffectiveCurrentAccount } from './accountsStore.ts';
 import { fetchAccountOwnedData, fetchAccountWishlistAppids } from './accountData.ts';
 import type { GameOwner } from './accountData.ts';
+import { fmtLastPlayed } from './utils.ts';
 
 export interface OwnershipStatus {
   inLibrary: boolean;
   onWishlist: boolean;
+}
+
+// Same shape as an Owned list row's own playtime/lastPlayed (hours; bare ISO date, '' = never).
+export interface MyPlaytime {
+  playtime: number;
+  lastPlayed: string;
 }
 
 // A factory, not a bare module-level singleton — same "testable cache" shape as
@@ -116,6 +123,19 @@ export function createMyOwnershipCache() {
     return ownersMap.get(appid) ?? [];
   }
 
+  // The current account's playtime for a game (summed across a Family's members, latest play
+  // date wins — as the Owned list computes it), for user-list rows' Played/Last Played columns.
+  // `undefined` while loading or with no account, `null` for a game the account doesn't own.
+  function peekMyPlaytime(appid: number): MyPlaytime | null | undefined {
+    if (!ensureLoading() || !ownedSet) return undefined;
+    if (!ownedSet.has(appid)) return null;
+    const owners = ownersMap.get(appid) ?? [];
+    return {
+      playtime: owners.reduce((sum, o) => sum + o.minutes, 0) / 60,
+      lastPlayed: fmtLastPlayed(Math.max(0, ...owners.map(o => o.lastPlayedSec))),
+    };
+  }
+
   // One-shot "both sets just became available" notification — fires once (then forgets every
   // registered listener) the next time both halves of the *current* currentAccount's fetch land.
   // Lets gameSearch.ts's dropdown, which rendered a peek of `null` (still loading) for its
@@ -126,11 +146,12 @@ export function createMyOwnershipCache() {
     return () => { readyListeners = readyListeners.filter(fn => fn !== cb); };
   }
 
-  return { getMyOwnershipStatus, peekMyOwnershipStatus, getOwnersFor, onMyOwnershipReady };
+  return { getMyOwnershipStatus, peekMyOwnershipStatus, peekMyPlaytime, getOwnersFor, onMyOwnershipReady };
 }
 
 const defaultCache = createMyOwnershipCache();
 export const getMyOwnershipStatus = defaultCache.getMyOwnershipStatus;
 export const peekMyOwnershipStatus = defaultCache.peekMyOwnershipStatus;
+export const peekMyPlaytime = defaultCache.peekMyPlaytime;
 export const getOwnersFor = defaultCache.getOwnersFor;
 export const onMyOwnershipReady = defaultCache.onMyOwnershipReady;

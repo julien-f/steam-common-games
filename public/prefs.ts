@@ -77,7 +77,38 @@ export function setPref(key: string, value: unknown): void {
   // one exception: it's never auto-pushed at all, local-only until the user explicitly hits Save
   // on the "unsaved changes" banner (tableViewSync.ts) — every edit to a table would otherwise
   // silently overwrite whatever's saved to the account before the user ever saw a diff.
-  if (signedInSteamid && !TABLE_VIEW_PREF_KEYS.includes(key)) pushPrefToServer(key, value, updatedAt);
+  if (!signedInSteamid || TABLE_VIEW_PREF_KEYS.includes(key)) return;
+  if (DEBOUNCED_PUSH_PREFIXES.some(p => key.startsWith(p))) schedulePush(key);
+  else pushPrefToServer(key, value, updatedAt);
+}
+
+// Written once per answer on the compare screen (ranking.ts) — pushing each write would trip the
+// server's per-minute limit on PUT /api/me/prefs/:key, so the push waits for a pause instead.
+const DEBOUNCED_PUSH_PREFIXES = ['ranking:'];
+const PUSH_DEBOUNCE_MS = 3000;
+const pendingPushes = new Map<string, ReturnType<typeof setTimeout>>();
+
+function schedulePush(key: string): void {
+  clearTimeout(pendingPushes.get(key));
+  pendingPushes.set(key, setTimeout(() => flushPush(key), PUSH_DEBOUNCE_MS));
+}
+
+function flushPush(key: string, keepalive = false): void {
+  clearTimeout(pendingPushes.get(key));
+  pendingPushes.delete(key);
+  const entry = readEntries()[key];
+  if (entry && signedInSteamid) pushPrefToServer(key, entry.value, entry.updatedAt, { keepalive });
+}
+
+// keepalive so a push flushed as the tab is hidden/closed still completes.
+export function flushPendingPushes(): void {
+  for (const key of [...pendingPushes.keys()]) flushPush(key, true);
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushPendingPushes();
+  });
 }
 
 // Set by authStore.ts once GET /api/me resolves (and cleared on sign-out) — kept here, rather
@@ -102,9 +133,10 @@ export function _resetSignedInSteamid(): void {
 // as it worked before server sync existed at all. Not retried here: authStore.ts's merge, which
 // runs on every sign-in check (not just the first), pushes any key whose local `updatedAt` still
 // beats the server's, so a failed push is naturally retried the next time this device checks in.
-export function pushPrefToServer(key: string, value: unknown, updatedAt: number): Promise<void> {
+export function pushPrefToServer(key: string, value: unknown, updatedAt: number, { keepalive = false } = {}): Promise<void> {
   return fetch(`/api/me/prefs/${encodeURIComponent(key)}`, {
     method: 'PUT',
+    keepalive,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value, updatedAt }),
   })

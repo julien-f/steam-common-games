@@ -32,7 +32,7 @@ A private profile or wishlist looks identical to an empty one from the outside; 
 
 - **Owned** and **Wishlist** for the current account, and one list per **bundle** you browse, are always live — never stored, never stale.
 - **Recently Looked Up** collects games you searched for, browsable like any other list.
-- **Your own lists** come in two kinds: a **manual** list you add and remove games from, and a **dynamic** list defined as a formula over other lists, recomputed every time you open it. A dynamic list can be **frozen** into a manual one, keeping its current contents and dropping the formula.
+- **Your own lists** come in three kinds: a **manual** list you add and remove games from, a **dynamic** list defined as a formula over other lists, recomputed every time you open it, and a **ranked** list that orders another list by your preferences (see [Ranking a list](#ranking-a-list)). A dynamic list can be **frozen** into a manual one, keeping its current contents and dropping the formula.
 - Lists live in a **folder tree** you can rename, nest and organize.
 
 ![The home page: the current account's card, the four always-available lists, and your own folder tree of lists](../images/home-lists.png)
@@ -51,6 +51,20 @@ Naming the combined list is optional: leave the name empty and it's called by wh
 The result is a live list: save it as dynamic (it re-resolves each time), or freeze it. A dynamic list's page states its formula, names every source, and says what each contributed.
 
 ![Two lists combined with group by membership: one table per combination — in both lists, then each list's exclusive games — under the formula that produced them](../images/group-by-membership.png)
+
+### Ranking a list
+
+**🏆 Rank this list** (on Owned, Wishlist, a bundle or any of your lists) creates a ranked list and asks you two games at a time: *which do you prefer?*
+
+- **← / →** pick one, **↓** Tie, **S** Skip (asked again later), **X** then **← / →** or "Haven't played" to exclude a game, **Z** Undo. All are buttons too.
+- **ℹ Details** under a card (or **I** then **← / →**) opens that game in the side panel to help you decide. It stays open while the game is still being compared; meanwhile **← / →** browse its screenshots and videos (pick by clicking a card), and **Esc** closes it.
+- Stop whenever you like (**Esc**): every answer is saved, and **Compare** on the list's page picks up where you left off.
+- Each new game is placed with as few questions as possible — about 7 for a list of 100 already-ranked games. The progress bar says roughly how many are left.
+- The list's page sorts by **Rank**. Select rows to **Re-rank** a game (it's asked again) or **Exclude** it.
+- Games are asked about in the table's current order: sort the list by Rank, then e.g. Played ↓, and your most-played games get ranked first — handy if you stop part-way. The order you rank in doesn't change the final result.
+- To rank only some games — say, your RPGs, or those you played more than 5 hours (your lists have Played and Last Played columns for the current account, hidden by default) — filter the table, select all, then **Compare N selected**: only those games are asked about, each still placed against the whole ranking. The rest wait until you compare them.
+- It follows its source: games added later are queued for comparison; a removed game drops out, and gets its rank back if it returns. **Change source** keeps every answer already given.
+- A ranked list can't be shared via a link yet.
 
 ### Comparing libraries
 
