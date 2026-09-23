@@ -19,6 +19,7 @@ import { Router, Route } from '@solidjs/router';
 import { AppShell } from './AppShell.tsx';
 import HomeRoute from './HomeRoute.tsx';
 import ListRoute from './ListRoute.tsx';
+import RankRoute from './RankRoute.tsx';
 import BundlesBrowseRoute from './BundlesBrowseRoute.tsx';
 import SearchRoute from './SearchRoute.tsx';
 import AboutRoute from './AboutRoute.tsx';
@@ -32,6 +33,7 @@ render(() => (
     <Route path="/lists/shared" component={ListRoute} />
     <Route path="/lists/bundle/:bundleId" component={ListRoute} />
     <Route path="/lists/:listId" component={ListRoute} />
+    <Route path="/lists/:listId/rank" component={RankRoute} />
     <Route path="/bundles" component={BundlesBrowseRoute} />
     <Route path="/search" component={SearchRoute} />
     <Route path="/game/:appid?" component={ListRoute} />

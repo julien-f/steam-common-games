@@ -123,6 +123,7 @@ export interface Game extends PriceFields {
   tierPrice?: number | null;
   tierCurrency?: string | null;
   addon?: boolean;
+  rank?: number | null; // a ranked list's own rows only — null = not ranked yet / excluded
 
   // standalone-lookup flag (see gameSearch.ts) — true for a game opened from the
   // "look up any game" box that isn't one of the loaded rows

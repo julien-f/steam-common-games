@@ -8,7 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- **Ranked lists: sort any list by answering one-vs-one "which do you prefer?" questions.** Binary insertion (`public/ranking.ts`), so ranking n games takes about n·log₂n answers; you can stop and resume at any point, answer Tie, Skip (ask later) or Exclude (leave the game out).
+- **Ranked lists: sort any list by answering one-vs-one "which do you prefer?" questions.**
+  - "🏆 Rank this list" on Owned, Wishlist, a bundle or any of your lists creates one and opens its compare screen (`/lists/:listId/rank`).
+  - Binary insertion (`public/ranking.ts`): about n·log₂n answers for n games; stop and resume any time, every answer is saved.
+  - Answers: prefer left/right, Tie, Skip (ask later), Exclude (haven't played), Undo — all keyboard-driven.
+  - The list page shows a Rank column (default sort), progress with an estimate of comparisons left, "Change source", and Re-rank/Exclude row actions.
+  - Follows its source live: new games are queued, removed ones drop out, and their ranks come back if they return.
+  - Can't be shared via a link yet.
 
 - **A dynamic list can be shared via a link, without saving it to the recipient's account first.** Its hero card gained a "🔗 Share list" action (next to "Edit sources") that copies a `/lists/shared?f=<formula>` link — the formula lives entirely in a compact URL grammar (`public/listShare.ts`), resolved in memory on arrival the same way `/lists/compare` already builds an unsaved comparison, so it opens for anyone with none of it in their own storage. A `user` source (another saved list used as one of this list's own sources) is inlined recursively at any depth rather than capped at one level, since only the on-screen *label* of a nested list was ever capped, not how deep one can actually resolve. Dynamic lists only for now — a source pointing at a manual list can't be shared yet, and the button disables itself with a reason in that case. Landing on a shared link offers "Save as a list", reconstructing any inlined sources as real saved lists. See `docs/dev/lists-and-accounts.md`/`docs/dev/frontend.md`.
 

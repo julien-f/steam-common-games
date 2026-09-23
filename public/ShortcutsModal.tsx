@@ -34,6 +34,17 @@ export const SHORTCUT_SECTIONS: Section[] = [
     ],
   },
   {
+    title: 'Ranking (compare screen)',
+    rows: [
+      { keys: ['←', '→'], label: 'Prefer the left / right game' },
+      { keys: ['↓'], label: 'Tie' },
+      { keys: ['S'], label: 'Skip — ask about this game later' },
+      { keys: ['X', '←', '→'], label: 'Exclude the left / right game' },
+      { keys: ['Z'], label: 'Undo the last answer' },
+      { keys: ['Esc'], label: 'Stop and go back to the list — progress is saved' },
+    ],
+  },
+  {
     title: 'Lightbox',
     rows: [
       { keys: ['←', '→'], label: 'Previous / next screenshot (seeks −5s / +5s instead while a video plays)' },

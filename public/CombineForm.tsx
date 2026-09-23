@@ -8,7 +8,7 @@ import { getLists } from './listsStore.ts';
 import { describeListRef, createDefaultNaming, formatCombine, OP_LABELS, OP_DESCRIPTIONS } from './listLabels.ts';
 import type { ListRef, CombineOp } from './types.ts';
 
-interface SourceOption {
+export interface SourceOption {
   key: string;
   label: string;
   ref: ListRef;
@@ -20,7 +20,7 @@ interface SourceOption {
 const COMBINE_OPS: { value: CombineOp; label: string }[] = (Object.keys(OP_LABELS) as CombineOp[])
   .map(op => ({ value: op, label: `${OP_LABELS[op]} (${OP_DESCRIPTIONS[op]})` }));
 
-function refKey(ref: ListRef): string {
+export function refKey(ref: ListRef): string {
   return [ref.kind, ref.accountId ?? ref.listId].filter(Boolean).join(':');
 }
 
@@ -28,7 +28,7 @@ function refKey(ref: ListRef): string {
 // Recently Looked Up, or any existing user list. Not a bundle (would need its own bundle-picker
 // UI, not just a checkbox) — see HomeRoute.tsx's header comment. `excludeListId` keeps a dynamic
 // list being edited from being offered as a source for itself.
-function sourceOptions(excludeListId?: string): SourceOption[] {
+export function sourceOptions(excludeListId?: string): SourceOption[] {
   const naming = createDefaultNaming();
   const refs: ListRef[] = [
     ...getRecentAccounts().flatMap((acc): ListRef[] => [

@@ -279,7 +279,7 @@ export default function HomeRoute() {
     const name = window.prompt('Rename list', listName(list));
     if (name == null) return;
     const trimmed = name.trim();
-    if (!trimmed && list.kind !== 'dynamic') return;
+    if (!trimmed && list.kind === 'manual') return;
     renameList(list.id, trimmed || undefined);
     refreshTree();
   }
@@ -558,7 +558,7 @@ export default function HomeRoute() {
                   ) : (
                     <>
                       <A href={`/lists/${row.item.id}`}>
-                        {(row.item as GameList).kind === 'dynamic' ? '⚡ ' : '📄 '}
+                        {{ dynamic: '⚡ ', ranked: '🏆 ', manual: '📄 ' }[(row.item as GameList).kind]}
                         <span classList={{ 'derived-name': !row.item.name }}>{listName(row.item as GameList)}</span>
                       </A>
                       <button type="button" onClick={() => handleRenameList(row.item as GameList)}>Rename</button>
