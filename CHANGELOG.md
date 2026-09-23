@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Binary insertion (`public/ranking.ts`): about n·log₂n answers for n games; stop and resume any time, every answer is saved.
   - Answers: prefer left/right, Tie, Skip (ask later), Exclude (haven't played), Undo — all keyboard-driven.
   - The list page shows a Rank column (default sort), progress with an estimate of comparisons left, "Change source", and Re-rank/Exclude row actions.
+  - "Compare N selected" asks only about the selected unranked games (filter the table, then select all, to rank a filtered subset) — still compared against the whole ranking.
   - Follows its source live: new games are queued, removed ones drop out, and their ranks come back if they return.
   - Can't be shared via a link yet.
 

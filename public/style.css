@@ -2837,6 +2837,11 @@ kbd {
 .rank-header h1 { font-size: 20px; color: var(--text0); }
 .rank-progress { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--text1); }
 .rank-progress progress { flex: 1 1 200px; height: 8px; accent-color: var(--accent); }
+.rank-focus-banner {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px;
+  background: var(--color-background-info); border: 1px solid var(--color-border-info); color: var(--color-text-info);
+  border-radius: var(--r); padding: 8px 12px;
+}
 .rank-question { font-size: 18px; text-align: center; color: var(--text0); }
 .rank-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .rank-card { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }

@@ -486,6 +486,19 @@ export default function ListRoute() {
     setSelectionActionStatus(`${rows.length} game(s) will be asked again on the next Compare.`);
     table?.selection.clear();
   }
+  // The selected games still to be ranked — what "Compare selected" asks about.
+  function selectedUnranked(): number[] {
+    const excluded = new Set(ranking()?.excluded ?? []);
+    return selectedRows().filter(r => r.rank == null && !excluded.has(r.appid)).map(r => r.appid);
+  }
+  // Handed over as history state rather than in the URL, which a few hundred appids would bloat;
+  // it survives a reload of the compare screen and is gone once it's navigated away from.
+  function handleCompareSelected(): void {
+    const list = userList();
+    const focus = selectedUnranked();
+    if (!list || !focus.length) return;
+    navigate(`/lists/${list.id}/rank`, { state: { rankFocus: focus } });
+  }
   function handleExcludeSelected(): void {
     const state = ranking();
     if (!state) return;
@@ -2294,6 +2307,12 @@ export default function ListRoute() {
             <button type="button" onClick={handleRemoveSelectedFromList}>Remove from this list</button>
           </Show>
           <Show when={kind === 'user' && userList()?.kind === 'ranked'}>
+            <button
+              type="button"
+              disabled={!selectedUnranked().length}
+              title={selectedUnranked().length ? 'Ask only about the selected games that are still unranked' : 'All selected games are ranked or excluded — Re-rank them first'}
+              onClick={handleCompareSelected}
+            >Compare {selectedUnranked().length} selected</button>
             <button type="button" title="Take out of the ranking so the next Compare asks about it again" onClick={handleRerankSelected}>Re-rank</button>
             <button type="button" title="Leave out of the ranking" onClick={handleExcludeSelected}>Exclude</button>
           </Show>

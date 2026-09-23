@@ -99,3 +99,35 @@ test('progress counts ranked/excluded/pending and estimates comparisons left', (
   ({ state } = runAll(state, source, id => id));
   assert.deepEqual(progress(state, source), { ranked: 4, excluded: 0, pending: 0, remaining: 0 });
 });
+
+test('a focus asks only about its unranked games, still against the whole ranking', () => {
+  const source = new Set([1, 2, 3, 4, 5, 6]);
+  const { state } = runAll(EMPTY_RANKING, new Set([1, 2, 3, 4]), id => id);
+  const focus = new Set([6, 2]);
+  assert.deepEqual(pendingAppids(state, source, focus), [6]);
+  const { state: done, asked } = (() => {
+    let { state: s, pair } = nextPair(state, source, focus);
+    let n = 0;
+    while (pair) {
+      assert.equal(pair.candidate, 6);
+      n++;
+      ({ state: s, pair } = answer(s, source, pair.candidate > pair.opponent ? 'candidate' : 'opponent', focus));
+    }
+    return { state: s, asked: n };
+  })();
+  assert.ok(asked <= 3);
+  assert.deepEqual(done.groups, [[6], [4], [3], [2], [1]]);
+  assert.deepEqual(pendingAppids(done, source), [5]);
+  assert.equal(progress(done, source, focus).pending, 0);
+});
+
+test('a focus restarts a mid-way insertion of a game outside it', () => {
+  const source = new Set([1, 2, 3]);
+  let { state } = runAll(EMPTY_RANKING, new Set([1, 2]), id => id);
+  ({ state } = nextPair(state, source));
+  assert.equal(state.cursor.appid, 3);
+  const { state: focused, pair } = nextPair(state, source, new Set([1]));
+  assert.equal(pair, null);
+  assert.equal(focused.cursor, undefined);
+  assert.deepEqual(pendingAppids(focused, source), [3]);
+});

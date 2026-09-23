@@ -4,7 +4,7 @@
 // so leaving at any point loses nothing; undo is an in-memory stack of previous states.
 import { createSignal, createEffect, onCleanup, Show, For, type JSX } from 'solid-js';
 import { createStore } from 'solid-js/store';
-import { A, useParams, useNavigate } from '@solidjs/router';
+import { A, useParams, useNavigate, useLocation } from '@solidjs/router';
 import { getList, getRanking, setRanking } from './listsStore.ts';
 import { resolveListWithSources, flattenCombineResult, createDefaultFetchers } from './listResolve.ts';
 import { createDefaultNaming, listDisplayName } from './listLabels.ts';
@@ -22,6 +22,15 @@ function headerImage(appid: number): string {
 export default function RankRoute() {
   const params = useParams();
   const navigate = useNavigate();
+  const location = useLocation<{ rankFocus?: number[] } | undefined>();
+  // The list page's "Compare selected" (history state) — only these games get asked about.
+  function focus(): Set<number> | undefined {
+    const ids = location.state?.rankFocus;
+    return Array.isArray(ids) && ids.length ? new Set(ids) : undefined;
+  }
+  function compareAll(): void {
+    navigate(location.pathname, { replace: true, state: {} });
+  }
   const [title, setTitle] = createSignal('');
   const [status, setStatus] = createSignal('Resolving list…');
   const [source, setSource] = createSignal<Set<number> | null>(null);
@@ -48,7 +57,7 @@ export default function RankRoute() {
       const { result } = await resolveListWithSources(list, createDefaultFetchers());
       if (token !== loadToken) return;
       const appids = flattenCombineResult(result);
-      const next = nextPair(getRanking(list.id), appids);
+      const next = nextPair(getRanking(list.id), appids, focus());
       setSource(appids);
       setState(next.state);
       setPair(next.pair);
@@ -79,7 +88,7 @@ export default function RankRoute() {
     const current = state();
     const src = source();
     if (!current || !src || !pair()) return;
-    const next = answer(current, src, ans);
+    const next = answer(current, src, ans, focus());
     setUndoStack(stack => [...stack.slice(-(MAX_UNDO - 1)), current]);
     setState(next.state);
     setPair(next.pair);
@@ -92,7 +101,7 @@ export default function RankRoute() {
     const src = source();
     if (!stack.length || !src) return;
     const previous = stack[stack.length - 1];
-    const next = nextPair(previous, src);
+    const next = nextPair(previous, src, focus());
     setUndoStack(stack.slice(0, -1));
     setState(next.state);
     setPair(next.pair);
@@ -101,8 +110,7 @@ export default function RankRoute() {
   }
 
   function onKeydown(e: KeyboardEvent): void {
-    const target = e.target as HTMLElement | null;
-    if (target?.closest('input, select, textarea')) return;
+    if (e.target instanceof Element && e.target.closest('input, select, textarea')) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const key = e.key;
     // Esc closes the shortcuts dialog first, when it's open (AppShell's own handler).
@@ -128,12 +136,12 @@ export default function RankRoute() {
     setBaseTitle(null);
   });
 
-  createEffect(() => { params.listId; void load(); });
+  createEffect(() => { params.listId; location.state; void load(); });
 
   function currentProgress() {
     const s = state();
     const src = source();
-    return s && src ? progress(s, src) : null;
+    return s && src ? progress(s, src, focus()) : null;
   }
 
   function card(appid: number, side: 'candidate' | 'opponent', note: JSX.Element): JSX.Element {
@@ -167,22 +175,48 @@ export default function RankRoute() {
       <Show when={status()}>
         <div class="list-status">{status()}</div>
       </Show>
+      <Show when={focus()}>
+        {f => (
+          <div class="rank-focus-banner">
+            Comparing your {f().size} selected games.
+            <button type="button" class="btn btn-ghost btn-sm" onClick={compareAll}>Compare all instead</button>
+          </div>
+        )}
+      </Show>
       <Show when={currentProgress()}>
         {p => (
           <div class="rank-progress">
-            <progress max={p().ranked + p().pending} value={p().ranked} />
-            <span>
-              {p().ranked} / {p().ranked + p().pending} ranked
-              {p().excluded ? ` · ${p().excluded} excluded` : ''}
-              {p().pending ? ` · ≈ ${p().remaining} comparisons left` : ''}
-            </span>
+            <Show
+              when={focus()}
+              fallback={<>
+                <progress max={p().ranked + p().pending} value={p().ranked} />
+                <span>
+                  {p().ranked} / {p().ranked + p().pending} ranked
+                  {p().excluded ? ` · ${p().excluded} excluded` : ''}
+                  {p().pending ? ` · ≈ ${p().remaining} comparisons left` : ''}
+                </span>
+              </>}
+            >
+              {f => <>
+                <progress max={f().size} value={f().size - p().pending} />
+                <span>
+                  {p().pending} of your {f().size} selected games left
+                  {p().pending ? ` · ≈ ${p().remaining} comparisons` : ''}
+                </span>
+              </>}
+            </Show>
           </div>
         )}
       </Show>
       <Show when={pair()} fallback={
         <Show when={source()}>
           <div class="rank-done">
-            <p>Every game in this list is ranked. New games added to its source will show up here.</p>
+            <Show when={focus()} fallback={<p>Every game in this list is ranked. New games added to its source will show up here.</p>}>
+              <p>Every selected game is ranked.</p>
+              <Show when={source() && state() && progress(state()!, source()!).pending}>
+                <button type="button" class="btn btn-ghost" onClick={compareAll}>Compare the rest</button>
+              </Show>
+            </Show>
             <A href={listHref()} class="btn btn-primary">See the ranking</A>
             <Show when={undoStack().length}>
               <button type="button" class="btn btn-ghost" onClick={undo}>Undo last answer</button>
