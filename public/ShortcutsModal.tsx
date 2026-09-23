@@ -36,12 +36,13 @@ export const SHORTCUT_SECTIONS: Section[] = [
   {
     title: 'Ranking (compare screen)',
     rows: [
-      { keys: ['←', '→'], label: 'Prefer the left / right game' },
+      { keys: ['←', '→'], label: 'Prefer the left / right game (browses media instead while the panel is open)' },
       { keys: ['↓'], label: 'Tie' },
       { keys: ['S'], label: 'Skip — ask about this game later' },
       { keys: ['X', '←', '→'], label: 'Exclude the left / right game' },
+      { keys: ['I', '←', '→'], label: 'Open the left / right game in the side panel' },
       { keys: ['Z'], label: 'Undo the last answer' },
-      { keys: ['Esc'], label: 'Stop and go back to the list — progress is saved' },
+      { keys: ['Esc'], label: 'Close the panel, else stop and go back to the list — progress is saved' },
     ],
   },
   {

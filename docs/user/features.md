@@ -57,6 +57,7 @@ The result is a live list: save it as dynamic (it re-resolves each time), or fre
 **🏆 Rank this list** (on Owned, Wishlist, a bundle or any of your lists) creates a ranked list and asks you two games at a time: *which do you prefer?*
 
 - **← / →** pick one, **↓** Tie, **S** Skip (asked again later), **X** then **← / →** or "Haven't played" to exclude a game, **Z** Undo. All are buttons too.
+- **ℹ Details** under a card (or **I** then **← / →**) opens that game in the side panel to help you decide. It stays open while the game is still being compared; meanwhile **← / →** browse its screenshots and videos (pick by clicking a card), and **Esc** closes it.
 - Stop whenever you like (**Esc**): every answer is saved, and **Compare** on the list's page picks up where you left off.
 - Each new game is placed with as few questions as possible — about 7 for a list of 100 already-ranked games. The progress bar says roughly how many are left.
 - The list's page sorts by **Rank**. Select rows to **Re-rank** a game (it's asked again) or **Exclude** it.

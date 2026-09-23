@@ -10,8 +10,10 @@ import { resolveListWithSources, flattenCombineResult, createDefaultFetchers } f
 import { createDefaultNaming, listDisplayName } from './listLabels.ts';
 import { nextPair, answer, progress, ranks, type RankingState, type RankingPair, type RankingAnswer } from './ranking.ts';
 import { setBaseTitle } from './pageTitle.ts';
+import { panelOpen, panelClose, isPanelOpen, getPanelGame } from './panel.tsx';
+import { isLightboxOpen } from './lightbox.tsx';
 import { withAccountParam } from './urlState.ts';
-import type { GameDetails } from './types.ts';
+import type { Game, GameDetails } from './types.ts';
 
 const MAX_UNDO = 100;
 
@@ -37,8 +39,9 @@ export default function RankRoute() {
   const [state, setState] = createSignal<RankingState | null>(null);
   const [pair, setPair] = createSignal<RankingPair | null>(null);
   const [undoStack, setUndoStack] = createSignal<RankingState[]>([]);
-  // X arms an exclusion; the next ←/→ says which side.
-  const [excludeArmed, setExcludeArmed] = createSignal(false);
+  // X (exclude) or I (details panel) arms an action; the next ←/→ says which side.
+  const [armed, setArmed] = createSignal<'exclude' | 'info' | null>(null);
+  const excludeArmed = () => armed() === 'exclude';
   const [details, setDetails] = createStore<Record<number, GameDetails | null>>({});
   let loadToken = 0;
 
@@ -84,6 +87,22 @@ export default function RankRoute() {
     if (p) { fetchDetails(p.candidate); fetchDetails(p.opponent); }
   });
 
+  function openPanel(appid: number): void {
+    const d = details[appid];
+    panelOpen({ appid, name: d?.meta?.name || `App ${appid}`, loading: !d, details: d ?? null } as Game);
+  }
+  // Re-opens once details land for a panel opened before they had.
+  createEffect(() => {
+    const open = getPanelGame();
+    if (open?.loading && details[open.appid]) openPanel(open.appid);
+  });
+  // The panel stays open only while its game is still one of the pair.
+  function syncPanel(): void {
+    const open = getPanelGame();
+    const p = pair();
+    if (open && (!p || (open.appid !== p.candidate && open.appid !== p.opponent))) panelClose();
+  }
+
   function respond(ans: RankingAnswer): void {
     const current = state();
     const src = source();
@@ -93,7 +112,8 @@ export default function RankRoute() {
     setState(next.state);
     setPair(next.pair);
     setRanking(params.listId!, next.state);
-    setExcludeArmed(false);
+    setArmed(null);
+    syncPanel();
   }
 
   function undo(): void {
@@ -106,32 +126,51 @@ export default function RankRoute() {
     setState(next.state);
     setPair(next.pair);
     setRanking(params.listId!, next.state);
-    setExcludeArmed(false);
+    setArmed(null);
+    syncPanel();
   }
 
+  // Capture phase, so it runs before AppShell's own panel shortcuts: an armed I/X + ←/→ wins over
+  // the panel's media stepping, and Esc can still see whether it's about to close the panel.
   function onKeydown(e: KeyboardEvent): void {
+    if (isLightboxOpen()) return;
     if (e.target instanceof Element && e.target.closest('input, select, textarea')) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const key = e.key;
-    // Esc closes the shortcuts dialog first, when it's open (AppShell's own handler).
-    if (key === 'Escape') { if (!document.querySelector('.shortcuts-modal.open')) navigate(listHref()); return; }
+    // AppShell's handler closes the shortcuts dialog or the panel first, when one is open.
+    if (key === 'Escape') {
+      if (!isPanelOpen() && !document.querySelector('.shortcuts-modal.open')) navigate(listHref());
+      return;
+    }
     if (key === 'z' || key === 'Z' || key === 'Backspace') { e.preventDefault(); undo(); return; }
-    if (!pair()) return;
-    if (key === 'x' || key === 'X') { e.preventDefault(); setExcludeArmed(v => !v); return; }
+    const p = pair();
+    if (!p) return;
+    if (key === 'x' || key === 'X') { e.preventDefault(); setArmed(a => (a === 'exclude' ? null : 'exclude')); return; }
+    if (key === 'i' || key === 'I') { e.preventDefault(); setArmed(a => (a === 'info' ? null : 'info')); return; }
     if (key === 'ArrowLeft' || key === 'ArrowRight') {
-      e.preventDefault();
       const left = key === 'ArrowLeft';
-      if (excludeArmed()) respond(left ? 'exclude-candidate' : 'exclude-opponent');
-      else respond(left ? 'candidate' : 'opponent');
+      const action = armed();
+      if (action) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setArmed(null);
+        if (action === 'info') openPanel(left ? p.candidate : p.opponent);
+        else respond(left ? 'exclude-candidate' : 'exclude-opponent');
+        return;
+      }
+      if (isPanelOpen()) return; // browses the panel's media instead
+      e.preventDefault();
+      respond(left ? 'candidate' : 'opponent');
       return;
     }
     if (key === 'ArrowDown' || key === '=') { e.preventDefault(); respond('tie'); return; }
     if (key === 's' || key === 'S') { e.preventDefault(); respond('skip'); return; }
-    setExcludeArmed(false);
+    setArmed(null);
   }
-  document.addEventListener('keydown', onKeydown);
+  document.addEventListener('keydown', onKeydown, true);
   onCleanup(() => {
-    document.removeEventListener('keydown', onKeydown);
+    document.removeEventListener('keydown', onKeydown, true);
+    if (isPanelOpen()) panelClose();
     loadToken++;
     setBaseTitle(null);
   });
@@ -151,7 +190,13 @@ export default function RankRoute() {
     const hltb = () => d()?.hltb?.main;
     return (
       <div class="rank-card" classList={{ 'rank-card-armed': excludeArmed() }}>
-        <button type="button" class="rank-card-pick" onClick={() => respond(excludeArmed() ? `exclude-${side}` : side)}>
+        <button
+          type="button"
+          class="rank-card-pick"
+          onClick={() => {
+            if (armed() === 'info') { setArmed(null); openPanel(appid); } else respond(excludeArmed() ? `exclude-${side}` : side);
+          }}
+        >
           <img src={headerImage(appid)} alt="" width="460" height="215" loading="eager" />
           <span class="rank-card-name">{meta()?.name || `App ${appid}`}</span>
           <span class="rank-card-facts">
@@ -159,9 +204,14 @@ export default function RankRoute() {
           </span>
           <span class="rank-card-note">{note}</span>
         </button>
-        <button type="button" class="btn btn-ghost btn-sm" title="Leave this game out of the ranking" onClick={() => respond(`exclude-${side}`)}>
-          Haven't played — exclude
-        </button>
+        <div class="rank-card-actions">
+          <button type="button" class="btn btn-ghost btn-sm" title="Open this game's details in the side panel" onClick={() => openPanel(appid)}>
+            ℹ Details
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm" title="Leave this game out of the ranking" onClick={() => respond(`exclude-${side}`)}>
+            Haven't played — exclude
+          </button>
+        </div>
       </div>
     );
   }
@@ -226,7 +276,9 @@ export default function RankRoute() {
       }>
         {p => (
           <>
-            <h2 class="rank-question">{excludeArmed() ? 'Exclude which game? (← / →)' : 'Which do you prefer?'}</h2>
+            <h2 class="rank-question">
+              {armed() === 'exclude' ? 'Exclude which game? (← / →)' : armed() === 'info' ? 'Show details of which game? (← / →)' : 'Which do you prefer?'}
+            </h2>
             <div class="rank-pair">
               {card(p().candidate, 'candidate', 'New to the ranking')}
               {card(p().opponent, 'opponent', `Currently #${ranks(state()!, source()!).get(p().opponent) ?? '?'}`)}
@@ -237,7 +289,12 @@ export default function RankRoute() {
               <button type="button" class="btn btn-ghost" disabled={!undoStack().length} onClick={undo}>Undo <kbd>Z</kbd></button>
             </div>
             <p class="rank-hint">
-              <For each={[['← / →', 'pick'], ['X then ← / →', 'exclude'], ['Esc', 'stop — progress is saved']]}>
+              <For each={[
+                ['← / →', isPanelOpen() ? 'browse the panel\'s media' : 'pick'],
+                ['X then ← / →', 'exclude'],
+                ['I then ← / →', 'details'],
+                ['Esc', isPanelOpen() ? 'close the panel' : 'stop — progress is saved'],
+              ]}>
                 {([k, v]) => <span><kbd>{k}</kbd> {v}</span>}
               </For>
             </p>

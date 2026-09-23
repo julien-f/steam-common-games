@@ -2855,6 +2855,8 @@ kbd {
 .rank-card-pick img { width: 100%; height: auto; aspect-ratio: 460 / 215; object-fit: cover; background: var(--bg3); }
 .rank-card-name { font-size: 16px; font-weight: 600; padding: 0 12px; }
 .rank-card-facts, .rank-card-note { font-size: 12px; color: var(--text1); padding: 0 12px; }
+.rank-card-actions { display: flex; gap: 6px; }
+.rank-card-actions .btn { flex: 1; }
 .rank-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
 .rank-hint { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--text1); }
 .rank-done { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px; text-align: center; }

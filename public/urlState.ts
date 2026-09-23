@@ -46,6 +46,8 @@ export function urlWithParams(params: URLSearchParams, pathname: string = locati
 // URL could differ from the canonical order the rest of the app enforces). Always
 // `history.replaceState`, never pushed — opening/closing a game or stepping a lightbox shot
 // isn't its own back/forward-navigable step on any of the three pages.
+// Each rewrite below keeps `history.state` — the router's own navigation state (RankRoute.tsx's
+// `rankFocus`) would otherwise be dropped by opening a game or a screenshot.
 export function setPanelParam(appid: number | string | null): void {
   const params = new URLSearchParams(location.search);
   // A close (appid == null) with neither param already present is a genuine no-op — bail out
@@ -64,14 +66,14 @@ export function setPanelParam(appid: number | string | null): void {
   params.delete('shot');
   if (appid == null) params.delete('game');
   else params.set('game', String(appid));
-  history.replaceState(null, '', urlWithParams(params));
+  history.replaceState(history.state, '', urlWithParams(params));
 }
 
 export function setLightboxParam(idx: number | string | null): void {
   const params = new URLSearchParams(location.search);
   if (idx == null) params.delete('shot');
   else params.set('shot', String(idx));
-  history.replaceState(null, '', urlWithParams(params));
+  history.replaceState(history.state, '', urlWithParams(params));
 }
 
 // `/search`'s own live search box writes its term here as the user types (debounced by the
@@ -81,7 +83,7 @@ export function setSearchQueryParam(term: string): void {
   const params = new URLSearchParams(location.search);
   if (term) params.set('q', term);
   else params.delete('q');
-  history.replaceState(null, '', urlWithParams(params));
+  history.replaceState(history.state, '', urlWithParams(params));
 }
 
 export interface UrlState {
