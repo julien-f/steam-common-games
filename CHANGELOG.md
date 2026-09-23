@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Your own lists now have Played (h) and Last Played columns** (hidden by default), showing the current account's playtime — the same library fetch as the ✓/☆ ownership markers, so no extra request. Lets you filter a list (or rank only the games) you've played more than N hours.
+
 - **Ranked lists: sort any list by answering one-vs-one "which do you prefer?" questions.**
   - "🏆 Rank this list" on Owned, Wishlist, a bundle or any of your lists creates one and opens its compare screen (`/lists/:listId/rank`).
   - Binary insertion (`public/ranking.ts`): about n·log₂n answers for n games; stop and resume any time, every answer is saved.

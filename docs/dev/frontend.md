@@ -142,7 +142,8 @@ Every list of games — owned, wishlist, bundle, recent, user — renders throug
 - **owned** — Played (h), Last Played, after the HLTB cluster.
 - **wishlist** — Wishlist Rank, then `PRICE_COLUMNS`, plus Added.
 - **bundle** — ownership status, Tier Price, Add-on, then `PRICE_COLUMNS`.
-- **recent** — ownership status only; **user** — plain `CORE_COLUMNS`.
+- **recent** (also compare/shared) — ownership status only.
+- **user** — ownership status, plus Played (h)/Last Played for the **current account** (hidden by default), stamped alongside the ✓/☆ markers from `myOwnership.ts`'s `peekMyPlaytime` — the same library fetch, no extra request. A **ranked** list adds Rank, its default sort.
 
 Default sort is Weighted Rating descending, except a bundle (cheapest tier first, then rating). `/bundles` is a table too, but of bundle rows rather than `Game` rows, so it has its own small column set — reusing `gameColumns.ts`'s generic bucket/compare helpers so a price/date/count column there groups and sorts like its counterpart in a game table.
 

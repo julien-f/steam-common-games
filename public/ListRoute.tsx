@@ -114,7 +114,7 @@ import { ranks, progress, rerank, exclude, type RankingState, type RankingProgre
 import { resolveListWithSources, flattenCombineResult, createDefaultFetchers, type ListResolveFetchers } from './listResolve.ts';
 import { CombineForm, sourceOptions, refKey, type SourceOption } from './CombineForm.tsx';
 import type { MembershipGroup } from './combine.ts';
-import { peekMyOwnershipStatus, onMyOwnershipReady } from './myOwnership.ts';
+import { peekMyOwnershipStatus, peekMyPlaytime, onMyOwnershipReady } from './myOwnership.ts';
 
 type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user' | 'compare' | 'shared';
 
@@ -170,6 +170,9 @@ const OWNED_DEFAULT_VISIBLE = ['capsule', 'name', 'steamdbRating', 'hltbAll', 'r
 // restatement of what the Name column right next to it already shows.
 const RECENT_COLUMNS = insertColumnsAfter(CORE_COLUMNS, 'name', OWNERSHIP_STATUS_COLUMN);
 const RECENT_DEFAULT_VISIBLE = ['capsule', 'name', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
+// A user list also gets the current account's Played/Last Played (stamped from myOwnership.ts,
+// the same fetch as the ✓/☆ markers) — hidden by default, there to filter/sort on.
+const USER_COLUMNS = insertColumnsAfter(RECENT_COLUMNS, 'hltbCompletionist', PLAYTIME_COLUMN, LAST_PLAYED_COLUMN);
 
 const WISHLIST_COLUMNS = insertColumnsAfter(
   insertColumnsAfter(
@@ -224,7 +227,7 @@ const BUNDLE_DEFAULT_SORT: SortEntry[] = [{ key: 'tierPrice', dir: 'asc' }, { ke
 // A ranked list's own order (ranking.ts) — unranked/excluded games have no rank and sort last.
 const RANK_COLUMN: ColumnDef<Record<string, any>> =
   { key: 'rank', label: 'Rank', type: 'number', groupable: false, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'asc' };
-const RANKED_COLUMNS = insertColumnsAfter(RECENT_COLUMNS, 'capsule', RANK_COLUMN);
+const RANKED_COLUMNS = insertColumnsAfter(USER_COLUMNS, 'capsule', RANK_COLUMN);
 const RANKED_DEFAULT_VISIBLE = ['rank', ...RECENT_DEFAULT_VISIBLE];
 const RANKED_DEFAULT_SORT: SortEntry[] = [{ key: 'rank', dir: 'asc' }];
 
@@ -1135,10 +1138,18 @@ export default function ListRoute() {
     batch(() => {
       for (const item of rowsStore) {
         const status = peekMyOwnershipStatus(item.appid);
-        if (!status) continue;
+        if (status) {
+          rowStore.mutateRow(item.appid, draft => {
+            draft.inLibrary = status.inLibrary;
+            draft.onWishlist = status.onWishlist;
+          });
+        }
+        if (kind !== 'user') continue;
+        const played = peekMyPlaytime(item.appid);
+        if (played === undefined) continue;
         rowStore.mutateRow(item.appid, draft => {
-          draft.inLibrary = status.inLibrary;
-          draft.onWishlist = status.onWishlist;
+          draft.playtime = played?.playtime;
+          draft.lastPlayed = played?.lastPlayed;
         });
       }
     });
@@ -1285,7 +1296,7 @@ export default function ListRoute() {
         disposeTableState = dispose;
         return createTableState<Game>(
           () => rowsStore.filter(r => !r.loading && appidSet.has(r.appid)),
-          RECENT_COLUMNS as unknown as ColumnDef<Game>[],
+          (kind === 'user' ? USER_COLUMNS : RECENT_COLUMNS) as unknown as ColumnDef<Game>[],
           { initialViewState: { pageSize: 50, visibleCols: RECENT_DEFAULT_VISIBLE, sorts: DEFAULT_SORT } },
         );
       });
@@ -1654,7 +1665,8 @@ export default function ListRoute() {
         isRanked ? RANKED_COLUMNS
           : kind === 'wishlist' ? WISHLIST_COLUMNS
           : kind === 'bundle' ? BUNDLE_COLUMNS
-          : kind === 'recent' || kind === 'user' || kind === 'compare' || kind === 'shared' ? RECENT_COLUMNS
+          : kind === 'user' ? USER_COLUMNS
+          : kind === 'recent' || kind === 'compare' || kind === 'shared' ? RECENT_COLUMNS
           : OWNED_COLUMNS
       ) as unknown as ColumnDef<Game>[];
       const defaultVisible = isRanked ? RANKED_DEFAULT_VISIBLE
