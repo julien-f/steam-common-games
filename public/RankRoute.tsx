@@ -28,7 +28,7 @@ export default function RankRoute() {
   const params = useParams();
   const navigate = useNavigate();
   const location = useLocation<{ rankFocus?: number[]; rankOrder?: number[] } | undefined>();
-  // The list page's "Compare selected" (history state) — only these games get asked about.
+  // The list page's "Compare selected" or "Rank N games" (history state) — only these games get asked about.
   function focus(): Set<number> | undefined {
     const ids = location.state?.rankFocus;
     return Array.isArray(ids) && ids.length ? new Set(ids) : undefined;
@@ -247,7 +247,7 @@ export default function RankRoute() {
       <Show when={focus()}>
         {f => (
           <div class="rank-focus-banner">
-            Comparing your {f().size} selected games.
+            Comparing {f().size} chosen games.
             <button type="button" class="btn btn-ghost btn-sm" onClick={compareAll}>Compare all instead</button>
           </div>
         )}
@@ -269,7 +269,7 @@ export default function RankRoute() {
               {f => <>
                 <progress max={f().size} value={f().size - p().pending} />
                 <span>
-                  {p().pending} of your {f().size} selected games left
+                  {p().pending} of {f().size} chosen games left
                   {p().pending ? ` · ≈ ${p().remaining} comparisons` : ''}
                 </span>
               </>}
@@ -281,7 +281,7 @@ export default function RankRoute() {
         <Show when={source()}>
           <div class="rank-done">
             <Show when={focus()} fallback={<p>Every game in this list is ranked. New games added to its source will show up here.</p>}>
-              <p>Every selected game is ranked.</p>
+              <p>Every chosen game is ranked.</p>
               <Show when={source() && state() && progress(state()!, source()!).pending}>
                 <button type="button" class="btn btn-ghost" onClick={compareAll}>Compare the rest</button>
               </Show>

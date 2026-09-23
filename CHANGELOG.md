@@ -11,14 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Your own lists now have Played (h) and Last Played columns** (hidden by default), showing the current account's playtime — the same library fetch as the ✓/☆ ownership markers, so no extra request. Lets you filter a list (or rank only the games) you've played more than N hours.
 
 - **Ranked lists: sort any list by answering one-vs-one "which do you prefer?" questions.**
-  - "🏆 Rank this list" on Owned, Wishlist, a bundle or any of your lists creates one and opens its compare screen (`/lists/:listId/rank`).
+  - "🏆 Rank this list" on Owned, Wishlist, a bundle or any of your lists creates one and opens its compare screen (`/lists/:listId/rank`). It asks in that page's current table order, and only about its selected games — or, with none selected, its filtered ones — when there are any ("🏆 Rank N games", disabled when the filter shows none).
   - Binary insertion (`public/ranking.ts`): about n·log₂n answers for n games; stop and resume any time, every answer is saved.
   - Answers: prefer left/right, Tie, Skip (ask later), Exclude (haven't played), Undo — all keyboard-driven.
   - Each card shows the game's Weighted Rating, year, genres and HLTB main-story time.
   - The list page shows a Rank column (default sort), progress with an estimate of comparisons left, "Change source", and Re-rank/Exclude row actions.
   - "ℹ Details" (or I then ← / →) opens a compared game in the side panel; it stays open while that game is still in the pair. While it's open, ← / → browse its media and Esc closes it first.
   - Compare asks about unranked games in the table's current sort order (e.g. Rank, then Played ↓ ranks your most-played games first); the final ranking doesn't depend on that order.
-  - "Compare N selected" asks only about the selected unranked games (filter the table, then select all, to rank a filtered subset) — still compared against the whole ranking.
+  - "Compare N shown" (with a filter on) and "Compare N selected" ask only about those unranked games — still compared against the whole ranking.
   - Follows its source live: new games are queued, removed ones drop out, and their ranks come back if they return.
   - Can't be shared via a link yet.
 

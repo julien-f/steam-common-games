@@ -476,10 +476,24 @@ export default function ListRoute() {
     const list = userList();
     return list && list.kind !== 'ranked' ? { kind: 'user', listId: list.id } : null;
   }
+  // What "Rank this list" asks about first: the selection, else the filtered rows (null = all, [] = the filter hides every row).
+  function rankThisListFocus(): number[] | null {
+    const selected = selectedRows();
+    if (selected.length) return selected.map(r => r.appid);
+    if (!tableReady() || !table) return null; // `table` isn't a signal; tableReady() is
+    const visible = table.processedData();
+    return visible.length < table.data().length ? visible.map(r => r.appid) : null;
+  }
+  function rankThisListLabel(): string {
+    const focus = rankThisListFocus();
+    if (!focus) return '🏆 Rank this list';
+    return focus.length ? `🏆 Rank ${focus.length} games` : '🏆 Rank (none shown)';
+  }
   function handleRankThisList(): void {
     const source = rankSourceRef();
-    if (!source) return;
-    navigate(`/lists/${createList({ kind: 'ranked', source }).id}/rank`);
+    if (!source || rankThisListFocus()?.length === 0) return;
+    const rankOrder = (table?.processedData() ?? []).map(r => r.appid);
+    navigate(`/lists/${createList({ kind: 'ranked', source }).id}/rank`, { state: { rankFocus: rankThisListFocus() ?? undefined, rankOrder } });
   }
   function handleRerankSelected(): void {
     const state = ranking();
@@ -501,9 +515,24 @@ export default function ListRoute() {
   }
   // Handed over as history state rather than in the URL, which a few hundred appids would bloat;
   // it survives a reload of the compare screen and is gone once it's navigated away from.
+  // The shown games still to be ranked when a filter hides some — what "Compare" then asks about.
+  function filteredUnranked(): number[] | null {
+    if (!tableReady() || !table) return null;
+    const visible = table.processedData();
+    if (visible.length >= table.data().length) return null;
+    const excluded = new Set(ranking()?.excluded ?? []);
+    return visible.filter(r => r.rank == null && !excluded.has(r.appid)).map(r => r.appid);
+  }
+  function compareLabel(): string {
+    const focus = filteredUnranked();
+    if (focus) return focus.length ? `Compare ${focus.length} shown` : 'Compare (all shown ranked)';
+    return rankingProgress()?.pending === 0 ? 'Compare (all ranked)' : 'Compare';
+  }
   function handleCompare(): void {
     const list = userList();
-    if (list) navigate(`/lists/${list.id}/rank`, { state: { rankOrder: unrankedInTableOrder() } });
+    const focus = filteredUnranked();
+    if (!list || focus?.length === 0) return;
+    navigate(`/lists/${list.id}/rank`, { state: { rankFocus: focus ?? undefined, rankOrder: unrankedInTableOrder() } });
   }
   function handleCompareSelected(): void {
     const list = userList();
@@ -2070,16 +2099,16 @@ export default function ListRoute() {
         </button>
       </Show>
       <Show when={kind === 'user' && userList()?.kind === 'ranked'}>
-        <button type="button" class="btn btn-primary btn-sm" title="Asks about unranked games in the table's current sort order" onClick={handleCompare}>
-          {rankingProgress()?.pending === 0 ? 'Compare (all ranked)' : 'Compare'}
+        <button type="button" class="btn btn-primary btn-sm" title="Asks about unranked games in the table's current sort order (only the shown ones, when filtered)" disabled={filteredUnranked()?.length === 0} onClick={handleCompare}>
+          {compareLabel()}
         </button>
         <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingRankedSource(v => !v)}>
           {editingRankedSource() ? 'Cancel' : 'Change source'}
         </button>
       </Show>
       <Show when={rankSourceRef()}>
-        <button type="button" class="btn btn-ghost btn-sm" title="Create a list ranking these games by comparing them two at a time" onClick={handleRankThisList}>
-          🏆 Rank this list
+        <button type="button" class="btn btn-ghost btn-sm" title="Create a list ranking these games by comparing them two at a time, in the table's current order (only the selected or filtered games, if any)" disabled={rankThisListFocus()?.length === 0} onClick={handleRankThisList}>
+          {rankThisListLabel()}
         </button>
       </Show>
       {kind === 'shared' && (
