@@ -13,6 +13,7 @@ import { setBaseTitle } from './pageTitle.ts';
 import { panelOpen, panelClose, isPanelOpen, getPanelGame } from './panel.tsx';
 import { isLightboxOpen } from './lightbox.tsx';
 import { withAccountParam } from './urlState.ts';
+import { computeSteamdbRating, scoreColor } from './utils.ts';
 import type { Game, GameDetails } from './types.ts';
 
 const MAX_UNDO = 100;
@@ -188,6 +189,11 @@ export default function RankRoute() {
     const meta = () => d()?.meta ?? null;
     const year = () => meta()?.releaseDate?.match(/\d{4}/)?.[0];
     const hltb = () => d()?.hltb?.main;
+    const rating = () => {
+      const r = d()?.rating;
+      const v = r ? computeSteamdbRating(r.positive, r.total) : null;
+      return v == null ? null : Math.round(v);
+    };
     return (
       <div class="rank-card" classList={{ 'rank-card-armed': excludeArmed() }}>
         <button
@@ -198,7 +204,12 @@ export default function RankRoute() {
           }}
         >
           <img src={headerImage(appid)} alt="" width="460" height="215" loading="eager" />
-          <span class="rank-card-name">{meta()?.name || `App ${appid}`}</span>
+          <span class="rank-card-name">
+            {meta()?.name || `App ${appid}`}
+            <Show when={rating() != null}>
+              <span class="rank-card-rating" style={{ color: scoreColor(rating()) }} title="Weighted Rating">{rating()}</span>
+            </Show>
+          </span>
           <span class="rank-card-facts">
             {[year(), ...(meta()?.genres ?? []).slice(0, 2), hltb() ? `${hltb()}h main story` : null].filter(Boolean).join(' · ')}
           </span>

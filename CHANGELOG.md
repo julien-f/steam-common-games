@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - "🏆 Rank this list" on Owned, Wishlist, a bundle or any of your lists creates one and opens its compare screen (`/lists/:listId/rank`).
   - Binary insertion (`public/ranking.ts`): about n·log₂n answers for n games; stop and resume any time, every answer is saved.
   - Answers: prefer left/right, Tie, Skip (ask later), Exclude (haven't played), Undo — all keyboard-driven.
+  - Each card shows the game's Weighted Rating, year, genres and HLTB main-story time.
   - The list page shows a Rank column (default sort), progress with an estimate of comparisons left, "Change source", and Re-rank/Exclude row actions.
   - "ℹ Details" (or I then ← / →) opens a compared game in the side panel; it stays open while that game is still in the pair. While it's open, ← / → browse its media and Esc closes it first.
   - "Compare N selected" asks only about the selected unranked games (filter the table, then select all, to rank a filtered subset) — still compared against the whole ranking.
