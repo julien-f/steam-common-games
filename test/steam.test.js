@@ -592,6 +592,18 @@ test('getAppDetails: returns null when success is false', async (t) => {
   assert.equal(await getAppDetails(400), null);
 });
 
+test('getAppDetails: accepts an entry keyed under another appid when its steam_appid matches', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(3290770, { steam_appid: 1656930, name: 'Coridden' }));
+  assert.equal((await getAppDetails(1656930)).name, 'Coridden');
+});
+
+test('getAppDetails: ignores an entry keyed under another appid whose steam_appid differs', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(3290770, { steam_appid: 3290770, name: 'Other' }));
+  assert.equal(await getAppDetails(1656930), null);
+});
+
 test('getAppDetails: returns genres, categories, developers and publishers', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(400, {

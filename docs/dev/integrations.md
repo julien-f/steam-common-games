@@ -8,6 +8,7 @@ Every upstream this app talks to, and what is undocumented about each. Cache tie
 - [Wishlist — undocumented endpoint](#wishlist--undocumented-endpoint)
 - [Friends — documented, keyed endpoint](#friends--documented-keyed-endpoint)
 - [Tags & demo link — Steam's own store browse data, not SteamSpy](#tags--demo-link--steams-own-store-browse-data-not-steamspy)
+- [Store metadata — appdetails](#store-metadata--appdetails)
 - [Looking up an arbitrary game](#looking-up-an-arbitrary-game)
 - [IsThereAnyDeal](#isthereanydeal)
   - [Currency is passed through, not converted](#currency-is-passed-through-not-converted)
@@ -47,6 +48,12 @@ If HLTB breaks again, recent npm packages (e.g. `howlongtobeat-ts`) tend to reve
 - `https://store.steampowered.com/actions/ajaxgetstoretags?l=english` maps every tagid to its human-readable name — a single, near-static ~430-entry list, not per-game, so it's fetched once and cached long-term (`tagnames:all`, same 60-day `META_CACHE_TTL_MINUTES` group as `browse:` — see the cache table above) rather than repeated for every game lookup.
 
 The `browse:` cache key is the third one used for this data — `tags:` (SteamSpy's `{tagname: voteCount}` object) then briefly `tagids:` (a bare `tagid[]`) came before it. Each format change got a new key rather than reusing the old one: a shape check alone can't safely tell an old value apart from a new one when both can legitimately be the same JS type (e.g. a game with zero SteamSpy votes cached a bare `[]`, indistinguishable from an empty `tagid[]` result). Retired-key entries are simply never read again and age out on their own via the existing TTL sweep.
+
+## Store metadata — appdetails
+
+`getAppDetails` (`lib/steam.js`) calls the undocumented `store.steampowered.com/api/appdetails?appids={id}` (same trust tier as above).
+
+- **The reply can be keyed under another appid.** Since about 2026-09-24, many games come back as `{"<other id>": {"success": true, "data": {"steam_appid": <requested id>, …}}}`, where the key is often one of the game's DLCs (e.g. 1656930 → `"3290770"`, 39210 → `"4831120"`). The data is correct; only the key is wrong. `getAppDetails` falls back to the entry whose `data.steam_appid` matches the request, so an entry for a different game is still rejected. Other projects saw the same: [romm#4774](https://github.com/rommapp/romm/pull/4774), [EnhancedGV#9](https://github.com/Featherwolf/EnhancedGV/pull/9).
 
 ## Looking up an arbitrary game
 
