@@ -149,3 +149,62 @@ test('the final ranking does not depend on the order games are asked in', () => 
   };
   assert.deepEqual(run([6, 2, 9]), run([]));
 });
+
+// 1..n ranked best-first as [[n], …, [1]].
+function ranked(n) {
+  return runAll(EMPTY_RANKING, new Set(Array.from({ length: n }, (_, i) => i + 1)), id => id).state;
+}
+
+test('a re-ranked game that did not move is placed back in 2 answers', () => {
+  const source = new Set(Array.from({ length: 64 }, (_, i) => i + 1));
+  const state = rerank(ranked(64), 30);
+  assert.equal(nextPair(state, source).pair.opponent, 29);
+  const { state: done, asked } = runAll(JSON.parse(JSON.stringify(state)), source, id => id);
+  assert.equal(asked, 2);
+  assert.deepEqual(done.groups, ranked(64).groups);
+  assert.equal(done.hints[30], undefined);
+});
+
+test('a re-ranked game tied with others is placed back in 1 answer', () => {
+  const source = new Set([1, 2, 3, 4]);
+  const { state } = runAll(EMPTY_RANKING, source, id => Math.min(id, 3));
+  assert.deepEqual(state.groups, [[3, 4], [2], [1]]);
+  const { state: done, asked } = runAll(rerank(state, 4), source, id => Math.min(id, 3));
+  assert.equal(asked, 1);
+  assert.deepEqual(done.groups, [[3, 4], [2], [1]]);
+});
+
+test('a re-ranked game gallops to its new place, near or far, up or down', () => {
+  const n = 64;
+  const source = new Set(Array.from({ length: n }, (_, i) => i + 1));
+  for (const [id, newScore] of [[30, 31.5], [30, 27.5], [30, 64.5], [30, 0.5], [64, 0.5], [1, 64.5]]) {
+    const score = x => (x === id ? newScore : x);
+    const { state: done, asked } = runAll(rerank(ranked(n), id), source, score);
+    const expected = [...source].sort((a, b) => score(b) - score(a)).map(x => [x]);
+    assert.deepEqual(done.groups, expected, `${id} → ${newScore}`);
+    const moved = Math.abs(Math.round(newScore) - id);
+    assert.ok(asked <= 2 * Math.ceil(Math.log2(moved + 2)) + 1, `${id} → ${newScore}: ${asked} answers`);
+  }
+});
+
+test('a hint whose anchor is gone falls back to plain insertion', () => {
+  const source = new Set([1, 2, 3, 4, 5]);
+  const state = exclude(rerank(ranked(5), 3), 2);
+  const { state: done } = runAll(state, source, id => id);
+  assert.deepEqual(done.groups, [[5], [4], [3], [1]]);
+});
+
+test('skipping a re-ranked game keeps its hint; excluding it drops it', () => {
+  const source = new Set([1, 2, 3, 4, 5]);
+  let { state } = nextPair(rerank(ranked(5), 3), source);
+  ({ state } = answer(state, source, 'skip'));
+  assert.equal(state.hints[3], 2);
+  assert.equal(nextPair(state, source).pair.opponent, 2);
+  ({ state } = answer(state, source, 'exclude-candidate'));
+  assert.equal(state.hints[3], undefined);
+});
+
+test('progress estimates about 2 answers for a re-ranked game', () => {
+  const source = new Set(Array.from({ length: 64 }, (_, i) => i + 1));
+  assert.equal(progress(rerank(ranked(64), 30), source).remaining, 2);
+});

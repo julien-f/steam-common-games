@@ -60,7 +60,7 @@ The result is a live list: save it as dynamic (it re-resolves each time), or fre
 - **ℹ Details** under a card (or **I** then **← / →**) opens that game in the side panel to help you decide. It stays open while the game is still being compared; meanwhile **← / →** browse its screenshots and videos (pick by clicking a card), and **Esc** closes it.
 - Stop whenever you like (**Esc**): every answer is saved, and **Compare** on the list's page picks up where you left off.
 - Each new game is placed with as few questions as possible — about 7 for a list of 100 already-ranked games. The progress bar says roughly how many are left.
-- The list's page sorts by **Rank**. Select rows to **Re-rank** a game (it's asked again) or **Exclude** it.
+- The list's page sorts by **Rank**. Select rows to **Re-rank** a game or **Exclude** it. Re-rank asks about it right away, starting from its current place: 1–2 questions if it stays put, a few more the further it moves.
 - Games are asked about in the table's current order: sort the list by Rank, then e.g. Played ↓, and your most-played games get ranked first — handy if you stop part-way. The order you rank in doesn't change the final result.
 - To rank only some games — say, your RPGs, or those you played more than 5 hours (your lists have Played and Last Played columns for the current account, hidden by default) — filter the table, then **Compare N shown** (or select rows, then **Compare N selected**): only those games are asked about, each still placed against the whole ranking. The rest wait until you compare them.
 - It follows its source: games added later are queued for comparison; a removed game drops out, and gets its rank back if it returns. **Change source** keeps every answer already given.

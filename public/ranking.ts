@@ -12,12 +12,15 @@ export interface RankingCursor {
   appid: number; // the game being inserted
   lo: number; // insertion gap range [lo, hi] into `groups`, narrowed by each answer
   hi: number;
+  anchor?: number; // a re-ranked game's old neighbour, asked about first
+  gallop?: { dir: 'up' | 'down'; step: number }; // after the anchor: probes 1, 2, 4… live groups away, until an answer turns back
 }
 
 export interface RankingState {
   groups: number[][]; // tie groups, best first
   excluded: number[];
   skipped: number[]; // deferred, asked again after every other pending game
+  hints?: Record<number, number>; // re-ranked game → its anchor, so its insertion starts from where it was
   cursor?: RankingCursor;
 }
 
@@ -43,7 +46,8 @@ function clone(state: RankingState): RankingState {
     groups: state.groups.map(g => [...g]),
     excluded: [...state.excluded],
     skipped: [...state.skipped],
-    ...(state.cursor ? { cursor: { ...state.cursor } } : {}),
+    ...(state.hints ? { hints: { ...state.hints } } : {}),
+    ...(state.cursor ? { cursor: { ...state.cursor, ...(state.cursor.gallop ? { gallop: { ...state.cursor.gallop } } : {}) } } : {}),
   };
 }
 
@@ -53,11 +57,28 @@ function liveIndices(state: RankingState, source: Set<number>, lo = 0, hi = stat
   return out;
 }
 
-function midIndex(state: RankingState, source: Set<number>): number | null {
+type Probe = { index: number; phase: 'anchor' | 'gallop' | 'bisect' };
+
+// The group the cursor is compared against next: the anchor's, then galloping away from it,
+// then plain bisection of what's left.
+function probe(state: RankingState, source: Set<number>): Probe | null {
   const { cursor } = state;
   if (!cursor) return null;
   const live = liveIndices(state, source, cursor.lo, cursor.hi);
-  return live.length ? live[Math.floor(live.length / 2)] : null;
+  if (!live.length) return null;
+  if (cursor.anchor !== undefined) {
+    const g = state.groups.findIndex(group => group.includes(cursor.anchor as number));
+    if (live.includes(g)) return { index: g, phase: 'anchor' };
+  }
+  if (cursor.gallop) {
+    const i = cursor.gallop.dir === 'down' ? cursor.gallop.step - 1 : live.length - cursor.gallop.step;
+    if (i >= 0 && i < live.length) return { index: live[i], phase: 'gallop' };
+  }
+  return { index: live[Math.floor(live.length / 2)], phase: 'bisect' };
+}
+
+function dropHint(state: RankingState, appid: number): void {
+  if (state.hints) delete state.hints[appid];
 }
 
 function isPlaced(state: RankingState, appid: number): boolean {
@@ -93,6 +114,7 @@ function placeCursor(state: RankingState): void {
   const { cursor } = state;
   if (!cursor) return;
   state.groups.splice(cursor.lo, 0, [cursor.appid]);
+  dropHint(state, cursor.appid);
   delete state.cursor;
 }
 
@@ -109,11 +131,12 @@ export function nextPair(input: RankingState, source: Set<number>, opts: Ranking
       const next = pendingAppids(state, source, opts)[0];
       if (next === undefined) return { state, pair: null };
       state.skipped = state.skipped.filter(id => id !== next);
-      state.cursor = { appid: next, lo: 0, hi: state.groups.length };
+      const anchor = state.hints?.[next];
+      state.cursor = { appid: next, lo: 0, hi: state.groups.length, ...(anchor !== undefined ? { anchor } : {}) };
     }
-    const mid = midIndex(state, source);
-    if (mid === null) { placeCursor(state); continue; }
-    const opponent = state.groups[mid].find(id => source.has(id)) as number;
+    const p = probe(state, source);
+    if (!p) { placeCursor(state); continue; }
+    const opponent = state.groups[p.index].find(id => source.has(id)) as number;
     return { state, pair: { candidate: state.cursor.appid, opponent } };
   }
 }
@@ -127,12 +150,21 @@ export function answer(
   if (!pair) return { state: current, pair: null };
   const state = clone(current);
   const cursor = state.cursor as RankingCursor;
-  const mid = midIndex(state, source) as number;
+  const { index: mid, phase } = probe(state, source) as Probe;
   switch (ans) {
-    case 'candidate': cursor.hi = mid; break;
-    case 'opponent': cursor.lo = mid + 1; break;
+    case 'candidate':
+    case 'opponent': {
+      const dir = ans === 'candidate' ? 'up' : 'down';
+      if (dir === 'up') cursor.hi = mid; else cursor.lo = mid + 1;
+      if (phase === 'anchor') cursor.gallop = { dir, step: 1 };
+      else if (phase === 'gallop' && cursor.gallop?.dir === dir) cursor.gallop.step *= 2;
+      else delete cursor.gallop;
+      delete cursor.anchor;
+      break;
+    }
     case 'tie':
       state.groups[mid].push(cursor.appid);
+      dropHint(state, cursor.appid);
       delete state.cursor;
       break;
     case 'skip':
@@ -141,6 +173,7 @@ export function answer(
       break;
     case 'exclude-candidate':
       state.excluded.push(cursor.appid);
+      dropHint(state, cursor.appid);
       delete state.cursor;
       break;
     case 'exclude-opponent':
@@ -151,10 +184,15 @@ export function answer(
   return nextPair(state, source, opts);
 }
 
-// Takes a game out of the ranking (and out of excluded/skipped) so it's asked again.
+// Takes a game out of the ranking (and out of excluded/skipped) so it's asked again, starting
+// next to where it was: a game it was tied with, else the one below it, else the one above.
 export function rerank(input: RankingState, appid: number): RankingState {
   const state = clone(input);
   if (state.cursor?.appid === appid) delete state.cursor;
+  dropHint(state, appid);
+  const g = state.groups.findIndex(group => group.includes(appid));
+  const anchor = g === -1 ? undefined : state.groups[g].find(id => id !== appid) ?? state.groups[g + 1]?.[0] ?? state.groups[g - 1]?.[0];
+  if (anchor !== undefined) state.hints = { ...state.hints, [appid]: anchor };
   removeFromGroups(state, appid);
   state.excluded = state.excluded.filter(id => id !== appid);
   state.skipped = state.skipped.filter(id => id !== appid);
@@ -163,6 +201,7 @@ export function rerank(input: RankingState, appid: number): RankingState {
 
 export function exclude(input: RankingState, appid: number): RankingState {
   const state = rerank(input, appid);
+  dropHint(state, appid);
   state.excluded.push(appid);
   return state;
 }
@@ -190,10 +229,12 @@ export function progress(state: RankingState, source: Set<number>, { focus }: Ra
   const ranked = ranks(state, source).size;
   const excluded = state.excluded.filter(id => source.has(id)).length;
   const hasCursor = !!state.cursor && source.has(state.cursor.appid) && (!focus || focus.has(state.cursor.appid));
-  const queued = pendingAppids(state, source, { focus }).length;
+  const queued = pendingAppids(state, source, { focus });
   let groups = liveIndices(state, source).length;
-  let remaining = hasCursor ? Math.ceil(Math.log2(liveIndices(state, source, state.cursor!.lo, state.cursor!.hi).length + 1)) : 0;
+  // A re-ranked game is expected to land near its anchor: about 2 answers.
+  const cost = (k: number, hinted: boolean) => Math.min(hinted ? 2 : Infinity, Math.ceil(Math.log2(k + 1)));
+  let remaining = hasCursor ? cost(liveIndices(state, source, state.cursor!.lo, state.cursor!.hi).length, state.cursor!.anchor !== undefined) : 0;
   if (hasCursor) groups++;
-  for (let i = 0; i < queued; i++) remaining += Math.ceil(Math.log2(groups++ + 1));
-  return { ranked, excluded, pending: queued + (hasCursor ? 1 : 0), remaining };
+  for (const id of queued) remaining += cost(groups++, state.hints?.[id] !== undefined);
+  return { ranked, excluded, pending: queued.length + (hasCursor ? 1 : 0), remaining };
 }

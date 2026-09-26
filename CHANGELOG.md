@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Answers: prefer left/right, Tie, Skip (ask later), Exclude (haven't played), Undo — all keyboard-driven.
   - Each card shows the game's Weighted Rating, year, genres and HLTB main-story time.
   - The list page shows a Rank column (default sort), progress with an estimate of comparisons left, "Change source", and Re-rank/Exclude row actions.
+  - Re-rank opens the compare screen on the selected games and starts from each one's current place, galloping outward (1, 2, 4… places): 1–2 answers if it stays put, a few more the further it moves.
   - "ℹ Details" (or I then ← / →) opens a compared game in the side panel; it stays open while that game is still in the pair. While it's open, ← / → browse its media and Esc closes it first.
   - Compare asks about unranked games in the table's current sort order (e.g. Rank, then Played ↓ ranks your most-played games first); the final ranking doesn't depend on that order.
   - "Compare N shown" (with a filter on) and "Compare N selected" ask only about those unranked games — still compared against the whole ranking.

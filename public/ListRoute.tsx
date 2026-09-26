@@ -496,12 +496,13 @@ export default function ListRoute() {
     navigate(`/lists/${createList({ kind: 'ranked', source }).id}/rank`, { state: { rankFocus: rankThisListFocus() ?? undefined, rankOrder } });
   }
   function handleRerankSelected(): void {
+    const list = userList();
     const state = ranking();
-    if (!state) return;
-    const rows = selectedRows();
-    applyRanking(rows.reduce((s, row) => rerank(s, row.appid), state));
-    setSelectionActionStatus(`${rows.length} game(s) will be asked again on the next Compare.`);
+    if (!list || !state) return;
+    const focus = selectedRows().map(r => r.appid);
+    applyRanking(focus.reduce((s, appid) => rerank(s, appid), state));
     table?.selection.clear();
+    navigate(`/lists/${list.id}/rank`, { state: { rankFocus: focus, rankOrder: focus } });
   }
   // The selected games still to be ranked — what "Compare selected" asks about.
   function selectedUnranked(): number[] {
@@ -2363,7 +2364,7 @@ export default function ListRoute() {
               title={selectedUnranked().length ? 'Ask only about the selected games that are still unranked' : 'All selected games are ranked or excluded — Re-rank them first'}
               onClick={handleCompareSelected}
             >Compare {selectedUnranked().length} selected</button>
-            <button type="button" title="Take out of the ranking so the next Compare asks about it again" onClick={handleRerankSelected}>Re-rank</button>
+            <button type="button" title="Ask about it again, starting from its current place" onClick={handleRerankSelected}>Re-rank</button>
             <button type="button" title="Leave out of the ranking" onClick={handleExcludeSelected}>Exclude</button>
           </Show>
           <button type="button" onClick={() => table?.selection.clear()}>Clear selection</button>
