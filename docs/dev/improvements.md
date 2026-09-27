@@ -56,7 +56,6 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 
 - **U34 · minor · A1** — first-visit Home doesn't say what the app does; the main button reads "Set as current account". One-line intro; "Look up".
 - **U37 · minor · A1, A2** — a stored account slot's `label` is never refreshed from what the account card fetches: a slot without one (seeded, or resolved before labels existed) stays a steam64 id in the chip, Recent accounts, list labels and page title.
-- **U38 · minor · A4** — a private friends list shows "Friends (0)" plus two overlapping lines. "Friends (private)".
 
 - **U44 · minor · B3** — a combined list built from a bundle drops the bundle's games with no Steam listing without a word; the bundle page lists them below its table. Say how many were left out, on the formula line.
 

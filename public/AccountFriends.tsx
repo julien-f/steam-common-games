@@ -67,7 +67,10 @@ export function AccountFriends(props: {
     <Show when={explored()}>
       {(data) => (
         <details class="account-friends">
-          <summary>Friends ({data().friends.length})</summary>
+          {/* "0" would read as "no friends"; with nothing visible because it's private, say so. */}
+          <summary>
+            Friends ({data().friends.length === 0 && data().unavailable.length > 0 ? 'private' : data().friends.length})
+          </summary>
           {/* Same age-is-the-control shape as the list heroes' Updated tile and the panel's own
               ↻ — inside the disclosure rather than in its summary, since clicking a button in a
               <summary> would also toggle the disclosure it sits in. */}
@@ -88,7 +91,10 @@ export function AccountFriends(props: {
               Friends list is private for {data().unavailable.length} member{data().unavailable.length > 1 ? 's' : ''}.
             </p>
           </Show>
-          <Show when={data().friends.length > 0} fallback={<p>No public friends found.</p>}>
+          <Show
+            when={data().friends.length > 0}
+            fallback={data().unavailable.length ? undefined : <p>No public friends found.</p>}
+          >
             <ul class="account-friends-list">
               <For each={sortedFriends()}>
                 {(f) => (
