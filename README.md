@@ -56,6 +56,7 @@ Application data lives in `db.sqlite` (gitignored); today it holds only cache ta
 - [integrations.md](docs/dev/integrations.md) — Steam, HLTB, IsThereAnyDeal, ProtonDB
 - [data.md](docs/dev/data.md) — database, cache tiers, refresh paths
 - [observability.md](docs/dev/observability.md) — metrics endpoint and log warnings
+- [scenarios.md](docs/dev/scenarios.md) — user journeys, for design reviews and end-to-end tests
 - [decisions.md](docs/dev/decisions.md) — computed ratings and heuristics
 
 Screenshots used by the docs live in [docs/images/](docs/images).
