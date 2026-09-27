@@ -22,6 +22,8 @@ export interface RankingState {
   skipped: number[]; // deferred, asked again after every other pending game
   hints?: Record<number, number>; // re-ranked game → its anchor, so its insertion starts from where it was
   cursor?: RankingCursor;
+  // The chosen games ("Rank N games", "Compare N selected"), so a stopped session resumes on them.
+  focus?: number[];
 }
 
 export type RankingAnswer = 'candidate' | 'opponent' | 'tie' | 'skip' | 'exclude-candidate' | 'exclude-opponent';
@@ -47,6 +49,7 @@ function clone(state: RankingState): RankingState {
     excluded: [...state.excluded],
     skipped: [...state.skipped],
     ...(state.hints ? { hints: { ...state.hints } } : {}),
+    ...(state.focus ? { focus: [...state.focus] } : {}),
     ...(state.cursor
       ? { cursor: { ...state.cursor, ...(state.cursor.gallop ? { gallop: { ...state.cursor.gallop } } : {}) } }
       : {}),
@@ -245,6 +248,20 @@ export interface RankingProgress {
   excluded: number;
   pending: number; // includes the game currently being inserted; only focused games under a focus
   remaining: number; // estimated comparisons left
+}
+
+export function withFocus(state: RankingState, focus: number[] | undefined): RankingState {
+  const next = clone(state);
+  if (focus?.length) next.focus = [...focus];
+  else delete next.focus;
+  return next;
+}
+
+// The stored choice, as long as some of it is still to be placed — undefined once it's used up.
+export function pendingFocus(state: RankingState, source: Set<number>): Set<number> | undefined {
+  if (!state.focus?.length) return undefined;
+  const focus = new Set(state.focus);
+  return progress(state, source, { focus }).pending > 0 ? focus : undefined;
 }
 
 export function progress(state: RankingState, source: Set<number>, { focus }: RankingOptions = {}): RankingProgress {

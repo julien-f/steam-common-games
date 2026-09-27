@@ -11,6 +11,8 @@ const {
   ranks,
   progress,
   pendingAppids,
+  withFocus,
+  pendingFocus,
 } = require('../public/ranking.ts');
 
 // Answers every pair by `score` (higher = better, equal = tie) until nothing is pending.
@@ -243,4 +245,25 @@ test('skipping a re-ranked game keeps its hint; excluding it drops it', () => {
 test('progress estimates about 2 answers for a re-ranked game', () => {
   const source = new Set(Array.from({ length: 64 }, (_, i) => i + 1));
   assert.equal(progress(rerank(ranked(64), 30), source).remaining, 2);
+});
+
+test('withFocus: stores the chosen games on the state, and clears them', () => {
+  const focused = withFocus(EMPTY_RANKING, [3, 1]);
+  assert.deepEqual(focused.focus, [3, 1]);
+  assert.equal(EMPTY_RANKING.focus, undefined, 'the input is not mutated');
+  assert.equal('focus' in withFocus(focused, undefined), false);
+  assert.equal('focus' in withFocus(focused, []), false);
+});
+
+test('pendingFocus: the choice while some of it is left to place, then undefined', () => {
+  const source = new Set([1, 2, 3, 4, 5]);
+  const focus = [4, 5];
+  let s = withFocus(EMPTY_RANKING, focus);
+  assert.deepEqual(pendingFocus(s, source), new Set(focus));
+  // Answering keeps the choice on the state, and only its games are asked.
+  let { state, pair } = nextPair(s, source, { focus: new Set(focus) });
+  while (pair) ({ state, pair } = answer(state, source, 'candidate', { focus: new Set(focus) }));
+  assert.deepEqual(state.focus, focus);
+  assert.equal(pendingFocus(state, source), undefined, 'used up');
+  assert.equal(pendingFocus(EMPTY_RANKING, source), undefined, 'no choice at all');
 });

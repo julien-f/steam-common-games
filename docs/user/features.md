@@ -60,7 +60,7 @@ A bundle joins a combine from its own page: **What does this add?** opens the co
 
 - **← / →** pick one, **↓** Tie, **S** Skip (asked again later), **X** then **← / →** or "Haven't played" to exclude a game, **Z** Undo. All are buttons too.
 - **ℹ Details** under a card (or **I** then **← / →**) opens that game in the side panel to help you decide. It stays open while the game is still being compared; meanwhile **← / →** browse its screenshots and videos (pick by clicking a card), and **Esc** closes it.
-- Stop whenever you like (**Esc**): every answer is saved, and **Compare** on the list's page picks up where you left off.
+- Stop whenever you like (**Esc**): every answer is saved, and **Compare** on the list's page picks up where you left off — on the games you chose, if you started from a selection or filter (it then reads **Continue: N chosen left**, and the Ranked figure counts those).
 - Each new game is placed with as few questions as possible — about 7 for a list of 100 already-ranked games. The progress bar says roughly how many are left.
 - The list's page sorts by **Rank**. Select rows to **Re-rank** a game or **Exclude** it. Re-rank asks about it right away, starting from its current place: 1–2 questions if it stays put, a few more the further it moves.
 - Games are asked about in the table's current order: sort the list by Rank, then e.g. Played ↓, and your most-played games get ranked first — handy if you stop part-way. The order you rank in doesn't change the final result.

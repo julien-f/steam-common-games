@@ -186,7 +186,7 @@ import {
   getRanking,
   setRanking,
 } from './listsStore.ts';
-import { ranks, progress, rerank, exclude, type RankingState, type RankingProgress } from './ranking.ts';
+import { ranks, progress, pendingFocus, rerank, exclude, type RankingState, type RankingProgress } from './ranking.ts';
 import {
   resolveListWithSources,
   flattenCombineResult,
@@ -618,6 +618,13 @@ export default function ListRoute() {
     const state = ranking();
     return source && state ? progress(state, source) : null;
   }
+  // The games last chosen for comparing, while some are still to be placed — what Compare resumes.
+  function chosenProgress(): RankingProgress | null {
+    const source = rankedSource();
+    const state = ranking();
+    const focus = source && state ? pendingFocus(state, source) : undefined;
+    return focus ? progress(state!, source!, { focus }) : null;
+  }
   // Rewrites the Rank column in place rather than reloading — nothing else about the rows changed.
   function applyRanking(state: RankingState): void {
     const list = userList();
@@ -726,6 +733,8 @@ export default function ListRoute() {
   function compareLabel(): string {
     const focus = filteredUnranked();
     if (focus) return focus.length ? `Compare ${focus.length} shown` : 'Compare (all shown ranked)';
+    const chosen = chosenProgress();
+    if (chosen) return `Continue: ${chosen.pending} chosen left`;
     return rankingProgress()?.pending === 0 ? 'Compare (all ranked)' : 'Compare';
   }
   function handleCompare(): void {
@@ -2346,11 +2355,21 @@ export default function ListRoute() {
       }
       const p = list.kind === 'ranked' ? rankingProgress() : null;
       if (p) {
+        // Measured against the chosen games while some are left: the whole source's estimate
+        // (thousands of comparisons) says nothing about a session meant to rank five.
+        const chosen = chosenProgress();
+        const excluded = p.excluded ? `${p.excluded} excluded` : '';
         tiles.push({
           label: 'Ranked',
           value: `${p.ranked} / ${p.ranked + p.pending}`,
-          sub: p.pending ? `≈ ${p.remaining} comparisons left` : 'Complete',
-          title: p.excluded ? `${p.excluded} excluded` : undefined,
+          sub: chosen
+            ? `${chosen.pending} chosen left · ≈ ${chosen.remaining} comparisons`
+            : p.pending
+              ? `≈ ${p.remaining} comparisons left`
+              : 'Complete',
+          title:
+            [chosen && p.pending ? `≈ ${p.remaining} comparisons for all` : '', excluded].filter(Boolean).join(' · ') ||
+            undefined,
         });
       }
     }

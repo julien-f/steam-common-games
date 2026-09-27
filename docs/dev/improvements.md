@@ -49,7 +49,6 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 
 ## Ranking
 
-- **U24 · major · R1** — ranking "5 chosen games", stopping, then resuming ranks the whole library; the list reads "4 / 1179 ranked · ≈ 10907 comparisons left". Keep the chosen scope on resume and show progress against it.
 - **U25 · minor · R1, F1** — the ranking card says "1.5h main story" where the table says 2.5 in "All (h)" (itself unclear). Pick one HLTB figure and label it.
 
 ## Keyboard and accessibility

@@ -12,6 +12,8 @@ import {
   nextPair,
   answer,
   progress,
+  withFocus,
+  pendingFocus,
   ranks,
   type RankingState,
   type RankingPair,
@@ -35,19 +37,27 @@ export default function RankRoute() {
   const params = useParams();
   const navigate = useNavigate();
   const location = useLocation<{ rankFocus?: number[]; rankOrder?: number[] } | undefined>();
-  // The list page's "Compare selected" or "Rank N games" (history state) — only these games get asked about.
+  // The chosen games — from the list page's "Compare selected"/"Rank N games" (history state),
+  // stored on the ranking by load() so a later visit resumes on them.
   function focus(): Set<number> | undefined {
-    const ids = location.state?.rankFocus;
-    return Array.isArray(ids) && ids.length ? new Set(ids) : undefined;
+    const ids = state()?.focus;
+    return ids?.length ? new Set(ids) : undefined;
   }
   // Plus the list page's table sort, which orders the games asked (ranking.ts's RankingOptions).
   function opts(): RankingOptions {
     const order = location.state?.rankOrder;
     return { focus: focus(), order: Array.isArray(order) ? order : undefined };
   }
-  // Keeps the table order, drops only the selection.
+  // Keeps the table order, drops only the choice.
   function compareAll(): void {
+    const current = state();
+    const src = source();
     navigate(location.pathname, { replace: true, state: { rankOrder: location.state?.rankOrder } });
+    if (!current || !src) return;
+    const next = nextPair(withFocus(current, undefined), src, { order: opts().order });
+    setState(next.state);
+    setPair(next.pair);
+    setRanking(params.listId!, next.state);
   }
   const [title, setTitle] = createSignal('');
   const [status, setStatus] = createSignal('Resolving list…');
@@ -79,7 +89,15 @@ export default function RankRoute() {
       const { result } = await resolveListWithSources(list, createDefaultFetchers());
       if (token !== loadToken) return;
       const appids = flattenCombineResult(result);
-      const next = nextPair(getRanking(list.id), appids, opts());
+      // A new choice replaces the stored one; a used-up one is dropped rather than resumed.
+      const incoming = location.state?.rankFocus;
+      const saved = getRanking(list.id);
+      let stored = saved;
+      if (Array.isArray(incoming) && incoming.length) stored = withFocus(saved, incoming);
+      else if (saved.focus && !pendingFocus(saved, appids)) stored = withFocus(saved, undefined);
+      if (stored !== saved) setRanking(list.id, stored);
+      setState(stored);
+      const next = nextPair(stored, appids, opts());
       setSource(appids);
       setState(next.state);
       setPair(next.pair);
