@@ -27,8 +27,8 @@ export function refKey(ref: ListRef): string {
 }
 
 // Every source a combine can currently be built from — any recent account's Owned/Wishlist,
-// Recently Looked Up, or any existing user list. Not a bundle (would need its own bundle-picker
-// UI, not just a checkbox) — see HomeRoute.tsx's header comment. `excludeListId` keeps a dynamic
+// Recently Looked Up, or any existing user list. A bundle arrives only as a prefilled source
+// (see HomeRoute.tsx's header comment and options() below). `excludeListId` keeps a dynamic
 // list being edited from being offered as a source for itself.
 export function sourceOptions(excludeListId?: string): SourceOption[] {
   const naming = createDefaultNaming();

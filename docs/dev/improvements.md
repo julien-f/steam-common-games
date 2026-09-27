@@ -45,7 +45,6 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 
 ## Bundles and prices
 
-- **U20 · blocker · B3** — a bundle can't be a combine source (`CombineForm.tsx`), so "what does this bundle add for the household" can't be built — README's tagline promises it. Allow bundle sources (e.g. "Combine…" on the bundle page).
 - **U21 · major · B1** — "Cheapest tier" mixes $ and € in one sortable column (region EUR). Convert, or sort per currency and flag USD-only shops.
 - **U22 · major · B1** — a bundle page has no "new to you" summary; the owned marker (yellow name + ✓) has no legend. Tile: "Adds N games · €X at best deal".
 - **U23 · minor · B1** — every game in a three-tier bundle showed the first tier's price; check the tier mapping against ITAD.

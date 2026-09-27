@@ -125,7 +125,9 @@ Deleting a folder walks its contents and applies the same soft-delete check to e
 
 A `GameList` or `AccountSlot` still referenced by some dynamic list's `sources[]` is never hard-deleted on removal — it's stamped (`deletedAt`/`removedAt`) and hidden from normal browsing (tree, pickers, recents) but kept resolvable, with a restore affordance (ideally inline, right next to the now-broken-looking source in whatever dynamic list still points at it, in addition to a general "Trash" view). A sweep on every reference change purges anything soft-deleted that's no longer referenced by anything.
 
-A referenced **bundle** disappearing (ITAD's own data expiring) is different — that's remote data, not something the app deleted, so it just renders as "Bundle no longer available," no restore possible.
+A referenced **bundle** disappearing (ITAD stops listing it some time after it ends, and `GET /api/bundles/:id` 404s) is remote data, not something the app deleted. `bundleSnapshots.ts` keeps each referenced bundle's last-known title and appids, refreshed whenever a resolve succeeds (`listResolve.ts`'s `resolveBundleSource`); on the 404, `listsStore.ts`'s `orphanBundle` turns that snapshot into a soft-deleted manual list (`orphanOf: { bundleId }`, named "<title> (no longer listed)") and re-points every source at it, so the lists keep their contents and the soft-delete lifecycle above takes over. Any other failure falls back to the snapshot without converting. A bundle that never resolved has no snapshot and contributes nothing.
+
+The sweep runs inside `listsStore.ts` itself — `deleteList`, `updateDynamicList`, `updateRankedSource`, `orphanBundle` — repeated until nothing more goes, and prunes the snapshots no list uses.
 
 ## Storage schema
 
@@ -140,6 +142,7 @@ AccountSlot  id (sorted-joined member steam64 ids) · members[] · rawInputs[] �
              lastUsedAt · removedAt?
 Folder       id · name · parentId (null = root) · order · createdAt
 GameList     id · name? (absent = unnamed, labeled by its formula) · parentId · order · createdAt · updatedAt
+             orphanOf? { bundleId } (a bundle's last-known games — see Soft-delete)
              kind 'manual'  → appids[]
              kind 'dynamic' → op + sources[] (ListRef)
              kind 'ranked'  → source (ListRef); progress in pref key ranking:<id>
@@ -150,7 +153,7 @@ ListRef      kind 'account-owned' | 'account-wishlist' | 'bundle' | 'recent-game
 
 `Folder` and `GameList` share one `order` numbering per `parentId`, so folders and lists interleave in display order.
 
-Pref keys: `schemaVersion`, `myAccount`, `currentAccount`, `recentAccounts`, `lists`, `folders`, `recentGames` (backs the `recent-games` system list), `ranking:<listId>` (one per ranked list), plus the shared table-view keys for the fixed system kinds (`ownedListView`, `wishlistListView`, `bundleListView`, `compareListView` and `sharedListView` — each shared across all bundles/comparisons/shared links, unlike user lists which each keep their own `tableView` — and `recentListView`), and `bundlesBrowseView` for `/bundles`' own bundle-picker table (a table of bundles, not of games).
+Pref keys: `schemaVersion`, `myAccount`, `currentAccount`, `recentAccounts`, `lists`, `folders`, `recentGames` (backs the `recent-games` system list), `ranking:<listId>` (one per ranked list), `bundleSnapshots` (last-known title and appids of each bundle a list uses, `bundleSnapshots.ts`), plus the shared table-view keys for the fixed system kinds (`ownedListView`, `wishlistListView`, `bundleListView`, `compareListView` and `sharedListView` — each shared across all bundles/comparisons/shared links, unlike user lists which each keep their own `tableView` — and `recentListView`), and `bundlesBrowseView` for `/bundles`' own bundle-picker table (a table of bundles, not of games).
 
 **Cross-tab sync**: not implemented. The design called for a `window` `storage` listener refreshing in-memory state when another tab writes these keys; nothing listens today, so two open tabs can hold divergent state until one reloads.
 

@@ -11,8 +11,8 @@
 // chrome. No trash/restore UI for soft-deleted lists yet (`listsStore.ts`'s `restoreList`/
 // `getLists({ includeDeleted: true })` are ready for it, just not surfaced here). The combine
 // form below can pick any recent account's Owned/Wishlist, Recently Looked Up, or any existing
-// user list as a source — bundles are deliberately not offered as a source yet (would need its
-// own bundle-picker UI, not just a checkbox).
+// user list as a source. A bundle joins it only from its own page (`?combine=b:<id>`, below) —
+// offering every bundle here would need a bundle picker, not a checkbox.
 import { createSignal, createEffect, createMemo, onCleanup, onMount, For, Index, Show } from 'solid-js';
 import { A, useLocation, useNavigate } from '@solidjs/router';
 import {

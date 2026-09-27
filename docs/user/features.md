@@ -50,6 +50,8 @@ Naming the combined list is optional: leave the name empty and it's called by wh
 
 The result is a live list: save it as dynamic (it re-resolves each time), or freeze it. A dynamic list's page states its formula, names every source, and says what each contributed.
 
+A bundle joins a combine from its own page: **What does this add?** opens the combine form with that bundle minus your Owned games, ready to save or to change — a Family's Owned, or Group by membership with a friend's. Once IsThereAnyDeal stops listing an ended bundle, a list using it keeps the bundle's last-known games and says so.
+
 ![Two lists combined with group by membership: one table per combination — in both lists, then each list's exclusive games — under the formula that produced them](../images/group-by-membership.png)
 
 ### Ranking a list
@@ -76,7 +78,7 @@ The result is a link. Copy the address and whoever opens it sees the same compar
 
 ## Bundles
 
-Browse current Steam game bundles (sourced from IsThereAnyDeal, and only available if the app is configured with an ITAD key). Open one and its games become a list like any other, with the bundle's tier price alongside each game's rating, playtime estimates and current best price anywhere. Games in a bundle with no Steam listing are listed separately below the table rather than quietly dropped. The header's counts are clickable: "New" narrows the table to the bundles published in the last week, "Ending soon" to the ones ending within 48 hours, and clicking either again brings the rest back. "Updated" re-fetches the list (it replaces the old ↻ Refresh button — the same is true of the Owned and Wishlist headers), and "Prices" opens the region setting.
+Browse current Steam game bundles (sourced from IsThereAnyDeal, and only available if the app is configured with an ITAD key). Open one and its games become a list like any other, with the bundle's tier price alongside each game's rating, playtime estimates and current best price anywhere. Games in a bundle with no Steam listing are listed separately below the table rather than quietly dropped. The header's counts are clickable: "New" narrows the table to the bundles published in the last week, "Ending soon" to the ones ending within 48 hours, and clicking either again brings the rest back. "Updated" re-fetches the list (it replaces the old ↻ Refresh button — the same is true of the Owned and Wishlist headers), and "Prices" opens the region setting. **What does this add?** turns a bundle into a list of the games in it you don't own yet (see [Combining lists](#combining-lists)).
 
 ![The bundle browser: current bundles with shop, game count, cheapest tier, publication and end dates](../images/bundles-browse.png)
 
