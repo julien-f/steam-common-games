@@ -11,9 +11,9 @@
 // chrome. No trash/restore UI for soft-deleted lists yet (`listsStore.ts`'s `restoreList`/
 // `getLists({ includeDeleted: true })` are ready for it, just not surfaced here). The combine
 // form below can pick any recent account's Owned/Wishlist, Recently Looked Up, or any existing
-// user list as a source — bundles are deliberately not offered as a source yet (would need its
-// own bundle-picker UI, not just a checkbox).
-import { createSignal, createEffect, createMemo, onCleanup, For, Index, Show } from 'solid-js';
+// user list as a source. A bundle joins it only from its own page (`?combine=b:<id>`, below) —
+// offering every bundle here would need a bundle picker, not a checkbox.
+import { createSignal, createEffect, createMemo, onCleanup, onMount, For, Index, Show } from 'solid-js';
 import { A, useLocation, useNavigate } from '@solidjs/router';
 import {
   getMyAccount,
@@ -29,7 +29,14 @@ import {
   ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
 import { getAccountOverrideState, clearAccountOverride, accountOverrideStatusText } from './accountOverride.ts';
-import { withAccountParam, urlWithoutAccountParam, parseUrlState, compareUrl, COMPARE_PATH } from './urlState.ts';
+import {
+  withAccountParam,
+  urlWithoutAccountParam,
+  urlWithParams,
+  parseUrlState,
+  compareUrl,
+  COMPARE_PATH,
+} from './urlState.ts';
 import { resolveAccountSummary, fetchAccountOverview, fetchAccountWishlistItems } from './accountData.ts';
 import type { AccountPlayer } from './accountData.ts';
 import { normalizeInput, steamVanity, fmtAge, countryFlag } from './utils.ts';
@@ -291,13 +298,37 @@ export default function HomeRoute() {
 
   // ── Combine setup (creating a dynamic list) ───────────────────────────────────────────────
   const [combineOpen, setCombineOpen] = createSignal(false);
+  // Set by a bundle page's "What does this add?" (`?combine=b:<id>`): Subtract this account's
+  // Owned from the bundle, and open the result once it's saved.
+  const [combinePrefill, setCombinePrefill] = createSignal<{ op: CombineOp; sources: ListRef[] } | null>(null);
+  let combineFormEl: HTMLDivElement | undefined;
+
+  onMount(() => {
+    const params = new URLSearchParams(location.search);
+    const bundleId = params.get('combine')?.match(/^b:(\d+)$/)?.[1];
+    if (!bundleId) return;
+    const account = getEffectiveCurrentAccount();
+    const owned: ListRef[] = account ? [{ kind: 'account-owned', accountId: account.id }] : [];
+    setCombinePrefill({ op: 'subtract', sources: [{ kind: 'bundle', bundleId }, ...owned] });
+    setCombineOpen(true);
+    params.delete('combine');
+    navigate(urlWithParams(params, location.pathname), { replace: true });
+    queueMicrotask(() => combineFormEl?.scrollIntoView({ block: 'center' }));
+  });
+
+  function toggleCombine(): void {
+    setCombinePrefill(null);
+    setCombineOpen((v) => !v);
+  }
 
   // No name is a valid choice, not a missing field: the list is then labeled by its own formula
   // everywhere, and follows a later source edit (see listLabels.ts).
   function handleCreateCombine(input: { name?: string; op: CombineOp; sources: ListRef[] }): void {
-    createList({ name: input.name, kind: 'dynamic', op: input.op, sources: input.sources });
+    const list = createList({ name: input.name, kind: 'dynamic', op: input.op, sources: input.sources });
     refreshTree();
     setCombineOpen(false);
+    if (combinePrefill()) navigate(withAccountParam(`/lists/${list.id}`, location.search));
+    setCombinePrefill(null);
   }
 
   // A list's on-screen label — its name, or its formula when it has none (listLabels.ts).
@@ -641,13 +672,20 @@ export default function HomeRoute() {
           <button type="button" onClick={handleNewList}>
             + New list
           </button>
-          <button type="button" onClick={() => setCombineOpen((v) => !v)}>
+          <button type="button" onClick={toggleCombine}>
             {combineOpen() ? 'Cancel combine' : '+ New combined list'}
           </button>
         </div>
 
         <Show when={combineOpen()}>
-          <CombineForm submitLabel="Create combined list" onSubmit={handleCreateCombine} />
+          <div ref={combineFormEl}>
+            <CombineForm
+              submitLabel="Create combined list"
+              initialOp={combinePrefill()?.op}
+              initialSources={combinePrefill()?.sources}
+              onSubmit={handleCreateCombine}
+            />
+          </div>
         </Show>
         <Show when={treeRows().length > 0} fallback={<p>No lists yet — create one above.</p>}>
           <ul class="list-tree">

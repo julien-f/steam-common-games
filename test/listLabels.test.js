@@ -63,11 +63,20 @@ test('describeListRef: an account the naming has never heard of is reported, not
   assert.match(desc.problem, /no longer one of your accounts/);
 });
 
-test('describeListRef: bundles are named by id (no client-side title without an ITAD fetch) but still link', () => {
+test('describeListRef: a bundle with no known title is named by id, but still links', () => {
   assert.deepEqual(describeListRef({ kind: 'bundle', bundleId: '16538' }, NAMING), {
     label: 'Bundle 16538',
     href: '/lists/bundle/16538',
   });
+});
+
+test('describeListRef: a bundle is named by its last-known title when the naming has one', () => {
+  const naming = { ...NAMING, bundle: (id) => (id === '16538' ? { title: 'Trine Pack' } : null) };
+  assert.deepEqual(describeListRef({ kind: 'bundle', bundleId: '16538' }, naming), {
+    label: 'Trine Pack',
+    href: '/lists/bundle/16538',
+  });
+  assert.equal(describeListRef({ kind: 'bundle', bundleId: '1' }, naming).label, 'Bundle 1');
 });
 
 test('describeListRef: recent-games points at the Recently Looked Up route', () => {
@@ -90,6 +99,14 @@ test('describeListRef: a soft-deleted source list still resolves, and says why i
   assert.equal(desc.label, 'Old comparison');
   assert.equal(desc.href, '/lists/gone');
   assert.match(desc.problem, /deleted, and kept only because this formula uses it/);
+  assert.ok(!desc.countsAsEmpty, 'it still contributes its games');
+});
+
+test('describeListRef: an orphaned bundle list says where its games come from', () => {
+  const naming = { ...NAMING, list: () => ({ name: 'Pack (no longer listed)', deleted: true, orphaned: true }) };
+  const desc = describeListRef({ kind: 'user', listId: 'o' }, naming);
+  assert.match(desc.problem, /no longer lists this bundle; these are its last-known games/);
+  assert.ok(!desc.countsAsEmpty);
 });
 
 test('describeListRef: a hard-deleted source list is a named hole, not a silent omission', () => {
@@ -97,6 +114,7 @@ test('describeListRef: a hard-deleted source list is a named hole, not a silent 
   assert.equal(desc.label, 'A list that no longer exists');
   assert.equal(desc.href, null);
   assert.match(desc.problem, /deleted/);
+  assert.equal(desc.countsAsEmpty, true);
 });
 
 test('describeListRef: a ref saved without its id is reported rather than rendered as a real source', () => {
@@ -104,6 +122,7 @@ test('describeListRef: a ref saved without its id is reported rather than render
     const desc = describeListRef(ref, NAMING);
     assert.equal(desc.href, null, ref.kind);
     assert.match(desc.problem, /names no /, ref.kind);
+    assert.equal(desc.countsAsEmpty, true, ref.kind);
   }
 });
 

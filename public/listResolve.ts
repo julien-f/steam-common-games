@@ -15,9 +15,10 @@
 import type { GameList, ListRef, CombineOp } from './types.ts';
 import { combine, type LabeledSet, type CombineResult } from './combine.ts';
 import { fetchAccountOwnedData, fetchAccountWishlistData } from './accountData.ts';
-import { fetchBundleAppids } from './bundleData.ts';
+import { fetchBundleContents, BundleNotFoundError } from './bundleData.ts';
 import { loadRecentGames } from './recentGames.ts';
-import { getList } from './listsStore.ts';
+import { getList, isBundleReferenced, orphanBundle } from './listsStore.ts';
+import { getBundleSnapshot, rememberBundle } from './bundleSnapshots.ts';
 
 export interface ListResolveFetchers {
   accountOwned(accountId: string): Promise<Set<number>>;
@@ -200,8 +201,28 @@ export function createDefaultFetchers({
     // No refresh and no age for the other two: GET /api/bundles/:id has no force path at all
     // (server.js — finding one bundle walks several cached pages, so forcing it costs several
     // upstream calls), and the recent-games list is this browser's own localStorage.
-    bundle: fetchBundleAppids,
+    bundle: (bundleId) => resolveBundleSource(bundleId),
     recentGames: async () => new Set(loadRecentGames().map((g) => g.appid)),
     getList,
   };
+}
+
+// A bundle source, backed by its bundleSnapshots.ts entry: refreshed on every successful fetch
+// (for a bundle a saved list uses), turned into an orphan list once ITAD no longer lists it
+// (listsStore.ts's orphanBundle), and standing in for it through any other failure — so one
+// bundle can't fail the whole list. `fetchContents` is injectable for tests.
+export async function resolveBundleSource(
+  bundleId: string,
+  fetchContents: typeof fetchBundleContents = fetchBundleContents,
+): Promise<Set<number>> {
+  try {
+    const { title, appids } = await fetchContents(bundleId);
+    if (isBundleReferenced(bundleId)) rememberBundle(bundleId, title, appids);
+    return appids;
+  } catch (err) {
+    if (err instanceof BundleNotFoundError) return new Set(orphanBundle(bundleId)?.appids ?? []);
+    const snapshot = getBundleSnapshot(bundleId);
+    if (snapshot) return new Set(snapshot.appids);
+    throw err;
+  }
 }

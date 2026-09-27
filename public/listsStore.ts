@@ -15,6 +15,7 @@
 import { getPref, setPref } from './prefs.ts';
 import { union, subtract } from './combine.ts';
 import { EMPTY_RANKING, type RankingState } from './ranking.ts';
+import { getBundleSnapshot, pruneBundleSnapshots } from './bundleSnapshots.ts';
 import type { Folder, GameList, ListRef, CombineOp } from './types.ts';
 
 const LISTS_KEY = 'lists';
@@ -121,6 +122,11 @@ export function isDescendantFolder(
 
 export function isListReferenced(listId: string, lists: GameList[] = readLists()): boolean {
   return lists.some((l) => !l.deletedAt && listDeps(l).some((s) => s.kind === 'user' && s.listId === listId));
+}
+
+// Any list, soft-deleted ones included: they're kept only while resolvable, so they resolve too.
+export function isBundleReferenced(bundleId: string, lists: GameList[] = readLists()): boolean {
+  return lists.some((l) => listDeps(l).some((s) => s.kind === 'bundle' && s.bundleId === bundleId));
 }
 
 export function isAccountReferenced(accountId: string, lists: GameList[] = readLists()): boolean {
@@ -315,6 +321,7 @@ export function updateDynamicList(id: string, op: CombineOp, sources: ListRef[])
   const updated: GameList = { ...lists[idx], op, sources, updatedAt: Date.now() };
   lists[idx] = updated;
   writeLists(lists);
+  sweepDeletedLists();
   return updated;
 }
 
@@ -328,6 +335,7 @@ export function updateRankedSource(id: string, source: ListRef): GameList {
   const updated: GameList = { ...lists[idx], source, updatedAt: Date.now() };
   lists[idx] = updated;
   writeLists(lists);
+  sweepDeletedLists();
   return updated;
 }
 
@@ -373,6 +381,7 @@ export function deleteList(id: string): { softDeleted: boolean } {
   const [removed] = lists.splice(idx, 1);
   writeLists(lists);
   if (removed.kind === 'ranked') dropRanking(id);
+  sweepDeletedLists(); // it may have been the last reference to a soft-deleted list
   return { softDeleted: false };
 }
 
@@ -388,10 +397,57 @@ export function restoreList(id: string): void {
 // Permanently purges any soft-deleted list no longer referenced by anything — call after any
 // change that could have removed the last reference to a soft-deleted list (e.g. a dynamic
 // list's sources being edited, or another soft-deleted list itself finally being purged).
+// Repeats until stable (a purged list may have been the last reference to another), then drops
+// the bundle snapshots nothing refers to any more.
 export function sweepDeletedLists(): number {
   const lists = readLists();
-  const kept = lists.filter((l) => !l.deletedAt || isListReferenced(l.id, lists));
+  let kept = lists;
+  for (;;) {
+    const next = kept.filter((l) => !l.deletedAt || isListReferenced(l.id, kept));
+    if (next.length === kept.length) break;
+    kept = next;
+  }
   if (kept.length !== lists.length) writeLists(kept);
   for (const l of lists) if (l.kind === 'ranked' && !kept.includes(l)) dropRanking(l.id);
+  const bundles = new Set(
+    kept.flatMap((l) => listDeps(l).flatMap((s) => (s.kind === 'bundle' && s.bundleId ? [s.bundleId] : []))),
+  );
+  pruneBundleSnapshots(bundles);
   return lists.length - kept.length;
+}
+
+// For when ITAD no longer lists a bundle some saved list uses (GET /api/bundles/:id 404s): its
+// last-known games become a hidden (soft-deleted) manual list that every such source is re-pointed
+// at, so those lists keep their contents; the sweep purges it once nothing refers to it. Returns
+// it, or nothing when there's no snapshot to keep or no list using the bundle.
+export function orphanBundle(bundleId: string): GameList | undefined {
+  const snapshot = getBundleSnapshot(bundleId);
+  const lists = readLists();
+  if (!snapshot || !isBundleReferenced(bundleId, lists)) return undefined;
+  const now = Date.now();
+  const orphan: GameList = {
+    id: genId(),
+    name: `${snapshot.title} (no longer listed)`,
+    parentId: null,
+    order: nextOrder(null),
+    createdAt: now,
+    updatedAt: now,
+    kind: 'manual',
+    appids: snapshot.appids,
+    orphanOf: { bundleId },
+    deletedAt: now,
+  };
+  const repoint = (ref: ListRef): ListRef =>
+    ref.kind === 'bundle' && ref.bundleId === bundleId ? { kind: 'user', listId: orphan.id } : ref;
+  // updatedAt left alone: the list's contents didn't change, only where they're read from.
+  const rewritten = lists.map((l) =>
+    l.kind === 'dynamic'
+      ? { ...l, sources: (l.sources ?? []).map(repoint) }
+      : l.kind === 'ranked' && l.source
+        ? { ...l, source: repoint(l.source) }
+        : l,
+  );
+  writeLists([...rewritten, orphan]);
+  sweepDeletedLists();
+  return orphan;
 }

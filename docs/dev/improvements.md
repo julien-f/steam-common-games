@@ -45,7 +45,6 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 
 ## Bundles and prices
 
-- **U20 · blocker · B3** — a bundle can't be a combine source (`CombineForm.tsx`), so "what does this bundle add for the household" can't be built — README's tagline promises it. Allow bundle sources (e.g. "Combine…" on the bundle page).
 - **U21 · major · B1** — "Cheapest tier" mixes $ and € in one sortable column (region EUR). Convert, or sort per currency and flag USD-only shops.
 - **U22 · major · B1** — a bundle page has no "new to you" summary; the owned marker (yellow name + ✓) has no legend. Tile: "Adds N games · €X at best deal".
 - **U23 · minor · B1** — every game in a three-tier bundle showed the first tier's price; check the tier mapping against ITAD.
@@ -75,6 +74,8 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 - **U36 · minor · A2** — the nav chip's switcher doesn't mark which account is mine (★).
 - **U37 · minor · A1, A2** — a stored account slot's `label` is never refreshed from what the account card fetches: a slot without one (seeded, or resolved before labels existed) stays a steam64 id in the chip, Recent accounts, list labels and page title.
 - **U38 · minor · A4** — a private friends list shows "Friends (0)" plus two overlapping lines. "Friends (private)".
+
+- **U44 · minor · B3** — a combined list built from a bundle drops the bundle's games with no Steam listing without a word; the bundle page lists them below its table. Say how many were left out, on the formula line.
 
 ## Consistency and polish
 

@@ -23,12 +23,12 @@ const COMBINE_OPS: { value: CombineOp; label: string }[] = (Object.keys(OP_LABEL
 }));
 
 export function refKey(ref: ListRef): string {
-  return [ref.kind, ref.accountId ?? ref.listId].filter(Boolean).join(':');
+  return [ref.kind, ref.accountId ?? ref.listId ?? ref.bundleId].filter(Boolean).join(':');
 }
 
 // Every source a combine can currently be built from — any recent account's Owned/Wishlist,
-// Recently Looked Up, or any existing user list. Not a bundle (would need its own bundle-picker
-// UI, not just a checkbox) — see HomeRoute.tsx's header comment. `excludeListId` keeps a dynamic
+// Recently Looked Up, or any existing user list. A bundle arrives only as a prefilled source
+// (see HomeRoute.tsx's header comment and options() below). `excludeListId` keeps a dynamic
 // list being edited from being offered as a source for itself.
 export function sourceOptions(excludeListId?: string): SourceOption[] {
   const naming = createDefaultNaming();
@@ -71,8 +71,15 @@ export function CombineForm(props: CombineFormProps) {
     return props.showName ?? true;
   }
 
+  // Plus any prefilled source the usual enumeration doesn't offer (a bundle, a `?u=` account).
   function options(): SourceOption[] {
-    return sourceOptions(props.excludeListId);
+    const base = sourceOptions(props.excludeListId);
+    const keys = new Set(base.map((o) => o.key));
+    const naming = createDefaultNaming();
+    const extra = (props.initialSources ?? [])
+      .filter((ref) => !keys.has(refKey(ref)))
+      .map((ref) => ({ key: refKey(ref), label: describeListRef(ref, naming).label, ref }));
+    return [...extra, ...base];
   }
 
   function selectedSources(): ListRef[] {
