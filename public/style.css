@@ -4560,3 +4560,26 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
+
+/* Phone game tables: a capsule-sized thumbnail and tighter cells, so rating and length fit
+   beside the name rather than off to the right. */
+@media (max-width: 600px) {
+  .game-thumb {
+    width: 64px;
+    height: 24px;
+  }
+  .dt-td,
+  .dt-th {
+    padding: 6px 8px;
+  }
+  .td-name {
+    min-width: 0;
+  }
+  .dt-th {
+    white-space: normal;
+  }
+  .list-route,
+  .bundles-browse-route {
+    padding: 16px 12px 40px;
+  }
+}

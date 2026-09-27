@@ -59,7 +59,7 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 
 ## Phone
 
-- **U30 · major · I1, F3** — on a 390 px table the thumbnail takes ~40 % of the width, only name and rating fit, and the table starts halfway down. Smaller thumbnail or card rows; compact the header.
+- **U30 · minor · I1, F3** — on a 390 px phone the table now shows name, rating and length, but still starts ~56 % down the screen: the hero card, status line, Share/Reset row and a two-line toolbar sit above it. Collapse them (e.g. hero tiles folded, toolbar on one row).
 - **U31 · minor · I1** — the game panel is shifted 15 px off the left edge (x = −15), clipping content; the page scrollbar shows beside it.
 - **U32 · minor · I1, R1** — the ranking screen stacks cards vertically (Tie/Skip/Undo below the fold) and has no side gutter.
 - **U33 · minor · F3** — no random pick on phone until a panel is open (the 🎲 lives in the panel's nav).
