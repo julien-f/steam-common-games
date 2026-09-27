@@ -79,7 +79,7 @@ export default function RankRoute() {
     const token = ++loadToken;
     const list = getList(params.listId!);
     if (!list || list.kind !== 'ranked') {
-      setStatus('This ranked list no longer exists.');
+      setStatus("This ranked list isn't in this browser: it was deleted, or it was made in another one.");
       return;
     }
     const name = listDisplayName(list, createDefaultNaming());

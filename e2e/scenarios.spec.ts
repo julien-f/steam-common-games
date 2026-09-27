@@ -56,6 +56,12 @@ test('A2: explore a friend, then switch back to my ★ account from the nav chip
   await expect(page.getByRole('navigation')).toContainText('Alice');
 });
 
+test("S3 edge: another browser's list link explains lists are local", async ({ page }) => {
+  await page.goto('/lists/not-in-this-browser');
+  await expect(page.getByText("This list isn't in this browser")).toBeVisible();
+  await expect(page.getByText('Share list')).toBeVisible();
+});
+
 test('C1: compare three players — one table grouped from "all" to "only one"', async ({ page }) => {
   await page.goto('/lists/compare?u=alice&u=bob&u=carol');
   await expect(groupRows(page)).toHaveCount(6);

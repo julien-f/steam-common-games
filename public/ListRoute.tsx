@@ -1782,7 +1782,10 @@ export default function ListRoute() {
       // the one table is grouped by it (membershipColumn.ts).
       const list = getList(params.listId!);
       if (!list) {
-        setStatusText('This list no longer exists.');
+        // Also what a /lists/<id> link from someone else's browser lands on.
+        setStatusText(
+          "This list isn't in this browser: it was deleted, or it was made in another one — lists live in the browser that created them. To send a list, use its 🔗 Share list link.",
+        );
         return;
       }
       setUserList(list);

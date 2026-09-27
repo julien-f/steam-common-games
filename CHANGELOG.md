@@ -274,6 +274,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- A link to a list from someone else's browser explains that lists live in the browser that made them, and points to 🔗 Share list, instead of saying the list no longer exists.
 - A private friends list reads "Friends (private)" rather than "Friends (0)" followed by a second, redundant "No public friends found".
 - Owned and Wishlist with no account set link to Home to pick one, instead of showing "Games 0".
 - On a phone, the game panel no longer sits partly off the left edge of the screen.
