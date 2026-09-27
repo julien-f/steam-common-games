@@ -8,6 +8,7 @@ const {
   parseDirectAppid,
   gameSearchResultHtml,
   gameSearchSectionHtml,
+  gameSearchEmptyHtml,
   gameSearchMoreHtml,
   shouldShowRecents,
 } = require('../public/gameSearch.ts');
@@ -110,6 +111,14 @@ test('gameSearchSectionHtml: escapes its label and stays out of the listbox opti
   assert.ok(html.includes('Recently &lt;looked&gt; up'));
   assert.ok(html.includes('role="presentation"'));
   assert.ok(!html.includes('role="option"'));
+});
+
+test('gameSearchEmptyHtml: names the term, escaped, and tells a failure from no match', () => {
+  const none = gameSearchEmptyHtml('<b>zz</b>');
+  assert.ok(none.includes('No games match'));
+  assert.ok(none.includes('&lt;b&gt;zz&lt;/b&gt;'));
+  assert.ok(none.includes('role="status"'));
+  assert.ok(gameSearchEmptyHtml('zz', true).includes('Search failed'));
 });
 
 test('gameSearchMoreHtml: renders a selectable, non-focusable option row', () => {

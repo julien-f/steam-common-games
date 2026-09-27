@@ -86,6 +86,12 @@ export function gameSearchSectionHtml(label: string): string {
   return `<div class="game-search-section" role="presentation">${esc(label)}</div>`;
 }
 
+// Shown in place of results, so an empty or failed search doesn't look like nothing happened.
+export function gameSearchEmptyHtml(term: string, failed = false): string {
+  const text = failed ? 'Search failed — try again' : `No games match “${term}”`;
+  return `<div class="game-search-empty" role="status">${esc(text)}</div>`;
+}
+
 export function gameSearchMoreHtml(label: string, active = false): string {
   return `<button type="button" id="game-search-more-opt" role="option" aria-selected="${active}" tabindex="-1"
     class="game-search-more${active ? ' active' : ''}">${esc(label)}</button>`;
@@ -219,10 +225,18 @@ export function initGameSearch({
       const data = await res.json();
       if (fetchId !== activeFetch) return; // a newer keystroke's request already landed
       lastTerm = term;
-      showResults(res.ok ? data.results || [] : []);
+      const results = res.ok ? data.results || [] : [];
+      if (results.length) showResults(results);
+      else showEmpty(term, !res.ok);
     } catch {
-      if (fetchId === activeFetch) hideResults();
+      if (fetchId === activeFetch) showEmpty(term, true);
     }
+  }
+
+  function showEmpty(term: string, failed: boolean) {
+    hideResults();
+    resultsEl.innerHTML = gameSearchEmptyHtml(term, failed);
+    resultsEl.hidden = false;
   }
 
   function pick(game: GameSearchResult) {

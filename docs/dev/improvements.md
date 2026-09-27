@@ -25,7 +25,6 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 
 - **U4 · major · A1, F3** — first load of a large library is slow by design (≈ 8 min for 1,179 games; uncached details are throttled), with only "368 / 1179 games loaded…" and unloaded games absent from the table. Progress bar, ETA, one line on why.
 - **U5 · major · A1, F1** — while streaming into a sorted table, rows get inserted above the pointer and columns change width, so clicks land on the wrong game. Fix column widths; append or hold new rows ("N new — show").
-- **U6 · minor · F1** — nav search with no match shows nothing at all. Add an empty state.
 - **U7 · minor · L3** — Reset view drops sort/filters instantly with no undo.
 
 ## Lists and selection

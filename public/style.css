@@ -934,6 +934,11 @@ tbody td {
   letter-spacing: 0.6px;
   color: var(--text2);
 }
+.game-search-empty {
+  padding: 10px;
+  font-size: 13px;
+  color: var(--text2);
+}
 .game-search-more {
   display: block;
   width: 100%;

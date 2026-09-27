@@ -262,6 +262,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- The game search box now says when nothing matches, or when the search itself failed, instead of showing nothing.
 - The row whose game is open in the side panel is now highlighted, so stepping with ↑/↓ no longer loses your place in the table.
 - Esc in the game search box now leaves it once the dropdown is closed — shortcuts pressed afterwards (`?`, `R`, …) used to be typed into the box.
 - 🔗 Share view on Owned and Wishlist now carries the account being shown (`?u=`) — the recipient used to land on their own list, or on "No account selected".
