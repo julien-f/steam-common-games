@@ -27,7 +27,6 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 ## Lists and selection
 
 - **U11 · minor · F3** — Filter popover: category pane too narrow (scrolls sideways); the range shows no field label and raw floats (`0 – 99.0202584`, `380.2666…`); "never played" needs max = 0 and then reads "Played (h): 0–0". Label and round; add a "never played" preset.
-- **U12 · minor · L2** — an unnamed Subtract list's `∖` reads as `|` in the tree's italic font. Use "minus" or `−`.
 - **U13 · minor · L2, B3** — a dynamic list built from the Wishlist loses its price columns. Keep them when a source has them.
 
 ## Comparing

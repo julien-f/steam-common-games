@@ -38,7 +38,7 @@ export const OP_DESCRIPTIONS: Record<CombineOp, string> = {
 export const OP_SYMBOLS: Record<CombineOp, string> = {
   union: '∪',
   intersect: '∩',
-  subtract: '∖',
+  subtract: '−', // U+2212 minus: the set-minus ∖ reads as | in italics
   'group-by-membership': '+',
 };
 
@@ -203,7 +203,7 @@ export function createDefaultNaming(depth = 0): ListNaming {
       const found = getLists({ includeDeleted: true }).find((l) => l.id === listId);
       if (!found) return null;
       // An unnamed source list is described by its own formula, parenthesized: a formula reading
-      // "Alice — Owned ∩ Bob — Owned ∖ Demos" would otherwise be unparseable as one term.
+      // "Alice — Owned ∩ Bob — Owned − Demos" would otherwise be unparseable as one term.
       const name =
         found.name ||
         (depth < 1 ? `(${listDisplayName(found, createDefaultNaming(depth + 1))})` : 'Untitled combined list');

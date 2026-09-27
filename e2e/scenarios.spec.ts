@@ -116,7 +116,7 @@ test('B1: a bundle, then what it adds to my library', async ({ page }) => {
 
   await page.getByRole('link', { name: 'What does this add?' }).click();
   await page.getByRole('button', { name: 'Create combined list' }).click();
-  await expect(page.getByRole('heading', { name: 'Test Co-op Pack ∖ Alice — Owned' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Test Co-op Pack − Alice — Owned' })).toBeVisible();
   await expect(rows(page)).toHaveCount(2);
   await expect(row(page, 'Overcooked! 2')).toHaveCount(1);
   await expect(row(page, 'It Takes Two')).toHaveCount(1);

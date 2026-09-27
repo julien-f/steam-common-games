@@ -48,6 +48,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- Subtract reads with a minus sign ("Owned − Couch co-op picks"): the set-minus sign looked like `|` in the list tree's italics.
 - A comparison, or any list grouped by membership, is now one table grouped by "Owned by" instead of one table per group: sort, filters and columns are set once and saved, rows can be selected, and each group says who's in and who's missing ("Alice + Bob — not Carol", "All 3", "Only Carol").
 - Opening a 🔗 Share view link no longer replaces your own saved layout for that kind of list: the shared one applies to that visit, with **Keep as my layout** / **Use my own**.
 - The `pre-commit` hook is now version-controlled (`.githooks/`, enabled by `npm install`) and checks whitespace, formatting, typecheck and lint as well as the tests.

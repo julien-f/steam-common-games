@@ -172,7 +172,7 @@ test('formatFormula: joins sources with the op symbol', () => {
       ]),
       NAMING,
     ),
-    'Alice — Wishlist ∖ Co-op night',
+    'Alice — Wishlist − Co-op night',
   );
 });
 
