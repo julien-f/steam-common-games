@@ -46,7 +46,6 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 ## Keyboard and accessibility
 
 - **U28 · polish · I2** — the open game's row is highlighted, but not exposed to assistive tech (`aria-current`); the table library has no per-row attribute hook.
-- **U29 · minor · I2** — Tab reaches the Close button of the hidden shortcuts dialog. Make it `inert` while closed.
 
 ## Phone
 

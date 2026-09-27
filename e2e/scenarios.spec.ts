@@ -150,6 +150,13 @@ test('I2: into a list from the keyboard — skip link, and R with no panel open'
   await page.keyboard.press('Enter');
   expect(await page.evaluate(() => document.activeElement?.closest('tbody') != null)).toBe(true);
 
+  // The closed shortcuts dialog isn't a Tab stop; open, it is.
+  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts', includeHidden: true });
+  await expect(dialog).toHaveAttribute('inert', '');
+  await page.keyboard.press('?');
+  await expect(dialog).not.toHaveAttribute('inert');
+  await dialog.getByRole('button', { name: 'Close' }).click();
+
   await page.keyboard.press('r');
   await expect(page).toHaveURL(/[?&]game=\d+/);
   await expect(page.locator('.game-panel')).toBeVisible();

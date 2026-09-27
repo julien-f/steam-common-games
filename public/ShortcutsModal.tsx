@@ -70,6 +70,8 @@ export function ShortcutsModal(props: { open: boolean; onClose: () => void }): J
         aria-modal="true"
         aria-label="Keyboard shortcuts"
         aria-hidden={props.open ? undefined : 'true'}
+        // Hidden with CSS, so without this its Close button was still a Tab stop.
+        inert={!props.open}
       >
         <div class="shortcuts-header">
           <span class="shortcuts-title">Keyboard shortcuts</span>
