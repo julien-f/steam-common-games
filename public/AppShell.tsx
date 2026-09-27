@@ -117,6 +117,20 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
   // so an unrelated param write (a panel `?game=`, a lightbox `&shot=`) costs nothing.
   createEffect(() => syncAccountOverrideFromUrl(location.search));
 
+  // Highlights the open game's row in whichever table shows it. A generated rule rather than a
+  // class on the <tr>: rows are re-rendered by streaming, paging and sorting, which would drop it.
+  const openRowStyle = document.createElement('style');
+  document.head.appendChild(openRowStyle);
+  onCleanup(() => openRowStyle.remove());
+  createEffect(() => {
+    const appid = getPanelGame()?.appid;
+    openRowStyle.textContent =
+      appid == null
+        ? ''
+        : `.dt-tr[data-row-key="${appid}"] { background: var(--color-background-info); }` +
+          `.dt-tr[data-row-key="${appid}"] > .dt-td:first-child { box-shadow: inset 3px 0 0 var(--accent); }`;
+  });
+
   // Scroll to the top on navigation. The router does this itself (`window.scrollTo(0, 0)` on
   // every non-hash navigation), which no longer reaches the desktop layout's own scroller — so
   // without this a route change would land wherever the previous one was scrolled to.
