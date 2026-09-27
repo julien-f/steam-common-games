@@ -1,6 +1,6 @@
 # Scenarios
 
-What users come to the app to get done. The input for design reviews (walk each one, judge the friction) and for end-to-end tests (★ marks the ones worth locking in first).
+What users come to the app to get done. The input for design reviews (walk each one, judge the friction) and for end-to-end tests: ★ marks the ones locked in by `e2e/scenarios.spec.ts` (`npm run test:e2e`) — A1, C1, L1, R1, B1, F1, S1 so far; F3 is still to add.
 
 Each scenario: **who / goal**, **steps** as a user would take them, **expect** — what must be true at the end — and **edges** worth checking. ◇ marks a step or outcome the app doesn't support yet — the target flow a design review should push toward.
 

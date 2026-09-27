@@ -1,0 +1,145 @@
+// docs/dev/scenarios.md's ★ scenarios, end to end against mocked data (mockApi.ts).
+import { test, expect, type Page } from '@playwright/test';
+import { mockApi } from './mockApi.ts';
+import { asPlayer } from './state.ts';
+import { ALICE } from './fixtures.ts';
+
+let pageErrors: string[];
+test.beforeEach(async ({ page }) => {
+  pageErrors = [];
+  page.on('pageerror', (err) => pageErrors.push(err.message));
+  await mockApi(page);
+});
+test.afterEach(() => {
+  expect(pageErrors, 'uncaught page errors').toEqual([]);
+});
+
+const rows = (page: Page) => page.locator('tbody tr:not(.dt-group-row)');
+const row = (page: Page, name: string) => rows(page).filter({ hasText: name });
+const groupRows = (page: Page) => page.locator('.dt-group-row');
+
+test('A1: first visit — resolve my account, then open my library', async ({ page }) => {
+  await page.goto('/');
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('alice');
+  await page.getByRole('button', { name: 'Set as current account' }).click();
+  await expect(page.getByRole('main')).toContainText('Owned: 6');
+
+  await page.getByRole('main').getByRole('link', { name: 'Owned', exact: true }).click();
+  await expect(rows(page)).toHaveCount(6);
+  await expect(row(page, 'Hades')).toContainText('44.5');
+
+  await page.reload();
+  await expect(page.getByRole('navigation')).toContainText('Alice');
+  await expect(rows(page)).toHaveCount(6);
+});
+
+test('C1: compare three players — one table grouped from "all" to "only one"', async ({ page }) => {
+  await page.goto('/lists/compare?u=alice&u=bob&u=carol');
+  await expect(groupRows(page)).toHaveCount(6);
+  const labels = await groupRows(page).allInnerTexts();
+  expect(labels.map((l) => l.replace(/\s+/g, ' '))).toEqual([
+    expect.stringContaining('All 3'),
+    expect.stringContaining('Alice + Bob — not Carol'),
+    expect.stringContaining('Bob + Carol — not Alice'),
+    expect.stringContaining('Only Alice'),
+    expect.stringContaining('Only Bob'),
+    expect.stringContaining('Only Carol'),
+  ]);
+  // One toolbar, and the comparison lives in the URL alone (nothing stored as "my" account).
+  await expect(page.getByRole('button', { name: 'Columns' })).toHaveCount(1);
+  expect(await page.evaluate(() => localStorage.getItem('steam.isonoe.net:prefs') ?? '')).not.toContain(
+    'currentAccount',
+  );
+});
+
+test('L1: select games, add them to a new list, open it', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Portal 2').getByRole('checkbox').check();
+  await row(page, 'Terraria').getByRole('checkbox').check();
+
+  const toolbar = page.locator('.selection-toolbar');
+  await toolbar.getByRole('combobox').selectOption({ label: '+ Create new list…' });
+  await page.getByRole('textbox', { name: 'New list name' }).fill('To play with Bob');
+  await page.keyboard.press('Enter');
+
+  const toast = page.getByRole('status').filter({ hasText: 'Added 2 game(s) to new list "To play with Bob"' });
+  await expect(toast).toBeVisible();
+  await toast.getByRole('link', { name: 'Open list' }).click();
+  await expect(page.getByRole('heading', { name: 'To play with Bob' })).toBeVisible();
+  await expect(rows(page)).toHaveCount(2);
+});
+
+test('R1: rank chosen games, stop, resume on the same ones', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  for (const name of ['Portal 2', 'Terraria', 'Hades']) await row(page, name).getByRole('checkbox').check();
+  await page.getByRole('button', { name: '🏆 Rank 3 games' }).click();
+
+  await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('Escape');
+
+  const resume = page.getByRole('button', { name: /^Continue: \d+ chosen left$/ });
+  await expect(resume).toBeVisible();
+  await resume.click();
+  await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
+});
+
+test('B1: a bundle, then what it adds to my library', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/bundles');
+  await page.getByRole('cell', { name: 'Test Co-op Pack' }).click();
+  await expect(page.getByRole('heading', { name: 'Test Co-op Pack' })).toBeVisible();
+  await expect(rows(page)).toHaveCount(4);
+  // A game with no Steam listing is listed apart, not dropped.
+  await page.getByRole('button', { name: /1 more in this bundle, not on Steam/ }).click();
+  await expect(page.getByText('Test Soundtrack')).toBeVisible();
+
+  await page.getByRole('link', { name: 'What does this add?' }).click();
+  await page.getByRole('button', { name: 'Create combined list' }).click();
+  await expect(page.getByRole('heading', { name: 'Test Co-op Pack ∖ Alice — Owned' })).toBeVisible();
+  await expect(rows(page)).toHaveCount(2);
+  await expect(row(page, 'Overcooked! 2')).toHaveCount(1);
+  await expect(row(page, 'It Takes Two')).toHaveCount(1);
+});
+
+test('F1: look up one game from the nav search, in place', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await page.keyboard.press('/');
+  await page.keyboard.type('hollow');
+  await page.getByRole('option', { name: /Hollow Knight/ }).click();
+  await expect(page).toHaveURL(/\/lists\/owned\?game=367520/);
+  await expect(page.locator('.game-panel')).toContainText('Hollow Knight');
+
+  // Esc closes the panel; a second one leaves the search box, so shortcuts work again.
+  await page.keyboard.press('/');
+  await page.keyboard.type('zz');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT');
+});
+
+test("S1: share my wishlist's view; a fresh browser sees my games with my layout", async ({ page, browser }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await expect(rows(page)).toHaveCount(2);
+  await page.locator('thead th').filter({ hasText: /^Name/ }).click();
+  await page.evaluate(() => {
+    (window as unknown as { copied: string[] }).copied = [];
+    navigator.clipboard.writeText = async (text) => void (window as unknown as { copied: string[] }).copied.push(text);
+  });
+  await page.getByRole('button', { name: /Share view/ }).click();
+  const link = await page.evaluate(() => (window as unknown as { copied: string[] }).copied[0]);
+  expect(new URL(link).searchParams.get('u')).toBe(ALICE.steamid);
+
+  const friend = await (await browser.newContext()).newPage();
+  friend.on('pageerror', (err) => pageErrors.push(err.message));
+  await mockApi(friend);
+  await friend.goto(link);
+  await expect(friend.getByRole('heading', { name: "Alice's Wishlist" })).toBeVisible();
+  await expect(friend.getByText('This table uses a layout from a shared link')).toBeVisible();
+  await expect(rows(friend)).toHaveCount(2);
+});

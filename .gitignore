@@ -8,3 +8,5 @@ db.sqlite
 db.sqlite-wal
 db.sqlite-shm
 .playwright-mcp/
+test-results/
+playwright-report/

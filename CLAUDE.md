@@ -5,7 +5,7 @@ Working conventions for this repo. Documentation lives in `docs/` — keep it th
 ## Project context
 
 - **Stack**: Node >=22.13 + Express 5 backend, Solid + TypeScript frontend bundled by Vite, `node:sqlite` for `db.sqlite`; npm. Setup, dev servers and ports are in [README.md](README.md).
-- **Tests**: `node:test` + `supertest`, flat in `test/*.test.{js,ts}`; `npm test` runs with `DB_FILE=` so no real database is touched.
+- **Tests**: `node:test` + `supertest`, flat in `test/*.test.{js,ts}`; `npm test` runs with `DB_FILE=` so no real database is touched. End-to-end: `npm run test:e2e` (Playwright, `e2e/`) runs [scenarios.md](docs/dev/scenarios.md)'s ★ scenarios with every `/api` call mocked in the browser — no backend, no upstream traffic; fixtures use made-up accounts only. Not in the pre-commit hook: run it when a change touches one of those flows.
 - **Types**: `tsc --noEmit`, strict, over `public/**/*.{ts,tsx}` only — the backend is plain JS.
 - **Lint**: `eslint public`, via eslint-plugin-solid.
 - **Format**: Prettier over the whole tree (`.prettierrc.json`); `npm run format` rewrites, `npm run format:check` verifies.
