@@ -37,7 +37,6 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 
 ## Bundles and prices
 
-- **U22 · major · B1** — a bundle page has no "new to you" summary; the owned marker (yellow name + ✓) has no legend. Tile: "Adds N games · €X at best deal".
 - **U23 · minor · B1** — every game in a three-tier bundle showed the first tier's price; check the tier mapping against ITAD.
 
 ## Ranking

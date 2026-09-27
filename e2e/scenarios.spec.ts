@@ -108,6 +108,8 @@ test('B1: a bundle, then what it adds to my library', async ({ page }) => {
   await page.getByRole('cell', { name: 'Test Co-op Pack' }).click();
   await expect(page.getByRole('heading', { name: 'Test Co-op Pack' })).toBeVisible();
   await expect(rows(page)).toHaveCount(4);
+  // Alice owns two of the four: what the bundle adds, and at what price.
+  await expect(page.locator('.list-hero')).toContainText(/New to you\s*2 of 4\s*≈ .+ at best deals/i);
   // A game with no Steam listing is listed apart, not dropped.
   await page.getByRole('button', { name: /1 more in this bundle, not on Steam/ }).click();
   await expect(page.getByText('Test Soundtrack')).toBeVisible();

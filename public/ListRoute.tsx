@@ -115,6 +115,7 @@ import {
 import { getPref, setPref } from './prefs.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
 import { etaSeconds, formatEta, type LoadSample } from './loadProgress.ts';
+import { convert, REGION_CURRENCY } from './currency.ts';
 import {
   membershipColumn,
   membershipKey,
@@ -2255,6 +2256,24 @@ export default function ListRoute() {
           unresolved > 0 ? `${bundleResolvedCount()} of ${bundleResolvedCount() + unresolved}` : bundleResolvedCount(),
         sub: unresolved > 0 ? 'on Steam' : undefined,
         title: meta.itadCount != null ? `IsThereAnyDeal lists ${meta.itadCount} in this bundle` : undefined,
+      });
+    }
+    // What the bundle adds for the current account: its Steam games not in the library, and what
+    // those cost at their best deal right now (summed in the region's currency, currency.ts) —
+    // the "is it worth it" sum the table otherwise leaves to the reader. Once ownership is known.
+    const account = getEffectiveCurrentAccount();
+    if (account && rowsStore.length > 0 && rowsStore.every((r) => r.inLibrary != null)) {
+      const fresh = rowsStore.filter((r) => !r.inLibrary);
+      const target = REGION_CURRENCY[resolveRegion(getStoredRegion())] ?? 'USD';
+      const priced = fresh.map((r) =>
+        r.bestDealPrice == null ? null : convert(r.bestDealPrice, r.priceCurrency ?? target, target),
+      );
+      const total = priced.every((p) => p != null) ? priced.reduce((sum, p) => sum! + p!, 0)! : null;
+      tiles.push({
+        label: 'New to you',
+        value: `${fresh.length} of ${rowsStore.length}`,
+        sub: fresh.length && total != null ? `≈ ${formatMoney(total, target)} at best deals` : undefined,
+        title: `Games here that aren't in ${accountDisplayLabel(account)}'s library — the ones that are carry a ✓ in the table`,
       });
     }
     if (meta.tiers.length > 0) {

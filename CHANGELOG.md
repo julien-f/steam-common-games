@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- A bundle's page says what it adds for you: **New to you · 2 of 5 · ≈ €7.47 at best deals** — the games in it you don't own, and what they'd cost bought separately right now.
 - **Move to…** on every list and folder in Home's tree, to file a list into a folder (or out of one) after creating it.
 - End-to-end tests (`npm run test:e2e`, Playwright) for the starred scenarios, against mocked API data: no backend or upstream traffic needed.
 - A list's loading line has a progress bar and an estimate of the time left, and says why when a large library takes minutes (details for games not seen before are fetched a few at a time).
