@@ -121,6 +121,7 @@ import {
 } from './urlState.ts';
 import { getPref, setPref } from './prefs.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
+import { etaSeconds, formatEta, type LoadSample } from './loadProgress.ts';
 import {
   getEffectiveCurrentAccount,
   accountIdentifiers,
@@ -975,6 +976,10 @@ export default function ListRoute() {
   let activeGroupKey: string | null = null; // whichever group the currently-open game belongs to, for prev/next/random
   let total = 0;
   let loaded = 0;
+  let loadSamples: LoadSample[] = [];
+  let slowLoad = false;
+  // 0–1 while a list's game details stream in, null otherwise — the status line's progress bar.
+  const [loadFraction, setLoadFraction] = createSignal<number | null>(null);
   // kind === 'recent' only: the one row addRecentGame should persist once its data streams in —
   // set by openOrAddRecentGame right before kicking off that row's own stream call, cleared once
   // the matching event lands (see the detailBatcher below). Every *other* 'recent' row (already
@@ -1051,10 +1056,18 @@ export default function ListRoute() {
   // leaving a gap.
   function updateStatus(): void {
     if (total > 0 && loaded < total) {
-      setStatusText(`${loaded} / ${total} games loaded…`);
+      const now = Date.now();
+      loadSamples = [...loadSamples.filter((s) => s.t >= now - 30_000), { t: now, loaded }];
+      const eta = etaSeconds(loadSamples, total);
+      // Past a minute, say why — and keep saying it for this load, rather than flicker at 60 s.
+      if (eta != null && eta >= 60) slowLoad = true;
+      const why = slowLoad ? ' — details for games not seen before are fetched a few at a time' : '';
+      setStatusText(`${loaded} / ${total} games loaded${eta != null ? ` · ${formatEta(eta)}` : '…'}${why}`);
+      setLoadFraction(loaded / total);
       return;
     }
     setStatusText('');
+    setLoadFraction(null);
   }
 
   function renderPanelNav(game: Game): void {
@@ -1677,6 +1690,9 @@ export default function ListRoute() {
     rowStore.reset();
     total = 0;
     loaded = 0;
+    loadSamples = [];
+    slowLoad = false;
+    setLoadFraction(null);
     // Bundle-detail state belongs to the bundle being left — stepping ‹/› to the next one reuses
     // this component instance, so a stale card/"not on Steam" list would otherwise sit there
     // describing the previous bundle until the new fetch resolved.
@@ -2833,7 +2849,14 @@ export default function ListRoute() {
           <p>Answers already given are kept, and apply again to any game that's in the new source too.</p>
         </div>
       </Show>
-      <div class="list-status">{statusText()}</div>
+      <div class="list-status">
+        {statusText()}
+        <Show when={loadFraction()}>
+          {(fraction) => (
+            <progress class="list-progress" value={fraction()} max={1} aria-label="Loading game details" />
+          )}
+        </Show>
+      </div>
       {(kind === 'wishlist' || kind === 'bundle') && <div class="price-status">{priceStatusText()}</div>}
       <Show when={selectedRows().length > 0}>
         <div class="selection-toolbar">

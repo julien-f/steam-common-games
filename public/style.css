@@ -3168,6 +3168,15 @@ kbd {
   padding: 36px 20px 60px;
 }
 
+.list-progress {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  height: 6px;
+  margin-top: 6px;
+  accent-color: var(--accent);
+}
+
 .list-status,
 .bundles-status {
   font-size: 13px;

@@ -22,7 +22,6 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 
 ## Loading and feedback
 
-- **U4 · major · A1, F3** — first load of a large library is slow by design (≈ 8 min for 1,179 games; uncached details are throttled), with only "368 / 1179 games loaded…" and unloaded games absent from the table. Progress bar, ETA, one line on why.
 - **U7 · minor · L3** — Reset view drops sort/filters instantly with no undo.
 
 ## Lists and selection
