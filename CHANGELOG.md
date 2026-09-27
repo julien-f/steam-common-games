@@ -265,6 +265,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- A combined list's formula no longer says a deleted-but-kept source list, or an account no longer among yours, "counts as no games" — both still contribute theirs. A bundle kept after IsThereAnyDeal stopped listing it says so.
 - Deleted lists that no other list uses any more are now actually removed; the clean-up existed but never ran.
 - Adding selected games to a list now confirms it in a toast at the bottom of the screen, with an "Open list" link, and a new list is named in the toolbar instead of a browser prompt. The old confirmation sat at the top of the page, out of sight.
 - The selection toolbar (Add to list…) now stays in view while you select rows further down a table — it used to sit at the top of the page, off screen.

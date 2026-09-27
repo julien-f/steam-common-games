@@ -289,6 +289,7 @@ export interface GameList {
   sources?: ListRef[]; // kind: 'dynamic'
   source?: ListRef; // kind: 'ranked'
   tableView?: object; // persisted per-list (not shared across lists), same shape tableViewPrefs.ts stores
+  orphanOf?: { bundleId: string }; // listsStore.ts's orphanBundle: a bundle's last-known games
   deletedAt?: number; // soft-deleted — hidden from the tree/pickers, kept for dynamic-list
   // resolution + restore as long as something still references it
 }

@@ -99,6 +99,14 @@ test('describeListRef: a soft-deleted source list still resolves, and says why i
   assert.equal(desc.label, 'Old comparison');
   assert.equal(desc.href, '/lists/gone');
   assert.match(desc.problem, /deleted, and kept only because this formula uses it/);
+  assert.ok(!desc.countsAsEmpty, 'it still contributes its games');
+});
+
+test('describeListRef: an orphaned bundle list says where its games come from', () => {
+  const naming = { ...NAMING, list: () => ({ name: 'Pack (no longer listed)', deleted: true, orphaned: true }) };
+  const desc = describeListRef({ kind: 'user', listId: 'o' }, naming);
+  assert.match(desc.problem, /no longer lists this bundle; these are its last-known games/);
+  assert.ok(!desc.countsAsEmpty);
 });
 
 test('describeListRef: a hard-deleted source list is a named hole, not a silent omission', () => {
@@ -106,6 +114,7 @@ test('describeListRef: a hard-deleted source list is a named hole, not a silent 
   assert.equal(desc.label, 'A list that no longer exists');
   assert.equal(desc.href, null);
   assert.match(desc.problem, /deleted/);
+  assert.equal(desc.countsAsEmpty, true);
 });
 
 test('describeListRef: a ref saved without its id is reported rather than rendered as a real source', () => {
@@ -113,6 +122,7 @@ test('describeListRef: a ref saved without its id is reported rather than render
     const desc = describeListRef(ref, NAMING);
     assert.equal(desc.href, null, ref.kind);
     assert.match(desc.problem, /names no /, ref.kind);
+    assert.equal(desc.countsAsEmpty, true, ref.kind);
   }
 });
 

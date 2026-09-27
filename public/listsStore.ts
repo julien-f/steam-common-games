@@ -434,6 +434,7 @@ export function orphanBundle(bundleId: string): GameList | undefined {
     updatedAt: now,
     kind: 'manual',
     appids: snapshot.appids,
+    orphanOf: { bundleId },
     deletedAt: now,
   };
   const repoint = (ref: ListRef): ListRef =>

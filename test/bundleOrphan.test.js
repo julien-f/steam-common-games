@@ -42,6 +42,7 @@ test('orphanBundle: re-points every source at a hidden list of the last-known ga
   assert.equal(orphan.kind, 'manual');
   assert.deepEqual(orphan.appids, [1, 3]);
   assert.ok(orphan.deletedAt, 'hidden from the tree');
+  assert.deepEqual(orphan.orphanOf, { bundleId: '7' });
   const ref = { kind: 'user', listId: orphan.id };
   assert.deepEqual(m.getList(dynamic.id).sources, [ref, OWNED]);
   assert.deepEqual(m.getList(ranked.id).source, ref);

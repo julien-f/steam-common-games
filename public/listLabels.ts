@@ -53,7 +53,7 @@ export function opLabel(op: CombineOp | undefined): string {
 // inject for it; it's named by id.
 export interface ListNaming {
   account(accountId: string): { label: string; identifiers: string[] } | null;
-  list(listId: string): { name: string; deleted: boolean } | null;
+  list(listId: string): { name: string; deleted: boolean; orphaned?: boolean } | null;
   // Optional: without it a bundle source reads as its id.
   bundle?(bundleId: string): { title: string } | null;
 }
@@ -71,6 +71,9 @@ export interface RefDescription {
   // accountId is always openable, being the member ids themselves — but an injected naming can
   // still report one.
   problem?: string;
+  // The source contributes nothing (a list that's gone, a ref with no id) — as opposed to a
+  // problem worth reporting that still resolves (a soft-deleted list, a forgotten account).
+  countsAsEmpty?: boolean;
 }
 
 export function describeListRef(ref: ListRef, naming: ListNaming): RefDescription {
@@ -79,7 +82,12 @@ export function describeListRef(ref: ListRef, naming: ListNaming): RefDescriptio
     case 'account-wishlist': {
       const which = ref.kind === 'account-owned' ? 'Owned' : 'Wishlist';
       if (!ref.accountId)
-        return { label: `Unknown account — ${which}`, href: null, problem: 'this source names no account' };
+        return {
+          label: `Unknown account — ${which}`,
+          href: null,
+          problem: 'this source names no account',
+          countsAsEmpty: true,
+        };
       const account = naming.account(ref.accountId);
       if (!account) {
         return {
@@ -97,7 +105,8 @@ export function describeListRef(ref: ListRef, naming: ListNaming): RefDescriptio
       };
     }
     case 'bundle':
-      if (!ref.bundleId) return { label: 'Unknown bundle', href: null, problem: 'this source names no bundle' };
+      if (!ref.bundleId)
+        return { label: 'Unknown bundle', href: null, problem: 'this source names no bundle', countsAsEmpty: true };
       // The title is the last-known one (bundleSnapshots.ts): ITAD is the only source for it, and
       // this is a synchronous labeling function.
       return {
@@ -107,19 +116,30 @@ export function describeListRef(ref: ListRef, naming: ListNaming): RefDescriptio
     case 'recent-games':
       return { label: 'Recently Looked Up', href: '/game' };
     case 'user': {
-      if (!ref.listId) return { label: 'Unknown list', href: null, problem: 'this source names no list' };
+      if (!ref.listId)
+        return { label: 'Unknown list', href: null, problem: 'this source names no list', countsAsEmpty: true };
       const list = naming.list(ref.listId);
-      if (!list) return { label: 'A list that no longer exists', href: null, problem: 'this list was deleted' };
+      if (!list)
+        return {
+          label: 'A list that no longer exists',
+          href: null,
+          problem: 'this list was deleted',
+          countsAsEmpty: true,
+        };
       return {
         label: list.name,
         href: `/lists/${ref.listId}`,
         // Soft-deleted (listsStore.ts keeps a referenced list resolvable rather than dropping it,
         // so this formula still works) — worth saying, since it's hidden everywhere else.
-        problem: list.deleted ? 'this list is deleted, and kept only because this formula uses it' : undefined,
+        problem: list.orphaned
+          ? 'IsThereAnyDeal no longer lists this bundle; these are its last-known games'
+          : list.deleted
+            ? 'this list is deleted, and kept only because this formula uses it'
+            : undefined,
       };
     }
     default:
-      return { label: 'Unknown source', href: null, problem: 'unrecognized source kind' };
+      return { label: 'Unknown source', href: null, problem: 'unrecognized source kind', countsAsEmpty: true };
   }
 }
 
@@ -187,7 +207,7 @@ export function createDefaultNaming(depth = 0): ListNaming {
       const name =
         found.name ||
         (depth < 1 ? `(${listDisplayName(found, createDefaultNaming(depth + 1))})` : 'Untitled combined list');
-      return { name, deleted: found.deletedAt != null };
+      return { name, deleted: found.deletedAt != null, orphaned: found.orphanOf != null };
     },
     bundle(bundleId) {
       const snapshot = getBundleSnapshot(bundleId);

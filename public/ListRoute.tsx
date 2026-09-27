@@ -2417,8 +2417,8 @@ export default function ListRoute() {
             <For each={problems}>
               {(problem) => (
                 <li>
-                  ⚠ {problem.desc.label} — {problem.desc.problem}. It counts as no games; the rest of the formula still
-                  applies.
+                  ⚠ {problem.desc.label} — {problem.desc.problem}.
+                  {problem.desc.countsAsEmpty && ' It counts as no games; the rest of the formula still applies.'}
                 </li>
               )}
             </For>
