@@ -101,7 +101,7 @@ Clicking any row opens a detail panel beside the table — not over it, so the l
 - A game's own link (`/game/<appid>`) opens that game for anyone, whether or not they own it.
 - Add `?u=` to any list link to share the account you're exploring. It never changes the recipient's own default account, and a game link deliberately doesn't carry it.
 - A comparison's link names its players the same way, one `?u=` each — including links made by older versions of this app, which still work.
-- **🔗 Share view** copies a link with your current table layout — columns, sort, grouping, filters — baked in. On Owned and Wishlist it also carries the account (`?u=`), so the recipient sees your games, not their own. The recipient gets it as a starting point; it doesn't override their setup permanently.
+- **🔗 Share view** copies a link with your current table layout — columns, sort, grouping, filters — baked in. On Owned and Wishlist it also carries the account (`?u=`), so the recipient sees your games, not their own. The recipient sees it for that visit only, with **Keep as my layout** to make it theirs or **Use my own** to go back; nothing of their own setup changes otherwise.
 
 ## Keyboard shortcuts
 

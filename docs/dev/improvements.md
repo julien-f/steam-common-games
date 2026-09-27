@@ -18,13 +18,11 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 ## Sharing
 
 - **U2 · minor · S3** — a `/lists/<id>` link opened elsewhere says "This list no longer exists"; it exists, in the sender's browser. Explain lists are local and point to 🔗 Share list.
-- **U42 · minor · S1, S3** — opening a Share view link saves its layout as the recipient's own stored default (frontend.md: `restoreTableView` "seeds it as the new stored default"), while features.md promises it "doesn't override their setup permanently". Decide which is intended; make the other match.
 - **U3 · minor · L2, S1** — a dynamic list has both "🔗 Share list" and "🔗 Share view", in different places. Merge or explain the difference.
 
 ## Loading and feedback
 
 - **U4 · major · A1, F3** — first load of a large library is slow by design (≈ 8 min for 1,179 games; uncached details are throttled), with only "368 / 1179 games loaded…" and unloaded games absent from the table. Progress bar, ETA, one line on why.
-- **U5 · major · A1, F1** — while streaming into a sorted table, rows get inserted above the pointer and columns change width, so clicks land on the wrong game. Fix column widths; append or hold new rows ("N new — show").
 - **U7 · minor · L3** — Reset view drops sort/filters instantly with no undo.
 
 ## Lists and selection

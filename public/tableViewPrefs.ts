@@ -21,26 +21,29 @@ interface DataTableLike {
   onViewChange?(cb: (view: object) => void): () => void;
 }
 
-// An incoming param (from a shared/bookmarked link) always wins over the stored default, but
-// only once: applies it, seeds it as the new stored default, then strips it from the live URL —
-// otherwise a shared link would keep clobbering later edits on every table rebuild (a fresh
-// search, an account refresh, a tab switch), not just the one it was meant to seed.
-export function restoreTableView(table: DataTableLike, prefKey: string, paramName: string): void {
+// An incoming param (from a shared/bookmarked link) wins over the stored default, for this visit
+// only: applied but not stored, then stripped from the live URL so a later table rebuild (a fresh
+// search, an account refresh) falls back to the viewer's own. Returns whether it applied one — the
+// caller then pauses its view persistence until the viewer keeps or drops it (SharedViewBanner).
+export function restoreTableView(table: DataTableLike, prefKey: string, paramName: string): boolean {
+  const shared = takeSharedView(paramName);
+  table.setViewState(shared ?? getPref(prefKey, {}));
+  return shared != null;
+}
+
+// The incoming view param, parsed and stripped from the URL; null when absent or malformed.
+export function takeSharedView(paramName: string): object | null {
   const params = new URLSearchParams(location.search);
   const raw = params.get(paramName);
-  if (raw) {
-    try {
-      const view = JSON.parse(raw);
-      table.setViewState(view);
-      setPref(prefKey, view);
-      params.delete(paramName);
-      history.replaceState(null, '', urlWithParams(params));
-      return;
-    } catch {
-      /* malformed param — fall through to the stored default */
-    }
+  if (!raw) return null;
+  try {
+    const view = JSON.parse(raw);
+    params.delete(paramName);
+    history.replaceState(null, '', urlWithParams(params));
+    return view;
+  } catch {
+    return null; // malformed — fall back to the stored default
   }
-  table.setViewState(getPref(prefKey, {}));
 }
 
 // Wires the table to auto-persist every future change under prefKey — the only ongoing side

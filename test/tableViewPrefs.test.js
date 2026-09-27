@@ -61,11 +61,14 @@ function withLocation(search, fn) {
   }
 }
 
-test('restoreTableView: an incoming param wins, is seeded as the stored default, and is stripped from the URL', () => {
+test('restoreTableView: an incoming param wins for this visit only — applied, not stored, stripped from the URL', () => {
   withLocation('?lv=%7B%22pageSize%22%3A25%7D', () => {
+    const { getPref, setPref } = require('../public/prefs.ts');
+    setPref('libraryView', { pageSize: 10 });
     const table = fakeTable();
-    restoreTableView(table, 'libraryView', 'lv');
+    assert.equal(restoreTableView(table, 'libraryView', 'lv'), true, 'reports a shared view');
     assert.deepEqual(table.getViewState(), { pageSize: 25 });
+    assert.deepEqual(getPref('libraryView'), { pageSize: 10 }, "the viewer's own view is untouched");
     assert.equal(new URLSearchParams(location.search).has('lv'), false, 'param consumed');
   });
 });
@@ -73,7 +76,7 @@ test('restoreTableView: an incoming param wins, is seeded as the stored default,
 test('restoreTableView: a malformed param falls through to the stored default', () => {
   withLocation('?lv=not-json', () => {
     const table = fakeTable();
-    restoreTableView(table, 'libraryView', 'lv');
+    assert.equal(restoreTableView(table, 'libraryView', 'lv'), false);
     assert.deepEqual(table.getViewState(), {}, 'no stored pref yet either');
   });
 });

@@ -88,6 +88,7 @@ import {
 } from './utils.ts';
 import {
   restoreTableView,
+  takeSharedView,
   shareTableView,
   resetTableView,
   saveTableViewToServer,
@@ -118,7 +119,8 @@ import {
   compareUrl,
   DEFAULT_COMPARE_OP,
 } from './urlState.ts';
-import { setPref } from './prefs.ts';
+import { getPref, setPref } from './prefs.ts';
+import { SharedViewBanner } from './SharedViewBanner.tsx';
 import {
   getEffectiveCurrentAccount,
   accountIdentifiers,
@@ -448,11 +450,19 @@ function applyDetailsEvent(row: Game, event: DetailsEvent) {
 // tableViewPrefs.ts's own bindViewPersistence needs `table.onViewChange`, which the Solid table
 // doesn't have — reconstructed via a createEffect that re-reads getViewState() (tracking every
 // signal it touches) instead, same as library.tsx's/bundles.tsx's own identical helper.
-function bindSolidViewPersistence(ts: TableState<Game>, prefKey: string): () => void {
+// `paused`: while a shared link's layout is on screen (SharedViewBanner); un-pausing saves it.
+function bindSolidViewPersistence(
+  ts: TableState<Game>,
+  save: (view: object) => void,
+  paused: () => boolean,
+): () => void {
   let dispose: (() => void) | null = null;
   createRoot((d) => {
     dispose = d;
-    createEffect(() => setPref(prefKey, ts.getViewState()));
+    createEffect(() => {
+      const view = ts.getViewState();
+      if (!paused()) save(view);
+    });
   });
   return () => dispose?.();
 }
@@ -1523,6 +1533,14 @@ export default function ListRoute() {
   // load() below), not through prefs.ts, so its own reset goes around resetTableView rather than
   // through it — reusing that shared helper here would clear the wrong (shared, kind-generic)
   // pref key instead of this specific list's own stored view.
+  // A 🔗 Share view link's layout, on screen but not saved (see restoreTableView).
+  const [viewingShared, setViewingShared] = createSignal(false);
+  function handleDiscardSharedView(): void {
+    const list = userList();
+    table?.setViewState(list ? (getList(list.id)?.tableView ?? {}) : getPref(viewPrefKey(), {}));
+    setViewingShared(false);
+  }
+
   function handleShareView(btn: HTMLElement): void {
     if (!table) return;
     // Owned/Wishlist are whoever is current — without `u=` the recipient would get their own.
@@ -2096,31 +2114,13 @@ export default function ListRoute() {
         // the URL) but persists via setListTableView rather than a prefs.ts key, so it can't
         // reuse that helper directly — same reasoning handleResetView gives on the reset side.
         const list = userList()!;
-        const urlParams = new URLSearchParams(location.search);
-        const raw = urlParams.get(viewParamName());
-        let initialView = list.tableView ?? {};
-        if (raw) {
-          try {
-            initialView = JSON.parse(raw);
-            setListTableView(list.id, initialView);
-            urlParams.delete(viewParamName());
-            history.replaceState(null, '', urlWithParams(urlParams));
-          } catch {
-            /* malformed param — fall through to the stored view */
-          }
-        }
-        table.setViewState(initialView);
-        unsyncView = (() => {
-          let dispose: (() => void) | null = null;
-          createRoot((d) => {
-            dispose = d;
-            createEffect(() => setListTableView(list.id, ts.getViewState()));
-          });
-          return () => dispose?.();
-        })();
+        const shared = takeSharedView(viewParamName());
+        table.setViewState(shared ?? list.tableView ?? {});
+        setViewingShared(shared != null);
+        unsyncView = bindSolidViewPersistence(table, (view) => setListTableView(list.id, view), viewingShared);
       } else {
-        restoreTableView(table, viewPrefKey(), viewParamName());
-        unsyncView = bindSolidViewPersistence(table, viewPrefKey());
+        setViewingShared(restoreTableView(table, viewPrefKey(), viewParamName()));
+        unsyncView = bindSolidViewPersistence(table, (view) => setPref(viewPrefKey(), view), viewingShared);
       }
       setTableReady(true);
     }
@@ -2899,6 +2899,9 @@ export default function ListRoute() {
             Revert
           </button>
         </div>
+      </Show>
+      <Show when={tableReady() && viewingShared()}>
+        <SharedViewBanner onKeep={() => setViewingShared(false)} onDiscard={handleDiscardSharedView} />
       </Show>
       <Show when={tableReady()}>
         <div class="list-view-actions">

@@ -70,7 +70,8 @@ import {
 import { isUnsaved, summarizeViewDiff } from './tableViewSync.ts';
 import { getAuthUser } from './authStore.ts';
 import { createStaleGuard } from './staleGuard.ts';
-import { setPref } from './prefs.ts';
+import { getPref, setPref } from './prefs.ts';
+import { SharedViewBanner } from './SharedViewBanner.tsx';
 import { setBaseTitle } from './pageTitle.ts';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
 
@@ -311,13 +312,21 @@ export default function BundlesBrowseRoute() {
   const table = createTableState<BundleRow>(rows, COLUMNS, {
     initialViewState: { pageSize: 50, visibleCols: DEFAULT_VISIBLE, sorts: DEFAULT_SORT },
   });
-  restoreTableView(table, VIEW_PREF_KEY, VIEW_PARAM);
+  // A 🔗 Share view link's layout is shown but not saved until kept (see restoreTableView).
+  const [viewingShared, setViewingShared] = createSignal(restoreTableView(table, VIEW_PREF_KEY, VIEW_PARAM));
   // tableViewPrefs.ts's own bindViewPersistence needs `table.onViewChange`, which the Solid table
   // doesn't have — a createEffect re-reading getViewState() (tracking every signal it touches)
   // reconstructs it. Unlike ListRoute.tsx's own copy this needs no createRoot of its own: the
   // table is built in this component's body, so the effect is owned by the component and disposed
   // with it.
-  createEffect(() => setPref(VIEW_PREF_KEY, table.getViewState()));
+  createEffect(() => {
+    const view = table.getViewState();
+    if (!viewingShared()) setPref(VIEW_PREF_KEY, view);
+  });
+  function handleDiscardSharedView(): void {
+    table.setViewState(getPref(VIEW_PREF_KEY, {}));
+    setViewingShared(false);
+  }
 
   function handleSaveView(): void {
     saveTableViewToServer(VIEW_PREF_KEY, table.getViewState());
@@ -521,6 +530,9 @@ export default function BundlesBrowseRoute() {
         }
         tiles={heroTiles()}
       />
+      <Show when={viewingShared()}>
+        <SharedViewBanner onKeep={() => setViewingShared(false)} onDiscard={handleDiscardSharedView} />
+      </Show>
       <Show when={getAuthUser() && isUnsaved(VIEW_PREF_KEY, table.getViewState())}>
         <div class="pref-unsaved-banner">
           Unsaved changes to this view ({summarizeViewDiff(VIEW_PREF_KEY, table.getViewState()).join(', ')}) — differs
