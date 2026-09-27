@@ -1,0 +1,38 @@
+---
+name: release
+description: Cut a release — pick the version, consolidate CHANGELOG.md's Unreleased section into a dated version, bump package.json, commit and tag. Use when asked to release, cut, tag or version the app.
+---
+
+# Release
+
+Only on an explicit request, from a clean `main`. Tags are `vX.Y.Z`, annotated, message `vX.Y.Z` (see `git show v0.4.0`).
+
+## 1. Pick the version
+
+Pre-1.0: **minor** for anything under Added/Changed/Removed, **patch** for Fixed/Security only. Propose it with `AskUserQuestion`; the user decides.
+
+## 2. Consolidate the changelog
+
+`[Unreleased]` accumulates one entry per commit, often with several blocks of the same category. Before cutting:
+
+- Merge into one block per category, in order: Added, Changed, Deprecated, Removed, Fixed, Security.
+- Keep bullet order within each category; merge bullets that describe the same feature's evolution into its final state.
+- Rewrite for a reader of the release, not of the commits: what changed for users first, implementation detail only when a developer needs it. Keep it short — CLAUDE.md's doc-prose rules apply.
+- Show the consolidated section to the user before going on.
+
+Then rename it `## [X.Y.Z] - YYYY-MM-DD` (today) and add an empty `## [Unreleased]` above it.
+
+## 3. Bump, commit, tag
+
+```bash
+npm version X.Y.Z --no-git-tag-version   # package.json + package-lock.json
+git add CHANGELOG.md package.json package-lock.json
+git commit -m "Release X.Y.Z"            # body: one line on what the release is about
+git tag -a vX.Y.Z -m vX.Y.Z
+```
+
+No `chore(release):` prefix — CLAUDE.md dropped Conventional Commits.
+
+## 4. Push
+
+Only when asked: `git push && git push origin vX.Y.Z`.
