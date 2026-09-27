@@ -16,7 +16,8 @@ Judges the app against [docs/dev/scenarios.md](../../../docs/dev/scenarios.md), 
 
 1. `npm run dev` if not already running; review at `http://localhost:58991`.
 2. Demo state only — same rule and mechanism as the `screenshots` skill: `node scripts/demo-prefs.js seed`, run the printed function with `browser_evaluate`, reload. Never type a real account's identifier.
-3. Stay inside `integrations.md`'s trust tiers: one pass per scenario, no repeated refreshes or large-library loops against Steam/HLTB/ProtonDB.
+3. Scenarios needing other players (Family, Compare, friends) use only accounts the user names for testing — never commit them, keep their screenshots in `.playwright-mcp/`, and call them Friend A/B in the report. Skip A4 while no allowed account has a public friends list.
+4. Stay inside `integrations.md`'s trust tiers: one pass per scenario, no repeated refreshes or large-library loops against Steam/HLTB/ProtonDB.
 
 ## Walk each scenario
 
@@ -46,4 +47,5 @@ One table, ranked by severity, then one line of anything that went well enough t
 | --- | -------- | -------- | ----- | ------- | ---------- |
 
 - **Severity**: _blocker_ (the goal can't be reached) · _major_ (reached with real confusion or a workaround) · _minor_ (friction) · _polish_.
+- Record every finding in [docs/dev/improvements.md](../../../docs/dev/improvements.md) (next free `U` number, under its area); update or drop items the run shows fixed.
 - Findings only — fix nothing. The user picks what to fix; each fix is its own commit.

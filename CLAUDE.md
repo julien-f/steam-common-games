@@ -21,6 +21,7 @@ Working conventions for this repo. Documentation lives in `docs/` — keep it th
 - [docs/dev/data.md](docs/dev/data.md) — `db.sqlite`, cache tiers and TTLs, the three refresh paths
 - [docs/dev/observability.md](docs/dev/observability.md) — `GET /api/metrics`, outbound budgets, proactive log warnings
 - [docs/dev/scenarios.md](docs/dev/scenarios.md) — user journeys (goal, steps, expected outcome); the basis for design reviews and end-to-end tests
+- [docs/dev/improvements.md](docs/dev/improvements.md) — UX backlog from design reviews, keyed to scenarios
 - [docs/dev/decisions.md](docs/dev/decisions.md) — Weighted Rating vs. Wilson score, the Production Tier heuristic
 - [docs/images/](docs/images) — the screenshots the docs embed; shooting them is the `screenshots` skill
 
