@@ -101,6 +101,10 @@ let _getGamePosition: (() => { index: number; total: number } | null) | null = n
 // picked by the same rule the re-point itself would have used.
 let _awaitingMedia: MediaItem['type'] | null = null;
 let _lbPrevFocus: Element | null = null;
+// One mount at a time: a second initLightbox (Vite hot-reloading AppShell) tears the first down —
+// its DOM and every listener it put on `document` — instead of mounting a duplicate beside it.
+let _lbTeardown: (() => void) | null = null;
+let _lbSignal: AbortSignal | undefined;
 const _lbPrefetchedHls = new Set();
 
 // ── Init ───────────────────────────────────────────────────────────────────
@@ -128,9 +132,18 @@ export function initLightbox({
   _onGameNav = onGameNav ?? null;
   _onGameRandom = onGameRandom ?? null;
   _getGamePosition = getGamePosition ?? null;
-  document.addEventListener('fullscreenchange', syncLightboxFullscreenBtn);
-  document.addEventListener('webkitfullscreenchange', syncLightboxFullscreenBtn);
-  mountLightboxDom();
+  _lbTeardown?.();
+  const abort = new AbortController();
+  _lbSignal = abort.signal;
+  document.addEventListener('fullscreenchange', syncLightboxFullscreenBtn, { signal: _lbSignal });
+  document.addEventListener('webkitfullscreenchange', syncLightboxFullscreenBtn, { signal: _lbSignal });
+  const dispose = mountLightboxDom();
+  _lbTeardown = () => {
+    abort.abort();
+    dispose();
+    _lbTeardown = null;
+  };
+  return _lbTeardown;
 }
 
 export function isLightboxOpen() {
@@ -517,83 +530,87 @@ function wireButtons(lb: HTMLElement) {
 }
 
 function wireKeyboard(lb: HTMLElement) {
-  document.addEventListener('keydown', (e) => {
-    if (!isLightboxOpen()) return;
-    const onScrub = (e.target as HTMLElement | null)?.classList.contains('lb-vc-scrub');
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      if (!isLightboxOpen()) return;
+      const onScrub = (e.target as HTMLElement | null)?.classList.contains('lb-vc-scrub');
 
-    // Focus trap
-    if (e.key === 'Tab') {
-      const focusable = getFocusable(lb);
-      if (!focusable.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
+      // Focus trap
+      if (e.key === 'Tab') {
+        const focusable = getFocusable(lb);
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
         }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
+        return;
       }
-      return;
-    }
 
-    const vc = lb.querySelector<HTMLElement>('.lb-vctrls');
-    const vid = vc && vc.style.display !== 'none' ? lbVideoEl : null;
+      const vc = lb.querySelector<HTMLElement>('.lb-vctrls');
+      const vid = vc && vc.style.display !== 'none' ? lbVideoEl : null;
 
-    if ((!onScrub || e.shiftKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-      e.preventDefault();
-      const dir = e.key === 'ArrowRight' ? 1 : -1;
-      // While a video is playing, bare arrows seek it in place so the user
-      // isn't yanked to the next screenshot mid-scrub; Shift+arrow always
-      // forces media navigation instead, as an explicit escape hatch — even
-      // when focus is on the scrub bar itself, whose native range-input
-      // behavior would otherwise consume a bare arrow key to nudge its value.
-      if (vid && !e.shiftKey) {
-        seekVideo(vid, dir * LB_SEEK_SECONDS);
-      } else {
-        stepLightbox(dir);
-      }
-    }
-    if (!onScrub && (e.key === 'Home' || e.key === 'End') && shots().length > 1) {
-      e.preventDefault();
-      gotoLightbox(e.key === 'Home' ? 0 : shots().length - 1);
-    }
-    if (!onScrub && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && _onGameNav) {
-      e.preventDefault();
-      const dir = e.key === 'ArrowDown' ? 1 : -1;
-      stepGameFromLightbox(() => _onGameNav!(dir), dir);
-    }
-    // R, the same random pick the panel offers — page-level shortcuts are all blocked while the
-    // lightbox is open (panelKeyboard.ts hands it the keyboard wholesale), so it has to be bound
-    // here to work at all, exactly as ↑/↓ above do.
-    if (!onScrub && (e.key === 'r' || e.key === 'R') && _onGameRandom) {
-      e.preventDefault();
-      stepGameFromLightbox(() => _onGameRandom!());
-    }
-    if (e.key === 'f' || e.key === 'F') {
-      if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
-        (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
-      } else {
-        (
-          lb.requestFullscreen?.() ??
-          (lb as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.()
-        )?.catch?.(() => {});
-      }
-    }
-    if (vid) {
-      if (e.key === ' ' && !onScrub) {
+      if ((!onScrub || e.shiftKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
-        vid.paused ? vid.play().catch(() => {}) : vid.pause();
+        const dir = e.key === 'ArrowRight' ? 1 : -1;
+        // While a video is playing, bare arrows seek it in place so the user
+        // isn't yanked to the next screenshot mid-scrub; Shift+arrow always
+        // forces media navigation instead, as an explicit escape hatch — even
+        // when focus is on the scrub bar itself, whose native range-input
+        // behavior would otherwise consume a bare arrow key to nudge its value.
+        if (vid && !e.shiftKey) {
+          seekVideo(vid, dir * LB_SEEK_SECONDS);
+        } else {
+          stepLightbox(dir);
+        }
       }
-      if (e.key === 'm' || e.key === 'M') {
-        vid.muted = !vid.muted;
+      if (!onScrub && (e.key === 'Home' || e.key === 'End') && shots().length > 1) {
+        e.preventDefault();
+        gotoLightbox(e.key === 'Home' ? 0 : shots().length - 1);
       }
-    }
-  });
+      if (!onScrub && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && _onGameNav) {
+        e.preventDefault();
+        const dir = e.key === 'ArrowDown' ? 1 : -1;
+        stepGameFromLightbox(() => _onGameNav!(dir), dir);
+      }
+      // R, the same random pick the panel offers — page-level shortcuts are all blocked while the
+      // lightbox is open (panelKeyboard.ts hands it the keyboard wholesale), so it has to be bound
+      // here to work at all, exactly as ↑/↓ above do.
+      if (!onScrub && (e.key === 'r' || e.key === 'R') && _onGameRandom) {
+        e.preventDefault();
+        stepGameFromLightbox(() => _onGameRandom!());
+      }
+      if (e.key === 'f' || e.key === 'F') {
+        if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
+          (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
+        } else {
+          (
+            lb.requestFullscreen?.() ??
+            (lb as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.()
+          )?.catch?.(() => {});
+        }
+      }
+      if (vid) {
+        if (e.key === ' ' && !onScrub) {
+          e.preventDefault();
+          vid.paused ? vid.play().catch(() => {}) : vid.pause();
+        }
+        if (e.key === 'm' || e.key === 'M') {
+          vid.muted = !vid.muted;
+        }
+      }
+    },
+    { signal: _lbSignal },
+  );
 }
 
 function wireMouseHandlers(lb: HTMLElement) {
@@ -629,17 +646,25 @@ function wireMouseHandlers(lb: HTMLElement) {
     lbImg.style.cursor = 'grabbing';
     e.preventDefault();
   });
-  document.addEventListener('mousemove', (e) => {
-    if (!lbDragging) return;
-    lbPanX = lbPanStartX + (e.clientX - lbDragStartX);
-    lbPanY = lbPanStartY + (e.clientY - lbDragStartY);
-    applyLbTransform();
-  });
-  document.addEventListener('mouseup', () => {
-    if (!lbDragging) return;
-    lbDragging = false;
-    lbImg.style.cursor = lbZoom > 1 ? 'grab' : '';
-  });
+  document.addEventListener(
+    'mousemove',
+    (e) => {
+      if (!lbDragging) return;
+      lbPanX = lbPanStartX + (e.clientX - lbDragStartX);
+      lbPanY = lbPanStartY + (e.clientY - lbDragStartY);
+      applyLbTransform();
+    },
+    { signal: _lbSignal },
+  );
+  document.addEventListener(
+    'mouseup',
+    () => {
+      if (!lbDragging) return;
+      lbDragging = false;
+      lbImg.style.cursor = lbZoom > 1 ? 'grab' : '';
+    },
+    { signal: _lbSignal },
+  );
   lbImg.addEventListener('dblclick', (e) => {
     if (lbZoom > 1) resetLbZoom();
     else lbZoomTowardPoint(e.clientX, e.clientY);
@@ -939,8 +964,8 @@ function wireVideoControls(lb: HTMLElement) {
 // ~20-node static tree, and it means every other function in this file can keep using a bare
 // `document.getElementById('screenshot-lightbox')`/`.lb-*` lookup exactly as before, with no
 // "has it been created yet" guard needed anywhere.
-function mountLightboxDom() {
-  render(() => <LightboxDom />, document.body);
+function mountLightboxDom(): () => void {
+  const dispose = render(() => <LightboxDom />, document.body);
   const lb = document.getElementById('screenshot-lightbox')!;
   lbVideoEl = lb.querySelector<LbVideo>('.lb-video')!;
   lbVideoAnchor = lb.querySelector('.lb-next')!; // re-inserted here, keeping the original order
@@ -950,6 +975,7 @@ function mountLightboxDom() {
   wireMouseHandlers(lb);
   wireTouchHandlers(lb);
   wireVideoControls(lb);
+  return dispose;
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────

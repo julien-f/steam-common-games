@@ -1,3 +1,6 @@
+// @refresh reload
+// (solid-refresh: the shell mounts app-wide singletons once — panel, lightbox, keyboard shortcuts —
+// and hot-swapping it in dev would mount them a second time, so a change reloads the page instead.)
 // The persistent app shell — nav bar, ⚙ Preferences popover, global "look up any game" search,
 // the shared side panel + lightbox (mounted once, not per-route) — passed as @solidjs/router's
 // `root` (see AppRoot.tsx) so it wraps every route instead of remounting on each navigation.
@@ -167,7 +170,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
     window.addEventListener('scroll', onScroll, true);
     onCleanup(() => window.removeEventListener('scroll', onScroll, true));
 
-    initLightbox({
+    const disposeLightbox = initLightbox({
       // `&shot=<id>` deep links: the lightbox reports every open/step/close, and this writes it
       // next to the panel's own `?game=`. Wiring this back is what makes a copied link reopen the
       // exact screenshot again — `setLightboxParam` had no caller at all since the redesign, so
@@ -195,6 +198,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       // the list you're paging through.
       getGamePosition: () => routeHandlers.gamePosition?.() ?? null,
     });
+    onCleanup(disposeLightbox);
     initPanel({
       onClose: () => {
         routeHandlers.onGameClose?.();
