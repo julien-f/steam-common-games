@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+# Whitespace errors and leftover conflict markers in what's being committed.
+git diff --cached --check
+
+npm run -s format:check
+npm test
+npm run -s typecheck
+npm run -s lint

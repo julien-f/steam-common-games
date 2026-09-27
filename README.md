@@ -34,11 +34,7 @@ npm run format          # Prettier over the whole tree
 
 Open `http://localhost:58991` in dev (not `:3000` — that serves the last `npm run build`).
 
-A `pre-commit` hook runs the tests, typecheck and lint before every commit. `.git/` isn't version-controlled, so recreate it after a fresh clone:
-
-```bash
-printf '#!/bin/sh\nnpm test && npm run typecheck && npm run lint\n' > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
-```
+`.githooks/pre-commit` checks whitespace, formatting, tests, typecheck and lint before every commit; `npm install` enables it (`core.hooksPath`) and points `git blame` at `.git-blame-ignore-revs`.
 
 Application data lives in `db.sqlite` (gitignored); today it holds only cache tables. `npm run cache:clear` empties them without deleting the file.
 
