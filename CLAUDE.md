@@ -74,7 +74,7 @@ After making changes:
 
 1. Check whether existing tests need updating, or new ones are needed, to cover the change, then run `npm test` and report actual results — not assumptions. For any frontend change also run `npm run typecheck` **and `npm run lint`**, and fix what they report; `npm run lint` must stay at 0 problems, and the few intended violations carry a targeted `eslint-disable-next-line` with a reason.
 2. Update any affected documentation — see "Knowledge sharing" above — and `CHANGELOG.md` (see "Changelog" below).
-3. The `pre-commit` hook already runs `npm test` and blocks the commit on failure, so once step 1 has passed don't run it again just because a commit is about to happen. It doesn't run `npm run typecheck`/`npm run lint` — step 1 is where those happen. README's Development section has the snippet to recreate it after a fresh clone.
+3. The `pre-commit` hook runs `npm test`, `npm run typecheck` and `npm run lint` and blocks the commit on failure, so once step 1 has passed don't run them again just because a commit is about to happen. README's Development section has the snippet to recreate it after a fresh clone.
 
 ## Changelog
 

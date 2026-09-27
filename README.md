@@ -33,10 +33,10 @@ npm run lint            # eslint-plugin-solid over public/
 
 Open `http://localhost:58991` in dev (not `:3000` — that serves the last `npm run build`).
 
-A `pre-commit` hook runs the test suite before every commit. `.git/` isn't version-controlled, so recreate it after a fresh clone:
+A `pre-commit` hook runs the tests, typecheck and lint before every commit. `.git/` isn't version-controlled, so recreate it after a fresh clone:
 
 ```bash
-printf '#!/bin/sh\nnpm test\n' > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+printf '#!/bin/sh\nnpm test && npm run typecheck && npm run lint\n' > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 ```
 
 Application data lives in `db.sqlite` (gitignored); today it holds only cache tables. `npm run cache:clear` empties them without deleting the file.
