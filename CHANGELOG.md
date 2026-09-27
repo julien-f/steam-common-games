@@ -262,6 +262,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Adding selected games to a list now confirms it in a toast at the bottom of the screen, with an "Open list" link, and a new list is named in the toolbar instead of a browser prompt. The old confirmation sat at the top of the page, out of sight.
 - The selection toolbar (Add to list…) now stays in view while you select rows further down a table — it used to sit at the top of the page, off screen.
 - The game search box now says when nothing matches, or when the search itself failed, instead of showing nothing.
 - The row whose game is open in the side panel is now highlighted, so stepping with ↑/↓ no longer loses your place in the table.

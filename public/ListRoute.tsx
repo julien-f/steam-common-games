@@ -734,7 +734,7 @@ export default function ListRoute() {
     if (!state) return;
     const rows = selectedRows();
     applyRanking(rows.reduce((s, row) => exclude(s, row.appid), state));
-    setSelectionActionStatus(`Excluded ${rows.length} game(s) from the ranking.`);
+    showSelectionStatus(`Excluded ${rows.length} game(s) from the ranking.`);
     table?.selection.clear();
   }
   // ── kind === 'shared' ─────────────────────────────────────────────────────────────────────
@@ -889,7 +889,18 @@ export default function ListRoute() {
   const [manualLists, setManualLists] = createSignal<GameList[]>(getLists().filter((l) => l.kind === 'manual'));
   const NEW_LIST_OPTION = '__new__';
   const [addTarget, setAddTarget] = createSignal('');
-  const [selectionActionStatus, setSelectionActionStatus] = createSignal('');
+  const [newListName, setNewListName] = createSignal('');
+  const [selectionActionStatus, setSelectionActionStatus] = createSignal<{ text: string; listId?: string } | null>(
+    null,
+  );
+  let selectionStatusTimer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => clearTimeout(selectionStatusTimer));
+  // A floating toast rather than a line in the page: the rows acted on are often scrolled far below it.
+  function showSelectionStatus(text: string, listId?: string): void {
+    clearTimeout(selectionStatusTimer);
+    setSelectionActionStatus({ text, listId });
+    selectionStatusTimer = setTimeout(() => setSelectionActionStatus(null), 6000);
+  }
 
   function refreshManualLists(): void {
     setManualLists(getLists().filter((l) => l.kind === 'manual'));
@@ -901,17 +912,18 @@ export default function ListRoute() {
     if (!target || rows.length === 0) return;
     const appids = rows.map((r) => r.appid);
     if (target === NEW_LIST_OPTION) {
-      const name = window.prompt('New list name?');
+      const name = newListName().trim();
       if (!name) return;
       const list = createList({ name, kind: 'manual', appids });
       refreshManualLists();
-      setSelectionActionStatus(`Added ${appids.length} game(s) to new list "${list.name}".`);
+      showSelectionStatus(`Added ${appids.length} game(s) to new list "${list.name}".`, list.id);
     } else {
       const list = getList(target);
       addAppidsToList(target, appids);
-      setSelectionActionStatus(`Added ${appids.length} game(s) to "${list?.name ?? 'list'}".`);
+      showSelectionStatus(`Added ${appids.length} game(s) to "${list?.name ?? 'list'}".`, target);
     }
     setAddTarget('');
+    setNewListName('');
     table?.selection.clear();
   }
 
@@ -922,7 +934,7 @@ export default function ListRoute() {
   // changed), and `load()` already correctly handles every other piece of teardown/rebuild this
   // needs (table/rowsStore/stream), so re-deriving it by hand here would just be a second,
   // easier-to-drift-out-of-sync copy of that same logic. The status message is set *after*
-  // `load()` resolves, not before — `load()`'s own reset (`setSelectionActionStatus('')`, same
+  // `load()` resolves, not before — `load()`'s own reset (`setSelectionActionStatus(null)`, same
   // as `setSelectedRows([])`, right at its top) runs synchronously the moment it's called and
   // would otherwise wipe out this exact message in the same tick it was set, before Solid ever
   // gets a chance to render it (confirmed live: the message never appeared until this was fixed).
@@ -933,7 +945,7 @@ export default function ListRoute() {
     const appids = rows.map((r) => r.appid);
     removeAppidsFromList(list.id, appids);
     await load();
-    setSelectionActionStatus(`Removed ${appids.length} game(s) from "${list.name}".`);
+    showSelectionStatus(`Removed ${appids.length} game(s) from "${list.name}".`);
   }
   // group-by-membership mode: one real table per group instead of the single `table` above (see
   // buildGroupTables) — all sharing the one `rowsStore`/`rowStore` above (every game belongs to
@@ -1676,7 +1688,7 @@ export default function ListRoute() {
       setRankingState(null);
     }
     setSelectedRows([]); // a fresh load means a fresh table — nothing carries a prior selection over
-    setSelectionActionStatus('');
+    setSelectionActionStatus(null);
 
     if (kind === 'compare') {
       const slots = compareSlots();
@@ -2797,7 +2809,25 @@ export default function ListRoute() {
             </For>
             <option value={NEW_LIST_OPTION}>+ Create new list…</option>
           </select>
-          <button type="button" disabled={!addTarget()} onClick={handleAddSelectedToList}>
+          <Show when={addTarget() === NEW_LIST_OPTION}>
+            <input
+              type="text"
+              class="selection-new-list-name"
+              placeholder="New list name"
+              aria-label="New list name"
+              value={newListName()}
+              ref={(el) => queueMicrotask(() => el.focus())}
+              onInput={(e) => setNewListName(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void handleAddSelectedToList();
+              }}
+            />
+          </Show>
+          <button
+            type="button"
+            disabled={!addTarget() || (addTarget() === NEW_LIST_OPTION && !newListName().trim())}
+            onClick={handleAddSelectedToList}
+          >
             Add
           </button>
           <Show when={kind === 'user' && userList()?.kind === 'manual'}>
@@ -2837,7 +2867,10 @@ export default function ListRoute() {
       {/* Outside the selection-gated block above on purpose — "Add"/"Remove" both clear the
           selection right after acting (Add explicitly; Remove via load()'s own reset), and the
           whole point of this message is to confirm what just happened *after* that clears. */}
-      {selectionActionStatus() && <div class="selection-status">{selectionActionStatus()}</div>}
+      <div class="selection-status" classList={{ 'is-visible': !!selectionActionStatus() }} role="status">
+        {selectionActionStatus()?.text}
+        <Show when={selectionActionStatus()?.listId}>{(listId) => <A href={`/lists/${listId()}`}>Open list</A>}</Show>
+      </div>
       <Show when={tableReady() && !userList() && getAuthUser() && isUnsaved(viewPrefKey(), currentViewState())}>
         <div class="pref-unsaved-banner">
           Unsaved changes to this view ({summarizeViewDiff(viewPrefKey(), currentViewState()).join(', ')}) — differs
