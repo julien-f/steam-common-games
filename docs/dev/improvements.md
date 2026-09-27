@@ -75,6 +75,8 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 - **U37 · minor · A1, A2** — a stored account slot's `label` is never refreshed from what the account card fetches: a slot without one (seeded, or resolved before labels existed) stays a steam64 id in the chip, Recent accounts, list labels and page title.
 - **U38 · minor · A4** — a private friends list shows "Friends (0)" plus two overlapping lines. "Friends (private)".
 
+- **U44 · minor · B3** — a combined list built from a bundle drops the bundle's games with no Steam listing without a word; the bundle page lists them below its table. Say how many were left out, on the formula line.
+
 ## Consistency and polish
 
 - **U39 · polish** — `favicon.ico` 404s; nav items shift sideways between routes; missing thumbnails have no placeholder; Released and Added use different date formats; "Demo" pills look like primary buttons; the "Updated" age has very low contrast; Compare's op `<select>` is an unstyled native white control; wishlisted/owned name colours have no legend.
