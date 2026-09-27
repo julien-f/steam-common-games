@@ -4628,3 +4628,7 @@ kbd {
 .app-content:focus:not(:focus-visible) {
   outline: none;
 }
+.account-chip-mine {
+  color: var(--accent);
+  font-size: 12px;
+}

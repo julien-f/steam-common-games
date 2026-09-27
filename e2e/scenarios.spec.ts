@@ -41,6 +41,20 @@ test('A1 edge: Owned with no account points to Home rather than showing 0 games'
   await expect(page).toHaveURL(/\/$/);
 });
 
+test('A2: explore a friend, then switch back to my ★ account from the nav chip', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
+  await page.getByRole('button', { name: 'Set as current account' }).click();
+  await expect(page.getByRole('navigation')).toContainText('Bob');
+
+  await page.getByRole('navigation').getByText('Bob', { exact: true }).click();
+  const back = page.getByRole('button', { name: /Alice/ }).filter({ has: page.getByTitle(/Your account/) });
+  await expect(back).toBeVisible();
+  await back.click();
+  await expect(page.getByRole('navigation')).toContainText('Alice');
+});
+
 test('C1: compare three players — one table grouped from "all" to "only one"', async ({ page }) => {
   await page.goto('/lists/compare?u=alice&u=bob&u=carol');
   await expect(groupRows(page)).toHaveCount(6);

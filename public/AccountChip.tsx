@@ -22,6 +22,7 @@ import {
   getEffectiveCurrentAccount,
   getAccountOverride,
   getRecentAccounts,
+  getMyAccount,
   setCurrentAccount,
   accountDisplayLabel,
   accountIdentifiers,
@@ -190,6 +191,11 @@ export function AccountChip(): JSX.Element {
                         {(url) => <img class="account-chip-avatar" src={url()} alt="" width="20" height="20" />}
                       </Show>
                       <span class="account-chip-name">{accountDisplayLabel(acc)}</span>
+                      <Show when={acc.id === getMyAccount()?.id}>
+                        <span class="account-chip-mine" title="Your account (★ on Home)">
+                          ★
+                        </span>
+                      </Show>
                     </button>
                     {/* Beside the switch button rather than inside it — nesting a button in a
                         button is invalid, and copying an identifier shouldn't also switch account. */}
