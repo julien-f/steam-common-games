@@ -14,7 +14,7 @@ const account = (label, members, identifiers, extra = {}) => ({
 const ALICE = account('Alice', ['76561198000000001'], ['alice']);
 const BOB = account('Bob', ['76561198000000002'], ['bob']);
 // No custom URL — its identifier falls back to the steam64 id, which is the case chips exist for.
-const NAMELESS = account('Pixl Pixl', ['76561198000000009'], ['76561198000000009']);
+const NAMELESS = account('Dana', ['76561198000000009'], ['76561198000000009']);
 const FAMILY = account('Bob + Carol', ['76561198000000002', '76561198000000003'], ['bob', 'carol']);
 
 const KNOWN = [ALICE, BOB, NAMELESS, FAMILY];
@@ -30,7 +30,7 @@ test('entryIdentifiers: an account contributes every member, a typed entry just 
 });
 
 test('entryLabel: an account reads as its name, a typed entry as what was typed', () => {
-  assert.equal(entryLabel(picked(NAMELESS)), 'Pixl Pixl');
+  assert.equal(entryLabel(picked(NAMELESS)), 'Dana');
   assert.equal(entryLabel(typed('dave')), 'dave');
 });
 
@@ -84,7 +84,7 @@ test('slotsToIdentifiers: drops empty slots entirely', () => {
 test('slotsFromIdentifiers: a known account comes back as an account entry, not raw text', () => {
   const slots = slotsFromIdentifiers([['76561198000000009']], KNOWN);
   assert.deepEqual(slots, [[picked(NAMELESS)]]);
-  assert.equal(entryLabel(slots[0][0]), 'Pixl Pixl', 'reads as a name, not a 17-digit id');
+  assert.equal(entryLabel(slots[0][0]), 'Dana', 'reads as a name, not a 17-digit id');
 });
 
 test('slotsFromIdentifiers: an unknown identifier stays typed', () => {
@@ -119,11 +119,11 @@ test('slotsFromIdentifiers: round-trips back to the identifiers it was built fro
 // ── the dropdown's list ───────────────────────────────────────────────────────
 
 test('filterAccounts: everything known when nothing is typed', () => {
-  assert.deepEqual(filterAccounts(KNOWN, [[]], '').map(a => a.label), ['Alice', 'Bob', 'Pixl Pixl', 'Bob + Carol']);
+  assert.deepEqual(filterAccounts(KNOWN, [[]], '').map(a => a.label), ['Alice', 'Bob', 'Dana', 'Bob + Carol']);
 });
 
 test('filterAccounts: matches on the label, case-insensitively', () => {
-  assert.deepEqual(filterAccounts(KNOWN, [[]], 'pixl').map(a => a.label), ['Pixl Pixl']);
+  assert.deepEqual(filterAccounts(KNOWN, [[]], 'dana').map(a => a.label), ['Dana']);
 });
 
 test('filterAccounts: matches on an identifier or a steam64 id too', () => {
@@ -134,7 +134,7 @@ test('filterAccounts: matches on an identifier or a steam64 id too', () => {
 test('filterAccounts: hides accounts already placed anywhere in the form', () => {
   assert.deepEqual(
     filterAccounts(KNOWN, [[picked(ALICE)], []], '').map(a => a.label),
-    ['Bob', 'Pixl Pixl', 'Bob + Carol'],
+    ['Bob', 'Dana', 'Bob + Carol'],
   );
 });
 

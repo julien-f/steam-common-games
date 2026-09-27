@@ -90,7 +90,7 @@ export function AccountChip(): JSX.Element {
   // the resulting text — so switching from one account straight to another (truthy → truthy,
   // exactly what a `?u=` link resolving does) left the name stuck on the previous account while
   // the avatar next to it, a plain JSX expression, updated correctly. Confirmed live: the chip
-  // read "Pixl Pixl" over spirulou's avatar on `/lists/wishlist?u=spirulou`. As a plain accessor
+  // read "Dana" over bob's avatar on `/lists/wishlist?u=bob`. As a plain accessor
   // read inside JSX, this is a reactive insertion like any other.
   const chipLabel = () => {
     const acc = account();

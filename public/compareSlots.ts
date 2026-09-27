@@ -71,7 +71,7 @@ export function slotsHaveAccount(slots: Slot[], account: KnownAccount): boolean 
 }
 
 // Rebuilds slots of raw identifiers (what a `?u=` URL carries) into named entries, so reopening
-// the form on an existing comparison shows "Pixl Pixl", not the steam64 id the URL spells it as.
+// the form on an existing comparison shows "Dana", not the steam64 id the URL spells it as.
 //
 // A multi-member account only matches a slot it accounts for *entirely* — otherwise a Family
 // would swallow a slot that merely mentions one of its members. Everything else is matched one
