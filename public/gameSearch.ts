@@ -276,7 +276,9 @@ export function initGameSearch({
 
   inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      hideResults();
+      // Second Esc leaves the box, so the page's own shortcuts work again.
+      if (resultsEl.hidden) inputEl.blur();
+      else hideResults();
       return;
     }
     if (e.key === 'ArrowDown') {

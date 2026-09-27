@@ -262,6 +262,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Esc in the game search box now leaves it once the dropdown is closed — shortcuts pressed afterwards (`?`, `R`, …) used to be typed into the box.
 - 🔗 Share view on Owned and Wishlist now carries the account being shown (`?u=`) — the recipient used to land on their own list, or on "No account selected".
 - **Games whose Steam store answer comes back under a different appid now load their screenshots, videos and store details** (e.g. Coridden, 1656930, answered as `"3290770"`). They were treated as having no store page. The entry is now accepted when its `steam_appid` matches the request.
 

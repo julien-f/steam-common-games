@@ -60,7 +60,6 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 
 ## Keyboard and accessibility
 
-- **U26 · major · I2** — Esc doesn't leave the nav search box; later shortcuts (r, ?) are typed into it. Esc clears, then blurs.
 - **U27 · major · I2, F3** — with no panel open, ↓/Enter/R do nothing; reaching a row takes ~25 Tabs. ↓ / R should open the first / a random row.
 - **U28 · minor · F1, I2** — the row whose game is open in the panel isn't highlighted (`aria-selected=false`), so ↑/↓ loses your place. Highlight + `aria-current`.
 - **U29 · minor · I2** — Tab reaches the Close button of the hidden shortcuts dialog. Make it `inert` while closed.
