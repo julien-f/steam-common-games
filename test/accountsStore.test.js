@@ -6,9 +6,9 @@ const assert = require('node:assert/strict');
 function makeMemoryLocalStorage() {
   const store = new Map();
   return {
-    getItem: k => (store.has(k) ? store.get(k) : null),
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
     setItem: (k, v) => store.set(k, String(v)),
-    removeItem: k => store.delete(k),
+    removeItem: (k) => store.delete(k),
   };
 }
 
@@ -45,7 +45,8 @@ test('getMyAccount/getCurrentAccount: null when never set', () => {
 });
 
 test('setMyAccount/setCurrentAccount: round-trip independently, clearing recents orphans neither', () => {
-  const { setMyAccount, setCurrentAccount, getMyAccount, getCurrentAccount, clearRecentAccounts, getRecentAccounts } = store();
+  const { setMyAccount, setCurrentAccount, getMyAccount, getCurrentAccount, clearRecentAccounts, getRecentAccounts } =
+    store();
   const me = makeAccount('me');
   const other = makeAccount('other');
   setMyAccount(me);
@@ -62,7 +63,7 @@ test('setCurrentAccount: upserts into recentAccounts (dedupe by id, bumps lastUs
   const { setCurrentAccount, getRecentAccounts } = store();
   setCurrentAccount(makeAccount('acc1', { lastUsedAt: 1 }));
   const firstStamp = getRecentAccounts()[0].lastUsedAt;
-  await new Promise(r => setTimeout(r, 2));
+  await new Promise((r) => setTimeout(r, 2));
   setCurrentAccount(makeAccount('acc1', { lastUsedAt: 1 }));
 
   const recents = getRecentAccounts();
@@ -73,16 +74,22 @@ test('setCurrentAccount: upserts into recentAccounts (dedupe by id, bumps lastUs
 test('setMyAccount: also upserts into recentAccounts (starring is itself a use)', () => {
   const { setMyAccount, getRecentAccounts } = store();
   setMyAccount(makeAccount('me'));
-  assert.equal(getRecentAccounts().some(a => a.id === 'me'), true);
+  assert.equal(
+    getRecentAccounts().some((a) => a.id === 'me'),
+    true,
+  );
 });
 
 test('getRecentAccounts: most-recently-used first', async () => {
   const { setCurrentAccount, getRecentAccounts } = store();
   setCurrentAccount(makeAccount('older'));
-  await new Promise(r => setTimeout(r, 2));
+  await new Promise((r) => setTimeout(r, 2));
   setCurrentAccount(makeAccount('newer'));
 
-  assert.deepEqual(getRecentAccounts().map(a => a.id), ['newer', 'older']);
+  assert.deepEqual(
+    getRecentAccounts().map((a) => a.id),
+    ['newer', 'older'],
+  );
 });
 
 test('removeRecentAccount: hard-removes an account nothing references', () => {
@@ -98,7 +105,9 @@ test('removeRecentAccount: soft-removes an account still referenced by a dynamic
   const { createList } = require('../public/listsStore.ts');
   setCurrentAccount(makeAccount('acc1'));
   createList({
-    name: 'Watcher', kind: 'dynamic', op: 'union',
+    name: 'Watcher',
+    kind: 'dynamic',
+    op: 'union',
     sources: [{ kind: 'account-owned', accountId: 'acc1' }],
   });
 
@@ -113,13 +122,18 @@ test('restoreRecentAccount: clears removedAt, account reappears in the default v
   const { createList } = require('../public/listsStore.ts');
   setCurrentAccount(makeAccount('acc1'));
   createList({
-    name: 'Watcher', kind: 'dynamic', op: 'union',
+    name: 'Watcher',
+    kind: 'dynamic',
+    op: 'union',
     sources: [{ kind: 'account-owned', accountId: 'acc1' }],
   });
   removeRecentAccount('acc1');
 
   restoreRecentAccount('acc1');
-  assert.equal(getRecentAccounts().some(a => a.id === 'acc1'), true);
+  assert.equal(
+    getRecentAccounts().some((a) => a.id === 'acc1'),
+    true,
+  );
 });
 
 test('clearRecentAccounts: soft-removes referenced accounts, hard-removes the rest', () => {
@@ -128,7 +142,9 @@ test('clearRecentAccounts: soft-removes referenced accounts, hard-removes the re
   setCurrentAccount(makeAccount('referenced'));
   setCurrentAccount(makeAccount('unreferenced'));
   createList({
-    name: 'Watcher', kind: 'dynamic', op: 'union',
+    name: 'Watcher',
+    kind: 'dynamic',
+    op: 'union',
     sources: [{ kind: 'account-wishlist', accountId: 'referenced' }],
   });
 
@@ -136,7 +152,10 @@ test('clearRecentAccounts: soft-removes referenced accounts, hard-removes the re
 
   assert.equal(getRecentAccounts().length, 0);
   const all = getRecentAccounts({ includeRemoved: true });
-  assert.deepEqual(all.map(a => a.id), ['referenced']);
+  assert.deepEqual(
+    all.map((a) => a.id),
+    ['referenced'],
+  );
 });
 
 test('sweepRemovedAccounts: purges a soft-removed account once its last reference is gone', () => {
@@ -144,7 +163,9 @@ test('sweepRemovedAccounts: purges a soft-removed account once its last referenc
   const { createList, updateDynamicList } = require('../public/listsStore.ts');
   setCurrentAccount(makeAccount('acc1'));
   const watcher = createList({
-    name: 'Watcher', kind: 'dynamic', op: 'union',
+    name: 'Watcher',
+    kind: 'dynamic',
+    op: 'union',
     sources: [{ kind: 'account-owned', accountId: 'acc1' }],
   });
   removeRecentAccount('acc1');
@@ -190,7 +211,7 @@ test('getEffectiveCurrentAccount: null when there is neither an override nor a s
 
 test('setAccountOverride/setCurrentAccount: broadcast ACCOUNT_CHANGED_EVENT', () => {
   const events = [];
-  global.window = { dispatchEvent: e => events.push(e.type) };
+  global.window = { dispatchEvent: (e) => events.push(e.type) };
   const { setAccountOverride, setCurrentAccount, ACCOUNT_CHANGED_EVENT } = store();
 
   setAccountOverride(makeAccount('theirs'));
@@ -202,7 +223,7 @@ test('setAccountOverride/setCurrentAccount: broadcast ACCOUNT_CHANGED_EVENT', ()
 
 test('setAccountOverride: re-setting the same account id broadcasts nothing', () => {
   const events = [];
-  global.window = { dispatchEvent: e => events.push(e.type) };
+  global.window = { dispatchEvent: (e) => events.push(e.type) };
   const { setAccountOverride } = store();
 
   setAccountOverride(makeAccount('theirs'));
@@ -246,7 +267,10 @@ test('accountDisplayLabel: prefers the cached Steam label', () => {
 
 test('accountDisplayLabel: falls back to what the user typed, joined for a Family', () => {
   const { accountDisplayLabel } = store();
-  assert.equal(accountDisplayLabel({ id: 'a+b', members: ['a', 'b'], rawInputs: ['alice', 'bob'], lastUsedAt: 0 }), 'alice + bob');
+  assert.equal(
+    accountDisplayLabel({ id: 'a+b', members: ['a', 'b'], rawInputs: ['alice', 'bob'], lastUsedAt: 0 }),
+    'alice + bob',
+  );
 });
 
 test('accountDisplayLabel: falls back to the member ids when nothing else is known', () => {

@@ -38,7 +38,7 @@ export function accountDisplayLabel(account: AccountSlot): string {
 // string for the slot: a Family's joined label is nothing any input accepts back.
 // `vanities` is absent on accounts resolved before it was stored, which simply fall back to ids.
 export function accountIdentifiers(account: AccountSlot): { steamid: string; identifier: string }[] {
-  return account.members.map(steamid => ({ steamid, identifier: account.vanities?.[steamid] || steamid }));
+  return account.members.map((steamid) => ({ steamid, identifier: account.vanities?.[steamid] || steamid }));
 }
 
 function readRecents(): AccountSlot[] {
@@ -115,7 +115,11 @@ export function getEffectiveCurrentAccount(): AccountSlot | null {
 export const ACCOUNT_CHANGED_EVENT = 'scg:account-changed';
 
 export function notifyAccountChanged(): void {
-  try { window.dispatchEvent(new CustomEvent(ACCOUNT_CHANGED_EVENT)); } catch { /* no window (tests) */ }
+  try {
+    window.dispatchEvent(new CustomEvent(ACCOUNT_CHANGED_EVENT));
+  } catch {
+    /* no window (tests) */
+  }
 }
 
 // ── recentAccounts ───────────────────────────────────────────────────────────────────────────
@@ -124,7 +128,7 @@ export function notifyAccountChanged(): void {
 // a "Trash"/removed-items view.
 export function getRecentAccounts({ includeRemoved = false }: { includeRemoved?: boolean } = {}): AccountSlot[] {
   const list = readRecents();
-  const filtered = includeRemoved ? list : list.filter(a => !a.removedAt);
+  const filtered = includeRemoved ? list : list.filter((a) => !a.removedAt);
   return [...filtered].sort((a, b) => b.lastUsedAt - a.lastUsedAt);
 }
 
@@ -133,9 +137,10 @@ export function getRecentAccounts({ includeRemoved = false }: { includeRemoved?:
 // piling up duplicates.
 export function upsertRecentAccount(account: AccountSlot): AccountSlot {
   const recents = readRecents();
-  const idx = recents.findIndex(a => a.id === account.id);
+  const idx = recents.findIndex((a) => a.id === account.id);
   const entry: AccountSlot = { ...account, lastUsedAt: Date.now(), removedAt: undefined };
-  if (idx === -1) recents.push(entry); else recents[idx] = entry;
+  if (idx === -1) recents.push(entry);
+  else recents[idx] = entry;
   writeRecents(recents);
   return entry;
 }
@@ -145,7 +150,7 @@ export function upsertRecentAccount(account: AccountSlot): AccountSlot {
 // they happen to hold the same id, since those are stored independently.
 export function removeRecentAccount(id: string): { softRemoved: boolean } {
   const recents = readRecents();
-  const idx = recents.findIndex(a => a.id === id);
+  const idx = recents.findIndex((a) => a.id === id);
   if (idx === -1) return { softRemoved: false };
   if (isAccountReferenced(id)) {
     recents[idx] = { ...recents[idx], removedAt: Date.now() };
@@ -159,7 +164,7 @@ export function removeRecentAccount(id: string): { softRemoved: boolean } {
 
 export function restoreRecentAccount(id: string): void {
   const recents = readRecents();
-  const idx = recents.findIndex(a => a.id === id);
+  const idx = recents.findIndex((a) => a.id === id);
   if (idx === -1 || !recents[idx].removedAt) return;
   const { removedAt: _removedAt, ...rest } = recents[idx];
   recents[idx] = rest as AccountSlot;
@@ -169,14 +174,16 @@ export function restoreRecentAccount(id: string): void {
 // "Clear all" — removes every current entry via the same soft-remove-if-referenced rule as a
 // single removeRecentAccount call, just applied across the whole list.
 export function clearRecentAccounts(): void {
-  readRecents().forEach(a => { if (!a.removedAt) removeRecentAccount(a.id); });
+  readRecents().forEach((a) => {
+    if (!a.removedAt) removeRecentAccount(a.id);
+  });
 }
 
 // Permanently purges any soft-removed account no longer referenced by anything — call after any
 // change that could have removed the last reference (e.g. a dynamic list's sources edited).
 export function sweepRemovedAccounts(): number {
   const recents = readRecents();
-  const kept = recents.filter(a => !a.removedAt || isAccountReferenced(a.id));
+  const kept = recents.filter((a) => !a.removedAt || isAccountReferenced(a.id));
   if (kept.length !== recents.length) writeRecents(kept);
   return recents.length - kept.length;
 }

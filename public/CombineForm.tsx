@@ -17,8 +17,10 @@ export interface SourceOption {
 // Wording comes from listLabels.ts, shared with the hero card that later has to name the very
 // same op back to the user on the list's own page (ListRoute.tsx) — two hand-maintained copies
 // were one edit from disagreeing about what a combine does.
-const COMBINE_OPS: { value: CombineOp; label: string }[] = (Object.keys(OP_LABELS) as CombineOp[])
-  .map(op => ({ value: op, label: `${OP_LABELS[op]} (${OP_DESCRIPTIONS[op]})` }));
+const COMBINE_OPS: { value: CombineOp; label: string }[] = (Object.keys(OP_LABELS) as CombineOp[]).map((op) => ({
+  value: op,
+  label: `${OP_LABELS[op]} (${OP_DESCRIPTIONS[op]})`,
+}));
 
 export function refKey(ref: ListRef): string {
   return [ref.kind, ref.accountId ?? ref.listId].filter(Boolean).join(':');
@@ -36,9 +38,11 @@ export function sourceOptions(excludeListId?: string): SourceOption[] {
       { kind: 'account-wishlist', accountId: acc.id },
     ]),
     { kind: 'recent-games' },
-    ...getLists().filter(l => l.id !== excludeListId).map((list): ListRef => ({ kind: 'user', listId: list.id })),
+    ...getLists()
+      .filter((l) => l.id !== excludeListId)
+      .map((list): ListRef => ({ kind: 'user', listId: list.id })),
   ];
-  return refs.map(ref => ({ key: refKey(ref), label: describeListRef(ref, naming).label, ref }));
+  return refs.map((ref) => ({ key: refKey(ref), label: describeListRef(ref, naming).label, ref }));
 }
 
 export interface CombineFormProps {
@@ -72,8 +76,8 @@ export function CombineForm(props: CombineFormProps) {
   }
 
   function selectedSources(): ListRef[] {
-    const byKey = new Map(options().map(o => [o.key, o.ref]));
-    return selected().flatMap(key => {
+    const byKey = new Map(options().map((o) => [o.key, o.ref]));
+    return selected().flatMap((key) => {
       const ref = byKey.get(key);
       return ref ? [ref] : [];
     });
@@ -87,11 +91,11 @@ export function CombineForm(props: CombineFormProps) {
   }
 
   function toggleSource(key: string): void {
-    setSelected(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]));
+    setSelected((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   }
 
   function moveSource(index: number, delta: -1 | 1): void {
-    setSelected(prev => {
+    setSelected((prev) => {
       const target = index + delta;
       if (target < 0 || target >= prev.length) return prev;
       const next = [...prev];
@@ -105,9 +109,12 @@ export function CombineForm(props: CombineFormProps) {
     setError('');
     const trimmed = name().trim();
     const sources = selectedSources();
-    if (sources.length < 2) { setError('Pick at least 2 sources.'); return; }
+    if (sources.length < 2) {
+      setError('Pick at least 2 sources.');
+      return;
+    }
     try {
-      props.onSubmit({ name: showName() ? (trimmed || undefined) : undefined, op: op(), sources });
+      props.onSubmit({ name: showName() ? trimmed || undefined : undefined, op: op(), sources });
     } catch (err) {
       setError((err as Error).message);
     }
@@ -120,25 +127,32 @@ export function CombineForm(props: CombineFormProps) {
           type="text"
           placeholder="Combined list name (optional)…"
           value={name()}
-          onInput={e => setName(e.currentTarget.value)}
+          onInput={(e) => setName(e.currentTarget.value)}
         />
       </Show>
-      <select value={op()} onChange={e => setOp(e.currentTarget.value as CombineOp)}>
-        <For each={COMBINE_OPS}>{o => <option value={o.value}>{o.label}</option>}</For>
+      <select value={op()} onChange={(e) => setOp(e.currentTarget.value as CombineOp)}>
+        <For each={COMBINE_OPS}>{(o) => <option value={o.value}>{o.label}</option>}</For>
       </select>
       {/* Says what leaving the name empty gets you — otherwise "optional" is invisible until after
           the list is saved. */}
       <Show when={showName() && !name().trim() && derivedName()}>
-        {label => <p>Will be named: <span class="derived-name">{label()}</span></p>}
+        {(label) => (
+          <p>
+            Will be named: <span class="derived-name">{label()}</span>
+          </p>
+        )}
       </Show>
       {/* Order only affects `subtract` (first source minus the rest — see OP_DESCRIPTIONS), so the
           reorder controls only appear for it; for the other ops pick order is inert. */}
       <Show when={op() === 'subtract' && selected().length > 0}>
-        <p>{OP_DESCRIPTIONS.subtract[0].toUpperCase()}{OP_DESCRIPTIONS.subtract.slice(1)}:</p>
+        <p>
+          {OP_DESCRIPTIONS.subtract[0].toUpperCase()}
+          {OP_DESCRIPTIONS.subtract.slice(1)}:
+        </p>
         <ol class="combine-sources-ordered">
           <For each={selected()}>
             {(key, i) => {
-              const label = () => options().find(o => o.key === key)?.label ?? key;
+              const label = () => options().find((o) => o.key === key)?.label ?? key;
               return (
                 <li>
                   <span class="combine-source-index">{i() + 1}.</span>
@@ -163,14 +177,10 @@ export function CombineForm(props: CombineFormProps) {
       <p>Pick at least 2 sources:</p>
       <ul class="combine-sources">
         <For each={options()}>
-          {opt => (
+          {(opt) => (
             <li>
               <label>
-                <input
-                  type="checkbox"
-                  checked={selected().includes(opt.key)}
-                  onChange={() => toggleSource(opt.key)}
-                />
+                <input type="checkbox" checked={selected().includes(opt.key)} onChange={() => toggleSource(opt.key)} />
                 {opt.label}
               </label>
             </li>
@@ -181,7 +191,11 @@ export function CombineForm(props: CombineFormProps) {
       <div class="combine-form-actions">
         <button type="submit">{props.submitLabel}</button>
         <Show when={props.onCancel}>
-          {cancel => <button type="button" onClick={() => cancel()()}>Cancel</button>}
+          {(cancel) => (
+            <button type="button" onClick={() => cancel()()}>
+              Cancel
+            </button>
+          )}
         </Show>
       </div>
     </form>

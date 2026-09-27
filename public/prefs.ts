@@ -29,8 +29,10 @@ function readRawBlob(): Record<string, unknown> {
     const raw = localStorage.getItem(PREFS_STORAGE_KEY);
     if (!raw) return {};
     const parsed: unknown = JSON.parse(raw);
-    return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed as Record<string, unknown> : {};
-  } catch { return {}; } // unavailable storage, or a corrupted/foreign value
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  } // unavailable storage, or a corrupted/foreign value
 }
 
 function isPrefEntry(value: unknown): value is PrefEntry {
@@ -54,7 +56,9 @@ function readEntries(): Record<string, PrefEntry> {
 function writeEntries(entries: Record<string, PrefEntry>): void {
   try {
     localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify({ schemaVersion: SCHEMA_VERSION, ...entries }));
-  } catch { /* not persisted this session — private browsing, quota, storage unavailable */ }
+  } catch {
+    /* not persisted this session — private browsing, quota, storage unavailable */
+  }
 }
 
 // Returns `fallback` when the key was never set, storage is unavailable (private browsing,
@@ -78,7 +82,7 @@ export function setPref(key: string, value: unknown): void {
   // on the "unsaved changes" banner (tableViewSync.ts) — every edit to a table would otherwise
   // silently overwrite whatever's saved to the account before the user ever saw a diff.
   if (!signedInSteamid || TABLE_VIEW_PREF_KEYS.includes(key)) return;
-  if (DEBOUNCED_PUSH_PREFIXES.some(p => key.startsWith(p))) schedulePush(key);
+  if (DEBOUNCED_PUSH_PREFIXES.some((p) => key.startsWith(p))) schedulePush(key);
   else pushPrefToServer(key, value, updatedAt);
 }
 
@@ -90,7 +94,10 @@ const pendingPushes = new Map<string, ReturnType<typeof setTimeout>>();
 
 function schedulePush(key: string): void {
   clearTimeout(pendingPushes.get(key));
-  pendingPushes.set(key, setTimeout(() => flushPush(key), PUSH_DEBOUNCE_MS));
+  pendingPushes.set(
+    key,
+    setTimeout(() => flushPush(key), PUSH_DEBOUNCE_MS),
+  );
 }
 
 function flushPush(key: string, keepalive = false): void {
@@ -133,7 +140,12 @@ export function _resetSignedInSteamid(): void {
 // as it worked before server sync existed at all. Not retried here: authStore.ts's merge, which
 // runs on every sign-in check (not just the first), pushes any key whose local `updatedAt` still
 // beats the server's, so a failed push is naturally retried the next time this device checks in.
-export function pushPrefToServer(key: string, value: unknown, updatedAt: number, { keepalive = false } = {}): Promise<void> {
+export function pushPrefToServer(
+  key: string,
+  value: unknown,
+  updatedAt: number,
+  { keepalive = false } = {},
+): Promise<void> {
   return fetch(`/api/me/prefs/${encodeURIComponent(key)}`, {
     method: 'PUT',
     keepalive,
@@ -141,7 +153,7 @@ export function pushPrefToServer(key: string, value: unknown, updatedAt: number,
     body: JSON.stringify({ value, updatedAt }),
   })
     .then(() => undefined)
-    .catch(err => console.error(`[prefs] failed to sync "${key}" to the server`, err));
+    .catch((err) => console.error(`[prefs] failed to sync "${key}" to the server`, err));
 }
 
 // Every locally stored key, with its value and last-write time — authStore.ts's merge diffs this

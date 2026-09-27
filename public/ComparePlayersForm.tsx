@@ -22,11 +22,21 @@
 // synchronously, once at mount: nothing here can change what's in recents while it's open.
 import { createSignal, createMemo, createUniqueId, For, Index, Show, type JSX } from 'solid-js';
 import {
-  getRecentAccounts, getMyAccount, getAccountOverride, accountDisplayLabel, accountIdentifiers,
+  getRecentAccounts,
+  getMyAccount,
+  getAccountOverride,
+  accountDisplayLabel,
+  accountIdentifiers,
 } from './accountsStore.ts';
 import {
-  slotsFromIdentifiers, slotsToIdentifiers, slotIdentifiers, filterAccounts, entryLabel,
-  type KnownAccount, type Slot, type SlotEntry,
+  slotsFromIdentifiers,
+  slotsToIdentifiers,
+  slotIdentifiers,
+  filterAccounts,
+  entryLabel,
+  type KnownAccount,
+  type Slot,
+  type SlotEntry,
 } from './compareSlots.ts';
 import type { AccountSlot } from './types.ts';
 
@@ -46,14 +56,14 @@ function knownAccounts(): KnownAccount[] {
   const myId = getMyAccount()?.id;
   const recents = getRecentAccounts();
   const override = getAccountOverride();
-  const all = override && !recents.some(a => a.id === override.id) ? [override, ...recents] : recents;
+  const all = override && !recents.some((a) => a.id === override.id) ? [override, ...recents] : recents;
   return all.map((account: AccountSlot) => ({
     id: account.id,
     label: accountDisplayLabel(account),
     avatarUrl: account.avatarUrl,
     starred: account.id === myId,
     members: account.members,
-    identifiers: accountIdentifiers(account).map(m => m.identifier),
+    identifiers: accountIdentifiers(account).map((m) => m.identifier),
   }));
 }
 
@@ -91,18 +101,18 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
   }
 
   function addEntry(slotIdx: number, entry: SlotEntry): void {
-    setSlots(prev => prev.map((slot, i) => (i === slotIdx ? [...slot, entry] : slot)));
+    setSlots((prev) => prev.map((slot, i) => (i === slotIdx ? [...slot, entry] : slot)));
     setQuery('');
     setHighlight(0);
   }
 
   function removeEntry(slotIdx: number, entryIdx: number): void {
-    setSlots(prev => prev.map((slot, i) => (i === slotIdx ? slot.filter((_, j) => j !== entryIdx) : slot)));
+    setSlots((prev) => prev.map((slot, i) => (i === slotIdx ? slot.filter((_, j) => j !== entryIdx) : slot)));
   }
 
   function removeSlot(slotIdx: number): void {
     closeDropdown();
-    setSlots(prev => prev.filter((_, i) => i !== slotIdx));
+    setSlots((prev) => prev.filter((_, i) => i !== slotIdx));
   }
 
   // Enter commits whichever the user meant: the highlighted account when the dropdown has
@@ -110,7 +120,10 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
   // the case this whole form has to keep working for.
   function commit(slotIdx: number): void {
     const account = matches()[highlight()];
-    if (account) { addEntry(slotIdx, { kind: 'account', account }); return; }
+    if (account) {
+      addEntry(slotIdx, { kind: 'account', account });
+      return;
+    }
     const value = query().trim();
     if (value) addEntry(slotIdx, { kind: 'typed', value });
   }
@@ -121,11 +134,11 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
       case 'ArrowDown':
         e.preventDefault();
         openDropdown(slotIdx);
-        setHighlight(h => (list.length === 0 ? 0 : (h + 1) % list.length));
+        setHighlight((h) => (list.length === 0 ? 0 : (h + 1) % list.length));
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setHighlight(h => (list.length === 0 ? 0 : (h - 1 + list.length) % list.length));
+        setHighlight((h) => (list.length === 0 ? 0 : (h - 1 + list.length) % list.length));
         break;
       case 'Enter':
         // Always swallowed: this field commits a chip, it never submits the form. Submitting on
@@ -136,7 +149,10 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
       case 'Escape':
         // Only closes the dropdown — the route's own Escape (closing the panel) has nothing to do
         // with a form the user is mid-way through.
-        if (openSlot() != null) { e.stopPropagation(); closeDropdown(); }
+        if (openSlot() != null) {
+          e.stopPropagation();
+          closeDropdown();
+        }
         break;
       case 'Backspace':
         // The standard token-input affordance: backspace on an empty field deletes the chip
@@ -188,7 +204,7 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
                 the first place and so never reaches this. */}
             <div
               class="compare-tokens"
-              onFocusOut={e => {
+              onFocusOut={(e) => {
                 if (!e.currentTarget.contains(e.relatedTarget as Node | null)) handleFocusOut(slotIdx);
               }}
             >
@@ -198,7 +214,7 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
                   return (
                     <span class="compare-token" classList={{ 'is-typed': !account }}>
                       <Show when={account?.avatarUrl}>
-                        {url => <img class="account-avatar" src={url()} alt="" width="18" height="18" />}
+                        {(url) => <img class="account-avatar" src={url()} alt="" width="18" height="18" />}
                       </Show>
                       <span class="compare-token-label">{entryLabel(entry)}</span>
                       <Show when={account && account.members.length > 1}>
@@ -209,7 +225,9 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
                         class="compare-token-remove"
                         aria-label={`Remove ${entryLabel(entry)}`}
                         onClick={() => removeEntry(slotIdx, entryIdx())}
-                      >×</button>
+                      >
+                        ×
+                      </button>
                     </span>
                   );
                 }}
@@ -226,8 +244,11 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
                 placeholder={slot().length > 0 ? 'Add another account…' : 'Steam name, profile URL, or 64-bit ID…'}
                 value={openSlot() === slotIdx ? query() : ''}
                 onFocus={() => openDropdown(slotIdx)}
-                onInput={e => { setQuery(e.currentTarget.value); openDropdown(slotIdx); }}
-                onKeyDown={e => handleKeyDown(e, slotIdx)}
+                onInput={(e) => {
+                  setQuery(e.currentTarget.value);
+                  openDropdown(slotIdx);
+                }}
+                onKeyDown={(e) => handleKeyDown(e, slotIdx)}
               />
               <Show when={openSlot() === slotIdx && matches().length > 0}>
                 <ul class="compare-options" id={listboxId} role="listbox">
@@ -238,14 +259,17 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
                         role="option"
                         aria-selected={highlight() === optionIdx()}
                         classList={{ active: highlight() === optionIdx() }}
-                        onMouseDown={e => e.preventDefault()} // keep focus on the input, so focusout doesn't beat the click
+                        onMouseDown={(e) => e.preventDefault()} // keep focus on the input, so focusout doesn't beat the click
                         onMouseEnter={() => setHighlight(optionIdx())}
                         onClick={() => addEntry(slotIdx, { kind: 'account', account })}
                       >
                         <Show when={account.avatarUrl}>
-                          {url => <img class="account-avatar" src={url()} alt="" width="20" height="20" />}
+                          {(url) => <img class="account-avatar" src={url()} alt="" width="20" height="20" />}
                         </Show>
-                        <span>{account.starred ? '★ ' : ''}{account.label}</span>
+                        <span>
+                          {account.starred ? '★ ' : ''}
+                          {account.label}
+                        </span>
                         <Show when={account.members.length > 1}>
                           <span class="account-count">Family · {account.members.length} accounts</span>
                         </Show>
@@ -256,7 +280,14 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
               </Show>
             </div>
             <Show when={slots().length > 2}>
-              <button type="button" class="btn btn-ghost btn-sm" title="Remove this player" onClick={() => removeSlot(slotIdx)}>×</button>
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                title="Remove this player"
+                onClick={() => removeSlot(slotIdx)}
+              >
+                ×
+              </button>
             </Show>
           </div>
         )}
@@ -265,10 +296,18 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
           Steam Family shape an AccountSlot has everywhere else in the app. */}
       <p class="compare-form-hint">Add more than one account to a player to compare a Steam Family as one library.</p>
       <div class="compare-form-actions">
-        <button type="button" class="btn btn-ghost btn-sm" onClick={() => setSlots(prev => [...prev, []])}>+ Add player</button>
-        <button type="submit" class="btn btn-primary btn-sm" disabled={filledCount() < 2}>{props.submitLabel}</button>
+        <button type="button" class="btn btn-ghost btn-sm" onClick={() => setSlots((prev) => [...prev, []])}>
+          + Add player
+        </button>
+        <button type="submit" class="btn btn-primary btn-sm" disabled={filledCount() < 2}>
+          {props.submitLabel}
+        </button>
         <Show when={props.onCancel}>
-          {cancel => <button type="button" class="btn btn-ghost btn-sm" onClick={() => cancel()()}>Cancel</button>}
+          {(cancel) => (
+            <button type="button" class="btn btn-ghost btn-sm" onClick={() => cancel()()}>
+              Cancel
+            </button>
+          )}
         </Show>
       </div>
     </form>

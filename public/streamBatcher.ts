@@ -48,7 +48,10 @@ export function createStreamBatcher<E>(opts: {
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   function flushNow(): void {
-    if (timer !== null) { clearTimeout(timer); timer = null; }
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
     if (pending.length > 0) {
       const events = pending;
       pending = [];

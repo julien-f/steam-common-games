@@ -3,13 +3,24 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  decideSwipeAxis, resolveSwipe,
-  LB_SWIPE_X_DISTANCE, LB_SWIPE_Y_DISTANCE, LB_SWIPE_FLICK_DISTANCE, LB_SWIPE_FLICK_MS,
+  decideSwipeAxis,
+  resolveSwipe,
+  LB_SWIPE_X_DISTANCE,
+  LB_SWIPE_Y_DISTANCE,
+  LB_SWIPE_FLICK_DISTANCE,
+  LB_SWIPE_FLICK_MS,
 } = require('../public/lightboxSwipe.ts');
 
-const swipe = extra => resolveSwipe({
-  axis: 'x', dx: 0, dy: 0, dt: 1000, mediaCount: 12, hasGameList: true, ...extra,
-});
+const swipe = (extra) =>
+  resolveSwipe({
+    axis: 'x',
+    dx: 0,
+    dy: 0,
+    dt: 1000,
+    mediaCount: 12,
+    hasGameList: true,
+    ...extra,
+  });
 
 // ── decideSwipeAxis ───────────────────────────────────────────────────────────
 

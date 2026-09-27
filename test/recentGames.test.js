@@ -9,9 +9,9 @@ const assert = require('node:assert/strict');
 function makeMemoryLocalStorage() {
   const store = new Map();
   return {
-    getItem: k => (store.has(k) ? store.get(k) : null),
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
     setItem: (k, v) => store.set(k, String(v)),
-    removeItem: k => store.delete(k),
+    removeItem: (k) => store.delete(k),
   };
 }
 
@@ -68,7 +68,10 @@ test('removeRecentGame: removes only the matching appid', () => {
   addRecentGame(620, 'Portal 2', null);
   addRecentGame(400, 'Portal', null);
   removeRecentGame(620);
-  assert.deepEqual(loadRecentGames().map(g => g.appid), [400]);
+  assert.deepEqual(
+    loadRecentGames().map((g) => g.appid),
+    [400],
+  );
 });
 
 test('addRecentGame/removeRecentGame: coexist with other prefs keys in the same blob', () => {
@@ -93,7 +96,13 @@ test('addRecentGame: a real name still overwrites an older one, and still moves 
   addRecentGame(440, 'Old Name', null);
   addRecentGame(620, 'Portal 2', null);
   addRecentGame(440, 'Team Fortress 2', 'https://cdn/tf2.jpg');
-  assert.deepEqual(loadRecentGames().map(g => [g.appid, g.name]), [[440, 'Team Fortress 2'], [620, 'Portal 2']]);
+  assert.deepEqual(
+    loadRecentGames().map((g) => [g.appid, g.name]),
+    [
+      [440, 'Team Fortress 2'],
+      [620, 'Portal 2'],
+    ],
+  );
 });
 
 test('addRecentGame: an entry recorded with no name at all stores an empty one rather than a placeholder', () => {

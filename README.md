@@ -29,6 +29,7 @@ npm run dev             # Vite on :58991 + Express on :3000, together
 npm test                # Node's test runner
 npm run typecheck       # tsc --noEmit over public/
 npm run lint            # eslint-plugin-solid over public/
+npm run format          # Prettier over the whole tree
 ```
 
 Open `http://localhost:58991` in dev (not `:3000` — that serves the last `npm run build`).

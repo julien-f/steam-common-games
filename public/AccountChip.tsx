@@ -19,8 +19,13 @@
 import { createSignal, onCleanup, onMount, For, Show, type JSX } from 'solid-js';
 import { A, useLocation, useNavigate } from '@solidjs/router';
 import {
-  getEffectiveCurrentAccount, getAccountOverride, getRecentAccounts, setCurrentAccount,
-  accountDisplayLabel, accountIdentifiers, ACCOUNT_CHANGED_EVENT,
+  getEffectiveCurrentAccount,
+  getAccountOverride,
+  getRecentAccounts,
+  setCurrentAccount,
+  accountDisplayLabel,
+  accountIdentifiers,
+  ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
 import { getAccountOverrideState, clearAccountOverride, accountOverrideStatusText } from './accountOverride.ts';
 import { withAccountParam, urlWithoutAccountParam } from './urlState.ts';
@@ -83,7 +88,7 @@ export function AccountChip(): JSX.Element {
     refresh();
   }
 
-  const otherRecents = () => recents().filter(a => a.id !== account()?.id);
+  const otherRecents = () => recents().filter((a) => a.id !== account()?.id);
 
   // Not `<Show when={account()}>{acc => accountDisplayLabel(acc())}</Show>`: a child function
   // returning a bare string is evaluated once, when `when` first goes truthy, and Solid inserts
@@ -102,34 +107,42 @@ export function AccountChip(): JSX.Element {
     <div class="site-nav-account">
       <Show when={account()}>
         <div class="account-chip-links">
-          <A href={link('/lists/owned')} class="site-nav-link" activeClass="active">Owned</A>
-          <A href={link('/lists/wishlist')} class="site-nav-link" activeClass="active">Wishlist</A>
+          <A href={link('/lists/owned')} class="site-nav-link" activeClass="active">
+            Owned
+          </A>
+          <A href={link('/lists/wishlist')} class="site-nav-link" activeClass="active">
+            Wishlist
+          </A>
         </div>
       </Show>
 
       <details class="site-nav-popover" ref={detailsEl}>
         <summary class="site-nav-link account-chip-btn" aria-label="Account">
           <Show when={account()?.avatarUrl}>
-            {url => <img class="account-chip-avatar" src={url()} alt="" width="20" height="20" />}
+            {(url) => <img class="account-chip-avatar" src={url()} alt="" width="20" height="20" />}
           </Show>
           <span class="account-chip-name">{chipLabel()}</span>
           {/* A link's account is showing, not the stored one — the difference is invisible
               otherwise, and this chip is the one thing on screen from every route that can say so
               (Home says it at length; see its own account-override note). */}
           <Show when={override()}>
-            <span class="account-chip-explore" title="Showing an account from a shared link, not your own">🔗</span>
+            <span class="account-chip-explore" title="Showing an account from a shared link, not your own">
+              🔗
+            </span>
           </Show>
         </summary>
 
         <div class="site-nav-popover-panel account-chip-panel" ref={panelEl}>
           <Show when={accountOverrideStatusText(overrideState())}>
-            {text => <p class="account-chip-note">{text()}</p>}
+            {(text) => <p class="account-chip-note">{text()}</p>}
           </Show>
           <Show when={override()}>
-            {acc => (
+            {(acc) => (
               <p class="account-chip-note">
                 Exploring <strong>{accountDisplayLabel(acc())}</strong> from a link — your own account is unchanged.
-                <button type="button" class="account-chip-action" onClick={() => pick(acc())}>Set as my current account</button>
+                <button type="button" class="account-chip-action" onClick={() => pick(acc())}>
+                  Set as my current account
+                </button>
               </p>
             )}
           </Show>
@@ -138,8 +151,12 @@ export function AccountChip(): JSX.Element {
               given width (style.css's 768px breakpoint), so this isn't a visible duplicate. */}
           <Show when={account()}>
             <div class="account-chip-panel-links">
-              <A href={link('/lists/owned')} class="account-chip-panel-link">Owned</A>
-              <A href={link('/lists/wishlist')} class="account-chip-panel-link">Wishlist</A>
+              <A href={link('/lists/owned')} class="account-chip-panel-link">
+                Owned
+              </A>
+              <A href={link('/lists/wishlist')} class="account-chip-panel-link">
+                Wishlist
+              </A>
             </div>
           </Show>
 
@@ -148,10 +165,13 @@ export function AccountChip(): JSX.Element {
               a Family has one per member, which is Home's account card's job, not a nav
               popover's. */}
           <Show when={account()?.members.length === 1 && account()}>
-            {acc => (
+            {(acc) => (
               <div class="account-chip-id">
                 <code>{accountIdentifiers(acc())[0].identifier}</code>
-                <CopyButton text={accountIdentifiers(acc())[0].identifier} title="Copy this account's Steam identifier" />
+                <CopyButton
+                  text={accountIdentifiers(acc())[0].identifier}
+                  title="Copy this account's Steam identifier"
+                />
               </div>
             )}
           </Show>
@@ -160,11 +180,14 @@ export function AccountChip(): JSX.Element {
             <div class="account-chip-section">Switch account</div>
             <ul class="account-chip-recents">
               <For each={otherRecents()}>
-                {acc => (
+                {(acc) => (
                   <li>
                     <button type="button" class="account-chip-recent" onClick={() => pick(acc)}>
-                      <Show when={acc.avatarUrl} fallback={<span class="account-chip-avatar account-chip-avatar--empty" />}>
-                        {url => <img class="account-chip-avatar" src={url()} alt="" width="20" height="20" />}
+                      <Show
+                        when={acc.avatarUrl}
+                        fallback={<span class="account-chip-avatar account-chip-avatar--empty" />}
+                      >
+                        {(url) => <img class="account-chip-avatar" src={url()} alt="" width="20" height="20" />}
                       </Show>
                       <span class="account-chip-name">{accountDisplayLabel(acc)}</span>
                     </button>
@@ -191,15 +214,27 @@ export function AccountChip(): JSX.Element {
             // anchor-click interception — without it, this same-origin link was hijacked into a
             // client-side navigation to a path with no matching route (a blank page, no request
             // ever reaching the server) instead of the real page load /auth/steam/login needs.
-            fallback={<a href="/auth/steam/login" rel="external" class="account-chip-panel-link">Sign in with Steam</a>}
+            fallback={
+              <a href="/auth/steam/login" rel="external" class="account-chip-panel-link">
+                Sign in with Steam
+              </a>
+            }
           >
             <p class="account-chip-note">
               Signed in — your accounts/lists/settings sync to your Steam account.
-              <button type="button" class="account-chip-action" onClick={() => signOut()}>Sign out</button>
+              <button type="button" class="account-chip-action" onClick={() => signOut()}>
+                Sign out
+              </button>
             </p>
           </Show>
 
-          <A href={link('/')} class="account-chip-panel-link" onClick={() => { detailsEl.open = false; }}>
+          <A
+            href={link('/')}
+            class="account-chip-panel-link"
+            onClick={() => {
+              detailsEl.open = false;
+            }}
+          >
             {account() ? 'Manage accounts on Home' : 'Pick an account on Home'}
           </A>
         </div>

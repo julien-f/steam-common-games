@@ -19,13 +19,24 @@ function demoPrefs(now = Date.now()) {
     recentAccounts: [account],
     folders: [{ id: 'demo-folder-weekend', name: 'Weekend', parentId: null, order: 0, createdAt: now }],
     lists: [
-      list('demo-list-couch', null, 1, { name: 'Couch co-op picks', kind: 'manual', appids: [620, 1426210, 268910, 413150] }),
-      list('demo-list-friday', 'demo-folder-weekend', 0, { name: 'Friday shortlist', kind: 'manual', appids: [1145360, 646570, 504230] }),
+      list('demo-list-couch', null, 1, {
+        name: 'Couch co-op picks',
+        kind: 'manual',
+        appids: [620, 1426210, 268910, 413150],
+      }),
+      list('demo-list-friday', 'demo-folder-weekend', 0, {
+        name: 'Friday shortlist',
+        kind: 'manual',
+        appids: [1145360, 646570, 504230],
+      }),
       // Unnamed on purpose: shows the formula-derived label.
       list('demo-list-rest', null, 2, {
         kind: 'dynamic',
         op: 'subtract',
-        sources: [{ kind: 'account-owned', accountId: DEMO_STEAMID }, { kind: 'user', listId: 'demo-list-couch' }],
+        sources: [
+          { kind: 'account-owned', accountId: DEMO_STEAMID },
+          { kind: 'user', listId: 'demo-list-couch' },
+        ],
       }),
     ],
   };

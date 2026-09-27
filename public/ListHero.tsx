@@ -75,7 +75,7 @@ export function ListHero(props: ListHeroProps): JSX.Element {
       <Show when={props.tiles?.length}>
         <div class="list-hero-stats">
           <Index each={props.tiles}>
-            {tile => (
+            {(tile) => (
               <Dynamic
                 component={tile().onClick && !tile().subOnClick ? 'button' : 'div'}
                 class={tile().onClick && !tile().subOnClick ? 'list-stat list-stat-btn' : 'list-stat'}
@@ -90,7 +90,11 @@ export function ListHero(props: ListHeroProps): JSX.Element {
                     which is the bigger, better hit area. */}
                 <Show
                   when={tile().onClick && tile().subOnClick}
-                  fallback={<span class="list-stat-value" title={tile().title}>{tile().value}</span>}
+                  fallback={
+                    <span class="list-stat-value" title={tile().title}>
+                      {tile().value}
+                    </span>
+                  }
                 >
                   <button
                     type="button"
@@ -98,20 +102,21 @@ export function ListHero(props: ListHeroProps): JSX.Element {
                     title={tile().title}
                     disabled={!!tile().disabled}
                     onClick={() => tile().onClick?.()}
-                  >{tile().value}</button>
+                  >
+                    {tile().value}
+                  </button>
                 </Show>
                 <Show when={tile().sub}>
-                  <Show
-                    when={tile().subOnClick}
-                    fallback={<span class="list-stat-sub">{tile().sub}</span>}
-                  >
+                  <Show when={tile().subOnClick} fallback={<span class="list-stat-sub">{tile().sub}</span>}>
                     <button
                       type="button"
                       class="list-stat-sub list-stat-btn"
                       title={tile().subTitle}
                       disabled={!!tile().subDisabled}
                       onClick={() => tile().subOnClick?.()}
-                    >{tile().sub}</button>
+                    >
+                      {tile().sub}
+                    </button>
                   </Show>
                 </Show>
               </Dynamic>
@@ -132,5 +137,9 @@ export function ListHero(props: ListHeroProps): JSX.Element {
 // into its `value` rather than added here as a prop, so the card stays dumb about what any
 // tile's click means.
 export function refreshTileValue(text: string): JSX.Element {
-  return <>{text} <span class="list-stat-icon">↻</span></>;
+  return (
+    <>
+      {text} <span class="list-stat-icon">↻</span>
+    </>
+  );
 }

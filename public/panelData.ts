@@ -61,7 +61,10 @@ export function createPanelDataCache() {
   let itadConfiguredPromise: Promise<boolean> | null = null;
   function isItadConfigured(): Promise<boolean> {
     if (!itadConfiguredPromise) {
-      itadConfiguredPromise = fetch('/api/health').then(r => r.json()).then(d => !!d.itadConfigured).catch(() => false);
+      itadConfiguredPromise = fetch('/api/health')
+        .then((r) => r.json())
+        .then((d) => !!d.itadConfigured)
+        .catch(() => false);
     }
     return itadConfiguredPromise;
   }
@@ -116,7 +119,14 @@ export function createPanelDataCache() {
     if (achievementCount === 0) {
       // The same empty payload the route itself would return — NOT `null`, which renders as
       // "Couldn't load achievements." rather than "This game has no achievements."
-      const empty: Achievements = { achievements: [], total: 0, unlocked: 0, private: false, playerCount: memberIds.length, steamUrl: null };
+      const empty: Achievements = {
+        achievements: [],
+        total: 0,
+        unlocked: 0,
+        private: false,
+        playerCount: memberIds.length,
+        steamUrl: null,
+      };
       achievements.set(key, empty);
       return empty;
     }
@@ -192,22 +202,31 @@ export function createPanelDataCache() {
     // Seeded from the previous complete list (keyed by appid) so a forced refresh keeps showing
     // the old entries in place while each is re-fetched, instead of the list shrinking back to
     // empty and refilling.
-    const prevById = new Map((dlc.get(appid) || []).map(d => [d.appid, d]));
-    const partial: (DlcEntry | undefined)[] = dlcIds.map(id => prevById.get(id));
+    const prevById = new Map((dlc.get(appid) || []).map((d) => [d.appid, d]));
+    const partial: (DlcEntry | undefined)[] = dlcIds.map((id) => prevById.get(id));
     onPartial?.(partial.slice());
     try {
-      await Promise.all(dlcIds.map(async (id, i) => {
-        try {
-          const res = await fetch(`/api/game-details/${id}${force ? '?refresh=1' : ''}`);
-          const data = await res.json();
-          partial[i] = (res.ok && data.meta)
-            ? { appid: id, name: data.meta.name, capsule: data.meta.capsule, releaseDate: data.meta.releaseDate, comingSoon: data.meta.comingSoon }
-            : undefined;
-        } catch {
-          partial[i] = undefined;
-        }
-        onPartial?.(partial.slice()); // stream this entry in as soon as it resolves
-      }));
+      await Promise.all(
+        dlcIds.map(async (id, i) => {
+          try {
+            const res = await fetch(`/api/game-details/${id}${force ? '?refresh=1' : ''}`);
+            const data = await res.json();
+            partial[i] =
+              res.ok && data.meta
+                ? {
+                    appid: id,
+                    name: data.meta.name,
+                    capsule: data.meta.capsule,
+                    releaseDate: data.meta.releaseDate,
+                    comingSoon: data.meta.comingSoon,
+                  }
+                : undefined;
+          } catch {
+            partial[i] = undefined;
+          }
+          onPartial?.(partial.slice()); // stream this entry in as soon as it resolves
+        }),
+      );
       const entries = partial.filter((d): d is DlcEntry => d != null);
       dlc.set(appid, entries);
       return entries;

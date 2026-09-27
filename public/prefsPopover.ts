@@ -29,7 +29,7 @@ export function prefsPopoverPanelHtml(): string {
 export function initPrefsPopover() {
   const select = document.getElementById('nav-region-select') as HTMLSelectElement;
   const detected = detectCountry();
-  const detectedLabel = COUNTRY_OPTIONS.find(c => c.code === detected)?.label ?? detected;
+  const detectedLabel = COUNTRY_OPTIONS.find((c) => c.code === detected)?.label ?? detected;
   select.innerHTML = '';
   const autoOpt = document.createElement('option');
   autoOpt.value = AUTO_COUNTRY;

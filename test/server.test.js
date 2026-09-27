@@ -35,7 +35,7 @@ function makeLibraryFetch(games1 = [], games2 = []) {
       return { ok: true, json: async () => ({ response: { games: games2 } }) };
     }
     if (url.includes('GetPlayerSummaries')) {
-      const players = [ID1, ID2].map(id => ({ steamid: id, personaname: id, profileurl: '' }));
+      const players = [ID1, ID2].map((id) => ({ steamid: id, personaname: id, profileurl: '' }));
       return { ok: true, json: async () => ({ response: { players } }) };
     }
     throw new Error(`Unexpected fetch: ${url}`);
@@ -54,28 +54,70 @@ function makeDetailsFetch({ ratingOk = true, metaOk = true, tagsOk = true } = {}
   return async (url) => {
     if (url.includes('appreviews')) {
       if (!ratingOk) return { ok: false, status: 503 };
-      return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' },
+        }),
+      };
     }
     if (url.includes('IStoreBrowseService')) {
       if (!tagsOk) return { ok: false, status: 503 };
-      return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: TAG_IDS, related_items: { demo_appid: [DEMO_APPID] } }] } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          response: { store_items: [{ success: 1, tagids: TAG_IDS, related_items: { demo_appid: [DEMO_APPID] } }] },
+        }),
+      };
     }
     if (url.includes('ajaxgetstoretags')) {
       if (!tagsOk) return { ok: false, status: 503 };
-      return { ok: true, json: async () => ({ tags: Object.entries(TAG_NAME_MAP).map(([tagid, name]) => ({ tagid: Number(tagid), name })) }) };
+      return {
+        ok: true,
+        json: async () => ({
+          tags: Object.entries(TAG_NAME_MAP).map(([tagid, name]) => ({ tagid: Number(tagid), name })),
+        }),
+      };
     }
     if (url.includes('appdetails')) {
       if (!metaOk) return { ok: false, status: 503 };
       const appid = url.match(/appids=(\d+)/)?.[1];
-      return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: 'Portal', genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] } } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          [appid]: {
+            success: true,
+            data: {
+              name: 'Portal',
+              genres: [{ id: '1', description: 'Action' }],
+              categories: [{ id: '9', description: 'Co-op' }],
+              developers: ['Valve'],
+              publishers: ['Valve'],
+            },
+          },
+        }),
+      };
     }
     if (url.includes('protondb.com')) {
       return { ok: true, json: async () => ({ tier: 'gold', confidence: 'strong', total: 500 }) };
     }
     if (url.includes('GetNewsForApp')) {
-      return { ok: true, json: async () => ({ appnews: { newsitems: [
-        { title: 'Patch 1.2 released', url: 'https://store.steampowered.com/news/app/1/view/123', date: 1700000000, feedlabel: 'Community Announcements', feedname: 'steam_community_announcements' },
-      ] } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          appnews: {
+            newsitems: [
+              {
+                title: 'Patch 1.2 released',
+                url: 'https://store.steampowered.com/news/app/1/view/123',
+                date: 1700000000,
+                feedlabel: 'Community Announcements',
+                feedname: 'steam_community_announcements',
+              },
+            ],
+          },
+        }),
+      };
     }
     if (url.includes('search/site/init')) {
       return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
@@ -100,7 +142,9 @@ test('GET /api/health: 200 with ok=true, configured=true, and cache stats', asyn
 test('GET /api/health: configured=false when STEAM_API_KEY is absent', async (t) => {
   const saved = process.env.STEAM_API_KEY;
   delete process.env.STEAM_API_KEY;
-  t.after(() => { process.env.STEAM_API_KEY = saved; });
+  t.after(() => {
+    process.env.STEAM_API_KEY = saved;
+  });
 
   const res = await api.get('/api/health');
   assert.equal(res.status, 200);
@@ -245,7 +289,7 @@ test('POST /api/common-games: 200 with groups and slots', async (t) => {
   assert.ok(Array.isArray(res.body.slots));
   assert.equal(res.body.groups[0].games[0].appid, 400);
   assert.equal(res.body.slots.length, 2);
-  assert.equal(res.body.slots[0][0].gameCount, 1, 'gameCount reflects that account\'s own library size');
+  assert.equal(res.body.slots[0][0].gameCount, 1, "gameCount reflects that account's own library size");
 });
 
 test('POST /api/common-games: lastPlayed carries rtime_last_played per account, 0 when absent', async (t) => {
@@ -271,7 +315,7 @@ test('POST /api/common-games: 200 accepts legacy users array', async (t) => {
 test('POST /api/common-games: groups contains only games shared by both players', async (t) => {
   _reset();
   const SHARED = { appid: 400, name: 'Portal' };
-  const SOLO   = { appid: 440, name: 'TF2' };
+  const SOLO = { appid: 440, name: 'TF2' };
   t.mock.method(globalThis, 'fetch', makeLibraryFetch([SHARED, SOLO], [SHARED]));
 
   const res = await api.post('/api/common-games').send({ slots: [[ID1], [ID2]] });
@@ -283,7 +327,8 @@ test('POST /api/common-games: groups contains only games shared by both players'
 
 test('POST /api/common-games: refreshIds re-fetches only the listed account, not the whole slot', async (t) => {
   _reset();
-  let gamesFetchCount1 = 0, gamesFetchCount2 = 0;
+  let gamesFetchCount1 = 0,
+    gamesFetchCount2 = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('GetOwnedGames') && url.includes(ID1)) {
       gamesFetchCount1++;
@@ -294,7 +339,7 @@ test('POST /api/common-games: refreshIds re-fetches only the listed account, not
       return { ok: true, json: async () => ({ response: { games: [{ appid: 400, name: 'Portal' }] } }) };
     }
     if (url.includes('GetPlayerSummaries')) {
-      const players = [ID1, ID2].map(id => ({ steamid: id, personaname: id, profileurl: '' }));
+      const players = [ID1, ID2].map((id) => ({ steamid: id, personaname: id, profileurl: '' }));
       return { ok: true, json: async () => ({ response: { players } }) };
     }
     throw new Error(`Unexpected fetch: ${url}`);
@@ -371,7 +416,7 @@ function makeWishlistFetch(items1 = [], items2 = []) {
       return { ok: true, json: async () => ({ response: { items: items2 } }) };
     }
     if (url.includes('GetPlayerSummaries')) {
-      const players = [ID1, ID2].map(id => ({ steamid: id, personaname: id, profileurl: '' }));
+      const players = [ID1, ID2].map((id) => ({ steamid: id, personaname: id, profileurl: '' }));
       return { ok: true, json: async () => ({ response: { players } }) };
     }
     throw new Error(`Unexpected fetch: ${url}`);
@@ -394,17 +439,24 @@ test('POST /api/wishlist: 200 with items for a single account', async (t) => {
 
 test('POST /api/wishlist: unions two accounts, dedupes shared appid keeping first-seen', async (t) => {
   _reset();
-  t.mock.method(globalThis, 'fetch', makeWishlistFetch(
-    [{ appid: 400, priority: 1, date_added: 1433965886 }],
-    [{ appid: 400, priority: 5, date_added: 1500000000 }, { appid: 440, priority: 2, date_added: 1500000000 }],
-  ));
+  t.mock.method(
+    globalThis,
+    'fetch',
+    makeWishlistFetch(
+      [{ appid: 400, priority: 1, date_added: 1433965886 }],
+      [
+        { appid: 400, priority: 5, date_added: 1500000000 },
+        { appid: 440, priority: 2, date_added: 1500000000 },
+      ],
+    ),
+  );
 
   const res = await api.post('/api/wishlist').send({ members: [ID1, ID2] });
   assert.equal(res.status, 200);
   assert.equal(res.body.items.length, 2);
-  const shared = res.body.items.find(i => i.appid === 400);
+  const shared = res.body.items.find((i) => i.appid === 400);
   assert.equal(shared.priority, 1, 'first-seen account wins for a shared appid');
-  assert.ok(res.body.items.some(i => i.appid === 440));
+  assert.ok(res.body.items.some((i) => i.appid === 440));
 });
 
 test('POST /api/wishlist: an account with no items field contributes nothing', async (t) => {
@@ -412,7 +464,11 @@ test('POST /api/wishlist: an account with no items field contributes nothing', a
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('GetPlayerSummaries')) return { ok: true, json: async () => ({ response: { players: [] } }) };
     if (url.includes(ID1)) return { ok: true, json: async () => ({ response: {} }) }; // private/empty
-    if (url.includes(ID2)) return { ok: true, json: async () => ({ response: { items: [{ appid: 400, priority: 1, date_added: 1433965886 }] } }) };
+    if (url.includes(ID2))
+      return {
+        ok: true,
+        json: async () => ({ response: { items: [{ appid: 400, priority: 1, date_added: 1433965886 }] } }),
+      };
     throw new Error(`Unexpected fetch: ${url}`);
   });
 
@@ -462,16 +518,31 @@ const FRIEND1 = '76561198000000099';
 function makeFriendsFetch(friendIds1 = [], friendIds2 = []) {
   return async (url) => {
     if (url.includes('GetFriendList') && url.includes(ID1)) {
-      return { ok: true, json: async () => ({ friendslist: { friends: friendIds1.map(id => ({ steamid: id, relationship: 'friend', friend_since: 0 })) } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          friendslist: { friends: friendIds1.map((id) => ({ steamid: id, relationship: 'friend', friend_since: 0 })) },
+        }),
+      };
     }
     if (url.includes('GetFriendList') && url.includes(ID2)) {
-      return { ok: true, json: async () => ({ friendslist: { friends: friendIds2.map(id => ({ steamid: id, relationship: 'friend', friend_since: 0 })) } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          friendslist: { friends: friendIds2.map((id) => ({ steamid: id, relationship: 'friend', friend_since: 0 })) },
+        }),
+      };
     }
     if (url.includes('GetPlayerSummaries')) {
       const ids = url.split('steamids=')[1].split(',');
-      const players = ids.map(id => ({
-        steamid: id, personaname: id, profileurl: '', avatarfull: '',
-        timecreated: 1433965886, loccountrycode: 'US', realname: `Real ${id}`,
+      const players = ids.map((id) => ({
+        steamid: id,
+        personaname: id,
+        profileurl: '',
+        avatarfull: '',
+        timecreated: 1433965886,
+        loccountrycode: 'US',
+        realname: `Real ${id}`,
       }));
       return { ok: true, json: async () => ({ response: { players } }) };
     }
@@ -506,8 +577,13 @@ test('POST /api/friends: reports a private friends list as unavailable rather th
   _reset();
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('GetFriendList') && url.includes(ID1)) return { ok: false, status: 401 };
-    if (url.includes('GetFriendList') && url.includes(ID2)) return { ok: true, json: async () => ({ friendslist: { friends: [{ steamid: FRIEND1 }] } }) };
-    if (url.includes('GetPlayerSummaries')) return { ok: true, json: async () => ({ response: { players: [{ steamid: FRIEND1, personaname: FRIEND1, profileurl: '' }] } }) };
+    if (url.includes('GetFriendList') && url.includes(ID2))
+      return { ok: true, json: async () => ({ friendslist: { friends: [{ steamid: FRIEND1 }] } }) };
+    if (url.includes('GetPlayerSummaries'))
+      return {
+        ok: true,
+        json: async () => ({ response: { players: [{ steamid: FRIEND1, personaname: FRIEND1, profileurl: '' }] } }),
+      };
     throw new Error(`Unexpected fetch: ${url}`);
   });
 
@@ -546,15 +622,23 @@ test('GET /api/game-details/-1: 400 for negative appid', async () => {
 
 test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) => {
   _reset();
-  setCache('rating:400',   { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
-  setCache('hltb:400',     [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
-  setCache('meta:400',     { name: 'Portal', genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] });
-  setCache('browse:400',   { tagids: TAG_IDS, related_items: { demo_appid: [1714800] } });
+  setCache('rating:400', { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
+  setCache('hltb:400', [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
+  setCache('meta:400', {
+    name: 'Portal',
+    genres: [{ id: '1', description: 'Action' }],
+    categories: [{ id: '9', description: 'Co-op' }],
+    developers: ['Valve'],
+    publishers: ['Valve'],
+  });
+  setCache('browse:400', { tagids: TAG_IDS, related_items: { demo_appid: [1714800] } });
   setCache('tagnames:all', TAG_NAME_MAP);
   setCache('protondb:400', { tier: 'gold', confidence: 'strong', total: 500 });
 
   let fetchCalled = false;
-  t.mock.method(globalThis, 'fetch', async () => { fetchCalled = true; });
+  t.mock.method(globalThis, 'fetch', async () => {
+    fetchCalled = true;
+  });
 
   const res = await api.get('/api/game-details/400');
   assert.equal(res.status, 200);
@@ -573,10 +657,10 @@ test('GET /api/game-details/:appid: dates each source separately, and fetchedAt 
   // Deliberately staggered: the panel's ↻ shows one figure for five sources cached under tiers
   // of 90-180 days, so an old store page dating the whole readout is the normal case — the
   // per-source breakdown behind it is what makes that figure interpretable.
-  setCache('rating:402',   { total_reviews: 10, total_positive: 9, review_score_desc: 'Positive' });
-  setCache('hltb:402',     [{ game_id: 1, game_name: 'X', comp_main: 3600 }]);
-  setCache('meta:402',     { name: 'X' });
-  setCache('browse:402',   { tagids: TAG_IDS });
+  setCache('rating:402', { total_reviews: 10, total_positive: 9, review_score_desc: 'Positive' });
+  setCache('hltb:402', [{ game_id: 1, game_name: 'X', comp_main: 3600 }]);
+  setCache('meta:402', { name: 'X' });
+  setCache('browse:402', { tagids: TAG_IDS });
   setCache('tagnames:all', TAG_NAME_MAP);
   setCache('protondb:402', { tier: 'gold' });
   const now = Date.now();
@@ -585,7 +669,9 @@ test('GET /api/game-details/:appid: dates each source separately, and fetchedAt 
   db.prepare('UPDATE cache_meta SET ts = ? WHERE key = ?').run(now - 5 * 86400000, 'meta:402');
   db.prepare('UPDATE cache_rating SET ts = ? WHERE key = ?').run(now - 86400000, 'rating:402');
 
-  t.mock.method(globalThis, 'fetch', async () => { throw new Error('should not fetch'); });
+  t.mock.method(globalThis, 'fetch', async () => {
+    throw new Error('should not fetch');
+  });
   const res = await api.get('/api/game-details/402');
   assert.equal(res.status, 200);
   assert.equal(res.body.fetchedAts.meta, now - 5 * 86400000);
@@ -636,7 +722,9 @@ test('GET /api/game-news/:appid: 200 from cache without fetching', async (t) => 
   _reset();
   setCache('news:408', []);
   let fetchCalled = false;
-  t.mock.method(globalThis, 'fetch', async () => { fetchCalled = true; });
+  t.mock.method(globalThis, 'fetch', async () => {
+    fetchCalled = true;
+  });
 
   const res = await api.get('/api/game-news/408');
   assert.equal(res.status, 200);
@@ -684,15 +772,30 @@ test('GET /api/game-details/:appid: only fetches sources not already cached', as
   _reset();
   _resetAuth();
   setCache('rating:405', { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
-  setCache('meta:405',   { name: 'Portal', genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] });
+  setCache('meta:405', {
+    name: 'Portal',
+    genres: [{ id: '1', description: 'Action' }],
+    categories: [{ id: '9', description: 'Co-op' }],
+    developers: ['Valve'],
+    publishers: ['Valve'],
+  });
 
   let fetchedUrls = [];
   t.mock.method(globalThis, 'fetch', async (url) => {
     fetchedUrls.push(url);
-    if (url.includes('IStoreBrowseService')) return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: TAG_IDS }] } }) };
-    if (url.includes('ajaxgetstoretags'))    return { ok: true, json: async () => ({ tags: Object.entries(TAG_NAME_MAP).map(([tagid, name]) => ({ tagid: Number(tagid), name })) }) };
-    if (url.includes('search/site/init'))   return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
-    if (url.includes('search/site'))        return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
+    if (url.includes('IStoreBrowseService'))
+      return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: TAG_IDS }] } }) };
+    if (url.includes('ajaxgetstoretags'))
+      return {
+        ok: true,
+        json: async () => ({
+          tags: Object.entries(TAG_NAME_MAP).map(([tagid, name]) => ({ tagid: Number(tagid), name })),
+        }),
+      };
+    if (url.includes('search/site/init'))
+      return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
+    if (url.includes('search/site'))
+      return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
     throw new Error(`Unexpected fetch: ${url}`);
   });
 
@@ -702,8 +805,11 @@ test('GET /api/game-details/:appid: only fetches sources not already cached', as
   assert.deepEqual(res.body.meta?.genres, ['Action']);
   assert.equal(res.body.hltb?.main, 10);
   assert.ok(Array.isArray(res.body.tags));
-  assert.ok(!fetchedUrls.some(u => u.includes('appreviews')), 'rating should not be re-fetched');
-  assert.ok(!fetchedUrls.some(u => u.includes('steampowered.com') && u.includes('appdetails')), 'meta should not be re-fetched');
+  assert.ok(!fetchedUrls.some((u) => u.includes('appreviews')), 'rating should not be re-fetched');
+  assert.ok(
+    !fetchedUrls.some((u) => u.includes('steampowered.com') && u.includes('appdetails')),
+    'meta should not be re-fetched',
+  );
 });
 
 // ── GET /api/game-details/:appid — "fast refresh" cache / dedup ──────────────
@@ -713,10 +819,15 @@ test('GET /api/game-details/:appid: only fetches sources not already cached', as
 // fetch mock that tallies how many times each upstream source is hit.
 function makeCountingDetailsFetch(counts, { delayMs = 0 } = {}) {
   return async (url) => {
-    if (delayMs) await new Promise(r => setTimeout(r, delayMs));
+    if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
     if (url.includes('appreviews')) {
       counts.rating++;
-      return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' },
+        }),
+      };
     }
     if (url.includes('IStoreBrowseService')) {
       counts.tags++;
@@ -724,12 +835,25 @@ function makeCountingDetailsFetch(counts, { delayMs = 0 } = {}) {
     }
     if (url.includes('ajaxgetstoretags')) {
       counts.tags++;
-      return { ok: true, json: async () => ({ tags: Object.entries(TAG_NAME_MAP).map(([tagid, name]) => ({ tagid: Number(tagid), name })) }) };
+      return {
+        ok: true,
+        json: async () => ({
+          tags: Object.entries(TAG_NAME_MAP).map(([tagid, name]) => ({ tagid: Number(tagid), name })),
+        }),
+      };
     }
     if (url.includes('appdetails')) {
       counts.meta++;
       const appid = url.match(/appids=(\d+)/)?.[1];
-      return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] } } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          [appid]: {
+            success: true,
+            data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] },
+          },
+        }),
+      };
     }
     if (url.includes('search/site/init')) {
       counts.hltbInit++;
@@ -776,10 +900,7 @@ test('GET /api/game-details/:appid: concurrent requests for the same appid dedup
   t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts, { delayMs: 50 }));
 
   // Fire both without awaiting the first — they overlap in flight.
-  const [res1, res2] = await Promise.all([
-    api.get('/api/game-details/501'),
-    api.get('/api/game-details/501'),
-  ]);
+  const [res1, res2] = await Promise.all([api.get('/api/game-details/501'), api.get('/api/game-details/501')]);
 
   assert.equal(res1.status, 200);
   assert.equal(res2.status, 200);
@@ -799,7 +920,10 @@ function abortedGet(port, path, abortAfterMs) {
   return new Promise((resolve) => {
     const req = http.get({ host: '127.0.0.1', port, path }, (res) => res.resume());
     req.on('error', () => {}); // destroy() surfaces ECONNRESET — expected, ignore
-    setTimeout(() => { req.destroy(); resolve(); }, abortAfterMs);
+    setTimeout(() => {
+      req.destroy();
+      resolve();
+    }, abortAfterMs);
   });
 }
 
@@ -810,8 +934,8 @@ test('GET /api/game-details/:appid: a request aborted mid-flight still caches, s
   t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts, { delayMs: 100 }));
 
   const server = app.listen(0);
-  t.after(() => new Promise(r => server.close(r)));
-  await new Promise(r => server.once('listening', r));
+  t.after(() => new Promise((r) => server.close(r)));
+  await new Promise((r) => server.once('listening', r));
   const port = server.address().port;
 
   // Fire and kill the socket after 20ms — the handler has started upstream
@@ -823,12 +947,16 @@ test('GET /api/game-details/:appid: a request aborted mid-flight still caches, s
   // name from store metadata rather than trusting a client-supplied one), so that chain is
   // meta → search/site/init → search/site, three sequential ~100ms hops instead of running in parallel
   // with meta — comfortably under this budget but no longer as slack as it used to be.
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 500));
 
   // The refresh: same appid requested again.
   const res = await api.get('/api/game-details/600');
   assert.equal(res.status, 200);
-  assert.equal(counts.rating, 1, 'aborted request should have completed and cached the rating — refresh must not re-fetch');
+  assert.equal(
+    counts.rating,
+    1,
+    'aborted request should have completed and cached the rating — refresh must not re-fetch',
+  );
   assert.equal(counts.hltb, 1, 'aborted request should have completed and cached HLTB');
   assert.equal(counts.meta, 1, 'aborted request should have completed and cached meta');
   assert.equal(counts.tags, 2, 'aborted request should have completed and cached tags');
@@ -839,13 +967,31 @@ test('GET /api/game-details/:appid: failed fetch is not cached, retried on next 
   _resetAuth();
   let hltbCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('appreviews')) return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
+    if (url.includes('appreviews'))
+      return {
+        ok: true,
+        json: async () => ({
+          query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' },
+        }),
+      };
     if (url.includes('appdetails')) {
       const appid = url.match(/appids=(\d+)/)?.[1];
-      return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] } } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          [appid]: {
+            success: true,
+            data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] },
+          },
+        }),
+      };
     }
-    if (url.includes('search/site/init')) return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
-    if (url.includes('search/site')) { hltbCalls++; return { ok: false, status: 503 }; }
+    if (url.includes('search/site/init'))
+      return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
+    if (url.includes('search/site')) {
+      hltbCalls++;
+      return { ok: false, status: 503 };
+    }
     throw new Error(`Unexpected fetch: ${url}`);
   });
 
@@ -861,20 +1007,30 @@ test('GET /api/game-details/:appid: failed fetch is not cached, retried on next 
 // ── POST /api/game-details/stream ────────────────────────────────────────────
 
 function parseSseEvents(body) {
-  return body.split('\n\n').filter(c => c.startsWith('data: ')).map(c => JSON.parse(c.slice(6)));
+  return body
+    .split('\n\n')
+    .filter((c) => c.startsWith('data: '))
+    .map((c) => JSON.parse(c.slice(6)));
 }
 
 function ssePost(port, path, body) {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify(body);
     const req = http.request(
-      { host: '127.0.0.1', port, path, method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } },
+      {
+        host: '127.0.0.1',
+        port,
+        path,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+      },
       (res) => {
         let data = '';
-        res.on('data', c => { data += c; });
+        res.on('data', (c) => {
+          data += c;
+        });
         res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: data }));
-      }
+      },
     );
     req.on('error', reject);
     req.write(payload);
@@ -903,36 +1059,43 @@ test('POST /api/game-details/stream: 400 when games list exceeds STREAM_MAX_GAME
 test('POST /api/game-details/stream: streams one event per game plus a done event from cache', async (t) => {
   _reset();
   const rawRating = { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' };
-  const rawHltb   = [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }];
-  const rawMeta   = { name: 'Portal', genres: [{ id: '1', description: 'Action' }], categories: [{ id: '9', description: 'Co-op' }], developers: ['Valve'], publishers: ['Valve'] };
+  const rawHltb = [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }];
+  const rawMeta = {
+    name: 'Portal',
+    genres: [{ id: '1', description: 'Action' }],
+    categories: [{ id: '9', description: 'Co-op' }],
+    developers: ['Valve'],
+    publishers: ['Valve'],
+  };
   const rawProtonDb = { tier: 'gold', confidence: 'strong', total: 500 };
-  setCache('rating:400',   rawRating);
-  setCache('hltb:400',     rawHltb);
-  setCache('meta:400',     rawMeta);
-  setCache('browse:400',   { tagids: TAG_IDS });
+  setCache('rating:400', rawRating);
+  setCache('hltb:400', rawHltb);
+  setCache('meta:400', rawMeta);
+  setCache('browse:400', { tagids: TAG_IDS });
   setCache('protondb:400', rawProtonDb);
-  setCache('rating:401',   rawRating);
-  setCache('hltb:401',     rawHltb);
-  setCache('meta:401',     rawMeta);
-  setCache('browse:401',   { tagids: TAG_IDS });
+  setCache('rating:401', rawRating);
+  setCache('hltb:401', rawHltb);
+  setCache('meta:401', rawMeta);
+  setCache('browse:401', { tagids: TAG_IDS });
   setCache('protondb:401', rawProtonDb);
   setCache('tagnames:all', TAG_NAME_MAP);
 
   const server = app.listen(0);
-  t.after(() => new Promise(r => server.close(r)));
-  await new Promise(r => server.once('listening', r));
+  t.after(() => new Promise((r) => server.close(r)));
+  await new Promise((r) => server.once('listening', r));
 
-  const res = await ssePost(server.address().port, '/api/game-details/stream',
-    { games: [{ appid: 400 }, { appid: 401 }] });
+  const res = await ssePost(server.address().port, '/api/game-details/stream', {
+    games: [{ appid: 400 }, { appid: 401 }],
+  });
 
   assert.equal(res.status, 200);
   assert.equal(res.headers['content-type'], 'text/event-stream');
   const events = parseSseEvents(res.body);
-  const gameEvents = events.filter(e => !e.done);
-  const doneEvent  = events.find(e => e.done);
+  const gameEvents = events.filter((e) => !e.done);
+  const doneEvent = events.find((e) => e.done);
   assert.equal(gameEvents.length, 2);
-  assert.ok(gameEvents.some(e => e.appid === 400));
-  assert.ok(gameEvents.some(e => e.appid === 401));
+  assert.ok(gameEvents.some((e) => e.appid === 400));
+  assert.ok(gameEvents.some((e) => e.appid === 401));
   assert.ok(doneEvent, 'must end with a done event');
 });
 
@@ -942,15 +1105,14 @@ test('POST /api/game-details/stream: fetches fresh details and streams them', as
   t.mock.method(globalThis, 'fetch', makeDetailsFetch());
 
   const server = app.listen(0);
-  t.after(() => new Promise(r => server.close(r)));
-  await new Promise(r => server.once('listening', r));
+  t.after(() => new Promise((r) => server.close(r)));
+  await new Promise((r) => server.once('listening', r));
 
-  const res = await ssePost(server.address().port, '/api/game-details/stream',
-    { games: [{ appid: 700 }] });
+  const res = await ssePost(server.address().port, '/api/game-details/stream', { games: [{ appid: 700 }] });
 
   assert.equal(res.status, 200);
   const events = parseSseEvents(res.body);
-  const gameEvent = events.find(e => e.appid === 700);
+  const gameEvent = events.find((e) => e.appid === 700);
   assert.ok(gameEvent, 'must emit an event for the requested appid');
   assert.equal(typeof gameEvent.rating?.score, 'number');
   assert.equal(gameEvent.hltb?.main, 10);
@@ -968,17 +1130,35 @@ test('POST /api/game-details/stream: resolves HLTB name from store metadata', as
   let hltbSearchCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('appreviews')) {
-      return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' },
+        }),
+      };
     }
     if (url.includes('IStoreBrowseService')) {
       return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: TAG_IDS }] } }) };
     }
     if (url.includes('ajaxgetstoretags')) {
-      return { ok: true, json: async () => ({ tags: Object.entries(TAG_NAME_MAP).map(([tagid, name]) => ({ tagid: Number(tagid), name })) }) };
+      return {
+        ok: true,
+        json: async () => ({
+          tags: Object.entries(TAG_NAME_MAP).map(([tagid, name]) => ({ tagid: Number(tagid), name })),
+        }),
+      };
     }
     if (url.includes('appdetails')) {
       const appid = url.match(/appids=(\d+)/)?.[1];
-      return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] } } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          [appid]: {
+            success: true,
+            data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] },
+          },
+        }),
+      };
     }
     if (url.includes('protondb.com')) {
       return { ok: true, json: async () => ({ tier: 'gold', confidence: 'strong', total: 500 }) };
@@ -994,15 +1174,14 @@ test('POST /api/game-details/stream: resolves HLTB name from store metadata', as
   });
 
   const server = app.listen(0);
-  t.after(() => new Promise(r => server.close(r)));
-  await new Promise(r => server.once('listening', r));
+  t.after(() => new Promise((r) => server.close(r)));
+  await new Promise((r) => server.once('listening', r));
 
-  const res = await ssePost(server.address().port, '/api/game-details/stream',
-    { games: [{ appid: 701 }] });
+  const res = await ssePost(server.address().port, '/api/game-details/stream', { games: [{ appid: 701 }] });
 
   assert.equal(res.status, 200);
   const events = parseSseEvents(res.body);
-  const gameEvent = events.find(e => e.appid === 701);
+  const gameEvent = events.find((e) => e.appid === 701);
   assert.ok(gameEvent, 'must emit an event for the requested appid');
   assert.equal(gameEvent.meta?.name, 'Portal');
   assert.equal(hltbSearchCalls, 1, 'HLTB should have been searched using the name resolved from store metadata');
@@ -1021,31 +1200,36 @@ test('POST /api/game-details/stream: does not log [game-details] for rating/meta
   const warnMock = t.mock.method(console, 'warn', () => {});
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('appreviews') || url.includes('appdetails')) return { ok: false, status: 403 };
-    if (url.includes('IStoreBrowseService')) return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: [], related_items: {} }] } }) };
+    if (url.includes('IStoreBrowseService'))
+      return {
+        ok: true,
+        json: async () => ({ response: { store_items: [{ success: 1, tagids: [], related_items: {} }] } }),
+      };
     if (url.includes('ajaxgetstoretags')) return { ok: true, json: async () => ({ tags: [] }) };
     if (url.includes('protondb.com')) return { ok: false, status: 404 }; // "no reports yet", not an error
-    if (url.includes('search/site/init')) return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
+    if (url.includes('search/site/init'))
+      return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
     if (url.includes('search/site')) return { ok: true, json: async () => ({ data: [] }) };
     throw new Error(`Unexpected fetch: ${url}`);
   });
 
   const server = app.listen(0);
-  t.after(() => new Promise(r => server.close(r)));
-  await new Promise(r => server.once('listening', r));
+  t.after(() => new Promise((r) => server.close(r)));
+  await new Promise((r) => server.once('listening', r));
 
   // First game's own rating+meta 403s trip the circuit (2 consecutive 403s) — these ARE new
   // information and are expected to log normally.
   await ssePost(server.address().port, '/api/game-details/stream', { games: [{ appid: 900 }] });
-  assert.equal(warnMock.mock.calls.filter(c => /\[circuit-breaker\]/.test(c.arguments[0])).length, 1);
+  assert.equal(warnMock.mock.calls.filter((c) => /\[circuit-breaker\]/.test(c.arguments[0])).length, 1);
   warnMock.mock.resetCalls();
 
   // Second game, different appid, while the circuit is still open — its rating/meta calls are
   // immediately isCircuitOpen errors and must not each log their own [game-details] line.
   const res = await ssePost(server.address().port, '/api/game-details/stream', { games: [{ appid: 901 }] });
-  const gameEvent = parseSseEvents(res.body).find(e => e.appid === 901);
+  const gameEvent = parseSseEvents(res.body).find((e) => e.appid === 901);
   assert.equal(gameEvent.rating, null);
   assert.equal(gameEvent.meta, null);
-  assert.equal(warnMock.mock.calls.filter(c => /\[game-details\]/.test(c.arguments[0])).length, 0);
+  assert.equal(warnMock.mock.calls.filter((c) => /\[game-details\]/.test(c.arguments[0])).length, 0);
 });
 
 // ── GET /api/search-games ─────────────────────────────────────────────────────
@@ -1053,7 +1237,9 @@ test('POST /api/game-details/stream: does not log [game-details] for rating/meta
 test('GET /api/search-games: empty results (no fetch) when q is missing', async (t) => {
   _reset();
   let fetchCalled = false;
-  t.mock.method(globalThis, 'fetch', async () => { fetchCalled = true; });
+  t.mock.method(globalThis, 'fetch', async () => {
+    fetchCalled = true;
+  });
   const res = await api.get('/api/search-games');
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, { results: [] });
@@ -1063,7 +1249,9 @@ test('GET /api/search-games: empty results (no fetch) when q is missing', async 
 test('GET /api/search-games: empty results (no fetch) when q is below the minimum length', async (t) => {
   _reset();
   let fetchCalled = false;
-  t.mock.method(globalThis, 'fetch', async () => { fetchCalled = true; });
+  t.mock.method(globalThis, 'fetch', async () => {
+    fetchCalled = true;
+  });
   const res = await api.get('/api/search-games?q=a');
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, { results: [] });
@@ -1074,7 +1262,10 @@ test('GET /api/search-games: 200 with results shaped for the frontend dropdown',
   _reset();
   t.mock.method(globalThis, 'fetch', async (url) => {
     assert.match(url, /storesearch/);
-    return { ok: true, json: async () => ({ items: [{ id: 400, name: 'Portal', tiny_image: 'https://example.com/400.jpg' }] }) };
+    return {
+      ok: true,
+      json: async () => ({ items: [{ id: 400, name: 'Portal', tiny_image: 'https://example.com/400.jpg' }] }),
+    };
   });
   const res = await api.get('/api/search-games?q=portal');
   assert.equal(res.status, 200);
@@ -1084,7 +1275,8 @@ test('GET /api/search-games: 200 with results shaped for the frontend dropdown',
 test('GET /api/search-games: a repeated query is served from cache, no re-fetch', async (t) => {
   _reset();
   const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
-    ok: true, json: async () => ({ items: [{ id: 400, name: 'Portal' }] }),
+    ok: true,
+    json: async () => ({ items: [{ id: 400, name: 'Portal' }] }),
   }));
   await api.get('/api/search-games?q=portal');
   await api.get('/api/search-games?q=portal');
@@ -1113,13 +1305,17 @@ test('GET /api/search-games: a request blocked by an open circuit returns 502 wi
   // Two distinct uncached terms trip the circuit (2 consecutive 403s).
   await api.get('/api/search-games?q=trip-term-a');
   await api.get('/api/search-games?q=trip-term-b');
-  const tripWarnings = warnMock.mock.calls.filter(c => /\[circuit-breaker\]/.test(c.arguments[0]));
+  const tripWarnings = warnMock.mock.calls.filter((c) => /\[circuit-breaker\]/.test(c.arguments[0]));
   assert.equal(tripWarnings.length, 1, 'the trip itself is still logged once');
 
   const errorsBefore = errorMock.mock.callCount();
   const res = await api.get('/api/search-games?q=trip-term-c');
   assert.equal(res.status, 502);
-  assert.equal(errorMock.mock.callCount(), errorsBefore, 'no new [upstream:...] line for a call blocked by the already-open circuit');
+  assert.equal(
+    errorMock.mock.callCount(),
+    errorsBefore,
+    'no new [upstream:...] line for a call blocked by the already-open circuit',
+  );
 });
 
 // ── GET /api/achievements/:appid ─────────────────────────────────────────────
@@ -1127,21 +1323,68 @@ test('GET /api/search-games: a request blocked by an open circuit returns 502 wi
 function makeAchievementsFetch({ achieved = [] } = {}) {
   return async (url) => {
     if (url.includes('GetSchemaForGame')) {
-      return { ok: true, json: async () => ({ game: { availableGameStats: { achievements: [
-        { name: 'ACH_1', displayName: 'First', description: 'Do the thing', icon: 'i1', icongray: 'g1', hidden: 0 },
-        { name: 'ACH_2', displayName: 'Second', description: 'Do another thing', icon: 'i2', icongray: 'g2', hidden: 0 },
-      ] } } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          game: {
+            availableGameStats: {
+              achievements: [
+                {
+                  name: 'ACH_1',
+                  displayName: 'First',
+                  description: 'Do the thing',
+                  icon: 'i1',
+                  icongray: 'g1',
+                  hidden: 0,
+                },
+                {
+                  name: 'ACH_2',
+                  displayName: 'Second',
+                  description: 'Do another thing',
+                  icon: 'i2',
+                  icongray: 'g2',
+                  hidden: 0,
+                },
+              ],
+            },
+          },
+        }),
+      };
     }
     if (url.includes('GetGlobalAchievementPercentagesForApp')) {
-      return { ok: true, json: async () => ({ achievementpercentages: { achievements: [
-        { name: 'ACH_1', percent: '42.0' }, { name: 'ACH_2', percent: '8.5' },
-      ] } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          achievementpercentages: {
+            achievements: [
+              { name: 'ACH_1', percent: '42.0' },
+              { name: 'ACH_2', percent: '8.5' },
+            ],
+          },
+        }),
+      };
     }
     if (url.includes('GetPlayerAchievements')) {
-      return { ok: true, json: async () => ({ playerstats: { success: true, achievements: [
-        { apiname: 'ACH_1', achieved: achieved.includes('ACH_1') ? 1 : 0, unlocktime: achieved.includes('ACH_1') ? 1700000000 : 0 },
-        { apiname: 'ACH_2', achieved: achieved.includes('ACH_2') ? 1 : 0, unlocktime: achieved.includes('ACH_2') ? 1700000001 : 0 },
-      ] } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          playerstats: {
+            success: true,
+            achievements: [
+              {
+                apiname: 'ACH_1',
+                achieved: achieved.includes('ACH_1') ? 1 : 0,
+                unlocktime: achieved.includes('ACH_1') ? 1700000000 : 0,
+              },
+              {
+                apiname: 'ACH_2',
+                achieved: achieved.includes('ACH_2') ? 1 : 0,
+                unlocktime: achieved.includes('ACH_2') ? 1700000001 : 0,
+              },
+            ],
+          },
+        }),
+      };
     }
     throw new Error(`Unexpected fetch: ${url}`);
   };
@@ -1158,7 +1401,10 @@ test('GET /api/achievements/:appid: no steamids returns the achievement list wit
   assert.equal(res.body.private, false);
   assert.equal(res.body.playerCount, 0);
   assert.equal(res.body.achievements[0].globalPct, 42);
-  assert.equal(res.body.achievements.every(a => a.achieved === false), true);
+  assert.equal(
+    res.body.achievements.every((a) => a.achieved === false),
+    true,
+  );
 });
 
 test('GET /api/achievements/:appid: with steamids returns unlock progress and playerCount', async (t) => {
@@ -1170,7 +1416,7 @@ test('GET /api/achievements/:appid: with steamids returns unlock progress and pl
   assert.equal(res.body.playerCount, 1);
   assert.equal(res.body.unlocked, 1);
   assert.equal(res.body.private, false);
-  const first = res.body.achievements.find(a => a.apiname === 'ACH_1');
+  const first = res.body.achievements.find((a) => a.apiname === 'ACH_1');
   assert.equal(first.achieved, true);
   assert.equal(first.unlocktime, 1700000000);
 });
@@ -1179,9 +1425,18 @@ test('GET /api/achievements/:appid: private/no-data account is distinguished fro
   _reset();
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('GetSchemaForGame')) {
-      return { ok: true, json: async () => ({ game: { availableGameStats: { achievements: [
-        { name: 'ACH_1', displayName: 'First', description: '', icon: 'i1', icongray: 'g1', hidden: 0 },
-      ] } } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          game: {
+            availableGameStats: {
+              achievements: [
+                { name: 'ACH_1', displayName: 'First', description: '', icon: 'i1', icongray: 'g1', hidden: 0 },
+              ],
+            },
+          },
+        }),
+      };
     }
     if (url.includes('GetGlobalAchievementPercentagesForApp')) return { ok: false, status: 403 };
     if (url.includes('GetPlayerAchievements')) return { ok: false, status: 403 }; // private profile
@@ -1198,7 +1453,10 @@ test('GET /api/achievements/:appid: short-circuits on appdetails-confirmed zero 
   _reset();
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('appdetails')) {
-      return { ok: true, json: async () => ({ '400': { success: true, data: { achievements: { total: 0, highlighted: [] } } } }) };
+      return {
+        ok: true,
+        json: async () => ({ 400: { success: true, data: { achievements: { total: 0, highlighted: [] } } } }),
+      };
     }
     // Any of these firing would mean the short-circuit didn't work — fail loudly rather
     // than silently answering with fabricated achievement data.
@@ -1227,7 +1485,7 @@ test('GET /api/achievements/:appid: schema-confirmed zero achievements skips rar
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('appdetails')) {
       // achievementCount unknown (field absent) — forces the route to actually ask the schema.
-      return { ok: true, json: async () => ({ '400': { success: true, data: {} } }) };
+      return { ok: true, json: async () => ({ 400: { success: true, data: {} } }) };
     }
     if (url.includes('GetSchemaForGame')) {
       return { ok: true, json: async () => ({ game: { availableGameStats: {} } }) }; // no achievements key
@@ -1247,7 +1505,7 @@ test('GET /api/achievements/:appid: an unreleased game (schema 403, no achieveme
   t.mock.method(globalThis, 'fetch', async (url) => {
     // Exactly what a pre-order page returns: no `achievements` key at all, so the route's
     // achievementCount short-circuit can't fire and the schema fetch is what has to cope.
-    if (url.includes('appdetails')) return { ok: true, json: async () => ({ '400': { success: true, data: {} } }) };
+    if (url.includes('appdetails')) return { ok: true, json: async () => ({ 400: { success: true, data: {} } }) };
     if (url.includes('GetSchemaForGame')) return { ok: false, status: 403, text: async () => '{"game":{}}' };
     throw new Error(`Unexpected fetch: ${url}`);
   });
@@ -1328,7 +1586,7 @@ test('GET /api/bundles: clamps limit and validates country', async (t) => {
   process.env.ITAD_API_KEY = 'test-itad-key';
   t.mock.method(globalThis, 'fetch', async (url) => {
     assert.match(url, /country=US/); // invalid country falls back to default
-    assert.match(url, /limit=50/);   // clamped from 999
+    assert.match(url, /limit=50/); // clamped from 999
     return { ok: true, json: async () => [] };
   });
   const res = await api.get('/api/bundles?country=usa&limit=999');
@@ -1395,7 +1653,7 @@ test('POST /api/bundles/resolve: 200 with resolved appids map', async (t) => {
   t.mock.method(globalThis, 'fetch', async (url, opts) => {
     if (String(url).includes('/service/shops/')) return { ok: true, json: async () => [{ id: 61, title: 'Steam' }] };
     const gids = JSON.parse(opts.body);
-    const body = Object.fromEntries(gids.map(g => [g, g === 'gid-1' ? ['app/400'] : null]));
+    const body = Object.fromEntries(gids.map((g) => [g, g === 'gid-1' ? ['app/400'] : null]));
     return { ok: true, json: async () => body };
   });
   const res = await api.post('/api/bundles/resolve').send({ gids: ['gid-1', 'gid-2'] });
@@ -1433,14 +1691,26 @@ test('POST /api/prices: 200 with Steam regular price and historical lows, by gid
     if (String(url).includes('/service/shops/')) return { ok: true, json: async () => [{ id: 61, title: 'Steam' }] };
     if (String(url).includes('/games/prices/v3')) {
       return {
-        ok: true, json: async () => [{
-          id: 'gid-1',
-          historyLow: { all: { amount: 1, amountInt: 100, currency: 'USD' }, y1: null, m3: null },
-          deals: [
-            { shop: { id: 61, name: 'Steam' }, regular: { amount: 20, amountInt: 2000, currency: 'USD' }, price: { amount: 20, amountInt: 2000, currency: 'USD' } },
-            { shop: { id: 6, name: 'Fanatical' }, regular: { amount: 20, amountInt: 2000, currency: 'USD' }, price: { amount: 15, amountInt: 1500, currency: 'USD' }, cut: 25 },
-          ],
-        }],
+        ok: true,
+        json: async () => [
+          {
+            id: 'gid-1',
+            historyLow: { all: { amount: 1, amountInt: 100, currency: 'USD' }, y1: null, m3: null },
+            deals: [
+              {
+                shop: { id: 61, name: 'Steam' },
+                regular: { amount: 20, amountInt: 2000, currency: 'USD' },
+                price: { amount: 20, amountInt: 2000, currency: 'USD' },
+              },
+              {
+                shop: { id: 6, name: 'Fanatical' },
+                regular: { amount: 20, amountInt: 2000, currency: 'USD' },
+                price: { amount: 15, amountInt: 1500, currency: 'USD' },
+                cut: 25,
+              },
+            ],
+          },
+        ],
       };
     }
     return { ok: false, status: 500 };
@@ -1466,16 +1736,26 @@ test('POST /api/prices: refresh=1 bypasses the price cache and re-fetches, witho
     if (String(url).includes('/lookup/id/shop/')) {
       resolveCalls++;
       const keys = JSON.parse(opts.body);
-      return { ok: true, json: async () => Object.fromEntries(keys.map(k => [k, 'gid-1'])) };
+      return { ok: true, json: async () => Object.fromEntries(keys.map((k) => [k, 'gid-1'])) };
     }
     if (String(url).includes('/games/prices/v3')) {
       priceCalls++;
       return {
-        ok: true, json: async () => [{
-          id: 'gid-1',
-          historyLow: { all: null, y1: null, m3: null },
-          deals: [{ shop: { id: 61, name: 'Steam' }, regular: { amount: 20, amountInt: 2000, currency: 'USD' }, price: { amount: 20, amountInt: 2000, currency: 'USD' }, cut: 0 }],
-        }],
+        ok: true,
+        json: async () => [
+          {
+            id: 'gid-1',
+            historyLow: { all: null, y1: null, m3: null },
+            deals: [
+              {
+                shop: { id: 61, name: 'Steam' },
+                regular: { amount: 20, amountInt: 2000, currency: 'USD' },
+                price: { amount: 20, amountInt: 2000, currency: 'USD' },
+                cut: 0,
+              },
+            ],
+          },
+        ],
       };
     }
     return { ok: false, status: 500 };
@@ -1508,16 +1788,26 @@ test('POST /api/prices: 200 by appids — resolves to gids first, then prices, k
     if (String(url).includes('/service/shops/')) return { ok: true, json: async () => [{ id: 61, title: 'Steam' }] };
     if (String(url).includes('/lookup/id/shop/')) {
       const keys = JSON.parse(opts.body); // ["app/400", "app/500"]
-      const body = Object.fromEntries(keys.map(k => [k, k === 'app/400' ? 'gid-1' : null]));
+      const body = Object.fromEntries(keys.map((k) => [k, k === 'app/400' ? 'gid-1' : null]));
       return { ok: true, json: async () => body };
     }
     if (String(url).includes('/games/prices/v3')) {
       return {
-        ok: true, json: async () => [{
-          id: 'gid-1',
-          historyLow: { all: null, y1: null, m3: null },
-          deals: [{ shop: { id: 61, name: 'Steam' }, regular: { amount: 20, amountInt: 2000, currency: 'USD' }, price: { amount: 20, amountInt: 2000, currency: 'USD' }, cut: 0 }],
-        }],
+        ok: true,
+        json: async () => [
+          {
+            id: 'gid-1',
+            historyLow: { all: null, y1: null, m3: null },
+            deals: [
+              {
+                shop: { id: 61, name: 'Steam' },
+                regular: { amount: 20, amountInt: 2000, currency: 'USD' },
+                price: { amount: 20, amountInt: 2000, currency: 'USD' },
+                cut: 0,
+              },
+            ],
+          },
+        ],
       };
     }
     return { ok: false, status: 500 };
@@ -1528,10 +1818,18 @@ test('POST /api/prices: 200 by appids — resolves to gids first, then prices, k
   // still get an entry, keyed by their own appid, not the internal gid.
   assert.deepEqual(res.body.prices['400'], {
     steamRegular: { amount: 20, amountInt: 2000, currency: 'USD' },
-    lowAll: null, lowY1: null, lowM3: null,
+    lowAll: null,
+    lowY1: null,
+    lowM3: null,
     bestDeal: { price: { amount: 20, amountInt: 2000, currency: 'USD' }, shop: 'Steam', url: null },
   });
-  assert.deepEqual(res.body.prices['500'], { steamRegular: null, lowAll: null, lowY1: null, lowM3: null, bestDeal: null });
+  assert.deepEqual(res.body.prices['500'], {
+    steamRegular: null,
+    lowAll: null,
+    lowY1: null,
+    lowM3: null,
+    bestDeal: null,
+  });
 });
 
 // ── fetchedAt (how old the served data is) ────────────────────────────────────
@@ -1577,9 +1875,13 @@ test('POST /api/wishlist: fetchedAt comes from the wishlist entries', async (t) 
 
 test('POST /api/game-details/stream: caps in-flight appids and stops fetching once the client disconnects', async (t) => {
   _reset();
-  let inFlight = 0, maxInFlight = 0, started = 0;
+  let inFlight = 0,
+    maxInFlight = 0,
+    started = 0;
   let release;
-  const gate = new Promise(r => { release = r; });
+  const gate = new Promise((r) => {
+    release = r;
+  });
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (!String(url).includes('appreviews')) return { ok: true, json: async () => ({}) };
     started++;
@@ -1587,31 +1889,44 @@ test('POST /api/game-details/stream: caps in-flight appids and stops fetching on
     maxInFlight = Math.max(maxInFlight, inFlight);
     await gate;
     inFlight--;
-    return { ok: true, json: async () => ({ query_summary: { review_score_desc: 'x', total_positive: 1, total_negative: 0, total_reviews: 1 } }) };
+    return {
+      ok: true,
+      json: async () => ({
+        query_summary: { review_score_desc: 'x', total_positive: 1, total_negative: 0, total_reviews: 1 },
+      }),
+    };
   });
 
   const server = http.createServer(app).listen(0);
-  await new Promise(r => server.once('listening', r));
+  await new Promise((r) => server.once('listening', r));
   const port = server.address().port;
   const payload = JSON.stringify({ games: Array.from({ length: 200 }, (_, i) => ({ appid: i + 1 })) });
-  const req = http.request({ host: '127.0.0.1', port, path: '/api/game-details/stream', method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } });
+  const req = http.request({
+    host: '127.0.0.1',
+    port,
+    path: '/api/game-details/stream',
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+  });
   req.write(payload);
   req.end();
-  await new Promise(r => req.once('response', r));
+  await new Promise((r) => req.once('response', r));
 
   // Far fewer than the 200 requested are ever in flight at once — the whole list used to be
   // dispatched synchronously, straight onto lib/steam.js's shared semaphore queues.
   assert.ok(maxInFlight <= Number(process.env.STREAM_CONCURRENCY || 16), `maxInFlight=${maxInFlight}`);
 
   req.destroy();
-  await new Promise(r => setTimeout(r, 50));
+  await new Promise((r) => setTimeout(r, 50));
   const startedAtDisconnect = started;
   release();
-  await new Promise(r => setTimeout(r, 100));
+  await new Promise((r) => setTimeout(r, 100));
   // A disconnect stops the pool within roughly one appid per worker, rather than working
   // through the remaining 190-odd games for a client that has gone.
-  assert.ok(started - startedAtDisconnect <= Number(process.env.STREAM_CONCURRENCY || 16), `kept going: ${started - startedAtDisconnect}`);
+  assert.ok(
+    started - startedAtDisconnect <= Number(process.env.STREAM_CONCURRENCY || 16),
+    `kept going: ${started - startedAtDisconnect}`,
+  );
   server.close();
 });
 
@@ -1649,7 +1964,9 @@ test('GET /auth/steam/callback: 400 when the state cookie is missing or does not
 test('GET /auth/steam/callback: 400 when Steam does not confirm the assertion', async (t) => {
   const loginRes = await api.get('/auth/steam/login').expect(302);
   const stateCookie = loginRes.headers['set-cookie'][0];
-  const state = new URL(new URL(loginRes.headers.location).searchParams.get('openid.return_to')).searchParams.get('state');
+  const state = new URL(new URL(loginRes.headers.location).searchParams.get('openid.return_to')).searchParams.get(
+    'state',
+  );
 
   t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:false' }));
   await api
@@ -1665,14 +1982,17 @@ test('login flow → GET /api/me: returns the signed-in steamid and empty prefs 
   assert.deepEqual(res.body, { steamid: '76561198000000202', prefs: {} });
 });
 
-test('GET /api/me: 200 with a null steamid/prefs when not signed in — checking status isn\'t an error', async () => {
+test("GET /api/me: 200 with a null steamid/prefs when not signed in — checking status isn't an error", async () => {
   const res = await api.get('/api/me').expect(200);
   assert.deepEqual(res.body, { steamid: null, prefs: null });
 });
 
 test('PUT /api/me/prefs/:key: saves one key with its updatedAt, visible from a later GET /api/me', async (t) => {
   const agent = await loginAs(t, '76561198000000203');
-  await agent.put('/api/me/prefs/myAccount').send({ value: { id: '76561198000000203' }, updatedAt: 1000 }).expect(200);
+  await agent
+    .put('/api/me/prefs/myAccount')
+    .send({ value: { id: '76561198000000203' }, updatedAt: 1000 })
+    .expect(200);
   const res = await agent.get('/api/me').expect(200);
   assert.deepEqual(res.body.prefs, { myAccount: { value: { id: '76561198000000203' }, updatedAt: 1000 } });
 });

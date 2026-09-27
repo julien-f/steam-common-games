@@ -75,7 +75,8 @@ export function describeListRef(ref: ListRef, naming: ListNaming): RefDescriptio
     case 'account-owned':
     case 'account-wishlist': {
       const which = ref.kind === 'account-owned' ? 'Owned' : 'Wishlist';
-      if (!ref.accountId) return { label: `Unknown account — ${which}`, href: null, problem: 'this source names no account' };
+      if (!ref.accountId)
+        return { label: `Unknown account — ${which}`, href: null, problem: 'this source names no account' };
       const account = naming.account(ref.accountId);
       if (!account) {
         return {
@@ -87,7 +88,10 @@ export function describeListRef(ref: ListRef, naming: ListNaming): RefDescriptio
       // `?u=`: the source pins an explicit accountId (never "whichever account is current" — see
       // docs/dev/lists-and-accounts.md), so its link has to open that same account.
       const path = ref.kind === 'account-owned' ? '/lists/owned' : '/lists/wishlist';
-      return { label: `${account.label} — ${which}`, href: `${path}?u=${encodeURIComponent(account.identifiers.join(','))}` };
+      return {
+        label: `${account.label} — ${which}`,
+        href: `${path}?u=${encodeURIComponent(account.identifiers.join(','))}`,
+      };
     }
     case 'bundle':
       if (!ref.bundleId) return { label: 'Unknown bundle', href: null, problem: 'this source names no bundle' };
@@ -116,7 +120,7 @@ export function describeListRef(ref: ListRef, naming: ListNaming): RefDescriptio
 export function describeSources(list: GameList, naming: ListNaming): RefDescription[] {
   if (list.kind === 'ranked') return list.source ? [describeListRef(list.source, naming)] : [];
   if (list.kind !== 'dynamic') return [];
-  return (list.sources ?? []).map(ref => describeListRef(ref, naming));
+  return (list.sources ?? []).map((ref) => describeListRef(ref, naming));
 }
 
 // The whole formula as one plain string ("Alice — Owned ∩ Bob — Owned") — for a tooltip, a test,
@@ -126,9 +130,9 @@ export function describeSources(list: GameList, naming: ListNaming): RefDescript
 // Takes op/sources rather than a list, so Home's combine form can name a formula that isn't a
 // saved list yet (its "Will be named…" preview).
 export function formatCombine(op: CombineOp | undefined, sources: ListRef[], naming: ListNaming): string | null {
-  const described = sources.map(ref => describeListRef(ref, naming));
+  const described = sources.map((ref) => describeListRef(ref, naming));
   if (!described.length) return null;
-  const joined = described.map(s => s.label).join(` ${OP_SYMBOLS[op ?? 'union']} `);
+  const joined = described.map((s) => s.label).join(` ${OP_SYMBOLS[op ?? 'union']} `);
   return op === 'group-by-membership' ? `${joined} — grouped by membership` : joined;
 }
 
@@ -161,12 +165,8 @@ export function listDisplayName(list: GameList, naming: ListNaming): string {
 export function createDefaultNaming(depth = 0): ListNaming {
   return {
     account(accountId) {
-      const known = [
-        ...getRecentAccounts({ includeRemoved: true }),
-        getMyAccount(),
-        getEffectiveCurrentAccount(),
-      ];
-      const match = known.find(a => a?.id === accountId);
+      const known = [...getRecentAccounts({ includeRemoved: true }), getMyAccount(), getEffectiveCurrentAccount()];
+      const match = known.find((a) => a?.id === accountId);
       if (match) return { label: accountDisplayLabel(match), identifiers: match.members };
       // Not on record any more, but an accountId is self-describing enough to still open: it *is*
       // the member steam64 ids. Named by id rather than reported as missing outright.
@@ -174,12 +174,13 @@ export function createDefaultNaming(depth = 0): ListNaming {
       return members.length ? { label: members.join(' + '), identifiers: members } : null;
     },
     list(listId) {
-      const found = getLists({ includeDeleted: true }).find(l => l.id === listId);
+      const found = getLists({ includeDeleted: true }).find((l) => l.id === listId);
       if (!found) return null;
       // An unnamed source list is described by its own formula, parenthesized: a formula reading
       // "Alice — Owned ∩ Bob — Owned ∖ Demos" would otherwise be unparseable as one term.
-      const name = found.name
-        || (depth < 1 ? `(${listDisplayName(found, createDefaultNaming(depth + 1))})` : 'Untitled combined list');
+      const name =
+        found.name ||
+        (depth < 1 ? `(${listDisplayName(found, createDefaultNaming(depth + 1))})` : 'Untitled combined list');
       return { name, deleted: found.deletedAt != null };
     },
   };

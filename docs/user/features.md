@@ -54,7 +54,7 @@ The result is a live list: save it as dynamic (it re-resolves each time), or fre
 
 ### Ranking a list
 
-**🏆 Rank this list** (on Owned, Wishlist, a bundle or any of your lists) creates a ranked list and asks you two games at a time: *which do you prefer?* It starts from what the table shows: games come up in its current order, and if rows are selected — or, with none selected, a filter is on — only those are asked about (the button then reads **🏆 Rank N games**); the rest wait for a later Compare.
+**🏆 Rank this list** (on Owned, Wishlist, a bundle or any of your lists) creates a ranked list and asks you two games at a time: _which do you prefer?_ It starts from what the table shows: games come up in its current order, and if rows are selected — or, with none selected, a filter is on — only those are asked about (the button then reads **🏆 Rank N games**); the rest wait for a later Compare.
 
 - **← / →** pick one, **↓** Tie, **S** Skip (asked again later), **X** then **← / →** or "Haven't played" to exclude a game, **Z** Undo. All are buttons too.
 - **ℹ Details** under a card (or **I** then **← / →**) opens that game in the side panel to help you decide. It stays open while the game is still being compared; meanwhile **← / →** browse its screenshots and videos (pick by clicking a card), and **Esc** closes it.
@@ -70,7 +70,7 @@ The result is a live list: save it as dynamic (it re-resolves each time), or fre
 
 **Compare** in the nav bar asks for two or more players and shows what they own, grouped by exactly who owns what: everything all of them share first, then each smaller combination, down to what only one of them has. Add several identifiers to one player to compare a whole Steam Family as one library.
 
-Each player is a box you drop accounts into: it offers the accounts you've already looked at as you type, and takes a Steam name, profile URL or 64-bit ID for anyone it doesn't know yet. Put two accounts in the *same* player to compare a Steam Family — or any pair of libraries — as one. Picking an account doesn't add it to your recents or change your current account.
+Each player is a box you drop accounts into: it offers the accounts you've already looked at as you type, and takes a Steam name, profile URL or 64-bit ID for anyone it doesn't know yet. Put two accounts in the _same_ player to compare a Steam Family — or any pair of libraries — as one. Picking an account doesn't add it to your recents or change your current account.
 
 The result is a link. Copy the address and whoever opens it sees the same comparison — it names the players, so it doesn't depend on anything saved in your browser, and it doesn't change the recipient's own account. Switch it to **Intersect** for a single flat table of what everyone owns, or **Save as a list** to keep it in your own list tree, where it re-resolves every time you open it.
 

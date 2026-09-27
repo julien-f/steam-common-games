@@ -1,6 +1,16 @@
 'use strict';
 
-import { fmtAge, fmtPlaytime, formatMoney, scoreColor, dealRecordTier, DEAL_RECORD_TIERS, fmtH, fmtLastPlayed, computeSteamdbRating } from './utils.ts';
+import {
+  fmtAge,
+  fmtPlaytime,
+  formatMoney,
+  scoreColor,
+  dealRecordTier,
+  DEAL_RECORD_TIERS,
+  fmtH,
+  fmtLastPlayed,
+  computeSteamdbRating,
+} from './utils.ts';
 import { openLightbox, closeLightbox, isLightboxOpen } from './lightbox.tsx';
 import { buildMediaItems } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
@@ -11,7 +21,14 @@ import type { GameOwner } from './accountData.ts';
 import { ACCOUNT_CHANGED_EVENT, getEffectiveCurrentAccount } from './accountsStore.ts';
 import { achievementsAccountKey } from './achievementsRequest.ts';
 import {
-  peekNews, fetchNews, peekAchievements, fetchAchievements, peekPrice, fetchPrice, peekDlc, fetchDlc,
+  peekNews,
+  fetchNews,
+  peekAchievements,
+  fetchAchievements,
+  peekPrice,
+  fetchPrice,
+  peekDlc,
+  fetchDlc,
 } from './panelData.ts';
 import type { DlcEntry, PanelAchievements, PanelDlc, PanelNews, PanelPrice } from './panelData.ts';
 import { nextHopHistory } from './panelHistory.ts';
@@ -147,10 +164,10 @@ const randomQueues = new Map<string, { appid: number }[]>(); // queueKey → rem
 export function pickRandomFrom(list: { appid: number }[], queueKey: string, currentAppid: number) {
   if (!list.length) return null;
   let queue = randomQueues.get(queueKey) || [];
-  const ids = new Set(list.map(g => g.appid));
-  const queueValid = queue.length > 0 && queue.every(g => ids.has(g.appid));
+  const ids = new Set(list.map((g) => g.appid));
+  const queueValid = queue.length > 0 && queue.every((g) => ids.has(g.appid));
   if (!queueValid) {
-    const remaining = panelShuffle(list).filter(g => g.appid !== currentAppid);
+    const remaining = panelShuffle(list).filter((g) => g.appid !== currentAppid);
     queue = remaining.length ? remaining : panelShuffle(list);
   }
   const pick = queue.shift();
@@ -174,12 +191,16 @@ export function initPanel(options: PanelOptions = {}) {
   const panelBodyEl = document.getElementById('panel-body')!;
   render(() => <PanelBody />, panelBodyEl);
 
-  panelBodyEl.addEventListener('wheel', e => {
-    const strip = (e.target as Element).closest?.('.panel-filmstrip') as HTMLElement | null;
-    if (!strip) return;
-    e.preventDefault();
-    strip.scrollLeft += e.deltaY || e.deltaX;
-  }, { passive: false });
+  panelBodyEl.addEventListener(
+    'wheel',
+    (e) => {
+      const strip = (e.target as Element).closest?.('.panel-filmstrip') as HTMLElement | null;
+      if (!strip) return;
+      e.preventDefault();
+      strip.scrollLeft += e.deltaY || e.deltaX;
+    },
+    { passive: false },
+  );
 
   // Dismiss the "⋯ More links" menu on outside click, same convention as gameSearch.ts's
   // own dropdown — needs to catch clicks *outside* the panel too (backdrop, page behind it),
@@ -194,8 +215,12 @@ export function initPanel(options: PanelOptions = {}) {
   // opened. `composedPath()` is captured at dispatch time, before any handler (including
   // Solid's own) had a chance to mutate the DOM, so it's unaffected by that race — confirmed
   // live (the menu never opened at all before this fix).
-  document.addEventListener('click', e => {
-    if (moreLinksOpen() && !e.composedPath().some(el => el instanceof Element && el.classList.contains('panel-icon-more'))) setMoreLinksOpen(false);
+  document.addEventListener('click', (e) => {
+    if (
+      moreLinksOpen() &&
+      !e.composedPath().some((el) => el instanceof Element && el.classList.contains('panel-icon-more'))
+    )
+      setMoreLinksOpen(false);
   });
 
   initPanelSwipe();
@@ -207,7 +232,7 @@ export function initPanel(options: PanelOptions = {}) {
   // resources, all keyed on `appid:account`) react to picking a different account or following a
   // `?u=` link — rather than only re-checking on the next panel open. Registered here, not at
   // module scope, since panel.tsx is imported by Node unit tests too, which have no `window`.
-  window.addEventListener(ACCOUNT_CHANGED_EVENT, () => setAccountRev(r => r + 1));
+  window.addEventListener(ACCOUNT_CHANGED_EVENT, () => setAccountRev((r) => r + 1));
 
   // The one place document.title's "a game is open" layer is driven from (see pageTitle.ts).
   // `game.name` is read inside the effect, so a standalone lookup's placeholder title
@@ -224,9 +249,13 @@ export function initPanel(options: PanelOptions = {}) {
 // sense of "where am I". Bound once to #panel-body (a stable element across every render)
 // rather than to the subnav, which is rebuilt whenever the panel moves to a different game.
 function initSubnavScrollSpy() {
-  document.getElementById('panel-body')!.addEventListener('scroll', () => {
-    requestAnimationFrame(updateSubnavScrollSpy);
-  }, { passive: true });
+  document.getElementById('panel-body')!.addEventListener(
+    'scroll',
+    () => {
+      requestAnimationFrame(updateSubnavScrollSpy);
+    },
+    { passive: true },
+  );
 }
 
 // Buttons are walked in DOM order, which the body below keeps identical to the physical
@@ -250,11 +279,15 @@ function updateSubnavScrollSpy() {
     if (!el || el.getBoundingClientRect().top > threshold) continue;
     activeTarget = target;
   }
-  buttons.forEach(btn => btn.classList.toggle('active', btn.dataset.target === activeTarget));
+  buttons.forEach((btn) => btn.classList.toggle('active', btn.dataset.target === activeTarget));
 }
 
-export function isPanelOpen() { return panelGame() != null; }
-export function getPanelGame() { return panelGame(); }
+export function isPanelOpen() {
+  return panelGame() != null;
+}
+export function getPanelGame() {
+  return panelGame();
+}
 
 // Shared Escape-key handling: close the lightbox first (unless the browser's own Escape is
 // about to exit fullscreen instead — bail and leave the lightbox open, same as the lightbox's
@@ -265,7 +298,11 @@ export function getPanelGame() { return panelGame(); }
 // claimed the keypress.
 export function panelHandleEscape() {
   if (isLightboxOpen()) {
-    if (document.fullscreenElement || (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement) return; // browser exits FS; keep lightbox open
+    if (
+      document.fullscreenElement ||
+      (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement
+    )
+      return; // browser exits FS; keep lightbox open
     closeLightbox();
     return;
   }
@@ -333,13 +370,16 @@ const [revealedAchievements, setRevealedAchievements] = createSignal<Set<string>
 // Defaults to 'all' (map lookup miss) for any appid never touched.
 const [achievementsFilter, setAchievementsFilter] = createSignal<Map<number, string>>(new Map());
 
-function isSectionExpanded(appid: number, section: string) { return expandedSections().has(`${appid}:${section}`); }
+function isSectionExpanded(appid: number, section: string) {
+  return expandedSections().has(`${appid}:${section}`);
+}
 
 function toggleSection(appid: number, section: string) {
   const key = `${appid}:${section}`;
   const wasExpanded = expandedSections().has(key);
   const next = new Set(expandedSections());
-  if (wasExpanded) next.delete(key); else next.add(key);
+  if (wasExpanded) next.delete(key);
+  else next.add(key);
   setExpandedSections(next);
 }
 
@@ -401,18 +441,21 @@ const panelData = createRoot(() => {
     return !force && cached !== undefined ? cached : fetchNews(appid, { force });
   });
 
-  const [achievements, { refetch: refetchAchievements }] = createResource<PanelAchievements, string>(appidAndAccount, (_key, info) => {
-    // Read off the current game rather than packed into the source key: the key only has to
-    // change when the *identity* of what's being fetched changes (this appid, this account), and
-    // a resource fetcher runs untracked, so reading the game here subscribes to nothing.
-    const g = panelGame();
-    if (!g) return null;
-    const members = currentMembers();
-    const force = isForced(info);
-    const cached = peekAchievements(g.appid, members);
-    if (!force && cached !== undefined) return cached;
-    return fetchAchievements(g.appid, members, { force, achievementCount: g.details?.meta?.achievementCount });
-  });
+  const [achievements, { refetch: refetchAchievements }] = createResource<PanelAchievements, string>(
+    appidAndAccount,
+    (_key, info) => {
+      // Read off the current game rather than packed into the source key: the key only has to
+      // change when the *identity* of what's being fetched changes (this appid, this account), and
+      // a resource fetcher runs untracked, so reading the game here subscribes to nothing.
+      const g = panelGame();
+      if (!g) return null;
+      const members = currentMembers();
+      const force = isForced(info);
+      const cached = peekAchievements(g.appid, members);
+      if (!force && cached !== undefined) return cached;
+      return fetchAchievements(g.appid, members, { force, achievementCount: g.details?.meta?.achievementCount });
+    },
+  );
 
   // Both of these are free in practice — myOwnership.ts already holds the current account's
   // owned/wishlist sets (and per-member playtimes) from one fetch shared with the ✓/☆ markers on
@@ -469,10 +512,22 @@ const panelData = createRoot(() => {
     const cached = peekDlc(appid);
     if (!force && cached !== undefined) return cached;
     const ids = panelGame()?.details?.meta?.dlc ?? [];
-    return fetchDlc(appid, ids, { force, onPartial: entries => setDlcPartial({ appid, entries }) });
+    return fetchDlc(appid, ids, { force, onPartial: (entries) => setDlcPartial({ appid, entries }) });
   });
 
-  return { news, refetchNews, achievements, refetchAchievements, owners, ownership, price, refetchPrice, dlc, refetchDlc, dlcPartial };
+  return {
+    news,
+    refetchNews,
+    achievements,
+    refetchAchievements,
+    owners,
+    ownership,
+    price,
+    refetchPrice,
+    dlc,
+    refetchDlc,
+    dlcPartial,
+  };
 });
 
 // The price fields backing the Price card: whatever the host route already loaded onto the row
@@ -496,7 +551,7 @@ function navigateToGame(appid: number, name: string) {
   const game = panelGame();
   if (!game || !panelOptions.onNavigateGame) return;
   // See nextHopHistory (panelHistory.ts) for the push-vs-pop rule.
-  setPanelHistory(hist => nextHopHistory(hist, { appid: game.appid, name: game.name }, appid));
+  setPanelHistory((hist) => nextHopHistory(hist, { appid: game.appid, name: game.name }, appid));
   pendingHopAppid = appid;
   panelOptions.onNavigateGame(appid, name);
 }
@@ -554,7 +609,10 @@ export function panelOpen(game: ReadonlyGame) {
   // starts whichever of them this game still needs — and what makes a reopen free when it
   // doesn't.
   document.getElementById('game-panel')!.classList.add('open');
-  ((document.getElementById('panel-hero')?.querySelector('.panel-hero-img') ?? document.getElementById('panel-close')!) as HTMLElement).focus();
+  (
+    (document.getElementById('panel-hero')?.querySelector('.panel-hero-img') ??
+      document.getElementById('panel-close')!) as HTMLElement
+  ).focus();
 }
 
 // `preserveUrl`: threaded through to `onClose` unchanged — for a host that clears
@@ -590,7 +648,10 @@ export function panelClose({ preserveUrl = false } = {}) {
 // include the hero/hero-filmstrip height above the header and land short.
 function jumpToPanelSection(target: string) {
   const body = document.getElementById('panel-body')!;
-  if (target === 'top') { body.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  if (target === 'top') {
+    body.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
   const el = document.getElementById(target);
   if (!el) return;
   const headerH = document.querySelector('.panel-header-sticky')?.getBoundingClientRect().height ?? 0;
@@ -610,8 +671,12 @@ function jumpToPanelSection(target: string) {
 // (see GlanceGrid below) so it can still be shown, just visibly marked low-confidence rather
 // than presented as equal to a confirmed tier of the same name.
 const PROTON_TIER_COLORS: Record<string, string> = {
-  borked: '#b91c1c', bronze: '#8b4513', silver: '#757575', gold: '#b8860b',
-  platinum: '#5b6b85', native: '#15803d',
+  borked: '#b91c1c',
+  bronze: '#8b4513',
+  silver: '#757575',
+  gold: '#b8860b',
+  platinum: '#5b6b85',
+  native: '#15803d',
 };
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -638,45 +703,54 @@ const TAG_KIND_META = {
 };
 
 function TagCloud(props: { groups: { kind: TagKind; dim: string | null; items?: string[] | null }[] }): JSX.Element {
-  const present = createMemo(() => props.groups.filter(gr => gr.items?.length));
-  const pills = createMemo(() => present().flatMap(({ kind, dim, items }) => {
-    const values = kind === 'tags' ? [...items!] : [...items!].sort((a, b) => a.localeCompare(b));
-    return values.map(v => ({ kind, dim, v }));
-  }));
-  const seenKinds = createMemo(() => [...new Set(present().map(gr => gr.kind))]);
+  const present = createMemo(() => props.groups.filter((gr) => gr.items?.length));
+  const pills = createMemo(() =>
+    present().flatMap(({ kind, dim, items }) => {
+      const values = kind === 'tags' ? [...items!] : [...items!].sort((a, b) => a.localeCompare(b));
+      return values.map((v) => ({ kind, dim, v }));
+    }),
+  );
+  const seenKinds = createMemo(() => [...new Set(present().map((gr) => gr.kind))]);
   return (
     <Show when={present().length}>
-    <div class="panel-section panel-section--meta panel-card">
-      <div class="panel-section-title">Tags &amp; details</div>
-      <div class="panel-tags">
-        <For each={pills()}>
-          {({ kind, dim, v }) => {
-            const dot = <span class="panel-tag-dot" style={{ background: TAG_KIND_META[kind].color }} />;
-            if (dim) {
+      <div class="panel-section panel-section--meta panel-card">
+        <div class="panel-section-title">Tags &amp; details</div>
+        <div class="panel-tags">
+          <For each={pills()}>
+            {({ kind, dim, v }) => {
+              const dot = <span class="panel-tag-dot" style={{ background: TAG_KIND_META[kind].color }} />;
+              if (dim) {
+                return (
+                  <button
+                    class="panel-tag panel-tag-btn"
+                    classList={{ active: !!panelOptions.isTagActive?.(dim, v) }}
+                    onClick={() => panelOptions.onTagClick?.(dim, v)}
+                  >
+                    {dot}
+                    {v}
+                  </button>
+                );
+              }
               return (
-                <button
-                  class="panel-tag panel-tag-btn"
-                  classList={{ active: !!panelOptions.isTagActive?.(dim, v) }}
-                  onClick={() => panelOptions.onTagClick?.(dim, v)}
-                >
-                  {dot}{v}
-                </button>
+                <span class="panel-tag">
+                  {dot}
+                  {v}
+                </span>
               );
-            }
-            return <span class="panel-tag">{dot}{v}</span>;
-          }}
-        </For>
+            }}
+          </For>
+        </div>
+        <div class="panel-tag-legend">
+          <For each={seenKinds()}>
+            {(k) => (
+              <span class="panel-tag-legend-item">
+                <span class="panel-tag-dot" style={{ background: TAG_KIND_META[k].color }} />
+                {TAG_KIND_META[k].label}
+              </span>
+            )}
+          </For>
+        </div>
       </div>
-      <div class="panel-tag-legend">
-        <For each={seenKinds()}>
-          {k => (
-            <span class="panel-tag-legend-item">
-              <span class="panel-tag-dot" style={{ background: TAG_KIND_META[k].color }} />{TAG_KIND_META[k].label}
-            </span>
-          )}
-        </For>
-      </div>
-    </div>
     </Show>
   );
 }
@@ -690,17 +764,36 @@ function TagCloud(props: { groups: { kind: TagKind; dim: string | null; items?: 
 // `faded`: for a value that's a real tier/score but a low-confidence one (currently only
 // ProtonDB's provisional-tier case below) — dims the whole chip so it doesn't read as equally
 // certain as a normal chip of the same color/value.
-function GlanceChip(props: { href?: string | null; value: string | number | null; color?: string | null; caption: JSX.Element; faded?: boolean }): JSX.Element {
+function GlanceChip(props: {
+  href?: string | null;
+  value: string | number | null;
+  color?: string | null;
+  caption: JSX.Element;
+  faded?: boolean;
+}): JSX.Element {
   const inner = () => (
     <span class="panel-glance-sub">
-      <span class="panel-glance-num" style={props.color ? { color: props.color } : undefined}>{String(props.value)}</span>
+      <span class="panel-glance-num" style={props.color ? { color: props.color } : undefined}>
+        {String(props.value)}
+      </span>
       <span class="panel-glance-val">{props.caption}</span>
     </span>
   );
-  const style = () => props.faded ? { opacity: .65 } : undefined;
+  const style = () => (props.faded ? { opacity: 0.65 } : undefined);
   return (
-    <Show when={props.href} fallback={<div class="panel-glance-chip panel-glance-chip--static" style={style()}>{inner()}</div>}>
-      {href => <a class="panel-glance-chip" href={href()} target="_blank" rel="noopener" style={style()}>{inner()}</a>}
+    <Show
+      when={props.href}
+      fallback={
+        <div class="panel-glance-chip panel-glance-chip--static" style={style()}>
+          {inner()}
+        </div>
+      }
+    >
+      {(href) => (
+        <a class="panel-glance-chip" href={href()} target="_blank" rel="noopener" style={style()}>
+          {inner()}
+        </a>
+      )}
     </Show>
   );
 }
@@ -718,17 +811,57 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
   // number/caption is this app's own weighted rating, not SteamDB's.
   const ratingChip = () => {
     const r = details()?.rating;
-    if (!r) return <GlanceChip href={reviewsUrl()} value="—" caption={<><b>Weighted</b> · no rating</>} />;
-    const pct = r.total ? Math.round(r.positive / r.total * 100) : 0;
+    if (!r)
+      return (
+        <GlanceChip
+          href={reviewsUrl()}
+          value="—"
+          caption={
+            <>
+              <b>Weighted</b> · no rating
+            </>
+          }
+        />
+      );
+    const pct = r.total ? Math.round((r.positive / r.total) * 100) : 0;
     const steamdbRating = Math.round(computeSteamdbRating(r.positive, r.total) ?? 0);
-    return <GlanceChip href={reviewsUrl()} value={steamdbRating} color={scoreColor(steamdbRating)} caption={<><b>Weighted</b> · {pct}% of {fmtCompactCount(r.total)}</>} />;
+    return (
+      <GlanceChip
+        href={reviewsUrl()}
+        value={steamdbRating}
+        color={scoreColor(steamdbRating)}
+        caption={
+          <>
+            <b>Weighted</b> · {pct}% of {fmtCompactCount(r.total)}
+          </>
+        }
+      />
+    );
   };
 
   const mcChip = () => {
     const mc = details()?.meta?.metacritic;
-    return mc
-      ? <GlanceChip href={mc.url} value={mc.score} color={scoreColor(mc.score)} caption={<><b>Metacritic</b> · critic score</>} />
-      : <GlanceChip value="—" caption={<><b>Metacritic</b> · no score</>} />;
+    return mc ? (
+      <GlanceChip
+        href={mc.url}
+        value={mc.score}
+        color={scoreColor(mc.score)}
+        caption={
+          <>
+            <b>Metacritic</b> · critic score
+          </>
+        }
+      />
+    ) : (
+      <GlanceChip
+        value="—"
+        caption={
+          <>
+            <b>Metacritic</b> · no score
+          </>
+        }
+      />
+    );
   };
 
   const hltbChip = () => {
@@ -736,16 +869,56 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
     // A matched HLTB entry can still have no submitted completion times (all: null, e.g. a very
     // new/obscure game) — that's a real page with no data, not a failed search, so it still links
     // straight to the page rather than a generic search.
-    if (!h?.id) return <GlanceChip href={`https://howlongtobeat.com/?q=${encodeURIComponent(props.game.name)}`} value="—" caption={<><b>HLTB</b> · search</>} />;
+    if (!h?.id)
+      return (
+        <GlanceChip
+          href={`https://howlongtobeat.com/?q=${encodeURIComponent(props.game.name)}`}
+          value="—"
+          caption={
+            <>
+              <b>HLTB</b> · search
+            </>
+          }
+        />
+      );
     const hltbUrl = `https://howlongtobeat.com/game/${h.id}`;
-    return h.all
-      ? <GlanceChip href={hltbUrl} value={`${h.all}h`} caption={<><b>HLTB</b> · all playstyles</>} />
-      : <GlanceChip href={hltbUrl} value="—" caption={<><b>HLTB</b> · no data</>} />;
+    return h.all ? (
+      <GlanceChip
+        href={hltbUrl}
+        value={`${h.all}h`}
+        caption={
+          <>
+            <b>HLTB</b> · all playstyles
+          </>
+        }
+      />
+    ) : (
+      <GlanceChip
+        href={hltbUrl}
+        value="—"
+        caption={
+          <>
+            <b>HLTB</b> · no data
+          </>
+        }
+      />
+    );
   };
 
   const protonChip = () => {
     const pd = details()?.protondb;
-    if (!pd?.tier) return <GlanceChip href={protondbUrl()} value="—" caption={<><b>Linux/Deck</b> · no reports</>} />;
+    if (!pd?.tier)
+      return (
+        <GlanceChip
+          href={protondbUrl()}
+          value="—"
+          caption={
+            <>
+              <b>Linux/Deck</b> · no reports
+            </>
+          }
+        />
+      );
     const color = PROTON_TIER_COLORS[pd.tier] || '#52525b';
     // Kept short (no "reports"/"confidence" words) — the glance chip's one-line caption truncates
     // rather than wraps, and "strong · 336" already reads fine without them.
@@ -754,24 +927,49 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
     // instead of nothing (see extractProtonDb, lib/steam.js) — faded, with a "?" and a
     // "provisional" caption suffix, so it doesn't read as an equally-confirmed tier.
     const value = pd.pending ? `${capitalize(pd.tier)} ?` : capitalize(pd.tier);
-    return <GlanceChip href={protondbUrl()} value={value} color={color} faded={pd.pending} caption={<><b>Linux/Deck</b>{detail ? ` · ${detail}` : ''}{pd.pending ? ' · provisional' : ''}</>} />;
+    return (
+      <GlanceChip
+        href={protondbUrl()}
+        value={value}
+        color={color}
+        faded={pd.pending}
+        caption={
+          <>
+            <b>Linux/Deck</b>
+            {detail ? ` · ${detail}` : ''}
+            {pd.pending ? ' · provisional' : ''}
+          </>
+        }
+      />
+    );
   };
 
   return (
-    <Show when={props.game.loading} fallback={
-      <Show when={details()}>
-        <div class="panel-glance">{ratingChip()}{mcChip()}{hltbChip()}{protonChip()}</div>
-      </Show>
-    }>
+    <Show
+      when={props.game.loading}
+      fallback={
+        <Show when={details()}>
+          <div class="panel-glance">
+            {ratingChip()}
+            {mcChip()}
+            {hltbChip()}
+            {protonChip()}
+          </div>
+        </Show>
+      }
+    >
       <div class="panel-glance">
         <For each={[0, 1, 2, 3]}>
-          {() => <div class="panel-glance-chip panel-glance-chip--sk"><span class="sk" style={{ width: '100%', height: '32px', 'border-radius': '6px' }} /></div>}
+          {() => (
+            <div class="panel-glance-chip panel-glance-chip--sk">
+              <span class="sk" style={{ width: '100%', height: '32px', 'border-radius': '6px' }} />
+            </div>
+          )}
         </For>
       </div>
     </Show>
   );
 }
-
 
 // Shared "one card, expand-in-place" shape used by HLTB breakdown, news, and achievements:
 // a full-width chip (glance-grid numeral + caption, same template as GlanceChip) as the
@@ -786,25 +984,51 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
 // it, those two rows read as plain text next to achievements' bold colored percentage,
 // losing the "one visual family" look this whole shape is meant to have.
 function CollapsibleCard(props: {
-  appid: number; section: string;
-  num?: JSX.Element; numColor?: string | null; icon?: string;
-  val: JSX.Element; body: JSX.Element;
-  linkHref?: string | null; linkTitle: string;
+  appid: number;
+  section: string;
+  num?: JSX.Element;
+  numColor?: string | null;
+  icon?: string;
+  val: JSX.Element;
+  body: JSX.Element;
+  linkHref?: string | null;
+  linkTitle: string;
 }): JSX.Element {
   const expanded = () => isSectionExpanded(props.appid, props.section);
-  const numSpan = () => props.num != null
-    ? <span class="panel-glance-num" style={props.numColor ? { color: props.numColor } : undefined}>{props.num}</span>
-    : props.icon ? <span class="panel-achievements-icon">{props.icon}</span> : null;
+  const numSpan = () =>
+    props.num != null ? (
+      <span class="panel-glance-num" style={props.numColor ? { color: props.numColor } : undefined}>
+        {props.num}
+      </span>
+    ) : props.icon ? (
+      <span class="panel-achievements-icon">{props.icon}</span>
+    ) : null;
   return (
     <div class="panel-achievements-card">
       <div class="panel-achievements-card-header">
-        <button type="button" class="panel-achievements-chip panel-collapsible-chip" aria-expanded={expanded() ? 'true' : 'false'} onClick={() => toggleSection(props.appid, props.section)}>
+        <button
+          type="button"
+          class="panel-achievements-chip panel-collapsible-chip"
+          aria-expanded={expanded() ? 'true' : 'false'}
+          onClick={() => toggleSection(props.appid, props.section)}
+        >
           {numSpan()}
           <span class="panel-glance-val">{props.val}</span>
           <span class="panel-achievements-chevron">{expanded() ? '▾' : '▸'}</span>
         </button>
         <Show when={props.linkHref}>
-          {href => <a class="panel-icon-link" href={href()} target="_blank" rel="noopener" title={props.linkTitle} aria-label={props.linkTitle}>↗</a>}
+          {(href) => (
+            <a
+              class="panel-icon-link"
+              href={href()}
+              target="_blank"
+              rel="noopener"
+              title={props.linkTitle}
+              aria-label={props.linkTitle}
+            >
+              ↗
+            </a>
+          )}
         </Show>
       </div>
       <Show when={expanded()}>
@@ -849,39 +1073,56 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
   // just without any progress claim on top of it. `hasProgress` gates every place that would
   // otherwise imply real unlock data.
   const hasProgress = () => (data()?.playerCount ?? 0) > 0;
-  const pct = () => { const d = data(); return d && hasProgress() ? Math.round((d.unlocked / d.total) * 100) : null; };
+  const pct = () => {
+    const d = data();
+    return d && hasProgress() ? Math.round((d.unlocked / d.total) * 100) : null;
+  };
 
   // Sorted once per fetch and cached on the payload itself (a fresh object every fetch/refresh,
   // so this never goes stale) rather than re-sorting the full list on every render.
   const sorted = createMemo(() => {
     const d = data();
     if (!d) return [];
-    return d._sortedAchievements ??= d.achievements.slice().sort((a, b) => Number(b.achieved) - Number(a.achieved));
+    return (d._sortedAchievements ??= d.achievements.slice().sort((a, b) => Number(b.achieved) - Number(a.achieved)));
   });
   // 'unlocked'/'locked' only make sense with real progress loaded — filtering by achieved status
   // when nobody's loaded would just be "everything" vs. "nothing" either way. `createMemo` rather
   // than a bare thunk since `visible()` is read from two separate JSX spots below (the `<Show>`
   // and the `<For>`) in the same render — a memo shares one `filter()` pass across both instead
   // of each read re-running it.
-  const filter = createMemo(() => hasProgress() ? (achievementsFilter().get(props.game.appid) || 'all') : 'all');
-  const visible = createMemo(() => filter() === 'all'
-    ? sorted()
-    : sorted().filter(a => (filter() === 'unlocked') === !!a.achieved));
+  const filter = createMemo(() => (hasProgress() ? achievementsFilter().get(props.game.appid) || 'all' : 'all'));
+  const visible = createMemo(() =>
+    filter() === 'all' ? sorted() : sorted().filter((a) => (filter() === 'unlocked') === !!a.achieved),
+  );
 
   const body = (
     <>
       <Show when={hasProgress()}>
         <div class="panel-achievements-filter">
           <For each={['all', 'unlocked', 'locked']}>
-            {opt => <button type="button" class={`panel-achievements-filter-btn${filter() === opt ? ' active' : ''}`} onClick={() => setAchievementsFilterFor(props.game.appid, opt)}>{opt === 'all' ? 'All' : opt === 'unlocked' ? 'Unlocked' : 'Locked'}</button>}
+            {(opt) => (
+              <button
+                type="button"
+                class={`panel-achievements-filter-btn${filter() === opt ? ' active' : ''}`}
+                onClick={() => setAchievementsFilterFor(props.game.appid, opt)}
+              >
+                {opt === 'all' ? 'All' : opt === 'unlocked' ? 'Unlocked' : 'Locked'}
+              </button>
+            )}
           </For>
         </div>
       </Show>
-      <Show when={!hasProgress()}><div class="panel-no-data">Load a player above to see who's unlocked what.</div></Show>
-      <Show when={hasProgress() && data()?.private}><div class="panel-no-data">Progress unavailable — profile may be private.</div></Show>
-      <Show when={!visible().length}><div class="panel-no-data">No achievements match this filter.</div></Show>
+      <Show when={!hasProgress()}>
+        <div class="panel-no-data">Load a player above to see who's unlocked what.</div>
+      </Show>
+      <Show when={hasProgress() && data()?.private}>
+        <div class="panel-no-data">Progress unavailable — profile may be private.</div>
+      </Show>
+      <Show when={!visible().length}>
+        <div class="panel-no-data">No achievements match this filter.</div>
+      </Show>
       <For each={visible()}>
-        {a => {
+        {(a) => {
           // A hidden achievement not yet unlocked keeps its name/description a surprise by
           // default, same as Steam's own profile pages — the schema still carries the real text
           // either way (whether it's still a spoiler depends on which account is loaded, not on
@@ -889,9 +1130,9 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
           // than never sending it at all.
           const revealed = () => revealedAchievements().has(`${props.game.appid}:${a.apiname}`);
           const spoiler = () => a.hidden && !a.achieved && !revealed();
-          const name = () => spoiler() ? 'Hidden achievement' : (a.name || a.apiname);
-          const desc = () => spoiler() ? 'Click to reveal' : (a.description || '');
-          const icon = a.achieved ? a.icon : (a.icongray || a.icon);
+          const name = () => (spoiler() ? 'Hidden achievement' : a.name || a.apiname);
+          const desc = () => (spoiler() ? 'Click to reveal' : a.description || '');
+          const icon = a.achieved ? a.icon : a.icongray || a.icon;
           // Unlock date is real data the server already returns (`unlocktime`, seconds since
           // epoch) but otherwise has nowhere to show — surfaced as a plain hover tooltip rather
           // than a fifth line of on-card text.
@@ -899,7 +1140,12 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
           // Rarity isn't a spoiler — it's shown even for a still-hidden achievement, same as
           // Steam's own profile pages. Fixed to 1 decimal only when it's not a whole number.
           const rarityLabel = a.globalPct == null ? null : fmtRarity(a.globalPct);
-          const onSpoilerActivate = (e: MouseEvent | KeyboardEvent) => { if (spoiler()) { e.preventDefault(); revealAchievement(props.game.appid, a.apiname); } };
+          const onSpoilerActivate = (e: MouseEvent | KeyboardEvent) => {
+            if (spoiler()) {
+              e.preventDefault();
+              revealAchievement(props.game.appid, a.apiname);
+            }
+          };
           return (
             <div
               class={`panel-achievement-row${a.achieved ? ' unlocked' : ''}${spoiler() ? ' panel-achievement--spoiler' : ''}`}
@@ -907,15 +1153,19 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
               role={spoiler() ? 'button' : undefined}
               tabIndex={spoiler() ? 0 : undefined}
               onClick={onSpoilerActivate}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onSpoilerActivate(e); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') onSpoilerActivate(e);
+              }}
             >
               <img class="panel-achievement-icon" src={icon} alt="" loading="lazy" />
               <div class="panel-achievement-text">
                 <div class="panel-achievement-name">{name()}</div>
-                <Show when={desc()}>{d => <div class="panel-achievement-desc">{d()}</div>}</Show>
+                <Show when={desc()}>{(d) => <div class="panel-achievement-desc">{d()}</div>}</Show>
               </div>
               <Show when={rarityLabel != null}>
-                <div class="panel-achievement-rarity" title={`${rarityLabel} of players have unlocked this`}>{rarityLabel}</div>
+                <div class="panel-achievement-rarity" title={`${rarityLabel} of players have unlocked this`}>
+                  {rarityLabel}
+                </div>
               </Show>
             </div>
           );
@@ -925,31 +1175,57 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
   );
 
   return (
-    <Show when={panelData.achievements.loading} fallback={
-      <Show when={data() !== undefined}>
-        <div class="panel-section" id="panel-section-achievements">
-          <Show when={data()} fallback={<><div class="panel-section-title">Achievements</div><div class="panel-no-data">Couldn't load achievements.</div></>}>
-            {d => (
-              <Show when={d().total} fallback={<><div class="panel-section-title">Achievements</div><div class="panel-no-data">This game has no achievements.</div></>}>
-                <CollapsibleCard
-                  appid={props.game.appid}
-                  section="achievements"
-                  num={hasProgress() ? `${pct()}%` : '—'}
-                  numColor={hasProgress() ? scoreColor(pct()!) : null}
-                  val={<><b>Achievements</b> · {hasProgress() ? `${d().unlocked} / ${d().total} unlocked` : `${d().total} total`}</>}
-                  body={body}
-                  linkHref={d().steamUrl}
-                  linkTitle="View achievements on Steam"
-                />
-              </Show>
-            )}
-          </Show>
-        </div>
-      </Show>
-    }>
+    <Show
+      when={panelData.achievements.loading}
+      fallback={
+        <Show when={data() !== undefined}>
+          <div class="panel-section" id="panel-section-achievements">
+            <Show
+              when={data()}
+              fallback={
+                <>
+                  <div class="panel-section-title">Achievements</div>
+                  <div class="panel-no-data">Couldn't load achievements.</div>
+                </>
+              }
+            >
+              {(d) => (
+                <Show
+                  when={d().total}
+                  fallback={
+                    <>
+                      <div class="panel-section-title">Achievements</div>
+                      <div class="panel-no-data">This game has no achievements.</div>
+                    </>
+                  }
+                >
+                  <CollapsibleCard
+                    appid={props.game.appid}
+                    section="achievements"
+                    num={hasProgress() ? `${pct()}%` : '—'}
+                    numColor={hasProgress() ? scoreColor(pct()!) : null}
+                    val={
+                      <>
+                        <b>Achievements</b> ·{' '}
+                        {hasProgress() ? `${d().unlocked} / ${d().total} unlocked` : `${d().total} total`}
+                      </>
+                    }
+                    body={body}
+                    linkHref={d().steamUrl}
+                    linkTitle="View achievements on Steam"
+                  />
+                </Show>
+              )}
+            </Show>
+          </div>
+        </Show>
+      }
+    >
       <div class="panel-section" id="panel-section-achievements">
         <div class="panel-section-title">Achievements</div>
-        <div class="panel-achievements"><span class="sk" style={{ width: '100%', height: '48px', 'border-radius': '6px' }} /></div>
+        <div class="panel-achievements">
+          <span class="sk" style={{ width: '100%', height: '48px', 'border-radius': '6px' }} />
+        </div>
       </div>
     </Show>
   );
@@ -966,14 +1242,16 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
 function OwnersSection(): JSX.Element {
   const owners = (): GameOwner[] => panelData.owners() ?? [];
   const sorted = createMemo(() => sortOwners(owners()));
-  const maxMinutes = createMemo(() => Math.max(...sorted().map(o => o.minutes), 1));
+  const maxMinutes = createMemo(() => Math.max(...sorted().map((o) => o.minutes), 1));
   return (
     <Show when={sorted().length > 0}>
       <div class="panel-section panel-card" id="panel-section-owners">
-        <div class="panel-section-title">Owned by <span class="panel-section-subtitle">most recently played first</span></div>
+        <div class="panel-section-title">
+          Owned by <span class="panel-section-subtitle">most recently played first</span>
+        </div>
         <div class="panel-owners">
           <For each={sorted()}>
-            {o => {
+            {(o) => {
               const lastPlayed = fmtLastPlayed(o.lastPlayedSec);
               const playtime = fmtPlaytime(o.minutes);
               // Steam's `rtime_last_played` is genuinely 0 for plenty of owned-and-played games
@@ -989,7 +1267,10 @@ function OwnersSection(): JSX.Element {
                     <span class="panel-owner-lastplayed">{lastPlayedText}</span>
                   </div>
                   <div class="panel-owner-meter-track">
-                    <div class="panel-owner-meter-fill" style={{ width: `${ownerMeterPct(o.minutes, maxMinutes())}%` }} />
+                    <div
+                      class="panel-owner-meter-fill"
+                      style={{ width: `${ownerMeterPct(o.minutes, maxMinutes())}%` }}
+                    />
                   </div>
                   <span class="panel-owner-playtime">{playtime ? `${playtime} played` : 'not played'}</span>
                 </div>
@@ -1009,43 +1290,66 @@ function OwnersSection(): JSX.Element {
 function NewsSection(props: { game: ReadonlyGame }): JSX.Element {
   const items = () => panelData.news();
   return (
-    <Show when={panelData.news.loading} fallback={
-      // A failed fetch with nothing to fall back on (`null` — see panelData.ts's fetchNews, which
-      // keeps a previous successful load rather than wiping it) is worth a visible message rather
-      // than silently looking identical to a game with no news at all.
-      <Show when={items() === null || items()?.length}>
-        <div class="panel-section" id="panel-section-news">
-          <Show when={items()} fallback={<><div class="panel-section-title">News</div><div class="panel-no-data">Couldn't load news.</div></>}>
-            {list => (
-              <CollapsibleCard
-                appid={props.game.appid}
-                section="news"
-                icon="📰"
-                // Spelling out "more on Steam" here (not just relying on the ↗ icon's title
-                // tooltip) makes it explicit that this list is a preview, not the full history.
-                val={<><b>News</b> · more on Steam</>}
-                body={
-                  <div class="panel-collapsible-body-pad">
-                    <div class="panel-news">
-                      <For each={list()}>
-                        {n => (
-                          <a class="panel-news-item" href={safeHref(n.url) || undefined} target="_blank" rel="noopener">
-                            <span class="panel-news-title">{n.title}</span>
-                            <span class="panel-news-meta">{fmtLastPlayed(n.date)}{n.feedLabel ? ` · ${n.feedLabel}` : ''}</span>
-                          </a>
-                        )}
-                      </For>
+    <Show
+      when={panelData.news.loading}
+      fallback={
+        // A failed fetch with nothing to fall back on (`null` — see panelData.ts's fetchNews, which
+        // keeps a previous successful load rather than wiping it) is worth a visible message rather
+        // than silently looking identical to a game with no news at all.
+        <Show when={items() === null || items()?.length}>
+          <div class="panel-section" id="panel-section-news">
+            <Show
+              when={items()}
+              fallback={
+                <>
+                  <div class="panel-section-title">News</div>
+                  <div class="panel-no-data">Couldn't load news.</div>
+                </>
+              }
+            >
+              {(list) => (
+                <CollapsibleCard
+                  appid={props.game.appid}
+                  section="news"
+                  icon="📰"
+                  // Spelling out "more on Steam" here (not just relying on the ↗ icon's title
+                  // tooltip) makes it explicit that this list is a preview, not the full history.
+                  val={
+                    <>
+                      <b>News</b> · more on Steam
+                    </>
+                  }
+                  body={
+                    <div class="panel-collapsible-body-pad">
+                      <div class="panel-news">
+                        <For each={list()}>
+                          {(n) => (
+                            <a
+                              class="panel-news-item"
+                              href={safeHref(n.url) || undefined}
+                              target="_blank"
+                              rel="noopener"
+                            >
+                              <span class="panel-news-title">{n.title}</span>
+                              <span class="panel-news-meta">
+                                {fmtLastPlayed(n.date)}
+                                {n.feedLabel ? ` · ${n.feedLabel}` : ''}
+                              </span>
+                            </a>
+                          )}
+                        </For>
+                      </div>
                     </div>
-                  </div>
-                }
-                linkHref={`https://store.steampowered.com/news/app/${props.game.appid}`}
-                linkTitle="View all news on Steam"
-              />
-            )}
-          </Show>
-        </div>
-      </Show>
-    }>
+                  }
+                  linkHref={`https://store.steampowered.com/news/app/${props.game.appid}`}
+                  linkTitle="View all news on Steam"
+                />
+              )}
+            </Show>
+          </div>
+        </Show>
+      }
+    >
       <div class="panel-section" id="panel-section-news">
         <div class="panel-section-title">News</div>
         <span class="sk" style={{ display: 'block', width: '100%', height: '48px', 'border-radius': '6px' }} />
@@ -1073,7 +1377,10 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
     return v && v.bestDealPrice != null ? (v as PriceFields & { bestDealPrice: number }) : null;
   };
   // dealRecordTier (public/utils.ts) is the single shared source of this tier/color/icon logic.
-  const rec = () => { const d = deal(); return d ? dealRecordTier(d.bestDealPrice, d) : null; };
+  const rec = () => {
+    const d = deal();
+    return d ? dealRecordTier(d.bestDealPrice, d) : null;
+  };
   const shopUrl = () => safeHref(deal()?.bestDealUrl);
   const tooltip = () => {
     const shop = deal()?.bestDealShop;
@@ -1084,7 +1391,7 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
   // preserved in git history, for the full "why collapse equal-amount tiers" reasoning.
   const lowGroups = createMemo(() => {
     const d = deal();
-    const groups: { amount: number; tiers: typeof DEAL_RECORD_TIERS[number][] }[] = [];
+    const groups: { amount: number; tiers: (typeof DEAL_RECORD_TIERS)[number][] }[] = [];
     if (!d) return groups;
     for (const t of [...DEAL_RECORD_TIERS].reverse()) {
       const amount = d[t.low];
@@ -1105,50 +1412,93 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
     // file's own comment, preserved in git history, for the full reasoning).
     return (
       <>
-        <span class="panel-price-amount" style={{ ...(rec() ? { color: rec()!.color } : {}), ...(rec()?.bold ? { 'font-weight': 700 } : {}) }}>
-          {formatMoney(d.bestDealPrice, d.priceCurrency)}{rec() ? ' ' + rec()!.icon : ''}
+        <span
+          class="panel-price-amount"
+          style={{ ...(rec() ? { color: rec()!.color } : {}), ...(rec()?.bold ? { 'font-weight': 700 } : {}) }}
+        >
+          {formatMoney(d.bestDealPrice, d.priceCurrency)}
+          {rec() ? ' ' + rec()!.icon : ''}
         </span>
         <Show when={d.bestDealCut}>
-          <><span class="panel-price-sep">·</span><span class="panel-price-discount">-{d.bestDealCut}%</span></>
+          <>
+            <span class="panel-price-sep">·</span>
+            <span class="panel-price-discount">-{d.bestDealCut}%</span>
+          </>
         </Show>
         <Show when={d.bestDealShop}>
-          <><span class="panel-price-sep">·</span><span class="panel-price-shop">{shopUrl() ? 'Buy at ' : 'at '}{d.bestDealShop}{shopUrl() ? ' ↗' : ''}</span></>
+          <>
+            <span class="panel-price-sep">·</span>
+            <span class="panel-price-shop">
+              {shopUrl() ? 'Buy at ' : 'at '}
+              {d.bestDealShop}
+              {shopUrl() ? ' ↗' : ''}
+            </span>
+          </>
         </Show>
       </>
     );
   };
 
   return (
-    <Show when={panelData.price.loading} fallback={
-      <Show when={p() !== undefined}>
-        <div class="panel-section panel-card" id="panel-section-price">
-          <div class="panel-section-title">Price <a href={`https://isthereanydeal.com/steam/app/${props.game.appid}`} target="_blank" rel="noopener">IsThereAnyDeal ↗</a></div>
-          <Show when={deal()} fallback={<div class="panel-no-data">No pricing data available.</div>}>
-            <Show when={shopUrl()} fallback={<div class="panel-price-line" title={tooltip() || undefined}>{line()}</div>}>
-              {url => <a class="panel-price-line panel-price-line--link" href={url()} target="_blank" rel="noopener" title={tooltip() || undefined}>{line()}</a>}
+    <Show
+      when={panelData.price.loading}
+      fallback={
+        <Show when={p() !== undefined}>
+          <div class="panel-section panel-card" id="panel-section-price">
+            <div class="panel-section-title">
+              Price{' '}
+              <a href={`https://isthereanydeal.com/steam/app/${props.game.appid}`} target="_blank" rel="noopener">
+                IsThereAnyDeal ↗
+              </a>
+            </div>
+            <Show when={deal()} fallback={<div class="panel-no-data">No pricing data available.</div>}>
+              <Show
+                when={shopUrl()}
+                fallback={
+                  <div class="panel-price-line" title={tooltip() || undefined}>
+                    {line()}
+                  </div>
+                }
+              >
+                {(url) => (
+                  <a
+                    class="panel-price-line panel-price-line--link"
+                    href={url()}
+                    target="_blank"
+                    rel="noopener"
+                    title={tooltip() || undefined}
+                  >
+                    {line()}
+                  </a>
+                )}
+              </Show>
+              <Show when={lowGroups().length}>
+                <div class="panel-price-lows">
+                  <For each={lowGroups()}>
+                    {({ amount, tiers }, i) => {
+                      const icons = tiers.map((t) => t.icon).join('');
+                      const label = tiers.map((t) => t.statusLabel).join(' / ');
+                      const lowColor = tiers[0].color; // rarest tier in the group leads the color too
+                      const money = () => formatMoney(amount, deal()?.priceCurrency ?? null);
+                      return (
+                        <>
+                          <Show when={i() > 0}>
+                            <span class="panel-price-sep">·</span>
+                          </Show>
+                          <span class="panel-price-low" title={`${label}: ${money()}`} style={{ color: lowColor }}>
+                            {money()} {icons}
+                          </span>
+                        </>
+                      );
+                    }}
+                  </For>
+                </div>
+              </Show>
             </Show>
-            <Show when={lowGroups().length}>
-              <div class="panel-price-lows">
-                <For each={lowGroups()}>
-                  {({ amount, tiers }, i) => {
-                    const icons = tiers.map(t => t.icon).join('');
-                    const label = tiers.map(t => t.statusLabel).join(' / ');
-                    const lowColor = tiers[0].color; // rarest tier in the group leads the color too
-                    const money = () => formatMoney(amount, deal()?.priceCurrency ?? null);
-                    return (
-                      <>
-                        <Show when={i() > 0}><span class="panel-price-sep">·</span></Show>
-                        <span class="panel-price-low" title={`${label}: ${money()}`} style={{ color: lowColor }}>{money()} {icons}</span>
-                      </>
-                    );
-                  }}
-                </For>
-              </div>
-            </Show>
-          </Show>
-        </div>
-      </Show>
-    }>
+          </div>
+        </Show>
+      }
+    >
       <div class="panel-section panel-card" id="panel-section-price">
         <div class="panel-section-title">Price</div>
         <span class="sk" style={{ display: 'block', width: '100%', height: '32px', 'border-radius': '6px' }} />
@@ -1172,7 +1522,14 @@ function BaseGameLink(props: { game: ReadonlyGame }): JSX.Element {
   };
   return (
     <Show when={fg()}>
-      {base => <>DLC for <a class="panel-basegame-link" href={withAccountParam(`/game/${base().appid}`)} onClick={onClick}>{base().name || `App ${base().appid}`}</a></>}
+      {(base) => (
+        <>
+          DLC for{' '}
+          <a class="panel-basegame-link" href={withAccountParam(`/game/${base().appid}`)} onClick={onClick}>
+            {base().name || `App ${base().appid}`}
+          </a>
+        </>
+      )}
     </Show>
   );
 }
@@ -1222,7 +1579,11 @@ function DlcSection(props: { game: ReadonlyGame }): JSX.Element {
     const partial = panelData.dlcPartial();
     return (partial?.appid === props.game.appid ? partial.entries : []).filter((d): d is DlcEntry => d != null);
   };
-  const skeleton = <div class="panel-collapsible-body-pad"><span class="sk" style={{ display: 'block', width: '100%', height: '48px', 'border-radius': '6px' }} /></div>;
+  const skeleton = (
+    <div class="panel-collapsible-body-pad">
+      <span class="sk" style={{ display: 'block', width: '100%', height: '48px', 'border-radius': '6px' }} />
+    </div>
+  );
 
   const body = () => {
     if (panelData.dlc.loading) {
@@ -1233,17 +1594,28 @@ function DlcSection(props: { game: ReadonlyGame }): JSX.Element {
       const remaining = dlcIds().length - done.length;
       return (
         <div class="panel-dlc-list">
-          <For each={done}>{d => <DlcItem d={d} />}</For>
-          <Show when={remaining}>{n => <div class="panel-dlc-loading-more">Loading {n()} more…</div>}</Show>
+          <For each={done}>{(d) => <DlcItem d={d} />}</For>
+          <Show when={remaining}>{(n) => <div class="panel-dlc-loading-more">Loading {n()} more…</div>}</Show>
         </div>
       );
     }
     const entries = panelData.dlc();
-    if (entries === null) return <div class="panel-collapsible-body-pad"><div class="panel-no-data">Couldn't load DLC details.</div></div>;
+    if (entries === null)
+      return (
+        <div class="panel-collapsible-body-pad">
+          <div class="panel-no-data">Couldn't load DLC details.</div>
+        </div>
+      );
     if (!entries) return skeleton;
-    return entries.length
-      ? <div class="panel-dlc-list"><For each={sortDlcByRelease(entries)}>{d => <DlcItem d={d} />}</For></div>
-      : <div class="panel-collapsible-body-pad"><div class="panel-no-data">No DLC details available.</div></div>;
+    return entries.length ? (
+      <div class="panel-dlc-list">
+        <For each={sortDlcByRelease(entries)}>{(d) => <DlcItem d={d} />}</For>
+      </div>
+    ) : (
+      <div class="panel-collapsible-body-pad">
+        <div class="panel-no-data">No DLC details available.</div>
+      </div>
+    );
   };
 
   return (
@@ -1253,7 +1625,11 @@ function DlcSection(props: { game: ReadonlyGame }): JSX.Element {
           appid={props.game.appid}
           section="dlc"
           icon="📦"
-          val={<><b>DLC</b> · {dlcIds().length} available</>}
+          val={
+            <>
+              <b>DLC</b> · {dlcIds().length} available
+            </>
+          }
           body={body()}
           linkHref={`https://store.steampowered.com/dlc/${props.game.appid}/`}
           linkTitle="View all DLC on Steam"
@@ -1282,7 +1658,10 @@ function HeroMain(props: { items: MediaItem[] }): JSX.Element {
   // out the prev/next nav and, for videos, the play-button overlay and click target — even
   // though the video itself (or the full-res screenshot behind a broken thumb) still plays/
   // loads fine. Just mark the image broken and leave the rest of the hero working.
-  const onError = () => { imgEl.classList.remove('loading'); imgEl.classList.add('panel-hero-img--broken'); };
+  const onError = () => {
+    imgEl.classList.remove('loading');
+    imgEl.classList.add('panel-hero-img--broken');
+  };
   return (
     <div class={`panel-hero-main${current().type === 'video' ? ' is-video' : ''}`}>
       <img
@@ -1295,12 +1674,35 @@ function HeroMain(props: { items: MediaItem[] }): JSX.Element {
         alt={name()}
         onLoad={onLoad}
         onError={onError}
-        onClick={() => { const g = panelGame(); if (g) openLightbox(g, idx()); }}
-        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const g = panelGame(); if (g) openLightbox(g, idx()); } }}
+        onClick={() => {
+          const g = panelGame();
+          if (g) openLightbox(g, idx());
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const g = panelGame();
+            if (g) openLightbox(g, idx());
+          }
+        }}
       />
       <Show when={hasMany()}>
-        <button class="panel-hero-btn panel-hero-prev" disabled={idx() <= 0} aria-label="Previous" onClick={() => panelStepHero(-1)}>&#8249;</button>
-        <button class="panel-hero-btn panel-hero-next" disabled={idx() >= props.items.length - 1} aria-label="Next" onClick={() => panelStepHero(1)}>&#8250;</button>
+        <button
+          class="panel-hero-btn panel-hero-prev"
+          disabled={idx() <= 0}
+          aria-label="Previous"
+          onClick={() => panelStepHero(-1)}
+        >
+          &#8249;
+        </button>
+        <button
+          class="panel-hero-btn panel-hero-next"
+          disabled={idx() >= props.items.length - 1}
+          aria-label="Next"
+          onClick={() => panelStepHero(1)}
+        >
+          &#8250;
+        </button>
       </Show>
     </div>
   );
@@ -1313,7 +1715,10 @@ function PanelHero(): JSX.Element {
   // (screenshots/videos) asynchronously, without ever replacing the row object itself. Reading
   // the field through the store row is what makes the hero pick that up; it used to need a
   // `revision()` read here for the same reason, back when the row was a plain object.
-  const items = () => { const g = panelGame(); return g ? buildMediaItems(g.appid, g.details?.meta) : []; };
+  const items = () => {
+    const g = panelGame();
+    return g ? buildMediaItems(g.appid, g.details?.meta) : [];
+  };
   const idx = () => Math.max(0, Math.min(heroIdx(), items().length - 1));
   const hasMany = () => items().length > 1;
   let filmstripEl: HTMLDivElement | undefined;
@@ -1333,13 +1738,20 @@ function PanelHero(): JSX.Element {
   // re-renders a given <img> when its own props actually change.
   const onFilmstripRef = (el: HTMLDivElement) => {
     filmstripEl = el;
-    el.addEventListener('error', e => {
-      const img = e.target as HTMLImageElement;
-      if (!img.classList?.contains('panel-film-thumb')) return;
-      const fallback = img.dataset.fallback;
-      if (fallback && img.src !== fallback) { img.src = fallback; return; }
-      img.classList.add('panel-film-thumb--broken');
-    }, true);
+    el.addEventListener(
+      'error',
+      (e) => {
+        const img = e.target as HTMLImageElement;
+        if (!img.classList?.contains('panel-film-thumb')) return;
+        const fallback = img.dataset.fallback;
+        if (fallback && img.src !== fallback) {
+          img.src = fallback;
+          return;
+        }
+        img.classList.add('panel-film-thumb--broken');
+      },
+      true,
+    );
   };
 
   return (
@@ -1361,7 +1773,9 @@ function PanelHero(): JSX.Element {
                 <button
                   type="button"
                   class={`panel-film-item${i() === idx() ? ' active' : ''}${item.type === 'video' ? ' is-video' : ''}`}
-                  aria-label={i() === 0 ? (panelGame()?.name ?? '') : (item.type === 'video' ? `Video ${i()}` : `Screenshot ${i()}`)}
+                  aria-label={
+                    i() === 0 ? (panelGame()?.name ?? '') : item.type === 'video' ? `Video ${i()}` : `Screenshot ${i()}`
+                  }
                   onClick={() => setHeroIdx(i())}
                 >
                   <img class="panel-film-thumb" src={item.thumb} data-fallback={fallback} alt="" loading="lazy" />
@@ -1407,7 +1821,7 @@ function HltbSection(props: { game: ReadonlyGame }): JSX.Element {
     if (!present() || x?.all != null) return;
     const key = `${props.game.appid}:hltb`;
     if (expandedSections().has(key)) return;
-    setExpandedSections(prev => new Set(prev).add(key));
+    setExpandedSections((prev) => new Set(prev).add(key));
   });
 
   return (
@@ -1417,13 +1831,38 @@ function HltbSection(props: { game: ReadonlyGame }): JSX.Element {
           appid={props.game.appid}
           section="hltb"
           icon="⏱️"
-          val={<><b>How Long To Beat</b> · {parts().join(', ')}</>}
+          val={
+            <>
+              <b>How Long To Beat</b> · {parts().join(', ')}
+            </>
+          }
           body={
             <div class="panel-collapsible-body-pad">
               <div class="panel-hltb">
-                <Show when={h()?.main}>{v => <div class="panel-hltb-item"><div class="panel-hltb-label">Main Story</div><div class="panel-hltb-val">{fmtH(v())}</div></div>}</Show>
-                <Show when={h()?.extra}>{v => <div class="panel-hltb-item"><div class="panel-hltb-label">Main + Extra</div><div class="panel-hltb-val">{fmtH(v())}</div></div>}</Show>
-                <Show when={h()?.completionist}>{v => <div class="panel-hltb-item"><div class="panel-hltb-label">Completionist</div><div class="panel-hltb-val">{fmtH(v())}</div></div>}</Show>
+                <Show when={h()?.main}>
+                  {(v) => (
+                    <div class="panel-hltb-item">
+                      <div class="panel-hltb-label">Main Story</div>
+                      <div class="panel-hltb-val">{fmtH(v())}</div>
+                    </div>
+                  )}
+                </Show>
+                <Show when={h()?.extra}>
+                  {(v) => (
+                    <div class="panel-hltb-item">
+                      <div class="panel-hltb-label">Main + Extra</div>
+                      <div class="panel-hltb-val">{fmtH(v())}</div>
+                    </div>
+                  )}
+                </Show>
+                <Show when={h()?.completionist}>
+                  {(v) => (
+                    <div class="panel-hltb-item">
+                      <div class="panel-hltb-label">Completionist</div>
+                      <div class="panel-hltb-val">{fmtH(v())}</div>
+                    </div>
+                  )}
+                </Show>
               </div>
             </div>
           }
@@ -1449,7 +1888,7 @@ function TagCloudSection(props: { game: ReadonlyGame }): JSX.Element {
   const meta = () => props.game.details?.meta;
   // The caller passes each of the four TagKind literals; narrowing back to TagKind (not a bare
   // string) is what lets the TagCloud call below type-check its `kind` field.
-  const tagDim = (key: string) => panelOptions.enableTagFilters ? (key as TagKind) : null;
+  const tagDim = (key: string) => (panelOptions.enableTagFilters ? (key as TagKind) : null);
   const groups = createMemo(() => {
     const devs = meta()?.developers || [];
     const pubs = meta()?.publishers || [];
@@ -1473,20 +1912,49 @@ function TagCloudSection(props: { game: ReadonlyGame }): JSX.Element {
 // row — Workshop/Website are each conditional, tucked into a single "⋯ More" menu instead (see
 // the original file's own comment, preserved in git history, for the full reasoning).
 function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
-  const items = () => [
-    !props.game.loading && (props.game.details?.meta?.categories || []).includes('Steam Workshop') &&
-      { icon: '🛠️', label: 'Steam Workshop', href: `https://steamcommunity.com/app/${props.game.appid}/workshop/` },
-    props.game.details?.meta?.website && { icon: '🌐', label: 'Official Website', href: props.game.details.meta.website },
-    { icon: '🔎', label: 'More Like This (Steam)', href: `https://store.steampowered.com/recommended/morelike/app/${props.game.appid}/` },
-  ].filter((it): it is { icon: string; label: string; href: string } => !!it);
+  const items = () =>
+    [
+      !props.game.loading &&
+        (props.game.details?.meta?.categories || []).includes('Steam Workshop') && {
+          icon: '🛠️',
+          label: 'Steam Workshop',
+          href: `https://steamcommunity.com/app/${props.game.appid}/workshop/`,
+        },
+      props.game.details?.meta?.website && {
+        icon: '🌐',
+        label: 'Official Website',
+        href: props.game.details.meta.website,
+      },
+      {
+        icon: '🔎',
+        label: 'More Like This (Steam)',
+        href: `https://store.steampowered.com/recommended/morelike/app/${props.game.appid}/`,
+      },
+    ].filter((it): it is { icon: string; label: string; href: string } => !!it);
 
   return (
     <Show when={items().length}>
       <div class="panel-icon-more">
-        <button type="button" class="panel-icon-link panel-icon-more-btn" aria-haspopup="true" aria-expanded={moreLinksOpen() ? 'true' : 'false'} title="More links" aria-label="More links" onClick={() => setMoreLinksOpen(!moreLinksOpen())}>⋯</button>
+        <button
+          type="button"
+          class="panel-icon-link panel-icon-more-btn"
+          aria-haspopup="true"
+          aria-expanded={moreLinksOpen() ? 'true' : 'false'}
+          title="More links"
+          aria-label="More links"
+          onClick={() => setMoreLinksOpen(!moreLinksOpen())}
+        >
+          ⋯
+        </button>
         <Show when={moreLinksOpen()}>
           <div class="panel-icon-more-menu">
-            <For each={items()}>{it => <a class="panel-icon-more-item" href={safeHref(it.href) || undefined} target="_blank" rel="noopener">{it.icon} {it.label}</a>}</For>
+            <For each={items()}>
+              {(it) => (
+                <a class="panel-icon-more-item" href={safeHref(it.href) || undefined} target="_blank" rel="noopener">
+                  {it.icon} {it.label}
+                </a>
+              )}
+            </For>
           </div>
         </Show>
       </div>
@@ -1529,7 +1997,7 @@ function refreshTitle(game: ReadonlyGame): string {
 }
 
 function RefreshButton(props: { game: ReadonlyGame }): JSX.Element {
-  const age = () => props.game.detailsFetchedAt === undefined ? '' : fmtAge(props.game.detailsFetchedAt);
+  const age = () => (props.game.detailsFetchedAt === undefined ? '' : fmtAge(props.game.detailsFetchedAt));
   return (
     <Show when={panelOptions.onRefresh && !props.game.loading}>
       <button
@@ -1578,8 +2046,19 @@ function OwnershipRow(props: { game: ReadonlyGame }): JSX.Element {
   return (
     <Show when={own()?.inLibrary || own()?.onWishlist}>
       <div class="panel-ownership-row">
-        <Show when={own()?.inLibrary}><A class="panel-ownership-badge owned" href={withAccountParam(`/lists/owned?game=${props.game.appid}`)}>✓ In library</A></Show>
-        <Show when={own()?.onWishlist}><A class="panel-ownership-badge wishlisted" href={withAccountParam(`/lists/wishlist?game=${props.game.appid}`)}>☆ On wishlist</A></Show>
+        <Show when={own()?.inLibrary}>
+          <A class="panel-ownership-badge owned" href={withAccountParam(`/lists/owned?game=${props.game.appid}`)}>
+            ✓ In library
+          </A>
+        </Show>
+        <Show when={own()?.onWishlist}>
+          <A
+            class="panel-ownership-badge wishlisted"
+            href={withAccountParam(`/lists/wishlist?game=${props.game.appid}`)}
+          >
+            ☆ On wishlist
+          </A>
+        </Show>
       </div>
     </Show>
   );
@@ -1630,8 +2109,21 @@ function PanelSubnav(props: { game: ReadonlyGame }): JSX.Element {
   return (
     <Show when={items().length >= 2}>
       <div class="panel-subnav">
-        <button type="button" class="panel-subnav-btn" data-target="top" onClick={() => jumpToPanelSection('top')}>Overview</button>
-        <For each={items()}>{it => <button type="button" class="panel-subnav-btn" data-target={it.target} onClick={() => jumpToPanelSection(it.target)}>{it.label}</button>}</For>
+        <button type="button" class="panel-subnav-btn" data-target="top" onClick={() => jumpToPanelSection('top')}>
+          Overview
+        </button>
+        <For each={items()}>
+          {(it) => (
+            <button
+              type="button"
+              class="panel-subnav-btn"
+              data-target={it.target}
+              onClick={() => jumpToPanelSection(it.target)}
+            >
+              {it.label}
+            </button>
+          )}
+        </For>
       </div>
     </Show>
   );
@@ -1663,7 +2155,10 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
   // "← Back" only appears once a DLC hop is actually in progress — a plain table-row click never
   // gets this button, only a game reached by following a DLC link (or by going back through more
   // than one of them) does.
-  const back = () => { const hist = panelHistory(); return hist.length ? hist[hist.length - 1] : null; };
+  const back = () => {
+    const hist = panelHistory();
+    return hist.length ? hist[hist.length - 1] : null;
+  };
 
   // Release date and "DLC for X" folded onto one line ("<date> · DLC for X") since both are
   // short, secondary metadata about the same thing. `hasBaseGame` is a plain boolean rather than
@@ -1677,7 +2172,7 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
     <>
       <div class="panel-header-sticky">
         <Show when={back()}>
-          {prev => (
+          {(prev) => (
             <button type="button" class="panel-back-btn" title={`Back to ${prev().name}`} onClick={panelGoBack}>
               &#8249; {prev().name}
             </button>
@@ -1688,22 +2183,54 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
             {/* The `App <appid>` fallback is presentational only — a game looked up by bare appid
                 has no name at all until store metadata resolves one, and nothing persists this
                 string as if it were a real title (see ListRoute.tsx's recents mapping). */}
-            <div class="panel-title" id="panel-title">{g.name || `App ${g.appid}`}</div>
+            <div class="panel-title" id="panel-title">
+              {g.name || `App ${g.appid}`}
+            </div>
             <Show when={releaseDate() || hasBaseGame()}>
               <div class="panel-release">
                 {releaseDate()}
-                <Show when={releaseDate() && hasBaseGame()}><span class="panel-meta-sep"> · </span></Show>
-                <Show when={hasBaseGame()}><BaseGameLink game={g} /></Show>
+                <Show when={releaseDate() && hasBaseGame()}>
+                  <span class="panel-meta-sep"> · </span>
+                </Show>
+                <Show when={hasBaseGame()}>
+                  <BaseGameLink game={g} />
+                </Show>
               </div>
             </Show>
             <OwnershipRow game={g} />
           </div>
           <div class="panel-icon-links">
-            <a class="panel-icon-link" href={`https://store.steampowered.com/app/${g.appid}`} target="_blank" rel="noopener" title="Steam Store" aria-label="Steam Store">🛒</a>
-            <a class="panel-icon-link" href={`https://isthereanydeal.com/steam/app/${g.appid}`} target="_blank" rel="noopener" title="IsThereAnyDeal" aria-label="IsThereAnyDeal">$</a>
+            <a
+              class="panel-icon-link"
+              href={`https://store.steampowered.com/app/${g.appid}`}
+              target="_blank"
+              rel="noopener"
+              title="Steam Store"
+              aria-label="Steam Store"
+            >
+              🛒
+            </a>
+            <a
+              class="panel-icon-link"
+              href={`https://isthereanydeal.com/steam/app/${g.appid}`}
+              target="_blank"
+              rel="noopener"
+              title="IsThereAnyDeal"
+              aria-label="IsThereAnyDeal"
+            >
+              $
+            </a>
             <MoreLinks game={g} />
             <span class="panel-icon-divider" role="separator" aria-hidden="true" />
-            <button type="button" class="panel-icon-link panel-copy-link-btn" title="Copy link to this game" aria-label="Copy link to this game" onClick={copyPanelLink}>🔗</button>
+            <button
+              type="button"
+              class="panel-icon-link panel-copy-link-btn"
+              title="Copy link to this game"
+              aria-label="Copy link to this game"
+              onClick={copyPanelLink}
+            >
+              🔗
+            </button>
             <RefreshButton game={g} />
           </div>
         </div>
@@ -1712,23 +2239,34 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
       {/* A free demo is a "try before you buy" call to action, not supplementary info like the
           Website/Workshop links tucked into "⋯ More". */}
       <Show when={!g.loading && g.details?.demo}>
-        {demo => (
-          <a class="panel-demo-banner" href={safeHref(`https://store.steampowered.com/app/${demo().appid}`) || undefined} target="_blank" rel="noopener">
+        {(demo) => (
+          <a
+            class="panel-demo-banner"
+            href={safeHref(`https://store.steampowered.com/app/${demo().appid}`) || undefined}
+            target="_blank"
+            rel="noopener"
+          >
             <span class="panel-demo-banner-icon">🎮</span> Try the Free Demo
           </a>
         )}
       </Show>
       <GlanceGrid game={g} />
-      <Show when={!g.loading}><PriceSection game={g} /></Show>
+      <Show when={!g.loading}>
+        <PriceSection game={g} />
+      </Show>
       <Show when={description()}>
-        <div class="panel-desc panel-card" id="panel-desc">{decodedDescription()}</div>
+        <div class="panel-desc panel-card" id="panel-desc">
+          {decodedDescription()}
+        </div>
       </Show>
       <TagCloudSection game={g} />
       <OwnersSection />
       <HltbSection game={g} />
       <NewsSection game={g} />
       <AchievementsSection game={g} />
-      <Show when={!g.loading}><DlcSection game={g} /></Show>
+      <Show when={!g.loading}>
+        <DlcSection game={g} />
+      </Show>
     </>
   );
 }
@@ -1742,7 +2280,7 @@ function PanelBody(): JSX.Element {
           PanelRest), so data streaming in for the game already on screen patches the one thing it
           changed instead of re-rendering anything. */}
       <Show when={panelGame()} keyed>
-        {game => <PanelRest game={game} />}
+        {(game) => <PanelRest game={game} />}
       </Show>
     </>
   );
@@ -1753,65 +2291,105 @@ function initHeroSwipe() {
   // recreated on every panelOpen but not on most re-renders (see PanelHero above) — binding
   // here rather than to the hero element means this never needs to be rebound.
   const hero = document.getElementById('panel-body')!;
-  let startX = 0, startY = 0, tracking = false, decided = false, isHoriz = false;
+  let startX = 0,
+    startY = 0,
+    tracking = false,
+    decided = false,
+    isHoriz = false;
 
-  hero.addEventListener('touchstart', e => {
-    const target = e.target as Element;
-    if (e.touches.length !== 1 || target.closest('.panel-filmstrip') || !target.closest('.panel-hero')) return;
-    startX = e.touches[0].clientX; startY = e.touches[0].clientY;
-    tracking = true; decided = false; isHoriz = false;
-  }, { passive: true });
+  hero.addEventListener(
+    'touchstart',
+    (e) => {
+      const target = e.target as Element;
+      if (e.touches.length !== 1 || target.closest('.panel-filmstrip') || !target.closest('.panel-hero')) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      tracking = true;
+      decided = false;
+      isHoriz = false;
+    },
+    { passive: true },
+  );
 
-  hero.addEventListener('touchmove', e => {
-    if (!tracking || e.touches.length !== 1) return;
-    const dx = e.touches[0].clientX - startX;
-    const dy = e.touches[0].clientY - startY;
-    if (!decided) {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      isHoriz = Math.abs(dx) > Math.abs(dy) * 1.2;
-      decided = true;
-    }
-    if (isHoriz) e.stopPropagation(); // don't let panel-close swipe fire
-  }, { passive: true });
+  hero.addEventListener(
+    'touchmove',
+    (e) => {
+      if (!tracking || e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if (!decided) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        isHoriz = Math.abs(dx) > Math.abs(dy) * 1.2;
+        decided = true;
+      }
+      if (isHoriz) e.stopPropagation(); // don't let panel-close swipe fire
+    },
+    { passive: true },
+  );
 
-  hero.addEventListener('touchend', e => {
-    if (!tracking || !isHoriz) { tracking = false; return; }
-    tracking = false;
-    const dx = e.changedTouches[0].clientX - startX;
-    if (Math.abs(dx) < 40) return;
-    panelStepHero(dx < 0 ? 1 : -1);
-  }, { passive: true });
+  hero.addEventListener(
+    'touchend',
+    (e) => {
+      if (!tracking || !isHoriz) {
+        tracking = false;
+        return;
+      }
+      tracking = false;
+      const dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) < 40) return;
+      panelStepHero(dx < 0 ? 1 : -1);
+    },
+    { passive: true },
+  );
 
-  hero.addEventListener('touchcancel', () => { tracking = false; }, { passive: true });
+  hero.addEventListener(
+    'touchcancel',
+    () => {
+      tracking = false;
+    },
+    { passive: true },
+  );
 }
 
 function initPanelSwipe() {
   const panel = document.getElementById('game-panel')!;
-  let startX = 0, startY = 0, tracking = false, decided = false, horiz = false;
-
-  panel.addEventListener('touchstart', e => {
-    if (e.touches.length !== 1 || (e.target as Element).closest('.panel-filmstrip')) return;
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    tracking = true;
-    decided = false;
+  let startX = 0,
+    startY = 0,
+    tracking = false,
+    decided = false,
     horiz = false;
-    panel.style.transition = 'none';
-  }, { passive: true });
 
-  panel.addEventListener('touchmove', e => {
-    if (!tracking || e.touches.length !== 1) return;
-    const dx = e.touches[0].clientX - startX;
-    const dy = e.touches[0].clientY - startY;
-    if (!decided) {
-      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-      horiz = Math.abs(dx) > Math.abs(dy) * 1.2;
-      decided = true;
-    }
-    if (!horiz || dx <= 0) return;
-    e.preventDefault();
-    panel.style.transform = `translateX(${dx}px)`;
-  }, { passive: false });
+  panel.addEventListener(
+    'touchstart',
+    (e) => {
+      if (e.touches.length !== 1 || (e.target as Element).closest('.panel-filmstrip')) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      tracking = true;
+      decided = false;
+      horiz = false;
+      panel.style.transition = 'none';
+    },
+    { passive: true },
+  );
+
+  panel.addEventListener(
+    'touchmove',
+    (e) => {
+      if (!tracking || e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if (!decided) {
+        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+        horiz = Math.abs(dx) > Math.abs(dy) * 1.2;
+        decided = true;
+      }
+      if (!horiz || dx <= 0) return;
+      e.preventDefault();
+      panel.style.transform = `translateX(${dx}px)`;
+    },
+    { passive: false },
+  );
 
   function finish(clientX: number) {
     if (!tracking) return;
@@ -1829,18 +2407,26 @@ function initPanelSwipe() {
       if (panel.style.transform) {
         panel.style.transition = 'transform 0.25s ease';
         panel.style.transform = '';
-        setTimeout(() => { panel.style.transition = ''; }, 250);
+        setTimeout(() => {
+          panel.style.transition = '';
+        }, 250);
       } else {
         panel.style.transition = '';
       }
     }
   }
 
-  panel.addEventListener('touchend', e => finish(e.changedTouches[0].clientX), { passive: true });
-  panel.addEventListener('touchcancel', () => {
-    tracking = false;
-    panel.style.transition = 'transform 0.25s ease';
-    panel.style.transform = '';
-    setTimeout(() => { panel.style.transition = ''; }, 250);
-  }, { passive: true });
+  panel.addEventListener('touchend', (e) => finish(e.changedTouches[0].clientX), { passive: true });
+  panel.addEventListener(
+    'touchcancel',
+    () => {
+      tracking = false;
+      panel.style.transition = 'transform 0.25s ease';
+      panel.style.transform = '';
+      setTimeout(() => {
+        panel.style.transition = '';
+      }, 250);
+    },
+    { passive: true },
+  );
 }

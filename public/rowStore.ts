@@ -86,7 +86,9 @@ export function createRowStore<T extends { appid: number }>(
         else seen.add(r.appid);
       }
       if (dupes.size > 0) {
-        console.warn(`[rowStore] load() received duplicate appid(s): ${[...dupes].join(', ')} — only each one's last occurrence will be reachable; dedupe before calling load().`);
+        console.warn(
+          `[rowStore] load() received duplicate appid(s): ${[...dupes].join(', ')} — only each one's last occurrence will be reachable; dedupe before calling load().`,
+        );
       }
       rowIndex = new Map(rows.map((r, i) => [r.appid, i]));
     },

@@ -6,7 +6,7 @@ const { createStreamBatcher } = require('../public/streamBatcher.ts');
 
 test('createStreamBatcher: does not apply anything until a flush happens', () => {
   const applied = [];
-  const batcher = createStreamBatcher({ apply: e => applied.push(e), isStale: () => false });
+  const batcher = createStreamBatcher({ apply: (e) => applied.push(e), isStale: () => false });
   batcher.push('a', 1);
   batcher.push('b', 1);
   assert.deepEqual(applied, []);
@@ -14,7 +14,7 @@ test('createStreamBatcher: does not apply anything until a flush happens', () =>
 
 test('createStreamBatcher: flushNow() applies every pending event in push order', () => {
   const applied = [];
-  const batcher = createStreamBatcher({ apply: e => applied.push(e), isStale: () => false });
+  const batcher = createStreamBatcher({ apply: (e) => applied.push(e), isStale: () => false });
   batcher.push('a', 1);
   batcher.push('b', 1);
   batcher.push('c', 1);
@@ -24,7 +24,7 @@ test('createStreamBatcher: flushNow() applies every pending event in push order'
 
 test('createStreamBatcher: a second flushNow() with nothing new queued applies nothing more', () => {
   const applied = [];
-  const batcher = createStreamBatcher({ apply: e => applied.push(e), isStale: () => false });
+  const batcher = createStreamBatcher({ apply: (e) => applied.push(e), isStale: () => false });
   batcher.push('a', 1);
   batcher.flushNow();
   batcher.flushNow();
@@ -34,7 +34,7 @@ test('createStreamBatcher: a second flushNow() with nothing new queued applies n
 test('createStreamBatcher: drops events whose generation is stale by flush time', () => {
   const applied = [];
   let currentGen = 1;
-  const batcher = createStreamBatcher({ apply: e => applied.push(e), isStale: gen => gen !== currentGen });
+  const batcher = createStreamBatcher({ apply: (e) => applied.push(e), isStale: (gen) => gen !== currentGen });
   batcher.push('from-gen-1', 1);
   currentGen = 2; // a newer load superseded this one before the flush ran
   batcher.push('from-gen-2', 2);
@@ -44,7 +44,13 @@ test('createStreamBatcher: drops events whose generation is stale by flush time'
 
 test('createStreamBatcher: onFlush runs once per flushNow(), even when nothing was pending', () => {
   let flushes = 0;
-  const batcher = createStreamBatcher({ apply: () => {}, isStale: () => false, onFlush: () => { flushes++; } });
+  const batcher = createStreamBatcher({
+    apply: () => {},
+    isStale: () => false,
+    onFlush: () => {
+      flushes++;
+    },
+  });
   batcher.flushNow();
   batcher.push('a', 1);
   batcher.flushNow();
@@ -53,7 +59,7 @@ test('createStreamBatcher: onFlush runs once per flushNow(), even when nothing w
 
 test('createStreamBatcher: schedules exactly one timer regardless of how many pushes happen before it fires', (t, done) => {
   const applied = [];
-  const batcher = createStreamBatcher({ apply: e => applied.push(e), isStale: () => false, flushMs: 10 });
+  const batcher = createStreamBatcher({ apply: (e) => applied.push(e), isStale: () => false, flushMs: 10 });
   batcher.push('a', 1);
   batcher.push('b', 1);
   batcher.push('c', 1);

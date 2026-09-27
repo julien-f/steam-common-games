@@ -20,9 +20,7 @@ export interface KnownAccount {
 // entry, not one per member — so it can render as a chip saying who it is. Identifiers alone are
 // no good to show: an account with no Steam custom-URL name is a 17-digit number on screen, which
 // is what this model exists to stop.
-export type SlotEntry =
-  | { kind: 'account'; account: KnownAccount }
-  | { kind: 'typed'; value: string };
+export type SlotEntry = { kind: 'account'; account: KnownAccount } | { kind: 'typed'; value: string };
 
 export type Slot = SlotEntry[];
 
@@ -36,11 +34,14 @@ export function entryLabel(entry: SlotEntry): string {
 
 // What the route is handed: one slot's worth of plain identifiers, blanks dropped.
 export function slotIdentifiers(slot: Slot): string[] {
-  return slot.flatMap(entryIdentifiers).map(v => v.trim()).filter(Boolean);
+  return slot
+    .flatMap(entryIdentifiers)
+    .map((v) => v.trim())
+    .filter(Boolean);
 }
 
 export function slotsToIdentifiers(slots: Slot[]): string[][] {
-  return slots.map(slotIdentifiers).filter(slot => slot.length > 0);
+  return slots.map(slotIdentifiers).filter((slot) => slot.length > 0);
 }
 
 function token(value: string): string {
@@ -50,7 +51,7 @@ function token(value: string): string {
 }
 
 function accountTokens(account: KnownAccount): Set<string> {
-  return new Set([...account.members, ...account.identifiers].map(v => v.toLowerCase()));
+  return new Set([...account.members, ...account.identifiers].map((v) => v.toLowerCase()));
 }
 
 // Whether every member of `account` is named in `identifiers`, in either spelling. Every member,
@@ -58,8 +59,9 @@ function accountTokens(account: KnownAccount): Set<string> {
 export function namesAccount(identifiers: string[], account: KnownAccount): boolean {
   const typed = new Set(identifiers.map(token).filter(Boolean));
   if (typed.size === 0) return false;
-  return account.members.every((member, i) =>
-    typed.has(member.toLowerCase()) || typed.has((account.identifiers[i] ?? '').toLowerCase()));
+  return account.members.every(
+    (member, i) => typed.has(member.toLowerCase()) || typed.has((account.identifiers[i] ?? '').toLowerCase()),
+  );
 }
 
 export function slotHasAccount(slot: Slot, account: KnownAccount): boolean {
@@ -67,7 +69,7 @@ export function slotHasAccount(slot: Slot, account: KnownAccount): boolean {
 }
 
 export function slotsHaveAccount(slots: Slot[], account: KnownAccount): boolean {
-  return slots.some(slot => slotHasAccount(slot, account));
+  return slots.some((slot) => slotHasAccount(slot, account));
 }
 
 // Rebuilds slots of raw identifiers (what a `?u=` URL carries) into named entries, so reopening
@@ -78,17 +80,17 @@ export function slotsHaveAccount(slots: Slot[], account: KnownAccount): boolean 
 // identifier at a time against the single-member accounts, so a slot someone built by picking two
 // people comes back as those same two chips.
 export function slotsFromIdentifiers(slots: string[][], known: KnownAccount[]): Slot[] {
-  const families = known.filter(a => a.members.length > 1);
-  const singles = known.filter(a => a.members.length === 1);
-  return slots.map(identifiers => {
+  const families = known.filter((a) => a.members.length > 1);
+  const singles = known.filter((a) => a.members.length === 1);
+  return slots.map((identifiers) => {
     const typed = new Set(identifiers.map(token).filter(Boolean));
-    const whole = families.find(account => {
+    const whole = families.find((account) => {
       const wanted = accountTokens(account);
-      return namesAccount(identifiers, account) && [...typed].every(t => wanted.has(t));
+      return namesAccount(identifiers, account) && [...typed].every((t) => wanted.has(t));
     });
     if (whole) return [{ kind: 'account' as const, account: whole }];
     return identifiers.map((value): SlotEntry => {
-      const match = singles.find(account => namesAccount([value], account));
+      const match = singles.find((account) => namesAccount([value], account));
       return match ? { kind: 'account', account: match } : { kind: 'typed', value };
     });
   });
@@ -100,10 +102,9 @@ export function slotsFromIdentifiers(slots: string[][], known: KnownAccount[]): 
 // something for the arrow keys to trip over.
 export function filterAccounts(known: KnownAccount[], slots: Slot[], query: string): KnownAccount[] {
   const q = query.trim().toLowerCase();
-  return known.filter(account => {
+  return known.filter((account) => {
     if (slotsHaveAccount(slots, account)) return false;
     if (!q) return true;
-    return account.label.toLowerCase().includes(q)
-      || [...accountTokens(account)].some(t => t.includes(q));
+    return account.label.toLowerCase().includes(q) || [...accountTokens(account)].some((t) => t.includes(q));
   });
 }

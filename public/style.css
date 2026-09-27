@@ -1,4 +1,10 @@
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 :root {
   --bg0: #1b2838;
@@ -43,7 +49,11 @@ html:root {
 body {
   background: var(--bg0);
   color: var(--text0);
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family:
+    'Segoe UI',
+    system-ui,
+    -apple-system,
+    sans-serif;
   font-size: 14px;
   min-height: 100vh;
 }
@@ -72,7 +82,10 @@ body {
   text-decoration: none;
   border: 1px solid transparent;
 }
-.site-nav-link:hover { color: var(--text0); background: var(--bg1); }
+.site-nav-link:hover {
+  color: var(--text0);
+  background: var(--bg1);
+}
 .site-nav-link.active {
   color: var(--accent2);
   background: var(--bg1);
@@ -85,8 +98,13 @@ body {
    (AccountChip.tsx). Both are native <details> for a free, accessible open/close toggle;
    outside-click/Escape closing and the panel's own placement are added by hand in
    navPopover.ts's bindNavPopover, since <details> has neither. */
-.site-nav-prefs-btn { cursor: pointer; list-style: none; }
-.site-nav-prefs-btn::-webkit-details-marker { display: none; }
+.site-nav-prefs-btn {
+  cursor: pointer;
+  list-style: none;
+}
+.site-nav-prefs-btn::-webkit-details-marker {
+  display: none;
+}
 .site-nav-popover-panel {
   /* `position: fixed` with `top`/`left` computed in JS (navPopover.ts) rather than anchored via
      CSS at all — an earlier version anchored under the whole nav bar (centered via `left: 50%` on
@@ -111,13 +129,23 @@ body {
   max-width: calc(100vw - 24px);
   z-index: 20;
 }
-.site-nav-prefs-panel { width: 200px; }
-.site-nav-prefs-row { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text1); }
+.site-nav-prefs-panel {
+  width: 200px;
+}
+.site-nav-prefs-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text1);
+}
 .site-nav-prefs-row select {
   width: 100%;
   padding: 6px 8px;
-  background: var(--bg3); color: var(--text0);
-  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--bg3);
+  color: var(--text0);
+  border: 1px solid var(--border);
+  border-radius: 4px;
   font-size: 13px;
 }
 
@@ -125,58 +153,154 @@ body {
    Owned/Wishlist lists, from every route. The two list links are inline here on a wide viewport
    and inside the popover on a narrow one (see the 768px block below): they're the app's two
    most-visited destinations, worth permanent nav space wherever there's room for it. */
-.site-nav-account { display: flex; align-items: center; gap: 4px; }
-.account-chip-links { display: flex; gap: 4px; }
+.site-nav-account {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.account-chip-links {
+  display: flex;
+  gap: 4px;
+}
 .account-chip-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  cursor: pointer; list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
   max-width: 180px;
 }
-.account-chip-btn::-webkit-details-marker { display: none; }
-.account-chip-avatar { width: 20px; height: 20px; border-radius: 50%; display: block; flex-shrink: 0; }
-.account-chip-avatar--empty { background: var(--bg0); }
-.account-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.account-chip-explore { font-size: 11px; flex-shrink: 0; }
-.account-chip-panel { width: 240px; display: flex; flex-direction: column; gap: 8px; }
-.account-chip-note { font-size: 12px; color: var(--text1); line-height: 1.5; }
-.account-chip-note strong { color: var(--text0); }
+.account-chip-btn::-webkit-details-marker {
+  display: none;
+}
+.account-chip-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: block;
+  flex-shrink: 0;
+}
+.account-chip-avatar--empty {
+  background: var(--bg0);
+}
+.account-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-chip-explore {
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.account-chip-panel {
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.account-chip-note {
+  font-size: 12px;
+  color: var(--text1);
+  line-height: 1.5;
+}
+.account-chip-note strong {
+  color: var(--text0);
+}
 .account-chip-action {
-  display: block; margin-top: 4px; padding: 0;
-  background: none; border: none; cursor: pointer;
-  color: var(--accent2); font-size: 12px; text-align: left;
+  display: block;
+  margin-top: 4px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--accent2);
+  font-size: 12px;
+  text-align: left;
 }
-.account-chip-id { display: flex; align-items: center; gap: 6px; font-size: 12px; }
-.account-chip-id code { color: var(--text1); overflow-wrap: anywhere; }
+.account-chip-id {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.account-chip-id code {
+  color: var(--text1);
+  overflow-wrap: anywhere;
+}
 .account-chip-section {
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text2);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text2);
 }
-.account-chip-recents { display: flex; flex-direction: column; gap: 2px; list-style: none; }
-.account-chip-recents li { display: flex; align-items: center; gap: 4px; }
+.account-chip-recents {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+}
+.account-chip-recents li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 .account-chip-recent {
-  display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
-  padding: 5px 6px; background: none; border: none; border-radius: 4px; cursor: pointer;
-  color: var(--text0); font-size: 13px; text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 5px 6px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text0);
+  font-size: 13px;
+  text-align: left;
 }
-.account-chip-recent:hover { background: var(--bg1); }
+.account-chip-recent:hover {
+  background: var(--bg1);
+}
 /* The popover's own copies of Owned/Wishlist exist for the narrow layout below, where the inline
    pair is hidden — showing both at once would just be the same two links twice. */
-.account-chip-panel-links { display: none; gap: 10px; }
-.account-chip-panel-link { color: var(--accent2); text-decoration: none; font-size: 13px; }
-.account-chip-panel-link:hover { text-decoration: underline; }
+.account-chip-panel-links {
+  display: none;
+  gap: 10px;
+}
+.account-chip-panel-link {
+  color: var(--accent2);
+  text-decoration: none;
+  font-size: 13px;
+}
+.account-chip-panel-link:hover {
+  text-decoration: underline;
+}
 @media (max-width: 768px) {
-  .account-chip-links { display: none; }
-  .account-chip-panel-links { display: flex; }
+  .account-chip-links {
+    display: none;
+  }
+  .account-chip-panel-links {
+    display: flex;
+  }
 }
 
 /* Header */
-header { text-align: center; margin-bottom: 36px; }
+header {
+  text-align: center;
+  margin-bottom: 36px;
+}
 header h1 {
   font-size: 26px;
   font-weight: 600;
   color: var(--accent2);
   letter-spacing: 0.4px;
 }
-header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
+header p {
+  color: var(--text1);
+  margin-top: 6px;
+  font-size: 13px;
+}
 
 /* Card */
 .card {
@@ -186,13 +310,34 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
   padding: 22px 24px;
   margin-bottom: 18px;
 }
-.card h2 { font-size: 13px; font-weight: 600; color: var(--text1); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
-.card-subtitle { font-size: 13px; color: var(--text1); margin-bottom: 14px; line-height: 1.5; }
+.card h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text1);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 6px;
+}
+.card-subtitle {
+  font-size: 13px;
+  color: var(--text1);
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
 
 /* User inputs */
-#user-inputs { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+#user-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
 
-.user-row { display: flex; gap: 8px; align-items: center; }
+.user-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 .user-row input {
   flex: 1;
   min-width: 0;
@@ -205,8 +350,12 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
   outline: none;
   transition: border-color 0.15s;
 }
-.user-row input:focus { border-color: var(--accent); }
-.user-row input::placeholder { color: var(--text2); }
+.user-row input:focus {
+  border-color: var(--accent);
+}
+.user-row input::placeholder {
+  color: var(--text2);
+}
 
 .btn {
   padding: 9px 18px;
@@ -215,7 +364,9 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
   white-space: nowrap;
   text-decoration: none; /* .btn started out button-only; ListRoute.tsx's "← All bundles" is the
     first <a class="btn ..."> and would otherwise keep the browser's default underline. */
@@ -234,15 +385,25 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
   border-radius: var(--r);
   cursor: pointer;
 }
-.btn-remove:hover { background: rgba(200,60,60,0.2); border-color: #cc4040; color: #ff8888; }
+.btn-remove:hover {
+  background: rgba(200, 60, 60, 0.2);
+  border-color: #cc4040;
+  color: #ff8888;
+}
 
-.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .btn-ghost {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text0);
 }
-.btn-ghost:hover { background: var(--bg0); }
+.btn-ghost:hover {
+  background: var(--bg0);
+}
 
 .btn-primary {
   background: var(--accent);
@@ -262,12 +423,26 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
   font-size: 12px;
   line-height: 1.4;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
-.copy-btn:hover { border-color: var(--accent); color: var(--accent2); }
-.copy-btn--copied { border-color: #15803d; color: #15803d; }
-.btn-primary:hover { background: #1490e8; }
-.btn-primary:disabled { background: var(--bg2); color: var(--text2); cursor: not-allowed; }
+.copy-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
+.copy-btn--copied {
+  border-color: #15803d;
+  color: #15803d;
+}
+.btn-primary:hover {
+  background: #1490e8;
+}
+.btn-primary:disabled {
+  background: var(--bg2);
+  color: var(--text2);
+  cursor: not-allowed;
+}
 
 /* Alerts */
 .alert {
@@ -278,13 +453,13 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
   line-height: 1.5;
 }
 .alert-error {
-  background: rgba(200,50,50,0.12);
-  border: 1px solid rgba(200,50,50,0.35);
+  background: rgba(200, 50, 50, 0.12);
+  border: 1px solid rgba(200, 50, 50, 0.35);
   color: #ff8888;
 }
 .alert-warn {
-  background: rgba(228,168,46,0.1);
-  border: 1px solid rgba(228,168,46,0.3);
+  background: rgba(228, 168, 46, 0.1);
+  border: 1px solid rgba(228, 168, 46, 0.3);
   color: #e4c46e;
 }
 
@@ -296,12 +471,25 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
   margin-bottom: 10px;
   flex-wrap: wrap;
 }
-.results-header h2 { font-size: 16px; font-weight: 600; color: var(--text0); }
-.results-meta { font-size: 12px; color: var(--text1); }
+.results-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text0);
+}
+.results-meta {
+  font-size: 12px;
+  color: var(--text1);
+}
 
 /* Progress */
-.progress-wrap { margin-bottom: 14px; }
-.progress-text { font-size: 12px; color: var(--text1); margin-bottom: 6px; }
+.progress-wrap {
+  margin-bottom: 14px;
+}
+.progress-text {
+  font-size: 12px;
+  color: var(--text1);
+  margin-bottom: 6px;
+}
 .progress-bar-bg {
   background: var(--bg3);
   border-radius: 999px;
@@ -343,13 +531,20 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
 .table-wrap,
 .dt-table-wrap {
   background-image:
-    linear-gradient(to right, var(--bg0) 0%, var(--bg0) 100%),
-    linear-gradient(to left, var(--bg0) 0%, var(--bg0) 100%),
-    linear-gradient(to right, rgba(0,0,0,0.35), rgba(0,0,0,0)),
-    linear-gradient(to left, rgba(0,0,0,0.35), rgba(0,0,0,0));
+    linear-gradient(to right, var(--bg0) 0%, var(--bg0) 100%), linear-gradient(to left, var(--bg0) 0%, var(--bg0) 100%),
+    linear-gradient(to right, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0)),
+    linear-gradient(to left, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0));
   background-repeat: no-repeat;
-  background-size: 20px 100%, 20px 100%, 12px 100%, 12px 100%;
-  background-position: left top, right top, left top, right top;
+  background-size:
+    20px 100%,
+    20px 100%,
+    12px 100%,
+    12px 100%;
+  background-position:
+    left top,
+    right top,
+    left top,
+    right top;
   background-attachment: local, local, scroll, scroll;
 }
 
@@ -357,9 +552,14 @@ header p { color: var(--text1); margin-top: 6px; font-size: 13px; }
    --color-background-secondary default, matching the plain <table>'s thead th above.
    Ported from the legacy pages' `#table-container .dt-th` rule — `.table-container` is
    the new markup's equivalent wrapper (see ListRoute.tsx). */
-.table-container .dt-th { background: #0f1923 !important; }
+.table-container .dt-th {
+  background: #0f1923 !important;
+}
 
-table { width: 100%; border-collapse: collapse; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
 
 thead th {
   background: var(--bg3);
@@ -374,52 +574,113 @@ thead th {
   border-bottom: 1px solid var(--border);
   user-select: none;
 }
-thead th.sortable { cursor: pointer; }
-thead th.sortable:hover { color: var(--text0); }
-thead th.active { color: var(--accent2); }
-.th-inner { display: flex; align-items: center; gap: 5px; }
-.sort-icon { font-size: 10px; opacity: 0.5; }
-thead th.active .sort-icon { opacity: 1; }
+thead th.sortable {
+  cursor: pointer;
+}
+thead th.sortable:hover {
+  color: var(--text0);
+}
+thead th.active {
+  color: var(--accent2);
+}
+.th-inner {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.sort-icon {
+  font-size: 10px;
+  opacity: 0.5;
+}
+thead th.active .sort-icon {
+  opacity: 1;
+}
 
-tbody tr { border-bottom: 1px solid rgba(61,80,104,0.4); }
-tbody tr:last-child { border-bottom: none; }
-tbody tr:hover { background: rgba(42,71,94,0.45); }
+tbody tr {
+  border-bottom: 1px solid rgba(61, 80, 104, 0.4);
+}
+tbody tr:last-child {
+  border-bottom: none;
+}
+tbody tr:hover {
+  background: rgba(42, 71, 94, 0.45);
+}
 
-tbody td { padding: 9px 14px; vertical-align: middle; }
+tbody td {
+  padding: 9px 14px;
+  vertical-align: middle;
+}
 
 /* Thumbnail cell */
-.td-thumb { width: 128px; padding: 0; }
-.game-thumb { display: block; width: 120px; height: 45px; object-fit: cover; border-radius: 2px; }
+.td-thumb {
+  width: 128px;
+  padding: 0;
+}
+.game-thumb {
+  display: block;
+  width: 120px;
+  height: 45px;
+  object-fit: cover;
+  border-radius: 2px;
+}
 
 /* Game name cell */
-.td-name { min-width: 200px; }
-.td-name a { color: var(--text0); text-decoration: none; font-weight: 500; }
-.td-name a:hover { color: var(--accent2); }
+.td-name {
+  min-width: 200px;
+}
+.td-name a {
+  color: var(--text0);
+  text-decoration: none;
+  font-weight: 500;
+}
+.td-name a:hover {
+  color: var(--accent2);
+}
 
 /* Score cell */
-.td-score { min-width: 100px; }
+.td-score {
+  min-width: 100px;
+}
 .score-num {
   font-size: 19px;
   font-weight: 700;
   line-height: 1;
 }
-.score-label { font-size: 11px; color: var(--text1); margin-top: 2px; }
+.score-label {
+  font-size: 11px;
+  color: var(--text1);
+  margin-top: 2px;
+}
 
 /* HLTB cells */
-.td-hltb { min-width: 80px; font-variant-numeric: tabular-nums; }
+.td-hltb {
+  min-width: 80px;
+  font-variant-numeric: tabular-nums;
+}
 
-.dim { color: var(--text1); }
+.dim {
+  color: var(--text1);
+}
 
 /* Game groups */
-.game-group { margin-bottom: 32px; }
+.game-group {
+  margin-bottom: 32px;
+}
 .group-header {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 10px;
 }
-.group-title { font-size: 15px; font-weight: 600; color: var(--text0); }
-.group-meta { font-size: 12px; color: var(--text1); }
+.group-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text0);
+}
+.group-meta {
+  font-size: 12px;
+  color: var(--text1);
+}
 .group-random-btn {
   margin-left: auto;
   background: transparent;
@@ -436,13 +697,22 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   flex-shrink: 0;
   transition: border-color 0.15s;
 }
-.group-random-btn:hover { border-color: var(--accent); }
-.slot-link { color: var(--accent2); text-decoration: none; }
+.group-random-btn:hover {
+  border-color: var(--accent);
+}
+.slot-link {
+  color: var(--accent2);
+  text-decoration: none;
+}
 
 /* Skeleton shimmer */
 @keyframes shimmer {
-  0%   { background-position: -300px 0; }
-  100% { background-position:  300px 0; }
+  0% {
+    background-position: -300px 0;
+  }
+  100% {
+    background-position: 300px 0;
+  }
 }
 .sk {
   display: inline-block;
@@ -454,13 +724,21 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   animation: shimmer 1.4s linear infinite;
   vertical-align: middle;
 }
-.sk.sm { width: 32px; height: 13px; }
+.sk.sm {
+  width: 32px;
+  height: 13px;
+}
 
 /* Spinner */
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .spinner {
   display: inline-block;
-  width: 15px; height: 15px;
+  width: 15px;
+  height: 15px;
   border: 2px solid var(--border);
   border-top-color: var(--accent);
   border-radius: 50%;
@@ -470,8 +748,17 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
 }
 
 /* Family member sub-rows */
-.player-slot { display: flex; flex-direction: column; gap: 6px; }
-.family-row { display: flex; gap: 8px; align-items: center; padding-left: 40px; }
+.player-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.family-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-left: 40px;
+}
 .btn-add-family {
   flex-shrink: 0;
   padding: 0 10px;
@@ -485,7 +772,11 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   border-radius: var(--r);
   cursor: pointer;
 }
-.btn-add-family:hover { background: rgba(26,159,255,0.12); border-color: var(--accent); color: var(--accent); }
+.btn-add-family:hover {
+  background: rgba(26, 159, 255, 0.12);
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .family-hint {
   display: none;
   font-size: 12px;
@@ -493,7 +784,9 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   padding-left: 40px;
   font-style: italic;
 }
-.player-slot:has(.family-row) .family-hint { display: block; }
+.player-slot:has(.family-row) .family-hint {
+  display: block;
+}
 
 /*
  * One resolved Steam account's identity, as shown on Home's Account card (HomeRoute.tsx):
@@ -503,25 +796,56 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
  * docs/dev/frontend.md); these are the pieces Home's own card reuses rather than
  * restating, since a member row there is the same avatar/name/count it always was.
  */
-.account-avatar-wrap { position: relative; flex-shrink: 0; width: 28px; height: 28px; }
-.account-avatar { width: 28px; height: 28px; border-radius: 50%; display: block; }
-.account-name { font-size: 13px; font-weight: 500; }
-.account-count { font-size: 11px; color: var(--text1); }
+.account-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+}
+.account-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: block;
+}
+.account-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+.account-count {
+  font-size: 11px;
+  color: var(--text1);
+}
 .account-private {
-  font-size: 11px; font-weight: 500;
-  padding: 2px 7px; border-radius: 999px;
-  background: rgba(228,168,46,0.1); border: 1px solid rgba(228,168,46,0.3); color: #e4c46e;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(228, 168, 46, 0.1);
+  border: 1px solid rgba(228, 168, 46, 0.3);
+  color: #e4c46e;
 }
 
-.recents-clear { font-size: 12px; color: var(--text1); background: none; border: none; cursor: pointer; padding: 0; }
-.recents-clear:hover { color: var(--accent2); }
+.recents-clear {
+  font-size: 12px;
+  color: var(--text1);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.recents-clear:hover {
+  color: var(--accent2);
+}
 
 /*
  * "Look up any game" widget — shared by the comparison page and Library Explorer
  * (public/gameSearch.js). A text input plus a dropdown of name-search matches; picking one
  * opens the shared side panel (panel.js) for that game regardless of library/wishlist status.
  */
-.game-search-wrap { position: relative; }
+.game-search-wrap {
+  position: relative;
+}
 .game-search-wrap > input {
   width: 100%;
   padding: 9px 12px;
@@ -533,28 +857,70 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   outline: none;
   transition: border-color 0.15s;
 }
-.game-search-wrap > input:focus { border-color: var(--accent); }
-.game-search-wrap > input::placeholder { color: var(--text2); }
+.game-search-wrap > input:focus {
+  border-color: var(--accent);
+}
+.game-search-wrap > input::placeholder {
+  color: var(--text2);
+}
 
 /* /search's own copy (SearchRoute.tsx) is this page's primary control, not a nav-bar accessory —
    same look, more visual weight. */
-.search-page-input { margin-bottom: 16px; }
-.search-page-input > input { padding: 13px 16px; font-size: 16px; }
+.search-page-input {
+  margin-bottom: 16px;
+}
+.search-page-input > input {
+  padding: 13px 16px;
+  font-size: 16px;
+}
 .game-search-results {
-  position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; right: 0;
-  max-height: 280px; overflow-y: auto;
-  background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 .game-search-result {
-  display: flex; align-items: center; gap: 10px; width: 100%;
-  padding: 7px 10px; background: transparent; border: none; cursor: pointer;
-  color: var(--text0); font-size: 13px; text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text0);
+  font-size: 13px;
+  text-align: left;
 }
-.game-search-result:hover, .game-search-result:focus-visible, .game-search-result.active { background: var(--bg1); }
-.game-search-thumb { width: 46px; height: 22px; object-fit: cover; border-radius: 3px; flex-shrink: 0; }
-.game-search-thumb--empty { background: var(--bg0); }
-.game-search-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.game-search-result:hover,
+.game-search-result:focus-visible,
+.game-search-result.active {
+  background: var(--bg1);
+}
+.game-search-thumb {
+  width: 46px;
+  height: 22px;
+  object-fit: cover;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.game-search-thumb--empty {
+  background: var(--bg0);
+}
+.game-search-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* Owned/wishlisted markers (myOwnership.ts) — same colors as the panel's own
    .panel-ownership-badge, just a bare icon rather than a labeled pill (a dropdown row has far
    less room than the panel's ownership section). */
@@ -563,20 +929,41 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
    listbox's roving ArrowUp/ArrowDown selection, as its last virtual index. */
 .game-search-section {
   padding: 6px 10px 4px;
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text2);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text2);
 }
 .game-search-more {
-  display: block; width: 100%;
-  padding: 7px 10px; border: none; border-top: 1px solid var(--border);
-  cursor: pointer; color: var(--accent2); font-size: 12px; text-align: left;
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--accent2);
+  font-size: 12px;
+  text-align: left;
   /* Sticky, and opaque rather than transparent: the recents list can be taller than the
      dropdown's own max-height, and a "see all" row scrolled out of sight is one nobody finds. */
-  position: sticky; bottom: 0; background: var(--bg3);
+  position: sticky;
+  bottom: 0;
+  background: var(--bg3);
 }
-.game-search-more:hover, .game-search-more.active { background: var(--bg1); }
-.game-search-badge { flex-shrink: 0; font-size: 12px; }
-.game-search-badge.owned { color: #f1c40f; }
-.game-search-badge.wishlisted { color: #2ecc71; }
+.game-search-more:hover,
+.game-search-more.active {
+  background: var(--bg1);
+}
+.game-search-badge {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.game-search-badge.owned {
+  color: #f1c40f;
+}
+.game-search-badge.wishlisted {
+  color: #2ecc71;
+}
 
 /* Same markers, inline in the bundle/recent-list table's Name cell (gameColumns.ts's
    renderNameCell) rather than a dropdown row — same colors as .game-search-badge above. The
@@ -585,14 +972,29 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
    instead of a second, separately-maintained CSS copy that a tier's styling (e.g. Wishlisted's
    bold weight) could go missing from without anyone noticing, same as it briefly did between this
    file and OWNERSHIP_STATUS_COLUMN's own cell. */
-.game-name-cell { display: inline-flex; align-items: center; gap: 4px; }
-.name-status-badge { flex-shrink: 0; font-size: 12px; }
-.name-status-badge.owned { color: #f1c40f; }
-.name-status-badge.wishlisted { color: #2ecc71; }
+.game-name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.name-status-badge {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.name-status-badge.owned {
+  color: #f1c40f;
+}
+.name-status-badge.wishlisted {
+  color: #2ecc71;
+}
 
 /* App shell's own nav-bar search box (AppShell.tsx) — same look as .game-search-wrap's input,
    but sized to sit inline in the nav bar rather than fill a page section. */
-.app-search-wrap { position: relative; flex: 1 1 220px; max-width: 320px; }
+.app-search-wrap {
+  position: relative;
+  flex: 1 1 220px;
+  max-width: 320px;
+}
 .app-search-wrap > input {
   width: 100%;
   padding: 7px 12px;
@@ -604,11 +1006,17 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   outline: none;
   transition: border-color 0.15s;
 }
-.app-search-wrap > input:focus { border-color: var(--accent); }
-.app-search-wrap > input::placeholder { color: var(--text2); }
+.app-search-wrap > input:focus {
+  border-color: var(--accent);
+}
+.app-search-wrap > input::placeholder {
+  color: var(--text2);
+}
 
 /* How it works */
-.how-it-works { margin-bottom: 18px; }
+.how-it-works {
+  margin-bottom: 18px;
+}
 .how-steps {
   list-style: none;
   counter-reset: step;
@@ -641,7 +1049,9 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   align-items: center;
   justify-content: center;
 }
-.how-steps li strong { color: var(--text0); }
+.how-steps li strong {
+  color: var(--text0);
+}
 
 /* Filter panel */
 .filter-header {
@@ -650,12 +1060,20 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   justify-content: space-between;
   margin-bottom: 14px;
 }
-.filter-header h2 { margin-bottom: 0; }
-.filter-header-actions { display: flex; align-items: center; gap: 8px; }
+.filter-header h2 {
+  margin-bottom: 0;
+}
+.filter-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 /* Shown only under the max-width:768px rule below — collapsing the filter body only
    makes sense once it's actually the thing pushing results off-screen (see the mobile
    block's own comment). Desktop keeps the panel always expanded with no toggle at all. */
-.filter-toggle-btn { display: none; }
+.filter-toggle-btn {
+  display: none;
+}
 .filter-badge {
   display: inline-flex;
   align-items: center;
@@ -671,9 +1089,18 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   margin-left: 6px;
   vertical-align: middle;
 }
-.btn-sm { padding: 5px 10px; font-size: 12px; }
-.filter-dims { display: flex; flex-wrap: wrap; gap: 16px; }
-.filter-dim { flex: 1 1 160px; }
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+.filter-dims {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.filter-dim {
+  flex: 1 1 160px;
+}
 .filter-dim-title {
   font-size: 11px;
   font-weight: 600;
@@ -698,7 +1125,11 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   line-height: 1.4;
   user-select: none;
 }
-.filter-opt input[type="checkbox"] { cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
+.filter-opt input[type='checkbox'] {
+  cursor: pointer;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
 .filter-chips {
   display: flex;
   flex-wrap: wrap;
@@ -709,8 +1140,8 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: rgba(26,159,255,0.15);
-  border: 1px solid rgba(26,159,255,0.4);
+  background: rgba(26, 159, 255, 0.15);
+  border: 1px solid rgba(26, 159, 255, 0.4);
   color: var(--accent);
   font-size: 12px;
   font-weight: 500;
@@ -720,8 +1151,14 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   user-select: none;
   white-space: nowrap;
 }
-.filter-chip:hover { background: rgba(26,159,255,0.28); }
-.filter-chip-x { font-size: 14px; line-height: 1; opacity: 0.7; }
+.filter-chip:hover {
+  background: rgba(26, 159, 255, 0.28);
+}
+.filter-chip-x {
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.7;
+}
 .filter-search {
   width: 100%;
   box-sizing: border-box;
@@ -733,13 +1170,25 @@ tbody td { padding: 9px 14px; vertical-align: middle; }
   color: var(--text0);
   font-size: 12px;
 }
-.filter-search:focus { outline: none; border-color: var(--accent); }
-.filter-name-row { margin-bottom: 12px; }
-.filter-name-input { font-size: 14px; padding: 6px 10px; }
+.filter-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.filter-name-row {
+  margin-bottom: 12px;
+}
+.filter-name-input {
+  font-size: 14px;
+  padding: 6px 10px;
+}
 
 /* Clickable rows */
-tbody tr.game-row { cursor: pointer; }
-tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
+tbody tr.game-row {
+  cursor: pointer;
+}
+tbody tr.game-row.active {
+  background: rgba(26, 159, 255, 0.08) !important;
+}
 
 /* App shell layout (see docs/dev/frontend.md and AppShell.tsx)
    — `.app-shell` is the root: `.app-scroll` (nav bar, routed content, footer — everything that
@@ -767,13 +1216,17 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   display: flex;
   flex-direction: column;
 }
-.app-content { flex: 1; } /* pushes the footer to the bottom on a page shorter than the viewport */
+.app-content {
+  flex: 1;
+} /* pushes the footer to the bottom on a page shorter than the viewport */
 
 @media (min-width: 769px) {
   /* The panel is out of flow, so the shell reserves its width instead of laying it out: the nav
      bar and footer shorten along with the content rather than running underneath a panel that
      now reaches the top of the viewport. Below 769px the panel is full-width, so no gutter. */
-  .app-shell.panel-open { padding-right: var(--panel-w); }
+  .app-shell.panel-open {
+    padding-right: var(--panel-w);
+  }
 }
 
 @media (max-width: 768px) {
@@ -788,7 +1241,9 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
     min-height: 100dvh;
     overflow: visible;
   }
-  .app-scroll { overflow-y: visible; }
+  .app-scroll {
+    overflow-y: visible;
+  }
 }
 
 /* Back to top — one small fixed button rather than a pinned nav bar, since the nav scrolls away
@@ -814,12 +1269,20 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   align-items: center;
   justify-content: center;
   padding: 0;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.35);
-  transition: border-color 0.15s, color 0.15s, opacity 0.15s;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    opacity 0.15s;
 }
-.app-to-top:hover { border-color: var(--accent); color: var(--accent2); }
+.app-to-top:hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
 @media (min-width: 769px) {
-  .app-shell.panel-open .app-to-top { right: calc(var(--panel-w) + 16px); }
+  .app-shell.panel-open .app-to-top {
+    right: calc(var(--panel-w) + 16px);
+  }
 }
 
 /* Side panel — docked, not modal: a column of its own, not an overlay. No backdrop at all (see
@@ -849,10 +1312,14 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   flex-direction: column;
   overflow: hidden;
 }
-.game-panel.open { display: flex; }
+.game-panel.open {
+  display: flex;
+}
 
 @media (min-width: 1400px) {
-  :root { --panel-w: min(480px, 30vw); }
+  :root {
+    --panel-w: min(480px, 30vw);
+  }
 }
 
 @media (max-width: 768px) {
@@ -867,50 +1334,107 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 
 @media (max-width: 768px) {
   /* Lightbox fills the full screen — swipe handles navigation */
-  .lb-img { max-width: 100vw; max-height: 100%; border-radius: 0; }
-  .lb-btn  { width: 40px; height: 52px; font-size: 26px; }
-  .lb-prev { left: 4px; }
-  .lb-next { right: 4px; }
+  .lb-img {
+    max-width: 100vw;
+    max-height: 100%;
+    border-radius: 0;
+  }
+  .lb-btn {
+    width: 40px;
+    height: 52px;
+    font-size: 26px;
+  }
+  .lb-prev {
+    left: 4px;
+  }
+  .lb-next {
+    right: 4px;
+  }
   /* The pointer-friendly way to change game on touch (a vertical swipe is the other) — so
      back up to a thumb-sized target here. */
-  .lb-toolbar .lb-caption button { width: 34px; height: 34px; }
-  .lb-caption { padding: 0 44px; }
+  .lb-toolbar .lb-caption button {
+    width: 34px;
+    height: 34px;
+  }
+  .lb-caption {
+    padding: 0 44px;
+  }
 
-  .container { padding: 18px 14px 40px; }
-  header { margin-bottom: 20px; }
-  header h1 { font-size: 20px; }
-  .card { padding: 14px 16px; }
-  .game-group { margin-bottom: 20px; }
-  .btn-remove { width: 44px; height: 44px; line-height: 42px; }
-  .td-name { min-width: 140px; }
-  .td-score { min-width: 70px; }
-  .td-hltb { min-width: 60px; }
-  .family-row { padding-left: 20px; }
-  .family-hint { padding-left: 20px; }
+  .container {
+    padding: 18px 14px 40px;
+  }
+  header {
+    margin-bottom: 20px;
+  }
+  header h1 {
+    font-size: 20px;
+  }
+  .card {
+    padding: 14px 16px;
+  }
+  .game-group {
+    margin-bottom: 20px;
+  }
+  .btn-remove {
+    width: 44px;
+    height: 44px;
+    line-height: 42px;
+  }
+  .td-name {
+    min-width: 140px;
+  }
+  .td-score {
+    min-width: 70px;
+  }
+  .td-hltb {
+    min-width: 60px;
+  }
+  .family-row {
+    padding-left: 20px;
+  }
+  .family-hint {
+    padding-left: 20px;
+  }
   /* Prevent iOS Safari from zooming on input focus */
-  .user-row input, .filter-search, .filter-name-input { font-size: 16px; }
+  .user-row input,
+  .filter-search,
+  .filter-name-input {
+    font-size: 16px;
+  }
   /* Move the Steam Family button below the input+remove row */
-  .user-row { flex-wrap: wrap; }
-  .user-row .btn-remove { order: 1; }
-  .user-row .btn-add-family { order: 2; flex-basis: 100%; }
+  .user-row {
+    flex-wrap: wrap;
+  }
+  .user-row .btn-remove {
+    order: 1;
+  }
+  .user-row .btn-add-family {
+    order: 2;
+    flex-basis: 100%;
+  }
 
   /* The filter panel's Tag/Genre/Category/Developer/Publisher dims (each its own
      independently-scrolling checkbox list) otherwise push the actual results table
      ~2 screens down before a phone user ever sees a game. Collapsed by default (see
      filterPanelCollapsed in app.js) behind this toggle so results are visible first;
      the chips summary of active filters stays visible either way. */
-  .filter-toggle-btn { display: inline-flex; }
-  .filter-body[hidden] { display: none; }
+  .filter-toggle-btn {
+    display: inline-flex;
+  }
+  .filter-body[hidden] {
+    display: none;
+  }
 }
 
 .panel-close {
   position: absolute;
   top: 10px;
   right: 10px;
-  width: 28px; height: 28px;
+  width: 28px;
+  height: 28px;
   border: none;
   border-radius: 50%;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   color: var(--text0);
   font-size: 18px;
   line-height: 28px;
@@ -919,7 +1443,9 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   z-index: 1;
   padding: 0;
 }
-.panel-close:hover { background: rgba(0,0,0,0.75); }
+.panel-close:hover {
+  background: rgba(0, 0, 0, 0.75);
+}
 @media (max-width: 768px) {
   /* Bigger tap target on touch devices — kept right next to the base rule (rather than
      the shared max-width:768px block above) after this exact override was previously
@@ -927,7 +1453,12 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
      sits earlier in the file, so the later, unconditional .panel-close rule above won
      regardless of viewport at equal specificity. Confirmed live at 360px before this
      fix — the close button rendered 28x28, well under the ~44px recommended minimum. */
-  .panel-close { width: 36px; height: 36px; line-height: 36px; font-size: 20px; }
+  .panel-close {
+    width: 36px;
+    height: 36px;
+    line-height: 36px;
+    font-size: 20px;
+  }
 }
 
 /* Rendered as the first child of the scrollable #panel-body (see renderPanelBody in
@@ -936,7 +1467,10 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
    negative side margins cancel .panel-body's own side padding so the hero still bleeds
    edge-to-edge; no top margin/padding needed since .panel-body has none of its own
    (that padding lives on .panel-header-sticky below, see its comment). */
-.panel-hero { margin: 0 -20px; background: var(--bg3); }
+.panel-hero {
+  margin: 0 -20px;
+  background: var(--bg3);
+}
 .panel-hero-main {
   position: relative;
   width: 100%;
@@ -953,7 +1487,9 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
    simply overrides the aspect-ratio's computed height; `object-fit: cover` on the image
    itself means it crops tighter rather than distorting. */
 @media (max-height: 500px) {
-  .panel-hero-main { max-height: 30vh; }
+  .panel-hero-main {
+    max-height: 30vh;
+  }
 }
 .panel-hero-img {
   width: 100%;
@@ -974,12 +1510,14 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 /* A dead upstream image (broken banner guess, broken video poster, …) — keep the hero's
    footprint and background instead of collapsing it, so the play button/nav/click target
    for whatever still works (the video, the full-res shot) stay usable. */
-.panel-hero-img--broken { background: var(--bg3); }
+.panel-hero-img--broken {
+  background: var(--bg3);
+}
 .panel-hero-btn {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  background: rgba(0,0,0,0.45);
+  background: rgba(0, 0, 0, 0.45);
   border: none;
   color: #fff;
   font-size: 26px;
@@ -988,17 +1526,31 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   height: 48px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s, background 0.15s;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1;
 }
-.panel-hero-main:hover .panel-hero-btn { opacity: 1; }
-.panel-hero-btn:hover:not(:disabled) { background: rgba(26,159,255,0.5); }
-.panel-hero-btn:disabled { opacity: 0 !important; }
-.panel-hero-prev { left: 0; border-radius: 0 4px 4px 0; }
-.panel-hero-next { right: 0; border-radius: 4px 0 0 4px; }
+.panel-hero-main:hover .panel-hero-btn {
+  opacity: 1;
+}
+.panel-hero-btn:hover:not(:disabled) {
+  background: rgba(26, 159, 255, 0.5);
+}
+.panel-hero-btn:disabled {
+  opacity: 0 !important;
+}
+.panel-hero-prev {
+  left: 0;
+  border-radius: 0 4px 4px 0;
+}
+.panel-hero-next {
+  right: 0;
+  border-radius: 4px 0 0 4px;
+}
 .panel-hero-main.is-video::before {
   content: '▶';
   position: absolute;
@@ -1008,7 +1560,7 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   justify-content: center;
   font-size: 3rem;
   color: #fff;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.85);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
   pointer-events: none;
   z-index: 1;
 }
@@ -1032,7 +1584,11 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   padding: 0;
   background: none;
 }
-.panel-film-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 2px; }
+.panel-film-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
 .panel-film-item.is-video::after {
   content: '▶';
   position: absolute;
@@ -1042,7 +1598,7 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   justify-content: center;
   font-size: 1.1rem;
   color: #fff;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.85);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
   pointer-events: none;
 }
 .panel-film-thumb {
@@ -1052,12 +1608,21 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   border-radius: 2px;
   border: 2px solid transparent;
   opacity: 0.5;
-  transition: opacity 0.15s, border-color 0.15s;
+  transition:
+    opacity 0.15s,
+    border-color 0.15s;
   display: block;
 }
-.panel-film-item:hover .panel-film-thumb { opacity: 0.8; }
-.panel-film-item.active .panel-film-thumb { opacity: 1; border-color: var(--accent); }
-.panel-film-thumb--broken { background: var(--bg3); }
+.panel-film-item:hover .panel-film-thumb {
+  opacity: 0.8;
+}
+.panel-film-item.active .panel-film-thumb {
+  opacity: 1;
+  border-color: var(--accent);
+}
+.panel-film-thumb--broken {
+  background: var(--bg3);
+}
 
 /* Sticky to the bottom of the panel on both desktop and mobile now (previously sat
    between the hero and the body, which meant reaching it on desktop required
@@ -1079,13 +1644,17 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   padding: 8px 14px;
   border-top: 1px solid var(--border);
   background: var(--bg1);
-  box-shadow: 0 -4px 16px rgba(0,0,0,0.35);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.35);
   min-height: 40px;
 }
-.panel-nav:empty { display: none; }
+.panel-nav:empty {
+  display: none;
+}
 /* Extra bottom padding only when a nav bar is actually present, so its last section
    never sits underneath the floating bar. */
-.panel-nav:not(:empty) ~ .panel-body { padding-bottom: 76px; }
+.panel-nav:not(:empty) ~ .panel-body {
+  padding-bottom: 76px;
+}
 .panel-nav-btn {
   background: transparent;
   border: 1px solid var(--border);
@@ -1101,24 +1670,46 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   justify-content: center;
   padding: 0;
   flex-shrink: 0;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
-.panel-nav-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
-.panel-nav-btn:disabled { opacity: 0.3; cursor: default; }
+.panel-nav-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
+.panel-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
 @media (max-width: 768px) {
   /* Bigger tap target on touch devices — see .panel-close's identical comment above
      for why this lives here rather than the shared max-width:768px block: the same
      override placed there was silently losing to this later, unconditional rule at
      equal specificity. Confirmed live at 360px before this fix — the ↑/↓/🎲 nav
      buttons rendered 36x32, under the ~44px recommended minimum. */
-  .panel-nav-btn { width: 44px; height: 44px; }
+  .panel-nav-btn {
+    width: 44px;
+    height: 44px;
+  }
 }
-.panel-nav-reroll { font-size: 14px; margin-left: 4px; position: relative; }
+.panel-nav-reroll {
+  font-size: 14px;
+  margin-left: 4px;
+  position: relative;
+}
 /* Only the reroll button gets a key hint — prev/next's ↑/↓ icon already IS the key,
    so labeling it again would be redundant; 🎲 isn't a keyboard glyph, so it needs one. */
 .panel-nav-kbd {
-  position: absolute; bottom: -1px; right: 1px; font-size: 8px; line-height: 1.3;
-  color: var(--text1); background: var(--bg3); border-radius: 2px; padding: 0 2px;
+  position: absolute;
+  bottom: -1px;
+  right: 1px;
+  font-size: 8px;
+  line-height: 1.3;
+  color: var(--text1);
+  background: var(--bg3);
+  border-radius: 2px;
+  padding: 0 2px;
 }
 .panel-nav-pos {
   font-size: 12px;
@@ -1183,7 +1774,11 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.panel-back-btn:hover, .panel-back-btn:focus-visible { color: var(--accent2); outline: none; }
+.panel-back-btn:hover,
+.panel-back-btn:focus-visible {
+  color: var(--accent2);
+  outline: none;
+}
 
 /* Sticky sub-nav for jumping straight to a lower section — only rendered (see
    renderPanelBody in panel.js) once there are at least two sections worth jumping to, so a
@@ -1205,19 +1800,41 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   padding: 4px 10px;
   border-radius: 999px;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
-.panel-subnav-btn:hover, .panel-subnav-btn:focus-visible { border-color: var(--accent); color: var(--accent2); outline: none; }
+.panel-subnav-btn:hover,
+.panel-subnav-btn:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent2);
+  outline: none;
+}
 /* Scroll-spy state (updateSubnavScrollSpy in panel.js) — filled instead of just the
    hover/focus outline, so "where am I" reads at a glance without needing to hover. */
-.panel-subnav-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.panel-subnav-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
 
-.panel-icon-links { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-top: 1px; }
+.panel-icon-links {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
 /* Separates the outbound links (Store/ITAD/News/Workshop/Website — leave the page) from the
    in-panel actions after it (copy link, refresh — do something in place) — both used to
    render as one undifferentiated row of identical icon buttons with no cue that the last
    one or two behave completely differently from the rest. */
-.panel-icon-divider { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; }
+.panel-icon-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  flex-shrink: 0;
+}
 
 /* "⋯ More" — News (only when there's no News section to link out from instead)/Workshop/
    Website, whichever apply, tucked behind one toggle instead of each getting its own
@@ -1225,21 +1842,42 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
    game happens to have — with all three showing at once alongside Store/ITAD/copy-link/
    refresh, the row used to run to 7-8 icon buttons, wide enough to squeeze the title into a
    two-line wrap on a narrow panel. */
-.panel-icon-more { position: relative; }
-.panel-icon-more-btn[aria-expanded="true"] { border-color: var(--accent); color: var(--accent2); }
+.panel-icon-more {
+  position: relative;
+}
+.panel-icon-more-btn[aria-expanded='true'] {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
 .panel-icon-more-menu {
-  position: absolute; z-index: 5; top: calc(100% + 4px); right: 0;
-  display: flex; flex-direction: column; min-width: 170px;
-  background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 170px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
 .panel-icon-more-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px; color: var(--text0); font-size: 13px;
-  text-decoration: none; white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  color: var(--text0);
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
 }
-.panel-icon-more-item:hover, .panel-icon-more-item:focus-visible { background: var(--bg1); outline: none; }
+.panel-icon-more-item:hover,
+.panel-icon-more-item:focus-visible {
+  background: var(--bg1);
+  outline: none;
+}
 .panel-icon-link {
   width: 26px;
   height: 26px;
@@ -1253,9 +1891,14 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   justify-content: center;
   text-decoration: none;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
-.panel-icon-link:hover { border-color: var(--accent); color: var(--accent2); }
+.panel-icon-link:hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
 
 .panel-title {
   font-size: 17px;
@@ -1267,11 +1910,27 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
 /* "DLC for <Base Game>" — only present when the open game is itself a piece of DLC
    (meta.fullgame, see baseGameHtml in panel.js). Folded inline into .panel-release (below)
    rather than its own block, so it doesn't add a third stacked line under the title. */
-.panel-basegame-link { color: var(--text1); text-decoration: none; border-bottom: 1px solid transparent; font-weight: 600; transition: color 0.15s, border-color 0.15s; }
-.panel-basegame-link:hover, .panel-basegame-link:focus-visible { color: var(--accent2); border-bottom-color: var(--accent2); outline: none; }
-.panel-meta-sep { opacity: 0.6; }
+.panel-basegame-link {
+  color: var(--text1);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  font-weight: 600;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.panel-basegame-link:hover,
+.panel-basegame-link:focus-visible {
+  color: var(--accent2);
+  border-bottom-color: var(--accent2);
+  outline: none;
+}
+.panel-meta-sep {
+  opacity: 0.6;
+}
 
-.panel-refresh-btn, .panel-copy-link-btn {
+.panel-refresh-btn,
+.panel-copy-link-btn {
   flex-shrink: 0;
   margin-top: 1px;
   background: transparent;
@@ -1287,18 +1946,40 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
-.panel-refresh-btn:hover:not(:disabled), .panel-copy-link-btn:hover { border-color: var(--accent); color: var(--accent2); }
-.panel-refresh-btn:disabled { opacity: 0.6; cursor: default; }
+.panel-refresh-btn:hover:not(:disabled),
+.panel-copy-link-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
+.panel-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
 /* Wider than the icon buttons beside it: it carries the details' age as text (see panel.tsx's
    RefreshButton), so it sizes to its content instead of being a 26px square. */
-.panel-refresh-btn { width: auto; min-width: 26px; padding: 0 7px; gap: 5px; }
-.panel-refresh-age { font-size: 11px; white-space: nowrap; }
-.panel-refresh-icon.is-refreshing { animation: spin 0.75s linear infinite; }
+.panel-refresh-btn {
+  width: auto;
+  min-width: 26px;
+  padding: 0 7px;
+  gap: 5px;
+}
+.panel-refresh-age {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.panel-refresh-icon.is-refreshing {
+  animation: spin 0.75s linear infinite;
+}
 /* Brief post-click feedback (see clipboard.ts's copyWithFeedback) — green rather than the
    hover accent, so "copied" reads as a distinct confirmation, not just a hover state. */
-.panel-copy-link-btn--copied { border-color: #15803d; color: #15803d; }
+.panel-copy-link-btn--copied {
+  border-color: #15803d;
+  color: #15803d;
+}
 
 .panel-release {
   font-size: 12px;
@@ -1340,8 +2021,14 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   text-decoration: none;
   transition: background 0.15s;
 }
-.panel-demo-banner:hover, .panel-demo-banner:focus-visible { background: var(--accent2); outline: none; }
-.panel-demo-banner-icon { font-size: 15px; }
+.panel-demo-banner:hover,
+.panel-demo-banner:focus-visible {
+  background: var(--accent2);
+  outline: none;
+}
+.panel-demo-banner-icon {
+  font-size: 15px;
+}
 
 /* "In your library" / "On your wishlist" status — sits right under the title, inside the
    sticky header, so it's visible the instant the panel opens with no scrolling. Plain small
@@ -1349,15 +2036,30 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
    Each pill *is* a link (to /lists/owned|wishlist for the same game), but deliberately not
    underlined: the pill shape already reads as clickable, and an underline through a 11px badge
    just makes the status itself harder to read. */
-.panel-ownership-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.panel-ownership-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
 .panel-ownership-badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 2px 8px; border-radius: 999px;
-  font-size: 11px; font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
   text-decoration: none;
 }
-.panel-ownership-badge.owned { background: rgba(241, 196, 15, 0.16); color: #f1c40f; }
-.panel-ownership-badge.wishlisted { background: rgba(46, 204, 113, 0.16); color: #2ecc71; }
+.panel-ownership-badge.owned {
+  background: rgba(241, 196, 15, 0.16);
+  color: #f1c40f;
+}
+.panel-ownership-badge.wishlisted {
+  background: rgba(46, 204, 113, 0.16);
+  color: #2ecc71;
+}
 
 /* --text0/13px, not the --text1/12px caption treatment used elsewhere in the panel — this
    is prose meant to be read, not secondary metadata. Sits directly under the glance grid,
@@ -1369,8 +2071,12 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   margin-bottom: 18px;
 }
 
-.panel-section { margin-bottom: 18px; }
-.panel-section--meta { margin-bottom: 12px; }
+.panel-section {
+  margin-bottom: 18px;
+}
+.panel-section--meta {
+  margin-bottom: 12px;
+}
 .panel-section-title {
   font-size: 10px;
   font-weight: 600;
@@ -1382,25 +2088,53 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
   align-items: center;
   gap: 6px;
 }
-.panel-section--meta .panel-section-title { margin-bottom: 5px; }
+.panel-section--meta .panel-section-title {
+  margin-bottom: 5px;
+}
 .panel-section-title a {
   font-size: inherit;
   color: inherit;
   text-decoration: none;
   border-bottom: 1px solid transparent;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
-.panel-section-title a:hover { color: var(--accent2); border-bottom-color: var(--accent2); }
-.panel-no-data { font-size: 12px; color: var(--text1); }
-.panel-no-data a { color: var(--text1); text-decoration: none; border-bottom: 1px solid transparent; transition: color 0.15s, border-color 0.15s; }
-.panel-no-data a:hover { color: var(--accent2); border-bottom-color: var(--accent2); }
+.panel-section-title a:hover {
+  color: var(--accent2);
+  border-bottom-color: var(--accent2);
+}
+.panel-no-data {
+  font-size: 12px;
+  color: var(--text1);
+}
+.panel-no-data a {
+  color: var(--text1);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.panel-no-data a:hover {
+  color: var(--accent2);
+  border-bottom-color: var(--accent2);
+}
 
 /* Generic colored-pill treatment for a categorical status cell in the Library Explorer's table
    (public/library.js) — used by the ProtonDB column (colored per compatibility tier) and the
    Demo column (fixed accent blue), and available for any future column that wants the same
    "quick status chip" look rather than plain text. Not used by the side panel — its own
    ProtonDB indicator is a separate `glanceChip` with inline styling (see panel.js). */
-.status-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; color: #fff; line-height: 1.4; }
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.4;
+}
 
 /* Glance strip: a fixed 2×2 grid (SteamDB+Metacritic, then HLTB+Linux/Deck) instead of
    a horizontally-scrolling row — a scrollable strip here would risk the exact
@@ -1411,20 +2145,59 @@ tbody tr.game-row.active { background: rgba(26,159,255,0.08) !important; }
    padding-bottom instead (that box's edge IS the top of this gap), so margin-bottom below
    is set to match it rather than stacking a second top margin on top of that padding,
    which used to make the gap above the grid nearly 3x the (near-zero) gap below it. */
-.panel-glance { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.panel-glance {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
 .panel-glance-chip {
-  display: flex; align-items: center; padding: 8px 10px;
-  border-radius: var(--r); background: var(--bg0); border: 1px solid var(--border);
-  text-decoration: none; cursor: pointer; min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: var(--r);
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  cursor: pointer;
+  min-width: 0;
   transition: border-color 0.15s;
 }
-.panel-glance-chip--static { cursor: default; }
-.panel-glance-chip--sk { padding: 8px 10px; }
-a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var(--accent); outline: none; }
-.panel-glance-sub { display: flex; flex-direction: column; line-height: 1.25; gap: 1px; min-width: 0; }
-.panel-glance-num { font-size: 17px; font-weight: 700; color: var(--text0); font-variant-numeric: tabular-nums; }
-.panel-glance-val { font-size: 11px; color: var(--text1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.panel-glance-val b { color: var(--text1); font-weight: 600; }
+.panel-glance-chip--static {
+  cursor: default;
+}
+.panel-glance-chip--sk {
+  padding: 8px 10px;
+}
+a.panel-glance-chip:hover,
+a.panel-glance-chip:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+.panel-glance-sub {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  gap: 1px;
+  min-width: 0;
+}
+.panel-glance-num {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text0);
+  font-variant-numeric: tabular-nums;
+}
+.panel-glance-val {
+  font-size: 11px;
+  color: var(--text1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.panel-glance-val b {
+  color: var(--text1);
+  font-weight: 600;
+}
 
 /* Price card (panel.js's priceHtml) — one line: the best-deal amount (badge/tooltip/color
    mirroring the Best Deal table cell), its discount when there is one, and the shop name.
@@ -1436,65 +2209,159 @@ a.panel-glance-chip:hover, a.panel-glance-chip:focus-visible { border-color: var
    Negative margin + padding on the link variant expands its hit/hover area right up to the
    card's own edges without pushing the line's content off the plain (non-link) variant's
    flush-left position. */
-.panel-price-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 13px; }
+.panel-price-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+}
 a.panel-price-line--link {
-  text-decoration: none; color: inherit;
-  margin: -4px -12px; padding: 4px 12px;
+  text-decoration: none;
+  color: inherit;
+  margin: -4px -12px;
+  padding: 4px 12px;
   border-radius: var(--r);
   border: 1px solid transparent;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
-a.panel-price-line--link:hover, a.panel-price-line--link:focus-visible {
-  border-color: var(--accent); background: var(--bg1); outline: none;
+a.panel-price-line--link:hover,
+a.panel-price-line--link:focus-visible {
+  border-color: var(--accent);
+  background: var(--bg1);
+  outline: none;
 }
-a.panel-price-line--link:hover .panel-price-shop, a.panel-price-line--link:focus-visible .panel-price-shop { color: var(--accent2); }
-.panel-price-amount { font-size: 17px; font-weight: 700; color: var(--text0); font-variant-numeric: tabular-nums; }
-.panel-price-discount { color: var(--text1); }
-.panel-price-sep { color: var(--text1); }
-.panel-price-shop { color: var(--text1); font-weight: 600; transition: color 0.15s; }
+a.panel-price-line--link:hover .panel-price-shop,
+a.panel-price-line--link:focus-visible .panel-price-shop {
+  color: var(--accent2);
+}
+.panel-price-amount {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text0);
+  font-variant-numeric: tabular-nums;
+}
+.panel-price-discount {
+  color: var(--text1);
+}
+.panel-price-sep {
+  color: var(--text1);
+}
+.panel-price-shop {
+  color: var(--text1);
+  font-weight: 600;
+  transition: color 0.15s;
+}
 
 /* Historical lows line (all-time/1yr/3mo) — a second, smaller line under the main price line,
    each present low tagged with its own DEAL_RECORD_TIERS icon/color for a quick "how good is
    this deal, historically" glance without needing the IsThereAnyDeal ↗ link out. */
-.panel-price-lows { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 12px; margin-top: 4px; }
-.panel-price-low { font-weight: 600; font-variant-numeric: tabular-nums; }
+.panel-price-lows {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.panel-price-low {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 
-.panel-hltb { display: flex; flex-wrap: wrap; gap: 24px 24px; row-gap: 14px; }
-.panel-hltb-label { font-size: 11px; color: var(--text1); margin-bottom: 3px; }
-.panel-hltb-val { font-size: 20px; font-weight: 600; color: var(--text0); }
+.panel-hltb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px 24px;
+  row-gap: 14px;
+}
+.panel-hltb-label {
+  font-size: 11px;
+  color: var(--text1);
+  margin-bottom: 3px;
+}
+.panel-hltb-val {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text0);
+}
 
 /* News — a short list of recent headlines, each linking straight to the post. The link
    out to the game's full news hub for anything older lives in the card header (see
    collapsibleCard's linkHref, same spot achievements/HLTB put theirs) rather than a
    trailing link here. Rows, not cards, same "one thing" treatment the achievements list
    uses instead of a border around each item. */
-.panel-news { display: flex; flex-direction: column; }
+.panel-news {
+  display: flex;
+  flex-direction: column;
+}
 .panel-news-item {
-  display: flex; flex-direction: column; gap: 2px;
-  padding: 8px 0; text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  text-decoration: none;
   border-bottom: 1px solid var(--border);
 }
-.panel-news-item:last-child { border-bottom: none; }
-.panel-news-title { font-size: 12.5px; color: var(--text0); font-weight: 500; }
-.panel-news-item:hover .panel-news-title { color: var(--accent2); }
-.panel-news-meta { font-size: 11px; color: var(--text1); }
+.panel-news-item:last-child {
+  border-bottom: none;
+}
+.panel-news-title {
+  font-size: 12.5px;
+  color: var(--text0);
+  font-weight: 500;
+}
+.panel-news-item:hover .panel-news-title {
+  color: var(--accent2);
+}
+.panel-news-meta {
+  font-size: 11px;
+  color: var(--text1);
+}
 
 /* DLC — rows of capsule + name, same "list not boxes" treatment as news/achievements.
    Each row is a real <a href> (panel.js's dlcHtml/navigateToGame) so it works as a normal
    link (new tab via ctrl/cmd/middle-click) as well as in-panel navigation on a plain click. */
-.panel-dlc-list { display: flex; flex-direction: column; }
+.panel-dlc-list {
+  display: flex;
+  flex-direction: column;
+}
 .panel-dlc-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  text-decoration: none;
   border-bottom: 1px solid var(--border);
 }
-.panel-dlc-item:last-child { border-bottom: none; }
-.panel-dlc-capsule { width: 64px; height: 30px; border-radius: 4px; flex-shrink: 0; object-fit: cover; background: var(--bg1); }
-.panel-dlc-name { font-size: 12.5px; color: var(--text0); font-weight: 500; }
-.panel-dlc-item:hover .panel-dlc-name { color: var(--accent2); }
+.panel-dlc-item:last-child {
+  border-bottom: none;
+}
+.panel-dlc-capsule {
+  width: 64px;
+  height: 30px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  object-fit: cover;
+  background: var(--bg1);
+}
+.panel-dlc-name {
+  font-size: 12.5px;
+  color: var(--text0);
+  font-weight: 500;
+}
+.panel-dlc-item:hover .panel-dlc-name {
+  color: var(--accent2);
+}
 /* Shown while a DLC card is streaming in results (see loadDlc/dlcHtml in panel.js) — the
    entries already resolved render as normal rows above this, one line per still-pending one. */
-.panel-dlc-loading-more { padding: 8px 10px; font-size: 12px; color: var(--text2); }
+.panel-dlc-loading-more {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text2);
+}
 
 /* One card (border/radius/background) holds both the header and the list — a single
    grouped unit instead of a chip floating above a separate stack of boxes. The header
@@ -1517,31 +2384,68 @@ a.panel-price-line--link:hover .panel-price-shop, a.panel-price-line--link:focus
   transition: border-color 0.15s;
 }
 .panel-achievements-card:has(.panel-achievements-chip:hover),
-.panel-achievements-card:has(.panel-achievements-chip:focus-visible) { border-color: var(--accent); }
-.panel-achievements-card-header { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
-.panel-achievements-chip {
-  flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0;
-  background: none; border: none; padding: 0; margin: 0;
-  font: inherit; text-align: left; cursor: pointer;
+.panel-achievements-card:has(.panel-achievements-chip:focus-visible) {
+  border-color: var(--accent);
 }
-.panel-achievements-chip:focus-visible { outline: none; }
-.panel-achievements-chip .panel-glance-val { flex: 1; }
-.panel-achievements-chevron { color: var(--accent2); font-size: 14px; font-weight: 700; flex-shrink: 0; }
+.panel-achievements-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+}
+.panel-achievements-chip {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.panel-achievements-chip:focus-visible {
+  outline: none;
+}
+.panel-achievements-chip .panel-glance-val {
+  flex: 1;
+}
+.panel-achievements-chevron {
+  color: var(--accent2);
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
 /* Fills the numeral's slot for a card with no number to show (HLTB, News) — same
    font-size as panel-glance-num so the row's height/alignment doesn't shift depending on
    whether a card happens to have a numeral or an icon there. */
-.panel-achievements-icon { font-size: 17px; line-height: 1; flex-shrink: 0; }
+.panel-achievements-icon {
+  font-size: 17px;
+  line-height: 1;
+  flex-shrink: 0;
+}
 
 /* Rows divided by a line between them, not individually bordered/boxed — reads as one
    list inside the card rather than boxes stacked inside a box. */
-.panel-achievements-list { border-top: 1px solid var(--border); }
-.panel-achievements-list .panel-no-data { padding: 8px 10px; }
+.panel-achievements-list {
+  border-top: 1px solid var(--border);
+}
+.panel-achievements-list .panel-no-data {
+  padding: 8px 10px;
+}
 
 /* All/Unlocked/Locked filter pills — only rendered with real progress loaded (see
    achievementsHtml in panel.js; filtering by achieved status is meaningless otherwise),
    same pill styling as .panel-subnav-btn so the two "choose one of a few states" controls
    in the panel read as one family. */
-.panel-achievements-filter { display: flex; gap: 6px; padding: 8px 10px 0; }
+.panel-achievements-filter {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px 0;
+}
 .panel-achievements-filter-btn {
   background: transparent;
   border: 1px solid var(--border);
@@ -1551,40 +2455,88 @@ a.panel-price-line--link:hover .panel-price-shop, a.panel-price-line--link:focus
   padding: 3px 10px;
   border-radius: 999px;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
-.panel-achievements-filter-btn:hover, .panel-achievements-filter-btn:focus-visible { border-color: var(--accent); color: var(--accent2); outline: none; }
-.panel-achievements-filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.panel-achievements-filter-btn:hover,
+.panel-achievements-filter-btn:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent2);
+  outline: none;
+}
+.panel-achievements-filter-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
 
 /* collapsibleCard() (panel.js) is shared by achievements, HLTB breakdown, and news, but
    only achievements' own rows (.panel-achievement-row) carry their own left/right padding
    — HLTB's grid and news' list don't, so their bodyHtml wraps in this instead of every
    non-achievement caller having to remember matching inset padding by hand. */
-.panel-collapsible-body-pad { padding: 10px; }
+.panel-collapsible-body-pad {
+  padding: 10px;
+}
 .panel-achievement-row {
-  display: flex; align-items: center; gap: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 8px 10px;
   opacity: 0.55; /* locked, by default */
 }
-.panel-achievement-row + .panel-achievement-row { border-top: 1px solid var(--border); }
-.panel-achievement-row.unlocked { opacity: 1; }
-.panel-achievement-row.panel-achievement--spoiler { cursor: pointer; }
-.panel-achievement-row.panel-achievement--spoiler:hover { background: rgba(255, 255, 255, 0.04); }
-.panel-achievement-row.panel-achievement--spoiler .panel-achievement-desc { font-style: italic; }
-.panel-achievement-icon { width: 32px; height: 32px; border-radius: 4px; flex-shrink: 0; }
-.panel-achievement-text { flex: 1; min-width: 0; }
-.panel-achievement-name { font-size: 12px; font-weight: 600; color: var(--text0); }
-.panel-achievement-desc { font-size: 11px; color: var(--text1); margin-top: 1px; }
+.panel-achievement-row + .panel-achievement-row {
+  border-top: 1px solid var(--border);
+}
+.panel-achievement-row.unlocked {
+  opacity: 1;
+}
+.panel-achievement-row.panel-achievement--spoiler {
+  cursor: pointer;
+}
+.panel-achievement-row.panel-achievement--spoiler:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.panel-achievement-row.panel-achievement--spoiler .panel-achievement-desc {
+  font-style: italic;
+}
+.panel-achievement-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.panel-achievement-text {
+  flex: 1;
+  min-width: 0;
+}
+.panel-achievement-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text0);
+}
+.panel-achievement-desc {
+  font-size: 11px;
+  color: var(--text1);
+  margin-top: 1px;
+}
 /* Rarity (community-wide unlock %) — kept neutral/muted, not color-coded like the ratings
    elsewhere in the panel, since a low % isn't a "bad" value the way a low score is. */
 .panel-achievement-rarity {
-  font-size: 11px; color: var(--text1); font-variant-numeric: tabular-nums;
-  flex-shrink: 0; margin-left: 8px;
+  font-size: 11px;
+  color: var(--text1);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 
-.panel-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.panel-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
 .panel-tag {
-  background: rgba(61,80,104,0.5);
+  background: rgba(61, 80, 104, 0.5);
   border: 1px solid var(--border);
   color: var(--text1);
   font-size: 11px;
@@ -1593,31 +2545,98 @@ a.panel-price-line--link:hover .panel-price-shop, a.panel-price-line--link:focus
 }
 .panel-tag-btn {
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
 }
-.panel-tag-btn:hover { border-color: var(--accent); color: var(--accent2); }
-.panel-tag-btn.active { background: rgba(26,159,255,0.15); border-color: rgba(26,159,255,0.4); color: var(--accent); }
-.panel-tag-playtime { color: var(--text1); }
+.panel-tag-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
+.panel-tag-btn.active {
+  background: rgba(26, 159, 255, 0.15);
+  border-color: rgba(26, 159, 255, 0.4);
+  color: var(--accent);
+}
+.panel-tag-playtime {
+  color: var(--text1);
+}
 
 /* Tags/genres/categories/developer-publisher merged into one cloud (tagCloud() in
    panel.js) instead of four near-identical "uppercase title + pill row" sections —
    kind distinguished by this small dot + the legend below instead of by section. */
-.panel-tag-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
-.panel-tag-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 8px; font-size: 10.5px; color: var(--text1); }
-.panel-tag-legend-item { display: inline-flex; align-items: center; }
+.panel-tag-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.panel-tag-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 8px;
+  font-size: 10.5px;
+  color: var(--text1);
+}
+.panel-tag-legend-item {
+  display: inline-flex;
+  align-items: center;
+}
 
 /* Owned by — ordered by last played (most recent first, see buildOwnersHtml in
    app.js), with a playtime meter: a sequential single-hue magnitude cue layered
    *under* the number, which stays the primary read — color never stands in alone
    for the value. */
-.panel-owners { display: flex; flex-direction: column; gap: 10px; }
-.panel-owner-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.panel-owner-name { color: var(--text0); font-weight: 500; font-size: 12.5px; }
-.panel-owner-lastplayed { color: var(--text1); font-size: 11px; flex-shrink: 0; white-space: nowrap; }
-.panel-owner-meter-track { height: 4px; border-radius: 2px; background: var(--bg0); overflow: hidden; margin-top: 5px; }
-.panel-owner-meter-fill { height: 100%; background: var(--accent2); border-radius: 2px; }
-.panel-owner-playtime { display: block; margin-top: 3px; font-size: 11px; color: var(--text1); }
-.panel-section-subtitle { text-transform: none; font-weight: 400; letter-spacing: 0; color: var(--text1); }
+.panel-owners {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.panel-owner-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.panel-owner-name {
+  color: var(--text0);
+  font-weight: 500;
+  font-size: 12.5px;
+}
+.panel-owner-lastplayed {
+  color: var(--text1);
+  font-size: 11px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.panel-owner-meter-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg0);
+  overflow: hidden;
+  margin-top: 5px;
+}
+.panel-owner-meter-fill {
+  height: 100%;
+  background: var(--accent2);
+  border-radius: 2px;
+}
+.panel-owner-playtime {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text1);
+}
+.panel-section-subtitle {
+  text-transform: none;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--text1);
+}
 
 /* Screenshot lightbox */
 #screenshot-lightbox {
@@ -1628,12 +2647,16 @@ a.panel-price-line--link:hover .panel-price-shop, a.panel-price-line--link:focus
   align-items: center;
   justify-content: center;
 }
-#screenshot-lightbox.open { display: flex; }
-body.lb-open { overflow: hidden; }
+#screenshot-lightbox.open {
+  display: flex;
+}
+body.lb-open {
+  overflow: hidden;
+}
 .lb-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,0.88);
+  background: rgba(0, 0, 0, 0.88);
   cursor: zoom-out;
 }
 .lb-img {
@@ -1666,17 +2689,22 @@ body.lb-open { overflow: hidden; }
   align-items: center;
   gap: 8px;
   padding: 24px 14px 14px;
-  background: linear-gradient(transparent, rgba(0,0,0,0.65));
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.65));
   transition: opacity 0.25s;
 }
 /* Idle state (video playing, unattended): hide all chrome + the cursor */
 #screenshot-lightbox.lb-idle .lb-vctrls,
 #screenshot-lightbox.lb-idle .lb-btn,
-#screenshot-lightbox.lb-idle .lb-toolbar { opacity: 0; pointer-events: none; }
+#screenshot-lightbox.lb-idle .lb-toolbar {
+  opacity: 0;
+  pointer-events: none;
+}
 #screenshot-lightbox.lb-idle,
 #screenshot-lightbox.lb-idle .lb-video,
 #screenshot-lightbox.lb-idle .lb-img,
-#screenshot-lightbox.lb-idle .lb-backdrop { cursor: none; }
+#screenshot-lightbox.lb-idle .lb-backdrop {
+  cursor: none;
+}
 .lb-vc-btn {
   background: none;
   border: none;
@@ -1688,10 +2716,12 @@ body.lb-open { overflow: hidden; }
   flex-shrink: 0;
   opacity: 0.9;
 }
-.lb-vc-btn:hover { opacity: 1; }
+.lb-vc-btn:hover {
+  opacity: 1;
+}
 .lb-vc-time,
 .lb-vc-dur {
-  color: rgba(255,255,255,0.85);
+  color: rgba(255, 255, 255, 0.85);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
@@ -1703,7 +2733,7 @@ body.lb-open { overflow: hidden; }
   flex: 1;
   height: 3px;
   border-radius: 2px;
-  background: rgba(255,255,255,0.25);
+  background: rgba(255, 255, 255, 0.25);
   cursor: pointer;
   outline: none;
   border: none;
@@ -1728,8 +2758,8 @@ body.lb-open { overflow: hidden; }
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  background: rgba(0,0,0,0.55);
-  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   color: #fff;
   font-size: 32px;
   line-height: 1;
@@ -1738,15 +2768,26 @@ body.lb-open { overflow: hidden; }
   border-radius: 4px;
   cursor: pointer;
   z-index: 1;
-  transition: background 0.15s, opacity 0.25s;
+  transition:
+    background 0.15s,
+    opacity 0.25s;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.lb-btn:hover:not(:disabled) { background: rgba(26,159,255,0.5); }
-.lb-btn:disabled { opacity: 0.25; cursor: default; }
-.lb-prev { left: 12px; }
-.lb-next { right: 12px; }
+.lb-btn:hover:not(:disabled) {
+  background: rgba(26, 159, 255, 0.5);
+}
+.lb-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.lb-prev {
+  left: 12px;
+}
+.lb-next {
+  right: 12px;
+}
 .lb-toolbar {
   position: absolute;
   top: 0;
@@ -1768,7 +2809,7 @@ body.lb-open { overflow: hidden; }
   color: #fff;
   font-size: 14px;
   font-weight: 600;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
   padding: 0 48px; /* clears the toolbar buttons on either side at narrow widths */
 }
 .lb-caption-text {
@@ -1800,10 +2841,12 @@ body.lb-open { overflow: hidden; }
      the caption above it — `space-between` alone put it wherever the wider group left it. */
   flex: 1 1 0;
 }
-.lb-toolbar-right { justify-content: flex-end; }
+.lb-toolbar-right {
+  justify-content: flex-end;
+}
 .lb-toolbar button {
-  background: rgba(0,0,0,0.55);
-  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   color: #fff;
   width: 40px;
   height: 40px;
@@ -1817,50 +2860,86 @@ body.lb-open { overflow: hidden; }
 }
 .lb-fullscreen:hover,
 .lb-share:hover,
-.lb-toolbar .lb-caption button:hover { background: rgba(26,159,255,0.5); }
-.lb-close:hover { background: rgba(200,60,60,0.7); }
+.lb-toolbar .lb-caption button:hover {
+  background: rgba(26, 159, 255, 0.5);
+}
+.lb-close:hover {
+  background: rgba(200, 60, 60, 0.7);
+}
 /* One pill, two counters — the list position beside the game name, the media position below it.
    Same treatment because they answer the same question on different axes (↑/↓ vs ‹ ›); the pill
    rather than a text-shadow because either can land over a bright screenshot. */
 .lb-counter,
 .lb-caption-pos {
-  color: rgba(255,255,255,0.7);
+  color: rgba(255, 255, 255, 0.7);
   font-size: 13px;
   font-weight: 400; /* the caption around it is 600 — the counter is not part of the title */
   white-space: nowrap;
   flex: none;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   padding: 3px 10px;
   border-radius: 10px;
 }
 
 @keyframes lb-enter-right {
-  from { transform: translateX(40px); opacity: 0; }
-  to   { transform: translateX(0);    opacity: 1; }
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 @keyframes lb-enter-left {
-  from { transform: translateX(-40px); opacity: 0; }
-  to   { transform: translateX(0);     opacity: 1; }
+  from {
+    transform: translateX(-40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 /* The vertical pair: a game step (↑/↓ or a vertical swipe), not a media one. */
 @keyframes lb-enter-bottom {
-  from { transform: translateY(40px); opacity: 0; }
-  to   { transform: translateY(0);    opacity: 1; }
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 @keyframes lb-enter-top {
-  from { transform: translateY(-40px); opacity: 0; }
-  to   { transform: translateY(0);     opacity: 1; }
+  from {
+    transform: translateY(-40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
-.lb-img.lb-anim-right  { animation: lb-enter-right  0.18s ease-out forwards; }
-.lb-img.lb-anim-left   { animation: lb-enter-left   0.18s ease-out forwards; }
-.lb-img.lb-anim-bottom { animation: lb-enter-bottom 0.18s ease-out forwards; }
-.lb-img.lb-anim-top    { animation: lb-enter-top    0.18s ease-out forwards; }
+.lb-img.lb-anim-right {
+  animation: lb-enter-right 0.18s ease-out forwards;
+}
+.lb-img.lb-anim-left {
+  animation: lb-enter-left 0.18s ease-out forwards;
+}
+.lb-img.lb-anim-bottom {
+  animation: lb-enter-bottom 0.18s ease-out forwards;
+}
+.lb-img.lb-anim-top {
+  animation: lb-enter-top 0.18s ease-out forwards;
+}
 #screenshot-lightbox.lb--loading::after {
   content: '';
   position: absolute;
   width: 32px;
   height: 32px;
-  border: 3px solid rgba(255,255,255,0.2);
+  border: 3px solid rgba(255, 255, 255, 0.2);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.75s linear infinite;
@@ -1876,29 +2955,34 @@ body.lb-open { overflow: hidden; }
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  color: rgba(255,255,255,0.85);
+  color: rgba(255, 255, 255, 0.85);
   text-align: center;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0, 0, 0, 0.6);
   padding: 20px 24px;
   border-radius: 6px;
 }
-.lb-error-msg { margin: 0; font-size: 14px; }
+.lb-error-msg {
+  margin: 0;
+  font-size: 14px;
+}
 .lb-error-retry {
-  background: rgba(26,159,255,0.25);
-  border: 1px solid rgba(26,159,255,0.6);
+  background: rgba(26, 159, 255, 0.25);
+  border: 1px solid rgba(26, 159, 255, 0.6);
   color: #fff;
   padding: 6px 16px;
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
 }
-.lb-error-retry:hover { background: rgba(26,159,255,0.5); }
+.lb-error-retry:hover {
+  background: rgba(26, 159, 255, 0.5);
+}
 .lb-seek-flash {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
   z-index: 2;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0, 0, 0, 0.6);
   color: #fff;
   padding: 10px 16px;
   border-radius: 24px;
@@ -1908,9 +2992,15 @@ body.lb-open { overflow: hidden; }
   pointer-events: none;
   transition: opacity 0.2s;
 }
-.lb-seek-flash-left  { left: 15%; }
-.lb-seek-flash-right { right: 15%; }
-.lb-seek-flash--show { opacity: 1; }
+.lb-seek-flash-left {
+  left: 15%;
+}
+.lb-seek-flash-right {
+  right: 15%;
+}
+.lb-seek-flash--show {
+  opacity: 1;
+}
 
 /* Site footer */
 .site-footer {
@@ -1930,8 +3020,13 @@ body.lb-open { overflow: hidden; }
   padding: 1px 5px;
   color: var(--text1);
 }
-.footer-link { color: var(--text1); text-decoration: none; }
-.footer-link:hover { color: var(--accent2); }
+.footer-link {
+  color: var(--text1);
+  text-decoration: none;
+}
+.footer-link:hover {
+  color: var(--accent2);
+}
 
 /* The one-line hint pointing at the modal below — the only thing on screen that advertises the
    keyboard shortcuts exist at all. */
@@ -1944,8 +3039,14 @@ body.lb-open { overflow: hidden; }
   font-size: 11px;
   color: var(--text2);
 }
-.app-footer-link { color: var(--text2); text-decoration: none; }
-.app-footer-link:hover { color: var(--accent2); text-decoration: underline; }
+.app-footer-link {
+  color: var(--text2);
+  text-decoration: none;
+}
+.app-footer-link:hover {
+  color: var(--accent2);
+  text-decoration: underline;
+}
 
 /* Keyboard shortcuts modal */
 kbd {
@@ -1962,13 +3063,16 @@ kbd {
 .shortcuts-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.55);
+  background: rgba(0, 0, 0, 0.55);
   z-index: 200;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s;
 }
-.shortcuts-backdrop.open { opacity: 1; pointer-events: auto; }
+.shortcuts-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
 .shortcuts-modal {
   position: fixed;
   top: 50%;
@@ -1979,11 +3083,13 @@ kbd {
   background: var(--bg1);
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
   z-index: 201;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s, transform 0.15s;
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
 }
 .shortcuts-modal.open {
   opacity: 1;
@@ -2012,8 +3118,15 @@ kbd {
   cursor: pointer;
   padding: 0 2px;
 }
-.shortcuts-close:hover { color: var(--text0); }
-.shortcuts-body { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 16px; }
+.shortcuts-close:hover {
+  color: var(--text0);
+}
+.shortcuts-body {
+  padding: 12px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 .shortcuts-section-title {
   font-size: 10px;
   font-weight: 600;
@@ -2030,9 +3143,12 @@ kbd {
   font-size: 13px;
   color: var(--text1);
 }
-.shortcuts-row:last-child { margin-bottom: 0; }
-.shortcuts-row span { margin-left: 4px; }
-
+.shortcuts-row:last-child {
+  margin-bottom: 0;
+}
+.shortcuts-row span {
+  margin-left: 4px;
+}
 
 /* ── List route styles (see docs/dev/frontend.md) ─────────────────────── */
 
@@ -2055,9 +3171,18 @@ kbd {
 }
 /* A finished bundle blanks this line (its hero card's Games tile carries the count instead — see
    ListRoute.tsx's updateStatus), so it has to collapse rather than leave 10px of nothing. */
-.list-status:empty, .bundles-status:empty { display: none; }
-.price-status { font-size: 13px; color: var(--text1); margin-bottom: 10px; }
-.price-status:empty { display: none; }
+.list-status:empty,
+.bundles-status:empty {
+  display: none;
+}
+.price-status {
+  font-size: 13px;
+  color: var(--text1);
+  margin-bottom: 10px;
+}
+.price-status:empty {
+  display: none;
+}
 
 /* Row-selection-based add/remove-to-list (ListRoute.tsx) */
 .selection-toolbar {
@@ -2071,7 +3196,11 @@ kbd {
   padding: 10px 14px;
   margin-bottom: 12px;
 }
-.selection-count { font-size: 13px; font-weight: 600; color: var(--text0); }
+.selection-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text0);
+}
 .selection-toolbar select {
   background: var(--bg0);
   color: var(--text0);
@@ -2089,9 +3218,19 @@ kbd {
   font-size: 12.5px;
   cursor: pointer;
 }
-.selection-toolbar button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
-.selection-toolbar button:disabled { opacity: 0.5; cursor: not-allowed; }
-.selection-status { font-size: 13px; color: var(--accent2); margin-bottom: 10px; }
+.selection-toolbar button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
+.selection-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.selection-status {
+  font-size: 13px;
+  color: var(--accent2);
+  margin-bottom: 10px;
+}
 
 .list-view-actions {
   display: flex;
@@ -2109,7 +3248,9 @@ kbd {
   margin-bottom: 10px;
 }
 
-.table-container { margin-bottom: 18px; }
+.table-container {
+  margin-bottom: 18px;
+}
 
 /* /search's own table (SearchRoute.tsx) — hides @vates/data-table-solid's Columns/Sort/Search/
    Filter toolbar: none of it applies to a single, unsortable/unfilterable column, and the
@@ -2121,7 +3262,9 @@ kbd {
    column config (confirmed in the library's own source, neither wrapped in a length check), so
    even with `showSearch={false}` this table would still show two dead buttons. This blanket rule
    stays the only way to get an empty toolbar. */
-.search-table .dt-toolbar { display: none; }
+.search-table .dt-toolbar {
+  display: none;
+}
 
 /* The library ships no focus styling of its own for a row — needed here since SearchRoute.tsx
    moves real DOM focus onto a row to keep it in sync with panel/lightbox navigation (its own
@@ -2131,7 +3274,10 @@ kbd {
    whether the last interaction was mouse (the panel's own 🎲/↑/↓ buttons) or keyboard. Same
    outline treatment as .panel-film-item:focus-visible, offset inward instead of out since this is
    a table row, not a standalone tile. */
-.search-table .dt-tr:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+.search-table .dt-tr:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 
 /* The compare route's players form (ComparePlayersForm.tsx) — one row per player, one input per
    identifier within it. Same card treatment as Home's combine form, since it does the same job
@@ -2146,14 +3292,19 @@ kbd {
   flex-direction: column;
   gap: 10px;
 }
-.compare-slot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.compare-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .compare-slot-label {
   font-size: 12px;
   font-weight: 500;
   color: var(--text1);
   min-width: 62px;
 }
-.compare-slot input[type="text"] {
+.compare-slot input[type='text'] {
   flex: 1 1 220px;
   background: var(--bg0);
   border: 1px solid var(--border);
@@ -2162,7 +3313,10 @@ kbd {
   color: var(--text0);
   font-size: 13px;
 }
-.compare-slot input[type="text"]:focus { border-color: var(--accent); outline: none; }
+.compare-slot input[type='text']:focus {
+  border-color: var(--accent);
+  outline: none;
+}
 /* A player slot's token input: the chips already in it, the combobox field, and its dropdown of
    known accounts (ComparePlayersForm.tsx). */
 .compare-tokens {
@@ -2177,8 +3331,10 @@ kbd {
   border-radius: var(--r);
   padding: 5px 8px;
 }
-.compare-tokens:focus-within { border-color: var(--accent); }
-.compare-tokens input[type="text"] {
+.compare-tokens:focus-within {
+  border-color: var(--accent);
+}
+.compare-tokens input[type='text'] {
   flex: 1 1 160px;
   min-width: 120px;
   background: transparent;
@@ -2199,10 +3355,17 @@ kbd {
   font-size: 12px;
   color: var(--text0);
 }
-.compare-token .account-avatar { border-radius: 50%; }
-.compare-token:not(:has(.account-avatar)) { padding-left: 9px; }
+.compare-token .account-avatar {
+  border-radius: 50%;
+}
+.compare-token:not(:has(.account-avatar)) {
+  padding-left: 9px;
+}
 /* A raw identifier nobody has resolved yet reads as provisional, next to a named account. */
-.compare-token.is-typed .compare-token-label { color: var(--text1); font-style: italic; }
+.compare-token.is-typed .compare-token-label {
+  color: var(--text1);
+  font-style: italic;
+}
 .compare-token-remove {
   background: transparent;
   border: none;
@@ -2212,7 +3375,9 @@ kbd {
   padding: 0 3px;
   cursor: pointer;
 }
-.compare-token-remove:hover { color: var(--accent2); }
+.compare-token-remove:hover {
+  color: var(--accent2);
+}
 
 .compare-options {
   position: absolute;
@@ -2237,14 +3402,33 @@ kbd {
   color: var(--text0);
   cursor: pointer;
 }
-.compare-options li.active { background: var(--bg2); color: var(--accent2); }
-.compare-options .account-avatar { border-radius: 50%; }
-.compare-options .account-count { margin-left: auto; }
-.compare-form-hint { font-size: 12px; color: var(--text1); }
+.compare-options li.active {
+  background: var(--bg2);
+  color: var(--accent2);
+}
+.compare-options .account-avatar {
+  border-radius: 50%;
+}
+.compare-options .account-count {
+  margin-left: auto;
+}
+.compare-form-hint {
+  font-size: 12px;
+  color: var(--text1);
+}
 
-.compare-form-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.compare-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
-.list-groups { display: flex; flex-direction: column; gap: 28px; }
+.list-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
 .list-group-heading {
   font-size: 15px;
   font-weight: 600;
@@ -2263,18 +3447,35 @@ kbd {
   gap: 12px;
   flex-wrap: wrap;
 }
-.list-hero-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.list-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 .list-hero-outlink {
   font-size: 13px;
   color: var(--text1);
   text-decoration: none;
   border-bottom: 1px solid transparent;
   white-space: nowrap;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
-.list-hero-outlink:hover { color: var(--accent2); border-bottom-color: var(--accent2); }
-.list-hero-titlebar { display: flex; align-items: center; gap: 10px; }
-.list-hero-nav { display: flex; gap: 4px; }
+.list-hero-outlink:hover {
+  color: var(--accent2);
+  border-bottom-color: var(--accent2);
+}
+.list-hero-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.list-hero-nav {
+  display: flex;
+  gap: 4px;
+}
 .list-hero-nav button {
   padding: 4px 10px;
   border: 1px solid var(--border);
@@ -2284,11 +3485,22 @@ kbd {
   font-size: 14px;
   cursor: pointer;
 }
-.list-hero-nav button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
-.list-hero-nav button:disabled { opacity: 0.35; cursor: default; }
+.list-hero-nav button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
+.list-hero-nav button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
 /* An <h1>, so a list route has a real document heading rather than a styled <span> — hence the
    explicit margin/size reset over the browser's own h1 metrics. */
-.list-hero-title { margin: 0; font-size: 18px; font-weight: 700; color: var(--text0); }
+.list-hero-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text0);
+}
 
 /* Chips trailing the title: what kind of list this is (Manual/Union/Intersect/…) and, for the
    account-scoped kinds, whose account is on screen. The shop chip a bundle shows here is
@@ -2303,7 +3515,13 @@ kbd {
   color: var(--text1);
   white-space: nowrap;
 }
-.list-hero-account { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text0); }
+.list-hero-account {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text0);
+}
 
 /* The card wrapping all of the above plus the list's own facts as tiles. The bundle version of
    this was three loose blocks of same-sized gray text (header, a middot-joined facts line, the
@@ -2327,7 +3545,11 @@ kbd {
 }
 /* Label above value, so a value never has to explain itself in its own text ("ends 2026-09-25"
    becomes ENDS / Sep 25, 20:00) and every tile's values line up on one baseline across the row. */
-.list-stat { display: flex; flex-direction: column; gap: 2px; }
+.list-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .list-stat-label {
   font-size: 10.5px;
   font-weight: 600;
@@ -2335,8 +3557,14 @@ kbd {
   text-transform: uppercase;
   color: var(--text1);
 }
-.list-stat-value { font-size: 14px; color: var(--text0); }
-.list-stat-sub { font-size: 11px; color: var(--text1); }
+.list-stat-value {
+  font-size: 14px;
+  color: var(--text0);
+}
+.list-stat-sub {
+  font-size: 11px;
+  color: var(--text1);
+}
 /* A tile that is also a control (`/bundles`' "Ending soon" filter toggle). Button chrome reset so
    it still reads as one of the tiles beside it, plus a pressed state — the filter it applies is
    otherwise only visible in the table's own toolbar, several hundred pixels below. */
@@ -2350,31 +3578,58 @@ kbd {
   transition: color 0.15s;
 }
 .list-stat-btn:hover .list-stat-label,
-.list-stat-btn:focus-visible .list-stat-label { color: var(--accent2); }
+.list-stat-btn:focus-visible .list-stat-label {
+  color: var(--accent2);
+}
 /* A tile carrying two actions (Prices: region + price age) can't be one button, so each half is
    its own — which means re-stating the sizes `font: inherit` above resets, and hovering the part
    itself rather than the shared label. */
-.list-stat-value.list-stat-btn { font-size: 14px; color: var(--text0); }
-.list-stat-sub.list-stat-btn { font-size: 11px; color: var(--text1); }
+.list-stat-value.list-stat-btn {
+  font-size: 14px;
+  color: var(--text0);
+}
+.list-stat-sub.list-stat-btn {
+  font-size: 11px;
+  color: var(--text1);
+}
 .list-stat-value.list-stat-btn:hover:not(:disabled),
 .list-stat-value.list-stat-btn:focus-visible,
 .list-stat-sub.list-stat-btn:hover:not(:disabled),
-.list-stat-sub.list-stat-btn:focus-visible { color: var(--accent2); }
-.list-stat-btn[aria-pressed="true"] .list-stat-label { color: var(--accent); }
-.list-stat-icon { font-size: 11px; color: var(--text1); }
+.list-stat-sub.list-stat-btn:focus-visible {
+  color: var(--accent2);
+}
+.list-stat-btn[aria-pressed='true'] .list-stat-label {
+  color: var(--accent);
+}
+.list-stat-icon {
+  font-size: 11px;
+  color: var(--text1);
+}
 .list-stat-btn:hover .list-stat-icon,
-.list-stat-btn:focus-visible .list-stat-icon { color: var(--accent2); }
-.list-stat-btn:disabled { cursor: default; }
-.list-stat-btn:disabled .list-stat-label { color: var(--text1); }
+.list-stat-btn:focus-visible .list-stat-icon {
+  color: var(--accent2);
+}
+.list-stat-btn:disabled {
+  cursor: default;
+}
+.list-stat-btn:disabled .list-stat-label {
+  color: var(--text1);
+}
 
 /* Overrides .bundle-ends-rel's own inline-beside-the-time metrics (shared with the browse table's
    Ends cell) — here the countdown is its own line under the date, not a suffix. */
-.list-stat-sub .bundle-ends-rel { margin-left: 0; }
+.list-stat-sub .bundle-ends-rel {
+  margin-left: 0;
+}
 
 /* Tier prices as chips rather than middot-joined text: the middot was doing double duty as both
    the fact separator and the tier separator, so "13 games · tiers $5 · $15 · $25" read as five
    siblings. Each chip's title carries how many games that tier unlocks. */
-.bundle-tier-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.bundle-tier-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
 .bundle-tier-chip {
   padding: 1px 8px;
   border: 1px solid var(--border);
@@ -2417,14 +3672,29 @@ kbd {
   background: var(--bg2);
   white-space: nowrap;
 }
-.list-formula-source a { color: inherit; text-decoration: none; }
-.list-formula-source a:hover { color: var(--accent2); }
+.list-formula-source a {
+  color: inherit;
+  text-decoration: none;
+}
+.list-formula-source a:hover {
+  color: var(--accent2);
+}
 /* Same amber "heads up, not an error" palette as .account-private/.account-override-status: a
    dangling source doesn't break the list, it just contributes nothing. */
-.list-formula-source.has-problem { border-color: rgba(228,168,46,0.4); color: #e4c46e; }
-.list-formula-count { font-size: 11px; color: var(--text1); }
-.list-formula-op { color: var(--text1); }
-.list-formula-result { font-weight: 600; }
+.list-formula-source.has-problem {
+  border-color: rgba(228, 168, 46, 0.4);
+  color: #e4c46e;
+}
+.list-formula-count {
+  font-size: 11px;
+  color: var(--text1);
+}
+.list-formula-op {
+  color: var(--text1);
+}
+.list-formula-result {
+  font-weight: 600;
+}
 .list-formula-problems {
   list-style: none;
   margin: 6px 0 0;
@@ -2436,7 +3706,9 @@ kbd {
 
 /* The bundle's games with no Steam listing (ListRoute.tsx) — collapsed by default, but the count
    stays visible in the toggle so the table never passes itself off as the whole bundle. */
-.unresolved-games { margin-bottom: 24px; }
+.unresolved-games {
+  margin-bottom: 24px;
+}
 .unresolved-summary {
   background: none;
   border: none;
@@ -2446,7 +3718,9 @@ kbd {
   color: var(--text1);
   cursor: pointer;
 }
-.unresolved-summary:hover { color: var(--accent2); }
+.unresolved-summary:hover {
+  color: var(--accent2);
+}
 .unresolved-list {
   list-style: none;
   margin: 8px 0 0;
@@ -2455,10 +3729,24 @@ kbd {
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 4px 18px;
 }
-.unresolved-list li { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
-.unresolved-list a { color: var(--text0); text-decoration: none; }
-.unresolved-list a:hover { color: var(--accent2); }
-.unresolved-type { font-size: 11px; color: var(--text1); text-transform: capitalize; }
+.unresolved-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+.unresolved-list a {
+  color: var(--text0);
+  text-decoration: none;
+}
+.unresolved-list a:hover {
+  color: var(--accent2);
+}
+.unresolved-type {
+  font-size: 11px;
+  color: var(--text1);
+  text-transform: capitalize;
+}
 
 /* ── Bundles browse route ──────────────────────────────────────────────────────────────────── */
 
@@ -2484,7 +3772,11 @@ kbd {
    of its own). Fixed tracks rather than a flex row, so a bundle with only two or three games
    carrying artwork still occupies the same block as every other row instead of collapsing.
    Each banner is a little over half its native 145×55, so they stay sharp on a hidpi display. */
-.bundle-covers { display: grid; grid-template-columns: repeat(2, 80px); gap: 3px; }
+.bundle-covers {
+  display: grid;
+  grid-template-columns: repeat(2, 80px);
+  gap: 3px;
+}
 .bundle-cover {
   display: block;
   width: 80px;
@@ -2512,20 +3804,35 @@ kbd {
 /* Published/Ends cells: date on the first line, its time under it, smaller and dimmed. Stacked
    rather than one "2026-09-04 20:35" line so the column costs only the date's width — the rows are
    already tall enough for a second line, the cover grid above having set the row height anyway. */
-.bundle-datetime { display: flex; flex-direction: column; line-height: 1.35; }
-.bundle-datetime-time { font-size: 11px; color: var(--text1); }
+.bundle-datetime {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+.bundle-datetime-time {
+  font-size: 11px;
+  color: var(--text1);
+}
 
 /* "in 3d"/"in 11h"/"ended", sharing the Ends cell's second line with the time rather than widening
    the first — its color is set inline per row from scoreColor's own tiers (see renderEnds), so
    only the typography lives here. */
-.bundle-ends-rel { margin-left: 6px; font-weight: 600; white-space: nowrap; }
+.bundle-ends-rel {
+  margin-left: 6px;
+  font-weight: 600;
+  white-space: nowrap;
+}
 
 /* Dims an expired bundle's whole row. The table library has no per-row class hook, so the row is
    reached through the marker its Bundle cell carries (renderBundleTitle) — which means dimming
    stops if that column is hidden, an acceptable degradation for a column nobody hides. Only
    reachable at all with "Include expired" on; every row is Active otherwise. */
-.dt-tr:has(.bundle-expired) { opacity: 0.45; }
-.dt-tr:has(.bundle-expired):hover { opacity: 0.8; }
+.dt-tr:has(.bundle-expired) {
+  opacity: 0.45;
+}
+.dt-tr:has(.bundle-expired):hover {
+  opacity: 0.8;
+}
 
 /* ── Home route: account picker + folder/list tree ─────────────────────────────────────────── */
 
@@ -2537,8 +3844,22 @@ kbd {
   flex-direction: column;
   gap: 28px;
 }
-.home-route h2 { font-size: 13px; font-weight: 600; color: var(--text1); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 12px; }
-.home-route h3 { font-size: 12px; font-weight: 600; color: var(--text1); text-transform: uppercase; letter-spacing: 0.6px; margin: 14px 0 8px; }
+.home-route h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text1);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 12px;
+}
+.home-route h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text1);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin: 14px 0 8px;
+}
 
 .home-account {
   background: var(--bg1);
@@ -2552,22 +3873,43 @@ kbd {
   gap: 14px;
   margin-bottom: 16px;
 }
-.account-header img { border-radius: 50%; flex-shrink: 0; }
-.account-label {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  font-size: 15px; font-weight: 600; color: var(--text0);
+.account-header img {
+  border-radius: 50%;
+  flex-shrink: 0;
 }
-.account-counts { font-size: 12px; color: var(--text1); margin-top: 2px; }
+.account-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text0);
+}
+.account-counts {
+  font-size: 12px;
+  color: var(--text1);
+  margin-top: 2px;
+}
 /* Steam's optional "real name" field, next to the persona name it's never a replacement for
    (plenty of accounts leave it unset) — muted and parenthetical, same weight as .account-count. */
-.account-realname { font-size: 12px; font-weight: 400; color: var(--text1); }
+.account-realname {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text1);
+}
 /* "Updated <when> ↻ Refresh" on Home's Account card. Server-side caching runs for weeks
    (default.env's LIBRARY_CACHE_TTL_MINUTES), so how old the data is gets stated outright, with the
    control that fixes it sitting right next to the fact. Every *list* says it as a hero tile
    instead (ListHero.tsx), which is where `.bundles-updated`/`.region-readout` went. */
 .account-updated {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  font-size: 11px; color: var(--text2); margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--text2);
+  margin-top: 4px;
 }
 .account-updated-btn {
   background: none;
@@ -2578,35 +3920,77 @@ kbd {
   cursor: pointer;
   transition: color 0.15s;
 }
-.account-updated-btn:hover:not(:disabled), .account-updated-btn:focus-visible { color: var(--accent2); }
-.account-updated-btn:disabled { cursor: default; }
+.account-updated-btn:hover:not(:disabled),
+.account-updated-btn:focus-visible {
+  color: var(--accent2);
+}
+.account-updated-btn:disabled {
+  cursor: default;
+}
 
 /* The card's own larger avatar, against .account-avatar-wrap's 28px default. */
-.account-avatar-lg, .account-avatar-lg .account-avatar { width: 48px; height: 48px; }
-.account-profile-link { color: inherit; text-decoration: none; }
-.account-profile-link:hover { color: var(--accent2); }
-.account-profile-arrow { color: var(--text1); font-weight: 400; }
+.account-avatar-lg,
+.account-avatar-lg .account-avatar {
+  width: 48px;
+  height: 48px;
+}
+.account-profile-link {
+  color: inherit;
+  text-decoration: none;
+}
+.account-profile-link:hover {
+  color: var(--accent2);
+}
+.account-profile-arrow {
+  color: var(--text1);
+  font-weight: 400;
+}
 
 /* A Steam Family's member accounts — the header above speaks for the slot as a whole, so each
    account's own persona/profile link/presence/library size is listed here instead. */
-.account-members { list-style: none; margin: -8px 0 16px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.account-members li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.account-members {
+  list-style: none;
+  margin: -8px 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.account-members li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
 /* The currently-explored account's friends (AccountFriends.tsx) — same row shape as
    .account-members above, since both are "one Steam account per row". A <details> rather than
    always-open: a Family/public profile can easily have 100+ friends, which otherwise dwarfs the
    rest of the account card — collapsed by default, the count in the summary still says how many
    without opening it. */
-.account-friends { margin-bottom: 16px; }
+.account-friends {
+  margin-bottom: 16px;
+}
 .account-friends summary {
   cursor: pointer;
-  font-size: 12px; font-weight: 600; color: var(--text1);
-  text-transform: uppercase; letter-spacing: 0.6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text1);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
   margin: 14px 0 8px;
 }
-.account-friends[open] summary { margin-bottom: 8px; }
-.account-friends-note { font-size: 12px; color: var(--text1); margin: 0 0 8px; }
-.account-friends-meta { margin: 0 0 8px; }
+.account-friends[open] summary {
+  margin-bottom: 8px;
+}
+.account-friends-note {
+  font-size: 12px;
+  color: var(--text1);
+  margin: 0 0 8px;
+}
+.account-friends-meta {
+  margin: 0 0 8px;
+}
 .account-friends-refresh {
   background: none;
   border: 0;
@@ -2617,16 +4001,43 @@ kbd {
   cursor: pointer;
   transition: color 0.15s;
 }
-.account-friends-refresh:hover:not(:disabled), .account-friends-refresh:focus-visible { color: var(--accent2); }
-.account-friends-refresh:disabled { cursor: default; }
-.account-friends-refresh-icon { font-size: 11px; }
-.account-friends-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
-.account-friends-list li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.account-friends-list li .btn { margin-left: auto; }
+.account-friends-refresh:hover:not(:disabled),
+.account-friends-refresh:focus-visible {
+  color: var(--accent2);
+}
+.account-friends-refresh:disabled {
+  cursor: default;
+}
+.account-friends-refresh-icon {
+  font-size: 11px;
+}
+.account-friends-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.account-friends-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.account-friends-list li .btn {
+  margin-left: auto;
+}
 .account-friend-mutual {
-  font-size: 11px; font-weight: 500;
-  padding: 2px 7px; border-radius: 999px;
-  background: rgba(102,192,244,0.1); border: 1px solid rgba(102,192,244,0.3); color: var(--accent2);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(102, 192, 244, 0.1);
+  border: 1px solid rgba(102, 192, 244, 0.3);
+  color: var(--accent2);
 }
 
 .home-account form {
@@ -2635,7 +4046,7 @@ kbd {
   gap: 8px;
   margin-bottom: 8px;
 }
-.home-account form input[type="text"] {
+.home-account form input[type='text'] {
   flex: 1 1 240px;
   background: var(--bg0);
   border: 1px solid var(--border);
@@ -2644,34 +4055,75 @@ kbd {
   color: var(--text0);
   font-size: 13px;
 }
-.home-account form input[type="text"]:focus { border-color: var(--accent); outline: none; }
-.home-account form button { padding: 9px 14px; border: 1px solid var(--border); border-radius: var(--r); background: transparent; color: var(--text0); font-size: 13px; cursor: pointer; }
-.home-account form button[type="submit"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-.home-account form button:disabled { opacity: 0.6; cursor: not-allowed; }
+.home-account form input[type='text']:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.home-account form button {
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--text0);
+  font-size: 13px;
+  cursor: pointer;
+}
+.home-account form button[type='submit'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.home-account form button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
 /* A `?u=` link's account override (HomeRoute) — deliberately called out rather than styled
    like ordinary body text: the account card right below it is showing someone the *link's*
    account, not the visitor's own, and nothing else on the page says so. Same amber
    "heads up, not an error" palette as .account-private's own private-profile badge. */
 .account-override {
-  background: rgba(228,168,46,0.08);
-  border: 1px solid rgba(228,168,46,0.3);
+  background: rgba(228, 168, 46, 0.08);
+  border: 1px solid rgba(228, 168, 46, 0.3);
   border-radius: var(--r);
   padding: 10px 12px;
   margin-bottom: 14px;
 }
-.account-override-status { font-size: 12.5px; color: var(--text0); margin: 0; }
-.account-override-status + .account-override-status { margin-top: 6px; }
-.account-override-adopt {
-  margin-left: 8px; padding: 3px 9px;
-  border: 1px solid var(--border); border-radius: var(--r);
-  background: transparent; color: var(--text0); font-size: 12px; cursor: pointer;
+.account-override-status {
+  font-size: 12.5px;
+  color: var(--text0);
+  margin: 0;
 }
-.account-override-adopt:hover { border-color: var(--accent); color: var(--accent2); }
+.account-override-status + .account-override-status {
+  margin-top: 6px;
+}
+.account-override-adopt {
+  margin-left: 8px;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--text0);
+  font-size: 12px;
+  cursor: pointer;
+}
+.account-override-adopt:hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
 
-.error { color: #ff8888; font-size: 12.5px; margin: 6px 0; }
+.error {
+  color: #ff8888;
+  font-size: 12.5px;
+  margin: 6px 0;
+}
 
-.recent-accounts { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.recent-accounts {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .recent-accounts li {
   display: flex;
   align-items: center;
@@ -2682,8 +4134,19 @@ kbd {
   border-radius: var(--r);
   padding: 6px 10px;
 }
-.recent-accounts li > button:first-child { flex: 1; text-align: left; background: none; border: none; color: var(--text0); font-size: 13px; cursor: pointer; padding: 2px 0; }
-.recent-accounts li > button:first-child:hover { color: var(--accent2); }
+.recent-accounts li > button:first-child {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text0);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 0;
+}
+.recent-accounts li > button:first-child:hover {
+  color: var(--accent2);
+}
 .recent-accounts button:not(.copy-btn) {
   background: transparent;
   border: 1px solid var(--border);
@@ -2694,7 +4157,10 @@ kbd {
   cursor: pointer;
   white-space: nowrap;
 }
-.recent-accounts button:not(.copy-btn):hover { border-color: var(--accent); color: var(--accent2); }
+.recent-accounts button:not(.copy-btn):hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
 
 .home-fixed-links {
   display: flex;
@@ -2712,9 +4178,14 @@ kbd {
   text-decoration: none;
   font-size: 13px;
   font-weight: 500;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
-.home-fixed-links a:hover { border-color: var(--accent); color: var(--accent2); }
+.home-fixed-links a:hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
 
 .home-tree {
   background: var(--bg1);
@@ -2737,7 +4208,10 @@ kbd {
   font-size: 12.5px;
   cursor: pointer;
 }
-.tree-actions button:hover { border-color: var(--accent); color: var(--accent2); }
+.tree-actions button:hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
 
 .combine-form {
   background: var(--bg2);
@@ -2749,7 +4223,7 @@ kbd {
   flex-direction: column;
   gap: 8px;
 }
-.combine-form input[type="text"],
+.combine-form input[type='text'],
 .combine-form select {
   background: var(--bg0);
   border: 1px solid var(--border);
@@ -2758,18 +4232,56 @@ kbd {
   color: var(--text0);
   font-size: 13px;
 }
-.combine-form input[type="text"]:focus,
-.combine-form select:focus { border-color: var(--accent); outline: none; }
-.combine-form p { font-size: 12px; color: var(--text1); }
+.combine-form input[type='text']:focus,
+.combine-form select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.combine-form p {
+  font-size: 12px;
+  color: var(--text1);
+}
 /* A label the app derived rather than one someone typed (an unnamed dynamic list's formula) —
    dimmed and italic wherever it stands in for a name. */
-.derived-name { font-style: italic; color: var(--text1); }
-.combine-sources { list-style: none; display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
-.combine-sources label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text0); cursor: pointer; }
-.combine-sources-ordered { list-style: none; display: flex; flex-direction: column; gap: 4px; }
-.combine-sources-ordered li { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text0); }
-.combine-source-index { color: var(--text1); }
-.combine-source-label { flex: 1; }
+.derived-name {
+  font-style: italic;
+  color: var(--text1);
+}
+.combine-sources {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.combine-sources label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text0);
+  cursor: pointer;
+}
+.combine-sources-ordered {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.combine-sources-ordered li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text0);
+}
+.combine-source-index {
+  color: var(--text1);
+}
+.combine-source-label {
+  flex: 1;
+}
 .combine-sources-ordered button {
   padding: 2px 8px;
   border: 1px solid var(--border);
@@ -2779,10 +4291,20 @@ kbd {
   font-size: 11px;
   cursor: pointer;
 }
-.combine-sources-ordered button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
-.combine-sources-ordered button:disabled { opacity: 0.4; cursor: default; }
-.combine-form-actions { display: flex; align-items: center; gap: 8px; }
-.combine-form button[type="submit"] {
+.combine-sources-ordered button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
+.combine-sources-ordered button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.combine-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.combine-form button[type='submit'] {
   padding: 8px 16px;
   border: none;
   border-radius: var(--r);
@@ -2792,7 +4314,7 @@ kbd {
   font-weight: 500;
   cursor: pointer;
 }
-.combine-form button[type="button"] {
+.combine-form button[type='button'] {
   padding: 8px 16px;
   border: 1px solid var(--border);
   border-radius: var(--r);
@@ -2801,9 +4323,17 @@ kbd {
   font-size: 13px;
   cursor: pointer;
 }
-.combine-form button[type="button"]:hover { border-color: var(--accent); color: var(--accent2); }
+.combine-form button[type='button']:hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
 
-.list-tree { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.list-tree {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .list-tree li {
   display: flex;
   align-items: center;
@@ -2811,14 +4341,31 @@ kbd {
   padding: 7px 8px;
   border-radius: var(--r);
 }
-.list-tree li:hover { background: var(--bg2); }
-.list-tree a { flex: 1; color: var(--text0); text-decoration: none; font-size: 13px; }
-.list-tree a:hover { color: var(--accent2); }
+.list-tree li:hover {
+  background: var(--bg2);
+}
+.list-tree a {
+  flex: 1;
+  color: var(--text0);
+  text-decoration: none;
+  font-size: 13px;
+}
+.list-tree a:hover {
+  color: var(--accent2);
+}
 /* Beats the generic `.list-tree span` colour rule below, which is more specific than
    `.derived-name` on its own. */
-.list-tree a .derived-name { color: var(--text1); }
-.list-tree a:hover .derived-name { color: var(--accent2); }
-.list-tree span { flex: 1; color: var(--text0); font-size: 13px; }
+.list-tree a .derived-name {
+  color: var(--text1);
+}
+.list-tree a:hover .derived-name {
+  color: var(--accent2);
+}
+.list-tree span {
+  flex: 1;
+  color: var(--text0);
+  font-size: 13px;
+}
 .list-tree button {
   background: transparent;
   border: 1px solid var(--border);
@@ -2829,39 +4376,149 @@ kbd {
   cursor: pointer;
   white-space: nowrap;
 }
-.list-tree button:hover { border-color: var(--accent); color: var(--accent2); }
+.list-tree button:hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
 
 /* ── Ranked list compare screen (RankRoute.tsx) ─────────────────────────────────────────── */
-.rank-route { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
-.rank-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.rank-header h1 { font-size: 20px; color: var(--text0); }
-.rank-progress { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--text1); }
-.rank-progress progress { flex: 1 1 200px; height: 8px; accent-color: var(--accent); }
+.rank-route {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.rank-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.rank-header h1 {
+  font-size: 20px;
+  color: var(--text0);
+}
+.rank-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text1);
+}
+.rank-progress progress {
+  flex: 1 1 200px;
+  height: 8px;
+  accent-color: var(--accent);
+}
 .rank-focus-banner {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px;
-  background: var(--color-background-info); border: 1px solid var(--color-border-info); color: var(--color-text-info);
-  border-radius: var(--r); padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  background: var(--color-background-info);
+  border: 1px solid var(--color-border-info);
+  color: var(--color-text-info);
+  border-radius: var(--r);
+  padding: 8px 12px;
 }
-.rank-question { font-size: 18px; text-align: center; color: var(--text0); }
-.rank-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.rank-card { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.rank-question {
+  font-size: 18px;
+  text-align: center;
+  color: var(--text0);
+}
+.rank-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.rank-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
 .rank-card-pick {
-  display: flex; flex-direction: column; gap: 6px; text-align: left;
-  background: var(--bg1); border: 2px solid var(--border); border-radius: var(--r);
-  padding: 0 0 12px; overflow: hidden; color: var(--text0); cursor: pointer; font: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  background: var(--bg1);
+  border: 2px solid var(--border);
+  border-radius: var(--r);
+  padding: 0 0 12px;
+  overflow: hidden;
+  color: var(--text0);
+  cursor: pointer;
+  font: inherit;
 }
-.rank-card-pick:hover, .rank-card-pick:focus-visible { border-color: var(--accent); }
-.rank-card-armed .rank-card-pick:hover, .rank-card-armed .rank-card-pick:focus-visible { border-color: var(--color-text-warning); }
-.rank-card-pick img { width: 100%; height: auto; aspect-ratio: 460 / 215; object-fit: cover; background: var(--bg3); }
-.rank-card-name { font-size: 16px; font-weight: 600; padding: 0 12px; }
-.rank-card-name { display: flex; justify-content: space-between; gap: 8px; }
-.rank-card-rating { font-variant-numeric: tabular-nums; }
-.rank-card-facts, .rank-card-note { font-size: 12px; color: var(--text1); padding: 0 12px; }
-.rank-card-actions { display: flex; gap: 6px; }
-.rank-card-actions .btn { flex: 1; }
-.rank-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
-.rank-hint { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--text1); }
-.rank-done { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px; text-align: center; }
+.rank-card-pick:hover,
+.rank-card-pick:focus-visible {
+  border-color: var(--accent);
+}
+.rank-card-armed .rank-card-pick:hover,
+.rank-card-armed .rank-card-pick:focus-visible {
+  border-color: var(--color-text-warning);
+}
+.rank-card-pick img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 460 / 215;
+  object-fit: cover;
+  background: var(--bg3);
+}
+.rank-card-name {
+  font-size: 16px;
+  font-weight: 600;
+  padding: 0 12px;
+}
+.rank-card-name {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.rank-card-rating {
+  font-variant-numeric: tabular-nums;
+}
+.rank-card-facts,
+.rank-card-note {
+  font-size: 12px;
+  color: var(--text1);
+  padding: 0 12px;
+}
+.rank-card-actions {
+  display: flex;
+  gap: 6px;
+}
+.rank-card-actions .btn {
+  flex: 1;
+}
+.rank-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.rank-hint {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text1);
+}
+.rank-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
 @media (max-width: 600px) {
-  .rank-pair { grid-template-columns: 1fr; }
+  .rank-pair {
+    grid-template-columns: 1fr;
+  }
 }

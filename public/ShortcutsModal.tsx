@@ -73,17 +73,19 @@ export function ShortcutsModal(props: { open: boolean; onClose: () => void }): J
       >
         <div class="shortcuts-header">
           <span class="shortcuts-title">Keyboard shortcuts</span>
-          <button type="button" class="shortcuts-close" aria-label="Close" onClick={() => props.onClose()}>×</button>
+          <button type="button" class="shortcuts-close" aria-label="Close" onClick={() => props.onClose()}>
+            ×
+          </button>
         </div>
         <div class="shortcuts-body">
           <For each={SHORTCUT_SECTIONS}>
-            {section => (
+            {(section) => (
               <div class="shortcuts-section">
                 <div class="shortcuts-section-title">{section.title}</div>
                 <For each={section.rows}>
-                  {row => (
+                  {(row) => (
                     <div class="shortcuts-row">
-                      <For each={row.keys}>{k => <kbd>{k}</kbd>}</For>
+                      <For each={row.keys}>{(k) => <kbd>{k}</kbd>}</For>
                       <span>{row.label}</span>
                     </div>
                   )}

@@ -18,14 +18,14 @@ import { render } from 'solid-js/web';
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 
-const LB_FS_ENTER  = `<svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" aria-hidden="true"><polyline points="4,1 1,1 1,4"/><polyline points="8,1 11,1 11,4"/><polyline points="1,8 1,11 4,11"/><polyline points="11,8 11,11 8,11"/></svg>`;
+const LB_FS_ENTER = `<svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" aria-hidden="true"><polyline points="4,1 1,1 1,4"/><polyline points="8,1 11,1 11,4"/><polyline points="1,8 1,11 4,11"/><polyline points="11,8 11,11 8,11"/></svg>`;
 const LB_LINK_ICON = `<svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M5.5 8.5a3 3 0 0 0 4.24 0l1.42-1.42a3 3 0 0 0-4.24-4.24l-.71.71"/><path d="M8.5 5.5a3 3 0 0 0-4.24 0L2.84 6.92a3 3 0 0 0 4.24 4.24l.71-.71"/></svg>`;
 const LB_CHECK_ICON = `<svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,7 5.5,11 12,3"/></svg>`;
-const LB_FS_EXIT   = `<svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" aria-hidden="true"><polyline points="1,4 1,1 4,1"/><polyline points="11,4 11,1 8,1"/><polyline points="4,11 1,11 1,8"/><polyline points="8,11 11,11 11,8"/></svg>`;
-const LB_PLAY_ICON  = `<svg viewBox="0 0 12 12" width="16" height="16" fill="currentColor" aria-hidden="true"><polygon points="2,1 11,6 2,11"/></svg>`;
+const LB_FS_EXIT = `<svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" aria-hidden="true"><polyline points="1,4 1,1 4,1"/><polyline points="11,4 11,1 8,1"/><polyline points="4,11 1,11 1,8"/><polyline points="8,11 11,11 11,8"/></svg>`;
+const LB_PLAY_ICON = `<svg viewBox="0 0 12 12" width="16" height="16" fill="currentColor" aria-hidden="true"><polygon points="2,1 11,6 2,11"/></svg>`;
 const LB_PAUSE_ICON = `<svg viewBox="0 0 12 12" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="1" y="1" width="4" height="10" rx="0.5"/><rect x="7" y="1" width="4" height="10" rx="0.5"/></svg>`;
-const LB_VOL_ICON   = `<svg viewBox="0 0 14 12" width="16" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><polygon points="1,4 5,4 8,1 8,11 5,8 1,8" fill="currentColor" stroke="none"/><path d="M10 3.5c1 .9 1.5 1.7 1.5 2.5S11 8.1 10 9" stroke-linecap="round"/></svg>`;
-const LB_MUTE_ICON  = `<svg viewBox="0 0 14 12" width="16" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><polygon points="1,4 5,4 8,1 8,11 5,8 1,8" fill="currentColor" stroke="none"/><line x1="10.5" y1="4" x2="13.5" y2="8" stroke-linecap="round"/><line x1="13.5" y1="4" x2="10.5" y2="8" stroke-linecap="round"/></svg>`;
+const LB_VOL_ICON = `<svg viewBox="0 0 14 12" width="16" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><polygon points="1,4 5,4 8,1 8,11 5,8 1,8" fill="currentColor" stroke="none"/><path d="M10 3.5c1 .9 1.5 1.7 1.5 2.5S11 8.1 10 9" stroke-linecap="round"/></svg>`;
+const LB_MUTE_ICON = `<svg viewBox="0 0 14 12" width="16" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><polygon points="1,4 5,4 8,1 8,11 5,8 1,8" fill="currentColor" stroke="none"/><line x1="10.5" y1="4" x2="13.5" y2="8" stroke-linecap="round"/><line x1="13.5" y1="4" x2="10.5" y2="8" stroke-linecap="round"/></svg>`;
 
 // ── State ──────────────────────────────────────────────────────────────────
 // Converted from plain module-level variables to Solid signals for
@@ -46,9 +46,16 @@ const [idx, setIdx] = createSignal(0);
 // proxy sees them arrive. Snapshotting meant such a game showed that lone banner for as long as
 // it stayed open. Plain accessors rather than `createMemo`s: a memo at module level would need
 // its own `createRoot` (see the effect at the foot of this file) to cache two array spreads.
-const shots = () => { const g = lbGame(); return g ? buildMediaItems(g.appid, g.details?.meta) : []; };
+const shots = () => {
+  const g = lbGame();
+  return g ? buildMediaItems(g.appid, g.details?.meta) : [];
+};
 const gameName = () => lbGame()?.name ?? '';
-let lbZoom = 1, lbPanX = 0, lbPanY = 0, lbLastDir = 0, lbVcTimer: ReturnType<typeof setTimeout> | undefined;
+let lbZoom = 1,
+  lbPanX = 0,
+  lbPanY = 0,
+  lbLastDir = 0,
+  lbVcTimer: ReturnType<typeof setTimeout> | undefined;
 // Bumped on every renderLightbox() call; a detached Image()'s onload checks it's still current
 // before touching the shared img element, so a slow load from a shot the viewer already
 // navigated away from can't clobber the one currently displayed — img is reused across shots
@@ -73,8 +80,12 @@ type LbVideo = HTMLVideoElement & { _hls?: { destroy: () => void } | null; _hlsT
 // re-queried because `wireVideoControls` binds to it once at mount, while it is detached.
 let lbVideoEl!: LbVideo;
 let lbVideoAnchor!: Element;
-function attachLbVideo() { if (!lbVideoEl.isConnected) lbVideoAnchor.before(lbVideoEl); }
-function detachLbVideo() { lbVideoEl.remove(); }
+function attachLbVideo() {
+  if (!lbVideoEl.isConnected) lbVideoAnchor.before(lbVideoEl);
+}
+function detachLbVideo() {
+  lbVideoEl.remove();
+}
 type LbFlashEl = HTMLElement & { _flashTimer?: ReturnType<typeof setTimeout> };
 
 const LB_SEEK_SECONDS = 5;
@@ -102,7 +113,12 @@ const _lbPrefetchedHls = new Set();
 // `getGamePosition()`: where the open game sits in that list, for the caption — null when there
 // is no list to page through at all (a standalone lookup), which is also what hides the caption's
 // own ↑/↓ buttons. All optional; a host with none of them just no-ops.
-export function initLightbox({ onParamChange, onGameNav, onGameRandom, getGamePosition }: {
+export function initLightbox({
+  onParamChange,
+  onGameNav,
+  onGameRandom,
+  getGamePosition,
+}: {
   onParamChange?: (shotId: string | null) => void;
   onGameNav?: (dir: number) => void;
   onGameRandom?: () => void;
@@ -117,7 +133,9 @@ export function initLightbox({ onParamChange, onGameNav, onGameRandom, getGamePo
   mountLightboxDom();
 }
 
-export function isLightboxOpen() { return lbGame() !== null; }
+export function isLightboxOpen() {
+  return lbGame() !== null;
+}
 
 // Every game step from inside the lightbox (↑/↓, R, the caption's own buttons) goes through
 // here. The host's step opens the panel *behind* the overlay, and `panelOpen` focuses that
@@ -128,7 +146,10 @@ export function isLightboxOpen() { return lbGame() !== null; }
 function stepGameFromLightbox(step: () => void, dir = 0) {
   const lb = document.getElementById('screenshot-lightbox')!;
   const before = document.activeElement;
-  if (dir !== 0) { lbLastDir = dir; lbLastAxis = 'y'; }
+  if (dir !== 0) {
+    lbLastDir = dir;
+    lbLastAxis = 'y';
+  }
   step();
   if (lb.contains(document.activeElement)) return;
   ((before && lb.contains(before) ? before : lb.querySelector('.lb-close')) as HTMLElement).focus();
@@ -163,13 +184,16 @@ function syncLightboxFullscreenBtn() {
 // ahead of the user actually reaching a video shot, same idea as its existing manifest prefetch.
 let _hlsModulePromise: Promise<any> | null = null;
 function loadHlsModule(): Promise<any> {
-  return (_hlsModulePromise ??= import('hls.js').then(m => m.default));
+  return (_hlsModulePromise ??= import('hls.js').then((m) => m.default));
 }
 
 async function playHls(videoEl: LbVideo, src: string | null | undefined) {
   if (!src) return;
   hideLbError();
-  if (videoEl._hls) { videoEl._hls.destroy(); videoEl._hls = null; }
+  if (videoEl._hls) {
+    videoEl._hls.destroy();
+    videoEl._hls = null;
+  }
   if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
     // Assigned as a property (not addEventListener) since videoEl is reused
     // across shots — a property assignment overwrites rather than stacking.
@@ -199,7 +223,10 @@ function stopHls(videoEl: LbVideo | null) {
   if (!videoEl) return;
   videoEl.pause();
   videoEl._hlsToken = (videoEl._hlsToken || 0) + 1; // invalidate any in-flight playHls() load
-  if (videoEl._hls) { videoEl._hls.destroy(); videoEl._hls = null; }
+  if (videoEl._hls) {
+    videoEl._hls.destroy();
+    videoEl._hls = null;
+  }
   videoEl.removeAttribute('src');
 }
 
@@ -236,8 +263,16 @@ function retryCurrentShot() {
     // won't necessarily re-attempt the network request otherwise.
     const bust = shot.main! + (shot.main!.includes('?') ? '&' : '?') + '_retry=' + Date.now();
     const full = new Image();
-    full.onload  = () => { img.src = bust; img.style.opacity = '1'; lb?.classList.remove('lb--loading'); };
-    full.onerror = () => { img.style.opacity = '0'; lb?.classList.remove('lb--loading'); showLbError("Couldn't load this image."); };
+    full.onload = () => {
+      img.src = bust;
+      img.style.opacity = '1';
+      lb?.classList.remove('lb--loading');
+    };
+    full.onerror = () => {
+      img.style.opacity = '0';
+      lb?.classList.remove('lb--loading');
+      showLbError("Couldn't load this image.");
+    };
     full.src = bust;
   }
 }
@@ -248,12 +283,13 @@ function applyLbTransform() {
   const img = document.querySelector<HTMLImageElement>('#screenshot-lightbox .lb-img');
   if (!img) return;
   if (lbZoom === 1) {
-    lbPanX = 0; lbPanY = 0;
+    lbPanX = 0;
+    lbPanY = 0;
     img.style.transform = '';
     img.style.cursor = '';
   } else {
-    const maxX = img.offsetWidth  * (lbZoom - 1) / 2;
-    const maxY = img.offsetHeight * (lbZoom - 1) / 2;
+    const maxX = (img.offsetWidth * (lbZoom - 1)) / 2;
+    const maxY = (img.offsetHeight * (lbZoom - 1)) / 2;
     lbPanX = Math.max(-maxX, Math.min(maxX, lbPanX));
     lbPanY = Math.max(-maxY, Math.min(maxY, lbPanY));
     img.style.transform = `scale(${lbZoom}) translate(${lbPanX / lbZoom}px, ${lbPanY / lbZoom}px)`;
@@ -262,7 +298,9 @@ function applyLbTransform() {
 }
 
 function resetLbZoom() {
-  lbZoom = 1; lbPanX = 0; lbPanY = 0;
+  lbZoom = 1;
+  lbPanX = 0;
+  lbPanY = 0;
   applyLbTransform();
 }
 
@@ -273,8 +311,8 @@ function lbZoomTowardPoint(clientX: number, clientY: number) {
   if (!img) return;
   const rect = img.getBoundingClientRect();
   lbZoom = 2;
-  lbPanX = -(clientX - rect.left - rect.width  / 2);
-  lbPanY = -(clientY - rect.top  - rect.height / 2);
+  lbPanX = -(clientX - rect.left - rect.width / 2);
+  lbPanY = -(clientY - rect.top - rect.height / 2);
   applyLbTransform();
   img.style.cursor = 'grab';
 }
@@ -336,7 +374,7 @@ function showLbChrome() {
 }
 
 function schedHideLbChrome() {
-  const lb  = document.getElementById('screenshot-lightbox');
+  const lb = document.getElementById('screenshot-lightbox');
   if (!lb) return;
   const isPausedVideo = lbVideoEl.isConnected && lbVideoEl.paused;
   clearTimeout(lbVcTimer);
@@ -347,15 +385,14 @@ function schedHideLbChrome() {
 
 // Returns all focusable elements that are not inside a display:none ancestor.
 function getFocusable(lb: HTMLElement): HTMLElement[] {
-  return [...lb.querySelectorAll<HTMLElement>('button:not([disabled]), input[type="range"]')]
-    .filter(el => {
-      let node: HTMLElement | null = el;
-      while (node && node !== lb) {
-        if (node.style.display === 'none') return false;
-        node = node.parentElement;
-      }
-      return true;
-    });
+  return [...lb.querySelectorAll<HTMLElement>('button:not([disabled]), input[type="range"]')].filter((el) => {
+    let node: HTMLElement | null = el;
+    while (node && node !== lb) {
+      if (node.style.display === 'none') return false;
+      node = node.parentElement;
+    }
+    return true;
+  });
 }
 
 // ── DOM creation ───────────────────────────────────────────────────────────
@@ -372,16 +409,24 @@ function LightboxDom() {
   return (
     <div id="screenshot-lightbox" role="dialog" aria-modal="true" aria-label="Screenshot viewer">
       <div class="lb-backdrop" />
-      <button class="lb-btn lb-prev" aria-label="Previous screenshot">&#8249;</button>
+      <button class="lb-btn lb-prev" aria-label="Previous screenshot">
+        &#8249;
+      </button>
       <img class="lb-img" src="" alt="Screenshot" />
       <video class="lb-video" playsinline />
-      <button class="lb-btn lb-next" aria-label="Next screenshot">&#8250;</button>
+      <button class="lb-btn lb-next" aria-label="Next screenshot">
+        &#8250;
+      </button>
       <div class="lb-error" style={{ display: 'none' }} role="alert">
         <p class="lb-error-msg" />
         <button class="lb-error-retry">Retry</button>
       </div>
-      <div class="lb-seek-flash lb-seek-flash-left" aria-hidden="true">⏪ {LB_TOUCH_SEEK_SECONDS}s</div>
-      <div class="lb-seek-flash lb-seek-flash-right" aria-hidden="true">{LB_TOUCH_SEEK_SECONDS}s ⏩</div>
+      <div class="lb-seek-flash lb-seek-flash-left" aria-hidden="true">
+        ⏪ {LB_TOUCH_SEEK_SECONDS}s
+      </div>
+      <div class="lb-seek-flash lb-seek-flash-right" aria-hidden="true">
+        {LB_TOUCH_SEEK_SECONDS}s ⏩
+      </div>
       <div class="lb-vctrls" style={{ display: 'none' }}>
         {/* eslint-disable-next-line solid/no-innerhtml -- a module-level literal SVG string
             from the top of this file, not data: nothing here comes from a game, a user, or an
@@ -401,10 +446,14 @@ function LightboxDom() {
             media within one game). Both buttons are hidden when there's no list to page
             through — see `_getGamePosition`. */}
         <div class="lb-caption">
-          <button class="lb-game-prev" aria-label="Previous game">&#8593;</button>
+          <button class="lb-game-prev" aria-label="Previous game">
+            &#8593;
+          </button>
           <span class="lb-caption-text" />
           <span class="lb-caption-pos" />
-          <button class="lb-game-next" aria-label="Next game">&#8595;</button>
+          <button class="lb-game-next" aria-label="Next game">
+            &#8595;
+          </button>
         </div>
         <div class="lb-toolbar-row">
           <div class="lb-toolbar-left">
@@ -417,7 +466,9 @@ function LightboxDom() {
           </div>
           <div class="lb-counter" aria-live="polite" aria-atomic="true" />
           <div class="lb-toolbar-right">
-            <button class="lb-close" aria-label="Close lightbox">&#215;</button>
+            <button class="lb-close" aria-label="Close lightbox">
+              &#215;
+            </button>
           </div>
         </div>
       </div>
@@ -441,7 +492,9 @@ function wireButtons(lb: HTMLElement) {
     try {
       await navigator.clipboard.writeText(location.href);
       btn.innerHTML = LB_CHECK_ICON;
-      setTimeout(() => { btn.innerHTML = LB_LINK_ICON; }, 1500);
+      setTimeout(() => {
+        btn.innerHTML = LB_LINK_ICON;
+      }, 1500);
     } catch {
       window.prompt('Copy this link:', location.href);
     }
@@ -455,13 +508,16 @@ function wireButtons(lb: HTMLElement) {
     if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
       (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
     } else {
-      (lb.requestFullscreen?.() ?? (lb as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.())?.catch?.(() => {});
+      (
+        lb.requestFullscreen?.() ??
+        (lb as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.()
+      )?.catch?.(() => {});
     }
   });
 }
 
 function wireKeyboard(lb: HTMLElement) {
-  document.addEventListener('keydown', e => {
+  document.addEventListener('keydown', (e) => {
     if (!isLightboxOpen()) return;
     const onScrub = (e.target as HTMLElement | null)?.classList.contains('lb-vc-scrub');
 
@@ -470,11 +526,17 @@ function wireKeyboard(lb: HTMLElement) {
       const focusable = getFocusable(lb);
       if (!focusable.length) return;
       const first = focusable[0];
-      const last  = focusable[focusable.length - 1];
+      const last = focusable[focusable.length - 1];
       if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
       } else {
-        if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
       return;
     }
@@ -516,37 +578,58 @@ function wireKeyboard(lb: HTMLElement) {
       if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
         (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
       } else {
-        (lb.requestFullscreen?.() ?? (lb as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.())?.catch?.(() => {});
+        (
+          lb.requestFullscreen?.() ??
+          (lb as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.()
+        )?.catch?.(() => {});
       }
     }
     if (vid) {
-      if (e.key === ' ' && !onScrub) { e.preventDefault(); vid.paused ? vid.play().catch(() => {}) : vid.pause(); }
-      if (e.key === 'm' || e.key === 'M') { vid.muted = !vid.muted; }
+      if (e.key === ' ' && !onScrub) {
+        e.preventDefault();
+        vid.paused ? vid.play().catch(() => {}) : vid.pause();
+      }
+      if (e.key === 'm' || e.key === 'M') {
+        vid.muted = !vid.muted;
+      }
     }
   });
 }
 
 function wireMouseHandlers(lb: HTMLElement) {
-  lb.addEventListener('wheel', e => {
-    if (lb.querySelector<HTMLImageElement>('.lb-img')!.style.display === 'none') return;
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    lbZoom = Math.max(1, Math.min(4, lbZoom * factor));
-    if (lbZoom === 1) { lbPanX = 0; lbPanY = 0; }
-    applyLbTransform();
-  }, { passive: false });
+  lb.addEventListener(
+    'wheel',
+    (e) => {
+      if (lb.querySelector<HTMLImageElement>('.lb-img')!.style.display === 'none') return;
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      lbZoom = Math.max(1, Math.min(4, lbZoom * factor));
+      if (lbZoom === 1) {
+        lbPanX = 0;
+        lbPanY = 0;
+      }
+      applyLbTransform();
+    },
+    { passive: false },
+  );
 
   const lbImg = lb.querySelector<HTMLImageElement>('.lb-img')!;
-  let lbDragging = false, lbDragStartX = 0, lbDragStartY = 0, lbPanStartX = 0, lbPanStartY = 0;
-  lbImg.addEventListener('mousedown', e => {
+  let lbDragging = false,
+    lbDragStartX = 0,
+    lbDragStartY = 0,
+    lbPanStartX = 0,
+    lbPanStartY = 0;
+  lbImg.addEventListener('mousedown', (e) => {
     if (lbZoom <= 1) return;
     lbDragging = true;
-    lbDragStartX = e.clientX; lbDragStartY = e.clientY;
-    lbPanStartX = lbPanX; lbPanStartY = lbPanY;
+    lbDragStartX = e.clientX;
+    lbDragStartY = e.clientY;
+    lbPanStartX = lbPanX;
+    lbPanStartY = lbPanY;
     lbImg.style.cursor = 'grabbing';
     e.preventDefault();
   });
-  document.addEventListener('mousemove', e => {
+  document.addEventListener('mousemove', (e) => {
     if (!lbDragging) return;
     lbPanX = lbPanStartX + (e.clientX - lbDragStartX);
     lbPanY = lbPanStartY + (e.clientY - lbDragStartY);
@@ -557,7 +640,7 @@ function wireMouseHandlers(lb: HTMLElement) {
     lbDragging = false;
     lbImg.style.cursor = lbZoom > 1 ? 'grab' : '';
   });
-  lbImg.addEventListener('dblclick', e => {
+  lbImg.addEventListener('dblclick', (e) => {
     if (lbZoom > 1) resetLbZoom();
     else lbZoomTowardPoint(e.clientX, e.clientY);
   });
@@ -583,147 +666,203 @@ function setLbDrag(el: HTMLElement, x: number, y: number) {
 function clearLbDrag(el: HTMLElement, animate: boolean) {
   el.style.transition = animate ? 'transform 0.2s ease, opacity 0.18s' : '';
   el.style.transform = '';
-  if (animate) setTimeout(() => { el.style.transition = ''; }, 200);
+  if (animate)
+    setTimeout(() => {
+      el.style.transition = '';
+    }, 200);
 }
 
 function wireTouchHandlers(lb: HTMLElement) {
-  let lbX = 0, lbY = 0, lbActive = false;
-  let pinchStartDist = 0, pinchStartZoom = 1;
-  let touchPanning = false, touchPanStartX = 0, touchPanStartY = 0, touchPanOriginX = 0, touchPanOriginY = 0;
-  let lbLastTapTime = 0, lbLastTapX = 0, lbLastTapY = 0;
+  let lbX = 0,
+    lbY = 0,
+    lbActive = false;
+  let pinchStartDist = 0,
+    pinchStartZoom = 1;
+  let touchPanning = false,
+    touchPanStartX = 0,
+    touchPanStartY = 0,
+    touchPanOriginX = 0,
+    touchPanOriginY = 0;
+  let lbLastTapTime = 0,
+    lbLastTapX = 0,
+    lbLastTapY = 0;
   // Swipe drag: the axis locked onto (null until the finger has moved far enough to tell), when
   // it started (for the flick threshold), and what each axis has to step to — the latter read
   // once per gesture rather than per touchmove, `_getGamePosition` reaching the route's own list
   // (see `renderLightbox`'s untracked read of it).
   let dragAxis: SwipeAxis | null = null;
-  let dragStart = 0, dragMediaCount = 0, dragHasGameList = false;
+  let dragStart = 0,
+    dragMediaCount = 0,
+    dragHasGameList = false;
 
-  lb.addEventListener('touchstart', e => {
-    if (e.touches.length === 2) {
-      if (lb.querySelector<HTMLImageElement>('.lb-img')!.style.display === 'none') return;
-      pinchStartDist = Math.hypot(
-        e.touches[1].clientX - e.touches[0].clientX,
-        e.touches[1].clientY - e.touches[0].clientY
-      );
-      pinchStartZoom = lbZoom;
-      lbActive = false;
-      e.preventDefault();
-    } else if (e.touches.length === 1) {
-      // A touch starting on the chrome is operating it, not swiping the media behind it —
-      // dragging the video scrubber sideways otherwise steps to the next shot as well.
-      if ((e.target as Element).closest('.lb-vctrls, .lb-toolbar, .lb-btn')) { lbActive = false; return; }
-      lbX = e.touches[0].clientX; lbY = e.touches[0].clientY; lbActive = true;
-      dragAxis = null;
-      dragStart = e.timeStamp;
-      dragMediaCount = shots().length;
-      dragHasGameList = !!_onGameNav && !!_getGamePosition?.();
-      if (lbZoom > 1) {
-        touchPanning = true;
-        touchPanStartX = e.touches[0].clientX; touchPanStartY = e.touches[0].clientY;
-        touchPanOriginX = lbPanX; touchPanOriginY = lbPanY;
-      }
-    }
-  }, { passive: false });
-
-  lb.addEventListener('touchmove', e => {
-    if (e.touches.length === 2) {
-      if (lb.querySelector<HTMLImageElement>('.lb-img')!.style.display === 'none') return;
-      const dist = Math.hypot(
-        e.touches[1].clientX - e.touches[0].clientX,
-        e.touches[1].clientY - e.touches[0].clientY
-      );
-      lbZoom = Math.max(1, Math.min(4, pinchStartZoom * dist / pinchStartDist));
-      if (lbZoom === 1) { lbPanX = 0; lbPanY = 0; }
-      applyLbTransform();
-      e.preventDefault();
-    } else if (e.touches.length === 1 && touchPanning) {
-      lbPanX = touchPanOriginX + (e.touches[0].clientX - touchPanStartX);
-      lbPanY = touchPanOriginY + (e.touches[0].clientY - touchPanStartY);
-      applyLbTransform();
-      e.preventDefault();
-    } else if (e.touches.length === 1 && lbActive && lbZoom === 1) {
-      const dx = e.touches[0].clientX - lbX, dy = e.touches[0].clientY - lbY;
-      dragAxis ??= decideSwipeAxis(dx, dy);
-      if (!dragAxis) return;
-      const el = lbMediaEl();
-      if (!el) return;
-      // Nothing to step to on this axis: the media still follows the finger, damped, so the
-      // gesture reads as resistance rather than as a step that silently didn't happen.
-      const slack = (dragAxis === 'x' ? dragMediaCount > 1 : dragHasGameList) ? 1 : LB_SWIPE_RESISTANCE;
-      setLbDrag(el, dragAxis === 'x' ? dx * slack : 0, dragAxis === 'y' ? dy * slack : 0);
-      e.preventDefault();
-    }
-  }, { passive: false });
-
-  lb.addEventListener('touchend', e => {
-    if (e.touches.length < 2) touchPanning = false;
-    if (!lbActive) return;
-    lbActive = false;
-    const endX = e.changedTouches[0].clientX, endY = e.changedTouches[0].clientY;
-    const dx = endX - lbX, dy = endY - lbY;
-    if (dragAxis) {
-      const action = resolveSwipe({
-        axis: dragAxis, dx, dy, dt: e.timeStamp - dragStart,
-        mediaCount: dragMediaCount, hasGameList: dragHasGameList,
-      });
-      dragAxis = null;
-      const el = lbMediaEl();
-      if (el) clearLbDrag(el, !action);
-      if (action === 'media-prev' || action === 'media-next') stepLightbox(action === 'media-next' ? 1 : -1);
-      else if (action) {
-        const dir = action === 'game-next' ? 1 : -1;
-        stepGameFromLightbox(() => _onGameNav?.(dir), dir);
-      }
-      return;
-    }
-    const isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
-    const showingImg = lb.querySelector<HTMLImageElement>('.lb-img')!.style.display !== 'none';
-    const showingVid = lbVideoEl.isConnected;
-    if (isTap && (showingImg || showingVid)) {
-      const now = Date.now();
-      const tapDist = Math.hypot(endX - lbLastTapX, endY - lbLastTapY);
-      if (now - lbLastTapTime < LB_DOUBLE_TAP_MS && tapDist < LB_DOUBLE_TAP_DIST) {
-        lbLastTapTime = 0; // consume, so a 3rd quick tap starts a fresh pair rather than re-triggering
-        if (showingImg) {
-          if (lbZoom > 1) resetLbZoom();
-          else lbZoomTowardPoint(endX, endY);
-        } else {
-          // Video: double-tap the left/right third to seek, YouTube-style.
-          // The middle third is left alone — a plain single tap already
-          // toggles play/pause via the video's own 'click' listener.
-          const rect = lb.getBoundingClientRect();
-          const frac = (endX - rect.left) / rect.width;
-          const vid = lbVideoEl;
-          if (frac < 1 / 3) { seekVideo(vid, -LB_TOUCH_SEEK_SECONDS); flashSeek('left'); }
-          else if (frac > 2 / 3) { seekVideo(vid, LB_TOUCH_SEEK_SECONDS); flashSeek('right'); }
+  lb.addEventListener(
+    'touchstart',
+    (e) => {
+      if (e.touches.length === 2) {
+        if (lb.querySelector<HTMLImageElement>('.lb-img')!.style.display === 'none') return;
+        pinchStartDist = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY,
+        );
+        pinchStartZoom = lbZoom;
+        lbActive = false;
+        e.preventDefault();
+      } else if (e.touches.length === 1) {
+        // A touch starting on the chrome is operating it, not swiping the media behind it —
+        // dragging the video scrubber sideways otherwise steps to the next shot as well.
+        if ((e.target as Element).closest('.lb-vctrls, .lb-toolbar, .lb-btn')) {
+          lbActive = false;
+          return;
         }
-      } else {
-        lbLastTapTime = now; lbLastTapX = endX; lbLastTapY = endY;
+        lbX = e.touches[0].clientX;
+        lbY = e.touches[0].clientY;
+        lbActive = true;
+        dragAxis = null;
+        dragStart = e.timeStamp;
+        dragMediaCount = shots().length;
+        dragHasGameList = !!_onGameNav && !!_getGamePosition?.();
+        if (lbZoom > 1) {
+          touchPanning = true;
+          touchPanStartX = e.touches[0].clientX;
+          touchPanStartY = e.touches[0].clientY;
+          touchPanOriginX = lbPanX;
+          touchPanOriginY = lbPanY;
+        }
       }
-    }
-  }, { passive: true });
+    },
+    { passive: false },
+  );
 
-  lb.addEventListener('touchcancel', () => {
-    lbActive = false;
-    touchPanning = false;
-    if (dragAxis) {
-      dragAxis = null;
-      const el = lbMediaEl();
-      if (el) clearLbDrag(el, true);
-    }
-  }, { passive: true });
+  lb.addEventListener(
+    'touchmove',
+    (e) => {
+      if (e.touches.length === 2) {
+        if (lb.querySelector<HTMLImageElement>('.lb-img')!.style.display === 'none') return;
+        const dist = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY,
+        );
+        lbZoom = Math.max(1, Math.min(4, (pinchStartZoom * dist) / pinchStartDist));
+        if (lbZoom === 1) {
+          lbPanX = 0;
+          lbPanY = 0;
+        }
+        applyLbTransform();
+        e.preventDefault();
+      } else if (e.touches.length === 1 && touchPanning) {
+        lbPanX = touchPanOriginX + (e.touches[0].clientX - touchPanStartX);
+        lbPanY = touchPanOriginY + (e.touches[0].clientY - touchPanStartY);
+        applyLbTransform();
+        e.preventDefault();
+      } else if (e.touches.length === 1 && lbActive && lbZoom === 1) {
+        const dx = e.touches[0].clientX - lbX,
+          dy = e.touches[0].clientY - lbY;
+        dragAxis ??= decideSwipeAxis(dx, dy);
+        if (!dragAxis) return;
+        const el = lbMediaEl();
+        if (!el) return;
+        // Nothing to step to on this axis: the media still follows the finger, damped, so the
+        // gesture reads as resistance rather than as a step that silently didn't happen.
+        const slack = (dragAxis === 'x' ? dragMediaCount > 1 : dragHasGameList) ? 1 : LB_SWIPE_RESISTANCE;
+        setLbDrag(el, dragAxis === 'x' ? dx * slack : 0, dragAxis === 'y' ? dy * slack : 0);
+        e.preventDefault();
+      }
+    },
+    { passive: false },
+  );
+
+  lb.addEventListener(
+    'touchend',
+    (e) => {
+      if (e.touches.length < 2) touchPanning = false;
+      if (!lbActive) return;
+      lbActive = false;
+      const endX = e.changedTouches[0].clientX,
+        endY = e.changedTouches[0].clientY;
+      const dx = endX - lbX,
+        dy = endY - lbY;
+      if (dragAxis) {
+        const action = resolveSwipe({
+          axis: dragAxis,
+          dx,
+          dy,
+          dt: e.timeStamp - dragStart,
+          mediaCount: dragMediaCount,
+          hasGameList: dragHasGameList,
+        });
+        dragAxis = null;
+        const el = lbMediaEl();
+        if (el) clearLbDrag(el, !action);
+        if (action === 'media-prev' || action === 'media-next') stepLightbox(action === 'media-next' ? 1 : -1);
+        else if (action) {
+          const dir = action === 'game-next' ? 1 : -1;
+          stepGameFromLightbox(() => _onGameNav?.(dir), dir);
+        }
+        return;
+      }
+      const isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
+      const showingImg = lb.querySelector<HTMLImageElement>('.lb-img')!.style.display !== 'none';
+      const showingVid = lbVideoEl.isConnected;
+      if (isTap && (showingImg || showingVid)) {
+        const now = Date.now();
+        const tapDist = Math.hypot(endX - lbLastTapX, endY - lbLastTapY);
+        if (now - lbLastTapTime < LB_DOUBLE_TAP_MS && tapDist < LB_DOUBLE_TAP_DIST) {
+          lbLastTapTime = 0; // consume, so a 3rd quick tap starts a fresh pair rather than re-triggering
+          if (showingImg) {
+            if (lbZoom > 1) resetLbZoom();
+            else lbZoomTowardPoint(endX, endY);
+          } else {
+            // Video: double-tap the left/right third to seek, YouTube-style.
+            // The middle third is left alone — a plain single tap already
+            // toggles play/pause via the video's own 'click' listener.
+            const rect = lb.getBoundingClientRect();
+            const frac = (endX - rect.left) / rect.width;
+            const vid = lbVideoEl;
+            if (frac < 1 / 3) {
+              seekVideo(vid, -LB_TOUCH_SEEK_SECONDS);
+              flashSeek('left');
+            } else if (frac > 2 / 3) {
+              seekVideo(vid, LB_TOUCH_SEEK_SECONDS);
+              flashSeek('right');
+            }
+          }
+        } else {
+          lbLastTapTime = now;
+          lbLastTapX = endX;
+          lbLastTapY = endY;
+        }
+      }
+    },
+    { passive: true },
+  );
+
+  lb.addEventListener(
+    'touchcancel',
+    () => {
+      lbActive = false;
+      touchPanning = false;
+      if (dragAxis) {
+        dragAxis = null;
+        const el = lbMediaEl();
+        if (el) clearLbDrag(el, true);
+      }
+    },
+    { passive: true },
+  );
 }
 
 function wireVideoControls(lb: HTMLElement) {
-  const vid2    = lbVideoEl;
-  const vc2     = lb.querySelector<HTMLElement>('.lb-vctrls')!;
-  const scrub   = vc2.querySelector<HTMLInputElement>('.lb-vc-scrub')!;
-  const timEl   = vc2.querySelector<HTMLElement>('.lb-vc-time')!;
-  const durEl   = vc2.querySelector<HTMLElement>('.lb-vc-dur')!;
+  const vid2 = lbVideoEl;
+  const vc2 = lb.querySelector<HTMLElement>('.lb-vctrls')!;
+  const scrub = vc2.querySelector<HTMLInputElement>('.lb-vc-scrub')!;
+  const timEl = vc2.querySelector<HTMLElement>('.lb-vc-time')!;
+  const durEl = vc2.querySelector<HTMLElement>('.lb-vc-dur')!;
   const playBtn = vc2.querySelector<HTMLElement>('.lb-vc-play')!;
   const muteBtn = vc2.querySelector<HTMLElement>('.lb-vc-mute')!;
 
-  const updateScrubBg = () => { scrub.style.backgroundImage = lbScrubGradient(Number(scrub.value) * 100); };
+  const updateScrubBg = () => {
+    scrub.style.backgroundImage = lbScrubGradient(Number(scrub.value) * 100);
+  };
 
   vid2.addEventListener('timeupdate', () => {
     if (!vid2.duration) return;
@@ -731,8 +870,10 @@ function wireVideoControls(lb: HTMLElement) {
     timEl.textContent = fmtTime(vid2.currentTime);
     updateScrubBg();
   });
-  vid2.addEventListener('durationchange', () => { durEl.textContent = fmtTime(vid2.duration); });
-  vid2.addEventListener('play',  () => {
+  vid2.addEventListener('durationchange', () => {
+    durEl.textContent = fmtTime(vid2.duration);
+  });
+  vid2.addEventListener('play', () => {
     playBtn.innerHTML = LB_PAUSE_ICON;
     playBtn.setAttribute('aria-label', 'Pause');
     schedHideLbChrome();
@@ -757,18 +898,36 @@ function wireVideoControls(lb: HTMLElement) {
     updateScrubBg();
   });
   scrub.addEventListener('mousedown', () => clearTimeout(lbVcTimer));
-  scrub.addEventListener('mouseup',   () => schedHideLbChrome());
+  scrub.addEventListener('mouseup', () => schedHideLbChrome());
 
-  playBtn.addEventListener('click', () => { vid2.paused ? vid2.play().catch(() => {}) : vid2.pause(); });
-  muteBtn.addEventListener('click', () => { vid2.muted = !vid2.muted; });
+  playBtn.addEventListener('click', () => {
+    vid2.paused ? vid2.play().catch(() => {}) : vid2.pause();
+  });
+  muteBtn.addEventListener('click', () => {
+    vid2.muted = !vid2.muted;
+  });
 
-  vid2.addEventListener('click', () => { vid2.paused ? vid2.play().catch(() => {}) : vid2.pause(); });
+  vid2.addEventListener('click', () => {
+    vid2.paused ? vid2.play().catch(() => {}) : vid2.pause();
+  });
 
   // Unconditional (not gated on vc2 being visible) so an image, not just a
   // video, also gets idle-hide chrome on interaction — see showLbChrome.
-  lb.addEventListener('mousemove',  () => { showLbChrome(); schedHideLbChrome(); });
-  lb.addEventListener('mouseleave', () => { schedHideLbChrome(); });
-  lb.addEventListener('touchstart', () => { showLbChrome(); schedHideLbChrome(); }, { passive: true });
+  lb.addEventListener('mousemove', () => {
+    showLbChrome();
+    schedHideLbChrome();
+  });
+  lb.addEventListener('mouseleave', () => {
+    schedHideLbChrome();
+  });
+  lb.addEventListener(
+    'touchstart',
+    () => {
+      showLbChrome();
+      schedHideLbChrome();
+    },
+    { passive: true },
+  );
 }
 
 // ── Mount ────────────────────────────────────────────────────────────────
@@ -923,10 +1082,10 @@ function renderLightbox() {
   const name = gameName();
   const lb = document.getElementById('screenshot-lightbox')!;
   const shot = list[i];
-  const img  = lb.querySelector<HTMLImageElement>('.lb-img')!;
-  const vid  = lbVideoEl;
-  const vc   = lb.querySelector<HTMLElement>('.lb-vctrls')!;
-  const dir  = lbLastDir;
+  const img = lb.querySelector<HTMLImageElement>('.lb-img')!;
+  const vid = lbVideoEl;
+  const vc = lb.querySelector<HTMLElement>('.lb-vctrls')!;
+  const dir = lbLastDir;
   const axis = lbLastAxis;
   lbLastDir = 0;
   lbLastAxis = 'x';
@@ -942,7 +1101,8 @@ function renderLightbox() {
   // second and the lightbox visibly blinked. The caption keeps it live in its own pass instead
   // (`renderLbCaption`); the alt text here is rebuilt on every step anyway.
   const pos = untrack(() => _getGamePosition?.() ?? null);
-  const label = `${name ? name + ' — ' : ''}${pos ? `game ${pos.index + 1} of ${pos.total} — ` : ''}` +
+  const label =
+    `${name ? name + ' — ' : ''}${pos ? `game ${pos.index + 1} of ${pos.total} — ` : ''}` +
     `${shot.type === 'video' ? 'Video' : 'Screenshot'} ${i + 1} of ${list.length}`;
   if (shot.type === 'video') {
     img.style.display = 'none';
@@ -966,9 +1126,15 @@ function renderLightbox() {
     if (dir !== 0) {
       // Named for the side the new shot comes in from, which is the one swiped toward: the
       // next media enters from the right, the next game from the bottom.
-      const from = axis === 'y' ? (dir > 0 ? 'bottom' : 'top') : (dir > 0 ? 'right' : 'left');
+      const from = axis === 'y' ? (dir > 0 ? 'bottom' : 'top') : dir > 0 ? 'right' : 'left';
       img.className = `lb-img lb-anim-${from}`;
-      img.addEventListener('animationend', () => { img.className = 'lb-img'; }, { once: true });
+      img.addEventListener(
+        'animationend',
+        () => {
+          img.className = 'lb-img';
+        },
+        { once: true },
+      );
     } else {
       img.className = 'lb-img';
     }
@@ -987,8 +1153,18 @@ function renderLightbox() {
     const full = new Image();
     // Left at opacity 0 (rather than 1) so the browser's own broken-image
     // icon doesn't show behind the error overlay.
-    full.onload  = () => { if (imgToken !== lbImgToken) return; img.src = shot.main!; img.style.opacity = '1'; lb.classList.remove('lb--loading'); };
-    full.onerror = () => { if (imgToken !== lbImgToken) return; img.style.opacity = '0'; lb.classList.remove('lb--loading'); showLbError("Couldn't load this image."); };
+    full.onload = () => {
+      if (imgToken !== lbImgToken) return;
+      img.src = shot.main!;
+      img.style.opacity = '1';
+      lb.classList.remove('lb--loading');
+    };
+    full.onerror = () => {
+      if (imgToken !== lbImgToken) return;
+      img.style.opacity = '0';
+      lb.classList.remove('lb--loading');
+      showLbError("Couldn't load this image.");
+    };
     full.src = shot.main!;
     schedHideLbChrome();
   }
@@ -1021,13 +1197,17 @@ function renderLightbox() {
   }
   // Drop stale preloads (keep only prev/next)
   const keep = new Set<string>(
-    [-1, 1].map(o => {
-      const s = list[(i + o + list.length) % list.length];
-      const src = s && (s.type === 'video' ? s.thumb : s.main);
-      return src ?? '';
-    }).filter(src => src !== '')
+    [-1, 1]
+      .map((o) => {
+        const s = list[(i + o + list.length) % list.length];
+        const src = s && (s.type === 'video' ? s.thumb : s.main);
+        return src ?? '';
+      })
+      .filter((src) => src !== ''),
   );
-  lb.querySelectorAll<HTMLImageElement>('.lb-preload').forEach(el => { if (!keep.has(el.dataset.src ?? '')) el.remove(); });
+  lb.querySelectorAll<HTMLImageElement>('.lb-preload').forEach((el) => {
+    if (!keep.has(el.dataset.src ?? '')) el.remove();
+  });
 }
 
 // The one Solid-driven trigger for the whole file: re-runs `renderLightbox()` whenever
@@ -1061,7 +1241,9 @@ createRoot(() => {
     _onLightboxParamChange?.(list[target].shotId);
   });
   createEffect(() => {
-    const list = shots(); idx(); gameName();
+    const list = shots();
+    idx();
+    gameName();
     if (list.length) renderLightbox();
   });
   createEffect(() => {

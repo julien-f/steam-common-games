@@ -7,7 +7,15 @@ process.env.ITAD_API_KEY = 'test-itad-key';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { getSteamShopId, getBundles, findBundleById, resolveSteamAppIds, resolveItadIds, getPrices, extractPriceInfo } = require('../lib/itad');
+const {
+  getSteamShopId,
+  getBundles,
+  findBundleById,
+  resolveSteamAppIds,
+  resolveItadIds,
+  getPrices,
+  extractPriceInfo,
+} = require('../lib/itad');
 const { _reset } = require('../lib/cache');
 
 const SHOPS = [
@@ -19,7 +27,10 @@ const SHOPS = [
 test('getSteamShopId: finds and caches the Steam entry', async (t) => {
   _reset();
   let calls = 0;
-  t.mock.method(globalThis, 'fetch', async () => { calls++; return { ok: true, json: async () => SHOPS }; });
+  t.mock.method(globalThis, 'fetch', async () => {
+    calls++;
+    return { ok: true, json: async () => SHOPS };
+  });
   const id = await getSteamShopId();
   assert.equal(id, 61);
   await getSteamShopId();
@@ -29,20 +40,29 @@ test('getSteamShopId: finds and caches the Steam entry', async (t) => {
 test('getSteamShopId: throws when no Steam entry is present', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => [{ id: 2, title: 'AllYouPlay' }] }));
-  await assert.rejects(() => getSteamShopId(), err => err.isUpstream === true);
+  await assert.rejects(
+    () => getSteamShopId(),
+    (err) => err.isUpstream === true,
+  );
 });
 
 test('getBundles: throws on upstream error', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
-  await assert.rejects(() => getBundles(), err => err.isUpstream === true);
+  await assert.rejects(
+    () => getBundles(),
+    (err) => err.isUpstream === true,
+  );
 });
 
 test('getBundles: returns and caches the bundle list', async (t) => {
   _reset();
   const bundles = [{ id: 1, title: 'Test Bundle' }];
   let calls = 0;
-  t.mock.method(globalThis, 'fetch', async () => { calls++; return { ok: true, json: async () => bundles }; });
+  t.mock.method(globalThis, 'fetch', async () => {
+    calls++;
+    return { ok: true, json: async () => bundles };
+  });
   const result = await getBundles({ country: 'US', offset: 0, limit: 20 });
   assert.deepEqual(result, bundles);
   await getBundles({ country: 'US', offset: 0, limit: 20 });
@@ -59,7 +79,10 @@ test('getBundles: returns and caches the bundle list', async (t) => {
 test('getBundles: always asks ITAD to include mature-flagged bundles', async (t) => {
   _reset();
   let requested = null;
-  t.mock.method(globalThis, 'fetch', async (url) => { requested = new URL(url); return { ok: true, json: async () => [] }; });
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    requested = new URL(url);
+    return { ok: true, json: async () => [] };
+  });
   await getBundles({ country: 'US', offset: 0, limit: 20 });
   assert.equal(requested.searchParams.get('mature'), 'true');
 });
@@ -103,7 +126,10 @@ test('findBundleById: includes mature-flagged bundles in its search', async (t) 
   _reset();
   const requested = [];
   const pager = makeBundlesPager({ active: [{ id: 42, title: 'Found Me' }] });
-  t.mock.method(globalThis, 'fetch', async (url) => { requested.push(new URL(url)); return pager(url); });
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    requested.push(new URL(url));
+    return pager(url);
+  });
   await findBundleById(42, { country: 'US' });
   assert.ok(requested.length > 0, 'expected at least one upstream page fetch');
   for (const u of requested) assert.equal(u.searchParams.get('mature'), 'true');
@@ -150,7 +176,7 @@ function makeResolveFetch({ shopEntries, steam = {}, info = {} }) {
     if (u.includes('/service/shops/')) return { ok: true, json: async () => SHOPS };
     if (u.includes('/lookup/shop/')) {
       const gids = JSON.parse(opts.body);
-      return { ok: true, json: async () => Object.fromEntries(gids.map(g => [g, shopEntries[g] ?? null])) };
+      return { ok: true, json: async () => Object.fromEntries(gids.map((g) => [g, shopEntries[g] ?? null])) };
     }
     if (u.includes('/api/packagedetails')) {
       const id = new URL(u).searchParams.get('packageids');
@@ -172,42 +198,58 @@ function makeResolveFetch({ shopEntries, steam = {}, info = {} }) {
 
 test('resolveSteamAppIds: a gid listed only as a Steam "sub" (single-item package) expands via Steam\'s own packagedetails', async (t) => {
   _reset();
-  t.mock.method(globalThis, 'fetch', makeResolveFetch({
-    shopEntries: { 'gid-sub-only': ['sub/1234'] },
-    steam: { 'sub/1234': { success: true, data: { apps: [{ id: 292030 }] } } },
-  }));
+  t.mock.method(
+    globalThis,
+    'fetch',
+    makeResolveFetch({
+      shopEntries: { 'gid-sub-only': ['sub/1234'] },
+      steam: { 'sub/1234': { success: true, data: { apps: [{ id: 292030 }] } } },
+    }),
+  );
   const result = await resolveSteamAppIds(['gid-sub-only']);
   assert.equal(result.get('gid-sub-only'), 292030);
 });
 
 test('resolveSteamAppIds: a gid listed as a Steam "bundle" spanning several apps resolves to an array', async (t) => {
   _reset();
-  t.mock.method(globalThis, 'fetch', makeResolveFetch({
-    shopEntries: { 'gid-bundle': ['bundle/4995'] },
-    steam: { 'bundle/4995': [{ bundleid: 4995, appids: [396750, 688700, 709150] }] },
-  }));
+  t.mock.method(
+    globalThis,
+    'fetch',
+    makeResolveFetch({
+      shopEntries: { 'gid-bundle': ['bundle/4995'] },
+      steam: { 'bundle/4995': [{ bundleid: 4995, appids: [396750, 688700, 709150] }] },
+    }),
+  );
   const result = await resolveSteamAppIds(['gid-bundle']);
   assert.deepEqual(result.get('gid-bundle'), [396750, 688700, 709150]);
 });
 
-test('resolveSteamAppIds: falls back to games/info/v2\'s own appid when the Steam-side sub/bundle expansion comes up empty', async (t) => {
+test("resolveSteamAppIds: falls back to games/info/v2's own appid when the Steam-side sub/bundle expansion comes up empty", async (t) => {
   _reset();
-  t.mock.method(globalThis, 'fetch', makeResolveFetch({
-    shopEntries: { 'gid-sub-only': ['sub/1234'] },
-    steam: { 'sub/1234': { success: false } },
-    info: { 'gid-sub-only': { appid: 292030 } },
-  }));
+  t.mock.method(
+    globalThis,
+    'fetch',
+    makeResolveFetch({
+      shopEntries: { 'gid-sub-only': ['sub/1234'] },
+      steam: { 'sub/1234': { success: false } },
+      info: { 'gid-sub-only': { appid: 292030 } },
+    }),
+  );
   const result = await resolveSteamAppIds(['gid-sub-only']);
   assert.equal(result.get('gid-sub-only'), 292030);
 });
 
 test('resolveSteamAppIds: still resolves to null when neither the Steam expansion nor the games/info/v2 fallback has an appid', async (t) => {
   _reset();
-  t.mock.method(globalThis, 'fetch', makeResolveFetch({
-    shopEntries: { 'gid-sub-only': ['sub/1234'] },
-    steam: { 'sub/1234': { success: false } },
-    info: { 'gid-sub-only': { title: 'No Steam Listing' } },
-  }));
+  t.mock.method(
+    globalThis,
+    'fetch',
+    makeResolveFetch({
+      shopEntries: { 'gid-sub-only': ['sub/1234'] },
+      steam: { 'sub/1234': { success: false } },
+      info: { 'gid-sub-only': { title: 'No Steam Listing' } },
+    }),
+  );
   const result = await resolveSteamAppIds(['gid-sub-only']);
   assert.equal(result.get('gid-sub-only'), null);
 });
@@ -244,7 +286,10 @@ test('resolveSteamAppIds: throws when the lookup call fails', async (t) => {
     if (String(url).includes('/service/shops/')) return { ok: true, json: async () => SHOPS };
     return { ok: false, status: 502 };
   });
-  await assert.rejects(() => resolveSteamAppIds(['gid-x']), err => err.isUpstream === true);
+  await assert.rejects(
+    () => resolveSteamAppIds(['gid-x']),
+    (err) => err.isUpstream === true,
+  );
 });
 
 test('resolveItadIds: resolves, caches, and treats a missing mapping as null', async (t) => {
@@ -276,19 +321,32 @@ test('resolveItadIds: throws when the lookup call fails', async (t) => {
     if (String(url).includes('/service/shops/')) return { ok: true, json: async () => SHOPS };
     return { ok: false, status: 502 };
   });
-  await assert.rejects(() => resolveItadIds([400]), err => err.isUpstream === true);
+  await assert.rejects(
+    () => resolveItadIds([400]),
+    (err) => err.isUpstream === true,
+  );
 });
 
 const PRICE_ENTRY = {
   id: 'gid-1',
   historyLow: {
     all: { amount: 0.99, amountInt: 99, currency: 'USD' },
-    y1:  { amount: 0.99, amountInt: 99, currency: 'USD' },
-    m3:  { amount: 9.99, amountInt: 999, currency: 'USD' },
+    y1: { amount: 0.99, amountInt: 99, currency: 'USD' },
+    m3: { amount: 9.99, amountInt: 999, currency: 'USD' },
   },
   deals: [
-    { shop: { id: 61, name: 'Steam' }, regular: { amount: 19.99, amountInt: 1999, currency: 'USD' }, price: { amount: 19.99, amountInt: 1999, currency: 'USD' } },
-    { shop: { id: 6, name: 'Fanatical' }, regular: { amount: 14.99, amountInt: 1499, currency: 'USD' }, price: { amount: 11.24, amountInt: 1124, currency: 'USD' }, cut: 25, url: 'https://next.isthereanydeal.com/link/abc' },
+    {
+      shop: { id: 61, name: 'Steam' },
+      regular: { amount: 19.99, amountInt: 1999, currency: 'USD' },
+      price: { amount: 19.99, amountInt: 1999, currency: 'USD' },
+    },
+    {
+      shop: { id: 6, name: 'Fanatical' },
+      regular: { amount: 14.99, amountInt: 1499, currency: 'USD' },
+      price: { amount: 11.24, amountInt: 1124, currency: 'USD' },
+      cut: 25,
+      url: 'https://next.isthereanydeal.com/link/abc',
+    },
   ],
 };
 
@@ -296,7 +354,10 @@ test('getPrices: fetches, caches per (gid, country), and treats a missing gid as
   _reset();
   let priceCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (String(url).includes('/games/prices/v3')) { priceCalls++; return { ok: true, json: async () => [PRICE_ENTRY] }; }
+    if (String(url).includes('/games/prices/v3')) {
+      priceCalls++;
+      return { ok: true, json: async () => [PRICE_ENTRY] };
+    }
     return { ok: false, status: 500 };
   });
   const result = await getPrices(['gid-1', 'gid-missing'], { country: 'US' });
@@ -315,7 +376,10 @@ test('getPrices: force bypasses the cache read and re-fetches', async (t) => {
   _reset();
   let priceCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (String(url).includes('/games/prices/v3')) { priceCalls++; return { ok: true, json: async () => [PRICE_ENTRY] }; }
+    if (String(url).includes('/games/prices/v3')) {
+      priceCalls++;
+      return { ok: true, json: async () => [PRICE_ENTRY] };
+    }
     return { ok: false, status: 500 };
   });
   await getPrices(['gid-1'], { country: 'US' });
@@ -332,10 +396,13 @@ test('getPrices: force bypasses the cache read and re-fetches', async (t) => {
 test('getPrices: throws on upstream error', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
-  await assert.rejects(() => getPrices(['gid-1'], { country: 'US' }), err => err.isUpstream === true);
+  await assert.rejects(
+    () => getPrices(['gid-1'], { country: 'US' }),
+    (err) => err.isUpstream === true,
+  );
 });
 
-test('extractPriceInfo: pulls Steam\'s regular price and the three historical lows', () => {
+test("extractPriceInfo: pulls Steam's regular price and the three historical lows", () => {
   const info = extractPriceInfo(PRICE_ENTRY, 61);
   assert.deepEqual(info.steamRegular, { amount: 19.99, amountInt: 1999, currency: 'USD' });
   assert.deepEqual(info.lowAll, PRICE_ENTRY.historyLow.all);
@@ -343,13 +410,23 @@ test('extractPriceInfo: pulls Steam\'s regular price and the three historical lo
   assert.deepEqual(info.lowM3, PRICE_ENTRY.historyLow.m3);
 });
 
-test('extractPriceInfo: bestDeal picks the cheapest current price across every shop, Steam included, and carries that deal\'s own url', () => {
+test("extractPriceInfo: bestDeal picks the cheapest current price across every shop, Steam included, and carries that deal's own url", () => {
   const info = extractPriceInfo(PRICE_ENTRY, 61);
-  assert.deepEqual(info.bestDeal, { price: { amount: 11.24, amountInt: 1124, currency: 'USD' }, shop: 'Fanatical', url: 'https://next.isthereanydeal.com/link/abc' });
+  assert.deepEqual(info.bestDeal, {
+    price: { amount: 11.24, amountInt: 1124, currency: 'USD' },
+    shop: 'Fanatical',
+    url: 'https://next.isthereanydeal.com/link/abc',
+  });
 });
 
 test('extractPriceInfo: bestDeal.url is null when the deal has no url', () => {
-  const noUrl = { ...PRICE_ENTRY, deals: PRICE_ENTRY.deals.map(d => { const { url, ...rest } = d; return rest; }) };
+  const noUrl = {
+    ...PRICE_ENTRY,
+    deals: PRICE_ENTRY.deals.map((d) => {
+      const { url, ...rest } = d;
+      return rest;
+    }),
+  };
   assert.equal(extractPriceInfo(noUrl, 61).bestDeal.url, null);
 });
 
@@ -359,7 +436,13 @@ test('extractPriceInfo: bestDeal is null when no deal has a price', () => {
 });
 
 test('extractPriceInfo: all fields null for a missing entry or a shop with no Steam deal', () => {
-  assert.deepEqual(extractPriceInfo(null, 61), { steamRegular: null, lowAll: null, lowY1: null, lowM3: null, bestDeal: null });
+  assert.deepEqual(extractPriceInfo(null, 61), {
+    steamRegular: null,
+    lowAll: null,
+    lowY1: null,
+    lowM3: null,
+    bestDeal: null,
+  });
   const noSteam = { ...PRICE_ENTRY, deals: [PRICE_ENTRY.deals[1]] };
   assert.equal(extractPriceInfo(noSteam, 61).steamRegular, null);
 });

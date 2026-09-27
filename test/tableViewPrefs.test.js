@@ -2,10 +2,18 @@
 
 const { test, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { restoreTableView, resetTableView, shareTableView, saveTableViewToServer, revertTableViewToServer } = require('../public/tableViewPrefs.ts');
+const {
+  restoreTableView,
+  resetTableView,
+  shareTableView,
+  saveTableViewToServer,
+  revertTableViewToServer,
+} = require('../public/tableViewPrefs.ts');
 const { setBaseline, getBaseline, resetBaselines } = require('../public/tableViewSync.ts');
 
-beforeEach(() => { resetBaselines(); });
+beforeEach(() => {
+  resetBaselines();
+});
 
 // tableViewPrefs.js reads/writes `location`/`history` and prefs.js's own localStorage-backed
 // store directly — stub the minimal browser globals it touches, same idea prefs.test.js/
@@ -13,7 +21,9 @@ beforeEach(() => { resetBaselines(); });
 function fakeTable(initial = {}) {
   let state = initial;
   return {
-    setViewState: v => { state = v; },
+    setViewState: (v) => {
+      state = v;
+    },
     getViewState: () => state,
   };
 }
@@ -21,18 +31,34 @@ function fakeTable(initial = {}) {
 function withLocation(search, fn) {
   const store = {};
   globalThis.localStorage = {
-    getItem: k => (k in store ? store[k] : null),
-    setItem: (k, v) => { store[k] = v; },
-    removeItem: k => { delete store[k]; },
+    getItem: (k) => (k in store ? store[k] : null),
+    setItem: (k, v) => {
+      store[k] = v;
+    },
+    removeItem: (k) => {
+      delete store[k];
+    },
   };
   let currentSearch = search;
   globalThis.location = { search: currentSearch, origin: 'https://example.test', pathname: '/library.html' };
-  globalThis.history = { replaceState: (_s, _t, url) => { currentSearch = url.split('?')[1] ? `?${url.split('?')[1]}` : ''; globalThis.location.search = currentSearch; } };
+  globalThis.history = {
+    replaceState: (_s, _t, url) => {
+      currentSearch = url.split('?')[1] ? `?${url.split('?')[1]}` : '';
+      globalThis.location.search = currentSearch;
+    },
+  };
   try {
     const result = fn();
-    return (result && typeof result.finally === 'function') ? result.finally(cleanup) : (cleanup(), result);
-  } catch (err) { cleanup(); throw err; }
-  function cleanup() { delete globalThis.localStorage; delete globalThis.location; delete globalThis.history; }
+    return result && typeof result.finally === 'function' ? result.finally(cleanup) : (cleanup(), result);
+  } catch (err) {
+    cleanup();
+    throw err;
+  }
+  function cleanup() {
+    delete globalThis.localStorage;
+    delete globalThis.location;
+    delete globalThis.history;
+  }
 }
 
 test('restoreTableView: an incoming param wins, is seeded as the stored default, and is stripped from the URL', () => {
@@ -75,7 +101,10 @@ test('saveTableViewToServer: pushes the given value and advances the baseline to
   await withLocation('', async () => {
     const restore = globalThis.fetch;
     let sent;
-    globalThis.fetch = async (url, opts) => { sent = { url, body: JSON.parse(opts.body) }; return { ok: true, json: async () => ({}) }; };
+    globalThis.fetch = async (url, opts) => {
+      sent = { url, body: JSON.parse(opts.body) };
+      return { ok: true, json: async () => ({}) };
+    };
     const before = Date.now();
     try {
       saveTableViewToServer('libraryView', { pageSize: 25 });
@@ -95,7 +124,10 @@ test('saveTableViewToServer: strips page/searchQuery before pushing and before s
   await withLocation('', async () => {
     const restore = globalThis.fetch;
     let sent;
-    globalThis.fetch = async (url, opts) => { sent = { url, body: JSON.parse(opts.body) }; return { ok: true, json: async () => ({}) }; };
+    globalThis.fetch = async (url, opts) => {
+      sent = { url, body: JSON.parse(opts.body) };
+      return { ok: true, json: async () => ({}) };
+    };
     try {
       saveTableViewToServer('libraryView', { pageSize: 25, page: 3, searchQuery: 'portal' });
     } finally {
@@ -116,7 +148,10 @@ test('revertTableViewToServer: live-patches the table and adopts the baseline lo
 
     const restore = globalThis.fetch;
     let called = false;
-    globalThis.fetch = async () => { called = true; return { ok: true, json: async () => ({}) }; };
+    globalThis.fetch = async () => {
+      called = true;
+      return { ok: true, json: async () => ({}) };
+    };
     try {
       revertTableViewToServer(table, 'libraryView');
     } finally {
@@ -148,11 +183,18 @@ test('shareTableView: copies a link with the view snapshotted into the param, wi
     await withLocation('', async () => {
       const table = fakeTable({ pageSize: 25 });
       let copied = null;
-      const stubNav = { clipboard: { writeText: async (text) => { copied = text; } } };
+      const stubNav = {
+        clipboard: {
+          writeText: async (text) => {
+            copied = text;
+          },
+        },
+      };
       Object.defineProperty(globalThis, 'navigator', { value: stubNav, configurable: true });
       const btn = { textContent: 'Share view' };
       shareTableView(table, 'lv', btn);
-      await Promise.resolve(); await Promise.resolve(); // let writeText()'s .then() microtask run
+      await Promise.resolve();
+      await Promise.resolve(); // let writeText()'s .then() microtask run
       assert.match(copied, /\?lv=%7B%22pageSize%22%3A25%7D/);
       assert.equal(location.search, '', 'live URL left untouched');
     });

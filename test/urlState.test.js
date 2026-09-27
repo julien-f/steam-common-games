@@ -3,9 +3,16 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  parseUrlState, reorderUrlParams,
-  parseAccountParam, accountParamValues, withAccountParam, urlWithoutAccountParam, urlWithParams,
-  normalizeSlots, compareUrl, COMPARE_PATH,
+  parseUrlState,
+  reorderUrlParams,
+  parseAccountParam,
+  accountParamValues,
+  withAccountParam,
+  urlWithoutAccountParam,
+  urlWithParams,
+  normalizeSlots,
+  compareUrl,
+  COMPARE_PATH,
 } = require('../public/urlState.ts');
 
 // ── parseUrlState — slots ─────────────────────────────────────────────────────
@@ -188,7 +195,7 @@ test('normalizeSlots: sorting is case-insensitive', () => {
   assert.deepEqual(normalizeSlots([['bob'], ['Alice']]), [['Alice'], ['bob']]);
 });
 
-test('compareUrl: one u= per slot, comma-joined within a slot — the old page\'s convention', () => {
+test("compareUrl: one u= per slot, comma-joined within a slot — the old page's convention", () => {
   assert.equal(compareUrl([['alice'], ['bob', 'carol']]), '/lists/compare?u=alice&u=bob%2Ccarol');
 });
 

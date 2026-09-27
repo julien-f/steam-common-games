@@ -2,9 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const {
-  encodeListFormula, decodeListFormula, shareListUrl, SHARED_LIST_PATH,
-} = require('../public/listShare.ts');
+const { encodeListFormula, decodeListFormula, shareListUrl, SHARED_LIST_PATH } = require('../public/listShare.ts');
 
 function dynamicList(id, op, sources) {
   return { id, name: id, parentId: null, order: 0, createdAt: 0, updatedAt: 0, kind: 'dynamic', op, sources };
@@ -15,8 +13,8 @@ function manualList(id, appids) {
 }
 
 function makeGetList(lists) {
-  const map = new Map(lists.map(l => [l.id, l]));
-  return id => map.get(id);
+  const map = new Map(lists.map((l) => [l.id, l]));
+  return (id) => map.get(id);
 }
 
 // ── encodeListFormula: leaf sources ─────────────────────────────────────────────────────────
@@ -37,10 +35,13 @@ test('encodeListFormula: encodes owned/wishlist/bundle/recent-games sources', ()
 });
 
 test('encodeListFormula: percent-encodes a Family accountId\'s "+" join', () => {
-  const list = { op: 'union', sources: [
-    { kind: 'account-owned', accountId: 'idA+idB' },
-    { kind: 'account-owned', accountId: 'idC' },
-  ] };
+  const list = {
+    op: 'union',
+    sources: [
+      { kind: 'account-owned', accountId: 'idA+idB' },
+      { kind: 'account-owned', accountId: 'idC' },
+    ],
+  };
   const result = encodeListFormula(list, makeGetList([]));
   assert.equal(result.ok, true);
   assert.equal(result.formula, 'union:(o:idA%2BidB;o:idC)');
@@ -58,43 +59,70 @@ test('encodeListFormula: inlines a `user` source as a `g:` group', () => {
     { kind: 'account-owned', accountId: 'a1' },
     { kind: 'account-wishlist', accountId: 'a1' },
   ]);
-  const outer = { op: 'union', sources: [
-    { kind: 'user', listId: 'inner' },
-    { kind: 'bundle', bundleId: 'b1' },
-  ] };
+  const outer = {
+    op: 'union',
+    sources: [
+      { kind: 'user', listId: 'inner' },
+      { kind: 'bundle', bundleId: 'b1' },
+    ],
+  };
   const result = encodeListFormula(outer, makeGetList([inner]));
   assert.equal(result.ok, true);
   assert.equal(result.formula, 'union:(g:intersect:(o:a1;w:a1);b:b1)');
 });
 
 test('encodeListFormula: inlines nested `user` sources arbitrarily deep', () => {
-  const c = dynamicList('c', 'union', [{ kind: 'account-owned', accountId: 'a1' }, { kind: 'account-owned', accountId: 'a2' }]);
-  const b = dynamicList('b', 'intersect', [{ kind: 'user', listId: 'c' }, { kind: 'account-wishlist', accountId: 'a3' }]);
-  const a = dynamicList('a', 'subtract', [{ kind: 'user', listId: 'b' }, { kind: 'bundle', bundleId: 'b1' }]);
+  const c = dynamicList('c', 'union', [
+    { kind: 'account-owned', accountId: 'a1' },
+    { kind: 'account-owned', accountId: 'a2' },
+  ]);
+  const b = dynamicList('b', 'intersect', [
+    { kind: 'user', listId: 'c' },
+    { kind: 'account-wishlist', accountId: 'a3' },
+  ]);
+  const a = dynamicList('a', 'subtract', [
+    { kind: 'user', listId: 'b' },
+    { kind: 'bundle', bundleId: 'b1' },
+  ]);
   const result = encodeListFormula(a, makeGetList([a, b, c]));
   assert.equal(result.ok, true);
-  assert.equal(
-    result.formula,
-    'subtract:(g:intersect:(g:union:(o:a1;o:a2);w:a3);b:b1)',
-  );
+  assert.equal(result.formula, 'subtract:(g:intersect:(g:union:(o:a1;o:a2);w:a3);b:b1)');
 });
 
 test('encodeListFormula: rejects a `user` source pointing at a manual list', () => {
   const manual = manualList('m1', [1, 2, 3]);
-  const outer = { op: 'union', sources: [{ kind: 'user', listId: 'm1' }, { kind: 'bundle', bundleId: 'b1' }] };
+  const outer = {
+    op: 'union',
+    sources: [
+      { kind: 'user', listId: 'm1' },
+      { kind: 'bundle', bundleId: 'b1' },
+    ],
+  };
   const result = encodeListFormula(outer, makeGetList([manual]));
   assert.deepEqual(result, { ok: false, reason: 'manual-source' });
 });
 
 test('encodeListFormula: rejects a `user` source that would cycle', () => {
-  const a = dynamicList('a', 'union', [{ kind: 'user', listId: 'b' }, { kind: 'bundle', bundleId: 'b1' }]);
-  const b = dynamicList('b', 'union', [{ kind: 'user', listId: 'a' }, { kind: 'bundle', bundleId: 'b2' }]);
+  const a = dynamicList('a', 'union', [
+    { kind: 'user', listId: 'b' },
+    { kind: 'bundle', bundleId: 'b1' },
+  ]);
+  const b = dynamicList('b', 'union', [
+    { kind: 'user', listId: 'a' },
+    { kind: 'bundle', bundleId: 'b2' },
+  ]);
   const result = encodeListFormula(a, makeGetList([a, b]));
   assert.deepEqual(result, { ok: false, reason: 'cycle-or-too-deep' });
 });
 
 test('encodeListFormula: rejects a dangling `user` source', () => {
-  const outer = { op: 'union', sources: [{ kind: 'user', listId: 'gone' }, { kind: 'bundle', bundleId: 'b1' }] };
+  const outer = {
+    op: 'union',
+    sources: [
+      { kind: 'user', listId: 'gone' },
+      { kind: 'bundle', bundleId: 'b1' },
+    ],
+  };
   const result = encodeListFormula(outer, makeGetList([]));
   assert.deepEqual(result, { ok: false, reason: 'cycle-or-too-deep' });
 });
@@ -144,8 +172,14 @@ test('decodeListFormula: rejects malformed input instead of throwing', () => {
 // ── round trip ───────────────────────────────────────────────────────────────────────────────
 
 test('round trip: encode then decode reconstructs an equivalent nested formula', () => {
-  const c = dynamicList('c', 'union', [{ kind: 'account-owned', accountId: 'a1' }, { kind: 'account-owned', accountId: 'a2' }]);
-  const b = dynamicList('b', 'intersect', [{ kind: 'user', listId: 'c' }, { kind: 'account-wishlist', accountId: 'a3' }]);
+  const c = dynamicList('c', 'union', [
+    { kind: 'account-owned', accountId: 'a1' },
+    { kind: 'account-owned', accountId: 'a2' },
+  ]);
+  const b = dynamicList('b', 'intersect', [
+    { kind: 'user', listId: 'c' },
+    { kind: 'account-wishlist', accountId: 'a3' },
+  ]);
   const encoded = encodeListFormula(b, makeGetList([b, c]));
   assert.equal(encoded.ok, true);
   const decoded = decodeListFormula(encoded.formula);
@@ -168,7 +202,21 @@ test('shareListUrl: builds a /lists/shared link carrying the formula verbatim (r
 });
 
 test('encodeListFormula: rejects a `user` source pointing at a ranked list', () => {
-  const ranked = { id: 'r1', parentId: null, order: 0, createdAt: 0, updatedAt: 0, kind: 'ranked', source: { kind: 'recent-games' } };
-  const outer = { op: 'union', sources: [{ kind: 'user', listId: 'r1' }, { kind: 'bundle', bundleId: 'b1' }] };
+  const ranked = {
+    id: 'r1',
+    parentId: null,
+    order: 0,
+    createdAt: 0,
+    updatedAt: 0,
+    kind: 'ranked',
+    source: { kind: 'recent-games' },
+  };
+  const outer = {
+    op: 'union',
+    sources: [
+      { kind: 'user', listId: 'r1' },
+      { kind: 'bundle', bundleId: 'b1' },
+    ],
+  };
   assert.deepEqual(encodeListFormula(outer, makeGetList([ranked])), { ok: false, reason: 'ranked-source' });
 });

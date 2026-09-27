@@ -9,7 +9,10 @@ test('sortOwners: most recently played first', () => {
     { name: 'A', minutes: 10, lastPlayedSec: 100 },
     { name: 'B', minutes: 999, lastPlayedSec: 500 },
   ];
-  assert.deepEqual(sortOwners(owners).map(o => o.name), ['B', 'A']);
+  assert.deepEqual(
+    sortOwners(owners).map((o) => o.name),
+    ['B', 'A'],
+  );
 });
 
 test('sortOwners: never-played owners sort last, alphabetically among themselves', () => {
@@ -18,13 +21,22 @@ test('sortOwners: never-played owners sort last, alphabetically among themselves
     { name: 'Ana', minutes: 0, lastPlayedSec: 0 },
     { name: 'Bob', minutes: 5, lastPlayedSec: 10 },
   ];
-  assert.deepEqual(sortOwners(owners).map(o => o.name), ['Bob', 'Ana', 'Zoe']);
+  assert.deepEqual(
+    sortOwners(owners).map((o) => o.name),
+    ['Bob', 'Ana', 'Zoe'],
+  );
 });
 
 test('sortOwners: does not mutate its input', () => {
-  const owners = [{ name: 'A', minutes: 1, lastPlayedSec: 1 }, { name: 'B', minutes: 2, lastPlayedSec: 9 }];
+  const owners = [
+    { name: 'A', minutes: 1, lastPlayedSec: 1 },
+    { name: 'B', minutes: 2, lastPlayedSec: 9 },
+  ];
   sortOwners(owners);
-  assert.deepEqual(owners.map(o => o.name), ['A', 'B']);
+  assert.deepEqual(
+    owners.map((o) => o.name),
+    ['A', 'B'],
+  );
 });
 
 test('ownerMeterPct: proportional to the most-played owner', () => {

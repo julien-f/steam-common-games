@@ -63,7 +63,9 @@ interface RouteHandlers {
 let routeHandlers: RouteHandlers = {};
 export function registerRouteHandlers(handlers: RouteHandlers): () => void {
   routeHandlers = handlers;
-  return () => { routeHandlers = {}; };
+  return () => {
+    routeHandlers = {};
+  };
 }
 
 // About is deliberately not here: it's a static page nobody visits twice, and the bar was out of
@@ -120,7 +122,12 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
   // without this a route change would land wherever the previous one was scrolled to.
   // Keyed on the path alone: the panel's `?game=`/`&shot=` params are raw `history.replaceState`
   // writes (urlState.ts), which never scrolled the window either.
-  createEffect(on(() => location.pathname, () => scrollPageToTop()));
+  createEffect(
+    on(
+      () => location.pathname,
+      () => scrollPageToTop(),
+    ),
+  );
 
   // The one place a game-lookup, from anywhere in the shell, gets routed to wherever it belongs
   // — the currently mounted route's own registered handler if it has one (ListRoute: opens the
@@ -151,7 +158,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       // next to the panel's own `?game=`. Wiring this back is what makes a copied link reopen the
       // exact screenshot again — `setLightboxParam` had no caller at all since the redesign, so
       // the param was parsed and ordered but never written.
-      onParamChange: shot => setLightboxParam(shot),
+      onParamChange: (shot) => setLightboxParam(shot),
       // ↑/↓ and R inside the lightbox step to another game in whatever list is on screen, using
       // the same handlers the panel's own ↑/↓/R use. Re-pointing the lightbox at that game is
       // these callbacks' job — stepping the panel behind the overlay otherwise leaves the
@@ -159,7 +166,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       // `repointLightboxGame`, which lands on real media rather than the banner (mediaItems.ts's
       // `preferredShotIndex`); the shot to pick depends on the one being left, so the lightbox
       // decides it rather than this callback.
-      onGameNav: dir => {
+      onGameNav: (dir) => {
         if (!routeHandlers.stepGame?.(dir === 1 ? 1 : -1)) return;
         const game = getPanelGame();
         if (game) repointLightboxGame(game);
@@ -185,7 +192,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       // have to land on that route's own store-backed row, not just on the panel's plain copy.
       // Only ListRoute registers it — which covers every case, since a game panel only ever opens
       // there (`openGameGlobally` navigates to /game/:appid, which *is* ListRoute).
-      onRefresh: game => routeHandlers.refreshGame?.(game),
+      onRefresh: (game) => routeHandlers.refreshGame?.(game),
       enableTagFilters: true,
       onTagClick: (dim, value) => routeHandlers.onTagClick?.(dim, value),
       isTagActive: (dim, value) => routeHandlers.isTagActive?.(dim, value) ?? false,
@@ -193,7 +200,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
     initGameSearch({
       inputEl: searchInputEl,
       resultsEl: document.getElementById('app-search-results') as HTMLElement,
-      onSelect: game => {
+      onSelect: (game) => {
         addRecentGame(game.appid, game.name, game.tinyImage);
         openGameGlobally(game.appid);
       },
@@ -205,7 +212,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       onSeeAllRecents: () => navigate(withAccountParam('/game', location.search)),
       // Analogous "see all" for actual search matches (not recents) — the full-page results list
       // with a shareable, editable URL, rather than the dropdown's capped/transient one.
-      onSeeAllResults: term => navigate(withAccountParam(`/search?q=${encodeURIComponent(term)}`, location.search)),
+      onSeeAllResults: (term) => navigate(withAccountParam(`/search?q=${encodeURIComponent(term)}`, location.search)),
     });
 
     bindPanelKeyboardShortcuts({
@@ -214,12 +221,12 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       panelClose,
       panelStepHero,
       pickRandom: () => routeHandlers.pickRandom?.(),
-      stepGame: dir => routeHandlers.stepGame?.(dir) ?? false,
+      stepGame: (dir) => routeHandlers.stepGame?.(dir) ?? false,
       focusSearchInput: () => searchInputEl.focus(),
       onEnterOnFocusedRow: () => routeHandlers.onEnterOnFocusedRow?.() ?? false,
       shortcuts: {
         isOpen: shortcutsOpen,
-        toggle: () => setShortcutsOpen(v => !v),
+        toggle: () => setShortcutsOpen((v) => !v),
         close: () => setShortcutsOpen(false),
       },
     });
@@ -235,7 +242,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       <div class="app-scroll" ref={scrollEl}>
         <nav id="site-nav" class="site-nav">
           <For each={NAV_LINKS}>
-            {link => (
+            {(link) => (
               <A
                 href={link.noAccountParam ? link.href : withAccountParam(link.href, location.search)}
                 end={link.end}
@@ -247,12 +254,20 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
             )}
           </For>
           <div class="app-search-wrap">
-            <input ref={searchInputEl} id="app-search-input" type="text" placeholder="Look up any game…" autocomplete="off" />
+            <input
+              ref={searchInputEl}
+              id="app-search-input"
+              type="text"
+              placeholder="Look up any game…"
+              autocomplete="off"
+            />
             <div id="app-search-results" class="game-search-results" hidden />
           </div>
           <AccountChip />
           <details class="site-nav-prefs site-nav-popover" ref={prefsDetailsEl}>
-            <summary class="site-nav-link site-nav-prefs-btn" aria-label="Preferences">⚙</summary>
+            <summary class="site-nav-link site-nav-prefs-btn" aria-label="Preferences">
+              ⚙
+            </summary>
             {/* eslint-disable-next-line solid/no-innerhtml -- prefsPopoverPanelHtml() is this app's
                 own static markup for the popover's contents (prefsPopover.ts, which then wires the
                 region <select> up imperatively); no external input reaches it. */}
@@ -263,8 +278,12 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
         <main class="app-content">{props.children}</main>
 
         <footer class="app-footer">
-          <span>Press <kbd>?</kbd> for keyboard shortcuts</span>
-          <A href="/about" class="app-footer-link">About</A>
+          <span>
+            Press <kbd>?</kbd> for keyboard shortcuts
+          </span>
+          <A href="/about" class="app-footer-link">
+            About
+          </A>
         </footer>
       </div>
 
@@ -273,13 +292,22 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           comment and docs/dev/frontend.md). Fixed and full-height, so it sits outside the
           scrolling column entirely (see style.css's .app-shell). */}
       <div id="game-panel" class="game-panel" role="complementary" aria-labelledby="panel-title">
-        <button id="panel-close" class="panel-close" aria-label="Close">×</button>
+        <button id="panel-close" class="panel-close" aria-label="Close">
+          ×
+        </button>
         <div id="panel-nav" class="panel-nav" />
         <div id="panel-body" class="panel-body" />
       </div>
 
       <Show when={scrolled()}>
-        <button class="app-to-top" title="Back to top" aria-label="Back to top" onClick={() => scrollPageToTop('smooth')}>↑</button>
+        <button
+          class="app-to-top"
+          title="Back to top"
+          aria-label="Back to top"
+          onClick={() => scrollPageToTop('smooth')}
+        >
+          ↑
+        </button>
       </Show>
       <ShortcutsModal open={shortcutsOpen()} onClose={() => setShortcutsOpen(false)} />
     </div>

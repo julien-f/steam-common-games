@@ -61,13 +61,38 @@ import { A, useParams, useLocation, useNavigate } from '@solidjs/router';
 import { createTableState, DataTableView, bucketDatePart, formatDatePart } from '@vates/data-table-solid';
 import type { ColumnDef, SortEntry, TableState } from '@vates/data-table-solid';
 import {
-  fmt, insertColumnsAfter, CORE_COLUMNS, PRICE_COLUMNS, compareDateMissingLast,
-  withMissingGroup, formatMissingGroup, halfDecadeBucket, formatHalfDecadeBucket,
-  protonDbValue, TYPE_LABELS, priceTierBucket, formatPriceTier, compareNumMissingLast,
+  fmt,
+  insertColumnsAfter,
+  CORE_COLUMNS,
+  PRICE_COLUMNS,
+  compareDateMissingLast,
+  withMissingGroup,
+  formatMissingGroup,
+  halfDecadeBucket,
+  formatHalfDecadeBucket,
+  protonDbValue,
+  TYPE_LABELS,
+  priceTierBucket,
+  formatPriceTier,
+  compareNumMissingLast,
   OWNERSHIP_STATUS_COLUMN,
 } from './gameColumns.ts';
-import { computeSteamdbRating, computeProductionTier, discountPct, fmtAge, fmtLastPlayed, formatMoney, scoreColor } from './utils.ts';
-import { restoreTableView, shareTableView, resetTableView, saveTableViewToServer, revertTableViewToServer } from './tableViewPrefs.ts';
+import {
+  computeSteamdbRating,
+  computeProductionTier,
+  discountPct,
+  fmtAge,
+  fmtLastPlayed,
+  formatMoney,
+  scoreColor,
+} from './utils.ts';
+import {
+  restoreTableView,
+  shareTableView,
+  resetTableView,
+  saveTableViewToServer,
+  revertTableViewToServer,
+} from './tableViewPrefs.ts';
 import { isUnsaved, summarizeViewDiff } from './tableViewSync.ts';
 import { getAuthUser } from './authStore.ts';
 import { renderPanelNav as renderPanelNavShared, stepGameList } from './panelNav.ts';
@@ -76,20 +101,40 @@ import { createStaleGuard } from './staleGuard.ts';
 import { createStreamBatcher } from './streamBatcher.ts';
 import { openLightbox } from './lightbox.tsx';
 import {
-  panelOpen, panelClose, isPanelOpen, getPanelGame, pickRandomFrom, clearRandomQueue, clearAllRandomQueues,
+  panelOpen,
+  panelClose,
+  isPanelOpen,
+  getPanelGame,
+  pickRandomFrom,
+  clearRandomQueue,
+  clearAllRandomQueues,
 } from './panel.tsx';
 import {
-  setPanelParam, urlWithParams, withAccountParam, parseUrlState, normalizeSlots, compareUrl,
+  setPanelParam,
+  urlWithParams,
+  withAccountParam,
+  parseUrlState,
+  normalizeSlots,
+  compareUrl,
   DEFAULT_COMPARE_OP,
 } from './urlState.ts';
 import { setPref } from './prefs.ts';
-import { getEffectiveCurrentAccount, accountIdFor, accountDisplayLabel, ACCOUNT_CHANGED_EVENT } from './accountsStore.ts';
+import {
+  getEffectiveCurrentAccount,
+  accountIdFor,
+  accountDisplayLabel,
+  ACCOUNT_CHANGED_EVENT,
+} from './accountsStore.ts';
 import { getAccountOverrideState, accountOverrideStatusText } from './accountOverride.ts';
 import { fetchAccountOverview, fetchAccountWishlist, resolveAccountSummary } from './accountData.ts';
 import { loadRecentGames, addRecentGame, renameRecentGame } from './recentGames.ts';
 import { fetchBundleById, resolveBundleGames, type ResolvedGame, type FlatGame } from './bundleData.ts';
 import {
-  bundleTierSummary, bundleUrgency, shopHue, fmtBundleDateFriendly, type BundleTierSummary,
+  bundleTierSummary,
+  bundleUrgency,
+  shopHue,
+  fmtBundleDateFriendly,
+  type BundleTierSummary,
 } from './bundleRows.ts';
 import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from './priceLoading.ts';
@@ -99,19 +144,51 @@ import { registerRouteHandlers } from './AppShell.tsx';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
 import { ComparePlayersForm } from './ComparePlayersForm.tsx';
 import {
-  describeSources, describeListRef, createDefaultNaming, listDisplayName, opLabel, OP_LABELS, OP_SYMBOLS,
-  type RefDescription, type ListNaming,
+  describeSources,
+  describeListRef,
+  createDefaultNaming,
+  listDisplayName,
+  opLabel,
+  OP_LABELS,
+  OP_SYMBOLS,
+  type RefDescription,
+  type ListNaming,
 } from './listLabels.ts';
 import { encodeListFormula, decodeListFormula, shareListUrl } from './listShare.ts';
 import { copyWithFeedback } from './clipboard.ts';
 import { setBaseTitle } from './pageTitle.ts';
-import type { AccountSlot, DetailsAges, Game, Rating, Hltb, GameMeta, ProtonDb, GameList, CombineOp, ListRef } from './types.ts';
+import type {
+  AccountSlot,
+  DetailsAges,
+  Game,
+  Rating,
+  Hltb,
+  GameMeta,
+  ProtonDb,
+  GameList,
+  CombineOp,
+  ListRef,
+} from './types.ts';
 import {
-  getList, getLists, getFolders, createList, updateDynamicList, updateRankedSource, addAppidsToList, removeAppidsFromList,
-  setListTableView, getRanking, setRanking,
+  getList,
+  getLists,
+  getFolders,
+  createList,
+  updateDynamicList,
+  updateRankedSource,
+  addAppidsToList,
+  removeAppidsFromList,
+  setListTableView,
+  getRanking,
+  setRanking,
 } from './listsStore.ts';
 import { ranks, progress, rerank, exclude, type RankingState, type RankingProgress } from './ranking.ts';
-import { resolveListWithSources, flattenCombineResult, createDefaultFetchers, type ListResolveFetchers } from './listResolve.ts';
+import {
+  resolveListWithSources,
+  flattenCombineResult,
+  createDefaultFetchers,
+  type ListResolveFetchers,
+} from './listResolve.ts';
 import { CombineForm, sourceOptions, refKey, type SourceOption } from './CombineForm.tsx';
 import type { MembershipGroup } from './combine.ts';
 import { peekMyOwnershipStatus, peekMyPlaytime, onMyOwnershipReady } from './myOwnership.ts';
@@ -134,29 +211,55 @@ function kindFromPath(pathname: string, params: { bundleId?: string; listId?: st
 // behind each column's grouping/format/category choices) ──────────────────────────────────────
 
 const PLAYTIME_COLUMN: ColumnDef<Record<string, any>> = {
-  key: 'playtime', label: 'Played (h)', type: 'number', groupable: true,
-  format: v => (v as number) > 0 ? Number(v).toFixed(1) : '—', defaultSortDir: 'desc',
-  groupValue: halfDecadeBucket, groupFormat: formatHalfDecadeBucket('h', 'Not played'),
-  keepVisibleWhenGrouped: true, category: 'Play Time & Dates',
-};
-
-const LAST_PLAYED_COLUMN: ColumnDef<Record<string, any>> = {
-  key: 'lastPlayed', label: 'Last Played', type: 'date', groupable: true, format: fmt.str,
-  compare: compareDateMissingLast, defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
-  groupValue: withMissingGroup(bucketDatePart('year'), (v: unknown) => v == null || v === ''),
-  groupFormat: formatMissingGroup(formatDatePart('year')), keepVisibleWhenGrouped: true,
+  key: 'playtime',
+  label: 'Played (h)',
+  type: 'number',
+  groupable: true,
+  format: (v) => ((v as number) > 0 ? Number(v).toFixed(1) : '—'),
+  defaultSortDir: 'desc',
+  groupValue: halfDecadeBucket,
+  groupFormat: formatHalfDecadeBucket('h', 'Not played'),
+  keepVisibleWhenGrouped: true,
   category: 'Play Time & Dates',
 };
 
-const WISHLIST_RANK_COLUMN: ColumnDef<Record<string, any>> =
-  { key: 'priority', label: 'Wishlist Rank', type: 'number', groupable: false, format: fmt.num };
+const LAST_PLAYED_COLUMN: ColumnDef<Record<string, any>> = {
+  key: 'lastPlayed',
+  label: 'Last Played',
+  type: 'date',
+  groupable: true,
+  format: fmt.str,
+  compare: compareDateMissingLast,
+  defaultSortDir: 'desc',
+  defaultValueSort: { by: 'alpha', dir: 'desc' },
+  groupValue: withMissingGroup(bucketDatePart('year'), (v: unknown) => v == null || v === ''),
+  groupFormat: formatMissingGroup(formatDatePart('year')),
+  keepVisibleWhenGrouped: true,
+  category: 'Play Time & Dates',
+};
 
-const WISHLIST_DATE_ADDED_COLUMN: ColumnDef<Record<string, any>> =
-  { key: 'dateAdded', label: 'Added', type: 'date', groupable: true, format: fmt.str, compare: compareDateMissingLast,
-    defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
-    groupValue: withMissingGroup(bucketDatePart('year')),
-    groupFormat: formatMissingGroup(formatDatePart('year')), keepVisibleWhenGrouped: true,
-    category: 'Play Time & Dates' };
+const WISHLIST_RANK_COLUMN: ColumnDef<Record<string, any>> = {
+  key: 'priority',
+  label: 'Wishlist Rank',
+  type: 'number',
+  groupable: false,
+  format: fmt.num,
+};
+
+const WISHLIST_DATE_ADDED_COLUMN: ColumnDef<Record<string, any>> = {
+  key: 'dateAdded',
+  label: 'Added',
+  type: 'date',
+  groupable: true,
+  format: fmt.str,
+  compare: compareDateMissingLast,
+  defaultSortDir: 'desc',
+  defaultValueSort: { by: 'alpha', dir: 'desc' },
+  groupValue: withMissingGroup(bucketDatePart('year')),
+  groupFormat: formatMissingGroup(formatDatePart('year')),
+  keepVisibleWhenGrouped: true,
+  category: 'Play Time & Dates',
+};
 
 const OWNED_COLUMNS = insertColumnsAfter(CORE_COLUMNS, 'hltbCompletionist', PLAYTIME_COLUMN, LAST_PLAYED_COLUMN);
 const OWNED_DEFAULT_VISIBLE = ['capsule', 'name', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres', 'playtime'];
@@ -175,15 +278,21 @@ const RECENT_DEFAULT_VISIBLE = ['capsule', 'name', 'steamdbRating', 'hltbAll', '
 const USER_COLUMNS = insertColumnsAfter(RECENT_COLUMNS, 'hltbCompletionist', PLAYTIME_COLUMN, LAST_PLAYED_COLUMN);
 
 const WISHLIST_COLUMNS = insertColumnsAfter(
-  insertColumnsAfter(
-    insertColumnsAfter(CORE_COLUMNS, 'name', WISHLIST_RANK_COLUMN),
-    'priority', ...PRICE_COLUMNS,
-  ),
-  'releaseDate', WISHLIST_DATE_ADDED_COLUMN,
+  insertColumnsAfter(insertColumnsAfter(CORE_COLUMNS, 'name', WISHLIST_RANK_COLUMN), 'priority', ...PRICE_COLUMNS),
+  'releaseDate',
+  WISHLIST_DATE_ADDED_COLUMN,
 );
 const WISHLIST_DEFAULT_VISIBLE = [
-  'capsule', 'name', 'dateAdded', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres', 'hasDemo',
-  'bestDealPrice', 'bestDealCut',
+  'capsule',
+  'name',
+  'dateAdded',
+  'steamdbRating',
+  'hltbAll',
+  'releaseDate',
+  'genres',
+  'hasDemo',
+  'bestDealPrice',
+  'bestDealCut',
 ];
 
 function renderAddonBadge(v: unknown): Node {
@@ -206,27 +315,61 @@ function renderTierPrice(v: unknown, row: Record<string, any>): Node {
 }
 
 const TIER_PRICE_COLUMN: ColumnDef<Record<string, any>> = {
-  key: 'tierPrice', label: 'Tier Price', type: 'number', groupable: true,
-  format: v => v == null ? 'Varies' : v === 0 ? 'Free' : Number(v).toFixed(2), render: renderTierPrice,
-  compare: compareNumMissingLast, defaultSortDir: 'asc',
-  groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier, 'Varies'), keepVisibleWhenGrouped: true,
+  key: 'tierPrice',
+  label: 'Tier Price',
+  type: 'number',
+  groupable: true,
+  format: (v) => (v == null ? 'Varies' : v === 0 ? 'Free' : Number(v).toFixed(2)),
+  render: renderTierPrice,
+  compare: compareNumMissingLast,
+  defaultSortDir: 'asc',
+  groupValue: withMissingGroup(priceTierBucket),
+  groupFormat: formatMissingGroup(formatPriceTier, 'Varies'),
+  keepVisibleWhenGrouped: true,
   category: 'Pricing',
 };
-const ADDON_COLUMN: ColumnDef<Record<string, any>> =
-  { key: 'addon', label: 'Add-on', groupable: true, format: v => v ? 'Add-on' : 'Base', render: renderAddonBadge, category: 'Classification' };
+const ADDON_COLUMN: ColumnDef<Record<string, any>> = {
+  key: 'addon',
+  label: 'Add-on',
+  groupable: true,
+  format: (v) => (v ? 'Add-on' : 'Base'),
+  render: renderAddonBadge,
+  category: 'Classification',
+};
 
 // OWNERSHIP_STATUS_COLUMN hidden by default here too, same reasoning as RECENT_DEFAULT_VISIBLE
 // above — the Name column right next to it already shows the same status inline.
 const BUNDLE_COLUMNS = insertColumnsAfter(
   insertColumnsAfter(CORE_COLUMNS, 'name', OWNERSHIP_STATUS_COLUMN, TIER_PRICE_COLUMN, ADDON_COLUMN),
-  'addon', ...PRICE_COLUMNS,
+  'addon',
+  ...PRICE_COLUMNS,
 );
-const BUNDLE_DEFAULT_VISIBLE = ['capsule', 'name', 'tierPrice', 'bestDealPrice', 'bestDealCut', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
-const BUNDLE_DEFAULT_SORT: SortEntry[] = [{ key: 'tierPrice', dir: 'asc' }, { key: 'steamdbRating', dir: 'desc' }];
+const BUNDLE_DEFAULT_VISIBLE = [
+  'capsule',
+  'name',
+  'tierPrice',
+  'bestDealPrice',
+  'bestDealCut',
+  'steamdbRating',
+  'hltbAll',
+  'releaseDate',
+  'genres',
+];
+const BUNDLE_DEFAULT_SORT: SortEntry[] = [
+  { key: 'tierPrice', dir: 'asc' },
+  { key: 'steamdbRating', dir: 'desc' },
+];
 
 // A ranked list's own order (ranking.ts) — unranked/excluded games have no rank and sort last.
-const RANK_COLUMN: ColumnDef<Record<string, any>> =
-  { key: 'rank', label: 'Rank', type: 'number', groupable: false, format: fmt.num, compare: compareNumMissingLast, defaultSortDir: 'asc' };
+const RANK_COLUMN: ColumnDef<Record<string, any>> = {
+  key: 'rank',
+  label: 'Rank',
+  type: 'number',
+  groupable: false,
+  format: fmt.num,
+  compare: compareNumMissingLast,
+  defaultSortDir: 'asc',
+};
 const RANKED_COLUMNS = insertColumnsAfter(USER_COLUMNS, 'capsule', RANK_COLUMN);
 const RANKED_DEFAULT_VISIBLE = ['rank', ...RECENT_DEFAULT_VISIBLE];
 const RANKED_DEFAULT_SORT: SortEntry[] = [{ key: 'rank', dir: 'asc' }];
@@ -236,51 +379,68 @@ const MAX_PRICE_LOOKUP_GAMES = 500; // mirrors the server's own cap — see load
 
 // The shape of one `data:` line in /api/game-details/stream's SSE response.
 interface DetailsEvent {
-  appid: number; done?: boolean; fetchedAt?: number | null; fetchedAts?: DetailsAges | null;
-  rating: Rating | null; hltb: Hltb | null; meta: GameMeta | null; tags: string[] | null;
-  demo: { appid: number } | null; protondb: ProtonDb | null;
+  appid: number;
+  done?: boolean;
+  fetchedAt?: number | null;
+  fetchedAts?: DetailsAges | null;
+  rating: Rating | null;
+  hltb: Hltb | null;
+  meta: GameMeta | null;
+  tags: string[] | null;
+  demo: { appid: number } | null;
+  protondb: ProtonDb | null;
 }
 
 function applyDetailsEvent(row: Game, event: DetailsEvent) {
   row.detailsFetchedAt = event.fetchedAt ?? null;
   row.detailsFetchedAts = event.fetchedAts ?? null;
-  row.capsule           = event.meta?.capsule ?? null;
+  row.capsule = event.meta?.capsule ?? null;
   if (!row.name) row.name = event.meta?.name || '';
-  row.score             = event.rating?.score ?? null;
-  row.positivePct       = (event.rating?.positive != null && event.rating?.total)
-    ? Math.round((event.rating.positive / event.rating.total) * 100) : null;
-  row.steamdbRating     = computeSteamdbRating(event.rating?.positive ?? 0, event.rating?.total ?? 0);
-  row.reviewsTotal      = event.rating?.total ?? null;
-  row.hltbMain          = event.hltb?.main           ?? null;
-  row.hltbExtra         = event.hltb?.extra          ?? null;
-  row.hltbCompletionist = event.hltb?.completionist  ?? null;
-  row.hltbAll           = event.hltb?.all            ?? null;
-  row.metacritic        = event.meta?.metacritic?.score ?? null;
-  row.releaseDate       = event.meta?.releaseDate    ?? null;
-  row.comingSoon        = event.meta?.comingSoon     ?? false;
-  row.genres            = event.meta?.genres     ?? [];
-  row.developers        = event.meta?.developers ?? [];
-  row.publishers        = event.meta?.publishers ?? [];
-  row.categories        = event.meta?.categories ?? [];
-  row.tags              = event.tags ?? [];
-  row.protondb          = protonDbValue(event.protondb?.tier);
-  row.protondbPending   = event.protondb?.pending ?? false;
-  row.achievementCount  = event.meta?.achievementCount ?? null;
-  row.dlcCount          = event.meta?.dlc?.length ?? null;
-  row.platforms         = event.meta?.platforms ?? [];
-  row.languages         = event.meta?.languages ?? [];
-  row.hasDemo           = event.demo != null;
-  row.type              = (TYPE_LABELS as Record<string, string>)[event.meta?.type ?? ''] ?? (event.meta?.type ? event.meta.type : null);
-  row.productionTier    = computeProductionTier({
-    isFree:       event.meta?.isFree ?? false,
+  row.score = event.rating?.score ?? null;
+  row.positivePct =
+    event.rating?.positive != null && event.rating?.total
+      ? Math.round((event.rating.positive / event.rating.total) * 100)
+      : null;
+  row.steamdbRating = computeSteamdbRating(event.rating?.positive ?? 0, event.rating?.total ?? 0);
+  row.reviewsTotal = event.rating?.total ?? null;
+  row.hltbMain = event.hltb?.main ?? null;
+  row.hltbExtra = event.hltb?.extra ?? null;
+  row.hltbCompletionist = event.hltb?.completionist ?? null;
+  row.hltbAll = event.hltb?.all ?? null;
+  row.metacritic = event.meta?.metacritic?.score ?? null;
+  row.releaseDate = event.meta?.releaseDate ?? null;
+  row.comingSoon = event.meta?.comingSoon ?? false;
+  row.genres = event.meta?.genres ?? [];
+  row.developers = event.meta?.developers ?? [];
+  row.publishers = event.meta?.publishers ?? [];
+  row.categories = event.meta?.categories ?? [];
+  row.tags = event.tags ?? [];
+  row.protondb = protonDbValue(event.protondb?.tier);
+  row.protondbPending = event.protondb?.pending ?? false;
+  row.achievementCount = event.meta?.achievementCount ?? null;
+  row.dlcCount = event.meta?.dlc?.length ?? null;
+  row.platforms = event.meta?.platforms ?? [];
+  row.languages = event.meta?.languages ?? [];
+  row.hasDemo = event.demo != null;
+  row.type =
+    (TYPE_LABELS as Record<string, string>)[event.meta?.type ?? ''] ?? (event.meta?.type ? event.meta.type : null);
+  row.productionTier = computeProductionTier({
+    isFree: event.meta?.isFree ?? false,
     priceInitial: event.meta?.priceInitial ?? null,
     reviewsTotal: event.rating?.total ?? null,
     hasMetacritic: event.meta?.metacritic != null,
-    isDlc:        event.meta?.fullgame != null,
-    type:         event.meta?.type ?? null,
+    isDlc: event.meta?.fullgame != null,
+    type: event.meta?.type ?? null,
   });
-  row.loading           = false;
-  row.details           = { rating: event.rating, hltb: event.hltb, meta: event.meta, tags: event.tags, demo: event.demo, protondb: event.protondb };
+  row.loading = false;
+  row.details = {
+    rating: event.rating,
+    hltb: event.hltb,
+    meta: event.meta,
+    tags: event.tags,
+    demo: event.demo,
+    protondb: event.protondb,
+  };
 }
 
 // tableViewPrefs.ts's own bindViewPersistence needs `table.onViewChange`, which the Solid table
@@ -288,7 +448,7 @@ function applyDetailsEvent(row: Game, event: DetailsEvent) {
 // signal it touches) instead, same as library.tsx's/bundles.tsx's own identical helper.
 function bindSolidViewPersistence(ts: TableState<Game>, prefKey: string): () => void {
   let dispose: (() => void) | null = null;
-  createRoot(d => {
+  createRoot((d) => {
     dispose = d;
     createEffect(() => setPref(prefKey, ts.getViewState()));
   });
@@ -323,7 +483,7 @@ export default function ListRoute() {
   // source would hide three-day-old ones behind a reassuring "just now".
   function noteFetchedAt(at: number | null): void {
     const t = at ?? Date.now();
-    setFetchedAt(prev => (prev === undefined || prev === null ? t : Math.min(prev, t)));
+    setFetchedAt((prev) => (prev === undefined || prev === null ? t : Math.min(prev, t)));
   }
   const [refreshing, setRefreshing] = createSignal(false);
   // The Prices tile's own refresh (wishlist/bundle kinds). Deliberately one control
@@ -340,7 +500,7 @@ export default function ListRoute() {
   // renders no readout at all rather than a premature "just now".
   const [priceFetchedAt, setPriceFetchedAt] = createSignal<number | null | undefined>(undefined);
   function notePriceFetchedAt(at: number | null): void {
-    setPriceFetchedAt(prev => (prev === undefined || at === null || prev === null ? at : Math.min(prev, at)));
+    setPriceFetchedAt((prev) => (prev === undefined || at === null || prev === null ? at : Math.min(prev, at)));
   }
   async function handleRefreshPrices(): Promise<void> {
     setRefreshingPrices(true);
@@ -348,7 +508,12 @@ export default function ListRoute() {
     try {
       const gen = loadGuard.current();
       if (kind === 'bundle' && resolvedBundleGames) await loadBundlePrices(resolvedBundleGames, gen, true);
-      else if (kind === 'wishlist') await loadWishlistPrices(rowsStore.map(r => ({ appid: r.appid })), gen, true);
+      else if (kind === 'wishlist')
+        await loadWishlistPrices(
+          rowsStore.map((r) => ({ appid: r.appid })),
+          gen,
+          true,
+        );
     } finally {
       setRefreshingPrices(false);
     }
@@ -356,7 +521,11 @@ export default function ListRoute() {
 
   async function handleRefreshList(): Promise<void> {
     setRefreshing(true);
-    try { await load({ refresh: true }); } finally { setRefreshing(false); }
+    try {
+      await load({ refresh: true });
+    } finally {
+      setRefreshing(false);
+    }
   }
   // The list's own name — the hero card's <h1> (see ListHero.tsx) *and* the document title, set
   // through one function since they were always the same string; before the card existed, only
@@ -376,15 +545,22 @@ export default function ListRoute() {
   // kind === 'bundle' only, alongside bundleTitle above — ITAD's own page for this bundle
   // (`details`) and the real shop/affiliate purchase link exactly as ITAD returned it (`url`,
   // never rewritten or stripped of tracking params — see docs/dev/integrations.md on why).
-  const [bundleLinks, setBundleLinks] = createSignal<{ details: string | null; url: string | null }>({ details: null, url: null });
+  const [bundleLinks, setBundleLinks] = createSignal<{ details: string | null; url: string | null }>({
+    details: null,
+    url: null,
+  });
   // kind === 'bundle' only — everything else the bundle response already carries, for the detail
   // card below the header. All of it rides on the one fetch the route already makes; none of it
   // costs a request. `itadCount` is ITAD's own game count for the bundle, which is NOT the same as
   // the table's row count (see unresolvedGames below), so the card shows both rather than letting
   // the smaller number pass itself off as the whole bundle.
   const [bundleMeta, setBundleMeta] = createSignal<{
-    shop: string | null; publish: string | null; expiry: string | null; note: string | null;
-    itadCount: number | null; tiers: BundleTierSummary[];
+    shop: string | null;
+    publish: string | null;
+    expiry: string | null;
+    note: string | null;
+    itadCount: number | null;
+    tiers: BundleTierSummary[];
   } | null>(null);
   // The bundle's games that have no Steam listing at all (a course, an asset pack, a shop-exclusive
   // key). resolveBundleGames has always returned these; this route used to drop them on the floor,
@@ -439,7 +615,10 @@ export default function ListRoute() {
     setRankingState(state);
     const rankOf = ranks(state, source);
     batch(() => {
-      for (const row of rowsStore) rowStore.mutateRow(row.appid, draft => { draft.rank = rankOf.get(row.appid) ?? null; });
+      for (const row of rowsStore)
+        rowStore.mutateRow(row.appid, (draft) => {
+          draft.rank = rankOf.get(row.appid) ?? null;
+        });
     });
   }
   const [editingRankedSource, setEditingRankedSource] = createSignal(false);
@@ -447,14 +626,18 @@ export default function ListRoute() {
     const list = userList();
     const options = sourceOptions(list?.id);
     // sourceOptions offers no bundles, so a bundle source is added back to stay selectable.
-    if (list?.source && !options.some(o => o.key === refKey(list.source!))) {
-      options.unshift({ key: refKey(list.source), label: describeListRef(list.source, createDefaultNaming()).label, ref: list.source });
+    if (list?.source && !options.some((o) => o.key === refKey(list.source!))) {
+      options.unshift({
+        key: refKey(list.source),
+        label: describeListRef(list.source, createDefaultNaming()).label,
+        ref: list.source,
+      });
     }
     return options;
   }
   function handleChangeRankedSource(key: string): void {
     const list = userList();
-    const option = rankedSourceOptions().find(o => o.key === key);
+    const option = rankedSourceOptions().find((o) => o.key === key);
     if (!list || !option) return;
     try {
       updateRankedSource(list.id, option.ref);
@@ -479,10 +662,10 @@ export default function ListRoute() {
   // What "Rank this list" asks about first: the selection, else the filtered rows (null = all, [] = the filter hides every row).
   function rankThisListFocus(): number[] | null {
     const selected = selectedRows();
-    if (selected.length) return selected.map(r => r.appid);
+    if (selected.length) return selected.map((r) => r.appid);
     if (!tableReady() || !table) return null; // `table` isn't a signal; tableReady() is
     const visible = table.processedData();
-    return visible.length < table.data().length ? visible.map(r => r.appid) : null;
+    return visible.length < table.data().length ? visible.map((r) => r.appid) : null;
   }
   function rankThisListLabel(): string {
     const focus = rankThisListFocus();
@@ -492,14 +675,16 @@ export default function ListRoute() {
   function handleRankThisList(): void {
     const source = rankSourceRef();
     if (!source || rankThisListFocus()?.length === 0) return;
-    const rankOrder = (table?.processedData() ?? []).map(r => r.appid);
-    navigate(`/lists/${createList({ kind: 'ranked', source }).id}/rank`, { state: { rankFocus: rankThisListFocus() ?? undefined, rankOrder } });
+    const rankOrder = (table?.processedData() ?? []).map((r) => r.appid);
+    navigate(`/lists/${createList({ kind: 'ranked', source }).id}/rank`, {
+      state: { rankFocus: rankThisListFocus() ?? undefined, rankOrder },
+    });
   }
   function handleRerankSelected(): void {
     const list = userList();
     const state = ranking();
     if (!list || !state) return;
-    const focus = selectedRows().map(r => r.appid);
+    const focus = selectedRows().map((r) => r.appid);
     applyRanking(focus.reduce((s, appid) => rerank(s, appid), state));
     table?.selection.clear();
     navigate(`/lists/${list.id}/rank`, { state: { rankFocus: focus, rankOrder: focus } });
@@ -507,12 +692,14 @@ export default function ListRoute() {
   // The selected games still to be ranked — what "Compare selected" asks about.
   function selectedUnranked(): number[] {
     const excluded = new Set(ranking()?.excluded ?? []);
-    return selectedRows().filter(r => r.rank == null && !excluded.has(r.appid)).map(r => r.appid);
+    return selectedRows()
+      .filter((r) => r.rank == null && !excluded.has(r.appid))
+      .map((r) => r.appid);
   }
   // The unranked games in the table's current sort (filters included — what's left out is asked
   // after, in source order), so whatever the user sorted first gets ranked first.
   function unrankedInTableOrder(): number[] {
-    return (table?.processedData() ?? []).filter(r => r.rank == null).map(r => r.appid);
+    return (table?.processedData() ?? []).filter((r) => r.rank == null).map((r) => r.appid);
   }
   // Handed over as history state rather than in the URL, which a few hundred appids would bloat;
   // it survives a reload of the compare screen and is gone once it's navigated away from.
@@ -522,7 +709,7 @@ export default function ListRoute() {
     const visible = table.processedData();
     if (visible.length >= table.data().length) return null;
     const excluded = new Set(ranking()?.excluded ?? []);
-    return visible.filter(r => r.rank == null && !excluded.has(r.appid)).map(r => r.appid);
+    return visible.filter((r) => r.rank == null && !excluded.has(r.appid)).map((r) => r.appid);
   }
   function compareLabel(): string {
     const focus = filteredUnranked();
@@ -563,13 +750,13 @@ export default function ListRoute() {
     return new URLSearchParams(location.search).get('f');
   }
   function sharedFetchers(base: ListResolveFetchers): ListResolveFetchers {
-    return { ...base, getList: id => sharedSynthetic().get(id) ?? base.getList(id) };
+    return { ...base, getList: (id) => sharedSynthetic().get(id) ?? base.getList(id) };
   }
   function sharedNaming(): ListNaming {
     const base = createDefaultNaming();
     return {
       ...base,
-      list: id => {
+      list: (id) => {
         const synth = sharedSynthetic().get(id);
         // Same "(unnamed nested formula)" parenthesizing createDefaultNaming applies to a real
         // stored list nested one level deep — a synthetic group is always unnamed, so it always
@@ -652,12 +839,14 @@ export default function ListRoute() {
   const compareSlots = (): string[][] => normalizeSlots(parseUrlState(location.search).slots);
   function compareOp(): CombineOp {
     const raw = new URLSearchParams(location.search).get('op');
-    return raw && raw in OP_LABELS ? raw as CombineOp : DEFAULT_COMPARE_OP as CombineOp;
+    return raw && raw in OP_LABELS ? (raw as CombineOp) : (DEFAULT_COMPARE_OP as CombineOp);
   }
   // The comparison a load has already done, in both spellings of it — see load()'s own guard.
   let loadedCompareKeys = new Set<string>();
   function compareKey(): string {
-    return `${compareOp()}|${compareSlots().map(slot => slot.join(',')).join('|')}`;
+    return `${compareOp()}|${compareSlots()
+      .map((slot) => slot.join(','))
+      .join('|')}`;
   }
   // Names this comparison's own accounts in the formula/group headings. They're resolved from the
   // URL, so they're typically in no store at all — createDefaultNaming would fall back to naming
@@ -678,8 +867,8 @@ export default function ListRoute() {
     const base = createDefaultNaming();
     return {
       ...base,
-      account: id => {
-        const match = compareAccounts().find(a => a.id === id);
+      account: (id) => {
+        const match = compareAccounts().find((a) => a.id === id);
         return match ? { label: accountDisplayLabel(match), identifiers: match.members } : base.account(id);
       },
     };
@@ -696,18 +885,20 @@ export default function ListRoute() {
 
   // ── Row-selection-based add/remove-to-list (see this file's own header comment) ────────────
   const [selectedRows, setSelectedRows] = createSignal<Game[]>([]);
-  const [manualLists, setManualLists] = createSignal<GameList[]>(getLists().filter(l => l.kind === 'manual'));
+  const [manualLists, setManualLists] = createSignal<GameList[]>(getLists().filter((l) => l.kind === 'manual'));
   const NEW_LIST_OPTION = '__new__';
   const [addTarget, setAddTarget] = createSignal('');
   const [selectionActionStatus, setSelectionActionStatus] = createSignal('');
 
-  function refreshManualLists(): void { setManualLists(getLists().filter(l => l.kind === 'manual')); }
+  function refreshManualLists(): void {
+    setManualLists(getLists().filter((l) => l.kind === 'manual'));
+  }
 
   async function handleAddSelectedToList(): Promise<void> {
     const target = addTarget();
     const rows = selectedRows();
     if (!target || rows.length === 0) return;
-    const appids = rows.map(r => r.appid);
+    const appids = rows.map((r) => r.appid);
     if (target === NEW_LIST_OPTION) {
       const name = window.prompt('New list name?');
       if (!name) return;
@@ -738,7 +929,7 @@ export default function ListRoute() {
     const list = userList();
     const rows = selectedRows();
     if (!list || rows.length === 0) return;
-    const appids = rows.map(r => r.appid);
+    const appids = rows.map((r) => r.appid);
     removeAppidsFromList(list.id, appids);
     await load();
     setSelectionActionStatus(`Removed ${appids.length} game(s) from "${list.name}".`);
@@ -772,15 +963,20 @@ export default function ListRoute() {
   // must not clobber it.
   let standaloneLookupToken = 0;
 
-  function tableData(): Game[] { return rowsStore.filter(r => !r.loading); }
+  function tableData(): Game[] {
+    return rowsStore.filter((r) => !r.loading);
+  }
 
   // In group mode there's no single `table` — prev/next/random operate on whichever group the
   // currently-open game belongs to (activeGroupKey, kept in sync by renderPanelNav below).
   function activeTable(): TableState<Game> | null {
-    if (groupTables.length) return groupTables.find(g => g.key === activeGroupKey)?.table ?? null;
+    if (groupTables.length) return groupTables.find((g) => g.key === activeGroupKey)?.table ?? null;
     return table;
   }
-  function getGameList(): Game[] { const t = activeTable(); return t ? t.processedData() : []; }
+  function getGameList(): Game[] {
+    const t = activeTable();
+    return t ? t.processedData() : [];
+  }
 
   // Scoped by specific id (and, in group mode, the active group) — kind/listId alone would
   // collide between two different bundles/user lists/groups navigated between without a remount
@@ -801,7 +997,7 @@ export default function ListRoute() {
   // "Load more" on /bundles while this route is open elsewhere) — cheap, a bundle list is never
   // more than a few hundred entries.
   function bundleNavIndex(): number {
-    return getBrowsedBundles().findIndex(b => b.id === Number(params.bundleId));
+    return getBrowsedBundles().findIndex((b) => b.id === Number(params.bundleId));
   }
   function prevBundleId(): number | null {
     const idx = bundleNavIndex();
@@ -821,13 +1017,16 @@ export default function ListRoute() {
   // kind for the same reason. `.list-status:empty` is display:none, so this collapses rather than
   // leaving a gap.
   function updateStatus(): void {
-    if (total > 0 && loaded < total) { setStatusText(`${loaded} / ${total} games loaded…`); return; }
+    if (total > 0 && loaded < total) {
+      setStatusText(`${loaded} / ${total} games loaded…`);
+      return;
+    }
     setStatusText('');
   }
 
   function renderPanelNav(game: Game): void {
     if (groupTables.length) {
-      const owning = groupTables.find(g => g.appids.has(game.appid));
+      const owning = groupTables.find((g) => g.appids.has(game.appid));
       activeGroupKey = owning?.key ?? null;
     }
     renderPanelNavShared({ table: activeTable(), game, getGameList, onOpen: openGame, onReroll: pickRandomGame });
@@ -879,7 +1078,7 @@ export default function ListRoute() {
     const game = getPanelGame();
     if (!activeTable() || !game || game.standalone) return null;
     const list = getGameList();
-    const index = list.findIndex(g => g.appid === game.appid);
+    const index = list.findIndex((g) => g.appid === game.appid);
     return index === -1 ? null : { index, total: list.length };
   }
 
@@ -929,7 +1128,10 @@ export default function ListRoute() {
 
   async function openStandaloneInPlace(appid: number): Promise<void> {
     const token = ++standaloneLookupToken;
-    if (!Number.isInteger(appid) || appid <= 0) { setStatusText('Invalid game id.'); return; }
+    if (!Number.isInteger(appid) || appid <= 0) {
+      setStatusText('Invalid game id.');
+      return;
+    }
     // No `App <appid>` placeholder in the data — panel.tsx's own title renders that fallback, so
     // the empty name here stays honest ("not resolved yet") for everything else that reads it.
     setStandaloneRows(appid, { appid, name: '', loading: true, details: null, standalone: true } as Game);
@@ -940,11 +1142,14 @@ export default function ListRoute() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Lookup failed');
       if (token !== standaloneLookupToken) return; // a newer lookup has since taken over
-      setStandaloneRows(appid, produce(draft => {
-        draft.details = data;
-        draft.loading = false;
-        if (data.meta?.name) draft.name = data.meta.name;
-      }));
+      setStandaloneRows(
+        appid,
+        produce((draft) => {
+          draft.details = data;
+          draft.loading = false;
+          if (data.meta?.name) draft.name = data.meta.name;
+        }),
+      );
       // `data.meta?.name`, not `game.name` — the latter falls back to panel.tsx's own
       // `App <appid>` placeholder, which must never reach the stored recents list as if it were
       // a real title (see load()'s recents mapping below).
@@ -966,8 +1171,14 @@ export default function ListRoute() {
   // sitting on this route) — same behavior either way, since /game/:appid *is* this route now.
   function openOrAddRecentGame(appid: number): void {
     const existing = rowStore.getRow(appid);
-    if (existing) { openGame(existing); return; }
-    if (!Number.isInteger(appid) || appid <= 0) { setStatusText('Invalid game id.'); return; }
+    if (existing) {
+      openGame(existing);
+      return;
+    }
+    if (!Number.isInteger(appid) || appid <= 0) {
+      setStatusText('Invalid game id.');
+      return;
+    }
     const placeholder: Game = { appid, name: '', loading: true, details: null };
     const rows = [placeholder, ...rowsStore];
     setRowsStore(rows);
@@ -994,7 +1205,10 @@ export default function ListRoute() {
     // (hasLoadedOnce) is what keeps that navigation cheap; it re-runs load() but, once already
     // mounted on this kind, that just calls straight back into openOrAddRecentGame instead of
     // refetching the whole recents list.
-    if (kind === 'recent') { navigate(withAccountParam(`/game/${appid}`), { replace: true }); return true; }
+    if (kind === 'recent') {
+      navigate(withAccountParam(`/game/${appid}`), { replace: true });
+      return true;
+    }
     const existing = rowStore.getRow(appid);
     if (existing) openGame(existing);
     else openStandaloneInPlace(appid);
@@ -1011,9 +1225,9 @@ export default function ListRoute() {
   }
 
   const detailBatcher = createStreamBatcher<DetailsEvent>({
-    apply: event => {
+    apply: (event) => {
       const hadName = !!rowStore.getRow(event.appid)?.name;
-      const row = rowStore.mutateRow(event.appid, draft => applyDetailsEvent(draft, event));
+      const row = rowStore.mutateRow(event.appid, (draft) => applyDetailsEvent(draft, event));
       if (!row) return;
       const capsule = (row as { capsule?: string | null }).capsule ?? null;
       if (pendingRecentFocus === event.appid) {
@@ -1046,7 +1260,7 @@ export default function ListRoute() {
         restorePendingShot();
       }
     },
-    isStale: gen => loadGuard.isStale(gen),
+    isStale: (gen) => loadGuard.isStale(gen),
     onFlush: () => {
       updateStatus();
       const g = getPanelGame();
@@ -1060,7 +1274,7 @@ export default function ListRoute() {
       resp = await fetch('/api/game-details/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ games: games.map(g => ({ appid: g.appid })) }),
+        body: JSON.stringify({ games: games.map((g) => ({ appid: g.appid })) }),
       });
     } catch (err) {
       if (loadGuard.isStale(gen)) return;
@@ -1072,7 +1286,10 @@ export default function ListRoute() {
     const decoder = new TextDecoder();
     let buffer = '';
     while (true) {
-      if (loadGuard.isStale(gen)) { reader.cancel(); return; }
+      if (loadGuard.isStale(gen)) {
+        reader.cancel();
+        return;
+      }
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
@@ -1082,7 +1299,11 @@ export default function ListRoute() {
         const line = part.trim();
         if (!line.startsWith('data: ')) continue;
         let event: DetailsEvent;
-        try { event = JSON.parse(line.slice(6)); } catch { continue; }
+        try {
+          event = JSON.parse(line.slice(6));
+        } catch {
+          continue;
+        }
         if (event.done) continue;
         detailBatcher.push(event, gen);
         loaded++;
@@ -1093,8 +1314,8 @@ export default function ListRoute() {
   }
 
   const itadConfiguredPromise = fetch('/api/health')
-    .then(res => res.json())
-    .then(data => !!data.itadConfigured)
+    .then((res) => res.json())
+    .then((data) => !!data.itadConfigured)
     .catch(() => false);
 
   async function loadWishlistPrices(items: { appid: number }[], gen: number, force = false): Promise<void> {
@@ -1104,14 +1325,14 @@ export default function ListRoute() {
     if (!configured) {
       batch(() => {
         for (const item of items) {
-          rowStore.mutateRow(item.appid, draft => nullAllPriceFields(draft));
+          rowStore.mutateRow(item.appid, (draft) => nullAllPriceFields(draft));
         }
       });
       return;
     }
 
     const country = resolveRegion(getStoredRegion());
-    const appids = items.map(i => i.appid);
+    const appids = items.map((i) => i.appid);
     for (let i = 0; i < appids.length; i += MAX_PRICE_LOOKUP_GAMES) {
       if (loadGuard.isStale(gen)) return;
       const chunk = appids.slice(i, i + MAX_PRICE_LOOKUP_GAMES);
@@ -1125,14 +1346,14 @@ export default function ListRoute() {
           for (const appid of chunk) {
             const info = prices[appid];
             if (!info) continue;
-            rowStore.mutateRow(appid, draft => applyPriceInfo(draft, info, discountPct));
+            rowStore.mutateRow(appid, (draft) => applyPriceInfo(draft, info, discountPct));
           }
         });
       } catch (err) {
         if (loadGuard.isStale(gen)) return;
         batch(() => {
           for (const appid of chunk) {
-            rowStore.mutateRow(appid, draft => nullMissingPriceFields(draft));
+            rowStore.mutateRow(appid, (draft) => nullMissingPriceFields(draft));
           }
         });
         setPriceStatusText(`Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`);
@@ -1150,9 +1371,12 @@ export default function ListRoute() {
       const res = await fetch(`/api/game-details/${game.appid}?refresh=1`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Refresh failed');
-      const updated = rowStore.mutateRow(game.appid, draft => applyDetailsEvent(draft, data));
+      const updated = rowStore.mutateRow(game.appid, (draft) => applyDetailsEvent(draft, data));
       if (!updated && standaloneRows[game.appid]) {
-        setStandaloneRows(game.appid, produce(draft => applyDetailsEvent(draft, data)));
+        setStandaloneRows(
+          game.appid,
+          produce((draft) => applyDetailsEvent(draft, data)),
+        );
       }
     } catch (err) {
       setStatusText(`Refresh failed: ${(err as Error).message}`);
@@ -1178,7 +1402,7 @@ export default function ListRoute() {
       for (const item of rowsStore) {
         const status = peekMyOwnershipStatus(item.appid);
         if (status) {
-          rowStore.mutateRow(item.appid, draft => {
+          rowStore.mutateRow(item.appid, (draft) => {
             draft.inLibrary = status.inLibrary;
             draft.onWishlist = status.onWishlist;
           });
@@ -1186,7 +1410,7 @@ export default function ListRoute() {
         if (kind !== 'user') continue;
         const played = peekMyPlaytime(item.appid);
         if (played === undefined) continue;
-        rowStore.mutateRow(item.appid, draft => {
+        rowStore.mutateRow(item.appid, (draft) => {
           draft.playtime = played?.playtime;
           draft.lastPlayed = played?.lastPlayed;
         });
@@ -1197,7 +1421,8 @@ export default function ListRoute() {
   // Whether "do I own this" is a genuine question for this kind at all — an Owned/Wishlist list's
   // own rows are trivially owned/wishlisted, the same reason OWNERSHIP_STATUS_COLUMN is only part
   // of BUNDLE_COLUMNS/RECENT_COLUMNS.
-  const stampsOwnership = kind === 'bundle' || kind === 'recent' || kind === 'user' || kind === 'compare' || kind === 'shared';
+  const stampsOwnership =
+    kind === 'bundle' || kind === 'recent' || kind === 'user' || kind === 'compare' || kind === 'shared';
 
   // Driven off the row list itself, not called once per load: rows can appear *after* a load has
   // finished (openOrAddRecentGame prepends the game a nav-bar lookup just found), and a stamping
@@ -1205,7 +1430,14 @@ export default function ListRoute() {
   // — confirmed live, and a bug class that comes back the next time another path adds a row.
   // `on(() => rowsStore.length)` tracks *only* the row count (its callback body runs untracked),
   // so this stays off the detail stream's own per-row mutations, which never add or remove a row.
-  createEffect(on(() => rowsStore.length, () => { if (stampsOwnership) stampMyOwnership(); }));
+  createEffect(
+    on(
+      () => rowsStore.length,
+      () => {
+        if (stampsOwnership) stampMyOwnership();
+      },
+    ),
+  );
 
   // The owned/wishlist sets are usually still in flight when a load's own first stamp runs, so
   // re-stamp once they land. One-shot per load (onMyOwnershipReady forgets its listeners once it
@@ -1224,21 +1456,25 @@ export default function ListRoute() {
   async function loadBundlePrices(resolved: ResolvedGame[], gen: number, force = false): Promise<void> {
     setPriceStatusText('');
     try {
-      const { prices, fetchedAt: at } = await postPrices({ gids: resolved.map(g => g.gid), country: resolveRegion(getStoredRegion()), force });
+      const { prices, fetchedAt: at } = await postPrices({
+        gids: resolved.map((g) => g.gid),
+        country: resolveRegion(getStoredRegion()),
+        force,
+      });
       notePriceFetchedAt(at);
       if (loadGuard.isStale(gen)) return;
       batch(() => {
         for (const g of resolved) {
           const info = prices[g.gid];
           if (!info) continue;
-          rowStore.mutateRow(g.appid, draft => applyPriceInfo(draft, info, discountPct));
+          rowStore.mutateRow(g.appid, (draft) => applyPriceInfo(draft, info, discountPct));
         }
       });
     } catch (err) {
       if (loadGuard.isStale(gen)) return;
       batch(() => {
         for (const g of resolved) {
-          rowStore.mutateRow(g.appid, draft => nullMissingPriceFields(draft));
+          rowStore.mutateRow(g.appid, (draft) => nullMissingPriceFields(draft));
         }
       });
       setPriceStatusText(`Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`);
@@ -1315,41 +1551,48 @@ export default function ListRoute() {
   // the single-table path's own imperative construction just above.
   function buildGroupTables(groups: MembershipGroup[]): void {
     groupsContainer.innerHTML = '';
-    groupTables = groups.map(group => {
+    groupTables = groups.map((group) => {
       const appidSet = new Set(group.appids);
 
       // combine.ts keys a group by its sources' own internal keys ("account-owned:76561…"), which
       // is what this heading used to print verbatim; listSources() maps each back to the name the
       // hero's formula line uses for the same source.
-      const names = new Map(listSources().map(source => [source.key, source.desc.label]));
+      const names = new Map(listSources().map((source) => [source.key, source.desc.label]));
       const heading = document.createElement('h3');
       heading.className = 'list-group-heading';
-      heading.textContent = `${group.keys.map(key => names.get(key) ?? key).join(' + ')} (${group.appids.length})`;
+      heading.textContent = `${group.keys.map((key) => names.get(key) ?? key).join(' + ')} (${group.appids.length})`;
       const container = document.createElement('div');
       container.className = 'table-container';
       groupsContainer.appendChild(heading);
       groupsContainer.appendChild(container);
 
       let disposeTableState!: () => void;
-      const ts = createRoot(dispose => {
+      const ts = createRoot((dispose) => {
         disposeTableState = dispose;
         return createTableState<Game>(
-          () => rowsStore.filter(r => !r.loading && appidSet.has(r.appid)),
+          () => rowsStore.filter((r) => !r.loading && appidSet.has(r.appid)),
           (kind === 'user' ? USER_COLUMNS : RECENT_COLUMNS) as unknown as ColumnDef<Game>[],
           { initialViewState: { pageSize: 50, visibleCols: RECENT_DEFAULT_VISIBLE, sorts: DEFAULT_SORT } },
         );
       });
-      const disposeView = render(() => DataTableView<Game>({
-        table: ts,
-        rowKey: 'appid',
-        onRowClick: row => openGame(rowStore.getRow(row.appid) ?? row),
-      }), container);
+      const disposeView = render(
+        () =>
+          DataTableView<Game>({
+            table: ts,
+            rowKey: 'appid',
+            onRowClick: (row) => openGame(rowStore.getRow(row.appid) ?? row),
+          }),
+        container,
+      );
 
       return {
         key: group.keys.join(' '),
         appids: appidSet,
         table: ts,
-        disposeTable: () => { disposeView(); disposeTableState(); },
+        disposeTable: () => {
+          disposeView();
+          disposeTableState();
+        },
       };
     });
     setGroupCount(groupTables.length);
@@ -1377,9 +1620,12 @@ export default function ListRoute() {
     const gen = loadGuard.next();
 
     setTableReady(false);
-    if (disposeTable) { disposeTable(); disposeTable = null; }
+    if (disposeTable) {
+      disposeTable();
+      disposeTable = null;
+    }
     table = null;
-    groupTables.forEach(g => g.disposeTable());
+    groupTables.forEach((g) => g.disposeTable());
     groupTables = [];
     setGroupCount(0);
     activeGroupKey = null;
@@ -1433,20 +1679,29 @@ export default function ListRoute() {
       loadedCompareKeys = new Set([compareKey()]);
       // Under two players there's nothing to compare — the players form renders in place of the
       // table (see the JSX below), so this is an empty state, not an error.
-      if (slots.length < 2) { setListTitle('Compare libraries'); return; }
+      if (slots.length < 2) {
+        setListTitle('Compare libraries');
+        return;
+      }
 
-      setListTitle(slots.map(slot => slot.join(' + ')).join(' vs. '));
+      setListTitle(slots.map((slot) => slot.join(' + ')).join(' vs. '));
       setStatusText('Resolving accounts…');
       let accounts: AccountSlot[];
       try {
-        accounts = await Promise.all(slots.map(async identifiers => {
-          const summary = await resolveAccountSummary(identifiers);
-          return {
-            id: accountIdFor(summary.members), members: summary.members, rawInputs: identifiers,
-            label: summary.label, avatarUrl: summary.avatarUrl ?? undefined,
-            vanities: summary.vanities, lastUsedAt: Date.now(),
-          };
-        }));
+        accounts = await Promise.all(
+          slots.map(async (identifiers) => {
+            const summary = await resolveAccountSummary(identifiers);
+            return {
+              id: accountIdFor(summary.members),
+              members: summary.members,
+              rawInputs: identifiers,
+              label: summary.label,
+              avatarUrl: summary.avatarUrl ?? undefined,
+              vanities: summary.vanities,
+              lastUsedAt: Date.now(),
+            };
+          }),
+        );
       } catch (err) {
         if (loadGuard.isStale(gen)) return;
         setStatusText(`Couldn't resolve every player: ${(err as Error).message}`);
@@ -1466,34 +1721,44 @@ export default function ListRoute() {
       // changed, and two spellings of one comparison would be two history entries. Never stored
       // in `recentAccounts` — comparing someone isn't picking them as your account, the same rule
       // a `?u=` override follows (see docs/dev/lists-and-accounts.md).
-      const canonicalSlots = normalizeSlots(accounts.map(a => a.members));
+      const canonicalSlots = normalizeSlots(accounts.map((a) => a.members));
       const canonical = compareUrl(canonicalSlots, compareOp());
-      loadedCompareKeys.add(`${compareOp()}|${canonicalSlots.map(slot => slot.join(',')).join('|')}`);
+      loadedCompareKeys.add(`${compareOp()}|${canonicalSlots.map((slot) => slot.join(',')).join('|')}`);
       if (canonical !== location.pathname + location.search) navigate(canonical, { replace: true });
 
       const list: GameList = {
-        id: '', parentId: null, order: 0, createdAt: 0, updatedAt: 0,
-        kind: 'dynamic', op: compareOp(),
-        sources: accounts.map(account => ({ kind: 'account-owned' as const, accountId: account.id })),
+        id: '',
+        parentId: null,
+        order: 0,
+        createdAt: 0,
+        updatedAt: 0,
+        kind: 'dynamic',
+        op: compareOp(),
+        sources: accounts.map((account) => ({ kind: 'account-owned' as const, accountId: account.id })),
       };
       setCompareList(list);
       setStatusText('Comparing libraries…');
       let appids: Set<number>;
       try {
-        const { result, sources } = await resolveListWithSources(list, createDefaultFetchers({ refresh, onFetchedAt: noteFetchedAt }));
+        const { result, sources } = await resolveListWithSources(
+          list,
+          createDefaultFetchers({ refresh, onFetchedAt: noteFetchedAt }),
+        );
         if (loadGuard.isStale(gen)) return;
         const described = describeSources(list, compareNaming());
-        setListSources(sources.map((source, i) => ({
-          ...source,
-          // Every source in a comparison is the same thing — a player's Owned list — so the
-          // shared label's "— Owned" half is pure noise once it's repeated across every group
-          // heading. "Alice + Bob", not "Alice — Owned + Bob — Owned"; the link still points at
-          // that player's own library.
-          desc: { ...described[i], label: accountDisplayLabel(accounts[i]) },
-        })));
+        setListSources(
+          sources.map((source, i) => ({
+            ...source,
+            // Every source in a comparison is the same thing — a player's Owned list — so the
+            // shared label's "— Owned" half is pure noise once it's repeated across every group
+            // heading. "Alice + Bob", not "Alice — Owned + Bob — Owned"; the link still points at
+            // that player's own library.
+            desc: { ...described[i], label: accountDisplayLabel(accounts[i]) },
+          })),
+        );
         if (Array.isArray(result)) {
           pendingGroups = result;
-          appids = new Set(result.flatMap(g => g.appids));
+          appids = new Set(result.flatMap((g) => g.appids));
         } else {
           appids = flattenCombineResult(result);
         }
@@ -1502,8 +1767,8 @@ export default function ListRoute() {
         setStatusText(`Error: ${(err as Error).message}`);
         return;
       }
-      initialRows = [...appids].map(appid => ({ appid, name: '', loading: true, details: null }));
-      streamTargets = [...appids].map(appid => ({ appid }));
+      initialRows = [...appids].map((appid) => ({ appid, name: '', loading: true, details: null }));
+      streamTargets = [...appids].map((appid) => ({ appid }));
     } else if (kind === 'user') {
       // A manual list, or a dynamic one using any op other than group-by-membership, renders as
       // one flat table (flattened via flattenCombineResult, same as when it's resolved as
@@ -1511,20 +1776,26 @@ export default function ListRoute() {
       // MembershipGroup[] result (stashed in pendingGroups) for buildGroupTables to render as
       // real per-group tables further down, once the shared rowsStore/stream have loaded.
       const list = getList(params.listId!);
-      if (!list) { setStatusText('This list no longer exists.'); return; }
+      if (!list) {
+        setStatusText('This list no longer exists.');
+        return;
+      }
       setUserList(list);
       setListTitle(listDisplayName(list, createDefaultNaming()));
       setStatusText('Resolving list…');
       const isGroupMode = list.kind === 'dynamic' && list.op === 'group-by-membership';
       let appids: Set<number>;
       try {
-        const { result, sources } = await resolveListWithSources(list, createDefaultFetchers({ refresh, onFetchedAt: noteFetchedAt }));
+        const { result, sources } = await resolveListWithSources(
+          list,
+          createDefaultFetchers({ refresh, onFetchedAt: noteFetchedAt }),
+        );
         if (loadGuard.isStale(gen)) return;
         const described = describeSources(list, createDefaultNaming());
         setListSources(sources.map((source, i) => ({ ...source, desc: described[i] })));
         if (isGroupMode && Array.isArray(result)) {
           pendingGroups = result;
-          appids = new Set(result.flatMap(g => g.appids));
+          appids = new Set(result.flatMap((g) => g.appids));
         } else {
           appids = flattenCombineResult(result);
         }
@@ -1540,22 +1811,34 @@ export default function ListRoute() {
         setRankingState(state);
         rankOf = ranks(state, appids);
       }
-      initialRows = [...appids].map(appid => ({
-        appid, name: '', loading: true, details: null,
+      initialRows = [...appids].map((appid) => ({
+        appid,
+        name: '',
+        loading: true,
+        details: null,
         ...(rankOf ? { rank: rankOf.get(appid) ?? null } : {}),
       }));
-      streamTargets = [...appids].map(appid => ({ appid }));
+      streamTargets = [...appids].map((appid) => ({ appid }));
     } else if (kind === 'shared') {
       // Another dynamic list's formula, decoded straight from ?f= (listShare.ts) — same "resolve
       // an in-memory dynamic list through the normal listResolve.ts/listLabels.ts path" idea
       // `compare` above uses, just built from a URL-encoded formula instead of account slots. See
       // this file's own header comment on the sharedSynthetic/sharedFetchers/sharedNaming trio.
       const decoded = decodeListFormula(sharedFormulaParam() ?? '');
-      if (!decoded) { setStatusText("This link isn't a valid shared list."); return; }
+      if (!decoded) {
+        setStatusText("This link isn't a valid shared list.");
+        return;
+      }
       setSharedSynthetic(decoded.synthetic);
       const list: GameList = {
-        id: '', parentId: null, order: 0, createdAt: 0, updatedAt: 0,
-        kind: 'dynamic', op: decoded.op, sources: decoded.sources,
+        id: '',
+        parentId: null,
+        order: 0,
+        createdAt: 0,
+        updatedAt: 0,
+        kind: 'dynamic',
+        op: decoded.op,
+        sources: decoded.sources,
       };
       setCompareList(list);
       setListTitle(listDisplayName(list, sharedNaming()));
@@ -1570,7 +1853,7 @@ export default function ListRoute() {
         setListSources(sources.map((source, i) => ({ ...source, desc: described[i] })));
         if (isGroupMode && Array.isArray(result)) {
           pendingGroups = result;
-          appids = new Set(result.flatMap(g => g.appids));
+          appids = new Set(result.flatMap((g) => g.appids));
         } else {
           appids = flattenCombineResult(result);
         }
@@ -1579,10 +1862,13 @@ export default function ListRoute() {
         setStatusText(`Error: ${(err as Error).message}`);
         return;
       }
-      initialRows = [...appids].map(appid => ({
-        appid, name: '', loading: true, details: null,
+      initialRows = [...appids].map((appid) => ({
+        appid,
+        name: '',
+        loading: true,
+        details: null,
       }));
-      streamTargets = [...appids].map(appid => ({ appid }));
+      streamTargets = [...appids].map((appid) => ({ appid }));
     } else if (kind === 'recent') {
       setListTitle('Recently Looked Up');
       const recents = loadRecentGames();
@@ -1593,15 +1879,20 @@ export default function ListRoute() {
       // metadata had streamed in with the real title. The placeholder is presentational only now
       // (panel.tsx's title falls back to it); a still-nameless row is `loading` and filtered out
       // of the table anyway until its details event lands.
-      initialRows = recents.map(g => ({
-        appid: g.appid, name: g.name, capsule: g.tinyImage || undefined,
-        loading: true, details: null,
+      initialRows = recents.map((g) => ({
+        appid: g.appid,
+        name: g.name,
+        capsule: g.tinyImage || undefined,
+        loading: true,
+        details: null,
       }));
       streamTargets = recents;
     } else if (kind === 'bundle') {
       setStatusText('Resolving games to Steam…');
       try {
-        const { bundle, fetchedAt: bundleFetchedAt } = await fetchBundleById(Number(params.bundleId), { country: resolveRegion(getStoredRegion()) });
+        const { bundle, fetchedAt: bundleFetchedAt } = await fetchBundleById(Number(params.bundleId), {
+          country: resolveRegion(getStoredRegion()),
+        });
         if (loadGuard.isStale(gen)) return;
         // Stated, not actionable — the single-bundle endpoint has no force path (see
         // fetchBundleById). Still worth saying: a bundle's tiers and end date are read here.
@@ -1620,13 +1911,28 @@ export default function ListRoute() {
         if (loadGuard.isStale(gen)) return;
         setUnresolvedGames(unresolved);
         setBundleResolvedCount(resolved.length);
-        if (resolved.length === 0) { setStatusText('No games in this bundle could be matched to a Steam listing.'); return; }
+        if (resolved.length === 0) {
+          setStatusText('No games in this bundle could be matched to a Steam listing.');
+          return;
+        }
         resolvedBundleGames = resolved;
-        initialRows = resolved.map(g => ({
-          appid: g.appid, name: g.title, tierPrice: g.tierPrice, tierCurrency: g.tierCurrency, addon: g.addon,
-          steamRegular: undefined, bestDealPrice: undefined, bestDealShop: undefined, bestDealUrl: undefined,
-          bestDealCut: undefined, lowAll: undefined, lowY1: undefined, lowM3: undefined, priceCurrency: undefined,
-          loading: true, details: null,
+        initialRows = resolved.map((g) => ({
+          appid: g.appid,
+          name: g.title,
+          tierPrice: g.tierPrice,
+          tierCurrency: g.tierCurrency,
+          addon: g.addon,
+          steamRegular: undefined,
+          bestDealPrice: undefined,
+          bestDealShop: undefined,
+          bestDealUrl: undefined,
+          bestDealCut: undefined,
+          lowAll: undefined,
+          lowY1: undefined,
+          lowM3: undefined,
+          priceCurrency: undefined,
+          loading: true,
+          details: null,
         }));
         streamTargets = resolved;
       } catch (err) {
@@ -1667,21 +1973,35 @@ export default function ListRoute() {
           const { games, fetchedAt: at } = await fetchAccountOverview(account.members, { refresh });
           if (loadGuard.isStale(gen)) return;
           setFetchedAt(at);
-          initialRows = games.map(g => ({
-            appid: g.appid, name: g.name,
-            playtime: g.playtimeMinutes / 60, lastPlayed: fmtLastPlayed(g.lastPlayedUnix),
-            loading: true, details: null,
+          initialRows = games.map((g) => ({
+            appid: g.appid,
+            name: g.name,
+            playtime: g.playtimeMinutes / 60,
+            lastPlayed: fmtLastPlayed(g.lastPlayedUnix),
+            loading: true,
+            details: null,
           }));
           streamTargets = games;
         } else {
           const { items, fetchedAt: at } = await fetchAccountWishlist(account.members, { refresh });
           if (loadGuard.isStale(gen)) return;
           setFetchedAt(at);
-          initialRows = items.map(item => ({
-            appid: item.appid, name: '', priority: item.priority, dateAdded: item.dateAdded,
-            steamRegular: undefined, bestDealPrice: undefined, bestDealShop: undefined, bestDealUrl: undefined,
-            bestDealCut: undefined, lowAll: undefined, lowY1: undefined, lowM3: undefined, priceCurrency: undefined,
-            loading: true, details: null,
+          initialRows = items.map((item) => ({
+            appid: item.appid,
+            name: '',
+            priority: item.priority,
+            dateAdded: item.dateAdded,
+            steamRegular: undefined,
+            bestDealPrice: undefined,
+            bestDealShop: undefined,
+            bestDealUrl: undefined,
+            bestDealCut: undefined,
+            lowAll: undefined,
+            lowY1: undefined,
+            lowM3: undefined,
+            priceCurrency: undefined,
+            loading: true,
+            details: null,
           }));
           streamTargets = items;
         }
@@ -1700,23 +2020,30 @@ export default function ListRoute() {
       buildGroupTables(pendingGroups);
     } else {
       const isRanked = userList()?.kind === 'ranked';
-      const columns = (
-        isRanked ? RANKED_COLUMNS
-          : kind === 'wishlist' ? WISHLIST_COLUMNS
-          : kind === 'bundle' ? BUNDLE_COLUMNS
-          : kind === 'user' ? USER_COLUMNS
-          : kind === 'recent' || kind === 'compare' || kind === 'shared' ? RECENT_COLUMNS
-          : OWNED_COLUMNS
-      ) as unknown as ColumnDef<Game>[];
-      const defaultVisible = isRanked ? RANKED_DEFAULT_VISIBLE
-        : kind === 'wishlist' ? WISHLIST_DEFAULT_VISIBLE
-        : kind === 'bundle' ? BUNDLE_DEFAULT_VISIBLE
-        : kind === 'recent' || kind === 'user' || kind === 'compare' || kind === 'shared' ? RECENT_DEFAULT_VISIBLE
-        : OWNED_DEFAULT_VISIBLE;
+      const columns = (isRanked
+        ? RANKED_COLUMNS
+        : kind === 'wishlist'
+          ? WISHLIST_COLUMNS
+          : kind === 'bundle'
+            ? BUNDLE_COLUMNS
+            : kind === 'user'
+              ? USER_COLUMNS
+              : kind === 'recent' || kind === 'compare' || kind === 'shared'
+                ? RECENT_COLUMNS
+                : OWNED_COLUMNS) as unknown as ColumnDef<Game>[];
+      const defaultVisible = isRanked
+        ? RANKED_DEFAULT_VISIBLE
+        : kind === 'wishlist'
+          ? WISHLIST_DEFAULT_VISIBLE
+          : kind === 'bundle'
+            ? BUNDLE_DEFAULT_VISIBLE
+            : kind === 'recent' || kind === 'user' || kind === 'compare' || kind === 'shared'
+              ? RECENT_DEFAULT_VISIBLE
+              : OWNED_DEFAULT_VISIBLE;
       const sort = isRanked ? RANKED_DEFAULT_SORT : kind === 'bundle' ? BUNDLE_DEFAULT_SORT : DEFAULT_SORT;
 
       let disposeTableState!: () => void;
-      const ts = createRoot(dispose => {
+      const ts = createRoot((dispose) => {
         disposeTableState = dispose;
         const state = createTableState<Game>(tableData, columns, {
           initialViewState: { pageSize: 50, visibleCols: defaultVisible, sorts: sort },
@@ -1729,13 +2056,20 @@ export default function ListRoute() {
         return state;
       });
       table = ts;
-      const disposeView = render(() => DataTableView<Game>({
-        table: ts,
-        rowKey: 'appid',
-        selectable: true,
-        onRowClick: row => openGame(rowStore.getRow(row.appid) ?? row),
-      }), tableContainer);
-      disposeTable = () => { disposeView(); disposeTableState(); };
+      const disposeView = render(
+        () =>
+          DataTableView<Game>({
+            table: ts,
+            rowKey: 'appid',
+            selectable: true,
+            onRowClick: (row) => openGame(rowStore.getRow(row.appid) ?? row),
+          }),
+        tableContainer,
+      );
+      disposeTable = () => {
+        disposeView();
+        disposeTableState();
+      };
       if (userList()) {
         // A user list's view lives on the list itself (GameList.tableView), not a shared pref
         // key — every user list keeps its own, unlike the fixed system kinds above which share
@@ -1754,12 +2088,14 @@ export default function ListRoute() {
             setListTableView(list.id, initialView);
             urlParams.delete(viewParamName());
             history.replaceState(null, '', urlWithParams(urlParams));
-          } catch { /* malformed param — fall through to the stored view */ }
+          } catch {
+            /* malformed param — fall through to the stored view */
+          }
         }
         table.setViewState(initialView);
         unsyncView = (() => {
           let dispose: (() => void) | null = null;
-          createRoot(d => {
+          createRoot((d) => {
             dispose = d;
             createEffect(() => setListTableView(list.id, ts.getViewState()));
           });
@@ -1812,7 +2148,10 @@ export default function ListRoute() {
     // it, streamGameDetails needs its own guard too: the server 400s a `games: []` stream
     // request outright ("Provide at least one game"), confirmed live the first time this path
     // was actually reachable through the UI.
-    if (streamTargets.length === 0) { setStatusText('No games to show.'); return; }
+    if (streamTargets.length === 0) {
+      setStatusText('No games to show.');
+      return;
+    }
 
     if (kind === 'wishlist') loadWishlistPrices(streamTargets, gen); // runs concurrently, not awaited
     if (kind === 'bundle' && resolvedBundleGames) loadBundlePrices(resolvedBundleGames, gen); // ditto
@@ -1836,7 +2175,7 @@ export default function ListRoute() {
     const names: string[] = [];
     let parentId = list.parentId;
     while (parentId) {
-      const folder = folders.find(f => f.id === parentId);
+      const folder = folders.find((f) => f.id === parentId);
       if (!folder) break;
       names.unshift(folder.name);
       parentId = folder.parentId;
@@ -1861,7 +2200,9 @@ export default function ListRoute() {
       // card. Offered even before anything has priced, so a failed first price load has a retry.
       sub: refreshingPrices()
         ? 'Refreshing prices… ↻'
-        : priceFetchedAt() === undefined ? 'Refresh prices ↻' : `Updated ${fmtAge(priceFetchedAt())} ↻`,
+        : priceFetchedAt() === undefined
+          ? 'Refresh prices ↻'
+          : `Updated ${fmtAge(priceFetchedAt())} ↻`,
       subTitle: 'Re-fetch current prices and historical lows for every game in this list',
       subOnClick: handleRefreshPrices,
       subDisabled: refreshingPrices(),
@@ -1878,14 +2219,22 @@ export default function ListRoute() {
       tiles.push({
         label: 'Ends',
         value: `${ended ? 'Ended ' : ''}${fmtBundleDateFriendly(meta.expiry, { time: true })}`,
-        sub: urgency && urgency.label && !ended
-          ? (
+        sub:
+          urgency && urgency.label && !ended ? (
             <span
               class="bundle-ends-rel"
-              style={{ color: urgency.tier === 'urgent' ? scoreColor(20) : urgency.tier === 'soon' ? scoreColor(55) : 'var(--text1)' }}
-            >⏳ {urgency.label}</span>
-          )
-          : undefined,
+              style={{
+                color:
+                  urgency.tier === 'urgent'
+                    ? scoreColor(20)
+                    : urgency.tier === 'soon'
+                      ? scoreColor(55)
+                      : 'var(--text1)',
+              }}
+            >
+              ⏳ {urgency.label}
+            </span>
+          ) : undefined,
       });
     }
     // "N of M" whenever some of the bundle's games have no Steam listing at all — the table only
@@ -1898,7 +2247,8 @@ export default function ListRoute() {
       const unresolved = unresolvedGames().length;
       tiles.push({
         label: 'Games',
-        value: unresolved > 0 ? `${bundleResolvedCount()} of ${bundleResolvedCount() + unresolved}` : bundleResolvedCount(),
+        value:
+          unresolved > 0 ? `${bundleResolvedCount()} of ${bundleResolvedCount() + unresolved}` : bundleResolvedCount(),
         sub: unresolved > 0 ? 'on Steam' : undefined,
         title: meta.itadCount != null ? `IsThereAnyDeal lists ${meta.itadCount} in this bundle` : undefined,
       });
@@ -1909,8 +2259,11 @@ export default function ListRoute() {
         value: (
           <span class="bundle-tier-chips">
             <For each={meta.tiers}>
-              {tier => (
-                <span class="bundle-tier-chip" title={`${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} at this tier`}>
+              {(tier) => (
+                <span
+                  class="bundle-tier-chip"
+                  title={`${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} at this tier`}
+                >
                   {tier.price == null ? 'Varies' : formatMoney(tier.price, tier.currency)}
                 </span>
               )}
@@ -1930,7 +2283,8 @@ export default function ListRoute() {
       tiles.push({
         label: 'Updated',
         value: fmtAge(fetchedAt()),
-        title: "How old the server's cached copy of this bundle is. It can't be forced from here — but each game's own details can (the panel's ↻), and so can the prices",
+        title:
+          "How old the server's cached copy of this bundle is. It can't be forced from here — but each game's own details can (the panel's ↻), and so can the prices",
       });
     }
     tiles.push(priceTile());
@@ -1952,9 +2306,10 @@ export default function ListRoute() {
       tiles.push({
         label: 'Updated',
         value: refreshTileValue(refreshing() ? 'Refreshing…' : fmtAge(fetchedAt())),
-        title: kind === 'owned' || kind === 'wishlist'
-          ? "How old the server's cached copy of this account's list is — click to force a fresh fetch"
-          : "How old the oldest library this list was built from is — click to re-fetch them all",
+        title:
+          kind === 'owned' || kind === 'wishlist'
+            ? "How old the server's cached copy of this account's list is — click to force a fresh fetch"
+            : 'How old the oldest library this list was built from is — click to re-fetch them all',
         // This tile *is* the ↻ Refresh the actions row used to carry: the staleness is stated
         // here, so this is where the reader already is when they decide to do something about it.
         // Prices keep their own age and refresh (a different fetch) on the Prices tile's own
@@ -2014,7 +2369,7 @@ export default function ListRoute() {
     const sources = listSources();
     if (!sources.length) return undefined;
     const symbol = OP_SYMBOLS[list.op ?? 'union'];
-    const problems = sources.filter(source => source.desc.problem);
+    const problems = sources.filter((source) => source.desc.problem);
     const ranked = list.kind === 'ranked';
     return (
       <>
@@ -2026,7 +2381,7 @@ export default function ListRoute() {
                 {i() > 0 && <span class="list-formula-op">{symbol}</span>}
                 <span class="list-formula-source" classList={{ 'has-problem': source.desc.problem != null }}>
                   <Show when={source.desc.href} fallback={<span>{source.desc.label}</span>}>
-                    {href => <A href={withAccountParam(href())}>{source.desc.label}</A>}
+                    {(href) => <A href={withAccountParam(href())}>{source.desc.label}</A>}
                   </Show>
                   <span class="list-formula-count">{source.count}</span>
                 </span>
@@ -2043,7 +2398,12 @@ export default function ListRoute() {
         <Show when={problems.length > 0}>
           <ul class="list-formula-problems">
             <For each={problems}>
-              {problem => <li>⚠ {problem.desc.label} — {problem.desc.problem}. It counts as no games; the rest of the formula still applies.</li>}
+              {(problem) => (
+                <li>
+                  ⚠ {problem.desc.label} — {problem.desc.problem}. It counts as no games; the rest of the formula still
+                  applies.
+                </li>
+              )}
             </For>
           </ul>
         </Show>
@@ -2071,98 +2431,159 @@ export default function ListRoute() {
   // button/link inside reads its own signals, so nothing here needs rebuilding when they change.
   // `undefined` (rather than an empty fragment) for the kinds with no actions at all, so
   // ListHero renders no action row for them instead of an empty one.
-  const heroLead: JSX.Element | undefined = kind !== 'bundle' ? undefined : (
-    <div class="list-hero-nav">
-      <button type="button" disabled={prevBundleId() == null} onClick={() => { const id = prevBundleId(); if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`)); }}>‹</button>
-      <button type="button" disabled={nextBundleId() == null} onClick={() => { const id = nextBundleId(); if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`)); }}>›</button>
-    </div>
-  );
-
-  const heroActions: JSX.Element | undefined = kind === 'recent' ? undefined : (
-    <>
-      {/* userList() is still null at mount (set once load() resolves it below), so this has to be
-          a reactive Show rather than a plain `kind === 'user' && ...` check — the latter would
-          freeze at "no list yet" forever, since heroActions itself is only built once. */}
-      <Show when={kind === 'user' && userList()?.kind === 'dynamic'}>
-        <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingSources(v => !v)}>
-          {editingSources() ? 'Cancel' : 'Edit sources'}
-        </button>
-        {/* Not offered on a `compare`/`shared` list — a comparison is already shareable via its
-            own URL, and a shared link re-shared would just point back at the same page. */}
+  const heroLead: JSX.Element | undefined =
+    kind !== 'bundle' ? undefined : (
+      <div class="list-hero-nav">
         <button
           type="button"
-          class="btn btn-ghost btn-sm"
-          disabled={shareFailure() != null}
-          title={shareFailure() ?? 'Copy a link anyone can open, live and without saving it themselves'}
-          onClick={e => handleShareList(e.currentTarget)}
+          disabled={prevBundleId() == null}
+          onClick={() => {
+            const id = prevBundleId();
+            if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`));
+          }}
         >
-          🔗 Share list
+          ‹
         </button>
-      </Show>
-      <Show when={kind === 'user' && userList()?.kind === 'ranked'}>
-        <button type="button" class="btn btn-primary btn-sm" title="Asks about unranked games in the table's current sort order (only the shown ones, when filtered)" disabled={filteredUnranked()?.length === 0} onClick={handleCompare}>
-          {compareLabel()}
+        <button
+          type="button"
+          disabled={nextBundleId() == null}
+          onClick={() => {
+            const id = nextBundleId();
+            if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`));
+          }}
+        >
+          ›
         </button>
-        <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingRankedSource(v => !v)}>
-          {editingRankedSource() ? 'Cancel' : 'Change source'}
-        </button>
-      </Show>
-      <Show when={rankSourceRef()}>
-        <button type="button" class="btn btn-ghost btn-sm" title="Create a list ranking these games by comparing them two at a time, in the table's current order (only the selected or filtered games, if any)" disabled={rankThisListFocus()?.length === 0} onClick={handleRankThisList}>
-          {rankThisListLabel()}
-        </button>
-      </Show>
-      {kind === 'shared' && (
-        <Show when={compareList()}>
-          <button type="button" class="btn btn-ghost btn-sm" title="Keep this shared list as one of your own" onClick={handleSaveShared}>
-            Save as a list
+      </div>
+    );
+
+  const heroActions: JSX.Element | undefined =
+    kind === 'recent' ? undefined : (
+      <>
+        {/* userList() is still null at mount (set once load() resolves it below), so this has to be
+          a reactive Show rather than a plain `kind === 'user' && ...` check — the latter would
+          freeze at "no list yet" forever, since heroActions itself is only built once. */}
+        <Show when={kind === 'user' && userList()?.kind === 'dynamic'}>
+          <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingSources((v) => !v)}>
+            {editingSources() ? 'Cancel' : 'Edit sources'}
+          </button>
+          {/* Not offered on a `compare`/`shared` list — a comparison is already shareable via its
+            own URL, and a shared link re-shared would just point back at the same page. */}
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            disabled={shareFailure() != null}
+            title={shareFailure() ?? 'Copy a link anyone can open, live and without saving it themselves'}
+            onClick={(e) => handleShareList(e.currentTarget)}
+          >
+            🔗 Share list
           </button>
         </Show>
-      )}
-      {kind === 'compare' && (
-        <>
-          {/* Gated on the players in the URL, not on the ones that resolved: a comparison naming
-              a private or misspelled profile is exactly when editing them has to be reachable. */}
-          <Show when={compareSlots().length >= 2}>
-            <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingPlayers(v => !v)}>
-              {editingPlayers() ? 'Cancel' : 'Edit players'}
-            </button>
-          </Show>
+        <Show when={kind === 'user' && userList()?.kind === 'ranked'}>
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            title="Asks about unranked games in the table's current sort order (only the shown ones, when filtered)"
+            disabled={filteredUnranked()?.length === 0}
+            onClick={handleCompare}
+          >
+            {compareLabel()}
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingRankedSource((v) => !v)}>
+            {editingRankedSource() ? 'Cancel' : 'Change source'}
+          </button>
+        </Show>
+        <Show when={rankSourceRef()}>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            title="Create a list ranking these games by comparing them two at a time, in the table's current order (only the selected or filtered games, if any)"
+            disabled={rankThisListFocus()?.length === 0}
+            onClick={handleRankThisList}
+          >
+            {rankThisListLabel()}
+          </button>
+        </Show>
+        {kind === 'shared' && (
           <Show when={compareList()}>
-            {/* Changing how the comparison is combined is a navigation, not local state: the op is
-                part of the URL, so a "just the games everyone owns" view is as shareable as the
-                grouped one it came from. */}
-            <select
-              value={compareOp()}
-              title="How to combine these players' libraries"
-              onChange={e => navigate(compareUrl(compareSlots(), e.currentTarget.value))}
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              title="Keep this shared list as one of your own"
+              onClick={handleSaveShared}
             >
-              <For each={Object.keys(OP_LABELS) as CombineOp[]}>
-                {op => <option value={op}>{OP_LABELS[op]}</option>}
-              </For>
-            </select>
-            <button type="button" class="btn btn-ghost btn-sm" title="Keep this comparison as a list of your own" onClick={handleSaveComparison}>
               Save as a list
             </button>
           </Show>
-        </>
-      )}
-      {kind === 'bundle' && (
-        <>
-          <Show when={bundleLinks().details}>
-            {details => <a class="list-hero-outlink" href={details()} target="_blank" rel="noopener">View on IsThereAnyDeal ↗</a>}
-          </Show>
-          <Show when={bundleLinks().url}>
-            {url => <a class="btn btn-primary btn-sm" href={url()} target="_blank" rel="noopener">Get this bundle ↗</a>}
-          </Show>
-          <a class="btn btn-ghost btn-sm" href="/bundles">← All bundles</a>
-        </>
-      )}
-    </>
-  );
+        )}
+        {kind === 'compare' && (
+          <>
+            {/* Gated on the players in the URL, not on the ones that resolved: a comparison naming
+              a private or misspelled profile is exactly when editing them has to be reachable. */}
+            <Show when={compareSlots().length >= 2}>
+              <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingPlayers((v) => !v)}>
+                {editingPlayers() ? 'Cancel' : 'Edit players'}
+              </button>
+            </Show>
+            <Show when={compareList()}>
+              {/* Changing how the comparison is combined is a navigation, not local state: the op is
+                part of the URL, so a "just the games everyone owns" view is as shareable as the
+                grouped one it came from. */}
+              <select
+                value={compareOp()}
+                title="How to combine these players' libraries"
+                onChange={(e) => navigate(compareUrl(compareSlots(), e.currentTarget.value))}
+              >
+                <For each={Object.keys(OP_LABELS) as CombineOp[]}>
+                  {(op) => <option value={op}>{OP_LABELS[op]}</option>}
+                </For>
+              </select>
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                title="Keep this comparison as a list of your own"
+                onClick={handleSaveComparison}
+              >
+                Save as a list
+              </button>
+            </Show>
+          </>
+        )}
+        {kind === 'bundle' && (
+          <>
+            <Show when={bundleLinks().details}>
+              {(details) => (
+                <a class="list-hero-outlink" href={details()} target="_blank" rel="noopener">
+                  View on IsThereAnyDeal ↗
+                </a>
+              )}
+            </Show>
+            <Show when={bundleLinks().url}>
+              {(url) => (
+                <a class="btn btn-primary btn-sm" href={url()} target="_blank" rel="noopener">
+                  Get this bundle ↗
+                </a>
+              )}
+            </Show>
+            <a class="btn btn-ghost btn-sm" href="/bundles">
+              ← All bundles
+            </a>
+          </>
+        )}
+      </>
+    );
 
   onMount(() => {
-    const unregister = registerRouteHandlers({ pickRandom: pickRandomGame, stepGame, gamePosition, openGame: handleOpenGameRequest, onGameClose: handleGameClose, refreshGame, onTagClick, isTagActive });
+    const unregister = registerRouteHandlers({
+      pickRandom: pickRandomGame,
+      stepGame,
+      gamePosition,
+      openGame: handleOpenGameRequest,
+      onGameClose: handleGameClose,
+      refreshGame,
+      onTagClick,
+      isTagActive,
+    });
     onCleanup(unregister);
 
     // The region preference lives in the nav bar's ⚙ popover, which knows nothing about who's
@@ -2174,7 +2595,11 @@ export default function ListRoute() {
     // from the price lookup.
     const onRegionChange = () => {
       setRegionCode(resolveRegion(getStoredRegion()));
-      if (kind === 'wishlist') void loadWishlistPrices(rowsStore.map(r => ({ appid: r.appid })), loadGuard.current());
+      if (kind === 'wishlist')
+        void loadWishlistPrices(
+          rowsStore.map((r) => ({ appid: r.appid })),
+          loadGuard.current(),
+        );
       else if (kind === 'bundle') void load();
     };
     window.addEventListener(REGION_CHANGED_EVENT, onRegionChange);
@@ -2203,7 +2628,7 @@ export default function ListRoute() {
   // previous account's ownership. Re-stamping is safe at any time: peek returns null until the
   // new account's sets land, so nothing is cleared in the meantime, then everything is rewritten.
   const onAccountChanged = () => {
-    setAccountRev(r => r + 1);
+    setAccountRev((r) => r + 1);
     if (stampsOwnership) loadMyOwnership(loadGuard.current());
     // Every account-scoped list's contents change at once, so no list's "already shuffled
     // through these" history means anything any more — panel.tsx exported clearAllRandomQueues
@@ -2214,7 +2639,9 @@ export default function ListRoute() {
   onCleanup(() => window.removeEventListener(ACCOUNT_CHANGED_EVENT, onAccountChanged));
 
   createEffect(() => {
-    params.bundleId; params.listId; params.appid;
+    params.bundleId;
+    params.listId;
+    params.appid;
     if (kind === 'owned' || kind === 'wishlist') accountRev();
     // A comparison lives entirely in the query string, not the path, so *that* is what has to be
     // read here for editing the players (or the op) to reload without a remount. load()'s own
@@ -2235,7 +2662,7 @@ export default function ListRoute() {
     setBaseTitle(null); // this route's own document.title context — see load()'s setBaseTitle calls
     loadGuard.next(); // invalidate any still-in-flight fetch/stream from this mount
     if (disposeTable) disposeTable();
-    groupTables.forEach(g => g.disposeTable());
+    groupTables.forEach((g) => g.disposeTable());
     if (unsyncView) unsyncView();
   });
 
@@ -2257,17 +2684,19 @@ export default function ListRoute() {
                 <Show when={bundleMeta()?.shop}>
                   {/* Same shopHue/.shop-chip as the browse table's own cells, so a bundle reads
                       the same here as in the picker you arrived from. */}
-                  {shop => <span class="shop-chip" style={{ '--shop-hue': String(shopHue(shop())) }}>{shop()}</span>}
+                  {(shop) => (
+                    <span class="shop-chip" style={{ '--shop-hue': String(shopHue(shop())) }}>
+                      {shop()}
+                    </span>
+                  )}
                 </Show>
               )}
-              <Show when={heroKindLabel()}>
-                {label => <span class="list-hero-chip">{label()}</span>}
-              </Show>
+              <Show when={heroKindLabel()}>{(label) => <span class="list-hero-chip">{label()}</span>}</Show>
               <Show when={heroAccount()}>
-                {account => (
+                {(account) => (
                   <span class="list-hero-account">
                     <Show when={account().avatarUrl}>
-                      {url => (
+                      {(url) => (
                         <span class="account-avatar-wrap">
                           <img class="account-avatar" src={url()} alt="" width="28" height="28" />
                         </span>
@@ -2279,7 +2708,12 @@ export default function ListRoute() {
                         profile to link to, so it stays plain text with a merge count instead. */}
                     <Show
                       when={account().members.length === 1}
-                      fallback={<span>{accountChipLabel(account())} <span class="account-count">({account().members.length} accounts merged)</span></span>}
+                      fallback={
+                        <span>
+                          {accountChipLabel(account())}{' '}
+                          <span class="account-count">({account().members.length} accounts merged)</span>
+                        </span>
+                      }
                     >
                       <a
                         class="account-profile-link"
@@ -2287,7 +2721,9 @@ export default function ListRoute() {
                         target="_blank"
                         rel="noopener noreferrer"
                         title={`Steam ID ${account().members[0]}`}
-                      >{accountChipLabel(account())} <span class="account-profile-arrow">↗</span></a>
+                      >
+                        {accountChipLabel(account())} <span class="account-profile-arrow">↗</span>
+                      </a>
                     </Show>
                   </span>
                 )}
@@ -2310,7 +2746,10 @@ export default function ListRoute() {
           initialSlots={compareSlots()}
           submitLabel={compareSlots().length < 2 ? 'Compare libraries' : 'Compare'}
           onCancel={editingPlayers() ? () => setEditingPlayers(false) : undefined}
-          onSubmit={slots => { setEditingPlayers(false); navigate(compareUrl(slots, compareOp())); }}
+          onSubmit={(slots) => {
+            setEditingPlayers(false);
+            navigate(compareUrl(slots, compareOp()));
+          }}
         />
       </Show>
       {/* The hero's "Edit sources" action reopens the same combine form used at creation
@@ -2332,10 +2771,11 @@ export default function ListRoute() {
         <div class="combine-form">
           <label>
             Rank the games of{' '}
-            <select value={refKey(userList()!.source!)} onChange={e => handleChangeRankedSource(e.currentTarget.value)}>
-              <For each={rankedSourceOptions()}>
-                {o => <option value={o.key}>{o.label}</option>}
-              </For>
+            <select
+              value={refKey(userList()!.source!)}
+              onChange={(e) => handleChangeRankedSource(e.currentTarget.value)}
+            >
+              <For each={rankedSourceOptions()}>{(o) => <option value={o.key}>{o.label}</option>}</For>
             </select>
           </label>
           <p>Answers already given are kept, and apply again to any game that's in the new source too.</p>
@@ -2346,28 +2786,48 @@ export default function ListRoute() {
       <Show when={selectedRows().length > 0}>
         <div class="selection-toolbar">
           <span class="selection-count">{selectedRows().length} selected</span>
-          <select value={addTarget()} onChange={e => setAddTarget(e.currentTarget.value)}>
+          <select value={addTarget()} onChange={(e) => setAddTarget(e.currentTarget.value)}>
             <option value="">Add to list…</option>
-            <For each={manualLists().filter(l => l.id !== userList()?.id)}>
-              {l => <option value={l.id}>{l.name}</option>}
+            <For each={manualLists().filter((l) => l.id !== userList()?.id)}>
+              {(l) => <option value={l.id}>{l.name}</option>}
             </For>
             <option value={NEW_LIST_OPTION}>+ Create new list…</option>
           </select>
-          <button type="button" disabled={!addTarget()} onClick={handleAddSelectedToList}>Add</button>
+          <button type="button" disabled={!addTarget()} onClick={handleAddSelectedToList}>
+            Add
+          </button>
           <Show when={kind === 'user' && userList()?.kind === 'manual'}>
-            <button type="button" onClick={handleRemoveSelectedFromList}>Remove from this list</button>
+            <button type="button" onClick={handleRemoveSelectedFromList}>
+              Remove from this list
+            </button>
           </Show>
           <Show when={kind === 'user' && userList()?.kind === 'ranked'}>
             <button
               type="button"
               disabled={!selectedUnranked().length}
-              title={selectedUnranked().length ? 'Ask only about the selected games that are still unranked' : 'All selected games are ranked or excluded — Re-rank them first'}
+              title={
+                selectedUnranked().length
+                  ? 'Ask only about the selected games that are still unranked'
+                  : 'All selected games are ranked or excluded — Re-rank them first'
+              }
               onClick={handleCompareSelected}
-            >Compare {selectedUnranked().length} selected</button>
-            <button type="button" title="Ask about it again, starting from its current place" onClick={handleRerankSelected}>Re-rank</button>
-            <button type="button" title="Leave out of the ranking" onClick={handleExcludeSelected}>Exclude</button>
+            >
+              Compare {selectedUnranked().length} selected
+            </button>
+            <button
+              type="button"
+              title="Ask about it again, starting from its current place"
+              onClick={handleRerankSelected}
+            >
+              Re-rank
+            </button>
+            <button type="button" title="Leave out of the ranking" onClick={handleExcludeSelected}>
+              Exclude
+            </button>
           </Show>
-          <button type="button" onClick={() => table?.selection.clear()}>Clear selection</button>
+          <button type="button" onClick={() => table?.selection.clear()}>
+            Clear selection
+          </button>
         </div>
       </Show>
       {/* Outside the selection-gated block above on purpose — "Add"/"Remove" both clear the
@@ -2376,15 +2836,24 @@ export default function ListRoute() {
       {selectionActionStatus() && <div class="selection-status">{selectionActionStatus()}</div>}
       <Show when={tableReady() && !userList() && getAuthUser() && isUnsaved(viewPrefKey(), currentViewState())}>
         <div class="pref-unsaved-banner">
-          Unsaved changes to this view ({summarizeViewDiff(viewPrefKey(), currentViewState()).join(', ')}) — differs from what's saved to your account.
-          <button type="button" class="btn btn-ghost btn-sm" onClick={handleSaveView}>Save</button>
-          <button type="button" class="btn btn-ghost btn-sm" onClick={handleRevertView}>Revert</button>
+          Unsaved changes to this view ({summarizeViewDiff(viewPrefKey(), currentViewState()).join(', ')}) — differs
+          from what's saved to your account.
+          <button type="button" class="btn btn-ghost btn-sm" onClick={handleSaveView}>
+            Save
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm" onClick={handleRevertView}>
+            Revert
+          </button>
         </div>
       </Show>
       <Show when={tableReady()}>
         <div class="list-view-actions">
-          <button type="button" class="btn btn-ghost btn-sm" onClick={e => handleShareView(e.currentTarget)}>🔗 Share view</button>
-          <button type="button" class="btn btn-ghost btn-sm" onClick={handleResetView}>Reset view</button>
+          <button type="button" class="btn btn-ghost btn-sm" onClick={(e) => handleShareView(e.currentTarget)}>
+            🔗 Share view
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm" onClick={handleResetView}>
+            Reset view
+          </button>
         </div>
       </Show>
       <div ref={tableContainer} class="table-container" />
@@ -2396,15 +2865,22 @@ export default function ListRoute() {
           which matters: for a bundle of courses these can be the *majority* of what you're buying. */}
       <Show when={kind === 'bundle' && unresolvedGames().length > 0}>
         <div class="unresolved-games">
-          <button type="button" class="unresolved-summary" aria-expanded={unresolvedOpen()} onClick={() => setUnresolvedOpen(!unresolvedOpen())}>
+          <button
+            type="button"
+            class="unresolved-summary"
+            aria-expanded={unresolvedOpen()}
+            onClick={() => setUnresolvedOpen(!unresolvedOpen())}
+          >
             {unresolvedOpen() ? '▾' : '▸'} {unresolvedGames().length} more in this bundle, not on Steam
           </button>
           <Show when={unresolvedOpen()}>
             <ul class="unresolved-list">
               <For each={unresolvedGames()}>
-                {game => (
+                {(game) => (
                   <li>
-                    <a href={`https://isthereanydeal.com/game/${game.slug}/info/`} target="_blank" rel="noopener">{game.title}</a>
+                    <a href={`https://isthereanydeal.com/game/${game.slug}/info/`} target="_blank" rel="noopener">
+                      {game.title}
+                    </a>
                     <Show when={game.type}>
                       <span class="unresolved-type">{game.type}</span>
                     </Show>

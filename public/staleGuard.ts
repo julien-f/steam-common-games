@@ -21,7 +21,7 @@ export function createStaleGuard(): StaleGuard {
   let gen = 0;
   return {
     next: () => ++gen,
-    isStale: g => g !== gen,
+    isStale: (g) => g !== gen,
     current: () => gen,
   };
 }

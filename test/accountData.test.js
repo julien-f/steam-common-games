@@ -3,15 +3,24 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  membersFromAccountId, fetchAccountOwnedGames, fetchAccountWishlistItems, fetchAccountWishlist,
-  fetchAccountOwnedAppids, fetchAccountWishlistAppids, resolveAccountSummary,
-  fetchAccountOverview, toAccountPlayer, fetchAccountFriends,
+  membersFromAccountId,
+  fetchAccountOwnedGames,
+  fetchAccountWishlistItems,
+  fetchAccountWishlist,
+  fetchAccountOwnedAppids,
+  fetchAccountWishlistAppids,
+  resolveAccountSummary,
+  fetchAccountOverview,
+  toAccountPlayer,
+  fetchAccountFriends,
 } = require('../public/accountData.ts');
 
 function withFetch(t, handler) {
   const restore = globalThis.fetch;
   globalThis.fetch = handler;
-  t.after(() => { globalThis.fetch = restore; });
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
 }
 
 test('membersFromAccountId: splits the sorted-joined id back into member steam64 ids', () => {
@@ -96,9 +105,17 @@ test('fetchAccountOwnedAppids: resolves an accountId straight to a flat appid Se
     return {
       ok: true,
       json: async () => ({
-        groups: [{ games: [{ appid: 440, name: 'TF2' }, { appid: 620, name: 'Portal 2' }] }],
+        groups: [
+          {
+            games: [
+              { appid: 440, name: 'TF2' },
+              { appid: 620, name: 'Portal 2' },
+            ],
+          },
+        ],
         slots: [[{ steamid: '1' }, { steamid: '2' }]],
-        playtime: {}, lastPlayed: {},
+        playtime: {},
+        lastPlayed: {},
       }),
     };
   });
@@ -129,11 +146,21 @@ test('resolveAccountSummary: a single account resolves members/label/avatar/both
         ok: true,
         json: async () => ({
           groups: [{ games: [{ appid: 440, name: 'TF2' }] }],
-          slots: [[{
-            steamid: '1', personaname: 'Alice', avatarmedium: 'https://x/a.jpg', profileurl: 'https://steamcommunity.com/id/alice/',
-            timecreated: 1433965886, loccountrycode: 'US', realname: 'Alice Smith',
-          }]],
-          playtime: {}, lastPlayed: {},
+          slots: [
+            [
+              {
+                steamid: '1',
+                personaname: 'Alice',
+                avatarmedium: 'https://x/a.jpg',
+                profileurl: 'https://steamcommunity.com/id/alice/',
+                timecreated: 1433965886,
+                loccountrycode: 'US',
+                realname: 'Alice Smith',
+              },
+            ],
+          ],
+          playtime: {},
+          lastPlayed: {},
         }),
       };
     }
@@ -159,11 +186,14 @@ test('resolveAccountSummary: a multi-member Family sorts members, joins the labe
         ok: true,
         json: async () => ({
           groups: [],
-          slots: [[
-            { steamid: '2', personaname: 'Bob', profileurl: 'https://steamcommunity.com/id/bob/' },
-            { steamid: '1', personaname: 'Alice', profileurl: 'https://steamcommunity.com/profiles/1' },
-          ]],
-          playtime: {}, lastPlayed: {},
+          slots: [
+            [
+              { steamid: '2', personaname: 'Bob', profileurl: 'https://steamcommunity.com/id/bob/' },
+              { steamid: '1', personaname: 'Alice', profileurl: 'https://steamcommunity.com/profiles/1' },
+            ],
+          ],
+          playtime: {},
+          lastPlayed: {},
         }),
       };
     }
@@ -187,12 +217,17 @@ test('resolveAccountSummary: throws with the server error message when the accou
   await assert.rejects(() => resolveAccountSummary(['ghost']), /profile not found/);
 });
 
-test('resolveAccountSummary: a failed/private wishlist just yields wishlistCount 0, doesn\'t fail the whole resolve', async (t) => {
+test("resolveAccountSummary: a failed/private wishlist just yields wishlistCount 0, doesn't fail the whole resolve", async (t) => {
   withFetch(t, async (url) => {
     if (url === '/api/common-games') {
       return {
         ok: true,
-        json: async () => ({ groups: [], slots: [[{ steamid: '1', personaname: 'Alice' }]], playtime: {}, lastPlayed: {} }),
+        json: async () => ({
+          groups: [],
+          slots: [[{ steamid: '1', personaname: 'Alice' }]],
+          playtime: {},
+          lastPlayed: {},
+        }),
       };
     }
     return { ok: false, json: async () => ({ error: 'private profile' }) };
@@ -206,15 +241,31 @@ test('resolveAccountSummary: a failed/private wishlist just yields wishlistCount
 // ── toAccountPlayer / fetchAccountOverview ───────────────────────────────────
 
 test('toAccountPlayer: maps a full player object onto display-ready fields', () => {
-  assert.deepEqual(toAccountPlayer({
-    steamid: '1', personaname: 'Alice', profileurl: 'https://steamcommunity.com/id/alice/',
-    avatarmedium: 'https://cdn/a.jpg', communityvisibilitystate: 3, personastate: 1, gameCount: 42,
-    timecreated: 1433965886, loccountrycode: 'US', realname: 'Alice Smith',
-  }), {
-    steamid: '1', name: 'Alice', profileUrl: 'https://steamcommunity.com/id/alice/',
-    avatarUrl: 'https://cdn/a.jpg', isPrivate: false, gameCount: 42,
-    memberSince: '2015-06-10', countryCode: 'US', realName: 'Alice Smith',
-  });
+  assert.deepEqual(
+    toAccountPlayer({
+      steamid: '1',
+      personaname: 'Alice',
+      profileurl: 'https://steamcommunity.com/id/alice/',
+      avatarmedium: 'https://cdn/a.jpg',
+      communityvisibilitystate: 3,
+      personastate: 1,
+      gameCount: 42,
+      timecreated: 1433965886,
+      loccountrycode: 'US',
+      realname: 'Alice Smith',
+    }),
+    {
+      steamid: '1',
+      name: 'Alice',
+      profileUrl: 'https://steamcommunity.com/id/alice/',
+      avatarUrl: 'https://cdn/a.jpg',
+      isPrivate: false,
+      gameCount: 42,
+      memberSince: '2015-06-10',
+      countryCode: 'US',
+      realName: 'Alice Smith',
+    },
+  );
 });
 
 test('toAccountPlayer: memberSince/countryCode/realName are empty strings when Steam did not return them (private profile)', () => {
@@ -236,7 +287,11 @@ test('toAccountPlayer: communityvisibilitystate other than 3 is private; absent 
 });
 
 test('toAccountPlayer: drops a non-http profile/avatar URL and falls back to the steamid for a name', () => {
-  const p = toAccountPlayer({ steamid: '76561198000000000', profileurl: 'javascript:alert(1)', avatarmedium: 'data:image/png;base64,x' });
+  const p = toAccountPlayer({
+    steamid: '76561198000000000',
+    profileurl: 'javascript:alert(1)',
+    avatarmedium: 'data:image/png;base64,x',
+  });
   assert.equal(p.profileUrl, '');
   assert.equal(p.avatarUrl, '');
   assert.equal(p.name, '76561198000000000');
@@ -256,10 +311,17 @@ test('fetchAccountFriends: maps friends and passes through memberSince/countryCo
     return {
       ok: true,
       json: async () => ({
-        friends: [{
-          steamid: '2', personaname: 'Bob', avatar: 'https://x/b.jpg', profileurl: 'https://steamcommunity.com/id/bob/',
-          timecreated: 1433965886, loccountrycode: 'US', realname: 'Bob Smith',
-        }],
+        friends: [
+          {
+            steamid: '2',
+            personaname: 'Bob',
+            avatar: 'https://x/b.jpg',
+            profileurl: 'https://steamcommunity.com/id/bob/',
+            timecreated: 1433965886,
+            loccountrycode: 'US',
+            realname: 'Bob Smith',
+          },
+        ],
         unavailable: ['3'],
         fetchedAt: 123,
       }),
@@ -268,10 +330,17 @@ test('fetchAccountFriends: maps friends and passes through memberSince/countryCo
 
   const result = await fetchAccountFriends(['1']);
   assert.deepEqual(result, {
-    friends: [{
-      steamid: '2', name: 'Bob', avatarUrl: 'https://x/b.jpg', profileUrl: 'https://steamcommunity.com/id/bob/',
-      memberSince: '2015-06-10', countryCode: 'US', realName: 'Bob Smith',
-    }],
+    friends: [
+      {
+        steamid: '2',
+        name: 'Bob',
+        avatarUrl: 'https://x/b.jpg',
+        profileUrl: 'https://steamcommunity.com/id/bob/',
+        memberSince: '2015-06-10',
+        countryCode: 'US',
+        realName: 'Bob Smith',
+      },
+    ],
     unavailable: ['3'],
     fetchedAt: 123,
   });
@@ -285,7 +354,13 @@ test('fetchAccountFriends: a friend Steam returned no name/location for gets emp
 
   const result = await fetchAccountFriends(['1']);
   assert.deepEqual(result.friends[0], {
-    steamid: '2', name: '2', avatarUrl: '', profileUrl: '', memberSince: '', countryCode: '', realName: '',
+    steamid: '2',
+    name: '2',
+    avatarUrl: '',
+    profileUrl: '',
+    memberSince: '',
+    countryCode: '',
+    realName: '',
   });
 });
 
@@ -297,10 +372,12 @@ test('fetchAccountOverview: returns the slot library and its member accounts fro
       ok: true,
       json: async () => ({
         groups: [{ games: [{ appid: 440, name: 'Team Fortress 2' }] }],
-        slots: [[
-          { steamid: '1', personaname: 'Alice', profileurl: 'https://steamcommunity.com/id/alice/', gameCount: 1 },
-          { steamid: '2', personaname: 'Bob', gameCount: 0 },
-        ]],
+        slots: [
+          [
+            { steamid: '1', personaname: 'Alice', profileurl: 'https://steamcommunity.com/id/alice/', gameCount: 1 },
+            { steamid: '2', personaname: 'Bob', gameCount: 0 },
+          ],
+        ],
         playtime: { 440: { 1: 10 } },
         lastPlayed: {},
       }),
@@ -310,24 +387,37 @@ test('fetchAccountOverview: returns the slot library and its member accounts fro
   const { games, players } = await fetchAccountOverview(['1', '2']);
   assert.equal(calls, 1);
   assert.deepEqual(games, [{ appid: 440, name: 'Team Fortress 2', playtimeMinutes: 10, lastPlayedUnix: 0 }]);
-  assert.deepEqual(players.map(p => p.name), ['Alice', 'Bob']);
+  assert.deepEqual(
+    players.map((p) => p.name),
+    ['Alice', 'Bob'],
+  );
   assert.equal(players[0].profileUrl, 'https://steamcommunity.com/id/alice/');
   assert.equal(players[1].profileUrl, '');
 });
 
-test('fetchAccountOverview/fetchAccountWishlist: surface the server\'s fetchedAt', async (t) => {
+test("fetchAccountOverview/fetchAccountWishlist: surface the server's fetchedAt", async (t) => {
   withFetch(t, async (url) => ({
     ok: true,
-    json: async () => (String(url).includes('wishlist')
-      ? { items: [{ appid: 2, priority: 1, dateAdded: null }], fetchedAt: 5678 }
-      : { groups: [{ games: [{ appid: 1, name: 'A' }] }], slots: [[{ steamid: '1' }]], playtime: {}, lastPlayed: {}, fetchedAt: 1234 }),
+    json: async () =>
+      String(url).includes('wishlist')
+        ? { items: [{ appid: 2, priority: 1, dateAdded: null }], fetchedAt: 5678 }
+        : {
+            groups: [{ games: [{ appid: 1, name: 'A' }] }],
+            slots: [[{ steamid: '1' }]],
+            playtime: {},
+            lastPlayed: {},
+            fetchedAt: 1234,
+          },
   }));
   assert.equal((await fetchAccountOverview(['1'])).fetchedAt, 1234);
   assert.equal((await fetchAccountWishlist(['1'])).fetchedAt, 5678);
 });
 
 test('fetchAccountOverview: a response with no fetchedAt (fetched fresh) is null, not undefined', async (t) => {
-  withFetch(t, async () => ({ ok: true, json: async () => ({ groups: [], slots: [[]], playtime: {}, lastPlayed: {} }) }));
+  withFetch(t, async () => ({
+    ok: true,
+    json: async () => ({ groups: [], slots: [[]], playtime: {}, lastPlayed: {} }),
+  }));
   assert.equal((await fetchAccountOverview(['1'])).fetchedAt, null);
 });
 
@@ -335,7 +425,14 @@ test('fetchAccountOverview: builds per-member owners from the playtime/lastPlaye
   withFetch(t, async () => ({
     ok: true,
     json: async () => ({
-      groups: [{ games: [{ appid: 440, name: 'TF2' }, { appid: 570, name: 'Dota' }] }],
+      groups: [
+        {
+          games: [
+            { appid: 440, name: 'TF2' },
+            { appid: 570, name: 'Dota' },
+          ],
+        },
+      ],
       slots: [[{ steamid: '1', personaname: 'Alice' }, { steamid: '2' }]],
       // 570 is owned by member 2 only — membership comes from these maps, not the slot's roster.
       playtime: { 440: { 1: 120, 2: 0 }, 570: { 2: 30 } },
@@ -357,7 +454,8 @@ test('fetchAccountOverview: a game nobody has an entry for gets no owners entry 
     json: async () => ({
       groups: [{ games: [{ appid: 440, name: 'TF2' }] }],
       slots: [[{ steamid: '1' }]],
-      playtime: {}, lastPlayed: {},
+      playtime: {},
+      lastPlayed: {},
     }),
   }));
   assert.equal((await fetchAccountOverview(['1'])).owners.has(440), false);

@@ -28,11 +28,19 @@ export function getAuthUser(): AuthUser | null {
 const SYNCED_FLAG_PREFIX = 'steam.isonoe.net:prefs-synced:';
 
 function hasSyncedBefore(steamid: string): boolean {
-  try { return localStorage.getItem(SYNCED_FLAG_PREFIX + steamid) === '1'; } catch { return true; }
+  try {
+    return localStorage.getItem(SYNCED_FLAG_PREFIX + steamid) === '1';
+  } catch {
+    return true;
+  }
 }
 
 function markSyncedBefore(steamid: string): void {
-  try { localStorage.setItem(SYNCED_FLAG_PREFIX + steamid, '1'); } catch { /* unavailable storage */ }
+  try {
+    localStorage.setItem(SYNCED_FLAG_PREFIX + steamid, '1');
+  } catch {
+    /* unavailable storage */
+  }
 }
 
 // Merges this device's local prefs against the account's server-side ones. Run on every sign-in
@@ -82,10 +90,13 @@ export async function syncPrefsWithServer(steamid: string, serverEntries: Record
   // still gets its stale in-memory baseline cleared.
   for (const key of TABLE_VIEW_PREF_KEYS) {
     const server = serverEntries[key];
-    if (server) setBaseline(key, server); else clearBaseline(key);
+    if (server) setBaseline(key, server);
+    else clearBaseline(key);
   }
 
-  const keys = new Set([...Object.keys(localEntries), ...Object.keys(serverEntries)].filter(k => !TABLE_VIEW_PREF_KEYS.includes(k)));
+  const keys = new Set(
+    [...Object.keys(localEntries), ...Object.keys(serverEntries)].filter((k) => !TABLE_VIEW_PREF_KEYS.includes(k)),
+  );
   let adopted = false;
   const pushes: Promise<void>[] = [];
 
@@ -141,8 +152,15 @@ export async function autoPopulateAccountFromLogin(steamid: string): Promise<voi
 export async function initAuth(): Promise<void> {
   try {
     const res = await fetch('/api/me');
-    const { steamid, prefs } = await res.json() as { steamid: string | null; prefs: Record<string, PrefEntry> | null };
-    if (!steamid) { currentUser = null; setSignedInSteamid(null); return; }
+    const { steamid, prefs } = (await res.json()) as {
+      steamid: string | null;
+      prefs: Record<string, PrefEntry> | null;
+    };
+    if (!steamid) {
+      currentUser = null;
+      setSignedInSteamid(null);
+      return;
+    }
     // Deliberately set only after syncPrefsWithServer resolves — a component gating its own
     // "unsaved changes" banner on getAuthUser() reruns once tableViewSync.ts's baselines are
     // populated, not a tick earlier while they're still empty (which would flash "unsaved" for
@@ -150,7 +168,10 @@ export async function initAuth(): Promise<void> {
     const adopted = await syncPrefsWithServer(steamid, prefs ?? {});
     currentUser = { steamid };
     setSignedInSteamid(steamid);
-    if (adopted) { location.reload(); return; }
+    if (adopted) {
+      location.reload();
+      return;
+    }
     await autoPopulateAccountFromLogin(steamid);
   } catch (err) {
     console.error('[auth] failed to check sign-in status', err);

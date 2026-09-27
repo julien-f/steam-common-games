@@ -3,8 +3,13 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  GAME_SEARCH_DEBOUNCE_MS, GAME_SEARCH_MIN_CHARS, parseDirectAppid, gameSearchResultHtml,
-  gameSearchSectionHtml, gameSearchMoreHtml, shouldShowRecents,
+  GAME_SEARCH_DEBOUNCE_MS,
+  GAME_SEARCH_MIN_CHARS,
+  parseDirectAppid,
+  gameSearchResultHtml,
+  gameSearchSectionHtml,
+  gameSearchMoreHtml,
+  shouldShowRecents,
 } = require('../public/gameSearch.ts');
 
 // `initGameSearch` itself (the debounced fetch/keyboard-nav widget) isn't covered here — it

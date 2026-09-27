@@ -61,23 +61,45 @@ export function computeSteamdbRating(positive: number, total: number): number | 
 // base-game back-reference. `isDlc` is still checked independently of `type` as a belt-and-
 // suspenders fallback — `type` is only ever missing when Steam's response omits it entirely.
 const AAA_PRICE_CENTS = 5000; // $50+ launch price
-const AA_PRICE_CENTS = 2000;  // $20+ launch price — the AA/premium-indie overlap zone
-const AA_REVIEW_THRESHOLD = 20000;         // needed (alongside AA-band price) to clear "just an expensive indie game"
-const FREE_AAA_REVIEW_THRESHOLD = 200000;  // the only lever available for F2P titles, which have no price signal at all
+const AA_PRICE_CENTS = 2000; // $20+ launch price — the AA/premium-indie overlap zone
+const AA_REVIEW_THRESHOLD = 20000; // needed (alongside AA-band price) to clear "just an expensive indie game"
+const FREE_AAA_REVIEW_THRESHOLD = 200000; // the only lever available for F2P titles, which have no price signal at all
 // Steam's appdetails `type` field, values other than 'game' — see the `type` comment in
 // lib/steam.js's extractAppDetails. Shared with public/library.js's Type column so the two
 // don't drift into disagreeing about what counts as "not really a game".
-export const NON_GAME_TYPES = new Set(['dlc', 'demo', 'music', 'video', 'series', 'episode', 'mod', 'hardware', 'advertising']);
+export const NON_GAME_TYPES = new Set([
+  'dlc',
+  'demo',
+  'music',
+  'video',
+  'series',
+  'episode',
+  'mod',
+  'hardware',
+  'advertising',
+]);
 export type ProductionTier = 'AAA' | 'AA' | 'Indie';
-export function computeProductionTier({ isFree, priceInitial, reviewsTotal, hasMetacritic, isDlc, type }: {
-  isFree?: boolean; priceInitial?: number | null; reviewsTotal?: number | null; hasMetacritic?: boolean; isDlc?: boolean; type?: string | null;
+export function computeProductionTier({
+  isFree,
+  priceInitial,
+  reviewsTotal,
+  hasMetacritic,
+  isDlc,
+  type,
+}: {
+  isFree?: boolean;
+  priceInitial?: number | null;
+  reviewsTotal?: number | null;
+  hasMetacritic?: boolean;
+  isDlc?: boolean;
+  type?: string | null;
 } = {}): ProductionTier | null {
   if (isDlc || (type != null && NON_GAME_TYPES.has(type))) return null;
   const reviews = reviewsTotal ?? 0;
   if (isFree) return reviews >= FREE_AAA_REVIEW_THRESHOLD ? 'AAA' : 'Indie';
   if (priceInitial == null) return null;
   if (priceInitial >= AAA_PRICE_CENTS) return 'AAA';
-  if (priceInitial >= AA_PRICE_CENTS) return (reviews >= AA_REVIEW_THRESHOLD || hasMetacritic) ? 'AA' : 'Indie';
+  if (priceInitial >= AA_PRICE_CENTS) return reviews >= AA_REVIEW_THRESHOLD || hasMetacritic ? 'AA' : 'Indie';
   return 'Indie';
 }
 
@@ -97,8 +119,11 @@ export function scoreColor(n: number | null): string {
 // to USD rather than throwing; an invalid/unrecognized currency code falls back to a plain
 // "12.34 XYZ" string rather than letting Intl.NumberFormat's own error propagate.
 export function formatMoney(v: number, currency?: string | null): string {
-  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(v); }
-  catch { return `${v.toFixed(2)} ${currency || ''}`; }
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(v);
+  } catch {
+    return `${v.toFixed(2)} ${currency || ''}`;
+  }
 }
 
 // Single source of truth for "is this price a historical record, and how should it look" —
@@ -131,15 +156,40 @@ export interface DealRecordTier {
   bold?: boolean;
 }
 export const DEAL_RECORD_TIERS: DealRecordTier[] = [
-  { tier: 'all-time', low: 'lowAll', statusLabel: 'All-Time Low',  tooltipLabel: 'all-time low',  color: scoreColor(90), icon: '🔥', bold: true },
-  { tier: '1yr',       low: 'lowY1',  statusLabel: '1-Year Low',   tooltipLabel: '1-year low',    color: scoreColor(70), icon: '★' },
-  { tier: '3mo',        low: 'lowM3',  statusLabel: '3-Month Low', tooltipLabel: '3-month low',   color: scoreColor(55), icon: '☆' },
+  {
+    tier: 'all-time',
+    low: 'lowAll',
+    statusLabel: 'All-Time Low',
+    tooltipLabel: 'all-time low',
+    color: scoreColor(90),
+    icon: '🔥',
+    bold: true,
+  },
+  {
+    tier: '1yr',
+    low: 'lowY1',
+    statusLabel: '1-Year Low',
+    tooltipLabel: '1-year low',
+    color: scoreColor(70),
+    icon: '★',
+  },
+  {
+    tier: '3mo',
+    low: 'lowM3',
+    statusLabel: '3-Month Low',
+    tooltipLabel: '3-month low',
+    color: scoreColor(55),
+    icon: '☆',
+  },
 ];
 // `lows` is any object carrying `lowAll`/`lowY1`/`lowM3` fields — a row/game object works as-is,
 // no need to destructure at the call site. `<=`, not `<` — the current deal genuinely can BE the
 // historical low itself (it's what set it), not only ever beat it. Returns `null` (not a tier)
 // when `price` is missing or doesn't beat any of the three windows.
-export function dealRecordTier(price: number | null | undefined, lows?: { lowAll?: number | null; lowY1?: number | null; lowM3?: number | null } | null): DealRecordTier | null {
+export function dealRecordTier(
+  price: number | null | undefined,
+  lows?: { lowAll?: number | null; lowY1?: number | null; lowM3?: number | null } | null,
+): DealRecordTier | null {
   if (price == null) return null;
   for (const t of DEAL_RECORD_TIERS) {
     const low = lows?.[t.low];
@@ -159,7 +209,10 @@ export function dealRecordTier(price: number | null | undefined, lows?: { lowAll
 // negative in practice. Lives here (not gameColumns.js, where the rest of the price-column logic
 // sits) for the same reason dealRecordTier/formatMoney do — panel.js's Price card needs it too,
 // without pulling in gameColumns.js's @vates/data-table-core dependency.
-export function discountPct(bestDealAmt: number | null | undefined, steamRegularAmt: number | null | undefined): number | null {
+export function discountPct(
+  bestDealAmt: number | null | undefined,
+  steamRegularAmt: number | null | undefined,
+): number | null {
   if (steamRegularAmt == null || !(steamRegularAmt > 0) || bestDealAmt == null) return null;
   return Math.round((1 - bestDealAmt / steamRegularAmt) * 100);
 }
@@ -191,8 +244,8 @@ export function fmtLastPlayed(epochSec: number | null | undefined): string {
 // anything that isn't exactly two letters, rather than rendering a broken/mismatched flag.
 export function countryFlag(code: string | null | undefined): string {
   if (!code || !/^[A-Za-z]{2}$/.test(code)) return '';
-  const REGIONAL_INDICATOR_A = 0x1F1E6;
-  return [...code.toUpperCase()].map(c => String.fromCodePoint(REGIONAL_INDICATOR_A + c.charCodeAt(0) - 65)).join('');
+  const REGIONAL_INDICATOR_A = 0x1f1e6;
+  return [...code.toUpperCase()].map((c) => String.fromCodePoint(REGIONAL_INDICATOR_A + c.charCodeAt(0) - 65)).join('');
 }
 
 // "how long ago was this fetched", for the "Updated <when>" readouts next to the app's ↻ Refresh
@@ -219,11 +272,7 @@ export function foldStr(s: string): string {
 }
 
 export function esc(s: unknown): string {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 export function renderScoreCell(game: Game): string {
@@ -257,10 +306,22 @@ export function renderExtraCell(game: Game): string {
 // free of a DOM dependency it otherwise has none of, and an `instanceof` check against the
 // window's own constructors is wrong for an element from another realm anyway.
 const TEXT_ENTRY_INPUT_TYPES = new Set([
-  'text', 'search', 'email', 'url', 'tel', 'password', 'number',
-  'date', 'datetime-local', 'month', 'time', 'week',
+  'text',
+  'search',
+  'email',
+  'url',
+  'tel',
+  'password',
+  'number',
+  'date',
+  'datetime-local',
+  'month',
+  'time',
+  'week',
 ]);
-export function isTextEntry(el: { tagName?: string; type?: string; isContentEditable?: boolean } | null | undefined): boolean {
+export function isTextEntry(
+  el: { tagName?: string; type?: string; isContentEditable?: boolean } | null | undefined,
+): boolean {
   const tag = el?.tagName;
   if (!tag) return false;
   if (tag === 'TEXTAREA' || tag === 'SELECT') return true;

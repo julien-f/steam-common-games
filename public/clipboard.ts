@@ -11,16 +11,23 @@ export const COPIED_MS = 1500;
 export function copyText(text: string): Promise<boolean> {
   const clipboard = navigator.clipboard;
   if (!clipboard?.writeText) return Promise.resolve(promptFallback(text));
-  return clipboard.writeText(text).then(() => true, () => promptFallback(text));
+  return clipboard.writeText(text).then(
+    () => true,
+    () => promptFallback(text),
+  );
 }
 
 function promptFallback(text: string): boolean {
-  try { window.prompt('Copy this:', text); } catch { /* no window (tests) */ }
+  try {
+    window.prompt('Copy this:', text);
+  } catch {
+    /* no window (tests) */
+  }
   return false;
 }
 
 export interface CopyFeedback {
-  copiedText?: string;  // label shown while confirming (default '✓ Copied!')
+  copiedText?: string; // label shown while confirming (default '✓ Copied!')
   copiedClass?: string; // class added for the same window, for a distinct confirmation color
 }
 
@@ -29,7 +36,9 @@ export interface CopyFeedback {
 // use CopyButton.tsx instead, which drives the same state through a signal rather than by
 // writing to the DOM behind Solid's back.
 export function copyWithFeedback(btn: HTMLElement, text: string, opts: CopyFeedback = {}): void {
-  copyText(text).then(ok => { if (ok) flash(btn, opts); });
+  copyText(text).then((ok) => {
+    if (ok) flash(btn, opts);
+  });
 }
 
 function flash(btn: HTMLElement, { copiedText = '✓ Copied!', copiedClass }: CopyFeedback): void {

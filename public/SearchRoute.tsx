@@ -62,8 +62,17 @@ function renderName(_value: unknown, row: GameSearchResult): Node {
 }
 
 const SEARCH_COLUMNS: ColumnDef<GameSearchResult>[] = [
-  { key: 'thumb', label: '', width: 90, sortable: false, filterable: false, groupable: false, searchable: false,
-    value: () => null, render: renderThumb },
+  {
+    key: 'thumb',
+    label: '',
+    width: 90,
+    sortable: false,
+    filterable: false,
+    groupable: false,
+    searchable: false,
+    value: () => null,
+    render: renderThumb,
+  },
   { key: 'name', label: 'Name', sortable: false, filterable: false, groupable: false, render: renderName },
 ];
 
@@ -95,23 +104,40 @@ export default function SearchRoute() {
   function handleInput(raw: string): void {
     if (debounceTimer != null) clearTimeout(debounceTimer);
     const term = raw.trim();
-    debounceTimer = setTimeout(() => { setSearchQueryParam(term); setQuery(term); }, GAME_SEARCH_DEBOUNCE_MS);
+    debounceTimer = setTimeout(() => {
+      setSearchQueryParam(term);
+      setQuery(term);
+    }, GAME_SEARCH_DEBOUNCE_MS);
   }
-  onCleanup(() => { if (debounceTimer != null) clearTimeout(debounceTimer); });
+  onCleanup(() => {
+    if (debounceTimer != null) clearTimeout(debounceTimer);
+  });
 
   let searchToken = 0;
-  createEffect(on(query, term => {
-    const token = ++searchToken;
-    // Same floor as the nav-bar box (gameSearch.ts) — a 1-character query is expensive and
-    // near-meaningless against an unofficial, unpaginated store-search endpoint.
-    if (term.length < GAME_SEARCH_MIN_CHARS) { setResults([]); setSearching(false); return; }
-    setSearching(true);
-    fetch(`/api/search-games?q=${encodeURIComponent(term)}`)
-      .then(res => res.json())
-      .then(data => { if (token === searchToken) setResults(data.results || []); })
-      .catch(() => { if (token === searchToken) setResults([]); })
-      .finally(() => { if (token === searchToken) setSearching(false); });
-  }));
+  createEffect(
+    on(query, (term) => {
+      const token = ++searchToken;
+      // Same floor as the nav-bar box (gameSearch.ts) — a 1-character query is expensive and
+      // near-meaningless against an unofficial, unpaginated store-search endpoint.
+      if (term.length < GAME_SEARCH_MIN_CHARS) {
+        setResults([]);
+        setSearching(false);
+        return;
+      }
+      setSearching(true);
+      fetch(`/api/search-games?q=${encodeURIComponent(term)}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (token === searchToken) setResults(data.results || []);
+        })
+        .catch(() => {
+          if (token === searchToken) setResults([]);
+        })
+        .finally(() => {
+          if (token === searchToken) setSearching(false);
+        });
+    }),
+  );
 
   // renderName reads ownership at render time, not through a tracked signal (render returns a
   // plain Node) — so a badge arriving after the table already drew its rows needs the table to
@@ -119,8 +145,8 @@ export default function SearchRoute() {
   // that, the same "force a redraw" role gameSearch.ts's own re-run of renderResults() plays for
   // its dropdown.
   createEffect(() => {
-    if (!results().some(r => peekMyOwnershipStatus(r.appid) === null)) return;
-    const unsub = onMyOwnershipReady(() => setResults(list => [...list]));
+    if (!results().some((r) => peekMyOwnershipStatus(r.appid) === null)) return;
+    const unsub = onMyOwnershipReady(() => setResults((list) => [...list]));
     onCleanup(unsub);
   });
 
@@ -131,7 +157,7 @@ export default function SearchRoute() {
   // for that). `true` stands in for stepGameList/renderPanelNav's `table` param, which both only
   // ever check for truthiness.
   function getGameList(): Game[] {
-    return results().map(r => ({ appid: r.appid, name: r.name, loading: true, details: null }) as Game);
+    return results().map((r) => ({ appid: r.appid, name: r.name, loading: true, details: null }) as Game);
   }
 
   // The table's roving-tabindex "current row" is driven entirely by real `focus` events on a
@@ -166,7 +192,13 @@ export default function SearchRoute() {
     const placeholder: Game = { appid, name, loading: true, details: null } as Game;
     panelOpen(placeholder);
     setPanelParam(appid);
-    renderPanelNav({ table: true, game: placeholder, getGameList, onOpen: g => openResult(g.appid, g.name, null), onReroll: pickRandomGame });
+    renderPanelNav({
+      table: true,
+      game: placeholder,
+      getGameList,
+      onOpen: (g) => openResult(g.appid, g.name, null),
+      onReroll: pickRandomGame,
+    });
     focusRow(appid);
     try {
       const res = await fetch(`/api/game-details/${appid}`);
@@ -206,7 +238,7 @@ export default function SearchRoute() {
     const game = getPanelGame();
     if (!game) return null;
     const list = getGameList();
-    const index = list.findIndex(g => g.appid === game.appid);
+    const index = list.findIndex((g) => g.appid === game.appid);
     return index === -1 ? null : { index, total: list.length };
   }
 
@@ -218,7 +250,10 @@ export default function SearchRoute() {
   let hasAutoOpened = false;
   onMount(() => {
     const restoreAppid = parseUrlState(location.search).game;
-    if (restoreAppid) { hasAutoOpened = true; openResult(restoreAppid, '', null); }
+    if (restoreAppid) {
+      hasAutoOpened = true;
+      openResult(restoreAppid, '', null);
+    }
   });
   createEffect(() => {
     const list = results();
@@ -229,7 +264,10 @@ export default function SearchRoute() {
 
   onMount(() => {
     const unregister = registerRouteHandlers({
-      openGame: appid => { openResult(appid, '', null); return true; },
+      openGame: (appid) => {
+        openResult(appid, '', null);
+        return true;
+      },
       stepGame,
       pickRandom: pickRandomGame,
       gamePosition,
@@ -244,8 +282,12 @@ export default function SearchRoute() {
       </header>
 
       <div class="game-search-wrap search-page-input">
-        <input ref={inputEl} type="text" placeholder="Search for a game…" value={query()}
-          onInput={e => handleInput(e.currentTarget.value)}
+        <input
+          ref={inputEl}
+          type="text"
+          placeholder="Search for a game…"
+          value={query()}
+          onInput={(e) => handleInput(e.currentTarget.value)}
           // `on:keydown`, not `onKeyDown`: Solid delegates onX-style handlers for `keydown`
           // through one listener on `document` — registered lazily, the first time anything in
           // the app uses it, which is here, well after AppShell's own plain
@@ -254,7 +296,7 @@ export default function SearchRoute() {
           // in registration order, not DOM order). `on:` attaches a real listener directly on
           // this element instead, which genuinely fires — and can stop the event — before it
           // ever reaches that later, document-level listener.
-          on:keydown={e => {
+          on:keydown={(e) => {
             // ↓ out of the input and into the table's first row — the table itself already has
             // roving-tabindex Up/Down/Home/End (its own README) once focus is inside it; this is
             // just the bridge into that from the search box.
@@ -264,18 +306,49 @@ export default function SearchRoute() {
             e.preventDefault();
             e.stopPropagation();
             firstRow.focus();
-          }} />
+          }}
+        />
       </div>
 
-      <Show when={query()} fallback={<div class="card"><p class="card-subtitle">Type a game name to search.</p></div>}>
-        <Show when={query().length >= GAME_SEARCH_MIN_CHARS} fallback={<div class="card"><p class="card-subtitle">Keep typing…</p></div>}>
-          <Show when={!searching()} fallback={<div class="card"><p class="card-subtitle">Searching…</p></div>}>
-            <Show when={results().length} fallback={<div class="card"><p class="card-subtitle">No games found for "{query()}".</p></div>}>
+      <Show
+        when={query()}
+        fallback={
+          <div class="card">
+            <p class="card-subtitle">Type a game name to search.</p>
+          </div>
+        }
+      >
+        <Show
+          when={query().length >= GAME_SEARCH_MIN_CHARS}
+          fallback={
+            <div class="card">
+              <p class="card-subtitle">Keep typing…</p>
+            </div>
+          }
+        >
+          <Show
+            when={!searching()}
+            fallback={
+              <div class="card">
+                <p class="card-subtitle">Searching…</p>
+              </div>
+            }
+          >
+            <Show
+              when={results().length}
+              fallback={
+                <div class="card">
+                  <p class="card-subtitle">No games found for "{query()}".</p>
+                </div>
+              }
+            >
               {/* search-table: hides the Columns/Sort/Search/Filter toolbar (style.css) — none of
                   it applies to a single, unsortable, unfilterable column, and its own "Search…"
                   box would sit confusingly right under this page's real one. The row-count line
                   above the table stays (`.dt-active-bar`, outside the toolbar). */}
-              <div class="table-container search-table" ref={tableWrapEl}
+              <div
+                class="table-container search-table"
+                ref={tableWrapEl}
                 // `on:keydown`, not `onKeyDown` — see the search input's own comment on why:
                 // same reasoning, and this one additionally needs to fire before the table
                 // library's own internal row-focus handling can act on ArrowUp at row 0 (e.g.
@@ -283,7 +356,7 @@ export default function SearchRoute() {
                 // runs after the row's own listener (bubble order: target first, then ancestors),
                 // but "after" is what's wanted here: this overrides whatever that did, by moving
                 // focus to the input last.
-                on:keydown={e => {
+                on:keydown={(e) => {
                   // ↑ out of the table's first row and back to the input — the mirror of the
                   // bridge above.
                   if (e.key !== 'ArrowUp') return;
@@ -292,9 +365,13 @@ export default function SearchRoute() {
                   e.preventDefault();
                   e.stopPropagation();
                   inputEl?.focus();
-                }}>
-                <DataTableView<GameSearchResult> table={table} rowKey="appid"
-                  onRowClick={r => openResult(r.appid, r.name, r.tinyImage)} />
+                }}
+              >
+                <DataTableView<GameSearchResult>
+                  table={table}
+                  rowKey="appid"
+                  onRowClick={(r) => openResult(r.appid, r.name, r.tinyImage)}
+                />
               </div>
             </Show>
           </Show>

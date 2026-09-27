@@ -36,7 +36,9 @@ export function restoreTableView(table: DataTableLike, prefKey: string, paramNam
       params.delete(paramName);
       history.replaceState(null, '', urlWithParams(params));
       return;
-    } catch { /* malformed param — fall through to the stored default */ }
+    } catch {
+      /* malformed param — fall through to the stored default */
+    }
   }
   table.setViewState(getPref(prefKey, {}));
 }
@@ -45,7 +47,7 @@ export function restoreTableView(table: DataTableLike, prefKey: string, paramNam
 // effect table interaction has; the URL stays untouched until explicitly shared. Returns the
 // unsubscribe function (same shape onViewChange itself returns).
 export function bindViewPersistence(table: DataTableLike, prefKey: string): () => void {
-  return table.onViewChange!(view => setPref(prefKey, view));
+  return table.onViewChange!((view) => setPref(prefKey, view));
 }
 
 // Snapshots the table's current view into `paramName` and copies the resulting link to the

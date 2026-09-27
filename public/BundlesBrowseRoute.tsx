@@ -23,23 +23,50 @@ import { createSignal, createEffect, onMount, onCleanup, Show } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { withAccountParam } from './urlState.ts';
 import {
-  createTableState, DataTableView, bucketDatePart, formatDatePart, bucketNumericRange, formatNumericRange,
+  createTableState,
+  DataTableView,
+  bucketDatePart,
+  formatDatePart,
+  bucketNumericRange,
+  formatNumericRange,
 } from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
 import {
-  fmt, compareDateMissingLast, compareNumMissingLast, withMissingGroup, formatMissingGroup,
-  priceTierBucket, formatPriceTier,
+  fmt,
+  compareDateMissingLast,
+  compareNumMissingLast,
+  withMissingGroup,
+  formatMissingGroup,
+  priceTierBucket,
+  formatPriceTier,
 } from './gameColumns.ts';
 import { fmtAge, formatMoney, scoreColor } from './utils.ts';
 import {
-  toBundleRow, fmtBundleDateTime, fmtBundleDatePart, fmtBundleTimePart, bundleUrgency, shopHue,
-  bundleEndsIn, compareEndsIn, ENDS_IN, bundleAge, compareBundleAge, BUNDLE_AGE,
-  type BundleListItem, type BundleRow,
+  toBundleRow,
+  fmtBundleDateTime,
+  fmtBundleDatePart,
+  fmtBundleTimePart,
+  bundleUrgency,
+  shopHue,
+  bundleEndsIn,
+  compareEndsIn,
+  ENDS_IN,
+  bundleAge,
+  compareBundleAge,
+  BUNDLE_AGE,
+  type BundleListItem,
+  type BundleRow,
 } from './bundleRows.ts';
 import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { setBrowsedBundles } from './bundleBrowseStore.ts';
 import { openPrefsPopover } from './prefsPopover.ts';
-import { restoreTableView, shareTableView, resetTableView, saveTableViewToServer, revertTableViewToServer } from './tableViewPrefs.ts';
+import {
+  restoreTableView,
+  shareTableView,
+  resetTableView,
+  saveTableViewToServer,
+  revertTableViewToServer,
+} from './tableViewPrefs.ts';
 import { isUnsaved, summarizeViewDiff } from './tableViewSync.ts';
 import { getAuthUser } from './authStore.ts';
 import { createStaleGuard } from './staleGuard.ts';
@@ -47,7 +74,7 @@ import { setPref } from './prefs.ts';
 import { setBaseTitle } from './pageTitle.ts';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
 
-const PAGE_SIZE = 50;      // ITAD's own max per page (lib/itad.js's getBundles `limit`)
+const PAGE_SIZE = 50; // ITAD's own max per page (lib/itad.js's getBundles `limit`)
 // How many pages load() fetches back-to-back before handing over to the "Load more" button. The
 // active list is ~30-40 bundles in practice (one page, so it always loads in full — which is what
 // makes client-side filtering/sorting over the *whole* set meaningful rather than over an
@@ -82,7 +109,9 @@ function renderCovers(_value: unknown, row: BundleRow): Node {
     img.width = 80;
     img.height = 30;
     img.src = src;
-    img.addEventListener('error', () => { img.style.visibility = 'hidden'; });
+    img.addEventListener('error', () => {
+      img.style.visibility = 'hidden';
+    });
     wrap.appendChild(img);
   }
   return wrap;
@@ -105,7 +134,10 @@ function renderBundleTitle(value: unknown, row: BundleRow): Node {
 // back to a column's own `render` for a group with no `groupFormat`, which is what's wanted here.
 function renderShop(value: unknown): Node {
   const span = document.createElement('span');
-  if (value == null || value === '') { span.textContent = '—'; return span; }
+  if (value == null || value === '') {
+    span.textContent = '—';
+    return span;
+  }
   const name = String(value);
   span.className = 'shop-chip';
   span.style.setProperty('--shop-hue', String(shopHue(name)));
@@ -150,9 +182,8 @@ function renderEnds(value: unknown, row: BundleRow): Node {
     rel = document.createElement('span');
     rel.className = 'bundle-ends-rel';
     rel.textContent = urgency.tier === 'ended' ? urgency.label : `⏳ ${urgency.label}`;
-    rel.style.color = urgency.tier === 'urgent' ? scoreColor(20)
-      : urgency.tier === 'soon' ? scoreColor(55)
-      : 'var(--text1)';
+    rel.style.color =
+      urgency.tier === 'urgent' ? scoreColor(20) : urgency.tier === 'soon' ? scoreColor(55) : 'var(--text1)';
   }
   // An expired row is dimmed as a whole (see renderBundleTitle), so nothing further here.
   void row;
@@ -160,13 +191,26 @@ function renderEnds(value: unknown, row: BundleRow): Node {
 }
 
 const COLUMNS: ColumnDef<BundleRow>[] = [
-  { key: 'covers', label: '', width: 188, sortable: false, filterable: false, groupable: false,
-    value: () => null, render: renderCovers },
+  {
+    key: 'covers',
+    label: '',
+    width: 188,
+    sortable: false,
+    filterable: false,
+    groupable: false,
+    value: () => null,
+    render: renderCovers,
+  },
   { key: 'title', label: 'Bundle', type: 'string', groupable: false, format: fmt.str, render: renderBundleTitle },
   { key: 'shop', label: 'Shop', type: 'string', groupable: true, format: fmt.str, render: renderShop },
   {
-    key: 'games', label: 'Games', type: 'number', groupable: true, format: fmt.num,
-    defaultSortDir: 'desc', compare: compareNumMissingLast,
+    key: 'games',
+    label: 'Games',
+    type: 'number',
+    groupable: true,
+    format: fmt.num,
+    defaultSortDir: 'desc',
+    compare: compareNumMissingLast,
     groupValue: withMissingGroup(bucketNumericRange(10)),
     groupFormat: formatMissingGroup(formatNumericRange(10)),
   },
@@ -176,35 +220,54 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     // column — a pick-and-mix bundle genuinely has no single tier price, which is not the same as
     // missing data. compareNumMissingLast for the same reason it carries one there: under the
     // default numeric comparator `null` coerces to 0 and sorts as the cheapest thing in the table.
-    key: 'price', label: 'Cheapest Tier', type: 'number', groupable: true,
-    format: (v, row) => v == null ? 'Varies' : formatMoney(Number(v), row.currency),
+    key: 'price',
+    label: 'Cheapest Tier',
+    type: 'number',
+    groupable: true,
+    format: (v, row) => (v == null ? 'Varies' : formatMoney(Number(v), row.currency)),
     compare: compareNumMissingLast,
     // withMissingGroup, not a bare priceTierBucket: `Number(null)` is 0, so a null price would
     // otherwise land in its "Free" bucket rather than in the missing/"Varies" one.
-    groupValue: withMissingGroup(priceTierBucket), groupFormat: formatMissingGroup(formatPriceTier, 'Varies'),
+    groupValue: withMissingGroup(priceTierBucket),
+    groupFormat: formatMissingGroup(formatPriceTier, 'Varies'),
   },
   { key: 'tierCount', label: 'Tiers', type: 'number', groupable: true, format: fmt.num },
   // Published before Ends — a bundle's own life order, and the default sort's column sits next to
   // the ones it's read against rather than at the far end of the row.
   {
-    key: 'publish', label: 'Published', type: 'date', groupable: true,
-    format: v => fmtBundleDateTime(v as string | null), render: v => renderDateTime(v),
+    key: 'publish',
+    label: 'Published',
+    type: 'date',
+    groupable: true,
+    format: (v) => fmtBundleDateTime(v as string | null),
+    render: (v) => renderDateTime(v),
     compare: compareDateMissingLast,
-    defaultSortDir: 'desc', defaultValueSort: { by: 'alpha', dir: 'desc' },
-    groupValue: withMissingGroup(bucketDatePart('month'), v => v == null || v === ''),
+    defaultSortDir: 'desc',
+    defaultValueSort: { by: 'alpha', dir: 'desc' },
+    groupValue: withMissingGroup(bucketDatePart('month'), (v) => v == null || v === ''),
     groupFormat: formatMissingGroup(formatDatePart('month')),
   },
   // Hidden by default, the publish-side counterpart of "Ends in" below, and what the hero's "New"
   // tile toggles.
   {
-    key: 'age', label: 'Age', type: 'string', groupable: true,
-    value: row => bundleAge(row.publish), format: fmt.str, compare: compareBundleAge,
+    key: 'age',
+    label: 'Age',
+    type: 'string',
+    groupable: true,
+    value: (row) => bundleAge(row.publish),
+    format: fmt.str,
+    compare: compareBundleAge,
   },
   {
-    key: 'expiry', label: 'Ends', type: 'date', groupable: true,
-    format: v => fmtBundleDateTime(v as string | null), render: renderEnds, compare: compareDateMissingLast,
+    key: 'expiry',
+    label: 'Ends',
+    type: 'date',
+    groupable: true,
+    format: (v) => fmtBundleDateTime(v as string | null),
+    render: renderEnds,
+    compare: compareDateMissingLast,
     defaultValueSort: { by: 'alpha', dir: 'asc' },
-    groupValue: withMissingGroup(bucketDatePart('month'), v => v == null || v === ''),
+    groupValue: withMissingGroup(bucketDatePart('month'), (v) => v == null || v === ''),
     groupFormat: formatMissingGroup(formatDatePart('month')),
   },
   // Hidden by default: the Ends column already carries each row's own countdown, so this one
@@ -215,8 +278,13 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
   // `Ended` bucket is also how Active and Expired rows are told apart under "Include expired" —
   // the hidden Status column that used to be the way to do that said nothing this doesn't.
   {
-    key: 'endsIn', label: 'Ends in', type: 'string', groupable: true,
-    value: row => bundleEndsIn(row.expiry), format: fmt.str, compare: compareEndsIn,
+    key: 'endsIn',
+    label: 'Ends in',
+    type: 'string',
+    groupable: true,
+    value: (row) => bundleEndsIn(row.expiry),
+    format: fmt.str,
+    compare: compareEndsIn,
   },
 ];
 
@@ -260,14 +328,14 @@ export default function BundlesBrowseRoute() {
   // Feeds /lists/bundle/:bundleId's prev/next nav (see bundleBrowseStore.ts) — off processedData,
   // not the raw row list, so ‹/› steps through exactly what's on screen in the order it's shown,
   // including whatever filter/sort/search the user has applied here.
-  createEffect(() => setBrowsedBundles(table.processedData().map(b => ({ id: b.id, title: b.title }))));
+  createEffect(() => setBrowsedBundles(table.processedData().map((b) => ({ id: b.id, title: b.title }))));
 
   // Oldest page write time across this load (a load pulls several pages), null once any page was
   // fetched fresh; undefined = nothing loaded yet, which renders no readout rather than a
   // premature "just now".
   const [fetchedAt, setFetchedAt] = createSignal<number | null | undefined>(undefined);
   function noteFetchedAt(at: number | null): void {
-    setFetchedAt(prev => (prev === undefined || at === null || prev === null ? at : Math.min(prev, at)));
+    setFetchedAt((prev) => (prev === undefined || at === null || prev === null ? at : Math.min(prev, at)));
   }
 
   async function fetchPage(force = false): Promise<BundleListItem[]> {
@@ -286,9 +354,16 @@ export default function BundlesBrowseRoute() {
     return data.bundles as BundleListItem[];
   }
 
-  async function load({ append = false, refresh = false }: { append?: boolean; refresh?: boolean } = {}): Promise<void> {
+  async function load({
+    append = false,
+    refresh = false,
+  }: { append?: boolean; refresh?: boolean } = {}): Promise<void> {
     const gen = loadGuard.next();
-    if (!append) { offset = 0; setRows([]); setFetchedAt(undefined); }
+    if (!append) {
+      offset = 0;
+      setRows([]);
+      setFetchedAt(undefined);
+    }
     setLoading(true);
     setStatusText(append ? 'Loading more bundles…' : 'Loading bundles…');
     try {
@@ -297,9 +372,12 @@ export default function BundlesBrowseRoute() {
       for (let page = 0; page < (append ? 1 : MAX_AUTO_PAGES); page++) {
         const bundles = await fetchPage(refresh);
         if (loadGuard.isStale(gen)) return;
-        collected.push(...bundles.map(b => toBundleRow(b)));
+        collected.push(...bundles.map((b) => toBundleRow(b)));
         offset += bundles.length;
-        if (bundles.length < PAGE_SIZE) { reachedEnd = true; break; }
+        if (bundles.length < PAGE_SIZE) {
+          reachedEnd = true;
+          break;
+        }
       }
       setRows(append ? [...rows(), ...collected] : collected);
       setMoreAvailable(!reachedEnd);
@@ -317,7 +395,10 @@ export default function BundlesBrowseRoute() {
   // has to react or silently keep showing the previous region's.
   const [regionCode, setRegionCode] = createSignal(resolveRegion(getStoredRegion()));
   onMount(() => {
-    const onRegionChange = () => { setRegionCode(resolveRegion(getStoredRegion())); void load(); };
+    const onRegionChange = () => {
+      setRegionCode(resolveRegion(getStoredRegion()));
+      void load();
+    };
     window.addEventListener(REGION_CHANGED_EVENT, onRegionChange);
     onCleanup(() => window.removeEventListener(REGION_CHANGED_EVENT, onRegionChange));
   });
@@ -333,7 +414,7 @@ export default function BundlesBrowseRoute() {
   // once (its checklist is OR within a column): bundles publish in waves, so a 24h window is
   // empty most days — observed live, the newest of 43 active bundles was 62 hours old.
   const NEW_WINDOW: string[] = [BUNDLE_AGE.fresh, BUNDLE_AGE.week];
-  const newOnly = () => NEW_WINDOW.every(v => table.filter.include().age?.has(v));
+  const newOnly = () => NEW_WINDOW.every((v) => table.filter.include().age?.has(v));
   const toggleNewOnly = () => table.filter.setValues('age', NEW_WINDOW, !newOnly());
 
   // The same hero card every list route now opens with (ListHero.tsx) — this route is the one you
@@ -350,7 +431,8 @@ export default function BundlesBrowseRoute() {
     tiles.push({
       label: 'Updated',
       value: refreshTileValue(loading() ? 'Refreshing…' : fetchedAt() === undefined ? '—' : fmtAge(fetchedAt())),
-      title: "How old the server's cached copy of this list is — a bundle can go live or expire at any time. Click to re-fetch",
+      title:
+        "How old the server's cached copy of this list is — a bundle can go live or expire at any time. Click to re-fetch",
       onClick: () => load({ refresh: true }),
       disabled: loading(),
     });
@@ -364,7 +446,7 @@ export default function BundlesBrowseRoute() {
     // newest-first precisely because "what appeared since I last looked" is the question — but
     // nothing counted it. Same rules as that one throughout (processedData, absent at zero unless
     // its own filter is what emptied it).
-    const fresh = table.processedData().filter(row => NEW_WINDOW.includes(bundleAge(row.publish))).length;
+    const fresh = table.processedData().filter((row) => NEW_WINDOW.includes(bundleAge(row.publish))).length;
     if (fresh > 0 || newOnly()) {
       tiles.push({
         label: 'New',
@@ -381,7 +463,7 @@ export default function BundlesBrowseRoute() {
     // Counted off processedData rather than the raw list, so it agrees with whatever filter/search
     // is applied — a "3 ending soon" that includes rows the table isn't showing is worse than
     // nothing. Absent at zero rather than showing a reassuring "0" nobody asked about.
-    const endingSoon = table.processedData().filter(row => bundleUrgency(row.expiry)?.tier === 'urgent').length;
+    const endingSoon = table.processedData().filter((row) => bundleUrgency(row.expiry)?.tier === 'urgent').length;
     // Kept on screen while its own filter is on even at a count of zero — otherwise the last
     // urgent bundle expiring (or a reload dropping it) leaves the table filtered down to nothing
     // with the control that filtered it gone.
@@ -411,32 +493,60 @@ export default function BundlesBrowseRoute() {
             {/* A data-scope control, not a view one — it round-trips to ITAD (see load()) — so it
                 leads the actions row rather than sitting with the table-view buttons. */}
             <label class="bundles-expired-toggle">
-              <input type="checkbox" checked={includeExpired()} onChange={e => { setIncludeExpired(e.currentTarget.checked); load(); }} />
+              <input
+                type="checkbox"
+                checked={includeExpired()}
+                onChange={(e) => {
+                  setIncludeExpired(e.currentTarget.checked);
+                  load();
+                }}
+              />
               Include expired
             </label>
-            <button type="button" class="btn btn-ghost btn-sm" onClick={e => shareTableView(table, VIEW_PARAM, e.currentTarget)}>🔗 Share view</button>
-            <button type="button" class="btn btn-ghost btn-sm" onClick={() => resetTableView(table, VIEW_PREF_KEY, VIEW_PARAM)}>Reset view</button>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              onClick={(e) => shareTableView(table, VIEW_PARAM, e.currentTarget)}
+            >
+              🔗 Share view
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              onClick={() => resetTableView(table, VIEW_PREF_KEY, VIEW_PARAM)}
+            >
+              Reset view
+            </button>
           </>
         }
         tiles={heroTiles()}
       />
       <Show when={getAuthUser() && isUnsaved(VIEW_PREF_KEY, table.getViewState())}>
         <div class="pref-unsaved-banner">
-          Unsaved changes to this view ({summarizeViewDiff(VIEW_PREF_KEY, table.getViewState()).join(', ')}) — differs from what's saved to your account.
-          <button type="button" class="btn btn-ghost btn-sm" onClick={handleSaveView}>Save</button>
-          <button type="button" class="btn btn-ghost btn-sm" onClick={handleRevertView}>Revert</button>
+          Unsaved changes to this view ({summarizeViewDiff(VIEW_PREF_KEY, table.getViewState()).join(', ')}) — differs
+          from what's saved to your account.
+          <button type="button" class="btn btn-ghost btn-sm" onClick={handleSaveView}>
+            Save
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm" onClick={handleRevertView}>
+            Revert
+          </button>
         </div>
       </Show>
-      <Show when={statusText()}><div class="bundles-status">{statusText()}</div></Show>
+      <Show when={statusText()}>
+        <div class="bundles-status">{statusText()}</div>
+      </Show>
       <div class="table-container">
         <DataTableView<BundleRow>
           table={table}
           rowKey="id"
-          onRowClick={row => navigate(withAccountParam(`/lists/bundle/${row.id}`))}
+          onRowClick={(row) => navigate(withAccountParam(`/lists/bundle/${row.id}`))}
         />
       </div>
       <Show when={moreAvailable()}>
-        <button type="button" class="btn btn-ghost" disabled={loading()} onClick={() => load({ append: true })}>Load more</button>
+        <button type="button" class="btn btn-ghost" disabled={loading()} onClick={() => load({ append: true })}>
+          Load more
+        </button>
       </Show>
     </div>
   );

@@ -4,12 +4,20 @@
 // (bundle kind) and by listResolve.ts's `bundle` ListRef case, decoupled from bundles.tsx's
 // bespoke table UI, which went away with that page.
 
-export interface PriceAmount { amount: number; currency: string }
+export interface PriceAmount {
+  amount: number;
+  currency: string;
+}
 
 export interface FlatGame {
-  gid: string; slug: string; title: string; type: string;
+  gid: string;
+  slug: string;
+  title: string;
+  type: string;
   assets: { boxart?: string } | null;
-  tierPrice: number | null; tierCurrency: string | null; addon: boolean;
+  tierPrice: number | null;
+  tierCurrency: string | null;
+  addon: boolean;
 }
 
 // A flat game that also resolved to a Steam appid.
@@ -28,13 +36,15 @@ export interface BundleTier {
 // getBundles in lib/itad.js) and doesn't label with it either — the flag proved inaccurate on the
 // very bundle it was hiding, so surfacing it would spread that inaccuracy rather than inform.
 export interface Bundle {
-  id: number; title: string;
+  id: number;
+  title: string;
   page: { name?: string } | null;
   counts: { games?: number } | null;
   publish: string | null;
   expiry: string | null;
   note: string | null;
-  url: string | null; details: string | null;
+  url: string | null;
+  details: string | null;
   tiers: BundleTier[];
 }
 
@@ -48,7 +58,11 @@ export function flattenBundleGames(bundle: Bundle): FlatGame[] {
     for (const g of tier.games || []) {
       if (seen.has(g.id)) continue;
       seen.set(g.id, {
-        gid: g.id, slug: g.slug, title: g.title, type: g.type, assets: g.assets ?? null,
+        gid: g.id,
+        slug: g.slug,
+        title: g.title,
+        type: g.type,
+        assets: g.assets ?? null,
         tierPrice: tier.price ? tier.price.amount : null,
         tierCurrency: tier.price ? tier.price.currency : null,
         addon: !!tier.addon,
@@ -97,16 +111,21 @@ export async function resolveBundleAppids(gids: string[]): Promise<Record<string
 // one row per appid, sharing the rest of that gid's metadata (tier price included — the price
 // buys the whole package, not just one of its rows) — each row still gets its own real Steam
 // title from game-details/stream, same as any other resolved row.
-export async function resolveBundleGames(bundle: Bundle): Promise<{ resolved: ResolvedGame[]; unresolved: FlatGame[] }> {
+export async function resolveBundleGames(
+  bundle: Bundle,
+): Promise<{ resolved: ResolvedGame[]; unresolved: FlatGame[] }> {
   const games = flattenBundleGames(bundle);
-  const appidsByGid = await resolveBundleAppids(games.map(g => g.gid));
+  const appidsByGid = await resolveBundleAppids(games.map((g) => g.gid));
 
   const resolved: ResolvedGame[] = [];
   const unresolved: FlatGame[] = [];
   const seenAppids = new Set<number>();
   for (const g of games) {
     const appid = appidsByGid[g.gid];
-    if (!appid) { unresolved.push(g); continue; }
+    if (!appid) {
+      unresolved.push(g);
+      continue;
+    }
     for (const id of Array.isArray(appid) ? appid : [appid]) {
       if (seenAppids.has(id)) continue;
       seenAppids.add(id);
@@ -120,5 +139,5 @@ export async function resolveBundleGames(bundle: Bundle): Promise<{ resolved: Re
 export async function fetchBundleAppids(bundleId: string): Promise<Set<number>> {
   const { bundle } = await fetchBundleById(Number(bundleId));
   const { resolved } = await resolveBundleGames(bundle);
-  return new Set(resolved.map(g => g.appid));
+  return new Set(resolved.map((g) => g.appid));
 }

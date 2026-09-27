@@ -38,9 +38,9 @@ function writeFolders(folders: Folder[]): void {
 }
 
 function nextOrder(parentId: string | null): number {
-  const folders = readFolders().filter(f => f.parentId === parentId);
-  const lists = readLists().filter(l => l.parentId === parentId && !l.deletedAt);
-  const orders = [...folders.map(f => f.order), ...lists.map(l => l.order)];
+  const folders = readFolders().filter((f) => f.parentId === parentId);
+  const lists = readLists().filter((l) => l.parentId === parentId && !l.deletedAt);
+  const orders = [...folders.map((f) => f.order), ...lists.map((l) => l.order)];
   return orders.length ? Math.max(...orders) + 1 : 0;
 }
 
@@ -53,15 +53,15 @@ export function getFolders(): Folder[] {
 // Excludes soft-deleted lists by default — pass includeDeleted for a "Trash" view.
 export function getLists({ includeDeleted = false }: { includeDeleted?: boolean } = {}): GameList[] {
   const lists = readLists();
-  return includeDeleted ? lists : lists.filter(l => !l.deletedAt);
+  return includeDeleted ? lists : lists.filter((l) => !l.deletedAt);
 }
 
 export function getFolder(id: string): Folder | undefined {
-  return readFolders().find(f => f.id === id);
+  return readFolders().find((f) => f.id === id);
 }
 
 export function getList(id: string): GameList | undefined {
-  return readLists().find(l => l.id === id);
+  return readLists().find((l) => l.id === id);
 }
 
 // What a list is computed from — a dynamic list's sources, a ranked list's one source.
@@ -74,7 +74,7 @@ export function listDeps(list: GameList): ListRef[] {
 // ── Cycle detection ──────────────────────────────────────────────────────────────────────────
 
 function userListDeps(sources: ListRef[]): string[] {
-  return sources.filter(s => s.kind === 'user' && s.listId).map(s => s.listId as string);
+  return sources.filter((s) => s.kind === 'user' && s.listId).map((s) => s.listId as string);
 }
 
 // Would giving `listId` these `sources` create a cycle (direct or transitive) in the
@@ -89,7 +89,7 @@ export function wouldCreateCycle(listId: string, sources: ListRef[], lists: Game
     if (id === listId) return true;
     if (visited.has(id)) continue;
     visited.add(id);
-    const dep = lists.find(l => l.id === id);
+    const dep = lists.find((l) => l.id === id);
     if (!dep) continue;
     stack.push(...userListDeps(listDeps(dep)));
   }
@@ -104,11 +104,15 @@ export class CycleError extends Error {
 }
 
 // Is a folder `candidateId` at or below `potentialAncestorId` in the parentId tree?
-export function isDescendantFolder(candidateId: string, potentialAncestorId: string, folders: Folder[] = readFolders()): boolean {
-  let current: Folder | undefined = folders.find(f => f.id === candidateId);
+export function isDescendantFolder(
+  candidateId: string,
+  potentialAncestorId: string,
+  folders: Folder[] = readFolders(),
+): boolean {
+  let current: Folder | undefined = folders.find((f) => f.id === candidateId);
   while (current) {
     if (current.id === potentialAncestorId) return true;
-    current = current.parentId ? folders.find(f => f.id === current!.parentId) : undefined;
+    current = current.parentId ? folders.find((f) => f.id === current!.parentId) : undefined;
   }
   return false;
 }
@@ -116,12 +120,17 @@ export function isDescendantFolder(candidateId: string, potentialAncestorId: str
 // ── Referenced-by checks (soft-delete/restore) ──────────────────────────────────────────────
 
 export function isListReferenced(listId: string, lists: GameList[] = readLists()): boolean {
-  return lists.some(l => !l.deletedAt && listDeps(l).some(s => s.kind === 'user' && s.listId === listId));
+  return lists.some((l) => !l.deletedAt && listDeps(l).some((s) => s.kind === 'user' && s.listId === listId));
 }
 
 export function isAccountReferenced(accountId: string, lists: GameList[] = readLists()): boolean {
-  return lists.some(l => !l.deletedAt
-    && listDeps(l).some(s => (s.kind === 'account-owned' || s.kind === 'account-wishlist') && s.accountId === accountId));
+  return lists.some(
+    (l) =>
+      !l.deletedAt &&
+      listDeps(l).some(
+        (s) => (s.kind === 'account-owned' || s.kind === 'account-wishlist') && s.accountId === accountId,
+      ),
+  );
 }
 
 // ── Folder CRUD ──────────────────────────────────────────────────────────────────────────────
@@ -134,7 +143,7 @@ export function createFolder(name: string, parentId: string | null = null): Fold
 
 export function renameFolder(id: string, name: string): void {
   const folders = readFolders();
-  const folder = folders.find(f => f.id === id);
+  const folder = folders.find((f) => f.id === id);
   if (!folder) return;
   folder.name = name;
   writeFolders(folders);
@@ -146,7 +155,7 @@ export function moveFolder(id: string, parentId: string | null): void {
   if (parentId != null && isDescendantFolder(parentId, id, folders)) {
     throw new Error('Cannot move a folder into its own descendant');
   }
-  const folder = folders.find(f => f.id === id);
+  const folder = folders.find((f) => f.id === id);
   if (!folder) return;
   folder.parentId = parentId;
   folder.order = nextOrder(parentId);
@@ -159,28 +168,32 @@ export function moveFolder(id: string, parentId: string | null): void {
 // an unconditional wipe of something still referenced elsewhere.
 export function deleteFolder(id: string, mode: 'promote' | 'delete'): void {
   const folders = readFolders();
-  const folder = folders.find(f => f.id === id);
+  const folder = folders.find((f) => f.id === id);
   if (!folder) return;
 
   if (mode === 'promote') {
-    const childFolders = folders.filter(f => f.parentId === id);
-    childFolders.forEach(f => { f.parentId = folder.parentId; });
-    writeFolders(folders.filter(f => f.id !== id));
+    const childFolders = folders.filter((f) => f.parentId === id);
+    childFolders.forEach((f) => {
+      f.parentId = folder.parentId;
+    });
+    writeFolders(folders.filter((f) => f.id !== id));
 
     const lists = readLists();
-    const childLists = lists.filter(l => l.parentId === id && !l.deletedAt);
-    childLists.forEach(l => { l.parentId = folder.parentId; });
+    const childLists = lists.filter((l) => l.parentId === id && !l.deletedAt);
+    childLists.forEach((l) => {
+      l.parentId = folder.parentId;
+    });
     writeLists(lists);
     return;
   }
 
-  const childFolders = folders.filter(f => f.parentId === id);
-  childFolders.forEach(f => deleteFolder(f.id, 'delete'));
+  const childFolders = folders.filter((f) => f.parentId === id);
+  childFolders.forEach((f) => deleteFolder(f.id, 'delete'));
 
-  const childLists = readLists().filter(l => l.parentId === id && !l.deletedAt);
-  childLists.forEach(l => deleteList(l.id));
+  const childLists = readLists().filter((l) => l.parentId === id && !l.deletedAt);
+  childLists.forEach((l) => deleteList(l.id));
 
-  writeFolders(readFolders().filter(f => f.id !== id));
+  writeFolders(readFolders().filter((f) => f.id !== id));
 }
 
 // Applies a new sibling order (folders and lists interleaved, sharing one numbering space per
@@ -191,10 +204,10 @@ export function reorderSiblings(parentId: string | null, orderedRefs: { kind: 'f
   const lists = readLists();
   orderedRefs.forEach((ref, index) => {
     if (ref.kind === 'folder') {
-      const f = folders.find(x => x.id === ref.id && x.parentId === parentId);
+      const f = folders.find((x) => x.id === ref.id && x.parentId === parentId);
       if (f) f.order = index;
     } else {
-      const l = lists.find(x => x.id === ref.id && x.parentId === parentId);
+      const l = lists.find((x) => x.id === ref.id && x.parentId === parentId);
       if (l) l.order = index;
     }
   });
@@ -219,7 +232,8 @@ export function createList(input: CreateListInput): GameList {
   const parentId = input.parentId ?? null;
   const lists = readLists();
 
-  const deps = input.kind === 'dynamic' ? input.sources ?? [] : input.kind === 'ranked' && input.source ? [input.source] : [];
+  const deps =
+    input.kind === 'dynamic' ? (input.sources ?? []) : input.kind === 'ranked' && input.source ? [input.source] : [];
   if (wouldCreateCycle(id, deps, lists)) throw new CycleError();
 
   const now = Date.now();
@@ -231,9 +245,11 @@ export function createList(input: CreateListInput): GameList {
     createdAt: now,
     updatedAt: now,
     kind: input.kind,
-    ...(input.kind === 'manual' ? { appids: input.appids ?? [] }
-      : input.kind === 'ranked' ? { source: input.source }
-      : { op: input.op ?? 'union', sources: input.sources ?? [] }),
+    ...(input.kind === 'manual'
+      ? { appids: input.appids ?? [] }
+      : input.kind === 'ranked'
+        ? { source: input.source }
+        : { op: input.op ?? 'union', sources: input.sources ?? [] }),
   };
   writeLists([...lists, list]);
   return list;
@@ -244,16 +260,17 @@ export function createList(input: CreateListInput): GameList {
 // which JSON wouldn't keep anyway.
 export function renameList(id: string, name: string | undefined): void {
   const lists = readLists();
-  const list = lists.find(l => l.id === id);
+  const list = lists.find((l) => l.id === id);
   if (!list) return;
-  if (name == null) delete list.name; else list.name = name;
+  if (name == null) delete list.name;
+  else list.name = name;
   list.updatedAt = Date.now();
   writeLists(lists);
 }
 
 export function moveList(id: string, parentId: string | null): void {
   const lists = readLists();
-  const list = lists.find(l => l.id === id);
+  const list = lists.find((l) => l.id === id);
   if (!list) return;
   list.parentId = parentId;
   list.order = nextOrder(parentId);
@@ -264,7 +281,7 @@ export function moveList(id: string, parentId: string | null): void {
 // A manual list's own appids — no cycle concern, nothing to validate beyond existence.
 export function setListAppids(id: string, appids: number[]): void {
   const lists = readLists();
-  const list = lists.find(l => l.id === id);
+  const list = lists.find((l) => l.id === id);
   if (!list || list.kind !== 'manual') return;
   list.appids = appids;
   list.updatedAt = Date.now();
@@ -277,13 +294,13 @@ export function setListAppids(id: string, appids: number[]): void {
 // not-manual guard as setListAppids (redundant with its own check, but avoids reading `.appids`
 // off a dynamic list, which doesn't have one).
 export function addAppidsToList(id: string, appids: number[]): void {
-  const list = readLists().find(l => l.id === id);
+  const list = readLists().find((l) => l.id === id);
   if (!list || list.kind !== 'manual') return;
   setListAppids(id, [...union([new Set(list.appids), new Set(appids)])]);
 }
 
 export function removeAppidsFromList(id: string, appids: number[]): void {
-  const list = readLists().find(l => l.id === id);
+  const list = readLists().find((l) => l.id === id);
   if (!list || list.kind !== 'manual') return;
   setListAppids(id, [...subtract([new Set(list.appids), new Set(appids)])]);
 }
@@ -292,7 +309,7 @@ export function removeAppidsFromList(id: string, appids: number[]): void {
 // action reopens the same setup dialog used at creation, pre-filled, and calls this to save.
 export function updateDynamicList(id: string, op: CombineOp, sources: ListRef[]): GameList {
   const lists = readLists();
-  const idx = lists.findIndex(l => l.id === id);
+  const idx = lists.findIndex((l) => l.id === id);
   if (idx === -1 || lists[idx].kind !== 'dynamic') throw new Error('Dynamic list not found');
   if (wouldCreateCycle(id, sources, lists)) throw new CycleError();
   const updated: GameList = { ...lists[idx], op, sources, updatedAt: Date.now() };
@@ -305,7 +322,7 @@ export function updateDynamicList(id: string, op: CombineOp, sources: ListRef[])
 // read time (ranking.ts), so switching back restores it.
 export function updateRankedSource(id: string, source: ListRef): GameList {
   const lists = readLists();
-  const idx = lists.findIndex(l => l.id === id);
+  const idx = lists.findIndex((l) => l.id === id);
   if (idx === -1 || lists[idx].kind !== 'ranked') throw new Error('Ranked list not found');
   if (wouldCreateCycle(id, [source], lists)) throw new CycleError();
   const updated: GameList = { ...lists[idx], source, updatedAt: Date.now() };
@@ -336,7 +353,7 @@ function dropRanking(listId: string): void {
 
 export function setListTableView(id: string, tableView: object): void {
   const lists = readLists();
-  const list = lists.find(l => l.id === id);
+  const list = lists.find((l) => l.id === id);
   if (!list) return;
   list.tableView = tableView;
   writeLists(lists);
@@ -346,7 +363,7 @@ export function setListTableView(id: string, tableView: object): void {
 // removes otherwise. Returns which happened so a caller can tell the user.
 export function deleteList(id: string): { softDeleted: boolean } {
   const lists = readLists();
-  const idx = lists.findIndex(l => l.id === id);
+  const idx = lists.findIndex((l) => l.id === id);
   if (idx === -1) return { softDeleted: false };
   if (isListReferenced(id, lists)) {
     lists[idx] = { ...lists[idx], deletedAt: Date.now() };
@@ -361,7 +378,7 @@ export function deleteList(id: string): { softDeleted: boolean } {
 
 export function restoreList(id: string): void {
   const lists = readLists();
-  const idx = lists.findIndex(l => l.id === id);
+  const idx = lists.findIndex((l) => l.id === id);
   if (idx === -1 || !lists[idx].deletedAt) return;
   const { deletedAt: _deletedAt, ...rest } = lists[idx];
   lists[idx] = rest as GameList;
@@ -373,7 +390,7 @@ export function restoreList(id: string): void {
 // list's sources being edited, or another soft-deleted list itself finally being purged).
 export function sweepDeletedLists(): number {
   const lists = readLists();
-  const kept = lists.filter(l => !l.deletedAt || isListReferenced(l.id, lists));
+  const kept = lists.filter((l) => !l.deletedAt || isListReferenced(l.id, lists));
   if (kept.length !== lists.length) writeLists(kept);
   for (const l of lists) if (l.kind === 'ranked' && !kept.includes(l)) dropRanking(l.id);
   return lists.length - kept.length;

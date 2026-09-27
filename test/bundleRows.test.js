@@ -3,16 +3,34 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  cheapestTierPrice, fmtBundleDateTime, fmtBundleDatePart, fmtBundleTimePart, toBundleRow,
-  bundleCovers, shopHue, bundleUrgency, bundleEndsIn, compareEndsIn, ENDS_IN, bundleAge,
-  compareBundleAge, BUNDLE_AGE, bundleTierSummary, fmtBundleDateFriendly,
+  cheapestTierPrice,
+  fmtBundleDateTime,
+  fmtBundleDatePart,
+  fmtBundleTimePart,
+  toBundleRow,
+  bundleCovers,
+  shopHue,
+  bundleUrgency,
+  bundleEndsIn,
+  compareEndsIn,
+  ENDS_IN,
+  bundleAge,
+  compareBundleAge,
+  BUNDLE_AGE,
+  bundleTierSummary,
+  fmtBundleDateFriendly,
 } = require('../public/bundleRows.ts');
 
 const HOUR = 3600000;
 const DAY = 24 * HOUR;
 
 function withBanner(id) {
-  return { assets: { boxart: `https://assets.example/${id}/boxart.jpg`, banner145: `https://assets.example/${id}/banner145.jpg` } };
+  return {
+    assets: {
+      boxart: `https://assets.example/${id}/boxart.jpg`,
+      banner145: `https://assets.example/${id}/banner145.jpg`,
+    },
+  };
 }
 
 function bundle(overrides = {}) {
@@ -31,11 +49,13 @@ function bundle(overrides = {}) {
 // ── cheapestTierPrice ────────────────────────────────────────────────────────────────────────
 
 test('cheapestTierPrice: picks the lowest-priced tier regardless of tier order', () => {
-  const b = bundle({ tiers: [
-    { price: { amount: 25, currency: 'EUR' } },
-    { price: { amount: 5, currency: 'EUR' } },
-    { price: { amount: 15, currency: 'EUR' } },
-  ] });
+  const b = bundle({
+    tiers: [
+      { price: { amount: 25, currency: 'EUR' } },
+      { price: { amount: 5, currency: 'EUR' } },
+      { price: { amount: 15, currency: 'EUR' } },
+    ],
+  });
   assert.deepEqual(cheapestTierPrice(b), { amount: 5, currency: 'EUR' });
 });
 
@@ -44,7 +64,10 @@ test('cheapestTierPrice: null when no tier carries a price (a "Build Your Own" b
 });
 
 test('cheapestTierPrice: a real zero-amount tier is a price, not a missing one', () => {
-  assert.deepEqual(cheapestTierPrice(bundle({ tiers: [{ price: { amount: 0, currency: 'USD' } }] })), { amount: 0, currency: 'USD' });
+  assert.deepEqual(cheapestTierPrice(bundle({ tiers: [{ price: { amount: 0, currency: 'USD' } }] })), {
+    amount: 0,
+    currency: 'USD',
+  });
 });
 
 test('cheapestTierPrice: ignores priceless tiers alongside priced ones', () => {
@@ -64,18 +87,18 @@ test('fmtBundleDateTime: formats an ITAD timestamp as its own local date and tim
   // offset timezone: this is what `toISOString().slice(0, 10)` gets wrong.
   const iso = '2026-09-25T01:30:00+02:00';
   const expected = new Date(iso);
-  const pad = n => String(n).padStart(2, '0');
+  const pad = (n) => String(n).padStart(2, '0');
   assert.equal(
     fmtBundleDateTime(iso),
-    `${expected.getFullYear()}-${pad(expected.getMonth() + 1)}-${pad(expected.getDate())}`
-      + ` ${pad(expected.getHours())}:${pad(expected.getMinutes())}`,
+    `${expected.getFullYear()}-${pad(expected.getMonth() + 1)}-${pad(expected.getDate())}` +
+      ` ${pad(expected.getHours())}:${pad(expected.getMinutes())}`,
   );
 });
 
 test('fmtBundleDatePart / fmtBundleTimePart: the two halves the stacked cell renders', () => {
   const iso = '2026-09-25T01:30:00+02:00';
   const d = new Date(iso);
-  const pad = n => String(n).padStart(2, '0');
+  const pad = (n) => String(n).padStart(2, '0');
   assert.equal(fmtBundleDatePart(iso), `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
   assert.equal(fmtBundleTimePart(iso), `${pad(d.getHours())}:${pad(d.getMinutes())}`);
   // Together they're exactly the flat form the column's own `format` (and so the table's search)
@@ -111,10 +134,12 @@ test('fmtBundleDateTime: missing/unparseable dates render as an em dash', () => 
 // ── bundleCovers ─────────────────────────────────────────────────────────────────────────────
 
 test('bundleCovers: takes the first four banners in tier order', () => {
-  const b = bundle({ tiers: [
-    { price: { amount: 5, currency: 'USD' }, games: [withBanner('a'), withBanner('b')] },
-    { price: { amount: 15, currency: 'USD' }, games: [withBanner('c'), withBanner('d'), withBanner('e')] },
-  ] });
+  const b = bundle({
+    tiers: [
+      { price: { amount: 5, currency: 'USD' }, games: [withBanner('a'), withBanner('b')] },
+      { price: { amount: 15, currency: 'USD' }, games: [withBanner('c'), withBanner('d'), withBanner('e')] },
+    ],
+  });
   assert.deepEqual(bundleCovers(b), [
     'https://assets.example/a/banner145.jpg',
     'https://assets.example/b/banner145.jpg',
@@ -124,11 +149,16 @@ test('bundleCovers: takes the first four banners in tier order', () => {
 });
 
 test('bundleCovers: dedupes a game listed in several tiers', () => {
-  const b = bundle({ tiers: [
-    { price: { amount: 5, currency: 'USD' }, games: [withBanner('a')] },
-    { price: { amount: 15, currency: 'USD' }, games: [withBanner('a'), withBanner('b')] },
-  ] });
-  assert.deepEqual(bundleCovers(b), ['https://assets.example/a/banner145.jpg', 'https://assets.example/b/banner145.jpg']);
+  const b = bundle({
+    tiers: [
+      { price: { amount: 5, currency: 'USD' }, games: [withBanner('a')] },
+      { price: { amount: 15, currency: 'USD' }, games: [withBanner('a'), withBanner('b')] },
+    ],
+  });
+  assert.deepEqual(bundleCovers(b), [
+    'https://assets.example/a/banner145.jpg',
+    'https://assets.example/b/banner145.jpg',
+  ]);
 });
 
 test('bundleCovers: skips games with no artwork rather than leaving a hole', () => {
@@ -186,11 +216,13 @@ test('fmtBundleDateFriendly: missing/unparseable dates render as an em dash', ()
 
 // ── bundleTierSummary ────────────────────────────────────────────────────────────────────────
 
-test('bundleTierSummary: one entry per tier, in order, with that tier\'s own game count', () => {
-  const b = bundle({ tiers: [
-    { price: { amount: 5, currency: 'USD' }, games: [withBanner('a')] },
-    { price: { amount: 15, currency: 'USD' }, games: [withBanner('a'), withBanner('b'), withBanner('c')] },
-  ] });
+test("bundleTierSummary: one entry per tier, in order, with that tier's own game count", () => {
+  const b = bundle({
+    tiers: [
+      { price: { amount: 5, currency: 'USD' }, games: [withBanner('a')] },
+      { price: { amount: 15, currency: 'USD' }, games: [withBanner('a'), withBanner('b'), withBanner('c')] },
+    ],
+  });
   assert.deepEqual(bundleTierSummary(b), [
     { price: 5, currency: 'USD', gameCount: 1 },
     // Deliberately not deduped against the cheaper tier: a pricier tier includes everything below
@@ -217,7 +249,16 @@ test('bundleTierSummary: empty for a bundle with no tiers', () => {
 // ── shopHue ──────────────────────────────────────────────────────────────────────────────────
 
 test('shopHue: deterministic, and in range for every shop name seen live', () => {
-  for (const name of ['Humble Bundle', 'Fanatical', 'GreenManGaming', 'GreenMan Gaming', 'IndieGala', 'Itch.io', 'Digiphile', '']) {
+  for (const name of [
+    'Humble Bundle',
+    'Fanatical',
+    'GreenManGaming',
+    'GreenMan Gaming',
+    'IndieGala',
+    'Itch.io',
+    'Digiphile',
+    '',
+  ]) {
     const hue = shopHue(name);
     assert.equal(hue, shopHue(name), `${name} must hash consistently`);
     assert.ok(Number.isInteger(hue) && hue >= 0 && hue < 360, `${name} hue out of range: ${hue}`);
@@ -233,7 +274,7 @@ test('shopHue: different shops get different hues (no collision among the live s
 
 test('bundleUrgency: tiers by how much time is left', () => {
   const now = Date.parse('2026-09-07T12:00:00Z');
-  const at = ms => new Date(now + ms).toISOString();
+  const at = (ms) => new Date(now + ms).toISOString();
   assert.deepEqual(bundleUrgency(at(-HOUR), now), { tier: 'ended', label: 'ended' });
   // Inside the last day the label counts hours — that's the window where 20h vs 2h changes what
   // you do about it.
@@ -260,7 +301,7 @@ test('bundleUrgency: no expiry (open-ended bundle) and unparseable dates are not
 
 test('bundleEndsIn: one label per urgency tier, and a named bucket for no end date', () => {
   const now = Date.parse('2026-09-07T12:00:00Z');
-  const at = ms => new Date(now + ms).toISOString();
+  const at = (ms) => new Date(now + ms).toISOString();
   assert.equal(bundleEndsIn(at(-HOUR), now), ENDS_IN.ended);
   assert.equal(bundleEndsIn(at(6 * HOUR), now), ENDS_IN.urgent);
   // The 48h boundary the hero tile's own count is drawn at.
@@ -282,7 +323,7 @@ test('compareEndsIn: orders by urgency, not alphabetically', () => {
 
 test('bundleAge: buckets a bundle by how long ago it was published', () => {
   const now = Date.parse('2026-09-07T12:00:00Z');
-  const ago = ms => new Date(now - ms).toISOString();
+  const ago = (ms) => new Date(now - ms).toISOString();
   assert.equal(bundleAge(ago(2 * HOUR), now), BUNDLE_AGE.fresh);
   // The 24h boundary the hero tile's "New" count is drawn at.
   assert.equal(bundleAge(ago(23 * HOUR), now), BUNDLE_AGE.fresh);

@@ -9,9 +9,9 @@ function fakeStorage(initial = {}) {
   const store = new Map(Object.entries(initial));
   return {
     store,
-    getItem: k => (store.has(k) ? store.get(k) : null),
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
     setItem: (k, v) => store.set(k, String(v)),
-    removeItem: k => store.delete(k),
+    removeItem: (k) => store.delete(k),
   };
 }
 
@@ -23,7 +23,10 @@ test('demo prefs name only the demo account', () => {
   const prefs = demoPrefs(0);
   assert.strictEqual(prefs.schemaVersion, 2);
   for (const key of ['myAccount', 'currentAccount']) assert.deepStrictEqual(prefs[key].value.members, [DEMO_STEAMID]);
-  assert.deepStrictEqual(prefs.recentAccounts.value.map(a => a.id), [DEMO_STEAMID]);
+  assert.deepStrictEqual(
+    prefs.recentAccounts.value.map((a) => a.id),
+    [DEMO_STEAMID],
+  );
 });
 
 test('seed backs up the real prefs, restore puts them back', () => {

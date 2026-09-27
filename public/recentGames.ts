@@ -41,8 +41,8 @@ export function saveRecentGames(list: RecentGame[]): void {
 // the "Recently Looked Up" list showing nothing for a game it had already identified.
 export function addRecentGame(appid: number, name: string, tinyImage?: string | null): void {
   const list = loadRecentGames();
-  const existing = list.find(g => g.appid === appid);
-  const rest = list.filter(g => g.appid !== appid);
+  const existing = list.find((g) => g.appid === appid);
+  const rest = list.filter((g) => g.appid !== appid);
   rest.unshift({ appid, name: name || existing?.name || '', tinyImage: tinyImage || existing?.tinyImage || null });
   saveRecentGames(rest.slice(0, MAX_RECENT_GAMES));
 }
@@ -53,12 +53,12 @@ export function addRecentGame(appid: number, name: string, tinyImage?: string | 
 // wrong here: nothing was looked up again, an existing entry just learned its own name.
 export function renameRecentGame(appid: number, name: string, tinyImage?: string | null): void {
   const list = loadRecentGames();
-  const idx = list.findIndex(g => g.appid === appid);
+  const idx = list.findIndex((g) => g.appid === appid);
   if (idx === -1) return;
   list[idx] = { appid, name: name || list[idx].name, tinyImage: tinyImage || list[idx].tinyImage };
   saveRecentGames(list);
 }
 
 export function removeRecentGame(appid: number): void {
-  saveRecentGames(loadRecentGames().filter(g => g.appid !== appid));
+  saveRecentGames(loadRecentGames().filter((g) => g.appid !== appid));
 }

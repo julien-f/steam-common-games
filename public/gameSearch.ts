@@ -59,7 +59,11 @@ function ownershipMarkersHtml(status: OwnershipStatus | null): string {
 // `id` + `role="option"` back `inputEl`'s `aria-activedescendant` in initGameSearch below;
 // `tabindex="-1"` keeps real DOM focus on the input the whole time, same combobox pattern
 // as a native `<select>`'s listbox — arrow keys move the highlight, not focus itself.
-export function gameSearchResultHtml(r: GameSearchResult, active: boolean, ownership: OwnershipStatus | null = null): string {
+export function gameSearchResultHtml(
+  r: GameSearchResult,
+  active: boolean,
+  ownership: OwnershipStatus | null = null,
+): string {
   const thumb = r.tinyImage
     ? `<img class="game-search-thumb" src="${esc(r.tinyImage)}" alt="" loading="lazy">`
     : '<span class="game-search-thumb game-search-thumb--empty"></span>';
@@ -95,7 +99,14 @@ export function shouldShowRecents(rawValue: string): boolean {
   return rawValue.trim() === '';
 }
 
-export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAllRecents, onSeeAllResults }: {
+export function initGameSearch({
+  inputEl,
+  resultsEl,
+  onSelect,
+  recents,
+  onSeeAllRecents,
+  onSeeAllResults,
+}: {
   inputEl: HTMLInputElement;
   resultsEl: HTMLElement;
   onSelect: (game: GameSearchResult) => void;
@@ -111,7 +122,7 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
   let lastResults: GameSearchResult[] = [];
   let lastTerm = ''; // the search that produced lastResults, for the "see all results" row's label/target
   let activeFetch = 0; // guards against a slower earlier request clobbering a faster later one
-  let activeIdx = -1;  // ArrowUp/ArrowDown highlight; -1 = none yet (Enter falls back to the top match)
+  let activeIdx = -1; // ArrowUp/ArrowDown highlight; -1 = none yet (Enter falls back to the top match)
   let unsubOwnershipReady: (() => void) | null = null;
   // Whether what's currently in the dropdown is the recents list rather than search matches —
   // the results themselves are the same `GameSearchResult` shape either way (and pick the same
@@ -132,15 +143,20 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
 
   function renderResults() {
     const moreActive = moreRowShown() && activeIdx === lastResults.length;
-    const options = lastResults.map((r, i) => gameSearchResultHtml(r, i === activeIdx, peekMyOwnershipStatus(r.appid))).join('');
-    const moreHtml = !moreRowShown() ? '' : gameSearchMoreHtml(
-      showingRecents ? 'See all recently looked up →' : `See all results for "${lastTerm}" →`,
-      moreActive,
-    );
+    const options = lastResults
+      .map((r, i) => gameSearchResultHtml(r, i === activeIdx, peekMyOwnershipStatus(r.appid)))
+      .join('');
+    const moreHtml = !moreRowShown()
+      ? ''
+      : gameSearchMoreHtml(
+          showingRecents ? 'See all recently looked up →' : `See all results for "${lastTerm}" →`,
+          moreActive,
+        );
     resultsEl.innerHTML = showingRecents
       ? gameSearchSectionHtml('Recently looked up') + options + moreHtml
       : options + moreHtml;
-    if (activeIdx >= 0 && activeIdx < lastResults.length) inputEl.setAttribute('aria-activedescendant', `game-search-opt-${lastResults[activeIdx].appid}`);
+    if (activeIdx >= 0 && activeIdx < lastResults.length)
+      inputEl.setAttribute('aria-activedescendant', `game-search-opt-${lastResults[activeIdx].appid}`);
     else if (moreActive) inputEl.setAttribute('aria-activedescendant', 'game-search-more-opt');
     else inputEl.removeAttribute('aria-activedescendant');
     // A peek above returning null for any shown result means either "no currentAccount loaded"
@@ -150,8 +166,10 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
     // than once) means a fresh search that landed before the previous one's fetch resolved
     // isn't left watching a stale listener for a dropdown it no longer owns.
     unsubOwnershipReady?.();
-    unsubOwnershipReady = lastResults.some(r => peekMyOwnershipStatus(r.appid) === null)
-      ? onMyOwnershipReady(() => { if (!resultsEl.hidden) renderResults(); })
+    unsubOwnershipReady = lastResults.some((r) => peekMyOwnershipStatus(r.appid) === null)
+      ? onMyOwnershipReady(() => {
+          if (!resultsEl.hidden) renderResults();
+        })
       : null;
   }
 
@@ -159,7 +177,10 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
     lastResults = results;
     activeIdx = -1;
     showingRecents = recent;
-    if (!results.length) { hideResults(); return; }
+    if (!results.length) {
+      hideResults();
+      return;
+    }
     renderResults();
     resultsEl.hidden = false;
     inputEl.setAttribute('aria-expanded', 'true');
@@ -184,11 +205,11 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
   function moveActive(dir: number) {
     const total = lastResults.length + (moreRowShown() ? 1 : 0);
     if (!total) return;
-    activeIdx = activeIdx === -1
-      ? (dir > 0 ? 0 : total - 1)
-      : (activeIdx + dir + total) % total;
+    activeIdx = activeIdx === -1 ? (dir > 0 ? 0 : total - 1) : (activeIdx + dir + total) % total;
     renderResults();
-    resultsEl.querySelector('.game-search-result.active, .game-search-more.active')?.scrollIntoView({ block: 'nearest' });
+    resultsEl
+      .querySelector('.game-search-result.active, .game-search-more.active')
+      ?.scrollIntoView({ block: 'nearest' });
   }
 
   async function runSearch(term: string) {
@@ -198,7 +219,7 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
       const data = await res.json();
       if (fetchId !== activeFetch) return; // a newer keystroke's request already landed
       lastTerm = term;
-      showResults(res.ok ? (data.results || []) : []);
+      showResults(res.ok ? data.results || [] : []);
     } catch {
       if (fetchId === activeFetch) hideResults();
     }
@@ -231,7 +252,9 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
   // Both events, not just focus: clicking an already-focused box (after Escape closed the
   // dropdown, say) fires no focus event, and "click the search box, see my recents" is exactly
   // the gesture this is for.
-  const openRecentsIfEmpty = () => { if (shouldShowRecents(inputEl.value)) showRecents(); };
+  const openRecentsIfEmpty = () => {
+    if (shouldShowRecents(inputEl.value)) showRecents();
+  };
   inputEl.addEventListener('focus', openRecentsIfEmpty);
   inputEl.addEventListener('click', openRecentsIfEmpty);
 
@@ -239,38 +262,67 @@ export function initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAll
     if (debounceTimer != null) clearTimeout(debounceTimer);
     const term = inputEl.value.trim();
     // Cleared back to empty — that's the recents view again, not just an empty dropdown.
-    if (shouldShowRecents(inputEl.value)) { if (!showRecents()) hideResults(); return; }
+    if (shouldShowRecents(inputEl.value)) {
+      if (!showRecents()) hideResults();
+      return;
+    }
     // A raw appid/URL doesn't need a name search — hide any stale dropdown instead.
-    if (term.length < GAME_SEARCH_MIN_CHARS || parseDirectAppid(term) != null) { hideResults(); return; }
+    if (term.length < GAME_SEARCH_MIN_CHARS || parseDirectAppid(term) != null) {
+      hideResults();
+      return;
+    }
     debounceTimer = setTimeout(() => runSearch(term), GAME_SEARCH_DEBOUNCE_MS);
   });
 
-  inputEl.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { hideResults(); return; }
-    if (e.key === 'ArrowDown') { if (lastResults.length) e.preventDefault(); moveActive(1); return; }
-    if (e.key === 'ArrowUp')   { if (lastResults.length) e.preventDefault(); moveActive(-1); return; }
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      hideResults();
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      if (lastResults.length) e.preventDefault();
+      moveActive(1);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      if (lastResults.length) e.preventDefault();
+      moveActive(-1);
+      return;
+    }
     if (e.key !== 'Enter') return;
     e.preventDefault();
     // The "more" row is the roving selection's last virtual index — check it before the
     // term-empty bail below, since the recents view's "see all" is reachable with an empty box.
-    if (moreRowShown() && activeIdx === lastResults.length) { activateMore(); return; }
+    if (moreRowShown() && activeIdx === lastResults.length) {
+      activateMore();
+      return;
+    }
     const term = inputEl.value.trim();
     if (!term) return;
     const directAppid = parseDirectAppid(term);
-    if (directAppid != null) { pick({ appid: directAppid, name: '', tinyImage: null }); return; }
-    if (activeIdx >= 0 && lastResults[activeIdx]) { pick(lastResults[activeIdx]); return; }
+    if (directAppid != null) {
+      pick({ appid: directAppid, name: '', tinyImage: null });
+      return;
+    }
+    if (activeIdx >= 0 && lastResults[activeIdx]) {
+      pick(lastResults[activeIdx]);
+      return;
+    }
     if (lastResults.length) pick(lastResults[0]); // no arrow-key highlight yet — same as clicking the top match
   });
 
-  resultsEl.addEventListener('click', e => {
-    if ((e.target as Element).closest('.game-search-more')) { activateMore(); return; }
+  resultsEl.addEventListener('click', (e) => {
+    if ((e.target as Element).closest('.game-search-more')) {
+      activateMore();
+      return;
+    }
     const btn = (e.target as Element).closest('.game-search-result') as HTMLElement | null;
     if (!btn) return;
     pick({ appid: Number(btn.dataset.appid), name: btn.dataset.name ?? '', tinyImage: null });
   });
 
   // Dismiss the dropdown on outside click, same convention as recentsBar-style widgets.
-  document.addEventListener('click', e => {
+  document.addEventListener('click', (e) => {
     if (e.target !== inputEl && !resultsEl.contains(e.target as Node)) hideResults();
   });
 }

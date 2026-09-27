@@ -8,9 +8,9 @@ const assert = require('node:assert/strict');
 function makeMemoryLocalStorage() {
   const store = new Map();
   return {
-    getItem: k => (store.has(k) ? store.get(k) : null),
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
     setItem: (k, v) => store.set(k, String(v)),
-    removeItem: k => store.delete(k),
+    removeItem: (k) => store.delete(k),
   };
 }
 
@@ -64,8 +64,12 @@ test('getPref: falls back gracefully when the stored value is not an object', ()
 
 test('getPref/setPref: never throw when localStorage is unavailable', () => {
   global.localStorage = {
-    getItem() { throw new Error('unavailable'); },
-    setItem() { throw new Error('unavailable'); },
+    getItem() {
+      throw new Error('unavailable');
+    },
+    setItem() {
+      throw new Error('unavailable');
+    },
   };
   delete require.cache[require.resolve('../public/prefs.ts')];
   const { getPref, setPref } = require('../public/prefs.ts');
@@ -107,7 +111,7 @@ test('getAllPrefEntries: reflects every key set via setPref, each with its own u
   assert.ok(entries.region.updatedAt >= before);
 });
 
-test('adoptPrefEntry: sets a key\'s value and updatedAt directly, readable via getPref', () => {
+test("adoptPrefEntry: sets a key's value and updatedAt directly, readable via getPref", () => {
   const { adoptPrefEntry, getPref, getAllPrefEntries } = require('../public/prefs.ts');
   adoptPrefEntry('region', 'GB', 12345);
   assert.equal(getPref('region'), 'GB');
@@ -117,8 +121,13 @@ test('adoptPrefEntry: sets a key\'s value and updatedAt directly, readable via g
 test('adoptPrefEntry: does not push to the server, even when signed in', async (t) => {
   const restore = globalThis.fetch;
   let called = false;
-  globalThis.fetch = async () => { called = true; return { ok: true, json: async () => ({}) }; };
-  t.after(() => { globalThis.fetch = restore; });
+  globalThis.fetch = async () => {
+    called = true;
+    return { ok: true, json: async () => ({}) };
+  };
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
 
   const { adoptPrefEntry, setSignedInSteamid } = require('../public/prefs.ts');
   setSignedInSteamid('76561198000000001');
@@ -132,8 +141,13 @@ test('adoptPrefEntry: does not push to the server, even when signed in', async (
 test('setPref: pushes { value, updatedAt } to PUT /api/me/prefs/:key once signed in', async (t) => {
   const restore = globalThis.fetch;
   let seen;
-  globalThis.fetch = async (url, opts) => { seen = { url, body: JSON.parse(opts.body) }; return { ok: true, json: async () => ({}) }; };
-  t.after(() => { globalThis.fetch = restore; });
+  globalThis.fetch = async (url, opts) => {
+    seen = { url, body: JSON.parse(opts.body) };
+    return { ok: true, json: async () => ({}) };
+  };
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
 
   const { setPref, setSignedInSteamid } = require('../public/prefs.ts');
   setSignedInSteamid('76561198000000001');
@@ -148,8 +162,13 @@ test('setPref: pushes { value, updatedAt } to PUT /api/me/prefs/:key once signed
 test('setPref: does not push anywhere when signed out', async (t) => {
   const restore = globalThis.fetch;
   let called = false;
-  globalThis.fetch = async () => { called = true; return { ok: true, json: async () => ({}) }; };
-  t.after(() => { globalThis.fetch = restore; });
+  globalThis.fetch = async () => {
+    called = true;
+    return { ok: true, json: async () => ({}) };
+  };
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
 
   const { setPref } = require('../public/prefs.ts');
   setPref('region', 'DE');
@@ -160,8 +179,13 @@ test('setPref: does not push anywhere when signed out', async (t) => {
 test('setPref: never pushes a table-view key, even when signed in — local-only until an explicit Save', async (t) => {
   const restore = globalThis.fetch;
   let called = false;
-  globalThis.fetch = async () => { called = true; return { ok: true, json: async () => ({}) }; };
-  t.after(() => { globalThis.fetch = restore; });
+  globalThis.fetch = async () => {
+    called = true;
+    return { ok: true, json: async () => ({}) };
+  };
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
 
   const { setPref, setSignedInSteamid } = require('../public/prefs.ts');
   setSignedInSteamid('76561198000000001');
@@ -173,8 +197,13 @@ test('setPref: never pushes a table-view key, even when signed in — local-only
 test('setPref: debounces the push of a ranking: key and sends only the latest value', async (t) => {
   const restore = globalThis.fetch;
   const seen = [];
-  globalThis.fetch = async (url, opts) => { seen.push({ url, body: JSON.parse(opts.body) }); return { ok: true, json: async () => ({}) }; };
-  t.after(() => { globalThis.fetch = restore; });
+  globalThis.fetch = async (url, opts) => {
+    seen.push({ url, body: JSON.parse(opts.body) });
+    return { ok: true, json: async () => ({}) };
+  };
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
   t.mock.timers.enable({ apis: ['setTimeout'] });
 
   const { setPref, setSignedInSteamid } = require('../public/prefs.ts');
@@ -184,14 +213,22 @@ test('setPref: debounces the push of a ranking: key and sends only the latest va
   assert.equal(seen.length, 0);
 
   t.mock.timers.tick(3000);
-  assert.deepEqual(seen.map(s => [s.url, s.body.value]), [['/api/me/prefs/ranking%3Aabc', { n: 2 }]]);
+  assert.deepEqual(
+    seen.map((s) => [s.url, s.body.value]),
+    [['/api/me/prefs/ranking%3Aabc', { n: 2 }]],
+  );
 });
 
 test('flushPendingPushes: pushes a pending ranking: key immediately', async (t) => {
   const restore = globalThis.fetch;
   const seen = [];
-  globalThis.fetch = async (url, opts) => { seen.push({ url, keepalive: opts.keepalive }); return { ok: true, json: async () => ({}) }; };
-  t.after(() => { globalThis.fetch = restore; });
+  globalThis.fetch = async (url, opts) => {
+    seen.push({ url, keepalive: opts.keepalive });
+    return { ok: true, json: async () => ({}) };
+  };
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
   t.mock.timers.enable({ apis: ['setTimeout'] });
 
   const { setPref, setSignedInSteamid, flushPendingPushes } = require('../public/prefs.ts');

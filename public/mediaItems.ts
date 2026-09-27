@@ -7,7 +7,10 @@ export interface MediaItem {
   thumb: string;
   shotId: string;
 }
-export function buildMediaItems(appid: number | string, details: Pick<GameMeta, 'banner' | 'movies' | 'screenshots'> | null | undefined): MediaItem[] {
+export function buildMediaItems(
+  appid: number | string,
+  details: Pick<GameMeta, 'banner' | 'movies' | 'screenshots'> | null | undefined,
+): MediaItem[] {
   // `details.banner` (see extractAppDetails in lib/steam.js) is Steam's own header image
   // for this specific game, resolved once store metadata has loaded — before that (the
   // game is still `loading`, so `details` itself is absent), guess the conventional CDN
@@ -21,14 +24,14 @@ export function buildMediaItems(appid: number | string, details: Pick<GameMeta, 
   const screenshots = details?.screenshots || [];
   return [
     { type: 'image', main: bannerUrl, thumb: bannerUrl, shotId: 'banner' },
-    ...movies.map(m => ({ type: 'video' as const, hls: m.hls, thumb: m.thumbnail, shotId: `v${m.id}` })),
-    ...screenshots.map(s => ({ type: 'image' as const, main: s.full, thumb: s.thumbnail, shotId: `s${s.id}` })),
+    ...movies.map((m) => ({ type: 'video' as const, hls: m.hls, thumb: m.thumbnail, shotId: `v${m.id}` })),
+    ...screenshots.map((s) => ({ type: 'image' as const, main: s.full, thumb: s.thumbnail, shotId: `s${s.id}` })),
   ];
 }
 
 export function resolveShotIndex(shots: MediaItem[], idxOrShotId: number | string): number {
   if (typeof idxOrShotId === 'string') {
-    const idx = shots.findIndex(s => s.shotId === idxOrShotId);
+    const idx = shots.findIndex((s) => s.shotId === idxOrShotId);
     return idx >= 0 ? idx : 0;
   }
   return Math.max(0, Math.min(idxOrShotId, shots.length - 1));
@@ -45,7 +48,7 @@ export function resolveShotIndex(shots: MediaItem[], idxOrShotId: number | strin
 // only: the lightbox autoplays video, so promoting an image to one would start a trailer
 // unasked on every step through a game that happens to have no screenshots.
 export function preferredShotIndex(shots: MediaItem[], leaving: MediaItem['type']): number {
-  const firstOfType = (type: MediaItem['type']) => shots.findIndex(s => s.type === type && s.shotId !== 'banner');
+  const firstOfType = (type: MediaItem['type']) => shots.findIndex((s) => s.type === type && s.shotId !== 'banner');
   const sameKind = leaving === 'video' ? firstOfType('video') : -1;
   if (sameKind >= 0) return sameKind;
   const screenshot = firstOfType('image');

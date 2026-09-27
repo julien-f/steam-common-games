@@ -106,7 +106,12 @@ test('resolveShotIndex: unknown string shotId falls back to 0', () => {
 const BANNER = { type: 'image', shotId: 'banner' };
 
 test('preferredShotIndex: leaving an image lands on the first screenshot, not the banner', () => {
-  const shots = [BANNER, { type: 'video', shotId: 'v1' }, { type: 'image', shotId: 's0' }, { type: 'image', shotId: 's1' }];
+  const shots = [
+    BANNER,
+    { type: 'video', shotId: 'v1' },
+    { type: 'image', shotId: 's0' },
+    { type: 'image', shotId: 's1' },
+  ];
   assert.equal(preferredShotIndex(shots, 'image'), 2);
 });
 

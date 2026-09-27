@@ -25,10 +25,16 @@ const api = supertest(app);
 
 function workingDetailsFetch(fetchedAppids) {
   return async (url) => {
-    const appid = url.match(/appids=(\d+)/)?.[1] || url.match(/appreviews\/(\d+)/)?.[1] || url.match(/appid=(\d+)/)?.[1];
+    const appid =
+      url.match(/appids=(\d+)/)?.[1] || url.match(/appreviews\/(\d+)/)?.[1] || url.match(/appid=(\d+)/)?.[1];
     if (appid) fetchedAppids.add(appid);
     if (url.includes('appreviews')) {
-      return { ok: true, json: async () => ({ query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' },
+        }),
+      };
     }
     if (url.includes('IStoreBrowseService')) {
       return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: [1001] }] } }) };
@@ -37,13 +43,23 @@ function workingDetailsFetch(fetchedAppids) {
       return { ok: true, json: async () => ({ tags: [{ tagid: 1001, name: 'Action' }] }) };
     }
     if (url.includes('appdetails')) {
-      return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] } } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          [appid]: {
+            success: true,
+            data: { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] },
+          },
+        }),
+      };
     }
     if (url.includes('protondb.com')) {
       return { ok: true, json: async () => ({ tier: 'gold', confidence: 'strong', total: 500 }) };
     }
-    if (url.includes('search/site/init')) return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
-    if (url.includes('search/site'))      return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
+    if (url.includes('search/site/init'))
+      return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
+    if (url.includes('search/site'))
+      return { ok: true, json: async () => ({ data: [{ game_name: 'Portal', comp_main: 36000, comp_plus: 72000 }] }) };
     throw new Error(`Unexpected fetch: ${url}`);
   };
 }
@@ -58,10 +74,10 @@ test('details limiter: counts cache misses but never counts cache hits', async (
   t.mock.method(globalThis, 'fetch', workingDetailsFetch(fetchedAppids));
 
   // Pre-cache appid 800 fully — this one should always be served.
-  setCache('rating:800',   { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
-  setCache('hltb:800',     [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
-  setCache('meta:800',     { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] });
-  setCache('browse:800',   { tagids: [1001] });
+  setCache('rating:800', { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' });
+  setCache('hltb:800', [{ game_id: 42, game_name: 'Portal', comp_main: 36000, comp_plus: 54000 }]);
+  setCache('meta:800', { name: 'Portal', genres: [], categories: [], developers: [], publishers: [] });
+  setCache('browse:800', { tagids: [1001] });
   setCache('tagnames:all', { 1001: 'Action' });
   setCache('protondb:800', { tier: 'gold', confidence: 'strong', total: 500 });
 
@@ -87,7 +103,8 @@ test('details limiter: counts cache misses but never counts cache hits', async (
 test('game search limiter: counts cache misses but never counts cache hits', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => ({
-    ok: true, json: async () => ({ items: [{ id: 400, name: 'Portal' }] }),
+    ok: true,
+    json: async () => ({ items: [{ id: 400, name: 'Portal' }] }),
   }));
 
   setCache('search:cached term', [{ appid: 900, name: 'Pre-cached', tinyImage: null }]);
@@ -121,7 +138,7 @@ test('search limiter: counts cache misses but never counts cache hits (common-ga
   const calledIds = new Set();
   t.mock.method(globalThis, 'fetch', async (url) => {
     const idMatch = url.match(/steamid=(\d+)/) || url.match(/steamids=([\d,]+)/);
-    if (idMatch) idMatch[1].split(',').forEach(id => calledIds.add(id));
+    if (idMatch) idMatch[1].split(',').forEach((id) => calledIds.add(id));
     if (url.includes('GetOwnedGames')) return { ok: true, json: async () => ({ response: { games: [] } }) };
     if (url.includes('GetWishlist')) return { ok: true, json: async () => ({ response: {} }) };
     if (url.includes('GetPlayerSummaries')) return { ok: true, json: async () => ({ response: { players: [] } }) };
@@ -184,7 +201,7 @@ test('bundles resolve limiter: counts cache misses but never counts fully-cached
   t.mock.method(globalThis, 'fetch', async (url, opts) => {
     if (String(url).includes('/service/shops/')) return { ok: true, json: async () => [{ id: 61, title: 'Steam' }] };
     const gids = JSON.parse(opts.body);
-    return { ok: true, json: async () => Object.fromEntries(gids.map(g => [g, ['app/1']])) };
+    return { ok: true, json: async () => Object.fromEntries(gids.map((g) => [g, ['app/1']])) };
   });
 
   setCache('itad-appid:cached-gid', 555);
@@ -209,7 +226,8 @@ test('a rejected request is recorded in GET /api/metrics rateLimiters', async (t
   _reset();
   _resetMetrics();
   t.mock.method(globalThis, 'fetch', async () => ({
-    ok: true, json: async () => ({ items: [{ id: 400, name: 'Portal' }] }),
+    ok: true,
+    json: async () => ({ items: [{ id: 400, name: 'Portal' }] }),
   }));
 
   // gameSearchLimit's own window-based budget is shared process-wide across every test in this

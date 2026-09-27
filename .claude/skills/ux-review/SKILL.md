@@ -42,8 +42,8 @@ Screenshot every finding into `.playwright-mcp/` (gitignored scratch — never `
 
 One table, ranked by severity, then one line of anything that went well enough to keep:
 
-| # | Severity | Scenario | Where | Finding | Suggestion |
-|---|---|---|---|---|---|
+| #   | Severity | Scenario | Where | Finding | Suggestion |
+| --- | -------- | -------- | ----- | ------- | ---------- |
 
-- **Severity**: *blocker* (the goal can't be reached) · *major* (reached with real confusion or a workaround) · *minor* (friction) · *polish*.
+- **Severity**: _blocker_ (the goal can't be reached) · _major_ (reached with real confusion or a workaround) · _minor_ (friction) · _polish_.
 - Findings only — fix nothing. The user picks what to fix; each fix is its own commit.

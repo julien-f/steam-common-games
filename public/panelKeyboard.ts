@@ -32,13 +32,19 @@ export interface PanelKeyboardOptions {
 }
 
 export function bindPanelKeyboardShortcuts(opts: PanelKeyboardOptions): void {
-  document.addEventListener('keydown', e => {
+  document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       // panelHandleEscape owns the lightbox-close/fullscreen-guard logic shared by all three
       // pages — delegating here means none of them can independently drift from it the way
       // bundles.tsx once did (missing the lightbox-close branch entirely; see its own history).
-      if (opts.isLightboxOpen()) { panelHandleEscape(); return; }
-      if (opts.shortcuts?.isOpen()) { opts.shortcuts.close(); return; }
+      if (opts.isLightboxOpen()) {
+        panelHandleEscape();
+        return;
+      }
+      if (opts.shortcuts?.isOpen()) {
+        opts.shortcuts.close();
+        return;
+      }
       opts.panelClose(); // onClose (see each page's own initPanel call) handles the URL/state cleanup
       return;
     }
@@ -46,16 +52,28 @@ export function bindPanelKeyboardShortcuts(opts: PanelKeyboardOptions): void {
     // lightbox.tsx's own listener) — every other page-level shortcut below is blocked rather
     // than firing invisibly behind it.
     if (opts.isLightboxOpen()) return;
-    if (opts.shortcuts && e.key === '?') { e.preventDefault(); opts.shortcuts.toggle(); return; }
+    if (opts.shortcuts && e.key === '?') {
+      e.preventDefault();
+      opts.shortcuts.toggle();
+      return;
+    }
     if (isTextEntry(document.activeElement)) return;
-    if (opts.focusSearchInput && e.key === '/') { e.preventDefault(); opts.focusSearchInput(); return; }
+    if (opts.focusSearchInput && e.key === '/') {
+      e.preventDefault();
+      opts.focusSearchInput();
+      return;
+    }
     if (opts.onEnterOnFocusedRow && e.key === 'Enter' && opts.onEnterOnFocusedRow()) return;
     if (!opts.isPanelOpen()) return;
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       if (opts.panelStepHero(e.key === 'ArrowRight' ? 1 : -1, { wrap: true })) e.preventDefault();
       return;
     }
-    if (e.key === 'r' || e.key === 'R') { e.preventDefault(); opts.pickRandom(); return; }
+    if (e.key === 'r' || e.key === 'R') {
+      e.preventDefault();
+      opts.pickRandom();
+      return;
+    }
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
     if (opts.stepGame(e.key === 'ArrowDown' ? 1 : -1)) e.preventDefault();
   });

@@ -23,7 +23,12 @@ export const POPOVER_MARGIN = 12;
 // it the clamp's own upper bound would fall below its lower one and push the panel off the left.
 // Pure and exported for unit testing — the off-screen case above is the whole reason this
 // positioning is in JS at all.
-export function clampPopoverLeft(triggerRight: number, panelWidth: number, viewportWidth: number, margin = POPOVER_MARGIN): number {
+export function clampPopoverLeft(
+  triggerRight: number,
+  panelWidth: number,
+  viewportWidth: number,
+  margin = POPOVER_MARGIN,
+): number {
   const maxLeft = viewportWidth - panelWidth - margin;
   return Math.min(Math.max(triggerRight - panelWidth, margin), Math.max(maxLeft, margin));
 }
@@ -39,7 +44,9 @@ function positionPanel(details: HTMLDetailsElement, panel: HTMLElement): void {
 // own popovers live as long as the app does, but a popover rendered inside a component (the
 // account chip) has to be able to unbind with it.
 export function bindNavPopover(details: HTMLDetailsElement, panel: HTMLElement): () => void {
-  const reposition = () => { if (details.open) positionPanel(details, panel); };
+  const reposition = () => {
+    if (details.open) positionPanel(details, panel);
+  };
   const onClick = (e: MouseEvent) => {
     if (details.open && !details.contains(e.target as Node)) details.open = false;
   };

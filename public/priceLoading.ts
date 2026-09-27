@@ -13,12 +13,22 @@
 import type { PriceFields } from './types.ts';
 
 export const PRICE_FIELDS = [
-  'steamRegular', 'bestDealPrice', 'bestDealShop', 'bestDealUrl', 'bestDealCut', 'lowAll', 'lowY1', 'lowM3',
+  'steamRegular',
+  'bestDealPrice',
+  'bestDealShop',
+  'bestDealUrl',
+  'bestDealCut',
+  'lowAll',
+  'lowY1',
+  'lowM3',
 ] as const;
 
 // The shape of one game's entry in a `POST /games/prices/v3` response, as extracted server-side
 // (lib/itad.js's extractPriceInfo) — only the fields read below.
-interface PriceAmount { amount: number; currency: string; }
+interface PriceAmount {
+  amount: number;
+  currency: string;
+}
 interface PriceInfo {
   steamRegular?: PriceAmount | null;
   bestDeal?: { price?: PriceAmount | null; shop?: string | null; url?: string | null } | null;
@@ -32,17 +42,26 @@ interface PriceInfo {
 // formatMoney (utils.ts)/renderPrice (gameColumns.ts) for why priceCurrency and a bundle's own
 // tierCurrency can legitimately disagree. `discountPct` (gameColumns.ts) is passed in rather than
 // imported — see the file-header note; its signature here matches utils.ts's own.
-export function applyPriceInfo(row: PriceFields, info: PriceInfo | null | undefined, discountPct: (bestDealAmt: number | null, steamRegularAmt: number | null) => number | null): void {
-  row.steamRegular  = info?.steamRegular?.amount ?? null;
+export function applyPriceInfo(
+  row: PriceFields,
+  info: PriceInfo | null | undefined,
+  discountPct: (bestDealAmt: number | null, steamRegularAmt: number | null) => number | null,
+): void {
+  row.steamRegular = info?.steamRegular?.amount ?? null;
   row.bestDealPrice = info?.bestDeal?.price?.amount ?? null;
-  row.bestDealShop  = info?.bestDeal?.shop ?? null;
-  row.bestDealUrl   = info?.bestDeal?.url ?? null;
-  row.bestDealCut   = discountPct(row.bestDealPrice, row.steamRegular);
-  row.lowAll        = info?.lowAll?.amount ?? null;
-  row.lowY1         = info?.lowY1?.amount ?? null;
-  row.lowM3         = info?.lowM3?.amount ?? null;
-  row.priceCurrency = info?.steamRegular?.currency ?? info?.bestDeal?.price?.currency
-    ?? info?.lowAll?.currency ?? info?.lowY1?.currency ?? info?.lowM3?.currency ?? null;
+  row.bestDealShop = info?.bestDeal?.shop ?? null;
+  row.bestDealUrl = info?.bestDeal?.url ?? null;
+  row.bestDealCut = discountPct(row.bestDealPrice, row.steamRegular);
+  row.lowAll = info?.lowAll?.amount ?? null;
+  row.lowY1 = info?.lowY1?.amount ?? null;
+  row.lowM3 = info?.lowM3?.amount ?? null;
+  row.priceCurrency =
+    info?.steamRegular?.currency ??
+    info?.bestDeal?.price?.currency ??
+    info?.lowAll?.currency ??
+    info?.lowY1?.currency ??
+    info?.lowM3?.currency ??
+    null;
 }
 
 // A failed request (rate limited, transient upstream error): fills only whatever this row never
@@ -69,7 +88,17 @@ export interface PriceLookup {
 
 // Exactly one of gids/appids, matching POST /api/prices's own contract. Throws with the
 // server's own error message on a non-2xx response, same as both callers' pre-extraction code.
-export async function postPrices({ gids, appids, country, force = false }: { gids?: string[]; appids?: number[]; country: string; force?: boolean }): Promise<PriceLookup> {
+export async function postPrices({
+  gids,
+  appids,
+  country,
+  force = false,
+}: {
+  gids?: string[];
+  appids?: number[];
+  country: string;
+  force?: boolean;
+}): Promise<PriceLookup> {
   const qs = new URLSearchParams({ country });
   if (force) qs.set('refresh', '1');
   const res = await fetch(`/api/prices?${qs}`, {

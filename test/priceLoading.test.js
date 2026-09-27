@@ -3,19 +3,27 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  PRICE_FIELDS, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields, postPrices,
+  PRICE_FIELDS,
+  applyPriceInfo,
+  nullMissingPriceFields,
+  nullAllPriceFields,
+  postPrices,
 } = require('../public/priceLoading.ts');
 const { discountPct } = require('../public/utils.ts');
 
 test('applyPriceInfo: maps an ITAD price response onto a row', () => {
   const row = {};
-  applyPriceInfo(row, {
-    steamRegular: { amount: 1999, currency: 'USD' },
-    bestDeal: { price: { amount: 999 }, shop: 'Fanatical', url: 'https://example.com' },
-    lowAll: { amount: 799 },
-    lowY1: { amount: 899 },
-    lowM3: { amount: 999 },
-  }, discountPct);
+  applyPriceInfo(
+    row,
+    {
+      steamRegular: { amount: 1999, currency: 'USD' },
+      bestDeal: { price: { amount: 999 }, shop: 'Fanatical', url: 'https://example.com' },
+      lowAll: { amount: 799 },
+      lowY1: { amount: 899 },
+      lowM3: { amount: 999 },
+    },
+    discountPct,
+  );
   assert.equal(row.steamRegular, 1999);
   assert.equal(row.bestDealPrice, 999);
   assert.equal(row.bestDealShop, 'Fanatical');
@@ -56,7 +64,9 @@ test('postPrices: sends gids or appids and returns .prices on success', async (t
     seenBody = JSON.parse(opts.body);
     return { ok: true, json: async () => ({ prices: { 42: { steamRegular: { amount: 100 } } }, fetchedAt: 1234 }) };
   };
-  t.after(() => { globalThis.fetch = restore; });
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
 
   const { prices, fetchedAt } = await postPrices({ gids: ['g1'], country: 'US' });
   assert.deepEqual(seenBody, { gids: ['g1'] });
@@ -67,14 +77,18 @@ test('postPrices: sends gids or appids and returns .prices on success', async (t
 test('postPrices: a response with no fetchedAt (fetched fresh) is null, not undefined', async (t) => {
   const restore = globalThis.fetch;
   globalThis.fetch = async () => ({ ok: true, json: async () => ({ prices: {} }) });
-  t.after(() => { globalThis.fetch = restore; });
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
   assert.equal((await postPrices({ appids: [1], country: 'US' })).fetchedAt, null);
 });
 
 test('postPrices: throws with the server error message on a non-2xx response', async (t) => {
   const restore = globalThis.fetch;
   globalThis.fetch = async () => ({ ok: false, json: async () => ({ error: 'rate limited' }) });
-  t.after(() => { globalThis.fetch = restore; });
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
 
   await assert.rejects(() => postPrices({ appids: [1], country: 'US' }), /rate limited/);
 });

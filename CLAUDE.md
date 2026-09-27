@@ -8,6 +8,7 @@ Working conventions for this repo. Documentation lives in `docs/` — keep it th
 - **Tests**: `node:test` + `supertest`, flat in `test/*.test.{js,ts}`; `npm test` runs with `DB_FILE=` so no real database is touched.
 - **Types**: `tsc --noEmit`, strict, over `public/**/*.{ts,tsx}` only — the backend is plain JS.
 - **Lint**: `eslint public`, via eslint-plugin-solid.
+- **Format**: Prettier over the whole tree (`.prettierrc.json`); `npm run format` rewrites, `npm run format:check` verifies.
 
 ## Where things are documented
 
@@ -28,12 +29,12 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
 ## Working style
 
 - Be concise and economical everywhere — responses, code comments, doc prose. No filler, no restating what was just done; favor the smallest change that satisfies the request. When more thorough work (deeper investigation, a broader refactor, extra tests) would clearly pay off, say so and let the user decide.
-  - Code comments: one line, stating the *why*, only when it isn't obvious from the code; skip the comment entirely if the code speaks for itself. This governs new comments; leave the long-form ones already in the tree alone.
+  - Code comments: one line, stating the _why_, only when it isn't obvious from the code; skip the comment entirely if the code speaks for itself. This governs new comments; leave the long-form ones already in the tree alone.
   - Doc prose (this file, `README.md`, `CHANGELOG.md`): short bullets over paragraphs; no preamble, no summary section, lead with the point.
 - Don't re-read a file already read in the current session unless it may have changed.
 - Wait for an explicit go-ahead before implementing, unless the request already states the exact change to make. Before that go-ahead: answer the question asked instead of jumping to implementation, present the options and trade-offs when there are several valid approaches, and draft a plan first for non-trivial changes (multiple files, non-obvious design decisions, refactors).
 - Ask clarifying questions as soon as the request is ambiguous, batched into one round.
-- Every question to the user goes through `AskUserQuestion` — including open-ended ones (offer the likely answers; the user can pick *Other*) and go-ahead requests after a plan. Never end a message with a question in prose.
+- Every question to the user goes through `AskUserQuestion` — including open-ended ones (offer the likely answers; the user can pick _Other_) and go-ahead requests after a plan. Never end a message with a question in prose.
 - Stay in scope: only make the changes asked for, plus the Development workflow checklist below. Flag other issues noticed rather than fixing them unprompted.
 - Match the existing code style and conventions in the file/project rather than imposing personal preference; don't reformat unrelated code.
 - If a rule here is stale or contradicts the code, say so instead of silently following it.
@@ -61,7 +62,7 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
 ## Git workflow
 
 - Make commits atomic: each commit represents one logical change and passes the tests on its own.
-- Write descriptive commit messages that explain the *why*, not just the *what* — a short subject line, with a body when context is needed.
+- Write descriptive commit messages that explain the _why_, not just the _what_ — a short subject line, with a body when context is needed.
 - **Message format**: a plain imperative subject, no Conventional Commits prefix — the `feat:`/`fix:` prefixes in older history were dropped; don't reintroduce them.
 - Ordinary changes commit directly to `main` — this is a solo repo with no PR/review process. A complex feature (multiple concerns, significant refactoring, a new subsystem) spanning more than one commit gets a dedicated branch instead.
 - Close such a branch with a real merge commit (`git merge --no-ff`), never a fast-forward or a rebase onto `main` — the branch is the unit of work and the merge commit is what shows it.
@@ -72,7 +73,7 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
 
 After making changes:
 
-1. Check whether existing tests need updating, or new ones are needed, to cover the change, then run `npm test` and report actual results — not assumptions. For any frontend change also run `npm run typecheck` **and `npm run lint`**, and fix what they report; `npm run lint` must stay at 0 problems, and the few intended violations carry a targeted `eslint-disable-next-line` with a reason.
+1. Check whether existing tests need updating, or new ones are needed, to cover the change, then run `npm run format` and `npm test` and report actual results — not assumptions. For any frontend change also run `npm run typecheck` **and `npm run lint`**, and fix what they report; `npm run lint` must stay at 0 problems, and the few intended violations carry a targeted `eslint-disable-next-line` with a reason.
 2. Update any affected documentation — see "Knowledge sharing" above — and `CHANGELOG.md` (see "Changelog" below).
 3. The `pre-commit` hook runs `npm test`, `npm run typecheck` and `npm run lint` and blocks the commit on failure, so once step 1 has passed don't run them again just because a commit is about to happen. README's Development section has the snippet to recreate it after a fresh clone.
 

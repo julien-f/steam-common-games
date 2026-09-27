@@ -10,7 +10,7 @@ export function CopyButton(props: { text: string; label?: string; title: string;
   onCleanup(() => clearTimeout(timer));
 
   function copy(): void {
-    copyText(props.text).then(ok => {
+    copyText(props.text).then((ok) => {
       if (!ok) return;
       setCopied(true);
       clearTimeout(timer);
@@ -25,6 +25,8 @@ export function CopyButton(props: { text: string; label?: string; title: string;
       title={copied() ? 'Copied!' : props.title}
       aria-label={props.title}
       onClick={copy}
-    >{copied() ? '✓' : (props.label ?? '⧉')}</button>
+    >
+      {copied() ? '✓' : (props.label ?? '⧉')}
+    </button>
   );
 }

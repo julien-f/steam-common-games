@@ -18,10 +18,12 @@ test('dedup: concurrent calls with same key share one in-flight promise, fn call
 
   const p1 = withDedup('k', () => {
     callCount++;
-    return new Promise(r => { resolve = r; });
+    return new Promise((r) => {
+      resolve = r;
+    });
   });
   const p2 = withDedup('k', () => {
-    callCount++;               // must not be reached
+    callCount++; // must not be reached
     return Promise.resolve('wrong');
   });
 
@@ -49,7 +51,10 @@ test('dedup: after resolution, next call with same key invokes fn again', async 
 test('dedup: after rejection, next call with same key invokes fn again', async () => {
   const withDedup = createDedup();
   let callCount = 0;
-  const fn = async () => { callCount++; throw new Error('fail'); };
+  const fn = async () => {
+    callCount++;
+    throw new Error('fail');
+  };
 
   await assert.rejects(() => withDedup('k', fn));
   await assert.rejects(() => withDedup('k', fn));
@@ -61,10 +66,7 @@ test('dedup: different keys invoke fn independently', async () => {
   let callCount = 0;
   const fn = async () => ++callCount;
 
-  const [r1, r2] = await Promise.all([
-    withDedup('a', fn),
-    withDedup('b', fn),
-  ]);
+  const [r1, r2] = await Promise.all([withDedup('a', fn), withDedup('b', fn)]);
 
   assert.equal(callCount, 2);
   assert.notEqual(r1, r2);
@@ -74,12 +76,19 @@ test('dedup: a named instance records a metrics hit only when a call actually co
   resetMetrics();
   const withDedup = createDedup('mymodule');
   let resolve;
-  const p1 = withDedup('k', () => new Promise(r => { resolve = r; }));
+  const p1 = withDedup(
+    'k',
+    () =>
+      new Promise((r) => {
+        resolve = r;
+      }),
+  );
   const p2 = withDedup('k', () => Promise.resolve('wrong')); // coalesces onto p1 — should record a hit
   assert.equal(getMetrics().sinceRestart.dedupHits.mymodule, 1);
 
   resolve('shared');
-  await p1; await p2;
+  await p1;
+  await p2;
 
   // A second, independent call (no concurrent duplicate) must not record another hit.
   await withDedup('k', async () => 'again');
@@ -90,10 +99,17 @@ test('dedup: an unnamed instance (createDedup()) does not record any metrics hit
   resetMetrics();
   const withDedup = createDedup();
   let resolve;
-  const p1 = withDedup('k', () => new Promise(r => { resolve = r; }));
+  const p1 = withDedup(
+    'k',
+    () =>
+      new Promise((r) => {
+        resolve = r;
+      }),
+  );
   const p2 = withDedup('k', () => Promise.resolve('wrong'));
   resolve('shared');
-  await p1; await p2;
+  await p1;
+  await p2;
 
   assert.deepEqual(getMetrics().sinceRestart.dedupHits, {});
 });

@@ -96,9 +96,15 @@ export interface UrlState {
 // URL & sharing section in docs/dev/frontend.md. Shared by parseUrlState and parseAccountParam below so the
 // two can never disagree about what a `u=` value means (whitespace handling, empty entries).
 function parseSlots(params: URLSearchParams): string[][] {
-  return params.getAll('u')
-    .map(s => s.split(',').map(v => v.trim()).filter(Boolean))
-    .filter(slot => slot.length > 0);
+  return params
+    .getAll('u')
+    .map((s) =>
+      s
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean),
+    )
+    .filter((slot) => slot.length > 0);
 }
 
 export function parseUrlState(search: string): UrlState {
@@ -107,12 +113,14 @@ export function parseUrlState(search: string): UrlState {
   const sortParam = params.get('sort');
   return {
     slots,
-    game:       Number(params.get('game')) || null,
-    shot:       params.get('shot'),
-    sort:       sortParam ? {
-      col: sortParam.startsWith('-') ? sortParam.slice(1) : sortParam,
-      dir: sortParam.startsWith('-') ? -1 : 1,
-    } : null,
+    game: Number(params.get('game')) || null,
+    shot: params.get('shot'),
+    sort: sortParam
+      ? {
+          col: sortParam.startsWith('-') ? sortParam.slice(1) : sortParam,
+          dir: sortParam.startsWith('-') ? -1 : 1,
+        }
+      : null,
   };
 }
 
@@ -135,9 +143,7 @@ export const DEFAULT_COMPARE_OP = 'group-by-membership';
 // which normalized for exactly this reason (plus deduping its own recent searches).
 export function normalizeSlots(slots: string[][]): string[][] {
   const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' });
-  return slots
-    .map(slot => [...slot].sort(cmp))
-    .sort((a, b) => cmp(a[0], b[0]));
+  return slots.map((slot) => [...slot].sort(cmp)).sort((a, b) => cmp(a[0], b[0]));
 }
 
 // `op` is this app's own addition, not part of the old convention — omitted for the default, so
@@ -188,7 +194,7 @@ export function withAccountParam(path: string, search: string = location.search)
   if (values.length !== 1) return path;
   const [pathname, ownQuery] = path.split('?');
   const params = new URLSearchParams(ownQuery ?? '');
-  if (!params.has('u')) values.forEach(v => params.append('u', v));
+  if (!params.has('u')) values.forEach((v) => params.append('u', v));
   return `${pathname}?${reorderUrlParams(params)}`;
 }
 

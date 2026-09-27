@@ -18,7 +18,7 @@ export interface AccountLibraryGame {
   appid: number;
   name: string;
   playtimeMinutes: number; // summed across every member of the slot
-  lastPlayedUnix: number;  // max across members; 0 = never played
+  lastPlayedUnix: number; // max across members; 0 = never played
 }
 
 // One member account's stake in one game, for the panel's "Owned by" card. Derived from the
@@ -26,8 +26,8 @@ export interface AccountLibraryGame {
 // themselves — the summed/maxed numbers on AccountLibraryGame above are all a table row needs,
 // but they flatten away exactly the per-member breakdown a merged Steam Family wants to see.
 export interface GameOwner {
-  name: string;         // persona name, or the steamid when Steam knows no name for it
-  minutes: number;      // this member's own playtime
+  name: string; // persona name, or the steamid when Steam knows no name for it
+  minutes: number; // this member's own playtime
   lastPlayedSec: number; // 0 = owns it, never launched it
 }
 
@@ -49,9 +49,9 @@ export interface RawAccountPlayer {
   avatarmedium?: string;
   communityvisibilitystate?: number;
   gameCount?: number;
-  timecreated?: number;    // Unix seconds; absent for a private profile
+  timecreated?: number; // Unix seconds; absent for a private profile
   loccountrycode?: string; // ISO 3166-1 alpha-2, e.g. "US"; absent when unset or profile is private
-  realname?: string;       // absent unless the profile owner set one and made it public
+  realname?: string; // absent unless the profile owner set one and made it public
 }
 
 // The shape of /api/common-games' success response, as read below — only the fields this
@@ -70,13 +70,13 @@ interface CommonGamesResponse {
 export interface AccountPlayer {
   steamid: string;
   name: string;
-  profileUrl: string;   // '' when Steam returned no (or a non-http) profile URL — don't render a link
-  avatarUrl: string;    // '' likewise
-  isPrivate: boolean;   // communityvisibilitystate !== 3 — a private/friends-only profile
+  profileUrl: string; // '' when Steam returned no (or a non-http) profile URL — don't render a link
+  avatarUrl: string; // '' likewise
+  isPrivate: boolean; // communityvisibilitystate !== 3 — a private/friends-only profile
   gameCount: number | null;
-  memberSince: string;  // bare ISO date the account was created, '' when Steam didn't return one
-  countryCode: string;  // ISO 3166-1 alpha-2, '' when unset
-  realName: string;     // '' when unset — Steam's own realname is optional and privacy-gated
+  memberSince: string; // bare ISO date the account was created, '' when Steam didn't return one
+  countryCode: string; // ISO 3166-1 alpha-2, '' when unset
+  realName: string; // '' when unset — Steam's own realname is optional and privacy-gated
 }
 
 // Presence (`personastate`/`gameextrainfo`) is deliberately NOT mapped here, even though Steam
@@ -132,7 +132,10 @@ export interface AccountWishlist {
 // Fetches one account's owned games (its members' libraries unioned, same Family-simulation
 // /api/common-games already does server-side for a single slot) with per-game playtime/last-
 // played summed/maxed across members, plus its member accounts' display data.
-export async function fetchAccountOverview(members: string[], { refresh = false }: { refresh?: boolean } = {}): Promise<AccountOverview> {
+export async function fetchAccountOverview(
+  members: string[],
+  { refresh = false }: { refresh?: boolean } = {},
+): Promise<AccountOverview> {
   const res = await fetch('/api/common-games', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -141,19 +144,19 @@ export async function fetchAccountOverview(members: string[], { refresh = false 
   const data: CommonGamesResponse & { error?: string } = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to fetch owned games');
 
-  const allGames = data.groups.flatMap(g => g.games);
-  const slotSteamIds = data.slots[0].map(p => p.steamid);
-  const games = allGames.map(game => {
+  const allGames = data.groups.flatMap((g) => g.games);
+  const slotSteamIds = data.slots[0].map((p) => p.steamid);
+  const games = allGames.map((game) => {
     const pt = data.playtime?.[game.appid] ?? {};
     const lp = data.lastPlayed?.[game.appid] ?? {};
     return {
       appid: game.appid,
       name: game.name,
       playtimeMinutes: slotSteamIds.reduce((sum, id) => sum + (pt[id] || 0), 0),
-      lastPlayedUnix: Math.max(0, ...slotSteamIds.map(id => lp[id] || 0)),
+      lastPlayedUnix: Math.max(0, ...slotSteamIds.map((id) => lp[id] || 0)),
     };
   });
-  const nameById = new Map(data.slots[0].map(p => [p.steamid, p.personaname || p.steamid]));
+  const nameById = new Map(data.slots[0].map((p) => [p.steamid, p.personaname || p.steamid]));
   const owners = new Map<number, GameOwner[]>();
   for (const game of allGames) {
     const pt = data.playtime?.[game.appid] ?? {};
@@ -162,8 +165,8 @@ export async function fetchAccountOverview(members: string[], { refresh = false 
     // response only carries an entry for a member who actually owns the game, which is exactly
     // the distinction this card exists to show for a Family.
     const entries = slotSteamIds
-      .filter(id => id in pt || id in lp)
-      .map(id => ({ name: nameById.get(id) ?? id, minutes: pt[id] || 0, lastPlayedSec: lp[id] || 0 }));
+      .filter((id) => id in pt || id in lp)
+      .map((id) => ({ name: nameById.get(id) ?? id, minutes: pt[id] || 0, lastPlayedSec: lp[id] || 0 }));
     if (entries.length) owners.set(game.appid, entries);
   }
   return { games, players: data.slots[0].map(toAccountPlayer), owners, fetchedAt: data.fetchedAt ?? null };
@@ -171,13 +174,19 @@ export async function fetchAccountOverview(members: string[], { refresh = false 
 
 // The owned-games half of fetchAccountOverview on its own — what every caller that doesn't care
 // about the member accounts themselves (listResolve.ts's fetchers, ListRoute's owned list) uses.
-export async function fetchAccountOwnedGames(members: string[], opts: { refresh?: boolean } = {}): Promise<AccountLibraryGame[]> {
+export async function fetchAccountOwnedGames(
+  members: string[],
+  opts: { refresh?: boolean } = {},
+): Promise<AccountLibraryGame[]> {
   return (await fetchAccountOverview(members, opts)).games;
 }
 
 // Fetches one account's wishlist (its members' wishlists unioned, same as /api/wishlist does
 // server-side).
-export async function fetchAccountWishlist(members: string[], { refresh = false }: { refresh?: boolean } = {}): Promise<AccountWishlist> {
+export async function fetchAccountWishlist(
+  members: string[],
+  { refresh = false }: { refresh?: boolean } = {},
+): Promise<AccountWishlist> {
   const res = await fetch('/api/wishlist', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -190,13 +199,19 @@ export async function fetchAccountWishlist(members: string[], { refresh = false 
 
 // The items half of fetchAccountWishlist on its own — for callers with no "Updated <when>"
 // readout to feed (listResolve.ts's fetchers, Home's counts).
-export async function fetchAccountWishlistItems(members: string[], opts: { refresh?: boolean } = {}): Promise<AccountWishlistItem[]> {
+export async function fetchAccountWishlistItems(
+  members: string[],
+  opts: { refresh?: boolean } = {},
+): Promise<AccountWishlistItem[]> {
   return (await fetchAccountWishlist(members, opts)).items;
 }
 
 // listResolve.ts's ListResolveFetchers.accountOwned/accountWishlist — just the flat appid set,
 // resolving accountId back to members via membersFromAccountId above.
-export async function fetchAccountOwnedAppids(accountId: string, opts: { refresh?: boolean } = {}): Promise<Set<number>> {
+export async function fetchAccountOwnedAppids(
+  accountId: string,
+  opts: { refresh?: boolean } = {},
+): Promise<Set<number>> {
   return (await fetchAccountOwnedData(accountId, opts)).appids;
 }
 
@@ -210,7 +225,7 @@ export async function fetchAccountOwnedData(
   opts: { refresh?: boolean } = {},
 ): Promise<{ appids: Set<number>; owners: Map<number, GameOwner[]>; fetchedAt: number | null }> {
   const { games, owners, fetchedAt } = await fetchAccountOverview(membersFromAccountId(accountId), opts);
-  return { appids: new Set(games.map(g => g.appid)), owners, fetchedAt };
+  return { appids: new Set(games.map((g) => g.appid)), owners, fetchedAt };
 }
 
 export interface AccountFriend {
@@ -225,7 +240,15 @@ export interface AccountFriend {
 
 // The shape of /api/friends' success response, as read below.
 interface FriendsResponse {
-  friends: { steamid: string; personaname?: string; avatar?: string | null; profileurl?: string; timecreated?: number; loccountrycode?: string; realname?: string }[];
+  friends: {
+    steamid: string;
+    personaname?: string;
+    avatar?: string | null;
+    profileurl?: string;
+    timecreated?: number;
+    loccountrycode?: string;
+    realname?: string;
+  }[];
   unavailable: string[]; // member steamids whose friends list is private — excluded from `friends`, not "no friends"
   fetchedAt: number | null;
 }
@@ -240,7 +263,10 @@ export interface AccountFriends {
 // fetchAccountWishlist uses). A member whose friends list is private shows up in `unavailable`
 // rather than being silently indistinguishable from "no friends" — see docs/dev/integrations.md's
 // Friends section.
-export async function fetchAccountFriends(members: string[], { refresh = false }: { refresh?: boolean } = {}): Promise<AccountFriends> {
+export async function fetchAccountFriends(
+  members: string[],
+  { refresh = false }: { refresh?: boolean } = {},
+): Promise<AccountFriends> {
   const res = await fetch('/api/friends', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -249,7 +275,7 @@ export async function fetchAccountFriends(members: string[], { refresh = false }
   const data: FriendsResponse & { error?: string } = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to fetch friends');
   return {
-    friends: data.friends.map(f => ({
+    friends: data.friends.map((f) => ({
       steamid: f.steamid,
       name: f.personaname || f.steamid,
       avatarUrl: f.avatar || '',
@@ -264,16 +290,16 @@ export async function fetchAccountFriends(members: string[], { refresh = false }
 }
 
 export interface ResolvedAccountSummary {
-  members: string[];        // resolved steam64 ids, sorted — becomes AccountSlot.members
-  label: string;            // joined persona name(s) ("PersonaName" or "A + B" for a Family)
+  members: string[]; // resolved steam64 ids, sorted — becomes AccountSlot.members
+  label: string; // joined persona name(s) ("PersonaName" or "A + B" for a Family)
   avatarUrl: string | null; // a single account's avatar; null for a Family (no one avatar to show)
   vanities: Record<string, string>; // steam64 → custom-URL name → AccountSlot.vanities
   memberSince: string | null; // solo-account trivia, same "null for a Family" reasoning as avatarUrl
   countryCode: string | null;
   realName: string | null;
   ownedCount: number;
-  wishlistCount: number;    // 0 if the wishlist call fails (e.g. private profile) — owned
-                            // resolving is enough to consider the account itself resolved
+  wishlistCount: number; // 0 if the wishlist call fails (e.g. private profile) — owned
+  // resolving is enough to consider the account itself resolved
 }
 
 // Home's "pick an account" resolve step — there's no standalone "just resolve an identifier"
@@ -299,8 +325,8 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
   if (!ownedRes.ok) throw new Error(ownedData.error || 'Failed to resolve account');
 
   const players: RawAccountPlayer[] = ownedData.slots[0];
-  const members = players.map(p => p.steamid).sort();
-  const label = players.map(p => p.personaname || p.steamid).join(' + ');
+  const members = players.map((p) => p.steamid).sort();
+  const label = players.map((p) => p.personaname || p.steamid).join(' + ');
   // Keyed by steamid rather than a parallel array: `members` is sorted, `players` is in the
   // order the API answered in, and the two only coincide by luck.
   const vanities: Record<string, string> = {};
@@ -324,7 +350,10 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
   return { members, label, avatarUrl, vanities, memberSince, countryCode, realName, ownedCount, wishlistCount };
 }
 
-export async function fetchAccountWishlistAppids(accountId: string, opts: { refresh?: boolean } = {}): Promise<Set<number>> {
+export async function fetchAccountWishlistAppids(
+  accountId: string,
+  opts: { refresh?: boolean } = {},
+): Promise<Set<number>> {
   return (await fetchAccountWishlistData(accountId, opts)).appids;
 }
 
@@ -335,5 +364,5 @@ export async function fetchAccountWishlistData(
   opts: { refresh?: boolean } = {},
 ): Promise<{ appids: Set<number>; fetchedAt: number | null }> {
   const { items, fetchedAt } = await fetchAccountWishlist(membersFromAccountId(accountId), opts);
-  return { appids: new Set(items.map(i => i.appid)), fetchedAt };
+  return { appids: new Set(items.map((i) => i.appid)), fetchedAt };
 }

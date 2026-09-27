@@ -36,7 +36,11 @@ function toAccountSlot(f: AccountFriend): AccountSlot {
   };
 }
 
-export function AccountFriends(props: { accountId: string; myAccountId: string | null; onExplore: (account: AccountSlot) => void }): JSX.Element {
+export function AccountFriends(props: {
+  accountId: string;
+  myAccountId: string | null;
+  onExplore: (account: AccountSlot) => void;
+}): JSX.Element {
   const [explored, { refetch: refetchExplored }] = createResource(() => props.accountId, loadFriends);
   // Only fetched when exploring somebody else's account — comparing an account's friends against
   // its own friends would mark every single one of them "mutual", which says nothing useful.
@@ -44,7 +48,7 @@ export function AccountFriends(props: { accountId: string; myAccountId: string |
     () => (props.myAccountId && props.myAccountId !== props.accountId ? props.myAccountId : undefined),
     loadFriends,
   );
-  const mineIds = createMemo(() => new Set((mine()?.friends ?? []).map(f => f.steamid)));
+  const mineIds = createMemo(() => new Set((mine()?.friends ?? []).map((f) => f.steamid)));
 
   // Mutual friends first (the more interesting fact when browsing someone else's list), then
   // alphabetical — Steam's own GetFriendList order is neither stable nor meaningful (roughly
@@ -52,7 +56,8 @@ export function AccountFriends(props: { accountId: string; myAccountId: string |
   const sortedFriends = createMemo(() => {
     const mutual = mineIds();
     return [...(explored()?.friends ?? [])].sort((a, b) => {
-      const am = mutual.has(a.steamid), bm = mutual.has(b.steamid);
+      const am = mutual.has(a.steamid),
+        bm = mutual.has(b.steamid);
       if (am !== bm) return am ? -1 : 1;
       return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
     });
@@ -60,7 +65,7 @@ export function AccountFriends(props: { accountId: string; myAccountId: string |
 
   return (
     <Show when={explored()}>
-      {data => (
+      {(data) => (
         <details class="account-friends">
           <summary>Friends ({data().friends.length})</summary>
           {/* Same age-is-the-control shape as the list heroes' Updated tile and the panel's own
@@ -74,7 +79,8 @@ export function AccountFriends(props: { accountId: string; myAccountId: string |
               title="How old the server's cached copy of this friends list is — click to re-fetch it from Steam"
               onClick={() => void refetchExplored()}
             >
-              Updated {explored.loading ? 'Refreshing…' : fmtAge(data().fetchedAt)} <span class="account-friends-refresh-icon">↻</span>
+              Updated {explored.loading ? 'Refreshing…' : fmtAge(data().fetchedAt)}{' '}
+              <span class="account-friends-refresh-icon">↻</span>
             </button>
           </p>
           <Show when={data().unavailable.length > 0}>
@@ -85,31 +91,40 @@ export function AccountFriends(props: { accountId: string; myAccountId: string |
           <Show when={data().friends.length > 0} fallback={<p>No public friends found.</p>}>
             <ul class="account-friends-list">
               <For each={sortedFriends()}>
-                {f => (
+                {(f) => (
                   <li>
                     <Show when={f.avatarUrl}>
-                      {url => (
+                      {(url) => (
                         <span class="account-avatar-wrap">
                           <img class="account-avatar" src={url()} alt="" width="28" height="28" />
                         </span>
                       )}
                     </Show>
                     <Show when={f.profileUrl} fallback={<span class="account-name">{f.name}</span>}>
-                      {url => (
-                        <a class="account-name account-profile-link" href={url()} target="_blank" rel="noopener noreferrer">
+                      {(url) => (
+                        <a
+                          class="account-name account-profile-link"
+                          href={url()}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
                           {f.name} <span class="account-profile-arrow">↗</span>
                         </a>
                       )}
                     </Show>
                     <Show when={mineIds().has(f.steamid)}>
-                      <span class="account-friend-mutual" title="Also a friend of your own account">🤝 Mutual</span>
+                      <span class="account-friend-mutual" title="Also a friend of your own account">
+                        🤝 Mutual
+                      </span>
                     </Show>
                     <button
                       type="button"
                       class="btn btn-ghost btn-sm"
                       title={`Explore ${f.name}'s library`}
                       onClick={() => props.onExplore(toAccountSlot(f))}
-                    >Explore →</button>
+                    >
+                      Explore →
+                    </button>
                   </li>
                 )}
               </For>

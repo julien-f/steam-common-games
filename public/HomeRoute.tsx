@@ -16,9 +16,17 @@
 import { createSignal, createEffect, createMemo, onCleanup, For, Index, Show } from 'solid-js';
 import { A, useLocation, useNavigate } from '@solidjs/router';
 import {
-  getMyAccount, setMyAccount, getEffectiveCurrentAccount, setCurrentAccount,
-  getRecentAccounts, removeRecentAccount, clearRecentAccounts,
-  getAccountOverride, accountDisplayLabel, accountIdentifiers, ACCOUNT_CHANGED_EVENT,
+  getMyAccount,
+  setMyAccount,
+  getEffectiveCurrentAccount,
+  setCurrentAccount,
+  getRecentAccounts,
+  removeRecentAccount,
+  clearRecentAccounts,
+  getAccountOverride,
+  accountDisplayLabel,
+  accountIdentifiers,
+  ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
 import { getAccountOverrideState, clearAccountOverride, accountOverrideStatusText } from './accountOverride.ts';
 import { withAccountParam, urlWithoutAccountParam, parseUrlState, compareUrl, COMPARE_PATH } from './urlState.ts';
@@ -28,8 +36,14 @@ import { normalizeInput, steamVanity, fmtAge, countryFlag } from './utils.ts';
 import { CopyButton } from './CopyButton.tsx';
 import { AccountFriends } from './AccountFriends.tsx';
 import {
-  getFolders, getLists, createFolder, createList, renameFolder, renameList,
-  deleteFolder, deleteList,
+  getFolders,
+  getLists,
+  createFolder,
+  createList,
+  renameFolder,
+  renameList,
+  deleteFolder,
+  deleteList,
 } from './listsStore.ts';
 import { setBaseTitle } from './pageTitle.ts';
 import { createDefaultNaming, listDisplayName } from './listLabels.ts';
@@ -61,7 +75,10 @@ export default function HomeRoute() {
   const [resolveInputs, setResolveInputs] = createSignal<string[]>(['']);
   const [resolveError, setResolveError] = createSignal('');
   const [resolving, setResolving] = createSignal(false);
-  const [counts, setCounts] = createSignal<{ owned: number | null; wishlist: number | null }>({ owned: null, wishlist: null });
+  const [counts, setCounts] = createSignal<{ owned: number | null; wishlist: number | null }>({
+    owned: null,
+    wishlist: null,
+  });
   // The current account's member accounts as Steam itself describes them (persona name, profile
   // URL, presence, profile visibility, per-member game count) — see the counts effect below for
   // why this rides along on the same fetch rather than being stored on AccountSlot.
@@ -106,7 +123,10 @@ export default function HomeRoute() {
   function loadAccountData(account: AccountSlot, { refresh = false }: { refresh?: boolean } = {}): void {
     setCounts({ owned: null, wishlist: null });
     setPlayers([]);
-    if (refresh) { setRefreshing(true); setFetchedAt(null); }
+    if (refresh) {
+      setRefreshing(true);
+      setFetchedAt(null);
+    }
     const members = account.members;
     // Guards every setter below: switching accounts again before this fetch settles (e.g.
     // adopting a `?u=` override right after landing on it, which fires this same effect for
@@ -120,19 +140,37 @@ export default function HomeRoute() {
     // `solid/reactivity`); the plain module accessor always reflects the live value on demand.
     const isStale = (): boolean => getEffectiveCurrentAccount()?.id !== account.id;
     const owned = fetchAccountOverview(members, { refresh }).then(
-      ({ games, players: ps, fetchedAt: at }) => { if (isStale()) return; setCounts(c => ({ ...c, owned: games.length })); setPlayers(ps); setFetchedAt(at); },
-      () => { if (!isStale()) setCounts(c => ({ ...c, owned: 0 })); },
+      ({ games, players: ps, fetchedAt: at }) => {
+        if (isStale()) return;
+        setCounts((c) => ({ ...c, owned: games.length }));
+        setPlayers(ps);
+        setFetchedAt(at);
+      },
+      () => {
+        if (!isStale()) setCounts((c) => ({ ...c, owned: 0 }));
+      },
     );
     const wishlist = fetchAccountWishlistItems(members, { refresh }).then(
-      items => { if (!isStale()) setCounts(c => ({ ...c, wishlist: items.length })); },
-      () => { if (!isStale()) setCounts(c => ({ ...c, wishlist: 0 })); },
+      (items) => {
+        if (!isStale()) setCounts((c) => ({ ...c, wishlist: items.length }));
+      },
+      () => {
+        if (!isStale()) setCounts((c) => ({ ...c, wishlist: 0 }));
+      },
     );
-    void Promise.allSettled([owned, wishlist]).then(() => { if (!isStale()) setRefreshing(false); });
+    void Promise.allSettled([owned, wishlist]).then(() => {
+      if (!isStale()) setRefreshing(false);
+    });
   }
 
   createEffect(() => {
     const account = currentAccount();
-    if (!account) { setCounts({ owned: null, wishlist: null }); setPlayers([]); setFetchedAt(null); return; }
+    if (!account) {
+      setCounts({ owned: null, wishlist: null });
+      setPlayers([]);
+      setFetchedAt(null);
+      return;
+    }
     loadAccountData(account);
   });
 
@@ -168,7 +206,9 @@ export default function HomeRoute() {
   onCleanup(() => setBaseTitle(null));
 
   async function resolveAndSetCurrent(): Promise<void> {
-    const trimmed = resolveInputs().map(s => normalizeInput(s.trim())).filter(Boolean);
+    const trimmed = resolveInputs()
+      .map((s) => normalizeInput(s.trim()))
+      .filter(Boolean);
     if (trimmed.length === 0) return;
     setResolving(true);
     setResolveError('');
@@ -285,9 +325,14 @@ export default function HomeRoute() {
   }
 
   function handleDeleteFolder(folder: Folder): void {
-    const hasChildren = folders().some(f => f.parentId === folder.id) || lists().some(l => l.parentId === folder.id);
+    const hasChildren =
+      folders().some((f) => f.parentId === folder.id) || lists().some((l) => l.parentId === folder.id);
     const mode = hasChildren
-      ? (window.confirm(`"${folder.name}" isn't empty. Delete it and everything inside? Cancel to move its contents up instead.`) ? 'delete' : 'promote')
+      ? window.confirm(
+          `"${folder.name}" isn't empty. Delete it and everything inside? Cancel to move its contents up instead.`,
+        )
+        ? 'delete'
+        : 'promote'
       : 'delete';
     deleteFolder(folder.id, mode);
     refreshTree();
@@ -296,13 +341,18 @@ export default function HomeRoute() {
   function handleDeleteList(list: GameList): void {
     if (!window.confirm(`Delete "${listName(list)}"?`)) return;
     const result = deleteList(list.id);
-    if (result.softDeleted) window.alert(`"${listName(list)}" is still referenced by another list, so it was hidden instead of deleted.`);
+    if (result.softDeleted)
+      window.alert(`"${listName(list)}" is still referenced by another list, so it was hidden instead of deleted.`);
     refreshTree();
   }
 
   function childrenOf(parentId: string | null): { type: 'folder' | 'list'; item: Folder | GameList; order: number }[] {
-    const childFolders = folders().filter(f => f.parentId === parentId).map(f => ({ type: 'folder' as const, item: f, order: f.order }));
-    const childLists = lists().filter(l => l.parentId === parentId).map(l => ({ type: 'list' as const, item: l, order: l.order }));
+    const childFolders = folders()
+      .filter((f) => f.parentId === parentId)
+      .map((f) => ({ type: 'folder' as const, item: f, order: f.order }));
+    const childLists = lists()
+      .filter((l) => l.parentId === parentId)
+      .map((l) => ({ type: 'list' as const, item: l, order: l.order }));
     return [...childFolders, ...childLists].sort((a, b) => a.order - b.order);
   }
 
@@ -332,13 +382,13 @@ export default function HomeRoute() {
         <Show when={overrideState().state !== 'none'}>
           <div class="account-override">
             <Show when={accountOverrideStatusText(overrideState())}>
-              {text => <p class="account-override-status">{text()}</p>}
+              {(text) => <p class="account-override-status">{text()}</p>}
             </Show>
             <Show when={overrideAccount()}>
-              {account => (
+              {(account) => (
                 <p class="account-override-status">
-                  Exploring <strong>{accountDisplayLabel(account())}</strong> from this
-                  link — your own current account is unchanged.
+                  Exploring <strong>{accountDisplayLabel(account())}</strong> from this link — your own current account
+                  is unchanged.
                   <button type="button" class="account-override-adopt" onClick={() => pickAccount(account())}>
                     Set as my current account
                   </button>
@@ -353,10 +403,10 @@ export default function HomeRoute() {
             beyond the label/avatar comes from `players()` (fetched live, see the effect above),
             not from the stored AccountSlot, so it can't show a stale persona or presence. */}
         <Show when={currentAccount()} fallback={<p>No account selected yet.</p>}>
-          {account => (
+          {(account) => (
             <div class="account-header">
               <Show when={solePlayer()?.avatarUrl || account().avatarUrl}>
-                {url => (
+                {(url) => (
                   <span class="account-avatar-wrap account-avatar-lg">
                     <img class="account-avatar" src={url()} alt="" width="48" height="48" />
                   </span>
@@ -364,31 +414,42 @@ export default function HomeRoute() {
               </Show>
               <div>
                 <div class="account-label">
-                  <Show
-                    when={solePlayer()?.profileUrl}
-                    fallback={solePlayer()?.name || accountDisplayLabel(account())}
-                  >
-                    {url => (
-                      <a class="account-profile-link" href={url()} target="_blank" rel="noopener noreferrer" title={`Steam ID ${solePlayer()!.steamid}`}>
+                  <Show when={solePlayer()?.profileUrl} fallback={solePlayer()?.name || accountDisplayLabel(account())}>
+                    {(url) => (
+                      <a
+                        class="account-profile-link"
+                        href={url()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Steam ID ${solePlayer()!.steamid}`}
+                      >
                         {solePlayer()!.name} <span class="account-profile-arrow">↗</span>
                       </a>
                     )}
                   </Show>
-                  <Show when={solePlayer()?.realName}>
-                    {n => <span class="account-realname">({n()})</span>}
-                  </Show>
+                  <Show when={solePlayer()?.realName}>{(n) => <span class="account-realname">({n()})</span>}</Show>
                   <Show when={solePlayer()}>
-                    {p => <CopyButton text={copyIdentifier(p())} title={`Copy this account's Steam identifier (${copyIdentifier(p())})`} />}
+                    {(p) => (
+                      <CopyButton
+                        text={copyIdentifier(p())}
+                        title={`Copy this account's Steam identifier (${copyIdentifier(p())})`}
+                      />
+                    )}
                   </Show>
                   <Show when={solePlayer()?.isPrivate}>
-                    <span class="account-private" title="This Steam profile isn't public — some data may be missing or empty">🔒 Private</span>
+                    <span
+                      class="account-private"
+                      title="This Steam profile isn't public — some data may be missing or empty"
+                    >
+                      🔒 Private
+                    </span>
                   </Show>
                 </div>
                 <div class="account-counts">
                   Owned: {counts().owned ?? '…'} · Wishlisted: {counts().wishlist ?? '…'}
                   <Show when={players().length > 1}>{` · ${players().length} accounts merged`}</Show>
-                  <Show when={solePlayer()?.memberSince}>{s => ` · Member since ${s()}`}</Show>
-                  <Show when={solePlayer()?.countryCode}>{c => ` ${countryFlag(c())}`}</Show>
+                  <Show when={solePlayer()?.memberSince}>{(s) => ` · Member since ${s()}`}</Show>
+                  <Show when={solePlayer()?.countryCode}>{(c) => ` ${countryFlag(c())}`}</Show>
                 </div>
                 {/* Steam data is cached server-side for a long time (see default.env's
                     LIBRARY_CACHE_TTL_MINUTES), so the age of what's on screen is stated outright
@@ -403,7 +464,8 @@ export default function HomeRoute() {
                     title="How old the server's cached copy of this account is — click to re-fetch its games, wishlist and profile from Steam"
                     onClick={() => loadAccountData(account(), { refresh: true })}
                   >
-                    Updated {refreshing() ? 'Refreshing…' : fmtAge(fetchedAt())} <span class="account-updated-icon">↻</span>
+                    Updated {refreshing() ? 'Refreshing…' : fmtAge(fetchedAt())}{' '}
+                    <span class="account-updated-icon">↻</span>
                   </button>
                 </div>
               </div>
@@ -416,23 +478,32 @@ export default function HomeRoute() {
         <Show when={players().length > 1}>
           <ul class="account-members">
             <For each={players()}>
-              {p => (
+              {(p) => (
                 <li>
                   <Show when={p.avatarUrl}>
-                    {url => (
+                    {(url) => (
                       <span class="account-avatar-wrap">
                         <img class="account-avatar" src={url()} alt="" width="28" height="28" />
                       </span>
                     )}
                   </Show>
                   <Show when={p.profileUrl} fallback={<span class="account-name">{p.name}</span>}>
-                    {url => (
-                      <a class="account-name account-profile-link" href={url()} target="_blank" rel="noopener noreferrer" title={`Steam ID ${p.steamid}`}>
+                    {(url) => (
+                      <a
+                        class="account-name account-profile-link"
+                        href={url()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Steam ID ${p.steamid}`}
+                      >
                         {p.name} <span class="account-profile-arrow">↗</span>
                       </a>
                     )}
                   </Show>
-                  <CopyButton text={copyIdentifier(p)} title={`Copy this account's Steam identifier (${copyIdentifier(p)})`} />
+                  <CopyButton
+                    text={copyIdentifier(p)}
+                    title={`Copy this account's Steam identifier (${copyIdentifier(p)})`}
+                  />
                   <Show when={p.realName}>
                     <span class="account-realname">({p.realName})</span>
                   </Show>
@@ -446,7 +517,12 @@ export default function HomeRoute() {
                     <span class="account-count">{countryFlag(p.countryCode)}</span>
                   </Show>
                   <Show when={p.isPrivate}>
-                    <span class="account-private" title="This Steam profile isn't public — some data may be missing or empty">🔒 Private</span>
+                    <span
+                      class="account-private"
+                      title="This Steam profile isn't public — some data may be missing or empty"
+                    >
+                      🔒 Private
+                    </span>
                   </Show>
                 </li>
               )}
@@ -455,10 +531,17 @@ export default function HomeRoute() {
         </Show>
 
         <Show when={currentAccount()}>
-          {account => <AccountFriends accountId={account().id} myAccountId={myAccount()?.id ?? null} onExplore={pickAccount} />}
+          {(account) => (
+            <AccountFriends accountId={account().id} myAccountId={myAccount()?.id ?? null} onExplore={pickAccount} />
+          )}
         </Show>
 
-        <form onSubmit={e => { e.preventDefault(); resolveAndSetCurrent(); }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            resolveAndSetCurrent();
+          }}
+        >
           {/* <Index>, not <For> — <For> keys each item by the value itself (`===` on the
               array element), which is exactly wrong for a list of strings the user is actively
               typing into: changing "a" to "ab" makes the old and new values two *different*
@@ -471,12 +554,18 @@ export default function HomeRoute() {
                 type="text"
                 value={value()}
                 placeholder="Steam name, profile URL, or 64-bit ID…"
-                onInput={e => setResolveInputs(prev => prev.map((v, idx) => idx === i ? e.currentTarget.value : v))}
+                onInput={(e) =>
+                  setResolveInputs((prev) => prev.map((v, idx) => (idx === i ? e.currentTarget.value : v)))
+                }
               />
             )}
           </Index>
-          <button type="button" onClick={() => setResolveInputs(prev => [...prev, ''])}>+ Add Steam Family account</button>
-          <button type="submit" disabled={resolving()}>{resolving() ? 'Resolving…' : 'Set as current account'}</button>
+          <button type="button" onClick={() => setResolveInputs((prev) => [...prev, ''])}>
+            + Add Steam Family account
+          </button>
+          <button type="submit" disabled={resolving()}>
+            {resolving() ? 'Resolving…' : 'Set as current account'}
+          </button>
         </form>
         {resolveError() && <p class="error">{resolveError()}</p>}
 
@@ -484,10 +573,11 @@ export default function HomeRoute() {
         <Show when={recents().length > 0} fallback={<p>No recent accounts yet.</p>}>
           <ul class="recent-accounts">
             <For each={recents()}>
-              {account => (
+              {(account) => (
                 <li>
                   <button type="button" onClick={() => selectAccount(account)}>
-                    {myAccount()?.id === account.id ? '★ ' : ''}{accountDisplayLabel(account)}
+                    {myAccount()?.id === account.id ? '★ ' : ''}
+                    {accountDisplayLabel(account)}
                   </button>
                   {/* From the slot's stored data, not players() — that's only fetched for the
                       current account, and a recent one's identifier shouldn't need selecting it
@@ -511,12 +601,23 @@ export default function HomeRoute() {
                   <button type="button" title="Set as my account" onClick={[toggleMyAccount, account]}>
                     {myAccount()?.id === account.id ? '☆ unstar' : '★ star as mine'}
                   </button>
-                  <button type="button" title="Remove" onClick={[handleRemoveRecent, account.id]}>×</button>
+                  <button type="button" title="Remove" onClick={[handleRemoveRecent, account.id]}>
+                    ×
+                  </button>
                 </li>
               )}
             </For>
           </ul>
-          <button type="button" class="recents-clear" onClick={() => { clearRecentAccounts(); refreshAccounts(); }}>Clear all</button>
+          <button
+            type="button"
+            class="recents-clear"
+            onClick={() => {
+              clearRecentAccounts();
+              refreshAccounts();
+            }}
+          >
+            Clear all
+          </button>
         </Show>
       </section>
 
@@ -534,9 +635,13 @@ export default function HomeRoute() {
       <section class="home-tree">
         <h2>Your lists</h2>
         <div class="tree-actions">
-          <button type="button" onClick={handleNewFolder}>+ New folder</button>
-          <button type="button" onClick={handleNewList}>+ New list</button>
-          <button type="button" onClick={() => setCombineOpen(v => !v)}>
+          <button type="button" onClick={handleNewFolder}>
+            + New folder
+          </button>
+          <button type="button" onClick={handleNewList}>
+            + New list
+          </button>
+          <button type="button" onClick={() => setCombineOpen((v) => !v)}>
             {combineOpen() ? 'Cancel combine' : '+ New combined list'}
           </button>
         </div>
@@ -547,13 +652,17 @@ export default function HomeRoute() {
         <Show when={treeRows().length > 0} fallback={<p>No lists yet — create one above.</p>}>
           <ul class="list-tree">
             <For each={treeRows()}>
-              {row => (
+              {(row) => (
                 <li style={{ 'padding-left': `${row.depth * 20}px` }}>
                   {row.type === 'folder' ? (
                     <>
                       <span>📁 {(row.item as Folder).name}</span>
-                      <button type="button" onClick={() => handleRenameFolder(row.item as Folder)}>Rename</button>
-                      <button type="button" onClick={() => handleDeleteFolder(row.item as Folder)}>Delete</button>
+                      <button type="button" onClick={() => handleRenameFolder(row.item as Folder)}>
+                        Rename
+                      </button>
+                      <button type="button" onClick={() => handleDeleteFolder(row.item as Folder)}>
+                        Delete
+                      </button>
                     </>
                   ) : (
                     <>
@@ -561,8 +670,12 @@ export default function HomeRoute() {
                         {{ dynamic: '⚡ ', ranked: '🏆 ', manual: '📄 ' }[(row.item as GameList).kind]}
                         <span classList={{ 'derived-name': !row.item.name }}>{listName(row.item as GameList)}</span>
                       </A>
-                      <button type="button" onClick={() => handleRenameList(row.item as GameList)}>Rename</button>
-                      <button type="button" onClick={() => handleDeleteList(row.item as GameList)}>Delete</button>
+                      <button type="button" onClick={() => handleRenameList(row.item as GameList)}>
+                        Rename
+                      </button>
+                      <button type="button" onClick={() => handleDeleteList(row.item as GameList)}>
+                        Delete
+                      </button>
                     </>
                   )}
                 </li>

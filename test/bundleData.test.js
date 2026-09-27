@@ -3,13 +3,19 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  flattenBundleGames, fetchBundleById, resolveBundleAppids, resolveBundleGames, fetchBundleAppids,
+  flattenBundleGames,
+  fetchBundleById,
+  resolveBundleAppids,
+  resolveBundleGames,
+  fetchBundleAppids,
 } = require('../public/bundleData.ts');
 
 function withFetch(t, handler) {
   const restore = globalThis.fetch;
   globalThis.fetch = handler;
-  t.after(() => { globalThis.fetch = restore; });
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
 }
 
 function game(id, title = id) {
@@ -18,7 +24,7 @@ function game(id, title = id) {
 
 // ── flattenBundleGames ───────────────────────────────────────────────────────────────────────
 
-test('flattenBundleGames: flattens every tier\'s games into one list', () => {
+test("flattenBundleGames: flattens every tier's games into one list", () => {
   const bundle = {
     tiers: [
       { price: { amount: 500, currency: 'USD' }, games: [game('a')], addon: false },
@@ -26,10 +32,13 @@ test('flattenBundleGames: flattens every tier\'s games into one list', () => {
     ],
   };
   const flat = flattenBundleGames(bundle);
-  assert.deepEqual(flat.map(g => g.gid), ['a', 'b']);
+  assert.deepEqual(
+    flat.map((g) => g.gid),
+    ['a', 'b'],
+  );
 });
 
-test('flattenBundleGames: a game repeated across tiers is deduped, keeping the cheapest (first-seen) tier\'s price', () => {
+test("flattenBundleGames: a game repeated across tiers is deduped, keeping the cheapest (first-seen) tier's price", () => {
   const bundle = {
     tiers: [
       { price: { amount: 500, currency: 'USD' }, games: [game('a')], addon: false },
@@ -38,7 +47,7 @@ test('flattenBundleGames: a game repeated across tiers is deduped, keeping the c
   };
   const flat = flattenBundleGames(bundle);
   assert.equal(flat.length, 2);
-  const a = flat.find(g => g.gid === 'a');
+  const a = flat.find((g) => g.gid === 'a');
   assert.equal(a.tierPrice, 500);
 });
 
@@ -62,7 +71,10 @@ test('flattenBundleGames: no tiers at all yields an empty list', () => {
 
 test('fetchBundleById: fetches GET /api/bundles/:id, with an optional country param, and unwraps the { bundle, fetchedAt } response', async (t) => {
   let seenUrl;
-  withFetch(t, async url => { seenUrl = url; return { ok: true, json: async () => ({ bundle: { id: 42, title: 'Bundle' }, fetchedAt: 1700000000000 }) }; });
+  withFetch(t, async (url) => {
+    seenUrl = url;
+    return { ok: true, json: async () => ({ bundle: { id: 42, title: 'Bundle' }, fetchedAt: 1700000000000 }) };
+  });
 
   const { bundle, fetchedAt } = await fetchBundleById(42, { country: 'US' });
   assert.equal(seenUrl, '/api/bundles/42?country=US');
@@ -78,7 +90,10 @@ test('fetchBundleById: a response with no fetchedAt at all reports null, not und
 
 test('fetchBundleById: no country param when omitted', async (t) => {
   let seenUrl;
-  withFetch(t, async url => { seenUrl = url; return { ok: true, json: async () => ({ bundle: { id: 1 } }) }; });
+  withFetch(t, async (url) => {
+    seenUrl = url;
+    return { ok: true, json: async () => ({ bundle: { id: 1 } }) };
+  });
   await fetchBundleById(1);
   assert.equal(seenUrl, '/api/bundles/1');
 });
@@ -114,8 +129,14 @@ test('resolveBundleGames: splits into resolved (with appid)/unresolved, preservi
   withFetch(t, async () => ({ ok: true, json: async () => ({ appids: { a: 440, b: null } }) }));
 
   const { resolved, unresolved } = await resolveBundleGames(bundle);
-  assert.deepEqual(resolved.map(g => g.appid), [440]);
-  assert.deepEqual(unresolved.map(g => g.gid), ['b']);
+  assert.deepEqual(
+    resolved.map((g) => g.appid),
+    [440],
+  );
+  assert.deepEqual(
+    unresolved.map((g) => g.gid),
+    ['b'],
+  );
 });
 
 test('resolveBundleGames: two distinct gids resolving to the same appid keep only the first occurrence', async (t) => {
@@ -129,19 +150,33 @@ test('resolveBundleGames: two distinct gids resolving to the same appid keep onl
 
 // A gid resolving to a Steam "sub"/"bundle" spanning several apps (e.g. a base game plus its
 // DLC sold as one SKU) becomes one row per appid, each sharing the gid's own tier price.
-test('resolveBundleGames: a gid resolving to an array of appids becomes one row per appid, sharing the gid\'s tier metadata', async (t) => {
-  const bundle = { tiers: [{ price: { amount: 2999, currency: 'USD' }, games: [game('everspace-ultimate')], addon: false }] };
-  withFetch(t, async () => ({ ok: true, json: async () => ({ appids: { 'everspace-ultimate': [396750, 688700, 709150] } }) }));
+test("resolveBundleGames: a gid resolving to an array of appids becomes one row per appid, sharing the gid's tier metadata", async (t) => {
+  const bundle = {
+    tiers: [{ price: { amount: 2999, currency: 'USD' }, games: [game('everspace-ultimate')], addon: false }],
+  };
+  withFetch(t, async () => ({
+    ok: true,
+    json: async () => ({ appids: { 'everspace-ultimate': [396750, 688700, 709150] } }),
+  }));
 
   const { resolved, unresolved } = await resolveBundleGames(bundle);
   assert.deepEqual(unresolved, []);
-  assert.deepEqual(resolved.map(g => g.appid), [396750, 688700, 709150]);
-  assert.ok(resolved.every(g => g.gid === 'everspace-ultimate' && g.tierPrice === 2999));
+  assert.deepEqual(
+    resolved.map((g) => g.appid),
+    [396750, 688700, 709150],
+  );
+  assert.ok(resolved.every((g) => g.gid === 'everspace-ultimate' && g.tierPrice === 2999));
 });
 
 test('resolveBundleGames: an appid from an expanded array already seen elsewhere is deduped, same as a plain duplicate', async (t) => {
   const bundle = {
-    tiers: [{ price: { amount: 2999, currency: 'USD' }, games: [game('everspace-base'), game('everspace-ultimate')], addon: false }],
+    tiers: [
+      {
+        price: { amount: 2999, currency: 'USD' },
+        games: [game('everspace-base'), game('everspace-ultimate')],
+        addon: false,
+      },
+    ],
   };
   withFetch(t, async () => ({
     ok: true,
@@ -149,7 +184,10 @@ test('resolveBundleGames: an appid from an expanded array already seen elsewhere
   }));
 
   const { resolved } = await resolveBundleGames(bundle);
-  assert.deepEqual(resolved.map(g => g.appid), [396750, 688700]);
+  assert.deepEqual(
+    resolved.map((g) => g.appid),
+    [396750, 688700],
+  );
   assert.equal(resolved[0].gid, 'everspace-base', 'first occurrence (the plain appid) wins the dedup');
 });
 
@@ -160,7 +198,10 @@ test('fetchBundleAppids: fetches the bundle, resolves it, returns just the flat 
   withFetch(t, async (url, opts) => {
     calls.push(url);
     if (url.startsWith('/api/bundles/42')) {
-      return { ok: true, json: async () => ({ bundle: { id: 42, tiers: [{ price: null, games: [game('a')], addon: false }] } }) };
+      return {
+        ok: true,
+        json: async () => ({ bundle: { id: 42, tiers: [{ price: null, games: [game('a')], addon: false }] } }),
+      };
     }
     return { ok: true, json: async () => ({ appids: { a: 440 } }) };
   });

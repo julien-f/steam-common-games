@@ -6,9 +6,9 @@ const assert = require('node:assert/strict');
 function makeMemoryLocalStorage() {
   const store = new Map();
   return {
-    getItem: k => (store.has(k) ? store.get(k) : null),
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
     setItem: (k, v) => store.set(k, String(v)),
-    removeItem: k => store.delete(k),
+    removeItem: (k) => store.delete(k),
   };
 }
 
@@ -80,7 +80,10 @@ test('deleteFolder("promote"): moves child folders and lists up to the deleted f
 
   deleteFolder(mid.id, 'promote');
 
-  assert.equal(getFolders().some(f => f.id === mid.id), false);
+  assert.equal(
+    getFolders().some((f) => f.id === mid.id),
+    false,
+  );
   assert.equal(getFolder(childFolder.id).parentId, root.id);
   assert.equal(getList(childList.id).parentId, root.id);
 });
@@ -93,14 +96,22 @@ test('deleteFolder("delete"): recursively deletes child folders and applies dele
   // A list still referenced by a dynamic list outside the folder must survive as soft-deleted.
   const referenced = createList({ name: 'Referenced', kind: 'manual', parentId: mid.id });
   createList({
-    name: 'Watcher', kind: 'dynamic', op: 'union',
+    name: 'Watcher',
+    kind: 'dynamic',
+    op: 'union',
     sources: [{ kind: 'user', listId: referenced.id }],
   });
 
   deleteFolder(mid.id, 'delete');
 
-  assert.equal(getFolders().some(f => f.id === mid.id || f.id === childFolder.id), false);
-  assert.equal(getLists().some(l => l.id === plainList.id), false);
+  assert.equal(
+    getFolders().some((f) => f.id === mid.id || f.id === childFolder.id),
+    false,
+  );
+  assert.equal(
+    getLists().some((l) => l.id === plainList.id),
+    false,
+  );
   assert.equal(getList(referenced.id)?.deletedAt !== undefined, true);
 });
 
@@ -114,10 +125,10 @@ test('createList: manual list stores appids, defaults to root/order 0', () => {
   assert.equal(l.parentId, null);
 });
 
-test('setListAppids: replaces a manual list\'s appids and bumps updatedAt', async () => {
+test("setListAppids: replaces a manual list's appids and bumps updatedAt", async () => {
   const { createList, setListAppids, getList } = store();
   const l = createList({ name: 'Backlog', kind: 'manual', appids: [1] });
-  await new Promise(r => setTimeout(r, 2));
+  await new Promise((r) => setTimeout(r, 2));
   setListAppids(l.id, [1, 2, 3]);
   const updated = getList(l.id);
   assert.deepEqual(updated.appids, [1, 2, 3]);
@@ -232,8 +243,13 @@ test('createList: rejects a dynamic list whose sources reference itself indirect
   const a = createList({ name: 'A', kind: 'manual', appids: [1] });
   const b = createList({ name: 'B', kind: 'manual', appids: [2] });
   const combo = createList({
-    name: 'Combo', kind: 'dynamic', op: 'union',
-    sources: [{ kind: 'user', listId: a.id }, { kind: 'user', listId: b.id }],
+    name: 'Combo',
+    kind: 'dynamic',
+    op: 'union',
+    sources: [
+      { kind: 'user', listId: a.id },
+      { kind: 'user', listId: b.id },
+    ],
   });
   assert.equal(combo.sources.length, 2);
 });
@@ -242,7 +258,9 @@ test('updateDynamicList: rejects a direct cycle (A depends on B, B depends on A)
   const { createList, updateDynamicList } = store();
   const a = createList({ name: 'A', kind: 'dynamic', op: 'union', sources: [] });
   const b = createList({
-    name: 'B', kind: 'dynamic', op: 'union',
+    name: 'B',
+    kind: 'dynamic',
+    op: 'union',
     sources: [{ kind: 'user', listId: a.id }],
   });
   assert.throws(() => updateDynamicList(a.id, 'union', [{ kind: 'user', listId: b.id }]), /cycle/i);
@@ -252,11 +270,15 @@ test('updateDynamicList: rejects a multi-hop cycle (A -> B -> C -> A)', () => {
   const { createList, updateDynamicList } = store();
   const a = createList({ name: 'A', kind: 'dynamic', op: 'union', sources: [] });
   const b = createList({
-    name: 'B', kind: 'dynamic', op: 'union',
+    name: 'B',
+    kind: 'dynamic',
+    op: 'union',
     sources: [{ kind: 'user', listId: a.id }],
   });
   const c = createList({
-    name: 'C', kind: 'dynamic', op: 'union',
+    name: 'C',
+    kind: 'dynamic',
+    op: 'union',
     sources: [{ kind: 'user', listId: b.id }],
   });
   assert.throws(() => updateDynamicList(a.id, 'union', [{ kind: 'user', listId: c.id }]), /cycle/i);
@@ -267,10 +289,15 @@ test('updateDynamicList: a non-cyclic edit (e.g. adding an unrelated list) succe
   const a = createList({ name: 'A', kind: 'manual', appids: [1] });
   const b = createList({ name: 'B', kind: 'manual', appids: [2] });
   const combo = createList({
-    name: 'Combo', kind: 'dynamic', op: 'union',
+    name: 'Combo',
+    kind: 'dynamic',
+    op: 'union',
     sources: [{ kind: 'user', listId: a.id }],
   });
-  updateDynamicList(combo.id, 'intersect', [{ kind: 'user', listId: a.id }, { kind: 'user', listId: b.id }]);
+  updateDynamicList(combo.id, 'intersect', [
+    { kind: 'user', listId: a.id },
+    { kind: 'user', listId: b.id },
+  ]);
   const updated = getList(combo.id);
   assert.equal(updated.op, 'intersect');
   assert.equal(updated.sources.length, 2);
@@ -279,8 +306,14 @@ test('updateDynamicList: a non-cyclic edit (e.g. adding an unrelated list) succe
 test('createList/updateDynamicList: non-user source kinds (account/bundle/recent-games) never trigger cycle detection', () => {
   const { createList } = store();
   const combo = createList({
-    name: 'Combo', kind: 'dynamic', op: 'union',
-    sources: [{ kind: 'account-owned', accountId: 'acc1' }, { kind: 'bundle', bundleId: 'b1' }, { kind: 'recent-games' }],
+    name: 'Combo',
+    kind: 'dynamic',
+    op: 'union',
+    sources: [
+      { kind: 'account-owned', accountId: 'acc1' },
+      { kind: 'bundle', bundleId: 'b1' },
+      { kind: 'recent-games' },
+    ],
   });
   assert.equal(combo.sources.length, 3);
 });
@@ -303,8 +336,14 @@ test('deleteList: soft-deletes a list still referenced by a dynamic list, hides 
   const result = deleteList(source.id);
   assert.equal(result.softDeleted, true);
   assert.ok(getList(source.id).deletedAt);
-  assert.equal(getLists().some(l => l.id === source.id), false);
-  assert.equal(getLists({ includeDeleted: true }).some(l => l.id === source.id), true);
+  assert.equal(
+    getLists().some((l) => l.id === source.id),
+    false,
+  );
+  assert.equal(
+    getLists({ includeDeleted: true }).some((l) => l.id === source.id),
+    true,
+  );
 });
 
 test('restoreList: clears deletedAt and brings the list back into getLists()', () => {
@@ -314,7 +353,10 @@ test('restoreList: clears deletedAt and brings the list back into getLists()', (
   deleteList(source.id);
 
   restoreList(source.id);
-  assert.equal(getLists().some(l => l.id === source.id), true);
+  assert.equal(
+    getLists().some((l) => l.id === source.id),
+    true,
+  );
 });
 
 test('sweepDeletedLists: purges a soft-deleted list once its last reference is gone, leaves a still-referenced one', () => {
@@ -322,8 +364,13 @@ test('sweepDeletedLists: purges a soft-deleted list once its last reference is g
   const source = createList({ name: 'Source', kind: 'manual', appids: [1] });
   const stillReferenced = createList({ name: 'StillReferenced', kind: 'manual', appids: [2] });
   const watcher = createList({
-    name: 'Watcher', kind: 'dynamic', op: 'union',
-    sources: [{ kind: 'user', listId: source.id }, { kind: 'user', listId: stillReferenced.id }],
+    name: 'Watcher',
+    kind: 'dynamic',
+    op: 'union',
+    sources: [
+      { kind: 'user', listId: source.id },
+      { kind: 'user', listId: stillReferenced.id },
+    ],
   });
   deleteList(source.id);
   deleteList(stillReferenced.id);
@@ -334,8 +381,14 @@ test('sweepDeletedLists: purges a soft-deleted list once its last reference is g
   const removed = sweepDeletedLists();
   assert.equal(removed, 1);
   const all = getLists({ includeDeleted: true });
-  assert.equal(all.some(l => l.id === source.id), false);
-  assert.equal(all.some(l => l.id === stillReferenced.id), true);
+  assert.equal(
+    all.some((l) => l.id === source.id),
+    false,
+  );
+  assert.equal(
+    all.some((l) => l.id === stillReferenced.id),
+    true,
+  );
 });
 
 // ── isAccountReferenced (used by accountsStore.ts) ───────────────────────────────────────────
@@ -344,7 +397,9 @@ test('isAccountReferenced: true only while a dynamic list references that accoun
   const { createList, isAccountReferenced, updateDynamicList } = store();
   assert.equal(isAccountReferenced('acc1'), false);
   const watcher = createList({
-    name: 'Watcher', kind: 'dynamic', op: 'union',
+    name: 'Watcher',
+    kind: 'dynamic',
+    op: 'union',
     sources: [{ kind: 'account-owned', accountId: 'acc1' }],
   });
   assert.equal(isAccountReferenced('acc1'), true);
@@ -367,7 +422,11 @@ test('createList: a ranked list stores its one source, and counts as referencing
 test('updateRankedSource: rejects a cycle through a ranked list', () => {
   const { createList, updateRankedSource, CycleError } = store();
   const ranked = createList({ kind: 'ranked', source: { kind: 'recent-games' } });
-  const dyn = createList({ kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: ranked.id }, { kind: 'recent-games' }] });
+  const dyn = createList({
+    kind: 'dynamic',
+    op: 'union',
+    sources: [{ kind: 'user', listId: ranked.id }, { kind: 'recent-games' }],
+  });
   assert.throws(() => updateRankedSource(ranked.id, { kind: 'user', listId: dyn.id }), CycleError);
 });
 

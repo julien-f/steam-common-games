@@ -6,16 +6,18 @@ const assert = require('node:assert/strict');
 function makeMemoryLocalStorage() {
   const store = new Map();
   return {
-    getItem: k => (store.has(k) ? store.get(k) : null),
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
     setItem: (k, v) => store.set(k, String(v)),
-    removeItem: k => store.delete(k),
+    removeItem: (k) => store.delete(k),
   };
 }
 
 function withFetch(t, handler) {
   const restore = globalThis.fetch;
   globalThis.fetch = handler;
-  t.after(() => { globalThis.fetch = restore; });
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
 }
 
 beforeEach(() => {
@@ -53,14 +55,24 @@ function makeAccount(id) {
 // Same shape resolveAccountSummary's own tests use (test/accountData.test.js) — a single member
 // resolving through /api/common-games (owned) and /api/wishlist.
 function mockResolveFetch(steamid = '76561198000000201') {
-  return async url => {
+  return async (url) => {
     if (url === '/api/common-games') {
       return {
         ok: true,
         json: async () => ({
           groups: [],
-          slots: [[{ steamid, personaname: 'Alice', avatarmedium: 'https://x/a.jpg', profileurl: 'https://steamcommunity.com/id/alice/' }]],
-          playtime: {}, lastPlayed: {},
+          slots: [
+            [
+              {
+                steamid,
+                personaname: 'Alice',
+                avatarmedium: 'https://x/a.jpg',
+                profileurl: 'https://steamcommunity.com/id/alice/',
+              },
+            ],
+          ],
+          playtime: {},
+          lastPlayed: {},
         }),
       };
     }
@@ -83,7 +95,10 @@ function markAlreadySynced(steamid = STEAMID) {
 test('syncPrefsWithServer (first sync): a local-only key is pushed to the server, nothing adopted', async (t) => {
   prefs().setPref('region', 'DE');
   let sent;
-  withFetch(t, async (url, opts) => { sent = { url, body: JSON.parse(opts.body) }; return { ok: true, json: async () => ({ ok: true }) }; });
+  withFetch(t, async (url, opts) => {
+    sent = { url, body: JSON.parse(opts.body) };
+    return { ok: true, json: async () => ({ ok: true }) };
+  });
 
   const adopted = await auth().syncPrefsWithServer(STEAMID, {});
 
@@ -93,7 +108,9 @@ test('syncPrefsWithServer (first sync): a local-only key is pushed to the server
 });
 
 test('syncPrefsWithServer (first sync): a server-only key is adopted locally', async (t) => {
-  withFetch(t, async () => { throw new Error('should not push anything'); });
+  withFetch(t, async () => {
+    throw new Error('should not push anything');
+  });
 
   const adopted = await auth().syncPrefsWithServer(STEAMID, { region: { value: 'GB', updatedAt: 500 } });
 
@@ -104,11 +121,14 @@ test('syncPrefsWithServer (first sync): a server-only key is adopted locally', a
 test('syncPrefsWithServer (first sync): server always wins a key both sides have, even if local is newer', async (t) => {
   prefs().setPref('region', 'DE'); // updatedAt = Date.now(), well after 500 — must not matter here
   let pushed = false;
-  withFetch(t, async () => { pushed = true; return { ok: true, json: async () => ({ ok: true }) }; });
+  withFetch(t, async () => {
+    pushed = true;
+    return { ok: true, json: async () => ({ ok: true }) };
+  });
 
   const adopted = await auth().syncPrefsWithServer(STEAMID, { region: { value: 'GB', updatedAt: 500 } });
 
-  assert.equal(adopted, true, 'server\'s value must be adopted, not the newer-but-untrusted local one');
+  assert.equal(adopted, true, "server's value must be adopted, not the newer-but-untrusted local one");
   assert.equal(pushed, false, 'local must never push over an existing server key on first sync');
   assert.equal(prefs().getPref('region'), 'GB');
 });
@@ -125,7 +145,10 @@ test('syncPrefsWithServer (ongoing): local newer than server for the same key pu
   markAlreadySynced();
   prefs().setPref('region', 'DE'); // updatedAt = Date.now(), well after 500
   let pushed = false;
-  withFetch(t, async () => { pushed = true; return { ok: true, json: async () => ({ ok: true }) }; });
+  withFetch(t, async () => {
+    pushed = true;
+    return { ok: true, json: async () => ({ ok: true }) };
+  });
 
   const adopted = await auth().syncPrefsWithServer(STEAMID, { region: { value: 'GB', updatedAt: 500 } });
 
@@ -139,7 +162,10 @@ test('syncPrefsWithServer (ongoing): server newer than local for the same key ad
   const entries = { schemaVersion: 2, region: { value: 'DE', updatedAt: 500 } };
   global.localStorage.setItem('steam.isonoe.net:prefs', JSON.stringify(entries));
   let pushed = false;
-  withFetch(t, async () => { pushed = true; return { ok: true, json: async () => ({ ok: true }) }; });
+  withFetch(t, async () => {
+    pushed = true;
+    return { ok: true, json: async () => ({ ok: true }) };
+  });
 
   const adopted = await auth().syncPrefsWithServer(STEAMID, { region: { value: 'GB', updatedAt: 999999999999 } });
 
@@ -153,7 +179,10 @@ test('syncPrefsWithServer (ongoing): equal timestamps on both sides are left alo
   const entries = { schemaVersion: 2, region: { value: 'DE', updatedAt: 500 } };
   global.localStorage.setItem('steam.isonoe.net:prefs', JSON.stringify(entries));
   let called = false;
-  withFetch(t, async () => { called = true; return { ok: true, json: async () => ({ ok: true }) }; });
+  withFetch(t, async () => {
+    called = true;
+    return { ok: true, json: async () => ({ ok: true }) };
+  });
 
   const adopted = await auth().syncPrefsWithServer(STEAMID, { region: { value: 'DE', updatedAt: 500 } });
 
@@ -166,18 +195,26 @@ test('syncPrefsWithServer (ongoing): equal timestamps on both sides are left alo
 test('syncPrefsWithServer: a table-view key is never adopted or pushed, regardless of what either side has', async (t) => {
   markAlreadySynced();
   prefs().setPref('ownedListView', { sorts: [{ key: 'name', dir: 'asc' }] });
-  withFetch(t, async () => { throw new Error('should not push or adopt'); });
+  withFetch(t, async () => {
+    throw new Error('should not push or adopt');
+  });
 
   const adopted = await auth().syncPrefsWithServer(STEAMID, {
     ownedListView: { value: { sorts: [{ key: 'rating', dir: 'desc' }] }, updatedAt: 999999999999 },
   });
 
   assert.equal(adopted, false);
-  assert.deepEqual(prefs().getPref('ownedListView'), { sorts: [{ key: 'name', dir: 'asc' }] }, 'local value left untouched');
+  assert.deepEqual(
+    prefs().getPref('ownedListView'),
+    { sorts: [{ key: 'name', dir: 'asc' }] },
+    'local value left untouched',
+  );
 });
 
 test('syncPrefsWithServer: a table-view key the server has refreshes its baseline', async (t) => {
-  withFetch(t, async () => { throw new Error('should not push'); });
+  withFetch(t, async () => {
+    throw new Error('should not push');
+  });
 
   const serverEntry = { value: { sorts: [{ key: 'rating', dir: 'desc' }] }, updatedAt: 500 };
   await auth().syncPrefsWithServer(STEAMID, { ownedListView: serverEntry });
@@ -187,7 +224,9 @@ test('syncPrefsWithServer: a table-view key the server has refreshes its baselin
 
 test('syncPrefsWithServer: a table-view key the server has never saved clears its baseline', async (t) => {
   tableViewSync().setBaseline('ownedListView', { value: { pageSize: 25 }, updatedAt: 1 });
-  withFetch(t, async () => { throw new Error('should not push'); });
+  withFetch(t, async () => {
+    throw new Error('should not push');
+  });
 
   await auth().syncPrefsWithServer(STEAMID, {});
 
@@ -233,7 +272,10 @@ test('autoPopulateAccountFromLogin: makes no request once both are already set',
   accounts().setMyAccount(existing);
   accounts().setCurrentAccount(existing);
   let called = false;
-  withFetch(t, async () => { called = true; return { ok: true, json: async () => ({}) }; });
+  withFetch(t, async () => {
+    called = true;
+    return { ok: true, json: async () => ({}) };
+  });
 
   await auth().autoPopulateAccountFromLogin('76561198000000201');
 

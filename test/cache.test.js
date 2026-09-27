@@ -85,7 +85,10 @@ test('getCacheStats: entries is the sum of every group in getCacheEntryCounts', 
   setCache('resolve:x', 'id');
   setCache('rating:y', 2);
 
-  assert.equal(getCacheStats().entries, Object.values(getCacheEntryCounts()).reduce((a, b) => a + b, 0));
+  assert.equal(
+    getCacheStats().entries,
+    Object.values(getCacheEntryCounts()).reduce((a, b) => a + b, 0),
+  );
   assert.equal(getCacheStats().entries, 3);
 });
 

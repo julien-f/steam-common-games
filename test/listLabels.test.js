@@ -3,16 +3,22 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  describeListRef, describeSources, formatFormula, listDisplayName, opLabel,
-  OP_LABELS, OP_SYMBOLS, OP_DESCRIPTIONS,
+  describeListRef,
+  describeSources,
+  formatFormula,
+  listDisplayName,
+  opLabel,
+  OP_LABELS,
+  OP_SYMBOLS,
+  OP_DESCRIPTIONS,
 } = require('../public/listLabels.ts');
 
 // The injected half of ListNaming (see listLabels.ts) — the real one reads accountsStore.ts/
 // listsStore.ts, which is exactly what these tests don't want to need.
 function makeNaming({ accounts = {}, lists = {} } = {}) {
   return {
-    account: id => accounts[id] ?? null,
-    list: id => lists[id] ?? null,
+    account: (id) => accounts[id] ?? null,
+    list: (id) => lists[id] ?? null,
   };
 }
 
@@ -103,42 +109,60 @@ test('describeListRef: a ref saved without its id is reported rather than render
 
 // ── describeSources / formatFormula ──────────────────────────────────────────────────────────
 
-test('describeSources: one description per source, in the list\'s own order', () => {
+test("describeSources: one description per source, in the list's own order", () => {
   const list = dynamicList('intersect', [
     { kind: 'account-owned', accountId: 'acc1' },
     { kind: 'user', listId: 'l1' },
   ]);
-  assert.deepEqual(describeSources(list, NAMING).map(d => d.label), ['Alice — Owned', 'Co-op night']);
+  assert.deepEqual(
+    describeSources(list, NAMING).map((d) => d.label),
+    ['Alice — Owned', 'Co-op night'],
+  );
 });
 
 test('describeSources: a manual list has no sources to describe', () => {
-  const manual = { id: 'm', name: 'm', parentId: null, order: 0, createdAt: 0, updatedAt: 0, kind: 'manual', appids: [1, 2] };
+  const manual = {
+    id: 'm',
+    name: 'm',
+    parentId: null,
+    order: 0,
+    createdAt: 0,
+    updatedAt: 0,
+    kind: 'manual',
+    appids: [1, 2],
+  };
   assert.deepEqual(describeSources(manual, NAMING), []);
 });
 
 test('formatFormula: joins sources with the op symbol', () => {
   assert.equal(
-    formatFormula(dynamicList('intersect', [
-      { kind: 'account-owned', accountId: 'acc1' },
-      { kind: 'account-owned', accountId: 'fam' },
-    ]), NAMING),
+    formatFormula(
+      dynamicList('intersect', [
+        { kind: 'account-owned', accountId: 'acc1' },
+        { kind: 'account-owned', accountId: 'fam' },
+      ]),
+      NAMING,
+    ),
     'Alice — Owned ∩ Alice + Bob — Owned',
   );
   assert.equal(
-    formatFormula(dynamicList('subtract', [
-      { kind: 'account-wishlist', accountId: 'acc1' },
-      { kind: 'user', listId: 'l1' },
-    ]), NAMING),
+    formatFormula(
+      dynamicList('subtract', [
+        { kind: 'account-wishlist', accountId: 'acc1' },
+        { kind: 'user', listId: 'l1' },
+      ]),
+      NAMING,
+    ),
     'Alice — Wishlist ∖ Co-op night',
   );
 });
 
 test('formatFormula: group-by-membership has no infix meaning, so it joins with + and says what it did', () => {
   assert.equal(
-    formatFormula(dynamicList('group-by-membership', [
-      { kind: 'account-owned', accountId: 'acc1' },
-      { kind: 'recent-games' },
-    ]), NAMING),
+    formatFormula(
+      dynamicList('group-by-membership', [{ kind: 'account-owned', accountId: 'acc1' }, { kind: 'recent-games' }]),
+      NAMING,
+    ),
     'Alice — Owned + Recently Looked Up — grouped by membership',
   );
 });
@@ -149,7 +173,16 @@ test('formatFormula: defaults a missing op to union, same as resolveGameList doe
 });
 
 test('formatFormula: nothing to show for a manual list, or a dynamic one with no sources saved', () => {
-  const manual = { id: 'm', name: 'm', parentId: null, order: 0, createdAt: 0, updatedAt: 0, kind: 'manual', appids: [1] };
+  const manual = {
+    id: 'm',
+    name: 'm',
+    parentId: null,
+    order: 0,
+    createdAt: 0,
+    updatedAt: 0,
+    kind: 'manual',
+    appids: [1],
+  };
   assert.equal(formatFormula(manual, NAMING), null);
   assert.equal(formatFormula(dynamicList('union', []), NAMING), null);
 });
@@ -157,15 +190,21 @@ test('formatFormula: nothing to show for a manual list, or a dynamic one with no
 // ── listDisplayName ──────────────────────────────────────────────────────────────────────────
 
 test('listDisplayName: a list with a name is called by it, formula or not', () => {
-  const named = { ...dynamicList('union', [{ kind: 'recent-games' }, { kind: 'user', listId: 'l1' }]), name: 'Friday shortlist' };
+  const named = {
+    ...dynamicList('union', [{ kind: 'recent-games' }, { kind: 'user', listId: 'l1' }]),
+    name: 'Friday shortlist',
+  };
   assert.equal(listDisplayName(named, NAMING), 'Friday shortlist');
 });
 
 test('listDisplayName: an unnamed dynamic list is called by its formula', () => {
-  const unnamed = { ...dynamicList('intersect', [
-    { kind: 'account-owned', accountId: 'acc1' },
-    { kind: 'account-owned', accountId: 'fam' },
-  ]), name: undefined };
+  const unnamed = {
+    ...dynamicList('intersect', [
+      { kind: 'account-owned', accountId: 'acc1' },
+      { kind: 'account-owned', accountId: 'fam' },
+    ]),
+    name: undefined,
+  };
   assert.equal(listDisplayName(unnamed, NAMING), 'Alice — Owned ∩ Alice + Bob — Owned');
 });
 
@@ -182,11 +221,16 @@ test('listDisplayName: nothing to derive from (no sources, or a manual list) fal
 function freshStores() {
   const store = new Map();
   global.localStorage = {
-    getItem: k => (store.has(k) ? store.get(k) : null),
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
     setItem: (k, v) => store.set(k, String(v)),
-    removeItem: k => store.delete(k),
+    removeItem: (k) => store.delete(k),
   };
-  for (const mod of ['../public/prefs.ts', '../public/listsStore.ts', '../public/accountsStore.ts', '../public/listLabels.ts']) {
+  for (const mod of [
+    '../public/prefs.ts',
+    '../public/listsStore.ts',
+    '../public/accountsStore.ts',
+    '../public/listLabels.ts',
+  ]) {
     delete require.cache[require.resolve(mod)];
   }
   return { ...require('../public/listsStore.ts'), ...require('../public/listLabels.ts') };
@@ -194,11 +238,17 @@ function freshStores() {
 
 test('createDefaultNaming: an unnamed dynamic list used as a source reads as its own formula, parenthesized', () => {
   const { createList, createDefaultNaming, formatFormula } = freshStores();
-  const inner = createList({ kind: 'dynamic', op: 'union', sources: [{ kind: 'recent-games' }, { kind: 'recent-games' }] });
-  const outer = createList({ name: 'Outer', kind: 'dynamic', op: 'intersect', sources: [
-    { kind: 'user', listId: inner.id },
-    { kind: 'recent-games' },
-  ] });
+  const inner = createList({
+    kind: 'dynamic',
+    op: 'union',
+    sources: [{ kind: 'recent-games' }, { kind: 'recent-games' }],
+  });
+  const outer = createList({
+    name: 'Outer',
+    kind: 'dynamic',
+    op: 'intersect',
+    sources: [{ kind: 'user', listId: inner.id }, { kind: 'recent-games' }],
+  });
   assert.equal(
     formatFormula(outer, createDefaultNaming()),
     '(Recently Looked Up ∪ Recently Looked Up) ∩ Recently Looked Up',
@@ -207,9 +257,22 @@ test('createDefaultNaming: an unnamed dynamic list used as a source reads as its
 
 test('createDefaultNaming: nesting is capped — an unnamed list two levels down is named by its kind, not spelled out', () => {
   const { createList, createDefaultNaming, formatFormula } = freshStores();
-  const deep = createList({ kind: 'dynamic', op: 'union', sources: [{ kind: 'recent-games' }, { kind: 'recent-games' }] });
-  const middle = createList({ kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: deep.id }, { kind: 'recent-games' }] });
-  const outer = createList({ name: 'Outer', kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: middle.id }] });
+  const deep = createList({
+    kind: 'dynamic',
+    op: 'union',
+    sources: [{ kind: 'recent-games' }, { kind: 'recent-games' }],
+  });
+  const middle = createList({
+    kind: 'dynamic',
+    op: 'union',
+    sources: [{ kind: 'user', listId: deep.id }, { kind: 'recent-games' }],
+  });
+  const outer = createList({
+    name: 'Outer',
+    kind: 'dynamic',
+    op: 'union',
+    sources: [{ kind: 'user', listId: middle.id }],
+  });
   assert.equal(formatFormula(outer, createDefaultNaming()), '(Untitled combined list ∪ Recently Looked Up)');
 });
 
@@ -228,7 +291,18 @@ test('every op has a label, a description and a join symbol', () => {
 });
 
 test('a ranked list is described by its one source, and named "Ranking of <source>" when unnamed', () => {
-  const ranked = { id: 'r', parentId: null, order: 0, createdAt: 0, updatedAt: 0, kind: 'ranked', source: { kind: 'account-owned', accountId: 'acc1' } };
-  assert.deepEqual(describeSources(ranked, NAMING).map(s => s.label), ['Alice — Owned']);
+  const ranked = {
+    id: 'r',
+    parentId: null,
+    order: 0,
+    createdAt: 0,
+    updatedAt: 0,
+    kind: 'ranked',
+    source: { kind: 'account-owned', accountId: 'acc1' },
+  };
+  assert.deepEqual(
+    describeSources(ranked, NAMING).map((s) => s.label),
+    ['Alice — Owned'],
+  );
   assert.equal(listDisplayName(ranked, NAMING), 'Ranking of Alice — Owned');
 });

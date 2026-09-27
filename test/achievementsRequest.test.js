@@ -2,7 +2,11 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { achievementsAccountKey, achievementsRequestUrl, achievementsSteamUrl } = require('../public/achievementsRequest.ts');
+const {
+  achievementsAccountKey,
+  achievementsRequestUrl,
+  achievementsSteamUrl,
+} = require('../public/achievementsRequest.ts');
 
 test('achievementsAccountKey: sorts, so member order never yields two keys for one slot', () => {
   assert.equal(achievementsAccountKey(['2', '1']), achievementsAccountKey(['1', '2']));
@@ -24,7 +28,9 @@ test('achievementsRequestUrl: force adds refresh=1, with or without an account',
 });
 
 test('achievementsSteamUrl: links the first member of a Family; null with no account', () => {
-  assert.equal(achievementsSteamUrl(440, ['76561198000000001', '76561198000000002']),
-    'https://steamcommunity.com/profiles/76561198000000001/stats/440/achievements/');
+  assert.equal(
+    achievementsSteamUrl(440, ['76561198000000001', '76561198000000002']),
+    'https://steamcommunity.com/profiles/76561198000000001/stats/440/achievements/',
+  );
   assert.equal(achievementsSteamUrl(440, []), null);
 });

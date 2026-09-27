@@ -2,7 +2,25 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeInput, steamVanity, scoreColor, fmtH, fmtPlaytime, fmtLastPlayed, countryFlag, esc, foldStr, renderScoreCell, renderMainCell, renderExtraCell, computeSteamdbRating, computeProductionTier, dealRecordTier, fmtAge, isTextEntry } = require('../public/utils.ts');
+const {
+  normalizeInput,
+  steamVanity,
+  scoreColor,
+  fmtH,
+  fmtPlaytime,
+  fmtLastPlayed,
+  countryFlag,
+  esc,
+  foldStr,
+  renderScoreCell,
+  renderMainCell,
+  renderExtraCell,
+  computeSteamdbRating,
+  computeProductionTier,
+  dealRecordTier,
+  fmtAge,
+  isTextEntry,
+} = require('../public/utils.ts');
 
 // ── normalizeInput ────────────────────────────────────────────────────────────
 
@@ -253,7 +271,7 @@ test('computeSteamdbRating: returns null with no reviews', () => {
   assert.equal(computeSteamdbRating(0, 0), null);
 });
 
-test('computeSteamdbRating: 90/100 lands around 87-88 at this app\'s shrink strength', () => {
+test("computeSteamdbRating: 90/100 lands around 87-88 at this app's shrink strength", () => {
   assert.equal(Math.round(computeSteamdbRating(90, 100)), 88);
 });
 
@@ -384,7 +402,9 @@ test('fmtAge: under a minute, in either direction, is just now', () => {
 
 test('fmtAge: steps through minutes, hours, days and months', () => {
   const now = 1_700_000_000_000;
-  const min = 60_000, hour = 60 * min, day = 24 * hour;
+  const min = 60_000,
+    hour = 60 * min,
+    day = 24 * hour;
   assert.equal(fmtAge(now - 5 * min, now), '5 min ago');
   assert.equal(fmtAge(now - 3 * hour, now), '3h ago');
   assert.equal(fmtAge(now - day, now), '1 day ago');

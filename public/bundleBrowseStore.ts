@@ -7,7 +7,10 @@
 // re-runs on navigation since params.bundleId itself is reactive), so nothing here needs to be a
 // signal of its own. Deliberately volatile (not persisted, unlike accountsStore.ts/listsStore.ts)
 // — a page reload always starts this at [] again, same as bundlesSig did.
-export interface BrowsedBundle { id: number; title: string }
+export interface BrowsedBundle {
+  id: number;
+  title: string;
+}
 
 let browsed: BrowsedBundle[] = [];
 

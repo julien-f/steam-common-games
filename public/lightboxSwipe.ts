@@ -29,7 +29,14 @@ export function decideSwipeAxis(dx: number, dy: number): SwipeAxis | null {
 
 // `mediaCount`/`hasGameList`: what there is to step to on each axis — a lone screenshot or a
 // standalone lookup with no list behind it resolves to null, and the caller snaps back.
-export function resolveSwipe({ axis, dx, dy, dt, mediaCount, hasGameList }: {
+export function resolveSwipe({
+  axis,
+  dx,
+  dy,
+  dt,
+  mediaCount,
+  hasGameList,
+}: {
   axis: SwipeAxis;
   dx: number;
   dy: number;
@@ -39,7 +46,8 @@ export function resolveSwipe({ axis, dx, dy, dt, mediaCount, hasGameList }: {
 }): SwipeAction | null {
   const delta = axis === 'x' ? dx : dy;
   const distance = Math.abs(delta);
-  const committed = distance >= (axis === 'x' ? LB_SWIPE_X_DISTANCE : LB_SWIPE_Y_DISTANCE) ||
+  const committed =
+    distance >= (axis === 'x' ? LB_SWIPE_X_DISTANCE : LB_SWIPE_Y_DISTANCE) ||
     (distance >= LB_SWIPE_FLICK_DISTANCE && dt <= LB_SWIPE_FLICK_MS);
   if (!committed) return null;
   if (axis === 'x') return mediaCount > 1 ? (delta < 0 ? 'media-next' : 'media-prev') : null;

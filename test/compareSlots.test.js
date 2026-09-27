@@ -3,12 +3,24 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  namesAccount, slotHasAccount, slotsHaveAccount, slotIdentifiers, slotsToIdentifiers,
-  slotsFromIdentifiers, filterAccounts, entryIdentifiers, entryLabel,
+  namesAccount,
+  slotHasAccount,
+  slotsHaveAccount,
+  slotIdentifiers,
+  slotsToIdentifiers,
+  slotsFromIdentifiers,
+  filterAccounts,
+  entryIdentifiers,
+  entryLabel,
 } = require('../public/compareSlots.ts');
 
 const account = (label, members, identifiers, extra = {}) => ({
-  id: members.join('+'), label, starred: false, members, identifiers, ...extra,
+  id: members.join('+'),
+  label,
+  starred: false,
+  members,
+  identifiers,
+  ...extra,
 });
 
 const ALICE = account('Alice', ['76561198000000001'], ['alice']);
@@ -19,8 +31,8 @@ const FAMILY = account('Bob + Carol', ['76561198000000002', '76561198000000003']
 
 const KNOWN = [ALICE, BOB, NAMELESS, FAMILY];
 
-const typed = value => ({ kind: 'typed', value });
-const picked = a => ({ kind: 'account', account: a });
+const typed = (value) => ({ kind: 'typed', value });
+const picked = (a) => ({ kind: 'account', account: a });
 
 // ── entries ───────────────────────────────────────────────────────────────────
 
@@ -73,10 +85,7 @@ test('slotIdentifiers: flattens entries, dropping blanks', () => {
 });
 
 test('slotsToIdentifiers: drops empty slots entirely', () => {
-  assert.deepEqual(
-    slotsToIdentifiers([[picked(ALICE)], [], [picked(FAMILY)]]),
-    [['alice'], ['bob', 'carol']],
-  );
+  assert.deepEqual(slotsToIdentifiers([[picked(ALICE)], [], [picked(FAMILY)]]), [['alice'], ['bob', 'carol']]);
 });
 
 // ── from identifiers — what "Edit players" reopens with ───────────────────────
@@ -105,10 +114,9 @@ test('slotsFromIdentifiers: an ad-hoc Family comes back as its own chips, not on
 
 test('slotsFromIdentifiers: a known Family plus an extra stays per-identifier', () => {
   // The Family accounts for only part of the slot, so collapsing it would hide the extra player.
-  assert.deepEqual(
-    slotsFromIdentifiers([['bob', 'carol', 'stranger']], KNOWN),
-    [[picked(BOB), typed('carol'), typed('stranger')]],
-  );
+  assert.deepEqual(slotsFromIdentifiers([['bob', 'carol', 'stranger']], KNOWN), [
+    [picked(BOB), typed('carol'), typed('stranger')],
+  ]);
 });
 
 test('slotsFromIdentifiers: round-trips back to the identifiers it was built from', () => {
@@ -119,21 +127,33 @@ test('slotsFromIdentifiers: round-trips back to the identifiers it was built fro
 // ── the dropdown's list ───────────────────────────────────────────────────────
 
 test('filterAccounts: everything known when nothing is typed', () => {
-  assert.deepEqual(filterAccounts(KNOWN, [[]], '').map(a => a.label), ['Alice', 'Bob', 'Dana', 'Bob + Carol']);
+  assert.deepEqual(
+    filterAccounts(KNOWN, [[]], '').map((a) => a.label),
+    ['Alice', 'Bob', 'Dana', 'Bob + Carol'],
+  );
 });
 
 test('filterAccounts: matches on the label, case-insensitively', () => {
-  assert.deepEqual(filterAccounts(KNOWN, [[]], 'dana').map(a => a.label), ['Dana']);
+  assert.deepEqual(
+    filterAccounts(KNOWN, [[]], 'dana').map((a) => a.label),
+    ['Dana'],
+  );
 });
 
 test('filterAccounts: matches on an identifier or a steam64 id too', () => {
-  assert.deepEqual(filterAccounts(KNOWN, [[]], 'carol').map(a => a.label), ['Bob + Carol']);
-  assert.deepEqual(filterAccounts(KNOWN, [[]], '76561198000000001').map(a => a.label), ['Alice']);
+  assert.deepEqual(
+    filterAccounts(KNOWN, [[]], 'carol').map((a) => a.label),
+    ['Bob + Carol'],
+  );
+  assert.deepEqual(
+    filterAccounts(KNOWN, [[]], '76561198000000001').map((a) => a.label),
+    ['Alice'],
+  );
 });
 
 test('filterAccounts: hides accounts already placed anywhere in the form', () => {
   assert.deepEqual(
-    filterAccounts(KNOWN, [[picked(ALICE)], []], '').map(a => a.label),
+    filterAccounts(KNOWN, [[picked(ALICE)], []], '').map((a) => a.label),
     ['Bob', 'Dana', 'Bob + Carol'],
   );
 });

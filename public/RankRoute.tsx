@@ -9,7 +9,14 @@ import { getList, getRanking, setRanking } from './listsStore.ts';
 import { resolveListWithSources, flattenCombineResult, createDefaultFetchers } from './listResolve.ts';
 import { createDefaultNaming, listDisplayName } from './listLabels.ts';
 import {
-  nextPair, answer, progress, ranks, type RankingState, type RankingPair, type RankingAnswer, type RankingOptions,
+  nextPair,
+  answer,
+  progress,
+  ranks,
+  type RankingState,
+  type RankingPair,
+  type RankingAnswer,
+  type RankingOptions,
 } from './ranking.ts';
 import { setBaseTitle } from './pageTitle.ts';
 import { panelOpen, panelClose, isPanelOpen, getPanelGame } from './panel.tsx';
@@ -61,7 +68,10 @@ export default function RankRoute() {
   async function load(): Promise<void> {
     const token = ++loadToken;
     const list = getList(params.listId!);
-    if (!list || list.kind !== 'ranked') { setStatus('This ranked list no longer exists.'); return; }
+    if (!list || list.kind !== 'ranked') {
+      setStatus('This ranked list no longer exists.');
+      return;
+    }
     const name = listDisplayName(list, createDefaultNaming());
     setTitle(name);
     setBaseTitle(`Rank — ${name}`);
@@ -86,14 +96,21 @@ export default function RankRoute() {
     if (appid in details) return;
     setDetails(appid, null);
     fetch(`/api/game-details/${appid}`)
-      .then(res => (res.ok ? res.json() : null))
-      .then((data: GameDetails | null) => { if (data) setDetails(appid, data); })
-      .catch(() => { /* card falls back to the header image and appid */ });
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: GameDetails | null) => {
+        if (data) setDetails(appid, data);
+      })
+      .catch(() => {
+        /* card falls back to the header image and appid */
+      });
   }
 
   createEffect(() => {
     const p = pair();
-    if (p) { fetchDetails(p.candidate); fetchDetails(p.opponent); }
+    if (p) {
+      fetchDetails(p.candidate);
+      fetchDetails(p.opponent);
+    }
   });
 
   function openPanel(appid: number): void {
@@ -117,7 +134,7 @@ export default function RankRoute() {
     const src = source();
     if (!current || !src || !pair()) return;
     const next = answer(current, src, ans, opts());
-    setUndoStack(stack => [...stack.slice(-(MAX_UNDO - 1)), current]);
+    setUndoStack((stack) => [...stack.slice(-(MAX_UNDO - 1)), current]);
     setState(next.state);
     setPair(next.pair);
     setRanking(params.listId!, next.state);
@@ -151,11 +168,23 @@ export default function RankRoute() {
       if (!isPanelOpen() && !document.querySelector('.shortcuts-modal.open')) navigate(listHref());
       return;
     }
-    if (key === 'z' || key === 'Z' || key === 'Backspace') { e.preventDefault(); undo(); return; }
+    if (key === 'z' || key === 'Z' || key === 'Backspace') {
+      e.preventDefault();
+      undo();
+      return;
+    }
     const p = pair();
     if (!p) return;
-    if (key === 'x' || key === 'X') { e.preventDefault(); setArmed(a => (a === 'exclude' ? null : 'exclude')); return; }
-    if (key === 'i' || key === 'I') { e.preventDefault(); setArmed(a => (a === 'info' ? null : 'info')); return; }
+    if (key === 'x' || key === 'X') {
+      e.preventDefault();
+      setArmed((a) => (a === 'exclude' ? null : 'exclude'));
+      return;
+    }
+    if (key === 'i' || key === 'I') {
+      e.preventDefault();
+      setArmed((a) => (a === 'info' ? null : 'info'));
+      return;
+    }
     if (key === 'ArrowLeft' || key === 'ArrowRight') {
       const left = key === 'ArrowLeft';
       const action = armed();
@@ -172,8 +201,16 @@ export default function RankRoute() {
       respond(left ? 'candidate' : 'opponent');
       return;
     }
-    if (key === 'ArrowDown' || key === '=') { e.preventDefault(); respond('tie'); return; }
-    if (key === 's' || key === 'S') { e.preventDefault(); respond('skip'); return; }
+    if (key === 'ArrowDown' || key === '=') {
+      e.preventDefault();
+      respond('tie');
+      return;
+    }
+    if (key === 's' || key === 'S') {
+      e.preventDefault();
+      respond('skip');
+      return;
+    }
     setArmed(null);
   }
   document.addEventListener('keydown', onKeydown, true);
@@ -184,7 +221,11 @@ export default function RankRoute() {
     setBaseTitle(null);
   });
 
-  createEffect(() => { params.listId; location.state; void load(); });
+  createEffect(() => {
+    params.listId;
+    location.state;
+    void load();
+  });
 
   function currentProgress() {
     const s = state();
@@ -208,26 +249,43 @@ export default function RankRoute() {
           type="button"
           class="rank-card-pick"
           onClick={() => {
-            if (armed() === 'info') { setArmed(null); openPanel(appid); } else respond(excludeArmed() ? `exclude-${side}` : side);
+            if (armed() === 'info') {
+              setArmed(null);
+              openPanel(appid);
+            } else respond(excludeArmed() ? `exclude-${side}` : side);
           }}
         >
           <img src={headerImage(appid)} alt="" width="460" height="215" loading="eager" />
           <span class="rank-card-name">
             {meta()?.name || `App ${appid}`}
             <Show when={rating() != null}>
-              <span class="rank-card-rating" style={{ color: scoreColor(rating()) }} title="Weighted Rating">{rating()}</span>
+              <span class="rank-card-rating" style={{ color: scoreColor(rating()) }} title="Weighted Rating">
+                {rating()}
+              </span>
             </Show>
           </span>
           <span class="rank-card-facts">
-            {[year(), ...(meta()?.genres ?? []).slice(0, 2), hltb() ? `${hltb()}h main story` : null].filter(Boolean).join(' · ')}
+            {[year(), ...(meta()?.genres ?? []).slice(0, 2), hltb() ? `${hltb()}h main story` : null]
+              .filter(Boolean)
+              .join(' · ')}
           </span>
           <span class="rank-card-note">{note}</span>
         </button>
         <div class="rank-card-actions">
-          <button type="button" class="btn btn-ghost btn-sm" title="Open this game's details in the side panel" onClick={() => openPanel(appid)}>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            title="Open this game's details in the side panel"
+            onClick={() => openPanel(appid)}
+          >
             ℹ Details
           </button>
-          <button type="button" class="btn btn-ghost btn-sm" title="Leave this game out of the ranking" onClick={() => respond(`exclude-${side}`)}>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            title="Leave this game out of the ranking"
+            onClick={() => respond(`exclude-${side}`)}
+          >
             Haven't played — exclude
           </button>
         </div>
@@ -238,83 +296,119 @@ export default function RankRoute() {
   return (
     <div class="rank-route">
       <div class="rank-header">
-        <A href={listHref()} class="btn btn-ghost btn-sm">← Back to list</A>
+        <A href={listHref()} class="btn btn-ghost btn-sm">
+          ← Back to list
+        </A>
         <h1>{title()}</h1>
       </div>
       <Show when={status()}>
         <div class="list-status">{status()}</div>
       </Show>
       <Show when={focus()}>
-        {f => (
+        {(f) => (
           <div class="rank-focus-banner">
             Comparing {f().size} chosen games.
-            <button type="button" class="btn btn-ghost btn-sm" onClick={compareAll}>Compare all instead</button>
+            <button type="button" class="btn btn-ghost btn-sm" onClick={compareAll}>
+              Compare all instead
+            </button>
           </div>
         )}
       </Show>
       <Show when={currentProgress()}>
-        {p => (
+        {(p) => (
           <div class="rank-progress">
             <Show
               when={focus()}
-              fallback={<>
-                <progress max={p().ranked + p().pending} value={p().ranked} />
-                <span>
-                  {p().ranked} / {p().ranked + p().pending} ranked
-                  {p().excluded ? ` · ${p().excluded} excluded` : ''}
-                  {p().pending ? ` · ≈ ${p().remaining} comparisons left` : ''}
-                </span>
-              </>}
+              fallback={
+                <>
+                  <progress max={p().ranked + p().pending} value={p().ranked} />
+                  <span>
+                    {p().ranked} / {p().ranked + p().pending} ranked
+                    {p().excluded ? ` · ${p().excluded} excluded` : ''}
+                    {p().pending ? ` · ≈ ${p().remaining} comparisons left` : ''}
+                  </span>
+                </>
+              }
             >
-              {f => <>
-                <progress max={f().size} value={f().size - p().pending} />
-                <span>
-                  {p().pending} of {f().size} chosen games left
-                  {p().pending ? ` · ≈ ${p().remaining} comparisons` : ''}
-                </span>
-              </>}
+              {(f) => (
+                <>
+                  <progress max={f().size} value={f().size - p().pending} />
+                  <span>
+                    {p().pending} of {f().size} chosen games left
+                    {p().pending ? ` · ≈ ${p().remaining} comparisons` : ''}
+                  </span>
+                </>
+              )}
             </Show>
           </div>
         )}
       </Show>
-      <Show when={pair()} fallback={
-        <Show when={source()}>
-          <div class="rank-done">
-            <Show when={focus()} fallback={<p>Every game in this list is ranked. New games added to its source will show up here.</p>}>
-              <p>Every chosen game is ranked.</p>
-              <Show when={source() && state() && progress(state()!, source()!).pending}>
-                <button type="button" class="btn btn-ghost" onClick={compareAll}>Compare the rest</button>
+      <Show
+        when={pair()}
+        fallback={
+          <Show when={source()}>
+            <div class="rank-done">
+              <Show
+                when={focus()}
+                fallback={<p>Every game in this list is ranked. New games added to its source will show up here.</p>}
+              >
+                <p>Every chosen game is ranked.</p>
+                <Show when={source() && state() && progress(state()!, source()!).pending}>
+                  <button type="button" class="btn btn-ghost" onClick={compareAll}>
+                    Compare the rest
+                  </button>
+                </Show>
               </Show>
-            </Show>
-            <A href={listHref()} class="btn btn-primary">See the ranking</A>
-            <Show when={undoStack().length}>
-              <button type="button" class="btn btn-ghost" onClick={undo}>Undo last answer</button>
-            </Show>
-          </div>
-        </Show>
-      }>
-        {p => (
+              <A href={listHref()} class="btn btn-primary">
+                See the ranking
+              </A>
+              <Show when={undoStack().length}>
+                <button type="button" class="btn btn-ghost" onClick={undo}>
+                  Undo last answer
+                </button>
+              </Show>
+            </div>
+          </Show>
+        }
+      >
+        {(p) => (
           <>
             <h2 class="rank-question">
-              {armed() === 'exclude' ? 'Exclude which game? (← / →)' : armed() === 'info' ? 'Show details of which game? (← / →)' : 'Which do you prefer?'}
+              {armed() === 'exclude'
+                ? 'Exclude which game? (← / →)'
+                : armed() === 'info'
+                  ? 'Show details of which game? (← / →)'
+                  : 'Which do you prefer?'}
             </h2>
             <div class="rank-pair">
               {card(p().candidate, 'candidate', 'New to the ranking')}
               {card(p().opponent, 'opponent', `Currently #${ranks(state()!, source()!).get(p().opponent) ?? '?'}`)}
             </div>
             <div class="rank-actions">
-              <button type="button" class="btn btn-ghost" onClick={() => respond('tie')}>Tie <kbd>↓</kbd></button>
-              <button type="button" class="btn btn-ghost" onClick={() => respond('skip')}>Skip, ask later <kbd>S</kbd></button>
-              <button type="button" class="btn btn-ghost" disabled={!undoStack().length} onClick={undo}>Undo <kbd>Z</kbd></button>
+              <button type="button" class="btn btn-ghost" onClick={() => respond('tie')}>
+                Tie <kbd>↓</kbd>
+              </button>
+              <button type="button" class="btn btn-ghost" onClick={() => respond('skip')}>
+                Skip, ask later <kbd>S</kbd>
+              </button>
+              <button type="button" class="btn btn-ghost" disabled={!undoStack().length} onClick={undo}>
+                Undo <kbd>Z</kbd>
+              </button>
             </div>
             <p class="rank-hint">
-              <For each={[
-                ['← / →', isPanelOpen() ? 'browse the panel\'s media' : 'pick'],
-                ['X then ← / →', 'exclude'],
-                ['I then ← / →', 'details'],
-                ['Esc', isPanelOpen() ? 'close the panel' : 'stop — progress is saved'],
-              ]}>
-                {([k, v]) => <span><kbd>{k}</kbd> {v}</span>}
+              <For
+                each={[
+                  ['← / →', isPanelOpen() ? "browse the panel's media" : 'pick'],
+                  ['X then ← / →', 'exclude'],
+                  ['I then ← / →', 'details'],
+                  ['Esc', isPanelOpen() ? 'close the panel' : 'stop — progress is saved'],
+                ]}
+              >
+                {([k, v]) => (
+                  <span>
+                    <kbd>{k}</kbd> {v}
+                  </span>
+                )}
               </For>
             </p>
           </>

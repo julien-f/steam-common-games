@@ -21,11 +21,11 @@ export function getBaseline(key: string): PrefEntry | undefined {
 }
 
 export function setBaseline(key: string, entry: PrefEntry): void {
-  setBaselines(prev => ({ ...prev, [key]: entry }));
+  setBaselines((prev) => ({ ...prev, [key]: entry }));
 }
 
 export function clearBaseline(key: string): void {
-  setBaselines(prev => (key in prev ? { ...prev, [key]: undefined } : prev));
+  setBaselines((prev) => (key in prev ? { ...prev, [key]: undefined } : prev));
 }
 
 // `page`/`searchQuery` are excluded from the diff/unsaved check below, and from what Save/Revert
@@ -37,7 +37,7 @@ export function clearBaseline(key: string): void {
 const TRANSIENT_VIEW_FIELDS = ['page', 'searchQuery'] as const;
 
 export function stripTransientViewFields(view: unknown): TableViewState {
-  const v: TableViewState = { ...(view as TableViewState ?? {}) };
+  const v: TableViewState = { ...((view as TableViewState) ?? {}) };
   for (const f of TRANSIENT_VIEW_FIELDS) delete v[f];
   return v;
 }

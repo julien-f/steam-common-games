@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "test": "DB_FILE= node --test test/*.test.js test/*.test.ts",
     "cache:clear": "node scripts/cache-clear.js",
-    "lint": "eslint public"
+    "lint": "eslint public",
+    "format": "prettier --write --cache .",
+    "format:check": "prettier --check --cache ."
   },
   "dependencies": {
     "@solidjs/router": "^1.0.0",
@@ -27,10 +29,18 @@
     "node": ">=22.13.0"
   },
   "overrides": {
-    "@typescript-eslint/utils": { "typescript": "$typescript" },
-    "@typescript-eslint/typescript-estree": { "typescript": "$typescript" },
-    "@typescript-eslint/project-service": { "typescript": "$typescript" },
-    "@typescript-eslint/tsconfig-utils": { "typescript": "$typescript" }
+    "@typescript-eslint/utils": {
+      "typescript": "$typescript"
+    },
+    "@typescript-eslint/typescript-estree": {
+      "typescript": "$typescript"
+    },
+    "@typescript-eslint/project-service": {
+      "typescript": "$typescript"
+    },
+    "@typescript-eslint/tsconfig-utils": {
+      "typescript": "$typescript"
+    }
   },
   "devDependencies": {
     "@babel/core": "^8.0.1",
@@ -41,6 +51,7 @@
     "eslint": "^10.10.0",
     "eslint-plugin-solid": "^0.18.0",
     "morgan": "^1.12.0",
+    "prettier": "^3.9.9",
     "supertest": "^7.2.2",
     "typescript": "^7.0.2",
     "vite": "^8.3.0",

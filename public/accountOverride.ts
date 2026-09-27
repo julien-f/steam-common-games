@@ -87,7 +87,7 @@ export function createAccountOverrideSync() {
     setAccountOverride(null); // don't leave a previous link's account showing while this resolves
     setState({ state: 'resolving', identifiers });
     resolveAccountSummary(identifiers).then(
-      summary => {
+      (summary) => {
         if (guard.isStale(gen)) return;
         const account: AccountSlot = {
           id: accountIdFor(summary.members),
@@ -123,6 +123,7 @@ export const clearAccountOverride = defaultSync.clear;
 // leaving the user to guess that the link was the problem.
 export function accountOverrideStatusText(state: AccountOverrideState): string | null {
   if (state.state === 'resolving') return `Resolving ${state.identifiers.join(' + ')} from this link…`;
-  if (state.state === 'error') return `Couldn't resolve ${state.identifiers.join(' + ')} from this link: ${state.message}`;
+  if (state.state === 'error')
+    return `Couldn't resolve ${state.identifiers.join(' + ')} from this link: ${state.message}`;
   return null;
 }

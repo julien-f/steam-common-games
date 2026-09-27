@@ -6,9 +6,9 @@ const assert = require('node:assert/strict');
 function makeMemoryLocalStorage() {
   const store = new Map();
   return {
-    getItem: k => (store.has(k) ? store.get(k) : null),
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
     setItem: (k, v) => store.set(k, String(v)),
-    removeItem: k => store.delete(k),
+    removeItem: (k) => store.delete(k),
   };
 }
 
@@ -16,7 +16,12 @@ function makeMemoryLocalStorage() {
 // its own comment) — but the override it hands to accountsStore.ts is module-level state there,
 // which this repo's "delete require.cache" reset can't reach, so that half is cleared by hand.
 const { createAccountOverrideSync, accountOverrideStatusText } = require('../public/accountOverride.ts');
-const { getAccountOverride, setAccountOverride, getEffectiveCurrentAccount, setCurrentAccount } = require('../public/accountsStore.ts');
+const {
+  getAccountOverride,
+  setAccountOverride,
+  getEffectiveCurrentAccount,
+  setCurrentAccount,
+} = require('../public/accountsStore.ts');
 
 beforeEach(() => {
   global.localStorage = makeMemoryLocalStorage();
@@ -26,12 +31,19 @@ beforeEach(() => {
 function withFetch(t, handler) {
   const restore = globalThis.fetch;
   globalThis.fetch = handler;
-  t.after(() => { globalThis.fetch = restore; });
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
 }
 
 // A /api/common-games + /api/wishlist responder resolving every requested identifier to one
 // player, mirroring what resolveAccountSummary reads (accountData.ts).
-function fakeResolveFetch({ members = [{ steamid: '1', personaname: 'Alice', avatarmedium: 'a.jpg', profileurl: 'https://steamcommunity.com/id/alice/' }], fail = false } = {}) {
+function fakeResolveFetch({
+  members = [
+    { steamid: '1', personaname: 'Alice', avatarmedium: 'a.jpg', profileurl: 'https://steamcommunity.com/id/alice/' },
+  ],
+  fail = false,
+} = {}) {
   const calls = [];
   const handler = async (url, opts) => {
     calls.push({ url, body: JSON.parse(opts.body) });
@@ -47,7 +59,7 @@ function fakeResolveFetch({ members = [{ steamid: '1', personaname: 'Alice', ava
 
 // The resolve is fired off without being awaited (syncFromUrl is called from a Solid effect), so
 // tests wait for the microtasks it chains on rather than for a returned promise.
-const settle = () => new Promise(resolve => setTimeout(resolve, 0));
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 test('syncFromUrl: resolves ?u= into an override, leaving the stored account untouched', async (t) => {
   withFetch(t, fakeResolveFetch());
@@ -61,7 +73,11 @@ test('syncFromUrl: resolves ?u= into an override, leaving the stored account unt
   await settle();
   assert.equal(sync.getState().state, 'ready');
   assert.deepEqual(getAccountOverride(), {
-    id: '1', members: ['1'], rawInputs: ['alice'], label: 'Alice', avatarUrl: 'a.jpg',
+    id: '1',
+    members: ['1'],
+    rawInputs: ['alice'],
+    label: 'Alice',
+    avatarUrl: 'a.jpg',
     vanities: { 1: 'alice' }, // carried onto the slot, so the copyable identifier needs no fetch
     lastUsedAt: getAccountOverride().lastUsedAt,
   });
@@ -71,7 +87,10 @@ test('syncFromUrl: resolves ?u= into an override, leaving the stored account unt
 
 test('syncFromUrl: comma-joined identifiers resolve as one Family account', async (t) => {
   const fetchHandler = fakeResolveFetch({
-    members: [{ steamid: '1', personaname: 'Alice' }, { steamid: '2', personaname: 'Bob' }],
+    members: [
+      { steamid: '1', personaname: 'Alice' },
+      { steamid: '2', personaname: 'Bob' },
+    ],
   });
   withFetch(t, fetchHandler);
   const sync = createAccountOverrideSync();
@@ -110,7 +129,7 @@ test('syncFromUrl: an unrelated param write does not re-resolve the same account
   sync.syncFromUrl('?u=alice&game=620&shot=s0');
   await settle();
 
-  const resolves = fetchHandler.calls.filter(c => c.url === '/api/common-games').length;
+  const resolves = fetchHandler.calls.filter((c) => c.url === '/api/common-games').length;
   assert.equal(resolves, 1);
   assert.equal(sync.getState().state, 'ready');
 });
@@ -145,7 +164,7 @@ test('syncFromUrl: a superseded resolve never overwrites a newer one', async (t)
     const body = JSON.parse(opts.body);
     if (url !== '/api/common-games') return { ok: true, json: async () => ({ items: [] }) };
     const slow = body.slots[0][0] === 'slow';
-    if (slow) await new Promise(r => setTimeout(r, 20));
+    if (slow) await new Promise((r) => setTimeout(r, 20));
     return {
       ok: true,
       json: async () => ({
@@ -158,7 +177,7 @@ test('syncFromUrl: a superseded resolve never overwrites a newer one', async (t)
 
   sync.syncFromUrl('?u=slow');
   sync.syncFromUrl('?u=fast');
-  await new Promise(r => setTimeout(r, 40));
+  await new Promise((r) => setTimeout(r, 40));
 
   assert.equal(getAccountOverride().label, 'Fast');
   assert.deepEqual(sync.getState().identifiers, ['fast']);
@@ -177,20 +196,20 @@ test('clear: drops the override, and a later sync of the stripped URL is a no-op
 
   sync.syncFromUrl(''); // what HomeRoute's replaceState leaves behind after an explicit pick
   await settle();
-  assert.equal(fetchHandler.calls.filter(c => c.url === '/api/common-games').length, 1);
+  assert.equal(fetchHandler.calls.filter((c) => c.url === '/api/common-games').length, 1);
 });
 
 test('clear: a resolve still in flight cannot land afterward', async (t) => {
   withFetch(t, async (url) => {
     if (url !== '/api/common-games') return { ok: true, json: async () => ({ items: [] }) };
-    await new Promise(r => setTimeout(r, 20));
+    await new Promise((r) => setTimeout(r, 20));
     return { ok: true, json: async () => ({ groups: [], slots: [[{ steamid: '1', personaname: 'Alice' }]] }) };
   });
   const sync = createAccountOverrideSync();
 
   sync.syncFromUrl('?u=alice');
   sync.clear();
-  await new Promise(r => setTimeout(r, 40));
+  await new Promise((r) => setTimeout(r, 40));
 
   assert.equal(getAccountOverride(), null);
   assert.equal(sync.getState().state, 'none');

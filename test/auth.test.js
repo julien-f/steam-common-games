@@ -7,8 +7,15 @@ process.env.DB_FILE = '';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  parseCookies, serializeCookie, buildLoginUrl, verifySteamAssertion,
-  upsertUser, createSession, destroySession, getSessionUser, setUserPref,
+  parseCookies,
+  serializeCookie,
+  buildLoginUrl,
+  verifySteamAssertion,
+  upsertUser,
+  createSession,
+  destroySession,
+  getSessionUser,
+  setUserPref,
 } = require('../lib/auth');
 
 const VALID_CLAIMED_ID = 'https://steamcommunity.com/openid/id/76561198000000001';
@@ -157,7 +164,7 @@ test('setUserPref: an "older" updatedAt still overwrites — the server no longe
   assert.deepEqual(getSessionUser(sessionId).prefs.a, { value: 'later-but-lower-updatedAt', updatedAt: 1000 });
 });
 
-test('upsertUser: logging in again does not reset that user\'s prefs', () => {
+test("upsertUser: logging in again does not reset that user's prefs", () => {
   const steamid = '76561198000000104';
   upsertUser(steamid);
   setUserPref(steamid, 'keep', 'me', 1000);

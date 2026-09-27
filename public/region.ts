@@ -50,24 +50,55 @@ export const COUNTRY_OPTIONS: CountryOption[] = [
 // incorrectly bucketed into EUR pricing.
 export const TIMEZONE_COUNTRY: Record<string, string> = {
   'Europe/London': 'GB',
-  'Europe/Berlin': 'DE', 'Europe/Paris': 'DE', 'Europe/Madrid': 'DE', 'Europe/Rome': 'DE',
-  'Europe/Amsterdam': 'DE', 'Europe/Brussels': 'DE', 'Europe/Vienna': 'DE', 'Europe/Dublin': 'DE',
-  'Europe/Lisbon': 'DE', 'Europe/Helsinki': 'DE', 'Europe/Luxembourg': 'DE', 'Europe/Athens': 'DE',
-  'America/Toronto': 'CA', 'America/Vancouver': 'CA', 'America/Edmonton': 'CA',
-  'America/Winnipeg': 'CA', 'America/Halifax': 'CA', 'America/St_Johns': 'CA',
-  'Australia/Sydney': 'AU', 'Australia/Melbourne': 'AU', 'Australia/Brisbane': 'AU',
-  'Australia/Perth': 'AU', 'Australia/Adelaide': 'AU', 'Australia/Darwin': 'AU', 'Australia/Hobart': 'AU',
+  'Europe/Berlin': 'DE',
+  'Europe/Paris': 'DE',
+  'Europe/Madrid': 'DE',
+  'Europe/Rome': 'DE',
+  'Europe/Amsterdam': 'DE',
+  'Europe/Brussels': 'DE',
+  'Europe/Vienna': 'DE',
+  'Europe/Dublin': 'DE',
+  'Europe/Lisbon': 'DE',
+  'Europe/Helsinki': 'DE',
+  'Europe/Luxembourg': 'DE',
+  'Europe/Athens': 'DE',
+  'America/Toronto': 'CA',
+  'America/Vancouver': 'CA',
+  'America/Edmonton': 'CA',
+  'America/Winnipeg': 'CA',
+  'America/Halifax': 'CA',
+  'America/St_Johns': 'CA',
+  'Australia/Sydney': 'AU',
+  'Australia/Melbourne': 'AU',
+  'Australia/Brisbane': 'AU',
+  'Australia/Perth': 'AU',
+  'Australia/Adelaide': 'AU',
+  'Australia/Darwin': 'AU',
+  'Australia/Hobart': 'AU',
   'Asia/Tokyo': 'JP',
-  'America/Sao_Paulo': 'BR', 'America/Manaus': 'BR', 'America/Bahia': 'BR', 'America/Fortaleza': 'BR',
-  'Europe/Moscow': 'RU', 'Asia/Yekaterinburg': 'RU', 'Asia/Novosibirsk': 'RU',
-  'Asia/Vladivostok': 'RU', 'Asia/Krasnoyarsk': 'RU', 'Asia/Irkutsk': 'RU',
+  'America/Sao_Paulo': 'BR',
+  'America/Manaus': 'BR',
+  'America/Bahia': 'BR',
+  'America/Fortaleza': 'BR',
+  'Europe/Moscow': 'RU',
+  'Asia/Yekaterinburg': 'RU',
+  'Asia/Novosibirsk': 'RU',
+  'Asia/Vladivostok': 'RU',
+  'Asia/Krasnoyarsk': 'RU',
+  'Asia/Irkutsk': 'RU',
   'Europe/Istanbul': 'TR',
-  'Europe/Kyiv': 'UA', 'Europe/Kiev': 'UA', // Kiev is the older alias for the same zone
-  'America/Argentina/Buenos_Aires': 'AR', 'America/Argentina/Cordoba': 'AR',
-  'Asia/Kolkata': 'IN', 'Asia/Calcutta': 'IN', // Calcutta is the older alias for the same zone
-  'Asia/Shanghai': 'CN', 'Asia/Urumqi': 'CN',
+  'Europe/Kyiv': 'UA',
+  'Europe/Kiev': 'UA', // Kiev is the older alias for the same zone
+  'America/Argentina/Buenos_Aires': 'AR',
+  'America/Argentina/Cordoba': 'AR',
+  'Asia/Kolkata': 'IN',
+  'Asia/Calcutta': 'IN', // Calcutta is the older alias for the same zone
+  'Asia/Shanghai': 'CN',
+  'Asia/Urumqi': 'CN',
   'Asia/Seoul': 'KR',
-  'America/Mexico_City': 'MX', 'America/Tijuana': 'MX', 'America/Cancun': 'MX',
+  'America/Mexico_City': 'MX',
+  'America/Tijuana': 'MX',
+  'America/Cancun': 'MX',
 };
 
 // Best-effort location detection, falling back to US when nothing below matches or the browser
@@ -84,11 +115,15 @@ export function detectCountry(): string {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const zoned = TIMEZONE_COUNTRY[tz];
     if (zoned) return zoned;
-  } catch { /* Intl.DateTimeFormat unsupported */ }
+  } catch {
+    /* Intl.DateTimeFormat unsupported */
+  }
   try {
     const region = new Intl.Locale(navigator.language).maximize().region;
-    if (region != null && COUNTRY_OPTIONS.some(c => c.code === region)) return region;
-  } catch { /* Intl.Locale unsupported or unparseable navigator.language */ }
+    if (region != null && COUNTRY_OPTIONS.some((c) => c.code === region)) return region;
+  } catch {
+    /* Intl.Locale unsupported or unparseable navigator.language */
+  }
   return 'US';
 }
 
@@ -114,7 +149,7 @@ const REGION_PREF_KEY = 'region';
 // stored value isn't recognized (an old/foreign value). Never throws.
 export function getStoredRegion(): string {
   const v = getPref<string>(REGION_PREF_KEY);
-  if (v === AUTO_COUNTRY || (v != null && COUNTRY_OPTIONS.some(c => c.code === v))) return v;
+  if (v === AUTO_COUNTRY || (v != null && COUNTRY_OPTIONS.some((c) => c.code === v))) return v;
   return AUTO_COUNTRY;
 }
 // Fired on `window` on every change, regardless of which UI triggered it — the nav bar's own
@@ -129,14 +164,18 @@ export function getStoredRegion(): string {
 // that isn't in the curated list: detectCountry only ever returns codes from it, but a code
 // stored by an older/other version of the app shouldn't render as nothing.
 export function regionLabel(code: string): string {
-  return COUNTRY_OPTIONS.find(c => c.code === code)?.label ?? code;
+  return COUNTRY_OPTIONS.find((c) => c.code === code)?.label ?? code;
 }
 
 export const REGION_CHANGED_EVENT = 'scg:region-changed';
 
 export function setStoredRegion(value: string): void {
   setPref(REGION_PREF_KEY, value);
-  try { window.dispatchEvent(new CustomEvent(REGION_CHANGED_EVENT, { detail: { region: value } })); } catch { /* no window (tests) */ }
+  try {
+    window.dispatchEvent(new CustomEvent(REGION_CHANGED_EVENT, { detail: { region: value } }));
+  } catch {
+    /* no window (tests) */
+  }
 }
 
 // Resolves whatever the picker is currently set to (a real code, or AUTO_COUNTRY) to an actual

@@ -66,7 +66,7 @@ export function createMyOwnershipCache() {
     if (!ownedSet || !wishlistSet) return; // only once both halves have landed
     const listeners = readyListeners;
     readyListeners = [];
-    listeners.forEach(fn => fn());
+    listeners.forEach((fn) => fn());
   }
 
   // Starts (or reuses) the two fetches for whatever `currentAccount` currently is. Returns false
@@ -86,10 +86,19 @@ export function createMyOwnershipCache() {
     ownersMap = new Map();
     ownedPromise = fetchAccountOwnedData(account.id)
       .catch(() => ({ appids: new Set<number>(), owners: new Map<number, GameOwner[]>() }))
-      .then(({ appids, owners }) => { ownedSet = appids; ownersMap = owners; notifyReady(); return appids; });
+      .then(({ appids, owners }) => {
+        ownedSet = appids;
+        ownersMap = owners;
+        notifyReady();
+        return appids;
+      });
     wishlistPromise = fetchAccountWishlistAppids(account.id)
       .catch(() => new Set<number>())
-      .then(s => { wishlistSet = s; notifyReady(); return s; });
+      .then((s) => {
+        wishlistSet = s;
+        notifyReady();
+        return s;
+      });
     return true;
   }
 
@@ -132,7 +141,7 @@ export function createMyOwnershipCache() {
     const owners = ownersMap.get(appid) ?? [];
     return {
       playtime: owners.reduce((sum, o) => sum + o.minutes, 0) / 60,
-      lastPlayed: fmtLastPlayed(Math.max(0, ...owners.map(o => o.lastPlayedSec))),
+      lastPlayed: fmtLastPlayed(Math.max(0, ...owners.map((o) => o.lastPlayedSec))),
     };
   }
 
@@ -143,7 +152,9 @@ export function createMyOwnershipCache() {
   // dropdown's ownership markers permanently blank for whatever was on screen at load time.
   function onMyOwnershipReady(cb: () => void): () => void {
     readyListeners.push(cb);
-    return () => { readyListeners = readyListeners.filter(fn => fn !== cb); };
+    return () => {
+      readyListeners = readyListeners.filter((fn) => fn !== cb);
+    };
   }
 
   return { getMyOwnershipStatus, peekMyOwnershipStatus, peekMyPlaytime, getOwnersFor, onMyOwnershipReady };

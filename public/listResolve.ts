@@ -38,12 +38,18 @@ export class ListCycleError extends Error {
 
 function labelForRef(ref: ListRef, index: number): string {
   switch (ref.kind) {
-    case 'account-owned': return `account-owned:${ref.accountId ?? index}`;
-    case 'account-wishlist': return `account-wishlist:${ref.accountId ?? index}`;
-    case 'bundle': return `bundle:${ref.bundleId ?? index}`;
-    case 'recent-games': return 'recent-games';
-    case 'user': return `list:${ref.listId ?? index}`;
-    default: return String(index);
+    case 'account-owned':
+      return `account-owned:${ref.accountId ?? index}`;
+    case 'account-wishlist':
+      return `account-wishlist:${ref.accountId ?? index}`;
+    case 'bundle':
+      return `bundle:${ref.bundleId ?? index}`;
+    case 'recent-games':
+      return 'recent-games';
+    case 'user':
+      return `list:${ref.listId ?? index}`;
+    default:
+      return String(index);
   }
 }
 
@@ -133,14 +139,16 @@ export async function resolveListWithSources(
   }
 
   const sources = list.sources ?? [];
-  const labeled: LabeledSet[] = await Promise.all(sources.map(async (ref, i) => ({
-    key: labelForRef(ref, i),
-    appids: await resolveRef(ref, fetchers, visited, depth + 1),
-  })));
+  const labeled: LabeledSet[] = await Promise.all(
+    sources.map(async (ref, i) => ({
+      key: labelForRef(ref, i),
+      appids: await resolveRef(ref, fetchers, visited, depth + 1),
+    })),
+  );
   const op: CombineOp = list.op ?? 'union';
   return {
     result: combine(op, labeled),
-    sources: labeled.map(l => ({ key: l.key, count: l.appids.size })),
+    sources: labeled.map((l) => ({ key: l.key, count: l.appids.size })),
   };
 }
 
@@ -174,14 +182,17 @@ export interface DefaultFetchersOptions {
 // synchronous getList — what real routes construct and pass to resolveRef/
 // resolveGameList. Tests keep using their own mocked fetchers (see listResolve.test.js), so
 // this module itself never needs a real network/localStorage.
-export function createDefaultFetchers({ refresh = false, onFetchedAt }: DefaultFetchersOptions = {}): ListResolveFetchers {
+export function createDefaultFetchers({
+  refresh = false,
+  onFetchedAt,
+}: DefaultFetchersOptions = {}): ListResolveFetchers {
   return {
-    accountOwned: async accountId => {
+    accountOwned: async (accountId) => {
       const { appids, fetchedAt } = await fetchAccountOwnedData(accountId, { refresh });
       onFetchedAt?.(fetchedAt);
       return appids;
     },
-    accountWishlist: async accountId => {
+    accountWishlist: async (accountId) => {
       const { appids, fetchedAt } = await fetchAccountWishlistData(accountId, { refresh });
       onFetchedAt?.(fetchedAt);
       return appids;
@@ -190,7 +201,7 @@ export function createDefaultFetchers({ refresh = false, onFetchedAt }: DefaultF
     // (server.js — finding one bundle walks several cached pages, so forcing it costs several
     // upstream calls), and the recent-games list is this browser's own localStorage.
     bundle: fetchBundleAppids,
-    recentGames: async () => new Set(loadRecentGames().map(g => g.appid)),
+    recentGames: async () => new Set(loadRecentGames().map((g) => g.appid)),
     getList,
   };
 }

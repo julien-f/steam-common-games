@@ -7,14 +7,23 @@
 // operates on a plain scalar (`row.shop`, not `row.page?.name`), which is also what the table's
 // own filter checklists/group keys are built from.
 
-export interface PriceAmount { amount: number; currency: string }
+export interface PriceAmount {
+  amount: number;
+  currency: string;
+}
 
 // ITAD-hosted artwork for one game, as the bundle list itself returns it — `boxart` (300×450
 // portrait) plus banners at 145/300/400/600 wide. Only `banner145` (145×55, ~7KB) is used: it's
 // almost exactly the aspect of the game tables' own capsule thumbnails, so a strip of them reads
 // as a bundle "cover" without growing the row. Every asset is optional — an entry ITAD has no
 // artwork for (typically a non-game item: a course, a soundtrack) carries an empty object.
-export interface GameAssets { boxart?: string; banner145?: string; banner300?: string; banner400?: string; banner600?: string }
+export interface GameAssets {
+  boxart?: string;
+  banner145?: string;
+  banner300?: string;
+  banner400?: string;
+  banner600?: string;
+}
 
 // Only the fields actually read — the real response carries more (url, details, note, isMature,
 // each tier's own game list, …), none of which the *picker* needs; opening a bundle re-fetches it
@@ -47,9 +56,12 @@ export interface BundleRow {
 // Own N Bundle" pick-and-mix format, never a free bundle: a genuinely free/$0 tier still has a
 // real, truthy price object, so it groups with the priced tiers rather than with this case).
 export function cheapestTierPrice(bundle: BundleListItem): PriceAmount | null {
-  const priced = (bundle.tiers || []).filter(t => t.price);
+  const priced = (bundle.tiers || []).filter((t) => t.price);
   if (!priced.length) return null;
-  return priced.reduce((min, t) => (t.price as PriceAmount).amount < min.amount ? (t.price as PriceAmount) : min, priced[0].price as PriceAmount);
+  return priced.reduce(
+    (min, t) => ((t.price as PriceAmount).amount < min.amount ? (t.price as PriceAmount) : min),
+    priced[0].price as PriceAmount,
+  );
 }
 
 // Local-time `YYYY-MM-DD HH:MM`. Built from the local getters rather than `toISOString()` (what
@@ -109,7 +121,10 @@ export function fmtBundleDateFriendly(
   const sameYear = d.getFullYear() === new Date(now).getFullYear();
   const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
   if (!sameYear) opts.year = 'numeric';
-  if (time) { opts.hour = '2-digit'; opts.minute = '2-digit'; }
+  if (time) {
+    opts.hour = '2-digit';
+    opts.minute = '2-digit';
+  }
   return d.toLocaleString(locale, opts);
 }
 
@@ -154,7 +169,11 @@ export function shopHue(name: string): number {
   return Math.abs(hash) % 360;
 }
 
-export interface BundleTierSummary { price: number | null; currency: string | null; gameCount: number }
+export interface BundleTierSummary {
+  price: number | null;
+  currency: string | null;
+  gameCount: number;
+}
 
 // One entry per tier, cheapest first (ITAD's tiers are observed to always be price-ascending), for
 // the bundle detail card's "$5 · $15 · $25" line. `gameCount` is that tier's *own* game list as
@@ -162,15 +181,20 @@ export interface BundleTierSummary { price: number | null; currency: string | nu
 // don't sum to the bundle's total; the card labels them as tiers, not as a partition. A `null`
 // price is a pick-and-mix ("Build Your Own") tier, rendered "Varies" like everywhere else, never
 // as free. Kept here (pure, unit-tested) rather than inline in ListRoute.tsx's JSX.
-export function bundleTierSummary(bundle: { tiers?: { price?: PriceAmount | null; games?: unknown[] | null }[] | null }): BundleTierSummary[] {
-  return (bundle.tiers || []).map(tier => ({
+export function bundleTierSummary(bundle: {
+  tiers?: { price?: PriceAmount | null; games?: unknown[] | null }[] | null;
+}): BundleTierSummary[] {
+  return (bundle.tiers || []).map((tier) => ({
     price: tier.price ? tier.price.amount : null,
     currency: tier.price ? tier.price.currency : null,
     gameCount: (tier.games || []).length,
   }));
 }
 
-export interface BundleUrgency { tier: 'ended' | 'urgent' | 'soon' | 'later'; label: string }
+export interface BundleUrgency {
+  tier: 'ended' | 'urgent' | 'soon' | 'later';
+  label: string;
+}
 
 // How much time is left on a bundle, as the Ends cell renders it: a color tier plus a short
 // relative label. `later` carries no label at all — past a week out, the date itself says
@@ -202,7 +226,11 @@ export function bundleUrgency(expiry: string | null | undefined, now: number = D
 // rather than the table's generic "(none)": a bundle with no end date is a real case, not missing
 // data.
 export const ENDS_IN = {
-  urgent: 'Within 48h', soon: 'This week', later: 'Later', open: 'Open-ended', ended: 'Ended',
+  urgent: 'Within 48h',
+  soon: 'This week',
+  later: 'Later',
+  open: 'Open-ended',
+  ended: 'Ended',
 } as const;
 
 // Soonest-first, for the column's own comparator: alphabetically these order Ended < Later <
@@ -224,7 +252,10 @@ export function compareEndsIn(a: unknown, b: unknown): number {
 // "New" tile that toggles it — "what appeared since I last looked" is the other half of the
 // browsing question, and the Published column can only answer it by being sorted and read.
 export const BUNDLE_AGE = {
-  fresh: 'Last 24h', week: 'This week', older: 'Older', unknown: 'Unknown',
+  fresh: 'Last 24h',
+  week: 'This week',
+  older: 'Older',
+  unknown: 'Unknown',
 } as const;
 
 const BUNDLE_AGE_ORDER: string[] = [BUNDLE_AGE.fresh, BUNDLE_AGE.week, BUNDLE_AGE.older, BUNDLE_AGE.unknown];

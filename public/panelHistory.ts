@@ -17,7 +17,11 @@ export interface PanelHistoryEntry {
 // the explicit ← Back button, so it *pops* instead of pushing: bouncing between a base game and
 // its DLC entries shouldn't grow a stack of duplicate consecutive appids that then takes as many
 // Back presses to unwind.
-export function nextHopHistory(hist: readonly PanelHistoryEntry[], from: PanelHistoryEntry, toAppid: number): PanelHistoryEntry[] {
+export function nextHopHistory(
+  hist: readonly PanelHistoryEntry[],
+  from: PanelHistoryEntry,
+  toAppid: number,
+): PanelHistoryEntry[] {
   if (hist.length && hist[hist.length - 1].appid === toAppid) return hist.slice(0, -1);
   return [...hist, { appid: from.appid, name: from.name }];
 }

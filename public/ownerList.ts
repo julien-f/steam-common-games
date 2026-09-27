@@ -15,5 +15,5 @@ export function sortOwners(owners: GameOwner[]): GameOwner[] {
 // value. Guarded against an all-zero list (nobody has played it), which would otherwise divide by
 // zero and render NaN-width bars.
 export function ownerMeterPct(minutes: number, maxMinutes: number): number {
-  return Math.round(minutes / Math.max(maxMinutes, 1) * 100);
+  return Math.round((minutes / Math.max(maxMinutes, 1)) * 100);
 }

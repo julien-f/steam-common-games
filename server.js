@@ -14,11 +14,50 @@ const rateLimit = require('express-rate-limit');
 const { getCached, getCachedAt, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
 const { getMetrics, recordLimiterTrip } = require('./lib/metrics');
-const { resolveSteamId, getOwnedGames, getWishlist, getFriendList, getPlayerSummaries, getGameRating, getAppDetails, getSteamTags, getGameDemo, searchStoreGames, getProtonDbStatus, getGameSchema, getPlayerAchievements, getGlobalAchievementPercentages, getGameNews, getStoreCircuitBreaker, getSemaphoreStats } = require('./lib/steam');
+const {
+  resolveSteamId,
+  getOwnedGames,
+  getWishlist,
+  getFriendList,
+  getPlayerSummaries,
+  getGameRating,
+  getAppDetails,
+  getSteamTags,
+  getGameDemo,
+  searchStoreGames,
+  getProtonDbStatus,
+  getGameSchema,
+  getPlayerAchievements,
+  getGlobalAchievementPercentages,
+  getGameNews,
+  getStoreCircuitBreaker,
+  getSemaphoreStats,
+} = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
 const { groupByOwnership } = require('./lib/groupGames');
-const { getBundles, bundlesCacheKey, findBundleById, resolveSteamAppIds, resolveItadIds, getSteamShopId, getPrices, extractPriceInfo } = require('./lib/itad');
-const { SESSION_COOKIE, STATE_COOKIE, parseCookies, serializeCookie, buildLoginUrl, verifySteamAssertion, upsertUser, createSession, destroySession, getSessionUser, setUserPref } = require('./lib/auth');
+const {
+  getBundles,
+  bundlesCacheKey,
+  findBundleById,
+  resolveSteamAppIds,
+  resolveItadIds,
+  getSteamShopId,
+  getPrices,
+  extractPriceInfo,
+} = require('./lib/itad');
+const {
+  SESSION_COOKIE,
+  STATE_COOKIE,
+  parseCookies,
+  serializeCookie,
+  buildLoginUrl,
+  verifySteamAssertion,
+  upsertUser,
+  createSession,
+  destroySession,
+  getSessionUser,
+  setUserPref,
+} = require('./lib/auth');
 const { SESSION_TTL_MS } = require('./lib/config');
 
 const HOST = process.env.HOST;
@@ -39,12 +78,11 @@ const isItadConfigured = () => !!process.env.ITAD_API_KEY;
 // Shared by every /api/bundles* route that takes a `country` query param — falls back to US
 // for anything that isn't a plain 2-letter code rather than rejecting the request outright,
 // same "trust but sanitize" treatment as the rest of this app's query params.
-const parseCountry = (req) => /^[A-Za-z]{2}$/.test(req.query.country || '') ? req.query.country.toUpperCase() : 'US';
+const parseCountry = (req) => (/^[A-Za-z]{2}$/.test(req.query.country || '') ? req.query.country.toUpperCase() : 'US');
 
 // Rate limiting is bypassed under NODE_ENV=test so the suite isn't throttled,
 // unless a test opts in with RATE_LIMIT_ENABLED=true to exercise the limiter.
-const rateLimitBypassed = () =>
-  process.env.NODE_ENV === 'test' && process.env.RATE_LIMIT_ENABLED !== 'true';
+const rateLimitBypassed = () => process.env.NODE_ENV === 'test' && process.env.RATE_LIMIT_ENABLED !== 'true';
 
 const isForceRefresh = (req) => req.query.refresh === '1' || req.query.refresh === 'true';
 
@@ -100,8 +138,14 @@ function routeErrorStatus(route, err) {
   // near-identical [upstream:...] line per request blocked during the 5-minute window would
   // just repeat information already on record, potentially hundreds of times over.
   if (err.isCircuitOpen) return 502;
-  if (err.isUpstream) { console.error(`[upstream:${route}]`, err.stack || err.message); return 502; }
-  if (err.name === 'TimeoutError') { console.error(`[timeout:${route}]`, err.stack || err.message); return 504; }
+  if (err.isUpstream) {
+    console.error(`[upstream:${route}]`, err.stack || err.message);
+    return 502;
+  }
+  if (err.name === 'TimeoutError') {
+    console.error(`[timeout:${route}]`, err.stack || err.message);
+    return 504;
+  }
   console.error(`[bug:${route}]`, err.stack || err.message);
   return 400;
 }
@@ -144,15 +188,17 @@ const escapeXml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
 app.get('/opensearch.xml', (req, res) => {
   const host = escapeXml(req.get('host') || '');
   const origin = `${req.protocol}://${host}`;
-  res.type('application/opensearchdescription+xml').send(
-    '<?xml version="1.0" encoding="UTF-8"?>\n' +
-    '<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">\n' +
-    '  <ShortName>Steam Games</ShortName>\n' +
-    `  <Description>Search for a game on ${host}</Description>\n` +
-    '  <InputEncoding>UTF-8</InputEncoding>\n' +
-    `  <Url type="text/html" template="${origin}/search?q={searchTerms}"/>\n` +
-    '</OpenSearchDescription>\n'
-  );
+  res
+    .type('application/opensearchdescription+xml')
+    .send(
+      '<?xml version="1.0" encoding="UTF-8"?>\n' +
+        '<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">\n' +
+        '  <ShortName>Steam Games</ShortName>\n' +
+        `  <Description>Search for a game on ${host}</Description>\n` +
+        '  <InputEncoding>UTF-8</InputEncoding>\n' +
+        `  <Url type="text/html" template="${origin}/search?q={searchTerms}"/>\n` +
+        '</OpenSearchDescription>\n',
+    );
 });
 
 // Stricter limit for searches — each uncached user triggers Steam API calls. Shared by
@@ -181,12 +227,18 @@ const searchLimit = namedRateLimit('search', {
 
     let rawIdentifiers;
     let isWishlist;
-    if (Array.isArray(req.body?.slots))        { rawIdentifiers = req.body.slots.flat(); isWishlist = false; }
-    else if (Array.isArray(req.body?.users))   { rawIdentifiers = req.body.users;        isWishlist = false; }
-    else if (Array.isArray(req.body?.members)) { rawIdentifiers = req.body.members;      isWishlist = true; }
-    else return false; // let the route's own validation reject it
+    if (Array.isArray(req.body?.slots)) {
+      rawIdentifiers = req.body.slots.flat();
+      isWishlist = false;
+    } else if (Array.isArray(req.body?.users)) {
+      rawIdentifiers = req.body.users;
+      isWishlist = false;
+    } else if (Array.isArray(req.body?.members)) {
+      rawIdentifiers = req.body.members;
+      isWishlist = true;
+    } else return false; // let the route's own validation reject it
 
-    if (!rawIdentifiers.every(u => typeof u === 'string' && u.trim().length > 0)) return false;
+    if (!rawIdentifiers.every((u) => typeof u === 'string' && u.trim().length > 0)) return false;
 
     // Mirrors resolveSteamId's own cache key/short-circuit exactly — a raw Steam64 id needs no
     // resolution at all, so it's never an upstream call regardless of cache state; anything else
@@ -194,7 +246,10 @@ const searchLimit = namedRateLimit('search', {
     const resolvedIds = new Set();
     for (const raw of rawIdentifiers) {
       const id = raw.trim();
-      if (STEAM64_RE.test(id)) { resolvedIds.add(id); continue; }
+      if (STEAM64_RE.test(id)) {
+        resolvedIds.add(id);
+        continue;
+      }
       const hit = getCached(`resolve:${id}`);
       if (hit === undefined) return false;
       resolvedIds.add(hit);
@@ -228,12 +283,16 @@ const friendsLimit = namedRateLimit('friends', {
     if (Array.isArray(refreshIds) && refreshIds.length > 0) return false;
 
     const rawIdentifiers = req.body?.members;
-    if (!Array.isArray(rawIdentifiers) || !rawIdentifiers.every(u => typeof u === 'string' && u.trim().length > 0)) return false;
+    if (!Array.isArray(rawIdentifiers) || !rawIdentifiers.every((u) => typeof u === 'string' && u.trim().length > 0))
+      return false;
 
     const resolvedIds = new Set();
     for (const raw of rawIdentifiers) {
       const id = raw.trim();
-      if (STEAM64_RE.test(id)) { resolvedIds.add(id); continue; }
+      if (STEAM64_RE.test(id)) {
+        resolvedIds.add(id);
+        continue;
+      }
       const hit = getCached(`resolve:${id}`);
       if (hit === undefined) return false;
       resolvedIds.add(hit);
@@ -260,11 +319,13 @@ const detailsLimit = namedRateLimit('details', {
     if (isForceRefresh(req)) return false; // force-refresh always re-fetches, so it must always count
     const appid = Number(req.params.appid);
     if (!Number.isInteger(appid) || appid <= 0) return false;
-    return getCached(`rating:${appid}`)   !== undefined
-        && getCached(`hltb:${appid}`)     !== undefined
-        && getCached(`meta:${appid}`)     !== undefined
-        && getCached(`browse:${appid}`)   !== undefined
-        && getCached(`protondb:${appid}`) !== undefined;
+    return (
+      getCached(`rating:${appid}`) !== undefined &&
+      getCached(`hltb:${appid}`) !== undefined &&
+      getCached(`meta:${appid}`) !== undefined &&
+      getCached(`browse:${appid}`) !== undefined &&
+      getCached(`protondb:${appid}`) !== undefined
+    );
   },
 });
 
@@ -328,16 +389,24 @@ const achievementsLimit = namedRateLimit('achievements', {
     if (!Number.isInteger(appid) || appid <= 0) return false;
     if (getCached(`schema:${appid}`) === undefined) return false;
     if (getCached(`achrarity:${appid}`) === undefined) return false;
-    const ids = (req.query.steamids || '').split(',').map(s => s.trim()).filter(Boolean);
+    const ids = (req.query.steamids || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
     // No steamids at all (a standalone lookup with no player loaded) only ever needed
     // schema+rarity above, both already confirmed cached — nothing left to check.
     if (!ids.length) return true;
-    return ids.every(id => STEAM64_RE.test(id) && getCached(`playerach:${id}:${appid}`) !== undefined);
+    return ids.every((id) => STEAM64_RE.test(id) && getCached(`playerach:${id}:${appid}`) !== undefined);
   },
 });
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, configured: !!process.env.STEAM_API_KEY, itadConfigured: isItadConfigured(), cache: getCacheStats() });
+  res.json({
+    ok: true,
+    configured: !!process.env.STEAM_API_KEY,
+    itadConfigured: isItadConfigured(),
+    cache: getCacheStats(),
+  });
 });
 
 // Outbound-request counts to Steam/HLTB/ITAD/ProtonDB, grouped by trust-tier/routing boundary
@@ -402,7 +471,11 @@ const bundlesListLimit = namedRateLimit('bundlesList', {
 // underneath (a repeat deep link to an already-searched bundle makes no upstream calls even
 // though it still counts here) — just given a looser budget instead of a skip, since deep
 // links are a comparatively rare action (once per opened bundle) next to list browsing.
-const bundlesByIdLimit = namedRateLimit('bundlesById', { ...itadRateLimitOpts, max: BUNDLES_RATE_LIMIT_MAX * 2, skip: () => rateLimitBypassed() });
+const bundlesByIdLimit = namedRateLimit('bundlesById', {
+  ...itadRateLimitOpts,
+  max: BUNDLES_RATE_LIMIT_MAX * 2,
+  skip: () => rateLimitBypassed(),
+});
 
 const bundlesResolveLimit = namedRateLimit('bundlesResolve', {
   ...itadRateLimitOpts,
@@ -411,7 +484,7 @@ const bundlesResolveLimit = namedRateLimit('bundlesResolve', {
     const gids = req.body?.gids;
     if (!Array.isArray(gids) || gids.length === 0) return false; // let the route's own validation reject it
     // Mirrors resolveSteamAppIds' own per-gid cache key (lib/itad.js).
-    return gids.every(gid => typeof gid === 'string' && getCached(`itad-appid:${gid}`) !== undefined);
+    return gids.every((gid) => typeof gid === 'string' && getCached(`itad-appid:${gid}`) !== undefined);
   },
 });
 
@@ -428,10 +501,10 @@ const pricesLimit = namedRateLimit('prices', {
     const { gids, appids } = req.body || {};
     const country = parseCountry(req);
     if (Array.isArray(gids) && gids.length > 0) {
-      return gids.every(gid => typeof gid === 'string' && getCached(`itad-price:${country}:${gid}`) !== undefined);
+      return gids.every((gid) => typeof gid === 'string' && getCached(`itad-price:${country}:${gid}`) !== undefined);
     }
     if (Array.isArray(appids) && appids.length > 0) {
-      return appids.every(appid => {
+      return appids.every((appid) => {
         if (!Number.isInteger(appid)) return false;
         const gid = getCached(`itad-gid:${appid}`);
         if (gid === undefined) return false; // resolution itself not cached yet
@@ -448,13 +521,15 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
   // or legacy { users: ["alice", "charlie"] } (each user becomes a single-member slot)
   let rawSlots = req.body.slots;
   if (!rawSlots && Array.isArray(req.body.users)) {
-    rawSlots = req.body.users.map(u => [u]);
+    rawSlots = req.body.users.map((u) => [u]);
   }
 
   if (
     !Array.isArray(rawSlots) ||
     rawSlots.length < 1 ||
-    !rawSlots.every(s => Array.isArray(s) && s.length > 0 && s.every(u => typeof u === 'string' && u.trim().length > 0))
+    !rawSlots.every(
+      (s) => Array.isArray(s) && s.length > 0 && s.every((u) => typeof u === 'string' && u.trim().length > 0),
+    )
   ) {
     return res.status(400).json({ error: 'Provide at least 1 player' });
   }
@@ -473,21 +548,21 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
   try {
     // Resolve all users; deduplicate within each slot
     const resolvedSlots = await Promise.all(
-      rawSlots.map(async slot => [...new Set(await Promise.all(slot.map(resolveSteamId)))])
+      rawSlots.map(async (slot) => [...new Set(await Promise.all(slot.map(resolveSteamId)))]),
     );
 
     // Fetch all unique Steam IDs in one pass
     const uniqueIds = [...new Set(resolvedSlots.flat())];
     const [playerList, libraryList] = await Promise.all([
       getPlayerSummaries(uniqueIds, { force: refresh, forceIds: refreshIds }),
-      Promise.all(uniqueIds.map(id => getOwnedGames(id, { force: refresh || refreshIds.has(id) }))),
+      Promise.all(uniqueIds.map((id) => getOwnedGames(id, { force: refresh || refreshIds.has(id) }))),
     ]);
 
     const libraryById = new Map(uniqueIds.map((id, i) => [id, libraryList[i]]));
-    const playerById = new Map(playerList.map(p => [p.steamid, p]));
+    const playerById = new Map(playerList.map((p) => [p.steamid, p]));
 
     // Union libraries within each slot, group player summaries by slot
-    const slotLibraries = resolvedSlots.map(ids => {
+    const slotLibraries = resolvedSlots.map((ids) => {
       const merged = new Map();
       for (const id of ids) {
         for (const game of libraryById.get(id) || []) {
@@ -500,17 +575,17 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
     // `gameCount` rides along on each player object so the frontend can show it next to an
     // account's avatar (e.g. in the Library Explorer's accounts bar) without a second request —
     // it's just the length of the per-account library already fetched above.
-    const playerSlots = resolvedSlots.map(ids =>
-      ids.map(id => ({
+    const playerSlots = resolvedSlots.map((ids) =>
+      ids.map((id) => ({
         ...(playerById.get(id) || { steamid: id, personaname: id, profileurl: '' }),
         gameCount: (libraryById.get(id) || []).length,
-      }))
+      })),
     );
 
     const groups = groupByOwnership(slotLibraries);
 
     // Build per-account playtime, and last-played timestamp, for common games only
-    const groupAppIds = new Set(groups.flatMap(g => g.games.map(game => game.appid)));
+    const groupAppIds = new Set(groups.flatMap((g) => g.games.map((game) => game.appid)));
     const playtime = {};
     const lastPlayed = {};
     for (const [steamId, games] of libraryById) {
@@ -525,7 +600,13 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
       }
     }
 
-    res.json({ groups, slots: playerSlots, playtime, lastPlayed, fetchedAt: oldestCachedAt(uniqueIds.map(id => `games:${id}`)) });
+    res.json({
+      groups,
+      slots: playerSlots,
+      playtime,
+      lastPlayed,
+      fetchedAt: oldestCachedAt(uniqueIds.map((id) => `games:${id}`)),
+    });
   } catch (err) {
     const status = routeErrorStatus('common-games', err);
     res.status(status).json({ error: err.message });
@@ -541,7 +622,7 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
   if (
     !Array.isArray(members) ||
     members.length < 1 ||
-    !members.every(u => typeof u === 'string' && u.trim().length > 0)
+    !members.every((u) => typeof u === 'string' && u.trim().length > 0)
   ) {
     return res.status(400).json({ error: 'Provide at least 1 player' });
   }
@@ -556,7 +637,7 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
     const ids = [...new Set(await Promise.all(members.map(resolveSteamId)))];
     const [playerList, lists] = await Promise.all([
       getPlayerSummaries(ids, { force: refresh, forceIds: refreshIds }),
-      Promise.all(ids.map(id => getWishlist(id, { force: refresh || refreshIds.has(id) }))),
+      Promise.all(ids.map((id) => getWishlist(id, { force: refresh || refreshIds.has(id) }))),
     ]);
 
     // Union across accounts — first-seen wins, same rule /api/common-games uses for libraries.
@@ -567,7 +648,7 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
       }
     }
 
-    const items = [...merged.values()].map(item => ({
+    const items = [...merged.values()].map((item) => ({
       appid: item.appid,
       priority: item.priority,
       dateAdded: item.date_added ? new Date(item.date_added * 1000).toISOString().slice(0, 10) : null,
@@ -575,13 +656,13 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
 
     // Player summaries + per-account wishlist size, same shape/purpose as /api/common-games'
     // `slots` — lets the frontend show an accounts bar on the Wishlist tab too.
-    const playerById = new Map(playerList.map(p => [p.steamid, p]));
+    const playerById = new Map(playerList.map((p) => [p.steamid, p]));
     const players = ids.map((id, i) => ({
       ...(playerById.get(id) || { steamid: id, personaname: id, profileurl: '' }),
       itemCount: lists[i].length,
     }));
 
-    res.json({ items, players, fetchedAt: oldestCachedAt(ids.map(id => `wishlist:${id}`)) });
+    res.json({ items, players, fetchedAt: oldestCachedAt(ids.map((id) => `wishlist:${id}`)) });
   } catch (err) {
     const status = routeErrorStatus('wishlist', err);
     res.status(status).json({ error: err.message });
@@ -598,7 +679,7 @@ app.post('/api/friends', friendsLimit, async (req, res) => {
   if (
     !Array.isArray(members) ||
     members.length < 1 ||
-    !members.every(u => typeof u === 'string' && u.trim().length > 0)
+    !members.every((u) => typeof u === 'string' && u.trim().length > 0)
   ) {
     return res.status(400).json({ error: 'Provide at least 1 player' });
   }
@@ -611,13 +692,13 @@ app.post('/api/friends', friendsLimit, async (req, res) => {
 
   try {
     const ids = [...new Set(await Promise.all(members.map(resolveSteamId)))];
-    const lists = await Promise.all(ids.map(id => getFriendList(id, { force: refresh || refreshIds.has(id) })));
+    const lists = await Promise.all(ids.map((id) => getFriendList(id, { force: refresh || refreshIds.has(id) })));
 
     const unavailable = ids.filter((id, i) => lists[i] === null);
     const friendIds = [...new Set(lists.flat().filter(Boolean))];
 
     const players = friendIds.length > 0 ? await getPlayerSummaries(friendIds) : [];
-    const friends = players.map(p => ({
+    const friends = players.map((p) => ({
       steamid: p.steamid,
       personaname: p.personaname,
       avatar: p.avatarfull || p.avatarmedium || p.avatar || null,
@@ -627,7 +708,7 @@ app.post('/api/friends', friendsLimit, async (req, res) => {
       realname: p.realname,
     }));
 
-    res.json({ friends, unavailable, fetchedAt: oldestCachedAt(ids.map(id => `friends:${id}`)) });
+    res.json({ friends, unavailable, fetchedAt: oldestCachedAt(ids.map((id) => `friends:${id}`)) });
   } catch (err) {
     const status = routeErrorStatus('friends', err);
     res.status(status).json({ error: err.message });
@@ -647,7 +728,10 @@ function fetchGameDetails(appid, { force = false } = {}) {
     // client-supplied name would just be an unverified string. This costs a little latency
     // versus searching HLTB in parallel with an already-known, trusted name (e.g. an owned
     // game's name from Steam's library API) — that's the trade for not trusting the client.
-    const hltbPromise = metaPromise.then(meta => getHLTB(appid, meta?.name || '', { force }), () => null);
+    const hltbPromise = metaPromise.then(
+      (meta) => getHLTB(appid, meta?.name || '', { force }),
+      () => null,
+    );
 
     return Promise.allSettled([
       getGameRating(appid, { force }),
@@ -674,11 +758,11 @@ function fetchGameDetails(appid, { force = false } = {}) {
         if (err?.isCircuitOpen) return;
         console.warn(`[game-details] ${label} (appid ${appid}):`, err?.message, err?.cause ?? '');
       };
-      if (ratingRes.status   === 'rejected') logErr('rating',   ratingRes.reason);
-      if (hltbRes.status     === 'rejected') logErr('hltb',     hltbRes.reason);
-      if (metaRes.status     === 'rejected') logErr('meta',     metaRes.reason);
-      if (tagsRes.status     === 'rejected') logErr('tags',     tagsRes.reason);
-      if (demoRes.status     === 'rejected') logErr('demo',     demoRes.reason);
+      if (ratingRes.status === 'rejected') logErr('rating', ratingRes.reason);
+      if (hltbRes.status === 'rejected') logErr('hltb', hltbRes.reason);
+      if (metaRes.status === 'rejected') logErr('meta', metaRes.reason);
+      if (tagsRes.status === 'rejected') logErr('tags', tagsRes.reason);
+      if (demoRes.status === 'rejected') logErr('demo', demoRes.reason);
       if (protondbRes.status === 'rejected') logErr('protondb', protondbRes.reason);
       // Age of the oldest of this game's cached sources, which is what the panel's ↻ shows — plus
       // each source's own age behind it. The aggregate alone was misleading: these tiers run from
@@ -686,19 +770,25 @@ function fetchGameDetails(appid, { force = false } = {}) {
       // readout, and "5 months ago" says nothing about the rating fetched yesterday. The panel
       // puts the breakdown in the button's tooltip so the visible figure stays one number.
       return {
-        fetchedAt: oldestCachedAt([`rating:${appid}`, `hltb:${appid}`, `meta:${appid}`, `browse:${appid}`, `protondb:${appid}`]),
+        fetchedAt: oldestCachedAt([
+          `rating:${appid}`,
+          `hltb:${appid}`,
+          `meta:${appid}`,
+          `browse:${appid}`,
+          `protondb:${appid}`,
+        ]),
         fetchedAts: {
-          rating:   getCachedAt(`rating:${appid}`)   ?? null,
-          hltb:     getCachedAt(`hltb:${appid}`)     ?? null,
-          meta:     getCachedAt(`meta:${appid}`)     ?? null,
-          tags:     getCachedAt(`browse:${appid}`)   ?? null,
+          rating: getCachedAt(`rating:${appid}`) ?? null,
+          hltb: getCachedAt(`hltb:${appid}`) ?? null,
+          meta: getCachedAt(`meta:${appid}`) ?? null,
+          tags: getCachedAt(`browse:${appid}`) ?? null,
           protondb: getCachedAt(`protondb:${appid}`) ?? null,
         },
-        rating:   ratingRes.status   === 'fulfilled' ? ratingRes.value   : null,
-        hltb:     hltbRes.status     === 'fulfilled' ? hltbRes.value     : null,
-        meta:     metaRes.status     === 'fulfilled' ? metaRes.value     : null,
-        tags:     tagsRes.status     === 'fulfilled' ? tagsRes.value     : null,
-        demo:     demoRes.status     === 'fulfilled' ? demoRes.value     : null,
+        rating: ratingRes.status === 'fulfilled' ? ratingRes.value : null,
+        hltb: hltbRes.status === 'fulfilled' ? hltbRes.value : null,
+        meta: metaRes.status === 'fulfilled' ? metaRes.value : null,
+        tags: tagsRes.status === 'fulfilled' ? tagsRes.value : null,
+        demo: demoRes.status === 'fulfilled' ? demoRes.value : null,
         protondb: protondbRes.status === 'fulfilled' ? protondbRes.value : null,
       };
     });
@@ -741,7 +831,12 @@ app.get('/api/bundles', bundlesListLimit, async (req, res) => {
     // Age of this page of the list, for the "Updated <when>" beside the browse page's own ↻ —
     // a bundle going live or expiring is exactly what that button is for, and that question is
     // unanswerable without knowing how old the list on screen is.
-    res.json({ bundles, offset, limit, fetchedAt: getCachedAt(bundlesCacheKey({ country, offset, limit, sort, expired })) ?? null });
+    res.json({
+      bundles,
+      offset,
+      limit,
+      fetchedAt: getCachedAt(bundlesCacheKey({ country, offset, limit, sort, expired })) ?? null,
+    });
   } catch (err) {
     const status = routeErrorStatus('bundles', err);
     res.status(status).json({ error: err.message });
@@ -765,7 +860,9 @@ app.get('/api/bundles/:id', bundlesByIdLimit, async (req, res) => {
   try {
     const found = await findBundleById(id, { country });
     if (!found) {
-      return res.status(404).json({ error: 'Bundle not found — it may be older than what we search, or already fully expired' });
+      return res
+        .status(404)
+        .json({ error: 'Bundle not found — it may be older than what we search, or already fully expired' });
     }
     // Age of the cached list page this bundle was found on — the same page cache GET /api/bundles
     // reports for the browse list. There's no forcing it (see this route's own note above), so
@@ -789,7 +886,7 @@ app.post('/api/bundles/resolve', bundlesResolveLimit, async (req, res) => {
     return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
   }
   const gids = req.body.gids;
-  if (!Array.isArray(gids) || gids.length === 0 || !gids.every(g => typeof g === 'string' && g)) {
+  if (!Array.isArray(gids) || gids.length === 0 || !gids.every((g) => typeof g === 'string' && g)) {
     return res.status(400).json({ error: 'Provide at least one game id' });
   }
   if (gids.length > MAX_BUNDLE_RESOLVE_GAMES) {
@@ -825,13 +922,14 @@ app.post('/api/prices', pricesLimit, async (req, res) => {
   const { gids, appids } = req.body;
   const byGid = Array.isArray(gids) && gids.length > 0;
   const byAppid = Array.isArray(appids) && appids.length > 0;
-  if (byGid === byAppid) { // neither, or both — exactly one is required
+  if (byGid === byAppid) {
+    // neither, or both — exactly one is required
     return res.status(400).json({ error: 'Provide exactly one of gids or appids' });
   }
-  if (byGid && !gids.every(g => typeof g === 'string' && g)) {
+  if (byGid && !gids.every((g) => typeof g === 'string' && g)) {
     return res.status(400).json({ error: 'gids must be non-empty strings' });
   }
-  if (byAppid && !appids.every(a => Number.isInteger(a) && a > 0)) {
+  if (byAppid && !appids.every((a) => Number.isInteger(a) && a > 0)) {
     return res.status(400).json({ error: 'appids must be positive integers' });
   }
   if ((byGid ? gids : appids).length > MAX_PRICE_LOOKUP_GAMES) {
@@ -847,21 +945,16 @@ app.post('/api/prices', pricesLimit, async (req, res) => {
   try {
     // Map(requested key → gid|null) — an identity map when the caller already sent gids, so
     // the response-shaping loop below doesn't need two separate code paths.
-    const gidByKey = byAppid
-      ? await resolveItadIds([...new Set(appids)])
-      : new Map(gids.map(g => [g, g]));
+    const gidByKey = byAppid ? await resolveItadIds([...new Set(appids)]) : new Map(gids.map((g) => [g, g]));
     const gidsToPrice = [...new Set([...gidByKey.values()].filter(Boolean))];
-    const [shopId, prices] = await Promise.all([
-      getSteamShopId(),
-      getPrices(gidsToPrice, { country, force }),
-    ]);
+    const [shopId, prices] = await Promise.all([getSteamShopId(), getPrices(gidsToPrice, { country, force })]);
     const out = {};
     for (const [key, gid] of gidByKey) out[key] = extractPriceInfo(gid ? prices.get(gid) : null, shopId);
     // How old the oldest price in this batch is — the "Updated <when>" beside the caller's own
     // "↻ Refresh prices". Prices are the shortest-lived data the app shows and the most
     // consequential to act on (someone clicks through to a shop from these), so how old they are
     // is worth stating rather than implying.
-    res.json({ prices: out, fetchedAt: oldestCachedAt(gidsToPrice.map(gid => `itad-price:${country}:${gid}`)) });
+    res.json({ prices: out, fetchedAt: oldestCachedAt(gidsToPrice.map((gid) => `itad-price:${country}:${gid}`)) });
   } catch (err) {
     const status = routeErrorStatus('prices', err);
     res.status(status).json({ error: err.message });
@@ -911,7 +1004,10 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
   // achieved/unlocktime state per item depends on steamids being present; see `playerCount`
   // in the response below, which the frontend uses to distinguish "no player was asked about"
   // from "a player was asked about but their data is unavailable" (private:true).
-  const rawIds = (req.query.steamids || '').split(',').map(s => s.trim()).filter(Boolean);
+  const rawIds = (req.query.steamids || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   if (rawIds.length > MAX_USERS) {
     return res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
   }
@@ -947,13 +1043,13 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
       // schema/player-achievements failure does, so it degrades to "no rarity data" instead
       // of rejecting the whole Promise.all.
       getGlobalAchievementPercentages(appid, { force }).catch(() => null),
-      ...steamIds.map(id => getPlayerAchievements(id, appid, { force })),
+      ...steamIds.map((id) => getPlayerAchievements(id, appid, { force })),
     ]);
 
     // null means "no data for this account" (private profile, or never touched this game's
     // stats) — distinguished here from "resolved, but genuinely 0 achieved" so the frontend
     // can tell "nobody has unlocked anything (yet)" apart from "can't tell, profile's private".
-    const anyPlayerData = perPlayer.some(p => p !== null);
+    const anyPlayerData = perPlayer.some((p) => p !== null);
     const unlockedAt = new Map(); // apiname -> earliest unlocktime across members who have it
     for (const list of perPlayer) {
       if (!list) continue;
@@ -964,7 +1060,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
       }
     }
 
-    const achievements = schema.map(a => ({
+    const achievements = schema.map((a) => ({
       ...a,
       achieved: unlockedAt.has(a.apiname),
       unlocktime: unlockedAt.get(a.apiname) ?? null,
@@ -1028,7 +1124,9 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   res.flushHeaders();
 
   let closed = false;
-  res.on('close', () => { closed = true; });
+  res.on('close', () => {
+    closed = true;
+  });
 
   const send = (data) => {
     if (!closed && !res.writableEnded) res.write(`data: ${JSON.stringify(data)}\n\n`);
@@ -1092,7 +1190,10 @@ function requireAuth(req, res, next) {
 app.get('/auth/steam/login', authLimit, (req, res) => {
   const origin = `${req.protocol}://${req.get('host')}`;
   const state = crypto.randomBytes(16).toString('hex');
-  res.setHeader('Set-Cookie', serializeCookie(STATE_COOKIE, state, { maxAgeMs: 5 * 60 * 1000, secure: req.protocol === 'https' }));
+  res.setHeader(
+    'Set-Cookie',
+    serializeCookie(STATE_COOKIE, state, { maxAgeMs: 5 * 60 * 1000, secure: req.protocol === 'https' }),
+  );
   res.redirect(buildLoginUrl(origin, state));
 });
 
@@ -1120,7 +1221,10 @@ app.get('/auth/steam/callback', authLimit, async (req, res) => {
 
   upsertUser(steamid);
   const sessionId = createSession(steamid);
-  res.setHeader('Set-Cookie', [clearState, serializeCookie(SESSION_COOKIE, sessionId, { maxAgeMs: SESSION_TTL_MS, secure })]);
+  res.setHeader('Set-Cookie', [
+    clearState,
+    serializeCookie(SESSION_COOKIE, sessionId, { maxAgeMs: SESSION_TTL_MS, secure }),
+  ]);
   res.redirect('/');
 });
 

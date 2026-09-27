@@ -4,7 +4,14 @@ const { test } = require('node:test');
 process.env.OUTBOUND_HOURLY_MAX = '5';
 process.env.OUTBOUND_DAILY_MAX = '50';
 const assert = require('node:assert/strict');
-const { trackedFetch, recordLimiterTrip, recordDedupHit, recordCacheEvent, getMetrics, _reset } = require('../lib/metrics');
+const {
+  trackedFetch,
+  recordLimiterTrip,
+  recordDedupHit,
+  recordCacheEvent,
+  getMetrics,
+  _reset,
+} = require('../lib/metrics');
 
 test.beforeEach(() => _reset());
 
@@ -12,7 +19,10 @@ test('trackedFetch: calls fetch with the same url/opts and returns its result', 
   let seen;
   const t = trackedFetch.bind(null, 'grp', 'label');
   const restore = globalThis.fetch;
-  globalThis.fetch = async (url, opts) => { seen = { url, opts }; return { ok: true, status: 200, marker: 'res' }; };
+  globalThis.fetch = async (url, opts) => {
+    seen = { url, opts };
+    return { ok: true, status: 200, marker: 'res' };
+  };
   try {
     const res = await t('https://example.com/x', { signal: 'sig' });
     assert.deepEqual(seen, { url: 'https://example.com/x', opts: { signal: 'sig' } });
@@ -75,7 +85,9 @@ test('getMetrics: sinceRestart buckets outcomes by raw HTTP status code, not a b
 
 test('getMetrics: sinceRestart counts a thrown/network fetch failure separately from statusCounts', async () => {
   const restore = globalThis.fetch;
-  globalThis.fetch = async () => { throw new Error('timeout'); };
+  globalThis.fetch = async () => {
+    throw new Error('timeout');
+  };
   try {
     await assert.rejects(() => trackedFetch('hltb', 'search', 'u'));
     const entry = getMetrics().sinceRestart.groups.hltb.search;
@@ -116,7 +128,7 @@ test('getMetrics: lastHour drops entries older than an hour but sinceRestart kee
 
     const { sinceRestart, lastHour } = getMetrics();
     assert.equal(sinceRestart.groups.hltb.search.requests, 2); // lifetime total unaffected
-    assert.equal(lastHour.groups.hltb.search.requests, 1);      // only the recent one
+    assert.equal(lastHour.groups.hltb.search.requests, 1); // only the recent one
   } finally {
     globalThis.fetch = restore;
   }
@@ -164,7 +176,10 @@ test('getMetrics: sinceRestart/lastHour report avg/max latency per label', async
 test('getMetrics: a thrown/network failure still counts toward latency (not just successes)', async (t) => {
   const restore = globalThis.fetch;
   t.mock.timers.enable({ apis: ['Date'] });
-  globalThis.fetch = async () => { t.mock.timers.tick(50); throw new Error('timeout'); };
+  globalThis.fetch = async () => {
+    t.mock.timers.tick(50);
+    throw new Error('timeout');
+  };
   try {
     await assert.rejects(() => trackedFetch('hltb', 'search', 'u'));
     const entry = getMetrics().sinceRestart.groups.hltb.search;
@@ -275,7 +290,9 @@ test('trackedFetch: refuses calls past the hourly budget, per group', async (t) 
   _reset();
   const restore = globalThis.fetch;
   globalThis.fetch = async () => ({ status: 200 });
-  t.after(() => { globalThis.fetch = restore; });
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
   t.mock.method(console, 'warn', () => {});
 
   const max = Number(process.env.OUTBOUND_HOURLY_MAX);
@@ -292,7 +309,9 @@ test('getMetrics: reports per-group budget usage', async (t) => {
   _reset();
   const restore = globalThis.fetch;
   globalThis.fetch = async () => ({ status: 200 });
-  t.after(() => { globalThis.fetch = restore; });
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
 
   await trackedFetch('grp', 'label', 'u');
   const b = getMetrics().budgets.grp;

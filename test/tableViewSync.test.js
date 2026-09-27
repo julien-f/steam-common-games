@@ -2,19 +2,30 @@
 
 const { test, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
+const { TABLE_VIEW_PREF_KEYS } = require('../public/tableViewKeys.ts');
 const {
-  TABLE_VIEW_PREF_KEYS,
-} = require('../public/tableViewKeys.ts');
-const {
-  getBaseline, setBaseline, clearBaseline, resetBaselines, isUnsaved, summarizeViewDiff, stripTransientViewFields,
+  getBaseline,
+  setBaseline,
+  clearBaseline,
+  resetBaselines,
+  isUnsaved,
+  summarizeViewDiff,
+  stripTransientViewFields,
 } = require('../public/tableViewSync.ts');
 
-beforeEach(() => { resetBaselines(); });
+beforeEach(() => {
+  resetBaselines();
+});
 
 test('TABLE_VIEW_PREF_KEYS: covers every shared table-view pref key', () => {
   assert.deepEqual([...TABLE_VIEW_PREF_KEYS].sort(), [
-    'bundleListView', 'bundlesBrowseView', 'compareListView', 'ownedListView', 'recentListView',
-    'sharedListView', 'wishlistListView',
+    'bundleListView',
+    'bundlesBrowseView',
+    'compareListView',
+    'ownedListView',
+    'recentListView',
+    'sharedListView',
+    'wishlistListView',
   ]);
 });
 
@@ -48,10 +59,10 @@ test('resetBaselines: clears every key', () => {
 // ── stripTransientViewFields ─────────────────────────────────────────────────
 
 test('stripTransientViewFields: drops page and searchQuery, keeps everything else', () => {
-  assert.deepEqual(
-    stripTransientViewFields({ pageSize: 25, page: 3, searchQuery: 'portal', sorts: [] }),
-    { pageSize: 25, sorts: [] },
-  );
+  assert.deepEqual(stripTransientViewFields({ pageSize: 25, page: 3, searchQuery: 'portal', sorts: [] }), {
+    pageSize: 25,
+    sorts: [],
+  });
 });
 
 test('stripTransientViewFields: undefined input yields an empty object', () => {

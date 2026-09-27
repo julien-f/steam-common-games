@@ -23,7 +23,7 @@ Each scenario: **who / goal**, **steps** as a user would take them, **expect** �
 - **Who / goal**: a new visitor wants to see their own games with ratings and completion times.
 - **Steps**: open `/` → paste a profile URL, vanity name or steam64 id → resolve → it becomes my ★ account automatically, being the first ◇ → open **Owned**.
 - **Expect**: the account card shows avatar, name, owned/wishlist counts; the nav chip names the account; Owned streams in rows with rating/HLTB filled progressively; reloading keeps everything.
-- **Edges**: unknown identifier; private profile (looks empty — does the UI say *why* it might be?); a very large library (thousands of games); slow upstream.
+- **Edges**: unknown identifier; private profile (looks empty — does the UI say _why_ it might be?); a very large library (thousands of games); slow upstream.
 
 ### A2 Explore a friend without losing my own setup
 
@@ -59,7 +59,7 @@ Each scenario: **who / goal**, **steps** as a user would take them, **expect** �
 
 - **Who / goal**: find games all but one friend own, to decide what that friend should buy.
 - **Steps**: C1 → read the group missing exactly one player → sort it by price ◇.
-- **Expect**: group labels say clearly who is *in* and who is *missing*; a group missing players carries price columns ◇, so no panel needs opening.
+- **Expect**: group labels say clearly who is _in_ and who is _missing_; a group missing players carries price columns ◇, so no panel needs opening.
 
 ### C3 Keep a comparison
 
@@ -81,7 +81,7 @@ Each scenario: **who / goal**, **steps** as a user would take them, **expect** �
 ### C6 Co-op with one friend
 
 - **Who / goal**: find a co-op game we both own that neither of us has worn out.
-- **Steps**: Compare me and a friend → **Intersect** → filter tag co-op → filter low playtime for *both* of us ◇.
+- **Steps**: Compare me and a friend → **Intersect** → filter tag co-op → filter low playtime for _both_ of us ◇.
 - **Expect**: per-player playtime columns ◇; today membership groups carry playtime for the current account only (frontend.md, Known gaps).
 
 ## Lists
@@ -156,7 +156,7 @@ Each scenario: **who / goal**, **steps** as a user would take them, **expect** �
 
 - **Who / goal**: pick something from a friend's wishlist within a budget.
 - **Steps**: explore the friend (A2/A4) → **Wishlist** → sort by best price or filter record lows → open one → check it's not in their Family's library.
-- **Expect**: prices are in *my* region, not theirs, and say so; switching back to my account is one click.
+- **Expect**: prices are in _my_ region, not theirs, and say so; switching back to my account is one click.
 
 ## Finding a game
 

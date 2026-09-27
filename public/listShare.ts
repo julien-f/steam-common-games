@@ -34,16 +34,11 @@ export interface EncodableList {
 
 export type EncodeFailureReason = 'manual-source' | 'ranked-source' | 'cycle-or-too-deep' | 'empty';
 
-export type EncodeResult =
-  | { ok: true; formula: string }
-  | { ok: false; reason: EncodeFailureReason };
+export type EncodeResult = { ok: true; formula: string } | { ok: false; reason: EncodeFailureReason };
 
 // ── Encode ───────────────────────────────────────────────────────────────────────────────────
 
-export function encodeListFormula(
-  list: EncodableList,
-  getList: (id: string) => GameList | undefined,
-): EncodeResult {
+export function encodeListFormula(list: EncodableList, getList: (id: string) => GameList | undefined): EncodeResult {
   try {
     const formula = encodeFormula(list.op ?? 'union', list.sources ?? [], getList, new Set(), 0);
     return { ok: true, formula };
@@ -70,7 +65,7 @@ function encodeFormula(
 ): string {
   if (depth > MAX_DEPTH) throw new EncodeError('cycle-or-too-deep');
   if (!sources.length) throw new EncodeError('empty');
-  const encoded = sources.map(ref => encodeSource(ref, getList, visited, depth));
+  const encoded = sources.map((ref) => encodeSource(ref, getList, visited, depth));
   return `${op}:(${encoded.join(';')})`;
 }
 
@@ -158,16 +153,12 @@ function parseFormula(
   if (!OPS.includes(opRaw as CombineOp)) throw new Error('unknown op');
   const op = opRaw as CombineOp;
   const body = raw.slice(colon + 2, -1);
-  const sources = splitTopLevel(body).map(tok => parseSource(tok, synthetic, makeId));
+  const sources = splitTopLevel(body).map((tok) => parseSource(tok, synthetic, makeId));
   if (!sources.length) throw new Error('empty formula');
   return { op, sources };
 }
 
-function parseSource(
-  token: string,
-  synthetic: Map<string, GameList>,
-  makeId: () => string,
-): ListRef {
+function parseSource(token: string, synthetic: Map<string, GameList>, makeId: () => string): ListRef {
   if (token === 'r') return { kind: 'recent-games' };
   if (token.startsWith('o:')) return { kind: 'account-owned', accountId: decodeURIComponent(token.slice(2)) };
   if (token.startsWith('w:')) return { kind: 'account-wishlist', accountId: decodeURIComponent(token.slice(2)) };
@@ -176,7 +167,16 @@ function parseSource(
     const { op, sources } = parseFormula(token.slice(2), synthetic, makeId);
     const id = makeId();
     const now = Date.now();
-    const list: GameList = { id, parentId: null, order: 0, createdAt: now, updatedAt: now, kind: 'dynamic', op, sources };
+    const list: GameList = {
+      id,
+      parentId: null,
+      order: 0,
+      createdAt: now,
+      updatedAt: now,
+      kind: 'dynamic',
+      op,
+      sources,
+    };
     synthetic.set(id, list);
     return { kind: 'user', listId: id };
   }

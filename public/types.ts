@@ -229,12 +229,12 @@ export interface AccountSlot {
   members: string[]; // resolved steam64 ids, sorted
   rawInputs: string[]; // original typed identifiers (vanity name/URL/id), same order as entered
   label?: string; // last-known display name(s) ("PersonaName" or "A + B" for a Family) — cached
-                  // for instant recents rendering before a fresh fetch resolves
+  // for instant recents rendering before a fresh fetch resolves
   avatarUrl?: string; // last-known avatar, same reason
   vanities?: Record<string, string>; // steam64 → that member's Steam custom-URL name, for the
-                                     // members that set one — captured at resolve time so the
-                                     // nicest copyable identifier needs no fetch of its own
-                                     // (accountsStore.ts's accountIdentifiers)
+  // members that set one — captured at resolve time so the
+  // nicest copyable identifier needs no fetch of its own
+  // (accountsStore.ts's accountIdentifiers)
   // Last-known solo-account profile trivia — same "cached at resolve time, absent/stale until
   // next picked" reasoning as label/avatarUrl above. Only ever set for a single-account slot
   // (like avatarUrl, a Family has no one profile to speak for the whole thing).
@@ -290,5 +290,5 @@ export interface GameList {
   source?: ListRef; // kind: 'ranked'
   tableView?: object; // persisted per-list (not shared across lists), same shape tableViewPrefs.ts stores
   deletedAt?: number; // soft-deleted — hidden from the tree/pickers, kept for dynamic-list
-                      // resolution + restore as long as something still references it
+  // resolution + restore as long as something still references it
 }
