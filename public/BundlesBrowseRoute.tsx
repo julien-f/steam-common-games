@@ -73,6 +73,7 @@ import { createStaleGuard } from './staleGuard.ts';
 import { getPref, setPref } from './prefs.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
 import { setBaseTitle } from './pageTitle.ts';
+import { convert, formatWithEstimate, REGION_CURRENCY } from './currency.ts';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
 
 const PAGE_SIZE = 50; // ITAD's own max per page (lib/itad.js's getBundles `limit`)
@@ -191,6 +192,13 @@ function renderEnds(value: unknown, row: BundleRow): Node {
   return renderDateTime(value, rel);
 }
 
+function regionCurrency(): string {
+  return REGION_CURRENCY[resolveRegion(getStoredRegion())] ?? 'USD';
+}
+function inRegionCurrency(amount: number, currency: string | null | undefined): number {
+  return convert(amount, currency ?? regionCurrency(), regionCurrency()) ?? amount;
+}
+
 const COLUMNS: ColumnDef<BundleRow>[] = [
   {
     key: 'covers',
@@ -225,7 +233,11 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     label: 'Cheapest Tier',
     type: 'number',
     groupable: true,
-    format: (v, row) => (v == null ? 'Varies' : formatMoney(Number(v), row.currency)),
+    // Sorted, filtered and bucketed in the region's currency (currency.ts's approximate rates):
+    // some shops only price in USD, and "$6 < €10" is not an order. Shown in the shop's own.
+    value: (row) => (row.price == null ? null : inRegionCurrency(row.price, row.currency)),
+    format: (_v, row) =>
+      row.price == null ? 'Varies' : formatWithEstimate(row.price, row.currency ?? regionCurrency(), regionCurrency()),
     compare: compareNumMissingLast,
     // withMissingGroup, not a bare priceTierBucket: `Number(null)` is 0, so a null price would
     // otherwise land in its "Free" bucket rather than in the missing/"Varies" one.

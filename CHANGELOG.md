@@ -270,6 +270,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- The bundle browser's Cheapest Tier column sorts across currencies: a USD-only shop's price shows an approximate conversion to your region's currency ("$6.00 (≈ €5.13)") and sorts by it, instead of $6 counting as cheaper than €10.
 - One player that can't be found no longer blocks a whole comparison: the page names them, marks them in Edit players, and offers **Compare the other N**. The heading names the players it did find.
 - On a phone, game tables use a smaller thumbnail, tighter cells and wrapping headers, so rating and completion time fit beside the name.
 - Resuming a ranking started on chosen games ("🏆 Rank N games", Compare N selected/shown) now resumes on those games, and the list page says how many of them are left, instead of switching to the whole list and its thousands-of-comparisons estimate.

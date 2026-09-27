@@ -84,7 +84,7 @@ Browse current Steam game bundles (sourced from IsThereAnyDeal, and only availab
 
 ## Prices
 
-Wishlist and bundle lists carry price columns: the best deal across every shop IsThereAnyDeal tracks, the discount against Steam's full price, and historical lows. A price at or below a record low is badged — 🔥 all-time, ★ one-year, ☆ three-month. Prices are region-specific; pick your region in the nav bar's ⚙ Preferences (it defaults to auto-detecting from your system timezone). Some shops only ever price in USD regardless of region — that's their behaviour, passed through unchanged.
+Wishlist and bundle lists carry price columns: the best deal across every shop IsThereAnyDeal tracks, the discount against Steam's full price, and historical lows. A price at or below a record low is badged — 🔥 all-time, ★ one-year, ☆ three-month. Prices are region-specific; pick your region in the nav bar's ⚙ Preferences (it defaults to auto-detecting from your system timezone). Some shops only ever price in USD regardless of region — that's their behaviour, passed through unchanged, with an approximate conversion beside it ("$6.00 (≈ €5.13)") that the bundle browser also sorts by.
 
 ## The game panel
 
