@@ -29,7 +29,6 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 
 ## Lists and selection
 
-- **U8 · major · L1, L4** — the selection toolbar ("Add to list…") sits at the top of the page, not sticky: selecting row 20 gives no visible feedback. Make it sticky/floating.
 - **U9 · major · L1** — "+ Create new list…" uses a native `prompt()`, then the toolbar vanishes with no confirmation or link. Inline naming; toast with "Open list".
 - **U10 · major · L1** — a list can't be moved into a folder after creation (only Rename/Delete). Add "Move to…".
 - **U11 · minor · F3** — Filter popover: category pane too narrow (scrolls sideways); the range shows no field label and raw floats (`0 – 99.0202584`, `380.2666…`); "never played" needs max = 0 and then reads "Played (h): 0–0". Label and round; add a "never played" preset.

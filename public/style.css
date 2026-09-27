@@ -3200,6 +3200,11 @@ kbd {
   border-radius: var(--r);
   padding: 10px 14px;
   margin-bottom: 12px;
+  /* Stays in view while selecting rows further down the table. */
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 .selection-count {
   font-size: 13px;
