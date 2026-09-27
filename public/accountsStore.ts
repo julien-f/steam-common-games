@@ -145,6 +145,35 @@ export function upsertRecentAccount(account: AccountSlot): AccountSlot {
   return entry;
 }
 
+// An account's display fields (label, avatar, custom-URL names) are captured when it's picked
+// and nothing else updates them — so one picked before a field existed, or renamed on Steam
+// since, kept its old face in the chip, recents and list labels. This refreshes them wherever
+// the account is stored, from a fetch that returned newer ones; lastUsedAt is left alone, and
+// nothing is written (or broadcast) when nothing changed.
+export function refreshAccountInfo(
+  accountId: string,
+  info: { label?: string; avatarUrl?: string; vanities?: Record<string, string> },
+): boolean {
+  const fresh = Object.fromEntries(Object.entries(info).filter(([, v]) => v !== undefined && v !== ''));
+  const differs = (a: AccountSlot) =>
+    Object.entries(fresh).some(([k, v]) => JSON.stringify(a[k as keyof AccountSlot]) !== JSON.stringify(v));
+  let changed = false;
+  for (const key of [MY_ACCOUNT_KEY, CURRENT_ACCOUNT_KEY]) {
+    const slot = getPref<AccountSlot | null>(key, null);
+    if (slot?.id === accountId && differs(slot)) {
+      setPref(key, { ...slot, ...fresh });
+      changed = true;
+    }
+  }
+  const recents = readRecents();
+  if (recents.some((a) => a.id === accountId && differs(a))) {
+    writeRecents(recents.map((a) => (a.id === accountId ? { ...a, ...fresh } : a)));
+    changed = true;
+  }
+  if (changed) notifyAccountChanged();
+  return changed;
+}
+
 // Soft-removes when a dynamic list still references this account, hard-removes otherwise —
 // same shape as listsStore.ts's deleteList. Never touches myAccount/currentAccount even if
 // they happen to hold the same id, since those are stored independently.

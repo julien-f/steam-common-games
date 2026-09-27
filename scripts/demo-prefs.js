@@ -20,7 +20,7 @@ const DEMO_LABEL = 'julien-f';
 const DEMO_AVATAR = 'https://avatars.steamstatic.com/8cd7f9a9091ff23b8961f1c46ab22f986c271062_medium.jpg';
 
 function demoPrefs(now = Date.now()) {
-  // label/avatarUrl: the app never refreshes a stored slot's copy, so without them the demo shows as its steam64 id.
+  // label/avatarUrl: only Home refreshes a stored slot's copy, so a shot of any other page would show a steam64 id.
   const account = {
     id: DEMO_STEAMID,
     members: [DEMO_STEAMID],

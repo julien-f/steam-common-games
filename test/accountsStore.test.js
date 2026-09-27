@@ -278,3 +278,24 @@ test('accountDisplayLabel: falls back to the member ids when nothing else is kno
   const { accountDisplayLabel } = store();
   assert.equal(accountDisplayLabel({ id: 'a+b', members: ['a', 'b'], rawInputs: [], lastUsedAt: 0 }), 'a + b');
 });
+
+test('refreshAccountInfo: updates the account wherever it is stored, only when something changed', () => {
+  const { setMyAccount, setCurrentAccount, getMyAccount, getCurrentAccount, getRecentAccounts, refreshAccountInfo } =
+    store();
+  const slot = { id: '1', members: ['1'], rawInputs: ['1'], lastUsedAt: 5 };
+  setMyAccount(slot);
+  setCurrentAccount(slot);
+  const lastUsed = getRecentAccounts()[0].lastUsedAt;
+
+  assert.equal(refreshAccountInfo('1', { label: 'Alice', avatarUrl: 'a.png', vanities: { 1: 'alice' } }), true);
+  for (const acc of [getMyAccount(), getCurrentAccount(), getRecentAccounts()[0]]) {
+    assert.equal(acc.label, 'Alice');
+    assert.equal(acc.avatarUrl, 'a.png');
+    assert.deepEqual(acc.vanities, { 1: 'alice' });
+  }
+  assert.equal(getRecentAccounts()[0].lastUsedAt, lastUsed, 'not a new use of the account');
+
+  assert.equal(refreshAccountInfo('1', { label: 'Alice', avatarUrl: 'a.png' }), false, 'nothing new');
+  assert.equal(refreshAccountInfo('1', { label: 'Alice', avatarUrl: '' }), false, 'blank never erases');
+  assert.equal(refreshAccountInfo('2', { label: 'Bob' }), false, 'unknown account');
+});

@@ -62,6 +62,14 @@ test("S3 edge: another browser's list link explains lists are local", async ({ p
   await expect(page.getByText('Share list')).toBeVisible();
 });
 
+test('A1 edge: an account stored without its name picks it up from Home', async ({ page }) => {
+  await asPlayer(page, ALICE, { withLabel: false });
+  await page.goto('/');
+  await expect(page.getByRole('navigation')).toContainText('Alice');
+  await page.reload();
+  await expect(page.getByRole('navigation')).toContainText('Alice');
+});
+
 test('C1: compare three players — one table grouped from "all" to "only one"', async ({ page }) => {
   await page.goto('/lists/compare?u=alice&u=bob&u=carol');
   await expect(groupRows(page)).toHaveCount(6);

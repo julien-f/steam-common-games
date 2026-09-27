@@ -13,7 +13,7 @@
 // form below can pick any recent account's Owned/Wishlist, Recently Looked Up, or any existing
 // user list as a source. A bundle joins it only from its own page (`?combine=b:<id>`, below) —
 // offering every bundle here would need a bundle picker, not a checkbox.
-import { createSignal, createEffect, createMemo, onCleanup, onMount, For, Index, Show, type JSX } from 'solid-js';
+import { createSignal, createEffect, createMemo, on, onCleanup, onMount, For, Index, Show, type JSX } from 'solid-js';
 import { A, useLocation, useNavigate } from '@solidjs/router';
 import {
   getMyAccount,
@@ -26,6 +26,7 @@ import {
   getAccountOverride,
   accountDisplayLabel,
   accountIdentifiers,
+  refreshAccountInfo,
   ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
 import { getAccountOverrideState, clearAccountOverride, accountOverrideStatusText } from './accountOverride.ts';
@@ -156,6 +157,15 @@ export default function HomeRoute() {
         setCounts((c) => ({ ...c, owned: games.length }));
         setPlayers(ps);
         setFetchedAt(at);
+        // Keeps the stored slot's name/avatar current (accountsStore.ts's refreshAccountInfo).
+        const vanities = Object.fromEntries(
+          ps.flatMap((p) => (steamVanity(p.profileUrl) ? [[p.steamid, steamVanity(p.profileUrl)!]] : [])),
+        );
+        refreshAccountInfo(account.id, {
+          label: ps.map((p) => p.name || p.steamid).join(' + '),
+          avatarUrl: ps.length === 1 ? ps[0].avatarUrl : undefined,
+          vanities: Object.keys(vanities).length ? vanities : undefined,
+        });
       },
       () => {
         if (!isStale()) setCounts((c) => ({ ...c, owned: 0 }));
@@ -174,16 +184,22 @@ export default function HomeRoute() {
     });
   }
 
-  createEffect(() => {
-    const account = currentAccount();
-    if (!account) {
-      setCounts({ owned: null, wishlist: null });
-      setPlayers([]);
-      setFetchedAt(null);
-      return;
-    }
-    loadAccountData(account);
-  });
+  // Keyed on the id: a refreshed label (refreshAccountInfo) is the same account, not a new fetch.
+  createEffect(
+    on(
+      () => currentAccount()?.id,
+      () => {
+        const account = currentAccount();
+        if (!account) {
+          setCounts({ owned: null, wishlist: null });
+          setPlayers([]);
+          setFetchedAt(null);
+          return;
+        }
+        loadAccountData(account);
+      },
+    ),
+  );
 
   // The resolved slot a `?u=` link is currently showing, or null when there's no override (or
   // it hasn't resolved yet / failed) — what the "Exploring …" note and its adopt button read.

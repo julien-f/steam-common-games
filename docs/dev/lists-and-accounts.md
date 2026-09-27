@@ -41,6 +41,8 @@ Both are full `AccountSlot` objects (see the schema below), not just an id refer
 
 **Account header** (shown wherever `currentAccount` is relevant): avatar, persona name + profile link, online status, owned count, wishlist count.
 
+**Display fields stay current**: an account's `label`/`avatarUrl`/`vanities` are captured when it's picked; Home's account card refreshes them wherever the account is stored (`refreshAccountInfo`) from the profile it fetches anyway, so a Steam rename, or a slot from before a field existed, catches up.
+
 **Copyable identifier**: a ⧉ button beside the name copies the nicest identifier the account has — its Steam custom-URL name (`gaben`) when it set one, its steam64 id otherwise (`accountsStore.ts`'s `accountIdentifiers`). Per member, never one string for the slot: a Family's joined label is nothing any input accepts back. Offered wherever an account is named — the account card, Home's "Recent accounts", the nav chip and its recents — since it reads off the stored slot and so needs no account to be current. The custom names are captured at resolve time from the `profileurl` `/api/common-games` already returns and stored as `AccountSlot.vanities`, so every surface can offer the nice form without a fetch; a slot resolved before that field existed simply falls back to ids.
 
 **Reactivity**: `currentAccount` is app-wide reactive state, not read once per page load — if it changes while `/lists/owned` or `/lists/wishlist` is open, that route re-fetches/re-streams in place immediately, rather than only taking effect on the next navigation. This matters more than it would have in the old multi-page structure, since switching accounts no longer implies a page reload.

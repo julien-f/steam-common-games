@@ -2,13 +2,13 @@ import type { Page } from '@playwright/test';
 import type { Player } from './fixtures.ts';
 
 // Seeds `player` as both my ★ account and the current one, once per tab: later reloads keep
-// whatever the test did since.
-export async function asPlayer(page: Page, player: Player): Promise<void> {
+// whatever the test did since. `withLabel: false` stores it the way an old slot was: id only.
+export async function asPlayer(page: Page, player: Player, { withLabel = true } = {}): Promise<void> {
   const slot = {
     id: player.steamid,
     members: [player.steamid],
     rawInputs: [player.vanity],
-    label: player.personaname,
+    ...(withLabel ? { label: player.personaname } : {}),
     lastUsedAt: 0,
   };
   const entry = (value: unknown) => ({ value, updatedAt: 0 });
