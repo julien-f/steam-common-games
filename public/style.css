@@ -1333,7 +1333,9 @@ tbody tr.game-row.active {
      click-outside-dismiss, just a layout fallback. */
   .game-panel.open {
     z-index: 101;
-    width: 100vw;
+    /* Both edges, not 100vw: that includes the page scrollbar, pushing the left edge off-screen. */
+    left: 0;
+    width: auto;
   }
 }
 
