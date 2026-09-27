@@ -64,14 +64,15 @@ export function bindPanelKeyboardShortcuts(opts: PanelKeyboardOptions): void {
       return;
     }
     if (opts.onEnterOnFocusedRow && e.key === 'Enter' && opts.onEnterOnFocusedRow()) return;
-    if (!opts.isPanelOpen()) return;
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      if (opts.panelStepHero(e.key === 'ArrowRight' ? 1 : -1, { wrap: true })) e.preventDefault();
-      return;
-    }
+    // Also with no panel open: the quickest way into a list without the mouse.
     if (e.key === 'r' || e.key === 'R') {
       e.preventDefault();
       opts.pickRandom();
+      return;
+    }
+    if (!opts.isPanelOpen()) return;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      if (opts.panelStepHero(e.key === 'ArrowRight' ? 1 : -1, { wrap: true })) e.preventDefault();
       return;
     }
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;

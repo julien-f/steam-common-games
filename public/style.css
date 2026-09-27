@@ -4609,3 +4609,20 @@ kbd {
     padding: 16px 12px 40px;
   }
 }
+
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -40px;
+  z-index: 100;
+  padding: 6px 12px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--r);
+}
+.skip-link:focus {
+  top: 8px;
+}
+.app-content:focus:not(:focus-visible) {
+  outline: none;
+}

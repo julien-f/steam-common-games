@@ -105,7 +105,7 @@ Clicking any row opens a detail panel beside the table — not over it, so the l
 
 ## Keyboard shortcuts
 
-Press `?` for the full list. The essentials: `/` focuses search, `Esc` closes what's open, `↑`/`↓` move through the list, `←`/`→` through a game's media, and `R` picks a random game.
+Press `?` for the full list. The essentials: `/` focuses search, `Esc` closes what's open, `↑`/`↓` move through the list, `←`/`→` through a game's media, and `R` picks a random game, even with no panel open. The first Tab on a page is a **Skip to table** link.
 
 ## How fresh is this?
 

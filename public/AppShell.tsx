@@ -254,6 +254,19 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
   return (
     <div class="app-shell" classList={{ 'panel-open': isPanelOpen() }}>
       <div class="app-scroll" ref={scrollEl}>
+        {/* First Tab stop, shown only when focused: past the nav and toolbar straight to the rows. */}
+        <a
+          class="skip-link"
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            const target =
+              document.querySelector<HTMLElement>('main .dt-tr[tabindex]') ?? document.querySelector('main');
+            target?.focus();
+          }}
+        >
+          Skip to table
+        </a>
         <nav id="site-nav" class="site-nav">
           <For each={NAV_LINKS}>
             {(link) => (
@@ -289,7 +302,9 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           </details>
         </nav>
 
-        <main class="app-content">{props.children}</main>
+        <main class="app-content" tabindex="-1">
+          {props.children}
+        </main>
 
         <footer class="app-footer">
           <span>

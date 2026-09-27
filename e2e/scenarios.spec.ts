@@ -140,6 +140,21 @@ test('F1: look up one game from the nav search, in place', async ({ page }) => {
   expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT');
 });
 
+test('I2: into a list from the keyboard — skip link, and R with no panel open', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'Skip to table' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  expect(await page.evaluate(() => document.activeElement?.closest('tbody') != null)).toBe(true);
+
+  await page.keyboard.press('r');
+  await expect(page).toHaveURL(/[?&]game=\d+/);
+  await expect(page.locator('.game-panel')).toBeVisible();
+});
+
 test("S1: share my wishlist's view; a fresh browser sees my games with my layout", async ({ page, browser }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/wishlist');

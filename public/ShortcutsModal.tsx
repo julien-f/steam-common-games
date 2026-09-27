@@ -22,6 +22,7 @@ export const SHORTCUT_SECTIONS: Section[] = [
       { keys: ['?'], label: 'Show / hide this dialog' },
       { keys: ['/'], label: 'Focus the game search box' },
       { keys: ['Esc'], label: 'Close panel or dialog' },
+      { keys: ['R'], label: 'Open a random game from the list' },
     ],
   },
   {
@@ -29,7 +30,6 @@ export const SHORTCUT_SECTIONS: Section[] = [
     rows: [
       { keys: ['↑', '↓'], label: 'Previous / next game in the list' },
       { keys: ['←', '→'], label: 'Previous / next media' },
-      { keys: ['R'], label: 'Pick a random game from the list' },
       { keys: ['Enter'], label: 'Open the focused table row' },
     ],
   },
