@@ -33,6 +33,14 @@ test('A1: first visit — resolve my account, then open my library', async ({ pa
   await expect(rows(page)).toHaveCount(6);
 });
 
+test('A1 edge: Owned with no account points to Home rather than showing 0 games', async ({ page }) => {
+  await page.goto('/lists/owned');
+  await expect(page.getByText('No account selected')).toBeVisible();
+  await expect(page.locator('.list-hero')).not.toContainText('Games');
+  await page.getByRole('link', { name: 'pick one on Home' }).click();
+  await expect(page).toHaveURL(/\/$/);
+});
+
 test('C1: compare three players — one table grouped from "all" to "only one"', async ({ page }) => {
   await page.goto('/lists/compare?u=alice&u=bob&u=carol');
   await expect(groupRows(page)).toHaveCount(6);

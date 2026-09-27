@@ -981,6 +981,8 @@ export default function ListRoute() {
   let total = 0;
   let loaded = 0;
   let loadSamples: LoadSample[] = [];
+  // Owned/Wishlist with no account at all: the status links to Home, and there's no "Games 0".
+  const [needsAccount, setNeedsAccount] = createSignal(false);
   let slowLoad = false;
   // 0–1 while a list's game details stream in, null otherwise — the status line's progress bar.
   const [loadFraction, setLoadFraction] = createSignal<number | null>(null);
@@ -1964,8 +1966,10 @@ export default function ListRoute() {
       // "<account>'s Library" just below once there is one.
       const listLabel = kind === 'wishlist' ? 'Wishlist' : 'Library';
       setListTitle(listLabel);
+      const overrideText = accountOverrideStatusText(overrideState);
+      setNeedsAccount(!account && !overrideText);
       if (!account) {
-        setStatusText(accountOverrideStatusText(overrideState) ?? 'No account selected — pick one from Home.');
+        setStatusText(overrideText ?? '');
         return;
       }
       setHeroAccount(account);
@@ -2320,6 +2324,7 @@ export default function ListRoute() {
     // resolved) has no facts to state — a lone "Games 0" tile reads as a result, not as a
     // form waiting to be filled in.
     if (kind === 'compare' && !compareList()) return [];
+    if (needsAccount()) return [];
     const tiles: HeroTile[] = [{ label: 'Games', value: rowsStore.length }];
     // Owned/wishlist state their own fetch's age; a comparison or a dynamic list states the
     // oldest of the account fetches it was built from (noteFetchedAt), which is why this is
@@ -2852,7 +2857,9 @@ export default function ListRoute() {
         </div>
       </Show>
       <div class="list-status">
-        {statusText()}
+        <Show when={needsAccount()} fallback={statusText()}>
+          No account selected — <A href="/">pick one on Home</A>.
+        </Show>
         <Show when={loadFraction()}>
           {(fraction) => (
             <progress class="list-progress" value={fraction()} max={1} aria-label="Loading game details" />

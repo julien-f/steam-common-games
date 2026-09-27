@@ -273,6 +273,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Owned and Wishlist with no account set link to Home to pick one, instead of showing "Games 0".
 - On a phone, the game panel no longer sits partly off the left edge of the screen.
 - Tab no longer stops on the hidden keyboard-shortcuts dialog's Close button.
 - Development: editing `AppShell.tsx` reloads the page instead of hot-swapping the shell, which mounted the panel and lightbox a second time and threw.
