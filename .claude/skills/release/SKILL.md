@@ -5,7 +5,12 @@ description: Cut a release — pick the version, consolidate CHANGELOG.md's Unre
 
 # Release
 
-Only on an explicit request, from a clean `main`. Tags are `vX.Y.Z`, annotated, message `vX.Y.Z` (see `git show v0.4.0`).
+Only on an explicit request. Tags are `vX.Y.Z`, annotated, message `vX.Y.Z` (see `git show v0.4.0`).
+
+## 0. Preconditions
+
+- On `main`, clean tree (`git status --short` empty), and `## [Unreleased]` has entries.
+- `git log --oneline $(git describe --tags --abbrev=0)..` — what the release covers; every code commit in it should have its changelog entry.
 
 ## 1. Pick the version
 
@@ -17,10 +22,10 @@ Pre-1.0: **minor** for anything under Added/Changed/Removed, **patch** for Fixed
 
 - Merge into one block per category, in order: Added, Changed, Deprecated, Removed, Fixed, Security.
 - Keep bullet order within each category; merge bullets that describe the same feature's evolution into its final state.
-- Rewrite for a reader of the release, not of the commits: what changed for users first, implementation detail only when a developer needs it. Keep it short — CLAUDE.md's doc-prose rules apply.
+- Rewrite for a reader of the release, not of the commits: what changed for users first, implementation detail only when a developer needs it; drop internal references (`UX backlog U<n>`, file-by-file notes). Keep it short — CLAUDE.md's doc-prose rules apply.
 - Show the consolidated section to the user before going on.
 
-Then rename it `## [X.Y.Z] - YYYY-MM-DD` (today) and add an empty `## [Unreleased]` above it.
+Then rename it `## [X.Y.Z] - YYYY-MM-DD` (today) and add an empty `## [Unreleased]` above it. `npx prettier --write CHANGELOG.md` — the pre-commit hook rejects an unformatted file.
 
 ## 3. Bump, commit, tag
 
@@ -31,8 +36,8 @@ git commit -m "Release X.Y.Z"            # body: one line on what the release is
 git tag -a vX.Y.Z -m vX.Y.Z
 ```
 
-No `chore(release):` prefix — CLAUDE.md dropped Conventional Commits.
+No `chore(release):` prefix — CLAUDE.md dropped Conventional Commits. The pre-commit hook runs the full gate; don't re-run it by hand.
 
 ## 4. Push
 
-Only when asked: `git push && git push origin vX.Y.Z`.
+Only when asked: `git push --follow-tags`.

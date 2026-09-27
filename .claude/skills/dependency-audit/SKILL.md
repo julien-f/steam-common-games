@@ -60,7 +60,7 @@ So both should now be silent. If either comes back, the cause is a _new_ package
 Confirm the changes first, then:
 
 1. `npm update` for in-range drift, `npm install <pkg>@latest` for a range bump.
-2. Run the full gate — `npm test`, plus `npm run typecheck` and `npm run lint` (0 problems), plus `npm run build` for anything in the Vite/Babel/Solid chain. Report real output.
+2. Run the pre-commit gate by hand before committing — `npm run format:check`, `npm test`, `npm run typecheck`, `npm run lint` (0 problems) — plus `npm run build` for anything in the Vite/Babel/Solid chain, which the hook doesn't cover. Report real output.
 3. A lockfile-only change is still a code change: `CHANGELOG.md` entry in the same commit, per `CLAUDE.md`.
 4. Surface new lint violations from a plugin bump rather than silencing them with `eslint-disable`.
 
