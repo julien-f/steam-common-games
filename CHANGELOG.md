@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - `docs/dev/scenarios.md`: user journeys (goal, steps, expected outcome), the basis for design reviews and end-to-end tests.
+- `scripts/demo-prefs.js`: seeds the demo account and example lists into `localStorage`, backing up and restoring the real prefs around it; the `screenshots` skill uses it instead of hand-seeding.
 - **Your own lists now have Played (h) and Last Played columns** (hidden by default), showing the current account's playtime — the same library fetch as the ✓/☆ ownership markers, so no extra request. Lets you filter a list (or rank only the games) you've played more than N hours.
 
 - **Ranked lists: sort any list by answering one-vs-one "which do you prefer?" questions.**

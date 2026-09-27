@@ -11,10 +11,13 @@ Committed screenshots live in `docs/images/`, kebab-case, referenced from `READM
 
 Only the demo account may appear: <https://steamcommunity.com/profiles/76561198070571772/>. Real profiles reach the screenshots through the account card, "Recent accounts", the nav-bar chip and the panel's "Owned by".
 
-1. Back up `localStorage`'s `steam.isonoe.net:prefs`.
-2. Clear it, then seed the demo state — demo lists/folders go straight into `localStorage` rather than being clicked together, named so they read as examples ("Couch co-op picks", "Friday shortlist").
-3. Shoot.
-4. Restore the backup.
+`scripts/demo-prefs.js` holds the demo state (account, example lists and folders) and the backup/restore around it:
+
+1. `node scripts/demo-prefs.js seed` → run the printed function with `browser_evaluate` → reload. It backs up `steam.isonoe.net:prefs` first and refuses if a backup already exists.
+2. Shoot.
+3. `node scripts/demo-prefs.js restore` → run the printed function → reload.
+
+A shot needing more demo state (another list, a ranked list) gets it added to `demoPrefs()` rather than clicked together, named so it reads as an example.
 
 ## Capture
 
