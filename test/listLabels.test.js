@@ -63,11 +63,20 @@ test('describeListRef: an account the naming has never heard of is reported, not
   assert.match(desc.problem, /no longer one of your accounts/);
 });
 
-test('describeListRef: bundles are named by id (no client-side title without an ITAD fetch) but still link', () => {
+test('describeListRef: a bundle with no known title is named by id, but still links', () => {
   assert.deepEqual(describeListRef({ kind: 'bundle', bundleId: '16538' }, NAMING), {
     label: 'Bundle 16538',
     href: '/lists/bundle/16538',
   });
+});
+
+test('describeListRef: a bundle is named by its last-known title when the naming has one', () => {
+  const naming = { ...NAMING, bundle: (id) => (id === '16538' ? { title: 'Trine Pack' } : null) };
+  assert.deepEqual(describeListRef({ kind: 'bundle', bundleId: '16538' }, naming), {
+    label: 'Trine Pack',
+    href: '/lists/bundle/16538',
+  });
+  assert.equal(describeListRef({ kind: 'bundle', bundleId: '1' }, naming).label, 'Bundle 1');
 });
 
 test('describeListRef: recent-games points at the Recently Looked Up route', () => {

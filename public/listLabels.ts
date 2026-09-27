@@ -13,6 +13,7 @@ import type { CombineOp, GameList, ListRef } from './types.ts';
 import { getRecentAccounts, getMyAccount, getEffectiveCurrentAccount, accountDisplayLabel } from './accountsStore.ts';
 import { getLists } from './listsStore.ts';
 import { membersFromAccountId } from './accountData.ts';
+import { getBundleSnapshot } from './bundleSnapshots.ts';
 
 // Short form — a chip/label on its own, where surrounding context already says it's a combine.
 export const OP_LABELS: Record<CombineOp, string> = {
@@ -53,6 +54,8 @@ export function opLabel(op: CombineOp | undefined): string {
 export interface ListNaming {
   account(accountId: string): { label: string; identifiers: string[] } | null;
   list(listId: string): { name: string; deleted: boolean } | null;
+  // Optional: without it a bundle source reads as its id.
+  bundle?(bundleId: string): { title: string } | null;
 }
 
 export interface RefDescription {
@@ -95,9 +98,12 @@ export function describeListRef(ref: ListRef, naming: ListNaming): RefDescriptio
     }
     case 'bundle':
       if (!ref.bundleId) return { label: 'Unknown bundle', href: null, problem: 'this source names no bundle' };
-      // No name without a fetch — ITAD is the only source for one, and this is a synchronous
-      // labeling function. The route it links to says the real title as soon as it opens.
-      return { label: `Bundle ${ref.bundleId}`, href: `/lists/bundle/${ref.bundleId}` };
+      // The title is the last-known one (bundleSnapshots.ts): ITAD is the only source for it, and
+      // this is a synchronous labeling function.
+      return {
+        label: naming.bundle?.(ref.bundleId)?.title ?? `Bundle ${ref.bundleId}`,
+        href: `/lists/bundle/${ref.bundleId}`,
+      };
     case 'recent-games':
       return { label: 'Recently Looked Up', href: '/game' };
     case 'user': {
@@ -182,6 +188,10 @@ export function createDefaultNaming(depth = 0): ListNaming {
         found.name ||
         (depth < 1 ? `(${listDisplayName(found, createDefaultNaming(depth + 1))})` : 'Untitled combined list');
       return { name, deleted: found.deletedAt != null };
+    },
+    bundle(bundleId) {
+      const snapshot = getBundleSnapshot(bundleId);
+      return snapshot ? { title: snapshot.title } : null;
     },
   };
 }

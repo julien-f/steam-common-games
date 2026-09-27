@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- A bundle used as a combined list's source is named by its title (the last one seen) rather than "Bundle 16599".
 - Prettier (`npm run format`, `npm run format:check`); the whole tree was reformatted with it once.
 - `docs/dev/scenarios.md`: user journeys (goal, steps, expected outcome), the basis for design reviews and end-to-end tests.
 - `scripts/demo-prefs.js`: seeds the demo account (with its name and avatar) and example lists into `localStorage` — or clears them, for a first visit — optionally as a ready-to-run Playwright file (`--file`), backing up and restoring the real prefs around it; the `screenshots` skill uses it instead of hand-seeding.
