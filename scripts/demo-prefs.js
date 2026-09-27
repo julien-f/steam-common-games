@@ -9,9 +9,19 @@
 const PREFS_KEY = 'steam.isonoe.net:prefs'; // public/prefs.ts's PREFS_STORAGE_KEY
 const BACKUP_KEY = `${PREFS_KEY}.backup`;
 const DEMO_STEAMID = '76561198070571772';
+const DEMO_LABEL = 'julien-f';
+const DEMO_AVATAR = 'https://avatars.steamstatic.com/8cd7f9a9091ff23b8961f1c46ab22f986c271062_medium.jpg';
 
 function demoPrefs(now = Date.now()) {
-  const account = { id: DEMO_STEAMID, members: [DEMO_STEAMID], rawInputs: [DEMO_STEAMID], lastUsedAt: now };
+  // label/avatarUrl: the app never refreshes a stored slot's copy, so without them the demo shows as its steam64 id.
+  const account = {
+    id: DEMO_STEAMID,
+    members: [DEMO_STEAMID],
+    rawInputs: [DEMO_STEAMID],
+    label: DEMO_LABEL,
+    avatarUrl: DEMO_AVATAR,
+    lastUsedAt: now,
+  };
   const list = (id, parentId, order, fields) => ({ id, parentId, order, createdAt: now, updatedAt: now, ...fields });
   const values = {
     myAccount: account,

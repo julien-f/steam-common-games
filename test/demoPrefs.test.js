@@ -22,7 +22,10 @@ function run(fnSource, localStorage) {
 test('demo prefs name only the demo account', () => {
   const prefs = demoPrefs(0);
   assert.strictEqual(prefs.schemaVersion, 2);
-  for (const key of ['myAccount', 'currentAccount']) assert.deepStrictEqual(prefs[key].value.members, [DEMO_STEAMID]);
+  for (const key of ['myAccount', 'currentAccount']) {
+    assert.deepStrictEqual(prefs[key].value.members, [DEMO_STEAMID]);
+    assert.ok(prefs[key].value.label, 'named, not shown as a steam64 id');
+  }
   assert.deepStrictEqual(
     prefs.recentAccounts.value.map((a) => a.id),
     [DEMO_STEAMID],

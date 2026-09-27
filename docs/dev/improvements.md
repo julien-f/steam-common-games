@@ -86,7 +86,6 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 
 ## Review tooling
 
-- **U40** — `scripts/demo-prefs.js` seeds the demo account without `label`/`avatarUrl`, so the demo shows as a steam64 id (see U37). Seed both.
 - **U41** — [scenarios.md](scenarios.md) L1 asks to "put it in a folder" while its Edges say move has no UI. Update once U10 is decided.
 
 ## Not yet reviewed
