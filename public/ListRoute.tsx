@@ -138,6 +138,7 @@ import {
   type BundleTierSummary,
 } from './bundleRows.ts';
 import { getBrowsedBundles } from './bundleBrowseStore.ts';
+import { rememberBundle } from './bundleSnapshots.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from './priceLoading.ts';
 import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { openPrefsPopover } from './prefsPopover.ts';
@@ -2580,6 +2581,22 @@ export default function ListRoute() {
                   Get this bundle ↗
                 </a>
               )}
+            </Show>
+            <Show when={bundleResolvedCount() > 0}>
+              <A
+                class="btn btn-ghost btn-sm"
+                href={withAccountParam(`/?combine=b:${params.bundleId}`, location.search)}
+                title="Make a list of this bundle's games minus the ones you own"
+                onClick={() =>
+                  rememberBundle(
+                    params.bundleId!,
+                    heroTitle(),
+                    (resolvedBundleGames ?? []).map((g) => g.appid),
+                  )
+                }
+              >
+                What does this add?
+              </A>
             </Show>
             <a class="btn btn-ghost btn-sm" href="/bundles">
               ← All bundles

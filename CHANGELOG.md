@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **What does this add?** on a bundle's page opens a combined list of that bundle minus the current account's Owned games (a Family counts as one), pre-filled but editable — e.g. to Group by membership with a friend instead — and opens the result once saved.
 - A bundle used as a combined list's source is named by its title (the last one seen) rather than "Bundle 16599".
 - Prettier (`npm run format`, `npm run format:check`); the whole tree was reformatted with it once.
 - `docs/dev/scenarios.md`: user journeys (goal, steps, expected outcome), the basis for design reviews and end-to-end tests.

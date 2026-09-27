@@ -23,7 +23,7 @@ const COMBINE_OPS: { value: CombineOp; label: string }[] = (Object.keys(OP_LABEL
 }));
 
 export function refKey(ref: ListRef): string {
-  return [ref.kind, ref.accountId ?? ref.listId].filter(Boolean).join(':');
+  return [ref.kind, ref.accountId ?? ref.listId ?? ref.bundleId].filter(Boolean).join(':');
 }
 
 // Every source a combine can currently be built from — any recent account's Owned/Wishlist,
@@ -71,8 +71,15 @@ export function CombineForm(props: CombineFormProps) {
     return props.showName ?? true;
   }
 
+  // Plus any prefilled source the usual enumeration doesn't offer (a bundle, a `?u=` account).
   function options(): SourceOption[] {
-    return sourceOptions(props.excludeListId);
+    const base = sourceOptions(props.excludeListId);
+    const keys = new Set(base.map((o) => o.key));
+    const naming = createDefaultNaming();
+    const extra = (props.initialSources ?? [])
+      .filter((ref) => !keys.has(refKey(ref)))
+      .map((ref) => ({ key: refKey(ref), label: describeListRef(ref, naming).label, ref }));
+    return [...extra, ...base];
   }
 
   function selectedSources(): ListRef[] {
