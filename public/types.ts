@@ -73,6 +73,7 @@ export interface GameDetails {
 export interface Game extends PriceFields {
   appid: number;
   name: string;
+  membership?: string; // group-by-membership lists: its group's key (membershipColumn.ts)
   loading: boolean;
   details: GameDetails | null;
 

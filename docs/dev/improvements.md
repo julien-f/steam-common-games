@@ -34,8 +34,6 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 ## Comparing
 
 - **U14 · major · C1** — one unresolvable player blocks the whole comparison: grey error line, failing chip unmarked, no "compare the others". Validate inline before navigating; offer to drop that player.
-- **U15 · major · C2** — group headings list who's in ("A + B (12)"), never who's missing; "everyone" isn't named as such. "Everyone" / "Everyone but C".
-- **U16 · major · C1** — each membership group has its own toolbar (7 groups → 7 sort/filter/column setups) and no persistence, so "sort by rating, filter co-op" is repeated per group. One shared view across groups.
 - **U17 · minor · C1** — Player 1 isn't prefilled with my ★ account; the same account twice is accepted silently; the URL is rewritten with players reordered (me no longer first).
 - **U18 · minor · C1** — on a failed resolve the heading shows a known account as its steam64 id.
 - **U19 · minor · C3** — a saved comparison's auto-name ("X — Owned + Y — Owned — grouped by membership") doesn't match the Compare heading ("X vs. Y").

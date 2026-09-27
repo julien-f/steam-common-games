@@ -22,16 +22,9 @@
 // resolveGameList/createDefaultFetchers; a manual list, or a dynamic one using any op other than
 // group-by-membership, renders as one flat table (flattened via flattenCombineResult when
 // needed, same as when it's resolved as someone *else's* combine source) — but
-// group-by-membership renders one real table PER group instead (see buildGroupTables below),
-// generalizing the old Comparison page's "one table per owner set, most owners to fewest"
-// layout. Per-group tables also skip view persistence entirely (a single list only has room for
-// one stored `tableView`, and dividing that across however many groups a combine happens to
-// produce isn't solved here yet) — each group table just uses the construction-time default
-// view, and (see the selection toolbar below) skips row-selection too: selection is only wired
-// up on the single-table path, since every real use case for it (saving some games from an
-// Owned/Wishlist/bundle/recent/manual-list view into another list) is there already, and
-// spreading one selection across N independent per-group tables is a bigger problem than this
-// first pass solves. `currentAccount` is read once per mount, not live-reactive to being changed
+// group-by-membership is one table too, grouped by an "Owned by"/"In" column (membershipColumn.ts)
+// — generalizing the old Comparison page's "one table per owner set, most owners to fewest"
+// layout, with one view (sort, filters, columns, saved like any other) and row selection. `currentAccount` is read once per mount, not live-reactive to being changed
 // elsewhere while this route stays open — accountsStore.ts is a plain module with no Solid
 // signal of its own yet, so there's nothing to subscribe to reactively here until one exists (a
 // real follow-up, not an oversight). A bundle's detail card (shop/dates/counts/tiers/note/outbound
@@ -122,6 +115,13 @@ import {
 import { getPref, setPref } from './prefs.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
 import { etaSeconds, formatEta, type LoadSample } from './loadProgress.ts';
+import {
+  membershipColumn,
+  membershipKey,
+  withMembershipGrouping,
+  withoutMembershipGrouping,
+  MEMBERSHIP_KEY,
+} from './membershipColumn.ts';
 import {
   getEffectiveCurrentAccount,
   accountIdentifiers,
@@ -475,7 +475,6 @@ export default function ListRoute() {
   const kind = kindFromPath(location.pathname, params);
 
   let tableContainer!: HTMLDivElement;
-  let groupsContainer!: HTMLDivElement;
   const [statusText, setStatusText] = createSignal('');
   const [priceStatusText, setPriceStatusText] = createSignal('');
   // kind === 'bundle' only: the currently open bundle's Steam-resolved games, kept at component
@@ -901,8 +900,7 @@ export default function ListRoute() {
   // (and so "🔗 Share view"/"Reset view" below) doesn't apply there. Gates that toolbar's own
   // <Show> rather than leaving it visible-but-broken against a `table` that doesn't exist yet/at all.
   const [tableReady, setTableReady] = createSignal(false);
-  // How many per-group tables a group-by-membership list rendered (0 for every other kind/op) —
-  // groupTables itself is a plain array, so the hero's Groups tile needs a signal.
+  // How many membership groups a group-by-membership list has (0 for every other kind/op).
   const [groupCount, setGroupCount] = createSignal(0);
 
   // ── Row-selection-based add/remove-to-list (see this file's own header comment) ────────────
@@ -968,12 +966,6 @@ export default function ListRoute() {
     await load();
     showSelectionStatus(`Removed ${appids.length} game(s) from "${list.name}".`);
   }
-  // group-by-membership mode: one real table per group instead of the single `table` above (see
-  // buildGroupTables) — all sharing the one `rowsStore`/`rowStore` above (every game belongs to
-  // exactly one group, so there's no overlap to worry about), one shared detail stream, and each
-  // group's own createTableState fed by a filtered view into that shared store.
-  let groupTables: { key: string; appids: Set<number>; table: TableState<Game>; disposeTable: () => void }[] = [];
-  let activeGroupKey: string | null = null; // whichever group the currently-open game belongs to, for prev/next/random
   let total = 0;
   let loaded = 0;
   let loadSamples: LoadSample[] = [];
@@ -1005,10 +997,7 @@ export default function ListRoute() {
     return rowsStore.filter((r) => !r.loading);
   }
 
-  // In group mode there's no single `table` — prev/next/random operate on whichever group the
-  // currently-open game belongs to (activeGroupKey, kept in sync by renderPanelNav below).
   function activeTable(): TableState<Game> | null {
-    if (groupTables.length) return groupTables.find((g) => g.key === activeGroupKey)?.table ?? null;
     return table;
   }
   function getGameList(): Game[] {
@@ -1016,14 +1005,13 @@ export default function ListRoute() {
     return t ? t.processedData() : [];
   }
 
-  // Scoped by specific id (and, in group mode, the active group) — kind/listId alone would
-  // collide between two different bundles/user lists/groups navigated between without a remount
-  // (see the createEffect below).
+  // Scoped by specific id — kind/listId alone would collide between two different bundles/user
+  // lists navigated between without a remount (see the createEffect below).
   function randomQueueKey(): string {
     if (kind === 'bundle') return `list-route:bundle:${params.bundleId}`;
-    if (kind === 'user') return `list-route:user:${params.listId}:${activeGroupKey ?? ''}`;
-    if (kind === 'compare') return `list-route:compare:${compareKey()}:${activeGroupKey ?? ''}`;
-    if (kind === 'shared') return `list-route:shared:${sharedFormulaParam() ?? ''}:${activeGroupKey ?? ''}`;
+    if (kind === 'user') return `list-route:user:${params.listId}`;
+    if (kind === 'compare') return `list-route:compare:${compareKey()}`;
+    if (kind === 'shared') return `list-route:shared:${sharedFormulaParam() ?? ''}`;
     return `list-route:${kind}`;
   }
 
@@ -1071,10 +1059,6 @@ export default function ListRoute() {
   }
 
   function renderPanelNav(game: Game): void {
-    if (groupTables.length) {
-      const owning = groupTables.find((g) => g.appids.has(game.appid));
-      activeGroupKey = owning?.key ?? null;
-    }
     renderPanelNavShared({ table: activeTable(), game, getGameList, onOpen: openGame, onReroll: pickRandomGame });
   }
 
@@ -1599,62 +1583,6 @@ export default function ListRoute() {
     revertTableViewToServer(table, viewPrefKey());
   }
 
-  // Real per-group tables for a group-by-membership dynamic list — generalizes the old
-  // Comparison page's "one table per owner set, most owners to fewest" layout (already sorted
-  // that way by combine.ts's groupByMembership). Each group gets its own createTableState fed by
-  // a filtered view into the one shared rowsStore (every game belongs to exactly one group, so
-  // there's no overlap), and its own DOM container appended to groupsContainer — mounted
-  // imperatively (document.createElement + render()) rather than via a reactive <For>, matching
-  // the single-table path's own imperative construction just above.
-  function buildGroupTables(groups: MembershipGroup[]): void {
-    groupsContainer.innerHTML = '';
-    groupTables = groups.map((group) => {
-      const appidSet = new Set(group.appids);
-
-      // combine.ts keys a group by its sources' own internal keys ("account-owned:76561…"), which
-      // is what this heading used to print verbatim; listSources() maps each back to the name the
-      // hero's formula line uses for the same source.
-      const names = new Map(listSources().map((source) => [source.key, source.desc.label]));
-      const heading = document.createElement('h3');
-      heading.className = 'list-group-heading';
-      heading.textContent = `${group.keys.map((key) => names.get(key) ?? key).join(' + ')} (${group.appids.length})`;
-      const container = document.createElement('div');
-      container.className = 'table-container';
-      groupsContainer.appendChild(heading);
-      groupsContainer.appendChild(container);
-
-      let disposeTableState!: () => void;
-      const ts = createRoot((dispose) => {
-        disposeTableState = dispose;
-        return createTableState<Game>(
-          () => rowsStore.filter((r) => !r.loading && appidSet.has(r.appid)),
-          (kind === 'user' ? USER_COLUMNS : RECENT_COLUMNS) as unknown as ColumnDef<Game>[],
-          { initialViewState: { pageSize: 50, visibleCols: RECENT_DEFAULT_VISIBLE, sorts: DEFAULT_SORT } },
-        );
-      });
-      const disposeView = render(
-        () =>
-          DataTableView<Game>({
-            table: ts,
-            rowKey: 'appid',
-            onRowClick: (row) => openGame(rowStore.getRow(row.appid) ?? row),
-          }),
-        container,
-      );
-
-      return {
-        key: group.keys.join(' '),
-        appids: appidSet,
-        table: ts,
-        disposeTable: () => {
-          disposeView();
-          disposeTableState();
-        },
-      };
-    });
-    setGroupCount(groupTables.length);
-  }
-
   async function load({ refresh = false }: { refresh?: boolean } = {}): Promise<void> {
     if (kind === 'recent' && hasLoadedOnce) {
       // Guarded by "is this appid already the open panel's game" — openGame() above navigates
@@ -1682,10 +1610,7 @@ export default function ListRoute() {
       disposeTable = null;
     }
     table = null;
-    groupTables.forEach((g) => g.disposeTable());
-    groupTables = [];
     setGroupCount(0);
-    activeGroupKey = null;
     setRowsStore([]);
     rowStore.reset();
     total = 0;
@@ -1716,7 +1641,6 @@ export default function ListRoute() {
     // recents) must not keep showing the previous list's.
     setFetchedAt(undefined);
     tableContainer.innerHTML = '';
-    groupsContainer.innerHTML = '';
 
     let initialRows: Game[];
     let streamTargets: { appid: number }[];
@@ -1833,8 +1757,8 @@ export default function ListRoute() {
       // A manual list, or a dynamic one using any op other than group-by-membership, renders as
       // one flat table (flattened via flattenCombineResult, same as when it's resolved as
       // someone *else's* combine source). group-by-membership instead keeps its raw
-      // MembershipGroup[] result (stashed in pendingGroups) for buildGroupTables to render as
-      // real per-group tables further down, once the shared rowsStore/stream have loaded.
+      // MembershipGroup[] result (stashed in pendingGroups): each row gets its group's key, and
+      // the one table is grouped by it (membershipColumn.ts).
       const list = getList(params.listId!);
       if (!list) {
         setStatusText('This list no longer exists.');
@@ -2072,13 +1996,18 @@ export default function ListRoute() {
       }
     }
 
+    if (pendingGroups) {
+      const byAppid = new Map(
+        pendingGroups.flatMap((g) => g.appids.map((appid) => [appid, membershipKey(g)] as const)),
+      );
+      initialRows = initialRows.map((row) => ({ ...row, membership: byAppid.get(row.appid) }));
+      setGroupCount(pendingGroups.length);
+    }
     setRowsStore(initialRows);
     rowStore.load(initialRows);
     total = initialRows.length;
 
-    if (pendingGroups) {
-      buildGroupTables(pendingGroups);
-    } else {
+    {
       const isRanked = userList()?.kind === 'ranked';
       const columns = (isRanked
         ? RANKED_COLUMNS
@@ -2101,12 +2030,24 @@ export default function ListRoute() {
               ? RECENT_DEFAULT_VISIBLE
               : OWNED_DEFAULT_VISIBLE;
       const sort = isRanked ? RANKED_DEFAULT_SORT : kind === 'bundle' ? BUNDLE_DEFAULT_SORT : DEFAULT_SORT;
+      const groups = pendingGroups;
+      const names = new Map(listSources().map((source) => [source.key, source.desc.label]));
+      const allColumns = groups
+        ? [...columns, membershipColumn(groups, [...names.keys()], names, kind === 'compare')]
+        : columns;
 
       let disposeTableState!: () => void;
       const ts = createRoot((dispose) => {
         disposeTableState = dispose;
-        const state = createTableState<Game>(tableData, columns, {
-          initialViewState: { pageSize: 50, visibleCols: defaultVisible, sorts: sort },
+        const state = createTableState<Game>(tableData, allColumns, {
+          initialViewState: {
+            pageSize: 50,
+            visibleCols: defaultVisible,
+            sorts: sort,
+            ...(groups ? { groupBy: [MEMBERSHIP_KEY] } : {}),
+          },
+          // The old per-group tables showed every game; a collapsed group would hide them.
+          defaultGroupsCollapsed: false,
         });
         // Mirrors this table's own selection into a component-level signal so the JSX selection
         // toolbar below stays correct regardless of which load() constructed the table it's
@@ -2147,6 +2088,9 @@ export default function ListRoute() {
         setViewingShared(restoreTableView(table, viewPrefKey(), viewParamName()));
         unsyncView = bindSolidViewPersistence(table, (view) => setPref(viewPrefKey(), view), viewingShared);
       }
+      const restored = table.getViewState();
+      const adjusted = groups ? withMembershipGrouping(restored) : withoutMembershipGrouping(restored);
+      if (adjusted !== restored) table.setViewState(adjusted);
       setTableReady(true);
     }
 
@@ -2730,7 +2674,6 @@ export default function ListRoute() {
     setBaseTitle(null); // this route's own document.title context — see load()'s setBaseTitle calls
     loadGuard.next(); // invalidate any still-in-flight fetch/stream from this mount
     if (disposeTable) disposeTable();
-    groupTables.forEach((g) => g.disposeTable());
     if (unsyncView) unsyncView();
   });
 
@@ -2956,7 +2899,6 @@ export default function ListRoute() {
         </div>
       </Show>
       <div ref={tableContainer} class="table-container" />
-      <div ref={groupsContainer} class="list-groups" />
       {/* The bundle's games with no Steam listing at all (a course, an asset pack, a shop-exclusive
           key) — there's nothing for the table to show about them (no rating/HLTB/price/ownership),
           but dropping them silently made the table look like the whole bundle. Collapsed by

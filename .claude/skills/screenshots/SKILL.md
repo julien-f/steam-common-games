@@ -23,6 +23,7 @@ A shot needing more demo state (another list, a ranked list) gets it added to `d
 
 - Viewport 1440×900, downscaled to 1200px wide: `magick <in> -resize 1200x -strip <out>`.
 - The side panel is an element shot of `.game-panel` instead.
+- `fullPage` captures only the viewport — the desktop layout scrolls inside its own container. For a shot taller than 900px, set the viewport height to the content's height instead.
 - Wait for the data a shot shows (ratings, HLTB, prices) to finish streaming; a first load of the demo library takes minutes while its details are uncached.
 
 ## Upkeep

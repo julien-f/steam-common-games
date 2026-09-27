@@ -3471,18 +3471,6 @@ kbd {
   flex-wrap: wrap;
 }
 
-.list-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-}
-.list-group-heading {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text0);
-  margin-bottom: 10px;
-}
-
 /* Every list route's hero card (ListHero.tsx) — the title row (optional ‹/› lead, the list's
    name as the page's <h1>, then kind/shop/account chips) plus its right-hand actions. Used to be
    bundle-only markup named after that one kind; every other list opened with no name on screen at
