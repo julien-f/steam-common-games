@@ -7,7 +7,8 @@ const {
   fetchBundleById,
   resolveBundleAppids,
   resolveBundleGames,
-  fetchBundleAppids,
+  fetchBundleContents,
+  BundleNotFoundError,
 } = require('../public/bundleData.ts');
 
 function withFetch(t, handler) {
@@ -81,6 +82,16 @@ test('fetchBundleById: fetches GET /api/bundles/:id, with an optional country pa
   assert.equal(bundle.id, 42);
   // How old the server's cached copy is — the bundle hero's own Updated tile.
   assert.equal(fetchedAt, 1700000000000);
+});
+
+test('fetchBundleById: a 404 is a BundleNotFoundError, any other failure a plain Error', async (t) => {
+  withFetch(t, async (url) => ({
+    ok: false,
+    status: url.includes('/1') ? 404 : 502,
+    json: async () => ({ error: 'nope' }),
+  }));
+  await assert.rejects(fetchBundleById(1), BundleNotFoundError);
+  await assert.rejects(fetchBundleById(2), (err) => !(err instanceof BundleNotFoundError) && err.message === 'nope');
 });
 
 test('fetchBundleById: a response with no fetchedAt at all reports null, not undefined', async (t) => {
@@ -191,22 +202,25 @@ test('resolveBundleGames: an appid from an expanded array already seen elsewhere
   assert.equal(resolved[0].gid, 'everspace-base', 'first occurrence (the plain appid) wins the dedup');
 });
 
-// ── fetchBundleAppids ────────────────────────────────────────────────────────────────────────
+// ── fetchBundleContents ──────────────────────────────────────────────────────────────────────
 
-test('fetchBundleAppids: fetches the bundle, resolves it, returns just the flat appid Set', async (t) => {
+test('fetchBundleContents: fetches the bundle, resolves it, returns its title and flat appid Set', async (t) => {
   const calls = [];
   withFetch(t, async (url, opts) => {
     calls.push(url);
     if (url.startsWith('/api/bundles/42')) {
       return {
         ok: true,
-        json: async () => ({ bundle: { id: 42, tiers: [{ price: null, games: [game('a')], addon: false }] } }),
+        json: async () => ({
+          bundle: { id: 42, title: 'Pack', tiers: [{ price: null, games: [game('a')], addon: false }] },
+        }),
       };
     }
     return { ok: true, json: async () => ({ appids: { a: 440 } }) };
   });
 
-  const appids = await fetchBundleAppids('42');
+  const { title, appids } = await fetchBundleContents('42');
+  assert.equal(title, 'Pack');
   assert.deepEqual(appids, new Set([440]));
   assert.equal(calls[0], '/api/bundles/42');
 });

@@ -77,6 +77,15 @@ export function flattenBundleGames(bundle: Bundle): FlatGame[] {
 // several cached list pages, so GET /api/bundles/:id deliberately has no refresh parameter (see
 // server.js). What *is* refreshable on that screen is each game's own details (the panel's ↻)
 // and the whole list's prices (↻ Refresh prices).
+// GET /api/bundles/:id's 404: ITAD no longer lists the bundle (see findBundleById in lib/itad.js),
+// as opposed to a transient failure — the one case a saved list's bundle source gets orphaned.
+export class BundleNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BundleNotFoundError';
+  }
+}
+
 export async function fetchBundleById(
   id: number,
   { country }: { country?: string } = {},
@@ -84,6 +93,7 @@ export async function fetchBundleById(
   const qs = country ? `?${new URLSearchParams({ country })}` : '';
   const res = await fetch(`/api/bundles/${id}${qs}`);
   const data = await res.json();
+  if (res.status === 404) throw new BundleNotFoundError(data.error || 'Bundle not found');
   if (!res.ok) throw new Error(data.error || 'Bundle lookup failed');
   return { bundle: data.bundle, fetchedAt: data.fetchedAt ?? null };
 }
@@ -135,9 +145,9 @@ export async function resolveBundleGames(
   return { resolved, unresolved };
 }
 
-// listResolve.ts's ListResolveFetchers.bundle — just the flat, resolved appid set.
-export async function fetchBundleAppids(bundleId: string): Promise<Set<number>> {
+// listResolve.ts's bundle source — its title (for bundleSnapshots.ts) and resolved appid set.
+export async function fetchBundleContents(bundleId: string): Promise<{ title: string; appids: Set<number> }> {
   const { bundle } = await fetchBundleById(Number(bundleId));
   const { resolved } = await resolveBundleGames(bundle);
-  return new Set(resolved.map((g) => g.appid));
+  return { title: bundle.title, appids: new Set(resolved.map((g) => g.appid)) };
 }

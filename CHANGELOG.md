@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- A combined list keeps a bundle's games after IsThereAnyDeal stops listing it: its last-known games move into a hidden list the formula then uses, removed once no list needs it. A bundle that fails to load for any other reason uses its last-known games too, instead of failing the whole list.
 - **What does this add?** on a bundle's page opens a combined list of that bundle minus the current account's Owned games (a Family counts as one), pre-filled but editable — e.g. to Group by membership with a friend instead — and opens the result once saved.
 - A bundle used as a combined list's source is named by its title (the last one seen) rather than "Bundle 16599".
 - Prettier (`npm run format`, `npm run format:check`); the whole tree was reformatted with it once.
@@ -264,6 +265,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Deleted lists that no other list uses any more are now actually removed; the clean-up existed but never ran.
 - Adding selected games to a list now confirms it in a toast at the bottom of the screen, with an "Open list" link, and a new list is named in the toolbar instead of a browser prompt. The old confirmation sat at the top of the page, out of sight.
 - The selection toolbar (Add to list…) now stays in view while you select rows further down a table — it used to sit at the top of the page, off screen.
 - The game search box now says when nothing matches, or when the search itself failed, instead of showing nothing.

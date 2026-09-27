@@ -359,7 +359,7 @@ test('restoreList: clears deletedAt and brings the list back into getLists()', (
   );
 });
 
-test('sweepDeletedLists: purges a soft-deleted list once its last reference is gone, leaves a still-referenced one', () => {
+test('dropping the last reference to a soft-deleted list purges it, and leaves a still-referenced one', () => {
   const { createList, deleteList, updateDynamicList, sweepDeletedLists, getLists } = store();
   const source = createList({ name: 'Source', kind: 'manual', appids: [1] });
   const stillReferenced = createList({ name: 'StillReferenced', kind: 'manual', appids: [2] });
@@ -378,8 +378,8 @@ test('sweepDeletedLists: purges a soft-deleted list once its last reference is g
   // Drop the watcher's reference to `source` only — `stillReferenced` stays referenced.
   updateDynamicList(watcher.id, 'union', [{ kind: 'user', listId: stillReferenced.id }]);
 
-  const removed = sweepDeletedLists();
-  assert.equal(removed, 1);
+  // updateDynamicList sweeps on its own; nothing is left for an explicit sweep.
+  assert.equal(sweepDeletedLists(), 0);
   const all = getLists({ includeDeleted: true });
   assert.equal(
     all.some((l) => l.id === source.id),
