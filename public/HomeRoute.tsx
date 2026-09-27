@@ -13,7 +13,7 @@
 // form below can pick any recent account's Owned/Wishlist, Recently Looked Up, or any existing
 // user list as a source. A bundle joins it only from its own page (`?combine=b:<id>`, below) —
 // offering every bundle here would need a bundle picker, not a checkbox.
-import { createSignal, createEffect, createMemo, onCleanup, onMount, For, Index, Show } from 'solid-js';
+import { createSignal, createEffect, createMemo, onCleanup, onMount, For, Index, Show, type JSX } from 'solid-js';
 import { A, useLocation, useNavigate } from '@solidjs/router';
 import {
   getMyAccount,
@@ -51,6 +51,10 @@ import {
   renameList,
   deleteFolder,
   deleteList,
+  moveFolder,
+  moveList,
+  folderPaths,
+  isDescendantFolder,
 } from './listsStore.ts';
 import { setBaseTitle } from './pageTitle.ts';
 import { createDefaultNaming, listDisplayName } from './listLabels.ts';
@@ -400,6 +404,53 @@ export default function HomeRoute() {
     return out;
   });
 
+  // Where a row can go: the top level or any folder, minus where it already is and — for a
+  // folder — itself and its own descendants (listsStore.ts's moveFolder refuses those anyway).
+  const ROOT = '__root__';
+  function moveTargets(row: TreeRow): { id: string; label: string }[] {
+    const all = folders();
+    const here = row.item.parentId ?? ROOT;
+    return [
+      { id: ROOT, label: 'Top level' },
+      ...folderPaths(all).map((f) => ({ id: f.id, label: `📁 ${f.path}` })),
+    ].filter(
+      (t) =>
+        t.id !== here &&
+        !(
+          row.type === 'folder' &&
+          t.id !== ROOT &&
+          (t.id === row.item.id || isDescendantFolder(t.id, row.item.id, all))
+        ),
+    );
+  }
+  function handleMove(row: TreeRow, target: string): void {
+    const parentId = target === ROOT ? null : target;
+    if (row.type === 'folder') moveFolder(row.item.id, parentId);
+    else moveList(row.item.id, parentId);
+    refreshTree();
+  }
+  function MoveSelect(props: { row: TreeRow; name: string }): JSX.Element {
+    return (
+      <Show when={moveTargets(props.row).length > 0}>
+        <select
+          class="tree-move"
+          aria-label={`Move ${props.name} to…`}
+          value=""
+          onChange={(e) => {
+            const target = e.currentTarget.value;
+            e.currentTarget.value = '';
+            if (target) handleMove(props.row, target);
+          }}
+        >
+          <option value="" disabled>
+            Move to…
+          </option>
+          <For each={moveTargets(props.row)}>{(t) => <option value={t.id}>{t.label}</option>}</For>
+        </select>
+      </Show>
+    );
+  }
+
   return (
     <div class="home-route">
       <section class="home-account">
@@ -695,6 +746,7 @@ export default function HomeRoute() {
                   {row.type === 'folder' ? (
                     <>
                       <span>📁 {(row.item as Folder).name}</span>
+                      <MoveSelect row={row} name={(row.item as Folder).name} />
                       <button type="button" onClick={() => handleRenameFolder(row.item as Folder)}>
                         Rename
                       </button>
@@ -708,6 +760,7 @@ export default function HomeRoute() {
                         {{ dynamic: '⚡ ', ranked: '🏆 ', manual: '📄 ' }[(row.item as GameList).kind]}
                         <span classList={{ 'derived-name': !row.item.name }}>{listName(row.item as GameList)}</span>
                       </A>
+                      <MoveSelect row={row} name={listName(row.item as GameList)} />
                       <button type="button" onClick={() => handleRenameList(row.item as GameList)}>
                         Rename
                       </button>

@@ -26,7 +26,6 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 
 ## Lists and selection
 
-- **U10 · major · L1** — a list can't be moved into a folder after creation (only Rename/Delete). Add "Move to…".
 - **U11 · minor · F3** — Filter popover: category pane too narrow (scrolls sideways); the range shows no field label and raw floats (`0 – 99.0202584`, `380.2666…`); "never played" needs max = 0 and then reads "Played (h): 0–0". Label and round; add a "never played" preset.
 - **U12 · minor · L2** — an unnamed Subtract list's `∖` reads as `|` in the tree's italic font. Use "minus" or `−`.
 - **U13 · minor · L2, B3** — a dynamic list built from the Wishlist loses its price columns. Keep them when a source has them.
@@ -76,8 +75,6 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 - **U39 · polish** — `favicon.ico` 404s; nav items shift sideways between routes; missing thumbnails have no placeholder; Released and Added use different date formats; "Demo" pills look like primary buttons; the "Updated" age has very low contrast; Compare's op `<select>` is an unstyled native white control; wishlisted/owned name colours have no legend.
 
 ## Review tooling
-
-- **U41** — [scenarios.md](scenarios.md) L1 asks to "put it in a folder" while its Edges say move has no UI. Update once U10 is decided.
 
 - **U43 · dev** — when Vite hot-reloads `AppShell.tsx`, `initLightbox` runs again and throws in `detachLbVideo` (`Cannot read properties of null`); a full page load is fine. Make the lightbox mount idempotent.
 

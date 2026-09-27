@@ -440,3 +440,15 @@ test('getRanking/setRanking: empty by default, round-trips, and is dropped with 
   assert.deepEqual(getRanking(ranked.id).groups, []);
   assert.equal(require('../public/prefs.ts').getPref(`ranking:${ranked.id}`), null);
 });
+
+test('folderPaths: every folder with its full path, in tree order', () => {
+  const { createFolder, folderPaths } = store();
+  const games = createFolder('Games');
+  const coop = createFolder('Co-op', games.id);
+  const later = createFolder('Later');
+  assert.deepEqual(folderPaths(), [
+    { id: games.id, path: 'Games' },
+    { id: coop.id, path: 'Games / Co-op' },
+    { id: later.id, path: 'Later' },
+  ]);
+});

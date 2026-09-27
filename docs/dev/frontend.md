@@ -235,7 +235,7 @@ Region is the only user-facing preference today, in the nav bar's ⚙ popover (`
 
 Carried over from the redesign's own open-questions list, all still true:
 
-- **Folder/list tree polish** — rename/move/delete on Home use plain `window.prompt`/`window.confirm`; there's no drag-and-drop and no move-between-folders UI at all (`listsStore.ts`'s `moveFolder`/`moveList` have no caller), and no trash/restore UI for soft-deleted lists (`restoreList`/`getLists({ includeDeleted: true })` are ready for one).
+- **Folder/list tree polish** — rename/delete on Home use plain `window.prompt`/`window.confirm`; moving is a per-row "Move to…" menu (`folderPaths`, leaving out a folder's own subtree), with no drag-and-drop, and there's no trash/restore UI for soft-deleted lists (`restoreList`/`getLists({ includeDeleted: true })` are ready for one).
 - **Per-account playtime in `group-by-membership` lists** — the "Owned by" card covers the current account's own members only; `listResolve.ts`'s fetchers return bare appid sets, so there's no playtime for any other account in a membership group. Teaching those fetchers to carry per-account playtime is the real fix.
 - **`/bundles`' clock doesn't tick.** Every countdown and bucket on that page (`renderEnds`'s "⏳ in 6h", the Age/Ends in columns, the hero's New and Ending soon counts) is computed when the table processes its rows, not on a timer, so a tab left open for hours shows figures from whenever it last did. Fixing it properly means re-running the whole sort/filter/render pass on a timer for a page few people leave open that long; the cheap half-fix — ticking only the hero counts — would just have them disagree with the rows below.
 

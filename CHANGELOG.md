@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Move to…** on every list and folder in Home's tree, to file a list into a folder (or out of one) after creating it.
 - End-to-end tests (`npm run test:e2e`, Playwright) for the starred scenarios, against mocked API data: no backend or upstream traffic needed.
 - A list's loading line has a progress bar and an estimate of the time left, and says why when a large library takes minutes (details for games not seen before are fetched a few at a time).
 - A combined list keeps a bundle's games after IsThereAnyDeal stops listing it: its last-known games move into a hidden list the formula then uses, removed once no list needs it. A bundle that fails to load for any other reason uses its last-known games too, instead of failing the whole list.

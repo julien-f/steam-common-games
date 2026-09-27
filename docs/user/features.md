@@ -33,7 +33,7 @@ A private profile or wishlist looks identical to an empty one from the outside; 
 - **Owned** and **Wishlist** for the current account, and one list per **bundle** you browse, are always live — never stored, never stale.
 - **Recently Looked Up** collects games you searched for, browsable like any other list.
 - **Your own lists** come in three kinds: a **manual** list you add and remove games from, a **dynamic** list defined as a formula over other lists, recomputed every time you open it, and a **ranked** list that orders another list by your preferences (see [Ranking a list](#ranking-a-list)). A dynamic list can be **frozen** into a manual one, keeping its current contents and dropping the formula.
-- Lists live in a **folder tree** you can rename, nest and organize.
+- Lists live in a **folder tree** you can rename, nest and organize — **Move to…** on any list or folder puts it elsewhere in the tree.
 
 ![The home page: the current account's card, the four always-available lists, and your own folder tree of lists](../images/home-lists.png)
 

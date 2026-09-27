@@ -51,6 +51,21 @@ export function getFolders(): Folder[] {
   return readFolders();
 }
 
+// Every folder with its full path ("Weekend / Friday"), in tree order — for pickers like Home's
+// "Move to…".
+export function folderPaths(folders: Folder[] = readFolders()): { id: string; path: string }[] {
+  const out: { id: string; path: string }[] = [];
+  const walk = (parentId: string | null, prefix: string) => {
+    for (const f of folders.filter((x) => x.parentId === parentId).sort((a, b) => a.order - b.order)) {
+      const path = prefix ? `${prefix} / ${f.name}` : f.name;
+      out.push({ id: f.id, path });
+      walk(f.id, path);
+    }
+  };
+  walk(null, '');
+  return out;
+}
+
 // Excludes soft-deleted lists by default — pass includeDeleted for a "Trash" view.
 export function getLists({ includeDeleted = false }: { includeDeleted?: boolean } = {}): GameList[] {
   const lists = readLists();

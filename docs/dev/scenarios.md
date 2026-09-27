@@ -91,7 +91,7 @@ Each scenario: **who / goal**, **steps** as a user would take them, **expect** �
 - **Who / goal**: keep a "to play with Alice" shortlist.
 - **Steps**: from any list, select rows → add to a new manual list → name it → put it in a folder. Or, while reading one game's panel, **Add to list** there ◇.
 - **Expect**: the list appears in Home's tree; adding/removing games persists across reloads.
-- **Edges**: delete then restore (soft-delete); moving a folder into its own child is refused. Neither move nor restore has UI yet (frontend.md, Known gaps).
+- **Edges**: delete then restore (soft-delete — no restore UI yet, frontend.md's Known gaps); a folder's "Move to…" never offers its own subfolders.
 
 ### L2 Wishlisted but already owned in the family
 
