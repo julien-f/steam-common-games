@@ -39,12 +39,22 @@ function demoPrefs(now = Date.now()) {
       list('demo-list-couch', null, 1, {
         name: 'Couch co-op picks',
         kind: 'manual',
-        appids: [620, 1426210, 268910, 413150],
+        // Shares three games with the Friday shortlist, for the group-by-membership shot.
+        appids: [620, 105600, 892970, 413150, 1966720, 322330],
       }),
       list('demo-list-friday', 'demo-folder-weekend', 0, {
         name: 'Friday shortlist',
         kind: 'manual',
-        appids: [1145360, 646570, 504230],
+        appids: [620, 105600, 892970, 1145360, 1426210, 728880],
+      }),
+      list('demo-list-coop-compared', null, 3, {
+        name: 'Co-op lists compared',
+        kind: 'dynamic',
+        op: 'group-by-membership',
+        sources: [
+          { kind: 'user', listId: 'demo-list-couch' },
+          { kind: 'user', listId: 'demo-list-friday' },
+        ],
       }),
       // Unnamed on purpose: shows the formula-derived label.
       list('demo-list-rest', null, 2, {
