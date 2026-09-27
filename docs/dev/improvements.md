@@ -32,9 +32,7 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 
 ## Comparing
 
-- **U14 · major · C1** — one unresolvable player blocks the whole comparison: grey error line, failing chip unmarked, no "compare the others". Validate inline before navigating; offer to drop that player.
 - **U17 · minor · C1** — Player 1 isn't prefilled with my ★ account; the same account twice is accepted silently; the URL is rewritten with players reordered (me no longer first).
-- **U18 · minor · C1** — on a failed resolve the heading shows a known account as its steam64 id.
 - **U19 · minor · C3** — a saved comparison's auto-name ("X — Owned + Y — Owned — grouped by membership") doesn't match the Compare heading ("X vs. Y").
 
 ## Bundles and prices

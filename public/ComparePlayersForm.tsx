@@ -45,6 +45,8 @@ export interface ComparePlayersFormProps {
   submitLabel: string;
   onSubmit: (slots: string[][]) => void;
   onCancel?: () => void;
+  // Typed identifiers the last comparison couldn't resolve — their chips are marked.
+  invalid?: string[];
 }
 
 // Every account the app knows, most-recently-used first. `recentAccounts` already covers the
@@ -212,7 +214,18 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
                 {(entry, entryIdx) => {
                   const account = entry.kind === 'account' ? entry.account : null;
                   return (
-                    <span class="compare-token" classList={{ 'is-typed': !account }}>
+                    <span
+                      class="compare-token"
+                      classList={{
+                        'is-typed': !account,
+                        'is-invalid': entry.kind === 'typed' && !!props.invalid?.includes(entry.value),
+                      }}
+                      title={
+                        entry.kind === 'typed' && props.invalid?.includes(entry.value)
+                          ? 'No Steam account found for this'
+                          : undefined
+                      }
+                    >
                       <Show when={account?.avatarUrl}>
                         {(url) => <img class="account-avatar" src={url()} alt="" width="18" height="18" />}
                       </Show>

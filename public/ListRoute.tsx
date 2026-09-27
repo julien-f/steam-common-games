@@ -819,6 +819,17 @@ export default function ListRoute() {
   const [compareList, setCompareList] = createSignal<GameList | null>(null);
   const [compareAccounts, setCompareAccounts] = createSignal<AccountSlot[]>([]);
   const [editingPlayers, setEditingPlayers] = createSignal(false);
+  // Players the last comparison couldn't resolve, with why — the rest still compare (U14).
+  const [compareFailures, setCompareFailures] = createSignal<{ identifiers: string[]; message: string }[]>([]);
+  function compareOthers(): void {
+    const failed = new Set(compareFailures().map((f) => f.identifiers.join(',')));
+    navigate(
+      compareUrl(
+        compareSlots().filter((slot) => !failed.has(slot.join(','))),
+        compareOp(),
+      ),
+    );
+  }
   // kind === 'user', dynamic lists only — the hero's "Edit sources" action reopens the same
   // combine form used at creation, pre-filled from the list's own op/sources.
   const [editingSources, setEditingSources] = createSignal(false);
@@ -1670,28 +1681,35 @@ export default function ListRoute() {
 
       setListTitle(slots.map((slot) => slot.join(' + ')).join(' vs. '));
       setStatusText('Resolving accounts…');
-      let accounts: AccountSlot[];
-      try {
-        accounts = await Promise.all(
-          slots.map(async (identifiers) => {
-            const summary = await resolveAccountSummary(identifiers);
-            return {
-              id: accountIdFor(summary.members),
-              members: summary.members,
-              rawInputs: identifiers,
-              label: summary.label,
-              avatarUrl: summary.avatarUrl ?? undefined,
-              vanities: summary.vanities,
-              lastUsedAt: Date.now(),
-            };
-          }),
+      setCompareFailures([]);
+      const settled = await Promise.allSettled(
+        slots.map(async (identifiers): Promise<AccountSlot> => {
+          const summary = await resolveAccountSummary(identifiers);
+          return {
+            id: accountIdFor(summary.members),
+            members: summary.members,
+            rawInputs: identifiers,
+            label: summary.label,
+            avatarUrl: summary.avatarUrl ?? undefined,
+            vanities: summary.vanities,
+            lastUsedAt: Date.now(),
+          };
+        }),
+      );
+      if (loadGuard.isStale(gen)) return;
+      const failures = settled.flatMap((r, i) =>
+        r.status === 'rejected' ? [{ identifiers: slots[i], message: (r.reason as Error).message }] : [],
+      );
+      if (failures.length) {
+        // Named as far as known: a resolved player by name, a failed one as typed.
+        setListTitle(
+          settled.map((r, i) => (r.status === 'fulfilled' ? r.value.label : slots[i].join(' + '))).join(' vs. '),
         );
-      } catch (err) {
-        if (loadGuard.isStale(gen)) return;
-        setStatusText(`Couldn't resolve every player: ${(err as Error).message}`);
+        setCompareFailures(failures);
+        setStatusText('');
         return;
       }
-      if (loadGuard.isStale(gen)) return;
+      const accounts = settled.map((r) => (r as PromiseFulfilledResult<AccountSlot>).value);
       // Ordered by the same rule the canonical URL below sorts on (an accountId *is* its members'
       // sorted steam64 ids), so the title, the formula line and the group headings read in the
       // order the address bar names the players in — not in whatever order they were typed. Those
@@ -2750,11 +2768,33 @@ export default function ListRoute() {
           edit affordance (the hero's "Edit players"), never a third thing — see
           ComparePlayersForm.tsx on why it lives here rather than on Home. Keyed on the URL's own
           slots so reopening it after a change starts from what's actually on screen. */}
+      <Show when={kind === 'compare' && compareFailures().length > 0 && !editingPlayers()}>
+        <div class="compare-failures" role="alert">
+          <For each={compareFailures()}>
+            {(f) => (
+              <p>
+                ⚠ <strong>{f.identifiers.join(' + ')}</strong> — {f.message}
+              </p>
+            )}
+          </For>
+          <div class="compare-failures-actions">
+            <Show when={compareSlots().length - compareFailures().length >= 2}>
+              <button type="button" class="btn btn-primary btn-sm" onClick={compareOthers}>
+                Compare the other {compareSlots().length - compareFailures().length}
+              </button>
+            </Show>
+            <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingPlayers(true)}>
+              Edit players
+            </button>
+          </div>
+        </div>
+      </Show>
       <Show when={kind === 'compare' && (compareSlots().length < 2 || editingPlayers())}>
         {/* `initialSlots` seeds the form's own draft state and is deliberately not a live
             mirror of the URL — it's an editing buffer. */}
         <ComparePlayersForm
           initialSlots={compareSlots()}
+          invalid={compareFailures().flatMap((f) => f.identifiers)}
           submitLabel={compareSlots().length < 2 ? 'Compare libraries' : 'Compare'}
           onCancel={editingPlayers() ? () => setEditingPlayers(false) : undefined}
           onSubmit={(slots) => {

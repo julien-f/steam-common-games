@@ -52,6 +52,22 @@ test('C1: compare three players — one table grouped from "all" to "only one"',
   );
 });
 
+test('C1 edge: an unknown player is named, and the others still compare', async ({ page }) => {
+  await page.goto('/lists/compare?u=alice&u=bob&u=nobody-here');
+  const alert = page.getByRole('alert');
+  await expect(alert).toContainText('nobody-here');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Alice vs. Bob vs. nobody-here');
+
+  await alert.getByRole('button', { name: 'Edit players' }).click();
+  await expect(page.locator('.compare-token.is-invalid')).toHaveText(/nobody-here/);
+  await page.getByRole('button', { name: 'Cancel' }).first().click();
+
+  await page.getByRole('button', { name: 'Compare the other 2' }).click();
+  // Checked by what's gone: the route also rewrites players to canonical steam64 ids.
+  await expect(page).not.toHaveURL(/nobody-here/);
+  await expect(groupRows(page)).toHaveCount(3);
+});
+
 test('L1: select games, add them to a new list, open it', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
