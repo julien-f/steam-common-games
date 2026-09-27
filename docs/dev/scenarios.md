@@ -184,7 +184,7 @@ Each scenario: **who / goal**, **steps** as a user would take them, **expect** �
 ### S1 ★ Send a friend a view
 
 - **Who / goal**: show a friend my curated, filtered wishlist.
-- **Steps**: set up the table → **🔗 Share view** (with `?u=` for my account) → friend opens the link.
+- **Steps**: set up the table → **🔗 Share view** (carries my account on Owned/Wishlist) → friend opens the link.
 - **Expect**: the friend sees my account's list with my layout; their own account and saved views are untouched; clicking around keeps the shared account.
 - **Edges**: sharing a dynamic list (`/lists/shared?f=`) → friend saves it; on a ranked or manual-sourced list the button says why it can't share, before it's clicked ◇.
 

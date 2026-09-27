@@ -202,3 +202,30 @@ test('shareTableView: copies a link with the view snapshotted into the param, wi
     if (originalNavDesc) Object.defineProperty(globalThis, 'navigator', originalNavDesc);
   }
 });
+
+test('shareTableView: adds extra params, but never over one the URL already sets', async () => {
+  const originalNavDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  try {
+    let copied = null;
+    const stubNav = {
+      clipboard: {
+        writeText: async (text) => {
+          copied = text;
+        },
+      },
+    };
+    Object.defineProperty(globalThis, 'navigator', { value: stubNav, configurable: true });
+    const share = async (search) => {
+      await withLocation(search, async () => {
+        shareTableView(fakeTable({}), 'tv', { textContent: 'Share view' }, { u: 'alice' });
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      return new URL(copied).searchParams.getAll('u');
+    };
+    assert.deepEqual(await share(''), ['alice']);
+    assert.deepEqual(await share('?u=bob'), ['bob'], 'a shared link keeps the account it names');
+  } finally {
+    if (originalNavDesc) Object.defineProperty(globalThis, 'navigator', originalNavDesc);
+  }
+});

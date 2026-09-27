@@ -121,6 +121,7 @@ import {
 import { setPref } from './prefs.ts';
 import {
   getEffectiveCurrentAccount,
+  accountIdentifiers,
   accountIdFor,
   accountDisplayLabel,
   ACCOUNT_CHANGED_EVENT,
@@ -1511,7 +1512,10 @@ export default function ListRoute() {
   // pref key instead of this specific list's own stored view.
   function handleShareView(btn: HTMLElement): void {
     if (!table) return;
-    shareTableView(table, viewParamName(), btn);
+    // Owned/Wishlist are whoever is current — without `u=` the recipient would get their own.
+    const account = kind === 'owned' || kind === 'wishlist' ? getEffectiveCurrentAccount() : null;
+    const u = account && accountIdentifiers(account).map((m) => m.identifier);
+    shareTableView(table, viewParamName(), btn, u ? { u: u.join(',') } : {});
   }
   function handleResetView(): void {
     if (!table) return;

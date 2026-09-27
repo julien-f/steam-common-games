@@ -56,8 +56,15 @@ export function bindViewPersistence(table: DataTableLike, prefKey: string): () =
 // user makes one more change to the table, silently showing a snapshot that no longer matches
 // what's on screen. The stored pref (bindViewPersistence above) already captures live state on
 // every change; this link is only for handing the *current* view to someone else.
-export function shareTableView(table: DataTableLike, paramName: string, btn: HTMLElement): void {
+// `extraParams` are added only where the URL doesn't already set them.
+export function shareTableView(
+  table: DataTableLike,
+  paramName: string,
+  btn: HTMLElement,
+  extraParams: Record<string, string> = {},
+): void {
   const params = new URLSearchParams(location.search);
+  for (const [key, value] of Object.entries(extraParams)) if (!params.has(key)) params.set(key, value);
   params.set(paramName, JSON.stringify(table.getViewState()));
   const url = `${location.origin}${urlWithParams(params)}`;
   copyWithFeedback(btn, url);

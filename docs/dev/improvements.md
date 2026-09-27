@@ -17,7 +17,6 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 
 ## Sharing
 
-- **U1 · blocker · S1** — 🔗 Share view on Owned/Wishlist copies no `?u=`: the recipient gets "No account selected — Games 0". Carry the current account in the link (or offer it as a toggle).
 - **U2 · minor · S3** — a `/lists/<id>` link opened elsewhere says "This list no longer exists"; it exists, in the sender's browser. Explain lists are local and point to 🔗 Share list.
 - **U3 · minor · L2, S1** — a dynamic list has both "🔗 Share list" and "🔗 Share view", in different places. Merge or explain the difference.
 
@@ -87,7 +86,7 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 ## Review tooling
 
 - **U40** — `scripts/demo-prefs.js` seeds the demo account without `label`/`avatarUrl`, so the demo shows as a steam64 id (see U37). Seed both.
-- **U41** — [scenarios.md](scenarios.md) L1 asks to "put it in a folder" while its Edges say move has no UI; S1 assumes Share view adds `?u=`. Update once U10/U1 are decided.
+- **U41** — [scenarios.md](scenarios.md) L1 asks to "put it in a folder" while its Edges say move has no UI. Update once U10 is decided.
 
 ## Not yet reviewed
 
