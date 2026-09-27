@@ -1,51 +1,67 @@
 ---
 name: ux-review
-description: Run a UX/UI design review of the app by walking the user journeys in docs/dev/scenarios.md in a real browser, and report ranked findings with screenshots. Use when asked for a design, usability, UX or UI review, or to re-check a flow after a UI change.
+description: Run a UX/UI design review of the app by walking the user journeys in docs/dev/scenarios.md in a real browser, record findings in docs/dev/improvements.md, and report them ranked. Also re-checks one backlog item after its fix. Use when asked for a design, usability, UX or UI review, or to re-check a flow or a U-item after a UI change.
 ---
 
 # UX review
 
-Judges the app against [docs/dev/scenarios.md](../../../docs/dev/scenarios.md), not general taste. A finding is friction on a scenario's path, or a broken **Expect**/**Edges** line.
+Judges the app against [docs/dev/scenarios.md](../../../docs/dev/scenarios.md), not general taste. A finding is friction on a scenario's path, or a broken **Expect**/**Edges** line. A ◇ step is a known target, not a defect — note how far the UI gets toward it, nothing more.
 
 ## Scope
 
-- Default: every scenario. A named scenario, group or route narrows it.
-- A scenario that's wrong about the app (a step that doesn't exist, a stale expectation) is a finding against the doc, not the UI.
+- **Default: the ★ scenarios.** A named scenario, group or route narrows it; "full" walks every scenario.
+- **Re-check `U<n>`**: walk only the scenarios that [improvements.md](../../../docs/dev/improvements.md) item names, confirm the fix, then drop or narrow the item.
+- A scenario that's wrong about the app (a step that doesn't exist, a stale expectation) is a finding against the doc.
+- Say which scenarios were walked and which were skipped, and why.
 
-## Setup
+## Demo state — before the first page load
 
-1. `npm run dev` if not already running; review at `http://localhost:58991`.
-2. Demo state only — same rule and mechanism as the `screenshots` skill: `node scripts/demo-prefs.js seed`, run the printed function with `browser_evaluate`, reload. Never type a real account's identifier.
-3. Scenarios needing other players (Family, Compare, friends) use only accounts the user names for testing — never commit them, keep their screenshots in `.playwright-mcp/`, and call them Friend A/B in the report. Skip A4 while no allowed account has a public friends list.
-4. Stay inside `integrations.md`'s trust tiers: one pass per scenario, no repeated refreshes or large-library loops against Steam/HLTB/ProtonDB.
+**Every app page may write prefs** (opening any table stores its view), so seed before opening _any_ route, account or not, and restore only on the way out.
+
+```sh
+node scripts/demo-prefs.js seed --file      # or: empty --file, for a first visit (A1)
+node scripts/demo-prefs.js restore --file
+```
+
+Each writes `.playwright-mcp/demo-<mode>.js`; run it with `browser_run_code_unsafe`'s `filename`. It opens About (a page that writes nothing), backs up or restores `steam.isonoe.net:prefs`, and reloads. `seed`/`empty` refuse while a backup exists — restore first; never overwrite it.
+
+- Only the demo account (in the script) may be typed, except accounts the user names for this review. Those: never committed, screenshots only in `.playwright-mcp/`, called Friend A/B everywhere — in the report and in improvements.md, never by persona name. Skip A4 while no allowed account has a public friends list.
+- Stay inside [integrations.md](../../../docs/dev/integrations.md)'s trust tiers: one pass per scenario, no repeated ↻ refreshes. A large library's first load streams for minutes (uncached details are throttled) — judge the feedback, don't wait for it to finish.
 
 ## Walk each scenario
 
-At **1440×900** and **390×844** (phone), following its steps as a user would — mouse first, then keyboard only.
+`npm run dev` if not already running (check `curl localhost:58991`). At **1440×900** and **390×844**, following its steps as a user would — mouse first, then keyboard only.
 
 Check at each step:
 
 - **Clarity** — is the next action obvious? Are labels and icons self-explanatory without the docs?
-- **Feedback** — loading, progress, success and failure all visible; the "how fresh is this?" ages present.
+- **Feedback** — loading, progress, success and failure all visible, _where the user is looking_ (not scrolled out of view); the "how fresh is this?" ages present.
 - **Empty and error states** — private profile, no results, missing `ITAD_API_KEY`, upstream failure: does the screen say what happened and what to do?
 - **Consistency** — same action, same name and place across routes.
-- **Keyboard and accessibility** — focus visible and in a sensible order, Esc/arrow shortcuts as in `?`, names on icon-only buttons (check `browser_snapshot`), contrast.
-- **Layout** — no horizontal page scroll on phone, nothing clipped or overlapping, touch targets usable.
-- **Console** — `browser_console_messages` errors and warnings.
+- **Keyboard and accessibility** — focus visible and in a sensible order, Esc/arrow shortcuts as in `?`, names on icon-only buttons, contrast.
+- **Layout** — no horizontal page scroll on phone, nothing clipped or overlapping, touch targets usable, nothing jumping under the pointer.
+- **Console** — errors and warnings.
 
-Screenshot every finding into `.playwright-mcp/` (gitignored scratch — never `docs/images/`).
+## Mechanics
+
+- **Batch each step in one `browser_run_code_unsafe` call**: act, then measure with `page.evaluate` (focus, bounding boxes, computed styles, accessible names, `scrollWidth > innerWidth`), then screenshot. Far cheaper than click-by-click snapshots.
+- **Screenshots** go to `.playwright-mcp/ux-<scenario>-<what>.png` (gitignored — never `docs/images/`); `Read` them to look, `magick <in> -crop WxH+X+Y <out>` for detail.
+- **Native dialogs** (`prompt`/`confirm`) block the page: register `page.once('dialog', …)` before the click that opens one.
+- **Copied links**: stub `navigator.clipboard.writeText` in the page to capture them.
+- **A fresh browser** (S3, shared links): `page.context().browser().newContext()` — its own empty storage, so nothing to restore.
+- **Console noise**: `favicon.ico` 404 is known (U39). After editing source mid-run, Vite hot-reloads `AppShell` and `initLightbox` throws — reload the page before judging console errors.
 
 ## Teardown
 
-`node scripts/demo-prefs.js restore`, run the printed function, reload. Refuse to finish while the backup key is still present.
+Run `demo-restore.js`, then confirm `steam.isonoe.net:prefs.backup` is gone. Don't finish while it's still present.
 
-## Report
+## Record and report
 
-One table, ranked by severity, then one line of anything that went well enough to keep:
+- Record every finding in [improvements.md](../../../docs/dev/improvements.md): next free `U` number, under its area, `**U<n> · <severity> · <scenarios>** — problem. Direction.` Update or drop items the run shows fixed.
+- **Severity**: _blocker_ (the goal can't be reached) · _major_ (reached with real confusion or a workaround) · _minor_ (friction) · _polish_.
+- Report one table ranked by severity, then one line on what worked well enough to keep:
 
-| #   | Severity | Scenario | Where | Finding | Suggestion |
+| U   | Severity | Scenario | Where | Finding | Suggestion |
 | --- | -------- | -------- | ----- | ------- | ---------- |
 
-- **Severity**: _blocker_ (the goal can't be reached) · _major_ (reached with real confusion or a workaround) · _minor_ (friction) · _polish_.
-- Record every finding in [docs/dev/improvements.md](../../../docs/dev/improvements.md) (next free `U` number, under its area); update or drop items the run shows fixed.
-- Findings only — fix nothing. The user picks what to fix; each fix is its own commit.
+- Findings only — fix nothing. The user picks what to fix; each fix is its own commit, and a re-check closes it.

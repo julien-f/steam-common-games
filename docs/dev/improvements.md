@@ -84,6 +84,8 @@ UX backlog from the 2026-09-27 review (`ux-review` skill) against [scenarios.md]
 
 - **U41** — [scenarios.md](scenarios.md) L1 asks to "put it in a folder" while its Edges say move has no UI. Update once U10 is decided.
 
+- **U43 · dev** — when Vite hot-reloads `AppShell.tsx`, `initLightbox` runs again and throws in `detachLbVideo` (`Cannot read properties of null`); a full page load is fine. Make the lightbox mount idempotent.
+
 ## Not yet reviewed
 
 - A4 (no allowed account has a public friends list); C4–C6, L4, R2, R3, B4, S2 (second pass stopped early); Y1–Y3 (needs a Steam sign-in); D1–D3 (needs upstream-failure stubs); O1.

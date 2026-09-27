@@ -3,7 +3,16 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 
-const { PREFS_KEY, BACKUP_KEY, DEMO_STEAMID, demoPrefs, seedFn, restoreFn } = require('../scripts/demo-prefs');
+const {
+  PREFS_KEY,
+  BACKUP_KEY,
+  DEMO_STEAMID,
+  demoPrefs,
+  seedFn,
+  emptyFn,
+  restoreFn,
+  runFile,
+} = require('../scripts/demo-prefs');
 
 function fakeStorage(initial = {}) {
   const store = new Map(Object.entries(initial));
@@ -56,4 +65,24 @@ test('seed refuses to overwrite an existing backup', () => {
 
 test('restore without a backup fails', () => {
   assert.throws(() => run(restoreFn(), fakeStorage()), /No prefs backup/);
+});
+
+test('empty backs up the real prefs and clears them; restore puts them back', () => {
+  const ls = fakeStorage({ [PREFS_KEY]: 'real' });
+  assert.strictEqual(run(emptyFn(), ls), 'emptied');
+  assert.strictEqual(ls.getItem(PREFS_KEY), null);
+  run(restoreFn(), ls);
+  assert.strictEqual(ls.getItem(PREFS_KEY), 'real');
+});
+
+test('runFile runs the function on the About page, then reloads', async () => {
+  const calls = [];
+  const page = {
+    goto: async (url) => calls.push(`goto ${url}`),
+    evaluate: async (fn) => (calls.push('evaluate'), fn()),
+    reload: async () => calls.push('reload'),
+  };
+  const script = new Function(`return (${runFile('() => 42', 'http://app.test')})`)();
+  assert.strictEqual(await script(page), 42);
+  assert.deepStrictEqual(calls, ['goto http://app.test/about', 'evaluate', 'reload']);
 });
