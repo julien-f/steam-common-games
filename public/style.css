@@ -3222,9 +3222,32 @@ kbd {
   font-weight: 600;
   color: var(--text0);
 }
-.selection-pick-cost {
-  font-size: 13px;
+.tier-package {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.tier-package small {
+  font-size: 11px;
   color: var(--text1);
+}
+.selection-pick-cost {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.selection-pick-total {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent2);
+}
+.selection-pick-detail {
+  font-size: 12px;
+  color: var(--text1);
+}
+.selection-pick-savings {
+  font-size: 14px;
+  font-weight: 600;
 }
 .selection-toolbar select {
   background: var(--bg0);

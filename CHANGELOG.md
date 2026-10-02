@@ -8,9 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- Fanatical **Build your own** bundles show their real pricing (e.g. 5 for €5.99, 10 for €9.99) instead of "Varies", fetched from Fanatical since IsThereAnyDeal doesn't carry it: in the bundle list, as tier chips on the bundle's page, and as each game's best per-game rate. Selecting games shows what they'd cost — the cheapest tier or combination covering them, picks left free, and the same games at their best deals.
+- Fanatical **Build your own** bundles show their real pricing (e.g. 5 for €5.99, 10 for €9.99) instead of "Varies", fetched from Fanatical since IsThereAnyDeal doesn't carry it: in the bundle list, as tier chips on the bundle's page, and as each game's per-game rate — every pick costs the rate of the largest tier reached (6 games at 5 for €5.99 = 6 × €1.198), so the rate follows how many games are selected. Selecting games shows what they'd cost — at that rate, or a larger tier when its price is lower, picks left free — as the toolbar's headline figure, with what it saves (or costs extra) over the same games at their best deals. A Steam package (a game plus its DLC sold as one) is one pick: its rows are selected together and marked **package · N games**, the rate shown once.
 - Keyboard: `R` opens a random game from the list even with no panel open, and a **Skip to table** link (the first Tab stop) jumps past the nav and toolbar to the rows.
-- A bundle's page says what it adds for you: **New to you · 2 of 5 · ≈ €7.47 at best deals** — the games in it you don't own, and what they'd cost bought separately right now.
+- A bundle's page says what it adds for you: **New to you · 2 of 5 · ≈ €7.47 at best deals** — the games in it you don't own, and what they'd cost bought separately right now (a Steam package counted once, not once per game in it).
 - **Move to…** on every list and folder in Home's tree, to file a list into a folder (or out of one) after creating it.
 - End-to-end tests (`npm run test:e2e`, Playwright) for the starred scenarios, against mocked API data: no backend or upstream traffic needed.
 - A list's loading line has a progress bar and an estimate of the time left, and says why when a large library takes minutes (details for games not seen before are fetched a few at a time).

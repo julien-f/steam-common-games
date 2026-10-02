@@ -164,20 +164,30 @@ test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }
   await page.goto('/bundles');
   await expect(page.getByRole('cell', { name: '1 for $2.00' })).toBeVisible();
   await page.getByRole('cell', { name: 'Test Build Your Own Bundle' }).click();
-  await expect(rows(page)).toHaveCount(3);
+  await expect(rows(page)).toHaveCount(5);
   await expect(page.locator('.bundle-tier-chip')).toHaveText(['1 for $2.00', '3 for $3.50']);
-  await expect(row(page, 'Hades')).toContainText('$1.17/game');
+  await expect(row(page, 'Hades')).toContainText('$2.00/game');
 
   await row(page, 'Portal 2').getByRole('checkbox').check();
-  await expect(page.locator('.selection-pick-cost')).toHaveText(
-    /^1 pick: \$2\.00 at the 1-game tier · vs .+ at best deals$/,
-  );
+  await expect(page.locator('.selection-pick-total')).toHaveText('$2.00');
+  await expect(page.locator('.selection-pick-detail')).toHaveText('1 pick · 1-game tier');
+  await expect(page.locator('.selection-pick-savings')).toHaveText(/^(saves .+|.+ more|same as best deals)$/);
   // Two picks cost less at the 3-game tier than bought one at a time.
   await row(page, 'Hades').getByRole('checkbox').check();
-  await expect(page.locator('.selection-pick-cost')).toContainText(
-    '2 picks: $3.50 at the 3-game tier · 1 more pick free',
-  );
+  await expect(page.locator('.selection-pick-total')).toHaveText('$3.50');
+  await expect(page.locator('.selection-pick-detail')).toHaveText('2 picks · 3-game tier · 1 more free');
   await expect(page.locator('.bundle-tier-chip--active')).toHaveText('3 for $3.50');
+  await expect(row(page, 'Hades')).toContainText('$1.17/game');
+
+  // A package's two rows are one pick, ticked and unticked together.
+  const pack = row(page, 'Test Survival Pack');
+  await expect(pack).toHaveCount(2);
+  await expect(pack.filter({ hasText: 'included' })).toHaveCount(1);
+  await pack.nth(0).getByRole('checkbox').check();
+  await expect(pack.nth(1).getByRole('checkbox')).toBeChecked();
+  await expect(page.locator('.selection-pick-detail')).toHaveText('3 picks · 3-game tier');
+  await pack.nth(1).getByRole('checkbox').uncheck();
+  await expect(pack.nth(0).getByRole('checkbox')).not.toBeChecked();
 });
 
 test('F1: look up one game from the nav search, in place', async ({ page }) => {

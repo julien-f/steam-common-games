@@ -184,6 +184,8 @@ export const PICK_BUNDLE = {
     { gid: 'pnm-portal-2', title: 'Portal 2', appid: 620, tier: 1 },
     { gid: 'pnm-hades', title: 'Hades', appid: 1145360, tier: 1 },
     { gid: 'pnm-terraria', title: 'Terraria', appid: 105600, tier: 1 },
+    // One ITAD game that is a Steam package of two apps: one pick, two rows.
+    { gid: 'pnm-pack', title: 'Test Survival Pack', appid: [367520, 322330], tier: 1 },
   ],
   pickAndMix: [
     { quantity: 1, prices: { USD: 2 } },

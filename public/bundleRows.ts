@@ -61,71 +61,97 @@ export function pickTiers(raw: PickAndMixTier[] | null | undefined, currency: st
   return cur ? raw.map((t) => ({ quantity: t.quantity, price: { amount: t.prices[cur], currency: cur } })) : [];
 }
 
-// Lowest price per game across the tiers — what one pick costs at best.
-export function bestPickRate(tiers: PickTier[]): PriceAmount | null {
-  let best: PriceAmount | null = null;
-  for (const t of tiers) {
-    const amount = t.price.amount / t.quantity;
-    if (!best || amount < best.amount) best = { amount, currency: t.price.currency };
-  }
-  return best;
-}
-
 export interface PickPlan {
   cost: number;
   currency: string;
-  // Tier quantities bought, largest first — more than one when buying the bundle again beats the next tier up.
-  quantities: number[];
+  // The tier whose per-game rate is charged.
+  tier: PickTier;
+  // Picks paid for beyond the selection: rounding up to a tier can beat the rate below it.
   spare: number;
 }
 
-// Cheapest set of tier purchases covering `n` picks. On a cost tie, more picks win (they're free).
+// Fanatical charges every pick at the per-game rate of the largest tier reached (6 games at
+// "5 for €5.99" = 6 × €1.198); below the smallest tier, that tier is the minimum. The cheapest way
+// to take `n` picks is that, or a larger tier's own price with its unused picks free. On a cost
+// tie, more picks win.
 export function cheapestPicks(tiers: PickTier[], n: number): PickPlan | null {
   if (!tiers.length || n <= 0) return null;
-  const cents = tiers.map((t) => Math.round(t.price.amount * 100));
-  const limit = n + Math.max(...tiers.map((t) => t.quantity));
-  const best: number[] = [0];
-  const via: number[] = [-1];
-  for (let c = 1; c <= limit; c++) {
-    best[c] = Infinity;
-    via[c] = -1;
-    tiers.forEach((t, i) => {
-      if (t.quantity <= c && best[c - t.quantity] + cents[i] < best[c]) {
-        best[c] = best[c - t.quantity] + cents[i];
-        via[c] = i;
-      }
-    });
-  }
-  let total = -1;
-  for (let c = n; c <= limit; c++) if (best[c] < Infinity && (total < 0 || best[c] <= best[total])) total = c;
-  if (total < 0) return null;
-  const quantities: number[] = [];
-  for (let c = total; c > 0; c -= tiers[via[c]].quantity) quantities.push(tiers[via[c]].quantity);
-  return {
-    cost: best[total] / 100,
-    currency: tiers[0].price.currency,
-    quantities: quantities.sort((a, b) => b - a),
-    spare: total - n,
-  };
+  const sorted = [...tiers].sort((a, b) => a.quantity - b.quantity);
+  let plan: PickPlan | null = null;
+  sorted.forEach((tier, i) => {
+    const taken = Math.max(n, tier.quantity);
+    if (sorted[i + 1]?.quantity <= taken) return; // the larger tier's rate applies at `taken`
+    const cost = Math.round((taken * Math.round(tier.price.amount * 100)) / tier.quantity) / 100;
+    if (!plan || cost < plan.cost || (cost === plan.cost && taken - n > plan.spare))
+      plan = { cost, currency: tier.price.currency, tier, spare: taken - n };
+  });
+  return plan;
 }
 
-// "6 + 1", "2 × 6 + 1".
-export function formatPickQuantities(quantities: number[]): string {
-  const counts = new Map<number, number>();
-  for (const q of quantities) counts.set(q, (counts.get(q) ?? 0) + 1);
-  return [...counts].map(([q, k]) => (k > 1 ? `${k} × ${q}` : String(q))).join(' + ');
+// The per-game rate `n` picks are charged at; the smallest tier's for none.
+export function pickRate(tiers: PickTier[], n: number): PriceAmount | null {
+  const plan = cheapestPicks(tiers, Math.max(n, 1));
+  return plan && { amount: plan.tier.price.amount / plan.tier.quantity, currency: plan.currency };
 }
 
-// The selection toolbar's line: "7 picks: €9.99 at the 10-game tier · 3 more picks free · vs €35.75 at best deals".
-export function pickPlanText(plan: PickPlan, picks: number, bestDeals: number | null): string {
-  const cost = formatMoney(plan.cost, plan.currency);
+// The line under the selection toolbar's cost: "7 picks · €1.20/game", or
+// "9 picks · 10-game tier · 1 more free" when the plan fills a tier.
+export function pickPlanDetail(plan: PickPlan, picks: number): string {
   const how =
-    plan.quantities.length === 1
-      ? `${cost} at the ${plan.quantities[0]}-game tier`
-      : `${cost} as ${formatPickQuantities(plan.quantities)}`;
-  const spare = plan.spare ? ` · ${plan.spare} more pick${plan.spare === 1 ? '' : 's'} free` : '';
-  const vs = bestDeals == null ? '' : ` · vs ${formatMoney(bestDeals, plan.currency)} at best deals`;
-  return `${picks} pick${picks === 1 ? '' : 's'}: ${how}${spare}${vs}`;
+    picks + plan.spare === plan.tier.quantity
+      ? `${plan.tier.quantity}-game tier`
+      : `${formatMoney(plan.tier.price.amount / plan.tier.quantity, plan.currency)}/game`;
+  const spare = plan.spare ? ` · ${plan.spare} more free` : '';
+  return `${picks} pick${picks === 1 ? '' : 's'} · ${how}${spare}`;
+}
+
+// What the plan saves over the same games at their best deals, or `overpays` when it doesn't.
+export function pickSavings(plan: PickPlan, bestDeals: number): { text: string; overpays: boolean } {
+  const diff = Math.round((bestDeals - plan.cost) * 100) / 100;
+  if (diff === 0) return { text: 'same as best deals', overpays: false };
+  const amount = formatMoney(Math.abs(diff), plan.currency);
+  return diff > 0 ? { text: `saves ${amount}`, overpays: false } : { text: `${amount} more`, overpays: true };
+}
+
+// A Steam package one bundle game expands to: its rows share one ITAD gid, price and pick.
+export interface BundlePackage {
+  gid: string;
+  title: string;
+  size: number;
+  lead: boolean; // the package's first row, the one that carries its pick-and-mix rate
+}
+
+// Each ITAD gid spanning several resolved rows, keyed by the rows' appids.
+export function bundlePackages(games: { gid: string; title: string; appid: number }[]): Map<number, BundlePackage> {
+  const byGid = new Map<string, { title: string; appid: number }[]>();
+  for (const g of games) byGid.set(g.gid, [...(byGid.get(g.gid) ?? []), g]);
+  const out = new Map<number, BundlePackage>();
+  for (const [gid, rows] of byGid)
+    if (rows.length > 1)
+      rows.forEach((r, i) => out.set(r.appid, { gid, title: rows[0].title, size: rows.length, lead: i === 0 }));
+  return out;
+}
+
+// Widens a selection change to whole packages: a row ticked since `prev` brings its package-mates,
+// one unticked takes them along. `null` when the selection is already whole.
+export function wholePackages<T>(
+  prev: ReadonlySet<T>,
+  next: readonly T[],
+  all: readonly T[],
+  gidOf: (row: T) => string | undefined,
+): T[] | null {
+  const nextSet = new Set(next);
+  const added = new Set<string>();
+  const removed = new Set<string>();
+  for (const r of next) if (!prev.has(r) && gidOf(r)) added.add(gidOf(r)!);
+  for (const r of prev) if (!nextSet.has(r) && gidOf(r)) removed.add(gidOf(r)!);
+  if (!added.size && !removed.size) return null;
+  const out = all.filter((r) => {
+    const gid = gidOf(r);
+    if (gid && removed.has(gid)) return false;
+    return nextSet.has(r) || (!!gid && added.has(gid));
+  });
+  return out.length === next.length && out.every((r) => nextSet.has(r)) ? null : out;
 }
 
 export interface BundleRow {

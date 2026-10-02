@@ -19,10 +19,12 @@ const {
   BUNDLE_AGE,
   bundleTierSummary,
   pickTiers,
-  bestPickRate,
+  pickRate,
   cheapestPicks,
-  formatPickQuantities,
-  pickPlanText,
+  pickPlanDetail,
+  pickSavings,
+  bundlePackages,
+  wholePackages,
   fmtBundleDateFriendly,
 } = require('../public/bundleRows.ts');
 
@@ -404,29 +406,33 @@ test('pickTiers: the region currency when every tier has it, else USD, else noth
   assert.deepEqual(pickTiers(null, 'USD'), []);
 });
 
-test('bestPickRate: lowest price per game', () => {
-  assert.deepEqual(bestPickRate(PICKS), { amount: 12.99 / 12, currency: 'USD' });
-  assert.equal(bestPickRate([]), null);
+test('pickRate: the rate the pick count reaches, the smallest tier for none', () => {
+  assert.deepEqual(pickRate(PICKS, 0), { amount: 1.49, currency: 'USD' });
+  assert.deepEqual(pickRate(PICKS, 7), { amount: 6.99 / 6, currency: 'USD' });
+  assert.deepEqual(pickRate(PICKS, 5), { amount: 6.99 / 6, currency: 'USD' });
+  assert.deepEqual(pickRate(PICKS, 12), { amount: 12.99 / 12, currency: 'USD' });
+  assert.equal(pickRate([], 3), null);
 });
 
-test('cheapestPicks: the smallest covering tier when that is cheapest, with the spare picks', () => {
-  assert.deepEqual(cheapestPicks(PICKS, 5), { cost: 6.99, currency: 'USD', quantities: [6], spare: 1 });
-  assert.deepEqual(cheapestPicks(PICKS, 1), { cost: 1.49, currency: 'USD', quantities: [1], spare: 0 });
+test('cheapestPicks: every pick at the rate of the largest tier reached', () => {
+  assert.deepEqual(cheapestPicks(PICKS, 7), { cost: 8.16, currency: 'USD', tier: PICKS[1], spare: 0 });
+  assert.deepEqual(cheapestPicks(PICKS, 11), { cost: 12.82, currency: 'USD', tier: PICKS[1], spare: 0 });
+  assert.deepEqual(cheapestPicks(PICKS, 25), { cost: 27.06, currency: 'USD', tier: PICKS[2], spare: 0 });
+  assert.deepEqual(cheapestPicks(PICKS, 1), { cost: 1.49, currency: 'USD', tier: PICKS[0], spare: 0 });
 });
 
-test('cheapestPicks: buying the bundle again when that beats the next tier up', () => {
-  assert.deepEqual(cheapestPicks(PICKS, 7), { cost: 8.48, currency: 'USD', quantities: [6, 1], spare: 0 });
-  assert.deepEqual(cheapestPicks(PICKS, 25), { cost: 27.47, currency: 'USD', quantities: [12, 12, 1], spare: 0 });
+test('cheapestPicks: rounding up to a tier when its price beats the rate below', () => {
+  assert.deepEqual(cheapestPicks(PICKS, 5), { cost: 6.99, currency: 'USD', tier: PICKS[1], spare: 1 });
+});
+
+test('cheapestPicks: below the smallest tier, that tier is the minimum', () => {
+  const tiers = pickTiers([{ quantity: 3, prices: { USD: 3 } }], 'USD');
+  assert.deepEqual(cheapestPicks(tiers, 2), { cost: 3, currency: 'USD', tier: tiers[0], spare: 1 });
 });
 
 test('cheapestPicks: nothing to plan without tiers or picks', () => {
   assert.equal(cheapestPicks([], 3), null);
   assert.equal(cheapestPicks(PICKS, 0), null);
-});
-
-test('formatPickQuantities: repeats are counted', () => {
-  assert.equal(formatPickQuantities([6, 1]), '6 + 1');
-  assert.equal(formatPickQuantities([12, 12, 1]), '2 × 12 + 1');
 });
 
 test('bundleTierSummary: Fanatical quantity tiers replace the null-price tier', () => {
@@ -442,11 +448,38 @@ test('toBundleRow: a pick-and-mix bundle lists its smallest tier, with its quant
   assert.equal(row.pickQuantity, 1);
 });
 
-test('pickPlanText: tier, spare picks and the best-deals comparison', () => {
-  assert.equal(
-    pickPlanText(cheapestPicks(PICKS, 5), 5, 23.4),
-    '5 picks: $6.99 at the 6-game tier · 1 more pick free · vs $23.40 at best deals',
-  );
-  assert.equal(pickPlanText(cheapestPicks(PICKS, 7), 7, null), '7 picks: $8.48 as 6 + 1');
-  assert.equal(pickPlanText(cheapestPicks(PICKS, 1), 1, null), '1 pick: $1.49 at the 1-game tier');
+test('pickPlanDetail: the rate, or the tier filled with its spare picks', () => {
+  assert.equal(pickPlanDetail(cheapestPicks(PICKS, 7), 7), '7 picks · $1.17/game');
+  assert.equal(pickPlanDetail(cheapestPicks(PICKS, 5), 5), '5 picks · 6-game tier · 1 more free');
+  assert.equal(pickPlanDetail(cheapestPicks(PICKS, 1), 1), '1 pick · 1-game tier');
+});
+
+test('pickSavings: saved, overpaid or even against the best deals', () => {
+  const plan = cheapestPicks(PICKS, 5);
+  assert.deepEqual(pickSavings(plan, 23.4), { text: 'saves $16.41', overpays: false });
+  assert.deepEqual(pickSavings(plan, 5), { text: '$1.99 more', overpays: true });
+  assert.deepEqual(pickSavings(plan, 6.99), { text: 'same as best deals', overpays: false });
+});
+
+// ── Steam packages ───────────────────────────────────────────────────────────────────────────
+
+test('bundlePackages: only gids spanning several rows, led by their first', () => {
+  const pkgs = bundlePackages([
+    { gid: 'a', title: 'Solo', appid: 1 },
+    { gid: 'p', title: 'Pack', appid: 2 },
+    { gid: 'p', title: 'Pack', appid: 3 },
+  ]);
+  assert.equal(pkgs.has(1), false);
+  assert.deepEqual(pkgs.get(2), { gid: 'p', title: 'Pack', size: 2, lead: true });
+  assert.deepEqual(pkgs.get(3), { gid: 'p', title: 'Pack', size: 2, lead: false });
+});
+
+test('wholePackages: ticking or unticking one row of a package does the same to the rest', () => {
+  const [solo, p1, p2] = [{ gid: undefined }, { gid: 'p' }, { gid: 'p' }];
+  const all = [solo, p1, p2];
+  const gidOf = (r) => r.gid;
+  assert.deepEqual(wholePackages(new Set([solo]), [solo, p1], all, gidOf), [solo, p1, p2]);
+  assert.deepEqual(wholePackages(new Set([solo, p1, p2]), [solo, p2], all, gidOf), [solo]);
+  assert.equal(wholePackages(new Set(), [solo], all, gidOf), null);
+  assert.equal(wholePackages(new Set([solo]), [solo, p1, p2], all, gidOf), null);
 });

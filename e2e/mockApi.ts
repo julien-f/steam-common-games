@@ -199,7 +199,7 @@ async function handle(route: Route): Promise<void> {
   if (path === '/api/prices') {
     const keys: (string | number)[] = body.gids ?? body.appids ?? [];
     const appidOf = (key: string | number) =>
-      typeof key === 'number' ? key : bundleGames.find((g) => g.gid === key)?.appid;
+      typeof key === 'number' ? key : [bundleGames.find((g) => g.gid === key)?.appid].flat()[0];
     const prices = Object.fromEntries(keys.flatMap((key) => (appidOf(key) ? [[key, priceInfo(appidOf(key)!)]] : [])));
     return json(route, { prices, fetchedAt: NOW });
   }

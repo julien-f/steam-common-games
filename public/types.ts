@@ -1,3 +1,4 @@
+import type { BundlePackage } from './bundleRows.ts';
 import type { ProductionTier } from './utils.ts';
 
 // Shared frontend types. A row/game object is assembled from several independent async sources
@@ -123,7 +124,8 @@ export interface Game extends PriceFields {
   dateAdded?: string | null;
   tierPrice?: number | null;
   tierCurrency?: string | null;
-  tierPerGame?: boolean; // tierPrice is a pick-and-mix bundle's best per-game rate
+  bundlePackage?: BundlePackage | null;
+  tierPerGame?: boolean; // tierPrice is a pick-and-mix bundle's per-game rate at the current selection
   addon?: boolean;
   rank?: number | null; // a ranked list's own rows only — null = not ranked yet / excluded
 

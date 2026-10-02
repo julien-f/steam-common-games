@@ -140,9 +140,13 @@ import {
   shopHue,
   fmtBundleDateFriendly,
   pickTiers,
-  bestPickRate,
+  pickRate,
   cheapestPicks,
-  pickPlanText,
+  pickPlanDetail,
+  bundlePackages,
+  wholePackages,
+  pickSavings,
+  type BundlePackage,
   type BundleTierSummary,
   type PickPlan,
   type PickTier,
@@ -320,10 +324,25 @@ function renderAddonBadge(v: unknown): Node {
 // A `null` tier price means "no single fixed price" (in practice, a pick-and-mix "Build Your
 // Own" tier), not free — an actual free/pay-what-you-want tier is a real `{amount: 0}`.
 function renderTierPrice(v: unknown, row: Record<string, any>): Node {
-  if (v === undefined) return document.createTextNode('…');
-  if (v == null) return document.createTextNode('Varies');
-  if (v === 0) return document.createTextNode('Free');
-  return document.createTextNode(`${formatMoney(Number(v), row.tierCurrency)}${row.tierPerGame ? '/game' : ''}`);
+  const price =
+    v === undefined
+      ? '…'
+      : v == null
+        ? 'Varies'
+        : v === 0
+          ? 'Free'
+          : `${formatMoney(Number(v), row.tierCurrency)}${row.tierPerGame ? '/game' : ''}`;
+  const pkg: BundlePackage | null | undefined = row.bundlePackage;
+  if (!pkg) return document.createTextNode(price);
+  // A package-mate's pick is its lead row's, so only the lead carries the per-game rate.
+  const wrap = document.createElement('span');
+  wrap.className = 'tier-package';
+  wrap.title = `Part of ${pkg.title}: ${pkg.size} games bought together${row.tierPerGame ? ', as one pick' : ''}`;
+  wrap.append(row.tierPerGame && !pkg.lead ? 'included' : price);
+  const note = document.createElement('small');
+  note.textContent = `package · ${pkg.size} games`;
+  wrap.append(note);
+  return wrap;
 }
 
 const TIER_PRICE_COLUMN: ColumnDef<Record<string, any>> = {
@@ -1916,7 +1935,7 @@ export default function ListRoute() {
         setBundleLinks({ details: bundle.details, url: bundle.url });
         const regionCur = REGION_CURRENCY[resolveRegion(getStoredRegion())] ?? 'USD';
         const picks = pickTiers(bundle.pickAndMix, regionCur);
-        const pickRate = bestPickRate(picks);
+        const entryRate = pickRate(picks, 0);
         setBundleMeta({
           shop: bundle.page?.name || null,
           publish: bundle.publish,
@@ -1935,13 +1954,15 @@ export default function ListRoute() {
           return;
         }
         resolvedBundleGames = resolved;
+        const packages = bundlePackages(resolved);
         initialRows = resolved.map((g) => ({
           appid: g.appid,
           name: g.title,
-          // A pick-and-mix game has no price of its own; its best per-game rate is the comparable number.
-          tierPrice: g.tierPrice ?? (pickRate ? pickRate.amount : null),
-          tierCurrency: g.tierPrice == null && pickRate ? pickRate.currency : g.tierCurrency,
-          tierPerGame: g.tierPrice == null && !!pickRate,
+          // A pick-and-mix game costs the per-game rate the selection reaches; see the effect by pickPlan.
+          tierPrice: g.tierPrice ?? (entryRate ? entryRate.amount : null),
+          tierCurrency: g.tierPrice == null && entryRate ? entryRate.currency : g.tierCurrency,
+          tierPerGame: g.tierPrice == null && !!entryRate,
+          bundlePackage: packages.get(g.appid) ?? null,
           addon: g.addon,
           steamRegular: undefined,
           bestDealPrice: undefined,
@@ -2092,7 +2113,16 @@ export default function ListRoute() {
         // toolbar below stays correct regardless of which load() constructed the table it's
         // currently reading from — disposed alongside the table itself (same createRoot), so a
         // later reload's own fresh table doesn't fight this effect over who last wrote the signal.
-        createEffect(() => setSelectedRows(state.selection.rows()));
+        // A bundle's package rows are bought together, so they're selected together too.
+        let prevSelection = new Set<Game>();
+        createEffect(
+          on(state.selection.rows, (rows) => {
+            const whole = wholePackages(prevSelection, rows, tableData(), (r) => r.bundlePackage?.gid);
+            if (whole) return state.selection.setAll(whole);
+            prevSelection = new Set(rows);
+            setSelectedRows(rows);
+          }),
+        );
         return state;
       });
       table = ts;
@@ -2235,18 +2265,44 @@ export default function ListRoute() {
   }
 
   // How many picks the selection takes in a pick-and-mix bundle — one per ITAD game, so a Steam
-  // package spanning several rows counts once — and the cheapest tier purchases covering them.
-  function selectedPickCount(): number {
+  // package spanning several rows counts once — and the cheapest way to buy them.
+  function onePerGid(rows: readonly Game[]): Game[] {
     const gidOf = new Map((resolvedBundleGames ?? []).map((g) => [g.appid, g.gid]));
-    return new Set(selectedRows().map((r) => gidOf.get(r.appid) ?? r.appid)).size;
+    const seen = new Set<string | number>();
+    return rows.filter((r) => {
+      const key = gidOf.get(r.appid) ?? r.appid;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+  function selectedPickCount(): number {
+    return onePerGid(selectedRows()).length;
   }
   function pickPlan(): PickPlan | null {
     const picks = bundleMeta()?.picks;
     return kind === 'bundle' && picks?.length ? cheapestPicks(picks, selectedPickCount()) : null;
   }
-  // The selection's summed best deals in the plan's currency, null until every one is priced.
+  createEffect(
+    on(
+      () => {
+        const picks = bundleMeta()?.picks;
+        return kind === 'bundle' && picks?.length ? pickRate(picks, selectedPickCount())?.amount : undefined;
+      },
+      (rate) => {
+        if (rate == null) return;
+        for (const r of rowsStore)
+          if (r.tierPerGame && r.tierPrice !== rate)
+            rowStore.mutateRow(r.appid, (draft) => {
+              draft.tierPrice = rate;
+            });
+      },
+    ),
+  );
+  // The selection's summed best deals in the plan's currency, null until every one is priced —
+  // once per gid, since a package's rows each carry the whole package's deal.
   function selectedBestDeals(currency: string): number | null {
-    const deals = selectedRows().map((r) =>
+    const deals = onePerGid(selectedRows()).map((r) =>
       r.bestDealPrice == null ? null : convert(r.bestDealPrice, r.priceCurrency ?? currency, currency),
     );
     return deals.every((d) => d != null) ? deals.reduce((sum, d) => sum! + d!, 0)! : null;
@@ -2303,7 +2359,8 @@ export default function ListRoute() {
     if (account && rowsStore.length > 0 && rowsStore.every((r) => r.inLibrary != null)) {
       const fresh = rowsStore.filter((r) => !r.inLibrary);
       const target = REGION_CURRENCY[resolveRegion(getStoredRegion())] ?? 'USD';
-      const priced = fresh.map((r) =>
+      // Once per gid: a package's rows each carry the whole package's deal.
+      const priced = onePerGid(fresh).map((r) =>
         r.bestDealPrice == null ? null : convert(r.bestDealPrice, r.priceCurrency ?? target, target),
       );
       const total = priced.every((p) => p != null) ? priced.reduce((sum, p) => sum! + p!, 0)! : null;
@@ -2324,7 +2381,7 @@ export default function ListRoute() {
                 <span
                   class="bundle-tier-chip"
                   classList={{
-                    'bundle-tier-chip--active': !!tier.quantity && !!pickPlan()?.quantities.includes(tier.quantity),
+                    'bundle-tier-chip--active': !!tier.quantity && pickPlan()?.tier.quantity === tier.quantity,
                   }}
                   title={
                     tier.quantity
@@ -2915,9 +2972,23 @@ export default function ListRoute() {
           <span class="selection-count">{selectedRows().length} selected</span>
           <Show when={pickPlan()}>
             {(plan) => (
-              <span class="selection-pick-cost">
-                {pickPlanText(plan(), selectedPickCount(), selectedBestDeals(plan().currency))}
-              </span>
+              <>
+                <span class="selection-pick-cost">
+                  <span class="selection-pick-total">{formatMoney(plan().cost, plan().currency)}</span>
+                  <span class="selection-pick-detail">{pickPlanDetail(plan(), selectedPickCount())}</span>
+                </span>
+                <Show when={selectedBestDeals(plan().currency)}>
+                  {(deals) => (
+                    <span
+                      class="selection-pick-savings"
+                      style={{ color: scoreColor(pickSavings(plan(), deals()).overpays ? 20 : 70) }}
+                      title={`vs ${formatMoney(deals(), plan().currency)} for the same games at their best deals`}
+                    >
+                      {pickSavings(plan(), deals()).text}
+                    </span>
+                  )}
+                </Show>
+              </>
             )}
           </Show>
           <select value={addTarget()} onChange={(e) => setAddTarget(e.currentTarget.value)}>
