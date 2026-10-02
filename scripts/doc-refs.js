@@ -2,12 +2,17 @@
 
 // Lists camelCase identifiers backticked in docs/ (`cheapestPicks`, `pickRate()`) that no longer
 // appear anywhere in the code — usually a doc describing something since renamed or removed.
-// Warns only; `--strict` makes it fail.
+// Run by `npm run check`; a name a doc mentions on purpose as removed or rejected goes in HISTORY.
 
 const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
+const HISTORY = new Set([
+  ...['newsLoading', 'newsError', 'achievementsLoading', 'achievementsAccountId', 'dlcLoading'], // frontend.md: gone from `Game`
+  ...['scheduleFlush', 'updateLastPlayedTooltip', 'processData', 'searchData'], // frontend.md: pre-redesign pages
+  'bundlesPricesLimit', // integrations.md: the name `pricesLimit` deliberately isn't
+]);
 const CODE_DIRS = ['public', 'lib', 'scripts', 'e2e', 'test'];
 const CODE_FILES = [
   'server.js',
@@ -40,11 +45,13 @@ for (const doc of walk(path.join(ROOT, 'docs'), (p) => p.endsWith('.md'))) {
     .split('\n')
     .forEach((line, i) => {
       for (const [, name] of line.matchAll(/`([a-z][a-z0-9]*[A-Z][A-Za-z0-9]*)(?:\(\))?`/g))
-        if (!words.has(name)) missing.push(`${path.relative(ROOT, doc)}:${i + 1}: \`${name}\``);
+        if (!words.has(name) && !HISTORY.has(name)) missing.push(`${path.relative(ROOT, doc)}:${i + 1}: \`${name}\``);
     });
 }
 
 if (missing.length) {
-  console.log(`Backticked in docs/ but not found in the code:\n${missing.join('\n')}`);
-  if (process.argv.includes('--strict')) process.exit(1);
+  console.error(
+    `Backticked in docs/ but not found in the code (fix the doc, or add to HISTORY):\n${missing.join('\n')}`,
+  );
+  process.exit(1);
 }

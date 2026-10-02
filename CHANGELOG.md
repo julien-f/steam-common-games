@@ -131,7 +131,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
-- Development: `npm run check` runs everything the pre-commit hook does, plus a CHANGELOG structure check and a non-blocking list of doc references missing from the code; the hook now calls it. A shared `.claude/settings.json` allows the check and read-only git commands.
+- Development: `npm run check` runs everything the pre-commit hook does, plus a CHANGELOG structure check and a check that names the docs put in code formatting still exist in the code; the hook now calls it. A shared `.claude/settings.json` allows the check and read-only git commands.
 - Development: `npm run typecheck` also covers the end-to-end tests (`tsconfig.e2e.json`); `E2E_SHOTS=1 npm run test:e2e` saves screenshots of each test to look at a UI change under mocks; the pre-commit hook prints test progress as dots, failures in full.
 - The nav chip's account switcher marks your own ★ account, so switching back to it after exploring a friend is obvious.
 - Subtract reads with a minus sign ("Owned − Couch co-op picks"): the set-minus sign looked like `|` in the list tree's italics.

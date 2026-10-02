@@ -75,9 +75,9 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
 
 After making changes:
 
-1. Check whether existing tests need updating, or new ones are needed, to cover the change, then run `npm run format` and `npm run check` (format check, CHANGELOG structure, tests, typecheck, lint, then a non-blocking list of doc references missing from the code) and report actual results — not assumptions. Fix what it reports; `npm run lint` must stay at 0 problems, and the few intended violations carry a targeted `eslint-disable-next-line` with a reason.
+1. Check whether existing tests need updating, or new ones are needed, to cover the change, then run `npm run format` and `npm run check` (format check, CHANGELOG structure, tests, typecheck, lint, doc references missing from the code) and report actual results — not assumptions. Fix what it reports; `npm run lint` must stay at 0 problems, and the few intended violations carry a targeted `eslint-disable-next-line` with a reason.
 2. Update any affected documentation — see "Knowledge sharing" above — and `CHANGELOG.md` (see "Changelog" below).
-3. The `pre-commit` hook (`.githooks/pre-commit`, enabled by `npm install`) runs `git diff --cached --check` and `npm run check` and blocks the commit on failure, so once step 1 has passed don't run them again just because a commit is about to happen. A doc reference `check` lists is either stale (fix the doc) or deliberate history (leave it).
+3. The `pre-commit` hook (`.githooks/pre-commit`, enabled by `npm install`) runs `git diff --cached --check` and `npm run check` and blocks the commit on failure, so once step 1 has passed don't run them again just because a commit is about to happen. A doc reference `check` reports is either stale (fix the doc) or deliberate history (add it to `HISTORY` in `scripts/doc-refs.js`).
 
 ## Changelog
 
