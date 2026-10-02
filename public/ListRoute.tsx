@@ -426,7 +426,7 @@ function applyDetailsEvent(row: Game, event: DetailsEvent) {
   row.detailsFetchedAt = event.fetchedAt ?? null;
   row.detailsFetchedAts = event.fetchedAts ?? null;
   row.capsule = event.meta?.capsule ?? null;
-  if (!row.name) row.name = event.meta?.name || '';
+  if (!row.name) row.name = event.meta?.name || row.bundlePackage?.title || '';
   row.score = event.rating?.score ?? null;
   row.positivePct =
     event.rating?.positive != null && event.rating?.total
@@ -1957,7 +1957,8 @@ export default function ListRoute() {
         const packages = bundlePackages(resolved);
         initialRows = resolved.map((g) => ({
           appid: g.appid,
-          name: g.title,
+          // A package's rows share ITAD's package title; each takes its own Steam name instead.
+          name: packages.has(g.appid) ? '' : g.title,
           // A pick-and-mix game costs the per-game rate the selection reaches; see the effect by pickPlan.
           tierPrice: g.tierPrice ?? (entryRate ? entryRate.amount : null),
           tierCurrency: g.tierPrice == null && entryRate ? entryRate.currency : g.tierCurrency,

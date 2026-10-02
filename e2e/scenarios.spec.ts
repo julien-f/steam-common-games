@@ -180,8 +180,8 @@ test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }
   await expect(row(page, 'Hades')).toContainText('$1.17/game');
 
   // A package's two rows are one pick, ticked and unticked together.
-  const pack = row(page, 'Test Survival Pack');
-  await expect(pack).toHaveCount(2);
+  const pack = rows(page).filter({ has: page.locator('.tier-package') });
+  await expect(pack).toHaveText([/Hollow Knight/, /Don't Starve Together/]);
   await expect(pack.filter({ hasText: 'included' })).toHaveCount(1);
   await pack.nth(0).getByRole('checkbox').check();
   await expect(pack.nth(1).getByRole('checkbox')).toBeChecked();

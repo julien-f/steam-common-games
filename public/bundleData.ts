@@ -122,8 +122,8 @@ export async function resolveBundleAppids(gids: string[]): Promise<Record<string
 // (already cheapest-tier-first, from flattenBundleGames), same rule bundles.tsx applies. A gid
 // that resolved to more than one appid (a Steam "sub"/"bundle" spanning several apps) becomes
 // one row per appid, sharing the rest of that gid's metadata (tier price included — the price
-// buys the whole package, not just one of its rows) — each row still gets its own real Steam
-// title from game-details/stream, same as any other resolved row.
+// buys the whole package, not just one of its rows). Each such row starts nameless in
+// ListRoute.tsx so its own Steam title from game-details/stream fills in, not the package's.
 export async function resolveBundleGames(
   bundle: Bundle,
 ): Promise<{ resolved: ResolvedGame[]; unresolved: FlatGame[] }> {
