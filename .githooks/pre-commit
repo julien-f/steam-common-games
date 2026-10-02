@@ -4,8 +4,4 @@ set -e
 # Whitespace errors and leftover conflict markers in what's being committed.
 git diff --cached --check
 
-npm run -s format:check
-# Dots, plus each failure in full: a passing run would otherwise print every test's name.
-NODE_OPTIONS=--test-reporter=dot npm run -s test
-npm run -s typecheck
-npm run -s lint
+npm run -s check

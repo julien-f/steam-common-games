@@ -26,6 +26,7 @@ Get a Steam API key at <https://steamcommunity.com/dev/apikey>. An optional `ITA
 
 ```bash
 npm run dev             # Vite on :58991 + Express on :3000, together
+npm run check           # everything the pre-commit hook runs: format, CHANGELOG, tests, typecheck, lint
 npm test                # Node's test runner
 npm run test:e2e        # the ★ scenarios in a browser, against mocked data (first: npx playwright install chromium)
 npm run typecheck       # tsc --noEmit over public/ and e2e/
@@ -35,7 +36,7 @@ npm run format          # Prettier over the whole tree
 
 Open `http://localhost:58991` in dev (not `:3000` — that serves the last `npm run build`).
 
-`.githooks/pre-commit` checks whitespace, formatting, tests, typecheck and lint before every commit; `npm install` enables it (`core.hooksPath`) and points `git blame` at `.git-blame-ignore-revs`.
+`.githooks/pre-commit` checks whitespace and runs `npm run check` before every commit; `npm install` enables it (`core.hooksPath`) and points `git blame` at `.git-blame-ignore-revs`.
 
 Application data lives in `db.sqlite` (gitignored); today it holds only cache tables. `npm run cache:clear` empties them without deleting the file.
 

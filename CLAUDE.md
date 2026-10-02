@@ -75,10 +75,10 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
 
 After making changes:
 
-1. Check whether existing tests need updating, or new ones are needed, to cover the change, then run `npm run format` and `npm test` and report actual results — not assumptions. For any frontend change also run `npm run typecheck` **and `npm run lint`**, and fix what they report; `npm run lint` must stay at 0 problems, and the few intended violations carry a targeted `eslint-disable-next-line` with a reason.
+1. Check whether existing tests need updating, or new ones are needed, to cover the change, then run `npm run format` and `npm run check` (format check, CHANGELOG structure, tests, typecheck, lint, then a non-blocking list of doc references missing from the code) and report actual results — not assumptions. Fix what it reports; `npm run lint` must stay at 0 problems, and the few intended violations carry a targeted `eslint-disable-next-line` with a reason.
 2. Update any affected documentation — see "Knowledge sharing" above — and `CHANGELOG.md` (see "Changelog" below).
-3. The `pre-commit` hook (`.githooks/pre-commit`, enabled by `npm install`) runs `git diff --cached --check`, `npm run format:check`, `npm test`, `npm run typecheck` and `npm run lint` and blocks the commit on failure, so once step 1 has passed don't run them again just because a commit is about to happen.
+3. The `pre-commit` hook (`.githooks/pre-commit`, enabled by `npm install`) runs `git diff --cached --check` and `npm run check` and blocks the commit on failure, so once step 1 has passed don't run them again just because a commit is about to happen. A doc reference `check` lists is either stale (fix the doc) or deliberate history (leave it).
 
 ## Changelog
 
-Every code change updates `CHANGELOG.md`, in the same commit as the code it documents — never a separate follow-up commit. Add entries under `## [Unreleased]` (create the section if it doesn't exist) using [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format (Added / Changed / Fixed / Removed).
+Every code change updates `CHANGELOG.md`, in the same commit as the code it documents — never a separate follow-up commit. Add entries under `## [Unreleased]` (create the section if it doesn't exist) using [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format (Added / Changed / Fixed / Removed), each subsection once — `npm run check` fails on a repeat.
