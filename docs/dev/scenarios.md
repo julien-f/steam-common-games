@@ -139,7 +139,7 @@ Each scenario: **who / goal**, **steps** as a user would take them, **expect** �
 - **Who / goal**: judge a bundle by what it adds to my library and how good those games are.
 - **Steps**: **Bundles** → narrow with "New" / "Ending soon" → open one → check tier price vs. best deals, owned badges, ratings.
 - **Expect**: owned games are obvious; games with no Steam listing are listed below the table, not dropped.
-- **Edges**: no `ITAD_API_KEY` configured (Bundles unavailable — is that explained?); region change reprices; a tab left open for hours shows stale countdowns (frontend.md, Known gaps).
+- **Edges**: no `ITAD_API_KEY` configured (Bundles unavailable — is that explained?); region change reprices; a Fanatical pick-and-mix bundle shows its quantity tiers and prices the selection (★); a tab left open for hours shows stale countdowns (frontend.md, Known gaps).
 
 ### B2 Is my wishlist on sale?
 

@@ -3222,6 +3222,10 @@ kbd {
   font-weight: 600;
   color: var(--text0);
 }
+.selection-pick-cost {
+  font-size: 13px;
+  color: var(--text1);
+}
 .selection-toolbar select {
   background: var(--bg0);
   color: var(--text0);
@@ -3696,6 +3700,11 @@ kbd {
   font-size: 12.5px;
   color: var(--text0);
   white-space: nowrap;
+}
+/* The pick-and-mix tier(s) the current selection would be bought at. */
+.bundle-tier-chip--active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 /* Prose under the tiles: ITAD's own bundle note ("Keys expire. Please redeem before …") — often

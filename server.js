@@ -45,6 +45,7 @@ const {
   getPrices,
   extractPriceInfo,
 } = require('./lib/itad');
+const { withPickAndMix } = require('./lib/fanatical');
 const {
   SESSION_COOKIE,
   STATE_COOKIE,
@@ -832,7 +833,7 @@ app.get('/api/bundles', bundlesListLimit, async (req, res) => {
     // a bundle going live or expiring is exactly what that button is for, and that question is
     // unanswerable without knowing how old the list on screen is.
     res.json({
-      bundles,
+      bundles: await withPickAndMix(bundles),
       offset,
       limit,
       fetchedAt: getCachedAt(bundlesCacheKey({ country, offset, limit, sort, expired })) ?? null,
@@ -867,7 +868,8 @@ app.get('/api/bundles/:id', bundlesByIdLimit, async (req, res) => {
     // Age of the cached list page this bundle was found on — the same page cache GET /api/bundles
     // reports for the browse list. There's no forcing it (see this route's own note above), so
     // this is stated rather than actionable: it says how old the tiers/dates on screen are.
-    res.json({ bundle: found.bundle, fetchedAt: getCachedAt(found.cacheKey) ?? null });
+    const [bundle] = await withPickAndMix([found.bundle]);
+    res.json({ bundle, fetchedAt: getCachedAt(found.cacheKey) ?? null });
   } catch (err) {
     const status = routeErrorStatus('bundles-by-id', err);
     res.status(status).json({ error: err.message });

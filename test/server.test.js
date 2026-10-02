@@ -1633,6 +1633,28 @@ test('GET /api/bundles/:id: 200 with the matching bundle', async (t) => {
   assert.equal(res.body.bundle?.title, 'Deep-Linked Bundle');
 });
 
+test('GET /api/bundles/:id: adds Fanatical pick-and-mix tiers to a null-price bundle', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  const bundle = {
+    id: 43,
+    page: { name: 'Fanatical' },
+    url: 'https://www.fanatical.com/en/pick-and-mix/byo-test',
+    tiers: [{ price: null, games: [] }],
+  };
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url).startsWith('https://www.fanatical.com/'))
+      return {
+        ok: true,
+        json: async () => ({ pickandmix: [{ slug: 'byo-test', tiers: [{ quantity: 3, price: { EUR: 500 } }] }] }),
+      };
+    return { ok: true, json: async () => (new URL(url).searchParams.get('expired') === 'true' ? [] : [bundle]) };
+  });
+  const res = await api.get('/api/bundles/43');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.bundle.pickAndMix, [{ quantity: 3, prices: { EUR: 5 } }]);
+});
+
 test('GET /api/bundles/:id: 404 when the id is never found', async (t) => {
   _reset();
   process.env.ITAD_API_KEY = 'test-itad-key';

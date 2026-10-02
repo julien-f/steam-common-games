@@ -159,6 +159,27 @@ test('B1: a bundle, then what it adds to my library', async ({ page }) => {
   await expect(row(page, 'It Takes Two')).toHaveCount(1);
 });
 
+test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/bundles');
+  await expect(page.getByRole('cell', { name: '1 for $2.00' })).toBeVisible();
+  await page.getByRole('cell', { name: 'Test Build Your Own Bundle' }).click();
+  await expect(rows(page)).toHaveCount(3);
+  await expect(page.locator('.bundle-tier-chip')).toHaveText(['1 for $2.00', '3 for $3.50']);
+  await expect(row(page, 'Hades')).toContainText('$1.17/game');
+
+  await row(page, 'Portal 2').getByRole('checkbox').check();
+  await expect(page.locator('.selection-pick-cost')).toHaveText(
+    /^1 pick: \$2\.00 at the 1-game tier · vs .+ at best deals$/,
+  );
+  // Two picks cost less at the 3-game tier than bought one at a time.
+  await row(page, 'Hades').getByRole('checkbox').check();
+  await expect(page.locator('.selection-pick-cost')).toContainText(
+    '2 picks: $3.50 at the 3-game tier · 1 more pick free',
+  );
+  await expect(page.locator('.bundle-tier-chip--active')).toHaveText('3 for $3.50');
+});
+
 test('F1: look up one game from the nav search, in place', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

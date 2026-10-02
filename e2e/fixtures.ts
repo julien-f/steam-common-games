@@ -173,3 +173,20 @@ export const BUNDLE = {
   ],
   tiers: [5, 12],
 };
+
+// A Fanatical "Build your own" bundle: one unpriced ITAD tier, priced by quantity instead
+// (server.js adds `pickAndMix` from lib/fanatical.js). USD-only, so the region doesn't matter.
+export const PICK_BUNDLE = {
+  id: 90002,
+  title: 'Test Build Your Own Bundle',
+  shop: 'Fanatical',
+  games: [
+    { gid: 'pnm-portal-2', title: 'Portal 2', appid: 620, tier: 1 },
+    { gid: 'pnm-hades', title: 'Hades', appid: 1145360, tier: 1 },
+    { gid: 'pnm-terraria', title: 'Terraria', appid: 105600, tier: 1 },
+  ],
+  pickAndMix: [
+    { quantity: 1, prices: { USD: 2 } },
+    { quantity: 3, prices: { USD: 3.5 } },
+  ],
+};

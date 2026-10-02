@@ -7,6 +7,8 @@
 // operates on a plain scalar (`row.shop`, not `row.page?.name`), which is also what the table's
 // own filter checklists/group keys are built from.
 
+import { formatMoney } from './utils.ts';
+
 export interface PriceAmount {
   amount: number;
   currency: string;
@@ -36,6 +38,94 @@ export interface BundleListItem {
   publish: string | null;
   expiry: string | null;
   tiers: { price: PriceAmount | null; games?: { assets?: GameAssets | null }[] | null }[];
+  pickAndMix?: PickAndMixTier[] | null;
+}
+
+// Fanatical's quantity tiers for a "Build your own" bundle ITAD prices as null — added by
+// server.js from lib/fanatical.js: "pick any `quantity` games for `prices[currency]`".
+export interface PickAndMixTier {
+  quantity: number;
+  prices: Record<string, number>;
+}
+
+export interface PickTier {
+  quantity: number;
+  price: PriceAmount;
+}
+
+// In `currency` when Fanatical prices every tier in it, else USD — the same fallback ITAD's own
+// USD-only shops land on.
+export function pickTiers(raw: PickAndMixTier[] | null | undefined, currency: string): PickTier[] {
+  if (!raw?.length) return [];
+  const cur = [currency, 'USD'].find((c) => raw.every((t) => typeof t.prices[c] === 'number'));
+  return cur ? raw.map((t) => ({ quantity: t.quantity, price: { amount: t.prices[cur], currency: cur } })) : [];
+}
+
+// Lowest price per game across the tiers — what one pick costs at best.
+export function bestPickRate(tiers: PickTier[]): PriceAmount | null {
+  let best: PriceAmount | null = null;
+  for (const t of tiers) {
+    const amount = t.price.amount / t.quantity;
+    if (!best || amount < best.amount) best = { amount, currency: t.price.currency };
+  }
+  return best;
+}
+
+export interface PickPlan {
+  cost: number;
+  currency: string;
+  // Tier quantities bought, largest first — more than one when buying the bundle again beats the next tier up.
+  quantities: number[];
+  spare: number;
+}
+
+// Cheapest set of tier purchases covering `n` picks. On a cost tie, more picks win (they're free).
+export function cheapestPicks(tiers: PickTier[], n: number): PickPlan | null {
+  if (!tiers.length || n <= 0) return null;
+  const cents = tiers.map((t) => Math.round(t.price.amount * 100));
+  const limit = n + Math.max(...tiers.map((t) => t.quantity));
+  const best: number[] = [0];
+  const via: number[] = [-1];
+  for (let c = 1; c <= limit; c++) {
+    best[c] = Infinity;
+    via[c] = -1;
+    tiers.forEach((t, i) => {
+      if (t.quantity <= c && best[c - t.quantity] + cents[i] < best[c]) {
+        best[c] = best[c - t.quantity] + cents[i];
+        via[c] = i;
+      }
+    });
+  }
+  let total = -1;
+  for (let c = n; c <= limit; c++) if (best[c] < Infinity && (total < 0 || best[c] <= best[total])) total = c;
+  if (total < 0) return null;
+  const quantities: number[] = [];
+  for (let c = total; c > 0; c -= tiers[via[c]].quantity) quantities.push(tiers[via[c]].quantity);
+  return {
+    cost: best[total] / 100,
+    currency: tiers[0].price.currency,
+    quantities: quantities.sort((a, b) => b - a),
+    spare: total - n,
+  };
+}
+
+// "6 + 1", "2 × 6 + 1".
+export function formatPickQuantities(quantities: number[]): string {
+  const counts = new Map<number, number>();
+  for (const q of quantities) counts.set(q, (counts.get(q) ?? 0) + 1);
+  return [...counts].map(([q, k]) => (k > 1 ? `${k} × ${q}` : String(q))).join(' + ');
+}
+
+// The selection toolbar's line: "7 picks: €9.99 at the 10-game tier · 3 more picks free · vs €35.75 at best deals".
+export function pickPlanText(plan: PickPlan, picks: number, bestDeals: number | null): string {
+  const cost = formatMoney(plan.cost, plan.currency);
+  const how =
+    plan.quantities.length === 1
+      ? `${cost} at the ${plan.quantities[0]}-game tier`
+      : `${cost} as ${formatPickQuantities(plan.quantities)}`;
+  const spare = plan.spare ? ` · ${plan.spare} more pick${plan.spare === 1 ? '' : 's'} free` : '';
+  const vs = bestDeals == null ? '' : ` · vs ${formatMoney(bestDeals, plan.currency)} at best deals`;
+  return `${picks} pick${picks === 1 ? '' : 's'}: ${how}${spare}${vs}`;
 }
 
 export interface BundleRow {
@@ -46,6 +136,8 @@ export interface BundleRow {
   tierCount: number;
   price: number | null;
   currency: string | null;
+  // Set when `price` is a pick-and-mix tier's: it buys this many of the bundle's games.
+  pickQuantity: number | null;
   publish: string | null;
   expiry: string | null;
   status: string;
@@ -173,6 +265,8 @@ export interface BundleTierSummary {
   price: number | null;
   currency: string | null;
   gameCount: number;
+  // Set on a Fanatical pick-and-mix tier: how many of the `gameCount` games this price picks.
+  quantity?: number;
 }
 
 // One entry per tier, cheapest first (ITAD's tiers are observed to always be price-ascending), for
@@ -181,9 +275,24 @@ export interface BundleTierSummary {
 // don't sum to the bundle's total; the card labels them as tiers, not as a partition. A `null`
 // price is a pick-and-mix ("Build Your Own") tier, rendered "Varies" like everywhere else, never
 // as free. Kept here (pure, unit-tested) rather than inline in ListRoute.tsx's JSX.
-export function bundleTierSummary(bundle: {
-  tiers?: { price?: PriceAmount | null; games?: unknown[] | null }[] | null;
-}): BundleTierSummary[] {
+// Fanatical's quantity tiers stand in for ITAD's lone null-price tier when `currency` is given and they're known.
+export function bundleTierSummary(
+  bundle: {
+    tiers?: { price?: PriceAmount | null; games?: unknown[] | null }[] | null;
+    pickAndMix?: PickAndMixTier[] | null;
+  },
+  currency?: string,
+): BundleTierSummary[] {
+  const picks = currency ? pickTiers(bundle.pickAndMix, currency) : [];
+  if (picks.length && (bundle.tiers || []).every((t) => !t.price)) {
+    const pool = Math.max(0, ...(bundle.tiers || []).map((t) => (t.games || []).length));
+    return picks.map((t) => ({
+      price: t.price.amount,
+      currency: t.price.currency,
+      gameCount: pool,
+      quantity: t.quantity,
+    }));
+  }
   return (bundle.tiers || []).map((tier) => ({
     price: tier.price ? tier.price.amount : null,
     currency: tier.price ? tier.price.currency : null,
@@ -277,8 +386,10 @@ export function compareBundleAge(a: unknown, b: unknown): number {
 // `now` is a parameter purely so the Active/Expired split is testable without freezing the clock.
 // A bundle with no expiry at all counts as Active — that's how ITAD represents an open-ended one,
 // not a missing date to guess at.
-export function toBundleRow(bundle: BundleListItem, now: number = Date.now()): BundleRow {
-  const price = cheapestTierPrice(bundle);
+// `currency` picks which of Fanatical's pick-and-mix prices stands in for a null tier price.
+export function toBundleRow(bundle: BundleListItem, now: number = Date.now(), currency = 'USD'): BundleRow {
+  const firstPick = cheapestTierPrice(bundle) ? null : (pickTiers(bundle.pickAndMix, currency)[0] ?? null);
+  const price = firstPick ? firstPick.price : cheapestTierPrice(bundle);
   const expired = !!bundle.expiry && new Date(bundle.expiry).getTime() < now;
   return {
     id: bundle.id,
@@ -288,6 +399,7 @@ export function toBundleRow(bundle: BundleListItem, now: number = Date.now()): B
     tierCount: (bundle.tiers || []).length,
     price: price ? price.amount : null,
     currency: price ? price.currency : null,
+    pickQuantity: firstPick ? firstPick.quantity : null,
     publish: bundle.publish,
     expiry: bundle.expiry,
     status: expired ? 'Expired' : 'Active',

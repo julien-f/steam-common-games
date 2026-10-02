@@ -123,6 +123,7 @@ export interface Game extends PriceFields {
   dateAdded?: string | null;
   tierPrice?: number | null;
   tierCurrency?: string | null;
+  tierPerGame?: boolean; // tierPrice is a pick-and-mix bundle's best per-game rate
   addon?: boolean;
   rank?: number | null; // a ranked list's own rows only — null = not ranked yet / excluded
 

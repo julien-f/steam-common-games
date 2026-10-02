@@ -4,6 +4,8 @@
 // (bundle kind) and by listResolve.ts's `bundle` ListRef case, decoupled from bundles.tsx's
 // bespoke table UI, which went away with that page.
 
+import type { PickAndMixTier } from './bundleRows.ts';
+
 export interface PriceAmount {
   amount: number;
   currency: string;
@@ -46,6 +48,7 @@ export interface Bundle {
   url: string | null;
   details: string | null;
   tiers: BundleTier[];
+  pickAndMix?: PickAndMixTier[] | null;
 }
 
 // A game can appear in more than one tier (a cheap tier's games are still included in every

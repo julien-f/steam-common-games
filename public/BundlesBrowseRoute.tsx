@@ -237,7 +237,9 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     // some shops only price in USD, and "$6 < €10" is not an order. Shown in the shop's own.
     value: (row) => (row.price == null ? null : inRegionCurrency(row.price, row.currency)),
     format: (_v, row) =>
-      row.price == null ? 'Varies' : formatWithEstimate(row.price, row.currency ?? regionCurrency(), regionCurrency()),
+      row.price == null
+        ? 'Varies'
+        : `${row.pickQuantity ? `${row.pickQuantity} for ` : ''}${formatWithEstimate(row.price, row.currency ?? regionCurrency(), regionCurrency())}`,
     compare: compareNumMissingLast,
     // withMissingGroup, not a bare priceTierBucket: `Number(null)` is 0, so a null price would
     // otherwise land in its "Free" bucket rather than in the missing/"Varies" one.
@@ -393,7 +395,7 @@ export default function BundlesBrowseRoute() {
       for (let page = 0; page < (append ? 1 : MAX_AUTO_PAGES); page++) {
         const bundles = await fetchPage(refresh);
         if (loadGuard.isStale(gen)) return;
-        collected.push(...bundles.map((b) => toBundleRow(b)));
+        collected.push(...bundles.map((b) => toBundleRow(b, undefined, regionCurrency())));
         offset += bundles.length;
         if (bundles.length < PAGE_SIZE) {
           reachedEnd = true;

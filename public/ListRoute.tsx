@@ -139,7 +139,13 @@ import {
   bundleUrgency,
   shopHue,
   fmtBundleDateFriendly,
+  pickTiers,
+  bestPickRate,
+  cheapestPicks,
+  pickPlanText,
   type BundleTierSummary,
+  type PickPlan,
+  type PickTier,
 } from './bundleRows.ts';
 import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { rememberBundle } from './bundleSnapshots.ts';
@@ -317,7 +323,7 @@ function renderTierPrice(v: unknown, row: Record<string, any>): Node {
   if (v === undefined) return document.createTextNode('…');
   if (v == null) return document.createTextNode('Varies');
   if (v === 0) return document.createTextNode('Free');
-  return document.createTextNode(formatMoney(Number(v), row.tierCurrency));
+  return document.createTextNode(`${formatMoney(Number(v), row.tierCurrency)}${row.tierPerGame ? '/game' : ''}`);
 }
 
 const TIER_PRICE_COLUMN: ColumnDef<Record<string, any>> = {
@@ -574,6 +580,7 @@ export default function ListRoute() {
     note: string | null;
     itadCount: number | null;
     tiers: BundleTierSummary[];
+    picks: PickTier[]; // Fanatical pick-and-mix tiers, when known
   } | null>(null);
   // The bundle's games that have no Steam listing at all (a course, an asset pack, a shop-exclusive
   // key). resolveBundleGames has always returned these; this route used to drop them on the floor,
@@ -1907,13 +1914,17 @@ export default function ListRoute() {
         noteFetchedAt(bundleFetchedAt);
         setListTitle(bundle.title);
         setBundleLinks({ details: bundle.details, url: bundle.url });
+        const regionCur = REGION_CURRENCY[resolveRegion(getStoredRegion())] ?? 'USD';
+        const picks = pickTiers(bundle.pickAndMix, regionCur);
+        const pickRate = bestPickRate(picks);
         setBundleMeta({
           shop: bundle.page?.name || null,
           publish: bundle.publish,
           expiry: bundle.expiry,
           note: bundle.note,
           itadCount: bundle.counts?.games ?? null,
-          tiers: bundleTierSummary(bundle),
+          tiers: bundleTierSummary(bundle, regionCur),
+          picks,
         });
         const { resolved, unresolved } = await resolveBundleGames(bundle);
         if (loadGuard.isStale(gen)) return;
@@ -1927,8 +1938,10 @@ export default function ListRoute() {
         initialRows = resolved.map((g) => ({
           appid: g.appid,
           name: g.title,
-          tierPrice: g.tierPrice,
-          tierCurrency: g.tierCurrency,
+          // A pick-and-mix game has no price of its own; its best per-game rate is the comparable number.
+          tierPrice: g.tierPrice ?? (pickRate ? pickRate.amount : null),
+          tierCurrency: g.tierPrice == null && pickRate ? pickRate.currency : g.tierCurrency,
+          tierPerGame: g.tierPrice == null && !!pickRate,
           addon: g.addon,
           steamRegular: undefined,
           bestDealPrice: undefined,
@@ -2221,6 +2234,24 @@ export default function ListRoute() {
     };
   }
 
+  // How many picks the selection takes in a pick-and-mix bundle — one per ITAD game, so a Steam
+  // package spanning several rows counts once — and the cheapest tier purchases covering them.
+  function selectedPickCount(): number {
+    const gidOf = new Map((resolvedBundleGames ?? []).map((g) => [g.appid, g.gid]));
+    return new Set(selectedRows().map((r) => gidOf.get(r.appid) ?? r.appid)).size;
+  }
+  function pickPlan(): PickPlan | null {
+    const picks = bundleMeta()?.picks;
+    return kind === 'bundle' && picks?.length ? cheapestPicks(picks, selectedPickCount()) : null;
+  }
+  // The selection's summed best deals in the plan's currency, null until every one is priced.
+  function selectedBestDeals(currency: string): number | null {
+    const deals = selectedRows().map((r) =>
+      r.bestDealPrice == null ? null : convert(r.bestDealPrice, r.priceCurrency ?? currency, currency),
+    );
+    return deals.every((d) => d != null) ? deals.reduce((sum, d) => sum! + d!, 0)! : null;
+  }
+
   function bundleHeroTiles(): HeroTile[] {
     const meta = bundleMeta();
     if (!meta) return [];
@@ -2292,9 +2323,18 @@ export default function ListRoute() {
               {(tier) => (
                 <span
                   class="bundle-tier-chip"
-                  title={`${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} at this tier`}
+                  classList={{
+                    'bundle-tier-chip--active': !!tier.quantity && !!pickPlan()?.quantities.includes(tier.quantity),
+                  }}
+                  title={
+                    tier.quantity
+                      ? `Pick any ${tier.quantity} of the ${tier.gameCount} games`
+                      : `${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} at this tier`
+                  }
                 >
-                  {tier.price == null ? 'Varies' : formatMoney(tier.price, tier.currency)}
+                  {tier.price == null
+                    ? 'Varies'
+                    : `${tier.quantity ? `${tier.quantity} for ` : ''}${formatMoney(tier.price, tier.currency)}`}
                 </span>
               )}
             </For>
@@ -2873,6 +2913,13 @@ export default function ListRoute() {
       <Show when={selectedRows().length > 0}>
         <div class="selection-toolbar">
           <span class="selection-count">{selectedRows().length} selected</span>
+          <Show when={pickPlan()}>
+            {(plan) => (
+              <span class="selection-pick-cost">
+                {pickPlanText(plan(), selectedPickCount(), selectedBestDeals(plan().currency))}
+              </span>
+            )}
+          </Show>
           <select value={addTarget()} onChange={(e) => setAddTarget(e.currentTarget.value)}>
             <option value="">Add to list…</option>
             <For each={manualLists().filter((l) => l.id !== userList()?.id)}>

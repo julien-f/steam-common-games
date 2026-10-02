@@ -18,6 +18,11 @@ const {
   compareBundleAge,
   BUNDLE_AGE,
   bundleTierSummary,
+  pickTiers,
+  bestPickRate,
+  cheapestPicks,
+  formatPickQuantities,
+  pickPlanText,
   fmtBundleDateFriendly,
 } = require('../public/bundleRows.ts');
 
@@ -352,6 +357,7 @@ test('toBundleRow: flattens every field the table sorts/filters/groups on', () =
     tierCount: 1,
     price: 5,
     currency: 'USD',
+    pickQuantity: null,
     publish: '2026-08-01T10:00:00+02:00',
     expiry: '2026-09-01T10:00:00+02:00',
     status: 'Active',
@@ -380,4 +386,67 @@ test('toBundleRow: missing shop/game count become null rather than empty strings
   const row = toBundleRow(bundle({ page: null, counts: null }), Date.now());
   assert.equal(row.shop, null);
   assert.equal(row.games, null);
+});
+
+// ── Fanatical pick-and-mix ───────────────────────────────────────────────────────────────────
+
+const PICKS_RAW = [
+  { quantity: 1, prices: { USD: 1.49, EUR: 1.55 } },
+  { quantity: 6, prices: { USD: 6.99, EUR: 7.25 } },
+  { quantity: 12, prices: { USD: 12.99, EUR: 13.5 } },
+];
+const PICKS = pickTiers(PICKS_RAW, 'USD');
+
+test('pickTiers: the region currency when every tier has it, else USD, else nothing', () => {
+  assert.deepEqual(pickTiers(PICKS_RAW, 'EUR')[1], { quantity: 6, price: { amount: 7.25, currency: 'EUR' } });
+  assert.equal(pickTiers(PICKS_RAW, 'BRL')[0].price.currency, 'USD');
+  assert.deepEqual(pickTiers([{ quantity: 1, prices: { GBP: 1 } }], 'EUR'), []);
+  assert.deepEqual(pickTiers(null, 'USD'), []);
+});
+
+test('bestPickRate: lowest price per game', () => {
+  assert.deepEqual(bestPickRate(PICKS), { amount: 12.99 / 12, currency: 'USD' });
+  assert.equal(bestPickRate([]), null);
+});
+
+test('cheapestPicks: the smallest covering tier when that is cheapest, with the spare picks', () => {
+  assert.deepEqual(cheapestPicks(PICKS, 5), { cost: 6.99, currency: 'USD', quantities: [6], spare: 1 });
+  assert.deepEqual(cheapestPicks(PICKS, 1), { cost: 1.49, currency: 'USD', quantities: [1], spare: 0 });
+});
+
+test('cheapestPicks: buying the bundle again when that beats the next tier up', () => {
+  assert.deepEqual(cheapestPicks(PICKS, 7), { cost: 8.48, currency: 'USD', quantities: [6, 1], spare: 0 });
+  assert.deepEqual(cheapestPicks(PICKS, 25), { cost: 27.47, currency: 'USD', quantities: [12, 12, 1], spare: 0 });
+});
+
+test('cheapestPicks: nothing to plan without tiers or picks', () => {
+  assert.equal(cheapestPicks([], 3), null);
+  assert.equal(cheapestPicks(PICKS, 0), null);
+});
+
+test('formatPickQuantities: repeats are counted', () => {
+  assert.equal(formatPickQuantities([6, 1]), '6 + 1');
+  assert.equal(formatPickQuantities([12, 12, 1]), '2 × 12 + 1');
+});
+
+test('bundleTierSummary: Fanatical quantity tiers replace the null-price tier', () => {
+  const b = { tiers: [{ price: null, games: [{}, {}, {}] }], pickAndMix: PICKS_RAW };
+  assert.deepEqual(bundleTierSummary(b, 'EUR')[0], { price: 1.55, currency: 'EUR', gameCount: 3, quantity: 1 });
+  assert.deepEqual(bundleTierSummary(b), [{ price: null, currency: null, gameCount: 3 }]);
+});
+
+test('toBundleRow: a pick-and-mix bundle lists its smallest tier, with its quantity', () => {
+  const row = toBundleRow({ id: 1, title: 'B', tiers: [{ price: null }], pickAndMix: PICKS_RAW }, Date.now(), 'EUR');
+  assert.equal(row.price, 1.55);
+  assert.equal(row.currency, 'EUR');
+  assert.equal(row.pickQuantity, 1);
+});
+
+test('pickPlanText: tier, spare picks and the best-deals comparison', () => {
+  assert.equal(
+    pickPlanText(cheapestPicks(PICKS, 5), 5, 23.4),
+    '5 picks: $6.99 at the 6-game tier · 1 more pick free · vs $23.40 at best deals',
+  );
+  assert.equal(pickPlanText(cheapestPicks(PICKS, 7), 7, null), '7 picks: $8.48 as 6 + 1');
+  assert.equal(pickPlanText(cheapestPicks(PICKS, 1), 1, null), '1 pick: $1.49 at the 1-game tier');
 });

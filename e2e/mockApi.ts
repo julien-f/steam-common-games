@@ -2,7 +2,7 @@
 // off localhost — so an e2e run needs no backend, touches no database, and sends nothing to
 // Steam, HLTB, IsThereAnyDeal or ProtonDB. Response shapes follow server.js's routes.
 import type { Page, Route } from '@playwright/test';
-import { PLAYERS, CATALOG, BUNDLE, game, type Player } from './fixtures.ts';
+import { PLAYERS, CATALOG, BUNDLE, PICK_BUNDLE, game, type Player } from './fixtures.ts';
 
 const NOW = Date.now();
 
@@ -86,18 +86,32 @@ function priceInfo(appid: number) {
   };
 }
 
-function bundleJson() {
+function pickBundleJson() {
   return {
-    id: BUNDLE.id,
-    title: BUNDLE.title,
-    page: { id: 1, name: BUNDLE.shop, shopId: 1 },
+    ...bundleJson(PICK_BUNDLE),
+    tiers: [
+      {
+        price: null,
+        addon: false,
+        games: PICK_BUNDLE.games.map((g) => ({ id: g.gid, slug: g.gid, title: g.title, type: 'game', assets: {} })),
+      },
+    ],
+    pickAndMix: PICK_BUNDLE.pickAndMix,
+  };
+}
+
+function bundleJson(b: typeof BUNDLE | typeof PICK_BUNDLE = BUNDLE) {
+  return {
+    id: b.id,
+    title: b.title,
+    page: { id: 1, name: b.shop, shopId: 1 },
     url: 'https://example.invalid/bundle',
     details: 'https://example.invalid/itad-bundle',
     isMature: false,
     publish: new Date(NOW - 2 * 86400_000).toISOString(),
     expiry: new Date(NOW + 10 * 86400_000).toISOString(),
     note: null,
-    counts: { games: BUNDLE.games.length, media: 0 },
+    counts: { games: b.games.length, media: 0 },
     tiers: BUNDLE.tiers.map((price, i) => ({
       price: money(price),
       addon: false,
@@ -170,20 +184,22 @@ async function handle(route: Route): Promise<void> {
     return json(route, { results });
   }
 
-  if (path === '/api/bundles') return json(route, { bundles: [bundleJson()], offset: 0, limit: 50, fetchedAt: NOW });
+  const bundleGames = [...BUNDLE.games, ...PICK_BUNDLE.games];
+  if (path === '/api/bundles') {
+    return json(route, { bundles: [bundleJson(), pickBundleJson()], offset: 0, limit: 50, fetchedAt: NOW });
+  }
   if (path === '/api/bundles/resolve') {
-    return json(route, { appids: Object.fromEntries(BUNDLE.games.map((g) => [g.gid, g.appid])) });
+    return json(route, { appids: Object.fromEntries(bundleGames.map((g) => [g.gid, g.appid])) });
   }
   const bundle = path.match(/^\/api\/bundles\/(\d+)$/);
   if (bundle) {
-    return Number(bundle[1]) === BUNDLE.id
-      ? json(route, { bundle: bundleJson(), fetchedAt: NOW })
-      : json(route, { error: 'Bundle not found' }, 404);
+    const found = { [BUNDLE.id]: bundleJson, [PICK_BUNDLE.id]: pickBundleJson }[Number(bundle[1])];
+    return found ? json(route, { bundle: found(), fetchedAt: NOW }) : json(route, { error: 'Bundle not found' }, 404);
   }
   if (path === '/api/prices') {
     const keys: (string | number)[] = body.gids ?? body.appids ?? [];
     const appidOf = (key: string | number) =>
-      typeof key === 'number' ? key : BUNDLE.games.find((g) => g.gid === key)?.appid;
+      typeof key === 'number' ? key : bundleGames.find((g) => g.gid === key)?.appid;
     const prices = Object.fromEntries(keys.flatMap((key) => (appidOf(key) ? [[key, priceInfo(appidOf(key)!)]] : [])));
     return json(route, { prices, fetchedAt: NOW });
   }

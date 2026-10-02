@@ -80,6 +80,8 @@ The result is a link. Copy the address and whoever opens it sees the same compar
 
 Browse current Steam game bundles (sourced from IsThereAnyDeal, and only available if the app is configured with an ITAD key). Open one and its games become a list like any other, with the bundle's tier price alongside each game's rating, playtime estimates and current best price anywhere. Games in a bundle with no Steam listing are listed separately below the table rather than quietly dropped. The header's counts are clickable: "New" narrows the table to the bundles published in the last week, "Ending soon" to the ones ending within 48 hours, and clicking either again brings the rest back. "Updated" re-fetches the list (it replaces the old ↻ Refresh button — the same is true of the Owned and Wishlist headers), and "Prices" opens the region setting. A bundle's **New to you** figure counts the games in it you don't own and what they'd cost at their best deals right now; **What does this add?** turns a bundle into a list of those games (see [Combining lists](#combining-lists)).
 
+Fanatical's **Build your own** bundles price by how many games you pick (e.g. 5 for €5.99, 10 for €9.99), taken from Fanatical itself since IsThereAnyDeal doesn't carry those prices. The tiers show in the bundle's header, each game's Tier Price is the best per-game rate, and selecting games in the table shows what they'd cost: the cheapest tier (or set of purchases) covering them, any picks left free, and the same games at their best deals.
+
 ![The bundle browser: current bundles with shop, game count, cheapest tier, publication and end dates](../images/bundles-browse.png)
 
 ## Prices

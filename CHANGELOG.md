@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Fanatical **Build your own** bundles show their real pricing (e.g. 5 for €5.99, 10 for €9.99) instead of "Varies", fetched from Fanatical since IsThereAnyDeal doesn't carry it: in the bundle list, as tier chips on the bundle's page, and as each game's best per-game rate. Selecting games shows what they'd cost — the cheapest tier or combination covering them, picks left free, and the same games at their best deals.
 - Keyboard: `R` opens a random game from the list even with no panel open, and a **Skip to table** link (the first Tab stop) jumps past the nav and toolbar to the rows.
 - A bundle's page says what it adds for you: **New to you · 2 of 5 · ≈ €7.47 at best deals** — the games in it you don't own, and what they'd cost bought separately right now.
 - **Move to…** on every list and folder in Home's tree, to file a list into a folder (or out of one) after creating it.
