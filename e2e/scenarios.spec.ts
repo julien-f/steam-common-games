@@ -1,7 +1,7 @@
 // docs/dev/scenarios.md's ★ scenarios, end to end against mocked data (mockApi.ts).
 import { test, expect, type Page } from '@playwright/test';
 import { mockApi } from './mockApi.ts';
-import { asPlayer } from './state.ts';
+import { asPlayer, shot } from './state.ts';
 import { ALICE } from './fixtures.ts';
 
 let pageErrors: string[];
@@ -186,6 +186,7 @@ test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }
   await pack.nth(0).getByRole('checkbox').check();
   await expect(pack.nth(1).getByRole('checkbox')).toBeChecked();
   await expect(page.locator('.selection-pick-detail')).toHaveText('3 picks · 3-game tier');
+  await shot(page, 'pick-and-mix-package-selected');
   await pack.nth(1).getByRole('checkbox').uncheck();
   await expect(pack.nth(0).getByRole('checkbox')).not.toBeChecked();
 });

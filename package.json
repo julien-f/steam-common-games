@@ -10,7 +10,7 @@
     "dev:backend": "node --watch server.js",
     "dev:frontend": "vite",
     "build": "vite build",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.e2e.json",
     "test": "DB_FILE= node --test test/*.test.js test/*.test.ts",
     "test:e2e": "playwright test",
     "cache:clear": "node scripts/cache-clear.js",

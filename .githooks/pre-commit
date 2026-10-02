@@ -5,6 +5,7 @@ set -e
 git diff --cached --check
 
 npm run -s format:check
-npm test
+# Dots, plus each failure in full: a passing run would otherwise print every test's name.
+NODE_OPTIONS=--test-reporter=dot npm run -s test
 npm run -s typecheck
 npm run -s lint

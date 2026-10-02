@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { test, type Page } from '@playwright/test';
 import type { Player } from './fixtures.ts';
 
 // Seeds `player` as both my ★ account and the current one, once per tab: later reloads keep
@@ -23,4 +23,10 @@ export async function asPlayer(page: Page, player: Player, { withLabel = true } 
     localStorage.setItem('steam.isonoe.net:prefs', blob);
     sessionStorage.setItem('e2e-seeded', '1');
   }, JSON.stringify(prefs));
+}
+
+// A named mid-test screenshot, kept only on an `E2E_SHOTS=1` run (see playwright.config.ts).
+export async function shot(page: Page, name: string): Promise<void> {
+  if (test.info().project.use.screenshot !== 'on') return;
+  await page.screenshot({ path: test.info().outputPath(`${name}.png`) });
 }

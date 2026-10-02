@@ -14,6 +14,8 @@ export default defineConfig({
     baseURL: `http://localhost:${PORT}`,
     viewport: { width: 1440, height: 900 },
     trace: 'retain-on-failure',
+    // `E2E_SHOTS=1 npm run test:e2e` keeps every test's final screen in test-results/, to look at a UI change under mocks.
+    screenshot: process.env.E2E_SHOTS ? 'on' : 'off',
   },
   webServer: {
     command: `npx vite --port ${PORT} --strictPort`,

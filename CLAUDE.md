@@ -5,8 +5,8 @@ Working conventions for this repo. Documentation lives in `docs/` — keep it th
 ## Project context
 
 - **Stack**: Node >=22.13 + Express 5 backend, Solid + TypeScript frontend bundled by Vite, `node:sqlite` for `db.sqlite`; npm. Setup, dev servers and ports are in [README.md](README.md).
-- **Tests**: `node:test` + `supertest`, flat in `test/*.test.{js,ts}`; `npm test` runs with `DB_FILE=` so no real database is touched. End-to-end: `npm run test:e2e` (Playwright, `e2e/`) runs [scenarios.md](docs/dev/scenarios.md)'s ★ scenarios with every `/api` call mocked in the browser — no backend, no upstream traffic; fixtures use made-up accounts only. Not in the pre-commit hook: run it when a change touches one of those flows.
-- **Types**: `tsc --noEmit`, strict, over `public/**/*.{ts,tsx}` only — the backend is plain JS.
+- **Tests**: `node:test` + `supertest`, flat in `test/*.test.{js,ts}`; `npm test` runs with `DB_FILE=` so no real database is touched. End-to-end: `npm run test:e2e` (Playwright, `e2e/`) runs [scenarios.md](docs/dev/scenarios.md)'s ★ scenarios with every `/api` call mocked in the browser — no backend, no upstream traffic; fixtures use made-up accounts only. Not in the pre-commit hook: run it when a change touches one of those flows. To look at a UI change without touching real prefs, `E2E_SHOTS=1 npm run test:e2e` keeps each test's final screen, plus any `shot(page, name)` (`e2e/state.ts`), under `test-results/`.
+- **Types**: `tsc --noEmit`, strict, over `public/**/*.{ts,tsx}`, plus `e2e/` via `tsconfig.e2e.json` — the backend is plain JS.
 - **Lint**: `eslint public`, via eslint-plugin-solid.
 - **Format**: Prettier over the whole tree (`.prettierrc.json`); `npm run format` rewrites, `npm run format:check` verifies.
 
@@ -39,6 +39,7 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
 - Stay in scope: only make the changes asked for, plus the Development workflow checklist below. Flag other issues noticed rather than fixing them unprompted.
 - Match the existing code style and conventions in the file/project rather than imposing personal preference; don't reformat unrelated code.
 - If a rule here is stale or contradicts the code, say so instead of silently following it.
+- When code models an upstream's behavior (pricing, limits, matching rules) from inference rather than its docs, state the assumption in the plan and confirm it before building on it; record confirmed rules and remaining assumptions in [integrations.md](docs/dev/integrations.md).
 
 ## Ask first
 

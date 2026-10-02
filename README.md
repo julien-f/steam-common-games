@@ -28,7 +28,7 @@ Get a Steam API key at <https://steamcommunity.com/dev/apikey>. An optional `ITA
 npm run dev             # Vite on :58991 + Express on :3000, together
 npm test                # Node's test runner
 npm run test:e2e        # the ★ scenarios in a browser, against mocked data (first: npx playwright install chromium)
-npm run typecheck       # tsc --noEmit over public/
+npm run typecheck       # tsc --noEmit over public/ and e2e/
 npm run lint            # eslint-plugin-solid over public/
 npm run format          # Prettier over the whole tree
 ```

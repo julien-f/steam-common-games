@@ -1,0 +1,6 @@
+// e2e/ is typechecked apart from public/: it runs under Playwright, not in the app's browser
+// bundle. playwright.config.ts stays out — it reads `process.env`, and @types/node isn't a dependency.
+{
+  "extends": "./tsconfig.json",
+  "include": ["e2e/**/*.ts"]
+}
