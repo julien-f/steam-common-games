@@ -187,6 +187,18 @@ test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }
   await expect(pack.nth(1).getByRole('checkbox')).toBeChecked();
   await expect(page.locator('.selection-pick-detail')).toHaveText('3 picks · 3-game tier');
   await shot(page, 'pick-and-mix-package-selected');
+
+  // Buying carries the picks, by Fanatical's names, on ITAD's link.
+  const buy = page.getByRole('link', { name: 'Buy 3 on Fanatical ↗' });
+  const href = new URL((await buy.getAttribute('href')) ?? '');
+  expect(href.origin + href.pathname).toBe('https://example.invalid/bundle');
+  expect(JSON.parse(href.searchParams.get('scg') ?? '')).toEqual(['Portal 2', 'Hades', 'Test Survival Pack']);
+  await expect(page.getByRole('link', { name: 'Add to Fanatical' })).toHaveAttribute('href', /^javascript:/);
+  await row(page, 'Terraria').getByRole('checkbox').check();
+  await expect(page.locator('.selection-fanatical-by-hand')).toHaveText('1 to pick by hand');
+  await expect(page.getByRole('link', { name: 'Buy 4 on Fanatical ↗' })).toBeVisible();
+  await row(page, 'Terraria').getByRole('checkbox').uncheck();
+
   await pack.nth(1).getByRole('checkbox').uncheck();
   await expect(pack.nth(0).getByRole('checkbox')).not.toBeChecked();
 });

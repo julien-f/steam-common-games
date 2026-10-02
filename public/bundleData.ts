@@ -49,6 +49,8 @@ export interface Bundle {
   details: string | null;
   tiers: BundleTier[];
   pickAndMix?: PickAndMixTier[] | null;
+  // GET /api/bundles/:id only: ITAD gid -> the name Fanatical's pick-and-mix page shows (matchPickAndMix).
+  pickAndMixNames?: Record<string, string> | null;
 }
 
 // A game can appear in more than one tier (a cheap tier's games are still included in every

@@ -191,4 +191,6 @@ export const PICK_BUNDLE = {
     { quantity: 1, prices: { USD: 2 } },
     { quantity: 3, prices: { USD: 3.5 } },
   ],
+  // What lib/fanatical.js's matchPickAndMix found on Fanatical's page; Terraria went unmatched.
+  pickAndMixNames: { 'pnm-portal-2': 'Portal 2', 'pnm-hades': 'Hades', 'pnm-pack': 'Test Survival Pack' },
 };

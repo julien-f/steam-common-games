@@ -97,6 +97,7 @@ function pickBundleJson() {
       },
     ],
     pickAndMix: PICK_BUNDLE.pickAndMix,
+    pickAndMixNames: PICK_BUNDLE.pickAndMixNames,
   };
 }
 

@@ -3249,6 +3249,25 @@ kbd {
   font-size: 14px;
   font-weight: 600;
 }
+.selection-fanatical {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.selection-fanatical-bookmarklet {
+  font-size: 12px;
+  color: var(--accent2);
+  border: 1px dashed var(--border);
+  border-radius: var(--r);
+  padding: 4px 8px;
+  cursor: grab;
+  text-decoration: none;
+}
+.selection-fanatical-by-hand {
+  font-size: 12px;
+  color: var(--text1);
+  cursor: help;
+}
 .selection-toolbar select {
   background: var(--bg0);
   color: var(--text0);

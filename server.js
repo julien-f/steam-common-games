@@ -868,7 +868,7 @@ app.get('/api/bundles/:id', bundlesByIdLimit, async (req, res) => {
     // Age of the cached list page this bundle was found on — the same page cache GET /api/bundles
     // reports for the browse list. There's no forcing it (see this route's own note above), so
     // this is stated rather than actionable: it says how old the tiers/dates on screen are.
-    const [bundle] = await withPickAndMix([found.bundle]);
+    const [bundle] = await withPickAndMix([found.bundle], { names: true });
     res.json({ bundle, fetchedAt: getCachedAt(found.cacheKey) ?? null });
   } catch (err) {
     const status = routeErrorStatus('bundles-by-id', err);

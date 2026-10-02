@@ -153,6 +153,7 @@ import {
 } from './bundleRows.ts';
 import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { rememberBundle } from './bundleSnapshots.ts';
+import { fanaticalBuyUrl, FANATICAL_BOOKMARKLET } from './fanaticalPicks.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from './priceLoading.ts';
 import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { openPrefsPopover } from './prefsPopover.ts';
@@ -582,10 +583,16 @@ export default function ListRoute() {
   const [heroAccount, setHeroAccount] = createSignal<AccountSlot | null>(null);
   // kind === 'bundle' only, alongside bundleTitle above — ITAD's own page for this bundle
   // (`details`) and the real shop/affiliate purchase link exactly as ITAD returned it (`url`,
-  // never rewritten or stripped of tracking params — see docs/dev/integrations.md on why).
-  const [bundleLinks, setBundleLinks] = createSignal<{ details: string | null; url: string | null }>({
+  // never rewritten or stripped of tracking params — see docs/dev/integrations.md on why), and the
+  // gid -> Fanatical name map "Buy on Fanatical" needs (pick-and-mix bundles only).
+  const [bundleLinks, setBundleLinks] = createSignal<{
+    details: string | null;
+    url: string | null;
+    fanaticalNames: Record<string, string> | null;
+  }>({
     details: null,
     url: null,
+    fanaticalNames: null,
   });
   // kind === 'bundle' only — everything else the bundle response already carries, for the detail
   // card below the header. All of it rides on the one fetch the route already makes; none of it
@@ -1932,7 +1939,7 @@ export default function ListRoute() {
         // fetchBundleById). Still worth saying: a bundle's tiers and end date are read here.
         noteFetchedAt(bundleFetchedAt);
         setListTitle(bundle.title);
-        setBundleLinks({ details: bundle.details, url: bundle.url });
+        setBundleLinks({ details: bundle.details, url: bundle.url, fanaticalNames: bundle.pickAndMixNames ?? null });
         const regionCur = REGION_CURRENCY[resolveRegion(getStoredRegion())] ?? 'USD';
         const picks = pickTiers(bundle.pickAndMix, regionCur);
         const entryRate = pickRate(picks, 0);
@@ -2300,6 +2307,21 @@ export default function ListRoute() {
       },
     ),
   );
+  // The selection under the names Fanatical's page shows, for "Buy on Fanatical"; `byHand` are the
+  // picks matchPickAndMix couldn't name.
+  function fanaticalPicks(): { url: string; names: string[]; byHand: string[] } | null {
+    const { url, fanaticalNames } = bundleLinks();
+    if (!url || !fanaticalNames || !pickPlan()) return null;
+    const gidOf = new Map((resolvedBundleGames ?? []).map((g) => [g.appid, g.gid]));
+    const names: string[] = [];
+    const byHand: string[] = [];
+    for (const r of onePerGid(selectedRows())) {
+      const name = fanaticalNames[gidOf.get(r.appid) ?? ''];
+      if (name) names.push(name);
+      else byHand.push(r.bundlePackage?.title || r.name);
+    }
+    return names.length ? { url: fanaticalBuyUrl(url, names), names, byHand } : null;
+  }
   // The selection's summed best deals in the plan's currency, null until every one is priced —
   // once per gid, since a package's rows each carry the whole package's deal.
   function selectedBestDeals(currency: string): number | null {
@@ -2986,6 +3008,39 @@ export default function ListRoute() {
                       title={`vs ${formatMoney(deals(), plan().currency)} for the same games at their best deals`}
                     >
                       {pickSavings(plan(), deals()).text}
+                    </span>
+                  )}
+                </Show>
+                <Show when={fanaticalPicks()}>
+                  {(picks) => (
+                    <span class="selection-fanatical">
+                      <a
+                        class="btn btn-primary btn-sm"
+                        href={picks().url}
+                        target="_blank"
+                        rel="noopener"
+                        title="Opens the bundle on Fanatical through IsThereAnyDeal's link; click the Add to Fanatical bookmark there to add these games"
+                      >
+                        Buy {selectedPickCount()} on Fanatical ↗
+                      </a>
+                      <a
+                        class="selection-fanatical-bookmarklet"
+                        href={FANATICAL_BOOKMARKLET}
+                        title="Drag to your bookmarks bar once, then click it on the Fanatical page to add the selected games"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          showSelectionStatus(
+                            'Drag "Add to Fanatical" to your bookmarks bar, then click it on the Fanatical page.',
+                          );
+                        }}
+                      >
+                        Add to Fanatical
+                      </a>
+                      <Show when={picks().byHand.length}>
+                        <span class="selection-fanatical-by-hand" title={picks().byHand.join('\n')}>
+                          {picks().byHand.length} to pick by hand
+                        </span>
+                      </Show>
                     </span>
                   )}
                 </Show>

@@ -82,6 +82,8 @@ Browse current Steam game bundles (sourced from IsThereAnyDeal, and only availab
 
 Fanatical's **Build your own** bundles price by how many games you pick (e.g. 5 for €5.99, 10 for €9.99), taken from Fanatical itself since IsThereAnyDeal doesn't carry those prices. Every game you pick costs the per-game rate of the largest tier you reach (6 games at 5 for €5.99 cost 6 × €1.198). The tiers show in the bundle's header, each game's Tier Price is the rate for the current selection (the smallest tier's with nothing selected), and selecting games in the table shows what they'd cost: at that rate, or a larger tier when its price is lower (any picks left free), and, in green or red, what that saves or costs over the same games at their best deals. A Steam package (a game plus its DLC sold as one) counts as one pick: its rows are marked **package · N games** and ticking one ticks them all.
 
+To buy them, drag **Add to Fanatical** from the selection toolbar to your bookmarks bar once. Then click **Buy N on Fanatical ↗**: it opens the bundle on Fanatical through IsThereAnyDeal's link, so the referral is kept. Click the bookmark there and it adds your picks to the bundle, then says what it added and anything you'll need to pick by hand (a game listed under a different name on Fanatical; the toolbar shows how many in advance).
+
 ![The bundle browser: current bundles with shop, game count, cheapest tier, publication and end dates](../images/bundles-browse.png)
 
 ## Prices

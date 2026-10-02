@@ -4,7 +4,7 @@ process.env.DB_FILE = '';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { pickAndMixSlug, parsePickAndMix, getPickAndMix, withPickAndMix } = require('../lib/fanatical');
+const { pickAndMixSlug, parsePickAndMix, matchPickAndMix, getPickAndMix, withPickAndMix } = require('../lib/fanatical');
 const { _reset, setCache } = require('../lib/cache');
 
 const ITAD_URL =
@@ -18,6 +18,7 @@ const FEED = {
         { quantity: 6, price: { USD: 699, CAD: 1789.9999999999998 } },
         { quantity: 1, price: { USD: 149, CAD: 250 } },
       ],
+      products: [{ _id: 'p1', name: 'Rain World', slug: 'rain-world', cover: 'x.jpeg' }, { name: '' }],
     },
     { slug: 'no-tiers', tiers: [] },
   ],
@@ -41,12 +42,67 @@ test('pickAndMixSlug: reads the slug out of ITAD affiliate redirects and direct 
 
 test('parsePickAndMix: major units, rounded, quantity-ascending, empty bundles dropped', () => {
   assert.deepEqual(parsePickAndMix(FEED), {
-    'build-your-own-killer-bundle': [
-      { quantity: 1, prices: { USD: 1.49, CAD: 2.5 } },
-      { quantity: 6, prices: { USD: 6.99, CAD: 17.9 } },
-    ],
+    'build-your-own-killer-bundle': {
+      tiers: [
+        { quantity: 1, prices: { USD: 1.49, CAD: 2.5 } },
+        { quantity: 6, prices: { USD: 6.99, CAD: 17.9 } },
+      ],
+      products: [{ name: 'Rain World', slug: 'rain-world' }],
+    },
   });
   assert.deepEqual(parsePickAndMix(null), {});
+});
+
+test('matchPickAndMix: by slug, title, subtitled title or base title; the rest left out', () => {
+  const products = [
+    { name: 'RoboCop: Rogue City', slug: 'robocop-rogue-city' },
+    { name: 'Café Owner™ & Friends', slug: 'cafe-x' },
+    { name: 'Dead Finger Dice: A Billionaire Killing Game', slug: 'dfd' },
+    { name: 'Insurmountable + Supporter Pack', slug: 'ins' },
+    { name: 'Unrelated Game', slug: 'u' },
+    { name: 'Another One', slug: 'a' },
+  ];
+  const game = (id, slug, title) => ({ id, slug, title });
+  const bundle = {
+    tiers: [
+      {
+        games: [
+          game('g1', 'robocop-rogue-city', 'Robocop Renamed'),
+          game('g2', 'cafe-owner', 'Cafe Owner and Friends'),
+          game('g3', 'dead-finger-dice', 'Dead Finger Dice'),
+          game('g4', 'insurmountable', 'Insurmountable - Supporter Bundle'),
+          game('g5', 'renamed', 'Renamed Pack'),
+        ],
+      },
+      { games: [game('g1', 'robocop-rogue-city', 'Robocop Renamed')] },
+    ],
+  };
+  assert.deepEqual(matchPickAndMix(bundle, products), {
+    g1: 'RoboCop: Rogue City',
+    g2: 'Café Owner™ & Friends',
+    g3: 'Dead Finger Dice: A Billionaire Killing Game',
+    g4: 'Insurmountable + Supporter Pack',
+  });
+});
+
+test('matchPickAndMix: the one game and one product left in a bundle whose counts agree are paired', () => {
+  const bundle = (titles) => ({
+    tiers: [{ games: titles.map((title, i) => ({ id: `g${i}`, slug: `s${i}`, title })) }],
+  });
+  const products = [{ name: 'Fearmonium' }, { name: 'Classic Adventure Triple Pack' }];
+  assert.deepEqual(matchPickAndMix(bundle(['Fearmonium', 'The Pixel Pulps Collection']), products), {
+    g0: 'Fearmonium',
+    g1: 'Classic Adventure Triple Pack',
+  });
+  // An extra game on ITAD's side means the leftover could be either.
+  assert.deepEqual(matchPickAndMix(bundle(['Fearmonium', 'The Pixel Pulps Collection', 'Other']), products), {
+    g0: 'Fearmonium',
+  });
+});
+
+test('matchPickAndMix: a subtitle prefix shared by two products matches neither', () => {
+  const products = [{ name: 'Doom: One' }, { name: 'Doom: Two' }];
+  assert.deepEqual(matchPickAndMix({ tiers: [{ games: [{ id: 'g', slug: 'doom', title: 'Doom' }] }] }, products), {});
 });
 
 test('withPickAndMix: enriches only null-price Fanatical bundles, one cached fetch', async (t) => {
@@ -60,9 +116,12 @@ test('withPickAndMix: enriches only null-price Fanatical bundles, one cached fet
   const humble = { id: 3, page: { name: 'Humble Bundle' }, url: ITAD_URL, tiers: [{ price: null }] };
   const [a, b, c] = await withPickAndMix([fanaticalBundle(), priced, humble]);
   assert.equal(a.pickAndMix.length, 2);
+  assert.equal(a.pickAndMixNames, undefined);
   assert.equal(b, priced);
   assert.equal(c, humble);
-  await withPickAndMix([fanaticalBundle()]);
+  const games = [{ id: 'g1', slug: 'rain-world', title: 'Rain World' }];
+  const [named] = await withPickAndMix([fanaticalBundle({ tiers: [{ price: null, games }] })], { names: true });
+  assert.deepEqual(named.pickAndMixNames, { g1: 'Rain World' });
   assert.equal(calls, 1);
 });
 
@@ -90,8 +149,8 @@ test('getPickAndMix: a failed fetch degrades to no tiers and is not retried per 
 test('getPickAndMix: re-fetches for an unknown slug once the map is old, keeping it on failure', async (t) => {
   _reset();
   t.mock.method(console, 'warn', () => {});
-  const old = { known: [{ quantity: 1, prices: { USD: 1 } }] };
-  setCache('fanatical-pnm:all', old);
+  const old = { known: { tiers: [{ quantity: 1, prices: { USD: 1 } }], products: [] } };
+  setCache('fanatical-pnm:v2', old);
   const later = Date.now() + 2 * 60 * 60 * 1000;
   t.mock.method(Date, 'now', () => later);
   let calls = 0;
