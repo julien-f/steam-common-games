@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - End-to-end tests (`npm run test:e2e`, Playwright) for the starred scenarios, against mocked API data: no backend or upstream traffic needed.
 - A list's loading line has a progress bar and an estimate of the time left, and says why when a large library takes minutes (details for games not seen before are fetched a few at a time).
 - A combined list keeps a bundle's games after IsThereAnyDeal stops listing it: its last-known games move into a hidden list the formula then uses, removed once no list needs it. A bundle that fails to load for any other reason uses its last-known games too, instead of failing the whole list.
-- **What does this add?** on a bundle's page opens a combined list of that bundle minus the current account's Owned games (a Family counts as one), pre-filled but editable — e.g. to Group by membership with a friend instead — and opens the result once saved.
+- **What does this add?** on a bundle's page shows that bundle minus the current account's Owned games (a Family counts as one) straight away, as an unsaved shareable list: **Save as a list** keeps it, and **Edit sources** then changes it — e.g. to Group by membership with a friend instead.
 - A bundle used as a combined list's source is named by its title (the last one seen) rather than "Bundle 16599".
 - Prettier (`npm run format`, `npm run format:check`); the whole tree was reformatted with it once.
 - `docs/dev/scenarios.md`: user journeys (goal, steps, expected outcome), the basis for design reviews and end-to-end tests.

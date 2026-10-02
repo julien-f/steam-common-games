@@ -11,8 +11,8 @@
 // chrome. No trash/restore UI for soft-deleted lists yet (`listsStore.ts`'s `restoreList`/
 // `getLists({ includeDeleted: true })` are ready for it, just not surfaced here). The combine
 // form below can pick any recent account's Owned/Wishlist, Recently Looked Up, or any existing
-// user list as a source. A bundle joins it only from its own page (`?combine=b:<id>`, below) —
-// offering every bundle here would need a bundle picker, not a checkbox.
+// user list as a source. A bundle joins it only from its own page ("What does this add?" opens a
+// /lists/shared link, saved from there) — offering every bundle here would need a bundle picker.
 import { createSignal, createEffect, createMemo, on, onCleanup, onMount, For, Index, Show, type JSX } from 'solid-js';
 import { A, useLocation, useNavigate } from '@solidjs/router';
 import {
@@ -318,37 +318,17 @@ export default function HomeRoute() {
 
   // ── Combine setup (creating a dynamic list) ───────────────────────────────────────────────
   const [combineOpen, setCombineOpen] = createSignal(false);
-  // Set by a bundle page's "What does this add?" (`?combine=b:<id>`): Subtract this account's
-  // Owned from the bundle, and open the result once it's saved.
-  const [combinePrefill, setCombinePrefill] = createSignal<{ op: CombineOp; sources: ListRef[] } | null>(null);
-  let combineFormEl: HTMLDivElement | undefined;
-
-  onMount(() => {
-    const params = new URLSearchParams(location.search);
-    const bundleId = params.get('combine')?.match(/^b:(\d+)$/)?.[1];
-    if (!bundleId) return;
-    const account = getEffectiveCurrentAccount();
-    const owned: ListRef[] = account ? [{ kind: 'account-owned', accountId: account.id }] : [];
-    setCombinePrefill({ op: 'subtract', sources: [{ kind: 'bundle', bundleId }, ...owned] });
-    setCombineOpen(true);
-    params.delete('combine');
-    navigate(urlWithParams(params, location.pathname), { replace: true });
-    queueMicrotask(() => combineFormEl?.scrollIntoView({ block: 'center' }));
-  });
 
   function toggleCombine(): void {
-    setCombinePrefill(null);
     setCombineOpen((v) => !v);
   }
 
   // No name is a valid choice, not a missing field: the list is then labeled by its own formula
   // everywhere, and follows a later source edit (see listLabels.ts).
   function handleCreateCombine(input: { name?: string; op: CombineOp; sources: ListRef[] }): void {
-    const list = createList({ name: input.name, kind: 'dynamic', op: input.op, sources: input.sources });
+    createList({ name: input.name, kind: 'dynamic', op: input.op, sources: input.sources });
     refreshTree();
     setCombineOpen(false);
-    if (combinePrefill()) navigate(withAccountParam(`/lists/${list.id}`, location.search));
-    setCombinePrefill(null);
   }
 
   // A list's on-screen label — its name, or its formula when it has none (listLabels.ts).
@@ -745,14 +725,7 @@ export default function HomeRoute() {
         </div>
 
         <Show when={combineOpen()}>
-          <div ref={combineFormEl}>
-            <CombineForm
-              submitLabel="Create combined list"
-              initialOp={combinePrefill()?.op}
-              initialSources={combinePrefill()?.sources}
-              onSubmit={handleCreateCombine}
-            />
-          </div>
+          <CombineForm submitLabel="Create combined list" onSubmit={handleCreateCombine} />
         </Show>
         <Show when={treeRows().length > 0} fallback={<p>No lists yet — create one above.</p>}>
           <ul class="list-tree">

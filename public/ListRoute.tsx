@@ -2307,6 +2307,18 @@ export default function ListRoute() {
       },
     ),
   );
+  // "What does this add?": the bundle minus the current account's Owned, as an unsaved shared list.
+  function bundleAddsHref(): string | null {
+    accountRev();
+    const account = getEffectiveCurrentAccount();
+    if (!account || !params.bundleId) return null;
+    const sources: ListRef[] = [
+      { kind: 'bundle', bundleId: params.bundleId },
+      { kind: 'account-owned', accountId: account.id },
+    ];
+    const result = encodeListFormula({ op: 'subtract', sources }, () => undefined);
+    return result.ok ? withAccountParam(shareListUrl(result.formula), location.search) : null;
+  }
   // The selection under the names Fanatical's page shows, for "Buy on Fanatical"; `byHand` are the
   // picks matchPickAndMix couldn't name.
   function fanaticalPicks(): { url: string; names: string[]; byHand: string[] } | null {
@@ -2726,11 +2738,11 @@ export default function ListRoute() {
                 </a>
               )}
             </Show>
-            <Show when={bundleResolvedCount() > 0}>
+            <Show when={bundleResolvedCount() > 0 && bundleAddsHref()}>
               <A
                 class="btn btn-ghost btn-sm"
-                href={withAccountParam(`/?combine=b:${params.bundleId}`, location.search)}
-                title="Make a list of this bundle's games minus the ones you own"
+                href={bundleAddsHref()!}
+                title="This bundle's games minus the ones you own — save it as a list from there"
                 onClick={() =>
                   rememberBundle(
                     params.bundleId!,

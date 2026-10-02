@@ -151,12 +151,15 @@ test('B1: a bundle, then what it adds to my library', async ({ page }) => {
   await page.getByRole('button', { name: /1 more in this bundle, not on Steam/ }).click();
   await expect(page.getByText('Test Soundtrack')).toBeVisible();
 
+  // The answer opens right away, unsaved; keeping it is one more click.
   await page.getByRole('link', { name: 'What does this add?' }).click();
-  await page.getByRole('button', { name: 'Create combined list' }).click();
-  await expect(page.getByRole('heading', { name: 'Test Co-op Pack − Alice — Owned' })).toBeVisible();
+  await expect(page).toHaveURL(/\/lists\/shared\?f=/);
   await expect(rows(page)).toHaveCount(2);
   await expect(row(page, 'Overcooked! 2')).toHaveCount(1);
   await expect(row(page, 'It Takes Two')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Save as a list' }).click();
+  await expect(page.getByRole('heading', { name: 'Test Co-op Pack − Alice — Owned' })).toBeVisible();
+  await expect(rows(page)).toHaveCount(2);
 });
 
 test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }) => {

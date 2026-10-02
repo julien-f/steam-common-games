@@ -149,9 +149,9 @@ Each scenario: **who / goal**, **steps** as a user would take them, **expect** �
 ### B3 What does this bundle add for the whole household?
 
 - **Who / goal**: judge a bundle against everything my Family or group already owns, not just my own games.
-- **Steps**: open a bundle → **What does this add?** → keep bundle minus my Owned, or swap in the Family's Owned (or **Group by membership** with a friend's Owned) → save.
+- **Steps**: open a bundle → **What does this add?** (bundle minus my Owned, unsaved) → **Save as a list** → **Edit sources** to swap in the Family's Owned (or **Group by membership** with a friend's Owned).
 - **Edges**: the bundle ends and IsThereAnyDeal stops listing it — the list keeps its last-known games and says so.
-- **Expect**: the result keeps the bundle's price columns; the default name reads the formula; games with no Steam listing are still accounted for.
+- **Expect**: the default name reads the formula; games with no Steam listing are still accounted for.
 
 ### B4 Buy a friend a gift
 
