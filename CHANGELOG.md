@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- Recently Looked Up lists your latest lookup first, in a new **Looked up** column, and says it keeps the last 10.
 - `npm run check` fails a CHANGELOG entry over 400 characters, keeping entries to one user-facing line.
 - A ranked or combined list built from a Wishlist or a bundle keeps the price columns (Best Deal and Discount shown), the Prices tile and its refresh.
 - 🔗 Share view is off on your own saved lists, saying why: their link only opened in your browser. A combined list points to 🔗 Share list instead.

@@ -145,7 +145,7 @@ import {
 } from './accountsStore.ts';
 import { getAccountOverrideState, accountOverrideStatusText } from './accountOverride.ts';
 import { fetchAccountOverview, fetchAccountWishlist, resolveAccountSummary } from './accountData.ts';
-import { loadRecentGames, addRecentGame, renameRecentGame } from './recentGames.ts';
+import { loadRecentGames, addRecentGame, renameRecentGame, MAX_RECENT_GAMES } from './recentGames.ts';
 import {
   fetchBundleById,
   loadErrorText,
@@ -311,6 +311,20 @@ const OWNED_DEFAULT_VISIBLE = ['capsule', 'name', 'steamdbRating', 'hltbAll', 'r
 // restatement of what the Name column right next to it already shows.
 const RECENT_COLUMNS = insertColumnsAfter(CORE_COLUMNS, 'name', OWNERSHIP_STATUS_COLUMN);
 const RECENT_DEFAULT_VISIBLE = ['capsule', 'name', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres'];
+// Recently Looked Up's own order: stored newest first (recentGames.ts), with no timestamps.
+const LOOKED_UP_COLUMN: ColumnDef<Record<string, any>> = {
+  key: 'lookedUp',
+  label: 'Looked up',
+  type: 'number',
+  groupable: false,
+  filterable: false,
+  format: (v) => (v == null ? '—' : v === 1 ? 'Latest' : `#${v}`),
+  compare: compareNumMissingLast,
+  defaultSortDir: 'asc',
+};
+const LOOKED_UP_COLUMNS = insertColumnsAfter(RECENT_COLUMNS, 'capsule', LOOKED_UP_COLUMN);
+const LOOKED_UP_DEFAULT_VISIBLE = ['lookedUp', ...RECENT_DEFAULT_VISIBLE];
+const LOOKED_UP_DEFAULT_SORT: SortEntry[] = [{ key: 'lookedUp', dir: 'asc' }];
 // A user list also gets the current account's Played/Last Played (stamped from myOwnership.ts,
 // the same fetch as the ✓/☆ markers) — hidden by default, there to filter/sort on.
 const USER_COLUMNS = insertColumnsAfter(RECENT_COLUMNS, 'hltbCompletionist', PLAYTIME_COLUMN, LAST_PLAYED_COLUMN);
@@ -1334,9 +1348,21 @@ export default function ListRoute() {
   // become a real row, not a standalone aside. Used both by load()'s own params.appid handling
   // (a fresh /game/:appid navigation) and by handleOpenGameRequest (a lookup made while already
   // sitting on this route) — same behavior either way, since /game/:appid *is* this route now.
+  // Renumbers the Looked up column after a lookup moved a game to the front of the stored list.
+  function restampLookedUp(): void {
+    const order = new Map(loadRecentGames().map((g, i) => [g.appid, i + 1]));
+    batch(() => {
+      for (const { appid } of rowsStore) {
+        rowStore.mutateRow(appid, (draft) => {
+          draft.lookedUp = order.get(appid) ?? null;
+        });
+      }
+    });
+  }
   function openOrAddRecentGame(appid: number): void {
     const existing = rowStore.getRow(appid);
     if (existing) {
+      restampLookedUp();
       openGame(existing);
       return;
     }
@@ -1348,6 +1374,7 @@ export default function ListRoute() {
     const rows = [placeholder, ...rowsStore];
     setRowsStore(rows);
     rowStore.load(rows);
+    restampLookedUp();
     total++;
     updateStatus();
     pendingRecentFocus = appid;
@@ -1398,6 +1425,7 @@ export default function ListRoute() {
       if (pendingRecentFocus === event.appid) {
         addRecentGame(row.appid, row.name, capsule);
         pendingRecentFocus = null;
+        if (kind === 'recent') restampLookedUp();
       } else if (kind === 'recent' && !hadName && row.name) {
         // This row was already in the stored recents list, but recorded without a name (a bare
         // appid/store-URL lookup — see load()'s own comment above). Now that store metadata has
@@ -2014,8 +2042,9 @@ export default function ListRoute() {
       // metadata had streamed in with the real title. The placeholder is presentational only now
       // (panel.tsx's title falls back to it); a still-nameless row is `loading` and filtered out
       // of the table anyway until its details event lands.
-      initialRows = recents.map((g) => ({
+      initialRows = recents.map((g, i) => ({
         appid: g.appid,
+        lookedUp: i + 1,
         name: g.name,
         capsule: g.tinyImage || undefined,
         loading: true,
@@ -2195,9 +2224,11 @@ export default function ListRoute() {
               ? priced
                 ? USER_PRICED_COLUMNS
                 : USER_COLUMNS
-              : kind === 'recent' || kind === 'compare' || kind === 'shared'
-                ? RECENT_COLUMNS
-                : OWNED_COLUMNS) as unknown as ColumnDef<Game>[];
+              : kind === 'recent'
+                ? LOOKED_UP_COLUMNS
+                : kind === 'compare' || kind === 'shared'
+                  ? RECENT_COLUMNS
+                  : OWNED_COLUMNS) as unknown as ColumnDef<Game>[];
       const defaultVisible = isRanked
         ? [...RANKED_DEFAULT_VISIBLE, ...(priced ? PRICED_DEFAULT_VISIBLE : [])]
         : kind === 'wishlist'
@@ -2206,10 +2237,18 @@ export default function ListRoute() {
             ? BUNDLE_DEFAULT_VISIBLE
             : kind === 'user' && priced
               ? [...RECENT_DEFAULT_VISIBLE, ...PRICED_DEFAULT_VISIBLE]
-              : kind === 'recent' || kind === 'user' || kind === 'compare' || kind === 'shared'
-                ? RECENT_DEFAULT_VISIBLE
-                : OWNED_DEFAULT_VISIBLE;
-      const sort = isRanked ? RANKED_DEFAULT_SORT : kind === 'bundle' ? BUNDLE_DEFAULT_SORT : DEFAULT_SORT;
+              : kind === 'recent'
+                ? LOOKED_UP_DEFAULT_VISIBLE
+                : kind === 'user' || kind === 'compare' || kind === 'shared'
+                  ? RECENT_DEFAULT_VISIBLE
+                  : OWNED_DEFAULT_VISIBLE;
+      const sort = isRanked
+        ? RANKED_DEFAULT_SORT
+        : kind === 'bundle'
+          ? BUNDLE_DEFAULT_SORT
+          : kind === 'recent'
+            ? LOOKED_UP_DEFAULT_SORT
+            : DEFAULT_SORT;
       const groups = pendingGroups;
       const names = new Map(listSources().map((source) => [source.key, source.desc.label]));
       const allColumns = groups
@@ -2704,7 +2743,8 @@ export default function ListRoute() {
     if (kind === 'bundle') return bundleMeta()?.note || undefined;
     // Recently Looked Up is pure local search history (recentGames.ts) — worth saying outright,
     // since every other list here is either someone's Steam data or a list they built on purpose.
-    if (kind === 'recent') return 'Games you looked up in this browser — local search history, never sent anywhere.';
+    if (kind === 'recent')
+      return `The last ${MAX_RECENT_GAMES} games you looked up in this browser — local search history, never sent anywhere.`;
     const list = combineList();
     if (list?.kind === 'dynamic' || list?.kind === 'ranked') return formulaNote(list);
     return undefined;

@@ -163,6 +163,23 @@ test('L1 edge: a list moves into the only folder', async ({ page }) => {
   await expect(move).toHaveValue('');
 });
 
+test('L4 edge: Recently Looked Up lists the latest lookup first, and says it keeps 10', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  // Portal 2 rates higher than Valheim, so a rating sort would put it first.
+  for (const name of ['Portal 2', 'Valheim']) {
+    await page.getByPlaceholder('Look up any game…').fill(name);
+    await page.locator('.game-search-result', { hasText: name }).first().click();
+    await expect(page.locator('#panel-title')).toHaveText(name);
+    await page.getByRole('button', { name: 'Close', exact: true }).click(); // a phone's panel covers the search
+  }
+  await page.goto('/game');
+  await expect(rows(page)).toHaveCount(2);
+  await expect(rows(page).first()).toContainText('Valheim');
+  await expect(page.locator('.list-hero')).toContainText('last 10');
+});
+
 test('R1: rank chosen games, stop, resume on the same ones', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
