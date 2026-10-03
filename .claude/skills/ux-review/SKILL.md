@@ -16,7 +16,7 @@ Judges the app against [docs/dev/scenarios.md](../../../docs/dev/scenarios.md), 
 
 ## Which server
 
-- **Mocked first: `npm run dev:mock` (`:58993`)** for clarity, layout, keyboard, consistency and the empty/error states the fixtures cover. Its storage is separate from the real prefs, so no seed/restore; start from Home with `alice`, `bob`, `carol` (`e2e/fixtures.ts`). A state the fixtures lack is a gap in `e2e/mockApi.ts` to report, not a reason to switch servers.
+- **Mocked first: `npm run dev:mock` (`:58993`)** for clarity, layout, keyboard, consistency and the empty/error states — `document.cookie = 'mock=no-itad'` (or `upstream-down`, `slow`) before a load switches one on; clear it after. Its storage is separate from the real prefs, so no seed/restore; start from Home with `alice`, `bob`, `carol` (`e2e/fixtures.ts`). A state the fixtures lack is a gap in `e2e/mockApi.ts` to report, not a reason to switch servers.
 - **Real: `npm run dev` (`:58991`)** only for what mocks can't show — loading and progress on a real library, freshness ages, real upstream failures — and for scenarios needing real data. Those visits need the demo state below.
 
 ## Demo state (real server only) — before the first page load

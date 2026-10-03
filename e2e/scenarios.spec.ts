@@ -253,6 +253,21 @@ test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }
   );
 });
 
+test('B1 edge: with no ITAD key, Bundles says why it is empty', async ({ page }) => {
+  await mockApi(page, { states: ['no-itad'] }); // registered last, so it answers first
+  await asPlayer(page, ALICE);
+  await page.goto('/bundles');
+  await expect(page.getByRole('main')).toContainText('IsThereAnyDeal');
+});
+
+test('D2: with upstreams down, every game is still listed', async ({ page }) => {
+  await mockApi(page, { states: ['upstream-down'] });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await expect(row(page, 'Hades')).toContainText('0.8'); // playtime comes from the library, not an upstream
+});
+
 test('F1: look up one game from the nav search, in place', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

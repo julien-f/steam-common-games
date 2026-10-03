@@ -1,6 +1,12 @@
 // Serves every /api call from fixtures.ts inside the browser (page.route), and blocks anything
 // off localhost — so an e2e run needs no backend, touches no database, and sends nothing to
 // Steam, HLTB, IsThereAnyDeal or ProtonDB. Response shapes follow server.js's routes.
+//
+// States reproduce what the fixtures alone can't (the `mock` cookie under `npm run dev:mock`,
+// `mockApi(page, { states })` in a test):
+//   no-itad        no ITAD_API_KEY: health says so, every ITAD route answers 503 as server.js does
+//   upstream-down  HLTB, ProtonDB and Steam reviews return nothing; ITAD routes answer 502
+//   slow           game details stream in one at a time (dev:mock only — page.route can't stream)
 import type { Page } from '@playwright/test';
 import { PLAYERS, CATALOG, BUNDLE, PICK_BUNDLE, game, type Player } from './fixtures.ts';
 
@@ -53,7 +59,8 @@ function details(appid: number) {
       releaseDate: g.release,
       comingSoon: false,
       metacritic: null,
-      capsule: null,
+      // Public store art; a test's browser blocks it (off localhost), dev:mock shows it.
+      capsule: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`,
       banner: null,
       movies: [],
       screenshots: [],
@@ -110,7 +117,8 @@ function bundleJson(b: typeof BUNDLE | typeof PICK_BUNDLE = BUNDLE) {
     details: 'https://example.invalid/itad-bundle',
     isMature: false,
     publish: new Date(NOW - 2 * 86400_000).toISOString(),
-    expiry: new Date(NOW + 10 * 86400_000).toISOString(),
+    // The pick-and-mix one ends within 48 h, for the Bundles page's "Ending soon".
+    expiry: new Date(NOW + (b === PICK_BUNDLE ? 20 * 3600_000 : 10 * 86400_000)).toISOString(),
     note: null,
     counts: { games: b.games.length, media: 0 },
     tiers: BUNDLE.tiers.map((price, i) => ({
@@ -135,12 +143,27 @@ const json = (body: unknown, status = 200): MockResponse => ({
   body: JSON.stringify(body),
 });
 
+const ITAD_ROUTE = /^\/api\/(bundles|game-bundles|prices)(\/|$)/;
+
 // Plain request in, response out: shared by mockApi() below and `npm run dev:mock` (vite.config.js).
-export function respond(method: string, url: URL, rawBody: string | null): MockResponse {
+export function respond(
+  method: string,
+  url: URL,
+  rawBody: string | null,
+  states: ReadonlySet<string> = new Set(),
+): MockResponse {
   const path = url.pathname;
   const body = rawBody ? JSON.parse(rawBody) : {};
 
-  if (path === '/api/health') return json({ ok: true, configured: true, itadConfigured: true, cache: { entries: 0 } });
+  if (states.has('no-itad') && ITAD_ROUTE.test(path))
+    return json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' }, 503);
+  if (states.has('upstream-down') && ITAD_ROUTE.test(path))
+    return json({ error: 'IsThereAnyDeal request failed (mock: upstream-down)' }, 502);
+  const detailsFor = (appid: number) =>
+    states.has('upstream-down') ? { ...details(appid), rating: null, hltb: null, protondb: null } : details(appid);
+
+  if (path === '/api/health')
+    return json({ ok: true, configured: true, itadConfigured: !states.has('no-itad'), cache: { entries: 0 } });
   if (path === '/api/me') return json({ steamid: null, prefs: null });
 
   if (path === '/api/common-games') {
@@ -171,7 +194,7 @@ export function respond(method: string, url: URL, rawBody: string | null): MockR
   if (path === '/api/friends') return json({ friends: [], unavailable: body.members ?? [], fetchedAt: NOW });
 
   if (path === '/api/game-details/stream') {
-    const lines = (body.games ?? []).map((g: { appid: number }) => `data: ${JSON.stringify(details(g.appid))}\n\n`);
+    const lines = (body.games ?? []).map((g: { appid: number }) => `data: ${JSON.stringify(detailsFor(g.appid))}\n\n`);
     return {
       status: 200,
       contentType: 'text/event-stream',
@@ -179,7 +202,7 @@ export function respond(method: string, url: URL, rawBody: string | null): MockR
     };
   }
   const one = path.match(/^\/api\/game-details\/(\d+)$/);
-  if (one) return json(details(Number(one[1])));
+  if (one) return json(detailsFor(Number(one[1])));
   if (/^\/api\/(game-news|achievements)\//.test(path)) return json({ items: [], news: [], achievements: [] });
 
   if (path === '/api/search-games') {
@@ -239,13 +262,13 @@ export function respond(method: string, url: URL, rawBody: string | null): MockR
   return json({ error: `e2e mock: no fixture for ${method} ${path}` }, 501);
 }
 
-export async function mockApi(page: Page): Promise<void> {
+export async function mockApi(page: Page, { states = [] as string[] } = {}): Promise<void> {
   await page.context().route(
     (url) => url.hostname !== 'localhost' && url.hostname !== '127.0.0.1',
     (route) => route.abort(),
   );
   await page.context().route('**/api/**', (route) => {
     const req = route.request();
-    return route.fulfill(respond(req.method(), new URL(req.url()), req.postData()));
+    return route.fulfill(respond(req.method(), new URL(req.url()), req.postData(), new Set(states)));
   });
 }

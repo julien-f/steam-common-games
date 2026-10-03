@@ -26,12 +26,22 @@ const mockApiPlugin = {
       const chunks = [];
       for await (const chunk of req) chunks.push(chunk);
       const { respond } = await server.ssrLoadModule(path.join(__dirname, 'e2e/mockApi.ts'));
+      // `document.cookie = 'mock=no-itad,slow'` in the page picks mockApi.ts's states.
+      const cookie = /(?:^|;\s*)mock=([^;]*)/.exec(req.headers.cookie ?? '');
+      const states = new Set(cookie ? decodeURIComponent(cookie[1]).split(',') : []);
       const { status, contentType, body } = respond(
         req.method,
         new URL(req.url, 'http://localhost'),
         chunks.length ? Buffer.concat(chunks).toString() : null,
+        states,
       );
-      res.writeHead(status, { 'Content-Type': contentType }).end(body);
+      res.writeHead(status, { 'Content-Type': contentType });
+      if (!states.has('slow') || contentType !== 'text/event-stream') return res.end(body);
+      for (const event of body.split(/(?<=\n\n)/)) {
+        res.write(event);
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+      res.end();
     });
   },
 };

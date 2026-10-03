@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Keyboard: `R` opens a random game from the list even with no panel open, and a **Skip to table** link (the first Tab stop) jumps past the nav and toolbar to the rows.
 - A bundle's page says what it adds for you: **New to you · 2 of 5 · ≈ €7.47 at best deals** — the games in it you don't own, and what they'd cost bought separately right now (a Steam package counted once, not once per game in it).
 - **Move to…** on every list and folder in Home's tree, to file a list into a folder (or out of one) after creating it.
-- `npm run dev:mock`: the app on `:58993` against the e2e fixtures, to work on the UI with no backend, upstream traffic or real prefs involved.
+- `npm run dev:mock`: the app on `:58993` against the e2e fixtures, to work on the UI with no backend, upstream traffic or real prefs involved. A `mock` cookie switches on states to review: no ITAD key, upstreams down, a slow details stream.
 - End-to-end tests (`npm run test:e2e`, Playwright) for the starred scenarios at desktop and phone widths, against mocked API data: no backend or upstream traffic needed.
 - A list's loading line has a progress bar and an estimate of the time left, and says why when a large library takes minutes (details for games not seen before are fetched a few at a time).
 - A combined list keeps a bundle's games after IsThereAnyDeal stops listing it: its last-known games move into a hidden list the formula then uses, removed once no list needs it. A bundle that fails to load for any other reason uses its last-known games too, instead of failing the whole list.
