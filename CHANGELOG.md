@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- An empty Wishlist or library says it's empty or private on Steam (e.g. "Carol's wishlist is empty, or private on Steam."), where the table would be, instead of "No games to show." above an empty table.
 - On a phone, the tables' checkboxes are 24 px instead of 13 px, so a tap beside one no longer misses it.
 - The ProtonDB filter and grouping name games with no report ("No report") apart from those ProtonDB didn't answer for, instead of one blank entry for both.
 - On a comparison, the side panel's Owned by lists every player who owns the game, with their playtime, instead of only your own account.

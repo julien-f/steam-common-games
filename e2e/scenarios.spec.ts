@@ -359,6 +359,14 @@ test('B1 edge: games ITAD lists under the first tier only show the tier range', 
   await expect(page.locator('#panel-body').getByTitle(/doesn't say which tier/)).toHaveText('€5.00–€12.00 tier');
 });
 
+test("B4 edge: a friend's empty wishlist says it may be private, where the table would be", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist?u=carol'); // Carol has no wishlist in the fixtures
+  const empty = page.getByText("Carol's wishlist is empty, or private on Steam.");
+  await expect(empty).toBeVisible();
+  await expect(page.locator('.dt-toolbar')).toBeHidden();
+});
+
 test('B2 edge: with no ITAD key, the Wishlist hides prices and says why', async ({ page }) => {
   await mockApi(page, { states: ['no-itad'] }); // registered last, so it answers first
   await asPlayer(page, ALICE);

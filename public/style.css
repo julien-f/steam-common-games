@@ -4855,3 +4855,15 @@ kbd {
   flex: 1;
   min-width: 0;
 }
+
+/* A list that loaded with no games: its message stands where the table would be. */
+.table-container--empty {
+  display: none;
+}
+.list-empty {
+  padding: 32px 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r);
+  color: var(--text1);
+  text-align: center;
+}

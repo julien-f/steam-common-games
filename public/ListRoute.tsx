@@ -642,6 +642,8 @@ export default function ListRoute() {
   // response carries no player data at all, so anything richer (presence, the 🔒 Private badge
   // Home's account card shows) would be available on one of these two kinds and not the other.
   const [heroAccount, setHeroAccount] = createSignal<AccountSlot | null>(null);
+  // Said where the table would be, for a list that loaded and has no games.
+  const [emptyText, setEmptyText] = createSignal('');
   // kind === 'bundle' only, alongside bundleTitle above — ITAD's own page for this bundle
   // (`details`) and the real shop/affiliate purchase link exactly as ITAD returned it (`url`,
   // never rewritten or stripped of tracking params — see docs/dev/integrations.md on why), and the
@@ -1847,6 +1849,7 @@ export default function ListRoute() {
     const kept = refresh ? new Map(rowsStore.map((r) => [r.appid, r])) : null;
     const keptSelection = refresh ? new Set(selectedRows().map((r) => r.appid)) : null;
     if (!kept) clearTable();
+    setEmptyText('');
     total = 0;
     loaded = 0;
     loadSamples = [];
@@ -2437,7 +2440,17 @@ export default function ListRoute() {
     // request outright ("Provide at least one game"), confirmed live the first time this path
     // was actually reachable through the UI.
     if (streamTargets.length === 0) {
-      setStatusText('No games to show.');
+      setStatusText('');
+      const account = heroAccount();
+      const whose = account ? `${accountDisplayLabel(account)}'s` : "This account's";
+      // Steam answers a private wishlist or library with an empty one, so the two read the same here.
+      setEmptyText(
+        kind === 'wishlist'
+          ? `${whose} wishlist is empty, or private on Steam.`
+          : kind === 'owned'
+            ? `${whose} library is empty, or private on Steam.`
+            : 'No games in this list.',
+      );
       return;
     }
 
@@ -3302,7 +3315,10 @@ export default function ListRoute() {
           </button>
         </div>
       </Show>
-      <div ref={tableContainer} class="table-container" />
+      <Show when={emptyText()}>
+        <p class="list-empty">{emptyText()}</p>
+      </Show>
+      <div ref={tableContainer} class="table-container" classList={{ 'table-container--empty': !!emptyText() }} />
       {/* The bundle's games with no Steam listing at all (a course, an asset pack, a shop-exclusive
           key) — there's nothing for the table to show about them (no rating/HLTB/price/ownership),
           but dropping them silently made the table look like the whole bundle. Collapsed by

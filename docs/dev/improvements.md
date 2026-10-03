@@ -57,7 +57,6 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 
 - **U34 · minor · A1** — first-visit Home doesn't say what the app does; the main button reads "Set as current account". One-line intro; "Look up".
 
-- **U66 · minor · B4** — a friend's empty Wishlist shows only "No games to show.", above the toolbar and apart from the empty table, with no hint it may be private on Steam. Say "Bob's wishlist is empty, or private on Steam", inside the table area.
 - **U44 · minor · B3** — a combined list built from a bundle drops the bundle's games with no Steam listing without a word; the bundle page lists them below its table. Say how many were left out, on the formula line.
 
 ## Consistency and polish
