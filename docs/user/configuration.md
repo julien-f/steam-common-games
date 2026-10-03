@@ -9,7 +9,7 @@ STEAM_API_KEY=your_key_here
 ```
 
 - **`STEAM_API_KEY`** — the only required setting. Get one at <https://steamcommunity.com/dev/apikey>. The server exits at startup with a clear message if it's missing.
-- **`ITAD_API_KEY`** — optional, enables bundle browsing and every price column. Without it those surfaces are hidden and the rest of the app runs normally. Get one at <https://isthereanydeal.com/apps/new/>.
+- **`ITAD_API_KEY`** — optional, enables bundle browsing and every price column. Without it those surfaces are hidden, with a line saying why, and the rest of the app runs normally. Get one at <https://isthereanydeal.com/apps/new/>.
 - **`HOST`/`PORT`** — where the server binds; `127.0.0.1:3000` by default.
 - **`DB_FILE`** — path to the SQLite database (`db.sqlite` by default). Set it empty to run entirely in memory.
 

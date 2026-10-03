@@ -296,6 +296,19 @@ test('B1 edge: games ITAD lists under the first tier only show the tier range', 
   await expect(page.locator('#panel-body').getByTitle(/doesn't say which tier/)).toHaveText('€5.00–€12.00 tier');
 });
 
+test('B2 edge: with no ITAD key, the Wishlist hides prices and says why', async ({ page }) => {
+  await mockApi(page, { states: ['no-itad'] }); // registered last, so it answers first
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await expect(rows(page)).toHaveCount(4);
+  const unavailable = "Prices aren't available on this instance: it isn't connected to IsThereAnyDeal.";
+  await expect(page.getByRole('main')).toContainText(unavailable);
+  await expect(page.locator('thead th').filter({ hasText: /^Best Deal/ })).toHaveCount(0);
+  await expect(page.locator('.list-stat-label').filter({ hasText: 'Prices' })).toHaveCount(0);
+  await row(page, 'It Takes Two').getByText('It Takes Two').click();
+  await expect(page.locator('#panel-section-price')).toContainText(unavailable);
+});
+
 test('D2: with upstreams down, every game is still listed', async ({ page }) => {
   await mockApi(page, { states: ['upstream-down'] });
   await asPlayer(page, ALICE);

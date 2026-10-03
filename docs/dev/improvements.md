@@ -41,8 +41,6 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 
 ## Bundles and prices
 
-- **U56 · minor · B4, B2, O1** — with no ITAD key, Wishlist still shows Best Deal/Discount columns of "—", a Prices tile with ↻, and the panel says "No pricing data available"; only /bundles says the instance isn't connected to IsThereAnyDeal. Reuse that message on the Prices tile and in the panel, or hide the price columns.
-
 ## Ranking
 
 - **U25 · minor · R1, F1** — the ranking card says "1.5h main story" where the table says 2.5 in "All (h)" (itself unclear). Pick one HLTB figure and label it. Still true on a Wishlist ranking (6.3h main story vs. 10.5 All (h)).

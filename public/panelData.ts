@@ -75,15 +75,21 @@ export function createPanelDataCache() {
   // Lazily resolved once per session rather than per-call — a plain GET /api/health, cheap to
   // over-share across every game a price is fetched for.
   let itadConfiguredPromise: Promise<boolean> | null = null;
+  let itadOff = false; // known not configured, as opposed to not yet asked or a failed /api/health
   function isItadConfigured(): Promise<boolean> {
     if (!itadConfiguredPromise) {
       itadConfiguredPromise = fetch('/api/health')
         .then((r) => r.json())
-        .then((d) => !!d.itadConfigured)
+        .then((d) => {
+          itadOff = !d.itadConfigured;
+          return !!d.itadConfigured;
+        })
         .catch(() => false);
     }
     return itadConfiguredPromise;
   }
+  // Read once a price has settled to null, by then the check has resolved.
+  const isItadOff = (): boolean => itadOff;
 
   // News is deliberately NOT part of the host route's rating/HLTB/meta/tags stream (see
   // server.js's newsLimit comment for why) — it's fetched per game, on demand, the first time
@@ -289,6 +295,7 @@ export function createPanelDataCache() {
     fetchBundles,
     peekDlc,
     fetchDlc,
+    isItadOff,
   };
 }
 
@@ -303,3 +310,4 @@ export const peekBundles = defaultCache.peekBundles;
 export const fetchBundles = defaultCache.fetchBundles;
 export const peekDlc = defaultCache.peekDlc;
 export const fetchDlc = defaultCache.fetchDlc;
+export const isItadOff = defaultCache.isItadOff;

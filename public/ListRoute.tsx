@@ -174,7 +174,7 @@ import {
 import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { rememberBundle } from './bundleSnapshots.ts';
 import { fanaticalBuyUrl, FANATICAL_BOOKMARKLET } from './fanaticalPicks.ts';
-import { postPrices, applyPriceInfo, nullMissingPriceFields, nullAllPriceFields } from './priceLoading.ts';
+import { postPrices, applyPriceInfo, nullMissingPriceFields, PRICES_UNAVAILABLE } from './priceLoading.ts';
 import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { openPrefsPopover } from './prefsPopover.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
@@ -442,6 +442,8 @@ const RANKED_DEFAULT_VISIBLE = ['rank', ...RECENT_DEFAULT_VISIBLE];
 const USER_PRICED_COLUMNS = insertColumnsAfter(USER_COLUMNS, 'ownershipStatus', ...PRICE_COLUMNS);
 const RANKED_PRICED_COLUMNS = insertColumnsAfter(RANKED_COLUMNS, 'ownershipStatus', ...PRICE_COLUMNS);
 const PRICED_DEFAULT_VISIBLE = ['bestDealPrice', 'bestDealCut'];
+const PRICE_KEYS = new Set(PRICE_COLUMNS.map((c) => c.key));
+const WISHLIST_NOPRICE_COLUMNS = WISHLIST_COLUMNS.filter((c) => !PRICE_KEYS.has(c.key));
 const RANKED_DEFAULT_SORT: SortEntry[] = [{ key: 'rank', dir: 'asc' }];
 
 const DEFAULT_SORT: SortEntry[] = [{ key: 'steamdbRating', dir: 'desc' }];
@@ -1457,17 +1459,15 @@ export default function ListRoute() {
     .then((res) => res.json())
     .then((data) => !!data.itadConfigured)
     .catch(() => false);
+  const [itadOff, setItadOff] = createSignal(false);
+  void itadConfiguredPromise.then((ok) => setItadOff(!ok));
 
   async function loadWishlistPrices(items: { appid: number }[], gen: number, force = false): Promise<void> {
     setPriceStatusText('');
     const configured = await itadConfiguredPromise;
     if (loadGuard.isStale(gen)) return;
     if (!configured) {
-      batch(() => {
-        for (const item of items) {
-          rowStore.mutateRow(item.appid, (draft) => nullAllPriceFields(draft));
-        }
-      });
+      setPriceStatusText(PRICES_UNAVAILABLE); // its columns are hidden, see load()
       return;
     }
 
@@ -2152,15 +2152,20 @@ export default function ListRoute() {
     rowStore.load(initialRows);
     total = initialRows.length;
 
+    // Without IsThereAnyDeal, no price columns at all rather than a column of "—" (the status line says why).
+    const pricesShown = hasPrices() && (await itadConfiguredPromise);
+    if (loadGuard.isStale(gen)) return;
     {
       const isRanked = userList()?.kind === 'ranked';
-      const priced = kind === 'user' && hasPrices();
+      const priced = kind === 'user' && pricesShown;
       const columns = (isRanked
         ? priced
           ? RANKED_PRICED_COLUMNS
           : RANKED_COLUMNS
         : kind === 'wishlist'
-          ? WISHLIST_COLUMNS
+          ? pricesShown
+            ? WISHLIST_COLUMNS
+            : WISHLIST_NOPRICE_COLUMNS
           : kind === 'bundle'
             ? BUNDLE_COLUMNS
             : kind === 'user'
@@ -2173,7 +2178,7 @@ export default function ListRoute() {
       const defaultVisible = isRanked
         ? [...RANKED_DEFAULT_VISIBLE, ...(priced ? PRICED_DEFAULT_VISIBLE : [])]
         : kind === 'wishlist'
-          ? WISHLIST_DEFAULT_VISIBLE
+          ? WISHLIST_DEFAULT_VISIBLE.filter((key) => pricesShown || !PRICE_KEYS.has(key))
           : kind === 'bundle'
             ? BUNDLE_DEFAULT_VISIBLE
             : kind === 'user' && priced
@@ -2565,7 +2570,7 @@ export default function ListRoute() {
         disabled: refreshing(),
       });
     }
-    if (hasPrices()) tiles.push(priceTile());
+    if (hasPrices() && !itadOff()) tiles.push(priceTile());
     const list = combineList();
     if (list) {
       if (list.kind === 'dynamic') {

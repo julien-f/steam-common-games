@@ -12,6 +12,9 @@
 // Both callers already import discountPct for their own column definitions anyway.
 import type { PriceFields } from './types.ts';
 
+// Same wording as the server's 503 for /bundles (server.js), so the two read as one cause.
+export const PRICES_UNAVAILABLE = "Prices aren't available on this instance: it isn't connected to IsThereAnyDeal.";
+
 export const PRICE_FIELDS = [
   'steamRegular',
   'bestDealPrice',

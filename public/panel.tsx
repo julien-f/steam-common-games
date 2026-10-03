@@ -31,6 +31,7 @@ import {
   fetchBundles,
   peekDlc,
   fetchDlc,
+  isItadOff,
 } from './panelData.ts';
 import type {
   DlcEntry,
@@ -47,6 +48,7 @@ import { getStoredRegion, resolveRegion } from './region.ts';
 import { nextHopHistory } from './panelHistory.ts';
 import type { PanelHistoryEntry } from './panelHistory.ts';
 import { setGameTitle } from './pageTitle.ts';
+import { PRICES_UNAVAILABLE } from './priceLoading.ts';
 import { TIER_RANGE_TITLE } from './bundleData.ts';
 import { withAccountParam } from './urlState.ts';
 import { copyWithFeedback } from './clipboard.ts';
@@ -1504,7 +1506,12 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
                 IsThereAnyDeal ↗
               </a>
             </div>
-            <Show when={deal()} fallback={<div class="panel-no-data">No pricing data available.</div>}>
+            <Show
+              when={deal()}
+              fallback={
+                <div class="panel-no-data">{isItadOff() ? PRICES_UNAVAILABLE : 'No pricing data available.'}</div>
+              }
+            >
               <Show
                 when={shopUrl()}
                 fallback={
