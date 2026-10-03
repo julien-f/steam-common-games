@@ -39,7 +39,7 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 
 ## Ranking
 
-- **U25 · minor · R1, F1** — the ranking card says "1.5h main story" where the table says 2.5 in "All (h)" (itself unclear). Pick one HLTB figure and label it. Still true on a Wishlist ranking (6.3h main story vs. 10.5 All (h)).
+- **U25 · minor · R1, F1** — the ranking card says "1.5h main story" where the table says 2.5 in "All (h)" (itself unclear). Pick one HLTB figure and label it. Still true on a Wishlist ranking (6.3h main story vs. 10.5 All (h)). The card also prints it unrounded and unlabelled ("2011 · Action · Adventure · 63.5999999999").
 
 ## Keyboard and accessibility
 
@@ -62,7 +62,6 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 ## Consistency and polish
 
 - **U39 · polish** — `favicon.ico` 404s; nav items shift sideways between routes; missing thumbnails have no placeholder; Released and Added use different date formats, as do the Bundles list (`2026-10-13 21:10`) and a bundle's page (`Oct 13, 09:10 PM`); "Demo" pills look like primary buttons; the "Updated" age has very low contrast; Compare's op `<select>` is an unstyled native white control; wishlisted/owned name colours have no legend (still true in Recently Looked Up).
-- **U69 · polish · L4, R2** — "Added 2 game(s) to new list…" and "≈ 1 comparisons left". Pluralize.
 
 ## Review tooling
 

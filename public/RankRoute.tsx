@@ -346,7 +346,7 @@ export default function RankRoute() {
                   <span>
                     {p().ranked} / {p().ranked + p().pending} ranked
                     {p().excluded ? ` · ${p().excluded} excluded` : ''}
-                    {p().pending ? ` · ≈ ${p().remaining} comparisons left` : ''}
+                    {p().pending ? ` · ≈ ${p().remaining} comparison${p().remaining === 1 ? '' : 's'} left` : ''}
                   </span>
                 </>
               }
@@ -356,7 +356,7 @@ export default function RankRoute() {
                   <progress max={f().size} value={f().size - p().pending} />
                   <span>
                     {p().pending} of {f().size} chosen games left
-                    {p().pending ? ` · ≈ ${p().remaining} comparisons` : ''}
+                    {p().pending ? ` · ≈ ${p().remaining} comparison${p().remaining === 1 ? '' : 's'}` : ''}
                   </span>
                 </>
               )}

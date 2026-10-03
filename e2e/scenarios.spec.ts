@@ -144,7 +144,7 @@ test('L1: select games, add them to a new list, open it', async ({ page }) => {
   await page.getByRole('textbox', { name: 'New list name' }).fill('To play with Bob');
   await page.keyboard.press('Enter');
 
-  const toast = page.getByRole('status').filter({ hasText: 'Added 2 game(s) to new list "To play with Bob"' });
+  const toast = page.getByRole('status').filter({ hasText: 'Added 2 games to new list "To play with Bob"' });
   await expect(toast).toBeVisible();
   await toast.getByRole('link', { name: 'Open list' }).click();
   await expect(page.getByRole('heading', { name: 'To play with Bob' })).toBeVisible();

@@ -927,7 +927,7 @@ export default function ListRoute() {
     if (!state) return;
     const rows = selectedRows();
     applyRanking(rows.reduce((s, row) => exclude(s, row.appid), state));
-    showSelectionStatus(`Excluded ${rows.length} game(s) from the ranking.`);
+    showSelectionStatus(`Excluded ${rows.length} game${rows.length === 1 ? '' : 's'} from the ranking.`);
     table?.selection.clear();
   }
   // ── kind === 'shared' ─────────────────────────────────────────────────────────────────────
@@ -1126,11 +1126,17 @@ export default function ListRoute() {
       if (!name) return;
       const list = createList({ name, kind: 'manual', appids });
       refreshManualLists();
-      showSelectionStatus(`Added ${appids.length} game(s) to new list "${list.name}".`, list.id);
+      showSelectionStatus(
+        `Added ${appids.length} game${appids.length === 1 ? '' : 's'} to new list "${list.name}".`,
+        list.id,
+      );
     } else {
       const list = getList(target);
       addAppidsToList(target, appids);
-      showSelectionStatus(`Added ${appids.length} game(s) to "${list?.name ?? 'list'}".`, target);
+      showSelectionStatus(
+        `Added ${appids.length} game${appids.length === 1 ? '' : 's'} to "${list?.name ?? 'list'}".`,
+        target,
+      );
     }
     setAddTarget('');
     setNewListName('');
@@ -1155,7 +1161,7 @@ export default function ListRoute() {
     const appids = rows.map((r) => r.appid);
     removeAppidsFromList(list.id, appids);
     await load();
-    showSelectionStatus(`Removed ${appids.length} game(s) from "${list.name}".`);
+    showSelectionStatus(`Removed ${appids.length} game${appids.length === 1 ? '' : 's'} from "${list.name}".`);
   }
   let total = 0;
   let loaded = 0;
@@ -2740,13 +2746,14 @@ export default function ListRoute() {
           label: 'Ranked',
           value: `${p.ranked} / ${p.ranked + p.pending}`,
           sub: chosen
-            ? `${chosen.pending} chosen left · ≈ ${chosen.remaining} comparisons`
+            ? `${chosen.pending} chosen left · ≈ ${chosen.remaining} comparison${chosen.remaining === 1 ? '' : 's'}`
             : p.pending
-              ? `≈ ${p.remaining} comparisons left`
+              ? `≈ ${p.remaining} comparison${p.remaining === 1 ? '' : 's'} left`
               : 'Complete',
           title:
-            [chosen && p.pending ? `≈ ${p.remaining} comparisons for all` : '', excluded].filter(Boolean).join(' · ') ||
-            undefined,
+            [chosen && p.pending ? `≈ ${p.remaining} comparison${p.remaining === 1 ? '' : 's'} for all` : '', excluded]
+              .filter(Boolean)
+              .join(' · ') || undefined,
         });
       }
     }
