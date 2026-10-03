@@ -124,7 +124,7 @@ Each scenario: **who / goal**, **steps** as a user would take them, **expect** �
 - **Who / goal**: order my wishlist, or a bundle's games, by how much I want them.
 - **Steps**: Wishlist → **🏆 Rank this list** → answer using ℹ Details (trailer, rating, HLTB) since I haven't played them → sort the ranked list by Rank next to price columns.
 - **Expect**: the ranked list shows prices and badges like its source; buying a game (it leaves the Wishlist) drops it from the ranking.
-- **Edges**: "Haven't played" as the exclude option makes no sense here — is the wording right?
+- **Edges**: the exclude option reads "Not interested" here, not "Haven't played".
 
 ### R3 Share my ranking
 

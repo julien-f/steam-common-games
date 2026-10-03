@@ -62,6 +62,9 @@ export default function RankRoute() {
   const [title, setTitle] = createSignal('');
   const [status, setStatus] = createSignal('Resolving list…');
   const [source, setSource] = createSignal<Set<number> | null>(null);
+  // "Haven't played" only fits games you own; a wishlist or a bundle is about wanting them.
+  const excludeLabel = (): string =>
+    getList(params.listId!)?.source?.kind === 'account-owned' ? "Haven't played — exclude" : 'Not interested — exclude';
   const [state, setState] = createSignal<RankingState | null>(null);
   const [pair, setPair] = createSignal<RankingPair | null>(null);
   const [undoStack, setUndoStack] = createSignal<RankingState[]>([]);
@@ -304,7 +307,7 @@ export default function RankRoute() {
             title="Leave this game out of the ranking"
             onClick={() => respond(`exclude-${side}`)}
           >
-            Haven't played — exclude
+            {excludeLabel()}
           </button>
         </div>
       </div>

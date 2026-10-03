@@ -229,6 +229,14 @@ test("R3 edge: a ranked list's Share view says why it can't be shared", async ({
   await expect(share).toHaveAttribute('title', /can't be shared/);
 });
 
+test("R2 edge: ranking games you don't own offers 'Not interested', not 'Haven't played'", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await page.getByRole('button', { name: /Rank this list/ }).click();
+  await expect(page.getByRole('button', { name: 'Not interested — exclude' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: "Haven't played — exclude" })).toHaveCount(0);
+});
+
 test('R2 edge: a Wishlist ranking keeps its price columns', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/wishlist');

@@ -40,7 +40,6 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 ## Ranking
 
 - **U25 · minor · R1, F1** — the ranking card says "1.5h main story" where the table says 2.5 in "All (h)" (itself unclear). Pick one HLTB figure and label it. Still true on a Wishlist ranking (6.3h main story vs. 10.5 All (h)).
-- **U63 · minor · R2** — ranking a Wishlist offers "Haven't played — exclude" for games the user doesn't own. Say "Not interested — exclude" when the source isn't Owned.
 - **U64 · minor · R2** — 🏆 Rank this list a second time silently creates another "Ranking of Alice — Wishlist"; Home then lists two with the same name. Offer to open the existing ranking of this source.
 
 ## Keyboard and accessibility
