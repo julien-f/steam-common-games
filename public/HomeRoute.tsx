@@ -438,7 +438,8 @@ export default function HomeRoute() {
             if (target) handleMove(props.row, target);
           }}
         >
-          <option value="" disabled>
+          {/* Without `selected`, the browser skips this disabled option and shows the first folder as already picked. */}
+          <option value="" disabled selected>
             Move to…
           </option>
           <For each={moveTargets(props.row)}>{(t) => <option value={t.id}>{t.label}</option>}</For>

@@ -29,7 +29,6 @@ UX backlog from the 2026-09-27 and 2026-10-03 (mocked, `npm run dev:mock`) revie
 ## Lists and selection
 
 - **U11 · minor · F3** — Filter popover: category pane too narrow (scrolls sideways); the range shows no field label and raw floats (`0 – 99.0202584`, `380.2666…`); "never played" needs max = 0 and then reads "Played (h): 0–0". Label and round; add a "never played" preset.
-- **U45 · major · L1** — Home's **Move to…** select shows the first folder as already chosen (its `value=""` matches only the disabled placeholder, so the browser falls back to the first enabled option). Picking that folder fires no change event: with one folder, a list can't be moved into it at all. Make the placeholder selectable at rest (e.g. `hidden` rather than `disabled`, or set `selected` on it).
 - **U47 · minor · L1, B1** — checking the first row inserts the selection toolbar above the table, pushing every row ~65 px down under the pointer; the next click can land on the wrong row. Reserve its space or float it.
 - **U13 · minor · L2, B3** — a dynamic list built from the Wishlist loses its price columns. Keep them when a source has them.
 

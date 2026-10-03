@@ -123,6 +123,21 @@ test('L1: select games, add them to a new list, open it', async ({ page }) => {
   await expect(rows(page)).toHaveCount(2);
 });
 
+test('L1 edge: a list moves into the only folder', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  page.once('dialog', (d) => d.accept('Shortlist'));
+  await page.getByRole('button', { name: '+ New list' }).click();
+  page.once('dialog', (d) => d.accept('Weekend'));
+  await page.getByRole('button', { name: '+ New folder' }).click();
+
+  const move = page.getByRole('combobox', { name: 'Move Shortlist to…' });
+  await expect(move).toHaveValue(''); // showing "Move to…", so picking the folder is a change
+  await move.selectOption({ label: '📁 Weekend' });
+  await expect(move.locator('option')).toContainText(['Move to…', 'Top level']); // now inside Weekend
+  await expect(move).toHaveValue('');
+});
+
 test('R1: rank chosen games, stop, resume on the same ones', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
