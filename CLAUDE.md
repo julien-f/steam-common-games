@@ -87,4 +87,4 @@ After making changes:
 
 ## Changelog
 
-Every code change updates `CHANGELOG.md`, in the same commit as the code it documents — never a separate follow-up commit. Add entries under `## [Unreleased]` (create the section if it doesn't exist) using [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format (Added / Changed / Fixed / Removed), each subsection once — `npm run check` fails on a repeat.
+Every code change updates `CHANGELOG.md`, in the same commit as the code it documents — never a separate follow-up commit. Add entries under `## [Unreleased]` (create the section if it doesn't exist) using [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format (Added / Changed / Fixed / Removed), each subsection once — `npm run check` fails on a repeat. One user-facing line per entry, no implementation detail; `check` fails an entry over 400 characters.
