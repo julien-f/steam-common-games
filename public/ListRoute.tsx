@@ -143,6 +143,7 @@ import {
   accountIdentifiers,
   accountIdFor,
   accountDisplayLabel,
+  getMyAccount,
   ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
 import { getAccountOverrideState, accountOverrideStatusText } from './accountOverride.ts';
@@ -1948,8 +1949,19 @@ export default function ListRoute() {
       // two orders disagreeing would make one URL render two ways: as typed on the way in, and
       // re-sorted for anyone opening the link afterwards.
       accounts.sort((a, b) => a.id.localeCompare(b.id, undefined, { sensitivity: 'base' }));
-      setCompareAccounts(accounts);
-      setListTitle(accounts.map(accountDisplayLabel).join(' vs. '));
+      // The same player twice compares nothing; said rather than shown as a one-player "comparison".
+      const twice = accounts.find((a, i) => accounts.findIndex((b) => b.id === a.id) !== i);
+      if (twice) {
+        setListTitle('Compare libraries');
+        setStatusText(`${accountDisplayLabel(twice)} is in two player boxes — compare two different players.`);
+        setEditingPlayers(true);
+        return;
+      }
+      // The URL stays sorted (one address per comparison), but the viewer's own ★ account reads first.
+      const myId = getMyAccount()?.id;
+      const shown = [...accounts].sort((a, b) => Number(b.id === myId) - Number(a.id === myId));
+      setCompareAccounts(shown);
+      setListTitle(shown.map(accountDisplayLabel).join(' vs. '));
       // Canonicalize the address to the resolved ids, exactly as the old Comparison page did: a
       // link built from vanity names would otherwise point somewhere else the day one of them is
       // changed, and two spellings of one comparison would be two history entries. Never stored
@@ -1968,7 +1980,7 @@ export default function ListRoute() {
         updatedAt: 0,
         kind: 'dynamic',
         op: compareOp(),
-        sources: accounts.map((account) => ({ kind: 'account-owned' as const, accountId: account.id })),
+        sources: shown.map((account) => ({ kind: 'account-owned' as const, accountId: account.id })),
       };
       setCompareList(list);
       setStatusText('Comparing libraries…');

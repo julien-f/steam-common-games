@@ -2,7 +2,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mockApi } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
-import { ALICE, BUNDLE } from './fixtures.ts';
+import { ALICE, BOB, BUNDLE } from './fixtures.ts';
 
 let pageErrors: string[];
 test.beforeEach(async ({ page }) => {
@@ -115,6 +115,18 @@ test('C1: compare three players — one table grouped from "all" to "only one"',
   expect(await page.evaluate(() => localStorage.getItem('steam.isonoe.net:prefs') ?? '')).not.toContain(
     'currentAccount',
   );
+});
+
+test('C1 edge: my account comes first, is prefilled, and only once', async ({ page }) => {
+  await asPlayer(page, BOB); // Bob's steamid sorts after Alice's
+  await page.goto('/lists/compare?u=alice&u=bob');
+  await expect(page.getByRole('heading', { name: 'Bob vs. Alice' })).toBeVisible();
+
+  await page.goto('/lists/compare?u=bob&u=bob');
+  await expect(page.getByRole('main')).toContainText('Bob is in two player boxes');
+
+  await page.goto('/lists/compare');
+  await expect(page.locator('.compare-form')).toContainText('Bob');
 });
 
 test('C1 edge: an unknown player is named, and the others still compare', async ({ page }) => {

@@ -30,7 +30,6 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 
 ## Comparing
 
-- **U17 · minor · C1** — Player 1 isn't prefilled with my ★ account; the same account twice is accepted silently; the URL is rewritten with players reordered (me no longer first).
 - **U51 · polish · C1** — the membership chip reads "↑ Owned by × ⊞ ×": two identical × (remove sort, remove group) side by side. The hero also states the mode twice, as a badge and as the select beside it.
 - **U71 · minor · C6** — a comparison has no Played column in any mode, not even mine (`PLAYTIME_COLUMN` is only on Owned and user lists), though the server sends per-account playtime. Add per-player Played columns (C6's ◇).
 - **U19 · minor · C3** — a saved comparison's auto-name ("X — Owned + Y — Owned — grouped by membership") doesn't match the Compare heading ("X vs. Y").

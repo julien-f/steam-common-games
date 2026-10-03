@@ -73,6 +73,9 @@ function knownAccounts(): KnownAccount[] {
 // single field makes it look like the account picker it isn't.
 function seedSlots(initial: string[][], known: KnownAccount[]): Slot[] {
   const seeded = slotsFromIdentifiers(initial, known);
+  // A new comparison starts from my ★ account: it's in nearly every one.
+  const me = known.find((account) => account.starred);
+  if (!seeded.length && me) seeded.push([{ kind: 'account', account: me }]);
   while (seeded.length < 2) seeded.push([]);
   return seeded;
 }
