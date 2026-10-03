@@ -349,13 +349,25 @@ function renderTierPrice(v: unknown, row: Record<string, any>): Node {
         ? 'Varies'
         : v === 0
           ? 'Free'
-          : `${formatMoney(Number(v), row.tierCurrency)}${row.tierPerGame ? '/game' : ''}`;
+          : row.tierPriceMax != null
+            ? `${formatMoney(Number(v), row.tierCurrency)}–${formatMoney(row.tierPriceMax, row.tierCurrency)}`
+            : `${formatMoney(Number(v), row.tierCurrency)}${row.tierPerGame ? '/game' : ''}`;
   const pkg: BundlePackage | null | undefined = row.bundlePackage;
-  if (!pkg) return document.createTextNode(price);
+  const rangeTitle =
+    row.tierPriceMax != null
+      ? "IsThereAnyDeal doesn't say which tier holds this game: it lists none under the pricier ones"
+      : null;
+  if (!pkg) {
+    if (!rangeTitle) return document.createTextNode(price);
+    const span = document.createElement('span');
+    span.title = rangeTitle;
+    span.textContent = price;
+    return span;
+  }
   // A package-mate's pick is its lead row's, so only the lead carries the per-game rate.
   const wrap = document.createElement('span');
   wrap.className = 'tier-package';
-  wrap.title = `Part of ${pkg.title}: ${pkg.size} games bought together${row.tierPerGame ? ', as one pick' : ''}`;
+  wrap.title = `Part of ${pkg.title}: ${pkg.size} games bought together${row.tierPerGame ? ', as one pick' : ''}${rangeTitle ? `. ${rangeTitle}` : ''}`;
   wrap.append(row.tierPerGame && !pkg.lead ? 'included' : price);
   const note = document.createElement('small');
   note.textContent = `package · ${pkg.size} games`;
@@ -2012,6 +2024,7 @@ export default function ListRoute() {
           tierPrice: g.tierPrice ?? (entryRate ? entryRate.amount : null),
           tierCurrency: g.tierPrice == null && entryRate ? entryRate.currency : g.tierCurrency,
           tierPerGame: g.tierPrice == null && !!entryRate,
+          tierPriceMax: g.tierPriceMax,
           bundlePackage: packages.get(g.appid) ?? null,
           addon: g.addon,
           steamRegular: undefined,

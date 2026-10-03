@@ -7,6 +7,7 @@
 //   no-itad        no ITAD_API_KEY: health says so, every ITAD route answers 503 as server.js does
 //   upstream-down  HLTB, ProtonDB and Steam reviews return nothing; ITAD routes answer 502
 //   slow           game details stream in one at a time (dev:mock only — page.route can't stream)
+//   untiered       the Co-op Pack lists every game in its first tier, the pricier one empty (as ITAD sends some)
 import type { Page } from '@playwright/test';
 import { PLAYERS, CATALOG, BUNDLE, PICK_BUNDLE, game, type Player } from './fixtures.ts';
 
@@ -221,21 +222,30 @@ export function respond(
   }
 
   const bundleGames = [...BUNDLE.games, ...PICK_BUNDLE.games];
+  const coopBundleJson = () => {
+    const b = bundleJson();
+    if (!states.has('untiered')) return b;
+    const [first, ...rest] = b.tiers;
+    return {
+      ...b,
+      tiers: [{ ...first, games: b.tiers.flatMap((t) => t.games) }, ...rest.map((t) => ({ ...t, games: [] }))],
+    };
+  };
   if (path === '/api/bundles') {
-    return json({ bundles: [bundleJson(), pickBundleJson()], offset: 0, limit: 50, fetchedAt: NOW });
+    return json({ bundles: [coopBundleJson(), pickBundleJson()], offset: 0, limit: 50, fetchedAt: NOW });
   }
   if (path === '/api/bundles/resolve') {
     return json({ appids: Object.fromEntries(bundleGames.map((g) => [g.gid, g.appid])) });
   }
   const bundle = path.match(/^\/api\/bundles\/(\d+)$/);
   if (bundle) {
-    const found = { [BUNDLE.id]: bundleJson, [PICK_BUNDLE.id]: pickBundleJson }[Number(bundle[1])];
+    const found = { [BUNDLE.id]: coopBundleJson, [PICK_BUNDLE.id]: pickBundleJson }[Number(bundle[1])];
     return found ? json({ bundle: found(), fetchedAt: NOW }) : json({ error: 'Bundle not found' }, 404);
   }
   const inBundles = path.match(/^\/api\/game-bundles\/(\d+)$/);
   if (inBundles) {
     const appid = Number(inBundles[1]);
-    const bundles = [bundleJson(), pickBundleJson()].flatMap((b) => {
+    const bundles = [coopBundleJson(), pickBundleJson()].flatMap((b) => {
       const tier = b.tiers.find((t) =>
         t.games.some((g) => [bundleGames.find((x) => x.gid === g.id)?.appid].flat().includes(appid)),
       );

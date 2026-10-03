@@ -19,6 +19,8 @@ export interface FlatGame {
   assets: { boxart?: string } | null;
   tierPrice: number | null;
   tierCurrency: string | null;
+  // Set when ITAD lists pricier tiers with no games: this game may sit in any of them, up to this price.
+  tierPriceMax: number | null;
   addon: boolean;
 }
 
@@ -59,7 +61,13 @@ export interface Bundle {
 // no explicit min() needed).
 export function flattenBundleGames(bundle: Bundle): FlatGame[] {
   const seen = new Map<string, FlatGame>();
-  for (const tier of bundle.tiers || []) {
+  const tiers = bundle.tiers || [];
+  const lastListed = tiers.findLastIndex((t) => (t.games || []).length > 0);
+  const emptyAbove = tiers
+    .slice(lastListed + 1)
+    .flatMap((t) => (t.price && !(t.games || []).length ? [t.price.amount] : []));
+  const rangeMax = emptyAbove.length ? Math.max(...emptyAbove) : null;
+  tiers.forEach((tier, i) => {
     for (const g of tier.games || []) {
       if (seen.has(g.id)) continue;
       seen.set(g.id, {
@@ -70,10 +78,12 @@ export function flattenBundleGames(bundle: Bundle): FlatGame[] {
         assets: g.assets ?? null,
         tierPrice: tier.price ? tier.price.amount : null,
         tierCurrency: tier.price ? tier.price.currency : null,
+        tierPriceMax:
+          i === lastListed && tier.price && rangeMax != null && rangeMax > tier.price.amount ? rangeMax : null,
         addon: !!tier.addon,
       });
     }
-  }
+  });
   return [...seen.values()];
 }
 

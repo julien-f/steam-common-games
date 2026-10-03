@@ -124,6 +124,7 @@ export interface Game extends PriceFields {
   dateAdded?: string | null;
   tierPrice?: number | null;
   tierCurrency?: string | null;
+  tierPriceMax?: number | null;
   bundlePackage?: BundlePackage | null;
   tierPerGame?: boolean; // tierPrice is a pick-and-mix bundle's per-game rate at the current selection
   addon?: boolean;

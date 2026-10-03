@@ -59,6 +59,31 @@ test('flattenBundleGames: a null tier price (e.g. a "Build Your Own" pick-and-mi
   assert.equal(flat[0].tierCurrency, null);
 });
 
+test('flattenBundleGames: priced tiers ITAD left empty make the last listed tier a price range', () => {
+  const bundle = {
+    tiers: [
+      { price: { amount: 5, currency: 'USD' }, games: [game('a')], addon: false },
+      { price: { amount: 10, currency: 'USD' }, games: [game('b')], addon: false },
+      { price: { amount: 15, currency: 'USD' }, games: [], addon: false },
+      { price: { amount: 20, currency: 'USD' }, games: [], addon: false },
+    ],
+  };
+  const [a, b] = flattenBundleGames(bundle);
+  assert.equal(a.tierPriceMax, null);
+  assert.equal(b.tierPrice, 10);
+  assert.equal(b.tierPriceMax, 20);
+});
+
+test('flattenBundleGames: a trailing empty unpriced tier leaves the price exact', () => {
+  const bundle = {
+    tiers: [
+      { price: { amount: 5, currency: 'USD' }, games: [game('a')], addon: false },
+      { price: null, games: [], addon: false },
+    ],
+  };
+  assert.equal(flattenBundleGames(bundle)[0].tierPriceMax, null);
+});
+
 test('flattenBundleGames: marks addon games from an addon tier', () => {
   const bundle = { tiers: [{ price: { amount: 100, currency: 'USD' }, games: [game('a')], addon: true }] };
   assert.equal(flattenBundleGames(bundle)[0].addon, true);

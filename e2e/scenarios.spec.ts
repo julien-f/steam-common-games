@@ -2,7 +2,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mockApi } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
-import { ALICE } from './fixtures.ts';
+import { ALICE, BUNDLE } from './fixtures.ts';
 
 let pageErrors: string[];
 test.beforeEach(async ({ page }) => {
@@ -259,6 +259,16 @@ test('B1 edge: with no ITAD key, Bundles says why it is empty', async ({ page })
   await page.goto('/bundles');
   await expect(page.getByRole('main')).toContainText("Bundles and prices aren't available on this instance");
   await expect(page.getByRole('main')).not.toContainText(/ITAD_API_KEY|Error:/);
+});
+
+test('B1 edge: games ITAD lists under the first tier only show the tier range', async ({ page }) => {
+  await mockApi(page, { states: ['untiered'] });
+  await asPlayer(page, ALICE);
+  await page.goto(`/lists/bundle/${BUNDLE.id}`);
+  await expect(rows(page)).toHaveCount(4);
+  // The pricier tier lists no games, so any of them may sit in it.
+  const price = row(page, 'Overcooked! 2').getByTitle(/doesn't say which tier/);
+  await expect(price).toHaveText('€5.00–€12.00');
 });
 
 test('D2: with upstreams down, every game is still listed', async ({ page }) => {
