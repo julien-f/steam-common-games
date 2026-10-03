@@ -41,6 +41,18 @@ export type PanelNews = NewsItem[] | null;
 export type PanelAchievements = Achievements | null;
 export type PanelPrice = PriceFields | null;
 export type PanelDlc = DlcEntry[] | null;
+export type PanelBundles = GameBundle[] | null;
+
+// One current bundle the game is in — GET /api/game-bundles/:appid (lib/itad.js's extractGameBundles).
+export interface GameBundle {
+  id: number;
+  title: string;
+  shop: string | null;
+  url: string | null;
+  expiry: string | null;
+  tierPrice: number | null;
+  tierCurrency: string | null;
+}
 
 export interface DlcEntry {
   appid: number;
@@ -55,6 +67,7 @@ export function createPanelDataCache() {
   const achievements = new Map<string, PanelAchievements>();
   const price = new Map<number, PanelPrice>();
   const dlc = new Map<number, PanelDlc>();
+  const bundles = new Map<number, PanelBundles>();
 
   // Lazily resolved once per session rather than per-call — a plain GET /api/health, cheap to
   // over-share across every game a price is fetched for.
@@ -169,6 +182,31 @@ export function createPanelDataCache() {
     }
   }
 
+  // Unlike price, fetched even when the row is already priced: no list loads this.
+  function peekBundles(appid: number): PanelBundles | undefined {
+    return bundles.get(appid);
+  }
+
+  async function fetchBundles(appid: number, { force = false } = {}): Promise<PanelBundles> {
+    try {
+      if (!(await isItadConfigured())) {
+        bundles.set(appid, null);
+        return null;
+      }
+      const qs = new URLSearchParams({ country: resolveRegion(getStoredRegion()) });
+      if (force) qs.set('refresh', '1');
+      const res = await fetch(`/api/game-bundles/${appid}?${qs}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Bundles lookup failed');
+      bundles.set(appid, data.bundles);
+      return data.bundles;
+    } catch {
+      const value = bundles.get(appid) ?? null;
+      bundles.set(appid, value);
+      return value;
+    }
+  }
+
   // DLC — unlike the three above, not fetched when the panel opens: the collapsed card's header
   // only needs `details.meta.dlc`'s bare appid *count* (already present for free, see
   // extractAppDetails in lib/steam.js), so the name/capsule-resolving fetch is deferred until the
@@ -237,7 +275,18 @@ export function createPanelDataCache() {
     }
   }
 
-  return { peekNews, fetchNews, peekAchievements, fetchAchievements, peekPrice, fetchPrice, peekDlc, fetchDlc };
+  return {
+    peekNews,
+    fetchNews,
+    peekAchievements,
+    fetchAchievements,
+    peekPrice,
+    fetchPrice,
+    peekBundles,
+    fetchBundles,
+    peekDlc,
+    fetchDlc,
+  };
 }
 
 const defaultCache = createPanelDataCache();
@@ -247,5 +296,7 @@ export const peekAchievements = defaultCache.peekAchievements;
 export const fetchAchievements = defaultCache.fetchAchievements;
 export const peekPrice = defaultCache.peekPrice;
 export const fetchPrice = defaultCache.fetchPrice;
+export const peekBundles = defaultCache.peekBundles;
+export const fetchBundles = defaultCache.fetchBundles;
 export const peekDlc = defaultCache.peekDlc;
 export const fetchDlc = defaultCache.fetchDlc;

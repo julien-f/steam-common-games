@@ -27,10 +27,13 @@ import {
   fetchAchievements,
   peekPrice,
   fetchPrice,
+  peekBundles,
+  fetchBundles,
   peekDlc,
   fetchDlc,
 } from './panelData.ts';
-import type { DlcEntry, PanelAchievements, PanelDlc, PanelNews, PanelPrice } from './panelData.ts';
+import type { DlcEntry, PanelAchievements, PanelBundles, PanelDlc, PanelNews, PanelPrice } from './panelData.ts';
+import { bundleUrgency, fmtBundleDateFriendly } from './bundleRows.ts';
 import { nextHopHistory } from './panelHistory.ts';
 import type { PanelHistoryEntry } from './panelHistory.ts';
 import { setGameTitle } from './pageTitle.ts';
@@ -330,6 +333,7 @@ async function handlePanelRefresh() {
       panelOptions.onRefresh(game),
       panelData.refetchNews(),
       panelData.refetchPrice(),
+      panelData.refetchBundles(),
       panelData.refetchAchievements(),
       peekDlc(game.appid) !== undefined ? panelData.refetchDlc() : null,
     ]);
@@ -487,6 +491,12 @@ const panelData = createRoot(() => {
     return !force && cached !== undefined ? cached : fetchPrice(appid, { force });
   });
 
+  const [bundles, { refetch: refetchBundles }] = createResource<PanelBundles, number>(openAppid, (appid, info) => {
+    const force = isForced(info);
+    const cached = peekBundles(appid);
+    return !force && cached !== undefined ? cached : fetchBundles(appid, { force });
+  });
+
   // DLC is the one card whose fetch is gated behind actually expanding it (see panelData.ts's
   // fetchDlc) — expressed here as "this game's card is expanded" being part of the source, so
   // expanding it *is* what starts the fetch. That also covers the case the old code needed a
@@ -524,6 +534,8 @@ const panelData = createRoot(() => {
     ownership,
     price,
     refetchPrice,
+    bundles,
+    refetchBundles,
     dlc,
     refetchDlc,
     dlcPartial,
@@ -1495,6 +1507,7 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
                 </div>
               </Show>
             </Show>
+            <PanelBundleLines />
           </div>
         </Show>
       }
@@ -1502,6 +1515,55 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
       <div class="panel-section panel-card" id="panel-section-price">
         <div class="panel-section-title">Price</div>
         <span class="sk" style={{ display: 'block', width: '100%', height: '32px', 'border-radius': '6px' }} />
+      </div>
+    </Show>
+  );
+}
+
+// The current bundles the open game is in, under the Price card's own lines.
+function PanelBundleLines(): JSX.Element {
+  return (
+    <Show when={panelData.bundles()?.length}>
+      <div class="panel-bundles">
+        <For each={panelData.bundles()}>
+          {(b) => {
+            const urgency = bundleUrgency(b.expiry);
+            const shopUrl = safeHref(b.url);
+            return (
+              <div class="panel-bundle">
+                <A class="panel-bundle-title" href={`/lists/bundle/${b.id}`}>
+                  📦 {b.title}
+                </A>
+                <div class="panel-bundle-meta">
+                  <Show when={b.shop}>
+                    <Show when={shopUrl} fallback={<span>{b.shop}</span>}>
+                      <a href={shopUrl!} target="_blank" rel="noopener">
+                        {b.shop} ↗
+                      </a>
+                    </Show>
+                    <span class="panel-price-sep">·</span>
+                  </Show>
+                  <span>{b.tierPrice == null ? 'Varies' : `${formatMoney(b.tierPrice, b.tierCurrency)} tier`}</span>
+                  <Show when={b.expiry}>
+                    <span class="panel-price-sep">·</span>
+                    <span
+                      style={
+                        urgency?.tier === 'urgent'
+                          ? { color: scoreColor(20) }
+                          : urgency?.tier === 'soon'
+                            ? { color: scoreColor(55) }
+                            : {}
+                      }
+                    >
+                      ends {fmtBundleDateFriendly(b.expiry)}
+                      {urgency?.label ? ` (${urgency.label})` : ''}
+                    </span>
+                  </Show>
+                </div>
+              </div>
+            );
+          }}
+        </For>
       </div>
     </Show>
   );

@@ -44,6 +44,9 @@ const {
   getSteamShopId,
   getPrices,
   extractPriceInfo,
+  getGameBundles,
+  gameBundlesCacheKey,
+  extractGameBundles,
 } = require('./lib/itad');
 const { withPickAndMix } = require('./lib/fanatical');
 const {
@@ -434,7 +437,7 @@ app.get('/api/metrics', (_req, res) => {
 // Browsing the bundle list, resolving games to/from Steam appids, and pricing them — each
 // distinct combination of params/ids only ever costs one upstream call (repeats hit the
 // cache), same reasoning as gameSearchLimit above. Unlike gameSearchLimit's single shared
-// limiter, this is 4 separate rateLimit() instances (one per route below) each with a `skip`
+// limiter, this is 5 separate rateLimit() instances (one per route below) each with a `skip`
 // tailored to that route's own cache-key shape — mirroring detailsLimit/achievementsLimit's own
 // "cache hits don't count" skip, not just a shared always-counts limiter. Without this, simply
 // reloading the Bundles page a handful of times (every reload re-requests the list, and
@@ -514,6 +517,19 @@ const pricesLimit = namedRateLimit('prices', {
       });
     }
     return false; // let the route's own validation reject it
+  },
+});
+
+// The side panel's "in bundles" lines — one game at a time, so the same appid → gid → cache
+// check as pricesLimit's appids branch.
+const gameBundlesLimit = namedRateLimit('gameBundles', {
+  ...itadRateLimitOpts,
+  skip: (req) => {
+    if (rateLimitBypassed()) return true;
+    if (isForceRefresh(req)) return false;
+    const gid = getCached(`itad-gid:${Number(req.params.appid)}`);
+    if (gid === undefined) return false;
+    return gid === null || getCached(gameBundlesCacheKey(gid, parseCountry(req))) !== undefined;
   },
 });
 
@@ -959,6 +975,25 @@ app.post('/api/prices', pricesLimit, async (req, res) => {
     res.json({ prices: out, fetchedAt: oldestCachedAt(gidsToPrice.map((gid) => `itad-price:${country}:${gid}`)) });
   } catch (err) {
     const status = routeErrorStatus('prices', err);
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.get('/api/game-bundles/:appid', gameBundlesLimit, async (req, res) => {
+  if (!isItadConfigured()) {
+    return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
+  }
+  const appid = Number(req.params.appid);
+  if (!Number.isInteger(appid) || appid <= 0) {
+    return res.status(400).json({ error: 'Invalid appid' });
+  }
+  try {
+    const gid = (await resolveItadIds([appid])).get(appid);
+    if (!gid) return res.json({ bundles: [] });
+    const bundles = await getGameBundles(gid, { country: parseCountry(req), force: isForceRefresh(req) });
+    res.json({ bundles: extractGameBundles(bundles, gid) });
+  } catch (err) {
+    const status = routeErrorStatus('game-bundles', err);
     res.status(status).json({ error: err.message });
   }
 });

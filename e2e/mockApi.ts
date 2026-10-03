@@ -197,6 +197,29 @@ async function handle(route: Route): Promise<void> {
     const found = { [BUNDLE.id]: bundleJson, [PICK_BUNDLE.id]: pickBundleJson }[Number(bundle[1])];
     return found ? json(route, { bundle: found(), fetchedAt: NOW }) : json(route, { error: 'Bundle not found' }, 404);
   }
+  const inBundles = path.match(/^\/api\/game-bundles\/(\d+)$/);
+  if (inBundles) {
+    const appid = Number(inBundles[1]);
+    const bundles = [bundleJson(), pickBundleJson()].flatMap((b) => {
+      const tier = b.tiers.find((t) =>
+        t.games.some((g) => [bundleGames.find((x) => x.gid === g.id)?.appid].flat().includes(appid)),
+      );
+      if (!tier) return [];
+      const { id, title, page, url, expiry } = b;
+      return [
+        {
+          id,
+          title,
+          shop: page.name,
+          url,
+          expiry,
+          tierPrice: tier.price?.amount ?? null,
+          tierCurrency: tier.price?.currency ?? null,
+        },
+      ];
+    });
+    return json(route, { bundles });
+  }
   if (path === '/api/prices') {
     const keys: (string | number)[] = body.gids ?? body.appids ?? [];
     const appidOf = (key: string | number) =>

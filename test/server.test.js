@@ -1601,6 +1601,80 @@ test('GET /api/bundles: 502 when the upstream call fails', async (t) => {
   assert.equal(res.status, 502);
 });
 
+// ── GET /api/game-bundles/:appid ──────────────────────────────────────────────
+
+test('GET /api/game-bundles/:appid: 503 when ITAD_API_KEY is not configured', async () => {
+  const prev = process.env.ITAD_API_KEY;
+  delete process.env.ITAD_API_KEY;
+  try {
+    const res = await api.get('/api/game-bundles/400');
+    assert.equal(res.status, 503);
+  } finally {
+    if (prev !== undefined) process.env.ITAD_API_KEY = prev;
+  }
+});
+
+test('GET /api/game-bundles/abc: 400 for non-numeric appid', async () => {
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  const res = await api.get('/api/game-bundles/abc');
+  assert.equal(res.status, 400);
+});
+
+test('GET /api/game-bundles/:appid: empty without an ITAD listing, no bundle lookup', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  setCache('itad-gid:400', null);
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
+  const res = await api.get('/api/game-bundles/400');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { bundles: [] });
+  assert.equal(fetchMock.mock.callCount(), 0);
+});
+
+test('GET /api/game-bundles/:appid: 200 with the bundles the game is in', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  setCache('itad-gid:400', 'gid-1');
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    assert.match(String(url), /\/games\/bundles\/v2\?.*id=gid-1.*country=FR/);
+    return {
+      ok: true,
+      json: async () => [
+        {
+          id: 7,
+          title: 'B',
+          page: { name: 'Humble Bundle' },
+          url: 'https://shop.example/7',
+          expiry: null,
+          tiers: [{ price: { amount: 5, currency: 'EUR' }, games: [{ id: 'gid-1' }] }],
+        },
+      ],
+    };
+  });
+  const res = await api.get('/api/game-bundles/400?country=fr');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.bundles, [
+    {
+      id: 7,
+      title: 'B',
+      shop: 'Humble Bundle',
+      url: 'https://shop.example/7',
+      expiry: null,
+      tierPrice: 5,
+      tierCurrency: 'EUR',
+    },
+  ]);
+});
+
+test('GET /api/game-bundles/:appid: 502 when the upstream call fails', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  setCache('itad-gid:400', 'gid-1');
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
+  const res = await api.get('/api/game-bundles/400');
+  assert.equal(res.status, 502);
+});
+
 // ── GET /api/bundles/:id ──────────────────────────────────────────────────────
 
 test('GET /api/bundles/:id: 503 when ITAD_API_KEY is not configured', async () => {

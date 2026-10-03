@@ -15,6 +15,8 @@ const {
   resolveItadIds,
   getPrices,
   extractPriceInfo,
+  getGameBundles,
+  extractGameBundles,
 } = require('../lib/itad');
 const { _reset } = require('../lib/cache');
 
@@ -459,4 +461,59 @@ test('getBundles: { force: true } bypasses the cache and re-fetches', async (t) 
   assert.equal(calls, 1, 'second call served from cache');
   await getBundles({ country: 'US', force: true });
   assert.equal(calls, 2, 'forced call re-fetches');
+});
+
+test('getGameBundles: fetches per (gid, country), caches, and honours force', async (t) => {
+  _reset();
+  const urls = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    urls.push(String(url));
+    return { ok: true, json: async () => [{ id: 1, title: 'B' }] };
+  });
+  assert.deepEqual(await getGameBundles('g1', { country: 'FR' }), [{ id: 1, title: 'B' }]);
+  await getGameBundles('g1', { country: 'FR' });
+  assert.equal(urls.length, 1, 'second call served from cache');
+  assert.match(urls[0], /\/games\/bundles\/v2\?.*id=g1.*country=FR/);
+  await getGameBundles('g1', { country: 'FR', force: true });
+  assert.equal(urls.length, 2, 'forced call re-fetches');
+});
+
+test('getGameBundles: throws on upstream error', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
+  await assert.rejects(
+    () => getGameBundles('g1'),
+    (err) => err.isUpstream === true,
+  );
+});
+
+test('extractGameBundles: keeps the cheapest tier holding the game, null for a pick-and-mix tier', () => {
+  const price = (amount) => ({ amount, amountInt: amount * 100, currency: 'USD' });
+  const bundles = [
+    {
+      id: 1,
+      title: 'Tiered',
+      page: { name: 'Humble Bundle' },
+      url: 'https://shop.example/1',
+      expiry: '2026-10-24T05:59:43+02:00',
+      tiers: [
+        { price: price(1), games: [{ id: 'other' }] },
+        { price: price(8), games: [{ id: 'g1' }] },
+        { price: price(15), games: [{ id: 'g1' }] },
+      ],
+    },
+    { id: 2, title: 'Pick', page: { name: 'Fanatical' }, tiers: [{ price: null, games: [{ id: 'g1' }] }] },
+  ];
+  assert.deepEqual(extractGameBundles(bundles, 'g1'), [
+    {
+      id: 1,
+      title: 'Tiered',
+      shop: 'Humble Bundle',
+      url: 'https://shop.example/1',
+      expiry: '2026-10-24T05:59:43+02:00',
+      tierPrice: 8,
+      tierCurrency: 'USD',
+    },
+    { id: 2, title: 'Pick', shop: 'Fanatical', url: null, expiry: null, tierPrice: null, tierCurrency: null },
+  ]);
 });

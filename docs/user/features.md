@@ -92,7 +92,7 @@ Wishlist and bundle lists carry price columns: the best deal across every shop I
 
 ## The game panel
 
-Clicking any row opens a detail panel beside the table — not over it, so the list stays usable and clicking another row just swaps the panel's contents. It carries screenshots and trailers, the weighted rating and review counts, How Long To Beat estimates, achievements, recent news from the developer, current price, DLC and links out. ↻ refetches everything for that one game.
+Clicking any row opens a detail panel beside the table — not over it, so the list stays usable and clicking another row just swaps the panel's contents. It carries screenshots and trailers, the weighted rating and review counts, How Long To Beat estimates, achievements, recent news from the developer, current price and the current bundles it's in (each opens that bundle's list), DLC and links out. ↻ refetches everything for that one game.
 
 ![A game's detail panel: media strip, weighted rating and Metacritic score, How Long To Beat estimate, ProtonDB tier, best price with record-low badges, tags, who owns it, and collapsible HLTB/news/achievements/DLC sections](../images/game-panel.png)
 
