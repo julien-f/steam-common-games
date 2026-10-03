@@ -961,8 +961,15 @@ export default function ListRoute() {
   onCleanup(() => clearTimeout(selectionStatusTimer));
   // A floating toast rather than a line in the page: the rows acted on are often scrolled far below it.
   function showSelectionStatus(text: string, listId?: string): void {
-    clearTimeout(selectionStatusTimer);
     setSelectionActionStatus({ text, listId });
+    resumeSelectionStatus();
+  }
+  // Held while pointed at or focused, so its Open list link can't vanish mid-reach.
+  function holdSelectionStatus(): void {
+    clearTimeout(selectionStatusTimer);
+  }
+  function resumeSelectionStatus(): void {
+    clearTimeout(selectionStatusTimer);
     selectionStatusTimer = setTimeout(() => setSelectionActionStatus(null), 6000);
   }
 
@@ -3124,7 +3131,15 @@ export default function ListRoute() {
       {/* Outside the selection-gated block above on purpose — "Add"/"Remove" both clear the
           selection right after acting (Add explicitly; Remove via load()'s own reset), and the
           whole point of this message is to confirm what just happened *after* that clears. */}
-      <div class="selection-status" classList={{ 'is-visible': !!selectionActionStatus() }} role="status">
+      <div
+        class="selection-status"
+        classList={{ 'is-visible': !!selectionActionStatus() }}
+        role="status"
+        onMouseEnter={holdSelectionStatus}
+        onMouseLeave={(e) => e.currentTarget.contains(document.activeElement) || resumeSelectionStatus()}
+        onFocusIn={holdSelectionStatus}
+        onFocusOut={(e) => e.currentTarget.matches(':hover') || resumeSelectionStatus()}
+      >
         {selectionActionStatus()?.text}
         <Show when={selectionActionStatus()?.listId}>{(listId) => <A href={`/lists/${listId()}`}>Open list</A>}</Show>
       </div>

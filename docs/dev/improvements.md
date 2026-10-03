@@ -23,7 +23,6 @@ UX backlog from the 2026-09-27 and 2026-10-03 (mocked, `npm run dev:mock`) revie
 ## Loading and feedback
 
 - **U7 · minor · L3** — Reset view drops sort/filters instantly with no undo.
-- **U46 · minor · L1** — the "Added N game(s) to new list" toast holds the only direct link to the new list (**Open list**) and disappears after 6 s, even while hovered or focused. Pause it on hover/focus.
 - **U48 · minor · S3** — no catch-all route: an unknown or outdated path (e.g. `/compare`, an old `.html` page) renders an empty page with only the nav. Say the page doesn't exist and link Home.
 
 ## Lists and selection

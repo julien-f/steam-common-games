@@ -282,6 +282,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- The "Added to new list" message, with its **Open list** link, stays up while pointed at or focused instead of closing after 6 seconds regardless.
 - Home's **Move to…** showed the first folder as already chosen, so a list or folder couldn't be moved into it when it was the only one.
 - A bundle game sold on Steam as a package of several apps showed the package's title on every one of its rows; each row now shows its own Steam name.
 - An account's name and avatar catch up with Steam when Home loads it: one saved before names were stored, or renamed since, no longer shows as a 17-digit id in the nav chip, recent accounts and list names.

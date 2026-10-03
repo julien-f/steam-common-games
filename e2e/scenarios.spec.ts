@@ -123,6 +123,24 @@ test('L1: select games, add them to a new list, open it', async ({ page }) => {
   await expect(rows(page)).toHaveCount(2);
 });
 
+test("L1 edge: the new list's toast stays while pointed at", async ({ page }) => {
+  await page.clock.install();
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Portal 2').getByRole('checkbox').check();
+  await page.locator('.selection-toolbar').getByRole('combobox').selectOption({ label: '+ Create new list…' });
+  await page.getByRole('textbox', { name: 'New list name' }).fill('Later');
+  await page.keyboard.press('Enter');
+
+  const toast = page.getByRole('status').filter({ hasText: 'new list "Later"' });
+  await toast.hover();
+  await page.clock.runFor(10_000);
+  await expect(toast).toBeVisible();
+  await page.mouse.move(0, 0);
+  await page.clock.runFor(7_000);
+  await expect(toast).toBeHidden();
+});
+
 test('L1 edge: a list moves into the only folder', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
