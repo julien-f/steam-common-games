@@ -5,3 +5,8 @@ set -e
 git diff --cached --check
 
 npm run -s check
+
+# The mocked end-to-end suite (~15 s), only when the frontend or the tests themselves change.
+if git diff --cached --name-only | grep -qE '^(public|e2e)/|^playwright\.config\.ts$'; then
+  npm run -s test:e2e -- --reporter=dot
+fi

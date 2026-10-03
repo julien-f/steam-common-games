@@ -133,6 +133,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- The pre-commit hook also runs the end-to-end tests when a commit touches `public/` or `e2e/`.
 - A Fanatical pick-and-mix bundle in a game's side panel shows its best rate ("from €1.17/game") instead of "Varies"; on the bundle's page, tier chips and the selection total add an "≈ €" estimate when Fanatical only prices in another currency, as the bundle list already did.
 - The selection toolbar sits at the bottom of the screen, below the table, instead of above it: checking the first row no longer pushes every row down under the pointer.
 - Development: `npm run check` runs everything the pre-commit hook does, plus a CHANGELOG structure check and a check that names the docs put in code formatting still exist in the code; the hook now calls it. A shared `.claude/settings.json` allows the check and read-only git commands.
