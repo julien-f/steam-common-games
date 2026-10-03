@@ -3375,6 +3375,31 @@ kbd {
   gap: 8px;
   margin-bottom: 10px;
 }
+.list-view-actions .btn-icon {
+  display: none;
+}
+/* Phone: icons only, and the table library's toolbar spacing tightened, so the rows start higher.
+   Share/Reset belong in the toolbar line itself, which the library has no slot for yet. */
+@media (max-width: 768px) {
+  .list-view-actions {
+    margin-bottom: 4px;
+  }
+  .list-view-actions .btn-label {
+    display: none;
+  }
+  .list-view-actions .btn-icon {
+    display: inline;
+  }
+  .list-route .dt-toolbar {
+    padding: 6px 0;
+  }
+  .list-route .dt-toolbar-divider {
+    display: none;
+  }
+  .list-route .dt-active-bar {
+    padding: 4px 0;
+  }
+}
 
 .pref-unsaved-banner {
   display: flex;

@@ -42,13 +42,14 @@ export function copyWithFeedback(btn: HTMLElement, text: string, opts: CopyFeedb
 }
 
 function flash(btn: HTMLElement, { copiedText = '✓ Copied!', copiedClass }: CopyFeedback): void {
-  const prevText = btn.textContent;
+  // Nodes, not text: a label may carry markup (an icon and a label hidden on a phone).
+  const prevNodes = [...btn.childNodes];
   const prevTitle = btn.title;
   btn.textContent = copiedText;
   btn.title = 'Copied!';
   if (copiedClass) btn.classList.add(copiedClass);
   setTimeout(() => {
-    btn.textContent = prevText;
+    btn.replaceChildren(...prevNodes);
     btn.title = prevTitle;
     if (copiedClass) btn.classList.remove(copiedClass);
   }, COPIED_MS);

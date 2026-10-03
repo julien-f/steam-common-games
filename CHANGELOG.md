@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
-- On a phone, a list's header card is shorter: its facts sit in one row you swipe, and a bundle's or comparison's less-used buttons fold behind ⋯ — a bundle's games now start about a third of the screen higher.
+- On a phone, a list's header card is shorter: its facts sit in one row you swipe, and a bundle's or comparison's less-used buttons fold behind ⋯, Share view and Reset view are icons, and the table's toolbar is tighter — a bundle's games now start about a third of the screen higher.
 
 ### Fixed
 

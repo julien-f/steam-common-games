@@ -330,7 +330,7 @@ test("I1 edge: on a phone, a bundle's table starts high, its other actions behin
   const top = await rows(page)
     .first()
     .evaluate((el) => el.getBoundingClientRect().top + scrollY);
-  expect(top).toBeLessThan(560); // 761 with the hero's tiles and actions wrapping
+  expect(top).toBeLessThan(520); // 761 with the hero's tiles and actions wrapping
   await expect(page.getByRole('link', { name: '← All bundles' })).toBeHidden();
   await page.getByRole('button', { name: 'More actions' }).click();
   await expect(page.getByRole('link', { name: '← All bundles' })).toBeVisible();

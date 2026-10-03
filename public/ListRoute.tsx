@@ -3099,11 +3099,24 @@ export default function ListRoute() {
       </Show>
       <Show when={tableReady()}>
         <div class="list-view-actions">
-          <button type="button" class="btn btn-ghost btn-sm" onClick={(e) => handleShareView(e.currentTarget)}>
-            🔗 Share view
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            aria-label="Share view"
+            title="Copy a link to this table's layout"
+            onClick={(e) => handleShareView(e.currentTarget)}
+          >
+            🔗<span class="btn-label"> Share view</span>
           </button>
-          <button type="button" class="btn btn-ghost btn-sm" onClick={handleResetView}>
-            Reset view
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            aria-label="Reset view"
+            title="Back to the default columns, sort and filters"
+            onClick={handleResetView}
+          >
+            <span class="btn-icon">↺</span>
+            <span class="btn-label">Reset view</span>
           </button>
         </div>
       </Show>

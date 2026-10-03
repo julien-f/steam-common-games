@@ -194,7 +194,7 @@ test('shareTableView: copies a link with the view snapshotted into the param, wi
         },
       };
       Object.defineProperty(globalThis, 'navigator', { value: stubNav, configurable: true });
-      const btn = { textContent: 'Share view' };
+      const btn = { textContent: 'Share view', childNodes: [], replaceChildren() {} };
       shareTableView(table, 'lv', btn);
       await Promise.resolve();
       await Promise.resolve(); // let writeText()'s .then() microtask run
@@ -220,7 +220,12 @@ test('shareTableView: adds extra params, but never over one the URL already sets
     Object.defineProperty(globalThis, 'navigator', { value: stubNav, configurable: true });
     const share = async (search) => {
       await withLocation(search, async () => {
-        shareTableView(fakeTable({}), 'tv', { textContent: 'Share view' }, { u: 'alice' });
+        shareTableView(
+          fakeTable({}),
+          'tv',
+          { textContent: 'Share view', childNodes: [], replaceChildren() {} },
+          { u: 'alice' },
+        );
         await Promise.resolve();
         await Promise.resolve();
       });
