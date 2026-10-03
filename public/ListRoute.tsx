@@ -904,10 +904,11 @@ export default function ListRoute() {
   }
   function compareLabel(): string {
     const focus = filteredUnranked();
-    if (focus) return focus.length ? `Compare ${focus.length} shown` : 'Compare (all shown ranked)';
+    if (focus) return focus.length ? `Rank ${focus.length} shown` : 'All shown ranked';
     const chosen = chosenProgress();
     if (chosen) return `Continue: ${chosen.pending} chosen left`;
-    return rankingProgress()?.pending === 0 ? 'Compare (all ranked)' : 'Compare';
+    // Not "Compare": the nav's Compare means comparing libraries.
+    return rankingProgress()?.pending === 0 ? 'All ranked' : 'Continue ranking';
   }
   function handleCompare(): void {
     const list = userList();
@@ -3460,7 +3461,7 @@ export default function ListRoute() {
               }
               onClick={handleCompareSelected}
             >
-              Compare {selectedUnranked().length} selected
+              Rank {selectedUnranked().length} selected
             </button>
             <button
               type="button"

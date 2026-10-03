@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- A ranked list's buttons say **Continue ranking**, **Rank N shown/selected** and **All ranked** instead of "Compare", which in the nav means comparing libraries.
 - 🏆 Rank this list, once the list has rankings, opens a menu to continue one or start another named by its criterion (e.g. "best JRPG"), instead of silently adding a same-named ranking.
 - Ranking a Wishlist or a bundle offers "Not interested — exclude" instead of "Haven't played — exclude", which only fits games you own.
 - Recently Looked Up lists your latest lookup first, in a new **Looked up** column, and says it keeps the last 10.

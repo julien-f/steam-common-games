@@ -115,7 +115,7 @@ Each scenario: **who / goal**, **steps** as a user would take them, **expect** �
 ### R1 ★ Rank my played games
 
 - **Who / goal**: build a personal top list from my library without ranking all of it.
-- **Steps**: Owned → filter (e.g. played > 5 h) → **🏆 Rank N games** → answer pairs with ← / → / ↓ / S / X / Z → stop with Esc halfway → later **Continue: N chosen left** (or **Compare**, for the whole list) on the list page to resume.
+- **Steps**: Owned → filter (e.g. played > 5 h) → **🏆 Rank N games** → answer pairs with ← / → / ↓ / S / X / Z → stop with Esc halfway → later **Continue: N chosen left** (or **Continue ranking**, for the whole list) on the list page to resume.
 - **Expect**: no answer lost on stop; the progress bar's estimate shrinks; the list sorts by Rank; **ℹ Details** opens the panel without losing the pair.
 - **Edges**: Re-rank a selected game; Exclude one, then bring it back; Undo right after resuming; the source gains/loses a game; Change source keeps answers.
 

@@ -330,7 +330,7 @@ export default function RankRoute() {
           <div class="rank-focus-banner">
             Comparing {f().size} chosen games.
             <button type="button" class="btn btn-ghost btn-sm" onClick={compareAll}>
-              Compare all instead
+              Rank all instead
             </button>
           </div>
         )}
@@ -376,7 +376,7 @@ export default function RankRoute() {
                 <p>Every chosen game is ranked.</p>
                 <Show when={source() && state() && progress(state()!, source()!).pending}>
                   <button type="button" class="btn btn-ghost" onClick={compareAll}>
-                    Compare the rest
+                    Rank the rest
                   </button>
                 </Show>
               </Show>

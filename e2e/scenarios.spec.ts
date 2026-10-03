@@ -254,6 +254,16 @@ test('R2 edge: ranking a list again offers its rankings, or a new one by a crite
   await expect(page.getByRole('heading', { name: 'Ranking of Alice — Wishlist (co-op)' })).toBeVisible();
 });
 
+test('R1 edge: a ranked list resumes with "Continue ranking", not the nav\'s Compare', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await page.getByRole('button', { name: /Rank this list/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading', { name: 'Ranking of Alice — Wishlist' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continue ranking' })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('button', { name: /^Compare/ })).toHaveCount(0);
+});
+
 test('R2 edge: a Wishlist ranking keeps its price columns', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/wishlist');
