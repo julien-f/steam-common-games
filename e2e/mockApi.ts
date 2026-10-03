@@ -8,6 +8,7 @@
 //   upstream-down  HLTB, ProtonDB and Steam reviews return nothing; ITAD routes answer 502
 //   slow           game details stream in one at a time (dev:mock only — page.route can't stream)
 //   store-down     Steam store pages return nothing (genres, release date, platforms…)
+//   stale          libraries and wishlists read as fetched 12 days ago, until a refresh (D1)
 //   untiered       the Co-op Pack lists every game in its first tier, the pricier one empty (as ITAD sends some)
 import type { Page } from '@playwright/test';
 import { PLAYERS, CATALOG, BUNDLE, PICK_BUNDLE, game, type Player } from './fixtures.ts';
@@ -78,7 +79,7 @@ function details(appid: number) {
     },
     tags: g.categories.includes('Co-op') ? ['Co-op'] : ['Singleplayer'],
     demo: null,
-    protondb: { tier: g.protondb, confidence: 'strong', total: 100 },
+    protondb: g.protondb ? { tier: g.protondb, confidence: 'strong', total: 100 } : null,
   };
 }
 
@@ -176,6 +177,9 @@ export function respond(
     return json({ ok: true, configured: true, itadConfigured: !states.has('no-itad'), cache: { entries: 0 } });
   if (path === '/api/me') return json({ steamid: null, prefs: null });
 
+  // A refresh is fetched now; otherwise as of server start, or 12 days before it under `stale`.
+  const accountFetchedAt = () => (body.refresh ? Date.now() : states.has('stale') ? NOW - 12 * 86400_000 : NOW);
+
   if (path === '/api/common-games') {
     const slot: string[] = body.slots?.[0] ?? [];
     const players = slot.map(findPlayer);
@@ -191,7 +195,7 @@ export function respond(
       slots: [members.map(playerJson)],
       playtime,
       lastPlayed: {},
-      fetchedAt: NOW,
+      fetchedAt: accountFetchedAt(),
     });
   }
   if (path === '/api/wishlist') {
@@ -199,7 +203,7 @@ export function respond(
     const items = members.flatMap((p) =>
       (p.wishlist ?? []).map((appid) => ({ appid, priority: 0, dateAdded: '2026-01-01' })),
     );
-    return json({ items, players: members.map(playerJson), fetchedAt: NOW });
+    return json({ items, players: members.map(playerJson), fetchedAt: accountFetchedAt() });
   }
   if (path === '/api/friends') return json({ friends: [], unavailable: body.members ?? [], fetchedAt: NOW });
 

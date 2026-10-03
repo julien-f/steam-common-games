@@ -17,7 +17,8 @@ export const ALICE: Player = {
   personaname: 'Alice',
   owned: [620, 105600, 413150, 1145360, 892970, 367520],
   playtime: { 620: 600, 105600: 1200, 1145360: 45 },
-  wishlist: [1426210, 728880],
+  // Apex Legends: Borked on ProtonDB; 3999990: no ProtonDB report at all.
+  wishlist: [1426210, 728880, 1172470, 3999990],
 };
 
 export const BOB: Player = {
@@ -25,6 +26,7 @@ export const BOB: Player = {
   vanity: 'bob',
   personaname: 'Bob',
   owned: [620, 105600, 322330, 728880],
+  wishlist: [413150, 1145360], // games Alice owns: B4's gift that's already in the family
 };
 
 export const CAROL: Player = {
@@ -45,7 +47,7 @@ export interface CatalogGame {
   genres: string[];
   categories: string[];
   release: string;
-  protondb: 'platinum' | 'gold' | 'silver' | 'bronze' | 'borked';
+  protondb: 'platinum' | 'gold' | 'silver' | 'bronze' | 'borked' | null; // null: no report
 }
 
 const coop = ['Multi-player', 'Co-op', 'Online Co-op'];
@@ -149,6 +151,28 @@ export const CATALOG: CatalogGame[] = [
     categories: coop,
     release: 'Mar 25, 2021',
     protondb: 'silver',
+  },
+  {
+    appid: 1172470,
+    name: 'Apex Legends',
+    score: 66,
+    reviews: 900000,
+    hltb: 120,
+    genres: ['Action', 'Adventure', 'Free to Play'],
+    categories: ['Online PvP'],
+    release: 'Nov 4, 2020',
+    protondb: 'borked',
+  },
+  {
+    appid: 3999990,
+    name: 'Quiet Little Game',
+    score: 88,
+    reviews: 40,
+    hltb: 3,
+    genres: ['Indie'],
+    categories: ['Single-player'],
+    release: 'Jun 2, 2026',
+    protondb: null,
   },
 ];
 

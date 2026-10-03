@@ -393,7 +393,7 @@ test('I2: into a list from the keyboard — skip link, and R with no panel open'
 test("S1: share my wishlist's view; a fresh browser sees my games with my layout", async ({ page, browser }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/wishlist');
-  await expect(rows(page)).toHaveCount(2);
+  await expect(rows(page)).toHaveCount(4);
   await page.locator('thead th').filter({ hasText: /^Name/ }).click();
   await page.evaluate(() => {
     (window as unknown as { copied: string[] }).copied = [];
@@ -409,5 +409,5 @@ test("S1: share my wishlist's view; a fresh browser sees my games with my layout
   await friend.goto(link);
   await expect(friend.getByRole('heading', { name: "Alice's Wishlist" })).toBeVisible();
   await expect(friend.getByText('This table uses a layout from a shared link')).toBeVisible();
-  await expect(rows(friend)).toHaveCount(2);
+  await expect(rows(friend)).toHaveCount(4);
 });

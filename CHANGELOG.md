@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- `dev:mock` fixtures: a Borked game, one with no ProtonDB report, a friend's wishlist, a 4-game wishlist, and a `stale` state whose library ages read 12 days old until refreshed.
 - `scripts/mock-server.js up|down` runs `dev:mock` in the background and waits until its modules load; `scripts/ux-measure.js` writes a Playwright file measuring routes at desktop and phone widths.
 
 ### Changed
