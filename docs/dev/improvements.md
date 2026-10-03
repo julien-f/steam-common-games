@@ -62,7 +62,6 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 ## Consistency and polish
 
 - **U39 · polish** — `favicon.ico` 404s; nav items shift sideways between routes; missing thumbnails have no placeholder; Released and Added use different date formats, as do the Bundles list (`2026-10-13 21:10`) and a bundle's page (`Oct 13, 09:10 PM`); "Demo" pills look like primary buttons; the "Updated" age has very low contrast; Compare's op `<select>` is an unstyled native white control; wishlisted/owned name colours have no legend (still true in Recently Looked Up).
-- **U60 · minor · C4** — the panel's section nav keeps "Overview" active after clicking Owned by, HLTB or Achievements when the panel can't scroll that section to the top. Set the active tab on click, or fall back to the last section at the scroll end.
 - **U68 · polish · R1, R2** — a ranked list's primary button reads "Compare (all ranked)", while the nav's Compare means comparing libraries. Rename it, e.g. "Rank more" / "Re-rank".
 - **U69 · polish · L4, R2** — "Added 2 game(s) to new list…" and "≈ 1 comparisons left". Pluralize.
 

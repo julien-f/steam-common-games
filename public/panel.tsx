@@ -277,14 +277,22 @@ export function initPanel(options: PanelOptions = {}) {
 // sense of "where am I". Bound once to #panel-body (a stable element across every render)
 // rather than to the subnav, which is rebuilt whenever the panel moves to a different game.
 function initSubnavScrollSpy() {
-  document.getElementById('panel-body')!.addEventListener(
+  const body = document.getElementById('panel-body')!;
+  body.addEventListener(
     'scroll',
     () => {
       requestAnimationFrame(updateSubnavScrollSpy);
     },
     { passive: true },
   );
+  // Scrolling by hand hands the highlight back to the scroll position.
+  for (const type of ['wheel', 'touchstart', 'keydown'] as const)
+    body.addEventListener(type, () => (pinnedSubnavTarget = null), { passive: true });
 }
+
+// The section a subnav click jumped to, kept highlighted until the user scrolls themselves: one
+// near the end can't reach the top, where the rule below looks.
+let pinnedSubnavTarget: string | null = null;
 
 // Buttons are walked in DOM order, which the body below keeps identical to the physical
 // top-to-bottom order of the sections themselves (Owners right after the tag cloud,
@@ -299,14 +307,19 @@ function updateSubnavScrollSpy() {
   const headerH = document.querySelector('.panel-header-sticky')?.getBoundingClientRect().height ?? 0;
   const threshold = body.getBoundingClientRect().top + headerH + 8;
   const buttons = [...nav.querySelectorAll<HTMLElement>('.panel-subnav-btn')];
+  // Scrolled to the end, the last section showing is current, though it never reached the top.
+  const atEnd = body.scrollTop > 0 && body.scrollTop + body.clientHeight >= body.scrollHeight - 2;
+  const limit = atEnd ? body.getBoundingClientRect().bottom - 24 : threshold;
   let activeTarget = 'top';
   for (const btn of buttons) {
     const target = btn.dataset.target;
     if (target === undefined || target === 'top') continue;
     const el = document.getElementById(target);
-    if (!el || el.getBoundingClientRect().top > threshold) continue;
+    if (!el || el.getBoundingClientRect().top > limit) continue;
     activeTarget = target;
   }
+  if (pinnedSubnavTarget && buttons.some((btn) => btn.dataset.target === pinnedSubnavTarget))
+    activeTarget = pinnedSubnavTarget;
   buttons.forEach((btn) => btn.classList.toggle('active', btn.dataset.target === activeTarget));
 }
 
@@ -639,6 +652,7 @@ export function panelStepHero(dir: number, { wrap = false } = {}) {
 }
 
 export function panelOpen(game: ReadonlyGame) {
+  pinnedSubnavTarget = null; // a jump in the previous game's panel says nothing about this one
   // Every opener (a table row, a search-box pick, prev/next/random, a deep link) starts a fresh
   // browsing trail — except the DLC/base-game hop this panel started itself, which arrives here
   // with `pendingHopAppid` armed (see its own comment above). Consumed either way: if some
@@ -694,6 +708,8 @@ export function panelClose({ preserveUrl = false } = {}) {
 // here that's #game-panel (position: fixed), not #panel-body itself, so offsetTop would
 // include the hero/hero-filmstrip height above the header and land short.
 function jumpToPanelSection(target: string) {
+  pinnedSubnavTarget = target;
+  updateSubnavScrollSpy();
   const body = document.getElementById('panel-body')!;
   if (target === 'top') {
     body.scrollTo({ top: 0, behavior: 'smooth' });

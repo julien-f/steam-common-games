@@ -432,6 +432,17 @@ test('D2 edge: a failed Steam store page is marked, not shown as missing data', 
     ).toBeVisible();
 });
 
+test('F1 edge: the panel section nav highlights the section it jumped to', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Hades').getByText('Hades').click();
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const nav = page.locator('.panel-subnav');
+  await nav.getByRole('button', { name: 'Achievements' }).click();
+  await expect(nav.getByRole('button', { name: 'Achievements' })).toHaveClass(/active/);
+  await expect(nav.getByRole('button', { name: 'Overview' })).not.toHaveClass(/active/);
+});
+
 test('F1 edge: the panel closes from its × after scrolling it', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
