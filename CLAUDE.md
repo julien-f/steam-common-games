@@ -1,15 +1,12 @@
 # CLAUDE.md
 
-Working conventions for this repo. Documentation lives in `docs/` — keep it there, not here (see Knowledge sharing below).
+Working conventions for this repo. Documentation lives in `docs/` — keep it there, not here (see Where things belong below).
 
 ## Project context
 
 - **Stack**: Node >=22.13 + Express 5 backend, Solid + TypeScript frontend bundled by Vite, `node:sqlite` for `db.sqlite`; npm. Setup, dev servers and ports are in [README.md](README.md).
-- **Tests**: `node:test` + `supertest`, flat in `test/*.test.{js,ts}`; `npm test` runs with `DB_FILE=` so no real database is touched. End-to-end: `npm run test:e2e` (Playwright, `e2e/`) runs [scenarios.md](docs/dev/scenarios.md)'s ★ scenarios at desktop (1440×900) and phone (390×844) widths, with every `/api` call mocked in the browser — no backend, no upstream traffic; fixtures use made-up accounts only. The pre-commit hook runs it when `public/`, `e2e/` or a frontend config is staged. To look at a UI change without touching real prefs, `E2E_SHOTS=1 npm run test:e2e` keeps each test's final screen, plus any `shot(page, name)` (`e2e/state.ts`), under `test-results/`, one folder per test and width.
+- **Tests**: `node:test` + `supertest`, flat in `test/*.test.{js,ts}`; `npm test` runs with `DB_FILE=` so no real database is touched. Single file: `DB_FILE= STORE_MIN_INTERVAL_MS=0 node --test test/<name>.test.js` (`npm test` hardcodes its glob). End-to-end: `npm run test:e2e` (Playwright, `e2e/`) runs [scenarios.md](docs/dev/scenarios.md)'s ★ scenarios at desktop (1440×900) and phone (390×844) widths, with every `/api` call mocked in the browser — no backend, no upstream traffic; fixtures use made-up accounts only. The pre-commit hook runs it when `public/`, `e2e/` or a frontend config is staged. To look at a UI change without touching real prefs, `E2E_SHOTS=1 npm run test:e2e` keeps each test's final screen, plus any `shot(page, name)` (`e2e/state.ts`), under `test-results/`, one folder per test and width.
 - **Looking at the UI**: `npm run dev:mock` (`:58993`) serves the app against the e2e fixtures — no backend or upstream traffic, and its own localStorage, so no demo-prefs seed/restore; the `mock` cookie switches on error and slow states (`e2e/mockApi.ts`). Use the real dev server only for real data or real loading times.
-- **Types**: `tsc --noEmit`, strict, over `public/**/*.{ts,tsx}`, plus `e2e/` via `tsconfig.e2e.json` — the backend is plain JS.
-- **Lint**: `eslint public`, via eslint-plugin-solid.
-- **Format**: Prettier over the whole tree (`.prettierrc.json`); `npm run format` rewrites, `npm run format:check` verifies.
 
 ## Where things are documented
 
@@ -24,44 +21,51 @@ Working conventions for this repo. Documentation lives in `docs/` — keep it th
 - [docs/dev/scenarios.md](docs/dev/scenarios.md) — user journeys (goal, steps, expected outcome); the basis for design reviews and end-to-end tests
 - [docs/dev/improvements.md](docs/dev/improvements.md) — UX backlog from design reviews, keyed to scenarios
 - [docs/dev/decisions.md](docs/dev/decisions.md) — Weighted Rating vs. Wilson score, the Production Tier heuristic
+- [docs/dev/pitfalls.md](docs/dev/pitfalls.md) — surprising behaviors, misleading errors and their fixes; check it when something fails or behaves unexpectedly
 - [docs/images/](docs/images) — the screenshots the docs embed; shooting them is the `screenshots` skill
 
 Read the relevant one before changing that area. Two are load-bearing: **frontend.md's reactivity rules** (`npm run lint` enforces the no-reactive-`const` one), and **integrations.md's trust tiers** — several upstreams are undocumented and unsanctioned, so don't scale request volume without revisiting them.
 
+## Code conventions
+
+- **Types**: `tsc --noEmit`, strict, over `public/**/*.{ts,tsx}`, plus `e2e/` via `tsconfig.e2e.json` — the backend is plain JS.
+- **Error handling**: routes catch and map through `routeErrorStatus` (client error → 400, upstream → 502, timeout → 504) and reply `{ error }`. An optional source (HLTB, ProtonDB, reviews) that fails logs a `[tag]`-prefixed `console.warn` and degrades instead of failing the request; the UI then says the source didn't answer rather than showing no data.
+- **Lint**: `eslint public`, via eslint-plugin-solid; stays at 0 problems, and the few intended violations carry a targeted `eslint-disable-next-line` with a reason.
+- **Format**: Prettier over the whole tree (`.prettierrc.json`); `npm run format` rewrites, `npm run format:check` verifies. Let it format instead of hand-formatting, and don't fight its output.
+- **Style**: match the existing code; don't reformat code outside the change.
+
 ## Working style
 
-- Be concise and economical everywhere — responses, code comments, doc prose. No filler, no restating what was just done; favor the smallest change that satisfies the request. When more thorough work (deeper investigation, a broader refactor, extra tests) would clearly pay off, say so and let the user decide.
+- Be concise and economical everywhere — responses, code comments, doc prose. No filler, no restating what was just done.
   - Code comments: one line, stating the _why_, only when it isn't obvious from the code; skip the comment entirely if the code speaks for itself. This governs new comments; leave the long-form ones already in the tree alone.
   - Doc prose (this file, `README.md`, `CHANGELOG.md`): short bullets over paragraphs; no preamble, no summary section, lead with the point.
 - Don't re-read a file already read in the current session unless it may have changed.
-- Wait for an explicit go-ahead before implementing, unless the request already states the exact change to make. Before that go-ahead: answer the question asked instead of jumping to implementation, present the options and trade-offs when there are several valid approaches, and draft a plan first for non-trivial changes (multiple files, non-obvious design decisions, refactors).
-  - Once a direction is agreed, carry it through on the recommended option — committing each step, if the series was approved — and ask only at real design forks.
-- Ask clarifying questions as soon as the request is ambiguous, batched into one round.
-- Every question to the user goes through `AskUserQuestion` — including open-ended ones (offer the likely answers; the user can pick _Other_) and go-ahead requests after a plan. Never end a message with a question in prose.
-- Stay in scope: only make the changes asked for, plus the Development workflow checklist below. Flag other issues noticed rather than fixing them unprompted.
-- Match the existing code style and conventions in the file/project rather than imposing personal preference; don't reformat unrelated code.
-- If a rule here is stale or contradicts the code, say so instead of silently following it.
+- Stay in scope: make the smallest change that satisfies the request, plus the Development workflow checklist below. Flag anything else — other issues, alternative approaches with your recommendation, deeper work that would clearly pay off — instead of acting on it.
+- Match the request's intent. A question or request for opinion gets an answer only — no edits or side-effecting commands, even when the fix seems obvious; offer to act instead. When unsure which it is, treat it as a question. An action request gets acted on without further go-ahead, except:
+  - ambiguous request: ask clarifying questions first, batched into one round;
+  - non-trivial change (multiple files, non-obvious design decisions, refactors): draft a plan and wait for approval.
+- When acting on a request, ask only about real choices within it (no clear winner); otherwise apply your recommendation — committing each step, if the series was approved. Every question to the user goes through `AskUserQuestion`, including open-ended ones (offer the likely answers; the user can pick _Other_) and go-ahead requests after a plan. Never end a message with a question in prose.
+- Reuse before writing: existing code, tests and docs first, then the standard library and dependencies already in use. For non-trivial problems with an established solution (parsing, dates, retries…), propose a library instead of hand-rolling it; adding one still needs approval (see Ask first). Flag duplication you spot, including code better moved to a shared module.
+- When a dependency's bug or limitation gets in the way, first check for a newer version or an existing upstream issue. If it's a genuine upstream gap (not a misuse), flag it and propose an upstream issue or PR, with a draft, before working around it. Any interim workaround gets a one-line comment linking the upstream issue.
 - When code models an upstream's behavior (pricing, limits, matching rules) from inference rather than its docs, state the assumption in the plan and confirm it before building on it; record confirmed rules and remaining assumptions in [integrations.md](docs/dev/integrations.md).
+- If a rule here is stale or contradicts the code, say so instead of silently following it.
 
 ## Ask first
 
 - Anything destructive or hard to reverse: `git reset --hard`, `git push --force`, deleting files, deleting or hand-editing `db.sqlite` (`npm run cache:clear` empties its cache tables without touching the file), overwriting the `steam.isonoe.net:prefs` localStorage backup a screenshot run left behind.
+- **Environments**: local dev servers, `dev:mock` and the test suites are safe; the live site (steam.isonoe.net) and its server need explicit approval.
 - Committing or pushing — only when explicitly asked.
-- Adding a new dependency; prefer what's already in use.
+- Outward-facing actions: opening PRs or issues, commenting, posting to external services.
+- Adding a new dependency.
 - Adding a skill, hook, plugin or agent.
 
-## Claude Code setup
+## Where things belong
 
-- Check `.claude/skills/` first: when a request matches a skill there, invoke it rather than improvising — it's the source of truth for the procedure it covers.
-- Multi-step procedures invoked on demand belong in `.claude/skills/`, not in this file — this file is for rules that apply to every task. Suggest a skill, hook, plugin or agent when one fits the task at hand or a procedure recurs.
-- Automated behaviors ("always run X after Y") need hooks in `.claude/settings.json`; instructions in this file can't guarantee them.
-
-## Knowledge sharing
-
-- Project conventions, workflow rules, and architecture decisions belong in this file (or docs linked from it) — they're version-controlled and apply on every machine/session this repo is worked on from, not just the current one.
-- Prefer a linked doc under `docs/` over growing this file when the detail is substantial, as the `docs/dev/` files already do; link to it from here rather than duplicating its content.
-- Facts specific to one person (role, personal working-style preferences, in-progress session/project context) belong in Claude's own memory, not here — this file is loaded for every session working on the repo, not a place for one contributor's personal notes.
-- Secrets, credentials, and ephemeral state belong in neither: `.env` is gitignored, and `default.env` documents every setting.
+- Project conventions, workflow rules, architecture decisions: this file — version-controlled and binding on every machine and session. Substantial detail goes in a `docs/` file linked from Where things are documented above, not duplicated here.
+- Multi-step procedures invoked on demand: `.claude/skills/`. Check there first and invoke a matching skill rather than improvising; it is the source of truth for its procedure, but if it contradicts this file, this file wins — flag the conflict. Suggest a new skill, hook, plugin or agent when one fits the task or a procedure recurs.
+- Automated behaviors ("always run X after Y"): hooks in `.claude/settings.json`; instructions here cannot guarantee them.
+- Facts specific to one person (role, working-style preferences, machine setup, session context): Claude's memory.
+- Secrets, credentials, API keys, `.env` values, ephemeral state: nowhere — never committed. `.env` is gitignored; `default.env` documents every setting.
 
 ## Git workflow
 
@@ -70,16 +74,16 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
 - **Message format**: a plain imperative subject, no Conventional Commits prefix — the `feat:`/`fix:` prefixes in older history were dropped; don't reintroduce them.
 - Ordinary changes commit directly to `main` — this is a solo repo with no PR/review process. A complex feature (multiple concerns, significant refactoring, a new subsystem) spanning more than one commit gets a dedicated branch instead.
 - Close such a branch with a real merge commit (`git merge --no-ff`), never a fast-forward or a rebase onto `main` — the branch is the unit of work and the merge commit is what shows it.
-- Never commit secrets, credentials, API keys, or `.env` values.
-- If a change is accidentally left out of a commit that was just made, amend that commit (`git commit --amend`) rather than adding a separate fixup commit for it.
+- When a change belongs to the unpushed commit just made, amend it (`git commit --amend`) rather than adding a separate fixup commit.
 
 ## Development workflow
 
 After making changes:
 
-1. Check whether existing tests need updating, or new ones are needed, to cover the change, then run `npm run format` and `npm run check` (format check, CHANGELOG structure, tests, typecheck, lint, doc references missing from the code) and report actual results — not assumptions. Fix what it reports; `npm run lint` must stay at 0 problems, and the few intended violations carry a targeted `eslint-disable-next-line` with a reason.
-2. Update any affected documentation — see "Knowledge sharing" above — and `CHANGELOG.md` (see "Changelog" below).
-3. The `pre-commit` hook (`.githooks/pre-commit`, enabled by `npm install`) runs `git diff --cached --check`, then `npm run check`'s steps in parallel — typecheck, lint and `npm run test:e2e` only when `public/`, `e2e/` or a frontend config is staged — and blocks the commit on failure, so once step 1 has passed don't run them again just because a commit is about to happen. A doc reference `check` reports is either stale (fix the doc) or deliberate history (add it to `HISTORY` in `scripts/doc-refs.js`).
+1. Update or add tests to cover the change. Run the single-file command while iterating, then `npm run format` and `npm run check` (format check, CHANGELOG structure, tests, typecheck, lint, doc references missing from the code) once at the end; report actual results, not assumptions. Fix what it reports. Never skip, disable or weaken tests or assertions to get green, and never bypass hooks (`--no-verify`) — report the failure instead.
+2. Update any affected documentation — see Where things belong above — and `CHANGELOG.md` (see Changelog below).
+3. Record what was surprising, misleading or broken, and its fix: as a comment or test when tied to specific code, otherwise in [pitfalls.md](docs/dev/pitfalls.md); machine-specific ones in Claude's memory. Delete entries once obsolete.
+4. The `pre-commit` hook (`.githooks/pre-commit`, enabled by `npm install`) runs `git diff --cached --check`, then `npm run check`'s steps in parallel — typecheck, lint and `npm run test:e2e` only when `public/`, `e2e/` or a frontend config is staged — and blocks the commit on failure, so once step 1 has passed don't run them again just because a commit is about to happen. A doc reference `check` reports is either stale (fix the doc) or deliberate history (add it to `HISTORY` in `scripts/doc-refs.js`).
 
 ## Changelog
 
