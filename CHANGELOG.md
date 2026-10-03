@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `scripts/mock-server.js up|down` runs `dev:mock` in the background and waits until its modules load; `scripts/ux-measure.js` writes a Playwright file measuring routes at desktop and phone widths.
+
 ### Changed
 
 - `npm run check` fails a CHANGELOG entry over 400 characters, keeping entries to one user-facing line.

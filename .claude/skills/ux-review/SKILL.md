@@ -16,7 +16,7 @@ Judges the app against [docs/dev/scenarios.md](../../../docs/dev/scenarios.md), 
 
 ## Which server
 
-- **Mocked first: `npm run dev:mock` (`:58993`)** for clarity, layout, keyboard, consistency and the empty/error states — `document.cookie = 'mock=no-itad'` (or `upstream-down`, `slow`) before a load switches one on; clear it after. Its storage is separate from the real prefs, so no seed/restore; start from Home with `alice`, `bob`, `carol` (`e2e/fixtures.ts`). A state the fixtures lack is a gap in `e2e/mockApi.ts` to report, not a reason to switch servers.
+- **Mocked first: `npm run dev:mock` (`:58993`; `node scripts/mock-server.js up` starts or reuses it, `down` stops it)** for clarity, layout, keyboard, consistency and the empty/error states — `document.cookie = 'mock=no-itad'` (or `upstream-down`, `slow`) before a load switches one on; clear it after. Its storage is separate from the real prefs, so no seed/restore — but it keeps earlier runs' lists, so start clean: `node scripts/ux-measure.js --fresh /` and run it (clears it, sets `alice`; `bob`, `carol` are in `e2e/fixtures.ts`). A state the fixtures lack is a gap in `e2e/mockApi.ts` to report, not a reason to switch servers.
 - **Real: `npm run dev` (`:58991`)** only for what mocks can't show — loading and progress on a real library, freshness ages, real upstream failures — and for scenarios needing real data. Those visits need the demo state below.
 
 ## Demo state (real server only) — before the first page load
@@ -49,6 +49,7 @@ Check at each step:
 
 ## Mechanics
 
+- **Layout per route**: `node scripts/ux-measure.js [--state=…] --name=ux-<scenario> /route…`, then `browser_run_code_unsafe` with `filename: .playwright-mcp/measure.js` — first-row position, block heights, overflow and console errors at both widths, with screenshots.
 - **Batch each step in one `browser_run_code_unsafe` call**: act, then measure with `page.evaluate` (focus, bounding boxes, computed styles, accessible names, `scrollWidth > innerWidth`), then screenshot. Far cheaper than click-by-click snapshots.
 - **Screenshots** go to `.playwright-mcp/ux-<scenario>-<what>.png` (gitignored — never `docs/images/`); `Read` them to look, `magick <in> -crop WxH+X+Y <out>` for detail.
 - **Native dialogs** (`prompt`/`confirm`) block the page: register `page.once('dialog', …)` before the click that opens one.
