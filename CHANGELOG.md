@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- On a phone, a list's header card is shorter: its facts sit in one row you swipe, and a bundle's or comparison's less-used buttons fold behind ⋯, Share view and Reset view are icons, and the table's toolbar is tighter — a bundle's games now start about a third of the screen higher.
+
 ### Fixed
 
 - When a game's Steam store page or tags fail to load, the columns they fill (genres, release date, Metacritic, platforms, tags…) show ⚠ and the list says the Steam store didn't answer, instead of showing no data.

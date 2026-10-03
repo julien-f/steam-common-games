@@ -48,7 +48,7 @@ UX backlog from the 2026-09-27 and 2026-10-03 (mocked, `npm run dev:mock`) revie
 
 ## Phone
 
-- **U30 · minor · I1, F3** — on a 390 px phone the table now shows name, rating and length, but still starts ~48 % down the screen (Compare ~68 %, a bundle's page ~85 %): the hero card, status line, Share/Reset row and a two-line toolbar sit above it. Collapse them (e.g. hero tiles folded, toolbar on one row).
+- **U30 · minor · I1, F3** — on a 390 px phone the table now starts ~48 % down the screen on Owned, ~57 % on Compare and a bundle's page (was up to ~85 %): the hero folds and the view buttons are icons, but the toolbar still takes two lines and Share/Reset their own row. Next: move them into the toolbar line once `@vates/data-table-solid` has a toolbar slot (upstream PR drafted).
 - **U32 · minor · I1, R1** — the ranking screen stacks cards vertically (Tie/Skip/Undo below the fold) and has no side gutter.
 - **U33 · minor · F3** — no random pick on phone until a panel is open (the 🎲 lives in the panel's nav).
 

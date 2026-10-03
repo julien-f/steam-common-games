@@ -3375,6 +3375,31 @@ kbd {
   gap: 8px;
   margin-bottom: 10px;
 }
+.list-view-actions .btn-icon {
+  display: none;
+}
+/* Phone: icons only, and the table library's toolbar spacing tightened, so the rows start higher.
+   Share/Reset belong in the toolbar line itself, which the library has no slot for yet. */
+@media (max-width: 768px) {
+  .list-view-actions {
+    margin-bottom: 4px;
+  }
+  .list-view-actions .btn-label {
+    display: none;
+  }
+  .list-view-actions .btn-icon {
+    display: inline;
+  }
+  .list-route .dt-toolbar {
+    padding: 6px 0;
+  }
+  .list-route .dt-toolbar-divider {
+    display: none;
+  }
+  .list-route .dt-active-bar {
+    padding: 4px 0;
+  }
+}
 
 .pref-unsaved-banner {
   display: flex;
@@ -3599,6 +3624,10 @@ kbd {
   gap: 12px;
   flex-wrap: wrap;
 }
+/* Phone only: the ⋯ that unfolds the actions marked `hero-secondary` (ListHero.tsx). */
+.list-hero-more {
+  display: none;
+}
 .list-hero-outlink {
   font-size: 13px;
   color: var(--text1);
@@ -3791,6 +3820,36 @@ kbd {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
+@media (max-width: 768px) {
+  .list-hero {
+    padding: 10px 12px;
+  }
+  .list-hero-more {
+    display: inline-flex;
+    order: 1;
+  }
+  .list-hero-actions {
+    gap: 8px;
+  }
+  .list-hero-actions:not(.list-hero-actions--open) .hero-secondary {
+    display: none;
+  }
+  /* One swipeable row instead of a wrapping grid: the facts stay one swipe away, not a screen. */
+  .list-hero-stats {
+    flex-wrap: nowrap;
+    gap: 20px;
+    margin-top: 10px;
+    padding-top: 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    /* Hints at tiles past the edge. */
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  }
+  .list-stat {
+    flex: none;
+    white-space: nowrap;
+  }
+}
 /* Prose under the tiles: ITAD's own bundle note ("Keys expire. Please redeem before …") — often
    the most human thing on the page — or a dynamic list's formula, both on their own line rather
    than folded in among the tiles. */

@@ -14,11 +14,24 @@ function withNavigator(t, clipboard) {
   });
 }
 
-// A button flat enough to assert against — .classList is only touched when copiedClass is given.
-function fakeBtn(text = '🔗') {
+// A button flat enough to assert against, its children plain `{ text }` nodes — .classList is only
+// touched when copiedClass is given.
+function fakeBtn(...texts) {
   const classes = new Set();
+  let nodes = (texts.length ? texts : ['🔗']).map((text) => ({ text }));
   return {
-    textContent: text,
+    get childNodes() {
+      return nodes;
+    },
+    get textContent() {
+      return nodes.map((n) => n.text).join('');
+    },
+    set textContent(text) {
+      nodes = [{ text }];
+    },
+    replaceChildren: (...next) => {
+      nodes = next;
+    },
     title: 'Copy link',
     classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), has: (c) => classes.has(c) },
   };
@@ -62,6 +75,16 @@ test('copyWithFeedback: swaps label/title/class, then restores them', async (t) 
   assert.equal(btn.textContent, '🔗');
   assert.equal(btn.title, 'Copy link');
   assert.equal(btn.classList.has('x--copied'), false);
+});
+
+test('copyWithFeedback: restores a label made of several nodes as they were', async (t) => {
+  withNavigator(t, { writeText: async () => {} });
+  const btn = fakeBtn('🔗', ' Share view');
+  const before = [...btn.childNodes];
+  copyWithFeedback(btn, 'https://example.test/?tv=x');
+  await new Promise((r) => setTimeout(r, COPIED_MS + 10));
+  assert.deepEqual(btn.childNodes, before);
+  assert.equal(btn.childNodes[1], before[1]);
 });
 
 test('copyWithFeedback: leaves the button alone when the copy failed', async (t) => {
