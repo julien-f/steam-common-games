@@ -53,7 +53,6 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 
 - **U30 · minor · I1, F3** — on a 390 px phone the table now starts ~48 % down the screen on Owned, ~57 % on Compare and a bundle's page (was up to ~85 %): the hero folds and the view buttons are icons, but the toolbar still takes two lines and Share/Reset their own row. Next: move them into the toolbar line once `@vates/data-table-solid` has a toolbar slot (upstream PR drafted).
 - **U32 · minor · I1, R1** — the ranking screen stacks cards vertically (Tie/Skip/Undo below the fold) and has no side gutter.
-- **U65 · minor · I1, L4** — row checkboxes are 13×13 px; a tap 12 px below one, inside its 29×45 cell, does nothing. Make the whole select cell the hit target (≥ 24×24).
 - **U33 · minor · F3** — no random pick on phone until a panel is open (the 🎲 lives in the panel's nav).
 
 ## Accounts and first visit

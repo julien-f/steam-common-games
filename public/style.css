@@ -4792,3 +4792,12 @@ kbd {
   color: var(--accent);
   font-size: 12px;
 }
+
+/* Phone: the table's checkboxes at a usable tap size; the library draws them at the native 13 px. */
+@media (max-width: 768px) {
+  .dt-table input[type='checkbox'] {
+    width: 24px;
+    height: 24px;
+    margin: 0;
+  }
+}
