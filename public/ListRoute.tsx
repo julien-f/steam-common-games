@@ -3009,6 +3009,81 @@ export default function ListRoute() {
         </Show>
       </div>
       {(kind === 'wishlist' || kind === 'bundle') && <div class="price-status">{priceStatusText()}</div>}
+      {/* Outside the selection-gated block below on purpose — "Add"/"Remove" both clear the
+          selection right after acting (Add explicitly; Remove via load()'s own reset), and the
+          whole point of this message is to confirm what just happened *after* that clears. */}
+      <div
+        class="selection-status"
+        classList={{ 'is-visible': !!selectionActionStatus() }}
+        role="status"
+        onMouseEnter={holdSelectionStatus}
+        onMouseLeave={(e) => e.currentTarget.contains(document.activeElement) || resumeSelectionStatus()}
+        onFocusIn={holdSelectionStatus}
+        onFocusOut={(e) => e.currentTarget.matches(':hover') || resumeSelectionStatus()}
+      >
+        {selectionActionStatus()?.text}
+        <Show when={selectionActionStatus()?.listId}>{(listId) => <A href={`/lists/${listId()}`}>Open list</A>}</Show>
+      </div>
+      <Show when={tableReady() && !userList() && getAuthUser() && isUnsaved(viewPrefKey(), currentViewState())}>
+        <div class="pref-unsaved-banner">
+          Unsaved changes to this view ({summarizeViewDiff(viewPrefKey(), currentViewState()).join(', ')}) — differs
+          from what's saved to your account.
+          <button type="button" class="btn btn-ghost btn-sm" onClick={handleSaveView}>
+            Save
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm" onClick={handleRevertView}>
+            Revert
+          </button>
+        </div>
+      </Show>
+      <Show when={tableReady() && viewingShared()}>
+        <SharedViewBanner onKeep={() => setViewingShared(false)} onDiscard={handleDiscardSharedView} />
+      </Show>
+      <Show when={tableReady()}>
+        <div class="list-view-actions">
+          <button type="button" class="btn btn-ghost btn-sm" onClick={(e) => handleShareView(e.currentTarget)}>
+            🔗 Share view
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm" onClick={handleResetView}>
+            Reset view
+          </button>
+        </div>
+      </Show>
+      <div ref={tableContainer} class="table-container" />
+      {/* The bundle's games with no Steam listing at all (a course, an asset pack, a shop-exclusive
+          key) — there's nothing for the table to show about them (no rating/HLTB/price/ownership),
+          but dropping them silently made the table look like the whole bundle. Collapsed by
+          default, with the count in the summary, so nothing is hidden even when it's closed —
+          which matters: for a bundle of courses these can be the *majority* of what you're buying. */}
+      <Show when={kind === 'bundle' && unresolvedGames().length > 0}>
+        <div class="unresolved-games">
+          <button
+            type="button"
+            class="unresolved-summary"
+            aria-expanded={unresolvedOpen()}
+            onClick={() => setUnresolvedOpen(!unresolvedOpen())}
+          >
+            {unresolvedOpen() ? '▾' : '▸'} {unresolvedGames().length} more in this bundle, not on Steam
+          </button>
+          <Show when={unresolvedOpen()}>
+            <ul class="unresolved-list">
+              <For each={unresolvedGames()}>
+                {(game) => (
+                  <li>
+                    <a href={`https://isthereanydeal.com/game/${game.slug}/info/`} target="_blank" rel="noopener">
+                      {game.title}
+                    </a>
+                    <Show when={game.type}>
+                      <span class="unresolved-type">{game.type}</span>
+                    </Show>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Show>
+        </div>
+      </Show>
+      {/* Last, and stuck to the bottom: appearing above the table shifted every row under the pointer. */}
       <Show when={selectedRows().length > 0}>
         <div class="selection-toolbar">
           <span class="selection-count">{selectedRows().length} selected</span>
@@ -3126,80 +3201,6 @@ export default function ListRoute() {
           <button type="button" onClick={() => table?.selection.clear()}>
             Clear selection
           </button>
-        </div>
-      </Show>
-      {/* Outside the selection-gated block above on purpose — "Add"/"Remove" both clear the
-          selection right after acting (Add explicitly; Remove via load()'s own reset), and the
-          whole point of this message is to confirm what just happened *after* that clears. */}
-      <div
-        class="selection-status"
-        classList={{ 'is-visible': !!selectionActionStatus() }}
-        role="status"
-        onMouseEnter={holdSelectionStatus}
-        onMouseLeave={(e) => e.currentTarget.contains(document.activeElement) || resumeSelectionStatus()}
-        onFocusIn={holdSelectionStatus}
-        onFocusOut={(e) => e.currentTarget.matches(':hover') || resumeSelectionStatus()}
-      >
-        {selectionActionStatus()?.text}
-        <Show when={selectionActionStatus()?.listId}>{(listId) => <A href={`/lists/${listId()}`}>Open list</A>}</Show>
-      </div>
-      <Show when={tableReady() && !userList() && getAuthUser() && isUnsaved(viewPrefKey(), currentViewState())}>
-        <div class="pref-unsaved-banner">
-          Unsaved changes to this view ({summarizeViewDiff(viewPrefKey(), currentViewState()).join(', ')}) — differs
-          from what's saved to your account.
-          <button type="button" class="btn btn-ghost btn-sm" onClick={handleSaveView}>
-            Save
-          </button>
-          <button type="button" class="btn btn-ghost btn-sm" onClick={handleRevertView}>
-            Revert
-          </button>
-        </div>
-      </Show>
-      <Show when={tableReady() && viewingShared()}>
-        <SharedViewBanner onKeep={() => setViewingShared(false)} onDiscard={handleDiscardSharedView} />
-      </Show>
-      <Show when={tableReady()}>
-        <div class="list-view-actions">
-          <button type="button" class="btn btn-ghost btn-sm" onClick={(e) => handleShareView(e.currentTarget)}>
-            🔗 Share view
-          </button>
-          <button type="button" class="btn btn-ghost btn-sm" onClick={handleResetView}>
-            Reset view
-          </button>
-        </div>
-      </Show>
-      <div ref={tableContainer} class="table-container" />
-      {/* The bundle's games with no Steam listing at all (a course, an asset pack, a shop-exclusive
-          key) — there's nothing for the table to show about them (no rating/HLTB/price/ownership),
-          but dropping them silently made the table look like the whole bundle. Collapsed by
-          default, with the count in the summary, so nothing is hidden even when it's closed —
-          which matters: for a bundle of courses these can be the *majority* of what you're buying. */}
-      <Show when={kind === 'bundle' && unresolvedGames().length > 0}>
-        <div class="unresolved-games">
-          <button
-            type="button"
-            class="unresolved-summary"
-            aria-expanded={unresolvedOpen()}
-            onClick={() => setUnresolvedOpen(!unresolvedOpen())}
-          >
-            {unresolvedOpen() ? '▾' : '▸'} {unresolvedGames().length} more in this bundle, not on Steam
-          </button>
-          <Show when={unresolvedOpen()}>
-            <ul class="unresolved-list">
-              <For each={unresolvedGames()}>
-                {(game) => (
-                  <li>
-                    <a href={`https://isthereanydeal.com/game/${game.slug}/info/`} target="_blank" rel="noopener">
-                      {game.title}
-                    </a>
-                    <Show when={game.type}>
-                      <span class="unresolved-type">{game.type}</span>
-                    </Show>
-                  </li>
-                )}
-              </For>
-            </ul>
-          </Show>
         </div>
       </Show>
     </div>
