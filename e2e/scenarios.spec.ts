@@ -309,6 +309,28 @@ test('B2 edge: with no ITAD key, the Wishlist hides prices and says why', async 
   await expect(page.locator('#panel-section-price')).toContainText(unavailable);
 });
 
+test('D1 edge: Updated ↻ keeps the rows and the selection while it refreshes', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await row(page, 'Portal 2').getByRole('checkbox').check();
+  // Holds the library refresh, so the table can be checked mid-way.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/common-games', async (route) => {
+    await held;
+    await route.fallback();
+  });
+  await page.locator('.list-stat', { hasText: 'Updated' }).click();
+  await expect(page.locator('.list-stat', { hasText: 'Updated' })).toContainText('Refreshing');
+  await expect(rows(page)).toHaveCount(6);
+  await expect(row(page, 'Hades')).toContainText('44.5'); // details still on screen
+  release();
+  await expect(page.locator('.list-stat', { hasText: 'Updated' })).not.toContainText('Refreshing');
+  await expect(rows(page)).toHaveCount(6);
+  await expect(row(page, 'Portal 2').getByRole('checkbox')).toBeChecked();
+});
+
 test('D2: with upstreams down, every game is still listed', async ({ page }) => {
   await mockApi(page, { states: ['upstream-down'] });
   await asPlayer(page, ALICE);

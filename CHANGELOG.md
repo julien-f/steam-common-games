@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Refreshing a list from its Updated tile keeps the games, their details and your selection on screen, and only loads games new to the list, instead of emptying the table and loading every row again.
 - Without an IsThereAnyDeal key, the Wishlist and lists built from it hide their price columns and Prices tile and say prices aren't available here, as the panel's Price card now does, instead of showing "—".
 - The side panel's × works after scrolling the panel; its sticky title bar used to cover it, its ↻ button sitting right underneath.
 - When a game's Steam store page or tags fail to load, the columns they fill (genres, release date, Metacritic, platforms, tags…) show ⚠ and the list says the Steam store didn't answer, instead of showing no data.

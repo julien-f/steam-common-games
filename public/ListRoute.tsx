@@ -1154,6 +1154,29 @@ export default function ListRoute() {
   // reasoning was already applied to bundles when they got a hero card, and now applies to every
   // kind for the same reason. `.list-status:empty` is display:none, so this collapses rather than
   // leaving a gap.
+  function clearTable(): void {
+    setTableReady(false);
+    if (disposeTable) {
+      disposeTable();
+      disposeTable = null;
+    }
+    table = null;
+    setGroupCount(0);
+    setRowsStore([]);
+    rowStore.reset();
+    tableContainer.innerHTML = '';
+  }
+
+  // A refreshed row: the new list's own fields, over the details the kept one already had — not
+  // its placeholder `loading`/`details`/empty name, since a kept row isn't streamed again.
+  function withKept(row: Game, old: Game | undefined): Game {
+    if (!old) return row;
+    const fresh = Object.entries(row).filter(
+      ([key, v]) => v !== undefined && key !== 'loading' && key !== 'details' && !(key === 'name' && !v),
+    );
+    return { ...old, ...Object.fromEntries(fresh) } as Game;
+  }
+
   function updateStatus(): void {
     if (total > 0 && loaded < total) {
       const now = Date.now();
@@ -1727,15 +1750,11 @@ export default function ListRoute() {
 
     const gen = loadGuard.next();
 
-    setTableReady(false);
-    if (disposeTable) {
-      disposeTable();
-      disposeTable = null;
-    }
-    table = null;
-    setGroupCount(0);
-    setRowsStore([]);
-    rowStore.reset();
+    // A ↻ refresh keeps the table, its rows' details and the selection on screen until the new
+    // list is in, then only streams the games new to it.
+    const kept = refresh ? new Map(rowsStore.map((r) => [r.appid, r])) : null;
+    const keptSelection = refresh ? new Set(selectedRows().map((r) => r.appid)) : null;
+    if (!kept) clearTable();
     total = 0;
     loaded = 0;
     loadSamples = [];
@@ -1763,7 +1782,6 @@ export default function ListRoute() {
     // Every kind that has one re-reports it during this load; a kind that doesn't (manual list,
     // recents) must not keep showing the previous list's.
     setFetchedAt(undefined);
-    tableContainer.innerHTML = '';
 
     let initialRows: Game[];
     let streamTargets: { appid: number }[];
@@ -1778,7 +1796,7 @@ export default function ListRoute() {
       setRankedSource(null);
       setRankingState(null);
     }
-    setSelectedRows([]); // a fresh load means a fresh table — nothing carries a prior selection over
+    if (!kept) setSelectedRows([]); // a fresh load means a fresh table — nothing carries a prior selection over
     setSelectionActionStatus(null);
 
     if (kind === 'compare') {
@@ -2148,6 +2166,11 @@ export default function ListRoute() {
       initialRows = initialRows.map((row) => ({ ...row, membership: byAppid.get(row.appid) }));
       setGroupCount(pendingGroups.length);
     }
+    if (kept) {
+      clearTable();
+      initialRows = initialRows.map((row) => withKept(row, kept.get(row.appid)));
+      loaded = initialRows.filter((row) => kept.has(row.appid)).length;
+    }
     setRowsStore(initialRows);
     rowStore.load(initialRows);
     total = initialRows.length;
@@ -2257,6 +2280,7 @@ export default function ListRoute() {
       const restored = table.getViewState();
       const adjusted = groups ? withMembershipGrouping(restored) : withoutMembershipGrouping(restored);
       if (adjusted !== restored) table.setViewState(adjusted);
+      if (keptSelection?.size) table.selection.setAll(tableData().filter((row) => keptSelection.has(row.appid)));
       setTableReady(true);
     }
 
@@ -2308,7 +2332,8 @@ export default function ListRoute() {
     if (hasPrices()) loadWishlistPrices(streamTargets, gen); // runs concurrently, not awaited
     if (kind === 'bundle' && resolvedBundleGames) loadBundlePrices(resolvedBundleGames, gen); // ditto
     if (stampsOwnership) loadMyOwnership(gen); // ditto
-    await streamGameDetails(streamTargets, gen);
+    const toStream = kept ? streamTargets.filter((target) => !kept.has(target.appid)) : streamTargets;
+    if (toStream.length) await streamGameDetails(toStream, gen);
     if (loadGuard.isStale(gen)) return;
     restorePendingShot(); // now that the open game's screenshots/videos have actually arrived
   }

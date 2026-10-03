@@ -22,7 +22,6 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 ## Loading and feedback
 
 - **U7 · minor · L3** — Reset view drops sort/filters instantly with no undo.
-- **U57 · minor · D1** — Updated ↻ on Owned empties the table at once, then re-streams every row (one by one under `mock=slow`, though details are cached), and clears the row selection. Keep the rows and selection on screen and swap in the new set when it lands.
 - **U67 · polish · O1** — `GET /api/metrics` shows `budgets: {}` until the first outbound call, so an operator can't see the ceilings before spending against them. List every budget group with 0 used.
 
 ## Lists and selection
