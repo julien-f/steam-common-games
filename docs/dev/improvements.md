@@ -27,7 +27,6 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 ## Lists and selection
 
 - **U11 · minor · F3** — Filter popover: category pane too narrow (scrolls sideways); the range shows no field label and raw floats (`0 – 99.0202584`, `380.2666…`); "never played" needs max = 0 and then reads "Played (h): 0–0". Label and round; add a "never played" preset.
-- **U61 · minor · C5** — when ProtonDB didn't answer, the Filter's ProtonDB values show one unlabelled blank entry, which would also hold games with no report. Label the empty values ("No report" / "Didn't answer").
 
 ## Comparing
 

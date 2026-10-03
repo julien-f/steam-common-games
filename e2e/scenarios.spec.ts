@@ -77,6 +77,18 @@ test('A1 edge: an account stored without its name picks it up from Home', async 
   await expect(page.getByRole('navigation')).toContainText('Alice');
 });
 
+test('C5 edge: the ProtonDB filter names games with no report apart from Borked ones', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await expect(rows(page)).toHaveCount(4);
+  await page.getByRole('button', { name: 'Filter', exact: true }).click();
+  await page.locator('.dt-filter-cols-search').fill('ProtonDB');
+  await page.locator('[data-filter-col-key="protondb"]').click();
+  const values = page.locator('.dt-dd');
+  await expect(values).toContainText('Borked');
+  await expect(values).toContainText('No report');
+});
+
 test("C4 edge: on a comparison, the panel's Owned by lists every player who owns the game", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare?u=alice&u=bob&u=carol');

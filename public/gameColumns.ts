@@ -115,8 +115,13 @@ export function protonDbValue(tier: string | null | undefined): string | null {
 // end of the sort regardless of ascending/descending, rather than an empty value sorting first
 // under plain ascending lexicographic comparison — games with no ProtonDB data yet shouldn't
 // float to the top just because "" sorts before every real tier name.
+const PROTON_NO_REPORT = 'No report';
+const PROTON_DIDNT_ANSWER = "Didn't answer";
+const isProtonMissing = (v: unknown): boolean =>
+  v == null || v === '' || v === PROTON_NO_REPORT || v === PROTON_DIDNT_ANSWER;
 export const compareProtonTier = compareMissingLast(
   (a, b) => PROTON_TIER_ORDER.indexOf(String(a).toLowerCase()) - PROTON_TIER_ORDER.indexOf(String(b).toLowerCase()),
+  isProtonMissing,
 );
 
 // The generic colored-pill treatment (`.status-badge`, shared style.css rule) — shared with
@@ -126,7 +131,7 @@ export const compareProtonTier = compareMissingLast(
 // suffixed with "?" rather than rendered identically to a confirmed tier of the same name.
 export function renderProtonBadge(v: unknown, row: Row): Node {
   if (v === undefined) return document.createTextNode('…');
-  if (!v) return document.createTextNode('—');
+  if (isProtonMissing(v)) return document.createTextNode('—');
   const span = document.createElement('span');
   span.className = 'status-badge';
   span.style.background = PROTON_TIER_COLORS[String(v).toLowerCase()] || '#52525b';
@@ -756,8 +761,10 @@ function markFailedSources(columns: ColumnDef<Row>[]): ColumnDef<Row>[] {
     const source = COLUMN_SOURCE[col.key];
     if (!source) return col;
     const render = (v: unknown, row: Row): Node => {
+      // The row's own field, not `v`: a column may name a missing value (ProtonDB's "No report").
       // Store-page lists are [] when missing, not null.
-      const missing = v == null || (Array.isArray(v) && v.length === 0);
+      const raw = (row as Record<string, unknown>)[col.key];
+      const missing = raw == null || (Array.isArray(raw) && raw.length === 0);
       if (missing && row.failedSources?.includes(source)) {
         const mark = document.createElement('span');
         mark.className = 'cell-failed';
@@ -1085,6 +1092,14 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
     key: 'protondb',
     label: 'ProtonDB',
     groupable: true,
+    // A missing tier is named, so the filter and grouping tell no report from no answer instead of
+    // listing one blank entry for both (the table library labels a missing scalar '').
+    value: (row) =>
+      row.protondb !== null
+        ? row.protondb
+        : row.failedSources?.includes('protondb')
+          ? PROTON_DIDNT_ANSWER
+          : PROTON_NO_REPORT,
     format: fmt.str,
     render: renderProtonBadge,
     compare: compareProtonTier,
