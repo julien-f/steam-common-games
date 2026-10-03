@@ -17,6 +17,7 @@ Everything else in `default.env` is a limit or a cache lifetime with a sensible 
 
 - **Rate limits** (`*_RATE_LIMIT_MAX`, `MAX_USERS`, `STREAM_MAX_GAMES`, `STREAM_CONCURRENCY`) — per-client request budgets and how much work one request may queue.
 - **Outbound budgets** (`OUTBOUND_HOURLY_MAX`, `OUTBOUND_DAILY_MAX`) — a hard ceiling on requests this app makes to each third-party service per hour and per day, protecting an API key's quota no matter how many clients are asking. `0` disables.
+- **Steam store pacing** (`STORE_MIN_INTERVAL_MS`, 500) — the pause before a store request slot is reused. Leave it: lowering it raises traffic to an undocumented endpoint.
 - **Cache lifetimes** (`*_CACHE_TTL_MINUTES`) — how long each kind of upstream data is kept. They're generous on purpose; every screen that shows cached data says how old it is and offers a ↻ that fetches fresh.
 
 `npm run cache:clear` empties every cache table without deleting the database.
