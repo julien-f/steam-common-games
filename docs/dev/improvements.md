@@ -39,8 +39,6 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 
 ## Ranking
 
-- **U25 · minor · R1, F1** — the ranking card says "1.5h main story" where the table says 2.5 in "All (h)" (itself unclear). Pick one HLTB figure and label it. Still true on a Wishlist ranking (6.3h main story vs. 10.5 All (h)). The card also prints it unrounded and unlabelled ("2011 · Action · Adventure · 63.5999999999").
-
 ## Keyboard and accessibility
 
 - **U50 · minor · I2, L4, C5** — the tables' select-all, group and row checkboxes have no accessible name. `@vates/data-table-solid` renders them with no label hook (its own "select all" label goes unused), so this needs an upstream change: name them "Select all", "Select <group>", "Select <game>".

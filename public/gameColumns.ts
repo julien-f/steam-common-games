@@ -911,7 +911,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   // above. `null` (no HLTB match found) needs the same `withMissingGroup` treatment.
   {
     key: 'hltbAll',
-    label: 'All (h)',
+    label: 'HLTB (h)',
     type: 'number',
     groupable: true,
     format: fmt.dec1,

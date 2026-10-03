@@ -258,7 +258,8 @@ export default function RankRoute() {
     const d = (): GameDetails | null | undefined => details[appid];
     const meta = () => d()?.meta ?? null;
     const year = () => meta()?.releaseDate?.match(/\d{4}/)?.[0];
-    const hltb = () => d()?.hltb?.main;
+    // The table's default HLTB figure (all playstyles), so the card and the row agree.
+    const hltb = () => d()?.hltb?.all;
     const rating = () => {
       const r = d()?.rating;
       const v = r ? computeSteamdbRating(r.positive, r.total) : null;
@@ -286,7 +287,11 @@ export default function RankRoute() {
             </Show>
           </span>
           <span class="rank-card-facts">
-            {[year(), ...(meta()?.genres ?? []).slice(0, 2), hltb() ? `${hltb()}h main story` : null]
+            {[
+              year(),
+              ...(meta()?.genres ?? []).slice(0, 2),
+              hltb() ? `${Math.round(hltb()! * 10) / 10} h to beat` : null,
+            ]
               .filter(Boolean)
               .join(' · ')}
           </span>

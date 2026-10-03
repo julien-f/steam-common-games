@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- A ranking card shows the same How Long To Beat time as the table, rounded and labelled ("10.5 h to beat"), and the table's "All (h)" column is now "HLTB (h)".
+
 ## [0.6.0] - 2026-10-04
 
 ### Added

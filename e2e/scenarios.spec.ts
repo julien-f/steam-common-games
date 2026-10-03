@@ -201,6 +201,16 @@ test('L4 edge: Recently Looked Up lists the latest lookup first, and says it kee
   await expect(page.locator('.list-hero')).toContainText('last 10');
 });
 
+test("R1 edge: a ranking card's HLTB time is the table's, rounded and labelled", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(page.locator('thead th').filter({ hasText: /^HLTB \(h\)/ })).toHaveCount(1);
+  await expect(row(page, 'Hades')).toContainText('44.5');
+  for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
+  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
+  await expect(page.locator('.rank-route')).toContainText('44.5 h to beat');
+});
+
 test('R1: rank chosen games, stop, resume on the same ones', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
