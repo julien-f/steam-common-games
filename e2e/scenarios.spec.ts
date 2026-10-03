@@ -289,6 +289,21 @@ test('D2: with upstreams down, every game is still listed', async ({ page }) => 
   await expect(page.locator('.panel-glance-chip').filter({ hasText: 'HLTB' })).toContainText("didn't answer");
 });
 
+test('D2 edge: a failed Steam store page is marked, not shown as missing data', async ({ page }, testInfo) => {
+  await mockApi(page, { states: ['store-down'] });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await expect(page.locator('.list-status')).toContainText("Steam store didn't answer for 6 games");
+  // The phone layout hides the store columns; the status line above still says it.
+  if (testInfo.project.name === 'desktop')
+    await expect(
+      row(page, 'Hades')
+        .getByTitle(/Steam store didn't answer/)
+        .first(),
+    ).toBeVisible();
+});
+
 test('F1: look up one game from the nav search, in place', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

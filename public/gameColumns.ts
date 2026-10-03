@@ -723,6 +723,8 @@ export const SOURCE_NAMES: Record<string, string> = {
   rating: 'Steam reviews',
   hltb: 'HowLongToBeat',
   protondb: 'ProtonDB',
+  meta: 'Steam store',
+  tags: 'Steam tags',
 };
 const COLUMN_SOURCE: Record<string, string> = {
   steamdbRating: 'rating',
@@ -734,6 +736,18 @@ const COLUMN_SOURCE: Record<string, string> = {
   hltbExtra: 'hltb',
   hltbCompletionist: 'hltb',
   protondb: 'protondb',
+  metacritic: 'meta',
+  releaseDate: 'meta',
+  genres: 'meta',
+  categories: 'meta',
+  developers: 'meta',
+  publishers: 'meta',
+  languages: 'meta',
+  type: 'meta',
+  platforms: 'meta',
+  achievementCount: 'meta',
+  dlcCount: 'meta',
+  tags: 'tags',
 };
 
 // A source that errored shows ⚠ rather than "—", which means it has no data for the game.
@@ -742,7 +756,9 @@ function markFailedSources(columns: ColumnDef<Row>[]): ColumnDef<Row>[] {
     const source = COLUMN_SOURCE[col.key];
     if (!source) return col;
     const render = (v: unknown, row: Row): Node => {
-      if (v == null && row.failedSources?.includes(source)) {
+      // Store-page lists are [] when missing, not null.
+      const missing = v == null || (Array.isArray(v) && v.length === 0);
+      if (missing && row.failedSources?.includes(source)) {
         const mark = document.createElement('span');
         mark.className = 'cell-failed';
         mark.textContent = '⚠';

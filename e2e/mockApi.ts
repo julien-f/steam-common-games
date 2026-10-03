@@ -7,6 +7,7 @@
 //   no-itad        no ITAD_API_KEY: health says so, every ITAD route answers 503 as server.js does
 //   upstream-down  HLTB, ProtonDB and Steam reviews return nothing; ITAD routes answer 502
 //   slow           game details stream in one at a time (dev:mock only — page.route can't stream)
+//   store-down     Steam store pages return nothing (genres, release date, platforms…)
 //   untiered       the Co-op Pack lists every game in its first tier, the pricier one empty (as ITAD sends some)
 import type { Page } from '@playwright/test';
 import { PLAYERS, CATALOG, BUNDLE, PICK_BUNDLE, game, type Player } from './fixtures.ts';
@@ -167,7 +168,9 @@ export function respond(
   const detailsFor = (appid: number) =>
     states.has('upstream-down')
       ? { ...details(appid), rating: null, hltb: null, protondb: null, failed: ['rating', 'hltb', 'protondb'] }
-      : details(appid);
+      : states.has('store-down')
+        ? { ...details(appid), meta: null, failed: ['meta'] }
+        : details(appid);
 
   if (path === '/api/health')
     return json({ ok: true, configured: true, itadConfigured: !states.has('no-itad'), cache: { entries: 0 } });

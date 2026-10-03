@@ -22,7 +22,6 @@ UX backlog from the 2026-09-27 and 2026-10-03 (mocked, `npm run dev:mock`) revie
 
 ## Loading and feedback
 
-- **U54 · minor · D2** — a failed Steam store page (genres, release date, Metacritic, platforms) still shows "—" like missing data; the server already reports it (`failed: ['meta']`). Mark those columns too. (Ratings, HLTB and ProtonDB are done.)
 - **U7 · minor · L3** — Reset view drops sort/filters instantly with no undo.
 
 ## Lists and selection
@@ -72,4 +71,4 @@ States `npm run dev:mock` can't show yet — each needs a fixture or state in `e
 
 ## Not yet reviewed
 
-- A4 (no allowed account has a public friends list); C4–C6, L4, R2, R3, B4, S2 (second pass stopped early); Y1–Y3 (needs a Steam sign-in); D1, D3 (D2 only spot-checked: U54); O1.
+- A4 (no allowed account has a public friends list); C4–C6, L4, R2, R3, B4, S2 (second pass stopped early); Y1–Y3 (needs a Steam sign-in); D1, D3 (D2 only spot-checked); O1.
