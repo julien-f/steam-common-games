@@ -1652,6 +1652,14 @@ export default function ListRoute() {
     setViewingShared(false);
   }
 
+  // A saved list's /lists/<id> link only opens in the browser that has the list.
+  function shareViewFailure(): string | null {
+    const list = userList();
+    if (kind !== 'user' || !list) return null;
+    return list.kind === 'dynamic'
+      ? "This list's link only opens in this browser — 🔗 Share list sends the list itself"
+      : `${list.kind === 'ranked' ? 'Ranked' : 'Manual'} lists can't be shared yet: their link only opens in this browser`;
+  }
   function handleShareView(btn: HTMLElement): void {
     if (!table) return;
     // Owned/Wishlist are whoever is current — without `u=` the recipient would get their own.
@@ -1875,7 +1883,7 @@ export default function ListRoute() {
       if (!list) {
         // Also what a /lists/<id> link from someone else's browser lands on.
         setStatusText(
-          "This list isn't in this browser: it was deleted, or it was made in another one — lists live in the browser that created them. To send a list, use its 🔗 Share list link.",
+          "This list isn't in this browser: it was deleted, or it was made in another one — lists live in the browser that created them. Ask for its 🔗 Share list link instead (combined lists only, for now).",
         );
         return;
       }
@@ -3103,7 +3111,8 @@ export default function ListRoute() {
             type="button"
             class="btn btn-ghost btn-sm"
             aria-label="Share view"
-            title="Copy a link to this table's layout"
+            disabled={shareViewFailure() != null}
+            title={shareViewFailure() ?? "Copy a link to this table's layout"}
             onClick={(e) => handleShareView(e.currentTarget)}
           >
             🔗<span class="btn-label"> Share view</span>

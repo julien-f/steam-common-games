@@ -179,6 +179,18 @@ test('R1: rank chosen games, stop, resume on the same ones', async ({ page }) =>
   await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
 });
 
+test("R3 edge: a ranked list's Share view says why it can't be shared", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await page.getByRole('button', { name: /Rank this list/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading', { name: /^Ranking of/ })).toBeVisible();
+  // Its /lists/<id> link only opens in this browser.
+  const share = page.getByRole('button', { name: 'Share view' });
+  await expect(share).toBeDisabled();
+  await expect(share).toHaveAttribute('title', /can't be shared/);
+});
+
 test('B1: a bundle, then what it adds to my library', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/bundles');

@@ -17,9 +17,7 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 
 ## Sharing
 
-- **U55 · major · R3, S1** — on a ranked or manual list, 🔗 Share view is enabled and copies `/lists/<local-id>?tv=…`; the recipient gets "This list isn't in this browser… use its 🔗 Share list link", a button neither kind has. Disable Share view there with the reason, and don't point the recipient at a button the sender lacks.
 - **U52 · polish · S1** — sharing an unchanged layout still sends `tv=%7B%7D`, so the recipient gets "This table uses a layout from a shared link" for a layout that is just the defaults. Omit `tv` when nothing differs.
-- **U3 · minor · L2, S1** — a dynamic list has both "🔗 Share list" and "🔗 Share view", in different places. Merge or explain the difference.
 
 ## Loading and feedback
 
