@@ -9,17 +9,7 @@ Read-only by default. Nothing below writes until the "Applying" section, which n
 
 ## 1. Unused and missing
 
-Every `dependencies`/`devDependencies` entry must be reachable from source, a config file, or an npm script — grep for the package name across `server.js lib public scripts test vite.config.js eslint.config.mjs package.json`, including comments and `docs/`.
-
-The reverse direction catches phantom deps — bare specifiers imported but never declared:
-
-```sh
-grep -rhoE "(require\(['\"][^'\"]+['\"]\)|from ['\"][^'\"]+['\"]|import\(['\"][^'\"]+['\"]\))" \
-  server.js lib public scripts test vite.config.js eslint.config.mjs \
-  | grep -oE "['\"][^'\"]+['\"]" | tr -d "'\"" | grep -vE "^[./]" | sort -u
-```
-
-Known false positive: **`@babel/core` is never imported directly.** It's the required peer of `@babel/eslint-parser` and is declared explicitly on purpose — see `docs/dev/architecture.md`'s `eslint.config.mjs` bullet. Not unused.
+`node scripts/deps-audit.js` — declared packages nothing references (source, configs, npm scripts, `docs/`) and bare imports nothing declares; exits 1 on any finding. `@babel/core` is exempt: it's `@babel/eslint-parser`'s required peer, never imported (`docs/dev/architecture.md`'s `eslint.config.mjs` bullet).
 
 ## 2. Outdated
 
@@ -32,35 +22,18 @@ Known false positive: **`@babel/core` is never imported directly.** It's the req
 
 - `npm ci --dry-run` — read-only; errors (`EUSAGE`) if the lock is out of sync with `package.json`.
 - `npm audit` — expected: 0 vulnerabilities.
-- Duplicate versions, which `npm outdated` never shows:
+- `npm dedupe --dry-run` — any change it lists is a collapsible duplicate. Major splits it can't collapse (e.g. `vite-plugin-solid`'s Babel 7 tree beside the linter's Babel 8) are upstream, dev-only and not findings.
 
-```sh
-node -e '
-const lock=require("./package-lock.json"), byName={};
-for (const [p,v] of Object.entries(lock.packages)) {
-  if (!p.startsWith("node_modules")) continue;
-  (byName[p.slice(p.lastIndexOf("node_modules/")+13)] ??= []).push([p, v.version]);
-}
-for (const [name,list] of Object.entries(byName)) {
-  const vers=[...new Set(list.map(x=>x[1]))];
-  if (vers.length>1) console.log(name, JSON.stringify(vers));
-}'
-```
+## Stale `typescript` peer ranges
 
-Only report a duplicate that `npm dedupe` can actually collapse. A major-version split can't be, and the big one here is upstream: `vite-plugin-solid` pins `@babel/core@^7`, so a whole second Babel 7 tree (~3.5 MB) sits under it alongside the Babel 8 the linter uses. Dev-only, not in the bundle, nothing to do — don't re-propose it every pass.
-
-## Known-benign, don't re-flag as broken
-
-`eslint-plugin-solid`'s nested `@typescript-eslint/*` packages peer-require `typescript >=4.8.4 <6.1.0`, which no published version has widened for TypeScript 7. This used to make `npm install`/`npm ci` print ~78 `ERESOLVE` warnings and `npm ls --all` exit non-zero on an `invalid` `typescript@7.0.2`. Fixed by `package.json`'s `overrides` block, which points those four packages' `typescript` peer at the root spec — safe because nothing there loads TypeScript (the linter parses with Babel; no rule is type-aware), and the resolved tree is unchanged.
-
-So both should now be silent. If either comes back, the cause is a _new_ package with the same stale peer range, not the old one — add it to `overrides` the same way rather than re-declaring the noise benign. Bumping `eslint-plugin-solid` never silenced it: the constraint is on the nested package.
+An `ERESOLVE` warning, or `npm ls --all` exiting non-zero on an `invalid` `typescript`, means a new package has a stale `typescript` peer range: add it to `package.json`'s `overrides` like the existing `@typescript-eslint/*` entries (safe — nothing there loads TypeScript), rather than bumping `eslint-plugin-solid` or declaring the noise benign.
 
 ## Applying
 
 Confirm the changes first, then:
 
 1. `npm update` for in-range drift, `npm install <pkg>@latest` for a range bump.
-2. Run the pre-commit gate by hand before committing — `npm run format:check`, `npm test`, `npm run typecheck`, `npm run lint` (0 problems) — plus `npm run build` for anything in the Vite/Babel/Solid chain, which the hook doesn't cover. Report real output.
+2. `npm run check`, plus `npm run build` — the one step neither it nor the hook covers. Report real output.
 3. A lockfile-only change is still a code change: `CHANGELOG.md` entry in the same commit, per `CLAUDE.md`.
 4. Surface new lint violations from a plugin bump rather than silencing them with `eslint-disable`.
 
