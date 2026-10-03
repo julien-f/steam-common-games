@@ -1666,6 +1666,37 @@ test('GET /api/game-bundles/:appid: 200 with the bundles the game is in', async 
   ]);
 });
 
+test('GET /api/game-bundles/:appid: adds Fanatical pick-and-mix tiers to a null-price bundle', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  setCache('itad-gid:400', 'gid-1');
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url).startsWith('https://www.fanatical.com/'))
+      return {
+        ok: true,
+        json: async () => ({
+          pickandmix: [{ slug: 'byo-test', tiers: [{ quantity: 3, price: { EUR: 500 } }], products: [] }],
+        }),
+      };
+    return {
+      ok: true,
+      json: async () => [
+        {
+          id: 43,
+          title: 'BYO',
+          page: { name: 'Fanatical' },
+          url: 'https://www.fanatical.com/en/pick-and-mix/byo-test',
+          tiers: [{ price: null, games: [{ id: 'gid-1' }] }],
+        },
+      ],
+    };
+  });
+  const res = await api.get('/api/game-bundles/400');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.bundles[0].tierPrice, null);
+  assert.deepEqual(res.body.bundles[0].pickAndMix, [{ quantity: 3, prices: { EUR: 5 } }]);
+});
+
 test('GET /api/game-bundles/:appid: 502 when the upstream call fails', async (t) => {
   _reset();
   process.env.ITAD_API_KEY = 'test-itad-key';

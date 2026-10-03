@@ -115,7 +115,7 @@ import {
 import { getPref, setPref } from './prefs.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
 import { etaSeconds, formatEta, type LoadSample } from './loadProgress.ts';
-import { convert, REGION_CURRENCY } from './currency.ts';
+import { convert, formatWithEstimate, REGION_CURRENCY } from './currency.ts';
 import {
   membershipColumn,
   membershipKey,
@@ -311,6 +311,10 @@ const WISHLIST_DEFAULT_VISIBLE = [
   'bestDealPrice',
   'bestDealCut',
 ];
+
+function regionCurrency(): string {
+  return REGION_CURRENCY[resolveRegion(getStoredRegion())] ?? 'USD';
+}
 
 function renderAddonBadge(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');
@@ -1947,7 +1951,7 @@ export default function ListRoute() {
         noteFetchedAt(bundleFetchedAt);
         setListTitle(bundle.title);
         setBundleLinks({ details: bundle.details, url: bundle.url, fanaticalNames: bundle.pickAndMixNames ?? null });
-        const regionCur = REGION_CURRENCY[resolveRegion(getStoredRegion())] ?? 'USD';
+        const regionCur = regionCurrency();
         const picks = pickTiers(bundle.pickAndMix, regionCur);
         const entryRate = pickRate(picks, 0);
         setBundleMeta({
@@ -2400,7 +2404,7 @@ export default function ListRoute() {
     const account = getEffectiveCurrentAccount();
     if (account && rowsStore.length > 0 && rowsStore.every((r) => r.inLibrary != null)) {
       const fresh = rowsStore.filter((r) => !r.inLibrary);
-      const target = REGION_CURRENCY[resolveRegion(getStoredRegion())] ?? 'USD';
+      const target = regionCurrency();
       // Once per gid: a package's rows each carry the whole package's deal.
       const priced = onePerGid(fresh).map((r) =>
         r.bestDealPrice == null ? null : convert(r.bestDealPrice, r.priceCurrency ?? target, target),
@@ -2433,7 +2437,7 @@ export default function ListRoute() {
                 >
                   {tier.price == null
                     ? 'Varies'
-                    : `${tier.quantity ? `${tier.quantity} for ` : ''}${formatMoney(tier.price, tier.currency)}`}
+                    : `${tier.quantity ? `${tier.quantity} for ` : ''}${formatWithEstimate(tier.price, tier.currency ?? regionCurrency(), regionCurrency())}`}
                 </span>
               )}
             </For>
@@ -3091,7 +3095,9 @@ export default function ListRoute() {
             {(plan) => (
               <>
                 <span class="selection-pick-cost">
-                  <span class="selection-pick-total">{formatMoney(plan().cost, plan().currency)}</span>
+                  <span class="selection-pick-total">
+                    {formatWithEstimate(plan().cost, plan().currency, regionCurrency())}
+                  </span>
                   <span class="selection-pick-detail">{pickPlanDetail(plan(), selectedPickCount())}</span>
                 </span>
                 <Show when={selectedBestDeals(plan().currency)}>

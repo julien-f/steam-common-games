@@ -32,8 +32,18 @@ import {
   peekDlc,
   fetchDlc,
 } from './panelData.ts';
-import type { DlcEntry, PanelAchievements, PanelBundles, PanelDlc, PanelNews, PanelPrice } from './panelData.ts';
-import { bundleUrgency, fmtBundleDateFriendly } from './bundleRows.ts';
+import type {
+  DlcEntry,
+  GameBundle,
+  PanelAchievements,
+  PanelBundles,
+  PanelDlc,
+  PanelNews,
+  PanelPrice,
+} from './panelData.ts';
+import { bestPickRate, bundleUrgency, fmtBundleDateFriendly, pickTiers } from './bundleRows.ts';
+import { formatWithEstimate, REGION_CURRENCY } from './currency.ts';
+import { getStoredRegion, resolveRegion } from './region.ts';
 import { nextHopHistory } from './panelHistory.ts';
 import type { PanelHistoryEntry } from './panelHistory.ts';
 import { setGameTitle } from './pageTitle.ts';
@@ -44,6 +54,14 @@ import type { DetailsAges, Game, PriceFields, ReadonlyGame } from './types.ts';
 import { createSignal, createEffect, createMemo, createResource, createRoot, For, Show, type JSX } from 'solid-js';
 import { render } from 'solid-js/web';
 import { A } from '@solidjs/router';
+
+// A pick-and-mix bundle has no tier price; its best quantity rate stands in, as on its own page.
+function bundleTierText(b: GameBundle): string {
+  if (b.tierPrice != null) return `${formatMoney(b.tierPrice, b.tierCurrency)} tier`;
+  const region = REGION_CURRENCY[resolveRegion(getStoredRegion())] ?? 'USD';
+  const rate = bestPickRate(pickTiers(b.pickAndMix, region));
+  return rate ? `from ${formatWithEstimate(rate.amount, rate.currency, region, '/game')}` : 'Varies';
+}
 
 // Host-page options passed to initPanel. All optional — a page supplies only the hooks it
 // needs; the field names mirror exactly what panel.tsx reads off panelOptions below.
@@ -1543,7 +1561,7 @@ function PanelBundleLines(): JSX.Element {
                     </Show>
                     <span class="panel-price-sep">·</span>
                   </Show>
-                  <span>{b.tierPrice == null ? 'Varies' : `${formatMoney(b.tierPrice, b.tierCurrency)} tier`}</span>
+                  <span>{bundleTierText(b)}</span>
                   <Show when={b.expiry}>
                     <span class="panel-price-sep">·</span>
                     <span

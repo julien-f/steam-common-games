@@ -37,7 +37,6 @@ UX backlog from the 2026-09-27 and 2026-10-03 (mocked, `npm run dev:mock`) revie
 
 ## Bundles and prices
 
-- **U49 · minor · B1, F1** — a Fanatical pick-and-mix bundle prices tiers, the per-game rate and the selection total in $ only, on a EUR region, while the Bundles list adds "≈ €"; the side panel's bundle line says "Varies" where the bundle page shows the rate. Show both currencies and the rate everywhere.
 - **U23 · minor · B1** — every game in a three-tier bundle showed the first tier's price; check the tier mapping against ITAD.
 
 ## Ranking

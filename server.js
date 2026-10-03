@@ -991,7 +991,7 @@ app.get('/api/game-bundles/:appid', gameBundlesLimit, async (req, res) => {
     const gid = (await resolveItadIds([appid])).get(appid);
     if (!gid) return res.json({ bundles: [] });
     const bundles = await getGameBundles(gid, { country: parseCountry(req), force: isForceRefresh(req) });
-    res.json({ bundles: extractGameBundles(bundles, gid) });
+    res.json({ bundles: extractGameBundles(await withPickAndMix(bundles), gid) });
   } catch (err) {
     const status = routeErrorStatus('game-bundles', err);
     res.status(status).json({ error: err.message });

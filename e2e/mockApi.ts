@@ -222,6 +222,7 @@ export function respond(method: string, url: URL, rawBody: string | null): MockR
           expiry,
           tierPrice: tier.price?.amount ?? null,
           tierCurrency: tier.price?.currency ?? null,
+          ...('pickAndMix' in b && { pickAndMix: b.pickAndMix }),
         },
       ];
     });

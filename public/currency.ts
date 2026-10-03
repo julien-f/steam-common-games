@@ -50,8 +50,9 @@ export function convert(amount: number, from: string, to: string): number | null
 }
 
 // A price in its own currency, plus "≈ €9.20" in `target`'s when they differ and a rate is known.
-export function formatWithEstimate(amount: number, currency: string, target: string): string {
-  const own = formatMoney(amount, currency);
+// `unit` follows the own-currency figure: "$1.17/game (≈ €1.00)".
+export function formatWithEstimate(amount: number, currency: string, target: string, unit = ''): string {
+  const own = formatMoney(amount, currency) + unit;
   const estimate = currency === target ? null : convert(amount, currency, target);
   return estimate == null ? own : `${own} (≈ ${formatMoney(estimate, target)})`;
 }

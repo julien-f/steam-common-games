@@ -133,6 +133,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- A Fanatical pick-and-mix bundle in a game's side panel shows its best rate ("from €1.17/game") instead of "Varies"; on the bundle's page, tier chips and the selection total add an "≈ €" estimate when Fanatical only prices in another currency, as the bundle list already did.
 - The selection toolbar sits at the bottom of the screen, below the table, instead of above it: checking the first row no longer pushes every row down under the pointer.
 - Development: `npm run check` runs everything the pre-commit hook does, plus a CHANGELOG structure check and a check that names the docs put in code formatting still exist in the code; the hook now calls it. A shared `.claude/settings.json` allows the check and read-only git commands.
 - Development: `npm run typecheck` also covers the end-to-end tests (`tsconfig.e2e.json`); `E2E_SHOTS=1 npm run test:e2e` saves screenshots of each test to look at a UI change under mocks; the pre-commit hook prints test progress as dots, failures in full.

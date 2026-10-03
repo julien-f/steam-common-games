@@ -33,6 +33,7 @@ import { applyPriceInfo, postPrices } from './priceLoading.ts';
 import { discountPct } from './utils.ts';
 import { getStoredRegion, resolveRegion } from './region.ts';
 import type { Achievements, NewsItem, PriceFields } from './types.ts';
+import type { PickAndMixTier } from './bundleRows.ts';
 
 // `null` throughout means "asked, and there's nothing to show" — a failed fetch (news,
 // achievements, DLC) or no ITAD key configured (price). Every section renders that as its own
@@ -52,6 +53,7 @@ export interface GameBundle {
   expiry: string | null;
   tierPrice: number | null;
   tierCurrency: string | null;
+  pickAndMix?: PickAndMixTier[];
 }
 
 export interface DlcEntry {

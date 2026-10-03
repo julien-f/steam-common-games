@@ -88,6 +88,14 @@ export function cheapestPicks(tiers: PickTier[], n: number): PickPlan | null {
   return plan;
 }
 
+// The lowest per-game rate any quantity tier reaches.
+export function bestPickRate(tiers: PickTier[]): PriceAmount | null {
+  return tiers.reduce<PriceAmount | null>((best, t) => {
+    const amount = t.price.amount / t.quantity;
+    return best && best.amount <= amount ? best : { amount, currency: t.price.currency };
+  }, null);
+}
+
 // The per-game rate `n` picks are charged at; the smallest tier's for none.
 export function pickRate(tiers: PickTier[], n: number): PriceAmount | null {
   const plan = cheapestPicks(tiers, Math.max(n, 1));

@@ -208,18 +208,19 @@ test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }
   await expect(page.getByRole('cell', { name: '1 for $2.00' })).toBeVisible();
   await page.getByRole('cell', { name: 'Test Build Your Own Bundle' }).click();
   await expect(rows(page)).toHaveCount(5);
-  await expect(page.locator('.bundle-tier-chip')).toHaveText(['1 for $2.00', '3 for $3.50']);
+  // USD-only on a EUR region, so each price carries its estimate, as in the bundle list.
+  await expect(page.locator('.bundle-tier-chip')).toHaveText([/^1 for \$2\.00 \(≈ €[\d.]+\)$/, /^3 for \$3\.50 \(≈ €/]);
   await expect(row(page, 'Hades')).toContainText('$2.00/game');
 
   await row(page, 'Portal 2').getByRole('checkbox').check();
-  await expect(page.locator('.selection-pick-total')).toHaveText('$2.00');
+  await expect(page.locator('.selection-pick-total')).toHaveText(/^\$2\.00 \(≈ €[\d.]+\)$/);
   await expect(page.locator('.selection-pick-detail')).toHaveText('1 pick · 1-game tier');
   await expect(page.locator('.selection-pick-savings')).toHaveText(/^(saves .+|.+ more|same as best deals)$/);
   // Two picks cost less at the 3-game tier than bought one at a time.
   await row(page, 'Hades').getByRole('checkbox').check();
-  await expect(page.locator('.selection-pick-total')).toHaveText('$3.50');
+  await expect(page.locator('.selection-pick-total')).toHaveText(/^\$3\.50 \(≈ €/);
   await expect(page.locator('.selection-pick-detail')).toHaveText('2 picks · 3-game tier · 1 more free');
-  await expect(page.locator('.bundle-tier-chip--active')).toHaveText('3 for $3.50');
+  await expect(page.locator('.bundle-tier-chip--active')).toHaveText(/^3 for \$3\.50/);
   await expect(row(page, 'Hades')).toContainText('$1.17/game');
 
   // A package's two rows are one pick, ticked and unticked together.
@@ -244,6 +245,12 @@ test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }
 
   await pack.nth(1).getByRole('checkbox').uncheck();
   await expect(pack.nth(0).getByRole('checkbox')).not.toBeChecked();
+
+  // A game's panel gives the bundle's best rate rather than "Varies".
+  await page.goto('/lists/owned?game=620');
+  await expect(page.locator('.panel-bundle').filter({ hasText: 'Test Build Your Own Bundle' })).toContainText(
+    /from \$1\.17\/game \(≈ €[\d.]+\)/,
+  );
 });
 
 test('F1: look up one game from the nav search, in place', async ({ page }) => {
