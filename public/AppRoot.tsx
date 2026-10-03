@@ -23,6 +23,7 @@ import RankRoute from './RankRoute.tsx';
 import BundlesBrowseRoute from './BundlesBrowseRoute.tsx';
 import SearchRoute from './SearchRoute.tsx';
 import AboutRoute from './AboutRoute.tsx';
+import NotFoundRoute from './NotFoundRoute.tsx';
 
 render(
   () => (
@@ -39,6 +40,7 @@ render(
       <Route path="/search" component={SearchRoute} />
       <Route path="/game/:appid?" component={ListRoute} />
       <Route path="/about" component={AboutRoute} />
+      <Route path="*" component={NotFoundRoute} />
     </Router>
   ),
   document.getElementById('app')!,

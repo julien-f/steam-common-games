@@ -56,6 +56,13 @@ test('A2: explore a friend, then switch back to my ★ account from the nav chip
   await expect(page.getByRole('navigation')).toContainText('Alice');
 });
 
+test('S3 edge: an unknown path says so and links Home', async ({ page }) => {
+  await page.goto('/compare');
+  await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
+  await page.getByRole('link', { name: 'Go to Home' }).click();
+  await expect(page).toHaveURL('/');
+});
+
 test("S3 edge: another browser's list link explains lists are local", async ({ page }) => {
   await page.goto('/lists/not-in-this-browser');
   await expect(page.getByText("This list isn't in this browser")).toBeVisible();
