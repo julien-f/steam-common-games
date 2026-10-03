@@ -2728,7 +2728,7 @@ export default function ListRoute() {
         <Show when={rankSourceRef()}>
           <button
             type="button"
-            class="btn btn-ghost btn-sm"
+            class={`btn btn-ghost btn-sm${kind === 'bundle' ? ' hero-secondary' : ''}`}
             title="Create a list ranking these games by comparing them two at a time, in the table's current order (only the selected or filtered games, if any)"
             disabled={rankThisListFocus()?.length === 0}
             onClick={handleRankThisList}
@@ -2753,7 +2753,11 @@ export default function ListRoute() {
             {/* Gated on the players in the URL, not on the ones that resolved: a comparison naming
               a private or misspelled profile is exactly when editing them has to be reachable. */}
             <Show when={compareSlots().length >= 2}>
-              <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingPlayers((v) => !v)}>
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm hero-secondary"
+                onClick={() => setEditingPlayers((v) => !v)}
+              >
                 {editingPlayers() ? 'Cancel' : 'Edit players'}
               </button>
             </Show>
@@ -2772,7 +2776,7 @@ export default function ListRoute() {
               </select>
               <button
                 type="button"
-                class="btn btn-ghost btn-sm"
+                class="btn btn-ghost btn-sm hero-secondary"
                 title="Keep this comparison as a list of your own"
                 onClick={handleSaveComparison}
               >
@@ -2785,7 +2789,7 @@ export default function ListRoute() {
           <>
             <Show when={bundleLinks().details}>
               {(details) => (
-                <a class="list-hero-outlink" href={details()} target="_blank" rel="noopener">
+                <a class="list-hero-outlink hero-secondary" href={details()} target="_blank" rel="noopener">
                   View on IsThereAnyDeal ↗
                 </a>
               )}
@@ -2813,7 +2817,7 @@ export default function ListRoute() {
                 What does this add?
               </A>
             </Show>
-            <a class="btn btn-ghost btn-sm" href="/bundles">
+            <a class="btn btn-ghost btn-sm hero-secondary" href="/bundles">
               ← All bundles
             </a>
           </>
@@ -2925,6 +2929,7 @@ export default function ListRoute() {
         <ListHero
           title={heroTitle()}
           lead={heroLead}
+          secondaryActions={kind === 'bundle' || kind === 'compare'}
           chips={
             <>
               {kind === 'bundle' && (

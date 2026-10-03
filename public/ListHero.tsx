@@ -19,7 +19,7 @@
 // — which a clickable tile (see `onClick`) can't afford, since activating one recomputes the
 // array and the button the user was on would be replaced mid-interaction, dropping keyboard
 // focus. `<Index>` keys by position and patches each tile's contents in place instead.
-import { Index, Show, type JSX } from 'solid-js';
+import { createSignal, Index, Show, type JSX } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
 
 export interface HeroTile {
@@ -55,11 +55,14 @@ export interface ListHeroProps {
   lead?: JSX.Element; // before the title — the bundle route's ‹/› nav
   chips?: JSX.Element; // after the title — kind/shop/account chips
   actions?: JSX.Element; // right-hand side of the title row — refresh, outbound links
+  // Some actions carry `hero-secondary`: on a phone they fold behind a ⋯ toggle.
+  secondaryActions?: boolean;
   tiles?: HeroTile[];
   note?: JSX.Element; // its own line under the tiles — prose (ITAD's note, a list's formula)
 }
 
 export function ListHero(props: ListHeroProps): JSX.Element {
+  const [moreOpen, setMoreOpen] = createSignal(false);
   return (
     <div class="list-hero">
       <div class="list-hero-header">
@@ -69,7 +72,20 @@ export function ListHero(props: ListHeroProps): JSX.Element {
           {props.chips}
         </div>
         <Show when={props.actions}>
-          <div class="list-hero-actions">{props.actions}</div>
+          <div class="list-hero-actions" classList={{ 'list-hero-actions--open': moreOpen() }}>
+            {props.actions}
+            <Show when={props.secondaryActions}>
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm list-hero-more"
+                aria-label="More actions"
+                aria-expanded={moreOpen()}
+                onClick={() => setMoreOpen((v) => !v)}
+              >
+                ⋯
+              </button>
+            </Show>
+          </div>
         </Show>
       </div>
       <Show when={props.tiles?.length}>

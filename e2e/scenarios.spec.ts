@@ -322,6 +322,20 @@ test('F1: look up one game from the nav search, in place', async ({ page }) => {
   expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT');
 });
 
+test("I1 edge: on a phone, a bundle's table starts high, its other actions behind ⋯", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout only');
+  await asPlayer(page, ALICE);
+  await page.goto(`/lists/bundle/${BUNDLE.id}`);
+  await expect(rows(page)).toHaveCount(4);
+  const top = await rows(page)
+    .first()
+    .evaluate((el) => el.getBoundingClientRect().top + scrollY);
+  expect(top).toBeLessThan(560); // 761 with the hero's tiles and actions wrapping
+  await expect(page.getByRole('link', { name: '← All bundles' })).toBeHidden();
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await expect(page.getByRole('link', { name: '← All bundles' })).toBeVisible();
+});
+
 test('I2: into a list from the keyboard — skip link, and R with no panel open', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
