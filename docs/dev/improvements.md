@@ -74,8 +74,6 @@ States `npm run dev:mock` can't show yet — each needs a fixture or state in `e
 - friends lists always private (A4, C4's ◇) and `/api/me` always signed out (Y1–Y3);
 - a static wishlist, so R2's "buying a game drops it from the ranking" can't be shown.
 
-- **U72 · polish · C1, C6, R1, O1** — docs out of step with the app: C1's edge and C6's steps say "the Intersect switch" (it's a Union / Intersect / Subtract / Grouped `<select>`); C6's Expect says membership groups carry the current account's playtime (a comparison has no Played column at all, U71); R1 says "Compare on the list page to resume" (it reads "Compare (all ranked)" once complete); `default.env` says `ITAD_API_KEY` is "only required for the Bundles page" (it also drives Wishlist prices and the panel's price and bundle lines).
-
 ## Not yet reviewed
 
 - A4 (no allowed account has a public friends list); Y1–Y3 (needs a Steam sign-in).

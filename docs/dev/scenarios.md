@@ -53,7 +53,7 @@ Each scenario: **who / goal**, **steps** as a user would take them, **expect** �
 - **Who / goal**: a group of 2–5 friends wants the games they all own, best-rated first.
 - **Steps**: **Compare** → one player box per friend (pick known accounts or type identifiers; or start from A4's **Compare with me** ◇) → submit → read the "everyone" group → sort by rating, filter by tag (e.g. co-op).
 - **Expect**: groups ordered from "all of them" down to "only one"; the URL alone reproduces the comparison; my current account is unchanged.
-- **Edges**: one friend private/unknown; a player box holding a Family; the Intersect switch for a single flat table.
+- **Edges**: one friend private/unknown; a player box holding a Family; **Intersect** in the mode select (Union / Intersect / Subtract / Grouped by membership) for a single flat table.
 
 ### C2 What would one purchase unlock?
 
@@ -82,7 +82,7 @@ Each scenario: **who / goal**, **steps** as a user would take them, **expect** �
 
 - **Who / goal**: find a co-op game we both own that neither of us has worn out.
 - **Steps**: Compare me and a friend → **Intersect** → filter tag co-op → filter low playtime for _both_ of us ◇.
-- **Expect**: per-player playtime columns ◇; today membership groups carry playtime for the current account only (frontend.md, Known gaps).
+- **Expect**: per-player playtime columns ◇; today a comparison has no Played column at all (U71), only the panel's Owned by lists each player's playtime (frontend.md, Known gaps).
 
 ## Lists
 
@@ -115,7 +115,7 @@ Each scenario: **who / goal**, **steps** as a user would take them, **expect** �
 ### R1 ★ Rank my played games
 
 - **Who / goal**: build a personal top list from my library without ranking all of it.
-- **Steps**: Owned → filter (e.g. played > 5 h) → **🏆 Rank N games** → answer pairs with ← / → / ↓ / S / X / Z → stop with Esc halfway → later **Compare** on the list page to resume.
+- **Steps**: Owned → filter (e.g. played > 5 h) → **🏆 Rank N games** → answer pairs with ← / → / ↓ / S / X / Z → stop with Esc halfway → later **Continue: N chosen left** (or **Compare**, for the whole list) on the list page to resume.
 - **Expect**: no answer lost on stop; the progress bar's estimate shrinks; the list sorts by Rank; **ℹ Details** opens the panel without losing the pair.
 - **Edges**: Re-rank a selected game; Exclude one, then bring it back; Undo right after resuming; the source gains/loses a game; Change source keeps answers.
 
