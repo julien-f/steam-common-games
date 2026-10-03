@@ -4,9 +4,35 @@ set -e
 # Whitespace errors and leftover conflict markers in what's being committed.
 git diff --cached --check
 
-npm run -s check
+# npm run check's steps, in parallel; typecheck, lint and the mocked e2e suite only when
+# something they cover is staged.
+ui='^(public|e2e)/|^(playwright\.config\.ts|vite\.config\.js|tsconfig[^/]*\.json|eslint\.config\.[^/]*|package(-lock)?\.json)$'
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
 
-# The mocked end-to-end suite (~15 s), only when the frontend or the tests themselves change.
-if git diff --cached --name-only | grep -qE '^(public|e2e)/|^playwright\.config\.ts$'; then
-  npm run -s test:e2e -- --reporter=dot
+run() {
+  name=$1
+  shift
+  (
+    if "$@" >"$tmp/$name.log" 2>&1; then :; else echo "$name" >>"$tmp/failed"; fi
+  ) &
+}
+
+run format npm run -s format:check
+run changelog npm run -s check:changelog
+run doc-refs npm run -s check:doc-refs
+NODE_OPTIONS=--test-reporter=dot run test npm run -s test
+if git diff --cached --name-only | grep -qE "$ui"; then
+  run typecheck npm run -s typecheck
+  run lint npm run -s lint
+  run e2e npm run -s test:e2e -- --reporter=dot
+fi
+wait
+
+if [ -s "$tmp/failed" ]; then
+  while read -r name; do
+    echo "── $name failed ──"
+    cat "$tmp/$name.log"
+  done <"$tmp/failed"
+  exit 1
 fi
