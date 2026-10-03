@@ -87,6 +87,14 @@ export function listDeps(list: GameList): ListRef[] {
   return [];
 }
 
+const sameRef = (a: ListRef, b: ListRef): boolean =>
+  a.kind === b.kind && a.accountId === b.accountId && a.bundleId === b.bundleId && a.listId === b.listId;
+
+// The ranked lists ordering this source — several can, each by its own criterion.
+export function rankingsOf(source: ListRef): GameList[] {
+  return getLists().filter((l) => l.kind === 'ranked' && !!l.source && sameRef(l.source, source));
+}
+
 // Whether a list is built, at any depth, from a source that has prices (a wishlist or a bundle).
 export function listHasPriceSource(list: GameList, seen = new Set<string>()): boolean {
   if (seen.has(list.id)) return false;

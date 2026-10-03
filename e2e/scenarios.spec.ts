@@ -237,6 +237,23 @@ test("R2 edge: ranking games you don't own offers 'Not interested', not 'Haven't
   await expect(page.getByRole('button', { name: "Haven't played — exclude" })).toHaveCount(0);
 });
 
+test('R2 edge: ranking a list again offers its rankings, or a new one by a criterion', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await page.getByRole('button', { name: /Rank this list/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading', { name: 'Ranking of Alice — Wishlist' })).toBeVisible();
+
+  await page.goto('/lists/wishlist');
+  await page.locator('summary', { hasText: /Rank this list/ }).click();
+  const menu = page.locator('.rank-menu-panel');
+  await expect(menu.getByRole('button', { name: /Ranking of Alice — Wishlist/ })).toBeVisible();
+  await menu.getByRole('textbox', { name: 'What are you ranking by?' }).fill('co-op');
+  await menu.getByRole('button', { name: '+ New ranking' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading', { name: 'Ranking of Alice — Wishlist (co-op)' })).toBeVisible();
+});
+
 test('R2 edge: a Wishlist ranking keeps its price columns', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/wishlist');

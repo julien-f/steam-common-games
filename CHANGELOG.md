@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- 🏆 Rank this list, once the list has rankings, opens a menu to continue one or start another named by its criterion (e.g. "best JRPG"), instead of silently adding a same-named ranking.
 - Ranking a Wishlist or a bundle offers "Not interested — exclude" instead of "Haven't played — exclude", which only fits games you own.
 - Recently Looked Up lists your latest lookup first, in a new **Looked up** column, and says it keeps the last 10.
 - `npm run check` fails a CHANGELOG entry over 400 characters, keeping entries to one user-facing line.

@@ -466,3 +466,16 @@ test('listHasPriceSource: a wishlist or bundle source, at any depth, has prices'
   assert.equal(listHasPriceSource(owned), false);
   assert.equal(listHasPriceSource(manual), false);
 });
+
+test('rankingsOf: the ranked lists ordering the same source', () => {
+  const { createList, rankingsOf } = store();
+  const wish = { kind: 'account-wishlist', accountId: 'a' };
+  const one = createList({ kind: 'ranked', source: wish });
+  const two = createList({ name: 'Ranking (co-op)', kind: 'ranked', source: { ...wish } });
+  createList({ kind: 'ranked', source: { kind: 'account-owned', accountId: 'a' } });
+  createList({ kind: 'dynamic', op: 'union', sources: [wish] });
+  assert.deepEqual(
+    rankingsOf(wish).map((l) => l.id),
+    [one.id, two.id],
+  );
+});

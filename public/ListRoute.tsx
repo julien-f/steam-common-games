@@ -106,6 +106,7 @@ import { renderPanelNav as renderPanelNavShared, stepGameList } from './panelNav
 import { createRowStore } from './rowStore.ts';
 import { createStaleGuard } from './staleGuard.ts';
 import { createStreamBatcher } from './streamBatcher.ts';
+import { bindNavPopover } from './navPopover.ts';
 import { openLightbox } from './lightbox.tsx';
 import {
   panelOpen,
@@ -220,6 +221,7 @@ import {
   getRanking,
   setRanking,
   listHasPriceSource,
+  rankingsOf,
 } from './listsStore.ts';
 import { ranks, progress, pendingFocus, rerank, exclude, type RankingState, type RankingProgress } from './ranking.ts';
 import {
@@ -800,13 +802,72 @@ export default function ListRoute() {
     if (!focus) return '🏆 Rank this list';
     return focus.length ? `🏆 Rank ${focus.length} games` : '🏆 Rank (none shown)';
   }
-  function handleRankThisList(): void {
+  // `criterion` names a further ranking of the same list ("best JRPG"); the first one keeps the default name.
+  function handleRankThisList(criterion = ''): void {
     const source = rankSourceRef();
     if (!source || rankThisListFocus()?.length === 0) return;
+    const name = criterion.trim()
+      ? `Ranking of ${describeListRef(source, createDefaultNaming()).label} (${criterion.trim()})`
+      : undefined;
+    openRanking(createList({ kind: 'ranked', source, name }).id);
+  }
+  function openRanking(listId: string): void {
     const rankOrder = (table?.processedData() ?? []).map((r) => r.appid);
-    navigate(`/lists/${createList({ kind: 'ranked', source }).id}/rank`, {
-      state: { rankFocus: rankThisListFocus() ?? undefined, rankOrder },
-    });
+    navigate(`/lists/${listId}/rank`, { state: { rankFocus: rankThisListFocus() ?? undefined, rankOrder } });
+  }
+  // Read when the menu renders; a ranking made here navigates away, so nothing goes stale on screen.
+  function existingRankings(): GameList[] {
+    const source = rankSourceRef();
+    return source ? rankingsOf(source) : [];
+  }
+  function rankingProgressText(list: GameList): string {
+    const p = progress(getRanking(list.id), new Set(rowsStore.map((r) => r.appid)));
+    const total = p.ranked + p.excluded + p.pending;
+    return p.pending ? `${p.ranked} of ${total} ranked` : `${p.ranked} ranked ✓`;
+  }
+  function RankMenu(): JSX.Element {
+    let details!: HTMLDetailsElement;
+    let panel!: HTMLDivElement;
+    let criterion!: HTMLInputElement;
+    onMount(() => onCleanup(bindNavPopover(details, panel)));
+    return (
+      <details ref={details} class={`rank-menu${kind === 'bundle' ? ' hero-secondary' : ''}`}>
+        <summary class="btn btn-ghost btn-sm">{rankThisListLabel()} ▾</summary>
+        <div ref={panel} class="site-nav-popover-panel rank-menu-panel">
+          <div class="rank-menu-heading">Continue</div>
+          <For each={existingRankings()}>
+            {(list) => (
+              <button
+                type="button"
+                class="rank-menu-item"
+                disabled={rankThisListFocus()?.length === 0}
+                onClick={() => openRanking(list.id)}
+              >
+                <span>{listDisplayName(list, createDefaultNaming())}</span>
+                <small>{rankingProgressText(list)}</small>
+              </button>
+            )}
+          </For>
+          <form
+            class="rank-menu-new"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleRankThisList(criterion.value);
+            }}
+          >
+            <input
+              ref={criterion}
+              type="text"
+              aria-label="What are you ranking by?"
+              placeholder="Ranked by… (optional)"
+            />
+            <button type="submit" class="btn btn-primary btn-sm" disabled={rankThisListFocus()?.length === 0}>
+              + New ranking
+            </button>
+          </form>
+        </div>
+      </details>
+    );
   }
   function handleRerankSelected(): void {
     const list = userList();
@@ -2833,15 +2894,22 @@ export default function ListRoute() {
           </button>
         </Show>
         <Show when={rankSourceRef()}>
-          <button
-            type="button"
-            class={`btn btn-ghost btn-sm${kind === 'bundle' ? ' hero-secondary' : ''}`}
-            title="Create a list ranking these games by comparing them two at a time, in the table's current order (only the selected or filtered games, if any)"
-            disabled={rankThisListFocus()?.length === 0}
-            onClick={handleRankThisList}
+          <Show
+            when={tableReady() && existingRankings().length > 0}
+            fallback={
+              <button
+                type="button"
+                class={`btn btn-ghost btn-sm${kind === 'bundle' ? ' hero-secondary' : ''}`}
+                title="Create a list ranking these games by comparing them two at a time, in the table's current order (only the selected or filtered games, if any)"
+                disabled={rankThisListFocus()?.length === 0}
+                onClick={() => handleRankThisList()}
+              >
+                {rankThisListLabel()}
+              </button>
+            }
           >
-            {rankThisListLabel()}
-          </button>
+            <RankMenu />
+          </Show>
         </Show>
         {kind === 'shared' && (
           <Show when={compareList()}>

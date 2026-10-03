@@ -66,6 +66,7 @@ A bundle joins a combine from its own page: **What does this add?** shows that b
 - Games are asked about in the table's current order: sort the list by Rank, then e.g. Played ↓, and your most-played games get ranked first — handy if you stop part-way. The order you rank in doesn't change the final result.
 - To rank only some games — say, your RPGs, or those you played more than 5 hours (your lists have Played and Last Played columns for the current account, hidden by default) — filter the table, then **Compare N shown** (or select rows, then **Compare N selected**): only those games are asked about, each still placed against the whole ranking. The rest wait until you compare them.
 - It follows its source: games added later are queued for comparison; a removed game drops out, and gets its rank back if it returns. **Change source** keeps every answer already given.
+- A list can have several rankings, each by its own criterion. Once it has one, **🏆 Rank this list** opens a menu: continue a ranking (with its progress), or start a new one named by what you're ranking by, e.g. "best JRPG".
 - A ranked list can't be shared via a link yet.
 - A ranked or combined list built from a Wishlist or a bundle keeps its price columns and Prices tile.
 
