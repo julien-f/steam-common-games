@@ -84,6 +84,19 @@ export function flattenBundleGames(bundle: Bundle): FlatGame[] {
 // and the whole list's prices (↻ Refresh prices).
 // GET /api/bundles/:id's 404: ITAD no longer lists the bundle (see findBundleById in lib/itad.js),
 // as opposed to a transient failure — the one case a saved list's bundle source gets orphaned.
+// A 503: the instance has no IsThereAnyDeal key — a setting, not a failure, so shown without "Error:".
+export class UnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnavailableError';
+  }
+}
+
+// The message to show for a failed bundle load.
+export function loadErrorText(err: unknown): string {
+  return err instanceof UnavailableError ? err.message : `Error: ${(err as Error).message}`;
+}
+
 export class BundleNotFoundError extends Error {
   constructor(message: string) {
     super(message);
@@ -99,6 +112,7 @@ export async function fetchBundleById(
   const res = await fetch(`/api/bundles/${id}${qs}`);
   const data = await res.json();
   if (res.status === 404) throw new BundleNotFoundError(data.error || 'Bundle not found');
+  if (res.status === 503) throw new UnavailableError(data.error);
   if (!res.ok) throw new Error(data.error || 'Bundle lookup failed');
   return { bundle: data.bundle, fetchedAt: data.fetchedAt ?? null };
 }

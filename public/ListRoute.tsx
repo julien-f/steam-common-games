@@ -146,7 +146,7 @@ import {
 import { getAccountOverrideState, accountOverrideStatusText } from './accountOverride.ts';
 import { fetchAccountOverview, fetchAccountWishlist, resolveAccountSummary } from './accountData.ts';
 import { loadRecentGames, addRecentGame, renameRecentGame } from './recentGames.ts';
-import { fetchBundleById, resolveBundleGames, type ResolvedGame, type FlatGame } from './bundleData.ts';
+import { fetchBundleById, loadErrorText, resolveBundleGames, type ResolvedGame, type FlatGame } from './bundleData.ts';
 import {
   bundleTierSummary,
   bundleUrgency,
@@ -2029,7 +2029,7 @@ export default function ListRoute() {
         streamTargets = resolved;
       } catch (err) {
         if (loadGuard.isStale(gen)) return;
-        setStatusText(`Error: ${(err as Error).message}`);
+        setStatusText(loadErrorText(err));
         return;
       }
     } else {

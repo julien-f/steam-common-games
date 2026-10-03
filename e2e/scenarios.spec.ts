@@ -257,7 +257,8 @@ test('B1 edge: with no ITAD key, Bundles says why it is empty', async ({ page })
   await mockApi(page, { states: ['no-itad'] }); // registered last, so it answers first
   await asPlayer(page, ALICE);
   await page.goto('/bundles');
-  await expect(page.getByRole('main')).toContainText('IsThereAnyDeal');
+  await expect(page.getByRole('main')).toContainText("Bundles and prices aren't available on this instance");
+  await expect(page.getByRole('main')).not.toContainText(/ITAD_API_KEY|Error:/);
 });
 
 test('D2: with upstreams down, every game is still listed', async ({ page }) => {

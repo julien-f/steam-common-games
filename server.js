@@ -79,6 +79,8 @@ const BUNDLES_RATE_LIMIT_MAX = Number(process.env.BUNDLES_RATE_LIMIT_MAX);
 // Optional feature — see ITAD_API_KEY's comment in default.env. Checked once here rather than
 // duplicated across every /api/bundles* route handler.
 const isItadConfigured = () => !!process.env.ITAD_API_KEY;
+// Shown to visitors; the setup hint goes to the startup log instead (see app.listen below).
+const ITAD_UNAVAILABLE = "Bundles and prices aren't available on this instance: it isn't connected to IsThereAnyDeal.";
 // Shared by every /api/bundles* route that takes a `country` query param — falls back to US
 // for anything that isn't a plain 2-letter code rather than rejecting the request outright,
 // same "trust but sanitize" treatment as the rest of this app's query params.
@@ -842,7 +844,7 @@ app.get('/api/search-games', gameSearchLimit, async (req, res) => {
 // See lib/itad.js and docs/dev/integrations.md and docs/dev/data.md.
 app.get('/api/bundles', bundlesListLimit, async (req, res) => {
   if (!isItadConfigured()) {
-    return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
+    return res.status(503).json({ error: ITAD_UNAVAILABLE });
   }
   const country = parseCountry(req);
   const offset = Math.max(0, Number(req.query.offset) || 0);
@@ -878,7 +880,7 @@ app.get('/api/bundles', bundlesListLimit, async (req, res) => {
 // old/deleted bundle, or a bad id).
 app.get('/api/bundles/:id', bundlesByIdLimit, async (req, res) => {
   if (!isItadConfigured()) {
-    return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
+    return res.status(503).json({ error: ITAD_UNAVAILABLE });
   }
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -912,7 +914,7 @@ app.get('/api/bundles/:id', bundlesByIdLimit, async (req, res) => {
 const MAX_BUNDLE_RESOLVE_GAMES = 500;
 app.post('/api/bundles/resolve', bundlesResolveLimit, async (req, res) => {
   if (!isItadConfigured()) {
-    return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
+    return res.status(503).json({ error: ITAD_UNAVAILABLE });
   }
   const gids = req.body.gids;
   if (!Array.isArray(gids) || gids.length === 0 || !gids.every((g) => typeof g === 'string' && g)) {
@@ -946,7 +948,7 @@ app.post('/api/bundles/resolve', bundlesResolveLimit, async (req, res) => {
 const MAX_PRICE_LOOKUP_GAMES = 500;
 app.post('/api/prices', pricesLimit, async (req, res) => {
   if (!isItadConfigured()) {
-    return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
+    return res.status(503).json({ error: ITAD_UNAVAILABLE });
   }
   const { gids, appids } = req.body;
   const byGid = Array.isArray(gids) && gids.length > 0;
@@ -992,7 +994,7 @@ app.post('/api/prices', pricesLimit, async (req, res) => {
 
 app.get('/api/game-bundles/:appid', gameBundlesLimit, async (req, res) => {
   if (!isItadConfigured()) {
-    return res.status(503).json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' });
+    return res.status(503).json({ error: ITAD_UNAVAILABLE });
   }
   const appid = Number(req.params.appid);
   if (!Number.isInteger(appid) || appid <= 0) {
@@ -1324,6 +1326,7 @@ if (require.main === module) {
     console.error('Get a key at: https://steamcommunity.com/dev/apikey');
     process.exit(1);
   }
+  if (!isItadConfigured()) console.warn('ITAD_API_KEY is not set: bundles and prices are off (see default.env).');
   app.listen(PORT, HOST, () => {
     console.log(`\nsteam.isonoe.net → http://${HOST}:${PORT}\n`);
   });

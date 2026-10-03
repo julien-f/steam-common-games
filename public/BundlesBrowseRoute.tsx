@@ -75,6 +75,7 @@ import { SharedViewBanner } from './SharedViewBanner.tsx';
 import { setBaseTitle } from './pageTitle.ts';
 import { convert, formatWithEstimate, REGION_CURRENCY } from './currency.ts';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
+import { loadErrorText, UnavailableError } from './bundleData.ts';
 
 const PAGE_SIZE = 50; // ITAD's own max per page (lib/itad.js's getBundles `limit`)
 // How many pages load() fetches back-to-back before handing over to the "Load more" button. The
@@ -372,6 +373,7 @@ export default function BundlesBrowseRoute() {
     if (force) qs.set('refresh', '1');
     const res = await fetch(`/api/bundles?${qs}`);
     const data = await res.json();
+    if (res.status === 503) throw new UnavailableError(data.error);
     if (!res.ok) throw new Error(data.error || 'Failed to load bundles');
     noteFetchedAt(data.fetchedAt ?? null);
     return data.bundles as BundleListItem[];
@@ -408,7 +410,7 @@ export default function BundlesBrowseRoute() {
       setStatusText(rows().length ? '' : 'No current bundles');
     } catch (err) {
       if (loadGuard.isStale(gen)) return;
-      setStatusText(`Error: ${(err as Error).message}`);
+      setStatusText(loadErrorText(err));
     } finally {
       if (!loadGuard.isStale(gen)) setLoading(false);
     }

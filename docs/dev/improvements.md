@@ -38,7 +38,6 @@ UX backlog from the 2026-09-27 and 2026-10-03 (mocked, `npm run dev:mock`) revie
 
 ## Bundles and prices
 
-- **U53 · minor · B1, O1** — with no ITAD key, Bundles shows "Error: IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env" — an instruction for whoever runs the instance, shown to every visitor above an empty table. Say bundles and prices aren't available here; keep the setup hint for the server log.
 - **U23 · minor · B1** — every game in a three-tier bundle showed the first tier's price; check the tier mapping against ITAD.
 
 ## Ranking

@@ -156,7 +156,10 @@ export function respond(
   const body = rawBody ? JSON.parse(rawBody) : {};
 
   if (states.has('no-itad') && ITAD_ROUTE.test(path))
-    return json({ error: 'IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env' }, 503);
+    return json(
+      { error: "Bundles and prices aren't available on this instance: it isn't connected to IsThereAnyDeal." },
+      503,
+    );
   if (states.has('upstream-down') && ITAD_ROUTE.test(path))
     return json({ error: 'IsThereAnyDeal request failed (mock: upstream-down)' }, 502);
   const detailsFor = (appid: number) =>

@@ -1548,6 +1548,9 @@ test('GET /api/bundles: 503 when ITAD_API_KEY is not configured', async () => {
   try {
     const res = await api.get('/api/bundles');
     assert.equal(res.status, 503);
+    // Shown as is to visitors, who can't act on a setup hint.
+    assert.match(res.body.error, /aren't available on this instance/);
+    assert.doesNotMatch(res.body.error, /ITAD_API_KEY|\.env/);
   } finally {
     if (prev !== undefined) process.env.ITAD_API_KEY = prev;
   }
