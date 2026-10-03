@@ -1,7 +1,7 @@
 // Serves every /api call from fixtures.ts inside the browser (page.route), and blocks anything
 // off localhost — so an e2e run needs no backend, touches no database, and sends nothing to
 // Steam, HLTB, IsThereAnyDeal or ProtonDB. Response shapes follow server.js's routes.
-import type { Page, Route } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { PLAYERS, CATALOG, BUNDLE, PICK_BUNDLE, game, type Player } from './fixtures.ts';
 
 const NOW = Date.now();
@@ -123,30 +123,37 @@ function bundleJson(b: typeof BUNDLE | typeof PICK_BUNDLE = BUNDLE) {
   };
 }
 
-const json = (route: Route, body: unknown, status = 200) =>
-  route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+export interface MockResponse {
+  status: number;
+  contentType: string;
+  body: string;
+}
 
-async function handle(route: Route): Promise<void> {
-  const req = route.request();
-  const url = new URL(req.url());
+const json = (body: unknown, status = 200): MockResponse => ({
+  status,
+  contentType: 'application/json',
+  body: JSON.stringify(body),
+});
+
+// Plain request in, response out: shared by mockApi() below and `npm run dev:mock` (vite.config.js).
+export function respond(method: string, url: URL, rawBody: string | null): MockResponse {
   const path = url.pathname;
-  const body = req.postData() ? JSON.parse(req.postData()!) : {};
+  const body = rawBody ? JSON.parse(rawBody) : {};
 
-  if (path === '/api/health')
-    return json(route, { ok: true, configured: true, itadConfigured: true, cache: { entries: 0 } });
-  if (path === '/api/me') return json(route, { steamid: null, prefs: null });
+  if (path === '/api/health') return json({ ok: true, configured: true, itadConfigured: true, cache: { entries: 0 } });
+  if (path === '/api/me') return json({ steamid: null, prefs: null });
 
   if (path === '/api/common-games') {
     const slot: string[] = body.slots?.[0] ?? [];
     const players = slot.map(findPlayer);
     const missing = slot.find((_, i) => !players[i]);
-    if (missing) return json(route, { error: `Cannot find Steam account: "${missing}"` }, 400);
+    if (missing) return json({ error: `Cannot find Steam account: "${missing}"` }, 400);
     const members = players as Player[];
     const appids = [...new Set(members.flatMap((p) => p.owned))];
     const playtime = Object.fromEntries(
       appids.map((a) => [a, Object.fromEntries(members.map((p) => [p.steamid, p.playtime?.[a] ?? 0]))]),
     );
-    return json(route, {
+    return json({
       groups: [{ userIndices: [0], games: appids.map((a) => ({ appid: a, name: game(a).name })) }],
       slots: [members.map(playerJson)],
       playtime,
@@ -159,21 +166,21 @@ async function handle(route: Route): Promise<void> {
     const items = members.flatMap((p) =>
       (p.wishlist ?? []).map((appid) => ({ appid, priority: 0, dateAdded: '2026-01-01' })),
     );
-    return json(route, { items, players: members.map(playerJson), fetchedAt: NOW });
+    return json({ items, players: members.map(playerJson), fetchedAt: NOW });
   }
-  if (path === '/api/friends') return json(route, { friends: [], unavailable: body.members ?? [], fetchedAt: NOW });
+  if (path === '/api/friends') return json({ friends: [], unavailable: body.members ?? [], fetchedAt: NOW });
 
   if (path === '/api/game-details/stream') {
     const lines = (body.games ?? []).map((g: { appid: number }) => `data: ${JSON.stringify(details(g.appid))}\n\n`);
-    return route.fulfill({
+    return {
       status: 200,
       contentType: 'text/event-stream',
       body: `${lines.join('')}data: {"done":true}\n\n`,
-    });
+    };
   }
   const one = path.match(/^\/api\/game-details\/(\d+)$/);
-  if (one) return json(route, details(Number(one[1])));
-  if (/^\/api\/(game-news|achievements)\//.test(path)) return json(route, { items: [], news: [], achievements: [] });
+  if (one) return json(details(Number(one[1])));
+  if (/^\/api\/(game-news|achievements)\//.test(path)) return json({ items: [], news: [], achievements: [] });
 
   if (path === '/api/search-games') {
     const q = (url.searchParams.get('q') ?? '').toLowerCase();
@@ -182,20 +189,20 @@ async function handle(route: Route): Promise<void> {
       name: g.name,
       tinyImage: '',
     }));
-    return json(route, { results });
+    return json({ results });
   }
 
   const bundleGames = [...BUNDLE.games, ...PICK_BUNDLE.games];
   if (path === '/api/bundles') {
-    return json(route, { bundles: [bundleJson(), pickBundleJson()], offset: 0, limit: 50, fetchedAt: NOW });
+    return json({ bundles: [bundleJson(), pickBundleJson()], offset: 0, limit: 50, fetchedAt: NOW });
   }
   if (path === '/api/bundles/resolve') {
-    return json(route, { appids: Object.fromEntries(bundleGames.map((g) => [g.gid, g.appid])) });
+    return json({ appids: Object.fromEntries(bundleGames.map((g) => [g.gid, g.appid])) });
   }
   const bundle = path.match(/^\/api\/bundles\/(\d+)$/);
   if (bundle) {
     const found = { [BUNDLE.id]: bundleJson, [PICK_BUNDLE.id]: pickBundleJson }[Number(bundle[1])];
-    return found ? json(route, { bundle: found(), fetchedAt: NOW }) : json(route, { error: 'Bundle not found' }, 404);
+    return found ? json({ bundle: found(), fetchedAt: NOW }) : json({ error: 'Bundle not found' }, 404);
   }
   const inBundles = path.match(/^\/api\/game-bundles\/(\d+)$/);
   if (inBundles) {
@@ -218,17 +225,17 @@ async function handle(route: Route): Promise<void> {
         },
       ];
     });
-    return json(route, { bundles });
+    return json({ bundles });
   }
   if (path === '/api/prices') {
     const keys: (string | number)[] = body.gids ?? body.appids ?? [];
     const appidOf = (key: string | number) =>
       typeof key === 'number' ? key : [bundleGames.find((g) => g.gid === key)?.appid].flat()[0];
     const prices = Object.fromEntries(keys.flatMap((key) => (appidOf(key) ? [[key, priceInfo(appidOf(key)!)]] : [])));
-    return json(route, { prices, fetchedAt: NOW });
+    return json({ prices, fetchedAt: NOW });
   }
 
-  return json(route, { error: `e2e mock: no fixture for ${req.method()} ${path}` }, 501);
+  return json({ error: `e2e mock: no fixture for ${method} ${path}` }, 501);
 }
 
 export async function mockApi(page: Page): Promise<void> {
@@ -236,5 +243,8 @@ export async function mockApi(page: Page): Promise<void> {
     (url) => url.hostname !== 'localhost' && url.hostname !== '127.0.0.1',
     (route) => route.abort(),
   );
-  await page.context().route('**/api/**', handle);
+  await page.context().route('**/api/**', (route) => {
+    const req = route.request();
+    return route.fulfill(respond(req.method(), new URL(req.url()), req.postData()));
+  });
 }

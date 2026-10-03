@@ -26,6 +26,7 @@ Get a Steam API key at <https://steamcommunity.com/dev/apikey>. An optional `ITA
 
 ```bash
 npm run dev             # Vite on :58991 + Express on :3000, together
+npm run dev:mock        # Vite alone on :58993, /api mocked from the e2e fixtures — for UI work
 npm run check           # everything the pre-commit hook runs: format, CHANGELOG, tests, typecheck, lint
 npm test                # Node's test runner
 npm run test:e2e        # the ★ scenarios in a browser, against mocked data (first: npx playwright install chromium)

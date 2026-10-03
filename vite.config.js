@@ -14,10 +14,31 @@
 // frontend source directory happens to be named public/ too.
 const { defineConfig } = require('vite');
 const solidPlugin = require('vite-plugin-solid');
+const path = require('node:path');
+
+// `npm run dev:mock`: answers /api from e2e/mockApi.ts's fixtures — no backend, no upstream traffic.
+const mock = process.env.MOCK_API === '1';
+const mockApiPlugin = {
+  name: 'mock-api',
+  configureServer(server) {
+    server.middlewares.use(async (req, res, next) => {
+      if (!req.url.startsWith('/api/')) return next();
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      const { respond } = await server.ssrLoadModule(path.join(__dirname, 'e2e/mockApi.ts'));
+      const { status, contentType, body } = respond(
+        req.method,
+        new URL(req.url, 'http://localhost'),
+        chunks.length ? Buffer.concat(chunks).toString() : null,
+      );
+      res.writeHead(status, { 'Content-Type': contentType }).end(body);
+    });
+  },
+};
 
 module.exports = defineConfig({
   root: 'public',
-  plugins: [solidPlugin()],
+  plugins: [solidPlugin(), mock && mockApiPlugin],
   publicDir: false,
   server: {
     // Local dev: `npm run dev:web` serves public/ (now TypeScript, which the plain
@@ -30,16 +51,18 @@ module.exports = defineConfig({
     // browser's concerned, so localStorage/cookies/auth silently reset each time.
     port: 58991,
     strictPort: true,
-    proxy: {
-      '/api': 'http://127.0.0.1:3000',
-      // Steam OpenID sign-in (lib/auth.js) — a real page navigation, not an /api fetch, so it
-      // needs its own proxy entry. The trailing slash matters: Vite's proxy keys are plain
-      // prefix matches, and '/auth' (no slash) also prefixes '/authStore.ts', this app's own
-      // frontend module — every request for it was silently proxied to the backend instead of
-      // served by Vite, which fell through to server.js's SPA catch-all and served index.html
-      // (text/html) in place of the script, breaking the module load entirely.
-      '/auth/': 'http://127.0.0.1:3000',
-    },
+    proxy: mock
+      ? undefined
+      : {
+          '/api': 'http://127.0.0.1:3000',
+          // Steam OpenID sign-in (lib/auth.js) — a real page navigation, not an /api fetch, so it
+          // needs its own proxy entry. The trailing slash matters: Vite's proxy keys are plain
+          // prefix matches, and '/auth' (no slash) also prefixes '/authStore.ts', this app's own
+          // frontend module — every request for it was silently proxied to the backend instead of
+          // served by Vite, which fell through to server.js's SPA catch-all and served index.html
+          // (text/html) in place of the script, breaking the module load entirely.
+          '/auth/': 'http://127.0.0.1:3000',
+        },
   },
   build: {
     outDir: '../dist',

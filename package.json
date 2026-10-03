@@ -9,6 +9,7 @@
     "dev": "concurrently -n backend,frontend -c blue,green \"npm:dev:backend\" \"npm:dev:frontend\"",
     "dev:backend": "node --watch server.js",
     "dev:frontend": "vite",
+    "dev:mock": "MOCK_API=1 vite --port 58993",
     "build": "vite build",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.e2e.json",
     "test": "DB_FILE= node --test test/*.test.js test/*.test.ts",

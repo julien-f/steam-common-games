@@ -14,7 +14,12 @@ Judges the app against [docs/dev/scenarios.md](../../../docs/dev/scenarios.md), 
 - A scenario that's wrong about the app (a step that doesn't exist, a stale expectation) is a finding against the doc.
 - Say which scenarios were walked and which were skipped, and why.
 
-## Demo state — before the first page load
+## Which server
+
+- **Mocked first: `npm run dev:mock` (`:58993`)** for clarity, layout, keyboard, consistency and the empty/error states the fixtures cover. Its storage is separate from the real prefs, so no seed/restore; start from Home with `alice`, `bob`, `carol` (`e2e/fixtures.ts`). A state the fixtures lack is a gap in `e2e/mockApi.ts` to report, not a reason to switch servers.
+- **Real: `npm run dev` (`:58991`)** only for what mocks can't show — loading and progress on a real library, freshness ages, real upstream failures — and for scenarios needing real data. Those visits need the demo state below.
+
+## Demo state (real server only) — before the first page load
 
 **Every app page may write prefs** (opening any table stores its view), so seed before opening _any_ route, account or not, and restore only on the way out.
 
@@ -30,7 +35,7 @@ Each writes `.playwright-mcp/demo-<mode>.js`; run it with `browser_run_code_unsa
 
 ## Walk each scenario
 
-`npm run dev` if not already running (check `curl localhost:58991`). At **1440×900** and **390×844**, following its steps as a user would — mouse first, then keyboard only.
+Start the server(s) you need if not already running (check `curl localhost:58993` / `curl localhost:58991`). At **1440×900** and **390×844**, following its steps as a user would — mouse first, then keyboard only.
 
 Check at each step:
 
@@ -53,7 +58,7 @@ Check at each step:
 
 ## Teardown
 
-Run `demo-restore.js`, then confirm `steam.isonoe.net:prefs.backup` is gone. Don't finish while it's still present.
+After any real-server visit: run `demo-restore.js`, then confirm `steam.isonoe.net:prefs.backup` is gone. Don't finish while it's still present.
 
 ## Record and report
 
