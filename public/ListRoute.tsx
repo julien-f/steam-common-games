@@ -115,6 +115,7 @@ import {
   pickRandomFrom,
   clearRandomQueue,
   clearAllRandomQueues,
+  notifyOwnersChanged,
 } from './panel.tsx';
 import {
   setPanelParam,
@@ -144,7 +145,7 @@ import {
   ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
 import { getAccountOverrideState, accountOverrideStatusText } from './accountOverride.ts';
-import { fetchAccountOverview, fetchAccountWishlist, resolveAccountSummary } from './accountData.ts';
+import { fetchAccountOverview, fetchAccountWishlist, resolveAccountSummary, type GameOwner } from './accountData.ts';
 import { loadRecentGames, addRecentGame, renameRecentGame, MAX_RECENT_GAMES } from './recentGames.ts';
 import {
   fetchBundleById,
@@ -558,6 +559,8 @@ export default function ListRoute() {
   const kind = kindFromPath(location.pathname, params);
 
   let tableContainer!: HTMLDivElement;
+  // A comparison's players who own each game, for the panel's Owned by (getOwners below).
+  let compareOwners: Map<number, GameOwner[]> | null = null;
   const [statusText, setStatusText] = createSignal('');
   const [priceStatusText, setPriceStatusText] = createSignal('');
   // kind === 'bundle' only: the currently open bundle's Steam-resolved games, kept at component
@@ -1900,11 +1903,20 @@ export default function ListRoute() {
       setStatusText('Comparing libraries…');
       let appids: Set<number>;
       try {
+        const owners = new Map<number, GameOwner[]>();
         const { result, sources } = await resolveListWithSources(
           list,
-          createDefaultFetchers({ refresh, onFetchedAt: noteFetchedAt }),
+          createDefaultFetchers({
+            refresh,
+            onFetchedAt: noteFetchedAt,
+            onOwners: (byAppid) => {
+              for (const [appid, members] of byAppid) owners.set(appid, [...(owners.get(appid) ?? []), ...members]);
+            },
+          }),
         );
         if (loadGuard.isStale(gen)) return;
+        compareOwners = owners;
+        notifyOwnersChanged();
         const described = describeSources(list, compareNaming());
         setListSources(
           sources.map((source, i) => ({
@@ -2930,8 +2942,12 @@ export default function ListRoute() {
       refreshGame,
       onTagClick,
       isTagActive,
+      getOwners: (appid) => (compareOwners ? (compareOwners.get(appid) ?? []) : null),
     });
-    onCleanup(unregister);
+    onCleanup(() => {
+      unregister();
+      if (compareOwners) notifyOwnersChanged();
+    });
 
     // The region preference lives in the nav bar's ⚙ popover, which knows nothing about who's
     // showing prices — it just broadcasts. Without this listener (lost with bundles.tsx/

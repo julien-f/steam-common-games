@@ -77,6 +77,8 @@ export interface PanelOptions {
   onNavigateGame?: (appid: number, name: string) => void;
   onClose?: (opts?: { preserveUrl?: boolean }) => void;
   enableTagFilters?: boolean;
+  // The route's own owners for a game (a comparison's players), over the current account's.
+  getOwners?: (appid: number) => GameOwner[] | null;
 }
 
 // ── Shared game side panel ──────────────────────────────────────────────────
@@ -434,6 +436,11 @@ function toggleSection(appid: number, section: string) {
 // refetch every time the source merely recomputed — e.g. `dlcSource` re-runs whenever any
 // section anywhere is expanded/collapsed, and must not turn that into a fresh DLC fetch.
 const [accountRev, setAccountRev] = createSignal(0);
+// Bumped by a route whose `getOwners` answer changed (a comparison resolved, or was left).
+const [ownersRev, setOwnersRev] = createSignal(0);
+export function notifyOwnersChanged(): void {
+  setOwnersRev((n) => n + 1);
+}
 
 // The account whose progress/ownership the panel is answering for — `getEffectiveCurrentAccount`
 // is a plain non-reactive module (accountsStore.ts, deliberately), so its own change event is
@@ -487,9 +494,14 @@ const panelData = createRoot(() => {
   // Both of these are free in practice — myOwnership.ts already holds the current account's
   // owned/wishlist sets (and per-member playtimes) from one fetch shared with the ✓/☆ markers on
   // every table row, so these await a resolved promise rather than making a request.
-  const [owners] = createResource<GameOwner[], string>(appidAndAccount, () => {
+  const ownersKey = createMemo(() => {
+    const key = appidAndAccount();
+    return key == null ? null : `${key}:${ownersRev()}`;
+  });
+  const [owners] = createResource<GameOwner[], string>(ownersKey, () => {
     const appid = openAppid();
-    return appid == null ? [] : getOwnersFor(appid);
+    if (appid == null) return [];
+    return panelOptions.getOwners?.(appid) ?? getOwnersFor(appid);
   });
 
   const [ownership] = createResource<OwnershipStatus | null, string>(appidAndAccount, () => {

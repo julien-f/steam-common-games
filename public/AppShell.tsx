@@ -19,6 +19,7 @@ import { initPanel, isPanelOpen, getPanelGame, panelClose, panelStepHero } from 
 import { bindPanelKeyboardShortcuts } from './panelKeyboard.ts';
 import { initGameSearch } from './gameSearch.ts';
 import { addRecentGame, loadRecentGames } from './recentGames.ts';
+import type { GameOwner } from './accountData.ts';
 import { setPanelParam, setLightboxParam, withAccountParam, COMPARE_PATH } from './urlState.ts';
 import { syncAccountOverrideFromUrl } from './accountOverride.ts';
 import type { Game } from './types.ts';
@@ -62,6 +63,7 @@ interface RouteHandlers {
   refreshGame?: (game: Game) => Promise<void>;
   onTagClick?: (dim: string, value: string) => void;
   isTagActive?: (dim: string, value: string) => boolean;
+  getOwners?: (appid: number) => GameOwner[] | null; // null: the current account's own (panel.tsx)
 }
 let routeHandlers: RouteHandlers = {};
 export function registerRouteHandlers(handlers: RouteHandlers): () => void {
@@ -213,6 +215,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       onRefresh: (game) => routeHandlers.refreshGame?.(game),
       enableTagFilters: true,
       onTagClick: (dim, value) => routeHandlers.onTagClick?.(dim, value),
+      getOwners: (appid) => routeHandlers.getOwners?.(appid) ?? null,
       isTagActive: (dim, value) => routeHandlers.isTagActive?.(dim, value) ?? false,
     });
     initGameSearch({

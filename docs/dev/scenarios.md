@@ -70,7 +70,7 @@ Each scenario: **who / goal**, **steps** as a user would take them, **expect** �
 
 - **Who / goal**: I'm looking at one game and want to know who I could play it with.
 - **Steps**: F1 → the panel's "Owned by" → it lists my friends who own it ◇.
-- **Expect**: today "Owned by" covers only the current account's own members; answering this needs friends' libraries, i.e. one library fetch per friend — check integrations.md's budgets first.
+- **Expect**: today "Owned by" covers the current account's own members, or a comparison's players; answering this needs friends' libraries, i.e. one library fetch per friend — check integrations.md's budgets first.
 
 ### C5 Can everyone actually run it?
 

@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- On a comparison, the side panel's Owned by lists every player who owns the game, with their playtime, instead of only your own account.
 - Refreshing a list from its Updated tile keeps the games, their details and your selection on screen, and only loads games new to the list, instead of emptying the table and loading every row again.
 - Without an IsThereAnyDeal key, the Wishlist and lists built from it hide their price columns and Prices tile and say prices aren't available here, as the panel's Price card now does, instead of showing "—".
 - The side panel's × works after scrolling the panel; its sticky title bar used to cover it, its ↻ button sitting right underneath.

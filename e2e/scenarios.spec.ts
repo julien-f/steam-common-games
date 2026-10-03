@@ -77,6 +77,15 @@ test('A1 edge: an account stored without its name picks it up from Home', async 
   await expect(page.getByRole('navigation')).toContainText('Alice');
 });
 
+test("C4 edge: on a comparison, the panel's Owned by lists every player who owns the game", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare?u=alice&u=bob&u=carol');
+  await row(page, 'Portal 2').getByText('Portal 2').click();
+  const owners = page.locator('#panel-section-owners .panel-owner-name');
+  await expect(owners).toHaveCount(3);
+  expect((await owners.allInnerTexts()).sort()).toEqual(['Alice', 'Bob', 'Carol']);
+});
+
 test('C1: compare three players — one table grouped from "all" to "only one"', async ({ page }) => {
   await page.goto('/lists/compare?u=alice&u=bob&u=carol');
   await expect(groupRows(page)).toHaveCount(6);

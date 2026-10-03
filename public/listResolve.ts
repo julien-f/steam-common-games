@@ -14,7 +14,7 @@
 // answer" principle.
 import type { GameList, ListRef, CombineOp } from './types.ts';
 import { combine, type LabeledSet, type CombineResult } from './combine.ts';
-import { fetchAccountOwnedData, fetchAccountWishlistData } from './accountData.ts';
+import { fetchAccountOwnedData, fetchAccountWishlistData, type GameOwner } from './accountData.ts';
 import { fetchBundleContents, BundleNotFoundError } from './bundleData.ts';
 import { loadRecentGames } from './recentGames.ts';
 import { getList, isBundleReferenced, orphanBundle } from './listsStore.ts';
@@ -176,6 +176,7 @@ export function flattenCombineResult(result: CombineResult): Set<number> {
 export interface DefaultFetchersOptions {
   refresh?: boolean;
   onFetchedAt?: (fetchedAt: number | null) => void;
+  onOwners?: (owners: Map<number, GameOwner[]>) => void; // each account-owned source's members who own each game
 }
 
 // The real ListResolveFetchers, wiring the injectable seam above to actual network calls
@@ -186,11 +187,13 @@ export interface DefaultFetchersOptions {
 export function createDefaultFetchers({
   refresh = false,
   onFetchedAt,
+  onOwners,
 }: DefaultFetchersOptions = {}): ListResolveFetchers {
   return {
     accountOwned: async (accountId) => {
-      const { appids, fetchedAt } = await fetchAccountOwnedData(accountId, { refresh });
+      const { appids, owners, fetchedAt } = await fetchAccountOwnedData(accountId, { refresh });
       onFetchedAt?.(fetchedAt);
+      onOwners?.(owners);
       return appids;
     },
     accountWishlist: async (accountId) => {
