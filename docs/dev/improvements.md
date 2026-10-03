@@ -22,6 +22,7 @@ UX backlog from the 2026-09-27 and 2026-10-03 (mocked, `npm run dev:mock`) revie
 
 ## Loading and feedback
 
+- **U54 · major · D2** — when HLTB, ProtonDB or Steam reviews fail, their columns show "—", exactly like a game with no data; nothing says a source failed or offers a retry (D2's Expect). Mark a failed field apart from a missing one. Reproduce with `mock=upstream-down`.
 - **U7 · minor · L3** — Reset view drops sort/filters instantly with no undo.
 
 ## Lists and selection
@@ -37,6 +38,7 @@ UX backlog from the 2026-09-27 and 2026-10-03 (mocked, `npm run dev:mock`) revie
 
 ## Bundles and prices
 
+- **U53 · minor · B1, O1** — with no ITAD key, Bundles shows "Error: IsThereAnyDeal API not configured — set ITAD_API_KEY in your .env" — an instruction for whoever runs the instance, shown to every visitor above an empty table. Say bundles and prices aren't available here; keep the setup hint for the server log.
 - **U23 · minor · B1** — every game in a three-tier bundle showed the first tier's price; check the tier mapping against ITAD.
 
 ## Ranking
@@ -66,13 +68,11 @@ UX backlog from the 2026-09-27 and 2026-10-03 (mocked, `npm run dev:mock`) revie
 
 ## Review tooling
 
-States `npm run dev:mock` can't show yet — each needs a fixture or switch in `e2e/mockApi.ts`:
+States `npm run dev:mock` can't show yet — each needs a fixture or state in `e2e/mockApi.ts`:
 
-- no images (capsules, avatars): thumbnails and avatars can't be judged (ranking cards still load Steam CDN art directly);
-- no bundle ending within 48 h, so B1's "Ending soon" tile never appears;
-- no ITAD-not-configured, upstream-failure, slow-stream or large-library mode (A1, B1 edges, D1–D3);
+- avatars, and a large library (thousands of games: A1's edge, U30 at scale);
 - friends lists always private (A4) and `/api/me` always signed out (Y1–Y3).
 
 ## Not yet reviewed
 
-- A4 (no allowed account has a public friends list); C4–C6, L4, R2, R3, B4, S2 (second pass stopped early); Y1–Y3 (needs a Steam sign-in); D1–D3 (needs upstream-failure stubs); O1.
+- A4 (no allowed account has a public friends list); C4–C6, L4, R2, R3, B4, S2 (second pass stopped early); Y1–Y3 (needs a Steam sign-in); D1, D3 (D2 only spot-checked: U54); O1.
