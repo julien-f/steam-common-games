@@ -2849,6 +2849,8 @@ export default function ListRoute() {
       <div class="list-hero-nav">
         <button
           type="button"
+          aria-label="Previous bundle"
+          title="Previous bundle"
           disabled={prevBundleId() == null}
           onClick={() => {
             const id = prevBundleId();
@@ -2859,6 +2861,8 @@ export default function ListRoute() {
         </button>
         <button
           type="button"
+          aria-label="Next bundle"
+          title="Next bundle"
           disabled={nextBundleId() == null}
           onClick={() => {
             const id = nextBundleId();

@@ -43,7 +43,7 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 
 ## Keyboard and accessibility
 
-- **U50 · minor · I2, B1, L4, C5** — unnamed controls: every table's select-all, group and row checkboxes; the bundle page's ‹ › (previous/next bundle); every table's image column (a sortable "↕" header, and "⠿ ×" with no label in the Columns picker); the nav's ⚙ renders as an ~8 px glyph, barely visible. Name them ("Select all", "Select <game>", "Image").
+- **U50 · minor · I2, L4, C5** — the tables' select-all, group and row checkboxes have no accessible name. `@vates/data-table-solid` renders them with no label hook (its own "select all" label goes unused), so this needs an upstream change: name them "Select all", "Select <group>", "Select <game>".
 - **U70 · polish · S2** — after the panel's 🔗 copy, the icon becomes ✓ but nothing is announced and `aria-label` stays "Copy link to this game". Announce "Link copied" through a live region.
 - **U28 · polish · I2** — the open game's row is highlighted, but not exposed to assistive tech (`aria-current`); the table library has no per-row attribute hook.
 

@@ -485,6 +485,16 @@ test("I1 edge: on a phone, a bundle's table starts high, its other actions behin
   await expect(page.getByRole('link', { name: '← All bundles' })).toBeVisible();
 });
 
+test('I2 edge: icon-only controls have names', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto(`/lists/bundle/${BUNDLE.id}`);
+  await expect(rows(page)).toHaveCount(4);
+  await expect(page.getByRole('button', { name: 'Previous bundle' })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Next bundle' })).toHaveCount(1);
+  await page.getByRole('button', { name: 'Columns', exact: true }).click();
+  await expect(page.locator('.dt-dd')).toContainText('Image');
+});
+
 test('I2: into a list from the keyboard — skip link, and R with no panel open', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

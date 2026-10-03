@@ -101,6 +101,8 @@ body {
 .site-nav-prefs-btn {
   cursor: pointer;
   list-style: none;
+  font-size: 16px;
+  line-height: 1;
 }
 .site-nav-prefs-btn::-webkit-details-marker {
   display: none;

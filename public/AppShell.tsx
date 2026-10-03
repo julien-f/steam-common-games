@@ -299,8 +299,9 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           </div>
           <AccountChip />
           <details class="site-nav-prefs site-nav-popover" ref={prefsDetailsEl}>
+            {/* U+FE0F asks for the emoji glyph: the text one renders ~8 px in common fallback fonts. */}
             <summary class="site-nav-link site-nav-prefs-btn" aria-label="Preferences">
-              ⚙
+              {'\u2699\uFE0F'}
             </summary>
             {/* eslint-disable-next-line solid/no-innerhtml -- prefsPopoverPanelHtml() is this app's
                 own static markup for the popover's contents (prefsPopover.ts, which then wires the

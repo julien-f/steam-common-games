@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Unnamed controls: a bundle page's ‹ › are announced as Previous/Next bundle, the image column is labelled Image, and the nav's ⚙ is drawn at a visible size.
 - The side panel's section nav highlights the section you jumped to, and the last one at the end of the panel, instead of staying on Overview.
 - An empty Wishlist or library says it's empty or private on Steam (e.g. "Carol's wishlist is empty, or private on Steam."), where the table would be, instead of "No games to show." above an empty table.
 - On a phone, the tables' checkboxes are 24 px instead of 13 px, so a tap beside one no longer misses it.

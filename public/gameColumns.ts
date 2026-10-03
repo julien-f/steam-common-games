@@ -782,7 +782,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   // ── Identity ────────────────────────────────────────────────────────────────
   {
     key: 'capsule',
-    label: '',
+    label: 'Image',
     width: 128,
     sortable: false,
     filterable: false,
