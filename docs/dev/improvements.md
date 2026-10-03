@@ -28,7 +28,6 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 ## Lists and selection
 
 - **U11 · minor · F3** — Filter popover: category pane too narrow (scrolls sideways); the range shows no field label and raw floats (`0 – 99.0202584`, `380.2666…`); "never played" needs max = 0 and then reads "Played (h): 0–0". Label and round; add a "never played" preset.
-- **U13 · major · L2, B3, R2** — a dynamic or ranked list built from the Wishlist loses its price columns (a Wishlist ranking has no Best Deal/Discount at all), so R2's "sort by Rank next to prices" can't be done. Keep them when a source has them.
 - **U61 · minor · C5** — when ProtonDB didn't answer, the Filter's ProtonDB values show one unlabelled blank entry, which would also hold games with no report. Label the empty values ("No report" / "Didn't answer").
 - **U62 · minor · L4** — Recently Looked Up defaults to ↓ Weighted Rating and has no Looked-up column, so the latest lookups aren't on top; it silently keeps only the last 10. Default to recency (or add the column) and say "your last 10 lookups".
 

@@ -87,6 +87,17 @@ export function listDeps(list: GameList): ListRef[] {
   return [];
 }
 
+// Whether a list is built, at any depth, from a source that has prices (a wishlist or a bundle).
+export function listHasPriceSource(list: GameList, seen = new Set<string>()): boolean {
+  if (seen.has(list.id)) return false;
+  seen.add(list.id);
+  return listDeps(list).some((ref) => {
+    if (ref.kind === 'account-wishlist' || ref.kind === 'bundle') return true;
+    const dep = ref.kind === 'user' && ref.listId ? getList(ref.listId) : undefined;
+    return !!dep && listHasPriceSource(dep, seen);
+  });
+}
+
 // ── Cycle detection ──────────────────────────────────────────────────────────────────────────
 
 function userListDeps(sources: ListRef[]): string[] {

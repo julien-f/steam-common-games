@@ -218,6 +218,7 @@ import {
   setListTableView,
   getRanking,
   setRanking,
+  listHasPriceSource,
 } from './listsStore.ts';
 import { ranks, progress, pendingFocus, rerank, exclude, type RankingState, type RankingProgress } from './ranking.ts';
 import {
@@ -437,6 +438,10 @@ const RANK_COLUMN: ColumnDef<Record<string, any>> = {
 };
 const RANKED_COLUMNS = insertColumnsAfter(USER_COLUMNS, 'capsule', RANK_COLUMN);
 const RANKED_DEFAULT_VISIBLE = ['rank', ...RECENT_DEFAULT_VISIBLE];
+// A user list built from a wishlist or a bundle keeps the price columns of its source.
+const USER_PRICED_COLUMNS = insertColumnsAfter(USER_COLUMNS, 'ownershipStatus', ...PRICE_COLUMNS);
+const RANKED_PRICED_COLUMNS = insertColumnsAfter(RANKED_COLUMNS, 'ownershipStatus', ...PRICE_COLUMNS);
+const PRICED_DEFAULT_VISIBLE = ['bestDealPrice', 'bestDealCut'];
 const RANKED_DEFAULT_SORT: SortEntry[] = [{ key: 'rank', dir: 'asc' }];
 
 const DEFAULT_SORT: SortEntry[] = [{ key: 'steamdbRating', dir: 'desc' }];
@@ -582,7 +587,7 @@ export default function ListRoute() {
     try {
       const gen = loadGuard.current();
       if (kind === 'bundle' && resolvedBundleGames) await loadBundlePrices(resolvedBundleGames, gen, true);
-      else if (kind === 'wishlist')
+      else if (hasPrices())
         await loadWishlistPrices(
           rowsStore.map((r) => ({ appid: r.appid })),
           gen,
@@ -1652,6 +1657,11 @@ export default function ListRoute() {
     setViewingShared(false);
   }
 
+  // Wishlist prices, by appid: the Wishlist itself, and a saved list built from one or a bundle.
+  function hasPrices(): boolean {
+    const list = userList();
+    return kind === 'wishlist' || (kind === 'user' && !!list && listHasPriceSource(list));
+  }
   // A saved list's /lists/<id> link only opens in the browser that has the list.
   function shareViewFailure(): string | null {
     const list = userList();
@@ -2144,26 +2154,33 @@ export default function ListRoute() {
 
     {
       const isRanked = userList()?.kind === 'ranked';
+      const priced = kind === 'user' && hasPrices();
       const columns = (isRanked
-        ? RANKED_COLUMNS
+        ? priced
+          ? RANKED_PRICED_COLUMNS
+          : RANKED_COLUMNS
         : kind === 'wishlist'
           ? WISHLIST_COLUMNS
           : kind === 'bundle'
             ? BUNDLE_COLUMNS
             : kind === 'user'
-              ? USER_COLUMNS
+              ? priced
+                ? USER_PRICED_COLUMNS
+                : USER_COLUMNS
               : kind === 'recent' || kind === 'compare' || kind === 'shared'
                 ? RECENT_COLUMNS
                 : OWNED_COLUMNS) as unknown as ColumnDef<Game>[];
       const defaultVisible = isRanked
-        ? RANKED_DEFAULT_VISIBLE
+        ? [...RANKED_DEFAULT_VISIBLE, ...(priced ? PRICED_DEFAULT_VISIBLE : [])]
         : kind === 'wishlist'
           ? WISHLIST_DEFAULT_VISIBLE
           : kind === 'bundle'
             ? BUNDLE_DEFAULT_VISIBLE
-            : kind === 'recent' || kind === 'user' || kind === 'compare' || kind === 'shared'
-              ? RECENT_DEFAULT_VISIBLE
-              : OWNED_DEFAULT_VISIBLE;
+            : kind === 'user' && priced
+              ? [...RECENT_DEFAULT_VISIBLE, ...PRICED_DEFAULT_VISIBLE]
+              : kind === 'recent' || kind === 'user' || kind === 'compare' || kind === 'shared'
+                ? RECENT_DEFAULT_VISIBLE
+                : OWNED_DEFAULT_VISIBLE;
       const sort = isRanked ? RANKED_DEFAULT_SORT : kind === 'bundle' ? BUNDLE_DEFAULT_SORT : DEFAULT_SORT;
       const groups = pendingGroups;
       const names = new Map(listSources().map((source) => [source.key, source.desc.label]));
@@ -2283,7 +2300,7 @@ export default function ListRoute() {
       return;
     }
 
-    if (kind === 'wishlist') loadWishlistPrices(streamTargets, gen); // runs concurrently, not awaited
+    if (hasPrices()) loadWishlistPrices(streamTargets, gen); // runs concurrently, not awaited
     if (kind === 'bundle' && resolvedBundleGames) loadBundlePrices(resolvedBundleGames, gen); // ditto
     if (stampsOwnership) loadMyOwnership(gen); // ditto
     await streamGameDetails(streamTargets, gen);
@@ -2548,7 +2565,7 @@ export default function ListRoute() {
         disabled: refreshing(),
       });
     }
-    if (kind === 'wishlist') tiles.push(priceTile());
+    if (hasPrices()) tiles.push(priceTile());
     const list = combineList();
     if (list) {
       if (list.kind === 'dynamic') {
@@ -2855,7 +2872,7 @@ export default function ListRoute() {
     // from the price lookup.
     const onRegionChange = () => {
       setRegionCode(resolveRegion(getStoredRegion()));
-      if (kind === 'wishlist')
+      if (hasPrices())
         void loadWishlistPrices(
           rowsStore.map((r) => ({ appid: r.appid })),
           loadGuard.current(),
@@ -3074,7 +3091,9 @@ export default function ListRoute() {
         </Show>
         <Show when={failedSummary()}>{(text) => <span class="list-failed">{text()}</span>}</Show>
       </div>
-      {(kind === 'wishlist' || kind === 'bundle') && <div class="price-status">{priceStatusText()}</div>}
+      <Show when={hasPrices() || kind === 'bundle'}>
+        <div class="price-status">{priceStatusText()}</div>
+      </Show>
       {/* Outside the selection-gated block below on purpose — "Add"/"Remove" both clear the
           selection right after acting (Add explicitly; Remove via load()'s own reset), and the
           whole point of this message is to confirm what just happened *after* that clears. */}

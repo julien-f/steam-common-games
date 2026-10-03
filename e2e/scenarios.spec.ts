@@ -191,6 +191,16 @@ test("R3 edge: a ranked list's Share view says why it can't be shared", async ({
   await expect(share).toHaveAttribute('title', /can't be shared/);
 });
 
+test('R2 edge: a Wishlist ranking keeps its price columns', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await page.getByRole('button', { name: /Rank this list/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading', { name: /^Ranking of/ })).toBeVisible();
+  await expect(page.locator('thead th').filter({ hasText: /^Best Deal/ })).toHaveCount(1);
+  await expect(page.locator('.list-hero')).toContainText(/Prices/i);
+});
+
 test('B1: a bundle, then what it adds to my library', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/bundles');

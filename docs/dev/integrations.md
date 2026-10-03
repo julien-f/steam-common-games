@@ -93,7 +93,7 @@ Bundle browsing (`/bundles`, `/lists/bundle/:bundleId`) and every price column i
 
 ### Price lookups from a Steam appid
 
-**A wishlist row only has a Steam appid, not an ITAD game id** — the reverse of a bundle's own games, which start as ITAD gids and get resolved _to_ a Steam appid (`resolveSteamAppIds`, `/api/bundles/resolve`). `loadWishlistPrices` (`ListRoute.tsx`) instead calls the shared `POST /api/prices` with `appids` (see the shared-route bullet above), which resolves them to gids server-side first via `resolveItadIds` before running the identical price lookup — so a wishlist never sees a raw ITAD gid.
+**A wishlist row only has a Steam appid, not an ITAD game id** — the reverse of a bundle's own games, which start as ITAD gids and get resolved _to_ a Steam appid (`resolveSteamAppIds`, `/api/bundles/resolve`). `loadWishlistPrices` (`ListRoute.tsx`) — also used by a saved list built from a wishlist or bundle (`listHasPriceSource`, `listsStore.ts`) — instead calls the shared `POST /api/prices` with `appids` (see the shared-route bullet above), which resolves them to gids server-side first via `resolveItadIds` before running the identical price lookup — so a wishlist never sees a raw ITAD gid.
 
 **Chunked client-side into batches of `MAX_PRICE_LOOKUP_GAMES` (500, mirroring the server's own cap)**, run sequentially rather than in parallel — unlike a bundle's game list (which never exceeds the cap, so `loadBundlePrices` always sends everything in one call), a Steam wishlist can run well past it, and firing several chunks at once would just be several concurrent ITAD-backed requests for no benefit.
 
