@@ -1447,7 +1447,8 @@ tbody tr.game-row.active {
   line-height: 28px;
   text-align: center;
   cursor: pointer;
-  z-index: 1;
+  /* Above the sticky header, which reserves room for it (see .panel-header-sticky). */
+  z-index: 3;
   padding: 0;
 }
 .panel-close:hover {
@@ -1758,6 +1759,13 @@ tbody tr.game-row.active {
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
+  /* Clears the fixed × (.panel-close), which its buttons would otherwise slide under. */
+  padding-right: 26px;
+}
+@media (max-width: 768px) {
+  .panel-title-row {
+    padding-right: 34px;
+  }
 }
 
 /* "← Back to <game>" — only rendered while a DLC-navigation trail is in progress (see

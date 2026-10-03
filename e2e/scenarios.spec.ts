@@ -326,6 +326,16 @@ test('D2 edge: a failed Steam store page is marked, not shown as missing data', 
     ).toBeVisible();
 });
 
+test('F1 edge: the panel closes from its × after scrolling it', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Hades').getByText('Hades').click();
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await page.locator('#panel-body').evaluate((el) => el.scrollTo(0, 400));
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.locator('#game-panel')).toBeHidden();
+});
+
 test('F1: look up one game from the nav search, in place', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
