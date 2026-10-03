@@ -53,6 +53,7 @@ export interface GameBundle {
   expiry: string | null;
   tierPrice: number | null;
   tierCurrency: string | null;
+  tierPriceMax?: number | null;
   pickAndMix?: PickAndMixTier[];
 }
 

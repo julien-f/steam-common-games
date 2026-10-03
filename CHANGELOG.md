@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
-- When IsThereAnyDeal lists a bundle's games all under its cheapest tier and leaves the pricier tiers empty, those games' Tier Price shows the range they could fall in (e.g. €10.55–€18.99) instead of the cheapest tier's price.
+- When IsThereAnyDeal lists a bundle's games all under its cheapest tier and leaves the pricier tiers empty, those games' Tier Price, and the side panel's Price card, show the range they could fall in (e.g. €10.55–€18.99) instead of the cheapest tier's price.
 
 ## [0.5.0] - 2026-10-03
 

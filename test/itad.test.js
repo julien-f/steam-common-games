@@ -513,7 +513,34 @@ test('extractGameBundles: keeps the cheapest tier holding the game, null for a p
       expiry: '2026-10-24T05:59:43+02:00',
       tierPrice: 8,
       tierCurrency: 'USD',
+      tierPriceMax: null,
     },
-    { id: 2, title: 'Pick', shop: 'Fanatical', url: null, expiry: null, tierPrice: null, tierCurrency: null },
+    {
+      id: 2,
+      title: 'Pick',
+      shop: 'Fanatical',
+      url: null,
+      expiry: null,
+      tierPrice: null,
+      tierCurrency: null,
+      tierPriceMax: null,
+    },
   ]);
+});
+
+test('extractGameBundles: priced tiers ITAD left empty make the last listed tier a price range', () => {
+  const price = (amount) => ({ amount, amountInt: amount * 100, currency: 'EUR' });
+  const bundle = (id) => ({
+    id,
+    title: 'Untiered',
+    page: { name: 'Humble Bundle' },
+    tiers: [
+      { price: price(5), games: [{ id: 'g0' }] },
+      { price: price(10), games: [{ id: 'g1' }] },
+      { price: price(15), games: [] },
+      { price: null, games: [] },
+    ],
+  });
+  assert.equal(extractGameBundles([bundle(1)], 'g1')[0].tierPriceMax, 15);
+  assert.equal(extractGameBundles([bundle(1)], 'g0')[0].tierPriceMax, null);
 });

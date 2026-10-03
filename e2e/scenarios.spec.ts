@@ -269,6 +269,9 @@ test('B1 edge: games ITAD lists under the first tier only show the tier range', 
   // The pricier tier lists no games, so any of them may sit in it.
   const price = row(page, 'Overcooked! 2').getByTitle(/doesn't say which tier/);
   await expect(price).toHaveText('€5.00–€12.00');
+  // The side panel's Price card says the same.
+  await row(page, 'Overcooked! 2').getByText('Overcooked! 2').click();
+  await expect(page.locator('#panel-body').getByTitle(/doesn't say which tier/)).toHaveText('€5.00–€12.00 tier');
 });
 
 test('D2: with upstreams down, every game is still listed', async ({ page }) => {

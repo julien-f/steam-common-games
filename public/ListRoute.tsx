@@ -146,7 +146,14 @@ import {
 import { getAccountOverrideState, accountOverrideStatusText } from './accountOverride.ts';
 import { fetchAccountOverview, fetchAccountWishlist, resolveAccountSummary } from './accountData.ts';
 import { loadRecentGames, addRecentGame, renameRecentGame } from './recentGames.ts';
-import { fetchBundleById, loadErrorText, resolveBundleGames, type ResolvedGame, type FlatGame } from './bundleData.ts';
+import {
+  fetchBundleById,
+  loadErrorText,
+  resolveBundleGames,
+  TIER_RANGE_TITLE,
+  type ResolvedGame,
+  type FlatGame,
+} from './bundleData.ts';
 import {
   bundleTierSummary,
   bundleUrgency,
@@ -353,10 +360,7 @@ function renderTierPrice(v: unknown, row: Record<string, any>): Node {
             ? `${formatMoney(Number(v), row.tierCurrency)}–${formatMoney(row.tierPriceMax, row.tierCurrency)}`
             : `${formatMoney(Number(v), row.tierCurrency)}${row.tierPerGame ? '/game' : ''}`;
   const pkg: BundlePackage | null | undefined = row.bundlePackage;
-  const rangeTitle =
-    row.tierPriceMax != null
-      ? "IsThereAnyDeal doesn't say which tier holds this game: it lists none under the pricier ones"
-      : null;
+  const rangeTitle = row.tierPriceMax != null ? TIER_RANGE_TITLE : null;
   if (!pkg) {
     if (!rangeTitle) return document.createTextNode(price);
     const span = document.createElement('span');

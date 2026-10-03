@@ -1679,6 +1679,7 @@ test('GET /api/game-bundles/:appid: 200 with the bundles the game is in', async 
       expiry: null,
       tierPrice: 5,
       tierCurrency: 'EUR',
+      tierPriceMax: null,
     },
   ]);
 });

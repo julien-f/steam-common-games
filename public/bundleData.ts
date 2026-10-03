@@ -59,6 +59,9 @@ export interface Bundle {
 // pricier tier above it) — dedupes by ITAD game id, keeping the cheapest tier's price, since
 // ITAD's tiers are observed to always be price-ascending (so "first occurrence wins" is enough,
 // no explicit min() needed).
+export const TIER_RANGE_TITLE =
+  "IsThereAnyDeal doesn't say which tier holds this game: it lists none under the pricier ones";
+
 export function flattenBundleGames(bundle: Bundle): FlatGame[] {
   const seen = new Map<string, FlatGame>();
   const tiers = bundle.tiers || [];

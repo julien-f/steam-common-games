@@ -10,6 +10,7 @@
 //   untiered       the Co-op Pack lists every game in its first tier, the pricier one empty (as ITAD sends some)
 import type { Page } from '@playwright/test';
 import { PLAYERS, CATALOG, BUNDLE, PICK_BUNDLE, game, type Player } from './fixtures.ts';
+import { flattenBundleGames, type Bundle } from '../public/bundleData.ts';
 
 const NOW = Date.now();
 
@@ -260,6 +261,9 @@ export function respond(
           expiry,
           tierPrice: tier.price?.amount ?? null,
           tierCurrency: tier.price?.currency ?? null,
+          tierPriceMax:
+            flattenBundleGames(b as unknown as Bundle).find((g) => tier.games.some((t) => t.id === g.gid))
+              ?.tierPriceMax ?? null,
           ...('pickAndMix' in b && { pickAndMix: b.pickAndMix }),
         },
       ];

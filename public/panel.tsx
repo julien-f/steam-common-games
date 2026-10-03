@@ -47,6 +47,7 @@ import { getStoredRegion, resolveRegion } from './region.ts';
 import { nextHopHistory } from './panelHistory.ts';
 import type { PanelHistoryEntry } from './panelHistory.ts';
 import { setGameTitle } from './pageTitle.ts';
+import { TIER_RANGE_TITLE } from './bundleData.ts';
 import { withAccountParam } from './urlState.ts';
 import { copyWithFeedback } from './clipboard.ts';
 import type { DetailsAges, Game, PriceFields, ReadonlyGame } from './types.ts';
@@ -57,6 +58,8 @@ import { A } from '@solidjs/router';
 
 // A pick-and-mix bundle has no tier price; its best quantity rate stands in, as on its own page.
 function bundleTierText(b: GameBundle): string {
+  if (b.tierPrice != null && b.tierPriceMax != null)
+    return `${formatMoney(b.tierPrice, b.tierCurrency)}–${formatMoney(b.tierPriceMax, b.tierCurrency)} tier`;
   if (b.tierPrice != null) return `${formatMoney(b.tierPrice, b.tierCurrency)} tier`;
   const region = REGION_CURRENCY[resolveRegion(getStoredRegion())] ?? 'USD';
   const rate = bestPickRate(pickTiers(b.pickAndMix, region));
@@ -1581,7 +1584,7 @@ function PanelBundleLines(): JSX.Element {
                     </Show>
                     <span class="panel-price-sep">·</span>
                   </Show>
-                  <span>{bundleTierText(b)}</span>
+                  <span title={b.tierPriceMax != null ? TIER_RANGE_TITLE : undefined}>{bundleTierText(b)}</span>
                   <Show when={b.expiry}>
                     <span class="panel-price-sep">·</span>
                     <span
