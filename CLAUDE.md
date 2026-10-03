@@ -35,6 +35,7 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
   - Doc prose (this file, `README.md`, `CHANGELOG.md`): short bullets over paragraphs; no preamble, no summary section, lead with the point.
 - Don't re-read a file already read in the current session unless it may have changed.
 - Wait for an explicit go-ahead before implementing, unless the request already states the exact change to make. Before that go-ahead: answer the question asked instead of jumping to implementation, present the options and trade-offs when there are several valid approaches, and draft a plan first for non-trivial changes (multiple files, non-obvious design decisions, refactors).
+  - Once a direction is agreed, carry it through on the recommended option — committing each step, if the series was approved — and ask only at real design forks.
 - Ask clarifying questions as soon as the request is ambiguous, batched into one round.
 - Every question to the user goes through `AskUserQuestion` — including open-ended ones (offer the likely answers; the user can pick _Other_) and go-ahead requests after a plan. Never end a message with a question in prose.
 - Stay in scope: only make the changes asked for, plus the Development workflow checklist below. Flag other issues noticed rather than fixing them unprompted.
