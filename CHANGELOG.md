@@ -6,37 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-04
+
 ### Added
 
-- `dev:mock` fixtures: a Borked game, one with no ProtonDB report, a friend's wishlist, a 4-game wishlist, and a `stale` state whose library ages read 12 days old until refreshed.
-- `scripts/deps-audit.js` lists declared packages nothing uses and imports nothing declares.
-- `scripts/mock-server.js up|down` runs `dev:mock` in the background and waits until its modules load; `scripts/ux-measure.js` writes a Playwright file measuring routes at desktop and phone widths.
+- Development:
+  - `scripts/mock-server.js up|down` runs `dev:mock` in the background and waits until its modules load; `scripts/ux-measure.js` writes a Playwright file measuring routes at desktop and phone widths.
+  - `scripts/deps-audit.js` lists declared packages nothing uses and imports nothing declares.
+  - `dev:mock` fixtures: a Borked game, one with no ProtonDB report, a friend's wishlist, a 4-game wishlist, and a `stale` state whose library ages read 12 days old until refreshed.
 
 ### Changed
 
-- A ranked list's buttons say **Continue ranking**, **Rank N shown/selected** and **All ranked** instead of "Compare", which in the nav means comparing libraries.
-- 🏆 Rank this list, once the list has rankings, opens a menu to continue one or start another named by its criterion (e.g. "best JRPG"), instead of silently adding a same-named ranking.
-- Ranking a Wishlist or a bundle offers "Not interested — exclude" instead of "Haven't played — exclude", which only fits games you own.
+- **Rankings:**
+  - A list can have several rankings. Once it has one, 🏆 Rank this list opens a menu to continue one or start another named by its criterion (e.g. "best JRPG"), instead of silently adding a same-named ranking.
+  - A ranked or combined list built from a Wishlist or a bundle keeps its price columns (Best Deal and Discount shown), Prices tile and refresh.
+  - The buttons say **Continue ranking**, **Rank N shown/selected** and **All ranked** instead of "Compare", which in the nav means comparing libraries; ranking a Wishlist or a bundle offers "Not interested — exclude" rather than "Haven't played".
+- On a phone, a list's header card is shorter: its facts sit in one row you swipe, a bundle's or comparison's less-used buttons fold behind ⋯, Share view and Reset view are icons, and the toolbar is tighter — a bundle's games start about a third of the screen higher.
 - Recently Looked Up lists your latest lookup first, in a new **Looked up** column, and says it keeps the last 10.
-- `npm run check` fails a CHANGELOG entry over 400 characters, keeping entries to one user-facing line.
-- A ranked or combined list built from a Wishlist or a bundle keeps the price columns (Best Deal and Discount shown), the Prices tile and its refresh.
 - 🔗 Share view is off on your own saved lists, saying why: their link only opened in your browser. A combined list points to 🔗 Share list instead.
-- On a phone, a list's header card is shorter: its facts sit in one row you swipe, and a bundle's or comparison's less-used buttons fold behind ⋯, Share view and Reset view are icons, and the table's toolbar is tighter — a bundle's games now start about a third of the screen higher.
+- `npm run check` fails a CHANGELOG entry over 400 characters.
 
 ### Fixed
 
-- Counts read "1 game" and "≈ 1 comparison" instead of "1 game(s)" and "≈ 1 comparisons".
-- Unnamed controls: a bundle page's ‹ › are announced as Previous/Next bundle, the image column is labelled Image, and the nav's ⚙ is drawn at a visible size.
-- The side panel's section nav highlights the section you jumped to, and the last one at the end of the panel, instead of staying on Overview.
-- An empty Wishlist or library says it's empty or private on Steam (e.g. "Carol's wishlist is empty, or private on Steam."), where the table would be, instead of "No games to show." above an empty table.
-- On a phone, the tables' checkboxes are 24 px instead of 13 px, so a tap beside one no longer misses it.
-- The ProtonDB filter and grouping name games with no report ("No report") apart from those ProtonDB didn't answer for, instead of one blank entry for both.
-- On a comparison, the side panel's Owned by lists every player who owns the game, with their playtime, instead of only your own account.
+- When IsThereAnyDeal lists a bundle's games all under its cheapest tier and leaves the pricier tiers empty, their Tier Price and the side panel's Price card show the range they could fall in (e.g. €10.55–€18.99) instead of the cheapest tier's price.
 - Refreshing a list from its Updated tile keeps the games, their details and your selection on screen, and only loads games new to the list, instead of emptying the table and loading every row again.
-- Without an IsThereAnyDeal key, the Wishlist and lists built from it hide their price columns and Prices tile and say prices aren't available here, as the panel's Price card now does, instead of showing "—".
-- The side panel's × works after scrolling the panel; its sticky title bar used to cover it, its ↻ button sitting right underneath.
 - When a game's Steam store page or tags fail to load, the columns they fill (genres, release date, Metacritic, platforms, tags…) show ⚠ and the list says the Steam store didn't answer, instead of showing no data.
-- When IsThereAnyDeal lists a bundle's games all under its cheapest tier and leaves the pricier tiers empty, those games' Tier Price, and the side panel's Price card, show the range they could fall in (e.g. €10.55–€18.99) instead of the cheapest tier's price.
+- Without an IsThereAnyDeal key, the Wishlist and lists built from it hide their price columns and Prices tile and say prices aren't available here, as the panel's Price card now does, instead of showing "—".
+- The side panel's × works after scrolling the panel; its sticky title bar used to cover it.
+- On a comparison, the side panel's Owned by lists every player who owns the game, with their playtime, instead of only your own account.
+- The ProtonDB filter and grouping name games with no report ("No report") apart from those ProtonDB didn't answer for, instead of one blank entry for both.
+- An empty Wishlist or library says it's empty or private on Steam (e.g. "Carol's wishlist is empty, or private on Steam."), where the table would be, instead of "No games to show." above an empty table.
+- The side panel's section nav highlights the section you jumped to, and the last one at the end of the panel, instead of staying on Overview.
+- On a phone, the tables' checkboxes are 24 px instead of 13 px, so a tap beside one no longer misses it.
+- A bundle page's ‹ › are announced as Previous/Next bundle, the image column is labelled Image, and the nav's ⚙ is drawn at a visible size.
+- Counts read "1 game" and "≈ 1 comparison" instead of "1 game(s)" and "≈ 1 comparisons".
 
 ## [0.5.0] - 2026-10-03
 
