@@ -160,7 +160,9 @@ export function respond(
   if (states.has('upstream-down') && ITAD_ROUTE.test(path))
     return json({ error: 'IsThereAnyDeal request failed (mock: upstream-down)' }, 502);
   const detailsFor = (appid: number) =>
-    states.has('upstream-down') ? { ...details(appid), rating: null, hltb: null, protondb: null } : details(appid);
+    states.has('upstream-down')
+      ? { ...details(appid), rating: null, hltb: null, protondb: null, failed: ['rating', 'hltb', 'protondb'] }
+      : details(appid);
 
   if (path === '/api/health')
     return json({ ok: true, configured: true, itadConfigured: !states.has('no-itad'), cache: { entries: 0 } });

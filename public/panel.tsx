@@ -832,6 +832,20 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
   const details = () => props.game.details;
   const reviewsUrl = () => `https://store.steampowered.com/app/${props.game.appid}/#app_reviews_hash`;
   const protondbUrl = () => `https://www.protondb.com/app/${props.game.appid}`;
+  // The source errored (server.js's `failed`): said apart from "no data", ↻ above retries it.
+  const failedChip = (source: string, label: string, href: string) =>
+    props.game.failedSources?.includes(source) ? (
+      <GlanceChip
+        href={href}
+        value="⚠"
+        color="#e0a83a"
+        caption={
+          <>
+            <b>{label}</b> · didn't answer
+          </>
+        }
+      />
+    ) : null;
 
   // Every chip stays in the grid even when its source has no data for this game — a missing
   // weighted rating or ProtonDB tier is itself informative, and a chip that vanishes instead makes
@@ -843,15 +857,17 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
     const r = details()?.rating;
     if (!r)
       return (
-        <GlanceChip
-          href={reviewsUrl()}
-          value="—"
-          caption={
-            <>
-              <b>Weighted</b> · no rating
-            </>
-          }
-        />
+        failedChip('rating', 'Weighted', reviewsUrl()) ?? (
+          <GlanceChip
+            href={reviewsUrl()}
+            value="—"
+            caption={
+              <>
+                <b>Weighted</b> · no rating
+              </>
+            }
+          />
+        )
       );
     const pct = r.total ? Math.round((r.positive / r.total) * 100) : 0;
     const steamdbRating = Math.round(computeSteamdbRating(r.positive, r.total) ?? 0);
@@ -901,15 +917,17 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
     // straight to the page rather than a generic search.
     if (!h?.id)
       return (
-        <GlanceChip
-          href={`https://howlongtobeat.com/?q=${encodeURIComponent(props.game.name)}`}
-          value="—"
-          caption={
-            <>
-              <b>HLTB</b> · search
-            </>
-          }
-        />
+        failedChip('hltb', 'HLTB', `https://howlongtobeat.com/?q=${encodeURIComponent(props.game.name)}`) ?? (
+          <GlanceChip
+            href={`https://howlongtobeat.com/?q=${encodeURIComponent(props.game.name)}`}
+            value="—"
+            caption={
+              <>
+                <b>HLTB</b> · search
+              </>
+            }
+          />
+        )
       );
     const hltbUrl = `https://howlongtobeat.com/game/${h.id}`;
     return h.all ? (
@@ -939,15 +957,17 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
     const pd = details()?.protondb;
     if (!pd?.tier)
       return (
-        <GlanceChip
-          href={protondbUrl()}
-          value="—"
-          caption={
-            <>
-              <b>Linux/Deck</b> · no reports
-            </>
-          }
-        />
+        failedChip('protondb', 'Linux/Deck', protondbUrl()) ?? (
+          <GlanceChip
+            href={protondbUrl()}
+            value="—"
+            caption={
+              <>
+                <b>Linux/Deck</b> · no reports
+              </>
+            }
+          />
+        )
       );
     const color = PROTON_TIER_COLORS[pd.tier] || '#52525b';
     // Kept short (no "reports"/"confidence" words) — the glance chip's one-line caption truncates

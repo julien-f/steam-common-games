@@ -3222,6 +3222,17 @@ kbd {
 .bundles-status:empty {
   display: none;
 }
+.list-failed,
+.cell-failed {
+  color: #e0a83a;
+}
+.list-status > .list-failed:not(:first-child)::before {
+  content: ' · ';
+  color: var(--text1);
+}
+.cell-failed {
+  cursor: help;
+}
 .price-status {
   font-size: 13px;
   color: var(--text1);

@@ -148,6 +148,8 @@ export interface Game extends PriceFields {
   // about a rating fetched yesterday behind a store page untouched since 2013. The panel's ↻
   // breaks it down in its tooltip (see server.js's fetchGameDetails).
   detailsFetchedAts?: DetailsAges | null;
+  // Detail sources that errored on the last fetch (server.js's `failed`), as opposed to having no data.
+  failedSources?: string[];
 }
 
 // Keyed by source, epoch ms, null when that source was fetched fresh for the request that

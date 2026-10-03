@@ -718,7 +718,44 @@ export function insertColumnsAfter(
 // specific (Tier Price/Add-on, Wishlist Rank/Added, Played/Last Played) — an owned game in the
 // Library tab has no price data at all (nothing to buy), so price columns would be dead weight
 // there, not just hidden by default the way they are on Wishlist/Bundles.
-export const CORE_COLUMNS: ColumnDef<Row>[] = [
+// What the user knows each detail source as, for "didn't answer" notes.
+export const SOURCE_NAMES: Record<string, string> = {
+  rating: 'Steam reviews',
+  hltb: 'HowLongToBeat',
+  protondb: 'ProtonDB',
+};
+const COLUMN_SOURCE: Record<string, string> = {
+  steamdbRating: 'rating',
+  score: 'rating',
+  positivePct: 'rating',
+  reviewsTotal: 'rating',
+  hltbAll: 'hltb',
+  hltbMain: 'hltb',
+  hltbExtra: 'hltb',
+  hltbCompletionist: 'hltb',
+  protondb: 'protondb',
+};
+
+// A source that errored shows ⚠ rather than "—", which means it has no data for the game.
+function markFailedSources(columns: ColumnDef<Row>[]): ColumnDef<Row>[] {
+  return columns.map((col) => {
+    const source = COLUMN_SOURCE[col.key];
+    if (!source) return col;
+    const render = (v: unknown, row: Row): Node => {
+      if (v == null && row.failedSources?.includes(source)) {
+        const mark = document.createElement('span');
+        mark.className = 'cell-failed';
+        mark.textContent = '⚠';
+        mark.title = `${SOURCE_NAMES[source]} didn't answer — ↻ in the game's panel retries`;
+        return mark;
+      }
+      return col.render ? col.render(v, row) : document.createTextNode(col.format ? col.format(v, row) : String(v));
+    };
+    return { ...col, render };
+  });
+}
+
+export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   // ── Identity ────────────────────────────────────────────────────────────────
   {
     key: 'capsule',
@@ -1093,7 +1130,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = [
     defaultSortDir: 'desc',
     category: 'Extras',
   },
-];
+]);
 
 // ── Price columns (IsThereAnyDeal) — shared by Wishlist and Bundles only, not the Library tab
 // (an owned game has nothing to buy). Each page inserts this cluster into CORE_COLUMNS right

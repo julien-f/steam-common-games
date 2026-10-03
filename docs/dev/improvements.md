@@ -22,7 +22,7 @@ UX backlog from the 2026-09-27 and 2026-10-03 (mocked, `npm run dev:mock`) revie
 
 ## Loading and feedback
 
-- **U54 · major · D2** — when HLTB, ProtonDB or Steam reviews fail, their columns show "—", exactly like a game with no data; nothing says a source failed or offers a retry (D2's Expect). Mark a failed field apart from a missing one. Reproduce with `mock=upstream-down`.
+- **U54 · minor · D2** — a failed Steam store page (genres, release date, Metacritic, platforms) still shows "—" like missing data; the server already reports it (`failed: ['meta']`). Mark those columns too. (Ratings, HLTB and ProtonDB are done.)
 - **U7 · minor · L3** — Reset view drops sort/filters instantly with no undo.
 
 ## Lists and selection

@@ -47,7 +47,19 @@
 // loadGuard, total/loaded, …) is now local to this component's own closure, created fresh on
 // each mount and torn down on unmount via onCleanup — library.tsx's page loads exactly once, but
 // a router-driven route mounts/unmounts every time its path is navigated to/away from.
-import { onMount, onCleanup, createSignal, createRoot, createEffect, on, batch, For, Show, type JSX } from 'solid-js';
+import {
+  onMount,
+  onCleanup,
+  createSignal,
+  createRoot,
+  createEffect,
+  createMemo,
+  on,
+  batch,
+  For,
+  Show,
+  type JSX,
+} from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { A, useParams, useLocation, useNavigate } from '@solidjs/router';
@@ -69,6 +81,7 @@ import {
   formatPriceTier,
   compareNumMissingLast,
   OWNERSHIP_STATUS_COLUMN,
+  SOURCE_NAMES,
 } from './gameColumns.ts';
 import {
   computeSteamdbRating,
@@ -425,11 +438,13 @@ interface DetailsEvent {
   tags: string[] | null;
   demo: { appid: number } | null;
   protondb: ProtonDb | null;
+  failed?: string[];
 }
 
 function applyDetailsEvent(row: Game, event: DetailsEvent) {
   row.detailsFetchedAt = event.fetchedAt ?? null;
   row.detailsFetchedAts = event.fetchedAts ?? null;
+  row.failedSources = event.failed ?? [];
   row.capsule = event.meta?.capsule ?? null;
   if (!row.name) row.name = event.meta?.name || row.bundlePackage?.title || '';
   row.score = event.rating?.score ?? null;
@@ -622,6 +637,22 @@ export default function ListRoute() {
   const [bundleResolvedCount, setBundleResolvedCount] = createSignal(0);
 
   const [rowsStore, setRowsStore] = createStore<Game[]>([]);
+  // "HowLongToBeat didn't answer for 6 games", per source: a hidden column's failure still shows.
+  const failedSummary = createMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of rowsStore) for (const s of row.failedSources ?? []) counts.set(s, (counts.get(s) ?? 0) + 1);
+    // Sources that failed for the same number of games share one phrase.
+    const byCount = new Map<number, string[]>();
+    for (const s of Object.keys(SOURCE_NAMES)) {
+      const n = counts.get(s);
+      if (n) byCount.set(n, [...(byCount.get(n) ?? []), SOURCE_NAMES[s]]);
+    }
+    const parts = [...byCount].map(([n, names]) => {
+      const who = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
+      return `${who} didn't answer for ${n} game${n === 1 ? '' : 's'}`;
+    });
+    return parts.length ? `${parts.join(' · ')} — ↻ in a game's panel retries` : '';
+  });
   const rowStore = createRowStore<Game>(rowsStore, (idx, updater) => setRowsStore(idx, updater));
   // Games opened as a standalone aside rather than as one of this list's own rows (a nav-bar
   // lookup, or a DLC/base-game hop out of the open panel — see openStandaloneInPlace). Their data
@@ -3011,6 +3042,7 @@ export default function ListRoute() {
             <progress class="list-progress" value={fraction()} max={1} aria-label="Loading game details" />
           )}
         </Show>
+        <Show when={failedSummary()}>{(text) => <span class="list-failed">{text()}</span>}</Show>
       </div>
       {(kind === 'wishlist' || kind === 'bundle') && <div class="price-status">{priceStatusText()}</div>}
       {/* Outside the selection-gated block below on purpose — "Add"/"Remove" both clear the

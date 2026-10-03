@@ -286,6 +286,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- When Steam reviews, HowLongToBeat or ProtonDB fail, their columns show ⚠ instead of "—" (which means the game has no data), the list says which sources didn't answer for how many games, and the side panel says so too — its ↻ retries.
 - An unknown address (an old or mistyped link) says the page doesn't exist and links Home, instead of showing an empty page.
 - The "Added to new list" message, with its **Open list** link, stays up while pointed at or focused instead of closing after 6 seconds regardless.
 - Home's **Move to…** showed the first folder as already chosen, so a list or folder couldn't be moved into it when it was the only one.

@@ -755,6 +755,20 @@ test('GET /api/game-details/:appid: 200 with null meta when appdetails fetch fai
   assert.equal(res.body.meta, null);
 });
 
+test('GET /api/game-details/:appid: names a failed source in `failed`, unlike one with no data', async (t) => {
+  _reset();
+  _resetAuth();
+  t.mock.method(globalThis, 'fetch', makeDetailsFetch({ ratingOk: false }));
+  const failing = await api.get('/api/game-details/406');
+  assert.equal(failing.body.rating, null);
+  assert.deepEqual(failing.body.failed, ['rating']);
+
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeDetailsFetch());
+  const fine = await api.get('/api/game-details/407');
+  assert.equal(fine.body.failed, undefined);
+});
+
 test('GET /api/game-details/:appid: 200 with null tags and null demo when the Steam store browse fetch fails (same call backs both)', async (t) => {
   _reset();
   _resetAuth();

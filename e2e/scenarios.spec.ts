@@ -266,6 +266,13 @@ test('D2: with upstreams down, every game is still listed', async ({ page }) => 
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
   await expect(row(page, 'Hades')).toContainText('0.8'); // playtime comes from the library, not an upstream
+  // A failed source is marked apart from "no data", and counted where the list says how it loaded.
+  await expect(row(page, 'Hades').getByTitle(/HowLongToBeat didn't answer/)).toBeVisible();
+  await expect(page.locator('.list-status')).toContainText(
+    "Steam reviews, HowLongToBeat and ProtonDB didn't answer for 6 games",
+  );
+  await row(page, 'Hades').getByText('Hades').click();
+  await expect(page.locator('.panel-glance-chip').filter({ hasText: 'HLTB' })).toContainText("didn't answer");
 });
 
 test('F1: look up one game from the nav search, in place', async ({ page }) => {

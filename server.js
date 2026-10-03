@@ -781,6 +781,16 @@ function fetchGameDetails(appid, { force = false } = {}) {
       if (tagsRes.status === 'rejected') logErr('tags', tagsRes.reason);
       if (demoRes.status === 'rejected') logErr('demo', demoRes.reason);
       if (protondbRes.status === 'rejected') logErr('protondb', protondbRes.reason);
+      // A null field is "no data" unless named here — the client marks these as failed, not empty.
+      const failed = Object.entries({
+        rating: ratingRes,
+        hltb: hltbRes,
+        meta: metaRes,
+        tags: tagsRes,
+        protondb: protondbRes,
+      })
+        .filter(([, r]) => r.status === 'rejected')
+        .map(([source]) => source);
       // Age of the oldest of this game's cached sources, which is what the panel's ↻ shows — plus
       // each source's own age behind it. The aggregate alone was misleading: these tiers run from
       // 90 to 180 days and are cached per source, so one untouched store page dates the whole
@@ -807,6 +817,7 @@ function fetchGameDetails(appid, { force = false } = {}) {
         tags: tagsRes.status === 'fulfilled' ? tagsRes.value : null,
         demo: demoRes.status === 'fulfilled' ? demoRes.value : null,
         protondb: protondbRes.status === 'fulfilled' ? protondbRes.value : null,
+        ...(failed.length && { failed }),
       };
     });
   });
