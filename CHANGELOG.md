@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- A comparison states its mode once, in its select, instead of also as a badge beside the title.
 - Compare starts with your ★ account filled in, names you first ("Bob vs. Alice" when you're Bob), and says so when the same player is in two boxes instead of comparing them with themselves.
 - A ranking card shows the same How Long To Beat time as the table, rounded and labelled ("10.5 h to beat"), and the table's "All (h)" column is now "HLTB (h)".
 

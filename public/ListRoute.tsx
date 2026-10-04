@@ -2789,7 +2789,8 @@ export default function ListRoute() {
   // shows its shop chip instead; owned/wishlist show whose account it is.
   function heroKindLabel(): string | null {
     const list = combineList();
-    if (!list) return null;
+    // A comparison's mode select, right beside the title, already says it.
+    if (!list || kind === 'compare') return null;
     if (list.kind === 'ranked') return 'Ranked list';
     return list.kind === 'manual' ? 'Manual list' : opLabel(list.op);
   }

@@ -141,6 +141,14 @@ test('C1 edge: my account comes first, is prefilled, and only once', async ({ pa
   await expect(page.locator('.compare-form')).toContainText('Bob');
 });
 
+test('C1 edge: the comparison states its mode once, in its select', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare?u=alice&u=bob');
+  await expect(page.getByRole('heading', { name: 'Alice vs. Bob' })).toBeVisible();
+  await expect(page.locator('.list-hero select')).toHaveValue('group-by-membership');
+  await expect(page.locator('.list-hero-chip', { hasText: 'Grouped by membership' })).toHaveCount(0);
+});
+
 test('C3 edge: a saved comparison keeps the name its page had', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare?u=alice&u=bob');
