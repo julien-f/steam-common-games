@@ -178,8 +178,10 @@ export async function resolveBundleGames(
 }
 
 // listResolve.ts's bundle source — its title (for bundleSnapshots.ts) and resolved appid set.
-export async function fetchBundleContents(bundleId: string): Promise<{ title: string; appids: Set<number> }> {
+export async function fetchBundleContents(
+  bundleId: string,
+): Promise<{ title: string; appids: Set<number>; notOnSteam: number }> {
   const { bundle } = await fetchBundleById(Number(bundleId));
-  const { resolved } = await resolveBundleGames(bundle);
-  return { title: bundle.title, appids: new Set(resolved.map((g) => g.appid)) };
+  const { resolved, unresolved } = await resolveBundleGames(bundle);
+  return { title: bundle.title, appids: new Set(resolved.map((g) => g.appid)), notOnSteam: unresolved.length };
 }

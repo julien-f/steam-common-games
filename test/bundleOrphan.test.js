@@ -118,3 +118,19 @@ test('resolveBundleSource: any other failure falls back to the snapshot, or reth
   assert.deepEqual(await m.resolveBundleSource('7', failing), new Set([4]));
   assert.equal(m.getList(m.getLists()[0].id).sources[0].kind, 'bundle', 'not orphaned');
 });
+
+test("resolveBundleSource: reports how many of the bundle's games have no Steam listing", async () => {
+  const m = load();
+  const reported = [];
+  await m.resolveBundleSource(
+    '7',
+    async () => ({ title: 'Pack', appids: new Set([1]), notOnSteam: 3 }),
+    (id, n) => reported.push([id, n]),
+  );
+  await m.resolveBundleSource(
+    '8',
+    async () => ({ title: 'All on Steam', appids: new Set([2]), notOnSteam: 0 }),
+    (id, n) => reported.push([id, n]),
+  );
+  assert.deepEqual(reported, [['7', 3]]);
+});

@@ -177,6 +177,7 @@ export interface DefaultFetchersOptions {
   refresh?: boolean;
   onFetchedAt?: (fetchedAt: number | null) => void;
   onOwners?: (owners: Map<number, GameOwner[]>) => void; // each account-owned source's members who own each game
+  onBundleLeftOut?: (bundleId: string, notOnSteam: number) => void; // a bundle's games with no Steam listing
 }
 
 // The real ListResolveFetchers, wiring the injectable seam above to actual network calls
@@ -188,6 +189,7 @@ export function createDefaultFetchers({
   refresh = false,
   onFetchedAt,
   onOwners,
+  onBundleLeftOut,
 }: DefaultFetchersOptions = {}): ListResolveFetchers {
   return {
     accountOwned: async (accountId) => {
@@ -204,7 +206,7 @@ export function createDefaultFetchers({
     // No refresh and no age for the other two: GET /api/bundles/:id has no force path at all
     // (server.js — finding one bundle walks several cached pages, so forcing it costs several
     // upstream calls), and the recent-games list is this browser's own localStorage.
-    bundle: (bundleId) => resolveBundleSource(bundleId),
+    bundle: (bundleId) => resolveBundleSource(bundleId, fetchBundleContents, onBundleLeftOut),
     recentGames: async () => new Set(loadRecentGames().map((g) => g.appid)),
     getList,
   };
@@ -217,9 +219,11 @@ export function createDefaultFetchers({
 export async function resolveBundleSource(
   bundleId: string,
   fetchContents: typeof fetchBundleContents = fetchBundleContents,
+  onLeftOut?: (bundleId: string, notOnSteam: number) => void,
 ): Promise<Set<number>> {
   try {
-    const { title, appids } = await fetchContents(bundleId);
+    const { title, appids, notOnSteam } = await fetchContents(bundleId);
+    if (notOnSteam) onLeftOut?.(bundleId, notOnSteam);
     if (isBundleReferenced(bundleId)) rememberBundle(bundleId, title, appids);
     return appids;
   } catch (err) {

@@ -350,6 +350,16 @@ test('B1: a bundle, then what it adds to my library', async ({ page }) => {
   await expect(rows(page)).toHaveCount(2);
 });
 
+test("B3 edge: a list built from a bundle says how many of its games aren't on Steam", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto(`/lists/bundle/${BUNDLE.id}`);
+  await expect(rows(page)).toHaveCount(4);
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds it behind ⋯
+  if (await more.isVisible()) await more.click();
+  await page.getByRole('link', { name: 'What does this add?' }).click();
+  await expect(page.locator('.list-formula')).toContainText('1 not on Steam');
+});
+
 test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/bundles');

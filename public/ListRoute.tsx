@@ -224,6 +224,7 @@ import {
   setRanking,
   listHasPriceSource,
   rankingsOf,
+  listDeps,
 } from './listsStore.ts';
 import { ranks, progress, pendingFocus, rerank, exclude, type RankingState, type RankingProgress } from './ranking.ts';
 import {
@@ -723,7 +724,10 @@ export default function ListRoute() {
   // (which is how a group-by-membership group's own keys map back to a readable name). Backs the
   // hero's formula line and the per-group table headings; empty until the resolve lands, which is
   // what keeps a half-built "A ∪ = 0" off the screen in the meantime.
-  const [listSources, setListSources] = createSignal<{ key: string; count: number; desc: RefDescription }[]>([]);
+  // `leftOut`: a bundle source's games with no Steam listing, which no list can hold.
+  const [listSources, setListSources] = createSignal<
+    { key: string; count: number; desc: RefDescription; leftOut?: number }[]
+  >([]);
   // kind === 'user', ranked lists only — its resolved source and stored ranking, backing the Rank
   // column, the Ranked tile and the Re-rank/Exclude row actions.
   const [rankedSource, setRankedSource] = createSignal<Set<number> | null>(null);
@@ -1884,6 +1888,7 @@ export default function ListRoute() {
       setHeroAccount(null);
     }
     setListSources([]);
+    bundleLeftOut = new Map();
     // Every kind that has one re-reports it during this load; a kind that doesn't (manual list,
     // recents) must not keep showing the previous list's.
     setFetchedAt(undefined);
@@ -2048,11 +2053,11 @@ export default function ListRoute() {
       try {
         const { result, sources } = await resolveListWithSources(
           list,
-          createDefaultFetchers({ refresh, onFetchedAt: noteFetchedAt }),
+          createDefaultFetchers({ refresh, onFetchedAt: noteFetchedAt, onBundleLeftOut: noteLeftOut }),
         );
         if (loadGuard.isStale(gen)) return;
         const described = describeSources(list, createDefaultNaming());
-        setListSources(sources.map((source, i) => ({ ...source, desc: described[i] })));
+        setListSources(sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) })));
         if (isGroupMode && Array.isArray(result)) {
           pendingGroups = result;
           appids = new Set(result.flatMap((g) => g.appids));
@@ -2106,11 +2111,13 @@ export default function ListRoute() {
       const isGroupMode = decoded.op === 'group-by-membership';
       let appids: Set<number>;
       try {
-        const fetchers = sharedFetchers(createDefaultFetchers({ refresh, onFetchedAt: noteFetchedAt }));
+        const fetchers = sharedFetchers(
+          createDefaultFetchers({ refresh, onFetchedAt: noteFetchedAt, onBundleLeftOut: noteLeftOut }),
+        );
         const { result, sources } = await resolveListWithSources(list, fetchers);
         if (loadGuard.isStale(gen)) return;
         const described = describeSources(list, sharedNaming());
-        setListSources(sources.map((source, i) => ({ ...source, desc: described[i] })));
+        setListSources(sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) })));
         if (isGroupMode && Array.isArray(result)) {
           pendingGroups = result;
           appids = new Set(result.flatMap((g) => g.appids));
@@ -2800,6 +2807,15 @@ export default function ListRoute() {
   // in the app says what a dynamic list is made of: its contents are recomputed on every open, so
   // a page showing 458 rows under a name someone chose months ago was otherwise unexplainable
   // without going back to Home and reading the combine form.
+  // Per load: each bundle source's games with no Steam listing (createDefaultFetchers' onBundleLeftOut).
+  let bundleLeftOut = new Map<string, number>();
+  function noteLeftOut(bundleId: string, notOnSteam: number): void {
+    bundleLeftOut.set(bundleId, notOnSteam);
+  }
+  function leftOutOf(list: GameList, i: number): number | undefined {
+    const ref = listDeps(list)[i];
+    return ref?.kind === 'bundle' && ref.bundleId ? bundleLeftOut.get(ref.bundleId) : undefined;
+  }
   function formulaNote(list: GameList): JSX.Element | undefined {
     const sources = listSources();
     if (!sources.length) return undefined;
@@ -2819,6 +2835,13 @@ export default function ListRoute() {
                     {(href) => <A href={withAccountParam(href())}>{source.desc.label}</A>}
                   </Show>
                   <span class="list-formula-count">{source.count}</span>
+                  <Show when={source.leftOut}>
+                    {(n) => (
+                      <span class="list-formula-leftout" title="Games in this bundle with no Steam listing">
+                        ({n()} not on Steam, left out)
+                      </span>
+                    )}
+                  </Show>
                 </span>
               </>
             )}

@@ -4889,3 +4889,10 @@ kbd {
     width: 45%;
   }
 }
+
+/* A bundle source's games with no Steam listing, beside its count on the formula line. */
+.list-formula-leftout {
+  margin-left: 6px;
+  font-size: 11.5px;
+  color: var(--text1);
+}
