@@ -551,7 +551,7 @@ header p {
 }
 
 /* Darkens the data-table library's own header row a shade further than its themed
-   --color-background-secondary default, matching the plain <table>'s thead th above.
+   --color-background-secondary default.
    Ported from the legacy pages' `#table-container .dt-th` rule — `.table-container` is
    the new markup's equivalent wrapper (see ListRoute.tsx). */
 .table-container .dt-th {
@@ -561,41 +561,6 @@ header p {
 table {
   width: 100%;
   border-collapse: collapse;
-}
-
-thead th {
-  background: var(--bg3);
-  color: var(--text1);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 9px 14px;
-  text-align: left;
-  white-space: nowrap;
-  border-bottom: 1px solid var(--border);
-  user-select: none;
-}
-thead th.sortable {
-  cursor: pointer;
-}
-thead th.sortable:hover {
-  color: var(--text0);
-}
-thead th.active {
-  color: var(--accent2);
-}
-.th-inner {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.sort-icon {
-  font-size: 10px;
-  opacity: 0.5;
-}
-thead th.active .sort-icon {
-  opacity: 1;
 }
 
 tbody tr {

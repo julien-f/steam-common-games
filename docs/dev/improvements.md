@@ -62,7 +62,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 and the 2026-10-04 header-menu (m
 ## Consistency and polish
 
 - **U39 · polish** — `favicon.ico` 404s; nav items shift sideways between routes; missing thumbnails have no placeholder; Released and Added use different date formats, as do the Bundles list (`2026-10-13 21:10`) and a bundle's page (`Oct 13, 09:10 PM`); "Demo" pills look like primary buttons; the "Updated" age has very low contrast; Compare's op `<select>` is an unstyled native white control; wishlisted/owned name colours have no legend (still true in Recently Looked Up).
-- **U73 · minor · L3, F3** — the header menu's filter values read "ACTION", "ADVENTURE" where the toolbar Filter and the cells say "Action": the library renders the menu inside the `<th>`, so `style.css`'s plain-table `thead th` rule (uppercase, letter-spacing) leaks into it — and into the Image header, the only one reading "IMAGE". Scope that rule to the non-library tables.
 - **U79 · polish · L3** — the Image header shows the ↕ sort icon although it isn't sortable (`sortable: false`), so it looks clickable and does nothing. Needs an upstream change: no sort icon on unsortable columns (vatesfr/data-table#38).
 
 ## Review tooling

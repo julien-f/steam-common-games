@@ -89,6 +89,21 @@ test('F3 edge: the Played (h) filter range reads in rounded hours', async ({ pag
   await expect.poll(bounds).toEqual(['0', '20']);
 });
 
+test("F3 edge: a column header's filter lists values as the cells write them", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  const menuButton = page.getByRole('button', { name: 'Genres options' });
+  // the menu closes when the table scrolls, so scroll to it before opening, as a finger would
+  await menuButton.scrollIntoViewIfNeeded();
+  await menuButton.click();
+  await page.getByRole('menuitem', { name: 'Filter' }).click();
+  // innerText, unlike textContent, applies CSS text-transform
+  const labels = () =>
+    page.locator('.dt-th-filter-flyout label').evaluateAll((ls) => ls.map((l) => (l as HTMLElement).innerText));
+  await expect.poll(labels).toContain('Action\n5');
+});
+
 test('C5 edge: the ProtonDB filter names games with no report apart from Borked ones', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/wishlist');
