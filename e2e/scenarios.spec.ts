@@ -77,6 +77,18 @@ test('A1 edge: an account stored without its name picks it up from Home', async 
   await expect(page.getByRole('navigation')).toContainText('Alice');
 });
 
+test('F3 edge: the Played (h) filter range reads in rounded hours', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await page.getByRole('button', { name: 'Filter', exact: true }).click();
+  await page.locator('.dt-filter-cols-search').fill('Played');
+  await page.locator('[data-filter-col-key="playtime"]').click();
+  const bounds = () =>
+    page.locator('.dt-range-input').evaluateAll((inputs) => inputs.map((i) => (i as HTMLInputElement).value));
+  await expect.poll(bounds).toEqual(['0', '20']);
+});
+
 test('C5 edge: the ProtonDB filter names games with no report apart from Borked ones', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/wishlist');

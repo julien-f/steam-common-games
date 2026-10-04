@@ -16,7 +16,7 @@ export const ALICE: Player = {
   vanity: 'alice',
   personaname: 'Alice',
   owned: [620, 105600, 413150, 1145360, 892970, 367520],
-  playtime: { 620: 600, 105600: 1200, 1145360: 45 },
+  playtime: { 620: 600, 105600: 1201, 1145360: 45 }, // 1201: hours that don't divide evenly
   // Apex Legends: Borked on ProtonDB; 3999990: no ProtonDB report at all.
   wishlist: [1426210, 728880, 1172470, 3999990],
 };

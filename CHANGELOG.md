@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Compare starts with your ★ account filled in, names you first ("Bob vs. Alice" when you're Bob), and says so when the same player is in two boxes instead of comparing them with themselves.
 - A ranking card shows the same How Long To Beat time as the table, rounded and labelled ("10.5 h to beat"), and the table's "All (h)" column is now "HLTB (h)".
 
+### Fixed
+
+- The Filter popover's column list fits without scrolling sideways, fits a phone screen, and Played (h) ranges read in rounded hours ("0 – 20", not "20.0166…").
+
 ## [0.6.0] - 2026-10-04
 
 ### Added

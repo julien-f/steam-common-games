@@ -328,3 +328,9 @@ export function isTextEntry(
   if (tag === 'INPUT') return TEXT_ENTRY_INPUT_TYPES.has(el!.type ?? '');
   return el!.isContentEditable === true;
 }
+
+// Hours to one decimal, as the Played column shows them — so the filter's range bounds read
+// "20", not "20.016666666666666" (the table library prints them unformatted).
+export function hoursFromMinutes(minutes: number): number {
+  return Math.round(minutes / 6) / 10;
+}

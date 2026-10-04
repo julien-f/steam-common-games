@@ -90,6 +90,7 @@ import {
   fmtAge,
   fmtLastPlayed,
   formatMoney,
+  hoursFromMinutes,
   scoreColor,
 } from './utils.ts';
 import {
@@ -2247,7 +2248,7 @@ export default function ListRoute() {
           initialRows = games.map((g) => ({
             appid: g.appid,
             name: g.name,
-            playtime: g.playtimeMinutes / 60,
+            playtime: hoursFromMinutes(g.playtimeMinutes),
             lastPlayed: fmtLastPlayed(g.lastPlayedUnix),
             loading: true,
             details: null,

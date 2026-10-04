@@ -27,7 +27,7 @@
 import { getEffectiveCurrentAccount } from './accountsStore.ts';
 import { fetchAccountOwnedData, fetchAccountWishlistAppids } from './accountData.ts';
 import type { GameOwner } from './accountData.ts';
-import { fmtLastPlayed } from './utils.ts';
+import { fmtLastPlayed, hoursFromMinutes } from './utils.ts';
 
 export interface OwnershipStatus {
   inLibrary: boolean;
@@ -140,7 +140,7 @@ export function createMyOwnershipCache() {
     if (!ownedSet.has(appid)) return null;
     const owners = ownersMap.get(appid) ?? [];
     return {
-      playtime: owners.reduce((sum, o) => sum + o.minutes, 0) / 60,
+      playtime: hoursFromMinutes(owners.reduce((sum, o) => sum + o.minutes, 0)),
       lastPlayed: fmtLastPlayed(Math.max(0, ...owners.map((o) => o.lastPlayedSec))),
     };
   }

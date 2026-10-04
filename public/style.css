@@ -4869,3 +4869,23 @@ kbd {
   color: var(--text1);
   text-align: center;
 }
+
+/* The Filter popover's column pane: the table library's 150 px cut category and column names
+   short, and its search box ran past the pane's edge, so the pane scrolled sideways. */
+.dt-filter-cols {
+  width: 200px;
+}
+.dt-filter-cols-search {
+  width: 100%;
+  box-sizing: border-box;
+}
+/* Phone: the library's 460 px minimum ran the popover past a 390 px screen. */
+@media (max-width: 768px) {
+  .dt-filter-panel {
+    min-width: 0;
+    width: calc(100vw - 24px);
+  }
+  .dt-filter-cols {
+    width: 45%;
+  }
+}

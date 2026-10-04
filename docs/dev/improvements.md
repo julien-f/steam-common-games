@@ -26,7 +26,7 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 
 ## Lists and selection
 
-- **U11 · minor · F3** — Filter popover: category pane too narrow (scrolls sideways); the range shows no field label and raw floats (`0 – 99.0202584`, `380.2666…`); "never played" needs max = 0 and then reads "Played (h): 0–0". Label and round; add a "never played" preset.
+- **U11 · minor · F3** — Filter popover: range bounds print raw floats for computed columns (Weighted Rating `93.9813501 – 97.9840615`), the range shows no field label, and "never played" needs max = 0 and then reads "Played (h): 0–0". The table library prints bounds with `String(n)` and has no presets; needs an upstream change (format the bounds, a "never played" preset).
 
 ## Comparing
 
