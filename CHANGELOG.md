@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Development: the pre-commit hook fails a commit changing app code without a `CHANGELOG.md` entry (`SKIP_CHANGELOG=1` for one that needs none).
 - Development: `scripts/ux-measure.js` also reports controls under 24×24 px and controls without an accessible name.
+- Each table column's header has a ▾ menu to filter, group by or hide that column, and a search or filter matching nothing says so, with a button to clear them.
 
 ### Changed
 
@@ -21,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - A list built from a bundle says, on its formula line, how many of the bundle's games aren't on Steam and were left out, instead of dropping them without a word.
 - A saved comparison keeps its page's name ("Alice vs. Bob") instead of a long formula ("Alice — Owned + Bob — Owned — grouped by membership").
+- Tables' select-all and group checkboxes and page buttons are named for screen readers, sorted headers announce their direction, and filter chips name the values kept when that's shorter.
 - The Filter popover's column list fits without scrolling sideways, fits a phone screen, and Played (h) ranges read in rounded hours ("0 – 20", not "20.0166…").
 
 ## [0.6.0] - 2026-10-04

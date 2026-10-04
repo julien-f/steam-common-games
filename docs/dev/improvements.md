@@ -39,7 +39,7 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 
 ## Keyboard and accessibility
 
-- **U50 · minor · I2, L4, C5** — the tables' select-all, group and row checkboxes have no accessible name. `@vates/data-table-solid` renders them with no label hook (its own "select all" label goes unused), so this needs an upstream change: name them "Select all", "Select <group>", "Select <game>" (tracked in data-table's own backlog as U1).
+- **U50 · minor · I2, L4, C5** — row checkboxes read "Select row " with no game name: `@vates/data-table-solid` (0.15) names them after the first visible column, the image, and its row label gets only that cell's text, not the row. Select-all and group checkboxes are named. Needs an upstream change: name a row after a chosen column, or the first non-empty one (vatesfr/data-table#31).
 - **U70 · polish · S2** — after the panel's 🔗 copy, the icon becomes ✓ but nothing is announced and `aria-label` stays "Copy link to this game". Announce "Link copied" through a live region.
 - **U28 · polish · I2** — the open game's row is highlighted, but not exposed to assistive tech (`aria-current`); the table library has no per-row attribute hook.
 
