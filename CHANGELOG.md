@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Development: the pre-commit hook fails a commit changing app code without a `CHANGELOG.md` entry (`SKIP_CHANGELOG=1` for one that needs none).
 - Development: `scripts/ux-measure.js` also reports controls under 24×24 px and controls without an accessible name.
 
 ### Changed

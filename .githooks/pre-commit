@@ -19,7 +19,10 @@ run() {
 }
 
 run format npm run -s format:check
-run changelog npm run -s check:changelog
+# An amend's commit is HEAD~1..index, not HEAD..index; only git's arguments say which it is.
+base=HEAD
+ps -o args= -p $PPID | grep -q -- '--amend' && base=HEAD~1
+run changelog npm run -s check:changelog -- --staged=$base
 run doc-refs npm run -s check:doc-refs
 NODE_OPTIONS=--test-reporter=dot run test npm run -s test
 if git diff --cached --name-only | grep -qE "$ui"; then
