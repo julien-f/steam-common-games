@@ -33,7 +33,7 @@ An `ERESOLVE` warning, or `npm ls --all` exiting non-zero on an `invalid` `types
 Confirm the changes first, then:
 
 1. `npm update` for in-range drift, `npm install <pkg>@latest` for a range bump.
-2. `npm run check`, plus `npm run build` — the one step neither it nor the hook covers. Report real output.
+2. `npm run check`, `npm run build` and, for a frontend dependency, `npm run test:e2e` — a lockfile-only change doesn't trigger the hook's e2e run. A 0.x minor bump can break like a major one even when its README and types show only additions. Report real output.
 3. A lockfile-only change is still a code change: `CHANGELOG.md` entry in the same commit, per `CLAUDE.md`.
 4. Surface new lint violations from a plugin bump rather than silencing them with `eslint-disable`.
 
