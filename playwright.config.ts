@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// End-to-end tests for docs/dev/scenarios.md's ★ scenarios (`npm run test:e2e`). The app runs on
+// End-to-end tests for docs/dev/journeys.md's ★ scenarios (`npm run test:e2e`). The app runs on
 // its own Vite server; every /api call is answered in the browser by e2e/mockApi.ts, so no
 // backend, database or upstream service is involved.
 // Below Linux's ephemeral range (32768–60999): the pre-commit hook runs this beside the unit tests,

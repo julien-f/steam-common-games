@@ -1,6 +1,6 @@
 # UI guidelines
 
-How the UI should behave where [scenarios.md](scenarios.md) and the feature docs are silent; what `ux-review` judges taste against. Conventions, not hard rules: a design that breaks one says why in [frontend.md](frontend.md).
+How the UI should behave where [journeys.md](journeys.md) and the feature docs are silent; what `ux-review` judges taste against. Conventions, not hard rules: a design that breaks one says why in [frontend.md](frontend.md).
 
 ## Principles
 
@@ -55,4 +55,4 @@ How the UI should behave where [scenarios.md](scenarios.md) and the feature docs
 - Empty, loading, failed and disabled states.
 - Accessible names and exposed state.
 - Phone width: no page overflow, nothing clipped, targets ≥ 24 px (`node scripts/ux-measure.js` reports both).
-- A scenario in [scenarios.md](scenarios.md) covering it, or an edge on an existing one.
+- A scenario in [journeys.md](journeys.md) covering it, or an edge on an existing one.

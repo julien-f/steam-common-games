@@ -1,11 +1,11 @@
 ---
 name: ux-review
-description: Run a UX/UI design review of the app by walking the user journeys in docs/dev/scenarios.md in a real browser, record findings in docs/dev/improvements.md, and report them ranked. Also re-checks one backlog item after its fix. Use when asked for a design, usability, UX or UI review, or to re-check a flow or a U-item after a UI change.
+description: Run a UX/UI design review of the app by walking the user journeys in docs/dev/journeys.md in a real browser, record findings in docs/dev/improvements.md, and report them ranked. Also re-checks one backlog item after its fix. Use when asked for a design, usability, UX or UI review, or to re-check a flow or a U-item after a UI change.
 ---
 
 # UX review
 
-Judges the app against [docs/dev/scenarios.md](../../../docs/dev/scenarios.md) and [ui-guidelines.md](../../../docs/dev/ui-guidelines.md), not general taste. A finding is friction on a scenario's path, a broken **Expect**/**Edges** line, or a guideline broken along the way. A ◇ step is a known target, not a defect — note how far the UI gets toward it, nothing more.
+Judges the app against [docs/dev/journeys.md](../../../docs/dev/journeys.md) and [ui-guidelines.md](../../../docs/dev/ui-guidelines.md), not general taste. A finding is friction on a scenario's path, a broken **Expect**/**Edges** line, or a guideline broken along the way. A ◇ step is a known target, not a defect — note how far the UI gets toward it, nothing more.
 
 ## Scope
 
