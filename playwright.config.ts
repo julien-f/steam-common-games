@@ -5,7 +5,8 @@ import { defineConfig, devices } from '@playwright/test';
 // backend, database or upstream service is involved.
 // Below Linux's ephemeral range (32768–60999): the pre-commit hook runs this beside the unit tests,
 // whose servers and requests draw random ports from that range and could take a fixed one there.
-const PORT = 28992;
+// E2E_PORT: scripts/guard.js runs a base and a head checkout, each on its own server, never reused.
+const PORT = Number(process.env.E2E_PORT) || 28992;
 
 export default defineConfig({
   testDir: 'e2e',
@@ -28,6 +29,6 @@ export default defineConfig({
   webServer: {
     command: `npx vite --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
-    reuseExistingServer: true,
+    reuseExistingServer: !process.env.E2E_PORT,
   },
 });
