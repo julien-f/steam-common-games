@@ -97,7 +97,7 @@ test("F3 edge: a column header's filter lists values as the cells write them", a
   // the menu closes when the table scrolls, so scroll to it before opening, as a finger would
   await menuButton.scrollIntoViewIfNeeded();
   await menuButton.click();
-  await page.getByRole('menuitem', { name: 'Filter' }).click();
+  await page.getByRole('dialog', { name: 'Genres options' }).getByRole('button', { name: 'Filter' }).click();
   // innerText, unlike textContent, applies CSS text-transform
   const labels = () =>
     page.locator('.dt-th-filter-flyout label').evaluateAll((ls) => ls.map((l) => (l as HTMLElement).innerText));

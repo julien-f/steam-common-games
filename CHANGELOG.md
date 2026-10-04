@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A list built from a bundle says, on its formula line, how many of the bundle's games aren't on Steam and were left out, instead of dropping them without a word.
 - A saved comparison keeps its page's name ("Alice vs. Bob") instead of a long formula ("Alice — Owned + Bob — Owned — grouped by membership").
 - Tables' select-all and group checkboxes and page buttons are named for screen readers, sorted headers announce their direction, and filter chips name the values kept when that's shorter.
+- The bundle browser's Cheapest Tier filter shows its bounds and chips as prices in your region's currency.
 - A column header's filter lists values as the table writes them ("Action", not "ACTION"), and the Image header no longer stands out in capitals.
 - The Filter popover's column list fits without scrolling sideways, fits a phone screen, and Played (h) ranges read in rounded hours ("0 – 20", not "20.0166…").
 

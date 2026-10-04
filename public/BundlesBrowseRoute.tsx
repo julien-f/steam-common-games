@@ -237,10 +237,15 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     // Sorted, filtered and bucketed in the region's currency (currency.ts's approximate rates):
     // some shops only price in USD, and "$6 < €10" is not an order. Shown in the shop's own.
     value: (row) => (row.price == null ? null : inRegionCurrency(row.price, row.currency)),
-    format: (_v, row) =>
-      row.price == null
-        ? 'Varies'
-        : `${row.pickQuantity ? `${row.pickQuantity} for ` : ''}${formatWithEstimate(row.price, row.currency ?? regionCurrency(), regionCurrency())}`,
+    format: (v, row) =>
+      // no row for a standalone value (filter chip, range bound): `v` is already in region currency
+      !row
+        ? v == null
+          ? 'Varies'
+          : formatMoney(v as number, regionCurrency())
+        : row.price == null
+          ? 'Varies'
+          : `${row.pickQuantity ? `${row.pickQuantity} for ` : ''}${formatWithEstimate(row.price, row.currency ?? regionCurrency(), regionCurrency())}`,
     compare: compareNumMissingLast,
     // withMissingGroup, not a bare priceTierBucket: `Number(null)` is 0, so a null price would
     // otherwise land in its "Free" bucket rather than in the missing/"Varies" one.
