@@ -39,6 +39,8 @@ Open `http://localhost:58991` in dev (not `:3000` — that serves the last `npm 
 
 `.githooks/pre-commit` checks whitespace and runs `npm run check`'s steps in parallel before every commit — typecheck, lint and `npm run test:e2e` only when `public/`, `e2e/` or a frontend config changes (~3 s otherwise, ~18 s with them); `npm install` enables it (`core.hooksPath`) and points `git blame` at `.git-blame-ignore-revs`.
 
+CI (`.github/workflows/ci.yml`) runs `npm run check` and the e2e suite on every push to `main` and every PR, and lists the journey steps the tests lock in the run's summary.
+
 Application data lives in `db.sqlite` (gitignored); today it holds only cache tables. `npm run cache:clear` empties them without deleting the file.
 
 ## Documentation
