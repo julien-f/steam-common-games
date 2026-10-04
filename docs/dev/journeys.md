@@ -7,7 +7,7 @@ What users come to the app to get done: the input for design reviews (walk each 
 
 Each journey: **Who / goal**, numbered **Steps** as a user would take them, **Done when** (what must be true at the end) and **Edges** worth checking. ◇ marks a step or outcome the app doesn't support yet: the target a design review pushes toward. ★ marks a journey locked by `e2e/scenarios.spec.ts` (`npm run test:e2e`).
 
-Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.2-4: …` only those steps, `A1 edge: …` its edges.
+Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: …` only those steps, `A1 edge: …` its edges.
 
 - [Accounts](#accounts)
 - [Comparing libraries](#comparing-libraries)
@@ -185,10 +185,9 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.2-4: …`
   1. Owned
   2. filter (e.g. played > 5 h)
   3. **🏆 Rank N games**
-  4. answer pairs with ← /
-  5. / ↓ / S / X / Z
-  6. stop with Esc halfway
-  7. later **Continue: N chosen left** (or **Continue ranking**, for the whole list) on the list page to resume
+  4. answer pairs with ← / → / ↓ / S / X / Z
+  5. stop with Esc halfway
+  6. later **Continue: N chosen left** (or **Continue ranking**, for the whole list) on the list page to resume
 - **Done when**: no answer lost on stop; the progress bar's estimate shrinks; the list sorts by Rank; **ℹ Details** opens the panel without losing the pair.
 - **Edges**: Re-rank a selected game; Exclude one, then bring it back; Undo right after resuming; the source gains/loses a game; Change source keeps answers.
 

@@ -42,7 +42,7 @@ test('A1 edge: Owned with no account points to Home rather than showing 0 games'
   await expect(page).toHaveURL(/\/$/);
 });
 
-test('A2: explore a friend, then switch back to my ★ account from the nav chip', async ({ page }) => {
+test('A2.1-2,4: explore a friend, then switch back to my ★ account from the nav chip', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
@@ -125,7 +125,7 @@ test("C4 edge: on a comparison, the panel's Owned by lists every player who owns
   expect((await owners.allInnerTexts()).sort()).toEqual(['Alice', 'Bob', 'Carol']);
 });
 
-test('C1: compare three players — one table grouped from "all" to "only one"', async ({ page }) => {
+test('C1.4: compare three players — one table grouped from "all" to "only one"', async ({ page }) => {
   await page.goto('/lists/compare?u=alice&u=bob&u=carol');
   await expect(groupRows(page)).toHaveCount(6);
   const labels = await groupRows(page).allInnerTexts();
@@ -191,7 +191,7 @@ test('C1 edge: an unknown player is named, and the others still compare', async 
   await expect(groupRows(page)).toHaveCount(3);
 });
 
-test('L1: select games, add them to a new list, open it', async ({ page }) => {
+test('L1.1-3: select games, add them to a new list, open it', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await row(page, 'Portal 2').getByRole('checkbox').check();
@@ -227,7 +227,7 @@ test("L1 edge: the new list's toast stays while pointed at", async ({ page }) =>
   await expect(toast).toBeHidden();
 });
 
-test('L1 edge: a list moves into the only folder', async ({ page }) => {
+test('L1.4: a list moves into the only folder', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
   page.once('dialog', (d) => d.accept('Shortlist'));
@@ -269,7 +269,7 @@ test("R1 edge: a ranking card's HLTB time is the table's, rounded and labelled",
   await expect(page.locator('.rank-route')).toContainText('44.5 h to beat');
 });
 
-test('R1: rank chosen games, stop, resume on the same ones', async ({ page }) => {
+test('R1.1,3-6: rank chosen games, stop, resume on the same ones', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Terraria', 'Hades']) await row(page, name).getByRole('checkbox').check();
@@ -342,7 +342,7 @@ test('R2 edge: a Wishlist ranking keeps its price columns', async ({ page }) => 
   await expect(page.locator('.list-hero')).toContainText(/Prices/i);
 });
 
-test('B1: a bundle, then what it adds to my library', async ({ page }) => {
+test('B1.1,3-4: a bundle, then what it adds to my library', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/bundles');
   await page.getByRole('cell', { name: 'Test Co-op Pack' }).click();
@@ -490,7 +490,7 @@ test('D1 edge: Updated ↻ keeps the rows and the selection while it refreshes',
   await expect(row(page, 'Portal 2').getByRole('checkbox')).toBeChecked();
 });
 
-test('D2: with upstreams down, every game is still listed', async ({ page }) => {
+test('D2.1-2: with upstreams down, every game is still listed', async ({ page }) => {
   await mockApi(page, { states: ['upstream-down'] });
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
@@ -541,7 +541,7 @@ test('F1 edge: the panel closes from its × after scrolling it', async ({ page }
   await expect(page.locator('#game-panel')).toBeHidden();
 });
 
-test('F1: look up one game from the nav search, in place', async ({ page }) => {
+test('F1.1-4: look up one game from the nav search, in place', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
@@ -583,7 +583,7 @@ test('I2 edge: icon-only controls have names', async ({ page }) => {
   await expect(page.locator('.dt-dd')).toContainText('Image');
 });
 
-test('I2: into a list from the keyboard — skip link, and R with no panel open', async ({ page }) => {
+test('I2.1: into a list from the keyboard — skip link, and R with no panel open', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
