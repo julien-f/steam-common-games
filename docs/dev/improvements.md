@@ -26,7 +26,7 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 
 ## Lists and selection
 
-- **U11 · minor · F3** — Filter popover: range bounds print raw floats for computed columns (Weighted Rating `93.9813501 – 97.9840615`), the range shows no field label, and "never played" needs max = 0 and then reads "Played (h): 0–0". The table library prints bounds with `String(n)` and has no presets; needs an upstream change (format the bounds, a "never played" preset).
+- **U11 · minor · F3** — Filter popover: range bounds print raw floats for computed columns (Weighted Rating `93.9813501 – 97.9840615`), the range shows no field label, and "never played" needs max = 0 and then reads "Played (h): 0–0". The table library prints bounds with `String(n)` and has no presets; needs an upstream change: formatting is data-table's backlog U5, presets vatesfr/data-table#30.
 
 ## Comparing
 
@@ -39,13 +39,13 @@ UX backlog from the 2026-09-27 and two 2026-10-03 (mocked, `npm run dev:mock`) r
 
 ## Keyboard and accessibility
 
-- **U50 · minor · I2, L4, C5** — the tables' select-all, group and row checkboxes have no accessible name. `@vates/data-table-solid` renders them with no label hook (its own "select all" label goes unused), so this needs an upstream change: name them "Select all", "Select <group>", "Select <game>".
+- **U50 · minor · I2, L4, C5** — the tables' select-all, group and row checkboxes have no accessible name. `@vates/data-table-solid` renders them with no label hook (its own "select all" label goes unused), so this needs an upstream change: name them "Select all", "Select <group>", "Select <game>" (tracked in data-table's own backlog as U1).
 - **U70 · polish · S2** — after the panel's 🔗 copy, the icon becomes ✓ but nothing is announced and `aria-label` stays "Copy link to this game". Announce "Link copied" through a live region.
 - **U28 · polish · I2** — the open game's row is highlighted, but not exposed to assistive tech (`aria-current`); the table library has no per-row attribute hook.
 
 ## Phone
 
-- **U30 · minor · I1, F3** — on a 390 px phone the table now starts ~48 % down the screen on Owned, ~57 % on Compare and a bundle's page (was up to ~85 %): the hero folds and the view buttons are icons, but the toolbar still takes two lines and Share/Reset their own row. Next: move them into the toolbar line once `@vates/data-table-solid` has a toolbar slot (upstream PR drafted).
+- **U30 · minor · I1, F3** — on a 390 px phone the table now starts ~48 % down the screen on Owned, ~57 % on Compare and a bundle's page (was up to ~85 %): the hero folds and the view buttons are icons, but the toolbar still takes two lines and Share/Reset their own row. Next: move them into the toolbar line once `@vates/data-table-solid` has a toolbar slot (vatesfr/data-table#29).
 - **U32 · minor · I1, R1** — the ranking screen stacks cards vertically (Tie/Skip/Undo below the fold) and has no side gutter.
 - **U33 · minor · F3** — no random pick on phone until a panel is open (the 🎲 lives in the panel's nav).
 
