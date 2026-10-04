@@ -15,6 +15,8 @@ export default defineConfig({
     ...devices['Desktop Chrome'],
     baseURL: `http://localhost:${PORT}`,
     trace: 'retain-on-failure',
+    // region.ts reads the region from the time zone; pinned so a UTC CI runner prices like a EUR region.
+    timezoneId: 'Europe/Paris',
     // `E2E_SHOTS=1 npm run test:e2e` keeps every test's final screen in test-results/, to look at a UI change under mocks.
     screenshot: process.env.E2E_SHOTS ? 'on' : 'off',
   },
