@@ -49,7 +49,7 @@ Check at each step:
 
 ## Mechanics
 
-- **Layout per route**: `node scripts/ux-measure.js [--state=…] --name=ux-<scenario> /route…`, then `browser_run_code_unsafe` with `filename: .playwright-mcp/measure.js` — first-row position, block heights, overflow and console errors at both widths, with screenshots.
+- **Layout per route**: `node scripts/ux-measure.js [--state=…] --name=ux-<scenario> /route…`, then `browser_run_code_unsafe` with `filename: .playwright-mcp/measure.js` — first-row position, block heights, overflow, targets under 24 px, unnamed controls and console errors at both widths, with screenshots.
 - **Batch each step in one `browser_run_code_unsafe` call**: act, then measure with `page.evaluate` (focus, bounding boxes, computed styles, accessible names, `scrollWidth > innerWidth`), then screenshot. Far cheaper than click-by-click snapshots.
 - **Screenshots** go to `.playwright-mcp/ux-<scenario>-<what>.png` (gitignored — never `docs/images/`); `Read` them to look, `magick <in> -crop WxH+X+Y <out>` for detail.
 - **Native dialogs** (`prompt`/`confirm`) block the page: register `page.once('dialog', …)` before the click that opens one.

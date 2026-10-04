@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Development: `scripts/ux-measure.js` also reports controls under 24×24 px and controls without an accessible name.
+
 ### Changed
 
 - A comparison states its mode once, in its select, instead of also as a badge beside the title.

@@ -8,7 +8,8 @@
 //   --state    the `mock` cookie (e.g. upstream-down,untiered — see e2e/mockApi.ts); cleared otherwise
 //   --name     screenshot prefix (default "measure"): .playwright-mcp/<name>-<route>-<width>.png
 // Returns, per route and width: where the first table row starts, the heights of the blocks
-// above it, horizontal page overflow, and console errors (favicon.ico aside).
+// above it, horizontal page overflow, interactive elements under 24×24 px (WCAG 2.5.8; links in
+// running text aside) or without an accessible name, and console errors (favicon.ico aside).
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -53,7 +54,32 @@ function measureScript({ fresh, state, name, routes }) {
           if (el && el.getBoundingClientRect().height) heights[s] = Math.round(el.getBoundingClientRect().height);
         }
         const row = document.querySelector('tbody tr');
-        return { firstRowTop: top(row), viewport: innerHeight, heights, overflow: document.documentElement.scrollWidth > innerWidth };
+        const rect = (el) => el.getBoundingClientRect();
+        const nameOf = (el) =>
+          (
+            el.getAttribute('aria-label') ||
+            el.getAttribute('aria-labelledby')?.split(' ').map((id) => document.getElementById(id)?.textContent).join(' ') ||
+            (el.id && document.querySelector(\`label[for="\${el.id}"]\`)?.textContent) ||
+            el.closest('label')?.textContent ||
+            (el.tagName === 'INPUT' || el.tagName === 'SELECT' ? '' : el.textContent) ||
+            el.getAttribute('title') ||
+            el.getAttribute('placeholder') ||
+            ''
+          ).trim();
+        const sample = (els) => ({ count: els.length, samples: els.slice(0, 5).map((el) => el.outerHTML.slice(0, 100)) });
+        const interactive = [
+          ...document.querySelectorAll('button, input, select, textarea, a[href], [role="button"], [tabindex="0"]'),
+        ].filter((el) => el.checkVisibility({ checkVisibilityCSS: true, checkOpacity: true }));
+        return {
+          firstRowTop: top(row),
+          viewport: innerHeight,
+          heights,
+          overflow: document.documentElement.scrollWidth > innerWidth,
+          smallTargets: sample(
+            interactive.filter((el) => (rect(el).width < 24 || rect(el).height < 24) && !(el.tagName === 'A' && el.closest('p'))),
+          ),
+          unnamed: sample(interactive.filter((el) => !nameOf(el))),
+        };
       }, ${JSON.stringify(BLOCKS)});
       const slug = route.replace(/^\\//, '').replace(/[^\\w]+/g, '_').slice(0, 40) || 'home';
       await page.screenshot({ path: \`.playwright-mcp/${name}-\${slug}-\${w}.png\` });

@@ -24,7 +24,7 @@ The smallest change that closes the item, following [frontend.md](../../../docs/
 
 ## 3. Look at it
 
-- `node scripts/mock-server.js up` (`dev:mock` on `:58993`, its own storage: no demo-prefs seed/restore; `down` when done). Check in the browser at **1440×900** and **390×844**: for layout, `node scripts/ux-measure.js --name=ux-U<n> /route…` then `browser_run_code_unsafe` with `filename: .playwright-mcp/measure.js` (first-row position, block heights, overflow, console errors, screenshots); for anything else, one `browser_run_code_unsafe` call per step that acts, measures what the item is about (bounding boxes before/after, accessible names), and screenshots to `.playwright-mcp/ux-U<n>-<what>.png`.
+- `node scripts/mock-server.js up` (`dev:mock` on `:58993`, its own storage: no demo-prefs seed/restore; `down` when done). Check in the browser at **1440×900** and **390×844**: for layout, `node scripts/ux-measure.js --name=ux-U<n> /route…` then `browser_run_code_unsafe` with `filename: .playwright-mcp/measure.js` (first-row position, block heights, overflow, targets under 24 px, unnamed controls, console errors, screenshots); for anything else, one `browser_run_code_unsafe` call per step that acts, measures what the item is about (bounding boxes before/after, accessible names), and screenshots to `.playwright-mcp/ux-U<n>-<what>.png`.
 - This is the item's re-check — no separate ux-review run.
 - A stale-module error after editing a widely imported file: restart the server (`down`, then `up`). A console error that appeared mid-edit: reload before believing it (pitfalls.md).
 
