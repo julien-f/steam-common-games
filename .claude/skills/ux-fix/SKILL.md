@@ -9,7 +9,7 @@ Works through the named `U<n>` items in [improvements.md](../../../docs/dev/impr
 
 ## 0. Before starting
 
-- Read every requested item and the scenario it names in [scenarios.md](../../../docs/dev/scenarios.md), then the code involved.
+- Read every requested item, the scenario it names in [scenarios.md](../../../docs/dev/scenarios.md) and the [UI guidelines](../../../docs/dev/ui-guidelines.md) it touches, then the code involved.
 - Batch the real design forks into one `AskUserQuestion`, recommendation first: placement or interaction model, frontend-only vs. a backend change, anything on CLAUDE.md's ask-first list (a new dependency). Everything else proceeds on the obvious fix — an item whose "Direction" already settles it needs no question.
 
 ## 1. Test first
