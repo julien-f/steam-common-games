@@ -141,6 +141,17 @@ test('C1 edge: my account comes first, is prefilled, and only once', async ({ pa
   await expect(page.locator('.compare-form')).toContainText('Bob');
 });
 
+test('C3 edge: a saved comparison keeps the name its page had', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare?u=alice&u=bob');
+  await expect(page.getByRole('heading', { name: 'Alice vs. Bob' })).toBeVisible();
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  if (await more.isVisible()) await more.click();
+  await page.getByRole('button', { name: 'Save as a list' }).click();
+  await expect(page).toHaveURL(/\/lists\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole('heading', { name: 'Alice vs. Bob' })).toBeVisible();
+});
+
 test('C1 edge: an unknown player is named, and the others still compare', async ({ page }) => {
   await page.goto('/lists/compare?u=alice&u=bob&u=nobody-here');
   const alert = page.getByRole('alert');

@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- A saved comparison keeps its page's name ("Alice vs. Bob") instead of a long formula ("Alice — Owned + Bob — Owned — grouped by membership").
 - The Filter popover's column list fits without scrolling sideways, fits a phone screen, and Played (h) ranges read in rounded hours ("0 – 20", not "20.0166…").
 
 ## [0.6.0] - 2026-10-04

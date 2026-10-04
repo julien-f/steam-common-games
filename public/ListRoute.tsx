@@ -1066,7 +1066,8 @@ export default function ListRoute() {
   function handleSaveComparison(): void {
     const list = compareList();
     if (!list) return;
-    const saved = createList({ kind: 'dynamic', op: list.op, sources: list.sources });
+    // Named as its page was ("Alice vs. Bob"), not by its formula, which reads differently.
+    const saved = createList({ kind: 'dynamic', name: heroTitle() || undefined, op: list.op, sources: list.sources });
     navigate(`/lists/${saved.id}`);
   }
 
