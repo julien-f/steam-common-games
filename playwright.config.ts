@@ -3,7 +3,9 @@ import { defineConfig, devices } from '@playwright/test';
 // End-to-end tests for docs/dev/scenarios.md's ★ scenarios (`npm run test:e2e`). The app runs on
 // its own Vite server; every /api call is answered in the browser by e2e/mockApi.ts, so no
 // backend, database or upstream service is involved.
-const PORT = 58992;
+// Below Linux's ephemeral range (32768–60999): the pre-commit hook runs this beside the unit tests,
+// whose servers and requests draw random ports from that range and could take a fixed one there.
+const PORT = 28992;
 
 export default defineConfig({
   testDir: 'e2e',
