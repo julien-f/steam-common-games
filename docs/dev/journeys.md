@@ -5,7 +5,7 @@ What users come to the app to get done: the input for design reviews (walk each 
 - **Goals**: explore Steam libraries as lists of games, with ratings, completion times and prices in one table; combine lists to answer what Steam can't (what friends both own, what a bundle adds, what the family already has); share a view; run it yourself for a group of friends.
 - **Non-goals**: buying or trading through the app; social features beyond reading Steam's friends lists; storing anything about an account beyond its cached public data and the user's own lists.
 
-Each journey: **Who / goal**, numbered **Steps** as a user would take them, **Done when** (what must be true at the end) and **Edges** worth checking. ◇ marks a step or outcome the app doesn't support yet: the target a design review pushes toward. ★ marks a journey locked by `e2e/scenarios.spec.ts` (`npm run test:e2e`).
+Each journey: **Who / goal**, numbered **Steps** as a user would take them, **Done when** (what must be true at the end) and **Edges** worth checking. ◇ marks a step or outcome the app doesn't support yet: the target a design review pushes toward. Which steps `e2e/scenarios.spec.ts` locks (★) is derived, never written: `node scripts/journey-coverage.js`.
 
 Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: …` only those steps, `A1 edge: …` its edges.
 
@@ -23,7 +23,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 
 ## Accounts
 
-### A1 ★ First visit: look at my library
+### A1 First visit: look at my library
 
 - **Who / goal**: a new visitor wants to see their own games with ratings and completion times.
 - **Steps**:
@@ -66,15 +66,12 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   3. explore one
   4. back on Home, their friends list marks mutual friends
 - **Done when**: the friend becomes the current account and joins Recent accounts, so Compare's player boxes offer them next.
-- **Or**:
-  1. select several friends
-  2. **Compare with me** ◇
-  3. lands on C1's result with me plus them, my current account unchanged
+- **Or**: 5. select several friends 6. **Compare with me** ◇ 7. lands on C1's result with me plus them, my current account unchanged
 - **Edges**: private friends list; a Family's merged friends list; the list's ↻ after adding a friend on Steam.
 
 ## Comparing libraries
 
-### C1 ★ What can we all play tonight?
+### C1 What can we all play tonight?
 
 - **Who / goal**: a group of 2–5 friends wants the games they all own, best-rated first.
 - **Steps**:
@@ -134,7 +131,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 
 ## Lists
 
-### L1 ★ Build a manual list
+### L1 Build a manual list
 
 - **Who / goal**: keep a "to play with Alice" shortlist.
 - **Steps**:
@@ -142,7 +139,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   2. add to a new manual list
   3. name it
   4. put it in a folder
-  - Or: while reading one game's panel, **Add to list** there ◇.
+  5. or, while reading one game's panel, **Add to list** there ◇
 - **Done when**: the list appears in Home's tree; adding/removing games persists across reloads.
 - **Edges**: delete then restore (soft-delete — no restore UI yet, frontend.md's Known gaps); a folder's "Move to…" never offers its own subfolders.
 
@@ -178,7 +175,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 
 ## Ranking
 
-### R1 ★ Rank my played games
+### R1 Rank my played games
 
 - **Who / goal**: build a personal top list from my library without ranking all of it.
 - **Steps**:
@@ -213,7 +210,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 
 ## Bundles and prices
 
-### B1 ★ Is this bundle worth it for me?
+### B1 Is this bundle worth it for me?
 
 - **Who / goal**: judge a bundle by what it adds to my library and how good those games are.
 - **Steps**:
@@ -256,7 +253,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 
 ## Finding a game
 
-### F1 ★ Look up one game
+### F1 Look up one game
 
 - **Who / goal**: check a game's rating, length, Linux support and price before buying.
 - **Steps**:
@@ -275,7 +272,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   2. type `steam half-life`
 - **Done when**: lands on `/search` with the closest match open; the on-page box refines without reopening the panel.
 
-### F3 ★ What should I play next?
+### F3 What should I play next?
 
 - **Who / goal**: pick something from my backlog for tonight, short and well rated.
 - **Steps**:
@@ -289,7 +286,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 
 ## Sharing
 
-### S1 ★ Send a friend a view
+### S1 Send a friend a view
 
 - **Who / goal**: show a friend my curated, filtered wishlist.
 - **Steps**:

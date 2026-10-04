@@ -1,4 +1,4 @@
-// docs/dev/journeys.md's ★ scenarios, end to end against mocked data (mockApi.ts).
+// docs/dev/journeys.md's journeys, end to end against mocked data (mockApi.ts).
 import { test, expect, type Page } from '@playwright/test';
 import { mockApi } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';

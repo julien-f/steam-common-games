@@ -24,6 +24,7 @@ base=HEAD
 ps -o args= -p $PPID | grep -q -- '--amend' && base=HEAD~1
 run changelog npm run -s check:changelog -- --staged=$base
 run doc-refs npm run -s check:doc-refs
+run journeys npm run -s check:journeys
 NODE_OPTIONS=--test-reporter=dot run test npm run -s test
 if git diff --cached --name-only | grep -qE "$ui"; then
   run typecheck npm run -s typecheck

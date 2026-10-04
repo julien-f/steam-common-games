@@ -9,7 +9,7 @@ Judges the app against [docs/dev/journeys.md](../../../docs/dev/journeys.md) and
 
 ## Scope
 
-- **Default: the ★ scenarios.** A named scenario, group or route narrows it; "full" walks every scenario.
+- **Default: the journeys with a ★ step** (`node scripts/journey-coverage.js`). A named scenario, group or route narrows it; "full" walks every scenario.
 - **Re-check `U<n>`**: walk only the scenarios that [improvements.md](../../../docs/dev/improvements.md) item names, confirm the fix, then drop or narrow the item.
 - A scenario that's wrong about the app (a step that doesn't exist, a stale expectation) is a finding against the doc.
 - Say which scenarios were walked and which were skipped, and why.
