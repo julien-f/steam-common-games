@@ -541,6 +541,26 @@ test('F1 edge: the panel closes from its × after scrolling it', async ({ page }
   await expect(page.locator('#game-panel')).toBeHidden();
 });
 
+test('F1 edge: fullscreen media turns a phone to landscape, and keeps it there', async ({ page }) => {
+  // Desktop browsers reject the lock, so record the calls instead.
+  await page.addInitScript(() => {
+    const w = window as Window & { locks?: string[] };
+    w.locks = [];
+    screen.orientation.lock = async (type: string) => void w.locks!.push(type);
+  });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Hades').getByText('Hades').click();
+  await page.getByRole('button', { name: 'Open in lightbox' }).click();
+  await page.getByRole('button', { name: 'Enter fullscreen' }).click();
+  const locks = () => page.evaluate(() => (window as Window & { locks?: string[] }).locks);
+  await expect.poll(locks).toEqual(['landscape']);
+
+  // Firefox for Android drops the lock when a trailer stops; the orientation change re-locks it.
+  await page.evaluate(() => screen.orientation.dispatchEvent(new Event('change')));
+  await expect.poll(locks).toEqual(['landscape', 'landscape']);
+});
+
 test('F1.1-4: look up one game from the nav search, in place', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

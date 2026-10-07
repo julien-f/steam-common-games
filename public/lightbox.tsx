@@ -137,6 +137,9 @@ export function initLightbox({
   _lbSignal = abort.signal;
   document.addEventListener('fullscreenchange', syncLightboxFullscreenBtn, { signal: _lbSignal });
   document.addEventListener('webkitfullscreenchange', syncLightboxFullscreenBtn, { signal: _lbSignal });
+  document.addEventListener('fullscreenchange', lockLbLandscape, { signal: _lbSignal });
+  document.addEventListener('webkitfullscreenchange', lockLbLandscape, { signal: _lbSignal });
+  screen.orientation?.addEventListener('change', lockLbLandscape, { signal: _lbSignal });
   const dispose = mountLightboxDom();
   _lbTeardown = () => {
     abort.abort();
@@ -183,6 +186,27 @@ function syncLightboxFullscreenBtn() {
   const isFs = !!(document.fullscreenElement || webkitDoc().webkitFullscreenElement);
   btn.innerHTML = isFs ? LB_FS_EXIT : LB_FS_ENTER;
   btn.setAttribute('aria-label', isFs ? 'Exit fullscreen' : 'Enter fullscreen');
+}
+
+function toggleLbFullscreen(lb: HTMLElement) {
+  if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
+    (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
+  } else {
+    (
+      lb.requestFullscreen?.() ??
+      (lb as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.()
+    )?.catch?.(() => {});
+  }
+}
+
+// Fullscreen media is landscape, so a phone turns to show it, pictures included. Re-asserted on
+// any orientation change while fullscreen: Firefox for Android resets the orientation when a
+// trailer's media session ends (stepping to the next item), overriding the lock. Rejected where
+// unsupported (desktop, iOS) — nothing to do then.
+function lockLbLandscape() {
+  const o = screen.orientation as ScreenOrientation & { lock?: (type: string) => Promise<void> };
+  if (!(document.fullscreenElement || webkitDoc().webkitFullscreenElement)) return;
+  o?.lock?.('landscape').catch(() => {});
 }
 
 // ── Video playback (HLS) ───────────────────────────────────────────────────
@@ -517,16 +541,7 @@ function wireButtons(lb: HTMLElement) {
   lb.querySelector('.lb-next')!.addEventListener('click', () => stepLightbox(1));
   lb.querySelector('.lb-game-prev')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav?.(-1), -1));
   lb.querySelector('.lb-game-next')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav?.(1), 1));
-  lb.querySelector('.lb-fullscreen')!.addEventListener('click', () => {
-    if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
-      (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
-    } else {
-      (
-        lb.requestFullscreen?.() ??
-        (lb as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.()
-      )?.catch?.(() => {});
-    }
-  });
+  lb.querySelector('.lb-fullscreen')!.addEventListener('click', () => toggleLbFullscreen(lb));
 }
 
 function wireKeyboard(lb: HTMLElement) {
@@ -589,16 +604,7 @@ function wireKeyboard(lb: HTMLElement) {
         e.preventDefault();
         stepGameFromLightbox(() => _onGameRandom!());
       }
-      if (e.key === 'f' || e.key === 'F') {
-        if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
-          (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
-        } else {
-          (
-            lb.requestFullscreen?.() ??
-            (lb as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.()
-          )?.catch?.(() => {});
-        }
-      }
+      if (e.key === 'f' || e.key === 'F') toggleLbFullscreen(lb);
       if (vid) {
         if (e.key === ' ' && !onScrub) {
           e.preventDefault();
