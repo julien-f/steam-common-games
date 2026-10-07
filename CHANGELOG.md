@@ -6,17 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-07
+
 ### Changed
 
-- A table's "Reset view" button is now "Default view", telling it apart from the "× Clear all" beside it: Default view restores the default columns, sort and filters; Clear all removes every sort, filter, grouping and search.
+- A table's Share view and Default view buttons sit in its toolbar line instead of a row of their own above it, so on a phone the games start higher on the screen. Default view (formerly Reset view) restores the default columns, sort and filters, which tells it apart from the "× Clear all" beside it, which removes every sort, filter, grouping and search.
 - The screenshot viewer has a Zoom button (and Z), the visible way to what double-tap, double-click and pinch do. On a phone its backdrop is solid black, its ‹ › arrows are narrower, and opening it with a tap no longer leaves a focus ring on its close button.
-- A table's Share view and Default view (formerly Reset view) buttons sit in its toolbar line instead of a row of their own above it, so on a phone the games start higher on the screen.
 
 ### Fixed
 
-- The About page's data sources line up, its GitHub link looks like a link, and the Bundles table's cover column is labelled "Image" like the other tables'.
+- The About page lists ProtonDB among its data sources, where the Linux/Deck tier comes from; its sources line up and its GitHub link looks like a link. The Bundles table's cover column is labelled "Image" like the other tables'.
 - Faint text people need to read — the footer, the game search's section titles and no-match message, the DLC list's "Loading more" line — meets the WCAG AA contrast minimum.
-- The About page lists ProtonDB among its data sources, where the Linux/Deck tier comes from.
 - In the screenshot viewer, ← and → step past a trailer that isn't playing (paused, not started or failed to load) instead of seeking it; they still seek one that plays.
 - On a slow connection, a game's panel no longer shows the previous screenshot, or the previous game's picture, while the next one loads: it shows that item's thumbnail, or a loading shimmer.
 - On a phone, Home's recent-account buttons, Clear all and Updated, the list headers' Prices and Updated lines, and Compare's mode menu are big enough to tap reliably.

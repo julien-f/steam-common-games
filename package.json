@@ -1,6 +1,6 @@
 {
   "name": "steam.isonoe.net",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Find games common to multiple Steam libraries",
   "main": "server.js",
   "scripts": {
