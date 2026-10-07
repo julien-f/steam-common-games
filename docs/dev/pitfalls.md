@@ -19,3 +19,9 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: the app stays blank; the server logs `The request id ".../node_modules/@solidjs/router/..." is outside of Vite serving allow list`, and the browser gets a 403 for it.
 - **Cause**: a page requested Solid's router while Vite was still optimizing dependencies on startup.
 - **Fix**: wait a few seconds and reload; the same file is then served (200).
+
+## `page.goto: net::ERR_ABORTED` right after closing the panel or lightbox in an e2e test
+
+- **Symptom**: a `page.goto` issued straight after a ×/Esc close fails with `net::ERR_ABORTED`, on CI more than locally.
+- **Cause**: the close steps history back over the overlay's own entry (`overlayHistory.ts`) with an asynchronous `history.go`, and that traversal aborts the navigation already under way.
+- **Fix**: wait for the step's `popstate` before navigating (see the L4 Recently Looked Up test).

@@ -251,7 +251,11 @@ test('L4 edge: Recently Looked Up lists the latest lookup first, and says it kee
     await page.getByPlaceholder('Look up any game…').fill(name);
     await page.locator('.game-search-result', { hasText: name }).first().click();
     await expect(page.locator('#panel-title')).toHaveText(name);
-    await page.getByRole('button', { name: 'Close', exact: true }).click(); // a phone's panel covers the search
+    // A phone's panel covers the search. Closing steps history back over the panel's own entry,
+    // asynchronously: a goto issued before that lands is aborted (net::ERR_ABORTED).
+    const steppedBack = page.evaluate(() => new Promise((r) => addEventListener('popstate', r, { once: true })));
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await steppedBack;
   }
   await page.goto('/game');
   await expect(rows(page)).toHaveCount(2);
