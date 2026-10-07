@@ -155,6 +155,13 @@ export function isLightboxOpen() {
   return lbGame() !== null;
 }
 
+// The open game and the shot on screen — reactive, so the panel's hero can follow it.
+export function lightboxShot(): { appid: number; shotId: string } | null {
+  const game = lbGame();
+  const shot = shots()[idx()];
+  return game && shot ? { appid: game.appid, shotId: shot.shotId } : null;
+}
+
 // Every game step from inside the lightbox (↑/↓, R, the caption's own buttons) goes through
 // here. The host's step opens the panel *behind* the overlay, and `panelOpen` focuses that
 // panel's hero image — which drops focus straight out of the lightbox's own trap onto an element

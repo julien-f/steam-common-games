@@ -11,9 +11,9 @@ import {
   fmtLastPlayed,
   computeSteamdbRating,
 } from './utils.ts';
-import { openLightbox, closeLightbox, isLightboxOpen } from './lightbox.tsx';
+import { openLightbox, closeLightbox, isLightboxOpen, lightboxShot } from './lightbox.tsx';
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
-import { buildMediaItems, mediaLabel } from './mediaItems.ts';
+import { buildMediaItems, mediaLabel, resolveShotIndex } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
 import { getMyOwnershipStatus, getOwnersFor } from './myOwnership.ts';
 import type { OwnershipStatus } from './myOwnership.ts';
@@ -1860,6 +1860,12 @@ function PanelHero(): JSX.Element {
   const idx = () => Math.max(0, Math.min(heroIdx(), items().length - 1));
   const hasMany = () => items().length > 1;
   let filmstripEl: HTMLDivElement | undefined;
+
+  // Follows the lightbox over it, so closing that leaves the hero on the last item looked at.
+  createEffect(() => {
+    const shot = lightboxShot();
+    if (shot && shot.appid === panelGame()?.appid) setHeroIdx(resolveShotIndex(items(), shot.shotId));
+  });
 
   // Keeps the active filmstrip thumb scrolled into view whenever the hero steps — same
   // "scrollIntoView on every step, including the very first render" behavior the original

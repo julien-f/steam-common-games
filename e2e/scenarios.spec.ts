@@ -606,6 +606,17 @@ async function fakePlayback(page: Page) {
   });
 }
 
+test('F1 edge: closing the lightbox leaves the panel on the last item looked at', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  await page.getByRole('button', { name: 'Open in lightbox' }).click();
+  await page.getByRole('button', { name: 'Next screenshot' }).click();
+  await page.getByRole('button', { name: 'Next screenshot' }).click();
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await page.getByRole('button', { name: 'Close lightbox' }).click();
+  await expect(page.locator('.panel-film-item[aria-current="true"]')).toHaveAccessibleName('Screenshot 1 of 3');
+});
+
 test("F1 edge: the panel's thumbnails are named as the lightbox counts them", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360');
