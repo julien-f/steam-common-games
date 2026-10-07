@@ -561,6 +561,36 @@ test('F1 edge: fullscreen media turns a phone to landscape, and keeps it there',
   await expect.poll(locks).toEqual(['landscape', 'landscape']);
 });
 
+test('F1 edge: on a phone, a double-tap zooms a screenshot and another zooms back out', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'touch only');
+  // A real image to zoom: mockApi blocks the Steam CDN, so the banner would fail to load.
+  await page.route('https://cdn.akamai.steamstatic.com/**', (route) =>
+    route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="460" height="215"/>',
+    }),
+  );
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Hades').getByText('Hades').click();
+  await page.getByRole('button', { name: 'Open in lightbox' }).tap();
+  const img = page.locator('#screenshot-lightbox .lb-img');
+  await expect(img).toBeVisible();
+  const box = (await img.boundingBox())!;
+  const cdp = await page.context().newCDPSession(page);
+  const doubleTap = async () => {
+    for (let i = 0; i < 2; i++) {
+      const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    }
+  };
+  await doubleTap();
+  await expect(img).toHaveAttribute('style', /scale\(2\)/);
+  await doubleTap();
+  await expect(img).not.toHaveAttribute('style', /scale/);
+});
+
 test('F1.1-4: look up one game from the nav search, in place', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

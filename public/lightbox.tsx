@@ -840,6 +840,8 @@ function wireTouchHandlers(lb: HTMLElement) {
         if (now - lbLastTapTime < LB_DOUBLE_TAP_MS && tapDist < LB_DOUBLE_TAP_DIST) {
           lbLastTapTime = 0; // consume, so a 3rd quick tap starts a fresh pair rather than re-triggering
           if (showingImg) {
+            // Or the browser follows up with a dblclick, whose handler would toggle the zoom back.
+            e.preventDefault();
             if (lbZoom > 1) resetLbZoom();
             else lbZoomTowardPoint(endX, endY);
           } else {
@@ -864,7 +866,7 @@ function wireTouchHandlers(lb: HTMLElement) {
         }
       }
     },
-    { passive: true },
+    { passive: false },
   );
 
   lb.addEventListener(
