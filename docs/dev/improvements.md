@@ -1,6 +1,6 @@
 # Improvements
 
-UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocked, `npm run dev:mock`) and the 2026-10-07 phone-lightbox (real dev server, touch emulation) phone panel-media (mocked) and broad mocked reviews (`ux-review` skill) against [journeys.md](journeys.md) and [ui-guidelines.md](ui-guidelines.md). Each item names the scenarios it blocks or slows; a dedicated run per item re-walks those scenarios. Severity: **blocker** (goal unreachable) · **major** (reached with confusion or a workaround) · **minor** · **polish**. Fix items with the `ux-fix` skill; remove an item once it ships.
+UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocked, `npm run dev:mock`) and the 2026-10-07 phone-lightbox (real dev server, touch emulation) phone panel-media (mocked), broad mocked and slow-media/design (mocked, delayed media) reviews (`ux-review` skill) against [journeys.md](journeys.md) and [ui-guidelines.md](ui-guidelines.md). Each item names the scenarios it blocks or slows; a dedicated run per item re-walks those scenarios. Severity: **blocker** (goal unreachable) · **major** (reached with confusion or a workaround) · **minor** · **polish**. Fix items with the `ux-fix` skill; remove an item once it ships.
 
 **Pilot** (claude-ux-workflow, from 2026-10-04): items tagged `pilot`, and the ◇ steps of C6, A4 and L1, are frozen. Only the bot's PRs fix them; `ux-fix` and hand fixes leave them alone until the pilot ends.
 
@@ -23,6 +23,7 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Loading and feedback
 
+- **U96 · major · F1** — on a slow connection the panel's hero keeps showing the previous image, with no loading sign, until the next one has loaded: stepping fast shows one item while the strip marks another (tapping it opens the lightbox on the one marked), and after ↑/↓ the new game's title sits over the previous game's picture for seconds. Its `loading` class only follows the cover/screenshot switch. Blank or fade the old image and show the new item's thumbnail as a placeholder, as the lightbox already does.
 - **U7 · minor · L3 · pilot** — Reset view drops sort/filters instantly with no undo.
 - **U67 · polish · O1 · pilot** — `GET /api/metrics` shows `budgets: {}` until the first outbound call, so an operator can't see the ceilings before spending against them. List every budget group with 0 used.
 
@@ -44,6 +45,8 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Keyboard and accessibility
 
+- **U97 · minor · F1, I2** — ← / → seek a trailer whenever one is on screen, also when it is paused, never started or failed to load, so they can't leave it without Shift; the shortcuts help (and the code's own comment) say they seek only while a video plays. Seek only when it is playing.
+- **U98 · minor · I2** — `--text2` (#4c6b8a on #1b2838, ~2.7:1) colours text people read: the footer ("Press ? for keyboard shortcuts", About), the search box's section titles and no-match message, the DLC "Loading N more…" line (and the account's Updated age, U39). Lift text uses to AA (4.5:1); keep `--text2` for placeholders and decoration.
 - **U70 · polish · S2 · pilot** — after the panel's 🔗 copy, the icon becomes ✓ but nothing is announced and `aria-label` stays "Copy link to this game". Announce "Link copied" through a live region.
 - **U28 · polish · I2** — the open game's row is highlighted, but not exposed to assistive tech (`aria-current`); the table library has no per-row attribute hook (vatesfr/data-table#40).
 
@@ -58,6 +61,9 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Consistency and polish
 
+- **U99 · minor · S3** — About lists Steam Web API, Steam Store, HowLongToBeat and IsThereAnyDeal as data sources but not ProtonDB, which the Linux/Deck tier comes from. Add it, worded like the others (community reports, unofficial endpoint).
+- **U100 · polish · L3** — since Share/Reset moved into the toolbar line, the table library's "× Clear all" (filters and sort) sits right beside "Reset view" (columns, sort and filters): two look-alike buttons with overlapping meanings. Distinguish them (e.g. "Clear filters") or keep one way to reset.
+- **U101 · polish** — About's data-source list wraps the source names ("Steam Web / API") into a narrow column with descriptions starting at ragged positions, and its Contact "GitHub" link looks like plain text; Bundles' image column has an empty header beside Owned's "Image"; every table shows a "Page 1 of 1" pager with all buttons disabled when everything fits.
 - **U39 · polish · pilot** — nav items shift sideways between routes; missing thumbnails have no placeholder; "Demo" pills look like primary buttons; the "Updated" age has very low contrast; Compare's op `<select>` is an unstyled native white control; wishlisted/owned name colours have no legend (still true in Recently Looked Up).
 - **U80 · polish · pilot** — `favicon.ico` 404s.
 - **U81 · polish · pilot** — dates read differently across pages: Released and Added differ, as do the Bundles list (`2026-10-13 21:10`) and a bundle's page (`Oct 13, 09:10 PM`).
