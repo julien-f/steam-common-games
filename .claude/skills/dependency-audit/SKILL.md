@@ -36,6 +36,7 @@ Confirm the changes first, then:
 2. `npm run check` and `npm run build` — the one step neither it nor the hook covers — then `npm run test:e2e` (the hook runs it too, but find breakage before committing). A 0.x minor bump can break like a major one even when its README and types show only additions. Report real output.
 3. A lockfile-only change is still a code change: `CHANGELOG.md` entry in the same commit, per `CLAUDE.md`.
 4. Surface new lint violations from a plugin bump rather than silencing them with `eslint-disable`.
+5. An updated `@vates/data-table-solid` (or any package an improvements.md item waits on): re-check every item citing its issues (`grep -n 'vatesfr/data-table' docs/dev/improvements.md`) on `dev:mock`, and drop or narrow the ones it fixed — 0.16 shipped five such fixes that sat unnoticed.
 
 ## Automation
 
