@@ -2900,7 +2900,6 @@ body.lb-open {
   font-size: 22px;
 }
 .lb-fullscreen:hover,
-.lb-share:hover,
 .lb-toolbar .lb-caption button:hover {
   background: rgba(26, 159, 255, 0.5);
 }

@@ -794,6 +794,19 @@ test('F1 edge: on a phone, the ‹ › buttons sit clear of the media and its co
   await clear('#screenshot-lightbox .lb-vctrls');
 });
 
+test("F1 edge: the viewer's toolbar holds only fullscreen, zoom and close", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  // The address bar already holds the media's link (`?shot=`), so there is no copy button.
+  const buttons = page.locator('.lb-toolbar-left button, .lb-toolbar-right button');
+  await expect(buttons.first()).toBeVisible();
+  expect(await buttons.evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))).toEqual([
+    'Enter fullscreen',
+    'Zoom',
+    'Close lightbox',
+  ]);
+});
+
 test('F1 edge: nothing of the page shows around the media', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');

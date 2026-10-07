@@ -22,8 +22,6 @@ import { render } from 'solid-js/web';
 
 const LB_FS_ENTER = `<svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" aria-hidden="true"><polyline points="4,1 1,1 1,4"/><polyline points="8,1 11,1 11,4"/><polyline points="1,8 1,11 4,11"/><polyline points="11,8 11,11 8,11"/></svg>`;
 const LB_ZOOM_ICON = `<svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="6" r="4.25"/><path d="M9.25 9.25 12.5 12.5M4 6h4M6 4v4"/></svg>`;
-const LB_LINK_ICON = `<svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M5.5 8.5a3 3 0 0 0 4.24 0l1.42-1.42a3 3 0 0 0-4.24-4.24l-.71.71"/><path d="M8.5 5.5a3 3 0 0 0-4.24 0L2.84 6.92a3 3 0 0 0 4.24 4.24l.71-.71"/></svg>`;
-const LB_CHECK_ICON = `<svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,7 5.5,11 12,3"/></svg>`;
 const LB_FS_EXIT = `<svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" aria-hidden="true"><polyline points="1,4 1,1 4,1"/><polyline points="11,4 11,1 8,1"/><polyline points="4,11 1,11 1,8"/><polyline points="8,11 11,11 11,8"/></svg>`;
 const LB_PLAY_ICON = `<svg viewBox="0 0 12 12" width="16" height="16" fill="currentColor" aria-hidden="true"><polygon points="2,1 11,6 2,11"/></svg>`;
 const LB_PAUSE_ICON = `<svg viewBox="0 0 12 12" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="1" y="1" width="4" height="10" rx="0.5"/><rect x="7" y="1" width="4" height="10" rx="0.5"/></svg>`;
@@ -534,9 +532,6 @@ function LightboxDom() {
             {/* eslint-disable-next-line solid/no-innerhtml -- module-level literal SVG strings
                 (see the top of this file); no external input reaches these. */}
             <button class="lb-fullscreen" aria-label="Enter fullscreen" innerHTML={LB_FS_ENTER} />
-            {/* eslint-disable-next-line solid/no-innerhtml -- module-level literal SVG strings
-                (see the top of this file); no external input reaches these. */}
-            <button class="lb-share" aria-label="Copy link to this screenshot" innerHTML={LB_LINK_ICON} />
           </div>
           <div class="lb-counter" aria-live="polite" aria-atomic="true" />
           <div class="lb-toolbar-right">
@@ -564,18 +559,6 @@ function LightboxDom() {
 function wireButtons(lb: HTMLElement) {
   lb.querySelector('.lb-backdrop')!.addEventListener('click', closeLightbox);
   lb.querySelector('.lb-close')!.addEventListener('click', closeLightbox);
-  lb.querySelector('.lb-share')!.addEventListener('click', async () => {
-    const btn = lb.querySelector<HTMLElement>('.lb-share')!;
-    try {
-      await navigator.clipboard.writeText(location.href);
-      btn.innerHTML = LB_CHECK_ICON;
-      setTimeout(() => {
-        btn.innerHTML = LB_LINK_ICON;
-      }, 1500);
-    } catch {
-      window.prompt('Copy this link:', location.href);
-    }
-  });
   lb.querySelector('.lb-error-retry')!.addEventListener('click', retryCurrentShot);
   lb.querySelector('.lb-prev')!.addEventListener('click', () => stepLightbox(-1));
   lb.querySelector('.lb-next')!.addEventListener('click', () => stepLightbox(1));

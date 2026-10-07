@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Stepping through media in the screenshot viewer, with the arrow keys or a swipe, no longer brings back its hidden controls: only the counter shows for a moment. A tap or Tab still brings them back.
 - Once the screenshot viewer's controls have hidden, moving the mouse brings back only those near it: the top bar near the top, an arrow near its edge, a trailer's controls near the bottom.
 
+### Removed
+
+- The screenshot viewer's copy-link button: the address bar already holds the link to the media on screen.
+
 ### Development
 
 - `scripts/dev-server.js up|down` runs `npm run dev` in the background, as `scripts/mock-server.js` does `dev:mock`.
