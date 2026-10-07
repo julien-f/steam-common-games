@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- In the screenshot viewer, ← and → step past a trailer that isn't playing (paused, not started or failed to load) instead of seeking it; they still seek one that plays.
 - On a slow connection, a game's panel no longer shows the previous screenshot, or the previous game's picture, while the next one loads: it shows that item's thumbnail, or a loading shimmer.
 - On a phone, Home's recent-account buttons, Clear all and Updated, the list headers' Prices and Updated lines, and Compare's mode menu are big enough to tap reliably.
 

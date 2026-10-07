@@ -712,6 +712,19 @@ test('F1 edge: a paused trailer offers a large play button', async ({ page }) =>
   await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
 });
 
+test('F1 edge: arrows seek a trailer only while it plays, and step past it otherwise', async ({ page }) => {
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  const counter = page.locator('.lb-counter');
+  await page.getByRole('button', { name: 'Play trailer' }).click();
+  await page.keyboard.press('ArrowRight');
+  await expect(counter).toHaveText('Trailer 1 of 1');
+  await page.locator('.lb-vc-play').click(); // pause
+  await page.keyboard.press('ArrowRight');
+  await expect(counter).toHaveText('Screenshot 1 of 3');
+});
+
 test('F1 edge: a trailer pauses when the page is hidden, and stays paused', async ({ page }) => {
   await fakePlayback(page);
   await asPlayer(page, ALICE);

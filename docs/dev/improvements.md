@@ -44,7 +44,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Keyboard and accessibility
 
-- **U97 · minor · F1, I2** — ← / → seek a trailer whenever one is on screen, also when it is paused, never started or failed to load, so they can't leave it without Shift; the shortcuts help (and the code's own comment) say they seek only while a video plays. Seek only when it is playing.
 - **U98 · minor · I2** — `--text2` (#4c6b8a on #1b2838, ~2.7:1) colours text people read: the footer ("Press ? for keyboard shortcuts", About), the search box's section titles and no-match message, the DLC "Loading N more…" line (and the account's Updated age, U39). Lift text uses to AA (4.5:1); keep `--text2` for placeholders and decoration.
 - **U70 · polish · S2 · pilot** — after the panel's 🔗 copy, the icon becomes ✓ but nothing is announced and `aria-label` stays "Copy link to this game". Announce "Link copied" through a live region.
 - **U28 · polish · I2** — the open game's row is highlighted, but not exposed to assistive tech (`aria-current`); the table library has no per-row attribute hook (vatesfr/data-table#40).

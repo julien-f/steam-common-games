@@ -614,7 +614,7 @@ function wireKeyboard(lb: HTMLElement) {
         // forces media navigation instead, as an explicit escape hatch — even
         // when focus is on the scrub bar itself, whose native range-input
         // behavior would otherwise consume a bare arrow key to nudge its value.
-        if (vid && !e.shiftKey) {
+        if (vid && !vid.paused && !e.shiftKey) {
           seekVideo(vid, dir * LB_SEEK_SECONDS);
         } else {
           stepLightbox(dir);
