@@ -51,8 +51,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 - **U32 · minor · I1, R1 · pilot** — the ranking screen stacks cards vertically (Tie/Skip/Undo below the fold) and has no side gutter.
 - **U33 · minor · F3 · pilot** — no random pick on phone until a panel is open (the 🎲 lives in the panel's nav).
-- **U89 · polish · F1** — the backdrop (88 % black) lets the panel show through behind the counters (its own × sits beside the lightbox's), and the lightbox's × shows a focus ring after a touch open. Opaque backdrop on phone; focus ring for keyboard only.
-- **U90 · polish · F1** — pinch and double-tap zoom, and double-tap ±10 s on a trailer, have no visible equivalent (ui-guidelines: no hidden affordances); the prev/next arrows meanwhile cover 60 px of each side of a 390 px image though swipe does the same. Slimmer arrows; a zoom hint or button.
 
 ## Accounts and first visit
 

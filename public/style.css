@@ -3045,9 +3045,13 @@ body.lb-open {
     border-radius: 0;
   }
   .lb-btn {
-    width: 40px;
+    width: 32px;
     height: 52px;
-    font-size: 26px;
+    font-size: 24px;
+  }
+  /* Opaque: at 88 % the panel behind showed through around the media and the toolbar. */
+  .lb-backdrop {
+    background: #000;
   }
   .lb-prev {
     left: 4px;

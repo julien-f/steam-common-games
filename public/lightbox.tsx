@@ -21,6 +21,7 @@ import { render } from 'solid-js/web';
 // ── Icons ──────────────────────────────────────────────────────────────────
 
 const LB_FS_ENTER = `<svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" aria-hidden="true"><polyline points="4,1 1,1 1,4"/><polyline points="8,1 11,1 11,4"/><polyline points="1,8 1,11 4,11"/><polyline points="11,8 11,11 8,11"/></svg>`;
+const LB_ZOOM_ICON = `<svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="6" r="4.25"/><path d="M9.25 9.25 12.5 12.5M4 6h4M6 4v4"/></svg>`;
 const LB_LINK_ICON = `<svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M5.5 8.5a3 3 0 0 0 4.24 0l1.42-1.42a3 3 0 0 0-4.24-4.24l-.71.71"/><path d="M8.5 5.5a3 3 0 0 0-4.24 0L2.84 6.92a3 3 0 0 0 4.24 4.24l.71-.71"/></svg>`;
 const LB_CHECK_ICON = `<svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,7 5.5,11 12,3"/></svg>`;
 const LB_FS_EXIT = `<svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" aria-hidden="true"><polyline points="1,4 1,1 4,1"/><polyline points="11,4 11,1 8,1"/><polyline points="4,11 1,11 1,8"/><polyline points="8,11 11,11 11,8"/></svg>`;
@@ -103,6 +104,8 @@ let _getGamePosition: (() => { index: number; total: number } | null) | null = n
 // picked by the same rule the re-point itself would have used.
 let _awaitingMedia: MediaItem['type'] | null = null;
 let _lbPrevFocus: Element | null = null;
+// How the viewer last interacted — see openLightbox's focus call.
+let lastInputWasKey = false;
 // One mount at a time: a second initLightbox (Vite hot-reloading AppShell) tears the first down —
 // its DOM and every listener it put on `document` — instead of mounting a duplicate beside it.
 let _lbTeardown: (() => void) | null = null;
@@ -139,6 +142,8 @@ export function initLightbox({
   _lbSignal = abort.signal;
   document.addEventListener('fullscreenchange', syncLightboxFullscreenBtn, { signal: _lbSignal });
   document.addEventListener('webkitfullscreenchange', syncLightboxFullscreenBtn, { signal: _lbSignal });
+  document.addEventListener('keydown', () => (lastInputWasKey = true), { capture: true, signal: _lbSignal });
+  document.addEventListener('pointerdown', () => (lastInputWasKey = false), { capture: true, signal: _lbSignal });
   document.addEventListener('fullscreenchange', lockLbLandscape, { signal: _lbSignal });
   document.addEventListener('webkitfullscreenchange', lockLbLandscape, { signal: _lbSignal });
   screen.orientation?.addEventListener('change', lockLbLandscape, { signal: _lbSignal });
@@ -328,6 +333,7 @@ function retryCurrentShot() {
 function applyLbTransform() {
   const img = document.querySelector<HTMLImageElement>('#screenshot-lightbox .lb-img');
   if (!img) return;
+  document.querySelector('#screenshot-lightbox .lb-zoom')?.setAttribute('aria-pressed', String(lbZoom > 1));
   if (lbZoom === 1) {
     lbPanX = 0;
     lbPanY = 0;
@@ -361,6 +367,15 @@ function lbZoomTowardPoint(clientX: number, clientY: number) {
   lbPanY = -(clientY - rect.top - rect.height / 2);
   applyLbTransform();
   img.style.cursor = 'grab';
+}
+
+// The visible way to what double-click, double-tap and pinch do: 2x on the image's centre, or back.
+function toggleLbZoom() {
+  const img = document.querySelector<HTMLImageElement>('#screenshot-lightbox .lb-img');
+  if (!img || img.style.display === 'none') return;
+  if (lbZoom > 1) return resetLbZoom();
+  const r = img.getBoundingClientRect();
+  lbZoomTowardPoint(r.left + r.width / 2, r.top + r.height / 2);
 }
 
 // ── Video seeking (keyboard arrows + touch double-tap) ─────────────────────
@@ -516,6 +531,9 @@ function LightboxDom() {
           </div>
           <div class="lb-counter" aria-live="polite" aria-atomic="true" />
           <div class="lb-toolbar-right">
+            {/* eslint-disable-next-line solid/no-innerhtml -- module-level literal SVG strings
+                (see the top of this file); no external input reaches these. */}
+            <button class="lb-zoom" aria-label="Zoom" aria-pressed="false" innerHTML={LB_ZOOM_ICON} />
             <button class="lb-close" aria-label="Close lightbox">
               &#215;
             </button>
@@ -555,6 +573,7 @@ function wireButtons(lb: HTMLElement) {
   lb.querySelector('.lb-game-prev')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav?.(-1), -1));
   lb.querySelector('.lb-game-next')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav?.(1), 1));
   lb.querySelector('.lb-fullscreen')!.addEventListener('click', () => toggleLbFullscreen(lb));
+  lb.querySelector('.lb-zoom')!.addEventListener('click', toggleLbZoom);
 }
 
 function wireKeyboard(lb: HTMLElement) {
@@ -618,6 +637,7 @@ function wireKeyboard(lb: HTMLElement) {
         stepGameFromLightbox(() => _onGameRandom!());
       }
       if (e.key === 'f' || e.key === 'F') toggleLbFullscreen(lb);
+      if ((e.key === 'z' || e.key === 'Z') && !vid) toggleLbZoom();
       if (vid) {
         if (e.key === ' ' && !onScrub) {
           e.preventDefault();
@@ -1043,7 +1063,8 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
   const lb = document.getElementById('screenshot-lightbox')!;
   lb.classList.add('open');
   document.body.classList.add('lb-open');
-  lb.querySelector<HTMLElement>('.lb-close')!.focus();
+  // A ring on × after a tap reads as a stray highlight; it's for whoever opened this by keyboard.
+  lb.querySelector<HTMLElement>('.lb-close')!.focus({ focusVisible: lastInputWasKey });
   _onLightboxParamChange?.(newShots[idx()].shotId);
 }
 
@@ -1175,6 +1196,7 @@ function renderLightbox() {
   const pos = untrack(() => _getGamePosition?.() ?? null);
   const label =
     `${name ? name + ' — ' : ''}${pos ? `game ${pos.index + 1} of ${pos.total} — ` : ''}` + mediaLabel(list, i);
+  lb.querySelector<HTMLElement>('.lb-zoom')!.style.display = shot.type === 'video' ? 'none' : '';
   if (shot.type === 'video') {
     img.style.display = 'none';
     lb.classList.remove('lb--loading');

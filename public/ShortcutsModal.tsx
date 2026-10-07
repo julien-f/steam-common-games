@@ -53,6 +53,7 @@ export const SHORTCUT_SECTIONS: Section[] = [
       { keys: ['↑', '↓'], label: 'Previous / next game' },
       { keys: ['R'], label: 'Pick a random game from the list' },
       { keys: ['F'], label: 'Toggle fullscreen' },
+      { keys: ['Z'], label: 'Zoom the screenshot in / out' },
       { keys: ['Space'], label: 'Play / pause video' },
       { keys: ['M'], label: 'Mute / unmute video' },
       { keys: ['Esc'], label: 'Close lightbox' },

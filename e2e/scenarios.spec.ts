@@ -626,6 +626,22 @@ test("F1 edge: the panel's thumbnails are named as the lightbox counts them", as
     .toEqual(['Cover', 'Trailer 1 of 1', 'Screenshot 1 of 3', 'Screenshot 2 of 3', 'Screenshot 3 of 3']);
 });
 
+test('F1 edge: a screenshot zooms from a visible button, or Z', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const zoom = page.getByRole('button', { name: 'Zoom', exact: true });
+  const img = page.locator('#screenshot-lightbox .lb-img');
+  await zoom.click();
+  await expect(zoom).toHaveAttribute('aria-pressed', 'true');
+  await expect(img).toHaveAttribute('style', /scale\(2\)/);
+  await page.keyboard.press('z');
+  await expect(zoom).toHaveAttribute('aria-pressed', 'false');
+  await expect(img).not.toHaveAttribute('style', /scale/);
+  // Nothing to zoom on a trailer.
+  await page.getByRole('button', { name: 'Previous screenshot' }).click();
+  await expect(zoom).toBeHidden();
+});
+
 test("F1 edge: the lightbox's counters say what they count", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=v1');
@@ -768,6 +784,28 @@ test("I1 edge: on a phone, a bundle's table starts high, its other actions behin
   await expect(page.getByRole('link', { name: '← All bundles' })).toBeHidden();
   await page.getByRole('button', { name: 'More actions' }).click();
   await expect(page.getByRole('link', { name: '← All bundles' })).toBeVisible();
+});
+
+test('I2 edge: the lightbox shows its focus ring when opened from the keyboard, not from a tap', async ({
+  page,
+}, testInfo) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const hero = page.getByRole('button', { name: 'Open in lightbox' });
+  const ringOnClose = () =>
+    page.locator('.lb-close').evaluate((e) => e === document.activeElement && e.matches(':focus-visible'));
+  if (testInfo.project.name === 'phone') {
+    await hero.tap();
+    await expect(page.locator('.lb-close')).toBeFocused();
+    expect(await ringOnClose()).toBe(false);
+    // Opaque, so the panel behind doesn't show through around the media.
+    await expect(page.locator('.lb-backdrop')).toHaveCSS('background-color', 'rgb(0, 0, 0)');
+  } else {
+    await hero.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.lb-close')).toBeFocused();
+    expect(await ringOnClose()).toBe(true);
+  }
 });
 
 test("I2 edge: the panel's current thumbnail is exposed, not only coloured", async ({ page }) => {
