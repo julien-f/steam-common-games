@@ -15,6 +15,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - On a phone, Home's recent-account buttons, Clear all and Updated, the list headers' Prices and Updated lines, and Compare's mode menu are big enough to tap reliably.
 
+### Development
+
+- A `slow-media` mock state makes every banner, screenshot and trailer poster take 1.5 s to load, under `npm run dev:mock` (`mock=slow-media` cookie) and in e2e tests.
+
 ## [0.7.0] - 2026-10-07
 
 ### Added

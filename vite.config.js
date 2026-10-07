@@ -29,12 +29,13 @@ const mockApiPlugin = {
       // `document.cookie = 'mock=no-itad,slow'` in the page picks mockApi.ts's states.
       const cookie = /(?:^|;\s*)mock=([^;]*)/.exec(req.headers.cookie ?? '');
       const states = new Set(cookie ? decodeURIComponent(cookie[1]).split(',') : []);
-      const { status, contentType, body } = respond(
+      const { status, contentType, body, delayMs } = respond(
         req.method,
         new URL(req.url, 'http://localhost'),
         chunks.length ? Buffer.concat(chunks).toString() : null,
         states,
       );
+      if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
       res.writeHead(status, { 'Content-Type': contentType });
       if (!states.has('slow') || contentType !== 'text/event-stream') return res.end(body);
       for (const event of body.split(/(?<=\n\n)/)) {

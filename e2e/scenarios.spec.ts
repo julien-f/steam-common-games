@@ -626,6 +626,28 @@ test("F1 edge: the panel's thumbnails are named as the lightbox counts them", as
     .toEqual(['Cover', 'Trailer 1 of 1', 'Screenshot 1 of 3', 'Screenshot 2 of 3', 'Screenshot 3 of 3']);
 });
 
+test('F1 edge: a slow screenshot shows its thumbnail and a spinner until it has loaded', async ({ page }) => {
+  await mockApi(page, { states: ['slow-media'] });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  // The panel's filmstrip has the thumbnails by the time the full image is asked for.
+  await expect
+    .poll(() =>
+      page.locator('.panel-film-thumb').evaluateAll((imgs) => imgs.every((i) => (i as HTMLImageElement).complete)),
+    )
+    .toBe(true);
+  await page.getByRole('button', { name: 'Open in lightbox' }).click();
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('Shift+ArrowRight');
+  const lb = page.locator('#screenshot-lightbox');
+  const img = lb.locator('.lb-img');
+  await expect(lb.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await expect(lb).toHaveClass(/lb--loading/);
+  await expect(img).toHaveAttribute('src', /Screenshot%201\.svg\?thumb/);
+  await expect(img).toHaveAttribute('src', /Screenshot%201\.svg\?full/);
+  await expect(lb).not.toHaveClass(/lb--loading/);
+});
+
 test('F1 edge: a screenshot zooms from a visible button, or Z', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');

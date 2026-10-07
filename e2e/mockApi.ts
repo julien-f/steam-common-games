@@ -10,6 +10,7 @@
 //   store-down     Steam store pages return nothing (genres, release date, platforms…)
 //   stale          libraries and wishlists read as fetched 12 days ago, until a refresh (D1)
 //   untiered       the Co-op Pack lists every game in its first tier, the pricier one empty (as ITAD sends some)
+//   slow-media     every banner, screenshot and trailer poster takes 1.5 s to load (Hades has the media)
 import type { Page } from '@playwright/test';
 import { PLAYERS, CATALOG, BUNDLE, PICK_BUNDLE, game, type Player } from './fixtures.ts';
 import { flattenBundleGames, type Bundle } from '../public/bundleData.ts';
@@ -42,22 +43,27 @@ function playerJson(p: Player) {
 // Drawn inline rather than fetched, so the lightbox has media to page through under both a test
 // and dev:mock. One game only: the rest keep just their banner.
 const MEDIA_APPID = 1145360;
-const svgImage = (label: string, hue: number) =>
-  `data:image/svg+xml,${encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720"><rect width="100%" height="100%" fill="hsl(${hue} 45% 35%)"/><text x="50%" y="50%" fill="#fff" font-family="sans-serif" font-size="64" text-anchor="middle">${label}</text></svg>`,
-  )}`;
+const SLOW_MEDIA_MS = 1500;
+const svg = (label: string) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720"><rect width="100%" height="100%" fill="hsl(${[...label].reduce((h, c) => h + c.charCodeAt(0) * 7, 0) % 360} 45% 35%)"/><text x="50%" y="50%" fill="#fff" font-family="sans-serif" font-size="64" text-anchor="middle">${label}</text></svg>`;
+// `slow-media` serves each image from /api/mock-media after SLOW_MEDIA_MS instead; `variant` keeps a
+// screenshot's thumbnail and full image apart, as Steam's are.
+const mediaUrl = (label: string, slow: boolean, variant = '') =>
+  slow
+    ? `/api/mock-media/${encodeURIComponent(label)}.svg${variant && `?${variant}`}`
+    : `data:image/svg+xml,${encodeURIComponent(svg(label))}`;
 // `hls: null`, as Steam sends for a trailer with no H.264 stream: the player and its controls
 // show, nothing plays (Playwright's Chromium has no H.264 decoder anyway).
-const MEDIA = {
-  movies: [{ id: 1, thumbnail: svgImage('Trailer', 0), hls: null }],
+const media = (slow: boolean) => ({
+  movies: [{ id: 1, thumbnail: mediaUrl('Trailer', slow), hls: null }],
   screenshots: [1, 2, 3].map((n) => ({
     id: n,
-    thumbnail: svgImage(`Screenshot ${n}`, 60 * n),
-    full: svgImage(`Screenshot ${n}`, 60 * n),
+    thumbnail: mediaUrl(`Screenshot ${n}`, slow, 'thumb'),
+    full: mediaUrl(`Screenshot ${n}`, slow, 'full'),
   })),
-};
+});
 
-function details(appid: number) {
+function details(appid: number, slowMedia = false) {
   const g = game(appid);
   return {
     appid,
@@ -83,8 +89,8 @@ function details(appid: number) {
       metacritic: null,
       // Public store art; a test's browser blocks it (off localhost), dev:mock shows it.
       capsule: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`,
-      banner: null,
-      ...(appid === MEDIA_APPID ? MEDIA : { movies: [], screenshots: [] }),
+      banner: slowMedia ? mediaUrl(`Banner ${appid}`, true) : null,
+      ...(appid === MEDIA_APPID ? media(slowMedia) : { movies: [], screenshots: [] }),
       dlc: [],
       fullgame: null,
       website: null,
@@ -156,6 +162,7 @@ export interface MockResponse {
   status: number;
   contentType: string;
   body: string;
+  delayMs?: number;
 }
 
 const json = (body: unknown, status = 200): MockResponse => ({
@@ -183,12 +190,27 @@ export function respond(
     );
   if (states.has('upstream-down') && ITAD_ROUTE.test(path))
     return json({ error: 'IsThereAnyDeal request failed (mock: upstream-down)' }, 502);
+  const slowMedia = states.has('slow-media');
   const detailsFor = (appid: number) =>
     states.has('upstream-down')
-      ? { ...details(appid), rating: null, hltb: null, protondb: null, failed: ['rating', 'hltb', 'protondb'] }
+      ? {
+          ...details(appid, slowMedia),
+          rating: null,
+          hltb: null,
+          protondb: null,
+          failed: ['rating', 'hltb', 'protondb'],
+        }
       : states.has('store-down')
-        ? { ...details(appid), meta: null, failed: ['meta'] }
-        : details(appid);
+        ? { ...details(appid, slowMedia), meta: null, failed: ['meta'] }
+        : details(appid, slowMedia);
+  const mediaPath = path.match(/^\/api\/mock-media\/(.+)\.svg$/);
+  if (mediaPath)
+    return {
+      status: 200,
+      contentType: 'image/svg+xml',
+      body: svg(decodeURIComponent(mediaPath[1])),
+      delayMs: SLOW_MEDIA_MS,
+    };
 
   if (path === '/api/health')
     return json({ ok: true, configured: true, itadConfigured: !states.has('no-itad'), cache: { entries: 0 } });
@@ -310,8 +332,10 @@ export async function mockApi(page: Page, { states = [] as string[] } = {}): Pro
     (url) => url.hostname !== 'localhost' && url.hostname !== '127.0.0.1',
     (route) => route.abort(),
   );
-  await page.context().route('**/api/**', (route) => {
+  await page.context().route('**/api/**', async (route) => {
     const req = route.request();
-    return route.fulfill(respond(req.method(), new URL(req.url()), req.postData(), new Set(states)));
+    const { delayMs, ...response } = respond(req.method(), new URL(req.url()), req.postData(), new Set(states));
+    if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    return route.fulfill(response);
   });
 }
