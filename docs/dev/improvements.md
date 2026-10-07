@@ -1,6 +1,6 @@
 # Improvements
 
-UX backlog from the 2026-09-27, two 2026-10-03 and the 2026-10-04 header-menu (mocked, `npm run dev:mock`) reviews (`ux-review` skill) against [journeys.md](journeys.md) and [ui-guidelines.md](ui-guidelines.md). Each item names the scenarios it blocks or slows; a dedicated run per item re-walks those scenarios. Severity: **blocker** (goal unreachable) · **major** (reached with confusion or a workaround) · **minor** · **polish**. Fix items with the `ux-fix` skill; remove an item once it ships.
+UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocked, `npm run dev:mock`) and the 2026-10-07 phone-lightbox (real dev server, touch emulation) reviews (`ux-review` skill) against [journeys.md](journeys.md) and [ui-guidelines.md](ui-guidelines.md). Each item names the scenarios it blocks or slows; a dedicated run per item re-walks those scenarios. Severity: **blocker** (goal unreachable) · **major** (reached with confusion or a workaround) · **minor** · **polish**. Fix items with the `ux-fix` skill; remove an item once it ships.
 
 **Pilot** (claude-ux-workflow, from 2026-10-04): items tagged `pilot`, and the ◇ steps of C6, A4 and L1, are frozen. Only the bot's PRs fix them; `ux-fix` and hand fixes leave them alone until the pilot ends.
 
@@ -56,6 +56,15 @@ UX backlog from the 2026-09-27, two 2026-10-03 and the 2026-10-04 header-menu (m
 - **U33 · minor · F3 · pilot** — no random pick on phone until a panel is open (the 🎲 lives in the panel's nav).
 - **U72 · major · I1, F3** — at 390 px, the header menu's Filter flyout opens on top of its own menu and past the screen edge: Genres' flyout is 406 px wide, so **All** is cut off and unreachable, and it hides Filter/Group by/Hide underneath. Needs an upstream change: clamp to the viewport and, on narrow screens, open the flyout in place of the menu (drill-down with a back row) (vatesfr/data-table#32 (overflow) and its backlog U20 (covering the menu)).
 - **U78 · polish · I1** — at 390 px, the header menu buttons of the wider labels (Weighted Rating, HLTB, Played) shrink to 17–19 px wide, under the 24 px minimum; opening a range filter focuses its text box, raising the phone keyboard over the flyout. Needs an upstream change (vatesfr/data-table#37 (size) and its backlog U20 (keyboard)).
+- **U82 · major · F1, R2** — on a phone, double-tap to zoom a screenshot does nothing: the touch handler zooms in, then the browser's synthesized `dblclick` runs the desktop handler and zooms back out in the same gesture (Chromium touch emulation; confirm on a phone). Handle `dblclick` only when it doesn't follow a touch.
+- **U83 · major · F1** — the phone's Back (button or edge gesture) with the lightbox open leaves the page: panel and lightbox only `replaceState`, so Back drops the list, the panel and the lightbox at once. On touch, push one entry per overlay so Back closes the innermost one (revisits frontend.md's "only `replaceState`").
+- **U84 · minor · F1** — the lightbox's phone sizes in `style.css` (`@media (max-width: 768px)`: game ↑/↓ 34 px, prev/next 40×52, caption padding) sit before the base `.lb-*` rules and never apply — ↑/↓ measure 28×28, prev/next 48×64. Move that block after the base rules.
+- **U85 · minor · F1** — trailer controls are small for a thumb: Play 24×24, Mute 24×22 (under the 24 px minimum), the seek bar 3 px tall with a 12 px thumb; a paused trailer has no large play button. 44 px buttons, a taller scrubber hit area, a centred play button while paused.
+- **U86 · minor · F1** — once a playing trailer's controls have idled out, the tap that brings them back also pauses it. First tap only shows the controls.
+- **U87 · minor · F1, R2** — two bare fractions stack at the top: "1 / 6" beside the game name, "3 / 16" under it; nothing says which counts games and which media. Label them, or show media position as a progress strip.
+- **U88 · minor · F1** — a downward swipe, the phone convention for dismissing a photo viewer, opens the previous game instead (vertical swipes page games). Decide whether swipe-down closes; at least close on swipe-down at the first game rather than resisting.
+- **U89 · polish · F1** — the backdrop (88 % black) lets the panel show through behind the counters (its own × sits beside the lightbox's), and the lightbox's × shows a focus ring after a touch open. Opaque backdrop on phone; focus ring for keyboard only.
+- **U90 · polish · F1** — pinch and double-tap zoom, and double-tap ±10 s on a trailer, have no visible equivalent (ui-guidelines: no hidden affordances); the prev/next arrows meanwhile cover 60 px of each side of a 390 px image though swipe does the same. Slimmer arrows; a zoom hint or button.
 
 ## Accounts and first visit
 
@@ -74,9 +83,11 @@ States `npm run dev:mock` can't show yet — each needs a fixture or state in `e
 
 - avatars, and a large library (thousands of games: A1's edge, U30 at scale);
 - friends lists always private (A4, C4's ◇) and `/api/me` always signed out (Y1–Y3);
-- a static wishlist, so R2's "buying a game drops it from the ranking" can't be shown.
+- a static wishlist, so R2's "buying a game drops it from the ranking" can't be shown;
+- screenshots and trailers (every fixture's `screenshots`/`movies` is empty), so the lightbox can only be reviewed on the real server.
 
 ## Not yet reviewed
 
 - A4 (no allowed account has a public friends list); Y1–Y3 (needs a Steam sign-in).
+- On a real phone: the lightbox's fullscreen landscape lock, trailer playback (headless Chromium showed black frames), pinch-zoom.
 - Partly: R2, R3 at phone width (the rank screen is U32); B4 (the fixture friend's wishlist is empty); D3 (◇ not started).
