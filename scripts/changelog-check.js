@@ -1,7 +1,8 @@
 'use strict';
 
 // Fails when CHANGELOG.md's Unreleased section repeats a subsection or uses one outside
-// Keep a Changelog's set — new entries then have one obvious place to go — or has an entry over
+// Keep a Changelog's set plus Development (tooling, tests, docs: kept apart from what users see)
+// — new entries then have one obvious place to go — or has an entry over
 // MAX_ENTRY characters: commit-sized essays made the 0.5.0 release's consolidation a rewrite.
 // With --staged[=<base>] (the pre-commit hook; base HEAD, HEAD~1 when amending), also fails when
 // the commit changes app code without CHANGELOG.md; SKIP_CHANGELOG=1 skips that part.
@@ -10,7 +11,7 @@ const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ALLOWED = ['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security'];
+const ALLOWED = ['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security', 'Development'];
 const MAX_ENTRY = 400;
 const APP_CODE = /^(public|lib)\/|^server\.js$/;
 

@@ -8,10 +8,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- Development: `npm run check` fails when a phone-width CSS rule is overridden by a later rule for the same selector, so it would never apply.
-- Development: under `npm run dev:mock`, Hades has screenshots and a trailer, so the lightbox can be tried without the real server.
-- Development: the pre-commit hook fails a commit changing app code without a `CHANGELOG.md` entry (`SKIP_CHANGELOG=1` for one that needs none).
-- Development: `scripts/ux-measure.js` also reports controls under 24×24 px and controls without an accessible name.
 - Each table column's header has a ▾ menu to filter, group by or hide that column, and a search or filter matching nothing says so, with a button to clear them.
 
 ### Changed
@@ -40,6 +36,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The bundle browser's Cheapest Tier filter shows its bounds and chips as prices in your region's currency.
 - A column header's filter lists values as the table writes them ("Action", not "ACTION"), and the Image header no longer stands out in capitals.
 - The Filter popover's column list fits without scrolling sideways, fits a phone screen, and Played (h) ranges read in rounded hours ("0 – 20", not "20.0166…").
+
+### Development
+
+- `npm run check` fails when a phone-width CSS rule is overridden by a later rule for the same selector, so it would never apply.
+- Under `npm run dev:mock`, Hades has screenshots and a trailer, so the lightbox can be tried without the real server.
+- The pre-commit hook fails a commit changing app code without a `CHANGELOG.md` entry (`SKIP_CHANGELOG=1` for one that needs none).
+- `scripts/ux-measure.js` also reports controls under 24×24 px and controls without an accessible name.
 
 ## [0.6.0] - 2026-10-04
 

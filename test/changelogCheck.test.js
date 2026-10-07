@@ -5,8 +5,9 @@ const assert = require('node:assert');
 
 const { structureProblems, missingEntry } = require('../scripts/changelog-check');
 
-test('structureProblems: a repeated or unknown subsection in Unreleased; released versions are ignored', () => {
-  const text = '## [Unreleased]\n\n### Fixed\n\n- a\n\n### Fixed\n\n- b\n\n### Misc\n\n## [0.1.0]\n\n### Fixed\n';
+test('structureProblems: a repeated or unknown subsection in Unreleased; Development is allowed; released versions are ignored', () => {
+  const text =
+    '## [Unreleased]\n\n### Fixed\n\n- a\n\n### Fixed\n\n- b\n\n### Misc\n\n### Development\n\n- c\n\n## [0.1.0]\n\n### Fixed\n';
   assert.deepStrictEqual(structureProblems(text), ['repeated "### Fixed"', 'unexpected "### Misc"']);
 });
 
