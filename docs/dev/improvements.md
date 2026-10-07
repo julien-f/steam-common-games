@@ -49,7 +49,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Phone
 
-- **U95 · minor · I1, A1, C1** — at 390 px several of our own controls are under 24 px tall, with neighbours too close for the spacing exception: on Home the recent account's ★ star as mine (22 px), × (22 px), its copy button (25×22) and Clear all (14 px), and the account's Updated ↻ (13 px); the heroes' clickable tile lines (Prices' region 17 px, its Updated ↻ 13 px); Compare's mode select (17 px). At least 24 px tall, or a taller hit area around the same look.
 - **U32 · minor · I1, R1 · pilot** — the ranking screen stacks cards vertically (Tie/Skip/Undo below the fold) and has no side gutter.
 - **U33 · minor · F3 · pilot** — no random pick on phone until a panel is open (the 🎲 lives in the panel's nav).
 

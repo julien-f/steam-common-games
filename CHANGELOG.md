@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The screenshot viewer has a Zoom button (and Z), the visible way to what double-tap, double-click and pinch do. On a phone its backdrop is solid black, its ‹ › arrows are narrower, and opening it with a tap no longer leaves a focus ring on its close button.
 - A table's Share view and Reset view buttons sit in its toolbar line instead of a row of their own above it, so on a phone the games start higher on the screen.
 
+### Fixed
+
+- On a phone, Home's recent-account buttons, Clear all and Updated, the list headers' Prices and Updated lines, and Compare's mode menu are big enough to tap reliably.
+
 ## [0.7.0] - 2026-10-07
 
 ### Added
