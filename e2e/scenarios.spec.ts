@@ -582,6 +582,56 @@ test('F1 edge: on a phone, a double-tap zooms a screenshot and another zooms bac
   await expect(img).not.toHaveAttribute('style', /scale/);
 });
 
+// The fixture trailer has no stream: play()/pause() only flip `paused` and fire their events.
+async function fakePlayback(page: Page) {
+  await page.addInitScript(() => {
+    const playing = new WeakSet<HTMLMediaElement>();
+    Object.defineProperty(HTMLMediaElement.prototype, 'paused', {
+      get(this: HTMLMediaElement) {
+        return !playing.has(this);
+      },
+    });
+    HTMLMediaElement.prototype.play = async function (this: HTMLMediaElement) {
+      playing.add(this);
+      this.dispatchEvent(new Event('play'));
+    };
+    HTMLMediaElement.prototype.pause = function (this: HTMLMediaElement) {
+      if (!playing.delete(this)) return;
+      this.dispatchEvent(new Event('pause'));
+    };
+  });
+}
+
+test('F1 edge: a paused trailer offers a large play button', async ({ page }) => {
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  const bigPlay = page.getByRole('button', { name: 'Play trailer' });
+  await expect(bigPlay).toBeVisible();
+  await bigPlay.click();
+  await expect(bigPlay).toBeHidden();
+  await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
+});
+
+test("F1 edge: on a phone, the tap that brings back a trailer's controls leaves it playing", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'touch only');
+  await page.clock.install();
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  await page.getByRole('button', { name: 'Play trailer' }).tap();
+  const lb = page.locator('#screenshot-lightbox');
+  await page.clock.runFor(3500);
+  await expect(lb).toHaveClass(/lb-idle/);
+  await page.locator('.lb-video').tap();
+  await expect(lb).not.toHaveClass(/lb-idle/);
+  await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
+  await page.locator('.lb-video').tap();
+  await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Play');
+});
+
 test('F1 edge: Back closes the open game, then leaves the list', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/about');

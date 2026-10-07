@@ -466,6 +466,10 @@ function LightboxDom() {
       <div class="lb-seek-flash lb-seek-flash-right" aria-hidden="true">
         {LB_TOUCH_SEEK_SECONDS}s ⏩
       </div>
+      {/* eslint-disable-next-line solid/no-innerhtml -- a module-level literal SVG string
+          from the top of this file, not data: nothing here comes from a game, a user, or an
+          API response. Solid's JSX can't express a raw SVG child any other way. */}
+      <button class="lb-bigplay" aria-label="Play trailer" innerHTML={LB_PLAY_ICON} />
       <div class="lb-vctrls" style={{ display: 'none' }}>
         {/* eslint-disable-next-line solid/no-innerhtml -- a module-level literal SVG string
             from the top of this file, not data: nothing here comes from a game, a user, or an
@@ -743,7 +747,7 @@ function wireTouchHandlers(lb: HTMLElement) {
       } else if (e.touches.length === 1) {
         // A touch starting on the chrome is operating it, not swiping the media behind it —
         // dragging the video scrubber sideways otherwise steps to the next shot as well.
-        if ((e.target as Element).closest('.lb-vctrls, .lb-toolbar, .lb-btn')) {
+        if ((e.target as Element).closest('.lb-vctrls, .lb-toolbar, .lb-btn, .lb-bigplay')) {
           lbActive = false;
           return;
         }
@@ -911,16 +915,19 @@ function wireVideoControls(lb: HTMLElement) {
   vid2.addEventListener('play', () => {
     playBtn.innerHTML = LB_PAUSE_ICON;
     playBtn.setAttribute('aria-label', 'Pause');
+    syncLbPaused();
     schedHideLbChrome();
   });
   vid2.addEventListener('pause', () => {
     playBtn.innerHTML = LB_PLAY_ICON;
     playBtn.setAttribute('aria-label', 'Play');
+    syncLbPaused();
     showLbChrome();
   });
   vid2.addEventListener('ended', () => {
     playBtn.innerHTML = LB_PLAY_ICON;
     playBtn.setAttribute('aria-label', 'Play');
+    syncLbPaused();
     showLbChrome();
   });
   vid2.addEventListener('volumechange', () => {
@@ -938,11 +945,14 @@ function wireVideoControls(lb: HTMLElement) {
   playBtn.addEventListener('click', () => {
     vid2.paused ? vid2.play().catch(() => {}) : vid2.pause();
   });
+  lb.querySelector('.lb-bigplay')!.addEventListener('click', () => vid2.play().catch(() => {}));
   muteBtn.addEventListener('click', () => {
     vid2.muted = !vid2.muted;
   });
 
   vid2.addEventListener('click', () => {
+    // A tap on a trailer whose controls had idled out only brings them back, as phone players do.
+    if (tapRevealedChrome) return;
     vid2.paused ? vid2.play().catch(() => {}) : vid2.pause();
   });
 
@@ -955,14 +965,22 @@ function wireVideoControls(lb: HTMLElement) {
   lb.addEventListener('mouseleave', () => {
     schedHideLbChrome();
   });
+  let tapRevealedChrome = false;
   lb.addEventListener(
     'touchstart',
     () => {
+      tapRevealedChrome = lb.classList.contains('lb-idle');
       showLbChrome();
       schedHideLbChrome();
     },
     { passive: true },
   );
+}
+
+// The large play button shows over a trailer that isn't playing — autoplay refused, paused, ended.
+function syncLbPaused() {
+  const lb = document.getElementById('screenshot-lightbox');
+  lb?.classList.toggle('lb--paused', lbVideoEl.isConnected && lbVideoEl.paused);
 }
 
 // ── Mount ────────────────────────────────────────────────────────────────
@@ -1041,7 +1059,7 @@ export function closeLightbox() {
   const lb = document.getElementById('screenshot-lightbox')!;
   stopHls(lbVideoEl);
   detachLbVideo();
-  lb.classList.remove('open', 'lb--loading', 'lb-idle');
+  lb.classList.remove('open', 'lb--loading', 'lb-idle', 'lb--paused');
   document.body.classList.remove('lb-open');
   if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
     (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
@@ -1152,10 +1170,12 @@ function renderLightbox() {
     vc.style.display = '';
     resetLbVc(vc);
     playHls(vid, shot.hls);
+    syncLbPaused();
     schedHideLbChrome();
   } else {
     stopHls(vid);
     detachLbVideo();
+    syncLbPaused();
     vc.style.display = 'none';
     img.style.display = 'block';
     img.alt = label;

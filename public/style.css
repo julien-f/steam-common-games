@@ -2702,6 +2702,8 @@ body.lb-open {
   color: #fff;
   cursor: pointer;
   padding: 4px;
+  min-width: 24px;
+  min-height: 24px;
   display: flex;
   align-items: center;
   flex-shrink: 0;
@@ -2993,6 +2995,47 @@ body.lb-open {
   opacity: 1;
 }
 
+.lb-bigplay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  width: 72px;
+  height: 72px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.15s,
+    visibility 0s 0.15s,
+    background 0.15s;
+}
+.lb-bigplay:hover {
+  background: rgba(26, 159, 255, 0.6);
+}
+.lb-bigplay svg {
+  width: 32px;
+  height: 32px;
+  margin-left: 4px; /* the triangle's visual centre sits left of its box */
+}
+/* Delayed, so it doesn't flash up in the moment before autoplay starts. */
+#screenshot-lightbox.lb--paused .lb-bigplay {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 0.15s 0.3s,
+    visibility 0s 0.3s,
+    background 0.15s;
+}
+
 /* After the base .lb-* rules, or they win at equal specificity. */
 @media (max-width: 768px) {
   /* Lightbox fills the full screen — swipe handles navigation */
@@ -3020,6 +3063,27 @@ body.lb-open {
   }
   .lb-caption {
     padding: 0 44px;
+  }
+  /* Thumb-sized trailer controls; the seek bar keeps its thin look inside a taller hit area. */
+  .lb-vc-btn {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
+  .lb-vc-scrub {
+    height: 24px;
+    background-color: transparent;
+    background-size: 100% 3px;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+  .lb-vc-scrub::-webkit-slider-thumb {
+    width: 18px;
+    height: 18px;
+  }
+  .lb-vc-scrub::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
   }
 }
 
