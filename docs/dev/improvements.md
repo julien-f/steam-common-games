@@ -58,7 +58,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Consistency and polish
 
-- **U100 · polish · L3** — since Share/Reset moved into the toolbar line, the table library's "× Clear all" (filters and sort) sits right beside "Reset view" (columns, sort and filters): two look-alike buttons with overlapping meanings. Distinguish them (e.g. "Clear filters") or keep one way to reset.
 - **U101 · polish** — About's data-source list wraps the source names ("Steam Web / API") into a narrow column with descriptions starting at ragged positions, and its Contact "GitHub" link looks like plain text; Bundles' image column has an empty header beside Owned's "Image"; every table shows a "Page 1 of 1" pager with all buttons disabled when everything fits.
 - **U39 · polish · pilot** — nav items shift sideways between routes; missing thumbnails have no placeholder; "Demo" pills look like primary buttons; the "Updated" age has very low contrast; Compare's op `<select>` is an unstyled native white control; wishlisted/owned name colours have no legend (still true in Recently Looked Up).
 - **U80 · polish · pilot** — `favicon.ico` 404s.

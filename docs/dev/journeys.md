@@ -160,7 +160,7 @@ Tests map to journeys by title: `A1: â€¦` covers A1's built steps, `A1.1,3-4: â€
   1. any list
   2. change columns, sort, group, filters
   3. reload
-  4. **Reset view**
+  4. **Default view**
 - **Done when**: the view persists per list kind; reset restores defaults.
 
 ### L4 Turn lookups into a shortlist

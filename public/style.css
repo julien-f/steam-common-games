@@ -3439,7 +3439,7 @@ kbd {
   font-size: 13px;
 }
 
-/* Share/Reset view, in the table toolbar's own line (the library's `toolbarEnd` slot). */
+/* Share view/Default view, in the table toolbar's own line (the library's `toolbarEnd` slot). */
 .list-view-actions {
   display: flex;
   gap: 8px;

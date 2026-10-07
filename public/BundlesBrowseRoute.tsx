@@ -574,12 +574,12 @@ export default function BundlesBrowseRoute() {
               <button
                 type="button"
                 class="btn btn-ghost btn-sm"
-                aria-label="Reset view"
+                aria-label="Default view"
                 title="Back to the default columns, sort and filters"
                 onClick={() => resetTableView(table, VIEW_PREF_KEY, VIEW_PARAM)}
               >
                 <span class="btn-icon">↺</span>
-                <span class="btn-label">Reset view</span>
+                <span class="btn-label">Default view</span>
               </button>
             </div>
           }

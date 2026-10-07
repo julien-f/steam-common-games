@@ -1088,7 +1088,7 @@ export default function ListRoute() {
   // True once load() has built the single-table path below (owned/wishlist/bundle/recent/user),
   // false while loading and permanently false for a group-by-membership list, which renders N
   // per-group tables instead of one — see this file's own header comment on why view persistence
-  // (and so "🔗 Share view"/"Reset view" below) doesn't apply there. Gates that toolbar's own
+  // (and so "🔗 Share view"/"Default view" below) doesn't apply there. Gates that toolbar's own
   // <Show> rather than leaving it visible-but-broken against a `table` that doesn't exist yet/at all.
   const [tableReady, setTableReady] = createSignal(false);
   // How many membership groups a group-by-membership list has (0 for every other kind/op).
@@ -1774,7 +1774,7 @@ export default function ListRoute() {
     return 'tv';
   }
 
-  // "🔗 Share view"/"Reset view" — see tableViewPrefs.ts for the share-on-demand-only reasoning
+  // "🔗 Share view"/"Default view" — see tableViewPrefs.ts for the share-on-demand-only reasoning
   // (a link written to the live URL goes stale the moment the table changes again). A user list's
   // view is persisted on the list itself (GameList.tableView, see the single-table branch of
   // load() below), not through prefs.ts, so its own reset goes around resetTableView rather than
@@ -1853,12 +1853,12 @@ export default function ListRoute() {
         <button
           type="button"
           class="btn btn-ghost btn-sm"
-          aria-label="Reset view"
+          aria-label="Default view"
           title="Back to the default columns, sort and filters"
           onClick={handleResetView}
         >
           <span class="btn-icon">↺</span>
-          <span class="btn-label">Reset view</span>
+          <span class="btn-label">Default view</span>
         </button>
       </div>
     );

@@ -8,8 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- A table's "Reset view" button is now "Default view", telling it apart from the "× Clear all" beside it: Default view restores the default columns, sort and filters; Clear all removes every sort, filter, grouping and search.
 - The screenshot viewer has a Zoom button (and Z), the visible way to what double-tap, double-click and pinch do. On a phone its backdrop is solid black, its ‹ › arrows are narrower, and opening it with a tap no longer leaves a focus ring on its close button.
-- A table's Share view and Reset view buttons sit in its toolbar line instead of a row of their own above it, so on a phone the games start higher on the screen.
+- A table's Share view and Default view (formerly Reset view) buttons sit in its toolbar line instead of a row of their own above it, so on a phone the games start higher on the screen.
 
 ### Fixed
 

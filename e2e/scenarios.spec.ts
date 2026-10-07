@@ -249,6 +249,17 @@ test('L1.4: a list moves into the only folder', async ({ page }) => {
   await expect(move).toHaveValue('');
 });
 
+test("L3 edge: the toolbar's two resets say what they do", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  for (const route of ['/lists/owned', '/bundles']) {
+    await page.goto(route);
+    // The library's "× Clear all" (sort, filters, grouping, search) beside ours, which restores the defaults.
+    await expect(page.getByRole('button', { name: '× Clear all' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Default view' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Reset view' })).toHaveCount(0);
+  }
+});
+
 test('L4 edge: Recently Looked Up lists the latest lookup first, and says it keeps 10', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

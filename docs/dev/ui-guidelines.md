@@ -20,7 +20,7 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 ## Feedback
 
 - Every action visibly changes something where the user is looking; a result with nothing to see (a copied link) is announced through a live region.
-- Reversible actions (sort, filter, hide a column, switch account) act at once, no confirmation. Clearing many at once (Reset view) is where an undo is worth it; deleting is soft or confirmed.
+- Reversible actions (sort, filter, hide a column, switch account) act at once, no confirmation. Clearing many at once (Default view) is where an undo is worth it; deleting is soft or confirmed.
 - Disabled controls say why (a tooltip naming the blocker), or are hidden when there's nothing to act on.
 - Empty states say what emptied the screen (no games, a filter matching nothing, a private profile) and offer the way back.
 
