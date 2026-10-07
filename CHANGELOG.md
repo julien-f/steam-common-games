@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Updated dependencies, fixing security advisories in `solid-js`'s `seroval` and `vite`'s `source-map-js`.
 - A list built from a bundle says, on its formula line, how many of the bundle's games aren't on Steam and were left out, instead of dropping them without a word.
 - A saved comparison keeps its page's name ("Alice vs. Bob") instead of a long formula ("Alice — Owned + Bob — Owned — grouped by membership").
 - Tables' select-all and group checkboxes and page buttons are named for screen readers, sorted headers announce their direction, and filter chips name the values kept when that's shorter.
