@@ -1,6 +1,6 @@
 # Improvements
 
-UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocked, `npm run dev:mock`) and the 2026-10-07 phone-lightbox (real dev server, touch emulation) reviews (`ux-review` skill) against [journeys.md](journeys.md) and [ui-guidelines.md](ui-guidelines.md). Each item names the scenarios it blocks or slows; a dedicated run per item re-walks those scenarios. Severity: **blocker** (goal unreachable) · **major** (reached with confusion or a workaround) · **minor** · **polish**. Fix items with the `ux-fix` skill; remove an item once it ships.
+UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocked, `npm run dev:mock`) and the 2026-10-07 phone-lightbox (real dev server, touch emulation) and phone panel-media (mocked) reviews (`ux-review` skill) against [journeys.md](journeys.md) and [ui-guidelines.md](ui-guidelines.md). Each item names the scenarios it blocks or slows; a dedicated run per item re-walks those scenarios. Severity: **blocker** (goal unreachable) · **major** (reached with confusion or a workaround) · **minor** · **polish**. Fix items with the `ux-fix` skill; remove an item once it ships.
 
 **Pilot** (claude-ux-workflow, from 2026-10-04): items tagged `pilot`, and the ◇ steps of C6, A4 and L1, are frozen. Only the bot's PRs fix them; `ux-fix` and hand fixes leave them alone until the pilot ends.
 
@@ -46,6 +46,7 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 - **U50 · minor · I2, L4, C5** — row checkboxes read "Select row " with no game name: `@vates/data-table-solid` (0.15) names them after the first visible column, the image, and its row label gets only that cell's text, not the row. Select-all and group checkboxes are named. Needs an upstream change: name a row after a chosen column, or the first non-empty one (vatesfr/data-table#31).
 - **U70 · polish · S2 · pilot** — after the panel's 🔗 copy, the icon becomes ✓ but nothing is announced and `aria-label` stays "Copy link to this game". Announce "Link copied" through a live region.
+- **U93 · polish · I2** — the panel filmstrip's current item is marked by colour only (`.active`), not exposed (`aria-current`).
 - **U28 · polish · I2** — the open game's row is highlighted, but not exposed to assistive tech (`aria-current`); the table library has no per-row attribute hook.
 - **U77 · minor · I2** — the header menu is a `role="menu"` with no name, and its Filter flyout puts a search box, checkboxes and Any/All buttons inside it (not menu items), so screen readers in menu mode may not reach them; the range's two text boxes have no name; Tab from the flyout's last value goes to Group by, then leaves the table menu past Hide column. Needs an upstream change (vatesfr/data-table#36).
 
@@ -56,6 +57,8 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 - **U33 · minor · F3 · pilot** — no random pick on phone until a panel is open (the 🎲 lives in the panel's nav).
 - **U72 · major · I1, F3** — at 390 px, the header menu's Filter flyout opens on top of its own menu and past the screen edge: Genres' flyout is 406 px wide, so **All** is cut off and unreachable, and it hides Filter/Group by/Hide underneath. Needs an upstream change: clamp to the viewport and, on narrow screens, open the flyout in place of the menu (drill-down with a back row) (vatesfr/data-table#32 (overflow) and its backlog U20 (covering the menu)).
 - **U78 · polish · I1** — at 390 px, the header menu buttons of the wider labels (Weighted Rating, HLTB, Played) shrink to 17–19 px wide, under the 24 px minimum; opening a range filter focuses its text box, raising the phone keyboard over the flyout. Needs an upstream change (vatesfr/data-table#37 (size) and its backlog U20 (keyboard)).
+- **U92 · minor · F1** — the panel's filmstrip names its items across all media while the lightbox now numbers each kind: the banner is named after the game, the first trailer "Video 1", the first screenshot "Screenshot 2". Share the lightbox's naming ("Cover", "Trailer 1", "Screenshot 1"), e.g. moved into `mediaItems.ts`.
+- **U94 · minor · F1** — paging in the lightbox and closing it leaves the panel's hero on the item the lightbox was opened from, not the last one looked at. Sync the hero to the lightbox's position on close.
 - **U89 · polish · F1** — the backdrop (88 % black) lets the panel show through behind the counters (its own × sits beside the lightbox's), and the lightbox's × shows a focus ring after a touch open. Opaque backdrop on phone; focus ring for keyboard only.
 - **U90 · polish · F1** — pinch and double-tap zoom, and double-tap ±10 s on a trailer, have no visible equivalent (ui-guidelines: no hidden affordances); the prev/next arrows meanwhile cover 60 px of each side of a 390 px image though swipe does the same. Slimmer arrows; a zoom hint or button.
 
