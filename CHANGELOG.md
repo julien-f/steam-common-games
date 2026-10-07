@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Development
+
+- `scripts/dev-server.js up|down` runs `npm run dev` in the background, as `scripts/mock-server.js` does `dev:mock`.
+
 ## [0.9.0] - 2026-10-07
 
 ### Changed
