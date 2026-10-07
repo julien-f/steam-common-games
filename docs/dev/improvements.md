@@ -81,10 +81,10 @@ States `npm run dev:mock` can't show yet — each needs a fixture or state in `e
 - avatars, and a large library (thousands of games: A1's edge, U30 at scale);
 - friends lists always private (A4, C4's ◇) and `/api/me` always signed out (Y1–Y3);
 - a static wishlist, so R2's "buying a game drops it from the ranking" can't be shown;
-- screenshots and trailers (every fixture's `screenshots`/`movies` is empty), so the lightbox can only be reviewed on the real server.
+- a trailer that plays: Hades' fixture trailer has no stream, so playback and its idle-hide can only be seen on the real server.
 
 ## Not yet reviewed
 
 - A4 (no allowed account has a public friends list); Y1–Y3 (needs a Steam sign-in).
-- On a real phone: the lightbox's fullscreen landscape lock, trailer playback (headless Chromium showed black frames), pinch-zoom.
+- On a real phone: trailer playback (headless Chromium showed black frames), pinch and double-tap zoom.
 - Partly: R2, R3 at phone width (the rank screen is U32); B4 (the fixture friend's wishlist is empty); D3 (◇ not started).

@@ -563,17 +563,8 @@ test('F1 edge: fullscreen media turns a phone to landscape, and keeps it there',
 
 test('F1 edge: on a phone, a double-tap zooms a screenshot and another zooms back out', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'touch only');
-  // A real image to zoom: mockApi blocks the Steam CDN, so the banner would fail to load.
-  await page.route('https://cdn.akamai.steamstatic.com/**', (route) =>
-    route.fulfill({
-      contentType: 'image/svg+xml',
-      body: '<svg xmlns="http://www.w3.org/2000/svg" width="460" height="215"/>',
-    }),
-  );
   await asPlayer(page, ALICE);
-  await page.goto('/lists/owned');
-  await row(page, 'Hades').getByText('Hades').click();
-  await page.getByRole('button', { name: 'Open in lightbox' }).tap();
+  await page.goto('/lists/owned?game=1145360&shot=s1');
   const img = page.locator('#screenshot-lightbox .lb-img');
   await expect(img).toBeVisible();
   const box = (await img.boundingBox())!;

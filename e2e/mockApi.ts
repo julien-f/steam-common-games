@@ -39,6 +39,24 @@ function playerJson(p: Player) {
   };
 }
 
+// Drawn inline rather than fetched, so the lightbox has media to page through under both a test
+// and dev:mock. One game only: the rest keep just their banner.
+const MEDIA_APPID = 1145360;
+const svgImage = (label: string, hue: number) =>
+  `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720"><rect width="100%" height="100%" fill="hsl(${hue} 45% 35%)"/><text x="50%" y="50%" fill="#fff" font-family="sans-serif" font-size="64" text-anchor="middle">${label}</text></svg>`,
+  )}`;
+// `hls: null`, as Steam sends for a trailer with no H.264 stream: the player and its controls
+// show, nothing plays (Playwright's Chromium has no H.264 decoder anyway).
+const MEDIA = {
+  movies: [{ id: 1, thumbnail: svgImage('Trailer', 0), hls: null }],
+  screenshots: [1, 2, 3].map((n) => ({
+    id: n,
+    thumbnail: svgImage(`Screenshot ${n}`, 60 * n),
+    full: svgImage(`Screenshot ${n}`, 60 * n),
+  })),
+};
+
 function details(appid: number) {
   const g = game(appid);
   return {
@@ -66,8 +84,7 @@ function details(appid: number) {
       // Public store art; a test's browser blocks it (off localhost), dev:mock shows it.
       capsule: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`,
       banner: null,
-      movies: [],
-      screenshots: [],
+      ...(appid === MEDIA_APPID ? MEDIA : { movies: [], screenshots: [] }),
       dlc: [],
       fullgame: null,
       website: null,
