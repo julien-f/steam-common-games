@@ -1095,7 +1095,7 @@ function gotoLightbox(target: number) {
 // The caption, rendered on its own rather than as part of `renderLightbox` below. It carries
 // the game/shot identity that used to exist only as invisible alt text (see `label` there), so
 // switching games while the lightbox stays open (↑/↓, R) is visibly confirmed even when the new
-// shot looks much like the old one — plus the position in the *list*, which the `1 / 12` media
+// shot looks much like the old one — plus the position in the *list*, which the `Screenshot 1 of 12` media
 // counter says nothing about. Split out because it's the one part reading the host's list
 // position: that read must stay tracked for the position to follow a list still streaming in,
 // and must not drag a full image reload along with it each time. Two text writes, no media.
@@ -1108,7 +1108,7 @@ function renderLbCaption() {
   // The two counters wear the same pill (`.lb-counter` is the other), one per axis, so they read
   // as a pair and neither is mistaken for part of the title beside it.
   const posEl = caption.querySelector<HTMLElement>('.lb-caption-pos')!;
-  posEl.textContent = pos ? `${pos.index + 1} / ${pos.total}` : '';
+  posEl.textContent = pos ? `Game ${pos.index + 1} of ${pos.total}` : '';
   posEl.style.display = pos ? '' : 'none';
   caption.querySelector<HTMLElement>('.lb-caption-text')!.textContent = name;
   caption.style.display = name || pos ? '' : 'none';
@@ -1226,7 +1226,8 @@ function renderLightbox() {
     full.src = shot.main!;
     schedHideLbChrome();
   }
-  lb.querySelector('.lb-counter')!.textContent = `${i + 1} / ${list.length}`;
+  lb.querySelector('.lb-counter')!.textContent =
+    `${shot.type === 'video' ? 'Trailer' : 'Screenshot'} ${i + 1} of ${list.length}`;
   lb.querySelector<HTMLButtonElement>('.lb-prev')!.disabled = list.length <= 1;
   lb.querySelector<HTMLButtonElement>('.lb-next')!.disabled = list.length <= 1;
   // Preload prev and next images so navigation feels instant; for a video,

@@ -602,6 +602,15 @@ async function fakePlayback(page: Page) {
   });
 }
 
+test("F1 edge: the lightbox's counters say what they count", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  await expect(page.locator('.lb-caption-pos')).toHaveText(/^Game \d+ of 6$/);
+  await expect(page.locator('.lb-counter')).toHaveText('Trailer 2 of 5');
+  await page.getByRole('button', { name: 'Next screenshot' }).click();
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 3 of 5');
+});
+
 test('F1 edge: a paused trailer offers a large play button', async ({ page }) => {
   await fakePlayback(page);
   await asPlayer(page, ALICE);
