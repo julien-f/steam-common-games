@@ -63,6 +63,13 @@ test('S3 edge: an unknown path says so and links Home', async ({ page }) => {
   await expect(page).toHaveURL('/');
 });
 
+test('S3 edge: About names every data source, ProtonDB included', async ({ page }) => {
+  await page.goto('/about');
+  const sources = page.locator('.card', { hasText: 'Data sources' });
+  for (const name of ['Steam Web API', 'Steam Store', 'HowLongToBeat', 'ProtonDB', 'IsThereAnyDeal'])
+    await expect(sources.getByText(name, { exact: true })).toBeVisible();
+});
+
 test("S3 edge: another browser's list link explains lists are local", async ({ page }) => {
   await page.goto('/lists/not-in-this-browser');
   await expect(page.getByText("This list isn't in this browser")).toBeVisible();

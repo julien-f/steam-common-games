@@ -18,7 +18,7 @@ export default function AboutRoute() {
         <p class="card-subtitle">
           steam.isonoe.net compares Steam libraries across players and helps you browse a single library, with ratings,
           playtime, and completion-time estimates. It's a small personal project, not affiliated with or endorsed by
-          Valve, Steam, or HowLongToBeat.
+          Valve, Steam, HowLongToBeat, or ProtonDB.
         </p>
       </div>
 
@@ -36,6 +36,10 @@ export default function AboutRoute() {
           <li>
             <strong>HowLongToBeat</strong> — estimated time to complete a game. Fetched from an unofficial endpoint;
             estimates may occasionally be missing or stale if that changes.
+          </li>
+          <li>
+            <strong>ProtonDB</strong> — community reports of how well a game runs on Linux and the Steam Deck (the
+            Linux/Deck tier). Fetched from an unofficial endpoint.
           </li>
           <li>
             <strong>IsThereAnyDeal</strong> — current Steam bundle listings and prices, on the Bundles page. Requires a
