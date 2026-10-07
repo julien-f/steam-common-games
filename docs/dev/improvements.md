@@ -58,6 +58,13 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Consistency and polish
 
+- **U106 · minor · F1, I3** — every media step (arrow, swipe, ‹ ›) brings back the whole chrome for 3 s, so flicking through screenshots flashes the toolbar and arrows on each one. A step should leave idle chrome idle, flashing only the counter.
+- **U107 · minor · F1** — on desktop any pointer movement over the viewer shows all of its chrome: toolbar, both ‹ ›, a trailer's control bar. Reveal each near where it lives instead: the toolbar near the top, an arrow near its edge, the control bar near the bottom.
+- **U108 · polish · F1** — the toolbar's 🔗 copies a link the address bar already holds (`?shot=`). Drop the button.
+- **U109 · polish · F1** — every chrome control is a filled, bordered circle or box, made to read over a see-through backdrop; over the opaque one they are heavier than needed. Plain icons with a shadow.
+- **U110 · minor · F1** — on desktop a trailer fills the whole viewport, so the toolbar and its control bar sit on the picture, while a screenshot keeps a margin for them. Give a trailer the same margins.
+- **U111 · polish · F1** — "↑ Hades Game 3 of 6 ↓" is always on, though looking at one game's media is the usual case. On desktop show the name alone, with the stepper and list position on hover or focus; keyboard and vertical swipe keep working, and a phone keeps the ↑↓, its pointer way to change game.
+
 - **U101 · polish** — every table shows a "Page 1 of 1" pager with all buttons disabled when everything fits. Needs an upstream change: hide the pager when there's a single page (an option or the default in `@vates/data-table-solid`, vatesfr/data-table#41).
 - **U39 · polish · pilot** — nav items shift sideways between routes; missing thumbnails have no placeholder; "Demo" pills look like primary buttons; the "Updated" age has very low contrast; Compare's op `<select>` is an unstyled native white control; wishlisted/owned name colours have no legend (still true in Recently Looked Up).
 - **U80 · polish · pilot** — `favicon.ico` 404s.
