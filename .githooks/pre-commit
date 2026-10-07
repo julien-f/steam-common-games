@@ -29,6 +29,7 @@ NODE_OPTIONS=--test-reporter=dot run test npm run -s test
 if git diff --cached --name-only | grep -qE "$ui"; then
   run typecheck npm run -s typecheck
   run lint npm run -s lint
+  run css npm run -s check:css
   run e2e npm run -s test:e2e -- --reporter=dot
 fi
 wait
