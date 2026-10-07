@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- The game panel's section buttons, tags and achievement filters are tall enough to tap reliably on a phone.
 - On a phone, the lightbox's buttons to change game are larger, and its ‹ › arrows narrower and closer to the edges, as intended.
 - On a phone, double-tapping a screenshot in the lightbox zooms in again (it zoomed back out at once).
 - Updated dependencies, fixing security advisories in `solid-js`'s `seroval` and `vite`'s `source-map-js`.

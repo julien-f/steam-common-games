@@ -1753,6 +1753,7 @@ tbody tr.game-row.active {
   font-size: 11px;
   font-weight: 600;
   padding: 4px 10px;
+  min-height: 24px; /* the touch-target minimum (ui-guidelines.md) */
   border-radius: 999px;
   cursor: pointer;
   transition:
@@ -2439,6 +2440,7 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   font-size: 11px;
   font-weight: 600;
   padding: 3px 10px;
+  min-height: 24px; /* the touch-target minimum (ui-guidelines.md) */
   border-radius: 999px;
   cursor: pointer;
   transition:
@@ -2522,6 +2524,9 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   gap: 5px;
 }
 .panel-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px; /* the touch-target minimum (ui-guidelines.md), kept on plain tags so a row reads even */
   background: rgba(61, 80, 104, 0.5);
   border: 1px solid var(--border);
   color: var(--text1);
