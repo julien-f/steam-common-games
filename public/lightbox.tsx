@@ -946,6 +946,15 @@ function wireVideoControls(lb: HTMLElement) {
     vid2.paused ? vid2.play().catch(() => {}) : vid2.pause();
   });
   lb.querySelector('.lb-bigplay')!.addEventListener('click', () => vid2.play().catch(() => {}));
+  // Screen locked, app or tab switched: stop rather than play on unseen. Not resumed on return —
+  // the large play button is there, and sound starting by itself on unlock would surprise.
+  document.addEventListener(
+    'visibilitychange',
+    () => {
+      if (document.visibilityState === 'hidden' && vid2.isConnected) vid2.pause();
+    },
+    { signal: _lbSignal },
+  );
   muteBtn.addEventListener('click', () => {
     vid2.muted = !vid2.muted;
   });

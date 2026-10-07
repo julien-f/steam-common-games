@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- A playing trailer pauses when the page is hidden (screen locked, another app or tab), and waits for you to press play again.
 - The screenshot viewer's counters say what they count: "Game 3 of 6" beside the name, and below it "Cover", "Trailer 1 of 2" or "Screenshot 1 of 8", each kind numbered on its own.
 - Back closes an open game's panel or the screenshot viewer instead of leaving the page, and Back from a page a game's panel linked to reopens that game.
 - On a phone, the lightbox in fullscreen turns to landscape for screenshots too, and stays there while you move between videos and games.

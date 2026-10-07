@@ -626,6 +626,23 @@ test('F1 edge: a paused trailer offers a large play button', async ({ page }) =>
   await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
 });
 
+test('F1 edge: a trailer pauses when the page is hidden, and stays paused', async ({ page }) => {
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  await page.getByRole('button', { name: 'Play trailer' }).click();
+  await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
+  const setHidden = (hidden: boolean) =>
+    page.evaluate((h) => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (h ? 'hidden' : 'visible') });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, hidden);
+  await setHidden(true);
+  await setHidden(false);
+  await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Play');
+  await expect(page.getByRole('button', { name: 'Play trailer' })).toBeVisible();
+});
+
 test("F1 edge: on a phone, the tap that brings back a trailer's controls leaves it playing", async ({
   page,
 }, testInfo) => {
