@@ -59,7 +59,8 @@ let lbZoom = 1,
   lbPanY = 0,
   lbLastDir = 0,
   lbVcTimer: ReturnType<typeof setTimeout> | undefined,
-  lbCounterTimer: ReturnType<typeof setTimeout> | undefined;
+  lbCounterTimer: ReturnType<typeof setTimeout> | undefined,
+  lbPointerTimer: ReturnType<typeof setTimeout> | undefined;
 // Bumped on every renderLightbox() call; a detached Image()'s onload checks it's still current
 // before touching the shared img element, so a slow load from a shot the viewer already
 // navigated away from can't clobber the one currently displayed — img is reused across shots
@@ -381,6 +382,7 @@ function toggleLbZoom() {
 
 // ── Video seeking (keyboard arrows + touch double-tap) ─────────────────────
 
+const LB_POINTER_ZONE = 120; // px from an edge within which the mouse brings back that edge's chrome
 const LB_TOUCH_SEEK_SECONDS = 10; // matches the common mobile-player convention (YouTube etc.)
 
 function seekVideo(vid: HTMLVideoElement | null, deltaSeconds: number) {
@@ -1004,15 +1006,20 @@ function wireVideoControls(lb: HTMLElement) {
     vid2.paused ? vid2.play().catch(() => {}) : vid2.pause();
   });
 
-  // Unconditional (not gated on vc2 being visible) so an image, not just a
-  // video, also gets idle-hide chrome on interaction — see showLbChrome.
-  lb.addEventListener('mousemove', () => {
-    showLbChrome();
-    schedHideLbChrome();
+  // Once the chrome has idled out, the mouse brings back only the part it nears — the toolbar
+  // at the top, an arrow at its edge, a trailer's controls at the bottom — and the cursor.
+  const pointerZones = ['lb-pointer', 'lb-near-top', 'lb-near-bottom', 'lb-near-left', 'lb-near-right'];
+  lb.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    lb.classList.add('lb-pointer');
+    lb.classList.toggle('lb-near-top', e.clientY < LB_POINTER_ZONE);
+    lb.classList.toggle('lb-near-bottom', e.clientY > innerHeight - LB_POINTER_ZONE);
+    lb.classList.toggle('lb-near-left', e.clientX < LB_POINTER_ZONE);
+    lb.classList.toggle('lb-near-right', e.clientX > innerWidth - LB_POINTER_ZONE);
+    clearTimeout(lbPointerTimer);
+    lbPointerTimer = setTimeout(() => lb.classList.remove(...pointerZones), 3000);
   });
-  lb.addEventListener('mouseleave', () => {
-    schedHideLbChrome();
-  });
+  lb.addEventListener('mouseleave', () => lb.classList.remove(...pointerZones));
   // A tap brings the chrome back; a swipe steps media without it.
   let tapRevealedChrome = false;
   let tapX = 0,
@@ -1121,7 +1128,7 @@ export function closeLightbox() {
   const lb = document.getElementById('screenshot-lightbox')!;
   stopHls(lbVideoEl);
   detachLbVideo();
-  lb.classList.remove('open', 'lb--loading', 'lb-idle', 'lb--paused', 'lb--unstarted', 'lb--stepped');
+  lb.classList.remove('open', 'lb--loading', 'lb-idle', 'lb--paused', 'lb--unstarted', 'lb--stepped', 'lb-pointer');
   document.body.classList.remove('lb-open');
   if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
     (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});

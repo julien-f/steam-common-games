@@ -2716,10 +2716,22 @@ body.lb-open {
   opacity: 0;
   pointer-events: none;
 }
-#screenshot-lightbox.lb-idle,
-#screenshot-lightbox.lb-idle .lb-video,
-#screenshot-lightbox.lb-idle .lb-img,
-#screenshot-lightbox.lb-idle .lb-backdrop {
+#screenshot-lightbox.lb-idle.lb-near-top :is(.lb-caption, .lb-toolbar-left, .lb-toolbar-right, .lb-counter),
+#screenshot-lightbox.lb-idle.lb-near-bottom .lb-vctrls,
+#screenshot-lightbox.lb-idle.lb-near-left .lb-prev,
+#screenshot-lightbox.lb-idle.lb-near-right .lb-next {
+  opacity: 1;
+}
+#screenshot-lightbox.lb-idle.lb-near-top :is(.lb-toolbar-left, .lb-toolbar-right),
+#screenshot-lightbox.lb-idle.lb-near-bottom .lb-vctrls,
+#screenshot-lightbox.lb-idle.lb-near-left .lb-prev,
+#screenshot-lightbox.lb-idle.lb-near-right .lb-next {
+  pointer-events: auto;
+}
+#screenshot-lightbox.lb-idle:not(.lb-pointer),
+#screenshot-lightbox.lb-idle:not(.lb-pointer) .lb-video,
+#screenshot-lightbox.lb-idle:not(.lb-pointer) .lb-img,
+#screenshot-lightbox.lb-idle:not(.lb-pointer) .lb-backdrop {
   cursor: none;
 }
 .lb-vc-btn {

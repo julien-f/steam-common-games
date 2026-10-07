@@ -725,6 +725,33 @@ test('F1 edge: stepping media leaves hidden controls hidden, flashing only the c
   await expect(lb).not.toHaveClass(/lb-idle/);
 });
 
+test('F1 edge: the mouse brings back only the controls near it', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'mouse only');
+  await page.clock.install();
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const lb = page.locator('#screenshot-lightbox');
+  await page.clock.runFor(3500);
+  await expect(lb).toHaveClass(/lb-idle/);
+  // Read once, after the fade: a retrying assertion would just wait out the idle timer. The
+  // toolbar's right group stands for the close button, as opacity isn't inherited.
+  const shown = async () => {
+    await page.waitForTimeout(400);
+    return page.evaluate(() =>
+      ['.lb-toolbar-right', '.lb-next'].filter((sel) => getComputedStyle(document.querySelector(sel)!).opacity === '1'),
+    );
+  };
+  await page.mouse.move(720, 450);
+  expect(await shown()).toEqual([]);
+  await expect(page.locator('.lb-backdrop')).toHaveCSS('cursor', 'zoom-out');
+  await page.mouse.move(720, 20);
+  expect(await shown()).toEqual(['.lb-toolbar-right']);
+  await page.mouse.move(1420, 450);
+  expect(await shown()).toEqual(['.lb-next']);
+  await page.locator('.lb-next').click();
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+});
+
 test('F1 edge: on a phone, a swipe steps without bringing the controls back, and a tap does', async ({
   page,
 }, testInfo) => {
