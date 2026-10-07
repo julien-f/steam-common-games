@@ -58,7 +58,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Consistency and polish
 
-- **U106 · minor · F1, I3** — every media step (arrow, swipe, ‹ ›) brings back the whole chrome for 3 s, so flicking through screenshots flashes the toolbar and arrows on each one. A step should leave idle chrome idle, flashing only the counter.
 - **U107 · minor · F1** — on desktop any pointer movement over the viewer shows all of its chrome: toolbar, both ‹ ›, a trailer's control bar. Reveal each near where it lives instead: the toolbar near the top, an arrow near its edge, the control bar near the bottom.
 - **U108 · polish · F1** — the toolbar's 🔗 copies a link the address bar already holds (`?shot=`). Drop the button.
 - **U109 · polish · F1** — every chrome control is a filled, bordered circle or box, made to read over a see-through backdrop; over the opaque one they are heavier than needed. Plain icons with a shadow.

@@ -58,7 +58,8 @@ let lbZoom = 1,
   lbPanX = 0,
   lbPanY = 0,
   lbLastDir = 0,
-  lbVcTimer: ReturnType<typeof setTimeout> | undefined;
+  lbVcTimer: ReturnType<typeof setTimeout> | undefined,
+  lbCounterTimer: ReturnType<typeof setTimeout> | undefined;
 // Bumped on every renderLightbox() call; a detached Image()'s onload checks it's still current
 // before touching the shared img element, so a slow load from a shot the viewer already
 // navigated away from can't clobber the one currently displayed — img is reused across shots
@@ -440,6 +441,14 @@ function schedHideLbChrome() {
   lbVcTimer = setTimeout(() => lb.classList.add('lb-idle'), 3000);
 }
 
+// A step with the chrome idle leaves it idle, showing only where the viewer now is.
+function flashLbCounter(lb: HTMLElement) {
+  if (!lb.classList.contains('lb-idle')) return;
+  lb.classList.add('lb--stepped');
+  clearTimeout(lbCounterTimer);
+  lbCounterTimer = setTimeout(() => lb.classList.remove('lb--stepped'), 1500);
+}
+
 // ── Focus helpers ──────────────────────────────────────────────────────────
 
 // Returns all focusable elements that are not inside a display:none ancestor.
@@ -583,6 +592,8 @@ function wireKeyboard(lb: HTMLElement) {
 
       // Focus trap
       if (e.key === 'Tab') {
+        showLbChrome();
+        schedHideLbChrome();
         const focusable = getFocusable(lb);
         if (!focusable.length) return;
         const first = focusable[0];
@@ -1002,11 +1013,24 @@ function wireVideoControls(lb: HTMLElement) {
   lb.addEventListener('mouseleave', () => {
     schedHideLbChrome();
   });
+  // A tap brings the chrome back; a swipe steps media without it.
   let tapRevealedChrome = false;
+  let tapX = 0,
+    tapY = 0;
   lb.addEventListener(
     'touchstart',
-    () => {
+    (e) => {
       tapRevealedChrome = lb.classList.contains('lb-idle');
+      tapX = e.touches[0].clientX;
+      tapY = e.touches[0].clientY;
+    },
+    { passive: true },
+  );
+  lb.addEventListener(
+    'touchend',
+    (e) => {
+      const t = e.changedTouches[0];
+      if (Math.abs(t.clientX - tapX) >= 10 || Math.abs(t.clientY - tapY) >= 10) return;
       showLbChrome();
       schedHideLbChrome();
     },
@@ -1097,7 +1121,7 @@ export function closeLightbox() {
   const lb = document.getElementById('screenshot-lightbox')!;
   stopHls(lbVideoEl);
   detachLbVideo();
-  lb.classList.remove('open', 'lb--loading', 'lb-idle', 'lb--paused', 'lb--unstarted');
+  lb.classList.remove('open', 'lb--loading', 'lb-idle', 'lb--paused', 'lb--unstarted', 'lb--stepped');
   document.body.classList.remove('lb-open');
   if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
     (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
@@ -1184,7 +1208,7 @@ function renderLightbox() {
   lbLastDir = 0;
   lbLastAxis = 'x';
   resetLbZoom();
-  showLbChrome();
+  flashLbCounter(lb);
   hideLbError();
   // Invalidate any image preload still in flight from a previous render — see lbImgToken decl.
   const imgToken = ++lbImgToken;

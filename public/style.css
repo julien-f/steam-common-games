@@ -2706,9 +2706,13 @@ body.lb-open {
   transition: opacity 0.25s;
 }
 /* Idle state (video playing, unattended): hide all chrome + the cursor */
+/* The toolbar's parts rather than the toolbar, so a step can show the counter alone. */
 #screenshot-lightbox.lb-idle .lb-vctrls,
 #screenshot-lightbox.lb-idle .lb-btn,
-#screenshot-lightbox.lb-idle .lb-toolbar {
+#screenshot-lightbox.lb-idle .lb-caption,
+#screenshot-lightbox.lb-idle .lb-toolbar-left,
+#screenshot-lightbox.lb-idle .lb-toolbar-right,
+#screenshot-lightbox.lb-idle:not(.lb--stepped) .lb-counter {
   opacity: 0;
   pointer-events: none;
 }
@@ -2814,6 +2818,11 @@ body.lb-open {
   padding: 10px 12px;
   z-index: 1;
   pointer-events: none;
+}
+.lb-caption,
+.lb-toolbar-left,
+.lb-toolbar-right,
+.lb-counter {
   transition: opacity 0.25s;
 }
 .lb-caption {

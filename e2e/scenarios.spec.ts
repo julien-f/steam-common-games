@@ -706,6 +706,49 @@ test('F1 edge: a screenshot zooms from a visible button, or Z', async ({ page })
   await expect(zoom).toBeHidden();
 });
 
+test('F1 edge: stepping media leaves hidden controls hidden, flashing only the counter', async ({ page }) => {
+  await page.clock.install();
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const lb = page.locator('#screenshot-lightbox');
+  await page.clock.runFor(3500);
+  await expect(lb).toHaveClass(/lb-idle/);
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+  // Read once: a retrying assertion would just wait out the idle timer (the clock keeps running).
+  expect(await lb.getAttribute('class')).toMatch(/lb-idle/);
+  await expect(page.locator('.lb-counter')).toHaveCSS('opacity', '1');
+  await page.clock.runFor(2000);
+  await expect(page.locator('.lb-counter')).toHaveCSS('opacity', '0');
+  // Tab brings the chrome back, so the focused control is never invisible.
+  await page.keyboard.press('Tab');
+  await expect(lb).not.toHaveClass(/lb-idle/);
+});
+
+test('F1 edge: on a phone, a swipe steps without bringing the controls back, and a tap does', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'touch only');
+  await page.clock.install();
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const lb = page.locator('#screenshot-lightbox');
+  const box = (await page.locator('#screenshot-lightbox .lb-img').boundingBox())!;
+  const y = box.y + box.height / 2;
+  const cdp = await page.context().newCDPSession(page);
+  await page.clock.runFor(3500);
+  await expect(lb).toHaveClass(/lb-idle/);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 300, y }] });
+  for (const x of [260, 200, 120])
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+  expect(await lb.getAttribute('class')).toMatch(/lb-idle/); // read once, as above
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 195, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(lb).not.toHaveClass(/lb-idle/);
+});
+
 test('F1 edge: on a phone, the ‹ › buttons sit clear of the media and its controls', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout');
   await fakePlayback(page);
