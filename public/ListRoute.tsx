@@ -1837,6 +1837,33 @@ export default function ListRoute() {
     revertTableViewToServer(table, viewPrefKey());
   }
 
+  function viewActions() {
+    return (
+      <div class="list-view-actions">
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          aria-label="Share view"
+          disabled={shareViewFailure() != null}
+          title={shareViewFailure() ?? "Copy a link to this table's layout"}
+          onClick={(e) => handleShareView(e.currentTarget)}
+        >
+          🔗<span class="btn-label"> Share view</span>
+        </button>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          aria-label="Reset view"
+          title="Back to the default columns, sort and filters"
+          onClick={handleResetView}
+        >
+          <span class="btn-icon">↺</span>
+          <span class="btn-label">Reset view</span>
+        </button>
+      </div>
+    );
+  }
+
   async function load({ refresh = false }: { refresh?: boolean } = {}): Promise<void> {
     if (kind === 'recent' && hasLoadedOnce) {
       // Guarded by "is this appid already the open panel's game" — openGame() above navigates
@@ -2396,6 +2423,8 @@ export default function ListRoute() {
             rowKey: 'appid',
             selectable: true,
             onRowClick: (row) => openGame(rowStore.getRow(row.appid) ?? row),
+            // In the toolbar's own line rather than a row above it, so a phone's table starts higher.
+            toolbarEnd: viewActions(),
           }),
         tableContainer,
       );
@@ -3340,30 +3369,6 @@ export default function ListRoute() {
       </Show>
       <Show when={tableReady() && viewingShared()}>
         <SharedViewBanner onKeep={() => setViewingShared(false)} onDiscard={handleDiscardSharedView} />
-      </Show>
-      <Show when={tableReady()}>
-        <div class="list-view-actions">
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            aria-label="Share view"
-            disabled={shareViewFailure() != null}
-            title={shareViewFailure() ?? "Copy a link to this table's layout"}
-            onClick={(e) => handleShareView(e.currentTarget)}
-          >
-            🔗<span class="btn-label"> Share view</span>
-          </button>
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            aria-label="Reset view"
-            title="Back to the default columns, sort and filters"
-            onClick={handleResetView}
-          >
-            <span class="btn-icon">↺</span>
-            <span class="btn-label">Reset view</span>
-          </button>
-        </div>
       </Show>
       <Show when={emptyText()}>
         <p class="list-empty">{emptyText()}</p>

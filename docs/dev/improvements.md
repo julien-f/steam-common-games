@@ -49,7 +49,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Phone
 
-- **U30 · minor · I1, F3** — on a 390 px phone the table now starts ~48 % down the screen on Owned, ~57 % on Compare and a bundle's page (was up to ~85 %): the hero folds and the view buttons are icons, but the toolbar still takes two lines and Share/Reset their own row. Next: move them into the toolbar line through `@vates/data-table-solid`'s toolbar-end slot (0.16, vatesfr/data-table#29).
 - **U32 · minor · I1, R1 · pilot** — the ranking screen stacks cards vertically (Tie/Skip/Undo below the fold) and has no side gutter.
 - **U33 · minor · F3 · pilot** — no random pick on phone until a panel is open (the 🎲 lives in the panel's nav).
 - **U89 · polish · F1** — the backdrop (88 % black) lets the panel show through behind the counters (its own × sits beside the lightbox's), and the lightbox's × shows a focus ring after a touch open. Opaque backdrop on phone; focus ring for keyboard only.
@@ -69,7 +68,7 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 States `npm run dev:mock` can't show yet — each needs a fixture or state in `e2e/mockApi.ts`:
 
-- avatars, and a large library (thousands of games: A1's edge, U30 at scale);
+- avatars, and a large library (thousands of games: A1's edge, how high the table starts at scale);
 - friends lists always private (A4, C4's ◇) and `/api/me` always signed out (Y1–Y3);
 - a static wishlist, so R2's "buying a game drops it from the ranking" can't be shown;
 - a trailer that plays: Hades' fixture trailer has no stream, so playback and its idle-hide can only be seen on the real server.

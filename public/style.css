@@ -3417,20 +3417,25 @@ kbd {
   font-size: 13px;
 }
 
+/* Share/Reset view, in the table toolbar's own line (the library's `toolbarEnd` slot). */
 .list-view-actions {
   display: flex;
-  justify-content: flex-end;
   gap: 8px;
-  margin-bottom: 10px;
 }
 .list-view-actions .btn-icon {
   display: none;
 }
-/* Phone: icons only, and the table library's toolbar spacing tightened, so the rows start higher.
-   Share/Reset belong in the toolbar line itself, which the library has no slot for yet. */
+/* Phone: icons only, and the table library's toolbar spacing tightened, so the rows start higher. */
 @media (max-width: 768px) {
-  .list-view-actions {
-    margin-bottom: 4px;
+  /* The library puts its end slot after the search line, a row of its own on a phone: move it up
+     to the end of the first line (Columns/Group/Sort), ahead of the search box and what follows. */
+  .dt-toolbar-actions > .dt-search-wrap,
+  .dt-toolbar-actions > .dt-search-wrap ~ * {
+    order: 2;
+  }
+  .dt-toolbar-actions > .dt-toolbar-end {
+    order: 1;
+    margin-left: auto;
   }
   .list-view-actions .btn-label {
     display: none;

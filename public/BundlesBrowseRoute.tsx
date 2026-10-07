@@ -521,7 +521,7 @@ export default function BundlesBrowseRoute() {
         actions={
           <>
             {/* A data-scope control, not a view one — it round-trips to ITAD (see load()) — so it
-                leads the actions row rather than sitting with the table-view buttons. */}
+                sits here rather than with the table-view buttons in the toolbar. */}
             <label class="bundles-expired-toggle">
               <input
                 type="checkbox"
@@ -533,20 +533,6 @@ export default function BundlesBrowseRoute() {
               />
               Include expired
             </label>
-            <button
-              type="button"
-              class="btn btn-ghost btn-sm"
-              onClick={(e) => shareTableView(table, VIEW_PARAM, e.currentTarget)}
-            >
-              🔗 Share view
-            </button>
-            <button
-              type="button"
-              class="btn btn-ghost btn-sm"
-              onClick={() => resetTableView(table, VIEW_PREF_KEY, VIEW_PARAM)}
-            >
-              Reset view
-            </button>
           </>
         }
         tiles={heroTiles()}
@@ -574,6 +560,29 @@ export default function BundlesBrowseRoute() {
           table={table}
           rowKey="id"
           onRowClick={(row) => navigate(withAccountParam(`/lists/bundle/${row.id}`))}
+          toolbarEnd={
+            <div class="list-view-actions">
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                aria-label="Share view"
+                title="Copy a link to this table's layout"
+                onClick={(e) => shareTableView(table, VIEW_PARAM, e.currentTarget)}
+              >
+                🔗<span class="btn-label"> Share view</span>
+              </button>
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                aria-label="Reset view"
+                title="Back to the default columns, sort and filters"
+                onClick={() => resetTableView(table, VIEW_PREF_KEY, VIEW_PARAM)}
+              >
+                <span class="btn-icon">↺</span>
+                <span class="btn-label">Reset view</span>
+              </button>
+            </div>
+          }
         />
       </div>
       <Show when={moreAvailable()}>

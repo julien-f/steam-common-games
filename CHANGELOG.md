@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- A table's Share view and Reset view buttons sit in its toolbar line instead of a row of their own above it, so on a phone the games start higher on the screen.
+
 ## [0.7.0] - 2026-10-07
 
 ### Added
