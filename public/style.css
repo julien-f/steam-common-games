@@ -1458,10 +1458,20 @@ tbody tr.game-row.active {
   outline: 3px solid var(--accent);
   outline-offset: -3px;
 }
+/* Until the current item's own image is in (HeroMain): the previous one hidden, the frame showing
+   the item's thumbnail (an inline background-image) or, without one, a shimmer. */
 .panel-hero-img.loading {
+  opacity: 0;
+}
+.panel-hero-main--loading {
   background: linear-gradient(90deg, var(--bg1) 25%, #3a5870 50%, var(--bg1) 75%);
   background-size: 600px 100%;
   animation: shimmer 1.4s linear infinite;
+}
+.panel-hero-main--loading[style*='background-image'] {
+  background-size: cover;
+  background-position: center;
+  animation: none;
 }
 /* A dead upstream image (broken banner guess, broken video poster, …) — keep the hero's
    footprint and background instead of collapsing it, so the play button/nav/click target

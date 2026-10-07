@@ -23,7 +23,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Loading and feedback
 
-- **U96 · major · F1** — on a slow connection the panel's hero keeps showing the previous image, with no loading sign, until the next one has loaded: stepping fast shows one item while the strip marks another (tapping it opens the lightbox on the one marked), and after ↑/↓ the new game's title sits over the previous game's picture for seconds. Its `loading` class only follows the cover/screenshot switch. Blank or fade the old image and show the new item's thumbnail as a placeholder, as the lightbox already does.
 - **U7 · minor · L3 · pilot** — Reset view drops sort/filters instantly with no undo.
 - **U67 · polish · O1 · pilot** — `GET /api/metrics` shows `budgets: {}` until the first outbound call, so an operator can't see the ceilings before spending against them. List every budget group with 0 used.
 

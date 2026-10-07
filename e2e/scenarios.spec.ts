@@ -626,6 +626,30 @@ test("F1 edge: the panel's thumbnails are named as the lightbox counts them", as
     .toEqual(['Cover', 'Trailer 1 of 1', 'Screenshot 1 of 3', 'Screenshot 2 of 3', 'Screenshot 3 of 3']);
 });
 
+test("F1 edge: the panel's hero never shows the previous item while the next one loads", async ({ page }) => {
+  await mockApi(page, { states: ['slow-media'] });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const main = page.locator('#panel-hero .panel-hero-main');
+  const img = main.locator('.panel-hero-img');
+  await expect(img).not.toHaveClass(/loading/); // the cover, loaded
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  // Screenshot 1's full image is on its way: the cover/trailer is hidden, its thumbnail stands in.
+  await expect(img).toHaveAttribute('src', /Screenshot%201\.svg\?full/);
+  await expect(img).toHaveClass(/loading/);
+  await expect(img).toHaveCSS('opacity', '0');
+  await expect(main).toHaveAttribute('style', /Screenshot%201\.svg\?thumb/);
+  await expect(img).not.toHaveClass(/loading/);
+
+  // Another game: its title doesn't sit over this game's picture.
+  await page.getByRole('button', { name: 'Next game' }).click();
+  await expect(page.locator('#panel-title')).not.toHaveText('Hades');
+  await expect(img).toHaveCSS('opacity', '0');
+  await expect(img).not.toHaveClass(/loading/);
+  await expect(img).toHaveCSS('opacity', '1');
+});
+
 test('F1 edge: a slow screenshot shows its thumbnail and a spinner until it has loaded', async ({ page }) => {
   await mockApi(page, { states: ['slow-media'] });
   await asPlayer(page, ALICE);

@@ -1789,29 +1789,33 @@ function HeroMain(props: { items: MediaItem[] }): JSX.Element {
   const name = () => panelGame()?.name ?? '';
   const isShot = () => idx() > 0;
   const hasMany = () => props.items.length > 1;
-  let imgEl!: HTMLImageElement;
-  const onLoad = () => imgEl.classList.remove('loading');
+  const src = () => (current().type === 'video' ? current().thumb : current().main);
+  // Which source has finished, rather than a flag the last load cleared: a browser keeps painting
+  // the previous image until the next one has loaded, so on a slow connection the hero showed the
+  // last item (or the last game's) under the new one's name. Until `src()` itself is in, the image
+  // is hidden and its frame shows the item's thumbnail, already loaded by the filmstrip.
+  const [loadedSrc, setLoadedSrc] = createSignal<string>();
+  const [brokenSrc, setBrokenSrc] = createSignal<string>();
+  const loading = () => loadedSrc() !== src() && brokenSrc() !== src();
   // A broken image (banner guess 404ing, or — as with a video's poster — a genuinely dead
   // upstream Steam CDN asset) used to hide the whole `.panel-hero-main`, which also wiped
   // out the prev/next nav and, for videos, the play-button overlay and click target — even
   // though the video itself (or the full-res screenshot behind a broken thumb) still plays/
   // loads fine. Just mark the image broken and leave the rest of the hero working.
-  const onError = () => {
-    imgEl.classList.remove('loading');
-    imgEl.classList.add('panel-hero-img--broken');
-  };
   return (
-    <div class={`panel-hero-main${current().type === 'video' ? ' is-video' : ''}`}>
+    <div
+      class={`panel-hero-main${current().type === 'video' ? ' is-video' : ''}${loading() ? ' panel-hero-main--loading' : ''}`}
+      style={loading() && current().thumb !== src() ? { 'background-image': `url("${current().thumb}")` } : undefined}
+    >
       <img
-        ref={imgEl}
-        class={`panel-hero-img loading${isShot() ? ' panel-hero-img--shot' : ''}`}
+        class={`panel-hero-img${loading() ? ' loading' : ''}${brokenSrc() === src() ? ' panel-hero-img--broken' : ''}${isShot() ? ' panel-hero-img--shot' : ''}`}
         tabIndex={0}
         role="button"
         aria-label="Open in lightbox"
-        src={current().type === 'video' ? current().thumb : current().main}
+        src={src()}
         alt={name()}
-        onLoad={onLoad}
-        onError={onError}
+        onLoad={(e) => setLoadedSrc(e.currentTarget.getAttribute('src') ?? undefined)}
+        onError={(e) => setBrokenSrc(e.currentTarget.getAttribute('src') ?? undefined)}
         onClick={() => {
           const g = panelGame();
           if (g) openLightbox(g, idx());
