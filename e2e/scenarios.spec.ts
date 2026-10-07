@@ -606,6 +606,15 @@ async function fakePlayback(page: Page) {
   });
 }
 
+test("F1 edge: the panel's thumbnails are named as the lightbox counts them", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const names = () => page.locator('.panel-film-item').evaluateAll((items) => items.map((e) => e.ariaLabel));
+  await expect
+    .poll(names)
+    .toEqual(['Cover', 'Trailer 1 of 1', 'Screenshot 1 of 3', 'Screenshot 2 of 3', 'Screenshot 3 of 3']);
+});
+
 test("F1 edge: the lightbox's counters say what they count", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=v1');

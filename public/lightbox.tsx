@@ -2,7 +2,7 @@
 
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
 import { urlWithoutShot } from './urlState.ts';
-import { buildMediaItems, resolveShotIndex, preferredShotIndex } from './mediaItems.ts';
+import { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
 import type { Game, ReadonlyGame } from './types.ts';
 import type Hls from 'hls.js';
@@ -1128,14 +1128,6 @@ function renderLbCaption() {
   }
 }
 
-// Numbered within its own kind, which is what the viewer sees: the first screenshot is
-// "Screenshot 1", not its position behind the banner and the trailers.
-function mediaCounterText(list: MediaItem[], i: number): string {
-  if (list[i].shotId === 'banner') return 'Cover';
-  const sameKind = list.filter((m) => m.type === list[i].type && m.shotId !== 'banner');
-  return `${list[i].type === 'video' ? 'Trailer' : 'Screenshot'} ${sameKind.indexOf(list[i]) + 1} of ${sameKind.length}`;
-}
-
 // The actual per-shot render — deliberately kept as a plain imperative function (called from
 // inside a `createEffect` below, not decomposed into fine-grained JSX bindings) rather than
 // converted the way `panel.tsx`'s own body was. Unlike that file, there's no template shape
@@ -1175,8 +1167,7 @@ function renderLightbox() {
   // (`renderLbCaption`); the alt text here is rebuilt on every step anyway.
   const pos = untrack(() => _getGamePosition?.() ?? null);
   const label =
-    `${name ? name + ' — ' : ''}${pos ? `game ${pos.index + 1} of ${pos.total} — ` : ''}` +
-    `${shot.type === 'video' ? 'Video' : 'Screenshot'} ${i + 1} of ${list.length}`;
+    `${name ? name + ' — ' : ''}${pos ? `game ${pos.index + 1} of ${pos.total} — ` : ''}` + mediaLabel(list, i);
   if (shot.type === 'video') {
     img.style.display = 'none';
     lb.classList.remove('lb--loading');
@@ -1243,7 +1234,7 @@ function renderLightbox() {
     full.src = shot.main!;
     schedHideLbChrome();
   }
-  lb.querySelector('.lb-counter')!.textContent = mediaCounterText(list, i);
+  lb.querySelector('.lb-counter')!.textContent = mediaLabel(list, i);
   lb.querySelector<HTMLButtonElement>('.lb-prev')!.disabled = list.length <= 1;
   lb.querySelector<HTMLButtonElement>('.lb-next')!.disabled = list.length <= 1;
   // Preload prev and next images so navigation feels instant; for a video,

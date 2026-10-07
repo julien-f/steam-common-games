@@ -13,7 +13,7 @@ import {
 } from './utils.ts';
 import { openLightbox, closeLightbox, isLightboxOpen } from './lightbox.tsx';
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
-import { buildMediaItems } from './mediaItems.ts';
+import { buildMediaItems, mediaLabel } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
 import { getMyOwnershipStatus, getOwnersFor } from './myOwnership.ts';
 import type { OwnershipStatus } from './myOwnership.ts';
@@ -1911,9 +1911,7 @@ function PanelHero(): JSX.Element {
                 <button
                   type="button"
                   class={`panel-film-item${i() === idx() ? ' active' : ''}${item.type === 'video' ? ' is-video' : ''}`}
-                  aria-label={
-                    i() === 0 ? (panelGame()?.name ?? '') : item.type === 'video' ? `Video ${i()}` : `Screenshot ${i()}`
-                  }
+                  aria-label={mediaLabel(items(), i())}
                   onClick={() => setHeroIdx(i())}
                 >
                   <img class="panel-film-thumb" src={item.thumb} data-fallback={fallback} alt="" loading="lazy" />

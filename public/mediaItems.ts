@@ -54,3 +54,13 @@ export function preferredShotIndex(shots: MediaItem[], leaving: MediaItem['type'
   const screenshot = firstOfType('image');
   return screenshot >= 0 ? screenshot : 0;
 }
+
+// What the viewer calls an item, numbered within its own kind: the first screenshot is
+// "Screenshot 1", not its position behind the banner and the trailers. Shared by the lightbox's
+// counter and alt text and the panel's thumbnails.
+export function mediaLabel(items: MediaItem[], i: number): string {
+  const item = items[i];
+  if (item.shotId === 'banner') return 'Cover';
+  const sameKind = items.filter((m) => m.type === item.type && m.shotId !== 'banner');
+  return `${item.type === 'video' ? 'Trailer' : 'Screenshot'} ${sameKind.indexOf(item) + 1} of ${sameKind.length}`;
+}

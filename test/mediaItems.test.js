@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { buildMediaItems, resolveShotIndex, preferredShotIndex } = require('../public/mediaItems.ts');
+const { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } = require('../public/mediaItems.ts');
 
 // ── buildMediaItems ───────────────────────────────────────────────────────────
 
@@ -138,4 +138,20 @@ test('preferredShotIndex: leaving an image never lands on a video', () => {
 test('preferredShotIndex: a banner-only game yields 0 whichever kind is being left', () => {
   assert.equal(preferredShotIndex([BANNER], 'image'), 0);
   assert.equal(preferredShotIndex([BANNER], 'video'), 0);
+});
+
+// ── mediaLabel ────────────────────────────────────────────────────────────────
+
+test('mediaLabel: the banner is the cover, and each kind is numbered on its own', () => {
+  const items = buildMediaItems(570, {
+    movies: [
+      { id: 1, thumbnail: 't1', hls: null },
+      { id: 2, thumbnail: 't2', hls: null },
+    ],
+    screenshots: [{ id: 7, thumbnail: 's', full: 'S' }],
+  });
+  assert.deepEqual(
+    items.map((_, i) => mediaLabel(items, i)),
+    ['Cover', 'Trailer 1 of 2', 'Trailer 2 of 2', 'Screenshot 1 of 1'],
+  );
 });
