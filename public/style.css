@@ -3432,7 +3432,8 @@ kbd {
 /* Phone: icons only, and the table library's toolbar spacing tightened, so the rows start higher. */
 @media (max-width: 768px) {
   /* The library puts its end slot after the search line, a row of its own on a phone: move it up
-     to the end of the first line (Columns/Group/Sort), ahead of the search box and what follows. */
+     to the end of the first line (Columns/Group/Sort), ahead of the search box and what follows.
+     Until the library does it itself: vatesfr/data-table#39. */
   .dt-toolbar-actions > .dt-search-wrap,
   .dt-toolbar-actions > .dt-search-wrap ~ * {
     order: 2;
