@@ -13,7 +13,7 @@
   --bg3: #17212b;
   --text0: #c6d4df;
   --text1: #8f98a0;
-  --text2: #4c6b8a;
+  --text2: #4c6b8a; /* placeholders, disabled and decoration only: ~2.7:1, under AA for text */
   --accent: #1a9fff;
   --accent2: #66c0f4;
   --border: #3d5068;
@@ -233,7 +233,7 @@ body {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: var(--text2);
+  color: var(--text1);
 }
 .account-chip-recents {
   display: flex;
@@ -907,12 +907,12 @@ tbody td {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: var(--text2);
+  color: var(--text1);
 }
 .game-search-empty {
   padding: 10px;
   font-size: 13px;
-  color: var(--text2);
+  color: var(--text1);
 }
 .game-search-more {
   display: block;
@@ -2365,7 +2365,7 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
 .panel-dlc-loading-more {
   padding: 8px 10px;
   font-size: 12px;
-  color: var(--text2);
+  color: var(--text1);
 }
 
 /* One card (border/radius/background) holds both the header and the list — a single
@@ -3144,10 +3144,10 @@ body.lb-open {
   justify-content: center;
   gap: 14px;
   font-size: 11px;
-  color: var(--text2);
+  color: var(--text1);
 }
 .app-footer-link {
-  color: var(--text2);
+  color: var(--text1);
   text-decoration: none;
 }
 .app-footer-link:hover {
