@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- On desktop the screenshot viewer's backdrop is solid black, as on a phone, so the page behind no longer shows around the picture.
+
 ## [0.8.0] - 2026-10-07
 
 ### Changed

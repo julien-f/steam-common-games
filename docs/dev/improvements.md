@@ -60,7 +60,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Consistency and polish
 
-- **U102 · minor · F1** — on desktop the lightbox's backdrop is 88 % black, so the nav, the table and the panel (with its own copy of the same screenshot) stay readable around the media, even once the chrome has idled out. Make it opaque, as on phone since 0.8.0.
 - **U103 · minor · F1** — the chrome is two stacked rows (94 px desktop, 100 px phone) holding three positions: the game stepper "↑ Hades Game 3 of 6 ↓", then "Screenshot 1 of 3", flanked by four round buttons. Fold it into one row: the game and its stepper on the left, "1 / 3" in the middle, the buttons on the right.
 - **U104 · minor · F1** — a trailer that is paused or not started never idles out: the whole chrome stays on the poster for good, with two play buttons (the 72 px centre one and the bar's) and an empty `0:00` scrub bar. Before the first play show only the centre button; once paused, let the chrome idle out too, leaving the centre play button.
 

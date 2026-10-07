@@ -706,6 +706,12 @@ test('F1 edge: a screenshot zooms from a visible button, or Z', async ({ page })
   await expect(zoom).toBeHidden();
 });
 
+test('F1 edge: nothing of the page shows around the media', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  await expect(page.locator('#screenshot-lightbox .lb-backdrop')).toHaveCSS('background-color', 'rgb(0, 0, 0)');
+});
+
 test("F1 edge: the lightbox's counters say what they count", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=v1');
