@@ -6,42 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-07
+
 ### Added
 
 - Each table column's header has a ▾ menu to filter, group by or hide that column, and a search or filter matching nothing says so, with a button to clear them.
 
 ### Changed
 
-- A playing trailer pauses when the page is hidden (screen locked, another app or tab), and waits for you to press play again.
-- The screenshot viewer's counters say what they count: "Game 3 of 6" beside the name, and below it "Cover", "Trailer 1 of 2" or "Screenshot 1 of 8", each kind numbered on its own.
 - Back closes an open game's panel or the screenshot viewer instead of leaving the page, and Back from a page a game's panel linked to reopens that game.
-- On a phone, the lightbox in fullscreen turns to landscape for screenshots too, and stays there while you move between videos and games.
+- On a phone, the screenshot viewer in fullscreen turns to landscape for screenshots too, and stays there while you move between trailers and games.
+- On a phone, trailer controls are thumb-sized, a paused trailer shows a large play button, and the tap that brings back hidden controls no longer pauses it. A playing trailer pauses when the page is hidden (screen locked, another app or tab).
+- The screenshot viewer's counters say what they count: "Game 3 of 6" beside the name, and "Cover", "Trailer 1 of 2" or "Screenshot 1 of 8" below it. Screen readers name a game's media the same way in its panel.
 - A comparison states its mode once, in its select, instead of also as a badge beside the title.
 - Compare starts with your ★ account filled in, names you first ("Bob vs. Alice" when you're Bob), and says so when the same player is in two boxes instead of comparing them with themselves.
 - A ranking card shows the same How Long To Beat time as the table, rounded and labelled ("10.5 h to beat"), and the table's "All (h)" column is now "HLTB (h)".
 
 ### Fixed
 
-- Closing the screenshot viewer leaves the game's panel on the last screenshot or trailer you looked at, not the one you opened.
-- Screen readers announce which of a game panel's thumbnails is the one shown.
-- Screen readers name a game's media the same way in its panel and in the screenshot viewer ("Cover", "Trailer 1 of 2", "Screenshot 1 of 8"), instead of numbering the first screenshot after the trailers.
-- On a phone, a trailer's play, mute and seek controls are thumb-sized, a paused trailer shows a large play button, and tapping a playing trailer to bring its controls back no longer pauses it.
-- The game panel's section buttons, tags and achievement filters are tall enough to tap reliably on a phone.
-- On a phone, the lightbox's buttons to change game are larger, and its ‹ › arrows narrower and closer to the edges, as intended.
-- On a phone, double-tapping a screenshot in the lightbox zooms in again (it zoomed back out at once).
-- Updated dependencies, fixing security advisories in `solid-js`'s `seroval` and `vite`'s `source-map-js`.
+- Closing the screenshot viewer leaves the game's panel on the last screenshot or trailer you looked at, and screen readers announce which thumbnail is shown.
+- On a phone, double-tapping a screenshot zooms in again (it zoomed back out at once), and the screenshot viewer's buttons and the game panel's section buttons, tags and achievement filters are sized for a thumb.
 - A list built from a bundle says, on its formula line, how many of the bundle's games aren't on Steam and were left out, instead of dropping them without a word.
 - A saved comparison keeps its page's name ("Alice vs. Bob") instead of a long formula ("Alice — Owned + Bob — Owned — grouped by membership").
 - Tables' select-all and group checkboxes and page buttons are named for screen readers, sorted headers announce their direction, and filter chips name the values kept when that's shorter.
 - The bundle browser's Cheapest Tier filter shows its bounds and chips as prices in your region's currency.
 - A column header's filter lists values as the table writes them ("Action", not "ACTION"), and the Image header no longer stands out in capitals.
 - The Filter popover's column list fits without scrolling sideways, fits a phone screen, and Played (h) ranges read in rounded hours ("0 – 20", not "20.0166…").
+- Updated dependencies, fixing security advisories in `solid-js`'s `seroval` and `vite`'s `source-map-js`.
 
 ### Development
 
-- `npm run check` fails when a phone-width CSS rule is overridden by a later rule for the same selector, so it would never apply.
-- Under `npm run dev:mock`, Hades has screenshots and a trailer, so the lightbox can be tried without the real server.
-- The pre-commit hook fails a commit changing app code without a `CHANGELOG.md` entry (`SKIP_CHANGELOG=1` for one that needs none).
+- Under `npm run dev:mock`, Hades has screenshots and a trailer, so the screenshot viewer can be tried without the real server.
+- `npm run check` fails on a phone-width CSS rule that a later rule overrides, and the pre-commit hook on app code changed without a `CHANGELOG.md` entry (`SKIP_CHANGELOG=1` for one that needs none).
 - `scripts/ux-measure.js` also reports controls under 24×24 px and controls without an accessible name.
 
 ## [0.6.0] - 2026-10-04
