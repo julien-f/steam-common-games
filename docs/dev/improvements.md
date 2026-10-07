@@ -44,18 +44,14 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Keyboard and accessibility
 
-- **U50 · minor · I2, L4, C5** — row checkboxes read "Select row " with no game name: `@vates/data-table-solid` (0.15) names them after the first visible column, the image, and its row label gets only that cell's text, not the row. Select-all and group checkboxes are named. Needs an upstream change: name a row after a chosen column, or the first non-empty one (vatesfr/data-table#31).
 - **U70 · polish · S2 · pilot** — after the panel's 🔗 copy, the icon becomes ✓ but nothing is announced and `aria-label` stays "Copy link to this game". Announce "Link copied" through a live region.
 - **U28 · polish · I2** — the open game's row is highlighted, but not exposed to assistive tech (`aria-current`); the table library has no per-row attribute hook.
-- **U77 · minor · I2** — the header menu is a `role="menu"` with no name, and its Filter flyout puts a search box, checkboxes and Any/All buttons inside it (not menu items), so screen readers in menu mode may not reach them; the range's two text boxes have no name; Tab from the flyout's last value goes to Group by, then leaves the table menu past Hide column. Needs an upstream change (vatesfr/data-table#36).
 
 ## Phone
 
-- **U30 · minor · I1, F3** — on a 390 px phone the table now starts ~48 % down the screen on Owned, ~57 % on Compare and a bundle's page (was up to ~85 %): the hero folds and the view buttons are icons, but the toolbar still takes two lines and Share/Reset their own row. Next: move them into the toolbar line once `@vates/data-table-solid` has a toolbar slot (vatesfr/data-table#29).
+- **U30 · minor · I1, F3** — on a 390 px phone the table now starts ~48 % down the screen on Owned, ~57 % on Compare and a bundle's page (was up to ~85 %): the hero folds and the view buttons are icons, but the toolbar still takes two lines and Share/Reset their own row. Next: move them into the toolbar line through `@vates/data-table-solid`'s toolbar-end slot (0.16, vatesfr/data-table#29).
 - **U32 · minor · I1, R1 · pilot** — the ranking screen stacks cards vertically (Tie/Skip/Undo below the fold) and has no side gutter.
 - **U33 · minor · F3 · pilot** — no random pick on phone until a panel is open (the 🎲 lives in the panel's nav).
-- **U72 · major · I1, F3** — at 390 px, the header menu's Filter flyout opens on top of its own menu and past the screen edge: Genres' flyout is 406 px wide, so **All** is cut off and unreachable, and it hides Filter/Group by/Hide underneath. Needs an upstream change: clamp to the viewport and, on narrow screens, open the flyout in place of the menu (drill-down with a back row) (vatesfr/data-table#32 (overflow) and its backlog U20 (covering the menu)).
-- **U78 · polish · I1** — at 390 px, the header menu buttons of the wider labels (Weighted Rating, HLTB, Played) shrink to 17–19 px wide, under the 24 px minimum; opening a range filter focuses its text box, raising the phone keyboard over the flyout. Needs an upstream change (vatesfr/data-table#37 (size) and its backlog U20 (keyboard)).
 - **U89 · polish · F1** — the backdrop (88 % black) lets the panel show through behind the counters (its own × sits beside the lightbox's), and the lightbox's × shows a focus ring after a touch open. Opaque backdrop on phone; focus ring for keyboard only.
 - **U90 · polish · F1** — pinch and double-tap zoom, and double-tap ±10 s on a trailer, have no visible equivalent (ui-guidelines: no hidden affordances); the prev/next arrows meanwhile cover 60 px of each side of a 390 px image though swipe does the same. Slimmer arrows; a zoom hint or button.
 
@@ -68,7 +64,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 - **U39 · polish · pilot** — nav items shift sideways between routes; missing thumbnails have no placeholder; "Demo" pills look like primary buttons; the "Updated" age has very low contrast; Compare's op `<select>` is an unstyled native white control; wishlisted/owned name colours have no legend (still true in Recently Looked Up).
 - **U80 · polish · pilot** — `favicon.ico` 404s.
 - **U81 · polish · pilot** — dates read differently across pages: Released and Added differ, as do the Bundles list (`2026-10-13 21:10`) and a bundle's page (`Oct 13, 09:10 PM`).
-- **U79 · polish · L3** — the Image header shows the ↕ sort icon although it isn't sortable (`sortable: false`), so it looks clickable and does nothing. Needs an upstream change: no sort icon on unsortable columns (vatesfr/data-table#38).
 
 ## Review tooling
 
