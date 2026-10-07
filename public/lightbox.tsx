@@ -1,5 +1,7 @@
 'use strict';
 
+import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
+import { urlWithoutShot } from './urlState.ts';
 import { buildMediaItems, resolveShotIndex, preferredShotIndex } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
 import type { Game, ReadonlyGame } from './types.ts';
@@ -993,6 +995,7 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
   // (↑/↓ — see AppShell's onGameNav), and capturing focus again there would remember an element
   // inside the lightbox itself, so closing would restore focus to something already hidden.
   if (!isLightboxOpen()) _lbPrevFocus = document.activeElement;
+  pushOverlayEntry('lightbox', closeLightbox, urlWithoutShot());
   const newShots = buildMediaItems(game.appid, game.details?.meta);
   // Batched: setLbGame alone would otherwise let the render effect below run once with the new
   // game's (possibly shorter) media list but the previous game's stale idx, indexing past the
@@ -1044,6 +1047,7 @@ export function closeLightbox() {
     (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
   }
   _onLightboxParamChange?.(null);
+  popOverlayEntry('lightbox');
   (_lbPrevFocus as HTMLElement | null)?.focus();
   _lbPrevFocus = null;
 }

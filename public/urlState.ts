@@ -44,8 +44,8 @@ export function urlWithParams(params: URLSearchParams, pathname: string = locati
 // out to each carry a near-identical hand-copy (bundles.tsx's own copies had drifted from the
 // other two: they skipped `reorderUrlParams` entirely, so `?game=`/`?shot=`'s position in the
 // URL could differ from the canonical order the rest of the app enforces). Always
-// `history.replaceState`, never pushed — opening/closing a game or stepping a lightbox shot
-// isn't its own back/forward-navigable step on any of the three pages.
+// `history.replaceState`: stepping games or shots isn't its own back/forward step — the one
+// entry per open overlay is overlayHistory.ts's.
 // Each rewrite below keeps `history.state` — the router's own navigation state (RankRoute.tsx's
 // `rankFocus`) would otherwise be dropped by opening a game or a screenshot.
 export function setPanelParam(appid: number | string | null): void {
@@ -74,6 +74,22 @@ export function setLightboxParam(idx: number | string | null): void {
   if (idx == null) params.delete('shot');
   else params.set('shot', String(idx));
   history.replaceState(history.state, '', urlWithParams(params));
+}
+
+// The addresses Back returns to from the panel's and the lightbox's own history entries
+// (overlayHistory.ts): the page with that overlay closed. Recently Looked Up names its game in the
+// path (`/game/:appid`) rather than in `?game=`.
+export function urlWithoutPanel(): string {
+  const params = new URLSearchParams(location.search);
+  params.delete('game');
+  params.delete('shot');
+  return urlWithParams(params, location.pathname.replace(/^\/game\/\d+$/, '/game'));
+}
+
+export function urlWithoutShot(): string {
+  const params = new URLSearchParams(location.search);
+  params.delete('shot');
+  return urlWithParams(params);
 }
 
 // `/search`'s own live search box writes its term here as the user types (debounced by the

@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- Back closes an open game's panel or the screenshot viewer instead of leaving the page, and Back from a page a game's panel linked to reopens that game.
 - On a phone, the lightbox in fullscreen turns to landscape for screenshots too, and stays there while you move between videos and games.
 - A comparison states its mode once, in its select, instead of also as a badge beside the title.
 - Compare starts with your ★ account filled in, names you first ("Bob vs. Alice" when you're Bob), and says so when the same player is in two boxes instead of comparing them with themselves.

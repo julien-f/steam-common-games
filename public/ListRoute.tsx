@@ -946,9 +946,9 @@ export default function ListRoute() {
   // them and to reconstruct real saved lists on "Save as a list" — see sharedFetchers/
   // sharedNaming/handleSaveShared below.
   const [sharedSynthetic, setSharedSynthetic] = createSignal<Map<string, GameList>>(new Map());
-  function sharedFormulaParam(): string | null {
-    return new URLSearchParams(location.search).get('f');
-  }
+  // A memo, so the load effect re-runs on a new formula only — not on Back dropping `?game=`
+  // (overlayHistory.ts), which changes the rest of the query string.
+  const sharedFormulaParam = createMemo(() => new URLSearchParams(location.search).get('f'));
   function sharedFetchers(base: ListResolveFetchers): ListResolveFetchers {
     return { ...base, getList: (id) => sharedSynthetic().get(id) ?? base.getList(id) };
   }
@@ -3152,7 +3152,7 @@ export default function ListRoute() {
     // The panel's own nav bar (renderPanelNav) points at *this* mount's table/getGameList —
     // leaving the route without closing it would leave the panel open on a stale game with a
     // prev/next list that no longer exists once disposeTable runs just below.
-    if (isPanelOpen()) panelClose();
+    if (isPanelOpen()) panelClose({ leavingRoute: true });
     setBaseTitle(null); // this route's own document.title context — see load()'s setBaseTitle calls
     loadGuard.next(); // invalidate any still-in-flight fetch/stream from this mount
     if (disposeTable) disposeTable();

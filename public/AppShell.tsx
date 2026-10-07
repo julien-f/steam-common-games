@@ -202,7 +202,8 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
     });
     onCleanup(disposeLightbox);
     initPanel({
-      onClose: () => {
+      onClose: ({ leavingRoute = false } = {}) => {
+        if (leavingRoute) return;
         routeHandlers.onGameClose?.();
         setPanelParam(null);
       },

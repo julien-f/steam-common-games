@@ -237,7 +237,7 @@ export default function RankRoute() {
   document.addEventListener('keydown', onKeydown, true);
   onCleanup(() => {
     document.removeEventListener('keydown', onKeydown, true);
-    if (isPanelOpen()) panelClose();
+    if (isPanelOpen()) panelClose({ leavingRoute: true });
     loadToken++;
     setBaseTitle(null);
   });

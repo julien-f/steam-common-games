@@ -12,6 +12,7 @@ import {
   computeSteamdbRating,
 } from './utils.ts';
 import { openLightbox, closeLightbox, isLightboxOpen } from './lightbox.tsx';
+import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
 import { buildMediaItems } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
 import { getMyOwnershipStatus, getOwnersFor } from './myOwnership.ts';
@@ -50,7 +51,7 @@ import type { PanelHistoryEntry } from './panelHistory.ts';
 import { setGameTitle } from './pageTitle.ts';
 import { PRICES_UNAVAILABLE } from './priceLoading.ts';
 import { TIER_RANGE_TITLE } from './bundleData.ts';
-import { withAccountParam } from './urlState.ts';
+import { withAccountParam, urlWithoutPanel } from './urlState.ts';
 import { copyWithFeedback } from './clipboard.ts';
 import type { DetailsAges, Game, PriceFields, ReadonlyGame } from './types.ts';
 
@@ -75,7 +76,7 @@ export interface PanelOptions {
   isTagActive?: (dim: string, val: string) => boolean;
   onRefresh?: (game: ReadonlyGame) => void;
   onNavigateGame?: (appid: number, name: string) => void;
-  onClose?: (opts?: { preserveUrl?: boolean }) => void;
+  onClose?: (opts?: { leavingRoute?: boolean }) => void;
   enableTagFilters?: boolean;
   // The route's own owners for a game (a comparison's players), over the current account's.
   getOwners?: (appid: number) => GameOwner[] | null;
@@ -660,6 +661,7 @@ export function panelOpen(game: ReadonlyGame) {
   const isHop = pendingHopAppid === game.appid;
   pendingHopAppid = null;
   if (!isHop) setPanelHistory([]);
+  pushOverlayEntry('panel', () => panelClose(), urlWithoutPanel());
   setPanelGame(game);
   setHeroIdx(0);
   setMoreLinksOpen(false);
@@ -676,12 +678,9 @@ export function panelOpen(game: ReadonlyGame) {
   ).focus();
 }
 
-// `preserveUrl`: threaded through to `onClose` unchanged — for a host that clears
-// `?game=`/`&shot=` there, this lets a caller that's about to reopen the same game right
-// after (e.g. a forced-refresh reload) close the panel's DOM state without losing the
-// deep link it'll restore from once the reload completes. Not used by the × button/swipe
-// paths below, which always want the default (URL cleared).
-export function panelClose({ preserveUrl = false } = {}) {
+// `leavingRoute`: the route is unmounting under a navigation — its host keeps `?game=` on the
+// history entry being left (see `onClose`), so Back to it reopens the game.
+export function panelClose({ leavingRoute = false } = {}) {
   if (!panelGame()) return;
   setPanelGame(null);
   // Closing the panel ends whatever DLC browsing trail was in progress — including a hop that
@@ -698,7 +697,8 @@ export function panelClose({ preserveUrl = false } = {}) {
   // host-specific close cleanup (clearing `?game=`/`&shot=` from the URL, resetting the host's
   // own "active game" state) can hook in without every
   // host having to remember to wrap all of those paths itself.
-  panelOptions.onClose?.({ preserveUrl });
+  panelOptions.onClose?.({ leavingRoute });
+  popOverlayEntry('panel');
 }
 
 // Scrolls #panel-body so `target` (a section id, or the literal 'top') sits just below the

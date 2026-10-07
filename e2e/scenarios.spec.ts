@@ -591,6 +591,58 @@ test('F1 edge: on a phone, a double-tap zooms a screenshot and another zooms bac
   await expect(img).not.toHaveAttribute('style', /scale/);
 });
 
+test('F1 edge: Back closes the open game, then leaves the list', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/about');
+  await page.goto('/lists/owned');
+  await row(page, 'Hades').getByText('Hades').click();
+  await expect(page).toHaveURL(/\?game=1145360/);
+  await page.goBack();
+  await expect(page.locator('#game-panel')).toBeHidden();
+  await expect(page).toHaveURL(/\/lists\/owned$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/about$/);
+});
+
+test('F1 edge: Back closes the lightbox before the game behind it', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Hades').getByText('Hades').click();
+  await page.getByRole('button', { name: 'Open in lightbox' }).click();
+  await expect(page).toHaveURL(/&shot=banner/);
+  await page.goBack();
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/open/);
+  await expect(page.locator('#game-panel')).toBeVisible();
+  await expect(page).toHaveURL(/\?game=1145360$/);
+});
+
+test('F1 edge: after closing the game with ×, one Back leaves the list', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/about');
+  await page.goto('/lists/owned');
+  await row(page, 'Hades').getByText('Hades').click();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.locator('#game-panel')).toBeHidden();
+  await expect(page).toHaveURL(/\/lists\/owned$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/about$/);
+});
+
+test('F1 edge: Back from a page the game panel linked to reopens that game', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/about');
+  await page.goto('/lists/owned');
+  await row(page, 'Hades').getByText('Hades').click();
+  await page.locator('#game-panel').getByText('Test Co-op Pack').click();
+  await expect(page).toHaveURL(/\/lists\/bundle\//);
+  await page.goBack();
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await page.goBack();
+  await expect(page.locator('#game-panel')).toBeHidden();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/about$/);
+});
+
 test('F1.1-4: look up one game from the nav search, in place', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
