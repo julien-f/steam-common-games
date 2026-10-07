@@ -49,8 +49,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Phone
 
-- **U105 · polish · F1** — on a phone the ‹ › buttons sit on the picture's edges, though swipe already steps media and a 16:9 screenshot leaves ~300 px of black above and below it. Move them off the picture (into the bottom band), or hide them once the user has swiped.
-
 - **U32 · minor · I1, R1 · pilot** — the ranking screen stacks cards vertically (Tie/Skip/Undo below the fold) and has no side gutter.
 - **U33 · minor · F3 · pilot** — no random pick on phone until a panel is open (the 🎲 lives in the panel's nav).
 

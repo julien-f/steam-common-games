@@ -706,6 +706,24 @@ test('F1 edge: a screenshot zooms from a visible button, or Z', async ({ page })
   await expect(zoom).toBeHidden();
 });
 
+test('F1 edge: on a phone, the ‹ › buttons sit clear of the media and its controls', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout');
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  const clear = async (media: string) => {
+    const m = (await page.locator(media).boundingBox())!;
+    for (const name of ['Previous screenshot', 'Next screenshot']) {
+      const b = (await page.getByRole('button', { name }).boundingBox())!;
+      expect(b.y >= m.y + m.height || b.y + b.height <= m.y, `${name} vs ${media}`).toBe(true);
+    }
+  };
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  await clear('#screenshot-lightbox .lb-img');
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  await page.getByRole('button', { name: 'Play trailer' }).click();
+  await clear('#screenshot-lightbox .lb-vctrls');
+});
+
 test('F1 edge: nothing of the page shows around the media', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
