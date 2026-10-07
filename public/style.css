@@ -3057,6 +3057,10 @@ body.lb-open {
     visibility 0s 0.3s,
     background 0.15s;
 }
+/* Until a trailer first plays, its large play button is the one control on it. */
+#screenshot-lightbox.lb--unstarted .lb-vctrls {
+  display: none;
+}
 
 /* After the base .lb-* rules, or they win at equal specificity. */
 @media (max-width: 768px) {

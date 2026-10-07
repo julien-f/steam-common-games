@@ -423,10 +423,9 @@ function resetLbVc(vc: HTMLElement) {
 // ── Chrome (toolbar/nav/video-controls) idle-hide ──────────────────────────
 
 // Idle state hides ALL lightbox chrome (video controls, prev/next, toolbar)
-// and the mouse cursor while the viewer is inactive — whether a video is
-// playing unattended or it's just a still image sitting there. A *paused*
-// video is the one exception: it stays fully visible regardless of the
-// timer, since "paused" itself already signals the viewer is looking at it.
+// and the mouse cursor while the viewer is inactive — a video playing or
+// paused, or a still image. A trailer that isn't playing keeps its large play
+// button, which isn't part of the chrome.
 function showLbChrome() {
   const lb = document.getElementById('screenshot-lightbox');
   if (!lb) return;
@@ -437,9 +436,8 @@ function showLbChrome() {
 function schedHideLbChrome() {
   const lb = document.getElementById('screenshot-lightbox');
   if (!lb) return;
-  const isPausedVideo = lbVideoEl.isConnected && lbVideoEl.paused;
   clearTimeout(lbVcTimer);
-  if (!isPausedVideo) lbVcTimer = setTimeout(() => lb.classList.add('lb-idle'), 3000);
+  lbVcTimer = setTimeout(() => lb.classList.add('lb-idle'), 3000);
 }
 
 // ── Focus helpers ──────────────────────────────────────────────────────────
@@ -942,6 +940,7 @@ function wireVideoControls(lb: HTMLElement) {
   vid2.addEventListener('play', () => {
     playBtn.innerHTML = LB_PAUSE_ICON;
     playBtn.setAttribute('aria-label', 'Pause');
+    document.getElementById('screenshot-lightbox')?.classList.remove('lb--unstarted');
     syncLbPaused();
     schedHideLbChrome();
   });
@@ -950,12 +949,14 @@ function wireVideoControls(lb: HTMLElement) {
     playBtn.setAttribute('aria-label', 'Play');
     syncLbPaused();
     showLbChrome();
+    schedHideLbChrome();
   });
   vid2.addEventListener('ended', () => {
     playBtn.innerHTML = LB_PLAY_ICON;
     playBtn.setAttribute('aria-label', 'Play');
     syncLbPaused();
     showLbChrome();
+    schedHideLbChrome();
   });
   vid2.addEventListener('volumechange', () => {
     muteBtn.innerHTML = vid2.muted ? LB_MUTE_ICON : LB_VOL_ICON;
@@ -1096,7 +1097,7 @@ export function closeLightbox() {
   const lb = document.getElementById('screenshot-lightbox')!;
   stopHls(lbVideoEl);
   detachLbVideo();
-  lb.classList.remove('open', 'lb--loading', 'lb-idle', 'lb--paused');
+  lb.classList.remove('open', 'lb--loading', 'lb-idle', 'lb--paused', 'lb--unstarted');
   document.body.classList.remove('lb-open');
   if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
     (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
@@ -1202,6 +1203,7 @@ function renderLightbox() {
     lb.classList.remove('lb--loading');
     attachLbVideo();
     vid.style.display = 'block';
+    lb.classList.add('lb--unstarted');
     vid.poster = shot.thumb || '';
     vid.setAttribute('aria-label', label);
     vc.style.display = '';
@@ -1212,6 +1214,7 @@ function renderLightbox() {
   } else {
     stopHls(vid);
     detachLbVideo();
+    lb.classList.remove('lb--unstarted');
     syncLbPaused();
     vc.style.display = 'none';
     img.style.display = 'block';

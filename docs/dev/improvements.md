@@ -61,7 +61,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 ## Consistency and polish
 
 - **U103 · minor · F1** — the chrome is two stacked rows (94 px desktop, 100 px phone) holding three positions: the game stepper "↑ Hades Game 3 of 6 ↓", then "Screenshot 1 of 3", flanked by four round buttons. Fold it into one row: the game and its stepper on the left, "1 / 3" in the middle, the buttons on the right.
-- **U104 · minor · F1** — a trailer that is paused or not started never idles out: the whole chrome stays on the poster for good, with two play buttons (the 72 px centre one and the bar's) and an empty `0:00` scrub bar. Before the first play show only the centre button; once paused, let the chrome idle out too, leaving the centre play button.
 
 - **U101 · polish** — every table shows a "Page 1 of 1" pager with all buttons disabled when everything fits. Needs an upstream change: hide the pager when there's a single page (an option or the default in `@vates/data-table-solid`, vatesfr/data-table#41).
 - **U39 · polish · pilot** — nav items shift sideways between routes; missing thumbnails have no placeholder; "Demo" pills look like primary buttons; the "Updated" age has very low contrast; Compare's op `<select>` is an unstyled native white control; wishlisted/owned name colours have no legend (still true in Recently Looked Up).

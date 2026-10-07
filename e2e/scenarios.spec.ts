@@ -736,6 +736,29 @@ test('F1 edge: a paused trailer offers a large play button', async ({ page }) =>
   await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
 });
 
+test('F1 edge: a trailer not yet played shows its large play button, not the control bar', async ({ page }) => {
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  await expect(page.getByRole('button', { name: 'Play trailer' })).toBeVisible();
+  await expect(page.locator('.lb-vctrls')).toBeHidden();
+  await page.getByRole('button', { name: 'Play trailer' }).click();
+  await expect(page.locator('.lb-vctrls')).toBeVisible();
+});
+
+test("F1 edge: a paused trailer's controls idle out, leaving its large play button", async ({ page }) => {
+  await page.clock.install();
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  await page.getByRole('button', { name: 'Play trailer' }).click();
+  await page.locator('.lb-vc-play').click(); // pause
+  const lb = page.locator('#screenshot-lightbox');
+  await page.clock.runFor(3500);
+  await expect(lb).toHaveClass(/lb-idle/);
+  await expect(page.getByRole('button', { name: 'Play trailer' })).toBeVisible();
+});
+
 test('F1 edge: arrows seek a trailer only while it plays, and step past it otherwise', async ({ page }) => {
   await fakePlayback(page);
   await asPlayer(page, ALICE);
