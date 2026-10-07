@@ -1,6 +1,6 @@
 # Improvements
 
-UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocked, `npm run dev:mock`) and the 2026-10-07 phone-lightbox (real dev server, touch emulation) phone panel-media (mocked), broad mocked and slow-media/design (mocked, delayed media) reviews (`ux-review` skill) against [journeys.md](journeys.md) and [ui-guidelines.md](ui-guidelines.md). Each item names the scenarios it blocks or slows; a dedicated run per item re-walks those scenarios. Severity: **blocker** (goal unreachable) · **major** (reached with confusion or a workaround) · **minor** · **polish**. Fix items with the `ux-fix` skill; remove an item once it ships.
+UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocked, `npm run dev:mock`) and the 2026-10-07 phone-lightbox (real dev server, touch emulation) phone panel-media (mocked), broad mocked, slow-media/design (mocked, delayed media) and lightbox-clutter (mocked) reviews (`ux-review` skill) against [journeys.md](journeys.md) and [ui-guidelines.md](ui-guidelines.md). Each item names the scenarios it blocks or slows; a dedicated run per item re-walks those scenarios. Severity: **blocker** (goal unreachable) · **major** (reached with confusion or a workaround) · **minor** · **polish**. Fix items with the `ux-fix` skill; remove an item once it ships.
 
 **Pilot** (claude-ux-workflow, from 2026-10-04): items tagged `pilot`, and the ◇ steps of C6, A4 and L1, are frozen. Only the bot's PRs fix them; `ux-fix` and hand fixes leave them alone until the pilot ends.
 
@@ -49,6 +49,8 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Phone
 
+- **U105 · polish · F1** — on a phone the ‹ › buttons sit on the picture's edges, though swipe already steps media and a 16:9 screenshot leaves ~300 px of black above and below it. Move them off the picture (into the bottom band), or hide them once the user has swiped.
+
 - **U32 · minor · I1, R1 · pilot** — the ranking screen stacks cards vertically (Tie/Skip/Undo below the fold) and has no side gutter.
 - **U33 · minor · F3 · pilot** — no random pick on phone until a panel is open (the 🎲 lives in the panel's nav).
 
@@ -57,6 +59,10 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 - **U34 · minor · A1 · pilot** — first-visit Home doesn't say what the app does; the main button reads "Set as current account". One-line intro; "Look up".
 
 ## Consistency and polish
+
+- **U102 · minor · F1** — on desktop the lightbox's backdrop is 88 % black, so the nav, the table and the panel (with its own copy of the same screenshot) stay readable around the media, even once the chrome has idled out. Make it opaque, as on phone since 0.8.0.
+- **U103 · minor · F1** — the chrome is two stacked rows (94 px desktop, 100 px phone) holding three positions: the game stepper "↑ Hades Game 3 of 6 ↓", then "Screenshot 1 of 3", flanked by four round buttons. Fold it into one row: the game and its stepper on the left, "1 / 3" in the middle, the buttons on the right.
+- **U104 · minor · F1** — a trailer that is paused or not started never idles out: the whole chrome stays on the poster for good, with two play buttons (the 72 px centre one and the bar's) and an empty `0:00` scrub bar. Before the first play show only the centre button; once paused, let the chrome idle out too, leaving the centre play button.
 
 - **U101 · polish** — every table shows a "Page 1 of 1" pager with all buttons disabled when everything fits. Needs an upstream change: hide the pager when there's a single page (an option or the default in `@vates/data-table-solid`, vatesfr/data-table#41).
 - **U39 · polish · pilot** — nav items shift sideways between routes; missing thumbnails have no placeholder; "Demo" pills look like primary buttons; the "Updated" age has very low contrast; Compare's op `<select>` is an unstyled native white control; wishlisted/owned name colours have no legend (still true in Recently Looked Up).
