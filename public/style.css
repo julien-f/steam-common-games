@@ -2809,8 +2809,8 @@ body.lb-open {
   left: 0;
   right: 0;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   padding: 10px 12px;
   z-index: 1;
   pointer-events: none;
@@ -2825,7 +2825,8 @@ body.lb-open {
   font-size: 14px;
   font-weight: 600;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
-  padding: 0 48px; /* clears the toolbar buttons on either side at narrow widths */
+  min-width: 0;
+  order: 1; /* between the left buttons and the counter, which .lb-toolbar-row lends the toolbar */
 }
 .lb-caption-text {
   white-space: nowrap;
@@ -2842,9 +2843,13 @@ body.lb-open {
   font-size: 15px;
 }
 .lb-toolbar-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: contents; /* one row with the caption; a phone stacks them again */
+}
+.lb-counter {
+  order: 2;
+}
+.lb-toolbar-right {
+  order: 3;
 }
 .lb-toolbar-left,
 .lb-toolbar-right {
@@ -2852,8 +2857,8 @@ body.lb-open {
   align-items: center;
   gap: 8px;
   pointer-events: auto;
-  /* Equal-width flanks, so the counter between them lands on the real centre and stacks under
-     the caption above it — `space-between` alone put it wherever the wider group left it. */
+  /* Equal-width flanks, so what sits between them lands on the real centre — `space-between`
+     alone put it wherever the wider group left it. */
   flex: 1 1 0;
 }
 .lb-toolbar-right {
@@ -2881,7 +2886,7 @@ body.lb-open {
 .lb-close:hover {
   background: rgba(200, 60, 60, 0.7);
 }
-/* One pill, two counters — the list position beside the game name, the media position below it.
+/* One pill, two counters — the list position beside the game name, the media position after it.
    Same treatment because they answer the same question on different axes (↑/↓ vs ‹ ›); the pill
    rather than a text-shadow because either can land over a bright screenshot. */
 .lb-counter,
@@ -3087,7 +3092,18 @@ body.lb-open {
     width: 34px;
     height: 34px;
   }
+  /* Two rows: in portrait they sit in the black band above the media, and one would not fit. */
+  .lb-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .lb-toolbar-row {
+    display: flex;
+    align-items: center;
+  }
   .lb-caption {
+    order: 0;
     padding: 0 44px;
   }
   /* Thumb-sized trailer controls; the seek bar keeps its thin look inside a taller hit area. */

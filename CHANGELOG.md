@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - On desktop the screenshot viewer's backdrop is solid black, as on a phone, so the page behind no longer shows around the picture.
 - A trailer not yet played shows only its large play button, without the control bar; a paused one's controls fade out after a few seconds like a playing one's, leaving the play button.
+- On a wide screen the screenshot viewer's game name, counters and buttons share one line at the top, instead of two rows over the picture.
 
 ## [0.8.0] - 2026-10-07
 
