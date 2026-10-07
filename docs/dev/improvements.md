@@ -46,7 +46,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 - **U50 · minor · I2, L4, C5** — row checkboxes read "Select row " with no game name: `@vates/data-table-solid` (0.15) names them after the first visible column, the image, and its row label gets only that cell's text, not the row. Select-all and group checkboxes are named. Needs an upstream change: name a row after a chosen column, or the first non-empty one (vatesfr/data-table#31).
 - **U70 · polish · S2 · pilot** — after the panel's 🔗 copy, the icon becomes ✓ but nothing is announced and `aria-label` stays "Copy link to this game". Announce "Link copied" through a live region.
-- **U93 · polish · I2** — the panel filmstrip's current item is marked by colour only (`.active`), not exposed (`aria-current`).
 - **U28 · polish · I2** — the open game's row is highlighted, but not exposed to assistive tech (`aria-current`); the table library has no per-row attribute hook.
 - **U77 · minor · I2** — the header menu is a `role="menu"` with no name, and its Filter flyout puts a search box, checkboxes and Any/All buttons inside it (not menu items), so screen readers in menu mode may not reach them; the range's two text boxes have no name; Tab from the flyout's last value goes to Group by, then leaves the table menu past Hide column. Needs an upstream change (vatesfr/data-table#36).
 

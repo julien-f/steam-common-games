@@ -759,6 +759,16 @@ test("I1 edge: on a phone, a bundle's table starts high, its other actions behin
   await expect(page.getByRole('link', { name: '← All bundles' })).toBeVisible();
 });
 
+test("I2 edge: the panel's current thumbnail is exposed, not only coloured", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const current = page.locator('.panel-film-item[aria-current="true"]');
+  await expect(current).toHaveAccessibleName('Cover');
+  await page.getByRole('button', { name: 'Screenshot 2 of 3' }).click();
+  await expect(current).toHaveAccessibleName('Screenshot 2 of 3');
+  await expect(current).toHaveCount(1);
+});
+
 test('I2 edge: icon-only controls have names', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);

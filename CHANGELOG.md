@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Screen readers announce which of a game panel's thumbnails is the one shown.
 - Screen readers name a game's media the same way in its panel and in the screenshot viewer ("Cover", "Trailer 1 of 2", "Screenshot 1 of 8"), instead of numbering the first screenshot after the trailers.
 - On a phone, a trailer's play, mute and seek controls are thumb-sized, a paused trailer shows a large play button, and tapping a playing trailer to bring its controls back no longer pauses it.
 - The game panel's section buttons, tags and achievement filters are tall enough to tap reliably on a phone.

@@ -1912,6 +1912,7 @@ function PanelHero(): JSX.Element {
                   type="button"
                   class={`panel-film-item${i() === idx() ? ' active' : ''}${item.type === 'video' ? ' is-video' : ''}`}
                   aria-label={mediaLabel(items(), i())}
+                  aria-current={i() === idx() ? 'true' : undefined}
                   onClick={() => setHeroIdx(i())}
                 >
                   <img class="panel-film-thumb" src={item.thumb} data-fallback={fallback} alt="" loading="lazy" />
