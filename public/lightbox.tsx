@@ -1119,6 +1119,14 @@ function renderLbCaption() {
   }
 }
 
+// Numbered within its own kind, which is what the viewer sees: the first screenshot is
+// "Screenshot 1", not its position behind the banner and the trailers.
+function mediaCounterText(list: MediaItem[], i: number): string {
+  if (list[i].shotId === 'banner') return 'Cover';
+  const sameKind = list.filter((m) => m.type === list[i].type && m.shotId !== 'banner');
+  return `${list[i].type === 'video' ? 'Trailer' : 'Screenshot'} ${sameKind.indexOf(list[i]) + 1} of ${sameKind.length}`;
+}
+
 // The actual per-shot render — deliberately kept as a plain imperative function (called from
 // inside a `createEffect` below, not decomposed into fine-grained JSX bindings) rather than
 // converted the way `panel.tsx`'s own body was. Unlike that file, there's no template shape
@@ -1226,8 +1234,7 @@ function renderLightbox() {
     full.src = shot.main!;
     schedHideLbChrome();
   }
-  lb.querySelector('.lb-counter')!.textContent =
-    `${shot.type === 'video' ? 'Trailer' : 'Screenshot'} ${i + 1} of ${list.length}`;
+  lb.querySelector('.lb-counter')!.textContent = mediaCounterText(list, i);
   lb.querySelector<HTMLButtonElement>('.lb-prev')!.disabled = list.length <= 1;
   lb.querySelector<HTMLButtonElement>('.lb-next')!.disabled = list.length <= 1;
   // Preload prev and next images so navigation feels instant; for a video,
