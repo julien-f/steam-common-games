@@ -203,7 +203,7 @@ function inRegionCurrency(amount: number, currency: string | null | undefined): 
 const COLUMNS: ColumnDef<BundleRow>[] = [
   {
     key: 'covers',
-    label: '',
+    label: 'Image',
     width: 188,
     sortable: false,
     filterable: false,

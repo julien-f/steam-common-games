@@ -1005,18 +1005,21 @@ tbody td {
   gap: 10px;
   margin-top: 10px;
 }
+/* The number sits in the item's padding rather than as a flex sibling: as one, a source's name and
+   its description each became their own flex item, wrapping the name into a narrow column. */
 .how-steps li {
   counter-increment: step;
-  display: flex;
-  gap: 12px;
-  align-items: baseline;
+  position: relative;
+  padding-left: 32px;
   font-size: 13px;
   color: var(--text1);
   line-height: 1.5;
 }
 .how-steps li::before {
   content: counter(step);
-  flex-shrink: 0;
+  position: absolute;
+  left: 0;
+  top: 0;
   width: 20px;
   height: 20px;
   border-radius: 50%;
@@ -3129,7 +3132,8 @@ body.lb-open {
 }
 .footer-link {
   color: var(--text1);
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .footer-link:hover {
   color: var(--accent2);

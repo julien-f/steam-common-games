@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- The About page's data sources line up, its GitHub link looks like a link, and the Bundles table's cover column is labelled "Image" like the other tables'.
 - Faint text people need to read — the footer, the game search's section titles and no-match message, the DLC list's "Loading more" line — meets the WCAG AA contrast minimum.
 - The About page lists ProtonDB among its data sources, where the Linux/Deck tier comes from.
 - In the screenshot viewer, ← and → step past a trailer that isn't playing (paused, not started or failed to load) instead of seeking it; they still seek one that plays.
