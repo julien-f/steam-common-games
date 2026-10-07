@@ -1307,33 +1307,6 @@ tbody tr.game-row.active {
 }
 
 @media (max-width: 768px) {
-  /* Lightbox fills the full screen — swipe handles navigation */
-  .lb-img {
-    max-width: 100vw;
-    max-height: 100%;
-    border-radius: 0;
-  }
-  .lb-btn {
-    width: 40px;
-    height: 52px;
-    font-size: 26px;
-  }
-  .lb-prev {
-    left: 4px;
-  }
-  .lb-next {
-    right: 4px;
-  }
-  /* The pointer-friendly way to change game on touch (a vertical swipe is the other) — so
-     back up to a thumb-sized target here. */
-  .lb-toolbar .lb-caption button {
-    width: 34px;
-    height: 34px;
-  }
-  .lb-caption {
-    padding: 0 44px;
-  }
-
   .container {
     padding: 18px 14px 40px;
   }
@@ -3013,6 +2986,36 @@ body.lb-open {
 }
 .lb-seek-flash--show {
   opacity: 1;
+}
+
+/* After the base .lb-* rules, or they win at equal specificity. */
+@media (max-width: 768px) {
+  /* Lightbox fills the full screen — swipe handles navigation */
+  .lb-img {
+    max-width: 100vw;
+    max-height: 100%;
+    border-radius: 0;
+  }
+  .lb-btn {
+    width: 40px;
+    height: 52px;
+    font-size: 26px;
+  }
+  .lb-prev {
+    left: 4px;
+  }
+  .lb-next {
+    right: 4px;
+  }
+  /* The pointer-friendly way to change game on touch (a vertical swipe is the other) — so
+     back up to a thumb-sized target here. */
+  .lb-toolbar .lb-caption button {
+    width: 34px;
+    height: 34px;
+  }
+  .lb-caption {
+    padding: 0 44px;
+  }
 }
 
 /* Site footer */
