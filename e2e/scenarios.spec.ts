@@ -631,6 +631,7 @@ test('F1 edge: stepping games in the lightbox on Recently Looked Up shows the ga
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('.lb-caption-text')).toHaveText('Valheim');
   await expect(page.locator('#panel-title')).toHaveText('Valheim');
+  await expect(page).toHaveURL(/\/game\/892970\?shot=banner$/);
   await expect(page.locator('#screenshot-lightbox')).toContainText('Game 3 of 3');
   expect(
     await page.evaluate(() => document.getElementById('screenshot-lightbox')!.contains(document.activeElement)),

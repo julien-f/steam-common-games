@@ -109,7 +109,7 @@ import { createRowStore } from './rowStore.ts';
 import { createStaleGuard } from './staleGuard.ts';
 import { createStreamBatcher } from './streamBatcher.ts';
 import { bindNavPopover } from './navPopover.ts';
-import { openLightbox } from './lightbox.tsx';
+import { openLightbox, isLightboxOpen } from './lightbox.tsx';
 import {
   panelOpen,
   panelClose,
@@ -1312,8 +1312,15 @@ export default function ListRoute() {
     // time this runs (right above), and load()'s fast path (see its own comment) checks the
     // panel's current game before doing anything, so the re-entry is a no-op rather than a
     // second open. Every other kind keeps the existing `?game=` contextual param instead.
-    if (kind === 'recent') navigate(withAccountParam(`/game/${resolved.appid}`), { replace: true });
-    else setPanelParam(resolved.appid);
+    if (kind === 'recent') {
+      // The router writes its target over the address only once it settles, so carry the shot of a
+      // lightbox open over the panel — deferred past this step, which re-points it at this game.
+      // `window.location`: the router's own lags behind that lightbox's replaceState.
+      queueMicrotask(() => {
+        const shot = isLightboxOpen() && new URLSearchParams(window.location.search).get('shot');
+        navigate(withAccountParam(`/game/${resolved.appid}${shot ? `?shot=${shot}` : ''}`), { replace: true });
+      });
+    } else setPanelParam(resolved.appid);
     // A `&shot=` deep link into a row whose details are already loaded (a revisit, or this
     // route's own fast path for an appid-only navigation) never reaches the post-stream replay
     // below, so try here too — restorePendingShot is a no-op when there's nothing pending or no
