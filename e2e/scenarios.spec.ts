@@ -624,6 +624,22 @@ async function fakePlayback(page: Page) {
   });
 }
 
+test('F1 edge: stepping games in the lightbox on Recently Looked Up shows the game stepped to', async ({ page }) => {
+  await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
+  await page.goto('/game/1145360?shot=s1');
+  await expect(page.locator('.lb-caption-text')).toHaveText('Hades');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.lb-caption-text')).toHaveText('Valheim');
+  await expect(page.locator('#panel-title')).toHaveText('Valheim');
+  await expect(page.locator('#screenshot-lightbox')).toContainText('Game 3 of 3');
+  expect(
+    await page.evaluate(() => document.getElementById('screenshot-lightbox')!.contains(document.activeElement)),
+  ).toBe(true);
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('.lb-caption-text')).toHaveText('Portal 2');
+});
+
 test('F1 edge: closing the lightbox leaves the panel on the last item looked at', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360');

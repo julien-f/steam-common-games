@@ -1,9 +1,14 @@
 import { test, type Page } from '@playwright/test';
-import type { Player } from './fixtures.ts';
+import { game, type Player } from './fixtures.ts';
 
 // Seeds `player` as both my ★ account and the current one, once per tab: later reloads keep
 // whatever the test did since. `withLabel: false` stores it the way an old slot was: id only.
-export async function asPlayer(page: Page, player: Player, { withLabel = true } = {}): Promise<void> {
+// `recentGames`: Recently Looked Up's appids, newest first.
+export async function asPlayer(
+  page: Page,
+  player: Player,
+  { withLabel = true, recentGames = [] as number[] } = {},
+): Promise<void> {
   const slot = {
     id: player.steamid,
     members: [player.steamid],
@@ -17,6 +22,9 @@ export async function asPlayer(page: Page, player: Player, { withLabel = true } 
     myAccount: entry(slot),
     currentAccount: entry(slot),
     recentAccounts: entry([slot]),
+    ...(recentGames.length
+      ? { recentGames: entry(recentGames.map((appid) => ({ appid, name: game(appid).name, tinyImage: null }))) }
+      : {}),
   };
   await page.addInitScript((blob) => {
     if (sessionStorage.getItem('e2e-seeded')) return;

@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On a desktop screen, trailers and large screenshots in the viewer leave room above and below for its controls instead of sitting under them.
 - With a mouse, the screenshot viewer's top line shows just the game's name; its ↑ ↓ and "Game 3 of 6" appear when you point at it or Tab to them. Touch screens keep them.
 
+### Fixed
+
+- On Recently Looked Up, stepping to another game in the screenshot viewer showed the game being left, and moved keyboard focus out of the viewer.
+
 ### Removed
 
 - The screenshot viewer's copy-link button: the address bar already holds the link to the media on screen.

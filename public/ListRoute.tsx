@@ -56,6 +56,7 @@ import {
   createMemo,
   on,
   batch,
+  untrack,
   For,
   Show,
   type JSX,
@@ -3174,7 +3175,10 @@ export default function ListRoute() {
     // from one shared link to another (no param change, since /lists/shared has none) has to be
     // read here too, or this component instance would just keep showing the first one.
     if (kind === 'shared') sharedFormulaParam();
-    load();
+    // Untracked: the reads above are the whole dependency list. load()'s fast path reads the open
+    // game, so opening another one re-ran it against the not-yet-updated `params.appid`, reopening
+    // the game being left.
+    untrack(() => load());
   });
 
   onCleanup(() => {
