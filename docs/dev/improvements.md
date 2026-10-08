@@ -58,7 +58,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Consistency and polish
 
-- **U109 · polish · F1** — every chrome control is a filled, bordered circle or box, made to read over a see-through backdrop; over the opaque one they are heavier than needed. Plain icons with a shadow.
 - **U110 · minor · F1** — on desktop a trailer fills the whole viewport, so the toolbar and its control bar sit on the picture, while a screenshot keeps a margin for them. Give a trailer the same margins.
 - **U111 · polish · F1** — "↑ Hades Game 3 of 6 ↓" is always on, though looking at one game's media is the usual case. On desktop show the name alone, with the stepper and list position on hover or focus; keyboard and vertical swipe keep working, and a phone keeps the ↑↓, its pointer way to change game.
 
