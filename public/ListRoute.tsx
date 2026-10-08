@@ -560,9 +560,9 @@ function bindSolidViewPersistence(
 
 export default function ListRoute() {
   const params = useParams();
-  const location = useLocation();
+  const routerLocation = useLocation();
   const navigate = useNavigate();
-  const kind = kindFromPath(location.pathname, params);
+  const kind = kindFromPath(routerLocation.pathname, params);
 
   let tableContainer!: HTMLDivElement;
   // A comparison's players who own each game, for the panel's Owned by (getOwners below).
@@ -949,7 +949,7 @@ export default function ListRoute() {
   const [sharedSynthetic, setSharedSynthetic] = createSignal<Map<string, GameList>>(new Map());
   // A memo, so the load effect re-runs on a new formula only — not on Back dropping `?game=`
   // (overlayHistory.ts), which changes the rest of the query string.
-  const sharedFormulaParam = createMemo(() => new URLSearchParams(location.search).get('f'));
+  const sharedFormulaParam = createMemo(() => new URLSearchParams(routerLocation.search).get('f'));
   function sharedFetchers(base: ListResolveFetchers): ListResolveFetchers {
     return { ...base, getList: (id) => sharedSynthetic().get(id) ?? base.getList(id) };
   }
@@ -1048,9 +1048,9 @@ export default function ListRoute() {
   const combineList = (): GameList | null => userList() ?? compareList();
   // The comparison currently in the URL. Read reactively (not captured), so editing the players
   // re-runs the load effect below without a remount.
-  const compareSlots = (): string[][] => normalizeSlots(parseUrlState(location.search).slots);
+  const compareSlots = (): string[][] => normalizeSlots(parseUrlState(routerLocation.search).slots);
   function compareOp(): CombineOp {
-    const raw = new URLSearchParams(location.search).get('op');
+    const raw = new URLSearchParams(routerLocation.search).get('op');
     return raw && raw in OP_LABELS ? (raw as CombineOp) : (DEFAULT_COMPARE_OP as CombineOp);
   }
   // The comparison a load has already done, in both spellings of it — see load()'s own guard.
@@ -1315,7 +1315,7 @@ export default function ListRoute() {
     if (kind === 'recent') {
       // The router writes its target over the address only once it settles, so carry the shot of a
       // lightbox open over the panel — deferred past this step, which re-points it at this game.
-      // `window.location`: the router's own lags behind that lightbox's replaceState.
+      // Not `routerLocation`: it lags behind that lightbox's replaceState.
       queueMicrotask(() => {
         const shot = isLightboxOpen() && new URLSearchParams(window.location.search).get('shot');
         navigate(withAccountParam(`/game/${resolved.appid}${shot ? `?shot=${shot}` : ''}`), { replace: true });
@@ -1822,7 +1822,7 @@ export default function ListRoute() {
     if (list) {
       table.setViewState({});
       setListTableView(list.id, {});
-      const urlParams = new URLSearchParams(location.search);
+      const urlParams = new URLSearchParams(routerLocation.search);
       urlParams.delete(viewParamName());
       history.replaceState(null, '', urlWithParams(urlParams));
     } else {
@@ -2012,7 +2012,7 @@ export default function ListRoute() {
       const canonicalSlots = normalizeSlots(accounts.map((a) => a.members));
       const canonical = compareUrl(canonicalSlots, compareOp());
       loadedCompareKeys.add(`${compareOp()}|${canonicalSlots.map((slot) => slot.join(',')).join('|')}`);
-      if (canonical !== location.pathname + location.search) navigate(canonical, { replace: true });
+      if (canonical !== routerLocation.pathname + routerLocation.search) navigate(canonical, { replace: true });
 
       const list: GameList = {
         id: '',
@@ -2483,12 +2483,12 @@ export default function ListRoute() {
     // URL (setPanelParam), and this route re-runs load() for reasons of its own (an appid-only
     // navigation, an account change) — a later pass reading the by-then-stripped URL would
     // otherwise wipe a value the first pass hasn't replayed yet. Cleared only by the replay.
-    const shotParam = new URLSearchParams(location.search).get('shot');
+    const shotParam = new URLSearchParams(routerLocation.search).get('shot');
     if (shotParam) pendingShot = shotParam;
     if (kind === 'recent') {
       if (params.appid) openOrAddRecentGame(Number(params.appid));
     } else {
-      const gameParam = new URLSearchParams(location.search).get('game');
+      const gameParam = new URLSearchParams(routerLocation.search).get('game');
       if (gameParam) {
         const focusAppid = Number(gameParam);
         const existing = rowStore.getRow(focusAppid);
@@ -2621,7 +2621,7 @@ export default function ListRoute() {
       { kind: 'account-owned', accountId: account.id },
     ];
     const result = encodeListFormula({ op: 'subtract', sources }, () => undefined);
-    return result.ok ? withAccountParam(shareListUrl(result.formula), location.search) : null;
+    return result.ok ? withAccountParam(shareListUrl(result.formula), routerLocation.search) : null;
   }
   // The selection under the names Fanatical's page shows, for "Buy on Fanatical"; `byHand` are the
   // picks matchPickAndMix couldn't name.
