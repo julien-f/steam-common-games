@@ -58,7 +58,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Consistency and polish
 
-- **U110 · minor · F1** — on desktop a trailer fills the whole viewport, so the toolbar and its control bar sit on the picture, while a screenshot keeps a margin for them. Give a trailer the same margins.
 - **U111 · polish · F1** — "↑ Hades Game 3 of 6 ↓" is always on, though looking at one game's media is the usual case. On desktop show the name alone, with the stepper and list position on hover or focus; keyboard and vertical swipe keep working, and a phone keeps the ↑↓, its pointer way to change game.
 
 - **U101 · polish** — every table shows a "Page 1 of 1" pager with all buttons disabled when everything fits. Needs an upstream change: hide the pager when there's a single page (an option or the default in `@vates/data-table-solid`, vatesfr/data-table#41).

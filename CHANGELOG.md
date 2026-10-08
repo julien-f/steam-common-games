@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Stepping through media in the screenshot viewer, with the arrow keys or a swipe, no longer brings back its hidden controls: only the counter shows for a moment. A tap or Tab still brings them back.
 - Once the screenshot viewer's controls have hidden, moving the mouse brings back only those near it: the top bar near the top, an arrow near its edge, a trailer's controls near the bottom.
 - The screenshot viewer's buttons are bare icons rather than filled circles and boxes.
+- On a desktop screen, trailers and large screenshots in the viewer leave room above and below for its controls instead of sitting under them.
 
 ### Removed
 

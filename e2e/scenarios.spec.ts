@@ -807,6 +807,21 @@ test("F1 edge: the viewer's toolbar holds only fullscreen, zoom and close", asyn
   ]);
 });
 
+test('F1 edge: on desktop, a trailer sits between the toolbar and its controls, not under them', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop layout');
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  await page.getByRole('button', { name: 'Play trailer' }).click();
+  const video = (await page.locator('#screenshot-lightbox .lb-video').boundingBox())!;
+  const toolbar = (await page.locator('.lb-toolbar').boundingBox())!;
+  const controls = (await page.locator('.lb-vctrls').boundingBox())!;
+  expect(video.y).toBeGreaterThanOrEqual(toolbar.y + toolbar.height);
+  expect(video.y + video.height).toBeLessThanOrEqual(controls.y);
+});
+
 test('F1 edge: nothing of the page shows around the media', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');

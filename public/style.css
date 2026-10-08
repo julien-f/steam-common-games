@@ -3088,6 +3088,17 @@ body.lb-open {
   display: none;
 }
 
+/* Room for the toolbar above the media and a trailer's controls below it, so neither sits on the
+   picture — where the screen is tall enough to spare it (not a phone turned landscape). */
+@media (min-width: 769px) and (min-height: 600px) {
+  .lb-img {
+    max-height: calc(100vh - 128px);
+  }
+  .lb-video {
+    height: calc(100vh - 128px);
+  }
+}
+
 /* After the base .lb-* rules, or they win at equal specificity. */
 @media (max-width: 768px) {
   /* Lightbox fills the full screen */
