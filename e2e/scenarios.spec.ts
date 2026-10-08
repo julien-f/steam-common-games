@@ -640,6 +640,29 @@ test('F1 edge: stepping games in the lightbox on Recently Looked Up shows the ga
   await expect(page.locator('.lb-caption-text')).toHaveText('Portal 2');
 });
 
+for (const [route, next] of [
+  ['/lists/owned?game=1145360', { name: 'Terraria', url: /\/lists\/owned\?game=105600$/ }],
+  ['/game/1145360', { name: 'Valheim', url: /\/game\/892970$/ }],
+] as const) {
+  test(`F1 edge: closing the lightbox after stepping games keeps the game stepped to (${route.split('/')[1]})`, async ({
+    page,
+  }) => {
+    await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
+    await page.goto(route);
+    for (const close of ['button', 'back'] as const) {
+      await page.getByRole('button', { name: 'Open in lightbox' }).click();
+      await page.keyboard.press(close === 'button' ? 'ArrowDown' : 'ArrowUp');
+      await expect(page.locator('#panel-title')).toHaveText(close === 'button' ? next.name : 'Hades');
+      if (close === 'button') await page.getByRole('button', { name: 'Close lightbox' }).click();
+      else await page.goBack();
+      await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/\bopen\b/);
+      await expect(page.locator('#panel-title')).toHaveText(close === 'button' ? next.name : 'Hades');
+      if (close === 'button') await expect(page).toHaveURL(next.url);
+      else await expect(page).toHaveURL(new RegExp(`${route.replace('?', '\\?')}$`));
+    }
+  });
+}
+
 test('F1 edge: closing the lightbox leaves the panel on the last item looked at', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360');

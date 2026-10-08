@@ -1064,7 +1064,7 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
   // (↑/↓ — see AppShell's onGameNav), and capturing focus again there would remember an element
   // inside the lightbox itself, so closing would restore focus to something already hidden.
   if (!isLightboxOpen()) _lbPrevFocus = document.activeElement;
-  pushOverlayEntry('lightbox', closeLightbox, urlWithoutShot());
+  pushOverlayEntry('lightbox', closeLightbox, urlWithoutShot);
   const newShots = buildMediaItems(game.appid, game.details?.meta);
   // Batched: setLbGame alone would otherwise let the render effect below run once with the new
   // game's (possibly shorter) media list but the previous game's stale idx, indexing past the

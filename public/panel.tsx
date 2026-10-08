@@ -661,7 +661,7 @@ export function panelOpen(game: ReadonlyGame) {
   const isHop = pendingHopAppid === game.appid;
   pendingHopAppid = null;
   if (!isHop) setPanelHistory([]);
-  pushOverlayEntry('panel', () => panelClose(), urlWithoutPanel());
+  pushOverlayEntry('panel', () => panelClose(), urlWithoutPanel);
   setPanelGame(game);
   setHeroIdx(0);
   setMoreLinksOpen(false);

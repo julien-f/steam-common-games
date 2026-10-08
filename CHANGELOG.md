@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 
 - On Recently Looked Up, stepping to another game in the screenshot viewer showed the game being left, and moved keyboard focus out of the viewer.
+- Closing the screenshot viewer after stepping to another game went back to the game it was opened on: the panel switched back on Recently Looked Up, and the address did on other lists.
 
 ### Removed
 

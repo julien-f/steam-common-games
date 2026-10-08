@@ -79,17 +79,17 @@ export function setLightboxParam(idx: number | string | null): void {
 // The addresses Back returns to from the panel's and the lightbox's own history entries
 // (overlayHistory.ts): the page with that overlay closed. Recently Looked Up names its game in the
 // path (`/game/:appid`) rather than in `?game=`.
-export function urlWithoutPanel(): string {
-  const params = new URLSearchParams(location.search);
+export function urlWithoutPanel(url: Location | URL = location): string {
+  const params = new URLSearchParams(url.search);
   params.delete('game');
   params.delete('shot');
-  return urlWithParams(params, location.pathname.replace(/^\/game\/\d+$/, '/game'));
+  return urlWithParams(params, url.pathname.replace(/^\/game\/\d+$/, '/game'));
 }
 
-export function urlWithoutShot(): string {
-  const params = new URLSearchParams(location.search);
+export function urlWithoutShot(url: Location | URL = location): string {
+  const params = new URLSearchParams(url.search);
   params.delete('shot');
-  return urlWithParams(params);
+  return urlWithParams(params, url.pathname);
 }
 
 // `/search`'s own live search box writes its term here as the user types (debounced by the
