@@ -2722,7 +2722,7 @@ body.lb-open {
 #screenshot-lightbox.lb-idle.lb-near-right .lb-next {
   opacity: 1;
 }
-#screenshot-lightbox.lb-idle.lb-near-top :is(.lb-toolbar-left, .lb-toolbar-right),
+#screenshot-lightbox.lb-idle.lb-near-top :is(.lb-caption, .lb-toolbar-left, .lb-toolbar-right),
 #screenshot-lightbox.lb-idle.lb-near-bottom .lb-vctrls,
 #screenshot-lightbox.lb-idle.lb-near-left .lb-prev,
 #screenshot-lightbox.lb-idle.lb-near-right .lb-next {
@@ -2849,6 +2849,18 @@ body.lb-open {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
   min-width: 0;
   order: 1; /* between the left buttons and the counter, which .lb-toolbar-row lends the toolbar */
+  pointer-events: auto; /* hoverable: it reveals the game stepper below */
+}
+/* Browsing one game's media is the usual case: with a mouse, the list stepper and position show
+   only on hover or focus. Faded rather than hidden, so Tab still reaches the buttons and the name
+   doesn't shift. Touch keeps them, its pointer way to change game. */
+@media (hover: hover) {
+  .lb-caption :is(.lb-game-prev, .lb-game-next, .lb-caption-pos) {
+    transition: opacity 0.15s;
+  }
+  .lb-caption:not(:hover, :focus-within) :is(.lb-game-prev, .lb-game-next, .lb-caption-pos) {
+    opacity: 0;
+  }
 }
 .lb-caption-text {
   white-space: nowrap;

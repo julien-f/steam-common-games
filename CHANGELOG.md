@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Once the screenshot viewer's controls have hidden, moving the mouse brings back only those near it: the top bar near the top, an arrow near its edge, a trailer's controls near the bottom.
 - The screenshot viewer's buttons are bare icons rather than filled circles and boxes.
 - On a desktop screen, trailers and large screenshots in the viewer leave room above and below for its controls instead of sitting under them.
+- With a mouse, the screenshot viewer's top line shows just the game's name; its ↑ ↓ and "Game 3 of 6" appear when you point at it or Tab to them. Touch screens keep them.
 
 ### Removed
 
