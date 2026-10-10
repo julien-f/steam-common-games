@@ -256,6 +256,43 @@ test('resolveSteamAppIds: still resolves to null when neither the Steam expansio
   assert.equal(result.get('gid-sub-only'), null);
 });
 
+test('resolveSteamAppIds: runs at most 3 games/info/v2 fallbacks at once', async (t) => {
+  _reset();
+  const gids = Array.from({ length: 10 }, (_, i) => `gid-sub-${i}`);
+  const base = makeResolveFetch({
+    shopEntries: Object.fromEntries(gids.map((g, i) => [g, [`sub/${i}`]])),
+    steam: Object.fromEntries(gids.map((_, i) => [`sub/${i}`, { success: false }])),
+  });
+  let inFlight = 0;
+  let maxInFlight = 0;
+  t.mock.method(globalThis, 'fetch', async (url, opts) => {
+    if (!String(url).includes('/games/info/')) return base(url, opts);
+    maxInFlight = Math.max(maxInFlight, ++inFlight);
+    await new Promise((r) => setTimeout(r, 10));
+    inFlight--;
+    return base(url, opts);
+  });
+  await resolveSteamAppIds(gids);
+  assert.ok(maxInFlight <= 3, `${maxInFlight} at once`);
+});
+
+test('resolveSteamAppIds: a games/info/v2 fallback that errored is not cached as "not on Steam"', async (t) => {
+  _reset();
+  const base = makeResolveFetch({
+    shopEntries: { 'gid-sub-only': ['sub/1234'] },
+    steam: { 'sub/1234': { success: false } },
+  });
+  let infoCalls = 0;
+  t.mock.method(globalThis, 'fetch', async (url, opts) => {
+    if (!String(url).includes('/games/info/')) return base(url, opts);
+    infoCalls++;
+    return { ok: false, status: 500 };
+  });
+  assert.equal((await resolveSteamAppIds(['gid-sub-only'])).get('gid-sub-only'), null);
+  await resolveSteamAppIds(['gid-sub-only']);
+  assert.equal(infoCalls, 2, 'retried on the next resolve');
+});
+
 test('resolveSteamAppIds: a failed Steam-side expansion falls back to games/info/v2 rather than throwing', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async (url, opts) => {
