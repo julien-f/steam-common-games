@@ -79,12 +79,18 @@ export function createPanelDataCache() {
   function isItadConfigured(): Promise<boolean> {
     if (!itadConfiguredPromise) {
       itadConfiguredPromise = fetch('/api/health')
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
         .then((d) => {
           itadOff = !d.itadConfigured;
           return !!d.itadConfigured;
         })
-        .catch(() => false);
+        .catch(() => {
+          itadConfiguredPromise = null; // asked again next time, rather than "off" for the session
+          return false;
+        });
     }
     return itadConfiguredPromise;
   }
@@ -184,8 +190,7 @@ export function createPanelDataCache() {
       price.set(appid, fields);
       return fields;
     } catch {
-      // "No pricing data available." rather than a stuck loading skeleton, same fallback the
-      // list-level price loaders use for a failed batch (see priceLoading.ts).
+      // "IsThereAnyDeal didn't answer" rather than a stuck loading skeleton; the panel's ↻ retries.
       price.set(appid, null);
       return null;
     }

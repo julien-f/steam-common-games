@@ -1537,7 +1537,13 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
             <Show
               when={deal()}
               fallback={
-                <div class="panel-no-data">{isItadOff() ? PRICES_UNAVAILABLE : 'No pricing data available.'}</div>
+                <div class="panel-no-data">
+                  {isItadOff()
+                    ? PRICES_UNAVAILABLE
+                    : p() === null
+                      ? "IsThereAnyDeal didn't answer."
+                      : 'No pricing data available.'}
+                </div>
               }
             >
               <Show
