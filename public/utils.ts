@@ -248,6 +248,14 @@ export function countryFlag(code: string | null | undefined): string {
   return [...code.toUpperCase()].map((c) => String.fromCodePoint(REGIONAL_INDICATOR_A + c.charCodeAt(0) - 65)).join('');
 }
 
+// Folds one more fetch's age into a readout built from several (pages, accounts): the oldest wins,
+// since that's the staleness on screen, and a fresh fetch (null) counts as now rather than winning
+// outright, or one fresh source would hide days-old ones behind "just now".
+export function oldestFetchedAt(prev: number | null | undefined, at: number | null, now: number = Date.now()): number {
+  const t = at ?? now;
+  return prev == null ? t : Math.min(prev, t);
+}
+
 // "how long ago was this fetched", for the "Updated <when>" readouts next to the app's ↻ Refresh
 // buttons. Deliberately coarse — the point is "is what I'm looking at from today or from last
 // month", not a precise duration — and it never says "in the future" for a small clock skew

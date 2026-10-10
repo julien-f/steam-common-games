@@ -13,7 +13,6 @@ Last audited: simplify 2026-10-10 · security 2026-10-10 · perf 2026-10-10 · r
 
 ## Simplify
 
-- **C3 · minor · S** — the two `noteFetchedAt` copies disagree: `public/BundlesBrowseRoute.tsx:366` depends on page order (pages [3 d, fresh, 1 h] end at "1h ago", understating page 1's age); `public/ListRoute.tsx:588` keeps the minimum correctly. Share ListRoute's rule as one helper.
 - **C4 · cleanup · S** — exports only their own tests call: `foldStr`, `renderScoreCell`, `renderMainCell`, `renderExtraCell` (`public/utils.ts:270-292`), `fetchAccountOwnedAppids` (`public/accountData.ts:211`), `nullAllPriceFields` (`public/priceLoading.ts:79`, named in frontend.md), `removeRecentGame` (`public/recentGames.ts:62`), `getFolder` (`public/listsStore.ts:75`). Delete with their tests and doc mentions.
 - **C5 · cleanup · S** — `reorderSiblings` and `restoreList` (`public/listsStore.ts:242, 422`) and `restoreRecentAccount` (`public/accountsStore.ts:194`) back a trash/drag-and-drop UI never built (`HomeRoute.tsx:11`: "ready for it, just not surfaced"). Delete with their tests; re-add with the UI. Judgment call.
 - **C7 · cleanup · S** — two `/api/health` probes derive `itadConfigured` (`public/panelData.ts:79`, `public/ListRoute.tsx:1597`, the latter on every mount, each counting every cache table). One memoized shared `isItadConfigured()`.

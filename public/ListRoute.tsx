@@ -92,6 +92,7 @@ import {
   fmtLastPlayed,
   formatMoney,
   hoursFromMinutes,
+  oldestFetchedAt,
   scoreColor,
 } from './utils.ts';
 import {
@@ -580,13 +581,9 @@ export default function ListRoute() {
   // `undefined` = this list has no server-cached data age to state at all (nothing loaded yet,
   // a manual list, the recent list) — which is not the same as `null`, "fetched fresh just now".
   const [fetchedAt, setFetchedAt] = createSignal<number | null | undefined>(undefined);
-  // A comparison/dynamic list is built from several account fetches, each with its own age:
-  // report the *oldest*, since that's the staleness the reader is actually exposed to. A `null`
-  // (fetched fresh for this request) counts as now rather than winning outright, or one fresh
-  // source would hide three-day-old ones behind a reassuring "just now".
+  // A comparison/dynamic list is built from several account fetches, each with its own age.
   function noteFetchedAt(at: number | null): void {
-    const t = at ?? Date.now();
-    setFetchedAt((prev) => (prev === undefined || prev === null ? t : Math.min(prev, t)));
+    setFetchedAt((prev) => oldestFetchedAt(prev, at));
   }
   const [refreshing, setRefreshing] = createSignal(false);
   // The Prices tile's own refresh (wishlist/bundle kinds). Deliberately one control

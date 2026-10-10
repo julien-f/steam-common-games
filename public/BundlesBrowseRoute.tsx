@@ -40,7 +40,7 @@ import {
   priceTierBucket,
   formatPriceTier,
 } from './gameColumns.ts';
-import { fmtAge, formatMoney, scoreColor } from './utils.ts';
+import { fmtAge, formatMoney, oldestFetchedAt, scoreColor } from './utils.ts';
 import {
   toBundleRow,
   fmtBundleDateTime,
@@ -356,12 +356,11 @@ export default function BundlesBrowseRoute() {
   // including whatever filter/sort/search the user has applied here.
   createEffect(() => setBrowsedBundles(table.processedData().map((b) => ({ id: b.id, title: b.title }))));
 
-  // Oldest page write time across this load (a load pulls several pages), null once any page was
-  // fetched fresh; undefined = nothing loaded yet, which renders no readout rather than a
-  // premature "just now".
+  // Oldest page write time across this load (a load pulls several pages); undefined = nothing
+  // loaded yet, which renders no readout rather than a premature "just now".
   const [fetchedAt, setFetchedAt] = createSignal<number | null | undefined>(undefined);
   function noteFetchedAt(at: number | null): void {
-    setFetchedAt((prev) => (prev === undefined || at === null || prev === null ? at : Math.min(prev, at)));
+    setFetchedAt((prev) => oldestFetchedAt(prev, at));
   }
 
   async function fetchPage(force = false): Promise<BundleListItem[]> {

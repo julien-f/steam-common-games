@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The game panel's Achievements card says when Steam didn't answer for achievement rarity, instead of just leaving the percentages out
 - Sharing a table whose layout you haven't changed no longer tells the recipient it uses a shared layout
 - An account you remove from Home's Recent accounts while a list still uses it is now cleared for good once no list uses it, instead of staying hidden and synced forever
+- The Bundles page's Updated age now states its oldest page's age, instead of sometimes understating it when one page was fetched fresh
 
 ### Development
 

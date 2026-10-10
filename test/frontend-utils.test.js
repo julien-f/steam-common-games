@@ -19,6 +19,7 @@ const {
   computeProductionTier,
   dealRecordTier,
   fmtAge,
+  oldestFetchedAt,
   isTextEntry,
 } = require('../public/utils.ts');
 
@@ -384,6 +385,16 @@ test('dealRecordTier: <= not < — a price equal to the historical low still cou
 test('dealRecordTier: a missing individual low is skipped in favor of a matching one further down the list', () => {
   const rec = dealRecordTier(20, { lowAll: null, lowY1: null, lowM3: 20 });
   assert.equal(rec.tier, '3mo');
+});
+
+// ── oldestFetchedAt ───────────────────────────────────────────────────────────
+
+test('oldestFetchedAt: keeps the oldest age, a fresh fetch counting as now', () => {
+  const now = 1_700_000_000_000;
+  const pages = [now - 3 * 86_400_000, null, now - 3_600_000];
+  const age = pages.reduce((prev, at) => oldestFetchedAt(prev, at, now), undefined);
+  assert.equal(age, now - 3 * 86_400_000);
+  assert.equal(oldestFetchedAt(undefined, null, now), now);
 });
 
 // ── fmtAge ────────────────────────────────────────────────────────────────────
