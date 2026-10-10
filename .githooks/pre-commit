@@ -4,40 +4,8 @@ set -e
 # Whitespace errors and leftover conflict markers in what's being committed.
 git diff --cached --check
 
-# npm run check's steps, in parallel; typecheck, lint and the mocked e2e suite only when
-# something they cover is staged.
-ui='^(public|e2e)/|^(playwright\.config\.ts|vite\.config\.js|tsconfig[^/]*\.json|eslint\.config\.[^/]*|package(-lock)?\.json)$'
-tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
-
-run() {
-  name=$1
-  shift
-  (
-    if "$@" >"$tmp/$name.log" 2>&1; then :; else echo "$name" >>"$tmp/failed"; fi
-  ) &
-}
-
-run format npm run -s format:check
-# An amend's commit is HEAD~1..index, not HEAD..index; only git's arguments say which it is.
+# npm run check's steps against the staged commit (scripts/check.js). An amend's commit is
+# HEAD~1..index, not HEAD..index; only git's arguments say which it is.
 base=HEAD
 ps -o args= -p $PPID | grep -q -- '--amend' && base=HEAD~1
-run changelog npm run -s check:changelog -- --staged=$base
-run doc-refs npm run -s check:doc-refs
-run journeys npm run -s check:journeys
-NODE_OPTIONS=--test-reporter=dot run test npm run -s test
-if git diff --cached --name-only | grep -qE "$ui"; then
-  run typecheck npm run -s typecheck
-  run lint npm run -s lint
-  run css npm run -s check:css
-  run e2e npm run -s test:e2e -- --reporter=dot
-fi
-wait
-
-if [ -s "$tmp/failed" ]; then
-  while read -r name; do
-    echo "── $name failed ──"
-    cat "$tmp/$name.log"
-  done <"$tmp/failed"
-  exit 1
-fi
+node scripts/check.js --staged=$base
