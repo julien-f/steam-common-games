@@ -167,6 +167,21 @@ test('resolveSteamAppIds: resolves, caches, and treats a missing mapping as null
   assert.equal(fetchCalls, callsBefore, 'both gids should now be cached individually');
 });
 
+test('resolveSteamAppIds: looks gids up in batches of at most 200', async (t) => {
+  _reset();
+  const sizes = [];
+  t.mock.method(globalThis, 'fetch', async (url, opts) => {
+    if (String(url).includes('/service/shops/')) return { ok: true, json: async () => SHOPS };
+    const gids = JSON.parse(opts.body);
+    sizes.push(gids.length);
+    return { ok: true, json: async () => Object.fromEntries(gids.map((g) => [g, ['app/1']])) };
+  });
+  const gids = Array.from({ length: 450 }, (_, i) => `gid-${i}`);
+  const result = await resolveSteamAppIds(gids);
+  assert.deepEqual(sizes, [200, 200, 50]);
+  assert.equal(result.size, 450);
+});
+
 // Mocks the three-domain fetch graph resolveSteamAppIds' fallbacks can reach: ITAD's shop
 // lookup (`shopEntries`, keyed by gid), Steam's packagedetails/ajaxresolvebundles (`steam`,
 // keyed by "sub/<id>"/"bundle/<id>"), and ITAD's games/info/v2 (`info`, keyed by gid) —
