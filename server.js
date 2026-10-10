@@ -96,6 +96,17 @@ const rateLimitBypassed = () => process.env.NODE_ENV === 'test' && process.env.R
 
 const isForceRefresh = (req) => req.query.refresh === '1' || req.query.refresh === 'true';
 
+// /api/bundles' query, shared with bundlesListLimit's skip so both compute the same cache key.
+function parseBundlesQuery(req) {
+  return {
+    country: parseCountry(req),
+    offset: Math.max(0, Number(req.query.offset) || 0),
+    limit: Math.min(50, Math.max(1, Number(req.query.limit) || 20)),
+    sort: typeof req.query.sort === 'string' && req.query.sort ? req.query.sort : '-publish',
+    expired: req.query.expired === '1' || req.query.expired === 'true',
+  };
+}
+
 // Used by searchLimit's skip below (a raw Steam64 id needs no resolve: cache check at all,
 // same short-circuit resolveSteamId itself uses) and by achievementsLimit's further down.
 const STEAM64_RE = /^7656119\d{10}$/;
@@ -483,12 +494,7 @@ const bundlesListLimit = namedRateLimit('bundlesList', {
   skip: (req) => {
     if (rateLimitBypassed()) return true;
     if (isForceRefresh(req)) return false; // force-refresh always re-fetches, so it must always count
-    const country = parseCountry(req);
-    const offset = Math.max(0, Number(req.query.offset) || 0);
-    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
-    const sort = typeof req.query.sort === 'string' && req.query.sort ? req.query.sort : '-publish';
-    const expired = req.query.expired === '1' || req.query.expired === 'true';
-    return getCached(bundlesCacheKey({ country, offset, limit, sort, expired })) !== undefined;
+    return getCached(bundlesCacheKey(parseBundlesQuery(req))) !== undefined;
   },
 });
 
@@ -878,11 +884,7 @@ app.get('/api/bundles', bundlesListLimit, async (req, res) => {
   if (!isItadConfigured()) {
     return res.status(503).json({ error: ITAD_UNAVAILABLE });
   }
-  const country = parseCountry(req);
-  const offset = Math.max(0, Number(req.query.offset) || 0);
-  const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
-  const sort = typeof req.query.sort === 'string' && req.query.sort ? req.query.sort : '-publish';
-  const expired = req.query.expired === '1' || req.query.expired === 'true';
+  const { country, offset, limit, sort, expired } = parseBundlesQuery(req);
   try {
     // ?refresh=1 backs the browse page's own "↻ Refresh" — a bundle can go live or expire at any
     // time, so "the list I'm looking at is out of date" needs an answer that isn't "wait out the
