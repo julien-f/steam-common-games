@@ -25,7 +25,7 @@ The smallest change that closes the item, following CLAUDE.md's code conventions
 
 ## 3. Close and commit
 
-- Remove the item from code-backlog.md, or narrow it to what's left and say so.
+- Remove the item from code-backlog.md, or narrow it to what's left and say so; a section left empty reads `None open.` (Prettier rejects an empty one).
 - Then CLAUDE.md's Development workflow and Changelog; the commit body names `C<n>`.
 
 ## Report
