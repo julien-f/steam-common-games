@@ -12,7 +12,7 @@ const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 const rateLimit = require('express-rate-limit');
 
-const { getCached, getCachedAt, capExpiry, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
+const { getCached, getCachedAt, isCached, capExpiry, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
 const { getMetrics, recordLimiterTrip } = require('./lib/metrics');
 const { getCircuitBreakers } = require('./lib/circuitBreaker');
@@ -276,7 +276,7 @@ const searchLimit = namedRateLimit('search', {
         resolvedIds.add(id);
         continue;
       }
-      const hit = getCached(`resolve:${id}`);
+      const hit = getCached(`resolve:${id}`, { record: false });
       if (hit === undefined) return false;
       resolvedIds.add(hit);
     }
@@ -285,8 +285,8 @@ const searchLimit = namedRateLimit('search', {
     // is just getPlayerSummaries + getOwnedGames (common-games) or getWishlist (wishlist) per
     // id, mirroring their own cache keys.
     for (const id of resolvedIds) {
-      if (getCached(`player:${id}`) === undefined) return false;
-      if (isWishlist ? getCached(`wishlist:${id}`) === undefined : getCached(`games:${id}`) === undefined) return false;
+      if (!isCached(`player:${id}`)) return false;
+      if (isWishlist ? !isCached(`wishlist:${id}`) : !isCached(`games:${id}`)) return false;
     }
     return true;
   },
@@ -319,13 +319,13 @@ const friendsLimit = namedRateLimit('friends', {
         resolvedIds.add(id);
         continue;
       }
-      const hit = getCached(`resolve:${id}`);
+      const hit = getCached(`resolve:${id}`, { record: false });
       if (hit === undefined) return false;
       resolvedIds.add(hit);
     }
 
     for (const id of resolvedIds) {
-      if (getCached(`friends:${id}`) === undefined) return false;
+      if (!isCached(`friends:${id}`)) return false;
     }
     return true;
   },
@@ -346,11 +346,11 @@ const detailsLimit = namedRateLimit('details', {
     const appid = Number(req.params.appid);
     if (!Number.isInteger(appid) || appid <= 0) return false;
     return (
-      getCached(`rating:${appid}`) !== undefined &&
-      getCached(`hltb:${appid}`) !== undefined &&
-      getCached(`meta:${appid}`) !== undefined &&
-      getCached(`browse:${appid}`) !== undefined &&
-      getCached(`protondb:${appid}`) !== undefined
+      isCached(`rating:${appid}`) &&
+      isCached(`hltb:${appid}`) &&
+      isCached(`meta:${appid}`) &&
+      isCached(`browse:${appid}`) &&
+      isCached(`protondb:${appid}`)
     );
   },
 });
@@ -366,7 +366,7 @@ const metaLimit = namedRateLimit('meta', {
   skip: (req) => {
     if (rateLimitBypassed()) return true;
     const appid = Number(req.params.appid);
-    return Number.isInteger(appid) && appid > 0 && getCached(`meta:${appid}`) !== undefined;
+    return Number.isInteger(appid) && appid > 0 && isCached(`meta:${appid}`);
   },
 });
 
@@ -388,7 +388,7 @@ const newsLimit = namedRateLimit('news', {
     if (isForceRefresh(req)) return false;
     const appid = Number(req.params.appid);
     if (!Number.isInteger(appid) || appid <= 0) return false;
-    return getCached(`news:${appid}`) !== undefined;
+    return isCached(`news:${appid}`);
   },
 });
 
@@ -409,7 +409,7 @@ const gameSearchLimit = namedRateLimit('gameSearch', {
     if (rateLimitBypassed()) return true;
     const term = normalizeSearchTerm(req.query.q);
     if (term.length < 2) return true; // no upstream call happens below this length
-    return getCached(`search:${term}`) !== undefined;
+    return isCached(`search:${term}`);
   },
 });
 
@@ -428,8 +428,8 @@ const achievementsLimit = namedRateLimit('achievements', {
     if (isForceRefresh(req)) return false;
     const appid = Number(req.params.appid);
     if (!Number.isInteger(appid) || appid <= 0) return false;
-    if (getCached(`schema:${appid}`) === undefined) return false;
-    if (getCached(`achrarity:${appid}`) === undefined) return false;
+    if (!isCached(`schema:${appid}`)) return false;
+    if (!isCached(`achrarity:${appid}`)) return false;
     const ids = (req.query.steamids || '')
       .split(',')
       .map((s) => s.trim())
@@ -437,7 +437,7 @@ const achievementsLimit = namedRateLimit('achievements', {
     // No steamids at all (a standalone lookup with no player loaded) only ever needed
     // schema+rarity above, both already confirmed cached — nothing left to check.
     if (!ids.length) return true;
-    return ids.every((id) => STEAM64_RE.test(id) && getCached(`playerach:${id}:${appid}`) !== undefined);
+    return ids.every((id) => STEAM64_RE.test(id) && isCached(`playerach:${id}:${appid}`));
   },
 });
 
@@ -496,7 +496,7 @@ const bundlesListLimit = namedRateLimit('bundlesList', {
   skip: (req) => {
     if (rateLimitBypassed()) return true;
     if (isForceRefresh(req)) return false; // force-refresh always re-fetches, so it must always count
-    return getCached(bundlesCacheKey(parseBundlesQuery(req))) !== undefined;
+    return isCached(bundlesCacheKey(parseBundlesQuery(req)));
   },
 });
 
@@ -520,7 +520,7 @@ const bundlesResolveLimit = namedRateLimit('bundlesResolve', {
     const gids = req.body.gids;
     if (!Array.isArray(gids) || gids.length === 0) return false; // let the route's own validation reject it
     // Mirrors resolveSteamAppIds' own per-gid cache key (lib/itad.js).
-    return gids.every((gid) => typeof gid === 'string' && getCached(`itad-appid:${gid}`) !== undefined);
+    return gids.every((gid) => typeof gid === 'string' && isCached(`itad-appid:${gid}`));
   },
 });
 
@@ -537,15 +537,15 @@ const pricesLimit = namedRateLimit('prices', {
     const { gids, appids } = req.body;
     const country = parseCountry(req);
     if (Array.isArray(gids) && gids.length > 0) {
-      return gids.every((gid) => typeof gid === 'string' && getCached(`itad-price:${country}:${gid}`) !== undefined);
+      return gids.every((gid) => typeof gid === 'string' && isCached(`itad-price:${country}:${gid}`));
     }
     if (Array.isArray(appids) && appids.length > 0) {
       return appids.every((appid) => {
         if (!Number.isInteger(appid)) return false;
-        const gid = getCached(`itad-gid:${appid}`);
+        const gid = getCached(`itad-gid:${appid}`, { record: false });
         if (gid === undefined) return false; // resolution itself not cached yet
         if (gid === null) return true; // confirmed no ITAD listing — nothing left to price
-        return getCached(`itad-price:${country}:${gid}`) !== undefined;
+        return isCached(`itad-price:${country}:${gid}`);
       });
     }
     return false; // let the route's own validation reject it
@@ -559,9 +559,9 @@ const gameBundlesLimit = namedRateLimit('gameBundles', {
   skip: (req) => {
     if (rateLimitBypassed()) return true;
     if (isForceRefresh(req)) return false;
-    const gid = getCached(`itad-gid:${Number(req.params.appid)}`);
+    const gid = getCached(`itad-gid:${Number(req.params.appid)}`, { record: false });
     if (gid === undefined) return false;
-    return gid === null || getCached(gameBundlesCacheKey(gid, parseCountry(req))) !== undefined;
+    return gid === null || isCached(gameBundlesCacheKey(gid, parseCountry(req)));
   },
 });
 
@@ -843,21 +843,17 @@ function fetchGameDetails(appid, { force = false } = {}) {
       // 90 to 180 days and are cached per source, so one untouched store page dates the whole
       // readout, and "5 months ago" says nothing about the rating fetched yesterday. The panel
       // puts the breakdown in the button's tooltip so the visible figure stays one number.
+      const fetchedAts = {
+        rating: getCachedAt(`rating:${appid}`) ?? null,
+        hltb: getCachedAt(`hltb:${appid}`) ?? null,
+        meta: getCachedAt(`meta:${appid}`) ?? null,
+        tags: getCachedAt(`browse:${appid}`) ?? null,
+        protondb: getCachedAt(`protondb:${appid}`) ?? null,
+      };
+      const ages = Object.values(fetchedAts);
       return {
-        fetchedAt: oldestCachedAt([
-          `rating:${appid}`,
-          `hltb:${appid}`,
-          `meta:${appid}`,
-          `browse:${appid}`,
-          `protondb:${appid}`,
-        ]),
-        fetchedAts: {
-          rating: getCachedAt(`rating:${appid}`) ?? null,
-          hltb: getCachedAt(`hltb:${appid}`) ?? null,
-          meta: getCachedAt(`meta:${appid}`) ?? null,
-          tags: getCachedAt(`browse:${appid}`) ?? null,
-          protondb: getCachedAt(`protondb:${appid}`) ?? null,
-        },
+        fetchedAt: ages.includes(null) ? null : Math.min(...ages),
+        fetchedAts,
         rating: ratingRes.status === 'fulfilled' ? ratingRes.value : null,
         hltb: hltbRes.status === 'fulfilled' ? hltbRes.value : null,
         meta: metaRes.status === 'fulfilled' ? metaRes.value : null,

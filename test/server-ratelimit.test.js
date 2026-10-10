@@ -93,10 +93,14 @@ test('details limiter: counts cache misses but never counts cache hits', async (
 
   // The cached appid is still served even though the budget is exhausted,
   // and crucially does NOT trigger any upstream fetch.
+  _resetMetrics();
   const cached = await api.get('/api/game-details/800');
   assert.equal(cached.status, 200, 'a cache hit must bypass the limiter');
   assert.equal(cached.body.rating.score, 88);
   assert.ok(!fetchedAppids.has('800'), 'cache hit must not fetch upstream');
+  // The skip's own checks aren't reads: only the route's count as hits in GET /api/metrics.
+  const { cacheHits } = (await api.get('/api/metrics')).body.sinceRestart;
+  assert.deepEqual(cacheHits.rating, { hits: 1, misses: 0, forced: 0 });
 });
 
 // Same "cache hits never count" rule as above, applied to the game-search limiter.

@@ -28,7 +28,7 @@ None open.
 
 ## Performance
 
-- **C29 · minor · S** — `getCachedAt` (`lib/cache.js:133`) selects the whole value to read `ts`, called 10× per game in `fetchGameDetails` (`server.js:802-815`), including the ~20 KB `meta:` blob twice (~110 ms event-loop per 2200-game cached stream vs. 28 ms); limiter skips use `getCached` (`server.js:329-333`), inflating `/api/metrics` `cacheHits` ~70%. Ts-only statement, ages computed once per game, a non-recording existence check for skips.
+None open.
 
 ## Reliability
 
