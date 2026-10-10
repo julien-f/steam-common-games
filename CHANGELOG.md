@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - When Steam doesn't answer for players' names, libraries still load, and a saved account keeps its name instead of being renamed to its Steam ID
 - When Steam's store page for a game fails, its HowLongToBeat times show as not answering, with ↻ to retry, instead of as no data
 - The game panel's Achievements card says when Steam didn't answer for achievement rarity, instead of just leaving the percentages out
+- Sharing a table whose layout you haven't changed no longer tells the recipient it uses a shared layout
 
 ### Development
 

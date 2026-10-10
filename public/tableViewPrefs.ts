@@ -68,7 +68,10 @@ export function shareTableView(
 ): void {
   const params = new URLSearchParams(location.search);
   for (const [key, value] of Object.entries(extraParams)) if (!params.has(key)) params.set(key, value);
-  params.set(paramName, JSON.stringify(table.getViewState()));
+  const view = table.getViewState();
+  // An unchanged view is the defaults: sending `{}` would only show the recipient a "shared layout" banner.
+  if (Object.keys(view).length) params.set(paramName, JSON.stringify(view));
+  else params.delete(paramName);
   const url = `${location.origin}${urlWithParams(params)}`;
   copyWithFeedback(btn, url);
 }

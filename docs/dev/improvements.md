@@ -17,7 +17,7 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Sharing
 
-- **U52 · polish · S1** — sharing an unchanged layout still sends `tv=%7B%7D`, so the recipient gets "This table uses a layout from a shared link" for a layout that is just the defaults. Omit `tv` when nothing differs.
+None open.
 
 ## Loading and feedback
 

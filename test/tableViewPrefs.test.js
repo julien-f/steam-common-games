@@ -206,6 +206,24 @@ test('shareTableView: copies a link with the view snapshotted into the param, wi
   }
 });
 
+test('shareTableView: an unchanged view sends no param, so the link opens on the defaults', async () => {
+  const originalNavDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  try {
+    await withLocation('?q=x', async () => {
+      let copied = null;
+      const stubNav = { clipboard: { writeText: async (text) => (copied = text) } };
+      Object.defineProperty(globalThis, 'navigator', { value: stubNav, configurable: true });
+      shareTableView(fakeTable({}), 'tv', { textContent: 'Share view', childNodes: [], replaceChildren() {} });
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.equal(new URL(copied).searchParams.has('tv'), false);
+      assert.equal(new URL(copied).searchParams.get('q'), 'x');
+    });
+  } finally {
+    if (originalNavDesc) Object.defineProperty(globalThis, 'navigator', originalNavDesc);
+  }
+});
+
 test('shareTableView: adds extra params, but never over one the URL already sets', async () => {
   const originalNavDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   try {

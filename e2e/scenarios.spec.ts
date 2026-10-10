@@ -1306,6 +1306,19 @@ test("S1: share my wishlist's view; a fresh browser sees my games with my layout
   await expect(rows(friend)).toHaveCount(4);
 });
 
+test('S1 edge: sharing an unchanged layout sends no layout, so no shared-layout banner', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await expect(rows(page)).toHaveCount(4);
+  await page.evaluate(() => {
+    (window as unknown as { copied: string[] }).copied = [];
+    navigator.clipboard.writeText = async (text) => void (window as unknown as { copied: string[] }).copied.push(text);
+  });
+  await page.getByRole('button', { name: /Share view/ }).click();
+  const link = await page.evaluate(() => (window as unknown as { copied: string[] }).copied[0]);
+  expect(new URL(link).searchParams.has('tv')).toBe(false);
+});
+
 test("Y1.1,3: signed in on a new device, the account's lists win over this browser's newer ones", async ({ page }) => {
   await asPlayer(page, BOB, { updatedAt: Date.now() }); // newer than the account's prefs, still not trusted
   await mockApi(page, { states: ['signed-in'] });
