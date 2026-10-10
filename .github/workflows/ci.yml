@@ -1,4 +1,4 @@
-# npm run check, then the e2e suite (mocked: no secrets, no upstream traffic), on main and on PRs.
+# npm run check, then the e2e suite (mocked: no secrets, no upstream traffic), on main, on PRs, and on demand.
 # Actions are pinned by commit, as this workflow will later gate merges. No traces are uploaded:
 # the repo is public.
 name: CI
@@ -7,6 +7,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Runs a branch without a PR: gh workflow run CI --ref <branch>
+  workflow_dispatch:
 
 permissions:
   contents: read
