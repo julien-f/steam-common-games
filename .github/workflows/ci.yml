@@ -46,3 +46,6 @@ jobs:
       - run: |
           { echo '```'; node scripts/journey-coverage.js --results=e2e-results.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
         if: success() || failure()
+      # The page's accessibility snapshot at each failure (mocked fixtures only), since no traces are kept.
+      - run: find test-results -name error-context.md -exec sh -c 'echo "== $1"; cat "$1"' _ {} \;
+        if: failure()
