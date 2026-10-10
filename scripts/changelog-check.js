@@ -53,4 +53,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { structureProblems, missingEntry };
+module.exports = { structureProblems, missingEntry, ALLOWED, MAX_ENTRY };

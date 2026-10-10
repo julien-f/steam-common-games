@@ -32,7 +32,7 @@ The smallest change that closes the item, following [frontend.md](../../../docs/
 ## 4. Close and commit
 
 - Remove the item from improvements.md, or narrow it to what's left and say so.
-- `CHANGELOG.md` under `## [Unreleased]` (Fixed or Changed), in user-facing words; update any doc the change makes stale.
+- `CHANGELOG.md` via `scripts/changelog-add.js` (Fixed or Changed), in user-facing words; update any doc the change makes stale.
 - `npm run format`, then commit per CLAUDE.md's Development workflow: subject says what changed for the user, body names `U<n>` and why.
 
 ## Report
