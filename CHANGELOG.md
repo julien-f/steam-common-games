@@ -6,57 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-10
+
 ### Changed
 
-- Stepping through media in the screenshot viewer, with the arrow keys or a swipe, no longer brings back its hidden controls: only the counter shows for a moment. A tap or Tab still brings them back.
-- Once the screenshot viewer's controls have hidden, moving the mouse brings back only those near it: the top bar near the top, an arrow near its edge, a trailer's controls near the bottom.
-- The screenshot viewer's buttons are bare icons rather than filled circles and boxes.
-- On a desktop screen, trailers and large screenshots in the viewer leave room above and below for its controls instead of sitting under them.
-- With a mouse, the screenshot viewer's top line shows just the game's name; its ↑ ↓ and "Game 3 of 6" appear when you point at it or Tab to them. Touch screens keep them.
-- HLTB, ProtonDB and Steam's store browse API are now paced to about 3 requests a second each (`UPSTREAM_MIN_INTERVAL_MS`, 1000), instead of as fast as 3 parallel requests allow; cold loads aren't slower, since Steam's store pace already limits them.
-- One client can have at most 2 game lists loading their details at once (`STREAM_MAX_PER_IP`); a third is refused with a "too many game lists loading at once" message (the list says the load failed), so no single visitor can fill the shared Steam queue.
-- The game panel's DLC card loads 20 entries at a time, with a "Show more" button, and looks up only each DLC's store page, instead of full details for every DLC at once (hundreds of lookups for some games); the panel's ↻ no longer reloads the DLC list.
-- Loading a large list's game details downloads about a fifth as much data: the details stream is now gzip-compressed (2000 games: 10.9 MB down to 2.0 MB).
-- Table filters: each value in a list filter has a visible ≠ button to exclude it, and an excluded value is struck through like its chip; a range filter's boxes stay empty until you set a bound, showing the column's own range as a hint, and are labelled with the column's name.
-
-### Fixed
-
-- On Recently Looked Up, stepping to another game in the screenshot viewer showed the game being left, and moved keyboard focus out of the viewer.
-- Closing the screenshot viewer after stepping to another game went back to the game it was opened on: the panel switched back on Recently Looked Up, and the address did on other lists.
-- On Recently Looked Up, stepping to another game in the screenshot viewer dropped the media on screen from the address, so a copied link opened the game without it.
-- The side panel's Price card says when a game isn't in any current bundle, or when IsThereAnyDeal didn't answer, instead of showing nothing in both cases.
-- The side panel's list of bundles a game is in now refreshes every 12 hours, as documented, instead of every 30 days.
-- Steam sign-in now rejects a login confirmation that Steam issued for another website, which could otherwise be replayed here to sign in as someone else.
-- Game search ignores `?refresh=1`, which let a client skip its rate limit and re-query Steam's store search on every request.
-- A wishlist request can no longer skip the search rate limit by also carrying an already-cached account in a field the wishlist doesn't use.
-- Friends lists with more than 100 people now load their names in batches of 100, within Steam's documented limit.
-- HLTB and ProtonDB are left alone for 5 minutes once they start blocking requests (two 403s in a row), as Steam's store already was, instead of being asked again for every game; `GET /api/metrics` shows all three circuit breakers.
-- Pages other than the home page no longer 404 when the app is installed in a folder whose path contains a hidden (dot) directory.
-- A list whose game details couldn't load (rate-limited, connection dropped) no longer sits at "0 / N games loaded": the unanswered games are marked as not answered, and the status line says why.
-- Switching accounts while the previous one's library was still loading no longer shows the previous account's ✓/☆ markers, "Owned by" and Played columns until a reload.
-- Home's account card says "couldn't load" for an owned or wishlist count Steam didn't answer, instead of 0; its Updated ↻ retries.
-- The game panel's Price card says "IsThereAnyDeal didn't answer" when the price lookup fails, instead of "No pricing data available." or that the instance isn't connected to IsThereAnyDeal; the panel's ↻ retries it.
-- A search page whose lookup failed says "Search failed — try again" instead of that no games were found.
-- When Steam's store asks the app to slow down (a 429), every store request now waits out its Retry-After, instead of only the one that got the 429 while the rest kept going.
-- Unreleased games now pick up their reviews, ProtonDB rating, How Long To Beat times and release status within a day of release, instead of staying blank or "coming soon" for up to a year.
+- The screenshot viewer gets out of the way: its controls stay hidden while you step through media (only the counter shows for a moment) and come back near the pointer, or with a tap or Tab; its buttons are bare icons; on a desktop, large media leaves room above and below for the controls; and with a mouse its top line shows just the game's name until you point at it.
+- Table filters: each value in a list filter has a visible ≠ button to exclude it, and an excluded value is struck through like its chip; a range filter shows the column's range as a hint until you set a bound.
+- The game panel's DLC card loads 20 entries at a time, with a "Show more" button, and the panel's ↻ no longer reloads it.
+- Loading a large list's game details downloads about a fifth as much data: the stream is gzip-compressed (2000 games: 10.9 MB down to 2.0 MB).
+- Gentler on the services the app reads from: HLTB, ProtonDB and Steam's store browse API are paced to about 3 requests a second each (`UPSTREAM_MIN_INTERVAL_MS`); a Steam 429 pauses every store request until its Retry-After; HLTB and ProtonDB, like Steam's store, are left alone for 5 minutes after two 403s in a row (all three show in `GET /api/metrics`); and friends' names are asked for at most 100 at a time, as Steam documents.
 
 ### Removed
 
 - The screenshot viewer's copy-link button: the address bar already holds the link to the media on screen.
 
+### Fixed
+
+- Stepping to another game in the screenshot viewer shows that game, keeps focus in the viewer and the media in the address, and closing the viewer leaves you on it.
+- Failures say so instead of looking like missing data: a list whose game details didn't load marks those games and says why, instead of sitting at "0 / N games loaded"; Home's account card says "couldn't load" instead of 0; the panel's Price card says when IsThereAnyDeal didn't answer (↻ retries) or a game is in no current bundle; and a failed search says "Search failed — try again".
+- Switching accounts while the previous one's library was still loading no longer shows its ✓/☆ markers, "Owned by" and Played columns.
+- Unreleased games pick up their reviews, ProtonDB rating, HLTB times and release status within a day of release, instead of up to a year later; the panel's list of bundles a game is in refreshes every 12 hours, not every 30 days.
+- Pages other than the home page no longer 404 when the app is installed under a hidden (dot) directory.
+
+### Security
+
+- Steam sign-in rejects a login confirmation Steam issued for another website, which could otherwise be replayed here to sign in as someone else.
+- One visitor can no longer drain the shared Steam budget: game search's `?refresh=1` and a wishlist request carrying an extra, cached account no longer skip the rate limits, and a visitor can load at most 2 lists' game details at once (`STREAM_MAX_PER_IP`).
+
 ### Development
 
-- `scripts/dev-server.js up|down` runs `npm run dev` in the background, as `scripts/mock-server.js` does `dev:mock`.
-- `npm run check` also catches broken links, unknown `npm run` scripts and missing `scripts/` files or flags, in the docs, the skills, README.md and CLAUDE.md.
-- `npm run check` runs its steps in parallel and prints one line per step, with the full output only for the ones that fail.
-- `setup-review` skill: reviews the skills, scripts, hooks and CLAUDE.md for drift and duplication, optionally mining past sessions for repeated friction, and proposes ranked changes.
-- `code-audit` and `code-fix` skills: a whole-codebase review by dimension (simplify, security, perf, reliability, compliance, tests) recorded in `docs/dev/code-backlog.md`, and fixing its items one commit each.
-- `node scripts/changelog-add.js <Section> "<entry>"` adds a CHANGELOG entry under Unreleased, creating the section and subsection in order when missing.
-- `node scripts/db-query.js "<sql>"` queries `db.sqlite` read-only.
-- The pre-commit hook and `npm run check` share one list of steps.
-- `npm run test:one <file>` runs one test file with the same settings as `npm test`.
-- Signing in with Steam works on the dev server (`npm run dev`) when browsing `localhost`: the proxy no longer sent Steam's return address to the backend's own port.
-- Dependencies updated within their ranges (express 5.3, vite 8.3.4, Playwright 1.64 — run `npx playwright install chromium` once — and others), `@vates/data-table-solid` to 0.17, and `concurrently` to 10.0.6, clearing `npm audit`'s two critical `shell-quote` advisories.
+- New scripts: `scripts/dev-server.js up|down` runs `npm run dev` in the background, `npm run test:one <file>` runs one test file, `node scripts/changelog-add.js` files CHANGELOG entries, and `node scripts/db-query.js` queries `db.sqlite` read-only.
+- `npm run check` runs its steps in parallel with one line each, shares them with the pre-commit hook, and also catches broken links, unknown npm scripts and missing script files or flags in the docs, skills, README.md and CLAUDE.md.
+- New skills: `setup-review` (reviews the Claude Code setup), `code-audit` (a whole-codebase review recorded in `docs/dev/code-backlog.md`) and `code-fix` (fixes its items).
+- Signing in with Steam works on `npm run dev` from `localhost`.
+- Dependencies updated within their ranges (express 5.3, vite 8.3.4, Playwright 1.64: run `npx playwright install chromium` once, and others), `@vates/data-table-solid` to 0.17, and `concurrently` to 10.0.6, clearing two critical `npm audit` advisories.
 
 ## [0.9.0] - 2026-10-07
 
