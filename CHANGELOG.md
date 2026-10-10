@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Development
 
 - `scripts/guard.js` prints its usage instead of a git error when `--base` or `--head` is missing
+- `scripts/setup-facts.js` gathers the setup-review skill's facts: each script's callers and missing usage lines, the gates' time and output (`--cost`), and recent session transcripts' largest outputs, slowest calls, repeated commands and skill runs (`--transcripts`)
 - Unit and e2e test runs print dots instead of every passing test, cutting a full `npm test` from 108 KB of output to 3 KB
 
 ## [0.10.0] - 2026-10-10
