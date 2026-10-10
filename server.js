@@ -148,7 +148,8 @@ function routeErrorStatus(route, err) {
   // near-identical [upstream:...] line per request blocked during the 5-minute window would
   // just repeat information already on record, potentially hundreds of times over.
   if (err.isCircuitOpen) return 502;
-  if (err.isUpstream) {
+  // Only res.json() on an upstream's reply throws one: an HTML page (an error or challenge) with a 200.
+  if (err.isUpstream || err.name === 'SyntaxError') {
     console.error(`[upstream:${route}]`, err.stack || err.message);
     return 502;
   }

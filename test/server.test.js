@@ -1029,6 +1029,21 @@ test('GET /api/game-meta/:appid: store metadata only, one upstream call', async 
   assert.match(urls[0], /appdetails/);
 });
 
+test("GET /api/game-meta/:appid: 502 when the store can't be reached or answers with HTML", async (t) => {
+  t.mock.method(console, 'error', () => {});
+  for (const fetchImpl of [
+    async () => {
+      throw new TypeError('fetch failed');
+    },
+    async () => new Response('<!DOCTYPE html><html></html>', { status: 200, headers: { 'Content-Type': 'text/html' } }),
+  ]) {
+    _reset();
+    _resetCircuitBreakers();
+    t.mock.method(globalThis, 'fetch', fetchImpl);
+    await api.get('/api/game-meta/400').expect(502);
+  }
+});
+
 test('GET /api/game-meta/:appid: 400 for an invalid appid, 502 when the store fails', async (t) => {
   _reset();
   _resetCircuitBreakers();
@@ -2573,10 +2588,14 @@ test('GET /api/me: a session past SESSION_TTL_MS is signed out and its row delet
   assert.equal(countSessions(), 0);
 });
 
-test('a repeated query param is read as one string, not answered with a 500', async () => {
+test('a repeated query param is read as one string, not answered with a 500', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  t.mock.method(globalThis, 'fetch', async () => {
+    throw new TypeError('fetch failed');
+  });
   for (const url of ['/api/search-games?q=a&q=b', '/api/achievements/1?steamids=a&steamids=b']) {
     const res = await api.get(url);
-    assert.ok(res.status < 500, `${url}: ${res.status}`);
+    assert.notEqual(res.status, 500, url);
     assert.match(res.type, /json/);
   }
 });

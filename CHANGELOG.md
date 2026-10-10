@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Signing in, signing out and syncing settings no longer fail when another site on the same host has set a cookie that isn't URL-encoded
 - The game panel's Metacritic chip no longer links an address Steam sends that isn't a web page
 - A malformed or unexpected request now gets a short JSON error instead of a server error page
+- When Steam or another service can't be reached, or answers with a web page instead of data, the app reports the service as failing rather than the request as invalid
 
 ### Development
 
