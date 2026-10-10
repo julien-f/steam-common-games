@@ -13,13 +13,11 @@ const SOURCE_FILES = ['server.js', 'vite.config.js', 'eslint.config.mjs', 'playw
 // Required peer of @babel/eslint-parser, never imported (architecture.md's eslint.config.mjs bullet).
 const NOT_IMPORTED = new Set(['@babel/core']);
 
-function walk(dir, keep) {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
-    const p = path.join(dir, e.name);
-    if (e.isDirectory()) return e.name === 'node_modules' ? [] : walk(p, keep);
-    return keep(p) ? [p] : [];
-  });
-}
+const walk = (dir, keep) =>
+  fs
+    .readdirSync(dir, { recursive: true })
+    .map((f) => path.join(dir, f))
+    .filter(keep);
 
 function packageName(specifier) {
   const parts = specifier.split('/');

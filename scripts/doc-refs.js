@@ -25,13 +25,11 @@ const CODE_FILES = [
   'eslint.config.mjs',
 ];
 
-function walk(dir, keep) {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
-    const p = path.join(dir, e.name);
-    if (e.isDirectory()) return e.name === 'node_modules' ? [] : walk(p, keep);
-    return keep(p) ? [p] : [];
-  });
-}
+const walk = (dir, keep) =>
+  fs
+    .readdirSync(dir, { recursive: true })
+    .map((f) => path.join(dir, f))
+    .filter(keep);
 
 // `ctx`: `words` (identifiers in the code), `npmScripts` (names), `exists(relPath)`, `scriptSource(name)`
 // (a `scripts/` file's text, or undefined); `doc` is the file's path relative to the repo root.
