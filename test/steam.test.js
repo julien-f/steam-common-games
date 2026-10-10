@@ -623,10 +623,33 @@ test('getPlayerSummaries: returns placeholder players when API fails, does not c
   assert.equal(result.length, 1);
   assert.equal(result[0].steamid, ids[0]);
   assert.equal(result[0].personaname, ids[0]);
+  assert.equal(result[0].placeholder, true, 'flagged, so the client never stores it as a name');
 
   // Since failure result wasn't cached, next call hits the API again
   await getPlayerSummaries(ids);
   assert.equal(fetchCount, 2, 'fallback result must not be cached');
+});
+
+test('getPlayerSummaries: a failed call warns [steam] and yields placeholders instead of rejecting', async (t) => {
+  _reset();
+  const warn = t.mock.method(console, 'warn', () => {});
+  for (const fetchImpl of [
+    async () => ({ ok: false, status: 503 }),
+    async () => {
+      throw new TypeError('fetch failed');
+    },
+  ]) {
+    t.mock.method(globalThis, 'fetch', fetchImpl);
+    const [p] = await getPlayerSummaries(['76561198000000009']);
+    assert.deepEqual(p, {
+      steamid: '76561198000000009',
+      personaname: '76561198000000009',
+      profileurl: '',
+      placeholder: true,
+    });
+  }
+  assert.equal(warn.mock.callCount(), 2);
+  assert.match(warn.mock.calls[0].arguments[0], /^\[steam\]/);
 });
 
 test('getPlayerSummaries: cache key is order-independent', async (t) => {

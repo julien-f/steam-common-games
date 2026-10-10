@@ -40,7 +40,6 @@ None open.
 ## Reliability
 
 - **C1 · minor · M** — dependency updates wait on a manual `dependency-audit` run. Dependabot or Renovate could open them, since CI (`.github/workflows/ci.yml`) runs `check` and the e2e suite on PRs, but their PRs lack the `CHANGELOG.md` entry the pre-commit hook requires (CI doesn't check it) and skip `npm run build`, so each still needs a local pass through dependency-audit's Applying.
-- **C33 · minor · S** — `fetchPlayerBatch`/`getPlayerSummaries` (`lib/steam.js:311-318, 356-361`): a non-OK response silently yields `{ personaname: steamid }`, which `public/HomeRoute.tsx:164` stores as the account label; a thrown error fails the whole `/api/common-games` though libraries loaded; `p.finally(...)` leaves an unhandled rejection per id. Catch with a `[steam]` warn, flag placeholders so the client never stores them, `.catch` the `finally` chain.
 - **C37 · minor · S** — `hltbPromise` (`server.js:750-753`) resolves `null` when `meta` rejects, so `failed` lists `meta` but not `hltb` and the HLTB cell looks like "no data". Rethrow so HLTB is reported failed.
 - **C38 · minor · S** — `getGlobalAchievementPercentages(...).catch(() => null)` (`server.js:1095`) degrades with no `[tag]` warn and the same response as "no rarity data". Warn `[achievements]` and return a failure flag the panel shows.
 

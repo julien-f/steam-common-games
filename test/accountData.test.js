@@ -12,6 +12,7 @@ const {
   resolveAccountSummary,
   fetchAccountOverview,
   toAccountPlayer,
+  accountInfoFrom,
   fetchAccountFriends,
 } = require('../public/accountData.ts');
 
@@ -264,8 +265,16 @@ test('toAccountPlayer: maps a full player object onto display-ready fields', () 
       memberSince: '2015-06-10',
       countryCode: 'US',
       realName: 'Alice Smith',
+      placeholder: false,
     },
   );
+});
+
+test("accountInfoFrom: no label while a player is only a placeholder, so a stored name isn't overwritten", () => {
+  const alice = toAccountPlayer({ steamid: '1', personaname: 'Alice', avatarmedium: 'https://cdn/a.jpg' });
+  const unknown = toAccountPlayer({ steamid: '2', personaname: '2', placeholder: true });
+  assert.deepEqual(accountInfoFrom([alice]), { label: 'Alice', avatarUrl: 'https://cdn/a.jpg', vanities: undefined });
+  assert.equal(accountInfoFrom([alice, unknown]).label, undefined);
 });
 
 test('toAccountPlayer: memberSince/countryCode/realName are empty strings when Steam did not return them (private profile)', () => {

@@ -38,7 +38,12 @@ import {
   compareUrl,
   COMPARE_PATH,
 } from './urlState.ts';
-import { resolveAccountSummary, fetchAccountOverview, fetchAccountWishlistItems } from './accountData.ts';
+import {
+  resolveAccountSummary,
+  fetchAccountOverview,
+  fetchAccountWishlistItems,
+  accountInfoFrom,
+} from './accountData.ts';
 import type { AccountPlayer } from './accountData.ts';
 import { normalizeInput, steamVanity, fmtAge, countryFlag } from './utils.ts';
 import { CopyButton } from './CopyButton.tsx';
@@ -161,14 +166,7 @@ export default function HomeRoute() {
         setPlayers(ps);
         setFetchedAt(at);
         // Keeps the stored slot's name/avatar current (accountsStore.ts's refreshAccountInfo).
-        const vanities = Object.fromEntries(
-          ps.flatMap((p) => (steamVanity(p.profileUrl) ? [[p.steamid, steamVanity(p.profileUrl)!]] : [])),
-        );
-        refreshAccountInfo(account.id, {
-          label: ps.map((p) => p.name || p.steamid).join(' + '),
-          avatarUrl: ps.length === 1 ? ps[0].avatarUrl : undefined,
-          vanities: Object.keys(vanities).length ? vanities : undefined,
-        });
+        refreshAccountInfo(account.id, accountInfoFrom(ps));
       },
       () => {
         if (!isStale()) setCounts((c) => ({ ...c, owned: 'failed' }));

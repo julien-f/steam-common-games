@@ -39,9 +39,9 @@ export interface AccountWishlistItem {
 
 // One member account of a slot, as /api/common-games returns it (a raw Steam
 // GetPlayerSummaries player object plus the server's own `gameCount`) — only the fields this
-// module reads. Everything is optional: a profile the API knows nothing about still comes back
-// as a bare `{ steamid, personaname, profileurl: '' }` placeholder (see getPlayerSummaries in
-// lib/steam.js).
+// module reads. Everything is optional: a profile the API knows nothing about, or one it failed to
+// answer for, still comes back as a bare `{ steamid, personaname, profileurl: '', placeholder: true }`
+// (see getPlayerSummaries in lib/steam.js).
 export interface RawAccountPlayer {
   steamid: string;
   personaname?: string;
@@ -52,6 +52,7 @@ export interface RawAccountPlayer {
   timecreated?: number; // Unix seconds; absent for a private profile
   loccountrycode?: string; // ISO 3166-1 alpha-2, e.g. "US"; absent when unset or profile is private
   realname?: string; // absent unless the profile owner set one and made it public
+  placeholder?: boolean;
 }
 
 // The shape of /api/common-games' success response, as read below — only the fields this
@@ -77,6 +78,7 @@ export interface AccountPlayer {
   memberSince: string; // bare ISO date the account was created, '' when Steam didn't return one
   countryCode: string; // ISO 3166-1 alpha-2, '' when unset
   realName: string; // '' when unset — Steam's own realname is optional and privacy-gated
+  placeholder: boolean; // Steam returned nothing for it: `name` is just the steamid
 }
 
 // Presence (`personastate`/`gameextrainfo`) is deliberately NOT mapped here, even though Steam
@@ -97,6 +99,20 @@ export function toAccountPlayer(p: RawAccountPlayer): AccountPlayer {
     memberSince: fmtLastPlayed(p.timecreated),
     countryCode: p.loccountrycode || '',
     realName: p.realname || '',
+    placeholder: p.placeholder === true,
+  };
+}
+
+// What refreshAccountInfo should store for an account from its players: no label while any of them
+// is a placeholder, which would overwrite the stored name with a steamid.
+export function accountInfoFrom(ps: AccountPlayer[]) {
+  const vanities = Object.fromEntries(
+    ps.flatMap((p) => (steamVanity(p.profileUrl) ? [[p.steamid, steamVanity(p.profileUrl)!]] : [])),
+  );
+  return {
+    label: ps.some((p) => p.placeholder) ? undefined : ps.map((p) => p.name).join(' + '),
+    avatarUrl: ps.length === 1 ? ps[0].avatarUrl : undefined,
+    vanities: Object.keys(vanities).length ? vanities : undefined,
   };
 }
 
