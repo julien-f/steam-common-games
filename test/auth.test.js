@@ -30,6 +30,10 @@ test('parseCookies: decodes percent-encoded values', () => {
   assert.deepEqual(parseCookies('k=a%20b'), { k: 'a b' });
 });
 
+test('parseCookies: skips a pair whose value does not decode, keeping the rest', () => {
+  assert.deepEqual(parseCookies('other=100%; sid=abc'), { sid: 'abc' });
+});
+
 test('parseCookies: empty/missing header yields no cookies', () => {
   assert.deepEqual(parseCookies(undefined), {});
   assert.deepEqual(parseCookies(''), {});

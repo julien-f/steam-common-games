@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Signing in, signing out and syncing settings no longer fail when another site on the same host has set a cookie that isn't URL-encoded
+
 ### Development
 
 - `scripts/guard.js` prints its usage instead of a git error when `--base` or `--head` is missing
