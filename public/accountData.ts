@@ -330,22 +330,23 @@ export interface ResolvedAccountSummary {
 // alongside it (Promise.all) rather than lazily, so the account header can show both counts as
 // soon as an account is picked, per docs/dev/lists-and-accounts.md.
 export async function resolveAccountSummary(rawInputs: string[]): Promise<ResolvedAccountSummary> {
-  const [ownedRes, wishlistRes] = await Promise.all([
-    fetch('/api/common-games', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ members: rawInputs }),
-    }),
+  const [ownedData, wishlistRes] = await Promise.all([
+    fetchJson<CommonGamesResponse>(
+      '/api/common-games',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ members: rawInputs }),
+      },
+      'Failed to resolve account',
+    ),
     fetch('/api/wishlist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ members: rawInputs }),
     }).catch(() => null),
   ]);
-  const ownedData = await ownedRes.json();
-  if (!ownedRes.ok) throw new Error(ownedData.error || 'Failed to resolve account');
-
-  const players: RawAccountPlayer[] = ownedData.players;
+  const players = ownedData.players;
   const members = players.map((p) => p.steamid).sort();
   const label = players.map((p) => p.personaname || p.steamid).join(' + ');
   // Keyed by steamid rather than a parallel array: `members` is sorted, `players` is in the

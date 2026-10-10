@@ -465,3 +465,8 @@ test('an API error keeps its own message', async (t) => {
   withFetch(t, async () => Response.json({ error: 'Profile is private' }, { status: 400 }));
   await assert.rejects(fetchAccountWishlist(['1']), { message: 'Profile is private' });
 });
+
+test('resolveAccountSummary: an HTML error page reads as the account failing to resolve, not as a JSON parse error', async (t) => {
+  withFetch(t, async () => new Response('<html>502 Bad Gateway</html>', { status: 502 }));
+  await assert.rejects(resolveAccountSummary(['alice']), { message: 'Failed to resolve account' });
+});
