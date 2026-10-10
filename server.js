@@ -62,6 +62,8 @@ const {
   destroySession,
   getSessionUser,
   setUserPref,
+  isSyncedPrefKey,
+  prefFits,
 } = require('./lib/auth');
 const { SESSION_TTL_MS, MISS_CACHE_TTL_MS } = require('./lib/config');
 
@@ -1372,6 +1374,10 @@ app.put('/api/me/prefs/:key', authLimit, requireAuth, (req, res) => {
   const { value, updatedAt } = req.body || {};
   if (!('value' in (req.body || {})) || typeof updatedAt !== 'number') {
     return res.status(400).json({ error: 'body must be { value, updatedAt }' });
+  }
+  if (!isSyncedPrefKey(req.params.key)) return res.status(400).json({ error: 'unknown pref key' });
+  if (!prefFits(req.user.steamid, req.params.key, value)) {
+    return res.status(413).json({ error: 'saved settings are over their size limit' });
   }
   const applied = setUserPref(req.user.steamid, req.params.key, value, updatedAt);
   res.json({ ok: true, applied });

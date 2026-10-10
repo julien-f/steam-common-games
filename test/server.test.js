@@ -18,6 +18,7 @@ const supertest = require('supertest');
 const { app } = require('../server');
 const { _reset, setCache, getCachedAt } = require('../lib/cache');
 const { db } = require('../lib/db');
+const { PREFS_MAX_BYTES, getUserPrefs, setUserPref } = require('../lib/auth');
 const { _resetAuth } = require('../lib/hltb');
 const { _resetCircuitBreakers } = require('../lib/circuitBreaker');
 const { SESSION_TTL_MS, MISS_CACHE_TTL_MS } = require('../lib/config');
@@ -2480,39 +2481,77 @@ test('PUT /api/me/prefs/:key: saves one key with its updatedAt, visible from a l
 
 test('PUT /api/me/prefs/:key: merges into existing prefs, leaving other keys untouched', async (t) => {
   const agent = await loginAs(t, '76561198000000206');
-  await agent.put('/api/me/prefs/a').send({ value: 1, updatedAt: 1000 }).expect(200);
-  await agent.put('/api/me/prefs/b').send({ value: 2, updatedAt: 1000 }).expect(200);
+  await agent.put('/api/me/prefs/region').send({ value: 1, updatedAt: 1000 }).expect(200);
+  await agent.put('/api/me/prefs/lists').send({ value: 2, updatedAt: 1000 }).expect(200);
   const res = await agent.get('/api/me').expect(200);
-  assert.deepEqual(res.body.prefs, { a: { value: 1, updatedAt: 1000 }, b: { value: 2, updatedAt: 1000 } });
+  assert.deepEqual(res.body.prefs, { region: { value: 1, updatedAt: 1000 }, lists: { value: 2, updatedAt: 1000 } });
 });
 
 test('PUT /api/me/prefs/:key: a later write replaces an earlier one, and reports applied: true', async (t) => {
   const agent = await loginAs(t, '76561198000000207');
-  await agent.put('/api/me/prefs/a').send({ value: 'old', updatedAt: 1000 }).expect(200);
-  const res = await agent.put('/api/me/prefs/a').send({ value: 'new', updatedAt: 2000 }).expect(200);
+  await agent.put('/api/me/prefs/region').send({ value: 'old', updatedAt: 1000 }).expect(200);
+  const res = await agent.put('/api/me/prefs/region').send({ value: 'new', updatedAt: 2000 }).expect(200);
   assert.equal(res.body.applied, true);
   const me = await agent.get('/api/me').expect(200);
-  assert.deepEqual(me.body.prefs.a, { value: 'new', updatedAt: 2000 });
+  assert.deepEqual(me.body.prefs.region, { value: 'new', updatedAt: 2000 });
 });
 
 test('PUT /api/me/prefs/:key: a write always overwrites, even with a lower updatedAt than what is stored', async (t) => {
   const agent = await loginAs(t, '76561198000000208');
-  await agent.put('/api/me/prefs/a').send({ value: 'new', updatedAt: 2000 }).expect(200);
-  const res = await agent.put('/api/me/prefs/a').send({ value: 'explicit-save', updatedAt: 1000 }).expect(200);
+  await agent.put('/api/me/prefs/region').send({ value: 'new', updatedAt: 2000 }).expect(200);
+  const res = await agent.put('/api/me/prefs/region').send({ value: 'explicit-save', updatedAt: 1000 }).expect(200);
   assert.equal(res.body.applied, true);
   const me = await agent.get('/api/me').expect(200);
-  assert.deepEqual(me.body.prefs.a, { value: 'explicit-save', updatedAt: 1000 });
+  assert.deepEqual(me.body.prefs.region, { value: 'explicit-save', updatedAt: 1000 });
 });
 
 test('PUT /api/me/prefs/:key: 400 when the body has no value field or a non-numeric updatedAt', async (t) => {
   const agent = await loginAs(t, '76561198000000204');
-  await agent.put('/api/me/prefs/a').send({ notValue: 1, updatedAt: 1000 }).expect(400);
-  await agent.put('/api/me/prefs/a').send({ value: 1, updatedAt: 'not-a-number' }).expect(400);
-  await agent.put('/api/me/prefs/a').send({ value: 1 }).expect(400);
+  await agent.put('/api/me/prefs/region').send({ notValue: 1, updatedAt: 1000 }).expect(400);
+  await agent.put('/api/me/prefs/region').send({ value: 1, updatedAt: 'not-a-number' }).expect(400);
+  await agent.put('/api/me/prefs/region').send({ value: 1 }).expect(400);
 });
 
 test('PUT /api/me/prefs/:key: 401 when not signed in', async () => {
-  await api.put('/api/me/prefs/a').send({ value: 1, updatedAt: 1000 }).expect(401);
+  await api.put('/api/me/prefs/region').send({ value: 1, updatedAt: 1000 }).expect(401);
+});
+
+test('PUT /api/me/prefs/:key: 400 for a key the app never syncs', async (t) => {
+  const agent = await loginAs(t, '76561198000000210');
+  await agent.put('/api/me/prefs/anything').send({ value: 1, updatedAt: 1000 }).expect(400);
+  await agent.put('/api/me/prefs/ranking%3Anot-a-list-id').send({ value: 1, updatedAt: 1000 }).expect(400);
+  const me = await agent.get('/api/me').expect(200);
+  assert.deepEqual(me.body.prefs, {});
+});
+
+test('PUT /api/me/prefs/:key: accepts every key the frontend syncs', async (t) => {
+  const { TABLE_VIEW_PREF_KEYS } = require('../public/tableViewKeys.ts');
+  const agent = await loginAs(t, '76561198000000211');
+  const keys = [
+    ...['myAccount', 'currentAccount', 'recentAccounts', 'recentGames', 'bundleSnapshots', 'region', 'lists'],
+    ...['folders', 'ranking:0b7e6c1a-3f2d-4e5a-9b8c-1d2e3f4a5b6c', ...TABLE_VIEW_PREF_KEYS],
+  ];
+  for (const key of keys) {
+    await agent
+      .put(`/api/me/prefs/${encodeURIComponent(key)}`)
+      .send({ value: 1, updatedAt: 1000 })
+      .expect(200);
+  }
+});
+
+test("PUT /api/me/prefs/:key: 413 once the account's prefs would pass PREFS_MAX_BYTES", async (t) => {
+  const steamid = '76561198000000212';
+  const agent = await loginAs(t, steamid);
+  const big = 'x'.repeat(90_000);
+  for (let i = 0; Object.keys(getUserPrefs(steamid)).length * 90_000 < PREFS_MAX_BYTES; i++) {
+    setUserPref(steamid, `ranking:00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, big, 1000);
+  }
+  await agent.put('/api/me/prefs/region').send({ value: big, updatedAt: 1000 }).expect(413);
+  // Overwriting a stored key counts only its new size, not the old one too.
+  await agent
+    .put('/api/me/prefs/ranking%3A00000000-0000-4000-8000-000000000000')
+    .send({ value: 'small', updatedAt: 2000 })
+    .expect(200);
 });
 
 test('POST /auth/logout: session stops working afterwards', async (t) => {
