@@ -122,6 +122,38 @@ test('steam-store circuit breaker: tripCount increments on trip and stays 0 unti
   assert.equal(getCircuitBreakers()['steam-store'].tripCount, 1, 'two consecutive 403s trip it once');
 });
 
+test('fetchStoreApi: a 429 holds every queued store request until Retry-After has passed', async (t) => {
+  _reset();
+  _resetCircuitBreakers();
+  t.after(_resetCircuitBreakers);
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
+  const flush = async () => {
+    for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r));
+  };
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    calls++;
+    return calls === 1
+      ? { ok: false, status: 429, headers: new Headers({ 'retry-after': '2' }) }
+      : makeReviewResponse(10, 9);
+  });
+
+  const first = getGameRating(500);
+  await flush();
+  const second = getGameRating(501); // queued after Steam asked us to slow down
+  await flush();
+  assert.equal(calls, 1);
+
+  t.mock.timers.tick(1999);
+  await flush();
+  assert.equal(calls, 1, 'nothing goes out before Retry-After');
+
+  t.mock.timers.tick(1);
+  await flush();
+  assert.equal(calls, 3, 'the retry and the queued request go out once it has passed');
+  await Promise.all([first, second]);
+});
+
 test('steam-store circuit breaker: consecutive403s exposes pre-trip state and resets on success', async (t) => {
   _reset();
   _resetCircuitBreakers();
