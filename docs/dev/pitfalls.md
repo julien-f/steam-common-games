@@ -61,3 +61,9 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: `npm run test:e2e` (or the pre-commit hook's e2e step) fails at start with `http://localhost:28992 is already used, make sure that nothing is running on the port/url`.
 - **Cause**: every checkout serves e2e on port 28992, and a run never reuses a server already there (it would serve another checkout's build), so a second run while one is going fails.
 - **Fix**: give each checkout its own port: `E2E_PORT=<free port> git commit …` (or `npm run test:e2e`).
+
+## `error: invalid object … Error building trees` from `git commit --amend -a`
+
+- **Symptom**: `git commit --amend -a --no-edit` fails with `error: invalid object 100644 <sha> for '<file>'` then `error: Error building trees`; nothing is committed.
+- **Cause**: unconfirmed (seen once, after the pre-commit hook had run on the commit being amended); `git fsck` showed no corruption.
+- **Fix**: stage explicitly, then amend: `git add <file> && git commit --amend --no-edit`.
