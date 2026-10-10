@@ -62,5 +62,4 @@ Then one `AskUserQuestion`: apply the recommended set, plus any real choice amon
 ## Applying
 
 - Follow CLAUDE.md's Development workflow; a `scripts/` change gets a Development changelog entry and a test.
-- Files in `PROTECTED` (`scripts/guard.js`) need the user's `viewed` while the pilot runs: say which ones the change touched.
 - Memory edits are outside the repo: say which entries were moved or deleted.

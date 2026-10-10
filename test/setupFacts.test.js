@@ -7,13 +7,13 @@ const { callers, argsWithoutUsage, commandKey, parseSession, skillRuns, summariz
 test('callers matches script paths and relative requires, not substrings', () => {
   const files = [
     ['package.json', '"check": "node scripts/check.js"'],
-    ['scripts/guard.js', "require('./journey-coverage')"],
+    ['scripts/other.js', "require('./journey-coverage')"],
     ['docs/a.md', 'run `scripts/changelog-check.js` and the check step'],
     ['scripts/check.js', 'scripts/check.js itself'],
     ['test/check.test.js', "require('../scripts/check')"],
   ];
   assert.deepEqual(callers('check', files), ['package.json']);
-  assert.deepEqual(callers('journey-coverage', files), ['scripts/guard.js']);
+  assert.deepEqual(callers('journey-coverage', files), ['scripts/other.js']);
   assert.deepEqual(callers('changelog-check', files), ['docs/a.md']);
 });
 

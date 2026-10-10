@@ -6,7 +6,7 @@ import { defineConfig, devices } from '@playwright/test';
 // backend, database or upstream service is involved.
 // Below Linux's ephemeral range (32768–60999): the pre-commit hook runs this beside the unit tests,
 // whose servers and requests draw random ports from that range and could take a fixed one there.
-// E2E_PORT: scripts/guard.js runs a base and a head checkout, each on its own server.
+// E2E_PORT: another port, for a checkout testing beside another one (pitfalls.md).
 const PORT = Number(process.env.E2E_PORT) || 28992;
 // A production build rather than the dev server: a page load fetches one bundle instead of every
 // module, which cuts the suite from about 30 s to 20 s.
