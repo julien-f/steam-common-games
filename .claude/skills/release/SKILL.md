@@ -19,9 +19,8 @@ Pre-1.0: **minor** for anything under Added/Changed/Removed, **patch** for Fixed
 
 ## 2. Consolidate the changelog
 
-`[Unreleased]` accumulates one entry per commit, often with several blocks of the same category. CHANGELOG.md is too large to `Read` whole; read the section with `sed -n '/^## \[Unreleased\]/,/^## \[[0-9]/p' CHANGELOG.md`. Before cutting:
+`[Unreleased]` accumulates one entry per commit. CHANGELOG.md is too large to `Read` whole; read the section with `sed -n '/^## \[Unreleased\]/,/^## \[[0-9]/p' CHANGELOG.md`. Before cutting:
 
-- Merge into one block per category, in order: Added, Changed, Deprecated, Removed, Fixed, Security, Development.
 - Keep bullet order within each category; merge bullets that describe the same feature's evolution into its final state.
 - Rewrite for a reader of the release, not of the commits: what changed for users first, implementation detail only when a developer needs it; drop internal references (`UX backlog U<n>`, file-by-file notes). Keep it short — CLAUDE.md's doc-prose rules apply.
 - Show the consolidated section to the user before going on.
