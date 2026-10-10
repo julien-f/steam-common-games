@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On Recently Looked Up, stepping to another game in the screenshot viewer dropped the media on screen from the address, so a copied link opened the game without it.
 - The side panel's Price card says when a game isn't in any current bundle, or when IsThereAnyDeal didn't answer, instead of showing nothing in both cases.
 - The side panel's list of bundles a game is in now refreshes every 12 hours, as documented, instead of every 30 days.
+- Steam sign-in now rejects a login confirmation that Steam issued for another website, which could otherwise be replayed here to sign in as someone else.
 
 ### Removed
 

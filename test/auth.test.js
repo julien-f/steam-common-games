@@ -63,10 +63,30 @@ test('buildLoginUrl: points at Steam with the realm, return_to and state set', (
 
 // ── verifySteamAssertion ──────────────────────────────────────────────────────
 
+const ORIGIN = 'https://example.com';
+const STATE = 'the-state';
+
+// A positive assertion as Steam returns it for a login this app started with ORIGIN and STATE.
+function assertion(overrides = {}) {
+  return {
+    'openid.ns': 'http://specs.openid.net/auth/2.0',
+    'openid.mode': 'id_res',
+    'openid.op_endpoint': 'https://steamcommunity.com/openid/login',
+    'openid.claimed_id': VALID_CLAIMED_ID,
+    'openid.identity': VALID_CLAIMED_ID,
+    'openid.return_to': `${ORIGIN}/auth/steam/callback?state=${STATE}`,
+    'openid.response_nonce': '2026-10-10T00:00:00Z0123456789',
+    'openid.assoc_handle': '1234567890',
+    'openid.signed': 'signed,op_endpoint,claimed_id,identity,return_to,response_nonce,assoc_handle',
+    'openid.sig': 'abc',
+    ...overrides,
+  };
+}
+const verify = (query) => verifySteamAssertion(query, { origin: ORIGIN, state: STATE });
+
 test('verifySteamAssertion: returns the steamid64 when Steam confirms the assertion', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'ns:...\nis_valid:true\n' }));
-  const steamid = await verifySteamAssertion({ 'openid.claimed_id': VALID_CLAIMED_ID, 'openid.mode': 'id_res' });
-  assert.equal(steamid, '76561198000000001');
+  assert.equal(await verify(assertion()), '76561198000000001');
 });
 
 test('verifySteamAssertion: forwards every openid.* param with mode overridden to check_authentication', async (t) => {
@@ -75,7 +95,7 @@ test('verifySteamAssertion: forwards every openid.* param with mode overridden t
     sentBody = new URLSearchParams(opts.body);
     return { ok: true, text: async () => 'is_valid:true' };
   });
-  await verifySteamAssertion({ 'openid.claimed_id': VALID_CLAIMED_ID, 'openid.sig': 'abc', unrelated: 'drop-me' });
+  await verify({ ...assertion(), unrelated: 'drop-me' });
   assert.equal(sentBody.get('openid.mode'), 'check_authentication');
   assert.equal(sentBody.get('openid.sig'), 'abc');
   assert.equal(sentBody.has('unrelated'), false);
@@ -83,23 +103,31 @@ test('verifySteamAssertion: forwards every openid.* param with mode overridden t
 
 test('verifySteamAssertion: null when Steam says the assertion is invalid', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:false' }));
-  assert.equal(await verifySteamAssertion({ 'openid.claimed_id': VALID_CLAIMED_ID }), null);
+  assert.equal(await verify(assertion()), null);
 });
 
 test('verifySteamAssertion: null when the verification request itself fails', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
-  assert.equal(await verifySteamAssertion({ 'openid.claimed_id': VALID_CLAIMED_ID }), null);
+  assert.equal(await verify(assertion()), null);
 });
 
-test('verifySteamAssertion: null for a malformed claimed_id, without even calling Steam', async (t) => {
-  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
-  assert.equal(await verifySteamAssertion({ 'openid.claimed_id': 'https://evil.example/not-steam' }), null);
-  assert.equal(fetchMock.mock.callCount(), 0);
-});
-
-test('verifySteamAssertion: null when claimed_id is missing entirely', async () => {
-  assert.equal(await verifySteamAssertion({}), null);
-});
+// Steam's check_authentication only vouches for the signature, so a valid assertion minted for
+// another site, or for another login on this one, must be rejected here (OpenID 2.0 §11.1).
+for (const [why, overrides] of [
+  ['a malformed claimed_id', { 'openid.claimed_id': 'https://evil.example/not-steam' }],
+  ['a missing claimed_id', { 'openid.claimed_id': undefined }],
+  ["another site's return_to", { 'openid.return_to': 'https://evil.example/auth/steam/callback?state=x' }],
+  ["another login's state", { 'openid.return_to': `${ORIGIN}/auth/steam/callback?state=other` }],
+  ['a foreign op_endpoint', { 'openid.op_endpoint': 'https://evil.example/openid/login' }],
+  ['an unsigned return_to', { 'openid.signed': 'signed,op_endpoint,claimed_id,identity,response_nonce,assoc_handle' }],
+  ['a missing signed list', { 'openid.signed': undefined }],
+]) {
+  test(`verifySteamAssertion: null for ${why}, without even calling Steam`, async (t) => {
+    const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
+    assert.equal(await verify(assertion(overrides)), null);
+    assert.equal(fetchMock.mock.callCount(), 0);
+  });
+}
 
 // ── users & sessions ──────────────────────────────────────────────────────────
 

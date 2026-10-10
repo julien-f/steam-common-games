@@ -1258,7 +1258,10 @@ app.get('/auth/steam/callback', authLimit, async (req, res) => {
 
   let steamid;
   try {
-    steamid = await verifySteamAssertion(req.query);
+    steamid = await verifySteamAssertion(req.query, {
+      origin: `${req.protocol}://${req.get('host')}`,
+      state: expectedState,
+    });
   } catch (err) {
     console.error('[auth] steam assertion verification failed', err.stack || err.message);
     res.setHeader('Set-Cookie', clearState);
