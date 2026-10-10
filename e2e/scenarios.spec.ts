@@ -288,10 +288,14 @@ test('L3 edge: the column menu undoes the group and filter it set', async ({ pag
   const menu = page.getByRole('button', { name: /^Weighted Rating options/ });
   const dialog = page.getByRole('dialog', { name: /^Weighted Rating options/ });
 
+  // Each regroup re-renders the table, closing a menu reopened before it lands (seen on CI).
+  const groupRows = page.locator('.dt-group-row');
   await menu.click();
   await dialog.getByRole('button', { name: 'Group by this column' }).click();
+  await expect(groupRows.first()).toBeVisible();
   await menu.click();
   await dialog.getByRole('button', { name: 'Remove group' }).click();
+  await expect(groupRows).toHaveCount(0);
   await menu.click();
   await expect(dialog.getByRole('button', { name: 'Group by this column' })).toBeVisible();
 
