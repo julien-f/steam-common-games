@@ -43,7 +43,7 @@ import {
   formatLogRange,
 } from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
-import { scoreColor, dealRecordTier, DEAL_RECORD_TIERS, formatMoney } from '/utils.ts';
+import { scoreColor, dealRecordTier, DEAL_RECORD_TIERS, formatMoney } from './utils.ts';
 
 // Rows are assembled in the still-untyped library.js/bundles.js from several independent async
 // sources (the game-details stream, price lookups, ...), so `any`-valued access is the honest

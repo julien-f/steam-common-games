@@ -3,16 +3,12 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { registerHooks } = require('node:module');
-const path = require('node:path');
-const { pathToFileURL } = require('node:url');
 
-// gameColumns.ts imports `/utils.ts` (Vite-root absolute), and @vates/data-table-solid touches
-// `window` on load; the helpers it uses are core's, re-exported. Drop once both load in Node.
+// @vates/data-table-solid touches `window` on load; the helpers gameColumns.ts uses are core's,
+// re-exported. Drop once it loads in Node.
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier === '/utils.ts') specifier = pathToFileURL(path.join(__dirname, '../public/utils.ts')).href;
-    else if (specifier === '@vates/data-table-solid') specifier = '@vates/data-table-core';
-    return next(specifier, context);
+    return next(specifier === '@vates/data-table-solid' ? '@vates/data-table-core' : specifier, context);
   },
 });
 
