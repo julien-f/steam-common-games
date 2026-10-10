@@ -57,6 +57,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The account routes no longer accept a per-account `refreshIds`, which nothing has sent since the legacy pages went away
 - `POST /api/common-games` takes `{ members }` and returns a flat `games` list, like `/api/wishlist`; the multi-slot and legacy `{ users }` request shapes and ownership grouping, unused by the app, are gone
 - The pre-commit hook checks only what is staged, setting unstaged edits aside while it runs, so a partly staged commit can't pass thanks to code it doesn't include
+- `scripts/setup-facts.js --transcripts` also counts the tool calls the user rejected, next to the permission classifier's denials
 
 ## [0.10.0] - 2026-10-10
 

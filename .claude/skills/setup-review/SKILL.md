@@ -35,7 +35,7 @@ Judges the setup against CLAUDE.md's Where things belong and Working style rules
 
 ## 3. Transcripts (only with `transcripts`)
 
-- `node scripts/setup-facts.js --transcripts[=N]` counts what needs no judgment over the last N sessions (default 20): largest outputs and slowest calls by command, command pairs repeated across sessions, calls the permission classifier denied, and each skill's runs and longest run.
+- `node scripts/setup-facts.js --transcripts[=N]` counts what needs no judgment over the last N sessions (default 20): largest outputs and slowest calls by command, command pairs repeated across sessions, calls the permission classifier denied or you rejected, and each skill's runs and longest run.
 - One `Agent` subagent then reads the same sessions under `~/.claude/projects/<this repo's slug>/*.jsonl`, newest first, for what does need judgment, seen in at least two sessions:
   - the user correcting the agent the same way (a rule missing, unclear or ignored);
   - the same command failing the same way (a pitfalls.md entry or a fix);

@@ -6,7 +6,7 @@
 //                                                  arguments without printing a usage line
 //   node scripts/setup-facts.js --cost             time and output size of the gates an agent runs
 //   node scripts/setup-facts.js --transcripts[=N]  the last N (default 20) sessions' largest outputs, slowest
-//                                                  calls, repeated command pairs and denied calls; commands are
+//                                                  calls, repeated command pairs, denied and rejected calls; commands are
 //                                                  reduced to their first words, so no arguments (or secrets) print
 
 const fs = require('node:fs');
@@ -45,7 +45,7 @@ function commandKey(command) {
 
 const text = (content) => (typeof content === 'string' ? content : (content ?? []).map((c) => c.text ?? '').join(''));
 
-// One session's JSONL lines → its tool calls, in order: `{ key, bytes, ms, denied }`.
+// One session's JSONL lines → its tool calls, in order: `{ key, bytes, ms, denied, rejected }`.
 function parseSession(lines) {
   const calls = new Map();
   for (const line of lines) {
@@ -61,6 +61,7 @@ function parseSession(lines) {
           bytes: out.length,
           ms: Date.parse(entry.timestamp) - call.start,
           denied: Boolean(part.is_error) && /^Permission for this action was denied/.test(out),
+          rejected: Boolean(part.is_error) && /^The user doesn't want to proceed/.test(out),
         });
       }
     }
@@ -105,12 +106,21 @@ function summarize(sessions) {
   const pairs = new Map();
   sessions.forEach((calls, session) => {
     calls.forEach((call, i) => {
-      const s = byKey.get(call.key) ?? { key: call.key, count: 0, bytes: 0, maxBytes: 0, maxMs: 0, denied: 0 };
+      const s = byKey.get(call.key) ?? {
+        key: call.key,
+        count: 0,
+        bytes: 0,
+        maxBytes: 0,
+        maxMs: 0,
+        denied: 0,
+        rejected: 0,
+      };
       s.count++;
       s.bytes += call.bytes;
       s.maxBytes = Math.max(s.maxBytes, call.bytes);
       s.maxMs = Math.max(s.maxMs, call.ms);
       s.denied += call.denied ? 1 : 0;
+      s.rejected += call.rejected ? 1 : 0;
       byKey.set(call.key, s);
       const next = calls[i + 1];
       if (next && next.key !== call.key) {
@@ -134,7 +144,9 @@ function summarize(sessions) {
       [...pairs.values()].filter((p) => p.sessions.size >= 2),
       (p) => p.sessions.size * 1000 + p.count,
     ).map((p) => ({ pair: p.pair, count: p.count, sessions: p.sessions.size })),
-    denied: keys.filter((k) => k.denied).map((k) => ({ key: k.key, denied: k.denied })),
+    denied: keys
+      .filter((k) => k.denied || k.rejected)
+      .map((k) => ({ key: k.key, denied: k.denied, rejected: k.rejected })),
   };
 }
 
@@ -173,8 +185,8 @@ function transcripts(limit) {
   for (const k of slow) console.log(`  ${k.key}: ${(k.maxMs / 1000).toFixed(0)} s`);
   console.log('\nCommand pairs repeated across sessions (sessions · times):');
   for (const p of pairs) console.log(`  ${p.pair}: ${p.sessions} · ${p.count}`);
-  console.log('\nDenied by the permission classifier:');
-  for (const d of denied) console.log(`  ${d.key}: ${d.denied}`);
+  console.log('\nDenied by the permission classifier · rejected by the user:');
+  for (const d of denied) console.log(`  ${d.key}: ${d.denied} · ${d.rejected}`);
   console.log('\nSkill runs (runs · sessions · longest run to the next prompt):');
   const runs = logs.map((lines) => skillRuns(lines, names));
   for (const name of names) {

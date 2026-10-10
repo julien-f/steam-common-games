@@ -30,7 +30,7 @@ test('commandKey keeps the command and subcommand, never arguments', () => {
   assert.equal(commandKey('grep -rn secret .'), 'grep');
 });
 
-test('parseSession pairs each call with its result: output size, elapsed time, classifier denial', () => {
+test('parseSession pairs each call with its result: output size, elapsed time, classifier denial, user rejection', () => {
   const line = (timestamp, content) => JSON.stringify({ timestamp, message: { content } });
   const calls = parseSession([
     line('2026-01-01T00:00:00Z', [{ type: 'tool_use', id: 'a', name: 'Bash', input: { command: 'npm test' } }]),
@@ -45,15 +45,20 @@ test('parseSession pairs each call with its result: output size, elapsed time, c
       },
     ]),
     line('2026-01-01T00:00:06Z', [{ type: 'tool_use', id: 'c', name: 'Read', input: {} }]),
+    line('2026-01-01T00:00:07Z', [{ type: 'tool_use', id: 'd', name: 'Edit', input: {} }]),
+    line('2026-01-01T00:00:08Z', [
+      { type: 'tool_result', tool_use_id: 'd', is_error: true, content: "The user doesn't want to proceed…" },
+    ]),
   ]);
   assert.deepEqual(calls, [
-    { key: 'npm test', bytes: 4, ms: 3000, denied: false },
-    { key: 'Read', bytes: 37, ms: 1000, denied: true },
+    { key: 'npm test', bytes: 4, ms: 3000, denied: false, rejected: false },
+    { key: 'Read', bytes: 37, ms: 1000, denied: true, rejected: false },
+    { key: 'Edit', bytes: 33, ms: 1000, denied: false, rejected: true },
   ]);
 });
 
 test('summarize ranks by output and time, and keeps only pairs seen in two sessions', () => {
-  const call = (key, bytes = 1, ms = 1) => ({ key, bytes, ms, denied: false });
+  const call = (key, bytes = 1, ms = 1) => ({ key, bytes, ms, denied: false, rejected: false });
   const { output, slow, pairs, denied } = summarize([
     [call('a', 100), call('b', 1, 9000)],
     [call('a'), call('b'), call('c')],
@@ -65,6 +70,15 @@ test('summarize ranks by output and time, and keeps only pairs seen in two sessi
   assert.equal(slow[0].key, 'b');
   assert.deepEqual(pairs, [{ pair: 'a → b', count: 2, sessions: 2 }]);
   assert.deepEqual(denied, []);
+});
+
+test('summarize lists classifier denials and user rejections per call', () => {
+  const call = (key, denied, rejected) => ({ key, bytes: 1, ms: 1, denied, rejected });
+  const { denied } = summarize([[call('Edit', false, true), call('Read', true, false), call('Edit', false, true)]]);
+  assert.deepEqual(denied, [
+    { key: 'Edit', denied: 0, rejected: 2 },
+    { key: 'Read', denied: 1, rejected: 0 },
+  ]);
 });
 
 test('skillRuns counts slash commands and Skill calls of known skills, each running to the next prompt', () => {
