@@ -11,8 +11,9 @@
 //   stale          libraries and wishlists read as fetched 12 days ago, until a refresh (D1)
 //   untiered       the Co-op Pack lists every game in its first tier, the pricier one empty (as ITAD sends some)
 //   slow-media     every banner, screenshot and trailer poster takes 1.5 s to load (Hades has the media)
+//   signed-in      signed in with Steam as Alice, whose account already has prefs (fixtures.ts's signedInPrefs)
 import type { Page } from '@playwright/test';
-import { PLAYERS, CATALOG, BUNDLE, PICK_BUNDLE, game, type Player } from './fixtures.ts';
+import { PLAYERS, CATALOG, BUNDLE, PICK_BUNDLE, SIGNED_IN, signedInPrefs, game, type Player } from './fixtures.ts';
 import { flattenBundleGames, type Bundle } from '../public/bundleData.ts';
 
 const NOW = Date.now();
@@ -222,7 +223,15 @@ export function respond(
 
   if (path === '/api/health')
     return json({ ok: true, configured: true, itadConfigured: !states.has('no-itad'), cache: { entries: 0 } });
-  if (path === '/api/me') return json({ steamid: null, prefs: null });
+  if (path === '/api/me')
+    return json(
+      states.has('signed-in')
+        ? { steamid: SIGNED_IN.steamid, prefs: signedInPrefs(NOW) }
+        : { steamid: null, prefs: null },
+    );
+  // Accepted, not stored: the next /api/me still answers the fixture prefs.
+  if (states.has('signed-in') && method === 'PUT' && path.startsWith('/api/me/prefs/'))
+    return json({ ok: true, applied: true });
 
   // A refresh is fetched now; otherwise as of server start, or 12 days before it under `stale`.
   const accountFetchedAt = () => (body.refresh ? Date.now() : states.has('stale') ? NOW - 12 * 86400_000 : NOW);

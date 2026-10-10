@@ -218,3 +218,33 @@ export const PICK_BUNDLE = {
   // What lib/fanatical.js's matchPickAndMix found on Fanatical's page; Terraria went unmatched.
   pickAndMixNames: { 'pnm-portal-2': 'Portal 2', 'pnm-hades': 'Hades', 'pnm-pack': 'Test Survival Pack' },
 };
+
+// The `signed-in` state's session: Alice, with prefs saved from another device (Y1) — her account
+// and one list, written a day before server start.
+export const SIGNED_IN = ALICE;
+export const SYNCED_LIST = 'Synced from my desktop';
+export function signedInPrefs(now: number) {
+  const updatedAt = now - 86400_000;
+  const slot = {
+    id: ALICE.steamid,
+    members: [ALICE.steamid],
+    rawInputs: [ALICE.vanity],
+    label: ALICE.personaname,
+    lastUsedAt: 0,
+  };
+  const list = {
+    id: 'synced-list',
+    name: SYNCED_LIST,
+    parentId: null,
+    order: 0,
+    createdAt: updatedAt,
+    updatedAt,
+    kind: 'manual',
+    appids: [620, 1145360],
+  };
+  return {
+    myAccount: { value: slot, updatedAt },
+    currentAccount: { value: slot, updatedAt },
+    lists: { value: [list], updatedAt },
+  };
+}

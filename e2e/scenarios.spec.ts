@@ -2,7 +2,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mockApi, respond } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
-import { ALICE, BOB, BUNDLE } from './fixtures.ts';
+import { ALICE, BOB, BUNDLE, SYNCED_LIST } from './fixtures.ts';
 
 let pageErrors: string[];
 test.beforeEach(async ({ page }) => {
@@ -1247,4 +1247,25 @@ test("S1: share my wishlist's view; a fresh browser sees my games with my layout
   await expect(friend.getByRole('heading', { name: "Alice's Wishlist" })).toBeVisible();
   await expect(friend.getByText('This table uses a layout from a shared link')).toBeVisible();
   await expect(rows(friend)).toHaveCount(4);
+});
+
+test("Y1.1,3: signed in on a new device, the account's lists win over this browser's newer ones", async ({ page }) => {
+  await asPlayer(page, BOB, { updatedAt: Date.now() }); // newer than the account's prefs, still not trusted
+  await mockApi(page, { states: ['signed-in'] });
+  const pushed: Record<string, string> = {}; // key → every body pushed for it
+  page.on('request', (req) => {
+    const key = new URL(req.url()).pathname.split('/').pop()!;
+    if (req.method() === 'PUT') pushed[key] = (pushed[key] ?? '') + req.postData();
+  });
+  await page.goto('/');
+
+  await expect(page.getByRole('main')).toContainText(SYNCED_LIST); // adopted, then reloaded
+  await expect(page.getByRole('navigation')).toContainText('Alice');
+  expect(pushed.recentAccounts).toContain(BOB.steamid); // a key the account lacks still goes up
+  // Home may refresh Alice's slot (its vanity) and push that; never this browser's Bob.
+  expect(pushed.myAccount ?? '').not.toContain(BOB.steamid);
+  expect(pushed.currentAccount ?? '').not.toContain(BOB.steamid);
+
+  await page.getByRole('navigation').getByText('Alice', { exact: true }).click();
+  await expect(page.getByText('Signed in — your accounts/lists/settings sync')).toBeVisible();
 });
