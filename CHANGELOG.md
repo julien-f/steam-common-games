@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - `scripts/dev-server.js up|down` runs `npm run dev` in the background, as `scripts/mock-server.js` does `dev:mock`.
 - `npm run check` also catches broken links, unknown `npm run` scripts and missing `scripts/` files or flags, in the docs, the skills, README.md and CLAUDE.md.
+- `npm run check` runs its steps in parallel and prints one line per step, with the full output only for the ones that fail.
 - `setup-review` skill: reviews the skills, scripts, hooks and CLAUDE.md for drift and duplication, optionally mining past sessions for repeated friction, and proposes ranked changes.
 - `code-audit` and `code-fix` skills: a whole-codebase review by dimension (simplify, security, perf, reliability, compliance, tests) recorded in `docs/dev/code-backlog.md`, and fixing its items one commit each.
 
