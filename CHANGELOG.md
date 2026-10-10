@@ -33,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `setup-review` skill: reviews the skills, scripts, hooks and CLAUDE.md for drift and duplication, optionally mining past sessions for repeated friction, and proposes ranked changes.
 - `code-audit` and `code-fix` skills: a whole-codebase review by dimension (simplify, security, perf, reliability, compliance, tests) recorded in `docs/dev/code-backlog.md`, and fixing its items one commit each.
 - `node scripts/changelog-add.js <Section> "<entry>"` adds a CHANGELOG entry under Unreleased, creating the section and subsection in order when missing.
+- `node scripts/db-query.js "<sql>"` queries `db.sqlite` read-only.
 
 ## [0.9.0] - 2026-10-07
 
