@@ -602,6 +602,20 @@ test('D2.1-2: with upstreams down, every game is still listed', async ({ page })
   await expect(page.locator('.panel-glance-chip').filter({ hasText: 'HLTB' })).toContainText("didn't answer");
 });
 
+test("D2.3: once the upstream is back, the panel's ↻ fills in what didn't answer", async ({ page }) => {
+  await mockApi(page, { states: ['upstream-down'] });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Hades').getByText('Hades').click();
+  const hltb = page.locator('.panel-glance-chip').filter({ hasText: 'HLTB' });
+  await expect(hltb).toContainText("didn't answer");
+
+  await mockApi(page); // the upstream is back: routes registered last take precedence
+  await page.locator('.panel-refresh-btn').click();
+  await expect(hltb).not.toContainText("didn't answer");
+  await expect(row(page, 'Hades').getByTitle(/HowLongToBeat didn't answer/)).toHaveCount(0);
+});
+
 test('D2 edge: a failed Steam store page is marked, not shown as missing data', async ({ page }, testInfo) => {
   await mockApi(page, { states: ['store-down'] });
   await asPlayer(page, ALICE);

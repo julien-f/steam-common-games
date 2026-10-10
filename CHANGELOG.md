@@ -52,6 +52,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A pre-push hook runs what CI runs, so a push that passes it passes CI; commits run only the desktop half of the end-to-end tests; CI runs its checks and end-to-end tests in parallel, on Node 24
 - GET /api/metrics no longer counts a rate limiter's own cache checks as cache hits, which inflated them by about 70%
 - The wishlist lookup no longer sends the Steam API key to Steam's undocumented wishlist endpoint, which answers the same without it
+- An end-to-end test covers retrying a game's sources with the panel's ↻ once a failed upstream is back (journey D2 step 3)
 
 ## [0.10.0] - 2026-10-10
 

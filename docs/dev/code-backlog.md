@@ -40,4 +40,4 @@ None open.
 
 ## Tests
 
-- **C64 · minor · S** — no e2e test locks journey D2 step 3 (the panel's ↻ retrying a source that didn't answer, once the upstream is back); `GET /api/game-details/:appid?refresh=1` itself is unit-tested. Add a mock state that fails a details source until cleared, and a D2.3 test.
+None open.
