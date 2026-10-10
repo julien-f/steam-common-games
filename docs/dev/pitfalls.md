@@ -43,9 +43,3 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: a screenshot path or `filename` in the scratchpad or `/tmp` is refused.
 - **Cause**: the Playwright MCP server reads and writes only under the repo's `.playwright-mcp/`.
 - **Fix**: keep MCP inputs and outputs under `.playwright-mcp/` (gitignored).
-
-## The client-side route test 404s in an agent worktree
-
-- **Symptom**: `GET /some/client-side/route: 200 with the app shell HTML` (`test/server.test.js`) gets a 404, so the pre-commit hook blocks every commit from a checkout under `.claude/worktrees/`.
-- **Cause**: `server.js` calls `res.sendFile` with an absolute path, and `send` treats any dot-segment in it (`.claude`) as a dotfile and refuses it.
-- **Fix**: commit from a checkout whose path has no dot-directory (apply the worktree's patches on the main checkout).

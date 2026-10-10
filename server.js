@@ -1314,7 +1314,7 @@ app.put('/api/me/prefs/:key', authLimit, requireAuth, (req, res) => {
 // extension) but genuinely doesn't exist still 404s via Express's default handler instead of
 // being silently rewritten into the shell.
 app.get(/^\/(?!api\/)(?!.*\.[a-zA-Z0-9]+$).*/, (_req, res) => {
-  res.sendFile(path.join(STATIC_DIR, 'index.html'));
+  res.sendFile('index.html', { root: STATIC_DIR });
 });
 
 if (require.main === module) {
