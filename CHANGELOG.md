@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Pages other than the home page no longer 404 when the app is installed in a folder whose path contains a hidden (dot) directory.
 - A list whose game details couldn't load (rate-limited, connection dropped) no longer sits at "0 / N games loaded": the unanswered games are marked as not answered, and the status line says why.
 - Switching accounts while the previous one's library was still loading no longer shows the previous account's ✓/☆ markers, "Owned by" and Played columns until a reload.
+- Home's account card says "couldn't load" for an owned or wishlist count Steam didn't answer, instead of 0; its Updated ↻ retries.
 
 ### Removed
 

@@ -42,6 +42,15 @@ test('A1 edge: Owned with no account points to Home rather than showing 0 games'
   await expect(page).toHaveURL(/\/$/);
 });
 
+test("A1 edge: a wishlist that didn't load says so on Home, rather than 0", async ({ page }) => {
+  await page.route('**/api/wishlist', (route) =>
+    route.fulfill({ status: 502, json: { error: 'Steam request failed' } }),
+  );
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await expect(page.locator('.account-counts')).toContainText("Owned: 6 · Wishlisted: couldn't load");
+});
+
 test('A2.1-2,4: explore a friend, then switch back to my ★ account from the nav chip', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');

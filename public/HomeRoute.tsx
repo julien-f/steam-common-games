@@ -87,7 +87,10 @@ export default function HomeRoute() {
   const [resolveInputs, setResolveInputs] = createSignal<string[]>(['']);
   const [resolveError, setResolveError] = createSignal('');
   const [resolving, setResolving] = createSignal(false);
-  const [counts, setCounts] = createSignal<{ owned: number | null; wishlist: number | null }>({
+  // null while loading; 'failed' when the fetch failed, so it doesn't read as an empty library.
+  type Count = number | null | 'failed';
+  const showCount = (n: Count) => (n === null ? '…' : n === 'failed' ? "couldn't load" : n);
+  const [counts, setCounts] = createSignal<{ owned: Count; wishlist: Count }>({
     owned: null,
     wishlist: null,
   });
@@ -168,7 +171,7 @@ export default function HomeRoute() {
         });
       },
       () => {
-        if (!isStale()) setCounts((c) => ({ ...c, owned: 0 }));
+        if (!isStale()) setCounts((c) => ({ ...c, owned: 'failed' }));
       },
     );
     const wishlist = fetchAccountWishlistItems(members, { refresh }).then(
@@ -176,7 +179,7 @@ export default function HomeRoute() {
         if (!isStale()) setCounts((c) => ({ ...c, wishlist: items.length }));
       },
       () => {
-        if (!isStale()) setCounts((c) => ({ ...c, wishlist: 0 }));
+        if (!isStale()) setCounts((c) => ({ ...c, wishlist: 'failed' }));
       },
     );
     void Promise.allSettled([owned, wishlist]).then(() => {
@@ -525,7 +528,7 @@ export default function HomeRoute() {
                   </Show>
                 </div>
                 <div class="account-counts">
-                  Owned: {counts().owned ?? '…'} · Wishlisted: {counts().wishlist ?? '…'}
+                  Owned: {showCount(counts().owned)} · Wishlisted: {showCount(counts().wishlist)}
                   <Show when={players().length > 1}>{` · ${players().length} accounts merged`}</Show>
                   <Show when={solePlayer()?.memberSince}>{(s) => ` · Member since ${s()}`}</Show>
                   <Show when={solePlayer()?.countryCode}>{(c) => ` ${countryFlag(c())}`}</Show>
