@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Friends lists with more than 100 people now load their names in batches of 100, within Steam's documented limit.
 - HLTB and ProtonDB are left alone for 5 minutes once they start blocking requests (two 403s in a row), as Steam's store already was, instead of being asked again for every game; `GET /api/metrics` shows all three circuit breakers.
 - Pages other than the home page no longer 404 when the app is installed in a folder whose path contains a hidden (dot) directory.
+- A list whose game details couldn't load (rate-limited, connection dropped) no longer sits at "0 / N games loaded": the unanswered games are marked as not answered, and the status line says why.
 
 ### Removed
 

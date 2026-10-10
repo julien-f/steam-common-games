@@ -1,6 +1,6 @@
 // docs/dev/journeys.md's journeys, end to end against mocked data (mockApi.ts).
 import { test, expect, type Page } from '@playwright/test';
-import { mockApi } from './mockApi.ts';
+import { mockApi, respond } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
 import { ALICE, BOB, BUNDLE } from './fixtures.ts';
 
@@ -541,6 +541,33 @@ test('D2 edge: a failed Steam store page is marked, not shown as missing data', 
         .getByTitle(/Steam store didn't answer/)
         .first(),
     ).toBeVisible();
+});
+
+test('D2 edge: a refused details stream marks every game failed, not loading forever', async ({ page }) => {
+  await page.route('**/api/game-details/stream', (route) =>
+    route.fulfill({ status: 429, json: { error: 'Too many requests. Please wait a minute and try again.' } }),
+  );
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await expect(page.locator('.list-status')).toContainText('Too many requests');
+  await expect(page.locator('.list-status')).toContainText("Steam store and Steam tags didn't answer for 6 games");
+  await expect(page.locator('.list-status')).not.toContainText('/ 6 games loaded');
+  await expect(row(page, 'Hades').getByTitle(/HowLongToBeat didn't answer/)).toBeVisible();
+});
+
+test('D2 edge: a details stream cut short marks the games it never sent failed', async ({ page }) => {
+  await page.route('**/api/game-details/stream', (route) => {
+    const req = route.request();
+    const full = respond(req.method(), new URL(req.url()), req.postData());
+    // The first two games' events only, and no `done`: the connection dropped.
+    return route.fulfill({ ...full, body: full.body.split('\n\n').slice(0, 2).join('\n\n') + '\n\n' });
+  });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await expect(page.locator('.list-status')).toContainText("didn't answer for 4 games");
+  await expect(page.locator('.list-status')).not.toContainText('/ 6 games loaded');
 });
 
 test("F1 edge: the Price card says when a game is in no bundle, and when ITAD didn't answer", async ({ page }) => {

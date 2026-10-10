@@ -485,6 +485,8 @@ interface DetailsEvent {
   failed?: string[];
 }
 
+const NO_DETAILS = { rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null };
+
 function applyDetailsEvent(row: Game, event: DetailsEvent) {
   row.detailsFetchedAt = event.fetchedAt ?? null;
   row.detailsFetchedAts = event.fetchedAts ?? null;
@@ -1550,48 +1552,57 @@ export default function ListRoute() {
   });
 
   async function streamGameDetails(games: { appid: number }[], gen: number): Promise<void> {
-    let resp: Response;
+    const unanswered = new Set(games.map((g) => g.appid));
+    let failure: string | null = null;
     try {
-      resp = await fetch('/api/game-details/stream', {
+      const resp = await fetch('/api/game-details/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ games: games.map((g) => ({ appid: g.appid })) }),
       });
-    } catch (err) {
-      if (loadGuard.isStale(gen)) return;
-      setStatusText(`Details stream failed: ${(err as Error).message}`);
-      return;
-    }
-
-    const reader = resp.body!.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    while (true) {
-      if (loadGuard.isStale(gen)) {
-        reader.cancel();
-        return;
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => null);
+        throw new Error(data?.error || `HTTP ${resp.status}`);
       }
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const parts = buffer.split('\n\n');
-      buffer = parts.pop() ?? '';
-      for (const part of parts) {
-        const line = part.trim();
-        if (!line.startsWith('data: ')) continue;
-        let event: DetailsEvent;
-        try {
-          event = JSON.parse(line.slice(6));
-        } catch {
-          continue;
+      const reader = resp.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        if (loadGuard.isStale(gen)) {
+          reader.cancel();
+          return;
         }
-        if (event.done) continue;
-        detailBatcher.push(event, gen);
-        loaded++;
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() ?? '';
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith('data: ')) continue;
+          let event: DetailsEvent;
+          try {
+            event = JSON.parse(line.slice(6));
+          } catch {
+            continue;
+          }
+          if (event.done) continue;
+          unanswered.delete(event.appid);
+          detailBatcher.push(event, gen);
+          loaded++;
+        }
       }
+    } catch (err) {
+      failure = (err as Error).message;
     }
     if (loadGuard.isStale(gen)) return;
+    // Rows the stream never answered (refused, dropped, cut short) would otherwise stay loading.
+    for (const appid of unanswered) {
+      detailBatcher.push({ appid, ...NO_DETAILS, failed: Object.keys(SOURCE_NAMES) }, gen);
+      loaded++;
+    }
     detailBatcher.flushNow();
+    if (failure) setStatusText(`Details stream failed: ${failure}`);
   }
 
   const itadConfiguredPromise = fetch('/api/health')
@@ -3338,7 +3349,7 @@ export default function ListRoute() {
         </div>
       </Show>
       <div class="list-status">
-        <Show when={needsAccount()} fallback={statusText()}>
+        <Show when={needsAccount()} fallback={<Show when={statusText()}>{(text) => <span>{text()}</span>}</Show>}>
           No account selected — <A href="/">pick one on Home</A>.
         </Show>
         <Show when={loadFraction()}>
