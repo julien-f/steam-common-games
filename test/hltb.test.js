@@ -357,6 +357,24 @@ test('getHLTB: skips init retry within 30s cooldown after failed init', async (t
   _resetAuth();
 });
 
+test('getHLTB: an init answering without a token also holds off re-init within the cooldown', async (t) => {
+  _reset();
+  _resetAuth();
+  let initCalls = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('search/site/init')) {
+      initCalls++;
+      return { ok: true, json: async () => ({}) };
+    }
+    return makeSearchResponse([]);
+  });
+
+  await assert.rejects(() => getHLTB(1, 'Portal'));
+  await assert.rejects(() => getHLTB(2, 'Portal 2'));
+  assert.equal(initCalls, 1, 'init should not be retried within cooldown window');
+  _resetAuth();
+});
+
 test('getHLTB: picks the best match by similarity, not first result', async (t) => {
   _reset();
   _resetAuth();
