@@ -66,7 +66,7 @@ async function assertMissesCountHitsDont(calls, { misses, over, hits }) {
   }
 }
 
-test('search limiter: legacy `users` and cached vanity names follow the same skip', async (t) => {
+test('search limiter: a cached vanity name skips it like a cached Steam64 id', async (t) => {
   _reset();
   const calls = mockUpstreams(t);
   const CACHED = '76561198000000099';
@@ -74,17 +74,16 @@ test('search limiter: legacy `users` and cached vanity names follow the same ski
   setCache(`games:${CACHED}`, []);
   setCache('resolve:cachedvanity', CACHED);
 
-  const commonGames = (body) => () => api.post('/api/common-games').send(body);
+  const commonGames = (members) => () => api.post('/api/common-games').send({ members });
   await assertMissesCountHitsDont(calls, {
     misses: {
-      'users, uncached Steam64': commonGames({ users: ['76561198000000001'] }),
-      'users, unresolved vanity': commonGames({ users: ['newvanity'] }),
+      'uncached Steam64': commonGames(['76561198000000001']),
+      'unresolved vanity': commonGames(['newvanity']),
     },
-    over: commonGames({ users: ['76561198000000002'] }),
+    over: commonGames(['76561198000000002']),
     hits: {
-      'users, cached Steam64': commonGames({ users: [CACHED] }),
-      'users, cached vanity': commonGames({ users: ['cachedvanity'] }),
-      'slots, cached vanity': commonGames({ slots: [['cachedvanity']] }),
+      'cached Steam64': commonGames([CACHED]),
+      'cached vanity': commonGames(['cachedvanity']),
     },
   });
 });

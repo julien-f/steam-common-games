@@ -187,7 +187,7 @@ test('GET /some/path/that/looks/like/an/asset.js: 404s instead of being rewritte
 test('GET /api/metrics: 200 with a since timestamp and per-group/label request counts', async (t) => {
   const GAME = { appid: 400, name: 'Portal' };
   t.mock.method(globalThis, 'fetch', makeLibraryFetch([GAME], []));
-  await api.post('/api/common-games').send({ slots: [[ID1], [ID2]] });
+  await api.post('/api/common-games').send({ members: [ID1, ID2] });
 
   const res = await api.get('/api/metrics');
   assert.equal(res.status, 200);
@@ -209,7 +209,7 @@ test('GET /api/metrics: includes semaphore, cache hit/entry, rate-limiter, and d
   _reset();
   const GAME = { appid: 400, name: 'Portal' };
   t.mock.method(globalThis, 'fetch', makeLibraryFetch([GAME], []));
-  await api.post('/api/common-games').send({ slots: [[ID1], [ID2]] });
+  await api.post('/api/common-games').send({ members: [ID1, ID2] });
 
   const res = await api.get('/api/metrics');
   assert.equal(res.status, 200);
@@ -241,60 +241,79 @@ test('GET /api/metrics: includes semaphore, cache hit/entry, rate-limiter, and d
 
 // ── POST /api/common-games — input validation ─────────────────────────────────
 
-test('POST /api/common-games: 400 when body has no slots field', async () => {
+test('POST /api/common-games: 400 when body has no members field', async () => {
   const res = await api.post('/api/common-games').send({});
   assert.equal(res.status, 400);
 });
 
-test('POST /api/common-games: 200 with full library when only one slot is provided', async (t) => {
-  _reset();
-  const GAME = { appid: 400, name: 'Portal' };
-  t.mock.method(globalThis, 'fetch', makeLibraryFetch([GAME], []));
-
-  const res = await api.post('/api/common-games').send({ slots: [[ID1]] });
-  assert.equal(res.status, 200);
-  assert.equal(res.body.groups.length, 1);
-  assert.equal(res.body.groups[0].games[0].appid, 400);
-  assert.equal(res.body.slots.length, 1);
+test('POST /api/common-games: 400 for the old { slots } and { users } bodies', async () => {
+  for (const body of [{ slots: [[ID1]] }, { users: [ID1] }]) {
+    const res = await api.post('/api/common-games').send(body);
+    assert.equal(res.status, 400, JSON.stringify(body));
+  }
 });
 
-test('POST /api/common-games: 400 when a slot is an empty array', async () => {
-  const res = await api.post('/api/common-games').send({ slots: [[], [ID1]] });
+test('POST /api/common-games: 400 when members is an empty array', async () => {
+  const res = await api.post('/api/common-games').send({ members: [] });
   assert.equal(res.status, 400);
 });
 
-test('POST /api/common-games: 400 when a slot value is null', async () => {
-  const res = await api.post('/api/common-games').send({ slots: [[null], [ID1]] });
+test('POST /api/common-games: 400 when a member value is null', async () => {
+  const res = await api.post('/api/common-games').send({ members: [null, ID1] });
   assert.equal(res.status, 400);
 });
 
-test('POST /api/common-games: 400 when a slot value is an empty string', async () => {
-  const res = await api.post('/api/common-games').send({ slots: [[''], [ID1]] });
+test('POST /api/common-games: 400 when a member value is an empty string', async () => {
+  const res = await api.post('/api/common-games').send({ members: ['', ID1] });
   assert.equal(res.status, 400);
 });
 
-test('POST /api/common-games: 400 when total users exceeds MAX_USERS', async () => {
-  // Default MAX_USERS is 10; send 11 slots of 1 user each.
-  const slots = Array.from({ length: 11 }, (_, i) => [`7656119800000000${i}`]);
-  const res = await api.post('/api/common-games').send({ slots });
+test('POST /api/common-games: 400 when members exceeds MAX_USERS', async () => {
+  // Default MAX_USERS is 10.
+  const members = Array.from({ length: 11 }, (_, i) => `7656119800000000${i}`);
+  const res = await api.post('/api/common-games').send({ members });
   assert.equal(res.status, 400);
   assert.match(res.body.error, /Too many users/);
 });
 
 // ── POST /api/common-games — happy path ──────────────────────────────────────
 
-test('POST /api/common-games: 200 with groups and slots', async (t) => {
+test('POST /api/common-games: 200 with the full library and player of a single account', async (t) => {
   _reset();
   const GAME = { appid: 400, name: 'Portal' };
-  t.mock.method(globalThis, 'fetch', makeLibraryFetch([GAME], [GAME]));
+  t.mock.method(globalThis, 'fetch', makeLibraryFetch([GAME], []));
 
-  const res = await api.post('/api/common-games').send({ slots: [[ID1], [ID2]] });
+  const res = await api.post('/api/common-games').send({ members: [ID1] });
   assert.equal(res.status, 200);
-  assert.ok(Array.isArray(res.body.groups));
-  assert.ok(Array.isArray(res.body.slots));
-  assert.equal(res.body.groups[0].games[0].appid, 400);
-  assert.equal(res.body.slots.length, 2);
-  assert.equal(res.body.slots[0][0].gameCount, 1, "gameCount reflects that account's own library size");
+  assert.deepEqual(res.body.games, [{ appid: 400, name: 'Portal' }]);
+  assert.equal(res.body.players.length, 1);
+  assert.equal(res.body.players[0].steamid, ID1);
+  assert.equal(res.body.players[0].gameCount, 1, "gameCount reflects that account's own library size");
+});
+
+test("POST /api/common-games: games is the alphabetical union of a Family's libraries, playtime covers every owned game", async (t) => {
+  _reset();
+  const SHARED = { appid: 400, name: 'Portal', playtime_forever: 10 };
+  const ONLY1 = { appid: 440, name: 'TF2', playtime_forever: 20 };
+  const ONLY2 = { appid: 220, name: 'Half-Life 2', playtime_forever: 30 };
+  t.mock.method(globalThis, 'fetch', makeLibraryFetch([ONLY1, SHARED], [SHARED, ONLY2]));
+
+  const res = await api.post('/api/common-games').send({ members: [ID1, ID2] });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.games, [
+    { appid: 220, name: 'Half-Life 2' },
+    { appid: 400, name: 'Portal' },
+    { appid: 440, name: 'TF2' },
+  ]);
+  assert.deepEqual(
+    res.body.players.map((p) => [p.steamid, p.gameCount]),
+    [
+      [ID1, 2],
+      [ID2, 2],
+    ],
+  );
+  // An account has an entry only for the games it owns.
+  assert.deepEqual(res.body.playtime, { 220: { [ID2]: 30 }, 400: { [ID1]: 10, [ID2]: 10 }, 440: { [ID1]: 20 } });
 });
 
 test('POST /api/common-games: lastPlayed carries rtime_last_played per account, 0 when absent', async (t) => {
@@ -303,31 +322,10 @@ test('POST /api/common-games: lastPlayed carries rtime_last_played per account, 
   const GAME2 = { appid: 400, name: 'Portal' }; // no rtime_last_played from this account
   t.mock.method(globalThis, 'fetch', makeLibraryFetch([GAME1], [GAME2]));
 
-  const res = await api.post('/api/common-games').send({ slots: [[ID1], [ID2]] });
+  const res = await api.post('/api/common-games').send({ members: [ID1, ID2] });
   assert.equal(res.status, 200);
   assert.equal(res.body.lastPlayed[400][ID1], 1751846400);
   assert.equal(res.body.lastPlayed[400][ID2], 0);
-});
-
-test('POST /api/common-games: 200 accepts legacy users array', async (t) => {
-  _reset();
-  t.mock.method(globalThis, 'fetch', makeLibraryFetch([], []));
-
-  const res = await api.post('/api/common-games').send({ users: [ID1, ID2] });
-  assert.equal(res.status, 200);
-});
-
-test('POST /api/common-games: groups contains only games shared by both players', async (t) => {
-  _reset();
-  const SHARED = { appid: 400, name: 'Portal' };
-  const SOLO = { appid: 440, name: 'TF2' };
-  t.mock.method(globalThis, 'fetch', makeLibraryFetch([SHARED, SOLO], [SHARED]));
-
-  const res = await api.post('/api/common-games').send({ slots: [[ID1], [ID2]] });
-  assert.equal(res.status, 200);
-  assert.equal(res.body.groups.length, 1);
-  assert.equal(res.body.groups[0].games.length, 1);
-  assert.equal(res.body.groups[0].games[0].appid, 400);
 });
 
 // ── POST /api/common-games — upstream / user errors ──────────────────────────
@@ -336,7 +334,7 @@ test('POST /api/common-games: 502 when Steam API returns a server error', async 
   _reset();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
 
-  const res = await api.post('/api/common-games').send({ slots: [[ID1], [ID2]] });
+  const res = await api.post('/api/common-games').send({ members: [ID1, ID2] });
   assert.equal(res.status, 502);
 });
 
@@ -350,7 +348,7 @@ test('POST /api/common-games: 400 when a library is private', async (t) => {
     return { ok: true, json: async () => ({ response: {} }) };
   });
 
-  const res = await api.post('/api/common-games').send({ slots: [[ID1], [ID2]] });
+  const res = await api.post('/api/common-games').send({ members: [ID1, ID2] });
   assert.equal(res.status, 400);
   assert.match(res.body.error, /private/);
 });
@@ -2268,17 +2266,17 @@ test('POST /api/common-games: fetchedAt is null on a fresh fetch, then the cache
   const GAME = { appid: 400, name: 'Portal' };
   t.mock.method(globalThis, 'fetch', makeLibraryFetch([GAME], []));
 
-  const fresh = await api.post('/api/common-games').send({ slots: [[ID1]] });
+  const fresh = await api.post('/api/common-games').send({ members: [ID1] });
   assert.equal(fresh.status, 200);
   // The library was fetched during this very request, so the entry it wrote is "just now" —
   // reported as a real timestamp, not null (null only happens when a key isn't cached at all).
   assert.equal(typeof fresh.body.fetchedAt, 'number');
 
-  const cached = await api.post('/api/common-games').send({ slots: [[ID1]] });
+  const cached = await api.post('/api/common-games').send({ members: [ID1] });
   assert.equal(cached.body.fetchedAt, fresh.body.fetchedAt);
 });
 
-test('POST /api/common-games: fetchedAt reports the OLDEST account in the slot', async (t) => {
+test('POST /api/common-games: fetchedAt reports the OLDEST member', async (t) => {
   _reset();
   const old = Date.now() - 60 * 60 * 1000;
   _reset([
@@ -2289,7 +2287,7 @@ test('POST /api/common-games: fetchedAt reports the OLDEST account in the slot',
   ]);
   t.mock.method(globalThis, 'fetch', makeLibraryFetch([], []));
 
-  const res = await api.post('/api/common-games').send({ slots: [[ID1, ID2]] });
+  const res = await api.post('/api/common-games').send({ members: [ID1, ID2] });
   assert.equal(res.status, 200);
   assert.equal(res.body.fetchedAt, old);
 });

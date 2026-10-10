@@ -156,28 +156,22 @@ test('search limiter: counts cache misses but never counts cache hits (common-ga
   setCache(`wishlist:${CACHED_WISHLIST}`, []);
 
   // Two uncached searches, one per route, consume the shared budget (max = 2).
-  const miss1 = await api.post('/api/common-games').send({ slots: [['76561198000000001']] });
+  const miss1 = await api.post('/api/common-games').send({ members: ['76561198000000001'] });
   assert.equal(miss1.status, 200, 'first miss should succeed within budget');
   const miss2 = await api.post('/api/wishlist').send({ members: ['76561198000000002'] });
   assert.equal(miss2.status, 200, 'second miss should succeed within budget');
 
   // A third uncached search, on either route, is over budget → 429.
-  const over = await api.post('/api/common-games').send({ slots: [['76561198000000003']] });
+  const over = await api.post('/api/common-games').send({ members: ['76561198000000003'] });
   assert.equal(over.status, 429, 'a cache miss past the budget should be rate limited');
 
   // The fully-cached accounts are still served even though the budget is exhausted, and make no
   // upstream call at all.
-  const cachedCommon = await api.post('/api/common-games').send({ slots: [[CACHED_COMMON]] });
+  const cachedCommon = await api.post('/api/common-games').send({ members: [CACHED_COMMON] });
   assert.equal(cachedCommon.status, 200, 'a fully-cached account (common-games) must bypass the limiter');
   const cachedWishlist = await api.post('/api/wishlist').send({ members: [CACHED_WISHLIST] });
   assert.equal(cachedWishlist.status, 200, 'a fully-cached account (wishlist) must bypass the limiter');
   assert.ok(!calledIds.has(CACHED_COMMON) && !calledIds.has(CACHED_WISHLIST), 'cache hits must not fetch upstream');
-
-  // Each route's skip reads only the field that route uses: a cached `slots` riding along on a
-  // wishlist request for uncached `members` must not get it past the limiter.
-  const mixed = await api.post('/api/wishlist').send({ slots: [[CACHED_COMMON]], members: ['76561198000000004'] });
-  assert.equal(mixed.status, 429, 'a wishlist miss must count whatever else the body carries');
-  assert.ok(!calledIds.has('76561198000000004'), 'a rate-limited request must not fetch upstream');
 });
 
 // Regression test for the bug reported live: reloading the Bundles page a handful of times (or

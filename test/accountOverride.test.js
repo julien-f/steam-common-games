@@ -49,7 +49,7 @@ function fakeResolveFetch({
     calls.push({ url, body: JSON.parse(opts.body) });
     if (url === '/api/common-games') {
       if (fail) return { ok: false, json: async () => ({ error: 'No such user' }) };
-      return { ok: true, json: async () => ({ groups: [{ games: [{ appid: 440, name: 'TF2' }] }], slots: [members] }) };
+      return { ok: true, json: async () => ({ games: [{ appid: 440, name: 'TF2' }], players: members }) };
     }
     return { ok: true, json: async () => ({ items: [] }) };
   };
@@ -98,7 +98,7 @@ test('syncFromUrl: comma-joined identifiers resolve as one Family account', asyn
   sync.syncFromUrl('?u=alice,bob');
   await settle();
 
-  assert.deepEqual(fetchHandler.calls[0].body, { slots: [['alice', 'bob']] });
+  assert.deepEqual(fetchHandler.calls[0].body, { members: ['alice', 'bob'] });
   assert.equal(getAccountOverride().id, '1+2');
   assert.equal(getAccountOverride().label, 'Alice + Bob');
 });
@@ -163,13 +163,13 @@ test('syncFromUrl: a superseded resolve never overwrites a newer one', async (t)
   withFetch(t, async (url, opts) => {
     const body = JSON.parse(opts.body);
     if (url !== '/api/common-games') return { ok: true, json: async () => ({ items: [] }) };
-    const slow = body.slots[0][0] === 'slow';
+    const slow = body.members[0] === 'slow';
     if (slow) await new Promise((r) => setTimeout(r, 20));
     return {
       ok: true,
       json: async () => ({
-        groups: [],
-        slots: [[{ steamid: slow ? '1' : '2', personaname: slow ? 'Slow' : 'Fast' }]],
+        games: [],
+        players: [{ steamid: slow ? '1' : '2', personaname: slow ? 'Slow' : 'Fast' }],
       }),
     };
   });
@@ -203,7 +203,7 @@ test('clear: a resolve still in flight cannot land afterward', async (t) => {
   withFetch(t, async (url) => {
     if (url !== '/api/common-games') return { ok: true, json: async () => ({ items: [] }) };
     await new Promise((r) => setTimeout(r, 20));
-    return { ok: true, json: async () => ({ groups: [], slots: [[{ steamid: '1', personaname: 'Alice' }]] }) };
+    return { ok: true, json: async () => ({ games: [], players: [{ steamid: '1', personaname: 'Alice' }] }) };
   });
   const sync = createAccountOverrideSync();
 

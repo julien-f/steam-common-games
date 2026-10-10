@@ -55,6 +55,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The wishlist lookup no longer sends the Steam API key to Steam's undocumented wishlist endpoint, which answers the same without it
 - An end-to-end test covers retrying a game's sources with the panel's ↻ once a failed upstream is back (journey D2 step 3)
 - The account routes no longer accept a per-account `refreshIds`, which nothing has sent since the legacy pages went away
+- `POST /api/common-games` takes `{ members }` and returns a flat `games` list, like `/api/wishlist`; the multi-slot and legacy `{ users }` request shapes and ownership grouping, unused by the app, are gone
 
 ## [0.10.0] - 2026-10-10
 
