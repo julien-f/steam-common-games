@@ -4225,6 +4225,14 @@ kbd {
   opacity: 0.8;
 }
 
+/* The game open in the panel (the tables' currentRow). */
+.dt-tr.dt-tr--current {
+  background: var(--color-background-info);
+}
+.dt-tr.dt-tr--current > .dt-td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
 /* ── Home route: account picker + folder/list tree ─────────────────────────────────────────── */
 
 .home-route {

@@ -380,6 +380,7 @@ export default function SearchRoute() {
                   table={table}
                   rowKey="appid"
                   onRowClick={(r) => openResult(r.appid, r.name, r.tinyImage)}
+                  currentRow={results().find((r) => r.appid === getPanelGame()?.appid) ?? null}
                 />
               </div>
             </Show>

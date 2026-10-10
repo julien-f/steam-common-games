@@ -40,7 +40,6 @@ None open.
 ## Keyboard and accessibility
 
 - **U70 · polish · S2** — after the panel's 🔗 copy, the icon becomes ✓ but nothing is announced and `aria-label` stays "Copy link to this game". Announce "Link copied" through a live region.
-- **U28 · polish · I2** — the open game's row is highlighted, but not exposed to assistive tech (`aria-current`). `@vates/data-table-solid` 0.17 added a current-row option (currentRow, setting `aria-current`); pass the open game's row to it.
 
 ## Phone
 

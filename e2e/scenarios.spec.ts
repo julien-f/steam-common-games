@@ -1252,6 +1252,16 @@ test("I2 edge: the panel's current thumbnail is exposed, not only coloured", asy
   await expect(current).toHaveCount(1);
 });
 
+test("I2 edge: the open game's row is exposed as current, not only coloured", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const current = page.locator('.dt-tr[aria-current="true"]');
+  await expect(current).toHaveCount(1);
+  await expect(current).toContainText('Hades');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(current).toHaveCount(0);
+});
+
 test('I2 edge: icon-only controls have names', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);

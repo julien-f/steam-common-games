@@ -2436,6 +2436,10 @@ export default function ListRoute() {
             rowKey: 'appid',
             selectable: true,
             onRowClick: (row) => openGame(rowStore.getRow(row.appid) ?? row),
+            get currentRow() {
+              const appid = getPanelGame()?.appid;
+              return appid == null ? null : (rowStore.getRow(appid) ?? null);
+            },
             // In the toolbar's own line rather than a row above it, so a phone's table starts higher.
             toolbarEnd: viewActions(),
           }),
