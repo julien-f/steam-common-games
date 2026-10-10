@@ -962,8 +962,8 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   // Same year-bucketed grouping, using this column's own `parseDate` (endOfReleasePeriod) so a
   // fuzzy "Fall 2026"/bare-year release groups under the year it actually resolves to instead of
   // bucketDatePart's own default `new Date(value).getTime()`, which can't make sense of those
-  // forms at all. `null` (no metadata) is the only missing case here — "Coming soon"/"TBA" are
-  // real (if imprecise) strings that endOfReleasePeriod resolves to an actual year, not `null`.
+  // forms at all. `null` (no metadata) is the only missing case here: "Coming soon"/"TBA" parse to
+  // NaN, which bucketDatePart keys by the string itself, so each keeps a group named after it.
   {
     key: 'releaseDate',
     label: 'Released',

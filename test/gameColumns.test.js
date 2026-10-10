@@ -21,6 +21,7 @@ const {
   scoreBucket,
   halfDecadeBucket,
   withMissingGroup,
+  CORE_COLUMNS,
 } = require('../public/gameColumns.ts');
 
 const day = (y, m, d) => new Date(y, m - 1, d).getTime();
@@ -170,4 +171,16 @@ test('halfDecadeBucket: 1-3-10 log steps, zero apart from below one', () => {
     assert.equal(halfDecadeBucket(input), expected, String(input));
   }
   assert.equal(withMissingGroup(halfDecadeBucket)(null), null, 'a failed fetch is not zero');
+});
+
+test('Released year grouping: "Coming soon"/"TBA" keep their own groups, no date in "—"', () => {
+  const col = CORE_COLUMNS.find((c) => c.key === 'releaseDate');
+  const label = (v) => {
+    const key = col.groupValue(v);
+    return col.groupFormat(key == null ? '' : String(key));
+  };
+  assert.equal(label('Fall 2026'), '2026');
+  assert.equal(label('Coming soon'), 'Coming soon');
+  assert.equal(label('To be announced'), 'To be announced');
+  assert.equal(label(null), '—');
 });
