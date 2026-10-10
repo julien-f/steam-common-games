@@ -75,6 +75,7 @@ const ACHIEVEMENTS_RATE_LIMIT_MAX = Number(process.env.ACHIEVEMENTS_RATE_LIMIT_M
 const FRIENDS_RATE_LIMIT_MAX = Number(process.env.FRIENDS_RATE_LIMIT_MAX);
 const STREAM_MAX_GAMES = Number(process.env.STREAM_MAX_GAMES);
 const STREAM_CONCURRENCY = Number(process.env.STREAM_CONCURRENCY);
+const STREAM_MAX_PER_IP = Number(process.env.STREAM_MAX_PER_IP);
 const BUNDLES_RATE_LIMIT_MAX = Number(process.env.BUNDLES_RATE_LIMIT_MAX);
 // Optional feature — see ITAD_API_KEY's comment in default.env. Checked once here rather than
 // duplicated across every /api/bundles* route handler.
@@ -1145,6 +1146,10 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
 // cache-hit exemption here, unlike the single-appid route); that's the safe direction to be
 // wrong in. STREAM_MAX_GAMES also caps how much work one request can queue up regardless of
 // how many requests/minute the budget above allows.
+// detailsLimit counts a stream once whatever its size, so this caps how many one client can have
+// open at once: otherwise parallel streams of uncached games fill the shared store queue.
+const openStreams = new Map(); // req.ip -> open stream count
+
 app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   const { games: gameList } = req.body;
   if (!Array.isArray(gameList) || gameList.length === 0) {
@@ -1161,6 +1166,20 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
       return res.status(400).json({ error: 'Invalid appid' });
     }
     validated.push(appid);
+  }
+
+  if (!rateLimitBypassed()) {
+    const open = openStreams.get(req.ip) ?? 0;
+    if (open >= STREAM_MAX_PER_IP) {
+      recordLimiterTrip('stream');
+      return res.status(429).json({ error: 'Too many game lists loading at once. Wait for one to finish.' });
+    }
+    openStreams.set(req.ip, open + 1);
+    res.once('close', () => {
+      const n = openStreams.get(req.ip) - 1;
+      if (n > 0) openStreams.set(req.ip, n);
+      else openStreams.delete(req.ip);
+    });
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
