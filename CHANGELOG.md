@@ -36,6 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A bundle game whose Steam page couldn't be looked up because a service was down is retried on the next visit, instead of showing as not on Steam for a day
 - When ProtonDB starts refusing requests, the app stops sending the ones it had already queued
 - When HowLongToBeat starts refusing requests, the app stops sending the searches it had already queued
+- On a comparison where your own account isn't first in the link, the "Only …" groups no longer swap players' names
 
 ### Development
 

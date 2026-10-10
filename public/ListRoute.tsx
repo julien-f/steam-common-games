@@ -2082,7 +2082,7 @@ export default function ListRoute() {
             // shared label's "— Owned" half is pure noise once it's repeated across every group
             // heading. "Alice + Bob", not "Alice — Owned + Bob — Owned"; the link still points at
             // that player's own library.
-            desc: { ...described[i], label: accountDisplayLabel(accounts[i]) },
+            desc: { ...described[i], label: accountDisplayLabel(shown[i]) },
           })),
         );
         if (Array.isArray(result)) {

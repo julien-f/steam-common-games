@@ -222,6 +222,14 @@ test('C3 edge: a saved comparison keeps the name its page had', async ({ page })
   await expect(page.getByRole('heading', { name: 'Alice vs. Bob' })).toBeVisible();
 });
 
+test('C1 edge: with my account listed first, each group still names the right players', async ({ page }) => {
+  await asPlayer(page, BOB); // Bob sorts after Alice in the URL, but reads first
+  await page.goto('/lists/compare?u=alice&u=bob');
+  const onlyBob = groupRows(page).filter({ hasText: 'Only Bob' });
+  await expect(onlyBob).toContainText('2 rows'); // Bob owns 2 games Alice doesn't
+  await expect(groupRows(page).filter({ hasText: 'Only Alice' })).toContainText('4 rows');
+});
+
 test('C1 edge: an unknown player is named, and the others still compare', async ({ page }) => {
   await page.goto('/lists/compare?u=alice&u=bob&u=nobody-here');
   const alert = page.getByRole('alert');
