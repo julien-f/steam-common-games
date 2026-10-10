@@ -469,3 +469,13 @@ test('fetchAccountOverview: a game nobody has an entry for gets no owners entry 
   }));
   assert.equal((await fetchAccountOverview(['1'])).owners.has(440), false);
 });
+
+test("an HTML error page (a proxy's 502) reads as the request failing, not as a JSON parse error", async (t) => {
+  withFetch(t, async () => new Response('<html>502 Bad Gateway</html>', { status: 502 }));
+  await assert.rejects(fetchAccountWishlist(['1']), { message: 'Failed to fetch wishlist' });
+});
+
+test('an API error keeps its own message', async (t) => {
+  withFetch(t, async () => Response.json({ error: 'Profile is private' }, { status: 400 }));
+  await assert.rejects(fetchAccountWishlist(['1']), { message: 'Profile is private' });
+});

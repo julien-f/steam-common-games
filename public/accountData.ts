@@ -5,7 +5,7 @@
 // functions (row-building, table wiring, URL/history updates, accounts-bar rendering) — none of
 // that belongs here; ListRoute.tsx owns the equivalent orchestration generically, for any list
 // kind, not just account-scoped ones.
-import { steamVanity, fmtLastPlayed } from './utils.ts';
+import { steamVanity, fmtLastPlayed, fetchJson } from './utils.ts';
 
 // An AccountSlot.id is itself the sorted-joined resolved member steam64 ids (see
 // accountsStore.ts's accountIdFor) — so resolving an id back to its members is just splitting
@@ -152,13 +152,15 @@ export async function fetchAccountOverview(
   members: string[],
   { refresh = false }: { refresh?: boolean } = {},
 ): Promise<AccountOverview> {
-  const res = await fetch('/api/common-games', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ slots: [members], refresh }),
-  });
-  const data: CommonGamesResponse & { error?: string } = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to fetch owned games');
+  const data = await fetchJson<CommonGamesResponse>(
+    '/api/common-games',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slots: [members], refresh }),
+    },
+    'Failed to fetch owned games',
+  );
 
   const allGames = data.groups.flatMap((g) => g.games);
   const slotSteamIds = data.slots[0].map((p) => p.steamid);
@@ -203,13 +205,15 @@ export async function fetchAccountWishlist(
   members: string[],
   { refresh = false }: { refresh?: boolean } = {},
 ): Promise<AccountWishlist> {
-  const res = await fetch('/api/wishlist', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ members, refresh }),
-  });
-  const data: WishlistResponse & { error?: string } = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to fetch wishlist');
+  const data = await fetchJson<WishlistResponse>(
+    '/api/wishlist',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ members, refresh }),
+    },
+    'Failed to fetch wishlist',
+  );
   return { items: data.items, fetchedAt: data.fetchedAt ?? null };
 }
 
@@ -283,13 +287,15 @@ export async function fetchAccountFriends(
   members: string[],
   { refresh = false }: { refresh?: boolean } = {},
 ): Promise<AccountFriends> {
-  const res = await fetch('/api/friends', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ members, refresh }),
-  });
-  const data: FriendsResponse & { error?: string } = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to fetch friends');
+  const data = await fetchJson<FriendsResponse>(
+    '/api/friends',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ members, refresh }),
+    },
+    'Failed to fetch friends',
+  );
   return {
     friends: data.friends.map((f) => ({
       steamid: f.steamid,

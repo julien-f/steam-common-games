@@ -38,6 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - When HowLongToBeat starts refusing requests, the app stops sending the searches it had already queued
 - On a comparison where your own account isn't first in the link, the "Only …" groups no longer swap players' names
 - When the game panel's ↻ fails to reach Steam or IsThereAnyDeal, its achievements and price keep what they showed, like its news and bundles, instead of switching to "didn't answer"
+- When the server is unreachable behind a proxy that answers with an error page, the app says what failed ("Failed to fetch wishlist"…) instead of showing a JSON parse error
 
 ### Development
 

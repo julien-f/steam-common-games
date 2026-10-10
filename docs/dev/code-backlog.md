@@ -20,7 +20,6 @@ Last audited: simplify 2026-10-10 · security 2026-10-10 · perf 2026-10-10 · r
 - **C11 · cleanup · S** — `stepGameList`'s `table: unknown` at `public/panelNav.ts:51` is only truth-tested and always truthy. Drop it; pass the list instead of a getter.
 - **C13 · cleanup · M** — `refreshIds` (common-games, wishlist, friends; `server.js:579-581, 653-654, 710-711`, limiter branches at `236-241, 286-289`) and `getPlayerSummaries`' `forceIds` (`lib/steam.js:325-358`) served the old Library Explorer ↻; no frontend or e2e sends them. Delete with their two tests.
 - **C14 · cleanup · M** — `/api/common-games` (`server.js:538-610`, `lib/groupGames.js`) accepts several slots, the legacy `{ users }` body and ownership grouping; the frontend posts one slot and flattens `groups` (`accountData.ts:142-147, 307, 342`). Take `{ members }` like `/api/wishlist`, return flat `games`, drop `groupByOwnership`, and update architecture.md:81 and `e2e/mockApi.ts`.
-- **C15 · cleanup · M** — `const data = await res.json(); if (!res.ok) throw new Error(data.error || '…')` at 13 sites in `public/` (accountData ×3, panelData ×3, bundleData ×2, priceLoading, SearchRoute, ListRoute ×2, BundlesBrowseRoute); each turns a proxy's HTML 502 into a JSON parse error. One JSON-fetch helper in `utils.ts`.
 
 ## Security
 

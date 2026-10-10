@@ -40,7 +40,7 @@ import {
   priceTierBucket,
   formatPriceTier,
 } from './gameColumns.ts';
-import { fmtAge, formatMoney, oldestFetchedAt, scoreColor } from './utils.ts';
+import { ApiError, fetchJson, fmtAge, formatMoney, oldestFetchedAt, scoreColor } from './utils.ts';
 import {
   toBundleRow,
   fmtBundleDateTime,
@@ -372,12 +372,14 @@ export default function BundlesBrowseRoute() {
       limit: String(PAGE_SIZE),
     });
     if (force) qs.set('refresh', '1');
-    const res = await fetch(`/api/bundles?${qs}`);
-    const data = await res.json();
-    if (res.status === 503) throw new UnavailableError(data.error);
-    if (!res.ok) throw new Error(data.error || 'Failed to load bundles');
+    let data: { bundles: BundleListItem[]; fetchedAt?: number | null };
+    try {
+      data = await fetchJson(`/api/bundles?${qs}`, undefined, 'Failed to load bundles');
+    } catch (err) {
+      throw err instanceof ApiError && err.status === 503 ? new UnavailableError(err.message) : err;
+    }
     noteFetchedAt(data.fetchedAt ?? null);
-    return data.bundles as BundleListItem[];
+    return data.bundles;
   }
 
   async function load({
