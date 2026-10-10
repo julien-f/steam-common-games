@@ -282,10 +282,9 @@ const searchLimit = namedRateLimit('search', {
   },
 });
 
-// Separate from searchLimit above rather than sharing it — that limiter's skip keys off
-// `members` to mean "wishlist", and /api/friends also sends `members`, so sharing it would
-// check the wrong cache prefix (wishlist: instead of friends:). Same "cache hits don't count"
-// shape otherwise.
+// Separate from searchLimit above rather than sharing it — that limiter's skip checks the
+// games:/wishlist: prefixes, so sharing it would check the wrong cache prefix for /api/friends
+// (friends:). Same "cache hits don't count" shape otherwise.
 const friendsLimit = namedRateLimit('friends', {
   windowMs: 60 * 1000,
   max: FRIENDS_RATE_LIMIT_MAX,
