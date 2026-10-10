@@ -59,6 +59,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The pre-commit hook checks only what is staged, setting unstaged edits aside while it runs, so a partly staged commit can't pass thanks to code it doesn't include
 - `scripts/setup-facts.js --transcripts` also counts the tool calls the user rejected, next to the permission classifier's denials
 - `npm run check:doc-refs` also flags links to a heading that no longer exists.
+- `node scripts/backlog-next.js <C|U>` gives the next code or UX backlog number, never one a closed item already used.
 
 ## [0.10.0] - 2026-10-10
 

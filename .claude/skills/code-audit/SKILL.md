@@ -41,7 +41,7 @@ Not findings: style (ESLint and Prettier own it), "might need later" generality,
 
 ## Record and report
 
-- Record each finding in [code-backlog.md](../../../docs/dev/code-backlog.md) under its dimension: next free `C` number, `**C<n> · <severity> · <effort>** — problem at \`file:line\`. Direction.` Drop or narrow items the run shows fixed, and set the header's last-audited date (today) for each dimension covered.
+- Record each finding in [code-backlog.md](../../../docs/dev/code-backlog.md) under its dimension: numbered on from `node scripts/backlog-next.js C` (never reuse a closed item's number), `**C<n> · <severity> · <effort>** — problem at \`file:line\`. Direction.` Drop or narrow items the run shows fixed, and set the header's last-audited date (today) for each dimension covered.
 - **Severity**: _critical_ (exploitable, or loses or corrupts data) · _major_ (a real bug, cost or risk users or the upstreams feel) · _minor_ · _cleanup_ (simpler code, no behaviour change).
 - Report one table ranked by severity, then effort:
 
