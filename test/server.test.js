@@ -940,6 +940,26 @@ test('GET /api/game-details/:appid: concurrent requests for the same appid dedup
   assert.equal(counts.tags, 2, 'tags fetched once for two concurrent requests (one browse + one name-map call)');
 });
 
+// A forced request never reuses the normal one's result, which can come from cache, but it does
+// share a call to the upstream already under way: that call missed the cache, so it's current.
+test('GET /api/game-details/:appid: ?refresh=1 alongside a normal request shares its in-flight upstream calls', async (t) => {
+  _reset();
+  _resetAuth();
+  t.mock.method(console, 'warn', () => {});
+  const counts = { rating: 0, hltb: 0, hltbInit: 0, meta: 0, tags: 0 };
+  t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts, { delayMs: 50 }));
+
+  const [normal, forced] = await Promise.all([
+    api.get('/api/game-details/503'),
+    api.get('/api/game-details/503?refresh=1'),
+  ]);
+  assert.equal(normal.status, 200);
+  assert.equal(forced.status, 200);
+  assert.equal(forced.body.rating.score, normal.body.rating.score);
+  assert.equal(counts.rating, 1);
+  assert.equal(counts.meta, 1);
+});
+
 test('GET /api/game-details/:appid: ?refresh=1 re-fetches every source despite the cache', async (t) => {
   _reset();
   _resetAuth();

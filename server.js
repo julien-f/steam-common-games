@@ -749,8 +749,9 @@ app.post('/api/friends', friendsLimit, async (req, res) => {
 const dedupDetails = createDedup();
 
 function fetchGameDetails(appid, { force = false } = {}) {
-  // Force-refresh gets its own dedup lane so it never joins an already in-flight
-  // non-forced fetch that started before the cache was known to be bypassed.
+  // Force-refresh gets its own lane here, so it's never handed a normal request's result, which
+  // may come straight from cache. Below this, lib/steam.js still lets it share a call to an
+  // upstream already under way: that call only exists because the cache missed, so it's current.
   const dedupKey = force ? `details:force:${appid}` : `details:${appid}`;
   return dedupDetails(dedupKey, () => {
     const metaPromise = getAppDetails(appid, { force });
