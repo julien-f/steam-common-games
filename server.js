@@ -85,6 +85,8 @@ const BUNDLES_RATE_LIMIT_MAX = Number(process.env.BUNDLES_RATE_LIMIT_MAX);
 const isItadConfigured = () => !!process.env.ITAD_API_KEY;
 // Shown to visitors; the setup hint goes to the startup log instead (see app.listen below).
 const ITAD_UNAVAILABLE = "Bundles and prices aren't available on this instance: it isn't connected to IsThereAnyDeal.";
+const requireItad = (_req, res, next) =>
+  isItadConfigured() ? next() : res.status(503).json({ error: ITAD_UNAVAILABLE });
 // Shared by every /api/bundles* route that takes a `country` query param — falls back to US
 // for anything that isn't a plain 2-letter code rather than rejecting the request outright,
 // same "trust but sanitize" treatment as the rest of this app's query params.
@@ -880,10 +882,7 @@ app.get('/api/search-games', gameSearchLimit, async (req, res) => {
 
 // Backs the Bundles page's bundle list — a thin, cached proxy over ITAD's GET /bundles/v1.
 // See lib/itad.js and docs/dev/integrations.md and docs/dev/data.md.
-app.get('/api/bundles', bundlesListLimit, async (req, res) => {
-  if (!isItadConfigured()) {
-    return res.status(503).json({ error: ITAD_UNAVAILABLE });
-  }
+app.get('/api/bundles', bundlesListLimit, requireItad, async (req, res) => {
   const { country, offset, limit, sort, expired } = parseBundlesQuery(req);
   try {
     // ?refresh=1 backs the browse page's own "↻ Refresh" — a bundle can go live or expire at any
@@ -912,10 +911,7 @@ app.get('/api/bundles', bundlesListLimit, async (req, res) => {
 // GET /bundles/v1 the list above uses, active bundles first then expired, up to a bounded
 // number of pages, and 404s rather than searching indefinitely if the id never turns up (very
 // old/deleted bundle, or a bad id).
-app.get('/api/bundles/:id', bundlesByIdLimit, async (req, res) => {
-  if (!isItadConfigured()) {
-    return res.status(503).json({ error: ITAD_UNAVAILABLE });
-  }
+app.get('/api/bundles/:id', bundlesByIdLimit, requireItad, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     return res.status(400).json({ error: 'Invalid bundle id' });
@@ -946,10 +942,7 @@ app.get('/api/bundles/:id', bundlesByIdLimit, async (req, res) => {
 // apps — see lib/itad.js's resolveSteamAppIds), or null for a gid with no Steam listing at all
 // — the frontend renders those as the separate "not on Steam" list.
 const MAX_BUNDLE_RESOLVE_GAMES = 500;
-app.post('/api/bundles/resolve', bundlesResolveLimit, async (req, res) => {
-  if (!isItadConfigured()) {
-    return res.status(503).json({ error: ITAD_UNAVAILABLE });
-  }
+app.post('/api/bundles/resolve', bundlesResolveLimit, requireItad, async (req, res) => {
   const gids = req.body.gids;
   if (!Array.isArray(gids) || gids.length === 0 || !gids.every((g) => typeof g === 'string' && g)) {
     return res.status(400).json({ error: 'Provide at least one game id' });
@@ -980,10 +973,7 @@ app.post('/api/bundles/resolve', bundlesResolveLimit, async (req, res) => {
 // specific; appid resolution isn't) and isn't always wanted (e.g. before a bundle's games have
 // even resolved to Steam). See lib/itad.js's resolveItadIds/getPrices/extractPriceInfo.
 const MAX_PRICE_LOOKUP_GAMES = 500;
-app.post('/api/prices', pricesLimit, async (req, res) => {
-  if (!isItadConfigured()) {
-    return res.status(503).json({ error: ITAD_UNAVAILABLE });
-  }
+app.post('/api/prices', pricesLimit, requireItad, async (req, res) => {
   const { gids, appids } = req.body;
   const byGid = Array.isArray(gids) && gids.length > 0;
   const byAppid = Array.isArray(appids) && appids.length > 0;
@@ -1026,10 +1016,7 @@ app.post('/api/prices', pricesLimit, async (req, res) => {
   }
 });
 
-app.get('/api/game-bundles/:appid', gameBundlesLimit, async (req, res) => {
-  if (!isItadConfigured()) {
-    return res.status(503).json({ error: ITAD_UNAVAILABLE });
-  }
+app.get('/api/game-bundles/:appid', gameBundlesLimit, requireItad, async (req, res) => {
   const appid = Number(req.params.appid);
   if (!Number.isInteger(appid) || appid <= 0) {
     return res.status(400).json({ error: 'Invalid appid' });
