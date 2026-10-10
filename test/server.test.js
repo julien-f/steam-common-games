@@ -330,36 +330,6 @@ test('POST /api/common-games: groups contains only games shared by both players'
   assert.equal(res.body.groups[0].games[0].appid, 400);
 });
 
-test('POST /api/common-games: refreshIds re-fetches only the listed account, not the whole slot', async (t) => {
-  _reset();
-  let gamesFetchCount1 = 0,
-    gamesFetchCount2 = 0;
-  t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('GetOwnedGames') && url.includes(ID1)) {
-      gamesFetchCount1++;
-      return { ok: true, json: async () => ({ response: { games: [{ appid: 400, name: 'Portal' }] } }) };
-    }
-    if (url.includes('GetOwnedGames') && url.includes(ID2)) {
-      gamesFetchCount2++;
-      return { ok: true, json: async () => ({ response: { games: [{ appid: 400, name: 'Portal' }] } }) };
-    }
-    if (url.includes('GetPlayerSummaries')) {
-      const players = [ID1, ID2].map((id) => ({ steamid: id, personaname: id, profileurl: '' }));
-      return { ok: true, json: async () => ({ response: { players } }) };
-    }
-    throw new Error(`Unexpected fetch: ${url}`);
-  });
-
-  await api.post('/api/common-games').send({ slots: [[ID1], [ID2]] }); // primes the cache
-  assert.equal(gamesFetchCount1, 1);
-  assert.equal(gamesFetchCount2, 1);
-
-  const res = await api.post('/api/common-games').send({ slots: [[ID1], [ID2]], refreshIds: [ID2] });
-  assert.equal(res.status, 200);
-  assert.equal(gamesFetchCount1, 1, 'ID1 was not in refreshIds — served from cache');
-  assert.equal(gamesFetchCount2, 2, 'ID2 was in refreshIds — re-fetched');
-});
-
 // ── POST /api/common-games — upstream / user errors ──────────────────────────
 
 test('POST /api/common-games: 502 when Steam API returns a server error', async (t) => {

@@ -248,12 +248,8 @@ const searchLimit = namedRateLimit('search', {
   skip: (req) => {
     if (rateLimitBypassed()) return true;
     // A full refresh always re-fetches every account, so it must always count — same rule
-    // isForceRefresh gets elsewhere in this file. A per-account refreshIds (the accounts bar's
-    // own "↻") forces at least those accounts regardless of cache state, so it must count too
-    // — no need to reason about which specific ids they are.
+    // isForceRefresh gets elsewhere in this file.
     if (req.body.refresh === true) return false;
-    const refreshIds = req.body.refreshIds;
-    if (Array.isArray(refreshIds) && refreshIds.length > 0) return false;
 
     // Read only the field the route itself reads, so a cached id in another field can't vouch
     // for uncached ones.
@@ -305,8 +301,6 @@ const friendsLimit = namedRateLimit('friends', {
   skip: (req) => {
     if (rateLimitBypassed()) return true;
     if (req.body.refresh === true) return false;
-    const refreshIds = req.body.refreshIds;
-    if (Array.isArray(refreshIds) && refreshIds.length > 0) return false;
 
     const rawIdentifiers = req.body.members;
     if (!Array.isArray(rawIdentifiers) || !rawIdentifiers.every((u) => typeof u === 'string' && u.trim().length > 0))
@@ -590,9 +584,6 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
   // library-tier cache (owned games + player summaries) so a just-bought game or a
   // changed display name shows up immediately, without waiting out the TTL.
   const refresh = req.body.refresh === true;
-  // Per-account refresh (the accounts bar's own "↻" on one chip) — bypasses the cache for
-  // just these already-resolved Steam64 IDs instead of every account in the search.
-  const refreshIds = new Set(Array.isArray(req.body.refreshIds) ? req.body.refreshIds : []);
 
   try {
     // Resolve all users; deduplicate within each slot
@@ -603,8 +594,8 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
     // Fetch all unique Steam IDs in one pass
     const uniqueIds = [...new Set(resolvedSlots.flat())];
     const [playerList, libraryList] = await Promise.all([
-      getPlayerSummaries(uniqueIds, { force: refresh, forceIds: refreshIds }),
-      Promise.all(uniqueIds.map((id) => getOwnedGames(id, { force: refresh || refreshIds.has(id) }))),
+      getPlayerSummaries(uniqueIds, { force: refresh }),
+      Promise.all(uniqueIds.map((id) => getOwnedGames(id, { force: refresh }))),
     ]);
 
     const libraryById = new Map(uniqueIds.map((id, i) => [id, libraryList[i]]));
@@ -680,13 +671,12 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
   }
 
   const refresh = req.body.refresh === true;
-  const refreshIds = new Set(Array.isArray(req.body.refreshIds) ? req.body.refreshIds : []);
 
   try {
     const ids = [...new Set(await Promise.all(members.map(resolveSteamId)))];
     const [playerList, lists] = await Promise.all([
-      getPlayerSummaries(ids, { force: refresh, forceIds: refreshIds }),
-      Promise.all(ids.map((id) => getWishlist(id, { force: refresh || refreshIds.has(id) }))),
+      getPlayerSummaries(ids, { force: refresh }),
+      Promise.all(ids.map((id) => getWishlist(id, { force: refresh }))),
     ]);
 
     // Union across accounts — first-seen wins, same rule /api/common-games uses for libraries.
@@ -737,11 +727,10 @@ app.post('/api/friends', friendsLimit, async (req, res) => {
   }
 
   const refresh = req.body.refresh === true;
-  const refreshIds = new Set(Array.isArray(req.body.refreshIds) ? req.body.refreshIds : []);
 
   try {
     const ids = [...new Set(await Promise.all(members.map(resolveSteamId)))];
-    const lists = await Promise.all(ids.map((id) => getFriendList(id, { force: refresh || refreshIds.has(id) })));
+    const lists = await Promise.all(ids.map((id) => getFriendList(id, { force: refresh })));
 
     const unavailable = ids.filter((id, i) => lists[i] === null);
     const friendIds = [...new Set(lists.flat().filter(Boolean))];
