@@ -4,8 +4,9 @@
 // Keep a Changelog's set plus Development (tooling, tests, docs: kept apart from what users see)
 // — new entries then have one obvious place to go — or has an entry over
 // MAX_ENTRY characters: commit-sized essays made the 0.5.0 release's consolidation a rewrite.
-// With --staged[=<base>] (the pre-commit hook; base HEAD, HEAD~1 when amending), also fails when
-// the commit changes app code without CHANGELOG.md; SKIP_CHANGELOG=1 skips that part.
+// With --staged[=<base>] (the pre-commit hook; base HEAD, HEAD~1 when amending), checks the staged
+// CHANGELOG.md instead of the working tree's, and also fails when the commit changes app code without
+// it; SKIP_CHANGELOG=1 skips that part.
 
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
@@ -34,9 +35,12 @@ function structureProblems(text) {
 const missingEntry = (files) => files.some((f) => APP_CODE.test(f)) && !files.includes('CHANGELOG.md');
 
 function main() {
-  const text = fs.readFileSync(path.join(__dirname, '..', 'CHANGELOG.md'), 'utf8');
-  const problems = [...new Set(structureProblems(text))];
+  const root = path.join(__dirname, '..');
   const staged = process.argv.slice(2).find((a) => a.startsWith('--staged'));
+  const text = staged
+    ? execFileSync('git', ['show', ':CHANGELOG.md'], { cwd: root, encoding: 'utf8' })
+    : fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
+  const problems = [...new Set(structureProblems(text))];
   if (staged && !process.env.SKIP_CHANGELOG) {
     const base = staged.split('=')[1] || 'HEAD';
     const files = execFileSync('git', ['diff', '--cached', '--name-only', base], { encoding: 'utf8' }).split('\n');
