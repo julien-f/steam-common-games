@@ -208,8 +208,8 @@ export function clearRecentAccounts(): void {
   });
 }
 
-// Permanently purges any soft-removed account no longer referenced by anything — call after any
-// change that could have removed the last reference (e.g. a dynamic list's sources edited).
+// Permanently purges any soft-removed account no longer referenced by anything — listsStore.ts's
+// sweepDeletedLists() calls it after every change that could have removed the last reference.
 export function sweepRemovedAccounts(): number {
   const recents = readRecents();
   const kept = recents.filter((a) => !a.removedAt || isAccountReferenced(a.id));

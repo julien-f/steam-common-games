@@ -11,11 +11,13 @@
 //     explicitly in the doc, but the same "never let a structural cycle get saved" principle.
 //
 // accountsStore.ts calls isAccountReferenced() from here (rather than duplicating this file's
-// source-scanning logic) to decide whether removing a recent account must soft-remove instead.
+// source-scanning logic) to decide whether removing a recent account must soft-remove instead;
+// this file calls its sweepRemovedAccounts() back from sweepDeletedLists().
 import { getPref, setPref } from './prefs.ts';
 import { union, subtract } from './combine.ts';
 import { EMPTY_RANKING, type RankingState } from './ranking.ts';
 import { getBundleSnapshot, pruneBundleSnapshots } from './bundleSnapshots.ts';
+import { sweepRemovedAccounts } from './accountsStore.ts';
 import type { Folder, GameList, ListRef, CombineOp } from './types.ts';
 
 const LISTS_KEY = 'lists';
@@ -163,13 +165,10 @@ export function isBundleReferenced(bundleId: string, lists: GameList[] = readLis
   return lists.some((l) => listDeps(l).some((s) => s.kind === 'bundle' && s.bundleId === bundleId));
 }
 
+// Soft-deleted lists count, as for bundles: they still resolve, and name the account by its slot.
 export function isAccountReferenced(accountId: string, lists: GameList[] = readLists()): boolean {
-  return lists.some(
-    (l) =>
-      !l.deletedAt &&
-      listDeps(l).some(
-        (s) => (s.kind === 'account-owned' || s.kind === 'account-wishlist') && s.accountId === accountId,
-      ),
+  return lists.some((l) =>
+    listDeps(l).some((s) => (s.kind === 'account-owned' || s.kind === 'account-wishlist') && s.accountId === accountId),
   );
 }
 
@@ -432,7 +431,7 @@ export function restoreList(id: string): void {
 // change that could have removed the last reference to a soft-deleted list (e.g. a dynamic
 // list's sources being edited, or another soft-deleted list itself finally being purged).
 // Repeats until stable (a purged list may have been the last reference to another), then drops
-// the bundle snapshots nothing refers to any more.
+// the bundle snapshots and soft-removed accounts nothing refers to any more.
 export function sweepDeletedLists(): number {
   const lists = readLists();
   let kept = lists;
@@ -447,6 +446,7 @@ export function sweepDeletedLists(): number {
     kept.flatMap((l) => listDeps(l).flatMap((s) => (s.kind === 'bundle' && s.bundleId ? [s.bundleId] : []))),
   );
   pruneBundleSnapshots(bundles);
+  sweepRemovedAccounts();
   return lists.length - kept.length;
 }
 

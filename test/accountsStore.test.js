@@ -158,8 +158,8 @@ test('clearRecentAccounts: soft-removes referenced accounts, hard-removes the re
   );
 });
 
-test('sweepRemovedAccounts: purges a soft-removed account once its last reference is gone', () => {
-  const { setCurrentAccount, removeRecentAccount, sweepRemovedAccounts, getRecentAccounts } = store();
+test('a soft-removed account is purged once a list edit drops its last reference', () => {
+  const { setCurrentAccount, removeRecentAccount, getRecentAccounts } = store();
   const { createList, updateDynamicList } = require('../public/listsStore.ts');
   setCurrentAccount(makeAccount('acc1'));
   const watcher = createList({
@@ -170,9 +170,47 @@ test('sweepRemovedAccounts: purges a soft-removed account once its last referenc
   });
   removeRecentAccount('acc1');
 
-  assert.equal(sweepRemovedAccounts(), 0); // still referenced
-  updateDynamicList(watcher.id, 'union', []); // drop the reference
-  assert.equal(sweepRemovedAccounts(), 1);
+  assert.equal(getRecentAccounts({ includeRemoved: true }).length, 1); // still referenced
+  updateDynamicList(watcher.id, 'union', []);
+  assert.equal(getRecentAccounts({ includeRemoved: true }).length, 0);
+});
+
+test('a soft-removed account is purged once the list referencing it is deleted', () => {
+  const { setCurrentAccount, removeRecentAccount, getRecentAccounts } = store();
+  const { createList, deleteList } = require('../public/listsStore.ts');
+  setCurrentAccount(makeAccount('acc1'));
+  const watcher = createList({
+    name: 'Watcher',
+    kind: 'dynamic',
+    op: 'union',
+    sources: [{ kind: 'account-owned', accountId: 'acc1' }],
+  });
+  removeRecentAccount('acc1');
+
+  deleteList(watcher.id);
+  assert.equal(getRecentAccounts({ includeRemoved: true }).length, 0);
+});
+
+test('a soft-deleted list still referencing an account keeps it until that list is purged', () => {
+  const { setCurrentAccount, removeRecentAccount, getRecentAccounts } = store();
+  const { createList, deleteList, updateDynamicList } = require('../public/listsStore.ts');
+  setCurrentAccount(makeAccount('acc1'));
+  const inner = createList({
+    name: 'Inner',
+    kind: 'dynamic',
+    op: 'union',
+    sources: [{ kind: 'account-owned', accountId: 'acc1' }],
+  });
+  const outer = createList({
+    name: 'Outer',
+    kind: 'dynamic',
+    op: 'union',
+    sources: [{ kind: 'user', listId: inner.id }],
+  });
+  assert.equal(deleteList(inner.id).softDeleted, true);
+  assert.equal(removeRecentAccount('acc1').softRemoved, true);
+
+  updateDynamicList(outer.id, 'union', []);
   assert.equal(getRecentAccounts({ includeRemoved: true }).length, 0);
 });
 

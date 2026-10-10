@@ -129,7 +129,7 @@ A `GameList` or `AccountSlot` still referenced by some dynamic list's `sources[]
 
 A referenced **bundle** disappearing (ITAD stops listing it some time after it ends, and `GET /api/bundles/:id` 404s) is remote data, not something the app deleted. `bundleSnapshots.ts` keeps each referenced bundle's last-known title and appids, refreshed whenever a resolve succeeds (`listResolve.ts`'s `resolveBundleSource`); on the 404, `listsStore.ts`'s `orphanBundle` turns that snapshot into a soft-deleted manual list (`orphanOf: { bundleId }`, named "<title> (no longer listed)") and re-points every source at it, so the lists keep their contents and the soft-delete lifecycle above takes over. Any other failure falls back to the snapshot without converting. A bundle that never resolved has no snapshot and contributes nothing.
 
-The sweep runs inside `listsStore.ts` itself — `deleteList`, `updateDynamicList`, `updateRankedSource`, `orphanBundle` — repeated until nothing more goes, and prunes the snapshots no list uses.
+The sweep runs inside `listsStore.ts` itself — `deleteList`, `updateDynamicList`, `updateRankedSource`, `orphanBundle` — repeated until nothing more goes, then prunes the snapshots and soft-removed accounts no list uses. A soft-deleted list still counts as a reference to the bundles and accounts in its sources, since it still resolves.
 
 ## Storage schema
 
