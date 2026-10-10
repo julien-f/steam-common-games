@@ -132,7 +132,7 @@ import {
 import { getPref, setPref } from './prefs.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
 import { etaSeconds, formatEta, type LoadSample } from './loadProgress.ts';
-import { convert, formatWithEstimate, REGION_CURRENCY } from './currency.ts';
+import { convert, formatWithEstimate } from './currency.ts';
 import {
   membershipColumn,
   membershipKey,
@@ -180,7 +180,7 @@ import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { rememberBundle } from './bundleSnapshots.ts';
 import { fanaticalBuyUrl, FANATICAL_BOOKMARKLET } from './fanaticalPicks.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, PRICES_UNAVAILABLE } from './priceLoading.ts';
-import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
+import { getStoredRegion, resolveRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { openPrefsPopover } from './prefsPopover.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
@@ -353,10 +353,6 @@ const WISHLIST_DEFAULT_VISIBLE = [
   'bestDealPrice',
   'bestDealCut',
 ];
-
-function regionCurrency(): string {
-  return REGION_CURRENCY[resolveRegion(getStoredRegion())] ?? 'USD';
-}
 
 function renderAddonBadge(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');

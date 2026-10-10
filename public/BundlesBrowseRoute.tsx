@@ -57,7 +57,7 @@ import {
   type BundleListItem,
   type BundleRow,
 } from './bundleRows.ts';
-import { getStoredRegion, resolveRegion, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
+import { getStoredRegion, resolveRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { setBrowsedBundles } from './bundleBrowseStore.ts';
 import { openPrefsPopover } from './prefsPopover.ts';
 import {
@@ -73,7 +73,7 @@ import { createStaleGuard } from './staleGuard.ts';
 import { getPref, setPref } from './prefs.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
 import { setBaseTitle } from './pageTitle.ts';
-import { convert, formatWithEstimate, REGION_CURRENCY } from './currency.ts';
+import { convert, formatWithEstimate } from './currency.ts';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
 import { loadErrorText, UnavailableError } from './bundleData.ts';
 
@@ -193,9 +193,6 @@ function renderEnds(value: unknown, row: BundleRow): Node {
   return renderDateTime(value, rel);
 }
 
-function regionCurrency(): string {
-  return REGION_CURRENCY[resolveRegion(getStoredRegion())] ?? 'USD';
-}
 function inRegionCurrency(amount: number, currency: string | null | undefined): number {
   return convert(amount, currency ?? regionCurrency(), regionCurrency()) ?? amount;
 }

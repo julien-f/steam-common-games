@@ -43,8 +43,8 @@ import type {
   PanelPrice,
 } from './panelData.ts';
 import { bestPickRate, bundleUrgency, fmtBundleDateFriendly, pickTiers } from './bundleRows.ts';
-import { formatWithEstimate, REGION_CURRENCY } from './currency.ts';
-import { getStoredRegion, resolveRegion } from './region.ts';
+import { formatWithEstimate } from './currency.ts';
+import { regionCurrency } from './region.ts';
 import { nextHopHistory } from './panelHistory.ts';
 import type { PanelHistoryEntry } from './panelHistory.ts';
 import { setGameTitle } from './pageTitle.ts';
@@ -63,7 +63,7 @@ function bundleTierText(b: GameBundle): string {
   if (b.tierPrice != null && b.tierPriceMax != null)
     return `${formatMoney(b.tierPrice, b.tierCurrency)}–${formatMoney(b.tierPriceMax, b.tierCurrency)} tier`;
   if (b.tierPrice != null) return `${formatMoney(b.tierPrice, b.tierCurrency)} tier`;
-  const region = REGION_CURRENCY[resolveRegion(getStoredRegion())] ?? 'USD';
+  const region = regionCurrency();
   const rate = bestPickRate(pickTiers(b.pickAndMix, region));
   return rate ? `from ${formatWithEstimate(rate.amount, rate.currency, region, '/game')}` : 'Varies';
 }

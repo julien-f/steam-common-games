@@ -1,6 +1,7 @@
 'use strict';
 
 import { getPref, setPref } from './prefs.ts';
+import { REGION_CURRENCY } from './currency.ts';
 
 // The region preference's data and logic — the curated list, the detection heuristic, and
 // get/set/resolve for the stored value — with no DOM/UI code of its own (see prefsPopover.js
@@ -184,6 +185,11 @@ export function setStoredRegion(value: string): void {
 // freezing whatever they happened to resolve to at picker-population time.
 export function resolveRegion(selected: string): string {
   return selected === AUTO_COUNTRY ? detectCountry() : selected;
+}
+
+// The currency prices are shown in for the current region.
+export function regionCurrency(): string {
+  return REGION_CURRENCY[resolveRegion(getStoredRegion())] ?? 'USD';
 }
 
 // `initRegionSelect` (the region <select>'s only remaining populator, public/prefsPopover.js)
