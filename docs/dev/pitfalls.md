@@ -25,3 +25,21 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: a `page.goto` issued straight after a ×/Esc close fails with `net::ERR_ABORTED`, on CI more than locally.
 - **Cause**: the close steps history back over the overlay's own entry (`overlayHistory.ts`) with an asynchronous `history.go`, and that traversal aborts the navigation already under way.
 - **Fix**: wait for the step's `popstate` before navigating (see the L4 Recently Looked Up test).
+
+## Exit 144, then `Port 58992 is already in use`, after `pkill -f`
+
+- **Symptom**: `pkill -f vite` (or `node server.js`) ends the command with exit 144, and the next start fails on a busy port or gets connection refused.
+- **Cause**: the pattern matches the shell running the `pkill` command itself, so it kills that shell, and it can miss the server's actual process.
+- **Fix**: stop servers with `node scripts/mock-server.js down` / `node scripts/dev-server.js down`, never `pkill`.
+
+## `document is not defined` in `browser_run_code_unsafe`
+
+- **Symptom**: `ReferenceError: document is not defined` (or `localStorage`, `setTimeout`, `require`) from a Playwright MCP code call.
+- **Cause**: the code runs in Playwright's sandbox with `page`, not in the page.
+- **Fix**: DOM and storage access go inside `page.evaluate(() => …)`; wait with `page.waitForTimeout(ms)`; pass a script file through `filename`.
+
+## `File access denied … is outside allowed roots` from Playwright MCP
+
+- **Symptom**: a screenshot path or `filename` in the scratchpad or `/tmp` is refused.
+- **Cause**: the Playwright MCP server reads and writes only under the repo's `.playwright-mcp/`.
+- **Fix**: keep MCP inputs and outputs under `.playwright-mcp/` (gitignored).

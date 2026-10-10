@@ -35,7 +35,7 @@ Each writes `.playwright-mcp/demo-<mode>.js`; run it with `browser_run_code_unsa
 
 ## Walk each scenario
 
-Start the server(s) you need if not already running (check `curl localhost:58993` / `curl localhost:58991`). At **1440×900** and **390×844**, following its steps as a user would — mouse first, then keyboard only.
+Start the server(s) you need (`up` reuses a running one). At **1440×900** and **390×844**, following its steps as a user would — mouse first, then keyboard only.
 
 Check at each step:
 
