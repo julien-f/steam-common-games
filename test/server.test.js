@@ -2070,6 +2070,58 @@ test('POST /api/prices: 200 by appids — resolves to gids first, then prices, k
   });
 });
 
+for (const [name, path, body, error] of [
+  [
+    'POST /api/prices: 400 when gids are not all non-empty strings',
+    '/api/prices',
+    { gids: ['gid-1', 42] },
+    /gids must be non-empty strings/,
+  ],
+  [
+    'POST /api/prices: 400 with more than 500 games',
+    '/api/prices',
+    { appids: Array.from({ length: 501 }, (_, i) => i + 1) },
+    /Too many games/,
+  ],
+  [
+    'POST /api/bundles/resolve: 400 with more than 500 games',
+    '/api/bundles/resolve',
+    { gids: Array.from({ length: 501 }, (_, i) => `gid-${i}`) },
+    /Too many games/,
+  ],
+]) {
+  test(name, async (t) => {
+    _reset();
+    process.env.ITAD_API_KEY = 'test-itad-key';
+    const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
+    const res = await api.post(path).send(body);
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, error);
+    assert.equal(fetchMock.mock.callCount(), 0);
+  });
+}
+
+// Every upstream call answers 500: each route maps the failure to a 502 with its message.
+for (const [name, request] of [
+  ['GET /api/bundles/:id', () => api.get('/api/bundles/9001')],
+  ['POST /api/bundles/resolve', () => api.post('/api/bundles/resolve').send({ gids: ['gid-x'] })],
+  ['POST /api/prices', () => api.post('/api/prices').send({ gids: ['gid-x'] })],
+  ['GET /api/game-news/:appid', () => api.get('/api/game-news/9002')],
+  ['GET /api/achievements/:appid', () => api.get('/api/achievements/9003')],
+]) {
+  test(`${name}: 502 when the upstream call fails`, async (t) => {
+    _reset();
+    _resetCircuitBreakers();
+    process.env.ITAD_API_KEY = 'test-itad-key';
+    t.mock.method(console, 'error', () => {});
+    t.mock.method(console, 'warn', () => {});
+    t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
+    const res = await request();
+    assert.equal(res.status, 502);
+    assert.match(res.body.error, /error 500/);
+  });
+}
+
 // ── fetchedAt (how old the served data is) ────────────────────────────────────
 
 test('POST /api/common-games: fetchedAt is null on a fresh fetch, then the cache write time', async (t) => {
