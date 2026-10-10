@@ -42,8 +42,6 @@ None open.
 
 ## Phone
 
-- **U114 · major · F1, I1, I2** — stepping games in the lightbox (swipe up/down, ↑/↓) once the chrome has idled flashes only the media counter ("Cover"), not the game's name or position: on a screenshot, nothing says which game you landed on. Flash the caption on a game step, the counter alone on a media step.
-
 - **U32 · minor · I1, R1** — the ranking screen stacks cards vertically (Tie/Skip/Undo below the fold) and has no side gutter.
 - **U33 · minor · F3** — no random pick on phone until a panel is open (the 🎲 lives in the panel's nav).
 

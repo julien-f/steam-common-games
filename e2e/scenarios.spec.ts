@@ -949,6 +949,25 @@ test('F1 edge: stepping media leaves hidden controls hidden, flashing only the c
   await expect(lb).not.toHaveClass(/lb-idle/);
 });
 
+test('F1 edge: stepping games with hidden controls flashes the game name too', async ({ page }) => {
+  await page.clock.install();
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const lb = page.locator('#screenshot-lightbox');
+  const caption = page.locator('.lb-caption');
+  await page.clock.runFor(3500);
+  await expect(lb).toHaveClass(/lb-idle/);
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.lb-counter')).toHaveCSS('opacity', '1');
+  await expect(caption).toHaveCSS('opacity', '0');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.lb-caption-text')).toHaveText('Terraria');
+  expect(await lb.getAttribute('class')).toMatch(/lb-idle/);
+  await expect(caption).toHaveCSS('opacity', '1');
+  await page.clock.runFor(2000);
+  await expect(caption).toHaveCSS('opacity', '0');
+});
+
 test('F1 edge: the mouse brings back only the controls near it', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'mouse only');
   await page.clock.install();

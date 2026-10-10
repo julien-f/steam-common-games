@@ -52,6 +52,8 @@ const shots = () => {
   return g ? buildMediaItems(g.appid, g.details?.meta) : [];
 };
 const gameName = () => lbGame()?.name ?? '';
+// The game `renderLightbox` last drew, so a render can tell a game step from a media step.
+let lbRenderedAppid: number | undefined;
 let lbZoom = 1,
   lbPanX = 0,
   lbPanY = 0,
@@ -441,12 +443,14 @@ function schedHideLbChrome() {
   lbVcTimer = setTimeout(() => lb.classList.add('lb-idle'), 3000);
 }
 
-// A step with the chrome idle leaves it idle, showing only where the viewer now is.
-function flashLbCounter(lb: HTMLElement) {
+// A step with the chrome idle leaves it idle, showing only where the viewer now is: the counter,
+// plus the game's name when the step changed game.
+function flashLbCounter(lb: HTMLElement, gameChanged: boolean) {
   if (!lb.classList.contains('lb-idle')) return;
   lb.classList.add('lb--stepped');
+  if (gameChanged) lb.classList.add('lb--stepped-game');
   clearTimeout(lbCounterTimer);
-  lbCounterTimer = setTimeout(() => lb.classList.remove('lb--stepped'), 1500);
+  lbCounterTimer = setTimeout(() => lb.classList.remove('lb--stepped', 'lb--stepped-game'), 1500);
 }
 
 // ── Focus helpers ──────────────────────────────────────────────────────────
@@ -1107,7 +1111,17 @@ export function closeLightbox() {
   const lb = document.getElementById('screenshot-lightbox')!;
   stopHls(lbVideoEl);
   detachLbVideo();
-  lb.classList.remove('open', 'lb--loading', 'lb-idle', 'lb--paused', 'lb--unstarted', 'lb--stepped', 'lb-pointer');
+  lb.classList.remove(
+    'open',
+    'lb--loading',
+    'lb-idle',
+    'lb--paused',
+    'lb--unstarted',
+    'lb--stepped',
+    'lb--stepped-game',
+    'lb-pointer',
+  );
+  lbRenderedAppid = undefined;
   document.body.classList.remove('lb-open');
   if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
     (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
@@ -1194,7 +1208,9 @@ function renderLightbox() {
   lbLastDir = 0;
   lbLastAxis = 'x';
   resetLbZoom();
-  flashLbCounter(lb);
+  const appid = lbGame()?.appid;
+  flashLbCounter(lb, appid !== lbRenderedAppid);
+  lbRenderedAppid = appid;
   hideLbError();
   // Invalidate any image preload still in flight from a previous render — see lbImgToken decl.
   const imgToken = ++lbImgToken;
