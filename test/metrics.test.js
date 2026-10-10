@@ -319,3 +319,30 @@ test('getMetrics: reports per-group budget usage', async (t) => {
   assert.equal(b.dayUsed, 1);
   assert.equal(b.hourMax, Number(process.env.OUTBOUND_HOURLY_MAX));
 });
+
+test('trackedFetch: refuses calls past the daily budget until the day rolls over', async (t) => {
+  _reset();
+  t.mock.timers.enable({ apis: ['Date'] });
+  const restore = globalThis.fetch;
+  globalThis.fetch = async () => ({ status: 200 });
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
+  const warnMock = t.mock.method(console, 'warn', () => {});
+
+  // Spend it one hourly budget per hour, so only the daily cap can refuse.
+  const hourly = Number(process.env.OUTBOUND_HOURLY_MAX);
+  const daily = Number(process.env.OUTBOUND_DAILY_MAX);
+  for (let spent = 0; spent < daily; spent += hourly) {
+    for (let i = 0; i < hourly; i++) await trackedFetch('grp', 'label', 'u');
+    t.mock.timers.tick(60 * 60 * 1000);
+  }
+  await assert.rejects(() => trackedFetch('grp', 'label', 'u'), /budget for grp exhausted/);
+  assert.ok(warnMock.mock.calls.some((c) => /daily outbound budget exhausted/.test(c.arguments[0])));
+  assert.equal(getMetrics().budgets.grp.dayUsed, daily);
+
+  // 24 h after the day's first call, the count starts over.
+  t.mock.timers.setTime(24 * 60 * 60 * 1000);
+  await trackedFetch('grp', 'label', 'u');
+  assert.equal(getMetrics().budgets.grp.dayUsed, 1);
+});
