@@ -529,6 +529,28 @@ test('getPlayerSummaries: caches result — second call skips fetch', async (t) 
   assert.equal(fetchCount, 1, 'second call should be served from cache');
 });
 
+test("getPlayerSummaries: asks for at most 100 ids per call, Steam's documented limit", async (t) => {
+  _reset();
+  const batches = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const ids = new URL(url).searchParams.get('steamids').split(',');
+    batches.push(ids.length);
+    return {
+      ok: true,
+      json: async () => ({ response: { players: ids.map((steamid) => ({ steamid, personaname: steamid })) } }),
+    };
+  });
+
+  const ids = Array.from({ length: 250 }, (_, i) => String(76561198000001000n + BigInt(i)));
+  const players = await getPlayerSummaries(ids);
+  assert.deepEqual(batches, [100, 100, 50]);
+  assert.equal(players.length, 250);
+  assert.ok(
+    players.every((p) => p.personaname === p.steamid),
+    'every id gets its real summary',
+  );
+});
+
 test('getPlayerSummaries: returns placeholder players when API fails, does not cache', async (t) => {
   _reset();
   let fetchCount = 0;

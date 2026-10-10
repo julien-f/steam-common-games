@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Steam sign-in now rejects a login confirmation that Steam issued for another website, which could otherwise be replayed here to sign in as someone else.
 - Game search ignores `?refresh=1`, which let a client skip its rate limit and re-query Steam's store search on every request.
 - A wishlist request can no longer skip the search rate limit by also carrying an already-cached account in a field the wishlist doesn't use.
+- Friends lists with more than 100 people now load their names in batches of 100, within Steam's documented limit.
 
 ### Removed
 

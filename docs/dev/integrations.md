@@ -37,7 +37,7 @@ If HLTB breaks again, recent npm packages (e.g. `howlongtobeat-ts`) tend to reve
 
 ## Friends — documented, keyed endpoint
 
-`getFriendList` calls `https://api.steampowered.com/ISteamUser/GetFriendList/v1/?key={key}&steamid={id}` — a published, key-gated endpoint (the good trust tier from this doc's intro, unlike the wishlist/tags/search endpoints above). It returns only `steamid`s; names/avatars are resolved separately through the same batched `GetPlayerSummaries` call every other player-profile lookup here already uses. A private friends list gets a `401` (not a `200` with an empty list), so — unlike the wishlist's private/empty ambiguity — it's distinguishable: `getFriendList` caches that case as `null` rather than `[]`, and `POST /api/friends` reports those steamids separately as `unavailable` instead of silently treating them as "no friends".
+`getFriendList` calls `https://api.steampowered.com/ISteamUser/GetFriendList/v1/?key={key}&steamid={id}` — a published, key-gated endpoint (the good trust tier from this doc's intro, unlike the wishlist/tags/search endpoints above). It returns only `steamid`s; names/avatars are resolved separately through the same batched `GetPlayerSummaries` call every other player-profile lookup here already uses — at most 100 steamids per call (Valve's documented limit), so a larger set goes out as sequential chunks. A private friends list gets a `401` (not a `200` with an empty list), so — unlike the wishlist's private/empty ambiguity — it's distinguishable: `getFriendList` caches that case as `null` rather than `[]`, and `POST /api/friends` reports those steamids separately as `unavailable` instead of silently treating them as "no friends".
 
 ## Tags & demo link — Steam's own store browse data, not SteamSpy
 
