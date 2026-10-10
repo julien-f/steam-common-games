@@ -37,7 +37,7 @@ npm run format          # Prettier over the whole tree
 
 Open `http://localhost:58991` in dev (not `:3000` — that serves the last `npm run build`).
 
-`.githooks/pre-commit` checks whitespace and runs `npm run check`'s steps in parallel before every commit — typecheck, lint and `npm run test:e2e` only when `public/`, `e2e/` or a frontend config changes (~3 s otherwise, ~18 s with them); `npm install` enables it (`core.hooksPath`) and points `git blame` at `.git-blame-ignore-revs`.
+`.githooks/pre-commit` checks whitespace and runs `npm run check`'s steps in parallel before every commit, on the staged content only (unstaged edits are set aside, then restored) — typecheck, lint and `npm run test:e2e` only when `public/`, `e2e/` or a frontend config changes (~3 s otherwise, ~18 s with them); `npm install` enables it (`core.hooksPath`) and points `git blame` at `.git-blame-ignore-revs`.
 
 CI (`.github/workflows/ci.yml`) runs `npm run check` and the e2e suite, as two parallel jobs on Node 24, on every push to `main` and every PR (the `pre-push` hook runs the same locally first), and lists the journey steps the tests lock in the run's summary.
 

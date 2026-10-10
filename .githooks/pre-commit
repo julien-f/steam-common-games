@@ -4,6 +4,30 @@ set -e
 # Whitespace errors and leftover conflict markers in what's being committed.
 git diff --cached --check
 
+# The checks run on the working tree, so unstaged edits are set aside for them: a commit must
+# pass on its own. Not `git stash`, which needs the index lock git holds during this hook.
+patch="$(git rev-parse --git-dir)/pre-commit-unstaged.patch"
+if [ -e "$patch" ]; then
+  echo "pre-commit: an earlier run left unstaged changes in $patch; restore them with \`git apply $patch\`, then delete it." >&2
+  exit 1
+fi
+git diff --binary --no-color --no-ext-diff >"$patch"
+if [ -s "$patch" ]; then
+  restore() {
+    trap - EXIT
+    if git apply --whitespace=nowarn "$patch"; then
+      rm -f "$patch"
+    else
+      echo "pre-commit: could not restore unstaged changes; they are in $patch" >&2
+    fi
+  }
+  trap restore EXIT
+  trap 'exit 130' INT TERM
+  git checkout -- .
+else
+  rm -f "$patch"
+fi
+
 # npm run check's steps against the staged commit (scripts/check.js). An amend's commit is
 # HEAD~1..index, not HEAD..index; only git's arguments say which it is.
 base=HEAD
