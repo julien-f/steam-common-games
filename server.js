@@ -1132,12 +1132,17 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
       return res.json({ achievements: [], total: 0, unlocked: 0, private: false, playerCount: steamIds.length });
     }
 
+    let rarityFailed = false;
     const [rarity, ...perPlayer] = await Promise.all([
       // Rarity is a nice-to-have annotation, not core progress data — a transient upstream
       // failure here shouldn't take down the whole achievements panel the way a genuine
-      // schema/player-achievements failure does, so it degrades to "no rarity data" instead
-      // of rejecting the whole Promise.all.
-      getGlobalAchievementPercentages(appid, { force }).catch(() => null),
+      // schema/player-achievements failure does, so it degrades (flagged as rarityFailed)
+      // instead of rejecting the whole Promise.all.
+      getGlobalAchievementPercentages(appid, { force }).catch((err) => {
+        console.warn(`[achievements] rarity (appid ${appid}):`, err.message);
+        rarityFailed = true;
+        return null;
+      }),
       ...steamIds.map((id) => getPlayerAchievements(id, appid, { force })),
     ]);
 
@@ -1180,6 +1185,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
       // arbitrarily over the others), so this is the one link that's always correct
       // regardless of who — if anyone — is currently loaded.
       steamUrl: `https://steamcommunity.com/stats/${appid}/achievements/`,
+      ...(rarityFailed && { rarityFailed }),
     });
   } catch (err) {
     const status = routeErrorStatus('achievements', err);

@@ -206,6 +206,7 @@ export interface Achievements {
   private: boolean;
   playerCount: number;
   steamUrl: string | null;
+  rarityFailed?: boolean; // Steam didn't answer for rarity: every globalPct is null
   _sortedAchievements?: Achievement[];
 }
 

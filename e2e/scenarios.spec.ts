@@ -590,6 +590,20 @@ test("F1 edge: the Price card says when a game is in no bundle, and when ITAD di
   await expect(page.locator('.panel-bundles')).toHaveText("Bundles: IsThereAnyDeal didn't answer.");
 });
 
+test("F1 edge: the Achievements card says when Steam didn't answer for rarity", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const card = page.locator('#panel-section-achievements');
+  await card.getByRole('button', { name: /Achievements/ }).click();
+  await expect(card).toContainText('71.5%');
+  await expect(card).not.toContainText("Rarity: Steam didn't answer.");
+
+  await mockApi(page, { states: ['upstream-down'] }); // registered last, so it answers first
+  await page.reload();
+  await card.getByRole('button', { name: /Achievements/ }).click();
+  await expect(card).toContainText("Rarity: Steam didn't answer.");
+});
+
 test("F1 edge: the panel doesn't link an upstream URL that isn't http(s)", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=892970');

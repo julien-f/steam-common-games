@@ -40,7 +40,6 @@ None open.
 ## Reliability
 
 - **C1 · minor · M** — dependency updates wait on a manual `dependency-audit` run. Dependabot or Renovate could open them, since CI (`.github/workflows/ci.yml`) runs `check` and the e2e suite on PRs, but their PRs lack the `CHANGELOG.md` entry the pre-commit hook requires (CI doesn't check it) and skip `npm run build`, so each still needs a local pass through dependency-audit's Applying.
-- **C38 · minor · S** — `getGlobalAchievementPercentages(...).catch(() => null)` (`server.js:1095`) degrades with no `[tag]` warn and the same response as "no rarity data". Warn `[achievements]` and return a failure flag the panel shows.
 
 ## Compliance
 

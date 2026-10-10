@@ -1593,6 +1593,23 @@ function makeAchievementsFetch({ achieved = [] } = {}) {
   };
 }
 
+test('GET /api/achievements/:appid: a failed rarity lookup warns and says so, unlike a game with no rarity data', async (t) => {
+  _reset();
+  const warn = t.mock.method(console, 'warn', () => {});
+  const base = makeAchievementsFetch();
+  t.mock.method(globalThis, 'fetch', async (url) =>
+    url.includes('GetGlobalAchievementPercentagesForApp') ? { ok: false, status: 503 } : base(url),
+  );
+  const res = await api.get('/api/achievements/401').expect(200);
+  assert.equal(res.body.rarityFailed, true);
+  assert.ok(res.body.achievements.every((a) => a.globalPct === null));
+  assert.ok(warn.mock.calls.some((c) => /^\[achievements\]/.test(c.arguments[0])));
+
+  _reset();
+  t.mock.method(globalThis, 'fetch', makeAchievementsFetch());
+  assert.equal((await api.get('/api/achievements/402').expect(200)).body.rarityFailed, undefined);
+});
+
 test('GET /api/achievements/:appid: no steamids returns the achievement list with playerCount 0, no progress claimed', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', makeAchievementsFetch());

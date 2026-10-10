@@ -5,7 +5,7 @@
 // States reproduce what the fixtures alone can't (the `mock` cookie under `npm run dev:mock`,
 // `mockApi(page, { states })` in a test):
 //   no-itad        no ITAD_API_KEY: health says so, every ITAD route answers 503 as server.js does
-//   upstream-down  HLTB, ProtonDB and Steam reviews return nothing; ITAD routes answer 502
+//   upstream-down  HLTB, ProtonDB, Steam reviews and achievement rarity return nothing; ITAD routes answer 502
 //   slow           game details stream in one at a time (dev:mock only — page.route can't stream)
 //   store-down     Steam store pages return nothing (genres, release date, platforms…)
 //   stale          libraries and wishlists read as fetched 12 days ago, until a refresh (D1)
@@ -105,7 +105,7 @@ function details(appid: number, slowMedia = false) {
       dlc: appid === MEDIA_APPID ? DLC_APPIDS : [],
       fullgame: null,
       website: null,
-      achievementCount: 0,
+      achievementCount: appid === MEDIA_APPID ? ACHIEVEMENTS.length : 0,
       platforms: { windows: true, mac: false, linux: false },
       languages: [],
       isFree: false,
@@ -114,6 +114,32 @@ function details(appid: number, slowMedia = false) {
     tags: g.categories.includes('Co-op') ? ['Co-op'] : ['Singleplayer'],
     demo: null,
     protondb: g.protondb ? { tier: g.protondb, confidence: 'strong', total: 100 } : null,
+  };
+}
+
+const ACHIEVEMENTS = [
+  { apiname: 'ACH_1', name: 'First steps', description: 'Finish the first chapter.', achieved: true, globalPct: 71.5 },
+  { apiname: 'ACH_2', name: 'Completionist', description: 'Finish everything.', achieved: false, globalPct: 4.2 },
+];
+
+function achievements(steamids: string | null, rarityDown: boolean) {
+  const list = ACHIEVEMENTS.map((a) => ({
+    ...a,
+    achieved: steamids ? a.achieved : false,
+    unlocktime: steamids && a.achieved ? Math.floor(NOW / 1000) : null,
+    globalPct: rarityDown ? null : a.globalPct,
+    icon: mediaUrl(a.name, false),
+    icongray: null,
+    hidden: false,
+  }));
+  return {
+    achievements: list,
+    total: list.length,
+    unlocked: list.filter((a) => a.achieved).length,
+    private: false,
+    playerCount: steamids ? steamids.split(',').length : 0,
+    steamUrl: `https://steamcommunity.com/stats/${MEDIA_APPID}/achievements/`,
+    ...(rarityDown && { rarityFailed: true }),
   };
 }
 
@@ -280,7 +306,9 @@ export function respond(
     const appid = Number(metaOnly[1]);
     return json({ meta: DLC_APPIDS.includes(appid) ? dlcMeta(appid) : detailsFor(appid).meta });
   }
-  if (/^\/api\/(game-news|achievements)\//.test(path)) return json({ items: [], news: [], achievements: [] });
+  if (path.startsWith('/api/achievements/'))
+    return json(achievements(url.searchParams.get('steamids'), states.has('upstream-down')));
+  if (path.startsWith('/api/game-news/')) return json({ items: [], news: [] });
 
   if (path === '/api/search-games') {
     const q = (url.searchParams.get('q') ?? '').toLowerCase();

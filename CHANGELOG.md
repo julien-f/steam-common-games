@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - When Steam or another service can't be reached, or answers with a web page instead of data, the app reports the service as failing rather than the request as invalid
 - When Steam doesn't answer for players' names, libraries still load, and a saved account keeps its name instead of being renamed to its Steam ID
 - When Steam's store page for a game fails, its HowLongToBeat times show as not answering, with ↻ to retry, instead of as no data
+- The game panel's Achievements card says when Steam didn't answer for achievement rarity, instead of just leaving the percentages out
 
 ### Development
 
@@ -25,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `scripts/setup-facts.js` gathers the setup-review skill's facts: each script's callers and missing usage lines, the gates' time and output (`--cost`), and recent session transcripts' largest outputs, slowest calls, repeated commands and skill runs (`--transcripts`)
 - Unit and e2e test runs print dots instead of every passing test, cutting a full `npm test` from 108 KB of output to 3 KB
 - The pre-commit changelog check validates the staged CHANGELOG.md, so a partial stage that repeats a subsection no longer slips through
+- The mock API gives Hades two achievements, and its upstream-down state drops their rarity
 
 ## [0.10.0] - 2026-10-10
 

@@ -1200,6 +1200,9 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
       <Show when={hasProgress() && data()?.private}>
         <div class="panel-no-data">Progress unavailable — profile may be private.</div>
       </Show>
+      <Show when={data()?.rarityFailed}>
+        <div class="panel-no-data">Rarity: Steam didn't answer.</div>
+      </Show>
       <Show when={!visible().length}>
         <div class="panel-no-data">No achievements match this filter.</div>
       </Show>
