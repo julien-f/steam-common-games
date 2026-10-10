@@ -48,7 +48,7 @@ Check at each step:
 - **Native dialogs** (`prompt`/`confirm`) block the page: register `page.once('dialog', …)` before the click that opens one.
 - **Copied links**: stub `navigator.clipboard.writeText` in the page to capture them.
 - **A fresh browser** (S3, shared links): `page.context().browser().newContext()` — its own empty storage, so nothing to restore.
-- **Console noise**: `favicon.ico` 404 is known (U80). Editing `AppShell.tsx` mid-run reloads the page (`@refresh reload`) — re-open what you were checking.
+- **Console noise**: editing `AppShell.tsx` mid-run reloads the page (`@refresh reload`) — re-open what you were checking.
 
 ## Teardown
 

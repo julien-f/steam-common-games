@@ -9,7 +9,7 @@
 //   --name     screenshot prefix (default "measure"): .playwright-mcp/<name>-<route>-<width>.png
 // Returns, per route and width: where the first table row starts, the heights of the blocks
 // above it, horizontal page overflow, interactive elements under 24×24 px (WCAG 2.5.8; links in
-// running text aside) or without an accessible name, and console errors (favicon.ico aside).
+// running text aside) or without an accessible name, and console errors.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -36,7 +36,7 @@ function measureScript({ fresh, state, name, routes }) {
     await page.waitForTimeout(500);
   }
   const errors = [];
-  page.on('console', (m) => m.type() === 'error' && !/favicon/.test(m.text()) && errors.push(m.text()));
+  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   page.on('pageerror', (e) => errors.push(e.message));
   const out = {};
   for (const [w, h] of ${JSON.stringify(SIZES)}) {
