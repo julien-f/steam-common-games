@@ -11,7 +11,7 @@ const fs = require('fs');
 const crypto = require('node:crypto');
 const rateLimit = require('express-rate-limit');
 
-const { getCached, getCachedAt, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
+const { getCached, getCachedAt, capExpiry, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
 const { getMetrics, recordLimiterTrip } = require('./lib/metrics');
 const { getCircuitBreakers } = require('./lib/circuitBreaker');
@@ -62,7 +62,7 @@ const {
   getSessionUser,
   setUserPref,
 } = require('./lib/auth');
-const { SESSION_TTL_MS } = require('./lib/config');
+const { SESSION_TTL_MS, MISS_CACHE_TTL_MS } = require('./lib/config');
 
 const HOST = process.env.HOST;
 const PORT = process.env.PORT;
@@ -804,6 +804,17 @@ function fetchGameDetails(appid, { force = false } = {}) {
       })
         .filter(([, r]) => r.status === 'rejected')
         .map(([source]) => source);
+      // A game that isn't out yet has no reviews, ProtonDB reports or HLTB times; those misses
+      // expire like any other miss, so they fill in after release instead of a year later.
+      if (metaRes.value?.comingSoon) {
+        for (const [source, res] of [
+          ['rating', ratingRes],
+          ['protondb', protondbRes],
+          ['hltb', hltbRes],
+        ]) {
+          if (res.status === 'fulfilled' && res.value == null) capExpiry(`${source}:${appid}`, MISS_CACHE_TTL_MS);
+        }
+      }
       // Age of the oldest of this game's cached sources, which is what the panel's ↻ shows — plus
       // each source's own age behind it. The aggregate alone was misleading: these tiers run from
       // 90 to 180 days and are cached per source, so one untouched store page dates the whole

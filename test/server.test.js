@@ -15,11 +15,11 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const supertest = require('supertest');
 const { app } = require('../server');
-const { _reset, setCache } = require('../lib/cache');
+const { _reset, setCache, getCachedAt } = require('../lib/cache');
 const { db } = require('../lib/db');
 const { _resetAuth } = require('../lib/hltb');
 const { _resetCircuitBreakers } = require('../lib/circuitBreaker');
-const { SESSION_TTL_MS } = require('../lib/config');
+const { SESSION_TTL_MS, MISS_CACHE_TTL_MS } = require('../lib/config');
 
 const api = supertest(app);
 
@@ -952,6 +952,43 @@ test('GET /api/game-details/:appid: ?refresh=1 re-fetches every source despite t
   assert.equal(counts.meta, 2);
   assert.ok(counts.tags >= 3, 'the store browse item is re-fetched');
 });
+
+// A game that isn't out yet has no reviews, ProtonDB reports or HLTB times: those misses, and its
+// store page, are only true until release, so they expire like other misses instead of in a year.
+for (const comingSoon of [true, false]) {
+  test(`GET /api/game-details/:appid: ${comingSoon ? "an unreleased game's" : "a released game's"} empty sources ${comingSoon ? 'expire within a day' : 'keep the long tier'}`, async (t) => {
+    _reset();
+    _resetAuth();
+    t.mock.method(globalThis, 'fetch', async (url) => {
+      if (url.includes('appdetails'))
+        return {
+          ok: true,
+          json: async () => ({
+            777: { success: true, data: { name: 'Soon', release_date: { coming_soon: comingSoon, date: 'Q4 2027' } } },
+          }),
+        };
+      if (url.includes('appreviews'))
+        return { ok: true, json: async () => ({ query_summary: { total_reviews: 0, total_positive: 0 } }) };
+      if (url.includes('protondb.com')) return { ok: false, status: 404 };
+      if (url.includes('search/site/init'))
+        return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
+      if (url.includes('search/site')) return { ok: true, json: async () => ({ data: [] }) };
+      if (url.includes('IStoreBrowseService'))
+        return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: [] }] } }) };
+      if (url.includes('ajaxgetstoretags')) return { ok: true, json: async () => ({ tags: [] }) };
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    await api.get('/api/game-details/777').expect(200);
+
+    const later = Date.now() + MISS_CACHE_TTL_MS + 1000;
+    t.mock.method(Date, 'now', () => later);
+    for (const source of ['rating', 'protondb', 'hltb', 'meta']) {
+      const cachedAt = getCachedAt(`${source}:777`);
+      assert.equal(cachedAt === undefined, comingSoon, source);
+    }
+    assert.notEqual(getCachedAt('browse:777'), undefined, 'tags are not a miss');
+  });
+}
 
 // ── GET /api/game-meta/:appid ─────────────────────────────────────────────────
 

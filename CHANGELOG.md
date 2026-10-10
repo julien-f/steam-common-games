@@ -36,6 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The game panel's Price card says "IsThereAnyDeal didn't answer" when the price lookup fails, instead of "No pricing data available." or that the instance isn't connected to IsThereAnyDeal; the panel's ↻ retries it.
 - A search page whose lookup failed says "Search failed — try again" instead of that no games were found.
 - When Steam's store asks the app to slow down (a 429), every store request now waits out its Retry-After, instead of only the one that got the 429 while the rest kept going.
+- Unreleased games now pick up their reviews, ProtonDB rating, How Long To Beat times and release status within a day of release, instead of staying blank or "coming soon" for up to a year.
 
 ### Removed
 
