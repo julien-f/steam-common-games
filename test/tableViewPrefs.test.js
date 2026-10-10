@@ -11,6 +11,9 @@ const {
 } = require('../public/tableViewPrefs.ts');
 const { setBaseline, getBaseline, resetBaselines } = require('../public/tableViewSync.ts');
 
+// Just enough DOM for clipboard.ts's copy announcement.
+globalThis.document = { createElement: () => ({ setAttribute() {}, style: {} }), body: { append() {} } };
+
 beforeEach(() => {
   resetBaselines();
 });

@@ -12,9 +12,27 @@ export function copyText(text: string): Promise<boolean> {
   const clipboard = navigator.clipboard;
   if (!clipboard?.writeText) return Promise.resolve(promptFallback(text));
   return clipboard.writeText(text).then(
-    () => true,
+    () => {
+      announce('Copied to clipboard');
+      return true;
+    },
     () => promptFallback(text),
   );
+}
+
+// The buttons' ✓ is visual only; screen readers hear this instead.
+let liveRegion: HTMLElement | undefined;
+function announce(message: string): void {
+  if (!liveRegion) {
+    liveRegion = document.createElement('div');
+    liveRegion.setAttribute('role', 'status');
+    liveRegion.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)';
+    document.body.append(liveRegion);
+  }
+  const region = liveRegion;
+  // Emptied first so a second copy in a row is announced again.
+  region.textContent = '';
+  setTimeout(() => (region.textContent = message), 100);
 }
 
 function promptFallback(text: string): boolean {

@@ -4,6 +4,13 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { copyText, copyWithFeedback, COPIED_MS } = require('../public/clipboard.ts');
 
+// Just enough DOM for the copy announcement's live region.
+const appended = [];
+globalThis.document = {
+  createElement: () => ({ setAttribute() {}, style: {}, textContent: '' }),
+  body: { append: (el) => appended.push(el) },
+};
+
 // Same navigator-stubbing shape tableViewPrefs.test.js already uses for its own share button.
 function withNavigator(t, clipboard) {
   const original = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
@@ -46,6 +53,8 @@ test('copyText: writes to the clipboard and reports success', async (t) => {
   });
   assert.equal(await copyText('gaben'), true);
   assert.equal(copied, 'gaben');
+  await new Promise((r) => setTimeout(r, 150));
+  assert.equal(appended[0].textContent, 'Copied to clipboard');
 });
 
 test('copyText: reports failure (prompt fallback) when the Clipboard API is unavailable', async (t) => {

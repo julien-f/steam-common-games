@@ -1333,6 +1333,16 @@ test('S1 edge: sharing an unchanged layout sends no layout, so no shared-layout 
   expect(new URL(link).searchParams.has('tv')).toBe(false);
 });
 
+test("S2 edge: copying a game's link is announced, not only shown as ✓", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  await page.evaluate(() => {
+    navigator.clipboard.writeText = async () => {};
+  });
+  await page.getByRole('button', { name: 'Copy link to this game' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Copied to clipboard' })).toHaveCount(1);
+});
+
 test("Y1.1,3: signed in on a new device, the account's lists win over this browser's newer ones", async ({ page }) => {
   await asPlayer(page, BOB, { updatedAt: Date.now() }); // newer than the account's prefs, still not trusted
   await mockApi(page, { states: ['signed-in'] });

@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - An account you remove from Home's Recent accounts while a list still uses it is now cleared for good once no list uses it, instead of staying hidden and synced forever
 - The Bundles page's Updated age now states its oldest page's age, instead of sometimes understating it when one page was fetched fresh
 - Screen readers now announce the game open in the panel as the current row of the table
+- Screen readers now announce "Copied to clipboard" after any copy button, instead of only showing a ✓
 
 ### Development
 
