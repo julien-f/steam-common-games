@@ -19,6 +19,7 @@ const { _reset, setCache } = require('../lib/cache');
 const { db } = require('../lib/db');
 const { _resetAuth } = require('../lib/hltb');
 const { _resetCircuitBreakers } = require('../lib/circuitBreaker');
+const { SESSION_TTL_MS } = require('../lib/config');
 
 const api = supertest(app);
 
@@ -2265,4 +2266,17 @@ test('POST /auth/logout: session stops working afterwards', async (t) => {
   await agent.post('/auth/logout').expect(200);
   const after = await agent.get('/api/me').expect(200);
   assert.equal(after.body.steamid, null);
+});
+
+test('GET /api/me: a session past SESSION_TTL_MS is signed out and its row deleted', async (t) => {
+  const steamid = '76561198000000209';
+  const agent = await loginAs(t, steamid);
+  const countSessions = () => db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE steamid = ?').get(steamid).n;
+  assert.equal(countSessions(), 1);
+
+  const expiredAt = Date.now() + SESSION_TTL_MS + 1000;
+  t.mock.method(Date, 'now', () => expiredAt);
+  const res = await agent.get('/api/me').expect(200);
+  assert.deepEqual(res.body, { steamid: null, prefs: null });
+  assert.equal(countSessions(), 0);
 });

@@ -71,7 +71,6 @@ Last audited: simplify 2026-10-10 · security 2026-10-10 · perf 2026-10-10 · r
 
 ## Tests
 
-- **C53 · major · S** — server-side session expiry in `getSessionUser` (`lib/auth.js:142-145`) is untested; an inverted check keeps old cookies valid until restart. Advance `Date.now` past `SESSION_TTL_MS`; assert undefined, row deleted, `/api/me` signed out.
 - **C54 · major · S** — no test sends `?refresh=1` to `/api/game-details` (`server.js:1020`, `740-742`), game-news, achievements or game-bundles (only prices, `test/server.test.js:1883`); D2 step 3 (↻ retry) has no e2e either. Assert each upstream re-fetches, including a forced request concurrent with a normal one.
 - **C55 · major · M** — five limiters' "cache hit doesn't count" skips never run in a test: friends, news, achievements, prices, gameBundles (`server.js:286-310, 345-356, 385-405, 502-521, 527-533`), plus `searchLimit`'s `users` branch and cached-vanity path (`240-241, 259-262`). One "misses count, hits don't" test each in `test/server-ratelimit.test.js`; prices with both `gids` and `appids`, including a `null` gid.
 - **C56 · major · M** — `public/gameColumns.ts` (1283 lines) has no unit test: `endOfReleasePeriod`/`releaseSortTimestamp` (seasons, quarters, bare year, "Coming soon"/"TBA"), `computePriceStatus` (undefined vs. null vs. 'Not Discounted'), `computeOwnershipStatus` and the buckets (`:289, 321, 460, 547, 627`). Table-driven `test/gameColumns.test.js`.
