@@ -40,5 +40,4 @@ None open.
 
 ## Tests
 
-- **C58 · minor · S** — `createPanelDataCache` (`public/panelData.ts:68`) is untested: a failed forced refresh keeping the last good news/bundles/DLC, the `achievementCount === 0` short-circuit, `isItadOff`. Note `fetchAchievements` (`:162-163`) and `fetchPrice` (`:187-188`) clear loaded data on a failed refresh unlike the others — confirm which is intended. Add `test/panelData.test.js`.
 - **C64 · minor · S** — no e2e test locks journey D2 step 3 (the panel's ↻ retrying a source that didn't answer, once the upstream is back); `GET /api/game-details/:appid?refresh=1` itself is unit-tested. Add a mock state that fails a details source until cleared, and a D2.3 test.

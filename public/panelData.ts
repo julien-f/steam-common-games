@@ -168,8 +168,9 @@ export function createPanelDataCache() {
       achievements.set(key, data);
       return data;
     } catch {
-      achievements.set(key, null);
-      return null;
+      const value = achievements.get(key) ?? null;
+      achievements.set(key, value);
+      return value;
     }
   }
 
@@ -193,8 +194,9 @@ export function createPanelDataCache() {
       return fields;
     } catch {
       // "IsThereAnyDeal didn't answer" rather than a stuck loading skeleton; the panel's ↻ retries.
-      price.set(appid, null);
-      return null;
+      const value = price.get(appid) ?? null;
+      price.set(appid, value);
+      return value;
     }
   }
 
