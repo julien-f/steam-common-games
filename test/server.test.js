@@ -2239,6 +2239,28 @@ test('GET /auth/steam/callback: 400 when Steam does not confirm the assertion', 
     .expect(400);
 });
 
+test('GET /auth/steam/callback: 502 when Steam cannot be reached to verify the assertion', async (t) => {
+  const steamid = '76561198000000210';
+  const loginRes = await api.get('/auth/steam/login').set('Host', HOST).expect(302);
+  const stateCookie = loginRes.headers['set-cookie'][0];
+  const returnTo = new URL(new URL(loginRes.headers.location).searchParams.get('openid.return_to'));
+
+  t.mock.method(console, 'error', () => {});
+  t.mock.method(globalThis, 'fetch', async () => {
+    throw new TypeError('fetch failed');
+  });
+  const res = await api
+    .get('/auth/steam/callback')
+    .set('Host', HOST)
+    .set('Cookie', stateCookie)
+    .query({ state: returnTo.searchParams.get('state'), ...steamAssertion(steamid, returnTo.href) })
+    .expect(502);
+  const cookies = String(res.headers['set-cookie']);
+  assert.match(cookies, /steam_login_state=;.*Max-Age=0/);
+  assert.ok(!cookies.includes('sid='));
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE steamid = ?').get(steamid).n, 0);
+});
+
 test("GET /auth/steam/callback: 400 for another site's assertion replayed with this site's own state", async (t) => {
   const loginRes = await api.get('/auth/steam/login').set('Host', HOST).expect(302);
   const stateCookie = loginRes.headers['set-cookie'][0];
