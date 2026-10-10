@@ -32,7 +32,6 @@ Last audited: simplify 2026-10-10 · security 2026-10-10 · perf 2026-10-10 · r
 
 - **C20 · minor · S** — no final error handler in `server.js` and `npm start` doesn't set `NODE_ENV`: anything thrown outside a route's try reaches Express's default handler with a full stack (`/api/search-games?q=a&q=b`, `/api/achievements/1?steamids=a&steamids=b`, malformed JSON, and a body without JSON content-type or `games: [null]` at `server.js:541, 1154, 1164`). Add an `(err, req, res, next)` handler replying `{ error }` (4xx from `err.status`, else 500); accept only string query params; default `req.body ?? {}`.
 - **C21 · minor · S** — `PUT /api/me/prefs/:key` (`server.js:1300`, `lib/auth.js:155`) stores any key and any value up to 100 kB: one free Steam account writes ~2.9 GB/day per IP, and `/api/me` loads every key. Allow only the keys `prefs.ts` syncs; cap value size.
-- **C22 · minor · S** — the Metacritic chip at `public/panel.tsx:925` puts `mc.url` (unfiltered Steam field) straight into `href`; a `javascript:` value would run in the app's origin. Wrap in `safeHref` like the other upstream links.
 
 ## Performance
 

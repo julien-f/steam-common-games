@@ -44,6 +44,7 @@ function playerJson(p: Player) {
 // Drawn inline rather than fetched, so the lightbox has media to page through under both a test
 // and dev:mock. One game only: the rest keep just their banner.
 const MEDIA_APPID = 1145360;
+const UNSAFE_LINK_APPID = 892970;
 const SLOW_MEDIA_MS = 1500;
 // The media game's DLC: more than the card's first page, so "Show more" appears.
 const DLC_APPIDS = Array.from({ length: 25 }, (_, i) => 900001 + i);
@@ -95,7 +96,8 @@ function details(appid: number, slowMedia = false) {
       description: `${g.name}, a fixture game.`,
       releaseDate: g.release,
       comingSoon: false,
-      metacritic: null,
+      // An unfiltered Steam field: the panel must not link a javascript: URL.
+      metacritic: appid === UNSAFE_LINK_APPID ? { score: 85, url: 'javascript:alert(1)' } : null,
       // Public store art; a test's browser blocks it (off localhost), dev:mock shows it.
       capsule: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`,
       banner: slowMedia ? mediaUrl(`Banner ${appid}`, true) : null,

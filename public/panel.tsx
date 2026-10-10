@@ -921,7 +921,7 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
     const mc = details()?.meta?.metacritic;
     return mc ? (
       <GlanceChip
-        href={mc.url}
+        href={safeHref(mc.url)}
         value={mc.score}
         color={scoreColor(mc.score)}
         caption={

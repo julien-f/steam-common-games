@@ -590,6 +590,14 @@ test("F1 edge: the Price card says when a game is in no bundle, and when ITAD di
   await expect(page.locator('.panel-bundles')).toHaveText("Bundles: IsThereAnyDeal didn't answer.");
 });
 
+test("F1 edge: the panel doesn't link an upstream URL that isn't http(s)", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=892970');
+  const chip = page.locator('.panel-glance-chip', { hasText: 'Metacritic' });
+  await expect(chip).toBeVisible();
+  await expect(chip).not.toHaveAttribute('href', /.*/);
+});
+
 test("F1 edge: the Price card says when ITAD didn't answer, and the panel's ↻ retries it", async ({ page }) => {
   let down = true;
   // Both the health check and the price lookup fail until the "upstream" is back.
