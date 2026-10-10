@@ -734,6 +734,18 @@ test('GET /api/game-news/:appid: 200 from cache without fetching', async (t) => 
   assert.equal(fetchCalled, false);
 });
 
+test('GET /api/game-news/:appid: ?refresh=1 re-fetches despite the cache', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', makeDetailsFetch());
+
+  await api.get('/api/game-news/409').expect(200);
+  await api.get('/api/game-news/409').expect(200);
+  assert.equal(fetchMock.mock.callCount(), 1);
+  const res = await api.get('/api/game-news/409?refresh=1').expect(200);
+  assert.equal(fetchMock.mock.callCount(), 2);
+  assert.equal(res.body.news.length, 1);
+});
+
 test('GET /api/game-details/:appid: 200 with null rating when reviews fetch fails', async (t) => {
   _reset();
   _resetAuth();
@@ -925,6 +937,20 @@ test('GET /api/game-details/:appid: concurrent requests for the same appid dedup
   assert.equal(counts.hltb, 1, 'HLTB fetched once for two concurrent requests');
   assert.equal(counts.meta, 1, 'meta fetched once for two concurrent requests');
   assert.equal(counts.tags, 2, 'tags fetched once for two concurrent requests (one browse + one name-map call)');
+});
+
+test('GET /api/game-details/:appid: ?refresh=1 re-fetches every source despite the cache', async (t) => {
+  _reset();
+  _resetAuth();
+  const counts = { rating: 0, hltb: 0, hltbInit: 0, meta: 0, tags: 0 };
+  t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts));
+
+  await api.get('/api/game-details/502').expect(200);
+  await api.get('/api/game-details/502?refresh=1').expect(200);
+  assert.equal(counts.rating, 2);
+  assert.equal(counts.hltb, 2);
+  assert.equal(counts.meta, 2);
+  assert.ok(counts.tags >= 3, 'the store browse item is re-fetched');
 });
 
 // #3 — real browser-abort on fast refresh. supertest awaits the full response,
@@ -1459,6 +1485,24 @@ test('GET /api/achievements/:appid: with steamids returns unlock progress and pl
   assert.equal(first.unlocktime, 1700000000);
 });
 
+test('GET /api/achievements/:appid: ?refresh=1 re-fetches the schema, rarity and player progress', async (t) => {
+  _reset();
+  const achievementsFetch = makeAchievementsFetch();
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    calls.push(url);
+    return achievementsFetch(url);
+  });
+  const count = (part) => calls.filter((u) => u.includes(part)).length;
+
+  await api.get(`/api/achievements/401?steamids=${ID1}`).expect(200);
+  await api.get(`/api/achievements/401?steamids=${ID1}`).expect(200);
+  await api.get(`/api/achievements/401?steamids=${ID1}&refresh=1`).expect(200);
+  for (const part of ['GetSchemaForGame', 'GetGlobalAchievementPercentagesForApp', 'GetPlayerAchievements']) {
+    assert.equal(count(part), 2, part);
+  }
+});
+
 test('GET /api/achievements/:appid: private/no-data account is distinguished from no steamids at all', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async (url) => {
@@ -1706,6 +1750,22 @@ test('GET /api/game-bundles/:appid: 200 with the bundles the game is in', async 
       tierPriceMax: null,
     },
   ]);
+});
+
+test('GET /api/game-bundles/:appid: ?refresh=1 re-fetches the bundles despite the cache', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  setCache('itad-gid:402', 'gid-2');
+  const fetchMock = t.mock.method(globalThis, 'fetch', async (url) => {
+    assert.match(String(url), /\/games\/bundles\/v2\?/);
+    return { ok: true, json: async () => [] };
+  });
+
+  await api.get('/api/game-bundles/402').expect(200);
+  await api.get('/api/game-bundles/402').expect(200);
+  assert.equal(fetchMock.mock.callCount(), 1);
+  await api.get('/api/game-bundles/402?refresh=1').expect(200);
+  assert.equal(fetchMock.mock.callCount(), 2);
 });
 
 test('GET /api/game-bundles/:appid: adds Fanatical pick-and-mix tiers to a null-price bundle', async (t) => {
