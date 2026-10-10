@@ -1,6 +1,6 @@
 # Improvements
 
-UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocked, `npm run dev:mock`) and the 2026-10-07 phone-lightbox (real dev server, touch emulation) phone panel-media (mocked), broad mocked, slow-media/design (mocked, delayed media) and lightbox-clutter (mocked) reviews (`ux-review` skill) against [journeys.md](journeys.md) and [ui-guidelines.md](ui-guidelines.md). Each item names the scenarios it blocks or slows; a dedicated run per item re-walks those scenarios. Severity: **blocker** (goal unreachable) · **major** (reached with confusion or a workaround) · **minor** · **polish**. Fix items with the `ux-fix` skill; remove an item once it ships.
+UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocked, `npm run dev:mock`) and the 2026-10-07 phone-lightbox (real dev server, touch emulation) phone panel-media (mocked), broad mocked, slow-media/design (mocked, delayed media) lightbox-clutter (mocked) and 2026-10-11 lightbox game-stepping (mocked) reviews (`ux-review` skill) against [journeys.md](journeys.md) and [ui-guidelines.md](ui-guidelines.md). Each item names the scenarios it blocks or slows; a dedicated run per item re-walks those scenarios. Severity: **blocker** (goal unreachable) · **major** (reached with confusion or a workaround) · **minor** · **polish**. Fix items with the `ux-fix` skill; remove an item once it ships.
 
 - [Sharing](#sharing)
 - [Loading and feedback](#loading-and-feedback)
@@ -38,7 +38,12 @@ None open.
 
 ## Keyboard and accessibility
 
+- **U113 · major · I2, F1** — in the lightbox, Tab never leaves × on a game with a single media item (a cover only): the focus trap's `getFocusable` keeps the CSS-hidden big play button, which becomes its first element once ‹ › are disabled, so the wrap focuses nothing. Arrows and Esc still work. Skip elements hidden by CSS, not only by an inline `display: none`.
+- **U115 · minor · I2** — Esc closing the panel (after the lightbox or not) drops focus on `<body>`, so the next ↓ moves nothing and there's no visible focus. Return focus to the row the panel was showing.
+
 ## Phone
+
+- **U114 · major · F1, I1, I2** — stepping games in the lightbox (swipe up/down, ↑/↓) once the chrome has idled flashes only the media counter ("Cover"), not the game's name or position: on a screenshot, nothing says which game you landed on. Flash the caption on a game step, the counter alone on a media step.
 
 - **U32 · minor · I1, R1** — the ranking screen stacks cards vertically (Tie/Skip/Undo below the fold) and has no side gutter.
 - **U33 · minor · F3** — no random pick on phone until a panel is open (the 🎲 lives in the panel's nav).
@@ -48,6 +53,12 @@ None open.
 - **U34 · minor · A1** — first-visit Home doesn't say what the app does; the main button reads "Set as current account". One-line intro; "Look up".
 
 ## Consistency and polish
+
+- **U116 · minor · F1** — the lightbox caption's ↑/↓ buttons sit on either side of the game name, so they slide sideways with each name's width (Hades → Stardew Valley: 64 px): after one click on ↓ the pointer is over "Game 4 of 6" and the next clicks do nothing. Keep both buttons at a fixed spot (e.g. both after the name, or a fixed-width name).
+- **U117 · minor · F1** — with a mouse, the lightbox shows the game name alone; the ↑/↓ game stepper and "Game 3 of 6" appear only while hovering that name, so nothing on screen says other games can be reached from here. Show the stepper while the chrome is visible.
+- **U118 · polish · F1** — stepping past the last media wraps to the Cover, and past the last game to game 1, with nothing but the counter changing. A wrap cue (direction of the enter animation, or a brief "back to start").
+- **U120 · polish · F1** — stepping back to a game just left in the lightbox lands on its first item of the kind being left, not where you were (Hades Screenshot 2 → ↓ → ↑ → Screenshot 1). Remember the last item per game for the session.
+- **U119 · polish · I2** — the `?` dialog lists no way to open the lightbox from the panel (Enter on the hero works); add it under Game panel.
 
 - **U112 · polish** — every table shows a "Page 1 of 1" pager with all buttons disabled when everything fits. Needs an upstream change: hide the pager when there's a single page (an option or the default in `@vates/data-table-solid`, vatesfr/data-table#41).
 - **U39 · polish** — nav items shift sideways between routes; missing thumbnails have no placeholder; "Demo" pills look like primary buttons; the "Updated" age has very low contrast; Compare's op `<select>` is an unstyled native white control; wishlisted/owned name colours have no legend (still true in Recently Looked Up).
