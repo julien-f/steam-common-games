@@ -22,9 +22,13 @@ test('missingEntry: app code without CHANGELOG.md; tests, docs and tooling alone
   assert.strictEqual(missingEntry(['test/steam.test.js', 'docs/dev/data.md', 'scripts/doc-refs.js', '']), false);
 });
 
+// Run from the pre-commit hook, GIT_INDEX_FILE (absolute under `git commit -a`) would point the
+// temp repo's git calls at the index of the commit being made.
+const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
+
 test('--staged checks the staged CHANGELOG.md, not the working tree', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'changelog-check-'));
-  const git = (...args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' }).trim();
+  const git = (...args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', env }).trim();
   const good = '## [Unreleased]\n\n### Development\n\n- a\n- b\n';
   try {
     fs.mkdirSync(path.join(dir, 'scripts'));
@@ -41,9 +45,14 @@ test('--staged checks the staged CHANGELOG.md, not the working tree', () => {
     const blob = execFileSync('git', ['-C', dir, 'hash-object', '-w', '--stdin'], {
       input: staged,
       encoding: 'utf8',
+      env,
     }).trim();
     git('update-index', '--cacheinfo', `100644,${blob},CHANGELOG.md`);
-    const run = spawnSync(process.execPath, ['scripts/changelog-check.js', '--staged'], { cwd: dir, encoding: 'utf8' });
+    const run = spawnSync(process.execPath, ['scripts/changelog-check.js', '--staged'], {
+      cwd: dir,
+      encoding: 'utf8',
+      env,
+    });
     assert.strictEqual(run.status, 1);
     assert.match(run.stderr, /repeated "### Development"/);
   } finally {
