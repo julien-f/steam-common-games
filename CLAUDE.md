@@ -40,26 +40,19 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
 
 ## Working style
 
-- Be concise and economical everywhere — responses, code comments, doc prose. No filler, no restating what was just done.
+These add to the user-level `~/.claude/CLAUDE.md` working style.
+
+- Concision extends to code comments and doc prose:
   - Code comments: one line, stating the _why_, only when it isn't obvious from the code; skip the comment entirely if the code speaks for itself. This governs new comments; leave the long-form ones already in the tree alone.
   - Doc prose (this file, `README.md`, `CHANGELOG.md`): short bullets over paragraphs; no preamble, no summary section, lead with the point.
 - Saying something is done includes where to see it: the route and steps for a UI change, the link to a posted comment or issue after checking it exists.
-- Stay in scope: make the smallest change that satisfies the request, plus the Development workflow checklist below. Propose anything else as an option in the response's `AskUserQuestion` — other issues, alternative approaches with your recommendation, deeper work that would clearly pay off — instead of acting on it.
-- Match the request's intent. A question or request for opinion gets an answer only — no edits or side-effecting commands, even when the fix seems obvious; offer to act instead. When unsure which it is, treat it as a question. An action request gets acted on without further go-ahead, except:
-  - ambiguous request: ask clarifying questions first, batched into one round;
-  - non-trivial change (multiple files, non-obvious design decisions, refactors): draft a plan and wait for approval.
-- When acting on a request, ask only about real choices within it (no clear winner); otherwise apply your recommendation — committing each step, if the series was approved. Every question to the user goes through `AskUserQuestion`, including open-ended ones (offer the likely answers; the user can pick _Other_) and go-ahead requests after a plan. Proposals beyond the request go in one single-select, "Apply the recommended set" first and only real alternatives after it — never a multi-select of your own recommendations. Never end a message with a question in prose.
-- Reuse before writing: existing code, tests and docs first, then the standard library and dependencies already in use. For non-trivial problems with an established solution (parsing, dates, retries…), propose a library instead of hand-rolling it; adding one still needs approval (see Ask first). Flag duplication you spot, including code better moved to a shared module.
-- When a dependency's bug or limitation gets in the way, first check for a newer version or an existing upstream issue. If it's a genuine upstream gap (not a misuse), flag it and propose an upstream issue or PR, with a draft, before working around it. Any interim workaround gets a one-line comment linking the upstream issue.
 - When code models an upstream's behavior (pricing, limits, matching rules) from inference rather than its docs, state the assumption in the plan and confirm it before building on it; record confirmed rules and remaining assumptions in [integrations.md](docs/dev/integrations.md).
-- Improve the setup on friction (a correction you'd need again, a procedure repeated by hand, a slow or output-heavy step, a rule that is stale, misleading or contradicts the code, a check better automated): propose it as a one-line option naming the target (this file, a skill, a script, a hook — see Where things belong) and the change, in the response's `AskUserQuestion` (or one of its own); prefer tightening or deleting a rule over adding one. Apply only on approval.
 
 ## Ask first
 
 - Anything destructive or hard to reverse: `git reset --hard`, `git push --force`, deleting files, deleting or hand-editing `db.sqlite` (`npm run cache:clear` empties its cache tables without touching the file), overwriting the `steam.isonoe.net:prefs` localStorage backup a screenshot run left behind.
 - **Environments**: local dev servers, `dev:mock` and the test suites are safe; the live site (steam.isonoe.net) and its server need explicit approval.
-- Committing or pushing — only when explicitly asked.
-- Outward-facing actions: opening PRs or issues, commenting, posting to external services.
+- Committing: approving a multi-step plan is the go-ahead to commit each step.
 - Adding a new dependency.
 - Adding a skill, hook, plugin or agent.
 
@@ -68,7 +61,7 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
 - Project conventions, workflow rules, architecture decisions: this file — version-controlled and binding on every machine and session. Substantial detail goes in a `docs/` file linked from Where things are documented above, not duplicated here.
 - Multi-step procedures invoked on demand: `.claude/skills/`. Check there first and invoke a matching skill rather than improvising; it is the source of truth for its procedure, but if it contradicts this file, this file wins — flag the conflict. Move deterministic steps into scripts the skill runs.
 - Automated behaviors ("always run X after Y"): hooks in `.claude/settings.json`; instructions here cannot guarantee them.
-- Facts specific to one person (role, working-style preferences, machine setup, session context): Claude's memory.
+- Facts specific to one person (role, working-style preferences, machine setup, session context): `~/.claude/CLAUDE.md` or Claude's memory.
 - Secrets, credentials, API keys, `.env` values, ephemeral state: nowhere — never committed. `.env` is gitignored; `default.env` documents every setting.
 
 ## Git workflow
@@ -79,17 +72,16 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
 - Ordinary changes commit directly to `main` — this is a solo repo with no PR/review process. A complex feature (multiple concerns, significant refactoring, a new subsystem) spanning more than one commit gets a dedicated branch instead.
 - Chasing a CI-only failure: experiment on a branch and run CI there (`gh workflow run CI --ref <branch>`), never by pushing to `main`.
 - Close such a branch with a real merge commit (`git merge --no-ff`), never a fast-forward or a rebase onto `main` — the branch is the unit of work and the merge commit is what shows it.
-- When asked to commit a change that belongs to the unpushed commit just made, amend it (`git commit --amend`) rather than adding a separate fixup commit.
 
 ## Development workflow
 
 After making changes:
 
-1. Update or add tests to cover the change. Run the single-file command while iterating, then `npm run format` and `npm run check` (format check, CHANGELOG structure, tests, typecheck, lint, phone CSS rules a later rule overrides, stale doc references — identifiers, links, npm scripts, script flags — in docs, skills, README.md and this file, journey test titles) once at the end — when committing, the pre-commit hook is that run (step 4); report actual results, not assumptions. Fix what it reports. Never skip, disable or weaken tests or assertions to get green, and never bypass hooks (`--no-verify`) — report the failure instead.
+1. Update or add tests to cover the change: the single-file command while iterating, then `npm run format`.
 2. Update any affected documentation — see Where things belong above — and `CHANGELOG.md` (see Changelog below).
 3. Record what was surprising, misleading or broken, and its fix: as a comment or test when tied to specific code, otherwise in [pitfalls.md](docs/dev/pitfalls.md); machine-specific ones in Claude's memory. Symptom first (exact error text), then cause and fix. Delete entries once obsolete.
-4. The `pre-commit` hook runs `check`'s relevant steps on what's staged and blocks the commit on failure, so don't run `check` by hand before committing; the `pre-push` hook runs what CI runs (see [testing.md](docs/dev/testing.md#hooks)).
+4. Verify with `npm run check` (format check, CHANGELOG structure, tests, typecheck, lint, phone CSS rules a later rule overrides, stale doc references — identifiers, links, npm scripts, script flags — in docs, skills, README.md and this file, journey test titles). When committing, the `pre-commit` hook runs its relevant steps on what's staged (plus desktop e2e on UI changes) and blocks on failure, so don't also run it by hand; the `pre-push` hook runs what CI runs (see [testing.md](docs/dev/testing.md#hooks)). Report actual results, not assumptions, and fix what it reports. Never skip, disable or weaken tests or assertions to get green, and never bypass hooks (`--no-verify`) — report the failure instead.
 
 ## Changelog
 
-Every code change updates `CHANGELOG.md`, in the same commit as the code it documents — never a separate follow-up commit. The pre-commit hook fails a commit touching `public/`, `lib/` or `server.js` without it; `SKIP_CHANGELOG=1 git commit` only for one that genuinely needs no entry (a pure refactor). Add entries with `node scripts/changelog-add.js <Section> "<entry>"`, which puts them under `## [Unreleased]` (creating it and the subsection when missing), using [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format (Added / Changed / Fixed / Removed), plus a last `### Development` for changes only contributors see (tooling, checks, mock data), each subsection once — `npm run check` fails on a repeat. One user-facing line per entry, no implementation detail; `check` fails an entry over 400 characters.
+Every code change updates `CHANGELOG.md`, in the same commit as the code it documents. The pre-commit hook enforces it for `public/`, `lib/` and `server.js`; `SKIP_CHANGELOG=1 git commit` only for one that genuinely needs no entry (a pure refactor). Add entries with `node scripts/changelog-add.js <Section> "<entry>"` (it files them under `## [Unreleased]`), in [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) sections (Added / Changed / Fixed / Removed) plus a last `### Development` for changes only contributors see (tooling, checks, mock data). One user-facing line per entry, no implementation detail; `npm run check` enforces the structure and length.
