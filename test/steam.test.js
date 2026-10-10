@@ -1416,6 +1416,20 @@ test('getProtonDbStatus: two 403s in a row (a blanket bot-block) open the circui
   assert.ok(getCircuitBreakers().protondb.blockedUntil > Date.now());
 });
 
+test('getProtonDbStatus: requests already queued when the circuit opens never reach ProtonDB', async (t) => {
+  _reset();
+  _resetCircuitBreakers();
+  t.after(_resetCircuitBreakers);
+  t.mock.method(console, 'warn', () => {});
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403, text: async () => '' }));
+
+  // protonLimit runs 3 at a time; at most one more can start between the first 403 and the
+  // second, which opens the circuit. The rest were queued and must fail without a request.
+  const results = await Promise.allSettled([410, 411, 412, 413, 414, 415, 416, 417].map((a) => getProtonDbStatus(a)));
+  assert.ok(results.every((r) => r.status === 'rejected'));
+  assert.ok(fetchMock.mock.callCount() <= 4, `${fetchMock.mock.callCount()} requests`);
+});
+
 test('getProtonDbStatus: returns null on 404 (no reports for this appid)', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 404 }));

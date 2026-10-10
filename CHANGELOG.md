@@ -32,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The app has a browser tab icon
 - When Steam's store starts refusing requests, the app stops sending the ones it had already queued, instead of letting them hit the block
 - A bundle game whose Steam page couldn't be looked up because a service was down is retried on the next visit, instead of showing as not on Steam for a day
+- When ProtonDB starts refusing requests, the app stops sending the ones it had already queued
 
 ### Development
 
