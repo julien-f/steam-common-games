@@ -2,7 +2,7 @@
 
 // Lists references in the docs, CLAUDE.md, README.md and the skills that no longer resolve: backticked
 // camelCase identifiers (`cheapestPicks`, `pickRate()`) found nowhere in the code, relative links to
-// missing files, `npm run` scripts package.json lacks, and `scripts/*.js` files or flags that don't exist.
+// missing files or headings, `npm run` scripts package.json lacks, and `scripts/*.js` files or flags that don't exist.
 // Run by `npm run check`; a name a doc mentions on purpose as removed or rejected goes in HISTORY.
 
 const fs = require('node:fs');
@@ -25,23 +25,48 @@ const CODE_FILES = [
   'eslint.config.mjs',
 ];
 
+// GitHub's heading anchors: lowercased, punctuation dropped, spaces to hyphens, `-1`… on repeats.
+function headingSlugs(markdown) {
+  const slugs = new Set();
+  let fenced = false;
+  for (const line of markdown.split('\n')) {
+    if (line.startsWith('```')) fenced = !fenced;
+    const heading = !fenced && line.match(/^#{1,6} (.*)/)?.[1];
+    if (!heading) continue;
+    const base = heading
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N} _-]/gu, '')
+      .replace(/ /g, '-');
+    let slug = base;
+    for (let n = 1; slugs.has(slug); n++) slug = `${base}-${n}`;
+    slugs.add(slug);
+  }
+  return slugs;
+}
+
 const walk = (dir, keep) =>
   fs
     .readdirSync(dir, { recursive: true })
     .map((f) => path.join(dir, f))
     .filter(keep);
 
-// `ctx`: `words` (identifiers in the code), `npmScripts` (names), `exists(relPath)`, `scriptSource(name)`
-// (a `scripts/` file's text, or undefined); `doc` is the file's path relative to the repo root.
+// `ctx`: `words` (identifiers in the code), `npmScripts` (names), `exists(relPath)`, `slugs(relPath)` (a
+// Markdown file's heading anchors), `scriptSource(name)` (a `scripts/` file's text, or undefined); `doc` is
+// the file's path relative to the repo root.
 function staleRefs(doc, text, ctx) {
   const stale = [];
   text.split('\n').forEach((line, i) => {
     const at = (what) => stale.push(`${doc}:${i + 1}: ${what}`);
     for (const [, name] of line.matchAll(/`([a-z][a-z0-9]*[A-Z][A-Za-z0-9]*)(?:\(\))?`/g))
       if (!ctx.words.has(name) && !HISTORY.has(name)) at(`\`${name}\` not in the code`);
-    for (const [, link] of line.matchAll(/\]\(([^)#\s]+)[^)]*\)/g))
-      if (!/^[a-z]+:/.test(link) && !ctx.exists(path.posix.join(path.posix.dirname(doc), link)))
-        at(`link to missing ${link}`);
+    for (const [, link, anchor] of line.matchAll(/\]\(([^)#\s]*)(?:#([^)\s]+))?[^)]*\)/g)) {
+      if (/^[a-z]+:/.test(link)) continue;
+      const target = link ? path.posix.join(path.posix.dirname(doc), link) : doc;
+      if (!ctx.exists(target)) at(`link to missing ${link}`);
+      else if (anchor && target.endsWith('.md') && !ctx.slugs(target).has(anchor))
+        at(`no heading #${anchor} in ${target}`);
+    }
     for (const [, name] of line.matchAll(/npm run (?:-s )?([\w:-]+)/g))
       if (!ctx.npmScripts.has(name)) at(`no npm script "${name}"`);
     for (const [, file, flags] of line.matchAll(/scripts\/([\w-]+\.js)((?: --?[\w-]+(?:=\S*)?)*)/g)) {
@@ -66,6 +91,7 @@ function main() {
     words: new Set(code.match(/[A-Za-z_$][\w$]*/g)),
     npmScripts: new Set(Object.keys(require('../package.json').scripts)),
     exists: (p) => fs.existsSync(path.join(ROOT, p)),
+    slugs: (p) => headingSlugs(fs.readFileSync(path.join(ROOT, p), 'utf8')),
     scriptSource: (name) => {
       const p = path.join(ROOT, 'scripts', name);
       return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : undefined;
@@ -88,4 +114,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { staleRefs };
+module.exports = { headingSlugs, staleRefs };
