@@ -223,6 +223,54 @@ test('getHLTB: 401 does not set retry cooldown — init is retried immediately',
   assert.equal(initCalls, 2, 'init should be retried immediately after a 401, no cooldown');
 });
 
+test('getHLTB: a search 403 (a block, unlike an expired-token 401) holds off re-init for the retry window', async (t) => {
+  _reset();
+  _resetAuth();
+  t.after(_resetAuth);
+  let initCalls = 0;
+  let searchCalls = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('search/site/init')) {
+      initCalls++;
+      return makeInitResponse();
+    }
+    searchCalls++;
+    return { ok: false, status: 403 };
+  });
+
+  await assert.rejects(() => getHLTB(1, 'Portal'));
+  await assert.rejects(() => getHLTB(2, 'Half-Life'));
+  assert.equal(initCalls, 1);
+  assert.equal(searchCalls, 1);
+});
+
+test('getHLTB: two search 403s in a row open the circuit for 5 minutes, failing fast without a request', async (t) => {
+  _reset();
+  _resetAuth();
+  t.after(_resetAuth);
+  t.mock.method(console, 'warn', () => {});
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  const fetchMock = t.mock.method(globalThis, 'fetch', async (url) =>
+    url.includes('search/site/init') ? makeInitResponse() : { ok: false, status: 403 },
+  );
+
+  await assert.rejects(() => getHLTB(1, 'Portal'));
+  t.mock.timers.tick(31 * 1000); // past the init retry window
+  await assert.rejects(() => getHLTB(2, 'Half-Life')); // the second 403 trips it
+  const calls = fetchMock.mock.callCount();
+
+  t.mock.timers.tick(31 * 1000);
+  await assert.rejects(
+    () => getHLTB(3, 'Portal 2'),
+    (err) => err.isCircuitOpen === true,
+  );
+  assert.equal(fetchMock.mock.callCount(), calls, 'no request while the circuit is open');
+
+  t.mock.timers.tick(5 * 60 * 1000);
+  await assert.rejects(() => getHLTB(4, 'Left 4 Dead'));
+  assert.ok(fetchMock.mock.callCount() > calls, 'requests resume once the block expires');
+});
+
 test('getHLTB: throws and clears auth on 401', async (t) => {
   _reset();
   _resetAuth();

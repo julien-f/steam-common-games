@@ -14,6 +14,7 @@ const rateLimit = require('express-rate-limit');
 const { getCached, getCachedAt, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
 const { getMetrics, recordLimiterTrip } = require('./lib/metrics');
+const { getCircuitBreakers } = require('./lib/circuitBreaker');
 const {
   resolveSteamId,
   getOwnedGames,
@@ -30,7 +31,6 @@ const {
   getPlayerAchievements,
   getGlobalAchievementPercentages,
   getGameNews,
-  getStoreCircuitBreaker,
   getSemaphoreStats,
 } = require('./lib/steam');
 const { getHLTB } = require('./lib/hltb');
@@ -419,13 +419,13 @@ app.get('/api/health', (_req, res) => {
 // auth, same trust level as /api/health (nothing sensitive in it). `circuitBreakers`/`semaphores`/
 // `cacheEntries` are composed in here rather than folded into lib/metrics.js itself — none of
 // them are append-only counters the way everything else here is: `circuitBreakers`/`semaphores`
-// are live state owned by lib/steam.js (storeBlockedUntil, the storeLimit/tagLimit/protonLimit
+// are live state owned by lib/circuitBreaker.js and lib/steam.js (the storeLimit/tagLimit/protonLimit
 // semaphores' own active/queued/rejected counts), and `cacheEntries` is a snapshot read
 // straight from db.sqlite by lib/cache.js, not an in-memory counter at all.
 app.get('/api/metrics', (_req, res) => {
   res.json({
     ...getMetrics(),
-    circuitBreakers: { 'steam-store': getStoreCircuitBreaker() },
+    circuitBreakers: getCircuitBreakers(),
     semaphores: getSemaphoreStats(),
     cacheEntries: getCacheEntryCounts(),
   });

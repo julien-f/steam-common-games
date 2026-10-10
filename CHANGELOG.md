@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Game search ignores `?refresh=1`, which let a client skip its rate limit and re-query Steam's store search on every request.
 - A wishlist request can no longer skip the search rate limit by also carrying an already-cached account in a field the wishlist doesn't use.
 - Friends lists with more than 100 people now load their names in batches of 100, within Steam's documented limit.
+- HLTB and ProtonDB are left alone for 5 minutes once they start blocking requests (two 403s in a row), as Steam's store already was, instead of being asked again for every game; `GET /api/metrics` shows all three circuit breakers.
 
 ### Removed
 

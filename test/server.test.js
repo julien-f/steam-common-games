@@ -18,7 +18,7 @@ const { app } = require('../server');
 const { _reset, setCache } = require('../lib/cache');
 const { db } = require('../lib/db');
 const { _resetAuth } = require('../lib/hltb');
-const { _resetStoreCircuitBreaker } = require('../lib/steam');
+const { _resetCircuitBreakers } = require('../lib/circuitBreaker');
 
 const api = supertest(app);
 
@@ -198,6 +198,7 @@ test('GET /api/metrics: 200 with a since timestamp and per-group/label request c
   assert.equal(res.body.circuitBreakers['steam-store'].blockedUntil, 0);
   assert.equal(typeof res.body.circuitBreakers['steam-store'].tripCount, 'number');
   assert.equal(res.body.circuitBreakers['steam-store'].consecutive403s, 0);
+  assert.deepEqual(Object.keys(res.body.circuitBreakers).sort(), ['hltb', 'protondb', 'steam-store']);
 });
 
 test('GET /api/metrics: includes semaphore, cache hit/entry, rate-limiter, and dedup stats', async (t) => {
@@ -1209,8 +1210,8 @@ test('POST /api/game-details/stream: resolves HLTB name from store metadata', as
 test('POST /api/game-details/stream: does not log [game-details] for rating/meta blocked by an already-open circuit', async (t) => {
   _reset();
   _resetAuth();
-  _resetStoreCircuitBreaker();
-  t.after(_resetStoreCircuitBreaker);
+  _resetCircuitBreakers();
+  t.after(_resetCircuitBreakers);
   const warnMock = t.mock.method(console, 'warn', () => {});
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('appreviews') || url.includes('appdetails')) return { ok: false, status: 403 };
@@ -1321,8 +1322,8 @@ test('GET /api/search-games: 502 when the store search endpoint errors', async (
 // new information worth repeating once per blocked request.
 test('GET /api/search-games: a request blocked by an open circuit returns 502 without its own [upstream:...] log line', async (t) => {
   _reset();
-  _resetStoreCircuitBreaker();
-  t.after(_resetStoreCircuitBreaker);
+  _resetCircuitBreakers();
+  t.after(_resetCircuitBreakers);
   const errorMock = t.mock.method(console, 'error', () => {});
   const warnMock = t.mock.method(console, 'warn', () => {});
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));

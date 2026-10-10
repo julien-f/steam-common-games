@@ -27,12 +27,11 @@ const {
   getPlayerAchievements,
   getGlobalAchievementPercentages,
   getGameNews,
-  getStoreCircuitBreaker,
-  _resetStoreCircuitBreaker,
   getSemaphoreStats,
   createSemaphore,
 } = require('../lib/steam');
 const { _reset, setCache } = require('../lib/cache');
+const { getCircuitBreakers, _resetCircuitBreakers } = require('../lib/circuitBreaker');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
   return {
@@ -43,17 +42,17 @@ function makeReviewResponse(total, positive, desc = 'Very Positive') {
   };
 }
 
-test('getStoreCircuitBreaker: blockedUntil is 0 when the circuit has never tripped', async (t) => {
+test('steam-store circuit breaker: blockedUntil is 0 when the circuit has never tripped', async (t) => {
   _reset();
-  _resetStoreCircuitBreaker();
-  t.after(_resetStoreCircuitBreaker);
-  assert.equal(getStoreCircuitBreaker().blockedUntil, 0);
+  _resetCircuitBreakers();
+  t.after(_resetCircuitBreakers);
+  assert.equal(getCircuitBreakers()['steam-store'].blockedUntil, 0);
 });
 
-test('getStoreCircuitBreaker: trips (blockedUntil in the future) after 2 consecutive 403s, and blocks further calls without hitting fetch', async (t) => {
+test('steam-store circuit breaker: trips (blockedUntil in the future) after 2 consecutive 403s, and blocks further calls without hitting fetch', async (t) => {
   _reset();
-  _resetStoreCircuitBreaker();
-  t.after(_resetStoreCircuitBreaker);
+  _resetCircuitBreakers();
+  t.after(_resetCircuitBreakers);
   const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
 
   await assert.rejects(
@@ -66,7 +65,7 @@ test('getStoreCircuitBreaker: trips (blockedUntil in the future) after 2 consecu
   );
   assert.equal(fetchMock.mock.callCount(), 2);
 
-  const { blockedUntil } = getStoreCircuitBreaker();
+  const { blockedUntil } = getCircuitBreakers()['steam-store'];
   assert.ok(blockedUntil > Date.now());
 
   // Circuit is now open — a third call must reject immediately (circuit-open message) without
@@ -77,8 +76,8 @@ test('getStoreCircuitBreaker: trips (blockedUntil in the future) after 2 consecu
 
 test('fetchStoreApi: the circuit-open error is marked isCircuitOpen so callers can skip re-logging it', async (t) => {
   _reset();
-  _resetStoreCircuitBreaker();
-  t.after(_resetStoreCircuitBreaker);
+  _resetCircuitBreakers();
+  t.after(_resetCircuitBreakers);
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
 
   await assert.rejects(() => getGameRating(420));
@@ -89,10 +88,10 @@ test('fetchStoreApi: the circuit-open error is marked isCircuitOpen so callers c
   );
 });
 
-test('getStoreCircuitBreaker: logs a [circuit-breaker] warning exactly once at the moment it trips, not on every blocked call after', async (t) => {
+test('steam-store circuit breaker: logs a [circuit-breaker] warning exactly once at the moment it trips, not on every blocked call after', async (t) => {
   _reset();
-  _resetStoreCircuitBreaker();
-  t.after(_resetStoreCircuitBreaker);
+  _resetCircuitBreakers();
+  t.after(_resetCircuitBreakers);
   const warnMock = t.mock.method(console, 'warn', () => {});
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
 
@@ -110,32 +109,36 @@ test('getStoreCircuitBreaker: logs a [circuit-breaker] warning exactly once at t
   assert.equal(warnMock.mock.callCount(), 1);
 });
 
-test('getStoreCircuitBreaker: tripCount increments on trip and stays 0 until then', async (t) => {
+test('steam-store circuit breaker: tripCount increments on trip and stays 0 until then', async (t) => {
   _reset();
-  _resetStoreCircuitBreaker();
-  t.after(_resetStoreCircuitBreaker);
-  assert.equal(getStoreCircuitBreaker().tripCount, 0);
+  _resetCircuitBreakers();
+  t.after(_resetCircuitBreakers);
+  assert.equal(getCircuitBreakers()['steam-store'].tripCount, 0);
 
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
   await assert.rejects(() => getGameRating(400));
-  assert.equal(getStoreCircuitBreaker().tripCount, 0, 'a single 403 must not trip it');
+  assert.equal(getCircuitBreakers()['steam-store'].tripCount, 0, 'a single 403 must not trip it');
   await assert.rejects(() => getGameRating(401));
-  assert.equal(getStoreCircuitBreaker().tripCount, 1, 'two consecutive 403s trip it once');
+  assert.equal(getCircuitBreakers()['steam-store'].tripCount, 1, 'two consecutive 403s trip it once');
 });
 
-test('getStoreCircuitBreaker: consecutive403s exposes pre-trip state and resets on success', async (t) => {
+test('steam-store circuit breaker: consecutive403s exposes pre-trip state and resets on success', async (t) => {
   _reset();
-  _resetStoreCircuitBreaker();
-  t.after(_resetStoreCircuitBreaker);
-  assert.equal(getStoreCircuitBreaker().consecutive403s, 0);
+  _resetCircuitBreakers();
+  t.after(_resetCircuitBreakers);
+  assert.equal(getCircuitBreakers()['steam-store'].consecutive403s, 0);
 
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
   await assert.rejects(() => getGameRating(410));
-  assert.equal(getStoreCircuitBreaker().consecutive403s, 1, 'a single 403 is visible before it trips anything');
+  assert.equal(
+    getCircuitBreakers()['steam-store'].consecutive403s,
+    1,
+    'a single 403 is visible before it trips anything',
+  );
 
   t.mock.method(globalThis, 'fetch', async () => makeReviewResponse(10, 9));
   await getGameRating(411);
-  assert.equal(getStoreCircuitBreaker().consecutive403s, 0, 'a success resets the streak');
+  assert.equal(getCircuitBreakers()['steam-store'].consecutive403s, 0, 'a success resets the streak');
 });
 
 test('getSemaphoreStats: reports live active/queued and a lifetime queue-depth high-water mark', async (t) => {
@@ -1304,6 +1307,23 @@ test('getProtonDbStatus: returns tier, confidence and total', async (t) => {
 
 // A 404 means "ProtonDB has no reports for this appid" — not an upstream failure —
 // same treatment as getGameRating's "no reviews yet" case.
+test('getProtonDbStatus: two 403s in a row (a blanket bot-block) open the circuit, failing fast without a request', async (t) => {
+  _reset();
+  _resetCircuitBreakers();
+  t.after(_resetCircuitBreakers);
+  t.mock.method(console, 'warn', () => {});
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403, text: async () => '' }));
+
+  await assert.rejects(() => getProtonDbStatus(400));
+  await assert.rejects(() => getProtonDbStatus(401));
+  await assert.rejects(
+    () => getProtonDbStatus(402),
+    (err) => err.isCircuitOpen === true,
+  );
+  assert.equal(fetchMock.mock.callCount(), 2);
+  assert.ok(getCircuitBreakers().protondb.blockedUntil > Date.now());
+});
+
 test('getProtonDbStatus: returns null on 404 (no reports for this appid)', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 404 }));
