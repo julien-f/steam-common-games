@@ -451,16 +451,12 @@ function flashLbCounter(lb: HTMLElement) {
 
 // ── Focus helpers ──────────────────────────────────────────────────────────
 
-// Returns all focusable elements that are not inside a display:none ancestor.
+// Returns all focusable elements that are rendered: hidden by a stylesheet (the big play button
+// off a trailer, ‹ › with one item) counts too, or the trap's wrap lands on one and focus is lost.
 function getFocusable(lb: HTMLElement): HTMLElement[] {
-  return [...lb.querySelectorAll<HTMLElement>('button:not([disabled]), input[type="range"]')].filter((el) => {
-    let node: HTMLElement | null = el;
-    while (node && node !== lb) {
-      if (node.style.display === 'none') return false;
-      node = node.parentElement;
-    }
-    return true;
-  });
+  return [...lb.querySelectorAll<HTMLElement>('button:not([disabled]), input[type="range"]')].filter((el) =>
+    el.checkVisibility({ visibilityProperty: true }),
+  );
 }
 
 // ── DOM creation ───────────────────────────────────────────────────────────

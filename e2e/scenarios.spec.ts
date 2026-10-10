@@ -1286,6 +1286,28 @@ test('I2 edge: the lightbox shows its focus ring when opened from the keyboard, 
   }
 });
 
+test('I2 edge: Tab cycles the lightbox controls on a game with a single item', async ({ page }) => {
+  // Serves the cover from localhost, so it loads instead of showing its Retry.
+  await mockApi(page, { states: ['slow-media'] });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=620');
+  await page.getByRole('button', { name: 'Open in lightbox' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.lb-img')).not.toHaveClass(/loading/);
+  await expect(page.locator('.lb-close')).toBeFocused();
+  const focused = () =>
+    page.evaluate(() => {
+      const el = document.activeElement as HTMLElement;
+      return el.checkVisibility({ visibilityProperty: true }) ? el.ariaLabel : null;
+    });
+  const seen: (string | null)[] = [];
+  for (let i = 0; i < 6; i++) {
+    await page.keyboard.press('Tab');
+    seen.push(await focused());
+  }
+  expect(seen).toEqual(['Previous game', 'Next game', 'Enter fullscreen', 'Zoom', 'Close lightbox', 'Previous game']);
+});
+
 test("I2 edge: the panel's current thumbnail is exposed, not only coloured", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360');

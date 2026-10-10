@@ -38,7 +38,6 @@ None open.
 
 ## Keyboard and accessibility
 
-- **U113 · major · I2, F1** — in the lightbox, Tab never leaves × on a game with a single media item (a cover only): the focus trap's `getFocusable` keeps the CSS-hidden big play button, which becomes its first element once ‹ › are disabled, so the wrap focuses nothing. Arrows and Esc still work. Skip elements hidden by CSS, not only by an inline `display: none`.
 - **U115 · minor · I2** — Esc closing the panel (after the lightbox or not) drops focus on `<body>`, so the next ↓ moves nothing and there's no visible focus. Return focus to the row the panel was showing.
 
 ## Phone
