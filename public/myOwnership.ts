@@ -84,21 +84,27 @@ export function createMyOwnershipCache() {
     ownedSet = null;
     wishlistSet = null;
     ownersMap = new Map();
-    ownedPromise = fetchAccountOwnedData(account.id)
+    // Each response writes only while it's still the current fetch: a slower one for an account
+    // switched away from must not overwrite the new account's sets.
+    const owned: Promise<Set<number>> = fetchAccountOwnedData(account.id)
       .catch(() => ({ appids: new Set<number>(), owners: new Map<number, GameOwner[]>() }))
       .then(({ appids, owners }) => {
+        if (ownedPromise !== owned) return appids;
         ownedSet = appids;
         ownersMap = owners;
         notifyReady();
         return appids;
       });
-    wishlistPromise = fetchAccountWishlistAppids(account.id)
+    const wishlist: Promise<Set<number>> = fetchAccountWishlistAppids(account.id)
       .catch(() => new Set<number>())
       .then((s) => {
+        if (wishlistPromise !== wishlist) return s;
         wishlistSet = s;
         notifyReady();
         return s;
       });
+    ownedPromise = owned;
+    wishlistPromise = wishlist;
     return true;
   }
 

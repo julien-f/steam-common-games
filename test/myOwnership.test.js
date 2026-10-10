@@ -133,6 +133,39 @@ test('getMyOwnershipStatus: switching currentAccount refetches against the new a
   assert.deepEqual(seenSlots, ['1', '2']); // cached per account — one /api/common-games call each, not one per appid check
 });
 
+test("peekMyOwnershipStatus: a superseded account's slow response doesn't overwrite the new account's sets", async (t) => {
+  let releaseFirst;
+  const firstHeld = new Promise((resolve) => (releaseFirst = resolve));
+  withFetch(t, async (url, opts) => {
+    const id = JSON.parse(opts.body).slots?.[0][0] ?? JSON.parse(opts.body).members?.[0];
+    if (id === '1') await firstHeld;
+    const appid = id === '1' ? 440 : 620;
+    if (url === '/api/common-games') {
+      return {
+        ok: true,
+        json: async () => ({
+          groups: [{ games: [{ appid, name: `${appid}` }] }],
+          slots: [[{ steamid: id }]],
+          playtime: {},
+          lastPlayed: {},
+        }),
+      };
+    }
+    return { ok: true, json: async () => ({ items: [{ appid, priority: 1, dateAdded: null }] }) };
+  });
+
+  const { peekMyOwnershipStatus, getMyOwnershipStatus } = createMyOwnershipCache();
+  setCurrentAccount(makeAccount('1'));
+  assert.equal(peekMyOwnershipStatus(440), null); // account 1's fetch starts, and hangs
+  setCurrentAccount(makeAccount('2'));
+  assert.deepEqual(await getMyOwnershipStatus(620), { inLibrary: true, onWishlist: true });
+
+  releaseFirst();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(peekMyOwnershipStatus(440), { inLibrary: false, onWishlist: false });
+  assert.deepEqual(peekMyOwnershipStatus(620), { inLibrary: true, onWishlist: true });
+});
+
 test('peekMyOwnershipStatus: null (not blocking) before the fetch resolves, then real data once it lands', async (t) => {
   let resolveCommonGames;
   withFetch(t, async (url) => {
