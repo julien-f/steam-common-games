@@ -1316,6 +1316,17 @@ test('GET /api/search-games: 502 when the store search endpoint errors', async (
   assert.equal(res.status, 502);
 });
 
+test('GET /api/search-games: 504 with a [timeout:...] log when the upstream call times out', async (t) => {
+  _reset();
+  const errorMock = t.mock.method(console, 'error', () => {});
+  t.mock.method(globalThis, 'fetch', async () => {
+    throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+  });
+  const res = await api.get('/api/search-games?q=timeout-term');
+  assert.equal(res.status, 504);
+  assert.ok(errorMock.mock.calls.some((c) => c.arguments[0] === '[timeout:search-games]'));
+});
+
 // A request blocked by an already-open circuit still 502s, but must not log its own
 // [upstream:...] line — that's an expected, already-explained consequence of the trip itself
 // (see the one-time [circuit-breaker] warning lib/steam.js logs at the moment it trips), not
