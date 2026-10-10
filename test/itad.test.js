@@ -270,6 +270,20 @@ test('resolveSteamAppIds: a failed Steam-side expansion falls back to games/info
   assert.equal(result.get('gid-sub-only'), 292030);
 });
 
+test('resolveSteamAppIds: a games/info/v2 fallback that throws leaves only that gid unresolved', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async (url, opts) => {
+    if (String(url).includes('/games/info/')) throw new Error('network error');
+    return makeResolveFetch({
+      shopEntries: { 'gid-app': ['app/100'], 'gid-sub-only': ['sub/1234'] },
+      steam: { 'sub/1234': { success: false } },
+    })(url, opts);
+  });
+  const result = await resolveSteamAppIds(['gid-app', 'gid-sub-only']);
+  assert.equal(result.get('gid-app'), 100);
+  assert.equal(result.get('gid-sub-only'), null);
+});
+
 test('resolveSteamAppIds: a gid with no shop entry at all never triggers the games/info/v2 fallback', async (t) => {
   _reset();
   let infoCalls = 0;
