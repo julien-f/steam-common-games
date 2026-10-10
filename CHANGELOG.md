@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The pre-commit changelog check validates the staged CHANGELOG.md, so a partial stage that repeats a subsection no longer slips through
 - The mock API gives Hades two achievements, and its upstream-down state drops their rarity
 - The end-to-end tests run against a production build instead of the dev server, cutting them from about 30 s to 20 s
+- An end-to-end test checks the column menu's Remove group and Clear filter
 
 ## [0.10.0] - 2026-10-10
 

@@ -29,7 +29,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 ## Lists and selection
 
 - **U11 · minor · F3** — Filter popover: "never played" needs max = 0 and then reads "Played (h): 0–0". `@vates/data-table-solid` 0.17 added range presets (its rangePresets option); give the Played column a `{ label: 'never played', max: 0 }` preset. (Raw-float bounds and the missing field label were fixed by 0.17.)
-- **U74 · minor · L3** — the column header menu has no inverses: after **Group by this column** the item vanishes rather than becoming "Remove group", a filtered column (funnel icon) offers no "Clear filter", and it has no sort items, so undoing any of them means finding the chip. Needs an upstream change: toggle items for group, filter and sort (vatesfr/data-table#33).
 - **U76 · polish · F3** — with **All** chosen, the chip still reads "Genres: Action, RPG", the same as **Any**, though it shows 3 rows instead of 6. Needs an upstream change: say "all of" in the chip (vatesfr/data-table#35).
 
 ## Comparing

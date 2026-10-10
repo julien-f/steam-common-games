@@ -270,6 +270,28 @@ test("L3 edge: the toolbar's two resets say what they do", async ({ page }) => {
   }
 });
 
+test('L3 edge: the column menu undoes the group and filter it set', async ({ page }, testInfo) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  const menu = page.getByRole('button', { name: /^Weighted Rating options/ });
+  const dialog = page.getByRole('dialog', { name: /^Weighted Rating options/ });
+
+  await menu.click();
+  await dialog.getByRole('button', { name: 'Group by this column' }).click();
+  await menu.click();
+  await dialog.getByRole('button', { name: 'Remove group' }).click();
+  await menu.click();
+  await expect(dialog.getByRole('button', { name: 'Group by this column' })).toBeVisible();
+
+  await dialog.getByRole('button', { name: 'Filter ▸' }).click();
+  await dialog.getByRole('textbox', { name: 'Weighted Rating Min' }).fill('95');
+  await expect(menu).toHaveAccessibleName('Weighted Rating options, filtered');
+  // A phone opens the filter as its own page of the menu.
+  if (testInfo.project.name === 'phone') await dialog.getByRole('button', { name: '‹ Weighted Rating' }).click();
+  await dialog.getByRole('button', { name: 'Clear filter' }).click();
+  await expect(menu).toHaveAccessibleName('Weighted Rating options');
+});
+
 test('L4 edge: Recently Looked Up lists the latest lookup first, and says it keeps 10', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
