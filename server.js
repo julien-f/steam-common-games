@@ -208,8 +208,7 @@ app.get('/opensearch.xml', (req, res) => {
 });
 
 // Stricter limit for searches — each uncached user triggers Steam API calls. Shared by
-// POST /api/common-games and POST /api/wishlist below (their body shapes never overlap:
-// common-games sends slots/users, wishlist sends members), same "cache hits don't count"
+// POST /api/common-games (slots/users) and POST /api/wishlist (members) below, same "cache hits don't count"
 // rule detailsLimit/gameSearchLimit/etc. already apply — a re-search for accounts already
 // sitting fully in cache (resolve/player/games/wishlist) makes no upstream call at all, so it
 // shouldn't spend this tighter budget the way a genuinely new/stale search does. Switching
@@ -231,18 +230,14 @@ const searchLimit = namedRateLimit('search', {
     const refreshIds = req.body?.refreshIds;
     if (Array.isArray(refreshIds) && refreshIds.length > 0) return false;
 
+    // Read only the field the route itself reads, so a cached id in another field can't vouch
+    // for uncached ones.
+    const isWishlist = req.path === '/api/wishlist';
     let rawIdentifiers;
-    let isWishlist;
-    if (Array.isArray(req.body?.slots)) {
-      rawIdentifiers = req.body.slots.flat();
-      isWishlist = false;
-    } else if (Array.isArray(req.body?.users)) {
-      rawIdentifiers = req.body.users;
-      isWishlist = false;
-    } else if (Array.isArray(req.body?.members)) {
-      rawIdentifiers = req.body.members;
-      isWishlist = true;
-    } else return false; // let the route's own validation reject it
+    if (isWishlist) rawIdentifiers = req.body?.members;
+    else if (Array.isArray(req.body?.slots)) rawIdentifiers = req.body.slots.flat();
+    else rawIdentifiers = req.body?.users;
+    if (!Array.isArray(rawIdentifiers)) return false; // let the route's own validation reject it
 
     if (!rawIdentifiers.every((u) => typeof u === 'string' && u.trim().length > 0)) return false;
 

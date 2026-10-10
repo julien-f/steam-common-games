@@ -168,6 +168,12 @@ test('search limiter: counts cache misses but never counts cache hits (common-ga
   const cachedWishlist = await api.post('/api/wishlist').send({ members: [CACHED_WISHLIST] });
   assert.equal(cachedWishlist.status, 200, 'a fully-cached account (wishlist) must bypass the limiter');
   assert.ok(!calledIds.has(CACHED_COMMON) && !calledIds.has(CACHED_WISHLIST), 'cache hits must not fetch upstream');
+
+  // Each route's skip reads only the field that route uses: a cached `slots` riding along on a
+  // wishlist request for uncached `members` must not get it past the limiter.
+  const mixed = await api.post('/api/wishlist').send({ slots: [[CACHED_COMMON]], members: ['76561198000000004'] });
+  assert.equal(mixed.status, 429, 'a wishlist miss must count whatever else the body carries');
+  assert.ok(!calledIds.has('76561198000000004'), 'a rate-limited request must not fetch upstream');
 });
 
 // Regression test for the bug reported live: reloading the Bundles page a handful of times (or
