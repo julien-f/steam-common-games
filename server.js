@@ -832,7 +832,7 @@ app.get('/api/search-games', gameSearchLimit, async (req, res) => {
   const term = normalizeSearchTerm(req.query.q);
   if (term.length < 2) return res.json({ results: [] });
   try {
-    const results = await searchStoreGames(term, { force: isForceRefresh(req) });
+    const results = await searchStoreGames(term);
     res.json({ results });
   } catch (err) {
     const status = routeErrorStatus('search-games', err);

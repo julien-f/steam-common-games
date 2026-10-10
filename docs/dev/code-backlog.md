@@ -60,7 +60,6 @@ Last audited: simplify 2026-10-10 · security 2026-10-10 · perf 2026-10-10 · r
 
 ## Compliance
 
-- **C39 · major · S** — `gameSearchLimit`'s skip (`server.js:373-377`) ignores `isForceRefresh`, yet the route passes `force` to `searchStoreGames` (`server.js:835`): `?q=<cached>&refresh=1` is never counted and always hits the undocumented `storesearch`, draining the shared steam-store budget. No frontend sends `refresh` here; drop `force` from the route.
 - **C40 · major · S** — `fetchPlayerBatch` (`lib/steam.js:311-318`, caller `server.js:719`) sends every uncached id in one `GetPlayerSummaries`, past Steam's documented 100-id limit (a 300-friend account → one 300-id call); missing players are never cached, so it repeats every load. Chunk by 100; briefly cache misses.
 - **C41 · major · S** — HLTB and ProtonDB (untrusted tier) have no circuit breaker: an HLTB search 401/403 (`lib/hltb.js:214-216`) clears auth without setting `_hltbAuthFailedAt`, re-running init per search; ProtonDB's blanket 403 (`lib/steam.js:833-843`) is never cached, so every uncached game hits it during a block. Same "N consecutive 403s → 5 min block" as steam-store; set `_hltbAuthFailedAt` on a search 403.
 - **C42 · major · S** — HLTB (`lib/hltb.js:65`), ProtonDB (`lib/steam.js:113`) and `IStoreBrowseService` (`lib/steam.js:108`) are paced by concurrency only (3 in flight, ~6–10 req/s each on a cold large library), not the "low-volume" integrations.md describes. Add a minimum interval like `STORE_MIN_INTERVAL_MS`; record each pacing in integrations.md.
