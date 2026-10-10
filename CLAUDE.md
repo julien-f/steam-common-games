@@ -42,6 +42,7 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
 - Be concise and economical everywhere — responses, code comments, doc prose. No filler, no restating what was just done.
   - Code comments: one line, stating the _why_, only when it isn't obvious from the code; skip the comment entirely if the code speaks for itself. This governs new comments; leave the long-form ones already in the tree alone.
   - Doc prose (this file, `README.md`, `CHANGELOG.md`): short bullets over paragraphs; no preamble, no summary section, lead with the point.
+- Saying something is done includes where to see it: the route and steps for a UI change, the link to a posted comment or issue after checking it exists.
 - Stay in scope: make the smallest change that satisfies the request, plus the Development workflow checklist below. Flag anything else — other issues, alternative approaches with your recommendation, deeper work that would clearly pay off — instead of acting on it.
 - Match the request's intent. A question or request for opinion gets an answer only — no edits or side-effecting commands, even when the fix seems obvious; offer to act instead. When unsure which it is, treat it as a question. An action request gets acted on without further go-ahead, except:
   - ambiguous request: ask clarifying questions first, batched into one round;
