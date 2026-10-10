@@ -11,6 +11,7 @@
 // pulls in `@vates/data-table-core`, meaningless for this module and for its Node unit tests.
 // Both callers already import discountPct for their own column definitions anyway.
 import type { PriceFields } from './types.ts';
+import { fetchJson } from './utils.ts';
 
 // Same wording as the server's 503 for /bundles (server.js), so the two read as one cause.
 export const PRICES_UNAVAILABLE = "Prices aren't available on this instance: it isn't connected to IsThereAnyDeal.";
@@ -104,12 +105,14 @@ export async function postPrices({
 }): Promise<PriceLookup> {
   const qs = new URLSearchParams({ country });
   if (force) qs.set('refresh', '1');
-  const res = await fetch(`/api/prices?${qs}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(gids ? { gids } : { appids }),
-  });
-  const data: { prices?: Record<string, PriceInfo>; fetchedAt?: number | null; error?: string } = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Price lookup failed');
+  const data = await fetchJson<{ prices?: Record<string, PriceInfo>; fetchedAt?: number | null }>(
+    `/api/prices?${qs}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(gids ? { gids } : { appids }),
+    },
+    'Price lookup failed',
+  );
   return { prices: data.prices ?? {}, fetchedAt: data.fetchedAt ?? null };
 }

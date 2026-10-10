@@ -38,6 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - When HowLongToBeat starts refusing requests, the app stops sending the searches it had already queued
 - On a comparison where your own account isn't first in the link, the "Only …" groups no longer swap players' names
 - When the game panel's ↻ fails to reach Steam or IsThereAnyDeal, its achievements and price keep what they showed, like its news and bundles, instead of switching to "didn't answer"
+- When the server is unreachable behind a proxy that answers with an error page, the app says what failed ("Failed to fetch wishlist"…) instead of showing a JSON parse error
 
 ### Development
 
@@ -53,6 +54,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - GET /api/metrics no longer counts a rate limiter's own cache checks as cache hits, which inflated them by about 70%
 - The wishlist lookup no longer sends the Steam API key to Steam's undocumented wishlist endpoint, which answers the same without it
 - An end-to-end test covers retrying a game's sources with the panel's ↻ once a failed upstream is back (journey D2 step 3)
+- The account routes no longer accept a per-account `refreshIds`, which nothing has sent since the legacy pages went away
+- `POST /api/common-games` takes `{ members }` and returns a flat `games` list, like `/api/wishlist`; the multi-slot and legacy `{ users }` request shapes and ownership grouping, unused by the app, are gone
 
 ## [0.10.0] - 2026-10-10
 

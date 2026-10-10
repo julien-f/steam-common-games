@@ -342,3 +342,21 @@ export function isTextEntry(
 export function hoursFromMinutes(minutes: number): number {
   return Math.round(minutes / 6) / 10;
 }
+
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+// An /api call's JSON body. Throws its `error`, else `fallback` — also when the body isn't JSON
+// (a proxy's HTML error page), which would otherwise surface as a parse error.
+export async function fetchJson<T>(url: string, init: RequestInit | undefined, fallback: string): Promise<T> {
+  const res = await fetch(url, init);
+  const data = await res.json().catch(() => undefined);
+  if (!res.ok || data === undefined) throw new ApiError(data?.error || fallback, res.status);
+  return data as T;
+}

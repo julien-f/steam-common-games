@@ -5,6 +5,7 @@
 // bespoke table UI, which went away with that page.
 
 import type { PickAndMixTier } from './bundleRows.ts';
+import { ApiError, fetchJson } from './utils.ts';
 
 export interface PriceAmount {
   amount: number;
@@ -122,12 +123,18 @@ export async function fetchBundleById(
   { country }: { country?: string } = {},
 ): Promise<{ bundle: Bundle; fetchedAt: number | null }> {
   const qs = country ? `?${new URLSearchParams({ country })}` : '';
-  const res = await fetch(`/api/bundles/${id}${qs}`);
-  const data = await res.json();
-  if (res.status === 404) throw new BundleNotFoundError(data.error || 'Bundle not found');
-  if (res.status === 503) throw new UnavailableError(data.error);
-  if (!res.ok) throw new Error(data.error || 'Bundle lookup failed');
-  return { bundle: data.bundle, fetchedAt: data.fetchedAt ?? null };
+  try {
+    const data = await fetchJson<{ bundle: Bundle; fetchedAt?: number | null }>(
+      `/api/bundles/${id}${qs}`,
+      undefined,
+      'Bundle lookup failed',
+    );
+    return { bundle: data.bundle, fetchedAt: data.fetchedAt ?? null };
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) throw new BundleNotFoundError(err.message);
+    if (err instanceof ApiError && err.status === 503) throw new UnavailableError(err.message);
+    throw err;
+  }
 }
 
 // gid -> a Steam appid (the overwhelmingly common case), an array of appids (a Steam "sub"/
@@ -135,13 +142,11 @@ export async function fetchBundleById(
 // SKU, such as EVERSPACE - Ultimate Edition), or null when ITAD has no Steam listing for that
 // game at all. See lib/itad.js's resolveSteamAppIds.
 export async function resolveBundleAppids(gids: string[]): Promise<Record<string, number | number[] | null>> {
-  const res = await fetch('/api/bundles/resolve', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ gids }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Resolution failed');
+  const data = await fetchJson<{ appids: Record<string, number | number[] | null> }>(
+    '/api/bundles/resolve',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gids }) },
+    'Resolution failed',
+  );
   return data.appids;
 }
 

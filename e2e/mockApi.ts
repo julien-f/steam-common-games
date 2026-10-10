@@ -265,9 +265,9 @@ export function respond(
   const accountFetchedAt = () => (body.refresh ? Date.now() : states.has('stale') ? NOW - 12 * 86400_000 : NOW);
 
   if (path === '/api/common-games') {
-    const slot: string[] = body.slots?.[0] ?? [];
-    const players = slot.map(findPlayer);
-    const missing = slot.find((_, i) => !players[i]);
+    const identifiers: string[] = body.members ?? [];
+    const players = identifiers.map(findPlayer);
+    const missing = identifiers.find((_, i) => !players[i]);
     if (missing) return json({ error: `Cannot find Steam account: "${missing}"` }, 400);
     const members = players as Player[];
     const appids = [...new Set(members.flatMap((p) => p.owned))];
@@ -275,8 +275,8 @@ export function respond(
       appids.map((a) => [a, Object.fromEntries(members.map((p) => [p.steamid, p.playtime?.[a] ?? 0]))]),
     );
     return json({
-      groups: [{ userIndices: [0], games: appids.map((a) => ({ appid: a, name: game(a).name })) }],
-      slots: [members.map(playerJson)],
+      games: appids.map((a) => ({ appid: a, name: game(a).name })),
+      players: members.map(playerJson),
       playtime,
       lastPlayed: {},
       fetchedAt: accountFetchedAt(),

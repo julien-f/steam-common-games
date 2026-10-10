@@ -5,7 +5,7 @@
 // functions (row-building, table wiring, URL/history updates, accounts-bar rendering) — none of
 // that belongs here; ListRoute.tsx owns the equivalent orchestration generically, for any list
 // kind, not just account-scoped ones.
-import { steamVanity, fmtLastPlayed } from './utils.ts';
+import { steamVanity, fmtLastPlayed, fetchJson } from './utils.ts';
 
 // An AccountSlot.id is itself the sorted-joined resolved member steam64 ids (see
 // accountsStore.ts's accountIdFor) — so resolving an id back to its members is just splitting
@@ -56,10 +56,10 @@ export interface RawAccountPlayer {
 }
 
 // The shape of /api/common-games' success response, as read below — only the fields this
-// module touches (it always resolves a single slot, so `slots[0]`).
+// module touches.
 interface CommonGamesResponse {
-  groups: { games: { appid: number; name: string }[] }[];
-  slots: RawAccountPlayer[][];
+  games: { appid: number; name: string }[];
+  players: RawAccountPlayer[];
   fetchedAt: number | null;
   playtime: Record<number, Record<string, number>>;
   lastPlayed: Record<number, Record<string, number>>;
@@ -152,17 +152,18 @@ export async function fetchAccountOverview(
   members: string[],
   { refresh = false }: { refresh?: boolean } = {},
 ): Promise<AccountOverview> {
-  const res = await fetch('/api/common-games', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ slots: [members], refresh }),
-  });
-  const data: CommonGamesResponse & { error?: string } = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to fetch owned games');
+  const data = await fetchJson<CommonGamesResponse>(
+    '/api/common-games',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ members, refresh }),
+    },
+    'Failed to fetch owned games',
+  );
 
-  const allGames = data.groups.flatMap((g) => g.games);
-  const slotSteamIds = data.slots[0].map((p) => p.steamid);
-  const games = allGames.map((game) => {
+  const slotSteamIds = data.players.map((p) => p.steamid);
+  const games = data.games.map((game) => {
     const pt = data.playtime?.[game.appid] ?? {};
     const lp = data.lastPlayed?.[game.appid] ?? {};
     return {
@@ -172,9 +173,9 @@ export async function fetchAccountOverview(
       lastPlayedUnix: Math.max(0, ...slotSteamIds.map((id) => lp[id] || 0)),
     };
   });
-  const nameById = new Map(data.slots[0].map((p) => [p.steamid, p.personaname || p.steamid]));
+  const nameById = new Map(data.players.map((p) => [p.steamid, p.personaname || p.steamid]));
   const owners = new Map<number, GameOwner[]>();
-  for (const game of allGames) {
+  for (const game of data.games) {
     const pt = data.playtime?.[game.appid] ?? {};
     const lp = data.lastPlayed?.[game.appid] ?? {};
     // Membership comes from the playtime map rather than the slot's full member list: the
@@ -185,7 +186,7 @@ export async function fetchAccountOverview(
       .map((id) => ({ name: nameById.get(id) ?? id, minutes: pt[id] || 0, lastPlayedSec: lp[id] || 0 }));
     if (entries.length) owners.set(game.appid, entries);
   }
-  return { games, players: data.slots[0].map(toAccountPlayer), owners, fetchedAt: data.fetchedAt ?? null };
+  return { games, players: data.players.map(toAccountPlayer), owners, fetchedAt: data.fetchedAt ?? null };
 }
 
 // The owned-games half of fetchAccountOverview on its own — what every caller that doesn't care
@@ -203,13 +204,15 @@ export async function fetchAccountWishlist(
   members: string[],
   { refresh = false }: { refresh?: boolean } = {},
 ): Promise<AccountWishlist> {
-  const res = await fetch('/api/wishlist', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ members, refresh }),
-  });
-  const data: WishlistResponse & { error?: string } = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to fetch wishlist');
+  const data = await fetchJson<WishlistResponse>(
+    '/api/wishlist',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ members, refresh }),
+    },
+    'Failed to fetch wishlist',
+  );
   return { items: data.items, fetchedAt: data.fetchedAt ?? null };
 }
 
@@ -283,13 +286,15 @@ export async function fetchAccountFriends(
   members: string[],
   { refresh = false }: { refresh?: boolean } = {},
 ): Promise<AccountFriends> {
-  const res = await fetch('/api/friends', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ members, refresh }),
-  });
-  const data: FriendsResponse & { error?: string } = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to fetch friends');
+  const data = await fetchJson<FriendsResponse>(
+    '/api/friends',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ members, refresh }),
+    },
+    'Failed to fetch friends',
+  );
   return {
     friends: data.friends.map((f) => ({
       steamid: f.steamid,
@@ -329,7 +334,7 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
     fetch('/api/common-games', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slots: [rawInputs] }),
+      body: JSON.stringify({ members: rawInputs }),
     }),
     fetch('/api/wishlist', {
       method: 'POST',
@@ -340,7 +345,7 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
   const ownedData = await ownedRes.json();
   if (!ownedRes.ok) throw new Error(ownedData.error || 'Failed to resolve account');
 
-  const players: RawAccountPlayer[] = ownedData.slots[0];
+  const players: RawAccountPlayer[] = ownedData.players;
   const members = players.map((p) => p.steamid).sort();
   const label = players.map((p) => p.personaname || p.steamid).join(' + ');
   // Keyed by steamid rather than a parallel array: `members` is sorted, `players` is in the
@@ -355,7 +360,7 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
   const memberSince = solePlayer ? fmtLastPlayed(solePlayer.timecreated) || null : null;
   const countryCode = solePlayer?.loccountrycode || null;
   const realName = solePlayer?.realname || null;
-  const ownedCount = ownedData.groups.flatMap((g: { games: unknown[] }) => g.games).length;
+  const ownedCount = ownedData.games.length;
 
   let wishlistCount = 0;
   if (wishlistRes && wishlistRes.ok) {

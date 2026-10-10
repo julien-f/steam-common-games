@@ -88,6 +88,7 @@ import {
   computeSteamdbRating,
   computeProductionTier,
   discountPct,
+  fetchJson,
   fmtAge,
   fmtLastPlayed,
   formatMoney,
@@ -203,6 +204,7 @@ import { setBaseTitle } from './pageTitle.ts';
 import type {
   AccountSlot,
   DetailsAges,
+  GameDetails,
   Game,
   Rating,
   Hltb,
@@ -1422,9 +1424,7 @@ export default function ListRoute() {
     const game = standaloneRows[appid];
     openGame(game);
     try {
-      const res = await fetch(`/api/game-details/${appid}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Lookup failed');
+      const data = await fetchJson<GameDetails>(`/api/game-details/${appid}`, undefined, 'Lookup failed');
       if (token !== standaloneLookupToken) return; // a newer lookup has since taken over
       setStandaloneRows(
         appid,
@@ -1673,9 +1673,11 @@ export default function ListRoute() {
   // has its own store (see standaloneRows).
   async function refreshGame(game: Game): Promise<void> {
     try {
-      const res = await fetch(`/api/game-details/${game.appid}?refresh=1`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Refresh failed');
+      const data = await fetchJson<DetailsEvent>(
+        `/api/game-details/${game.appid}?refresh=1`,
+        undefined,
+        'Refresh failed',
+      );
       const updated = rowStore.mutateRow(game.appid, (draft) => applyDetailsEvent(draft, data));
       if (!updated && standaloneRows[game.appid]) {
         setStandaloneRows(

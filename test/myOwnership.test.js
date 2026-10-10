@@ -46,8 +46,8 @@ function fakeAccountFetch({ ownedAppids = [], wishlistAppids = [], failWishlist 
       return {
         ok: true,
         json: async () => ({
-          groups: [{ games: ownedAppids.map((appid) => ({ appid, name: `Game ${appid}` })) }],
-          slots: [[{ steamid: '1' }]],
+          games: ownedAppids.map((appid) => ({ appid, name: `Game ${appid}` })),
+          players: [{ steamid: '1' }],
           playtime: {},
           lastPlayed: {},
         }),
@@ -103,17 +103,17 @@ test('getMyOwnershipStatus: only fetches once per loaded account — a second ap
 });
 
 test('getMyOwnershipStatus: switching currentAccount refetches against the new account', async (t) => {
-  let seenSlots = [];
+  let seenMembers = [];
   withFetch(t, async (url, opts) => {
     if (url === '/api/common-games') {
       const body = JSON.parse(opts.body);
-      seenSlots.push(body.slots[0][0]);
-      const appids = body.slots[0][0] === '1' ? [440] : [620];
+      seenMembers.push(body.members[0]);
+      const appids = body.members[0] === '1' ? [440] : [620];
       return {
         ok: true,
         json: async () => ({
-          groups: [{ games: appids.map((a) => ({ appid: a, name: `${a}` })) }],
-          slots: [[{ steamid: body.slots[0][0] }]],
+          games: appids.map((a) => ({ appid: a, name: `${a}` })),
+          players: [{ steamid: body.members[0] }],
           playtime: {},
           lastPlayed: {},
         }),
@@ -130,22 +130,22 @@ test('getMyOwnershipStatus: switching currentAccount refetches against the new a
   setCurrentAccount(makeAccount('2'));
   assert.deepEqual(await getMyOwnershipStatus(440), { inLibrary: false, onWishlist: false });
   assert.deepEqual(await getMyOwnershipStatus(620), { inLibrary: true, onWishlist: false });
-  assert.deepEqual(seenSlots, ['1', '2']); // cached per account — one /api/common-games call each, not one per appid check
+  assert.deepEqual(seenMembers, ['1', '2']); // cached per account — one /api/common-games call each, not one per appid check
 });
 
 test("peekMyOwnershipStatus: a superseded account's slow response doesn't overwrite the new account's sets", async (t) => {
   let releaseFirst;
   const firstHeld = new Promise((resolve) => (releaseFirst = resolve));
   withFetch(t, async (url, opts) => {
-    const id = JSON.parse(opts.body).slots?.[0][0] ?? JSON.parse(opts.body).members?.[0];
+    const id = JSON.parse(opts.body).members[0];
     if (id === '1') await firstHeld;
     const appid = id === '1' ? 440 : 620;
     if (url === '/api/common-games') {
       return {
         ok: true,
         json: async () => ({
-          groups: [{ games: [{ appid, name: `${appid}` }] }],
-          slots: [[{ steamid: id }]],
+          games: [{ appid, name: `${appid}` }],
+          players: [{ steamid: id }],
           playtime: {},
           lastPlayed: {},
         }),
@@ -175,8 +175,8 @@ test('peekMyOwnershipStatus: null (not blocking) before the fetch resolves, then
           resolve({
             ok: true,
             json: async () => ({
-              groups: [{ games: [{ appid: 440, name: 'TF2' }] }],
-              slots: [[{ steamid: '1' }]],
+              games: [{ appid: 440, name: 'TF2' }],
+              players: [{ steamid: '1' }],
               playtime: {},
               lastPlayed: {},
             }),
@@ -238,13 +238,13 @@ test('getMyOwnershipStatus: a ?u= override is what ownership answers for, not th
   // Owned games differ per account, so the answer says which one was actually asked about.
   withFetch(t, async (url, opts) => {
     const body = JSON.parse(opts.body);
-    const member = (body.slots ? body.slots[0] : body.members)[0];
+    const member = body.members[0];
     if (url === '/api/common-games') {
       return {
         ok: true,
         json: async () => ({
-          groups: [{ games: (member === '1' ? [440] : [620]).map((appid) => ({ appid, name: `App ${appid}` })) }],
-          slots: [[{ steamid: member }]],
+          games: (member === '1' ? [440] : [620]).map((appid) => ({ appid, name: `App ${appid}` })),
+          players: [{ steamid: member }],
           playtime: {},
           lastPlayed: {},
         }),
@@ -266,15 +266,11 @@ test('peekMyPlaytime: undefined while loading, then summed hours / latest date f
       return {
         ok: true,
         json: async () => ({
-          groups: [
-            {
-              games: [
-                { appid: 620, name: 'Portal 2' },
-                { appid: 440, name: 'TF2' },
-              ],
-            },
+          games: [
+            { appid: 620, name: 'Portal 2' },
+            { appid: 440, name: 'TF2' },
           ],
-          slots: [[{ steamid: '1' }, { steamid: '2' }]],
+          players: [{ steamid: '1' }, { steamid: '2' }],
           playtime: { 620: { 1: 300, 2: 60 } },
           lastPlayed: { 620: { 1: 1700000000, 2: 1600000000 } },
         }),

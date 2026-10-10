@@ -17,7 +17,8 @@ import { addRecentGame } from './recentGames.ts';
 import { peekMyOwnershipStatus, onMyOwnershipReady } from './myOwnership.ts';
 import { GAME_SEARCH_DEBOUNCE_MS, GAME_SEARCH_MIN_CHARS } from './gameSearch.ts';
 import type { GameSearchResult } from './gameSearch.ts';
-import type { Game } from './types.ts';
+import type { Game, GameDetails } from './types.ts';
+import { fetchJson } from './utils.ts';
 
 // Mirrors CORE_COLUMNS' own identity pair (gameColumns.ts) — a fixed-width thumb column plus a
 // Name column with inline ownership badges — but over GameSearchResult's bare {appid, name,
@@ -208,9 +209,7 @@ export default function SearchRoute() {
     });
     focusRow(appid);
     try {
-      const res = await fetch(`/api/game-details/${appid}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Lookup failed');
+      const data = await fetchJson<GameDetails>(`/api/game-details/${appid}`, undefined, 'Lookup failed');
       if (token !== lookupToken) return; // a newer pick has since taken over
       const resolved: Game = { ...placeholder, details: data, loading: false, name: data.meta?.name || name };
       panelOpen(resolved);

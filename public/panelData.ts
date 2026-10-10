@@ -30,7 +30,7 @@
 // myOwnership.ts's createMyOwnershipCache.
 import { achievementsAccountKey, achievementsRequestUrl, achievementsSteamUrl } from './achievementsRequest.ts';
 import { applyPriceInfo, postPrices } from './priceLoading.ts';
-import { discountPct } from './utils.ts';
+import { discountPct, fetchJson } from './utils.ts';
 import { getStoredRegion, resolveRegion } from './region.ts';
 import type { Achievements, NewsItem, PriceFields } from './types.ts';
 import type { PickAndMixTier } from './bundleRows.ts';
@@ -108,9 +108,11 @@ export function createPanelDataCache() {
 
   async function fetchNews(appid: number, { force = false } = {}): Promise<PanelNews> {
     try {
-      const res = await fetch(`/api/game-news/${appid}${force ? '?refresh=1' : ''}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'News lookup failed');
+      const data = await fetchJson<{ news: PanelNews }>(
+        `/api/game-news/${appid}${force ? '?refresh=1' : ''}`,
+        undefined,
+        'News lookup failed',
+      );
       news.set(appid, data.news);
       return data.news;
     } catch {
@@ -161,9 +163,11 @@ export function createPanelDataCache() {
       return empty;
     }
     try {
-      const res = await fetch(achievementsRequestUrl(appid, memberIds, { force }));
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Achievements lookup failed');
+      const data = await fetchJson<Achievements>(
+        achievementsRequestUrl(appid, memberIds, { force }),
+        undefined,
+        'Achievements lookup failed',
+      );
       data.steamUrl = achievementsSteamUrl(appid, memberIds);
       achievements.set(key, data);
       return data;
@@ -213,9 +217,11 @@ export function createPanelDataCache() {
       }
       const qs = new URLSearchParams({ country: resolveRegion(getStoredRegion()) });
       if (force) qs.set('refresh', '1');
-      const res = await fetch(`/api/game-bundles/${appid}?${qs}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Bundles lookup failed');
+      const data = await fetchJson<{ bundles: PanelBundles }>(
+        `/api/game-bundles/${appid}?${qs}`,
+        undefined,
+        'Bundles lookup failed',
+      );
       bundles.set(appid, data.bundles);
       return data.bundles;
     } catch {

@@ -60,16 +60,14 @@ function mockResolveFetch(steamid = '76561198000000201') {
       return {
         ok: true,
         json: async () => ({
-          groups: [],
-          slots: [
-            [
-              {
-                steamid,
-                personaname: 'Alice',
-                avatarmedium: 'https://x/a.jpg',
-                profileurl: 'https://steamcommunity.com/id/alice/',
-              },
-            ],
+          games: [],
+          players: [
+            {
+              steamid,
+              personaname: 'Alice',
+              avatarmedium: 'https://x/a.jpg',
+              profileurl: 'https://steamcommunity.com/id/alice/',
+            },
           ],
           playtime: {},
           lastPlayed: {},
