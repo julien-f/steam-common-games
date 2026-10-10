@@ -42,6 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `node scripts/changelog-add.js <Section> "<entry>"` adds a CHANGELOG entry under Unreleased, creating the section and subsection in order when missing.
 - `node scripts/db-query.js "<sql>"` queries `db.sqlite` read-only.
 - The pre-commit hook and `npm run check` share one list of steps.
+- `npm run test:one <file>` runs one test file with the same settings as `npm test`.
 
 ## [0.9.0] - 2026-10-07
 
