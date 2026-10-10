@@ -100,9 +100,10 @@ test('F3 edge: the Played (h) filter range reads in rounded hours', async ({ pag
   await page.getByRole('button', { name: 'Filter', exact: true }).click();
   await page.locator('.dt-filter-cols-search').fill('Played');
   await page.locator('[data-filter-col-key="playtime"]').click();
+  // Empty until a bound is set; the column's bounds show as placeholders in its own format (0 h is "—").
   const bounds = () =>
-    page.locator('.dt-range-input').evaluateAll((inputs) => inputs.map((i) => (i as HTMLInputElement).value));
-  await expect.poll(bounds).toEqual(['0', '20']);
+    page.locator('.dt-range-input').evaluateAll((inputs) => inputs.map((i) => (i as HTMLInputElement).placeholder));
+  await expect.poll(bounds).toEqual(['—', '20.0']);
 });
 
 test("F3 edge: a column header's filter lists values as the cells write them", async ({ page }) => {

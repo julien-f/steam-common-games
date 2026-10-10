@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - One client can have at most 2 game lists loading their details at once (`STREAM_MAX_PER_IP`); a third is refused with a "too many game lists loading at once" message (the list says the load failed), so no single visitor can fill the shared Steam queue.
 - The game panel's DLC card loads 20 entries at a time, with a "Show more" button, and looks up only each DLC's store page, instead of full details for every DLC at once (hundreds of lookups for some games); the panel's ↻ no longer reloads the DLC list.
 - Loading a large list's game details downloads about a fifth as much data: the details stream is now gzip-compressed (2000 games: 10.9 MB down to 2.0 MB).
+- Table filters: each value in a list filter has a visible ≠ button to exclude it, and an excluded value is struck through like its chip; a range filter's boxes stay empty until you set a bound, showing the column's own range as a hint, and are labelled with the column's name.
 
 ### Fixed
 
@@ -55,6 +56,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The pre-commit hook and `npm run check` share one list of steps.
 - `npm run test:one <file>` runs one test file with the same settings as `npm test`.
 - Signing in with Steam works on the dev server (`npm run dev`) when browsing `localhost`: the proxy no longer sent Steam's return address to the backend's own port.
+- Dependencies updated within their ranges (express 5.3, vite 8.3.4, Playwright 1.64 — run `npx playwright install chromium` once — and others), `@vates/data-table-solid` to 0.17, and `concurrently` to 10.0.6, clearing `npm audit`'s two critical `shell-quote` advisories.
 
 ## [0.9.0] - 2026-10-07
 

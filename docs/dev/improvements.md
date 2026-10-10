@@ -28,9 +28,8 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Lists and selection
 
-- **U11 · minor · F3** — Filter popover: range bounds print raw floats for computed columns (Weighted Rating `93.9813501 – 97.9840615`), the range shows no field label (the header menu's Filter flyout shows the same floats), and "never played" needs max = 0 and then reads "Played (h): 0–0". The table library prints bounds with `String(n)` and has no presets; needs an upstream change: formatting is data-table's backlog U5, presets vatesfr/data-table#30.
+- **U11 · minor · F3** — Filter popover: "never played" needs max = 0 and then reads "Played (h): 0–0". `@vates/data-table-solid` 0.17 added range presets (its rangePresets option); give the Played column a `{ label: 'never played', max: 0 }` preset. (Raw-float bounds and the missing field label were fixed by 0.17.)
 - **U74 · minor · L3** — the column header menu has no inverses: after **Group by this column** the item vanishes rather than becoming "Remove group", a filtered column (funnel icon) offers no "Clear filter", and it has no sort items, so undoing any of them means finding the chip. Needs an upstream change: toggle items for group, filter and sort (vatesfr/data-table#33).
-- **U75 · minor · F3** — include/exclude in the value filter (header flyout and toolbar Filter alike) is explained only by a hover `title` ("Click to include, click again to exclude"); an excluded value shows as an indeterminate checkbox, which reads as "partly selected", while its chip says "≠ Action" in red. Needs an upstream change: a visible exclude control or legend, and the excluded row marked like its chip (vatesfr/data-table#34).
 - **U76 · polish · F3** — with **All** chosen, the chip still reads "Genres: Action, RPG", the same as **Any**, though it shows 3 rows instead of 6. Needs an upstream change: say "all of" in the chip (vatesfr/data-table#35).
 
 ## Comparing
@@ -45,7 +44,7 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 ## Keyboard and accessibility
 
 - **U70 · polish · S2 · pilot** — after the panel's 🔗 copy, the icon becomes ✓ but nothing is announced and `aria-label` stays "Copy link to this game". Announce "Link copied" through a live region.
-- **U28 · polish · I2** — the open game's row is highlighted, but not exposed to assistive tech (`aria-current`); the table library has no per-row attribute hook (vatesfr/data-table#40).
+- **U28 · polish · I2** — the open game's row is highlighted, but not exposed to assistive tech (`aria-current`). `@vates/data-table-solid` 0.17 added a current-row option (currentRow, setting `aria-current`); pass the open game's row to it.
 
 ## Phone
 
