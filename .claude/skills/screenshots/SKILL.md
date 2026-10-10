@@ -11,11 +11,7 @@ Committed screenshots live in `docs/images/`, kebab-case, referenced from `READM
 
 Only the demo account may appear: <https://steamcommunity.com/profiles/76561198070571772/>. Real profiles reach the screenshots through the account card, "Recent accounts", the nav-bar chip and the panel's "Owned by" — including any extra account the user allowed for UX reviews.
 
-`scripts/demo-prefs.js` holds the demo state (account with its name and avatar, example lists and folders) and the backup/restore around it. **Seed before opening any app page** — every route with a table writes prefs:
-
-1. `node scripts/demo-prefs.js seed --file`, then run `.playwright-mcp/demo-seed.js` with `browser_run_code_unsafe`'s `filename`. It backs up `steam.isonoe.net:prefs` first and refuses if a backup already exists — restore that one first, never overwrite it.
-2. Shoot.
-3. `node scripts/demo-prefs.js restore --file`, run `.playwright-mcp/demo-restore.js`, and confirm the backup key is gone.
+`scripts/demo-prefs.js` holds the demo state (account with its name and avatar, example lists and folders) and the backup/restore around it: seed before opening any app page and restore after, as in CLAUDE.md's **Looking at the UI**.
 
 A shot needing more demo state (another list, a ranked list) gets it added to `demoPrefs()` rather than clicked together, named so it reads as an example.
 

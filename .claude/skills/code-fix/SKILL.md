@@ -26,8 +26,7 @@ The smallest change that closes the item, following CLAUDE.md's code conventions
 ## 3. Close and commit
 
 - Remove the item from code-backlog.md, or narrow it to what's left and say so.
-- `CHANGELOG.md` via `scripts/changelog-add.js` — Fixed or Changed for anything a user or operator notices, Development for contributor-only changes; a pure refactor commits with `SKIP_CHANGELOG=1`. Update any doc the change makes stale; record a surprise in pitfalls.md.
-- `npm run format`, then commit per CLAUDE.md's Development workflow: subject says what changed and why it matters, body names `C<n>`.
+- Then CLAUDE.md's Development workflow and Changelog; the commit body names `C<n>`.
 
 ## Report
 

@@ -21,14 +21,7 @@ Judges the app against [docs/dev/journeys.md](../../../docs/dev/journeys.md) and
 
 ## Demo state (real server only) — before the first page load
 
-**Every app page may write prefs** (opening any table stores its view), so seed before opening _any_ route, account or not, and restore only on the way out.
-
-```sh
-node scripts/demo-prefs.js seed --file      # or: empty --file, for a first visit (A1)
-node scripts/demo-prefs.js restore --file
-```
-
-Each writes `.playwright-mcp/demo-<mode>.js`; run it with `browser_run_code_unsafe`'s `filename`. It opens About (a page that writes nothing), backs up or restores `steam.isonoe.net:prefs`, and reloads. `seed`/`empty` refuse while a backup exists — restore first; never overwrite it.
+Seed before opening _any_ route and restore only on the way out, as in CLAUDE.md's **Looking at the UI** (`empty` for a first visit, A1).
 
 - Only the demo account (in the script) may be typed, except accounts the user names for this review. Those: never committed, screenshots only in `.playwright-mcp/`, called Friend A/B everywhere — in the report and in improvements.md, never by persona name. Skip A4 while no allowed account has a public friends list.
 - Stay inside [integrations.md](../../../docs/dev/integrations.md)'s trust tiers: one pass per scenario, no repeated ↻ refreshes. A large library's first load streams for minutes (uncached details are throttled) — judge the feedback, don't wait for it to finish.
@@ -59,7 +52,7 @@ Check at each step:
 
 ## Teardown
 
-After any real-server visit: run `demo-restore.js`, then confirm `steam.isonoe.net:prefs.backup` is gone. Don't finish while it's still present.
+After any real-server visit, restore the demo state; don't finish while `steam.isonoe.net:prefs.backup` is still present.
 
 ## Record and report
 

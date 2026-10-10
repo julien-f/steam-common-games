@@ -25,15 +25,14 @@ The smallest change that closes the item, following [frontend.md](../../../docs/
 
 ## 3. Look at it
 
-- `node scripts/mock-server.js up` (`dev:mock` on `:58993`, its own storage: no demo-prefs seed/restore; `down` when done). Check in the browser at **1440×900** and **390×844**: for layout, `node scripts/ux-measure.js --name=ux-U<n> /route…` then `browser_run_code_unsafe` with `filename: .playwright-mcp/measure.js` (first-row position, block heights, overflow, targets under 24 px, unnamed controls, console errors, screenshots); for anything else, one `browser_run_code_unsafe` call per step that acts, measures what the item is about (bounding boxes before/after, accessible names), and screenshots to `.playwright-mcp/ux-U<n>-<what>.png`.
+- `node scripts/mock-server.js up` (`dev:mock` on `:58993`, its own storage: no demo-prefs seed/restore; `down` when done). Check at **1440×900** and **390×844** with [ux-review](../ux-review/SKILL.md)'s Mechanics, starting clean (`ux-measure.js --fresh`), naming files `ux-U<n>` / `ux-U<n>-<what>.png`; measure what the item is about (bounding boxes before/after, accessible names).
 - This is the item's re-check — no separate ux-review run.
 - A stale-module error after editing a widely imported file: restart the server (`down`, then `up`). A console error that appeared mid-edit: reload before believing it (pitfalls.md).
 
 ## 4. Close and commit
 
 - Remove the item from improvements.md, or narrow it to what's left and say so.
-- `CHANGELOG.md` via `scripts/changelog-add.js` (Fixed or Changed), in user-facing words; update any doc the change makes stale.
-- `npm run format`, then commit per CLAUDE.md's Development workflow: subject says what changed for the user, body names `U<n>` and why.
+- Then CLAUDE.md's Development workflow and Changelog; the subject says what changed for the user, the body names `U<n>` and why.
 
 ## Report
 

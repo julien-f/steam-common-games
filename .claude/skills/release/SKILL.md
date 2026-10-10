@@ -19,7 +19,7 @@ Pre-1.0: **minor** for anything under Added/Changed/Removed, **patch** for Fixed
 
 ## 2. Consolidate the changelog
 
-`[Unreleased]` accumulates one entry per commit, often with several blocks of the same category. Before cutting:
+`[Unreleased]` accumulates one entry per commit, often with several blocks of the same category. CHANGELOG.md is too large to `Read` whole; read the section with `sed -n '/^## \[Unreleased\]/,/^## \[[0-9]/p' CHANGELOG.md`. Before cutting:
 
 - Merge into one block per category, in order: Added, Changed, Deprecated, Removed, Fixed, Security, Development.
 - Keep bullet order within each category; merge bullets that describe the same feature's evolution into its final state.
@@ -36,8 +36,6 @@ git add CHANGELOG.md package.json package-lock.json
 git commit -m "Release X.Y.Z"            # body: one line on what the release is about
 git tag -a vX.Y.Z -m vX.Y.Z
 ```
-
-No `chore(release):` prefix — CLAUDE.md dropped Conventional Commits. The pre-commit hook runs the full gate; don't re-run it by hand.
 
 ## 4. Push
 
