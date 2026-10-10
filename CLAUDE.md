@@ -21,6 +21,7 @@ Working conventions for this repo. Documentation lives in `docs/` — keep it th
 - [docs/dev/journeys.md](docs/dev/journeys.md) — user journeys (goal, numbered steps, done-when); the basis for design reviews and end-to-end tests
 - [docs/dev/ui-guidelines.md](docs/dev/ui-guidelines.md) — UI conventions where scenarios and feature docs are silent, and the checklist for a new UI feature
 - [docs/dev/improvements.md](docs/dev/improvements.md) — UX backlog from design reviews, keyed to scenarios
+- [docs/dev/code-backlog.md](docs/dev/code-backlog.md) — code backlog from `code-audit` runs (simplify, security, perf, reliability, compliance, tests)
 - [docs/dev/decisions.md](docs/dev/decisions.md) — Weighted Rating vs. Wilson score, the Production Tier heuristic
 - [docs/dev/pitfalls.md](docs/dev/pitfalls.md) — surprising behaviors, misleading errors and their fixes; check it when something fails or behaves unexpectedly
 - [docs/images/](docs/images) — the screenshots the docs embed; shooting them is the `screenshots` skill
