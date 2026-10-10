@@ -56,8 +56,8 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: `@vates/data-table-solid` touches `window` when it loads.
 - **Fix**: resolve it to `@vates/data-table-core`, which provides the helpers, with a `module.registerHooks` resolve hook in the test (see `test/gameColumns.test.js`; needs Node ≥ 22.15).
 
-## Every e2e test fails with `ERR_CONNECTION_REFUSED` while agents run in parallel
+## The e2e run fails at start while agents run in parallel
 
-- **Symptom**: midway through `npm run test:e2e` (or the pre-commit hook's e2e step), tests fail with `page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:28992/…`.
-- **Cause**: every checkout serves e2e on port 28992 and reuses a server already there, so a run from one worktree tests another checkout's code until that run ends and stops its server.
-- **Fix**: give each checkout its own port: `E2E_PORT=<free port> git commit …` (or `npm run test:e2e`); with `E2E_PORT` set, the server is never reused.
+- **Symptom**: `npm run test:e2e` (or the pre-commit hook's e2e step) fails at start with `http://localhost:28992 is already used, make sure that nothing is running on the port/url`.
+- **Cause**: every checkout serves e2e on port 28992, and a run never reuses a server already there (it would serve another checkout's build), so a second run while one is going fails.
+- **Fix**: give each checkout its own port: `E2E_PORT=<free port> git commit …` (or `npm run test:e2e`).

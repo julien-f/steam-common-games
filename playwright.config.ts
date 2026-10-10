@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 
 // End-to-end tests for docs/dev/journeys.md's journeys (`npm run test:e2e`). The app runs on
@@ -5,8 +6,11 @@ import { defineConfig, devices } from '@playwright/test';
 // backend, database or upstream service is involved.
 // Below Linux's ephemeral range (32768–60999): the pre-commit hook runs this beside the unit tests,
 // whose servers and requests draw random ports from that range and could take a fixed one there.
-// E2E_PORT: scripts/guard.js runs a base and a head checkout, each on its own server, never reused.
+// E2E_PORT: scripts/guard.js runs a base and a head checkout, each on its own server.
 const PORT = Number(process.env.E2E_PORT) || 28992;
+// A production build rather than the dev server: a page load fetches one bundle instead of every
+// module, which cuts the suite from about 30 s to 20 s.
+const OUT_DIR = path.join(__dirname, 'node_modules/.cache/e2e-dist', String(PORT));
 
 export default defineConfig({
   testDir: 'e2e',
@@ -27,8 +31,9 @@ export default defineConfig({
     { name: 'phone', use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
   ],
   webServer: {
-    command: `npx vite --port ${PORT} --strictPort`,
+    command: `npx vite build --sourcemap --outDir ${OUT_DIR} && npx vite preview --outDir ${OUT_DIR} --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
-    reuseExistingServer: !process.env.E2E_PORT,
+    // A server already on the port would serve another build: fail on the busy port instead.
+    reuseExistingServer: false,
   },
 });
