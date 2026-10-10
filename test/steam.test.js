@@ -1154,42 +1154,6 @@ test('getSteamTags: throws isUpstream (not a raw TypeError) when the tag name ma
   );
 });
 
-// Tags have moved cache key twice: `tags:` (SteamSpy-era `{tagname: voteCount}` objects) →
-// `tagids:` (a bare `tagid[]`, briefly) → `browse:` (the whole raw store browse item, current).
-// Entries under either retired key must never be read by the new code, in any shape — a shape
-// check (e.g. "is it an array?") isn't safe: a game with zero SteamSpy votes cached a bare
-// `[]` under the old key, indistinguishable by shape alone from a legitimate empty result
-// under either later format. That ambiguity used to leave every "no SteamSpy tags" game stuck
-// showing no tags forever, even once Steam's own data (fetched below) had some. A distinct key
-// each time a format changes sidesteps the whole problem: retired-key entries, in any shape,
-// are simply never consulted.
-test('getSteamTags: ignores a stale `tags:` entry (old SteamSpy object shape)', async (t) => {
-  _reset();
-  setCache('tags:400', { Action: 9054, 'Co-op': 4532 }); // old SteamSpy-shaped cache value, retired key
-  mockTagEndpoints(t, { tagids: [1, 2], nameMap: { 1: 'Action', 2: 'Indie' } });
-
-  const result = await getSteamTags(400);
-  assert.deepEqual(result, ['Action', 'Indie']);
-});
-
-test('getSteamTags: ignores a stale `tags:` entry of `[]` (old SteamSpy "no votes" games) — the exact case a shape check could not distinguish from a real empty result', async (t) => {
-  _reset();
-  setCache('tags:400', []); // retired key, empty array — SteamSpy's shape for "no tags recorded"
-  mockTagEndpoints(t, { tagids: [1, 2], nameMap: { 1: 'Action', 2: 'Indie' } });
-
-  const result = await getSteamTags(400);
-  assert.deepEqual(result, ['Action', 'Indie']);
-});
-
-test('getSteamTags: ignores a stale `tagids:` entry (the brief bare-array key format)', async (t) => {
-  _reset();
-  setCache('tagids:400', [999]); // retired key, from the format that sat between `tags:` and `browse:`
-  mockTagEndpoints(t, { tagids: [1, 2], nameMap: { 1: 'Action', 2: 'Indie' } });
-
-  const result = await getSteamTags(400);
-  assert.deepEqual(result, ['Action', 'Indie']);
-});
-
 test('getGameDemo: returns the demo appid from related_items.demo_appid', async (t) => {
   _reset();
   mockTagEndpoints(t, { tagids: [], nameMap: {}, demoAppid: 1714800 });

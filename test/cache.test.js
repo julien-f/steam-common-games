@@ -154,3 +154,14 @@ test('getCachedAt: honours a per-entry expiry too', () => {
   _reset([['meta:3', { value: null, ts: Date.now() - 1000, expires: Date.now() - 500 }]]);
   assert.equal(getCachedAt('meta:3'), undefined);
 });
+
+test('every key prefix has an explicit TTL group, and an unknown one throws', () => {
+  const old = Date.now() - BUNDLES_CACHE_TTL_MS - 1000;
+  _reset([
+    ['itad-gamebundles:US:gid', { value: [], ts: old }],
+    ['playerach:1:440', { value: [], ts: old }],
+  ]);
+  assert.equal(getCached('itad-gamebundles:US:gid'), undefined, 'bundles tier, not the 30-day library tier');
+  assert.deepEqual(getCached('playerach:1:440'), [], 'library tier');
+  assert.throws(() => setCache('nope:1', 1), /no TTL group for key nope:1/);
+});
