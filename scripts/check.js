@@ -26,7 +26,7 @@ function steps(staged, files = []) {
       : []),
     ['doc-refs', ['check:doc-refs']],
     ['journeys', ['check:journeys']],
-    ...(ui && staged !== undefined ? [['e2e', ['test:e2e']]] : []),
+    ...(ui && staged !== undefined ? [['e2e', ['test:e2e', '--', '--if-changed']]] : []),
   ];
 }
 

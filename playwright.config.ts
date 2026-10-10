@@ -31,7 +31,10 @@ export default defineConfig({
     { name: 'phone', use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
   ],
   webServer: {
-    command: `npx vite build --sourcemap --outDir ${OUT_DIR} && npx vite preview --outDir ${OUT_DIR} --port ${PORT} --strictPort`,
+    // E2E_BUILT: scripts/e2e.js (`npm run test:e2e`) already built into that directory.
+    command: process.env.E2E_BUILT
+      ? `npx vite preview --outDir ${process.env.E2E_BUILT} --port ${PORT} --strictPort`
+      : `npx vite build --sourcemap --outDir ${OUT_DIR} && npx vite preview --outDir ${OUT_DIR} --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     // A server already on the port would serve another build: fail on the busy port instead.
     reuseExistingServer: false,

@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.e2e.json",
     "test": "npm run test:one -- test/*.test.js test/*.test.ts",
     "test:one": "DB_FILE= STORE_MIN_INTERVAL_MS=0 UPSTREAM_MIN_INTERVAL_MS=0 node --test --test-reporter=dot",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/e2e.js",
     "check": "node scripts/check.js",
     "check:changelog": "node scripts/changelog-check.js",
     "check:css": "node scripts/css-overrides.js",

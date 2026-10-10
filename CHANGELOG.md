@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The end-to-end tests run against a production build instead of the dev server, cutting them from about 30 s to 20 s
 - An end-to-end test checks the column menu's Remove group and Clear filter
 - The UX-workflow pilot is cancelled: its frozen backlog items are open to fixes again, and its PR guard (`scripts/guard.js` and its workflow) is gone
+- The pre-commit hook skips the end-to-end tests when the build and tests are the same as in the last full passing run, so a comment-only frontend edit, or a commit right after a full run, takes seconds
 
 ## [0.10.0] - 2026-10-10
 
