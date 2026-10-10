@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A malformed or unexpected request now gets a short JSON error instead of a server error page
 - When Steam or another service can't be reached, or answers with a web page instead of data, the app reports the service as failing rather than the request as invalid
 - When Steam doesn't answer for players' names, libraries still load, and a saved account keeps its name instead of being renamed to its Steam ID
+- When Steam's store page for a game fails, its HowLongToBeat times show as not answering, with ↻ to retry, instead of as no data
 
 ### Development
 

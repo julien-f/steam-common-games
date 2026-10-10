@@ -770,10 +770,8 @@ function fetchGameDetails(appid, { force = false } = {}) {
     // client-supplied name would just be an unverified string. This costs a little latency
     // versus searching HLTB in parallel with an already-known, trusted name (e.g. an owned
     // game's name from Steam's library API) — that's the trade for not trusting the client.
-    const hltbPromise = metaPromise.then(
-      (meta) => getHLTB(appid, meta?.name || '', { force }),
-      () => null,
-    );
+    // A meta failure fails HLTB too, so it reads as failed, not as "no data".
+    const hltbPromise = metaPromise.then((meta) => getHLTB(appid, meta?.name || '', { force }));
 
     return Promise.allSettled([
       getGameRating(appid, { force }),
@@ -801,7 +799,7 @@ function fetchGameDetails(appid, { force = false } = {}) {
         console.warn(`[game-details] ${label} (appid ${appid}):`, err?.message, err?.cause ?? '');
       };
       if (ratingRes.status === 'rejected') logErr('rating', ratingRes.reason);
-      if (hltbRes.status === 'rejected') logErr('hltb', hltbRes.reason);
+      if (hltbRes.status === 'rejected' && hltbRes.reason !== metaRes.reason) logErr('hltb', hltbRes.reason);
       if (metaRes.status === 'rejected') logErr('meta', metaRes.reason);
       if (tagsRes.status === 'rejected') logErr('tags', tagsRes.reason);
       if (demoRes.status === 'rejected') logErr('demo', demoRes.reason);

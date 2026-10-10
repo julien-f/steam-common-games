@@ -769,6 +769,7 @@ test('GET /api/game-details/:appid: 200 with null meta when appdetails fetch fai
   assert.equal(res.status, 200);
   assert.equal(typeof res.body.rating?.score, 'number');
   assert.equal(res.body.meta, null);
+  assert.deepEqual(res.body.failed, ['hltb', 'meta'], "HLTB needs meta's name, so it failed too, not 'no data'");
 });
 
 test('GET /api/game-details/:appid: names a failed source in `failed`, unlike one with no data', async (t) => {
