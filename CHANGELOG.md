@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Development
 
 - `scripts/guard.js` prints its usage instead of a git error when `--base` or `--head` is missing
+- Unit and e2e test runs print dots instead of every passing test, cutting a full `npm test` from 108 KB of output to 3 KB
 
 ## [0.10.0] - 2026-10-10
 

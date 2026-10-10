@@ -11,7 +11,7 @@ const PORT = Number(process.env.E2E_PORT) || 28992;
 export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
-  reporter: 'list',
+  reporter: 'dot',
   use: {
     ...devices['Desktop Chrome'],
     baseURL: `http://localhost:${PORT}`,

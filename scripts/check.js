@@ -10,13 +10,13 @@ const { execFileSync, spawn } = require('node:child_process');
 const UI =
   /^(public|e2e)\/|^(playwright\.config\.ts|vite\.config\.js|tsconfig[^/]*\.json|eslint\.config\.[^/]*|package(-lock)?\.json)$/;
 
-// `[name, npm script args, env]` for a full run (`staged` undefined) or a commit against `staged`.
+// `[name, npm script args]` for a full run (`staged` undefined) or a commit against `staged`.
 function steps(staged, files = []) {
   const ui = staged === undefined || files.some((f) => UI.test(f));
   return [
     ['format', ['format:check']],
     ['changelog', staged === undefined ? ['check:changelog'] : ['check:changelog', '--', `--staged=${staged}`]],
-    ['test', ['test'], { NODE_OPTIONS: '--test-reporter=dot' }],
+    ['test', ['test']],
     ...(ui
       ? [
           ['typecheck', ['typecheck']],
@@ -26,18 +26,18 @@ function steps(staged, files = []) {
       : []),
     ['doc-refs', ['check:doc-refs']],
     ['journeys', ['check:journeys']],
-    ...(ui && staged !== undefined ? [['e2e', ['test:e2e', '--', '--reporter=dot']]] : []),
+    ...(ui && staged !== undefined ? [['e2e', ['test:e2e']]] : []),
   ];
 }
 
-// Runs each `[name, command, args, env]` in parallel; resolves to `{ name, ok, ms, output }` in order.
+// Runs each `[name, command, args]` in parallel; resolves to `{ name, ok, ms, output }` in order.
 function runAll(steps) {
   return Promise.all(
     steps.map(
-      ([name, command, args, env]) =>
+      ([name, command, args]) =>
         new Promise((resolve) => {
           const start = Date.now();
-          const child = spawn(command, args, { env: { ...process.env, ...env } });
+          const child = spawn(command, args);
           let output = '';
           child.stdout.on('data', (d) => (output += d));
           child.stderr.on('data', (d) => (output += d));
@@ -58,9 +58,7 @@ async function main() {
     staged === undefined
       ? []
       : execFileSync('git', ['diff', '--cached', '--name-only', staged], { encoding: 'utf8' }).split('\n');
-  const results = await runAll(
-    steps(staged, files).map(([name, args, env]) => [name, npm, ['run', '-s', ...args], env]),
-  );
+  const results = await runAll(steps(staged, files).map(([name, args]) => [name, npm, ['run', '-s', ...args]]));
   for (const r of results) console.log(`${r.ok ? '✓' : '✗'} ${r.name} (${(r.ms / 1000).toFixed(1)} s)`);
   for (const r of results.filter((r) => !r.ok)) console.log(`\n── ${r.name} failed ──\n${r.output.trimEnd()}`);
   if (results.some((r) => !r.ok)) process.exit(1);
