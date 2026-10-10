@@ -2,7 +2,7 @@
 
 Every upstream this app talks to, and what is undocumented about each. Cache tiers for all of it are in [data.md](data.md); request counters and budgets in [observability.md](observability.md).
 
-**Trust tiers.** Steam's keyed `api.steampowered.com` endpoints and the IsThereAnyDeal API are documented and sanctioned. Everything else here — HLTB's search API, Steam's wishlist/store-search/store-browse/packagedetails/ajaxresolvebundles endpoints, ProtonDB, Fanatical's storefront feed — is undocumented, reached without a key (sometimes with spoofed browser headers), and liable to break or be blocked without notice. Usage is low-volume and non-commercial; don't scale up request volume without revisiting the compliance note on each. The ones that answer a block with a 403 — Steam's store, HLTB's search, ProtonDB — each have a circuit breaker (`lib/circuitBreaker.js`): 2 consecutive 403s leave that upstream alone for 5 minutes, including requests already queued when it trips. Pacing: Steam's store takes 2 requests in flight with a 500 ms pause per slot (`STORE_MIN_INTERVAL_MS`, ≈ 4 req/s); HLTB's search, ProtonDB and the store browse API take 3 with a 1 s pause (`UPSTREAM_MIN_INTERVAL_MS`, ≈ 3 req/s each) — enough to keep pace with the store's ~2 games/s on a cold load. A store 429 pauses every store request for its `Retry-After` (2 s, then 4 s, when it sends none), and a request is retried at most twice before failing.
+**Trust tiers.** Steam's keyed `api.steampowered.com` endpoints and the IsThereAnyDeal API are documented and sanctioned. Everything else here — HLTB's search API, Steam's wishlist/store-search/store-browse/appdetails/appreviews/packagedetails/ajaxresolvebundles endpoints, ProtonDB, Fanatical's storefront feed — is undocumented, reached without a key (sometimes with spoofed browser headers), and liable to break or be blocked without notice. Usage is low-volume and non-commercial; don't scale up request volume without revisiting the compliance note on each. The ones that answer a block with a 403 — Steam's store, HLTB's search, ProtonDB — each have a circuit breaker (`lib/circuitBreaker.js`): 2 consecutive 403s leave that upstream alone for 5 minutes, including requests already queued when it trips. Pacing: Steam's store takes 2 requests in flight with a 500 ms pause per slot (`STORE_MIN_INTERVAL_MS`, ≈ 4 req/s); HLTB's search, ProtonDB and the store browse API take 3 with a 1 s pause (`UPSTREAM_MIN_INTERVAL_MS`, ≈ 3 req/s each) — enough to keep pace with the store's ~2 games/s on a cold load. A store 429 pauses every store request for its `Retry-After` (2 s, then 4 s, when it sends none), and a request is retried at most twice before failing.
 
 - [HLTB — no npm package](#hltb--no-npm-package)
 - [Wishlist — undocumented endpoint](#wishlist--undocumented-endpoint)
@@ -55,6 +55,30 @@ The `browse:` cache key is the third one used for this data — `tags:` (SteamSp
 `getAppDetails` (`lib/steam.js`) calls the undocumented `store.steampowered.com/api/appdetails?appids={id}` (same trust tier as above).
 
 - **The reply can be keyed under another appid.** Since about 2026-09-24, many games come back as `{"<other id>": {"success": true, "data": {"steam_appid": <requested id>, …}}}`, where the key is often one of the game's DLCs (e.g. 1656930 → `"3290770"`, 39210 → `"4831120"`). The data is correct; only the key is wrong. `getAppDetails` falls back to the entry whose `data.steam_appid` matches the request, so an entry for a different game is still rejected. Other projects saw the same: [romm#4774](https://github.com/rommapp/romm/pull/4774), [EnhancedGV#9](https://github.com/Featherwolf/EnhancedGV/pull/9).
+
+## Reviews — store appreviews
+
+`getGameRating` (`lib/steam.js`) calls the undocumented `store.steampowered.com/appreviews/{appid}?json=1&language=all&purchase_type=all&num_per_page=0` and reads only `query_summary` (`total_reviews`, `total_positive`, `review_score_desc`); `num_per_page=0` skips the review texts. It goes through the store's limiter and circuit breaker like `appdetails`. A game with no reviews (`total_reviews` 0 or absent) is cached as `null`: no data, not a failure.
+
+## ProtonDB — undocumented summary endpoint
+
+`getProtonDbStatus` (`lib/steam.js`) calls `https://www.protondb.com/api/v1/reports/summaries/{appid}.json`: untrusted tier, no key, sent with no headers at all (unlike HLTB's spoofed ones), on its own limiter (3 in flight) and circuit breaker.
+
+- **404** means no reports for this appid yet, cached as `null` (no data).
+- **403** has been seen as a blanket bot-block, the same page for every appid rather than a per-game error; the error message carries a body snippet to tell the two apart, and two in a row open the breaker.
+- **`tier: "pending"`** means too few reports for a tier, but ProtonDB still publishes a `provisionalTier` from those reports; that one is shown, marked `pending: true` so the UI renders it lower-confidence. Only no provisional tier either reads as no data. The raw reply is what's cached, so this display rule can change without busting anything.
+
+## Achievements — keyed `ISteamUserStats`
+
+Documented endpoints, but their "no data" answers are error statuses, which the code treats as answers rather than failures:
+
+- **`GetSchemaForGame/v2`** (key): a 403 with a **JSON** body means the game publishes no achievements (cached as `[]`, on the short miss TTL since a game gets them at release); a 403 with an **HTML** body is a rejected key, a real failure.
+- **`GetPlayerAchievements/v1`** (key): **400** means the game has no stats, **403** a private profile; both are cached as `null`, like a reply without `playerstats.success`.
+- **`GetGlobalAchievementPercentagesForApp/v2`**: needs **no key**. A 403 with an empty body answers both "no achievements" and "unknown appid", cached as `null` on the short miss TTL. `percent` comes back as a numeric string.
+
+## News — `GetNewsForApp`
+
+`getGameNews` (`lib/steam.js`) calls the documented, key-less `ISteamNews/GetNewsForApp/v2` with `count=20&maxlength=1` and **`feeds=steam_community_announcements`, a parameter Valve's docs don't list**: it keeps only the developer's own posts, the ones the game's store page shows. Without it the reply mixes in third-party press feeds in any language, which can outnumber official posts ten to one. If Steam drops the parameter, the panel's news would fill with that press.
 
 ## Looking up an arbitrary game
 

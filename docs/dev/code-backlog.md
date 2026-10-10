@@ -37,7 +37,6 @@ None open.
 ## Compliance
 
 - **C40 · minor · S** — players `GetPlayerSummaries` omits are never cached (`lib/steam.js` `fetchPlayerBatch`), so a deleted or invalid account in a friends list is re-requested on every load. Cache the omission briefly once it's confirmed Steam omits only ids that really don't exist (not transiently); record that in integrations.md.
-- **C49 · minor · S** — integrations.md doesn't record: ProtonDB (no section — endpoint, no headers, 404 = no reports, 403 block, `provisionalTier`; `lib/steam.js:825`), `store.steampowered.com/appreviews` (`lib/steam.js:397`), `GetNewsForApp`'s undocumented `feeds=` (`lib/steam.js:1040`), and the achievements status rules (`lib/steam.js:872, 927, 968`: 400/403 private, JSON vs. HTML 403, keyless global percentages). Add them, ProtonDB in the untrusted tier.
 - **C50 · cleanup · S** — integrations.md:36 says `GetWishlist` is a plain `?steamid=` request, but `lib/steam.js:259` also sends `key=`. Drop the key if unneeded, else fix the doc.
 
 ## Tests
