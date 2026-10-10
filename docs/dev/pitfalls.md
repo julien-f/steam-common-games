@@ -5,8 +5,8 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 ## Tests run slowly when started without `npm test`
 
 - **Symptom**: `node --test` on store-backed tests spends most of its time idle.
-- **Cause**: store calls are paced by `STORE_MIN_INTERVAL_MS` (500 ms, `default.env`), which `npm test` sets to 0.
-- **Fix**: set `DB_FILE= STORE_MIN_INTERVAL_MS=0` when running a test file directly.
+- **Cause**: upstream calls are paced by `STORE_MIN_INTERVAL_MS` (500 ms) and `UPSTREAM_MIN_INTERVAL_MS` (1000 ms, both in `default.env`), which `npm test` sets to 0.
+- **Fix**: set `DB_FILE= STORE_MIN_INTERVAL_MS=0 UPSTREAM_MIN_INTERVAL_MS=0` when running a test file directly.
 
 ## `ReferenceError: <name> is not defined` in the browser console mid-edit
 

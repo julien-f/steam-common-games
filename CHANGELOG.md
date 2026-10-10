@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The screenshot viewer's buttons are bare icons rather than filled circles and boxes.
 - On a desktop screen, trailers and large screenshots in the viewer leave room above and below for its controls instead of sitting under them.
 - With a mouse, the screenshot viewer's top line shows just the game's name; its ↑ ↓ and "Game 3 of 6" appear when you point at it or Tab to them. Touch screens keep them.
+- HLTB, ProtonDB and Steam's store browse API are now paced to about 3 requests a second each (`UPSTREAM_MIN_INTERVAL_MS`, 1000), instead of as fast as 3 parallel requests allow; cold loads aren't slower, since Steam's store pace already limits them.
 
 ### Fixed
 
