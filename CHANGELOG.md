@@ -50,6 +50,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The pre-commit hook skips the end-to-end tests when the build and tests are the same as in the last full passing run, so a comment-only frontend edit, or a commit right after a full run, takes seconds
 - A pre-push hook runs what CI runs, so a push that passes it passes CI; commits run only the desktop half of the end-to-end tests; CI runs its checks and end-to-end tests in parallel, on Node 24
 - GET /api/metrics no longer counts a rate limiter's own cache checks as cache hits, which inflated them by about 70%
+- The wishlist lookup no longer sends the Steam API key to Steam's undocumented wishlist endpoint, which answers the same without it
 
 ## [0.10.0] - 2026-10-10
 

@@ -462,6 +462,20 @@ test('getWishlist: fetches and returns wishlist items', async (t) => {
   assert.equal(items[0].appid, 400);
 });
 
+// The endpoint answers the same without a key, so the key isn't sent to an undocumented service.
+test('getWishlist: sends no API key', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ response: {} }),
+  }));
+
+  await getWishlist('76561198000000001');
+  const url = new URL(fetchMock.mock.calls[0].arguments[0]);
+  assert.equal(url.searchParams.get('steamid'), '76561198000000001');
+  assert.equal(url.searchParams.has('key'), false);
+});
+
 test('getWishlist: caches result — second call skips fetch', async (t) => {
   _reset();
   let fetchCount = 0;

@@ -35,7 +35,7 @@ If HLTB breaks again, recent npm packages (e.g. `howlongtobeat-ts`) tend to reve
 
 ## Wishlist — undocumented endpoint
 
-`getWishlist` calls `https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid={id}`, which is not listed in Valve's published Web API docs (same unofficial-endpoint situation as HLTB above, though no spoofed headers are needed here — it works with a plain request). A private wishlist, a private profile, and a genuinely empty wishlist are all indistinguishable: each returns `200 OK` with `{"response":{}}` (no `items` key). The app treats a missing `items` key as an empty wishlist rather than surfacing an error, since there's no way to tell those cases apart.
+`getWishlist` calls `https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid={id}`, which is not listed in Valve's published Web API docs (same unofficial-endpoint situation as HLTB above, though no spoofed headers are needed here — it works with a plain request, no API key: checked 2026-10-10 that it answers the same with or without one). A private wishlist, a private profile, and a genuinely empty wishlist are all indistinguishable: each returns `200 OK` with `{"response":{}}` (no `items` key). The app treats a missing `items` key as an empty wishlist rather than surfacing an error, since there's no way to tell those cases apart.
 
 ## Friends — documented, keyed endpoint
 

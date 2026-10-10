@@ -37,7 +37,6 @@ None open.
 ## Compliance
 
 - **C40 · minor · S** — players `GetPlayerSummaries` omits are never cached (`lib/steam.js` `fetchPlayerBatch`), so a deleted or invalid account in a friends list is re-requested on every load. Cache the omission briefly once it's confirmed Steam omits only ids that really don't exist (not transiently); record that in integrations.md.
-- **C50 · cleanup · S** — integrations.md:36 says `GetWishlist` is a plain `?steamid=` request, but `lib/steam.js:259` also sends `key=`. Drop the key if unneeded, else fix the doc.
 
 ## Tests
 
