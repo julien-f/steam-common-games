@@ -74,6 +74,19 @@ test('steam-store circuit breaker: trips (blockedUntil in the future) after 2 co
   assert.equal(fetchMock.mock.callCount(), 2);
 });
 
+test('steam-store circuit breaker: requests already queued when it trips never reach Steam', async (t) => {
+  _reset();
+  _resetCircuitBreakers();
+  t.after(_resetCircuitBreakers);
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
+
+  // storeLimit runs 2 at a time; at most one more can start between the first 403 and the
+  // second, which trips the breaker. The rest were queued and must fail without a request.
+  const results = await Promise.allSettled([410, 411, 412, 413, 414, 415].map((appid) => getGameRating(appid)));
+  assert.ok(results.every((r) => r.status === 'rejected'));
+  assert.ok(fetchMock.mock.callCount() <= 3, `${fetchMock.mock.callCount()} requests`);
+});
+
 test('fetchStoreApi: the circuit-open error is marked isCircuitOpen so callers can skip re-logging it', async (t) => {
   _reset();
   _resetCircuitBreakers();

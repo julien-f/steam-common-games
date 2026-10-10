@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Screen readers now announce the game open in the panel as the current row of the table
 - Screen readers now announce "Copied to clipboard" after any copy button, instead of only showing a ✓
 - The app has a browser tab icon
+- When Steam's store starts refusing requests, the app stops sending the ones it had already queued, instead of letting them hit the block
 
 ### Development
 
