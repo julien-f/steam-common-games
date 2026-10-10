@@ -488,6 +488,7 @@ test('B2 edge: with no ITAD key, the Wishlist hides prices and says why', async 
   await expect(page.locator('.list-stat-label').filter({ hasText: 'Prices' })).toHaveCount(0);
   await row(page, 'It Takes Two').getByText('It Takes Two').click();
   await expect(page.locator('#panel-section-price')).toContainText(unavailable);
+  await expect(page.locator('.panel-bundles')).toHaveCount(0); // the line above already says why
 });
 
 test('D1 edge: Updated ↻ keeps the rows and the selection while it refreshes', async ({ page }) => {
@@ -540,6 +541,16 @@ test('D2 edge: a failed Steam store page is marked, not shown as missing data', 
         .getByTitle(/Steam store didn't answer/)
         .first(),
     ).toBeVisible();
+});
+
+test("F1 edge: the Price card says when a game is in no bundle, and when ITAD didn't answer", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=892970');
+  await expect(page.locator('.panel-bundles')).toHaveText('Not in any current bundle.');
+
+  await mockApi(page, { states: ['upstream-down'] }); // registered last, so it answers first
+  await page.goto('/lists/owned?game=1145360');
+  await expect(page.locator('.panel-bundles')).toHaveText("Bundles: IsThereAnyDeal didn't answer.");
 });
 
 test('F1 edge: the panel section nav highlights the section it jumped to', async ({ page }) => {

@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On Recently Looked Up, stepping to another game in the screenshot viewer showed the game being left, and moved keyboard focus out of the viewer.
 - Closing the screenshot viewer after stepping to another game went back to the game it was opened on: the panel switched back on Recently Looked Up, and the address did on other lists.
 - On Recently Looked Up, stepping to another game in the screenshot viewer dropped the media on screen from the address, so a copied link opened the game without it.
+- The side panel's Price card says when a game isn't in any current bundle, or when IsThereAnyDeal didn't answer, instead of showing nothing in both cases.
 
 ### Removed
 

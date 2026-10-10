@@ -1597,10 +1597,17 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
 }
 
 // The current bundles the open game is in, under the Price card's own lines.
+// Nothing while loading or without ITAD (the price lines say that); otherwise none and failed are said apart.
 function PanelBundleLines(): JSX.Element {
   return (
-    <Show when={panelData.bundles()?.length}>
+    <Show when={panelData.bundles() !== undefined && !(panelData.bundles() === null && isItadOff())}>
       <div class="panel-bundles">
+        <Show when={panelData.bundles() === null}>
+          <div class="panel-no-data">Bundles: IsThereAnyDeal didn't answer.</div>
+        </Show>
+        <Show when={panelData.bundles()?.length === 0}>
+          <div class="panel-no-data">Not in any current bundle.</div>
+        </Show>
         <For each={panelData.bundles()}>
           {(b) => {
             const urgency = bundleUrgency(b.expiry);
