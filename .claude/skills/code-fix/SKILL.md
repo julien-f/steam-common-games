@@ -27,7 +27,7 @@ The smallest change that closes the item, following CLAUDE.md's code conventions
 
 - Remove the item from code-backlog.md, or narrow it to what's left and say so.
 - `CHANGELOG.md` under `## [Unreleased]` — Fixed or Changed for anything a user or operator notices, Development for contributor-only changes; a pure refactor commits with `SKIP_CHANGELOG=1`. Update any doc the change makes stale; record a surprise in pitfalls.md.
-- `npm run format` and `npm run check`, then commit: subject says what changed and why it matters, body names `C<n>`. The pre-commit hook re-runs the checks.
+- `npm run format`, then commit per CLAUDE.md's Development workflow: subject says what changed and why it matters, body names `C<n>`.
 
 ## Report
 
