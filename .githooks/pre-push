@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+
+# What CI runs, so a push that passes here passes CI (its fresh `npm ci` aside). The checks run on
+# the working tree, so it must be exactly the commit being pushed.
+head=$(git rev-parse HEAD)
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = 0000000000000000000000000000000000000000 ] && continue # deleting a ref
+  if [ "$(git rev-parse "$local_sha^{commit}")" != "$head" ]; then
+    echo "pre-push: $local_ref isn't HEAD; push from a checkout of it" >&2
+    exit 1
+  fi
+done
+if [ -n "$(git status --porcelain)" ]; then
+  echo 'pre-push: commit or stash your changes first: the checks run on the working tree' >&2
+  exit 1
+fi
+
+node scripts/check.js
+# Skipped when this build and these tests already passed in full (scripts/e2e.js).
+npm run -s test:e2e -- --if-changed

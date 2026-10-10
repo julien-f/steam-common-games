@@ -26,7 +26,8 @@ function steps(staged, files = []) {
       : []),
     ['doc-refs', ['check:doc-refs']],
     ['journeys', ['check:journeys']],
-    ...(ui && staged !== undefined ? [['e2e', ['test:e2e', '--', '--if-changed']]] : []),
+    // Desktop only: the pre-push hook runs both widths before anything reaches CI.
+    ...(ui && staged !== undefined ? [['e2e', ['test:e2e', '--', '--if-changed', '--project=desktop']]] : []),
   ];
 }
 
