@@ -76,6 +76,7 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
 - Write descriptive commit messages that explain the _why_, not just the _what_ — a short subject line, with a body when context is needed.
 - **Message format**: a plain imperative subject, no Conventional Commits prefix — the `feat:`/`fix:` prefixes in older history were dropped; don't reintroduce them.
 - Ordinary changes commit directly to `main` — this is a solo repo with no PR/review process. A complex feature (multiple concerns, significant refactoring, a new subsystem) spanning more than one commit gets a dedicated branch instead.
+- Chasing a CI-only failure: experiment on a branch and run CI there (`gh workflow run CI --ref <branch>`), never by pushing to `main`.
 - Close such a branch with a real merge commit (`git merge --no-ff`), never a fast-forward or a rebase onto `main` — the branch is the unit of work and the merge commit is what shows it.
 - When asked to commit a change that belongs to the unpushed commit just made, amend it (`git commit --amend`) rather than adding a separate fixup commit.
 
