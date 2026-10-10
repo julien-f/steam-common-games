@@ -261,6 +261,7 @@ const PLAYTIME_COLUMN: ColumnDef<Record<string, any>> = {
   type: 'number',
   groupable: true,
   format: (v) => ((v as number) > 0 ? Number(v).toFixed(1) : '—'),
+  rangePresets: [{ label: 'never played', max: 0 }],
   defaultSortDir: 'desc',
   groupValue: halfDecadeBucket,
   groupFormat: formatHalfDecadeBucket('h', 'Not played'),

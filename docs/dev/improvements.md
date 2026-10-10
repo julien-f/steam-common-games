@@ -26,7 +26,6 @@ UX backlog from the 2026-09-27, two 2026-10-03 the 2026-10-04 header-menu (mocke
 
 ## Lists and selection
 
-- **U11 · minor · F3** — Filter popover: "never played" needs max = 0 and then reads "Played (h): 0–0". `@vates/data-table-solid` 0.17 added range presets (its rangePresets option); give the Played column a `{ label: 'never played', max: 0 }` preset. (Raw-float bounds and the missing field label were fixed by 0.17.)
 - **U76 · polish · F3** — with **All** chosen, the chip still reads "Genres: Action, RPG", the same as **Any**, though it shows 3 rows instead of 6. Needs an upstream change: say "all of" in the chip (vatesfr/data-table#35).
 
 ## Comparing

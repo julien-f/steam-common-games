@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- The Played (h) filter has a "never played" button, so finding your unplayed games is one click
+
 ### Changed
 
 - Settings synced to a signed-in account are limited to the ones the app uses, up to 2 MB per account
