@@ -53,7 +53,7 @@ const TAG_NAME_MAP = { 1001: 'Action', 1002: 'Co-op' };
 // tagids above — see the `tagsOk` flag below, which gates both.
 const DEMO_APPID = 999900;
 
-function makeDetailsFetch({ ratingOk = true, metaOk = true, tagsOk = true } = {}) {
+function makeDetailsFetch({ ratingOk = true, metaOk = true, tagsOk = true, type } = {}) {
   return async (url) => {
     if (url.includes('appreviews')) {
       if (!ratingOk) return { ok: false, status: 503 };
@@ -92,6 +92,7 @@ function makeDetailsFetch({ ratingOk = true, metaOk = true, tagsOk = true } = {}
             success: true,
             data: {
               name: 'Portal',
+              type,
               genres: [{ id: '1', description: 'Action' }],
               categories: [{ id: '9', description: 'Co-op' }],
               developers: ['Valve'],
@@ -746,6 +747,18 @@ test('GET /api/game-news/:appid: ?refresh=1 re-fetches despite the cache', async
   const res = await api.get('/api/game-news/409?refresh=1').expect(200);
   assert.equal(fetchMock.mock.callCount(), 2);
   assert.equal(res.body.news.length, 1);
+});
+
+test("GET /api/game-details/:appid: a soundtrack isn't searched on HLTB, and reads as no data, not failed", async (t) => {
+  _reset();
+  _resetAuth();
+  const fetchMock = t.mock.method(globalThis, 'fetch', makeDetailsFetch({ type: 'music' }));
+
+  const res = await api.get('/api/game-details/412');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.hltb, null);
+  assert.ok(!res.body.failed?.includes('hltb'));
+  assert.ok(!fetchMock.mock.calls.some((c) => String(c.arguments[0]).includes('howlongtobeat')));
 });
 
 test('GET /api/game-details/:appid: 200 with null rating when reviews fetch fails', async (t) => {

@@ -765,6 +765,9 @@ app.post('/api/friends', friendsLimit, async (req, res) => {
 });
 
 const dedupDetails = createDedup();
+// Steam app types HLTB doesn't time, so searching for them would only spend requests on a miss.
+// `dlc` and `mod` stay: HLTB lists some.
+const NOT_PLAYED_TYPES = new Set(['music', 'video', 'series', 'episode', 'hardware', 'demo', 'advertising']);
 
 function fetchGameDetails(appid, { force = false } = {}) {
   // Force-refresh gets its own lane here, so it's never handed a normal request's result, which
@@ -779,7 +782,9 @@ function fetchGameDetails(appid, { force = false } = {}) {
     // versus searching HLTB in parallel with an already-known, trusted name (e.g. an owned
     // game's name from Steam's library API) — that's the trade for not trusting the client.
     // A meta failure fails HLTB too, so it reads as failed, not as "no data".
-    const hltbPromise = metaPromise.then((meta) => getHLTB(appid, meta?.name || '', { force }));
+    const hltbPromise = metaPromise.then((meta) =>
+      NOT_PLAYED_TYPES.has(meta?.type) ? null : getHLTB(appid, meta?.name || '', { force }),
+    );
 
     return Promise.allSettled([
       getGameRating(appid, { force }),
