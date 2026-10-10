@@ -16,12 +16,12 @@ Judges the app against [docs/dev/journeys.md](../../../docs/dev/journeys.md) and
 
 ## Which server
 
-- **Mocked first: `npm run dev:mock` (`:58993`; `node scripts/mock-server.js up` starts or reuses it, `down` stops it)** for clarity, layout, keyboard, consistency and the empty/error states — `document.cookie = 'mock=no-itad'` (or `upstream-down`, `store-down`, `untiered`, `stale`, `slow`, `slow-media`, `signed-in` — listed in `e2e/mockApi.ts`) before a load switches one on; clear it after. Its storage is separate from the real prefs, so no seed/restore — but it keeps earlier runs' lists, so start clean: `node scripts/ux-measure.js --fresh /` and run it (clears it, sets `alice`; `bob`, `carol` are in `e2e/fixtures.ts`). A state the fixtures lack is a gap in `e2e/mockApi.ts` to report, not a reason to switch servers.
+- **Mocked first: `npm run dev:mock` (`:58993`; `node scripts/mock-server.js up` starts or reuses it, `down` stops it)** for clarity, layout, keyboard, consistency and the empty/error states — `document.cookie = 'mock=no-itad'` (or another state from `e2e/mockApi.ts`'s header) before a load switches one on; clear it after. Its storage is separate from the real prefs, so no seed/restore — but it keeps earlier runs' lists, so start clean: `node scripts/ux-measure.js --fresh /` and run it (clears it, sets `alice`; `bob`, `carol` are in `e2e/fixtures.ts`). A state the fixtures lack is a gap in `e2e/mockApi.ts` to report, not a reason to switch servers.
 - **Real: `npm run dev` (`:58991`; `node scripts/dev-server.js up|down`)** only for what mocks can't show — loading and progress on a real library, freshness ages, real upstream failures — and for scenarios needing real data. Those visits need the demo state below.
 
 ## Demo state (real server only) — before the first page load
 
-Seed before opening _any_ route and restore only on the way out, as in CLAUDE.md's **Looking at the UI** (`empty` for a first visit, A1).
+Seed before opening _any_ route and restore only on the way out, as in [testing.md](../../../docs/dev/testing.md#looking-at-the-ui) (`empty` for a first visit, A1).
 
 - Only the demo account (in the script) may be typed, except accounts the user names for this review. Those: never committed, screenshots only in `.playwright-mcp/`, called Friend A/B everywhere — in the report and in improvements.md, never by persona name. Skip A4 while no allowed account has a public friends list.
 - Stay inside [integrations.md](../../../docs/dev/integrations.md)'s trust tiers: one pass per scenario, no repeated ↻ refreshes. A large library's first load streams for minutes (uncached details are throttled) — judge the feedback, don't wait for it to finish.
@@ -56,7 +56,7 @@ After any real-server visit, restore the demo state; don't finish while `steam.i
 
 ## Record and report
 
-- Record every finding in [improvements.md](../../../docs/dev/improvements.md): next free `U` number, under its area, `**U<n> · <severity> · <scenarios>** — problem. Direction.` Update or drop items the run shows fixed.
+- Record every finding in [improvements.md](../../../docs/dev/improvements.md): numbered on from `node scripts/backlog-next.js U` (never reuse a closed item's number), under its area, `**U<n> · <severity> · <scenarios>** — problem. Direction.` Update or drop items the run shows fixed.
 - **Severity**: _blocker_ (the goal can't be reached) · _major_ (reached with real confusion or a workaround) · _minor_ (friction) · _polish_.
 - Report one table ranked by severity, then one line on what worked well enough to keep:
 
