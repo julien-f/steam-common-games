@@ -1103,6 +1103,15 @@ test('F1 edge: Back from a page the game panel linked to reopens that game', asy
   await expect(page).toHaveURL(/\/about$/);
 });
 
+test("F2 edge: a failed search says so, rather than 'No games found'", async ({ page }) => {
+  await page.route('**/api/search-games?*', (route) =>
+    route.fulfill({ status: 502, json: { error: 'Steam store request failed' } }),
+  );
+  await page.goto('/search?q=hades');
+  await expect(page.getByText('Search failed — try again')).toBeVisible();
+  await expect(page.getByText('No games found')).toHaveCount(0);
+});
+
 test('F1.1-4: look up one game from the nav search, in place', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

@@ -32,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Switching accounts while the previous one's library was still loading no longer shows the previous account's ✓/☆ markers, "Owned by" and Played columns until a reload.
 - Home's account card says "couldn't load" for an owned or wishlist count Steam didn't answer, instead of 0; its Updated ↻ retries.
 - The game panel's Price card says "IsThereAnyDeal didn't answer" when the price lookup fails, instead of "No pricing data available." or that the instance isn't connected to IsThereAnyDeal; the panel's ↻ retries it.
+- A search page whose lookup failed says "Search failed — try again" instead of that no games were found.
 
 ### Removed
 

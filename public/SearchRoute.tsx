@@ -91,6 +91,7 @@ export default function SearchRoute() {
 
   const [results, setResults] = createSignal<GameSearchResult[]>([]);
   const [searching, setSearching] = createSignal(false);
+  const [searchFailed, setSearchFailed] = createSignal(false);
 
   // For the keyboard bridges between the search box and the table's first row — see their
   // own onKeyDown handlers below.
@@ -125,13 +126,19 @@ export default function SearchRoute() {
         return;
       }
       setSearching(true);
+      setSearchFailed(false);
       fetch(`/api/search-games?q=${encodeURIComponent(term)}`)
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
         .then((data) => {
           if (token === searchToken) setResults(data.results || []);
         })
         .catch(() => {
-          if (token === searchToken) setResults([]);
+          if (token !== searchToken) return;
+          setResults([]);
+          setSearchFailed(true);
         })
         .finally(() => {
           if (token === searchToken) setSearching(false);
@@ -338,7 +345,9 @@ export default function SearchRoute() {
               when={results().length}
               fallback={
                 <div class="card">
-                  <p class="card-subtitle">No games found for "{query()}".</p>
+                  <p class="card-subtitle">
+                    {searchFailed() ? 'Search failed — try again' : `No games found for "${query()}".`}
+                  </p>
                 </div>
               }
             >
