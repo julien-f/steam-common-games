@@ -61,7 +61,6 @@ Last audited: simplify 2026-10-10 · security 2026-10-10 · perf 2026-10-10 · r
 
 ## Tests
 
-- **C55 · major · M** — five limiters' "cache hit doesn't count" skips never run in a test: friends, news, achievements, prices, gameBundles (`server.js:286-310, 345-356, 385-405, 502-521, 527-533`), plus `searchLimit`'s `users` branch and cached-vanity path (`240-241, 259-262`). One "misses count, hits don't" test each in `test/server-ratelimit.test.js`; prices with both `gids` and `appids`, including a `null` gid.
 - **C57 · major · M** — `initAuth`'s signed-in path and `signOut` (`public/authStore.ts:152-194`) are untested, and `e2e/mockApi.ts:217` always answers signed out, so journeys Y1–Y3 have no covered step. Unit-test with mocked fetch; optionally a `signed-in` mock state and a Y1 e2e.
 - **C58 · minor · S** — `createPanelDataCache` (`public/panelData.ts:68`) is untested: a failed forced refresh keeping the last good news/bundles/DLC, the `achievementCount === 0` short-circuit, `isItadOff`. Note `fetchAchievements` (`:162-163`) and `fetchPrice` (`:187-188`) clear loaded data on a failed refresh unlike the others — confirm which is intended. Add `test/panelData.test.js`.
 - **C64 · minor · S** — no e2e test locks journey D2 step 3 (the panel's ↻ retrying a source that didn't answer, once the upstream is back); `GET /api/game-details/:appid?refresh=1` itself is unit-tested. Add a mock state that fails a details source until cleared, and a D2.3 test.
