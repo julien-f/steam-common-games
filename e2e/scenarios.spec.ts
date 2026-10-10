@@ -298,7 +298,32 @@ test('L3 edge: the column menu undoes the group and filter it set', async ({ pag
   await menu.click();
   await dialog.getByRole('button', { name: 'Group by this column' }).click();
   await expect(groupRows.first()).toBeVisible();
+  // TEMP diagnostics for the CI-only phone failure; remove with the fix.
+  const probe = (label: string) =>
+    page.evaluate((label) => {
+      const btn = [...document.querySelectorAll('button')].find(
+        (b) =>
+          b.getAttribute('aria-label') === 'Weighted Rating options' ||
+          (b.textContent === '▾' && b.closest('th')?.textContent?.includes('Weighted Rating')),
+      );
+      const r = btn?.getBoundingClientRect();
+      const hit = r ? document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) : null;
+      const dlg = [...document.querySelectorAll('[role="dialog"]')].map(
+        (d) =>
+          `${d.getAttribute('aria-label') ?? d.getAttribute('aria-labelledby')}:${(d as HTMLElement).checkVisibility()}`,
+      );
+      const scrollers = [...document.querySelectorAll('*')]
+        .filter((el) => el.scrollTop > 0)
+        .map((el) => `${el.tagName}.${el.className}=${el.scrollTop}`);
+      return `${label} t=${Math.round(performance.now())} btn=${r ? [r.x, r.y, r.width, r.height].map(Math.round) : 'none'} hit=${hit?.tagName}.${hit?.className} dialogs=${dlg.join('|')} scrollY=${scrollY} scrollers=${scrollers.join('|')} active=${document.activeElement?.tagName}.${document.activeElement?.className} vw=${innerWidth}x${innerHeight}`;
+    }, label);
+  console.log(await probe('before'));
+  page.on('console', (m) => console.log('page:', m.type(), m.text()));
   await menu.click();
+  for (let i = 0; i < 10; i++) {
+    console.log(await probe(`after${i}`));
+    await page.waitForTimeout(100);
+  }
   await dialog.getByRole('button', { name: 'Remove group' }).click();
   await expect(groupRows).toHaveCount(0);
   await menu.click();
