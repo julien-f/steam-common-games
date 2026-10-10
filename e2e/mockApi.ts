@@ -10,7 +10,7 @@
 //   store-down     Steam store pages return nothing (genres, release date, platforms…)
 //   stale          libraries and wishlists read as fetched 12 days ago, until a refresh (D1)
 //   untiered       the Co-op Pack lists every game in its first tier, the pricier one empty (as ITAD sends some)
-//   slow-media     every banner, screenshot and trailer poster takes 1.5 s to load (Hades has the media)
+//   slow-media     every banner, screenshot and trailer poster takes 1.5 s to load (Hades, Terraria and Hollow Knight have media)
 //   signed-in      signed in with Steam as Alice, whose account already has prefs (fixtures.ts's signedInPrefs)
 import type { Page } from '@playwright/test';
 import { PLAYERS, CATALOG, BUNDLE, PICK_BUNDLE, SIGNED_IN, signedInPrefs, game, type Player } from './fixtures.ts';
@@ -42,8 +42,16 @@ function playerJson(p: Player) {
 }
 
 // Drawn inline rather than fetched, so the lightbox has media to page through under both a test
-// and dev:mock. One game only: the rest keep just their banner.
+// and dev:mock. Hades is the media game (trailer, 3 screenshots); its neighbours in the library's
+// default order differ, so stepping games in the lightbox lands on each kind: Terraria has a
+// trailer too, Hollow Knight screenshots only. The rest keep just their banner.
 const MEDIA_APPID = 1145360;
+// Trailers and screenshots per game, and the prefix that tells its images apart from Hades'.
+const MEDIA: Record<number, { movies: number; screenshots: number; label: string }> = {
+  [MEDIA_APPID]: { movies: 1, screenshots: 3, label: '' },
+  105600: { movies: 1, screenshots: 2, label: 'Terraria ' },
+  367520: { movies: 0, screenshots: 2, label: 'Hollow Knight ' },
+};
 const UNSAFE_LINK_APPID = 892970;
 const SLOW_MEDIA_MS = 1500;
 // The media game's DLC: more than the card's first page, so "Show more" appears.
@@ -64,14 +72,19 @@ const mediaUrl = (label: string, slow: boolean, variant = '') =>
     : `data:image/svg+xml,${encodeURIComponent(svg(label))}`;
 // `hls: null`, as Steam sends for a trailer with no H.264 stream: the player and its controls
 // show, nothing plays (Playwright's Chromium has no H.264 decoder anyway).
-const media = (slow: boolean) => ({
-  movies: [{ id: 1, thumbnail: mediaUrl('Trailer', slow), hls: null }],
-  screenshots: [1, 2, 3].map((n) => ({
-    id: n,
-    thumbnail: mediaUrl(`Screenshot ${n}`, slow, 'thumb'),
-    full: mediaUrl(`Screenshot ${n}`, slow, 'full'),
-  })),
-});
+const media = (appid: number, slow: boolean) => {
+  const m = MEDIA[appid];
+  if (!m) return { movies: [], screenshots: [] };
+  const range = (length: number) => Array.from({ length }, (_, i) => i + 1);
+  return {
+    movies: range(m.movies).map((id) => ({ id, thumbnail: mediaUrl(`${m.label}Trailer`, slow), hls: null })),
+    screenshots: range(m.screenshots).map((id) => ({
+      id,
+      thumbnail: mediaUrl(`${m.label}Screenshot ${id}`, slow, 'thumb'),
+      full: mediaUrl(`${m.label}Screenshot ${id}`, slow, 'full'),
+    })),
+  };
+};
 
 function details(appid: number, slowMedia = false) {
   const g = game(appid);
@@ -101,7 +114,7 @@ function details(appid: number, slowMedia = false) {
       // Public store art; a test's browser blocks it (off localhost), dev:mock shows it.
       capsule: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`,
       banner: slowMedia ? mediaUrl(`Banner ${appid}`, true) : null,
-      ...(appid === MEDIA_APPID ? media(slowMedia) : { movies: [], screenshots: [] }),
+      ...media(appid, slowMedia),
       dlc: appid === MEDIA_APPID ? DLC_APPIDS : [],
       fullgame: null,
       website: null,
