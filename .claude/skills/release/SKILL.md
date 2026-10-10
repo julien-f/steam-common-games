@@ -11,6 +11,7 @@ Only on an explicit request. Tags are `vX.Y.Z`, annotated, message `vX.Y.Z` (see
 
 - On `main`, clean tree (`git status --short` empty), and `## [Unreleased]` has entries.
 - `git log --oneline $(git describe --tags --abbrev=0)..` — what the release covers; every code commit in it should have its changelog entry.
+- `node scripts/deps-audit.js` and `npm audit` clean; anything else is [dependency-audit](../dependency-audit/SKILL.md)'s to fix first.
 
 ## 1. Pick the version
 

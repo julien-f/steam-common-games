@@ -19,6 +19,8 @@ Last audited: simplify never · security never · perf never · reliability neve
 
 ## Reliability
 
+- **C1 · minor · M** — dependency updates wait on a manual `dependency-audit` run. Dependabot or Renovate could open them, since CI (`.github/workflows/ci.yml`) runs `check` and the e2e suite on PRs, but their PRs lack the `CHANGELOG.md` entry the pre-commit hook requires (CI doesn't check it) and skip `npm run build`, so each still needs a local pass through dependency-audit's Applying.
+
 ## Compliance
 
 ## Tests

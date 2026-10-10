@@ -37,7 +37,3 @@ Confirm the changes first, then:
 3. A lockfile-only change is still a code change: `CHANGELOG.md` entry in the same commit, per `CLAUDE.md`.
 4. Surface new lint violations from a plugin bump rather than silencing them with `eslint-disable`.
 5. An updated `@vates/data-table-solid` (or any package an improvements.md item waits on): re-check every item citing its issues (`grep -n 'vatesfr/data-table' docs/dev/improvements.md`) on `dev:mock`, and drop or narrow the ones it fixed — 0.16 shipped five such fixes that sat unnoticed.
-
-## Automation
-
-Dependabot or Renovate can be proposed now that CI (`.github/workflows/ci.yml`) runs `check` and the e2e suite on PRs, but their PRs lack the `CHANGELOG.md` entry the pre-commit hook requires (CI doesn't check for it) and skip `npm run build`, so each still needs a local pass through Applying before merging.
