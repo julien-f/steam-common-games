@@ -54,6 +54,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `node scripts/db-query.js "<sql>"` queries `db.sqlite` read-only.
 - The pre-commit hook and `npm run check` share one list of steps.
 - `npm run test:one <file>` runs one test file with the same settings as `npm test`.
+- Signing in with Steam works on the dev server (`npm run dev`) when browsing `localhost`: the proxy no longer sent Steam's return address to the backend's own port.
 
 ## [0.9.0] - 2026-10-07
 
