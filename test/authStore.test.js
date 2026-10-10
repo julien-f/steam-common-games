@@ -291,3 +291,148 @@ test('autoPopulateAccountFromLogin: a failed resolve leaves both unset instead o
   assert.equal(accounts().getMyAccount(), null);
   assert.equal(accounts().getCurrentAccount(), null);
 });
+
+// ── initAuth / signOut ───────────────────────────────────────────────────────
+
+// window/location stand-ins: records the events dispatched and whether the page reloaded.
+function withBrowser(t) {
+  const seen = { events: [], reloads: 0 };
+  global.window = { dispatchEvent: (e) => seen.events.push(e.type) };
+  global.location = { reload: () => seen.reloads++ };
+  t.after(() => {
+    delete global.window;
+    delete global.location;
+  });
+  return seen;
+}
+
+// Answers /api/me with `me`, prefs pushes and logout with ok, the rest as mockResolveFetch; records
+// every request.
+function mockMeFetch(t, me) {
+  const calls = [];
+  const resolve = mockResolveFetch(STEAMID);
+  withFetch(t, async (url, opts = {}) => {
+    calls.push({ url, method: opts.method ?? 'GET' });
+    if (url === '/api/me') return { ok: true, json: async () => me };
+    if (url.startsWith('/api/me/prefs/') || url === '/auth/logout')
+      return { ok: true, json: async () => ({ ok: true }) };
+    return resolve(url);
+  });
+  return calls;
+}
+
+const pushes = (calls) => calls.filter((c) => c.method === 'PUT');
+
+// authStore.ts's module state survives the require.cache reset (see beforeEach), so a test needing
+// a signed-out start after a signed-in one says so explicitly.
+async function signIn(t) {
+  mockMeFetch(t, { steamid: STEAMID, prefs: null });
+  await auth().initAuth();
+  assert.deepEqual(auth().getAuthUser(), { steamid: STEAMID });
+}
+
+test('initAuth (signed in): adopting server prefs reloads the page, and leaves the account to the reload', async (t) => {
+  const seen = withBrowser(t);
+  const calls = mockMeFetch(t, { steamid: STEAMID, prefs: { region: { value: 'GB', updatedAt: 500 } } });
+
+  await auth().initAuth();
+
+  assert.equal(seen.reloads, 1);
+  assert.equal(prefs().getPref('region'), 'GB');
+  assert.deepEqual(auth().getAuthUser(), { steamid: STEAMID });
+  assert.ok(!calls.some((c) => c.url === '/api/common-games'), 'no account resolve before the reload');
+  assert.deepEqual(seen.events, [auth().AUTH_CHANGED_EVENT]);
+});
+
+test('initAuth (signed in): with nothing to adopt, fills in the account from the login and syncs later edits', async (t) => {
+  const seen = withBrowser(t);
+  const calls = mockMeFetch(t, { steamid: STEAMID, prefs: null });
+
+  await auth().initAuth();
+
+  assert.equal(seen.reloads, 0);
+  assert.deepEqual(auth().getAuthUser(), { steamid: STEAMID });
+  assert.deepEqual(accounts().getMyAccount()?.members, [STEAMID]);
+  assert.deepEqual(accounts().getCurrentAccount()?.members, [STEAMID]);
+  assert.equal(seen.events.at(-1), auth().AUTH_CHANGED_EVENT);
+
+  calls.length = 0;
+  prefs().setPref('region', 'DE');
+  assert.deepEqual(
+    pushes(calls).map((c) => c.url),
+    ['/api/me/prefs/region'],
+  );
+});
+
+test('initAuth (signed out): no user, no reload, and edits stay local', async (t) => {
+  const seen = withBrowser(t);
+  await signIn(t);
+  const calls = mockMeFetch(t, { steamid: null, prefs: null });
+  seen.events.length = 0;
+
+  await auth().initAuth();
+
+  assert.equal(auth().getAuthUser(), null);
+  assert.equal(seen.reloads, 0);
+  assert.deepEqual(seen.events, [auth().AUTH_CHANGED_EVENT]);
+  prefs().setPref('region', 'DE');
+  assert.deepEqual(pushes(calls), []);
+});
+
+test('initAuth: /api/me failing reads as signed out, without throwing', async (t) => {
+  const seen = withBrowser(t);
+  await signIn(t);
+  const error = t.mock.method(console, 'error', () => {});
+  withFetch(t, async () => {
+    throw new Error('network down');
+  });
+  seen.events.length = 0;
+
+  await assert.doesNotReject(auth().initAuth());
+
+  assert.equal(auth().getAuthUser(), null);
+  assert.equal(seen.reloads, 0);
+  assert.deepEqual(seen.events, [auth().AUTH_CHANGED_EVENT]);
+  assert.equal(error.mock.callCount(), 1);
+});
+
+test('signOut: logs out, clears the user, stops syncing edits and drops table-view baselines', async (t) => {
+  const seen = withBrowser(t);
+  const calls = mockMeFetch(t, {
+    steamid: STEAMID,
+    prefs: { ownedListView: { value: { pageSize: 25 }, updatedAt: 500 } },
+  });
+  await auth().initAuth();
+  assert.ok(tableViewSync().getBaseline('ownedListView'));
+  calls.length = 0;
+  seen.events.length = 0;
+
+  await auth().signOut();
+
+  assert.deepEqual(calls, [{ url: '/auth/logout', method: 'POST' }]);
+  assert.equal(auth().getAuthUser(), null);
+  assert.equal(tableViewSync().getBaseline('ownedListView'), undefined);
+  assert.deepEqual(seen.events, [auth().AUTH_CHANGED_EVENT]);
+  prefs().setPref('region', 'DE');
+  assert.deepEqual(pushes(calls), []);
+});
+
+test('signOut: a failed logout request still signs out locally', async (t) => {
+  const seen = withBrowser(t);
+  await signIn(t);
+  t.mock.method(console, 'error', () => {});
+  const calls = [];
+  withFetch(t, async (url, opts = {}) => {
+    calls.push({ url, method: opts.method ?? 'GET' });
+    if (url === '/auth/logout') throw new Error('network down');
+    return { ok: true, json: async () => ({ ok: true }) };
+  });
+  seen.events.length = 0;
+
+  await assert.doesNotReject(auth().signOut());
+
+  assert.equal(auth().getAuthUser(), null);
+  assert.deepEqual(seen.events, [auth().AUTH_CHANGED_EVENT]);
+  prefs().setPref('region', 'DE');
+  assert.deepEqual(pushes(calls), []);
+});
