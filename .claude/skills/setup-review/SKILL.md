@@ -26,7 +26,7 @@ Judges the setup against CLAUDE.md's Where things belong and Working style rules
 - **Triggers**: skill descriptions whose "Use when" overlaps another skill's, built-in ones included (`/code-review`, `/simplify`, `/security-review`), or misses how the user actually asks.
 - **Scripts**: ones with no caller, overlapping jobs, missing usage messages on bad arguments.
 - **Hooks**: "always do X after Y" rules in CLAUDE.md or a skill that only a hook can guarantee.
-- **Permissions**: run the built-in `fewer-permission-prompts` skill rather than reviewing the allowlist by hand.
+- **Permissions**: allows that pre-approve CLAUDE.md's ask-first actions, and dead one-off entries, in both settings files. For missing allows, propose running the built-in `fewer-permission-prompts` skill (it writes settings) rather than reviewing transcripts by hand.
 - **Staleness**: rules about code, files or procedures that no longer exist; rules nothing has needed lately (prefer deleting them).
 
 ## 3. Transcripts (only with `transcripts`)
@@ -50,7 +50,7 @@ Not findings: wording taste, Prettier's output, deliberate exceptions recorded w
 
 One table, ranked by how often the friction bites, then effort:
 
-| #   | Target | Where | Friction | Proposed change | Effort |
-| --- | ------ | ----- | -------- | --------------- | ------ |
+| #   | Target | Where | Friction | Proposed change | Effort | Recommend |
+| --- | ------ | ----- | -------- | --------------- | ------ | --------- |
 
-Then ask through `AskUserQuestion` (multi-select) which to apply. Adding a skill, hook or agent still needs that explicit approval (CLAUDE.md, Ask first).
+Then one `AskUserQuestion`: apply the recommended set, plus any real choice among the rest. Adding a skill, hook or agent still needs that explicit approval (CLAUDE.md, Ask first).
