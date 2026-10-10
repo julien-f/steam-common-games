@@ -30,7 +30,7 @@ Last audited: simplify 2026-10-10 · security 2026-10-10 · perf 2026-10-10 · r
 
 ## Security
 
-- **C20 · minor · S** — no final error handler in `server.js` and `npm start` doesn't set `NODE_ENV`: anything thrown outside a route's try reaches Express's default handler with a full stack (`/api/search-games?q=a&q=b`, `/api/achievements/1?steamids=a&steamids=b`, malformed JSON, and a body without JSON content-type or `games: [null]` at `server.js:541, 1154, 1164`). Add an `(err, req, res, next)` handler replying `{ error }` (4xx from `err.status`, else 500); accept only string query params; default `req.body ?? {}`.
+None open.
 
 ## Performance
 

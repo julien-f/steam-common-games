@@ -162,8 +162,15 @@ function routeErrorStatus(route, err) {
 
 const app = express();
 if (TRUST_PROXY) app.set('trust proxy', TRUST_PROXY);
+// One string per param (the last), so a repeated `?q=a&q=b` can't hand a route an array.
+app.set('query parser', (str) => Object.fromEntries(new URLSearchParams(str)));
 if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
 app.use(express.json());
+// Express 5 leaves req.body undefined when no JSON body was parsed.
+app.use((req, _res, next) => {
+  req.body ??= {};
+  next();
+});
 
 // Serves the real Vite production build (`npm run build`) once one exists, and falls back to
 // serving public/ directly otherwise — but that fallback no longer serves a working frontend
@@ -230,17 +237,17 @@ const searchLimit = namedRateLimit('search', {
     // isForceRefresh gets elsewhere in this file. A per-account refreshIds (the accounts bar's
     // own "↻") forces at least those accounts regardless of cache state, so it must count too
     // — no need to reason about which specific ids they are.
-    if (req.body?.refresh === true) return false;
-    const refreshIds = req.body?.refreshIds;
+    if (req.body.refresh === true) return false;
+    const refreshIds = req.body.refreshIds;
     if (Array.isArray(refreshIds) && refreshIds.length > 0) return false;
 
     // Read only the field the route itself reads, so a cached id in another field can't vouch
     // for uncached ones.
     const isWishlist = req.path === '/api/wishlist';
     let rawIdentifiers;
-    if (isWishlist) rawIdentifiers = req.body?.members;
-    else if (Array.isArray(req.body?.slots)) rawIdentifiers = req.body.slots.flat();
-    else rawIdentifiers = req.body?.users;
+    if (isWishlist) rawIdentifiers = req.body.members;
+    else if (Array.isArray(req.body.slots)) rawIdentifiers = req.body.slots.flat();
+    else rawIdentifiers = req.body.users;
     if (!Array.isArray(rawIdentifiers)) return false; // let the route's own validation reject it
 
     if (!rawIdentifiers.every((u) => typeof u === 'string' && u.trim().length > 0)) return false;
@@ -283,11 +290,11 @@ const friendsLimit = namedRateLimit('friends', {
   message: { error: 'Too many friends lookups. Please wait a minute and try again.' },
   skip: (req) => {
     if (rateLimitBypassed()) return true;
-    if (req.body?.refresh === true) return false;
-    const refreshIds = req.body?.refreshIds;
+    if (req.body.refresh === true) return false;
+    const refreshIds = req.body.refreshIds;
     if (Array.isArray(refreshIds) && refreshIds.length > 0) return false;
 
-    const rawIdentifiers = req.body?.members;
+    const rawIdentifiers = req.body.members;
     if (!Array.isArray(rawIdentifiers) || !rawIdentifiers.every((u) => typeof u === 'string' && u.trim().length > 0))
       return false;
 
@@ -501,7 +508,7 @@ const bundlesResolveLimit = namedRateLimit('bundlesResolve', {
   ...itadRateLimitOpts,
   skip: (req) => {
     if (rateLimitBypassed()) return true;
-    const gids = req.body?.gids;
+    const gids = req.body.gids;
     if (!Array.isArray(gids) || gids.length === 0) return false; // let the route's own validation reject it
     // Mirrors resolveSteamAppIds' own per-gid cache key (lib/itad.js).
     return gids.every((gid) => typeof gid === 'string' && getCached(`itad-appid:${gid}`) !== undefined);
@@ -518,7 +525,7 @@ const pricesLimit = namedRateLimit('prices', {
   skip: (req) => {
     if (rateLimitBypassed()) return true;
     if (isForceRefresh(req)) return false; // force-refresh always re-fetches, so it must always count
-    const { gids, appids } = req.body || {};
+    const { gids, appids } = req.body;
     const country = parseCountry(req);
     if (Array.isArray(gids) && gids.length > 0) {
       return gids.every((gid) => typeof gid === 'string' && getCached(`itad-price:${country}:${gid}`) !== undefined);
@@ -1204,7 +1211,7 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
 
   const validated = [];
   for (const g of gameList) {
-    const appid = Number(g.appid);
+    const appid = Number(g?.appid);
     if (!Number.isInteger(appid) || appid <= 0) {
       return res.status(400).json({ error: 'Invalid appid' });
     }
@@ -1371,8 +1378,8 @@ app.get('/api/me', (req, res) => {
 // `updatedAt` (the device's own clock, not this server's receipt time) is what lets setUserPref
 // apply last-write-wins against whatever's already stored — see its own comment.
 app.put('/api/me/prefs/:key', authLimit, requireAuth, (req, res) => {
-  const { value, updatedAt } = req.body || {};
-  if (!('value' in (req.body || {})) || typeof updatedAt !== 'number') {
+  const { value, updatedAt } = req.body;
+  if (!('value' in req.body) || typeof updatedAt !== 'number') {
     return res.status(400).json({ error: 'body must be { value, updatedAt }' });
   }
   if (!isSyncedPrefKey(req.params.key)) return res.status(400).json({ error: 'unknown pref key' });
@@ -1394,6 +1401,15 @@ app.put('/api/me/prefs/:key', authLimit, requireAuth, (req, res) => {
 // being silently rewritten into the shell.
 app.get(/^\/(?!api\/)(?!.*\.[a-zA-Z0-9]+$).*/, (_req, res) => {
   res.sendFile('index.html', { root: STATIC_DIR });
+});
+
+// Anything a route didn't catch, body-parser's malformed or oversized JSON included: Express's own
+// handler would answer with an HTML page and, outside production, the stack.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const status = err.status >= 400 && err.status < 500 ? err.status : 500;
+  if (status === 500) console.error(`[server] ${req.method} ${req.path}`, err);
+  res.status(status).json({ error: status === 500 ? 'Internal server error' : err.message });
 });
 
 if (require.main === module) {

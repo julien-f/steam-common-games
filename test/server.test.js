@@ -2575,3 +2575,33 @@ test('GET /api/me: a session past SESSION_TTL_MS is signed out and its row delet
   assert.deepEqual(res.body, { steamid: null, prefs: null });
   assert.equal(countSessions(), 0);
 });
+
+test('a repeated query param is read as one string, not answered with a 500', async () => {
+  for (const url of ['/api/search-games?q=a&q=b', '/api/achievements/1?steamids=a&steamids=b']) {
+    const res = await api.get(url);
+    assert.ok(res.status < 500, `${url}: ${res.status}`);
+    assert.match(res.type, /json/);
+  }
+});
+
+test('malformed JSON gets a 400 { error }, not an HTML stack trace', async () => {
+  const res = await api.post('/api/common-games').set('Content-Type', 'application/json').send('{bad').expect(400);
+  assert.match(res.type, /json/);
+  assert.equal(typeof res.body.error, 'string');
+  assert.doesNotMatch(res.text, /at .*\.js:\d+/);
+});
+
+test('a POST without a JSON body is a 400, not a 500', async () => {
+  for (const url of ['/api/common-games', '/api/wishlist', '/api/friends', '/api/game-details/stream']) {
+    const res = await api.post(url).set('Content-Type', 'text/plain').send('x');
+    assert.equal(res.status, 400, url);
+    assert.equal(typeof res.body.error, 'string', url);
+  }
+});
+
+test('POST /api/game-details/stream: a null entry in games is a 400', async () => {
+  await api
+    .post('/api/game-details/stream')
+    .send({ games: [null] })
+    .expect(400);
+});
