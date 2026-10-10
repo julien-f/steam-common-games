@@ -4,6 +4,7 @@
 // /auth/steam/login (AccountChip.tsx), not something this module drives.
 import { getAllPrefEntries, adoptPrefEntry, pushPrefToServer, setSignedInSteamid, type PrefEntry } from './prefs.ts';
 import { TABLE_VIEW_PREF_KEYS } from './tableViewKeys.ts';
+import { isSyncedPrefKey } from './syncedPrefKeys.ts';
 import { setBaseline, clearBaseline, resetBaselines } from './tableViewSync.ts';
 import { getMyAccount, setMyAccount, getCurrentAccount, setCurrentAccount } from './accountsStore.ts';
 import { resolveAccountSummary } from './accountData.ts';
@@ -95,7 +96,9 @@ export async function syncPrefsWithServer(steamid: string, serverEntries: Record
   }
 
   const keys = new Set(
-    [...Object.keys(localEntries), ...Object.keys(serverEntries)].filter((k) => !TABLE_VIEW_PREF_KEYS.includes(k)),
+    [...Object.keys(localEntries), ...Object.keys(serverEntries)].filter(
+      (k) => isSyncedPrefKey(k) && !TABLE_VIEW_PREF_KEYS.includes(k),
+    ),
   );
   let adopted = false;
   const pushes: Promise<void>[] = [];

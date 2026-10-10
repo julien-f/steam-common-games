@@ -107,6 +107,19 @@ test('syncPrefsWithServer (first sync): a local-only key is pushed to the server
   assert.equal(sent.body.value, 'DE');
 });
 
+test("syncPrefsWithServer: a local key the server never syncs isn't pushed", async (t) => {
+  prefs().setPref('someOldKey', 1);
+  const urls = [];
+  withFetch(t, async (url) => {
+    urls.push(url);
+    return { ok: true, json: async () => ({ ok: true }) };
+  });
+
+  await auth().syncPrefsWithServer(STEAMID, {});
+
+  assert.deepEqual(urls, []);
+});
+
 test('syncPrefsWithServer (first sync): a server-only key is adopted locally', async (t) => {
   withFetch(t, async () => {
     throw new Error('should not push anything');

@@ -18,7 +18,7 @@ const supertest = require('supertest');
 const { app } = require('../server');
 const { _reset, setCache, getCachedAt } = require('../lib/cache');
 const { db } = require('../lib/db');
-const { PREFS_MAX_BYTES, getUserPrefs, setUserPref } = require('../lib/auth');
+const { PREFS_MAX_BYTES, SYNCED_PREF_KEYS, getUserPrefs, setUserPref } = require('../lib/auth');
 const { _resetAuth } = require('../lib/hltb');
 const { _resetCircuitBreakers } = require('../lib/circuitBreaker');
 const { SESSION_TTL_MS, MISS_CACHE_TTL_MS } = require('../lib/config');
@@ -2524,14 +2524,11 @@ test('PUT /api/me/prefs/:key: 400 for a key the app never syncs', async (t) => {
   assert.deepEqual(me.body.prefs, {});
 });
 
-test('PUT /api/me/prefs/:key: accepts every key the frontend syncs', async (t) => {
-  const { TABLE_VIEW_PREF_KEYS } = require('../public/tableViewKeys.ts');
+test('PUT /api/me/prefs/:key: accepts every key the frontend syncs, and only those', async (t) => {
+  const { SYNCED_PREF_KEYS: frontendKeys } = require('../public/syncedPrefKeys.ts');
+  assert.deepEqual([...SYNCED_PREF_KEYS].sort(), [...frontendKeys].sort());
   const agent = await loginAs(t, '76561198000000211');
-  const keys = [
-    ...['myAccount', 'currentAccount', 'recentAccounts', 'recentGames', 'bundleSnapshots', 'region', 'lists'],
-    ...['folders', 'ranking:0b7e6c1a-3f2d-4e5a-9b8c-1d2e3f4a5b6c', ...TABLE_VIEW_PREF_KEYS],
-  ];
-  for (const key of keys) {
+  for (const key of [...frontendKeys, 'ranking:0b7e6c1a-3f2d-4e5a-9b8c-1d2e3f4a5b6c']) {
     await agent
       .put(`/api/me/prefs/${encodeURIComponent(key)}`)
       .send({ value: 1, updatedAt: 1000 })
