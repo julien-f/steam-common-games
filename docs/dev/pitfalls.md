@@ -43,3 +43,9 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: a screenshot path or `filename` in the scratchpad or `/tmp` is refused.
 - **Cause**: the Playwright MCP server reads and writes only under the repo's `.playwright-mcp/`.
 - **Fix**: keep MCP inputs and outputs under `.playwright-mcp/` (gitignored).
+
+## A background agent's chained `git` command or heredoc is refused
+
+- **Symptom**: in an agent worktree (`.claude/worktrees/`), a chained command (`git add … && git commit …`) or a multi-line `python3` heredoc is denied, while the same steps run one by one go through.
+- **Cause**: a background agent can't answer a permission prompt, so any command its rules don't allow outright is refused, and a compound command is judged as a whole.
+- **Fix**: one plain command per call; commit with `git commit -F <file>` instead of a heredoc message, and write scripts to a file before running them.
