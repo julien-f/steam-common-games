@@ -532,6 +532,30 @@ test('getPlayerSummaries: caches result — second call skips fetch', async (t) 
   assert.equal(fetchCount, 1, 'second call should be served from cache');
 });
 
+test('getPlayerSummaries: a concurrent call joins the in-flight fetch for an id instead of re-fetching it', async (t) => {
+  _reset();
+  const ID_A = '76561198000000011';
+  const ID_B = '76561198000000012';
+  const requested = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const ids = new URL(url).searchParams.get('steamids').split(',');
+    requested.push(...ids);
+    await new Promise((r) => setTimeout(r, 10));
+    return {
+      ok: true,
+      json: async () => ({ response: { players: ids.map((id) => ({ steamid: id, personaname: `P${id}` })) } }),
+    };
+  });
+
+  const [first, second] = await Promise.all([getPlayerSummaries([ID_A]), getPlayerSummaries([ID_A, ID_B])]);
+  assert.deepEqual(requested.sort(), [ID_A, ID_B], 'ID_A is fetched once, not once per call');
+  assert.equal(first[0].personaname, `P${ID_A}`);
+  assert.deepEqual(
+    second.map((p) => p.personaname),
+    [`P${ID_A}`, `P${ID_B}`],
+  );
+});
+
 test("getPlayerSummaries: asks for at most 100 ids per call, Steam's documented limit", async (t) => {
   _reset();
   const batches = [];
