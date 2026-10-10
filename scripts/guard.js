@@ -133,6 +133,10 @@ function runTest(ref, head, title, port) {
 
 function main() {
   const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1];
+  if (!arg('base') || !arg('head')) {
+    console.error('Usage: node scripts/guard.js --base=<ref> --head=<ref> [--run]');
+    process.exit(1);
+  }
   const head = git('rev-parse', arg('head')).trim();
   const base = git('merge-base', arg('base'), head).trim();
   const changed = git('diff', '--name-only', base, head).split('\n').filter(Boolean);

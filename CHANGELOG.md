@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Development
+
+- `scripts/guard.js` prints its usage instead of a git error when `--base` or `--head` is missing
+
 ## [0.10.0] - 2026-10-10
 
 ### Changed
