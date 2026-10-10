@@ -4,6 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { levenshtein, stringSimilarity, getHLTB, buildSearchTerms, _resetAuth } = require('../lib/hltb');
 const { _reset } = require('../lib/cache');
+const { _resetCircuitBreakers } = require('../lib/circuitBreaker');
 
 // ── levenshtein ───────────────────────────────────────────────────────────
 
@@ -269,6 +270,37 @@ test('getHLTB: two search 403s in a row open the circuit for 5 minutes, failing 
   t.mock.timers.tick(5 * 60 * 1000);
   await assert.rejects(() => getHLTB(4, 'Left 4 Dead'));
   assert.ok(fetchMock.mock.callCount() > calls, 'requests resume once the block expires');
+});
+
+test('getHLTB: searches already queued when the circuit opens never reach HLTB', async (t) => {
+  _reset();
+  _resetAuth();
+  _resetCircuitBreakers();
+  t.after(_resetAuth);
+  t.after(_resetCircuitBreakers);
+  t.mock.method(console, 'warn', () => {});
+  let searchCalls = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('search/site/init')) return makeInitResponse();
+    searchCalls++;
+    return { ok: false, status: 403 };
+  });
+
+  // 3 searches run at once; at most one more can start between the first 403 and the second,
+  // which opens the circuit. The rest were queued and must fail without a request.
+  const names = [
+    'Portal',
+    'Half-Life',
+    'Portal 2',
+    'Left 4 Dead',
+    'Dota 2',
+    'Team Fortress 2',
+    'Counter-Strike',
+    'Ricochet',
+  ];
+  const results = await Promise.allSettled(names.map((name, i) => getHLTB(i + 1, name)));
+  assert.ok(results.every((r) => r.status === 'rejected'));
+  assert.ok(searchCalls <= 4, `${searchCalls} searches`);
 });
 
 test('getHLTB: throws and clears auth on 401', async (t) => {
