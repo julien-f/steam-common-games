@@ -60,6 +60,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `scripts/setup-facts.js --transcripts` also counts the tool calls the user rejected, next to the permission classifier's denials
 - `npm run check:doc-refs` also flags links to a heading that no longer exists.
 - `node scripts/backlog-next.js <C|U>` gives the next code or UX backlog number, never one a closed item already used.
+- The pre-commit hook sets unstaged edits aside with `git stash` instead of a hand-rolled patch file.
 
 ## [0.10.0] - 2026-10-10
 
