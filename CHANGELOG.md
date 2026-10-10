@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - The Played (h) filter has a "never played" button, so finding your unplayed games is one click
+- A comparison has a Played column for each player, so you can find games none of you has played much
 
 ### Changed
 

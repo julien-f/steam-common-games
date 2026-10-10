@@ -270,6 +270,25 @@ const PLAYTIME_COLUMN: ColumnDef<Record<string, any>> = {
   category: 'Play Time & Dates',
 };
 
+// A comparison's per-player Played columns. Keyed by position, not account, so a comparison's
+// saved layout fits the next one compared.
+const playedByKey = (i: number) => `playtime:${i}`;
+function playedByColumn(
+  player: { label: string; owners: Map<number, GameOwner[]> },
+  i: number,
+): ColumnDef<Record<string, any>> {
+  return {
+    ...PLAYTIME_COLUMN,
+    key: playedByKey(i),
+    label: `Played (h) · ${player.label}`,
+    // Summed over a Family's members, like myOwnership.ts's own Played; null: this player doesn't own it.
+    value: (row) => {
+      const owners = player.owners.get(row.appid);
+      return owners ? hoursFromMinutes(owners.reduce((sum, o) => sum + o.minutes, 0)) : null;
+    },
+  };
+}
+
 const LAST_PLAYED_COLUMN: ColumnDef<Record<string, any>> = {
   key: 'lastPlayed',
   label: 'Last Played',
@@ -567,6 +586,8 @@ export default function ListRoute() {
   let tableContainer!: HTMLDivElement;
   // A comparison's players who own each game, for the panel's Owned by (getOwners below).
   let compareOwners: Map<number, GameOwner[]> | null = null;
+  // Each compared player's label and the games their account owns, in `compareAccounts` order.
+  let comparePlayers: { label: string; owners: Map<number, GameOwner[]> }[] = [];
   const [statusText, setStatusText] = createSignal('');
   const [priceStatusText, setPriceStatusText] = createSignal('');
   // kind === 'bundle' only: the currently open bundle's Steam-resolved games, kept at component
@@ -2034,18 +2055,24 @@ export default function ListRoute() {
       let appids: Set<number>;
       try {
         const owners = new Map<number, GameOwner[]>();
+        const ownersByAccount = new Map<string, Map<number, GameOwner[]>>();
         const { result, sources } = await resolveListWithSources(
           list,
           createDefaultFetchers({
             refresh,
             onFetchedAt: noteFetchedAt,
-            onOwners: (byAppid) => {
+            onOwners: (byAppid, accountId) => {
+              ownersByAccount.set(accountId, byAppid);
               for (const [appid, members] of byAppid) owners.set(appid, [...(owners.get(appid) ?? []), ...members]);
             },
           }),
         );
         if (loadGuard.isStale(gen)) return;
         compareOwners = owners;
+        comparePlayers = shown.map((account) => ({
+          label: accountDisplayLabel(account),
+          owners: ownersByAccount.get(account.id) ?? new Map(),
+        }));
         notifyOwnersChanged();
         const described = describeSources(list, compareNaming());
         setListSources(
@@ -2370,9 +2397,11 @@ export default function ListRoute() {
                 : USER_COLUMNS
               : kind === 'recent'
                 ? LOOKED_UP_COLUMNS
-                : kind === 'compare' || kind === 'shared'
-                  ? RECENT_COLUMNS
-                  : OWNED_COLUMNS) as unknown as ColumnDef<Game>[];
+                : kind === 'compare'
+                  ? insertColumnsAfter(RECENT_COLUMNS, 'hltbCompletionist', ...comparePlayers.map(playedByColumn))
+                  : kind === 'shared'
+                    ? RECENT_COLUMNS
+                    : OWNED_COLUMNS) as unknown as ColumnDef<Game>[];
       const defaultVisible = isRanked
         ? [...RANKED_DEFAULT_VISIBLE, ...(priced ? PRICED_DEFAULT_VISIBLE : [])]
         : kind === 'wishlist'
@@ -2383,9 +2412,11 @@ export default function ListRoute() {
               ? [...RECENT_DEFAULT_VISIBLE, ...PRICED_DEFAULT_VISIBLE]
               : kind === 'recent'
                 ? LOOKED_UP_DEFAULT_VISIBLE
-                : kind === 'user' || kind === 'compare' || kind === 'shared'
-                  ? RECENT_DEFAULT_VISIBLE
-                  : OWNED_DEFAULT_VISIBLE;
+                : kind === 'compare'
+                  ? [...RECENT_DEFAULT_VISIBLE, ...comparePlayers.map((_, i) => playedByKey(i))]
+                  : kind === 'user' || kind === 'shared'
+                    ? RECENT_DEFAULT_VISIBLE
+                    : OWNED_DEFAULT_VISIBLE;
       const sort = isRanked
         ? RANKED_DEFAULT_SORT
         : kind === 'bundle'

@@ -159,6 +159,19 @@ test("C4 edge: on a comparison, the panel's Owned by lists every player who owns
   expect((await owners.allInnerTexts()).sort()).toEqual(['Alice', 'Bob', 'Carol']);
 });
 
+test('C6 edge: a comparison has a Played column per player', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare?u=alice&u=bob');
+  await expect(row(page, 'Portal 2')).toBeVisible();
+  const headers = await page.locator('thead th').allInnerTexts();
+  const col = (name: string) => headers.findIndex((h) => h.includes(name));
+  expect(col('Played (h) · Alice')).toBeGreaterThan(-1);
+  expect(col('Played (h) · Bob')).toBeGreaterThan(-1);
+  const portal = row(page, 'Portal 2').locator('td');
+  await expect(portal.nth(col('Played (h) · Alice'))).toHaveText('10.0');
+  await expect(portal.nth(col('Played (h) · Bob'))).toHaveText('—');
+});
+
 test('C1.4: compare three players — one table grouped from "all" to "only one"', async ({ page }) => {
   await page.goto('/lists/compare?u=alice&u=bob&u=carol');
   await expect(groupRows(page)).toHaveCount(6);

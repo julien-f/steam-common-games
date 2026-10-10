@@ -126,8 +126,8 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   1. Compare me and a friend
   2. **Intersect**
   3. filter tag co-op
-  4. filter low playtime for _both_ of us ◇
-- **Done when**: per-player playtime columns ◇; today a comparison has no Played column at all (U71), only the panel's Owned by lists each player's playtime (frontend.md, Known gaps).
+  4. filter low playtime for _both_ of us
+- **Done when**: each player has a Played column (`Played (h) · <name>`) to filter on.
 
 ## Lists
 

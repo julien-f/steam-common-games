@@ -176,7 +176,7 @@ export function flattenCombineResult(result: CombineResult): Set<number> {
 export interface DefaultFetchersOptions {
   refresh?: boolean;
   onFetchedAt?: (fetchedAt: number | null) => void;
-  onOwners?: (owners: Map<number, GameOwner[]>) => void; // each account-owned source's members who own each game
+  onOwners?: (owners: Map<number, GameOwner[]>, accountId: string) => void; // each account-owned source's members who own each game
   onBundleLeftOut?: (bundleId: string, notOnSteam: number) => void; // a bundle's games with no Steam listing
 }
 
@@ -195,7 +195,7 @@ export function createDefaultFetchers({
     accountOwned: async (accountId) => {
       const { appids, owners, fetchedAt } = await fetchAccountOwnedData(accountId, { refresh });
       onFetchedAt?.(fetchedAt);
-      onOwners?.(owners);
+      onOwners?.(owners, accountId);
       return appids;
     },
     accountWishlist: async (accountId) => {
