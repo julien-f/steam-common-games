@@ -1,2 +1,4 @@
 package-lock.json
 docs/images/
+# Agent worktrees: other checkouts, mid-edit; git skips them via .git/info/exclude, Prettier needs telling.
+.claude/worktrees/
