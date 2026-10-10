@@ -65,11 +65,13 @@ export interface DlcEntry {
   comingSoon: boolean;
 }
 
+const DLC_CONCURRENCY = 4;
+
 export function createPanelDataCache() {
   const news = new Map<number, PanelNews>();
   const achievements = new Map<string, PanelAchievements>();
   const price = new Map<number, PanelPrice>();
-  const dlc = new Map<number, PanelDlc>();
+  const dlcEntries = new Map<number, DlcEntry | null>(); // null: the store has no entry for it
   const bundles = new Map<number, PanelBundles>();
 
   // Lazily resolved once per session rather than per-call — a plain GET /api/health, cheap to
@@ -224,47 +226,36 @@ export function createPanelDataCache() {
   // DLC — unlike the three above, not fetched when the panel opens: the collapsed card's header
   // only needs `details.meta.dlc`'s bare appid *count* (already present for free, see
   // extractAppDetails in lib/steam.js), so the name/capsule-resolving fetch is deferred until the
-  // card is actually expanded.
-  //
-  // Each DLC appid is resolved through the exact same `GET /api/game-details/:appid` every other
-  // single-game lookup goes through, not a bespoke batch endpoint: a DLC appid isn't
-  // fundamentally different from any other appid this app looks up, so it shouldn't need its own
-  // rate-limit policy or its own cap on how many resolve at once. An entry that fails to resolve
-  // (delisted, or just rate-limited this time) is dropped rather than surfaced as an error — the
-  // rest is still worth showing. Resolving the *full* response (rating/HLTB/tags/ProtonDB too)
-  // when only `meta` is displayed is a feature, not waste: it warms that DLC's own cache, so
-  // clicking into its panel next opens instantly.
+  // card is actually expanded, and then covers only the entries it shows (DLC_PAGE at a time, see
+  // panel.tsx). Each DLC costs one store-metadata lookup (GET /api/game-meta), at most
+  // DLC_CONCURRENCY at once, kept for the session: a game can have hundreds of DLC, and resolving
+  // full game details for each used to send hundreds of rating/HLTB/tags/ProtonDB lookups too.
+  // A DLC the store has no entry for is left out; one that failed (rate-limited, offline) is
+  // tried again on the next call rather than remembered.
   //
   // `onPartial` is called with a snapshot of the in-progress list (one slot per requested appid,
   // filled in as each resolves) so the card can stream entries in as they land instead of sitting
-  // on its skeleton for however long the *slowest* of a Stellaris-sized list takes.
-  function peekDlc(appid: number): PanelDlc | undefined {
-    return dlc.get(appid);
-  }
-
+  // on its skeleton for however long the slowest one takes.
   async function fetchDlc(
-    appid: number,
     dlcIds: readonly number[],
-    { force = false, onPartial }: { force?: boolean; onPartial?: (entries: (DlcEntry | undefined)[]) => void } = {},
+    { onPartial }: { onPartial?: (entries: (DlcEntry | undefined)[]) => void } = {},
   ): Promise<PanelDlc> {
-    if (!dlcIds.length) {
-      dlc.set(appid, []);
-      return [];
-    }
-    // Seeded from the previous complete list (keyed by appid) so a forced refresh keeps showing
-    // the old entries in place while each is re-fetched, instead of the list shrinking back to
-    // empty and refilling.
-    const prevById = new Map((dlc.get(appid) || []).map((d) => [d.appid, d]));
-    const partial: (DlcEntry | undefined)[] = dlcIds.map((id) => prevById.get(id));
-    onPartial?.(partial.slice());
-    try {
-      await Promise.all(
-        dlcIds.map(async (id, i) => {
-          try {
-            const res = await fetch(`/api/game-details/${id}${force ? '?refresh=1' : ''}`);
-            const data = await res.json();
-            partial[i] =
-              res.ok && data.meta
+    const known = () => dlcIds.map((id) => dlcEntries.get(id) ?? undefined);
+    onPartial?.(known());
+    const missing = dlcIds.filter((id) => !dlcEntries.has(id));
+    let failed = false;
+    let next = 0;
+    const worker = async () => {
+      while (next < missing.length) {
+        const id = missing[next++];
+        try {
+          const res = await fetch(`/api/game-meta/${id}`);
+          const data = await res.json();
+          if (!res.ok) failed = true;
+          else
+            dlcEntries.set(
+              id,
+              data.meta
                 ? {
                     appid: id,
                     name: data.meta.name,
@@ -272,21 +263,17 @@ export function createPanelDataCache() {
                     releaseDate: data.meta.releaseDate,
                     comingSoon: data.meta.comingSoon,
                   }
-                : undefined;
-          } catch {
-            partial[i] = undefined;
-          }
-          onPartial?.(partial.slice()); // stream this entry in as soon as it resolves
-        }),
-      );
-      const entries = partial.filter((d): d is DlcEntry => d != null);
-      dlc.set(appid, entries);
-      return entries;
-    } catch {
-      const value = dlc.get(appid) ?? null;
-      dlc.set(appid, value);
-      return value;
-    }
+                : null,
+            );
+        } catch {
+          failed = true;
+        }
+        onPartial?.(known()); // stream this entry in as soon as it resolves
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(DLC_CONCURRENCY, missing.length) }, worker));
+    const entries = dlcIds.map((id) => dlcEntries.get(id)).filter((d): d is DlcEntry => d != null);
+    return entries.length || !failed ? entries : null;
   }
 
   return {
@@ -298,7 +285,6 @@ export function createPanelDataCache() {
     fetchPrice,
     peekBundles,
     fetchBundles,
-    peekDlc,
     fetchDlc,
     isItadOff,
   };
@@ -313,6 +299,5 @@ export const peekPrice = defaultCache.peekPrice;
 export const fetchPrice = defaultCache.fetchPrice;
 export const peekBundles = defaultCache.peekBundles;
 export const fetchBundles = defaultCache.fetchBundles;
-export const peekDlc = defaultCache.peekDlc;
 export const fetchDlc = defaultCache.fetchDlc;
 export const isItadOff = defaultCache.isItadOff;

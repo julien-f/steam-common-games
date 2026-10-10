@@ -44,6 +44,14 @@ function playerJson(p: Player) {
 // and dev:mock. One game only: the rest keep just their banner.
 const MEDIA_APPID = 1145360;
 const SLOW_MEDIA_MS = 1500;
+// The media game's DLC: more than the card's first page, so "Show more" appears.
+const DLC_APPIDS = Array.from({ length: 25 }, (_, i) => 900001 + i);
+const dlcMeta = (appid: number) => ({
+  name: `Expansion ${appid - 900000}`,
+  capsule: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`,
+  releaseDate: `${(appid % 28) + 1} Jan, 2024`,
+  comingSoon: false,
+});
 const svg = (label: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720"><rect width="100%" height="100%" fill="hsl(${[...label].reduce((h, c) => h + c.charCodeAt(0) * 7, 0) % 360} 45% 35%)"/><text x="50%" y="50%" fill="#fff" font-family="sans-serif" font-size="64" text-anchor="middle">${label}</text></svg>`;
 // `slow-media` serves each image from /api/mock-media after SLOW_MEDIA_MS instead; `variant` keeps a
@@ -91,7 +99,7 @@ function details(appid: number, slowMedia = false) {
       capsule: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`,
       banner: slowMedia ? mediaUrl(`Banner ${appid}`, true) : null,
       ...(appid === MEDIA_APPID ? media(slowMedia) : { movies: [], screenshots: [] }),
-      dlc: [],
+      dlc: appid === MEDIA_APPID ? DLC_APPIDS : [],
       fullgame: null,
       website: null,
       achievementCount: 0,
@@ -256,6 +264,11 @@ export function respond(
   }
   const one = path.match(/^\/api\/game-details\/(\d+)$/);
   if (one) return json(detailsFor(Number(one[1])));
+  const metaOnly = path.match(/^\/api\/game-meta\/(\d+)$/);
+  if (metaOnly) {
+    const appid = Number(metaOnly[1]);
+    return json({ meta: DLC_APPIDS.includes(appid) ? dlcMeta(appid) : detailsFor(appid).meta });
+  }
   if (/^\/api\/(game-news|achievements)\//.test(path)) return json({ items: [], news: [], achievements: [] });
 
   if (path === '/api/search-games') {

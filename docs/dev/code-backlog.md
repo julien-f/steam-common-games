@@ -53,7 +53,6 @@ Last audited: simplify 2026-10-10 · security 2026-10-10 · perf 2026-10-10 · r
 
 ## Compliance
 
-- **C43 · major · M** — expanding the DLC card (`public/panelData.ts:256-259`) fires one full `/api/game-details/:id` per DLC, uncapped and parallel (RPG Maker VX Ace: 422 DLC → ~844 store calls, ~3.5 min of the shared store queue, plus 422 HLTB/browse/ProtonDB calls; past 300/min the rest 429 silently), and the panel's ↻ (`public/panel.tsx:377`) repeats it with `?refresh=1`. Fetch DLC names through a meta-only capped path; don't force-refresh DLC on the parent's ↻.
 - **C40 · minor · S** — players `GetPlayerSummaries` omits are never cached (`lib/steam.js` `fetchPlayerBatch`), so a deleted or invalid account in a friends list is re-requested on every load. Cache the omission briefly once it's confirmed Steam omits only ids that really don't exist (not transiently); record that in integrations.md.
 - **C45 · minor · S** — the store breaker is checked only on entering `fetchStoreApi` (`lib/steam.js:143-146`): jobs already queued in `storeLimit` still fire into the block and re-trip it. Re-check inside the semaphore callback and before each retry.
 - **C46 · minor · S** — HLTB is searched for every appid whatever `meta.type` (`server.js:750-753`): soundtracks, videos, demos, tools are near-certain misses against a spoofed-header endpoint. Skip non-playable types (keep `dlc`).

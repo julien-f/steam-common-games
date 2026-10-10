@@ -953,6 +953,32 @@ test('GET /api/game-details/:appid: ?refresh=1 re-fetches every source despite t
   assert.ok(counts.tags >= 3, 'the store browse item is re-fetched');
 });
 
+// ── GET /api/game-meta/:appid ─────────────────────────────────────────────────
+
+test('GET /api/game-meta/:appid: store metadata only, one upstream call', async (t) => {
+  _reset();
+  _resetAuth();
+  const urls = [];
+  const detailsFetch = makeDetailsFetch();
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    urls.push(url);
+    return detailsFetch(url);
+  });
+  const res = await api.get('/api/game-meta/400').expect(200);
+  assert.equal(typeof res.body.meta.name, 'string');
+  assert.equal(urls.length, 1);
+  assert.match(urls[0], /appdetails/);
+});
+
+test('GET /api/game-meta/:appid: 400 for an invalid appid, 502 when the store fails', async (t) => {
+  _reset();
+  _resetCircuitBreakers();
+  t.mock.method(console, 'error', () => {});
+  t.mock.method(globalThis, 'fetch', makeDetailsFetch({ metaOk: false }));
+  await api.get('/api/game-meta/abc').expect(400);
+  await api.get('/api/game-meta/400').expect(502);
+});
+
 // #3 — real browser-abort on fast refresh. supertest awaits the full response,
 // so this uses a raw http request destroyed mid-flight against app.listen().
 // Question: when the client disconnects before setCache runs, does the server

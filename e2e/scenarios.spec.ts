@@ -606,6 +606,25 @@ test("F1 edge: the Price card says when ITAD didn't answer, and the panel's ↻ 
   await expect(card).toContainText('Buy at Test Shop');
 });
 
+test('F1 edge: the DLC card lists 20 entries from store metadata, then more on request', async ({ page }) => {
+  const requested: string[] = [];
+  page.on('request', (req) => {
+    if (/\/api\/game-(details|meta)\/9000\d\d/.test(req.url())) requested.push(new URL(req.url()).pathname);
+  });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const card = page.locator('#panel-section-dlc');
+  await card.getByRole('button', { name: /DLC · 25 available/ }).click();
+  await expect(card.locator('.panel-dlc-item')).toHaveCount(20);
+  expect(requested.every((p) => p.startsWith('/api/game-meta/'))).toBe(true);
+  expect(requested).toHaveLength(20);
+
+  await card.getByRole('button', { name: 'Show 5 more' }).click();
+  await expect(card.locator('.panel-dlc-item')).toHaveCount(25);
+  await expect(card.getByRole('button', { name: /Show \d+ more/ })).toHaveCount(0);
+  expect(requested).toHaveLength(25);
+});
+
 test('F1 edge: the panel section nav highlights the section it jumped to', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

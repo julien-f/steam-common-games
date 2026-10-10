@@ -30,7 +30,6 @@ import {
   fetchPrice,
   peekBundles,
   fetchBundles,
-  peekDlc,
   fetchDlc,
   isItadOff,
 } from './panelData.ts';
@@ -363,18 +362,14 @@ async function handlePanelRefresh() {
     // Each `refetch()` re-runs that resource's fetcher with `refetching` set, which is what its
     // fetcher reads as "force" (bypass both this app's session cache and the server's own TTL).
     // A refetch of a resource whose source is currently null — price, for a game its list
-    // already priced — is a no-op by construction, no extra check needed here.
-    //
-    // DLC is only force-refetched if it was ever actually loaded (i.e. the card was expanded at
-    // some point this session): no reason to kick off a fetch for a card nobody's opened just
-    // because the refresh button was clicked.
+    // already priced — is a no-op by construction, no extra check needed here. DLC isn't
+    // refetched: forcing every one of a game's DLC would cost one store lookup each.
     await Promise.all([
       panelOptions.onRefresh(game),
       panelData.refetchNews(),
       panelData.refetchPrice(),
       panelData.refetchBundles(),
       panelData.refetchAchievements(),
-      peekDlc(game.appid) !== undefined ? panelData.refetchDlc() : null,
     ]);
   } finally {
     setPanelRefreshing(false);
@@ -552,13 +547,17 @@ const panelData = createRoot(() => {
   // separate kick-off for: `expandedSections` remembers "DLC is expanded" per appid for the whole
   // session, so a game reopened later renders its card already open, with no click left to happen
   // — the source is already truthy on the first render, so the fetch just runs.
-  const dlcSource = createMemo(() => {
+  // `shown` is how many entries the card asks for: DLC_PAGE, plus DLC_PAGE per "Show more".
+  const [dlcMore, setDlcMore] = createSignal<{ appid: number; shown: number } | null>(null);
+  // The number shown rides along as an `appid:shown` string, so "Show more" re-runs the fetch.
+  const dlcShown = (): number => {
     const g = panelGame();
-    if (!g) return null;
-    const ids = g.details?.meta?.dlc;
-    if (!ids || !ids.length) return null;
-    return isSectionExpanded(g.appid, 'dlc') ? g.appid : null;
-  });
+    const ids = g?.details?.meta?.dlc;
+    if (!g || !ids?.length || !isSectionExpanded(g.appid, 'dlc')) return 0;
+    const more = dlcMore();
+    return Math.min(ids.length, more?.appid === g.appid ? more.shown : DLC_PAGE);
+  };
+  const dlcSource = createMemo(() => (dlcShown() ? `${panelGame()!.appid}:${dlcShown()}` : null));
 
   // The in-progress list, streamed in one entry at a time (see fetchDlc's `onPartial`) — a
   // resource is one value per fetch, so the partial state is its own signal alongside it rather
@@ -566,13 +565,12 @@ const panelData = createRoot(() => {
   // list can never be shown under a different game.
   const [dlcPartial, setDlcPartial] = createSignal<{ appid: number; entries: (DlcEntry | undefined)[] } | null>(null);
 
-  const [dlc, { refetch: refetchDlc }] = createResource<PanelDlc, number>(dlcSource, (appid, info) => {
-    const force = isForced(info);
-    const cached = peekDlc(appid);
-    if (!force && cached !== undefined) return cached;
-    const ids = panelGame()?.details?.meta?.dlc ?? [];
-    return fetchDlc(appid, ids, { force, onPartial: (entries) => setDlcPartial({ appid, entries }) });
+  const [dlc] = createResource<PanelDlc, string>(dlcSource, (key) => {
+    const [appid, shown] = key.split(':').map(Number);
+    const ids = (panelGame()?.details?.meta?.dlc ?? []).slice(0, shown);
+    return fetchDlc(ids, { onPartial: (entries) => setDlcPartial({ appid, entries }) });
   });
+  const showMoreDlc = (appid: number) => setDlcMore({ appid, shown: dlcShown() + DLC_PAGE });
 
   return {
     news,
@@ -586,8 +584,9 @@ const panelData = createRoot(() => {
     bundles,
     refetchBundles,
     dlc,
-    refetchDlc,
     dlcPartial,
+    dlcShown,
+    showMoreDlc,
   };
 });
 
@@ -1697,6 +1696,9 @@ function BaseGameLink(props: { game: ReadonlyGame }): JSX.Element {
 // `panelOptions.gameHref` (each of the three deleted pages had its own URL shape); with one
 // canonical link for every route there's nothing left for a host to decide, and nobody had
 // passed it since the redesign — so these were `href="#"`, and middle-click opened nothing.
+// The expanded DLC card resolves this many entries at a time (see panelData.ts's fetchDlc).
+const DLC_PAGE = 20;
+
 function sortDlcByRelease(list: DlcEntry[]) {
   const sortKey = (d: DlcEntry) => {
     const t = d.releaseDate ? Date.parse(d.releaseDate) : NaN;
@@ -1742,7 +1744,7 @@ function DlcSection(props: { game: ReadonlyGame }): JSX.Element {
       // its skeleton until every single one settles (see panelData.ts's fetchDlc).
       const done = loaded();
       if (!done.length) return skeleton;
-      const remaining = dlcIds().length - done.length;
+      const remaining = panelData.dlcShown() - done.length;
       return (
         <div class="panel-dlc-list">
           <For each={done}>{(d) => <DlcItem d={d} />}</For>
@@ -1758,9 +1760,15 @@ function DlcSection(props: { game: ReadonlyGame }): JSX.Element {
         </div>
       );
     if (!entries) return skeleton;
+    const notShown = dlcIds().length - panelData.dlcShown();
     return entries.length ? (
       <div class="panel-dlc-list">
         <For each={sortDlcByRelease(entries)}>{(d) => <DlcItem d={d} />}</For>
+        <Show when={notShown > 0}>
+          <button type="button" class="panel-dlc-more" onClick={() => panelData.showMoreDlc(props.game.appid)}>
+            {notShown > DLC_PAGE ? `Show ${DLC_PAGE} more of ${notShown}` : `Show ${notShown} more`}
+          </button>
+        </Show>
       </div>
     ) : (
       <div class="panel-collapsible-body-pad">

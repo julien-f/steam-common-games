@@ -331,6 +331,21 @@ const detailsLimit = namedRateLimit('details', {
   },
 });
 
+// Store metadata alone (GET /api/game-meta/:appid), for lists of entries that only show a name
+// and capsule (the panel's DLC card): one store call instead of fetchGameDetails' five sources.
+const metaLimit = namedRateLimit('meta', {
+  windowMs: 60 * 1000,
+  max: DETAILS_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please wait a minute and try again.' },
+  skip: (req) => {
+    if (rateLimitBypassed()) return true;
+    const appid = Number(req.params.appid);
+    return Number.isInteger(appid) && appid > 0 && getCached(`meta:${appid}`) !== undefined;
+  },
+});
+
 // News is deliberately NOT part of fetchGameDetails/the details limiter above — unlike
 // rating/HLTB/meta/tags/ProtonDB, it's never shown anywhere but the side panel (no table
 // column, nothing to sort/filter on), so fetching it for every game in a whole loaded
@@ -1013,6 +1028,19 @@ app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
     return res.status(400).json({ error: 'Invalid appid' });
   }
   res.json(await fetchGameDetails(appid, { force: isForceRefresh(req) }));
+});
+
+app.get('/api/game-meta/:appid', metaLimit, async (req, res) => {
+  const appid = Number(req.params.appid);
+  if (!Number.isInteger(appid) || appid <= 0) {
+    return res.status(400).json({ error: 'Invalid appid' });
+  }
+  try {
+    res.json({ meta: await getAppDetails(appid) });
+  } catch (err) {
+    const status = routeErrorStatus('game-meta', err);
+    res.status(status).json({ error: err.message });
+  }
 });
 
 // Recent news/announcements for one game — see newsLimit above for why this is its own

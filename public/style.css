@@ -2370,6 +2370,21 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   font-size: 12px;
   color: var(--text1);
 }
+/* "Show N more" under the first DLC_PAGE entries (see DlcSection in panel.tsx). */
+.panel-dlc-more {
+  min-height: 32px;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent2);
+  text-align: left;
+  cursor: pointer;
+}
+.panel-dlc-more:hover {
+  text-decoration: underline;
+}
 
 /* One card (border/radius/background) holds both the header and the list — a single
    grouped unit instead of a chip floating above a separate stack of boxes. The header

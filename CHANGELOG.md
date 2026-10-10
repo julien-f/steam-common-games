@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - With a mouse, the screenshot viewer's top line shows just the game's name; its ↑ ↓ and "Game 3 of 6" appear when you point at it or Tab to them. Touch screens keep them.
 - HLTB, ProtonDB and Steam's store browse API are now paced to about 3 requests a second each (`UPSTREAM_MIN_INTERVAL_MS`, 1000), instead of as fast as 3 parallel requests allow; cold loads aren't slower, since Steam's store pace already limits them.
 - One client can have at most 2 game lists loading their details at once (`STREAM_MAX_PER_IP`); a third is refused with a "too many game lists loading at once" message (the list says the load failed), so no single visitor can fill the shared Steam queue.
+- The game panel's DLC card loads 20 entries at a time, with a "Show more" button, and looks up only each DLC's store page, instead of full details for every DLC at once (hundreds of lookups for some games); the panel's ↻ no longer reloads the DLC list.
 
 ### Fixed
 
