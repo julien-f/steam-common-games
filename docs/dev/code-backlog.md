@@ -38,7 +38,6 @@ Last audited: simplify 2026-10-10 · security 2026-10-10 · perf 2026-10-10 · r
 
 ## Performance
 
-- **C26 · major · M** — no response compression: `/api/game-details/stream` events average 5.3 KB (10.6 MB per 2000-game load vs. 1.9 MB gzipped), 68% of it `meta.screenshots`/`movies` (`lib/steam.js:503-504`, sent at `server.js:1182`) that only the panel reads; nginx's default `gzip_types` skips `text/event-stream`. Strip media from stream events and load it with the panel (or add compression; a new dependency needs approval).
 - **C28 · minor · S** — `public/AppRoot.tsx:19-26` imports every route statically: ~200 kB of the 415 kB entry chunk (data-table 115 kB, ListRoute 46 kB, gameColumns 13 kB, other table routes ~20 kB) loads on `/` and `/about`. `lazy()` the table routes; fix `vite.config.js`'s "~310 kB" comment.
 - **C29 · minor · S** — `getCachedAt` (`lib/cache.js:133`) selects the whole value to read `ts`, called 10× per game in `fetchGameDetails` (`server.js:802-815`), including the ~20 KB `meta:` blob twice (~110 ms event-loop per 2200-game cached stream vs. 28 ms); limiter skips use `getCached` (`server.js:329-333`), inflating `/api/metrics` `cacheHits` ~70%. Ts-only statement, ages computed once per game, a non-recording existence check for skips.
 

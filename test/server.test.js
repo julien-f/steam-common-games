@@ -13,6 +13,7 @@ process.env.DB_FILE = '';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
+const zlib = require('node:zlib');
 const supertest = require('supertest');
 const { app } = require('../server');
 const { _reset, setCache, getCachedAt } = require('../lib/cache');
@@ -1140,6 +1141,44 @@ function ssePost(port, path, body) {
     req.on('error', reject);
     req.write(payload);
     req.end();
+  });
+}
+
+// The stream is the one large response (~5 KB per game, mostly media URLs), so it is gzipped for
+// clients that accept it, flushed per event so rows still arrive as each game resolves.
+for (const encoding of ['gzip', 'identity']) {
+  test(`POST /api/game-details/stream: ${encoding === 'gzip' ? 'gzipped' : 'plain'} for Accept-Encoding: ${encoding}`, async (t) => {
+    _reset();
+    _resetAuth();
+    t.mock.method(globalThis, 'fetch', makeDetailsFetch());
+    const server = app.listen(0);
+    t.after(() => new Promise((r) => server.close(r)));
+    await new Promise((r) => server.once('listening', r));
+
+    const payload = JSON.stringify({ games: [{ appid: 400 }, { appid: 401 }] });
+    const res = await new Promise((resolve, reject) => {
+      const req = http.request(
+        {
+          host: '127.0.0.1',
+          port: server.address().port,
+          path: '/api/game-details/stream',
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept-Encoding': encoding },
+        },
+        (r) => {
+          const chunks = [];
+          r.on('data', (c) => chunks.push(c));
+          r.on('end', () => resolve({ headers: r.headers, body: Buffer.concat(chunks) }));
+        },
+      );
+      req.on('error', reject);
+      req.end(payload);
+    });
+    assert.equal(res.headers['content-encoding'], encoding === 'gzip' ? 'gzip' : undefined);
+    const text = (encoding === 'gzip' ? zlib.gunzipSync(res.body) : res.body).toString();
+    const events = parseSseEvents(text);
+    assert.deepEqual(events.map((e) => e.appid).sort(), [400, 401, undefined]);
+    assert.equal(events.at(-1).done, true);
   });
 }
 

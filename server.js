@@ -9,6 +9,7 @@ const morgan = require('morgan');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('node:crypto');
+const zlib = require('node:zlib');
 const rateLimit = require('express-rate-limit');
 
 const { getCached, getCachedAt, capExpiry, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
@@ -1224,6 +1225,17 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Vary', 'Accept-Encoding');
+  // ~5 KB per game, mostly media URLs: gzipped it's a fifth of that (no reverse proxy is assumed
+  // to compress text/event-stream; nginx doesn't by default). Flushed per event, so each row
+  // still arrives as soon as it resolves.
+  const gzip = /\bgzip\b/.test(req.get('accept-encoding') ?? '');
+  let out = res;
+  if (gzip) {
+    res.setHeader('Content-Encoding', 'gzip');
+    out = zlib.createGzip();
+    out.pipe(res);
+  }
   res.flushHeaders();
 
   let closed = false;
@@ -1232,7 +1244,9 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   });
 
   const send = (data) => {
-    if (!closed && !res.writableEnded) res.write(`data: ${JSON.stringify(data)}\n\n`);
+    if (closed || res.writableEnded) return;
+    out.write(`data: ${JSON.stringify(data)}\n\n`);
+    if (gzip) out.flush(zlib.constants.Z_SYNC_FLUSH);
   };
 
   // A bounded worker pool, not `validated.map(...)`. Mapping dispatched every appid
@@ -1266,7 +1280,7 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   await Promise.allSettled(Array.from({ length: Math.min(STREAM_CONCURRENCY, validated.length) }, worker));
 
   send({ done: true });
-  if (!res.writableEnded) res.end();
+  if (!res.writableEnded) out.end();
 });
 
 // ── Authentication (Steam OpenID) ────────────────────────────────────────────
