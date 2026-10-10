@@ -81,7 +81,7 @@ module.exports = defineConfig({
     outDir: '../dist',
     emptyOutDir: true,
     // Only chunk over the 500 kB default is hls.js, lazy-imported by lightbox.tsx and never
-    // in the initial load; 600 keeps the warning guarding the ~310 kB entry chunk.
+    // in the initial load; 600 keeps a warning on every other chunk (the largest, data-table, is ~120 kB).
     chunkSizeWarningLimit: 600,
   },
 });

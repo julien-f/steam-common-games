@@ -14,16 +14,20 @@
 // table/nav beside the panel at all) is gone; ListRoute renders it as kind 'recent' the same way
 // it renders /lists/owned etc., just with `params.appid` acting as an initial focus rather than
 // nothing. `/game` bare (no id) is the plain "browse recents" entry point Home links to.
+import { lazy } from 'solid-js';
 import { render } from 'solid-js/web';
 import { Router, Route } from '@solidjs/router';
 import { AppShell } from './AppShell.tsx';
 import HomeRoute from './HomeRoute.tsx';
-import ListRoute from './ListRoute.tsx';
 import RankRoute from './RankRoute.tsx';
-import BundlesBrowseRoute from './BundlesBrowseRoute.tsx';
-import SearchRoute from './SearchRoute.tsx';
 import AboutRoute from './AboutRoute.tsx';
 import NotFoundRoute from './NotFoundRoute.tsx';
+
+// The table routes carry the data-table library and the column definitions, about half the app:
+// loaded on first use, so Home and About don't wait for them.
+const ListRoute = lazy(() => import('./ListRoute.tsx'));
+const BundlesBrowseRoute = lazy(() => import('./BundlesBrowseRoute.tsx'));
+const SearchRoute = lazy(() => import('./SearchRoute.tsx'));
 
 render(
   () => (

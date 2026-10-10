@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - Settings synced to a signed-in account are limited to the ones the app uses, up to 2 MB per account
+- Home and About load about half as much code; the table pages load theirs when first opened
 
 ### Fixed
 
