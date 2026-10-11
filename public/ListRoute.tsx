@@ -198,7 +198,7 @@ import {
   type RefDescription,
   type ListNaming,
 } from './listLabels.ts';
-import { encodeListFormula, decodeListFormula, shareListUrl } from './listShare.ts';
+import { encodeListFormula, decodeListFormula, shareListUrl, inMemoryDynamicList } from './listShare.ts';
 import { copyWithFeedback } from './clipboard.ts';
 import { setBaseTitle } from './pageTitle.ts';
 import type {
@@ -236,6 +236,7 @@ import {
   flattenCombineResult,
   createDefaultFetchers,
   type ListResolveFetchers,
+  type ResolvedSource,
 } from './listResolve.ts';
 import { CombineForm, sourceOptions, refKey, type SourceOption } from './CombineForm.tsx';
 import type { MembershipGroup } from './combine.ts';
@@ -1903,6 +1904,26 @@ export default function ListRoute() {
     if (!kept) setSelectedRows([]); // a fresh load means a fresh table — nothing carries a prior selection over
     setSelectionActionStatus(null);
 
+    // Resolves a dynamic or user list and shows its sources; a group-by-membership result keeps its
+    // groups. null once stale, or failed (said in the status line).
+    const resolveRows = async (
+      list: GameList,
+      fetchers: ListResolveFetchers,
+      toSources: (sources: ResolvedSource[]) => ReturnType<typeof listSources>,
+    ): Promise<{ appids: Set<number>; groups: MembershipGroup[] | null } | null> => {
+      try {
+        const { result, sources } = await resolveListWithSources(list, fetchers);
+        if (loadGuard.isStale(gen)) return null;
+        setListSources(toSources(sources));
+        return Array.isArray(result)
+          ? { appids: new Set(result.flatMap((g) => g.appids)), groups: result }
+          : { appids: flattenCombineResult(result), groups: null };
+      } catch (err) {
+        if (!loadGuard.isStale(gen)) setStatusText(`Error: ${(err as Error).message}`);
+        return null;
+      }
+    };
+
     if (kind === 'compare') {
       const slots = compareSlots();
       loadedCompareKeys = new Set([compareKey()]);
@@ -1974,34 +1995,23 @@ export default function ListRoute() {
       loadedCompareKeys.add(`${compareOp()}|${canonicalSlots.map((slot) => slot.join(',')).join('|')}`);
       if (canonical !== routerLocation.pathname + routerLocation.search) navigate(canonical, { replace: true });
 
-      const list: GameList = {
-        id: '',
-        parentId: null,
-        order: 0,
-        createdAt: 0,
-        updatedAt: 0,
-        kind: 'dynamic',
-        op: compareOp(),
-        sources: shown.map((account) => ({ kind: 'account-owned' as const, accountId: account.id })),
-      };
+      const list = inMemoryDynamicList(
+        compareOp(),
+        shown.map((account) => ({ kind: 'account-owned' as const, accountId: account.id })),
+      );
       setCompareList(list);
       setStatusText('Comparing libraries…');
-      let appids: Set<number>;
-      try {
-        const owners = new Map<number, GameOwner[]>();
-        const ownersByAccount = new Map<string, Map<number, GameOwner[]>>();
-        const { result, sources } = await resolveListWithSources(
-          list,
-          createDefaultFetchers({
-            refresh,
-            onFetchedAt,
-            onOwners: (byAppid, accountId) => {
-              ownersByAccount.set(accountId, byAppid);
-              for (const [appid, members] of byAppid) owners.set(appid, [...(owners.get(appid) ?? []), ...members]);
-            },
-          }),
-        );
-        if (loadGuard.isStale(gen)) return;
+      const owners = new Map<number, GameOwner[]>();
+      const ownersByAccount = new Map<string, Map<number, GameOwner[]>>();
+      const fetchers = createDefaultFetchers({
+        refresh,
+        onFetchedAt,
+        onOwners: (byAppid, accountId) => {
+          ownersByAccount.set(accountId, byAppid);
+          for (const [appid, members] of byAppid) owners.set(appid, [...(owners.get(appid) ?? []), ...members]);
+        },
+      });
+      const resolved = await resolveRows(list, fetchers, (sources) => {
         compareOwners = owners;
         comparePlayers = shown.map((account) => ({
           label: accountDisplayLabel(account),
@@ -2009,27 +2019,18 @@ export default function ListRoute() {
         }));
         notifyOwnersChanged();
         const described = describeSources(list, compareNaming());
-        setListSources(
-          sources.map((source, i) => ({
-            ...source,
-            // Every source in a comparison is the same thing — a player's Owned list — so the
-            // shared label's "— Owned" half is pure noise once it's repeated across every group
-            // heading. "Alice + Bob", not "Alice — Owned + Bob — Owned"; the link still points at
-            // that player's own library.
-            desc: { ...described[i], label: accountDisplayLabel(shown[i]) },
-          })),
-        );
-        if (Array.isArray(result)) {
-          pendingGroups = result;
-          appids = new Set(result.flatMap((g) => g.appids));
-        } else {
-          appids = flattenCombineResult(result);
-        }
-      } catch (err) {
-        if (loadGuard.isStale(gen)) return;
-        setStatusText(`Error: ${(err as Error).message}`);
-        return;
-      }
+        return sources.map((source, i) => ({
+          ...source,
+          // Every source in a comparison is the same thing — a player's Owned list — so the
+          // shared label's "— Owned" half is pure noise once it's repeated across every group
+          // heading. "Alice + Bob", not "Alice — Owned + Bob — Owned"; the link still points at
+          // that player's own library.
+          desc: { ...described[i], label: accountDisplayLabel(shown[i]) },
+        }));
+      });
+      if (!resolved) return;
+      const { appids } = resolved;
+      pendingGroups = resolved.groups;
       initialRows = [...appids].map((appid) => ({ appid, name: '', loading: true, details: null }));
       streamTargets = [...appids].map((appid) => ({ appid }));
     } else if (kind === 'user') {
@@ -2049,27 +2050,17 @@ export default function ListRoute() {
       setUserList(list);
       setListTitle(listDisplayName(list, createDefaultNaming()));
       setStatusText('Resolving list…');
-      const isGroupMode = list.kind === 'dynamic' && list.op === 'group-by-membership';
-      let appids: Set<number>;
-      try {
-        const { result, sources } = await resolveListWithSources(
-          list,
-          createDefaultFetchers({ refresh, onFetchedAt, onBundleLeftOut: noteLeftOut }),
-        );
-        if (loadGuard.isStale(gen)) return;
-        const described = describeSources(list, createDefaultNaming());
-        setListSources(sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) })));
-        if (isGroupMode && Array.isArray(result)) {
-          pendingGroups = result;
-          appids = new Set(result.flatMap((g) => g.appids));
-        } else {
-          appids = flattenCombineResult(result);
-        }
-      } catch (err) {
-        if (loadGuard.isStale(gen)) return;
-        setStatusText(`Error: ${(err as Error).message}`);
-        return;
-      }
+      const resolved = await resolveRows(
+        list,
+        createDefaultFetchers({ refresh, onFetchedAt, onBundleLeftOut: noteLeftOut }),
+        (sources) => {
+          const described = describeSources(list, createDefaultNaming());
+          return sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) }));
+        },
+      );
+      if (!resolved) return;
+      const { appids } = resolved;
+      pendingGroups = resolved.groups;
       let rankOf: Map<number, number> | null = null;
       if (list.kind === 'ranked') {
         const state = getRanking(list.id);
@@ -2096,38 +2087,21 @@ export default function ListRoute() {
         return;
       }
       setSharedSynthetic(decoded.synthetic);
-      const list: GameList = {
-        id: '',
-        parentId: null,
-        order: 0,
-        createdAt: 0,
-        updatedAt: 0,
-        kind: 'dynamic',
-        op: decoded.op,
-        sources: decoded.sources,
-      };
+      const list = inMemoryDynamicList(decoded.op, decoded.sources);
       setCompareList(list);
       setListTitle(listDisplayName(list, sharedNaming()));
       setStatusText('Resolving shared list…');
-      const isGroupMode = decoded.op === 'group-by-membership';
-      let appids: Set<number>;
-      try {
-        const fetchers = sharedFetchers(createDefaultFetchers({ refresh, onFetchedAt, onBundleLeftOut: noteLeftOut }));
-        const { result, sources } = await resolveListWithSources(list, fetchers);
-        if (loadGuard.isStale(gen)) return;
-        const described = describeSources(list, sharedNaming());
-        setListSources(sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) })));
-        if (isGroupMode && Array.isArray(result)) {
-          pendingGroups = result;
-          appids = new Set(result.flatMap((g) => g.appids));
-        } else {
-          appids = flattenCombineResult(result);
-        }
-      } catch (err) {
-        if (loadGuard.isStale(gen)) return;
-        setStatusText(`Error: ${(err as Error).message}`);
-        return;
-      }
+      const resolved = await resolveRows(
+        list,
+        sharedFetchers(createDefaultFetchers({ refresh, onFetchedAt, onBundleLeftOut: noteLeftOut })),
+        (sources) => {
+          const described = describeSources(list, sharedNaming());
+          return sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) }));
+        },
+      );
+      if (!resolved) return;
+      const { appids } = resolved;
+      pendingGroups = resolved.groups;
       initialRows = [...appids].map((appid) => ({
         appid,
         name: '',

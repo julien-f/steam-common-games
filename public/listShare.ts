@@ -158,6 +158,11 @@ function parseFormula(
   return { op, sources };
 }
 
+// A dynamic list that lives only in memory — a comparison, a shared formula, or one of its nested groups.
+export function inMemoryDynamicList(op: CombineOp, sources: ListRef[]): GameList {
+  return { id: '', parentId: null, order: 0, createdAt: 0, updatedAt: 0, kind: 'dynamic', op, sources };
+}
+
 function parseSource(token: string, synthetic: Map<string, GameList>, makeId: () => string): ListRef {
   if (token === 'r') return { kind: 'recent-games' };
   if (token.startsWith('o:')) return { kind: 'account-owned', accountId: decodeURIComponent(token.slice(2)) };
@@ -166,18 +171,7 @@ function parseSource(token: string, synthetic: Map<string, GameList>, makeId: ()
   if (token.startsWith('g:')) {
     const { op, sources } = parseFormula(token.slice(2), synthetic, makeId);
     const id = makeId();
-    const now = Date.now();
-    const list: GameList = {
-      id,
-      parentId: null,
-      order: 0,
-      createdAt: now,
-      updatedAt: now,
-      kind: 'dynamic',
-      op,
-      sources,
-    };
-    synthetic.set(id, list);
+    synthetic.set(id, { ...inMemoryDynamicList(op, sources), id });
     return { kind: 'user', listId: id };
   }
   throw new Error(`unknown source token: ${token}`);
