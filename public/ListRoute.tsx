@@ -97,11 +97,11 @@ import {
 } from './utils.ts';
 import {
   restoreTableView,
-  takeSharedView,
   shareTableView,
   resetTableView,
   bindViewPersistence,
-  VIEW_PARAM,
+  prefViewStore,
+  type ViewStore,
 } from './tableViewPrefs.ts';
 import { renderPanelNav as renderPanelNavShared, stepGameList } from './panelNav.ts';
 import { createRowStore } from './rowStore.ts';
@@ -121,14 +121,12 @@ import {
 } from './panel.tsx';
 import {
   setPanelParam,
-  urlWithParams,
   withAccountParam,
   parseUrlState,
   normalizeSlots,
   compareUrl,
   DEFAULT_COMPARE_OP,
 } from './urlState.ts';
-import { getPref, setPref } from './prefs.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
 import { UnsavedViewBanner, ViewActions } from './UnsavedViewBanner.tsx';
 import { etaSeconds, formatEta, type LoadSample } from './loadProgress.ts';
@@ -1721,7 +1719,7 @@ export default function ListRoute() {
     });
   }
 
-  // Unused for kind === 'user' (its view lives on the list itself, see handleResetView below) —
+  // Unused for kind === 'user' (its view lives on the list itself, see viewStore below) —
   // kept total anyway so a stray call never returns undefined.
   function viewPrefKey(): string {
     if (kind === 'wishlist') return 'wishlistListView';
@@ -1736,17 +1734,19 @@ export default function ListRoute() {
     if (kind === 'recent') return 'recentListView';
     return 'ownedListView';
   }
+  // A user list keeps its own view (GameList.tableView); every other kind shares one pref key per kind.
+  function viewStore(): ViewStore {
+    const list = userList();
+    return list
+      ? { load: () => getList(list.id)?.tableView ?? {}, save: (view) => setListTableView(list.id, view) }
+      : prefViewStore(viewPrefKey());
+  }
   // "🔗 Share view"/"Default view" — see tableViewPrefs.ts for the share-on-demand-only reasoning
-  // (a link written to the live URL goes stale the moment the table changes again). A user list's
-  // view is persisted on the list itself (GameList.tableView, see the single-table branch of
-  // load() below), not through prefs.ts, so its own reset goes around resetTableView rather than
-  // through it — reusing that shared helper here would clear the wrong (shared, kind-generic)
-  // pref key instead of this specific list's own stored view.
+  // (a link written to the live URL goes stale the moment the table changes again).
   // A 🔗 Share view link's layout, on screen but not saved (see restoreTableView).
   const [viewingShared, setViewingShared] = createSignal(false);
   function handleDiscardSharedView(): void {
-    const list = userList();
-    applyView(list ? (getList(list.id)?.tableView ?? {}) : getPref(viewPrefKey(), {}));
+    applyView(viewStore().load());
     setViewingShared(false);
   }
 
@@ -1771,17 +1771,7 @@ export default function ListRoute() {
     shareTableView(table, btn, u ? { u: u.join(',') } : {});
   }
   function handleResetView(): void {
-    if (!table) return;
-    const list = userList();
-    if (list) {
-      applyView({});
-      setListTableView(list.id, {});
-      const urlParams = new URLSearchParams(routerLocation.search);
-      urlParams.delete(VIEW_PARAM);
-      history.replaceState(null, '', urlWithParams(urlParams));
-    } else {
-      resetTableView(viewTable, viewPrefKey());
-    }
+    if (table) resetTableView(viewTable, viewStore());
   }
 
   function viewActions() {
@@ -2298,23 +2288,9 @@ export default function ListRoute() {
         disposeView();
         disposeTableState();
       };
-      if (userList()) {
-        // A user list's view lives on the list itself (GameList.tableView), not a shared pref
-        // key — every user list keeps its own, unlike the fixed system kinds above which share
-        // one key regardless of instance (see docs/dev/lists-and-accounts.md's storage schema).
-        // Mirrors tableViewPrefs.ts's own restoreTableView (an incoming `?tv=` param — see
-        // handleShareView above — wins, is seeded as the new stored default, then stripped from
-        // the URL) but persists via setListTableView rather than a prefs.ts key, so it can't
-        // reuse that helper directly — same reasoning handleResetView gives on the reset side.
-        const list = userList()!;
-        const shared = takeSharedView();
-        applyView(shared ?? list.tableView ?? {});
-        setViewingShared(shared != null);
-        unsyncView = bindViewPersistence(table, (view) => setListTableView(list.id, view), viewingShared);
-      } else {
-        setViewingShared(restoreTableView(viewTable, viewPrefKey()));
-        unsyncView = bindViewPersistence(table, (view) => setPref(viewPrefKey(), view), viewingShared);
-      }
+      const store = viewStore();
+      setViewingShared(restoreTableView(viewTable, store));
+      unsyncView = bindViewPersistence(table, store, viewingShared);
       if (keptSelection?.size) table.selection.setAll(tableData().filter((row) => keptSelection.has(row.appid)));
       setTableReady(true);
     }

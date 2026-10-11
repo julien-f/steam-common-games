@@ -1,11 +1,12 @@
 import { Show, type JSX } from 'solid-js';
 import { getAuthUser } from './authStore.ts';
 import { isUnsaved, summarizeViewDiff } from './tableViewSync.ts';
-import { revertTableViewToServer, saveTableViewToServer, type DataTableLike } from './tableViewPrefs.ts';
+import type { ViewStateApi } from '@vates/data-table-solid';
+import { revertTableViewToServer, saveTableViewToServer } from './tableViewPrefs.ts';
 
 // Shown while a signed-in viewer's table view differs from what's saved to their account (a
 // table-view pref is never auto-pushed, see prefs.ts's setPref).
-export function UnsavedViewBanner(props: { table: DataTableLike; prefKey: string }): JSX.Element {
+export function UnsavedViewBanner(props: { table: ViewStateApi; prefKey: string }): JSX.Element {
   return (
     <Show when={getAuthUser() && isUnsaved(props.prefKey, props.table.getViewState())}>
       <div class="pref-unsaved-banner">
