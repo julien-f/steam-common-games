@@ -75,13 +75,6 @@ export function nullMissingPriceFields(row: PriceFields): void {
   for (const f of PRICE_FIELDS) if (row[f] === undefined) row[f] = null;
 }
 
-// No ITAD key configured at all: every field is unconditionally "no data", not just whatever's
-// still unset.
-export function nullAllPriceFields(row: PriceFields): void {
-  for (const f of PRICE_FIELDS) row[f] = null;
-  row.priceCurrency = null;
-}
-
 // `fetchedAt` is when the oldest price in this batch was written to the server's cache (epoch
 // ms), or null when it was fetched fresh — backs the "Updated <when>" beside a list's own
 // "↻ Refresh prices", the same shape /api/common-games' own fetchedAt has.

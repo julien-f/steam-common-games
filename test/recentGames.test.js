@@ -63,18 +63,7 @@ test('addRecentGame: caps the list at MAX_RECENT_GAMES, dropping the oldest', ()
   assert.equal(recents.at(-1).appid, 3); // games 0-2 were dropped
 });
 
-test('removeRecentGame: removes only the matching appid', () => {
-  const { addRecentGame, removeRecentGame, loadRecentGames } = mod();
-  addRecentGame(620, 'Portal 2', null);
-  addRecentGame(400, 'Portal', null);
-  removeRecentGame(620);
-  assert.deepEqual(
-    loadRecentGames().map((g) => g.appid),
-    [400],
-  );
-});
-
-test('addRecentGame/removeRecentGame: coexist with other prefs keys in the same blob', () => {
+test('addRecentGame: coexists with other prefs keys in the same blob', () => {
   const { setPref, getPref } = require('../public/prefs.ts');
   const { addRecentGame } = mod();
   setPref('region', 'DE');

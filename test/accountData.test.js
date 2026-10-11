@@ -7,7 +7,6 @@ const {
   fetchAccountOwnedGames,
   fetchAccountWishlistItems,
   fetchAccountWishlist,
-  fetchAccountOwnedAppids,
   fetchAccountWishlistAppids,
   resolveAccountSummary,
   fetchAccountOverview,
@@ -97,29 +96,6 @@ test('fetchAccountWishlistItems: sends { members }, returns items as-is', async 
 test('fetchAccountWishlistItems: throws with the server error message on a non-2xx response', async (t) => {
   withFetch(t, async () => ({ ok: false, json: async () => ({ error: 'private profile' }) }));
   await assert.rejects(() => fetchAccountWishlistItems(['1']), /private profile/);
-});
-
-test('fetchAccountOwnedAppids: resolves an accountId straight to a flat appid Set', async (t) => {
-  let seenBody;
-  withFetch(t, async (url, opts) => {
-    seenBody = JSON.parse(opts.body);
-    return {
-      ok: true,
-      json: async () => ({
-        games: [
-          { appid: 440, name: 'TF2' },
-          { appid: 620, name: 'Portal 2' },
-        ],
-        players: [{ steamid: '1' }, { steamid: '2' }],
-        playtime: {},
-        lastPlayed: {},
-      }),
-    };
-  });
-
-  const appids = await fetchAccountOwnedAppids('1+2');
-  assert.deepEqual(seenBody.members, ['1', '2']);
-  assert.deepEqual(appids, new Set([440, 620]));
 });
 
 test('fetchAccountWishlistAppids: resolves an accountId straight to a flat appid Set', async (t) => {

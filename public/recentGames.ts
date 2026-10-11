@@ -58,7 +58,3 @@ export function renameRecentGame(appid: number, name: string, tinyImage?: string
   list[idx] = { appid, name: name || list[idx].name, tinyImage: tinyImage || list[idx].tinyImage };
   saveRecentGames(list);
 }
-
-export function removeRecentGame(appid: number): void {
-  saveRecentGames(loadRecentGames().filter((g) => g.appid !== appid));
-}

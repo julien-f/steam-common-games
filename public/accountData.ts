@@ -225,15 +225,6 @@ export async function fetchAccountWishlistItems(
   return (await fetchAccountWishlist(members, opts)).items;
 }
 
-// listResolve.ts's ListResolveFetchers.accountOwned/accountWishlist — just the flat appid set,
-// resolving accountId back to members via membersFromAccountId above.
-export async function fetchAccountOwnedAppids(
-  accountId: string,
-  opts: { refresh?: boolean } = {},
-): Promise<Set<number>> {
-  return (await fetchAccountOwnedData(accountId, opts)).appids;
-}
-
 // Both halves of what myOwnership.ts keeps per account — the owned-appid set behind the ✓/☆
 // markers, and the per-member breakdown behind the panel's "Owned by" card — from one request,
 // since /api/common-games returns both in the same response. `fetchedAt` rides along for the

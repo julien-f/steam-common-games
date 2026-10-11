@@ -41,20 +41,20 @@ test('createFolder: siblings get increasing order, folders and lists share the s
 });
 
 test('renameFolder: updates the name in place, leaves order/id untouched', () => {
-  const { createFolder, renameFolder, getFolder } = store();
+  const { createFolder, renameFolder, getFolders } = store();
   const f = createFolder('Old name');
   renameFolder(f.id, 'New name');
-  const updated = getFolder(f.id);
+  const updated = getFolders().find((f) => f.id === f.id);
   assert.equal(updated.name, 'New name');
   assert.equal(updated.order, f.order);
 });
 
 test('moveFolder: reparents and reorders to the end of the new parent', () => {
-  const { createFolder, moveFolder, getFolder } = store();
+  const { createFolder, moveFolder, getFolders } = store();
   const root2 = createFolder('Root 2');
   const child = createFolder('Child');
   moveFolder(child.id, root2.id);
-  assert.equal(getFolder(child.id).parentId, root2.id);
+  assert.equal(getFolders().find((f) => f.id === child.id).parentId, root2.id);
 });
 
 test('moveFolder: refuses to move a folder into itself', () => {
@@ -72,7 +72,7 @@ test('moveFolder: refuses to move a folder into its own descendant', () => {
 });
 
 test('deleteFolder("promote"): moves child folders and lists up to the deleted folder\'s parent', () => {
-  const { createFolder, createList, deleteFolder, getFolder, getList, getFolders } = store();
+  const { createFolder, createList, deleteFolder, getList, getFolders } = store();
   const root = createFolder('Root');
   const mid = createFolder('Mid', root.id);
   const childFolder = createFolder('ChildFolder', mid.id);
@@ -84,7 +84,7 @@ test('deleteFolder("promote"): moves child folders and lists up to the deleted f
     getFolders().some((f) => f.id === mid.id),
     false,
   );
-  assert.equal(getFolder(childFolder.id).parentId, root.id);
+  assert.equal(getFolders().find((f) => f.id === childFolder.id).parentId, root.id);
   assert.equal(getList(childList.id).parentId, root.id);
 });
 
@@ -217,7 +217,7 @@ test('renameList: an undefined name clears the field, rather than storing an emp
 });
 
 test('reorderSiblings: rewrites order for interleaved folders/lists at one parent, ignores refs from elsewhere', () => {
-  const { createFolder, createList, reorderSiblings, getFolder, getList } = store();
+  const { createFolder, createList, reorderSiblings, getFolders, getList } = store();
   const f1 = createFolder('F1');
   const l1 = createList({ name: 'L1', kind: 'manual' });
   const f2 = createFolder('F2');
@@ -230,9 +230,9 @@ test('reorderSiblings: rewrites order for interleaved folders/lists at one paren
     { kind: 'list', id: elsewhere.id }, // wrong parentId — must be ignored
   ]);
 
-  assert.equal(getFolder(f2.id).order, 0);
+  assert.equal(getFolders().find((f) => f.id === f2.id).order, 0);
   assert.equal(getList(l1.id).order, 1);
-  assert.equal(getFolder(f1.id).order, 2);
+  assert.equal(getFolders().find((f) => f.id === f1.id).order, 2);
   assert.equal(getList(elsewhere.id).order, 0); // untouched — still its original order
 });
 

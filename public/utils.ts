@@ -1,5 +1,3 @@
-import type { Game } from './types.ts';
-
 // The custom-URL name in a Steam profile URL ('https://steamcommunity.com/id/gaben/' → 'gaben'),
 // or null for anything else — a `/profiles/<steam64>` URL is Steam's own fallback form, which
 // means the account never set one.
@@ -275,32 +273,8 @@ export function fmtAge(fetchedAt: number | null | undefined, now: number = Date.
   return `${months} month${months === 1 ? '' : 's'} ago`;
 }
 
-export function foldStr(s: string): string {
-  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-}
-
 export function esc(s: unknown): string {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-export function renderScoreCell(game: Game): string {
-  if (game.loading) return '<span class="sk"></span>';
-  const r = game.details?.rating;
-  return r
-    ? `<div class="score-num" style="color:${scoreColor(r.score)}">${r.score}</div><div class="score-label">${esc(r.desc)}</div>`
-    : '<span class="dim">—</span>';
-}
-
-export function renderMainCell(game: Game): string {
-  if (game.loading) return '<span class="sk sm"></span>';
-  const h = game.details?.hltb;
-  return h ? fmtH(h.main) : '<span class="dim">—</span>';
-}
-
-export function renderExtraCell(game: Game): string {
-  if (game.loading) return '<span class="sk sm"></span>';
-  const h = game.details?.hltb;
-  return h ? fmtH(h.extra) : '<span class="dim">—</span>';
 }
 
 // Whether focus is somewhere that genuinely swallows a plain letter or arrow key, and so must

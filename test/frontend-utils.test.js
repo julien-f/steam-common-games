@@ -11,10 +11,6 @@ const {
   fmtLastPlayed,
   countryFlag,
   esc,
-  foldStr,
-  renderScoreCell,
-  renderMainCell,
-  renderExtraCell,
   computeSteamdbRating,
   computeProductionTier,
   dealRecordTier,
@@ -194,76 +190,6 @@ test('countryFlag: returns empty string for missing/malformed input', () => {
   assert.equal(countryFlag(''), '');
   assert.equal(countryFlag('USA'), '');
   assert.equal(countryFlag('1'), '');
-});
-
-// ── renderScoreCell ───────────────────────────────────────────────────────────
-
-test('renderScoreCell: returns skeleton for loading game', () => {
-  assert.equal(renderScoreCell({ loading: true }), '<span class="sk"></span>');
-});
-
-test('renderScoreCell: returns dim dash when loaded but no rating', () => {
-  assert.equal(renderScoreCell({ loading: false, details: {} }), '<span class="dim">—</span>');
-  assert.equal(renderScoreCell({ loading: false, details: null }), '<span class="dim">—</span>');
-});
-
-test('renderScoreCell: renders score and description when rating present', () => {
-  const game = { loading: false, details: { rating: { score: 85, desc: 'Very Positive' } } };
-  const html = renderScoreCell(game);
-  assert.ok(html.includes('85'));
-  assert.ok(html.includes('Very Positive'));
-  assert.ok(html.includes('score-num'));
-  assert.ok(html.includes('#57cbde')); // score 85 → blue tier
-});
-
-// ── renderMainCell ────────────────────────────────────────────────────────────
-
-test('renderMainCell: returns small skeleton for loading game', () => {
-  assert.equal(renderMainCell({ loading: true }), '<span class="sk sm"></span>');
-});
-
-test('renderMainCell: returns dim dash when loaded but no hltb', () => {
-  assert.equal(renderMainCell({ loading: false, details: {} }), '<span class="dim">—</span>');
-});
-
-test('renderMainCell: formats main story hours', () => {
-  assert.equal(renderMainCell({ loading: false, details: { hltb: { main: 12, extra: 20 } } }), '12h');
-});
-
-// ── foldStr ───────────────────────────────────────────────────────────────────
-
-test('foldStr: lowercases ASCII', () => {
-  assert.equal(foldStr('Hello'), 'hello');
-});
-
-test('foldStr: strips acute accent', () => {
-  assert.equal(foldStr('é'), 'e');
-});
-
-test('foldStr: strips umlaut', () => {
-  assert.equal(foldStr('Ö'), 'o');
-});
-
-test('foldStr: strips mixed diacritics', () => {
-  assert.equal(foldStr('Ångström'), 'angstrom');
-});
-
-test('foldStr: plain ASCII is unchanged (modulo case)', () => {
-  assert.equal(foldStr('abc123'), 'abc123');
-});
-
-// ── renderExtraCell ───────────────────────────────────────────────────────────
-
-test('renderExtraCell: returns small skeleton for loading game', () => {
-  assert.equal(renderExtraCell({ loading: true }), '<span class="sk sm"></span>');
-});
-
-test('renderExtraCell: returns dim dash when loaded but no hltb', () => {
-  assert.equal(renderExtraCell({ loading: false, details: {} }), '<span class="dim">—</span>');
-});
-
-test('renderExtraCell: formats main + extra hours', () => {
-  assert.equal(renderExtraCell({ loading: false, details: { hltb: { main: 12, extra: 25.5 } } }), '25.5h');
 });
 
 // ── computeSteamdbRating ───────────────────────────────────────────────────────

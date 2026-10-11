@@ -2,13 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const {
-  PRICE_FIELDS,
-  applyPriceInfo,
-  nullMissingPriceFields,
-  nullAllPriceFields,
-  postPrices,
-} = require('../public/priceLoading.ts');
+const { PRICE_FIELDS, applyPriceInfo, nullMissingPriceFields, postPrices } = require('../public/priceLoading.ts');
 const { discountPct } = require('../public/utils.ts');
 
 test('applyPriceInfo: maps an ITAD price response onto a row', () => {
@@ -48,13 +42,6 @@ test('nullMissingPriceFields: only fills fields that are still undefined', () =>
   assert.equal(row.steamRegular, 1999, 'already-set field left untouched');
   assert.equal(row.bestDealPrice, null);
   for (const f of PRICE_FIELDS) assert.notEqual(row[f], undefined, f);
-});
-
-test('nullAllPriceFields: unconditionally nulls every field', () => {
-  const row = { steamRegular: 1999, priceCurrency: 'USD' };
-  nullAllPriceFields(row);
-  for (const f of PRICE_FIELDS) assert.equal(row[f], null, f);
-  assert.equal(row.priceCurrency, null);
 });
 
 test('postPrices: sends gids or appids and returns .prices on success', async (t) => {

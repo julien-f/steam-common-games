@@ -74,10 +74,6 @@ export function getLists({ includeDeleted = false }: { includeDeleted?: boolean 
   return includeDeleted ? lists : lists.filter((l) => !l.deletedAt);
 }
 
-export function getFolder(id: string): Folder | undefined {
-  return readFolders().find((f) => f.id === id);
-}
-
 export function getList(id: string): GameList | undefined {
   return readLists().find((l) => l.id === id);
 }
