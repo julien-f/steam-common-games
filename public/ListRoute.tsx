@@ -1931,6 +1931,7 @@ export default function ListRoute() {
     if (kind === 'compare' && !refresh && loadedCompareKeys.has(compareKey())) return;
 
     const gen = loadGuard.next();
+    const onFetchedAt = (at: number | null) => loadGuard.isStale(gen) || noteFetchedAt(at);
 
     // A ↻ refresh keeps the table, its rows' details and the selection on screen until the new
     // list is in, then only streams the games new to it.
@@ -2084,7 +2085,7 @@ export default function ListRoute() {
           list,
           createDefaultFetchers({
             refresh,
-            onFetchedAt: noteFetchedAt,
+            onFetchedAt,
             onOwners: (byAppid, accountId) => {
               ownersByAccount.set(accountId, byAppid);
               for (const [appid, members] of byAppid) owners.set(appid, [...(owners.get(appid) ?? []), ...members]);
@@ -2144,7 +2145,7 @@ export default function ListRoute() {
       try {
         const { result, sources } = await resolveListWithSources(
           list,
-          createDefaultFetchers({ refresh, onFetchedAt: noteFetchedAt, onBundleLeftOut: noteLeftOut }),
+          createDefaultFetchers({ refresh, onFetchedAt, onBundleLeftOut: noteLeftOut }),
         );
         if (loadGuard.isStale(gen)) return;
         const described = describeSources(list, createDefaultNaming());
@@ -2202,9 +2203,7 @@ export default function ListRoute() {
       const isGroupMode = decoded.op === 'group-by-membership';
       let appids: Set<number>;
       try {
-        const fetchers = sharedFetchers(
-          createDefaultFetchers({ refresh, onFetchedAt: noteFetchedAt, onBundleLeftOut: noteLeftOut }),
-        );
+        const fetchers = sharedFetchers(createDefaultFetchers({ refresh, onFetchedAt, onBundleLeftOut: noteLeftOut }));
         const { result, sources } = await resolveListWithSources(list, fetchers);
         if (loadGuard.isStale(gen)) return;
         const described = describeSources(list, sharedNaming());
