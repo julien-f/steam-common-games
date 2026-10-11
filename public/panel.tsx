@@ -10,6 +10,7 @@ import {
   computeSteamdbRating,
 } from './utils.ts';
 import { openLightbox, closeLightbox, isLightboxOpen, lightboxShot } from './lightbox.tsx';
+import { decideSwipeAxis, type SwipeAxis } from './lightboxSwipe.ts';
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
 import { buildMediaItems, mediaLabel, resolveShotIndex } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
@@ -2424,8 +2425,7 @@ function initHeroSwipe() {
   let startX = 0,
     startY = 0,
     tracking = false,
-    decided = false,
-    isHoriz = false;
+    axis: SwipeAxis | null = null;
 
   hero.addEventListener(
     'touchstart',
@@ -2435,8 +2435,7 @@ function initHeroSwipe() {
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       tracking = true;
-      decided = false;
-      isHoriz = false;
+      axis = null;
     },
     { passive: true },
   );
@@ -2447,11 +2446,7 @@ function initHeroSwipe() {
       if (!tracking || e.touches.length !== 1) return;
       const dx = e.touches[0].clientX - startX;
       const dy = e.touches[0].clientY - startY;
-      if (!decided) {
-        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-        isHoriz = Math.abs(dx) > Math.abs(dy) * 1.2;
-        decided = true;
-      }
+      axis ??= decideSwipeAxis(dx, dy, 8);
     },
     { passive: true },
   );
@@ -2459,7 +2454,7 @@ function initHeroSwipe() {
   hero.addEventListener(
     'touchend',
     (e) => {
-      if (!tracking || !isHoriz) {
+      if (!tracking || axis !== 'x') {
         tracking = false;
         return;
       }
@@ -2485,8 +2480,7 @@ function initPanelSwipe() {
   let startX = 0,
     startY = 0,
     tracking = false,
-    decided = false,
-    horiz = false;
+    axis: SwipeAxis | null = null;
 
   panel.addEventListener(
     'touchstart',
@@ -2498,8 +2492,7 @@ function initPanelSwipe() {
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       tracking = true;
-      decided = false;
-      horiz = false;
+      axis = null;
       panel.style.transition = 'none';
     },
     { passive: true },
@@ -2511,12 +2504,8 @@ function initPanelSwipe() {
       if (!tracking || e.touches.length !== 1) return;
       const dx = e.touches[0].clientX - startX;
       const dy = e.touches[0].clientY - startY;
-      if (!decided) {
-        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-        horiz = Math.abs(dx) > Math.abs(dy) * 1.2;
-        decided = true;
-      }
-      if (!horiz || dx <= 0) return;
+      axis ??= decideSwipeAxis(dx, dy, 6);
+      if (axis !== 'x' || dx <= 0) return;
       e.preventDefault();
       panel.style.transform = `translateX(${dx}px)`;
     },
@@ -2527,7 +2516,7 @@ function initPanelSwipe() {
     if (!tracking) return;
     tracking = false;
     const dx = clientX - startX;
-    if (horiz && dx > 80) {
+    if (axis === 'x' && dx > 80) {
       panel.style.transition = 'transform 0.2s ease';
       panel.style.transform = 'translateX(100%)';
       setTimeout(() => {

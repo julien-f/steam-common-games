@@ -18,10 +18,10 @@ export const LB_SWIPE_FLICK_MS = 250;
 // reads as resistance rather than as a step that silently didn't happen.
 export const LB_SWIPE_RESISTANCE = 0.35;
 
-// Same bias as panel.tsx's own swipes: a gesture has to be clearly more horizontal than
-// vertical to page media, since vertical is the one that changes game.
-export function decideSwipeAxis(dx: number, dy: number): SwipeAxis | null {
-  if (Math.abs(dx) < LB_SWIPE_AXIS_LOCK && Math.abs(dy) < LB_SWIPE_AXIS_LOCK) return null;
+// Shared with panel.tsx's own swipes: a gesture has to be clearly more horizontal than vertical
+// to page media, since vertical is the one that changes game.
+export function decideSwipeAxis(dx: number, dy: number, lock = LB_SWIPE_AXIS_LOCK): SwipeAxis | null {
+  if (Math.abs(dx) < lock && Math.abs(dy) < lock) return null;
   return Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
 }
 
