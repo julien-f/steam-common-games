@@ -46,7 +46,7 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 
 - User terms, not model terms: "Owned by Alice", not a formula; a list or comparison is named after what it shows.
 - Numbers read as the user thinks of them: rounded, with units ("10.5 h to beat", "€5.99"), never raw floats or timestamps; filters, chips and group headers format values as their column does.
-- Dates: ISO in table columns (scanned down a sorted page), locale-formatted in cards and prose (read one at a time).
+- Dates: ISO everywhere (`YYYY-MM-DD`, plus `HH:MM` where the time matters), so one date reads the same in a table, a card and the panel; a coarse Steam release ("Q4 2026") stays as Steam wrote it.
 
 ## Checklist for a new UI feature
 

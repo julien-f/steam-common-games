@@ -301,6 +301,13 @@ export function endOfReleasePeriod(str: string): number {
   return new Date(s).getTime();
 }
 
+// A day-precise release as YYYY-MM-DD, like every other date in the app; coarse ones ("Q4 2026") as Steam wrote them.
+export function fmtReleaseDate(str: string): string {
+  const d = /\b\d{1,2}\b/.test(str) ? new Date(str) : null;
+  if (!d || isNaN(d.getTime())) return str;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // Sort-only view of the Released column. "Coming soon" (some info — it's presumably nearer than a
 // distant bare year) and "To be announced"/"TBA" (no info whatsoever) both need to sort after
 // every real or coarse date — including a far-future bare year like "2028" — while still
@@ -342,7 +349,7 @@ function renderReleaseDate(v: unknown, row: Row): Node {
   if (!v) return document.createTextNode('—');
   const span = document.createElement('span');
   if (row.comingSoon) span.style.color = '#e4a82e';
-  span.textContent = String(v);
+  span.textContent = fmtReleaseDate(String(v));
   return span;
 }
 
@@ -919,7 +926,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
     label: 'Released',
     type: 'date',
     groupable: true,
-    format: fmt.str,
+    format: (v) => (typeof v === 'string' ? fmtReleaseDate(v) : fmt.str(v)),
     parseDate: endOfReleasePeriod,
     compare: compareDateMissingLast,
     render: renderReleaseDate,

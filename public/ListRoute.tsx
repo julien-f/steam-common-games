@@ -156,8 +156,9 @@ import {
 import {
   bundleTierSummary,
   bundleUrgency,
+  fmtBundleDatePart,
+  fmtBundleDateTime,
   shopHue,
-  fmtBundleDateFriendly,
   pickTiers,
   pickRate,
   cheapestPicks,
@@ -2485,7 +2486,7 @@ export default function ListRoute() {
       const ended = urgency?.tier === 'ended';
       tiles.push({
         label: 'Ends',
-        value: `${ended ? 'Ended ' : ''}${fmtBundleDateFriendly(meta.expiry, { time: true })}`,
+        value: `${ended ? 'Ended ' : ''}${fmtBundleDateTime(meta.expiry)}`,
         sub:
           urgency && urgency.label && !ended ? (
             <span
@@ -2565,7 +2566,7 @@ export default function ListRoute() {
     }
     // Date only — the hour matters for a deadline, not for when a bundle went live, and the
     // browse table's own Published column still carries it.
-    if (meta.publish) tiles.push({ label: 'Published', value: fmtBundleDateFriendly(meta.publish) });
+    if (meta.publish) tiles.push({ label: 'Published', value: fmtBundleDatePart(meta.publish) });
     // The one Updated tile in the app that isn't also its own refresh control: a bundle is found
     // by walking several cached list pages, so there is no force path to hang on it (see
     // bundleData.ts's fetchBundleById). Stated anyway — the tiers and the end date above are

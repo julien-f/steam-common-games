@@ -200,7 +200,7 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
 
 Every route opens with a **hero card** (`ListHero.tsx`): the list's name as the page `<h1>`, an optional lead, kind/shop/account chips, the route's own actions, and the list's facts as labelled tiles — all off fetches the route already makes.
 
-- **The card is dumb**: no data, no per-kind branching; callers pass formatted values, so "what does a wishlist show" is answered in `ListRoute.tsx` alone. Its dates are locale-formatted, the tables' ISO (see [ui-guidelines.md](ui-guidelines.md)).
+- **The card is dumb**: no data, no per-kind branching; callers pass formatted values, so "what does a wishlist show" is answered in `ListRoute.tsx` alone. Its dates are ISO, like the tables' (see [ui-guidelines.md](ui-guidelines.md)).
 - **A tile can be a control**: given `onClick` it renders as a `<button aria-pressed>` (plus `disabled` while its action is in flight), its pressed state read back from what the click applied.
 - **A tile that refreshes replaces the route's ↻ Refresh button** (`refreshTileValue` adds a ↻ beside the value), so it's rendered unconditionally — during a load and after one that failed before fetching, when a retry is wanted.
   - `/bundles`: Updated re-fetches, Prices opens the ⚙ popover (`openPrefsPopover`, deferred past the click — `navPopover.ts`'s outside-click listener and Solid's delegated `onClick` share `document`, so `stopPropagation` can't help), New/Ending soon toggle filters.

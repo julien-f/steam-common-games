@@ -38,7 +38,8 @@ import type {
   PanelNews,
   PanelPrice,
 } from './panelData.ts';
-import { bestPickRate, bundleUrgency, fmtBundleDateFriendly, pickTiers } from './bundleRows.ts';
+import { bestPickRate, bundleUrgency, fmtBundleDateTime, pickTiers } from './bundleRows.ts';
+import { fmtReleaseDate } from './gameColumns.ts';
 import { formatWithEstimate } from './currency.ts';
 import { regionCurrency } from './region.ts';
 import { nextHopHistory } from './panelHistory.ts';
@@ -1611,7 +1612,7 @@ function PanelBundleLines(): JSX.Element {
                             : {}
                       }
                     >
-                      ends {fmtBundleDateFriendly(b.expiry)}
+                      ends {fmtBundleDateTime(b.expiry)}
                       {urgency?.label ? ` (${urgency.label})` : ''}
                     </span>
                   </Show>
@@ -2317,7 +2318,7 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
             </div>
             <Show when={releaseDate() || hasBaseGame()}>
               <div class="panel-release">
-                {releaseDate()}
+                {fmtReleaseDate(releaseDate()!)}
                 <Show when={releaseDate() && hasBaseGame()}>
                   <span class="panel-meta-sep"> · </span>
                 </Show>
