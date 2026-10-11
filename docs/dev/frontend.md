@@ -105,7 +105,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "r" | "g:" formula
 - `gameSearch.ts` — the combobox/debounce UI for "look up any game" (the shell owns where results go).
 - `urlState.ts` — param parsing, canonical param order, and the `?game=`/`&shot=`/`?u=` writers.
 - `prefs.ts` / `prefsPopover.ts` / `region.ts` / `navPopover.ts` — the localStorage preference blob; the ⚙ panel's contents; the region preference and its detection; `<details>` popover open/close/positioning.
-- `tableViewPrefs.ts` / `tableViewKeys.ts` / `tableViewSync.ts` — restore/persist/share/reset a table view; the table-view pref keys; the signed-in Save/Revert baseline.
+- `tableViewPrefs.ts` / `tableViewKeys.ts` / `tableViewSync.ts` / `SharedViewBanner.tsx` / `UnsavedViewBanner.tsx` — restore/persist/share/reset a table view; the table-view pref keys; the signed-in Save/Revert baseline; the shared-layout and unsaved-changes banners and the Share/Default view buttons.
 - `clipboard.ts` / `CopyButton.tsx` — the one copy-then-confirm helper behind every copy button (`copyWithFeedback` for plain DOM buttons, `<CopyButton>` for JSX), with a `window.prompt` fallback where the Clipboard API isn't available (it needs a secure context, and can be permission-denied).
 - `pageTitle.ts` — the two-layer `document.title` (route context, overridden by an open game).
 - `types.ts` — `Game`, `ReadonlyGame`, and the account/list interfaces; the single source of truth for row shape.
@@ -143,7 +143,7 @@ Still deliberately imperative: the subnav scroll-spy (measures section positions
   - A game that isn't one of the route's rows (a DLC/base-game link, a standalone lookup) gets `undefined` from `mutateRow`; the caller writes to `standaloneRows` instead.
 - **A streaming/high-frequency `mutateRow` caller must batch**, or the table's live `tableData()` re-sorts/re-filters/re-paginates once per _event_ instead of once per _flush_ (measured: a ~1150-game library took ~33 s of unresponsive main thread unbatched, ~6–7 s batched). Two shapes, two fixes:
   - **Spread over time** (the SSE `/api/game-details/stream` loop, `ListRoute.tsx`'s `streamGameDetails`) — `streamBatcher.ts`'s `createStreamBatcher` queues events and applies them in one `batch()` per ~150 ms flush; its `onFlush` runs `updateStatus`. Each queued event carries its load's generation (`loadGuard`, `staleGuard.ts`) and is dropped if stale by flush time, since two overlapping loads share the queue.
-  - **One synchronous burst** (a price response processed in one loop — `loadWishlistPrices`/`loadBundlePrices`) — the loop is wrapped in a bare `batch()`.
+  - **One synchronous burst** (a price response processed in one loop — `loadPrices`) — the loop is wrapped in a bare `batch()`.
   - Deliberately **not** built into `mutateRow`: one-off writes (an achievements load, a DLC toggle, a ↻ click) must apply immediately.
 
 ## The game table
@@ -255,7 +255,7 @@ The "look up any game" box is one nav-bar search in the shell, not one per route
 
 `panel.tsx` is a single instance mounted by `AppShell.tsx` — routes only open/close it (`panelOpen(game)`/`panelClose()`/`isPanelOpen()`/`getPanelGame()`/`panelStepHero()`/`panelHandleEscape()`). `AppShell.tsx` passes every `PanelOptions` hook (close, navigate, refresh, tag click/active, owners), each relayed to the mounted route through `routeHandlers`; only `ListRoute.tsx` registers them, so on `/rank` they no-op.
 
-**Tag pills filter the table.** A tag/genre/category/developer/publisher pill toggles that value in the matching column's `include` filter — `initPanel({ onTagClick, isTagActive })` forwards through `routeHandlers` to `ListRoute.tsx`'s `onTagClick`/`isTagActive` (`activeTable().filter.setValues(...)`/`.include()`). The panel's keys (`tags`/`genres`/`categories`/`developers`/`publishers`) are the table's column keys.
+**Tag pills filter the table.** A tag/genre/category/developer/publisher pill toggles that value in the matching column's `include` filter — `initPanel({ onTagClick, isTagActive })` forwards through `routeHandlers` to `ListRoute.tsx`'s `onTagClick`/`isTagActive` (`table.filter.setValues(...)`/`.include()`). The panel's keys (`tags`/`genres`/`categories`/`developers`/`publishers`) are the table's column keys.
 
 **Docked, not modal.** Table and panel are two live columns; no backdrop, focus trap or click-outside close — × or Escape closes it, and clicking another row swaps the content. A narrow viewport falls back to a full-screen overlay.
 
@@ -279,7 +279,7 @@ Above 768px the shell is locked to the viewport and **`.app-scroll` is the page'
 - **Price** — one always-open card: the Best Deal (with the record-low badge, see the game table), its Discount, the shop, and an "IsThereAnyDeal ↗" title link for history. When there's a deal, the _whole line_ below the title links to ITAD's per-deal `url`, unmodified — buying is the point of the card.
 - **Prev/next/random nav** (`panelNav.ts`, ↑/↓/R) steps the route's processed row order.
   - `panelKeyboard.ts` binds the page shortcuts (Escape, `?`, `/`, hero stepping, random, list stepping) once and blocks them all while the lightbox is open, so ↑/↓/R are bound again inside `lightbox.tsx` (`initLightbox`'s `onGameNav`/`onGameRandom`, re-pointing through `repointLightboxGame`). `gamePosition` only feeds the lightbox's caption.
-  - `ListRoute.tsx`'s `openGame` calls `activeTable()?.focus.moveTo(resolved)` on every open: `@vates/data-table-solid`'s external focus API (≥ 0.14) expands the row's group, jumps to its page and scrolls it into view without taking DOM focus from the panel. `SearchRoute.tsx` instead moves real DOM focus onto the row (`focusRow`) for a visible ring, which `moveTo` never does.
+  - `ListRoute.tsx`'s `openGame` calls `table?.focus.moveTo(resolved)` on every open: `@vates/data-table-solid`'s external focus API (≥ 0.14) expands the row's group, jumps to its page and scrolls it into view without taking DOM focus from the panel. `SearchRoute.tsx` instead moves real DOM focus onto the row (`focusRow`) for a visible ring, which `moveTo` never does.
 - **The DLC trail** — "← Back to ⟨game⟩" — is `panelHistory.ts`'s `nextHopHistory` rule (pop rather than push when the target is already on top, so bouncing between a base game and its DLC doesn't grow duplicates); the trail is a signal in `panel.tsx`, preserved across a hop through `/game/:appid` by its `pendingHopAppid` latch.
 - **↻ Refresh** refetches every panel resource with `refetching` set (bypass session cache and server TTL).
   - The button shows the details' age as text (`detailsFetchedAt`), visible on touch; only the ↻ glyph spins.

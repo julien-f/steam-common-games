@@ -16,9 +16,9 @@
 // Each result is cached for the session, keyed by appid (plus the account, where the result is
 // account-specific), so reopening a game already seen doesn't refetch — the same guarantee the
 // old `game.news !== undefined` row-field guards gave, just held here instead of on the row.
-// `peek*` exists so panel.tsx's resource fetchers can return a cached value *synchronously*:
-// createResource resolves a non-promise return with no pending state at all, so a reopen paints
-// the real card immediately instead of flashing its loading skeleton again.
+// A cached value is returned *synchronously* (see sessionCached): createResource resolves a
+// non-promise return with no pending state at all, so a reopen paints the real card immediately
+// instead of flashing its loading skeleton again.
 //
 // The cache is written as soon as a fetch resolves, even for a game the panel has since moved on
 // from — a createResource discards a superseded result, but the request was already paid for, so
@@ -30,7 +30,7 @@
 // myOwnership.ts's createMyOwnershipCache.
 import { achievementsAccountKey, achievementsRequestUrl, achievementsSteamUrl } from './achievementsRequest.ts';
 import { applyPriceInfo, postPrices } from './priceLoading.ts';
-import { discountPct, fetchJson } from './utils.ts';
+import { fetchJson } from './utils.ts';
 import { currentRegion } from './region.ts';
 import type { Achievements, NewsItem, PriceFields } from './types.ts';
 import type { PickAndMixTier } from './bundleRows.ts';
@@ -67,6 +67,30 @@ export interface DlcEntry {
 
 const DLC_CONCURRENCY = 4;
 
+// The cached value when there is one and `force` is unset, else a load that caches its result. A
+// failed load keeps whatever was last loaded rather than wiping it on a failed forced refresh;
+// `null` ("couldn't load") only the first time, when there's no fallback.
+function sessionCached<K, V>(
+  cache: Map<K, V | null>,
+  key: K,
+  load: () => Promise<V | null>,
+  force: boolean,
+): V | null | Promise<V | null> {
+  const cached = cache.get(key);
+  if (!force && cached !== undefined) return cached;
+  return load().then(
+    (value) => {
+      cache.set(key, value);
+      return value;
+    },
+    () => {
+      const value = cache.get(key) ?? null;
+      cache.set(key, value);
+      return value;
+    },
+  );
+}
+
 export function createPanelDataCache() {
   const news = new Map<number, PanelNews>();
   const achievements = new Map<string, PanelAchievements>();
@@ -102,27 +126,20 @@ export function createPanelDataCache() {
   // News is deliberately NOT part of the host route's rating/HLTB/meta/tags stream (see
   // server.js's newsLimit comment for why) — it's fetched per game, on demand, the first time
   // that game's panel opens.
-  function peekNews(appid: number): PanelNews | undefined {
-    return news.get(appid);
-  }
-
-  async function fetchNews(appid: number, { force = false } = {}): Promise<PanelNews> {
-    try {
-      const data = await fetchJson<{ news: PanelNews }>(
-        `/api/game-news/${appid}${force ? '?refresh=1' : ''}`,
-        undefined,
-        'News lookup failed',
-      );
-      news.set(appid, data.news);
-      return data.news;
-    } catch {
-      // Keep whatever was last successfully loaded rather than wiping it on a failed forced
-      // refresh; `null` ("couldn't load") only the first time, when there's no fallback.
-      const prev = news.get(appid);
-      const value = prev ?? null;
-      news.set(appid, value);
-      return value;
-    }
+  function fetchNews(appid: number, { force = false } = {}): PanelNews | Promise<PanelNews> {
+    return sessionCached(
+      news,
+      appid,
+      async () =>
+        (
+          await fetchJson<{ news: PanelNews }>(
+            `/api/game-news/${appid}${force ? '?refresh=1' : ''}`,
+            undefined,
+            'News lookup failed',
+          )
+        ).news,
+      force,
+    );
   }
 
   // Achievements — per *account*, not just per appid: `achievements[].achieved` is one specific
@@ -134,101 +151,80 @@ export function createPanelDataCache() {
     return `${appid}:${achievementsAccountKey(memberIds)}`;
   }
 
-  function peekAchievements(appid: number, memberIds: string[]): PanelAchievements | undefined {
-    return achievements.get(achievementsKey(appid, memberIds));
-  }
-
   // `achievementCount` (from the game's own store metadata, already streamed in for a loaded row)
   // short-circuits a game with no achievements at all: the route would answer the same thing from
   // its own check, but only after a round trip, and "no achievements" is a large share of any real
   // library.
-  async function fetchAchievements(
+  function fetchAchievements(
     appid: number,
     memberIds: string[],
     { force = false, achievementCount }: { force?: boolean; achievementCount?: number | null } = {},
-  ): Promise<PanelAchievements> {
-    const key = achievementsKey(appid, memberIds);
-    if (achievementCount === 0) {
-      // The same empty payload the route itself would return — NOT `null`, which renders as
-      // "Couldn't load achievements." rather than "This game has no achievements."
-      const empty: Achievements = {
-        achievements: [],
-        total: 0,
-        unlocked: 0,
-        private: false,
-        playerCount: memberIds.length,
-        steamUrl: null,
-      };
-      achievements.set(key, empty);
-      return empty;
-    }
-    try {
-      const data = await fetchJson<Achievements>(
-        achievementsRequestUrl(appid, memberIds, { force }),
-        undefined,
-        'Achievements lookup failed',
-      );
-      data.steamUrl = achievementsSteamUrl(appid, memberIds);
-      achievements.set(key, data);
-      return data;
-    } catch {
-      const value = achievements.get(key) ?? null;
-      achievements.set(key, value);
-      return value;
-    }
+  ): PanelAchievements | Promise<PanelAchievements> {
+    return sessionCached(
+      achievements,
+      achievementsKey(appid, memberIds),
+      async () => {
+        // The same empty payload the route itself would return — NOT `null`, which renders as
+        // "Couldn't load achievements." rather than "This game has no achievements."
+        if (achievementCount === 0)
+          return {
+            achievements: [],
+            total: 0,
+            unlocked: 0,
+            private: false,
+            playerCount: memberIds.length,
+            steamUrl: null,
+          };
+        const data = await fetchJson<Achievements>(
+          achievementsRequestUrl(appid, memberIds, { force }),
+          undefined,
+          'Achievements lookup failed',
+        );
+        data.steamUrl = achievementsSteamUrl(appid, memberIds);
+        return data;
+      },
+      force,
+    );
   }
 
   // A single game's price via the shared POST /api/prices route (the same route a whole list
   // batches through) — only ever called for a game whose price nothing else already loaded; see
   // panel.tsx's own price source for that check.
-  function peekPrice(appid: number): PanelPrice | undefined {
-    return price.get(appid);
-  }
-
-  async function fetchPrice(appid: number, { force = false } = {}): Promise<PanelPrice> {
-    try {
-      if (!(await isItadConfigured())) {
-        price.set(appid, null);
-        return null;
-      }
-      const { prices } = await postPrices({ appids: [appid], country: currentRegion(), force });
-      const fields = {} as PriceFields;
-      applyPriceInfo(fields, prices[appid], discountPct);
-      price.set(appid, fields);
-      return fields;
-    } catch {
-      // "IsThereAnyDeal didn't answer" rather than a stuck loading skeleton; the panel's ↻ retries.
-      const value = price.get(appid) ?? null;
-      price.set(appid, value);
-      return value;
-    }
+  // A failure reads as "IsThereAnyDeal didn't answer" rather than a stuck loading skeleton; the
+  // panel's ↻ retries.
+  function fetchPrice(appid: number, { force = false } = {}): PanelPrice | Promise<PanelPrice> {
+    return sessionCached(
+      price,
+      appid,
+      async () => {
+        if (!(await isItadConfigured())) return null;
+        const { prices } = await postPrices({ appids: [appid], country: currentRegion(), force });
+        const fields = {} as PriceFields;
+        applyPriceInfo(fields, prices[appid]);
+        return fields;
+      },
+      force,
+    );
   }
 
   // Unlike price, fetched even when the row is already priced: no list loads this.
-  function peekBundles(appid: number): PanelBundles | undefined {
-    return bundles.get(appid);
-  }
-
-  async function fetchBundles(appid: number, { force = false } = {}): Promise<PanelBundles> {
-    try {
-      if (!(await isItadConfigured())) {
-        bundles.set(appid, null);
-        return null;
-      }
-      const qs = new URLSearchParams({ country: currentRegion() });
-      if (force) qs.set('refresh', '1');
-      const data = await fetchJson<{ bundles: PanelBundles }>(
-        `/api/game-bundles/${appid}?${qs}`,
-        undefined,
-        'Bundles lookup failed',
-      );
-      bundles.set(appid, data.bundles);
-      return data.bundles;
-    } catch {
-      const value = bundles.get(appid) ?? null;
-      bundles.set(appid, value);
-      return value;
-    }
+  function fetchBundles(appid: number, { force = false } = {}): PanelBundles | Promise<PanelBundles> {
+    return sessionCached(
+      bundles,
+      appid,
+      async () => {
+        if (!(await isItadConfigured())) return null;
+        const qs = new URLSearchParams({ country: currentRegion() });
+        if (force) qs.set('refresh', '1');
+        const data = await fetchJson<{ bundles: PanelBundles }>(
+          `/api/game-bundles/${appid}?${qs}`,
+          undefined,
+          'Bundles lookup failed',
+        );
+        return data.bundles;
+      },
+      force,
+    );
   }
 
   // DLC — unlike the three above, not fetched when the panel opens: the collapsed card's header
@@ -285,13 +281,9 @@ export function createPanelDataCache() {
   }
 
   return {
-    peekNews,
     fetchNews,
-    peekAchievements,
     fetchAchievements,
-    peekPrice,
     fetchPrice,
-    peekBundles,
     fetchBundles,
     fetchDlc,
     isItadConfigured,
@@ -300,13 +292,9 @@ export function createPanelDataCache() {
 }
 
 const defaultCache = createPanelDataCache();
-export const peekNews = defaultCache.peekNews;
 export const fetchNews = defaultCache.fetchNews;
-export const peekAchievements = defaultCache.peekAchievements;
 export const fetchAchievements = defaultCache.fetchAchievements;
-export const peekPrice = defaultCache.peekPrice;
 export const fetchPrice = defaultCache.fetchPrice;
-export const peekBundles = defaultCache.peekBundles;
 export const fetchBundles = defaultCache.fetchBundles;
 export const fetchDlc = defaultCache.fetchDlc;
 export const isItadConfigured = defaultCache.isItadConfigured;

@@ -6,7 +6,13 @@ import { getAllPrefEntries, adoptPrefEntry, pushPrefToServer, setSignedInSteamid
 import { TABLE_VIEW_PREF_KEYS } from './tableViewKeys.ts';
 import { isSyncedPrefKey } from './syncedPrefKeys.ts';
 import { setBaseline, clearBaseline, resetBaselines } from './tableViewSync.ts';
-import { getMyAccount, setMyAccount, getCurrentAccount, setCurrentAccount } from './accountsStore.ts';
+import {
+  getMyAccount,
+  setMyAccount,
+  getCurrentAccount,
+  setCurrentAccount,
+  accountSlotFromSummary,
+} from './accountsStore.ts';
 import { resolveAccountSummary } from './accountData.ts';
 import type { AccountSlot } from './types.ts';
 
@@ -132,16 +138,7 @@ export async function syncPrefsWithServer(steamid: string, serverEntries: Record
 export async function autoPopulateAccountFromLogin(steamid: string): Promise<void> {
   if (getMyAccount() && getCurrentAccount()) return;
   try {
-    const summary = await resolveAccountSummary([steamid]);
-    const account: AccountSlot = {
-      id: [...summary.members].sort().join('+'),
-      members: summary.members,
-      rawInputs: [steamid],
-      label: summary.label,
-      avatarUrl: summary.avatarUrl ?? undefined,
-      vanities: summary.vanities,
-      lastUsedAt: Date.now(),
-    };
+    const account = accountSlotFromSummary(await resolveAccountSummary([steamid]), [steamid]);
     if (!getMyAccount()) setMyAccount(account);
     if (!getCurrentAccount()) setCurrentAccount(account);
   } catch (err) {

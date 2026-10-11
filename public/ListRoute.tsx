@@ -64,7 +64,7 @@ import {
 import { createStore, produce } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { A, useParams, useLocation, useNavigate } from '@solidjs/router';
-import { createTableState, DataTableView, bucketDatePart, formatDatePart } from '@vates/data-table-solid';
+import { createTableState, DataTableView, datePartGroup } from '@vates/data-table-solid';
 import type { ColumnDef, SortEntry, TableState } from '@vates/data-table-solid';
 import {
   fmt,
@@ -87,7 +87,6 @@ import {
 import {
   computeSteamdbRating,
   computeProductionTier,
-  discountPct,
   fetchJson,
   fmtAge,
   fmtLastPlayed,
@@ -101,11 +100,9 @@ import {
   takeSharedView,
   shareTableView,
   resetTableView,
-  saveTableViewToServer,
-  revertTableViewToServer,
+  bindViewPersistence,
+  VIEW_PARAM,
 } from './tableViewPrefs.ts';
-import { isUnsaved, summarizeViewDiff } from './tableViewSync.ts';
-import { getAuthUser } from './authStore.ts';
 import { renderPanelNav as renderPanelNavShared, stepGameList } from './panelNav.ts';
 import { createRowStore } from './rowStore.ts';
 import { createStaleGuard } from './staleGuard.ts';
@@ -133,6 +130,7 @@ import {
 } from './urlState.ts';
 import { getPref, setPref } from './prefs.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
+import { UnsavedViewBanner, ViewActions } from './UnsavedViewBanner.tsx';
 import { etaSeconds, formatEta, type LoadSample } from './loadProgress.ts';
 import { convert, formatWithEstimate } from './currency.ts';
 import {
@@ -145,7 +143,7 @@ import {
 import {
   getEffectiveCurrentAccount,
   accountIdentifiers,
-  accountIdFor,
+  accountSlotFromSummary,
   accountDisplayLabel,
   getMyAccount,
   ACCOUNT_CHANGED_EVENT,
@@ -199,7 +197,7 @@ import {
   type RefDescription,
   type ListNaming,
 } from './listLabels.ts';
-import { encodeListFormula, decodeListFormula, shareListUrl } from './listShare.ts';
+import { encodeListFormula, decodeListFormula, shareListUrl, inMemoryDynamicList } from './listShare.ts';
 import { copyWithFeedback } from './clipboard.ts';
 import { setBaseTitle } from './pageTitle.ts';
 import type {
@@ -237,6 +235,7 @@ import {
   flattenCombineResult,
   createDefaultFetchers,
   type ListResolveFetchers,
+  type ResolvedSource,
 } from './listResolve.ts';
 import { CombineForm, sourceOptions, refKey, type SourceOption } from './CombineForm.tsx';
 import type { MembershipGroup } from './combine.ts';
@@ -301,8 +300,7 @@ const LAST_PLAYED_COLUMN: ColumnDef<Record<string, any>> = {
   compare: compareDateMissingLast,
   defaultSortDir: 'desc',
   defaultValueSort: { by: 'alpha', dir: 'desc' },
-  groupValue: withMissingGroup(bucketDatePart('year'), (v: unknown) => v == null || v === ''),
-  groupFormat: formatMissingGroup(formatDatePart('year')),
+  ...datePartGroup('year', undefined, '—'),
   keepVisibleWhenGrouped: true,
   category: 'Play Time & Dates',
 };
@@ -324,8 +322,7 @@ const WISHLIST_DATE_ADDED_COLUMN: ColumnDef<Record<string, any>> = {
   compare: compareDateMissingLast,
   defaultSortDir: 'desc',
   defaultValueSort: { by: 'alpha', dir: 'desc' },
-  groupValue: withMissingGroup(bucketDatePart('year')),
-  groupFormat: formatMissingGroup(formatDatePart('year')),
+  ...datePartGroup('year', undefined, '—'),
   keepVisibleWhenGrouped: true,
   category: 'Play Time & Dates',
 };
@@ -488,7 +485,7 @@ const WISHLIST_NOPRICE_COLUMNS = WISHLIST_COLUMNS.filter((c) => !PRICE_KEYS.has(
 const RANKED_DEFAULT_SORT: SortEntry[] = [{ key: 'rank', dir: 'asc' }];
 
 const DEFAULT_SORT: SortEntry[] = [{ key: 'steamdbRating', dir: 'desc' }];
-const MAX_PRICE_LOOKUP_GAMES = 500; // mirrors the server's own cap — see loadWishlistPrices below
+const MAX_PRICE_LOOKUP_GAMES = 500; // mirrors the server's own cap — see loadPrices below
 
 // The shape of one `data:` line in /api/game-details/stream's SSE response.
 interface DetailsEvent {
@@ -560,26 +557,6 @@ function applyDetailsEvent(row: Game, event: DetailsEvent) {
   };
 }
 
-// tableViewPrefs.ts's own bindViewPersistence needs `table.onViewChange`, which the Solid table
-// doesn't have — reconstructed via a createEffect that re-reads getViewState() (tracking every
-// signal it touches) instead, same as library.tsx's/bundles.tsx's own identical helper.
-// `paused`: while a shared link's layout is on screen (SharedViewBanner); un-pausing saves it.
-function bindSolidViewPersistence(
-  ts: TableState<Game>,
-  save: (view: object) => void,
-  paused: () => boolean,
-): () => void {
-  let dispose: (() => void) | null = null;
-  createRoot((d) => {
-    dispose = d;
-    createEffect(() => {
-      const view = ts.getViewState();
-      if (!paused()) save(view);
-    });
-  });
-  return () => dispose?.();
-}
-
 export default function ListRoute() {
   const params = useParams();
   const routerLocation = useLocation();
@@ -634,13 +611,8 @@ export default function ListRoute() {
     setPriceFetchedAt(undefined);
     try {
       const gen = loadGuard.current();
-      if (kind === 'bundle' && resolvedBundleGames) await loadBundlePrices(resolvedBundleGames, gen, true);
-      else if (hasPrices())
-        await loadWishlistPrices(
-          rowsStore.map((r) => ({ appid: r.appid })),
-          gen,
-          true,
-        );
+      if (kind === 'bundle' && resolvedBundleGames) await loadPrices(resolvedBundleGames, gen, true);
+      else if (hasPrices()) await loadPrices(rowsStore, gen, true);
     } finally {
       setRefreshingPrices(false);
     }
@@ -1105,11 +1077,9 @@ export default function ListRoute() {
       },
     };
   }
-  // True once load() has built the single-table path below (owned/wishlist/bundle/recent/user),
-  // false while loading and permanently false for a group-by-membership list, which renders N
-  // per-group tables instead of one — see this file's own header comment on why view persistence
-  // (and so "🔗 Share view"/"Default view" below) doesn't apply there. Gates that toolbar's own
-  // <Show> rather than leaving it visible-but-broken against a `table` that doesn't exist yet/at all.
+  // True once load() has built the table, false while loading. Gates the "🔗 Share view"/"Default
+  // view" toolbar's own <Show> rather than leaving it visible-but-broken against a `table` that
+  // doesn't exist yet.
   const [tableReady, setTableReady] = createSignal(false);
   // How many membership groups a group-by-membership list has (0 for every other kind/op).
   const [groupCount, setGroupCount] = createSignal(0);
@@ -1223,12 +1193,9 @@ export default function ListRoute() {
     return rowsStore.filter((r) => !r.loading);
   }
 
-  function activeTable(): TableState<Game> | null {
-    return table;
-  }
   // Reads tableReady so a caller tracking this list (the panel's nav bar) follows a table rebuild.
   function getGameList(): Game[] {
-    const t = activeTable();
+    const t = table;
     return tableReady() && t ? t.processedData() : [];
   }
 
@@ -1311,7 +1278,7 @@ export default function ListRoute() {
   }
 
   function renderPanelNav(game: Game): void {
-    renderPanelNavShared({ hasList: !!activeTable(), game, getGameList, onStep: stepGame, onReroll: pickRandomGame });
+    renderPanelNavShared({ hasList: !!table, game, getGameList, onStep: stepGame, onReroll: pickRandomGame });
   }
 
   function openGame(game: Game, { isRandom = false }: { isRandom?: boolean } = {}): void {
@@ -1325,8 +1292,8 @@ export default function ListRoute() {
     // Reveals the newly-open game in the table (expands its group, jumps to its page, scrolls it
     // into view) without stealing real DOM focus from the panel — `@vates/data-table-solid`'s
     // external focus API (>= 0.14), built for exactly this "external nav just changed the current
-    // row" case. No-ops harmlessly for a standalone lookup not in `activeTable()`'s own data.
-    activeTable()?.focus.moveTo(resolved);
+    // row" case. No-ops harmlessly for a standalone lookup not in `table`'s own data.
+    table?.focus.moveTo(resolved);
     // 'recent' is the one kind whose address IS the focused game (see this file's own header
     // comment) — a row click/prev-next/random pick here updates the path, not a `?game=` query
     // param, so the address bar always matches whatever the panel is actually showing. This
@@ -1353,7 +1320,7 @@ export default function ListRoute() {
   // Returns whether it actually picked, the same way `stepGame` does — the lightbox re-points
   // itself at the new game only if there was one (see AppShell's `onGameRandom`).
   function pickRandomGame(): boolean {
-    if (!activeTable() || getPanelGame()?.standalone) return false;
+    if (!table || getPanelGame()?.standalone) return false;
     const pick = pickRandomFrom(getGameList(), randomQueueKey(), getPanelGame()?.appid ?? 0);
     if (!pick) return false;
     openGame(pick as Game, { isRandom: true });
@@ -1365,14 +1332,14 @@ export default function ListRoute() {
   // page through here" cases `stepGameList` returns null for.
   function gamePosition(): { index: number; total: number } | null {
     const game = getPanelGame();
-    if (!activeTable() || !game || game.standalone) return null;
+    if (!table || !game || game.standalone) return null;
     const list = getGameList();
     const index = list.findIndex((g) => g.appid === game.appid);
     return index === -1 ? null : { index, total: list.length };
   }
 
   function stepGame(dir: 1 | -1): boolean {
-    if (!activeTable()) return false;
+    if (!table) return false;
     const next = stepGameList(getGameList(), getPanelGame(), dir);
     if (!next) return false;
     openGame(next);
@@ -1384,12 +1351,12 @@ export default function ListRoute() {
   // `setValues` rather than `cycleValue` so a pill click only ever adds/removes from the include
   // set and never reaches the table filter dropdown's separate exclude state.
   function onTagClick(dim: string, value: string): void {
-    const t = activeTable();
+    const t = table;
     if (!t) return;
     t.filter.setValues(dim, [value], !t.filter.include()[dim]?.has(value));
   }
   function isTagActive(dim: string, value: string): boolean {
-    return activeTable()?.filter.include()[dim]?.has(value) ?? false;
+    return table?.filter.include()[dim]?.has(value) ?? false;
   }
 
   // Opens `appid` as a standalone panel docked to *this* route, without adding it to the route's
@@ -1613,7 +1580,13 @@ export default function ListRoute() {
   const [itadOff, setItadOff] = createSignal(false);
   void itadConfiguredPromise.then((ok) => setItadOff(!ok));
 
-  async function loadWishlistPrices(items: { appid: number }[], gen: number, force = false): Promise<void> {
+  // Looked up by appid, or by ITAD gid for a bundle's games (already known from its resolve). Chunked:
+  // a wishlist can run past the server's own cap.
+  async function loadPrices(
+    games: readonly { appid: number; gid?: string }[],
+    gen: number,
+    force = false,
+  ): Promise<void> {
     setPriceStatusText('');
     const configured = await itadConfiguredPromise;
     if (loadGuard.isStale(gen)) return;
@@ -1623,29 +1596,31 @@ export default function ListRoute() {
     }
 
     const country = currentRegion();
-    const appids = items.map((i) => i.appid);
-    for (let i = 0; i < appids.length; i += MAX_PRICE_LOOKUP_GAMES) {
+    for (let i = 0; i < games.length; i += MAX_PRICE_LOOKUP_GAMES) {
       if (loadGuard.isStale(gen)) return;
-      const chunk = appids.slice(i, i + MAX_PRICE_LOOKUP_GAMES);
+      const chunk = games.slice(i, i + MAX_PRICE_LOOKUP_GAMES);
+      const byGid = chunk[0].gid != null;
       try {
-        const { prices, fetchedAt: at } = await postPrices({ appids: chunk, country, force });
+        const { prices, fetchedAt: at } = await postPrices(
+          byGid
+            ? { gids: chunk.map((g) => g.gid!), country, force }
+            : { appids: chunk.map((g) => g.appid), country, force },
+        );
         // A wishlist is chunked across several calls, so the readout takes the oldest of them —
         // same "never claim data is fresher than its stalest part" rule as the account routes'.
         notePriceFetchedAt(at);
         if (loadGuard.isStale(gen)) return;
         batch(() => {
-          for (const appid of chunk) {
-            const info = prices[appid];
+          for (const g of chunk) {
+            const info = prices[byGid ? g.gid! : g.appid];
             if (!info) continue;
-            rowStore.mutateRow(appid, (draft) => applyPriceInfo(draft, info, discountPct));
+            rowStore.mutateRow(g.appid, (draft) => applyPriceInfo(draft, info));
           }
         });
       } catch (err) {
         if (loadGuard.isStale(gen)) return;
         batch(() => {
-          for (const appid of chunk) {
-            rowStore.mutateRow(appid, (draft) => nullMissingPriceFields(draft));
-          }
+          for (const g of chunk) rowStore.mutateRow(g.appid, (draft) => nullMissingPriceFields(draft));
         });
         setPriceStatusText(`Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`);
       }
@@ -1678,8 +1653,8 @@ export default function ListRoute() {
 
   // Stamps `inLibrary`/`onWishlist` onto every row currently in `rowsStore`, from myOwnership.ts's
   // own owned/wishlist appid sets, checked against `currentAccount` (whichever account's list this
-  // route itself loaded — see myOwnership.ts's own comment) — unlike loadWishlistPrices/
-  // loadBundlePrices above, this is never a per-row fetch: myOwnership.ts already loads (and
+  // route itself loaded — see myOwnership.ts's own comment) — unlike loadPrices above,
+  // this is never a per-row fetch: myOwnership.ts already loads (and
   // caches) the whole sets once per loaded account, so checking membership for every row here
   // costs nothing extra. `peekMyOwnershipStatus` is a synchronous, non-blocking peek that can
   // return null for "no currentAccount loaded" *or* "still loading" (see its own comment in
@@ -1743,37 +1718,6 @@ export default function ListRoute() {
     });
   }
 
-  // Bundle prices are looked up by ITAD gid (already known upfront from the bundle's own
-  // resolved games), not appid — mirrors bundles.tsx's own loadPrices. No chunking: unlike a
-  // wishlist, a single bundle's game list never runs past the server's own cap.
-  async function loadBundlePrices(resolved: ResolvedGame[], gen: number, force = false): Promise<void> {
-    setPriceStatusText('');
-    try {
-      const { prices, fetchedAt: at } = await postPrices({
-        gids: resolved.map((g) => g.gid),
-        country: currentRegion(),
-        force,
-      });
-      notePriceFetchedAt(at);
-      if (loadGuard.isStale(gen)) return;
-      batch(() => {
-        for (const g of resolved) {
-          const info = prices[g.gid];
-          if (!info) continue;
-          rowStore.mutateRow(g.appid, (draft) => applyPriceInfo(draft, info, discountPct));
-        }
-      });
-    } catch (err) {
-      if (loadGuard.isStale(gen)) return;
-      batch(() => {
-        for (const g of resolved) {
-          rowStore.mutateRow(g.appid, (draft) => nullMissingPriceFields(draft));
-        }
-      });
-      setPriceStatusText(`Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`);
-    }
-  }
-
   // Unused for kind === 'user' (its view lives on the list itself, see handleResetView below) —
   // kept total anyway so a stray call never returns undefined.
   function viewPrefKey(): string {
@@ -1789,13 +1733,6 @@ export default function ListRoute() {
     if (kind === 'recent') return 'recentListView';
     return 'ownedListView';
   }
-  // One shared param name regardless of kind — only one list/table is ever on screen per route,
-  // so there's no risk of two kinds' snapshots colliding in the same URL (see urlState.ts's own
-  // comment on `tv`).
-  function viewParamName(): string {
-    return 'tv';
-  }
-
   // "🔗 Share view"/"Default view" — see tableViewPrefs.ts for the share-on-demand-only reasoning
   // (a link written to the live URL goes stale the moment the table changes again). A user list's
   // view is persisted on the list itself (GameList.tableView, see the single-table branch of
@@ -1828,7 +1765,7 @@ export default function ListRoute() {
     // Owned/Wishlist are whoever is current — without `u=` the recipient would get their own.
     const account = kind === 'owned' || kind === 'wishlist' ? getEffectiveCurrentAccount() : null;
     const u = account && accountIdentifiers(account).map((m) => m.identifier);
-    shareTableView(table, viewParamName(), btn, u ? { u: u.join(',') } : {});
+    shareTableView(table, btn, u ? { u: u.join(',') } : {});
   }
   function handleResetView(): void {
     if (!table) return;
@@ -1837,53 +1774,15 @@ export default function ListRoute() {
       applyView({});
       setListTableView(list.id, {});
       const urlParams = new URLSearchParams(routerLocation.search);
-      urlParams.delete(viewParamName());
+      urlParams.delete(VIEW_PARAM);
       history.replaceState(null, '', urlWithParams(urlParams));
     } else {
-      resetTableView(viewTable, viewPrefKey(), viewParamName());
+      resetTableView(viewTable, viewPrefKey());
     }
   }
 
-  // "Unsaved changes" banner — only ever true for a shared, kind-generic view key (never a user
-  // list's own, see viewPrefKey's own comment), so gated the same way handleResetView's own
-  // list/kind-generic split is.
-  function currentViewState(): object {
-    return table?.getViewState() ?? {};
-  }
-  function handleSaveView(): void {
-    if (!table) return;
-    saveTableViewToServer(viewPrefKey(), table.getViewState());
-  }
-  function handleRevertView(): void {
-    if (!table) return;
-    revertTableViewToServer(viewTable, viewPrefKey());
-  }
-
   function viewActions() {
-    return (
-      <div class="list-view-actions">
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm"
-          aria-label="Share view"
-          disabled={shareViewFailure() != null}
-          title={shareViewFailure() ?? "Copy a link to this table's layout"}
-          onClick={(e) => handleShareView(e.currentTarget)}
-        >
-          🔗<span class="btn-label"> Share view</span>
-        </button>
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm"
-          aria-label="Default view"
-          title="Back to the default columns, sort and filters"
-          onClick={handleResetView}
-        >
-          <span class="btn-icon">↺</span>
-          <span class="btn-label">Default view</span>
-        </button>
-      </div>
-    );
+    return <ViewActions onShare={handleShareView} onReset={handleResetView} shareDisabledReason={shareViewFailure()} />;
   }
 
   async function load({ refresh = false }: { refresh?: boolean } = {}): Promise<void> {
@@ -1969,6 +1868,26 @@ export default function ListRoute() {
     if (!kept) setSelectedRows([]); // a fresh load means a fresh table — nothing carries a prior selection over
     setSelectionActionStatus(null);
 
+    // Resolves a dynamic or user list and shows its sources; a group-by-membership result keeps its
+    // groups. null once stale, or failed (said in the status line).
+    const resolveRows = async (
+      list: GameList,
+      fetchers: ListResolveFetchers,
+      toSources: (sources: ResolvedSource[]) => ReturnType<typeof listSources>,
+    ): Promise<{ appids: Set<number>; groups: MembershipGroup[] | null } | null> => {
+      try {
+        const { result, sources } = await resolveListWithSources(list, fetchers);
+        if (loadGuard.isStale(gen)) return null;
+        setListSources(toSources(sources));
+        return Array.isArray(result)
+          ? { appids: new Set(result.flatMap((g) => g.appids)), groups: result }
+          : { appids: flattenCombineResult(result), groups: null };
+      } catch (err) {
+        if (!loadGuard.isStale(gen)) setStatusText(`Error: ${(err as Error).message}`);
+        return null;
+      }
+    };
+
     if (kind === 'compare') {
       const slots = compareSlots();
       loadedCompareKeys = new Set([compareKey()]);
@@ -1984,18 +1903,7 @@ export default function ListRoute() {
       setListTitle(slots.map((slot) => slot.join(' + ')).join(' vs. '));
       setStatusText('Resolving accounts…');
       const settled = await Promise.allSettled(
-        slots.map(async (identifiers): Promise<AccountSlot> => {
-          const summary = await resolveAccountSummary(identifiers);
-          return {
-            id: accountIdFor(summary.members),
-            members: summary.members,
-            rawInputs: identifiers,
-            label: summary.label,
-            avatarUrl: summary.avatarUrl ?? undefined,
-            vanities: summary.vanities,
-            lastUsedAt: Date.now(),
-          };
-        }),
+        slots.map(async (identifiers) => accountSlotFromSummary(await resolveAccountSummary(identifiers), identifiers)),
       );
       if (loadGuard.isStale(gen)) return;
       const failures = settled.flatMap((r, i) =>
@@ -2040,34 +1948,23 @@ export default function ListRoute() {
       loadedCompareKeys.add(`${compareOp()}|${canonicalSlots.map((slot) => slot.join(',')).join('|')}`);
       if (canonical !== routerLocation.pathname + routerLocation.search) navigate(canonical, { replace: true });
 
-      const list: GameList = {
-        id: '',
-        parentId: null,
-        order: 0,
-        createdAt: 0,
-        updatedAt: 0,
-        kind: 'dynamic',
-        op: compareOp(),
-        sources: shown.map((account) => ({ kind: 'account-owned' as const, accountId: account.id })),
-      };
+      const list = inMemoryDynamicList(
+        compareOp(),
+        shown.map((account) => ({ kind: 'account-owned' as const, accountId: account.id })),
+      );
       setCompareList(list);
       setStatusText('Comparing libraries…');
-      let appids: Set<number>;
-      try {
-        const owners = new Map<number, GameOwner[]>();
-        const ownersByAccount = new Map<string, Map<number, GameOwner[]>>();
-        const { result, sources } = await resolveListWithSources(
-          list,
-          createDefaultFetchers({
-            refresh,
-            onFetchedAt,
-            onOwners: (byAppid, accountId) => {
-              ownersByAccount.set(accountId, byAppid);
-              for (const [appid, members] of byAppid) owners.set(appid, [...(owners.get(appid) ?? []), ...members]);
-            },
-          }),
-        );
-        if (loadGuard.isStale(gen)) return;
+      const owners = new Map<number, GameOwner[]>();
+      const ownersByAccount = new Map<string, Map<number, GameOwner[]>>();
+      const fetchers = createDefaultFetchers({
+        refresh,
+        onFetchedAt,
+        onOwners: (byAppid, accountId) => {
+          ownersByAccount.set(accountId, byAppid);
+          for (const [appid, members] of byAppid) owners.set(appid, [...(owners.get(appid) ?? []), ...members]);
+        },
+      });
+      const resolved = await resolveRows(list, fetchers, (sources) => {
         compareOwners = owners;
         comparePlayers = shown.map((account) => ({
           label: accountDisplayLabel(account),
@@ -2075,27 +1972,18 @@ export default function ListRoute() {
         }));
         notifyOwnersChanged();
         const described = describeSources(list, compareNaming());
-        setListSources(
-          sources.map((source, i) => ({
-            ...source,
-            // Every source in a comparison is the same thing — a player's Owned list — so the
-            // shared label's "— Owned" half is pure noise once it's repeated across every group
-            // heading. "Alice + Bob", not "Alice — Owned + Bob — Owned"; the link still points at
-            // that player's own library.
-            desc: { ...described[i], label: accountDisplayLabel(shown[i]) },
-          })),
-        );
-        if (Array.isArray(result)) {
-          pendingGroups = result;
-          appids = new Set(result.flatMap((g) => g.appids));
-        } else {
-          appids = flattenCombineResult(result);
-        }
-      } catch (err) {
-        if (loadGuard.isStale(gen)) return;
-        setStatusText(`Error: ${(err as Error).message}`);
-        return;
-      }
+        return sources.map((source, i) => ({
+          ...source,
+          // Every source in a comparison is the same thing — a player's Owned list — so the
+          // shared label's "— Owned" half is pure noise once it's repeated across every group
+          // heading. "Alice + Bob", not "Alice — Owned + Bob — Owned"; the link still points at
+          // that player's own library.
+          desc: { ...described[i], label: accountDisplayLabel(shown[i]) },
+        }));
+      });
+      if (!resolved) return;
+      const { appids } = resolved;
+      pendingGroups = resolved.groups;
       initialRows = [...appids].map((appid) => ({ appid, name: '', loading: true, details: null }));
       streamTargets = [...appids].map((appid) => ({ appid }));
     } else if (kind === 'user') {
@@ -2115,27 +2003,17 @@ export default function ListRoute() {
       setUserList(list);
       setListTitle(listDisplayName(list, createDefaultNaming()));
       setStatusText('Resolving list…');
-      const isGroupMode = list.kind === 'dynamic' && list.op === 'group-by-membership';
-      let appids: Set<number>;
-      try {
-        const { result, sources } = await resolveListWithSources(
-          list,
-          createDefaultFetchers({ refresh, onFetchedAt, onBundleLeftOut: noteLeftOut }),
-        );
-        if (loadGuard.isStale(gen)) return;
-        const described = describeSources(list, createDefaultNaming());
-        setListSources(sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) })));
-        if (isGroupMode && Array.isArray(result)) {
-          pendingGroups = result;
-          appids = new Set(result.flatMap((g) => g.appids));
-        } else {
-          appids = flattenCombineResult(result);
-        }
-      } catch (err) {
-        if (loadGuard.isStale(gen)) return;
-        setStatusText(`Error: ${(err as Error).message}`);
-        return;
-      }
+      const resolved = await resolveRows(
+        list,
+        createDefaultFetchers({ refresh, onFetchedAt, onBundleLeftOut: noteLeftOut }),
+        (sources) => {
+          const described = describeSources(list, createDefaultNaming());
+          return sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) }));
+        },
+      );
+      if (!resolved) return;
+      const { appids } = resolved;
+      pendingGroups = resolved.groups;
       let rankOf: Map<number, number> | null = null;
       if (list.kind === 'ranked') {
         const state = getRanking(list.id);
@@ -2162,38 +2040,21 @@ export default function ListRoute() {
         return;
       }
       setSharedSynthetic(decoded.synthetic);
-      const list: GameList = {
-        id: '',
-        parentId: null,
-        order: 0,
-        createdAt: 0,
-        updatedAt: 0,
-        kind: 'dynamic',
-        op: decoded.op,
-        sources: decoded.sources,
-      };
+      const list = inMemoryDynamicList(decoded.op, decoded.sources);
       setCompareList(list);
       setListTitle(listDisplayName(list, sharedNaming()));
       setStatusText('Resolving shared list…');
-      const isGroupMode = decoded.op === 'group-by-membership';
-      let appids: Set<number>;
-      try {
-        const fetchers = sharedFetchers(createDefaultFetchers({ refresh, onFetchedAt, onBundleLeftOut: noteLeftOut }));
-        const { result, sources } = await resolveListWithSources(list, fetchers);
-        if (loadGuard.isStale(gen)) return;
-        const described = describeSources(list, sharedNaming());
-        setListSources(sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) })));
-        if (isGroupMode && Array.isArray(result)) {
-          pendingGroups = result;
-          appids = new Set(result.flatMap((g) => g.appids));
-        } else {
-          appids = flattenCombineResult(result);
-        }
-      } catch (err) {
-        if (loadGuard.isStale(gen)) return;
-        setStatusText(`Error: ${(err as Error).message}`);
-        return;
-      }
+      const resolved = await resolveRows(
+        list,
+        sharedFetchers(createDefaultFetchers({ refresh, onFetchedAt, onBundleLeftOut: noteLeftOut })),
+        (sources) => {
+          const described = describeSources(list, sharedNaming());
+          return sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) }));
+        },
+      );
+      if (!resolved) return;
+      const { appids } = resolved;
+      pendingGroups = resolved.groups;
       initialRows = [...appids].map((appid) => ({
         appid,
         name: '',
@@ -2266,15 +2127,6 @@ export default function ListRoute() {
           tierPriceMax: g.tierPriceMax,
           bundlePackage: packages.get(g.appid) ?? null,
           addon: g.addon,
-          steamRegular: undefined,
-          bestDealPrice: undefined,
-          bestDealShop: undefined,
-          bestDealUrl: undefined,
-          bestDealCut: undefined,
-          lowAll: undefined,
-          lowY1: undefined,
-          lowM3: undefined,
-          priceCurrency: undefined,
           loading: true,
           details: null,
         }));
@@ -2337,15 +2189,6 @@ export default function ListRoute() {
             name: '',
             priority: item.priority,
             dateAdded: item.dateAdded,
-            steamRegular: undefined,
-            bestDealPrice: undefined,
-            bestDealShop: undefined,
-            bestDealUrl: undefined,
-            bestDealCut: undefined,
-            lowAll: undefined,
-            lowY1: undefined,
-            lowM3: undefined,
-            priceCurrency: undefined,
             loading: true,
             details: null,
           }));
@@ -2489,13 +2332,13 @@ export default function ListRoute() {
         // the URL) but persists via setListTableView rather than a prefs.ts key, so it can't
         // reuse that helper directly — same reasoning handleResetView gives on the reset side.
         const list = userList()!;
-        const shared = takeSharedView(viewParamName());
+        const shared = takeSharedView();
         applyView(shared ?? list.tableView ?? {});
         setViewingShared(shared != null);
-        unsyncView = bindSolidViewPersistence(table, (view) => setListTableView(list.id, view), viewingShared);
+        unsyncView = bindViewPersistence(table, (view) => setListTableView(list.id, view), viewingShared);
       } else {
-        setViewingShared(restoreTableView(viewTable, viewPrefKey(), viewParamName()));
-        unsyncView = bindSolidViewPersistence(table, (view) => setPref(viewPrefKey(), view), viewingShared);
+        setViewingShared(restoreTableView(viewTable, viewPrefKey()));
+        unsyncView = bindViewPersistence(table, (view) => setPref(viewPrefKey(), view), viewingShared);
       }
       if (keptSelection?.size) table.selection.setAll(tableData().filter((row) => keptSelection.has(row.appid)));
       setTableReady(true);
@@ -2556,8 +2399,8 @@ export default function ListRoute() {
       return;
     }
 
-    if (hasPrices()) loadWishlistPrices(streamTargets, gen); // runs concurrently, not awaited
-    if (kind === 'bundle' && resolvedBundleGames) loadBundlePrices(resolvedBundleGames, gen); // ditto
+    if (hasPrices()) loadPrices(streamTargets, gen); // runs concurrently, not awaited
+    if (kind === 'bundle' && resolvedBundleGames) loadPrices(resolvedBundleGames, gen); // ditto
     if (stampsOwnership) loadMyOwnership(gen); // ditto
     const toStream = kept ? streamTargets.filter((target) => !kept.has(target.appid)) : streamTargets;
     if (toStream.length) await streamGameDetails(toStream, gen);
@@ -2613,13 +2456,22 @@ export default function ListRoute() {
     };
   }
 
+  // The open bundle's appid -> ITAD gid, rebuilt only when load() replaces its games.
+  let gidMapFor: ResolvedGame[] | null | undefined;
+  let gidMap = new Map<number, string>();
+  function gidOf(appid: number): string | undefined {
+    if (gidMapFor !== resolvedBundleGames) {
+      gidMapFor = resolvedBundleGames;
+      gidMap = new Map((resolvedBundleGames ?? []).map((g) => [g.appid, g.gid]));
+    }
+    return gidMap.get(appid);
+  }
   // How many picks the selection takes in a pick-and-mix bundle — one per ITAD game, so a Steam
   // package spanning several rows counts once — and the cheapest way to buy them.
   function onePerGid(rows: readonly Game[]): Game[] {
-    const gidOf = new Map((resolvedBundleGames ?? []).map((g) => [g.appid, g.gid]));
     const seen = new Set<string | number>();
     return rows.filter((r) => {
-      const key = gidOf.get(r.appid) ?? r.appid;
+      const key = gidOf(r.appid) ?? r.appid;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -2665,20 +2517,19 @@ export default function ListRoute() {
   function fanaticalPicks(): { url: string; names: string[]; byHand: string[] } | null {
     const { url, fanaticalNames } = bundleLinks();
     if (!url || !fanaticalNames || !pickPlan()) return null;
-    const gidOf = new Map((resolvedBundleGames ?? []).map((g) => [g.appid, g.gid]));
     const names: string[] = [];
     const byHand: string[] = [];
     for (const r of onePerGid(selectedRows())) {
-      const name = fanaticalNames[gidOf.get(r.appid) ?? ''];
+      const name = fanaticalNames[gidOf(r.appid) ?? ''];
       if (name) names.push(name);
       else byHand.push(r.bundlePackage?.title || r.name);
     }
     return names.length ? { url: fanaticalBuyUrl(url, names), names, byHand } : null;
   }
-  // The selection's summed best deals in the plan's currency, null until every one is priced —
-  // once per gid, since a package's rows each carry the whole package's deal.
-  function selectedBestDeals(currency: string): number | null {
-    const deals = onePerGid(selectedRows()).map((r) =>
+  // `rows`' summed best deals in `currency`, null until every one is priced — once per gid, since a
+  // package's rows each carry the whole package's deal.
+  function sumBestDeals(rows: readonly Game[], currency: string): number | null {
+    const deals = onePerGid(rows).map((r) =>
       r.bestDealPrice == null ? null : convert(r.bestDealPrice, r.priceCurrency ?? currency, currency),
     );
     return deals.every((d) => d != null) ? deals.reduce((sum, d) => sum! + d!, 0)! : null;
@@ -2735,11 +2586,7 @@ export default function ListRoute() {
     if (account && rowsStore.length > 0 && rowsStore.every((r) => r.inLibrary != null)) {
       const fresh = rowsStore.filter((r) => !r.inLibrary);
       const target = regionCurrency();
-      // Once per gid: a package's rows each carry the whole package's deal.
-      const priced = onePerGid(fresh).map((r) =>
-        r.bestDealPrice == null ? null : convert(r.bestDealPrice, r.priceCurrency ?? target, target),
-      );
-      const total = priced.every((p) => p != null) ? priced.reduce((sum, p) => sum! + p!, 0)! : null;
+      const total = sumBestDeals(fresh, target);
       tiles.push({
         label: 'New to you',
         value: `${fresh.length} of ${rowsStore.length}`,
@@ -2958,10 +2805,6 @@ export default function ListRoute() {
     return undefined;
   }
 
-  function accountChipLabel(account: AccountSlot): string {
-    return account.label || account.rawInputs.join(' + ');
-  }
-
   // Built once per mount, not per render: `kind` never changes under a mounted route, and every
   // button/link inside reads its own signals, so nothing here needs rebuilding when they change.
   // `undefined` (rather than an empty fragment) for the kinds with no actions at all, so
@@ -3166,11 +3009,7 @@ export default function ListRoute() {
     const onRegionChange = () => {
       setRegionCode(currentRegion());
       setPriceFetchedAt(undefined);
-      if (hasPrices())
-        void loadWishlistPrices(
-          rowsStore.map((r) => ({ appid: r.appid })),
-          loadGuard.current(),
-        );
+      if (hasPrices()) void loadPrices(rowsStore, loadGuard.current());
       else if (kind === 'bundle') void load();
     };
     window.addEventListener(REGION_CHANGED_EVENT, onRegionChange);
@@ -3284,7 +3123,7 @@ export default function ListRoute() {
                       when={account().members.length === 1}
                       fallback={
                         <span>
-                          {accountChipLabel(account())}{' '}
+                          {accountDisplayLabel(account())}{' '}
                           <span class="account-count">({account().members.length} accounts merged)</span>
                         </span>
                       }
@@ -3296,7 +3135,7 @@ export default function ListRoute() {
                         rel="noopener noreferrer"
                         title={`Steam ID ${account().members[0]}`}
                       >
-                        {accountChipLabel(account())} <span class="account-profile-arrow">↗</span>
+                        {accountDisplayLabel(account())} <span class="account-profile-arrow">↗</span>
                       </a>
                     </Show>
                   </span>
@@ -3411,17 +3250,9 @@ export default function ListRoute() {
         {selectionActionStatus()?.text}
         <Show when={selectionActionStatus()?.listId}>{(listId) => <A href={`/lists/${listId()}`}>Open list</A>}</Show>
       </div>
-      <Show when={tableReady() && !userList() && getAuthUser() && isUnsaved(viewPrefKey(), currentViewState())}>
-        <div class="pref-unsaved-banner">
-          Unsaved changes to this view ({summarizeViewDiff(viewPrefKey(), currentViewState()).join(', ')}) — differs
-          from what's saved to your account.
-          <button type="button" class="btn btn-ghost btn-sm" onClick={handleSaveView}>
-            Save
-          </button>
-          <button type="button" class="btn btn-ghost btn-sm" onClick={handleRevertView}>
-            Revert
-          </button>
-        </div>
+      {/* Never a user list's own view (see viewPrefKey's own comment): that one isn't synced. */}
+      <Show when={tableReady() && !userList()}>
+        <UnsavedViewBanner table={viewTable} prefKey={viewPrefKey()} />
       </Show>
       <Show when={tableReady() && viewingShared()}>
         <SharedViewBanner onKeep={() => setViewingShared(false)} onDiscard={handleDiscardSharedView} />
@@ -3476,7 +3307,7 @@ export default function ListRoute() {
                   </span>
                   <span class="selection-pick-detail">{pickPlanDetail(plan(), selectedPickCount())}</span>
                 </span>
-                <Show when={selectedBestDeals(plan().currency)}>
+                <Show when={sumBestDeals(selectedRows(), plan().currency)}>
                   {(deals) => (
                     <span
                       class="selection-pick-savings"

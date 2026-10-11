@@ -101,6 +101,24 @@ export function computeProductionTier({
   return 'Indie';
 }
 
+// Each ProtonDB tier's badge color — the ProtonDB column's and the side panel's.
+export const PROTON_TIER_COLORS: Record<string, string> = {
+  borked: '#b91c1c',
+  bronze: '#8b4513',
+  silver: '#757575',
+  gold: '#b8860b',
+  platinum: '#5b6b85',
+  native: '#15803d',
+};
+
+// A column `compare` ordering values by their place in `order` (a categorical column's tiers).
+export function compareByOrder(
+  order: readonly string[],
+  toKey: (v: unknown) => string = String,
+): (a: unknown, b: unknown) => number {
+  return (a, b) => order.indexOf(toKey(a)) - order.indexOf(toKey(b));
+}
+
 export function scoreColor(n: number | null): string {
   if (n == null) return 'var(--text1)';
   if (n >= 80) return '#57cbde';
@@ -206,7 +224,7 @@ export function dealRecordTier(
 }
 
 // How much cheaper the best deal is than Steam Full Price, as a whole percentage — computed by
-// each page's own loadPrices/loadWishlistPrices (from the same response's steamRegular/
+// applyPriceInfo (priceLoading.ts, from the same response's steamRegular/
 // bestDeal.price) rather than taken from ITAD's own per-deal `cut` field, deliberately: `cut` is
 // that shop's own discount off *its own* regular price, which shops set independently and isn't
 // consistent from row to row, whereas Steam Full Price is one stable, Valve-set anchor this app

@@ -154,9 +154,9 @@ Bundle games carry only an ITAD id (uuid), slug and title. `resolveSteamAppIds` 
 - **Discount is computed against Steam Full Price, not ITAD's `cut`.** `cut` is each shop's discount off its own regular price, inconsistent across shops; `discountPct` (`public/utils.ts`) computes `1 − bestDeal/steamRegular` against the one stable reference. No clamping needed: Best Deal includes Steam, so it's never above Steam's price. `extractPriceInfo` doesn't surface `cut` at all. `renderCut` shows 0 as "—".
 - **Cached per (gid, country)** (`itad-price:{country}:{gid}`): a price differs per region, not just its currency label.
 - **One route for bundles and wishlists**, since only the identifier differs: a bundle sends `gids`; a wishlist (or a saved list built from one or from a bundle, `listHasPriceSource`) sends `appids`, which the route resolves first via `resolveItadIds` — `POST /lookup/id/shop/{shopId}/v1`, confirmed live: takes `["app/<appid>", …]`, returns `{"app/<appid>": "<uuid>"|null, …}` keyed by what was sent. Each appid is cached individually (`itad-gid:{appid}`), a confirmed miss included. Exactly one of `gids`/`appids`, else 400. No route exposes appid → gid, since nothing needs the raw gid.
-- **Chunks**: the server caps a call at `MAX_PRICE_LOOKUP_GAMES` (500), and `loadWishlistPrices` (`ListRoute.tsx`) chunks to match, sequentially — a wishlist can exceed it, a bundle never does.
+- **Chunks**: the server caps a call at `MAX_PRICE_LOOKUP_GAMES` (500), and `loadPrices` (`ListRoute.tsx`) chunks to match, sequentially — a wishlist can exceed it, a bundle never does.
 - **A bundle's prices load concurrently with its details stream**: pricing has nothing to do with ratings/HLTB/tags.
-- **A failed call** (rate limit, upstream error) sets every row's price fields to `null` ("—", not the loading "…") and says so in the list's price status line (`loadBundlePrices`, `loadWishlistPrices`).
+- **A failed call** (rate limit, upstream error) sets every row's price fields to `null` ("—", not the loading "…") and says so in the list's price status line (`loadPrices`).
 - **Default columns**: Best Deal and Discount visible; Steam Full Price (named so it reads as the list price), All-Time Low, Best Deal Shop, 1yr Low and 3mo Low hidden — Best Deal + Discount already answer "is this a good deal".
 
 ### Currency is passed through, not converted

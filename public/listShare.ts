@@ -23,8 +23,8 @@
 // `{ kind: 'user', listId }` — so resolveListWithSources/listLabels.ts need no changes at all,
 // only a ListResolveFetchers.getList/ListNaming.list that check this map first.
 import type { CombineOp, GameList, ListRef } from './types.ts';
+import { OP_LABELS } from './listLabels.ts';
 
-const OPS: CombineOp[] = ['union', 'intersect', 'subtract', 'group-by-membership'];
 const MAX_DEPTH = 50; // mirrors listResolve.ts's own backstop — not expected to bite in practice
 
 export interface EncodableList {
@@ -150,12 +150,17 @@ function parseFormula(
   const colon = raw.indexOf(':(');
   if (colon === -1 || !raw.endsWith(')')) throw new Error('malformed formula');
   const opRaw = raw.slice(0, colon);
-  if (!OPS.includes(opRaw as CombineOp)) throw new Error('unknown op');
+  if (!Object.hasOwn(OP_LABELS, opRaw)) throw new Error('unknown op');
   const op = opRaw as CombineOp;
   const body = raw.slice(colon + 2, -1);
   const sources = splitTopLevel(body).map((tok) => parseSource(tok, synthetic, makeId));
   if (!sources.length) throw new Error('empty formula');
   return { op, sources };
+}
+
+// A dynamic list that lives only in memory — a comparison, a shared formula, or one of its nested groups.
+export function inMemoryDynamicList(op: CombineOp, sources: ListRef[]): GameList {
+  return { id: '', parentId: null, order: 0, createdAt: 0, updatedAt: 0, kind: 'dynamic', op, sources };
 }
 
 function parseSource(token: string, synthetic: Map<string, GameList>, makeId: () => string): ListRef {
@@ -166,18 +171,7 @@ function parseSource(token: string, synthetic: Map<string, GameList>, makeId: ()
   if (token.startsWith('g:')) {
     const { op, sources } = parseFormula(token.slice(2), synthetic, makeId);
     const id = makeId();
-    const now = Date.now();
-    const list: GameList = {
-      id,
-      parentId: null,
-      order: 0,
-      createdAt: now,
-      updatedAt: now,
-      kind: 'dynamic',
-      op,
-      sources,
-    };
-    synthetic.set(id, list);
+    synthetic.set(id, { ...inMemoryDynamicList(op, sources), id });
     return { kind: 'user', listId: id };
   }
   throw new Error(`unknown source token: ${token}`);

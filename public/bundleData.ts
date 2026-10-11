@@ -4,13 +4,9 @@
 // (bundle kind) and by listResolve.ts's `bundle` ListRef case, decoupled from bundles.tsx's
 // bespoke table UI, which went away with that page.
 
-import type { PickAndMixTier } from './bundleRows.ts';
+import type { BundleListItem, PickAndMixTier } from './bundleRows.ts';
+import type { PriceAmount } from './types.ts';
 import { ApiError, fetchJson } from './utils.ts';
-
-export interface PriceAmount {
-  amount: number;
-  currency: string;
-}
 
 export interface FlatGame {
   gid: string;
@@ -115,6 +111,38 @@ export class BundleNotFoundError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'BundleNotFoundError';
+  }
+}
+
+// One page of GET /api/bundles (the browse list).
+export async function fetchBundlePage({
+  force = false,
+  ...params
+}: {
+  country: string;
+  sort: string;
+  expired: boolean;
+  offset: number;
+  limit: number;
+  force?: boolean;
+}): Promise<{ bundles: BundleListItem[]; fetchedAt: number | null }> {
+  const qs = new URLSearchParams({
+    country: params.country,
+    sort: params.sort,
+    expired: String(params.expired),
+    offset: String(params.offset),
+    limit: String(params.limit),
+  });
+  if (force) qs.set('refresh', '1');
+  try {
+    const data = await fetchJson<{ bundles: BundleListItem[]; fetchedAt?: number | null }>(
+      `/api/bundles?${qs}`,
+      undefined,
+      'Failed to load bundles',
+    );
+    return { bundles: data.bundles, fetchedAt: data.fetchedAt ?? null };
+  } catch (err) {
+    throw err instanceof ApiError && err.status === 503 ? new UnavailableError(err.message) : err;
   }
 }
 

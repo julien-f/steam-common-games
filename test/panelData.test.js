@@ -91,8 +91,9 @@ test('a failed forced refresh keeps what each source last loaded', async (t) => 
 
   state.down = true;
   assert.deepEqual(await loadAll({ force: true }), [news, achievements, price, bundles]);
-  assert.equal(cache.peekAchievements(620, members), achievements);
-  assert.equal(cache.peekPrice(620), price);
+  // An unforced call answers from the cache synchronously, not with a promise.
+  assert.equal(cache.fetchAchievements(620, members), achievements);
+  assert.equal(cache.fetchPrice(620), price);
 });
 
 test("a source that fails before loading anything reads as null (didn't answer)", async (t) => {
@@ -147,6 +148,6 @@ test('isItadOff: a failed /api/health is not "off", and is asked again next time
   const cache = createPanelDataCache();
   assert.equal(await cache.fetchPrice(620), null);
   assert.equal(cache.isItadOff(), false);
-  await cache.fetchPrice(620);
+  await cache.fetchPrice(620, { force: true }); // unforced, the cached null answers
   assert.equal(healthCalls, 2);
 });

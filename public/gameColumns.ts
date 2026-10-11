@@ -33,15 +33,20 @@
 // second, otherwise-unnecessary direct dependency on core.
 import {
   compareMissingLast,
-  bucketNumericRange,
-  bucketDatePart,
-  formatNumericRange,
-  formatDatePart,
+  numericRangeGroup,
+  datePartGroup,
   bucketLogRange,
   formatLogRange,
 } from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
-import { scoreColor, dealRecordTier, DEAL_RECORD_TIERS, formatMoney } from './utils.ts';
+import {
+  scoreColor,
+  dealRecordTier,
+  DEAL_RECORD_TIERS,
+  formatMoney,
+  compareByOrder,
+  PROTON_TIER_COLORS,
+} from './utils.ts';
 import { convert } from './currency.ts';
 
 // Rows are assembled in the still-untyped library.js/bundles.js from several independent async
@@ -89,14 +94,6 @@ function renderScoreNum(v: unknown): Node {
 // what arrives here is always one of the real tiers above, just possibly flagged `pending`
 // (see row.protondbPending / renderProtonBadge below) to mark it as low-confidence.
 const PROTON_TIER_ORDER: string[] = ['borked', 'bronze', 'silver', 'gold', 'platinum', 'native'];
-export const PROTON_TIER_COLORS: Record<string, string> = {
-  borked: '#b91c1c',
-  bronze: '#8b4513',
-  silver: '#757575',
-  gold: '#b8860b',
-  platinum: '#5b6b85',
-  native: '#15803d',
-};
 
 // Backing value is the plain capitalized tier name ("Gold", "Platinum") — @vates/data-table-core
 // 0.7.0 added a per-column `compare` option (see the ProtonDB column below) precisely so a
@@ -119,7 +116,7 @@ const PROTON_DIDNT_ANSWER = "Didn't answer";
 const isProtonMissing = (v: unknown): boolean =>
   v == null || v === '' || v === PROTON_NO_REPORT || v === PROTON_DIDNT_ANSWER;
 const compareProtonTier = compareMissingLast(
-  (a, b) => PROTON_TIER_ORDER.indexOf(String(a).toLowerCase()) - PROTON_TIER_ORDER.indexOf(String(b).toLowerCase()),
+  compareByOrder(PROTON_TIER_ORDER, (v) => String(v).toLowerCase()),
   isProtonMissing,
 );
 
@@ -247,9 +244,7 @@ export const TYPE_LABELS = {
 // with no price data) — `compareMissingLast` handles that the same way every other heuristic/
 // possibly-absent column here does, pinning it last regardless of sort direction.
 const PRODUCTION_TIER_ORDER: string[] = ['Indie', 'AA', 'AAA'];
-const compareProductionTier = compareMissingLast(
-  (a, b) => PRODUCTION_TIER_ORDER.indexOf(String(a)) - PRODUCTION_TIER_ORDER.indexOf(String(b)),
-);
+const compareProductionTier = compareMissingLast(compareByOrder(PRODUCTION_TIER_ORDER));
 
 // Plain numeric comparator, wrapped so a `null` ("no data" — no reviews, no Metacritic score,
 // no HLTB match) always sorts last regardless of direction. Without this, a `type: 'number'`
@@ -421,23 +416,14 @@ function formatScoreBucket(keyPart: string): string {
   return `${n}–${n + SCORE_BUCKET_STEP}`;
 }
 
-// A `groupValue` that returns `null`/`undefined` for a missing value ends up keyed by the empty
-// string once the table's own internals stringify it (`null ?? ''`) — but bucketNumericRange/
-// bucketDatePart don't know that convention; each calls `String(value)`/coerces it *before* any
-// such check, so a genuinely missing `null` column value (a failed rating fetch, an unparseable
-// release date) would come out the other end as the literal string `"null"` and show up as a
-// group header that reads "null" rather than "—". Checking for "missing" ourselves before ever
-// calling the underlying bucket function sidesteps that regardless of which one's used.
-export function withMissingGroup(
-  bucketFn: (v: unknown, row: Row) => unknown,
-  isMissing: (v: unknown) => boolean = (v) => v == null,
-) {
-  return (value: unknown, row: Row) => (isMissing(value) ? null : bucketFn(value, row));
+// For the hand-rolled bucketers here (scores, review counts, price tiers), which coerce a missing
+// value to 0 (`Number(null)`) and would fold it into a real group. A `null` group value is keyed by
+// the empty string, which formatMissingGroup below labels. (The library's own numericRangeGroup/
+// datePartGroup already handle missing values.)
+export function withMissingGroup(bucketFn: (v: unknown, row: Row) => unknown) {
+  return (value: unknown, row: Row) => (value == null ? null : bucketFn(value, row));
 }
-// Pairs with withMissingGroup above — the empty-string group key it produces for a missing value
-// needs its own label rather than being handed to a real formatter that has no idea what to do
-// with it (formatDatePart('year') on '' would print '' itself: `new Date('')` is invalid, but
-// still not NaN in a way that function checks for).
+// Pairs with withMissingGroup above: labels its empty-string group key.
 export function formatMissingGroup(
   formatFn: (keyPart: string) => string,
   missingLabel = '—',
@@ -495,8 +481,7 @@ export function formatPriceTier(keyPart: string): string {
 // request finished first "won" and silently mislabeled the other's amounts with the wrong
 // currency symbol — right number, wrong currency, easy to miss since only the symbol was wrong).
 // `tierCurrency` (a bundle's own tier data, bundles.js only) backs only the Tier Price column;
-// `priceCurrency` (`/games/prices/v3` data, set in each page's own `loadPrices`/
-// `loadWishlistPrices`) backs every other price column here. `null` means "free"/"no data"
+// `priceCurrency` (`/games/prices/v3` data, set by ListRoute.tsx's `loadPrices`) backs every other price column here. `null` means "free"/"no data"
 // throughout, never rendered as $0 or blank. `formatMoney` itself lives in utils.js, not here —
 // see this file's own header comment for why.
 export function renderPrice(v: unknown, row: Row): Node {
@@ -568,20 +553,36 @@ export function computePriceStatus(row: Row): string | null | undefined {
 // tiers' color/icon/bold are pulled straight from DEAL_RECORD_TIERS (public/utils.js, the same
 // list computePriceStatus/renderBestDeal read) rather than restated here, reversed to worst-
 // to-best order and prefixed with the two non-record labels. `PRICE_STATUS_ORDER` (feeding
-// `comparePriceStatus`, same "ordered array + indexOf" shape as PRODUCTION_TIER_ORDER/
-// PROTON_TIER_ORDER above) and renderPriceStatus's badge/color below both derive from this one
+// `comparePriceStatus`, compareByOrder like PRODUCTION_TIER_ORDER/PROTON_TIER_ORDER above) and
+// renderPriceStatus's badge/color below both derive from this one
 // list, so the sort order, the visual ramp, and the Best Deal cell's own badge can't drift out
 // of sync with each other. `defaultSortDir: 'desc'` on the column then shows the best deals
 // (All-Time Low) first on a fresh click. On Sale/Not Discounted stay plain, uncolored, no icon
 // — not being a record isn't a bad thing worth flagging, so nothing here draws the eye away
 // from the three real record tiers.
-export interface PriceStatusTier {
+export interface StatusTier {
   label: string;
   color?: string;
   icon?: string;
   bold?: boolean;
 }
-export const PRICE_STATUS_TIERS: PriceStatusTier[] = [
+
+// A categorical column's cell: its tier's color, weight and icon, or plain text for a tier with no
+// color; "—" for no value.
+function renderTierLabel(tiers: readonly StatusTier[]): (v: unknown) => Node {
+  return (v) => {
+    if (v == null) return document.createTextNode('—');
+    const sv = String(v);
+    const tier = tiers.find((t) => t.label === sv);
+    if (!tier?.color) return document.createTextNode(sv);
+    const span = document.createElement('span');
+    span.style.color = tier.color;
+    if (tier.bold) span.style.fontWeight = '700';
+    span.textContent = sv + tier.icon!;
+    return span;
+  };
+}
+export const PRICE_STATUS_TIERS: StatusTier[] = [
   { label: 'Not Discounted' },
   { label: 'On Sale' },
   ...DEAL_RECORD_TIERS.slice()
@@ -589,20 +590,10 @@ export const PRICE_STATUS_TIERS: PriceStatusTier[] = [
     .map((t) => ({ label: t.statusLabel, color: t.color, icon: ' ' + t.icon, bold: t.bold })),
 ];
 const PRICE_STATUS_ORDER = PRICE_STATUS_TIERS.map((t) => t.label);
-const comparePriceStatus = compareMissingLast(
-  (a, b) => PRICE_STATUS_ORDER.indexOf(String(a)) - PRICE_STATUS_ORDER.indexOf(String(b)),
-);
+const comparePriceStatus = compareMissingLast(compareByOrder(PRICE_STATUS_ORDER));
+const renderPriceTier = renderTierLabel(PRICE_STATUS_TIERS);
 function renderPriceStatus(v: unknown): Node {
-  if (v === undefined) return document.createTextNode('…');
-  if (v == null) return document.createTextNode('—');
-  const sv = String(v);
-  const tier = PRICE_STATUS_TIERS.find((t) => t.label === sv);
-  if (!tier?.color) return document.createTextNode(sv); // On Sale / Not Discounted — plain text
-  const span = document.createElement('span');
-  span.style.color = tier.color;
-  if (tier.bold) span.style.fontWeight = '700';
-  span.textContent = sv + tier.icon!;
-  return span;
+  return v === undefined ? document.createTextNode('…') : renderPriceTier(v);
 }
 const PRICE_STATUS_COLUMN: ColumnDef<Row> = {
   key: 'priceStatus',
@@ -665,34 +656,21 @@ export function computeOwnershipStatus(row: Row): string | null {
 // color, not Wishlisted's green — already owning it is what actually matters for a buy decision
 // regardless of wishlist status — but keeps the bold weight, since it's still the most
 // information any one status carries.
-const OWNERSHIP_STATUS_TIERS: { label: string; color?: string; icon?: string; bold?: boolean }[] = [
+const OWNERSHIP_STATUS_TIERS: StatusTier[] = [
   { label: 'Not Owned' },
   { label: 'Wishlisted', color: '#2ecc71', icon: ' ☆', bold: true },
   { label: 'Owned', color: '#f1c40f', icon: ' ✓' },
   { label: 'Owned & Wishlisted', color: '#f1c40f', icon: ' ✓', bold: true },
 ];
 const OWNERSHIP_STATUS_ORDER = OWNERSHIP_STATUS_TIERS.map((t) => t.label);
-const compareOwnershipStatus = compareMissingLast(
-  (a, b) => OWNERSHIP_STATUS_ORDER.indexOf(String(a)) - OWNERSHIP_STATUS_ORDER.indexOf(String(b)),
-);
-function renderOwnershipStatus(v: unknown): Node {
-  if (v == null) return document.createTextNode('—');
-  const sv = String(v);
-  const tier = OWNERSHIP_STATUS_TIERS.find((t) => t.label === sv);
-  if (!tier?.color) return document.createTextNode(sv); // 'Not Owned' — plain text
-  const span = document.createElement('span');
-  span.style.color = tier.color;
-  if (tier.bold) span.style.fontWeight = '700';
-  span.textContent = sv + tier.icon!;
-  return span;
-}
+const compareOwnershipStatus = compareMissingLast(compareByOrder(OWNERSHIP_STATUS_ORDER));
 export const OWNERSHIP_STATUS_COLUMN: ColumnDef<Row> = {
   key: 'ownershipStatus',
   label: 'Ownership Status',
   groupable: true,
   value: computeOwnershipStatus,
   format: (v) => (v == null ? '—' : String(v)),
-  render: renderOwnershipStatus,
+  render: renderTierLabel(OWNERSHIP_STATUS_TIERS),
   compare: compareOwnershipStatus,
   defaultSortDir: 'desc',
 };
@@ -920,7 +898,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   // open-world completionist runs into the 300-500h range, nothing like reviewsTotal's spread
   // into the millions) — a plain linear step stays meaningful across that whole range, unlike
   // that one, so a 10h `bucketNumericRange` is the right tool here rather than the log buckets
-  // above. `null` (no HLTB match found) needs the same `withMissingGroup` treatment.
+  // above. `null` (no HLTB match found) groups as "—".
   {
     key: 'hltbAll',
     label: 'HLTB (h)',
@@ -928,8 +906,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
     groupable: true,
     format: fmt.dec1,
     compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)),
-    groupFormat: formatMissingGroup(formatNumericRange(10, 'h')),
+    ...numericRangeGroup(10, 'h', '—'),
     keepVisibleWhenGrouped: true,
     category: 'How Long To Beat',
   },
@@ -940,8 +917,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
     groupable: true,
     format: fmt.dec1,
     compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)),
-    groupFormat: formatMissingGroup(formatNumericRange(10, 'h')),
+    ...numericRangeGroup(10, 'h', '—'),
     keepVisibleWhenGrouped: true,
     category: 'How Long To Beat',
   },
@@ -952,8 +928,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
     groupable: true,
     format: fmt.dec1,
     compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)),
-    groupFormat: formatMissingGroup(formatNumericRange(10, 'h')),
+    ...numericRangeGroup(10, 'h', '—'),
     keepVisibleWhenGrouped: true,
     category: 'How Long To Beat',
   },
@@ -964,8 +939,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
     groupable: true,
     format: fmt.dec1,
     compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)),
-    groupFormat: formatMissingGroup(formatNumericRange(10, 'h')),
+    ...numericRangeGroup(10, 'h', '—'),
     keepVisibleWhenGrouped: true,
     category: 'How Long To Beat',
   },
@@ -987,8 +961,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
     render: renderReleaseDate,
     defaultSortDir: 'desc',
     defaultValueSort: { by: 'alpha', dir: 'desc' },
-    groupValue: withMissingGroup(bucketDatePart('year', endOfReleasePeriod)),
-    groupFormat: formatMissingGroup(formatDatePart('year')),
+    ...datePartGroup('year', endOfReleasePeriod, '—'),
     keepVisibleWhenGrouped: true,
     category: 'Play Time & Dates',
   },
@@ -1179,7 +1152,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
 // (an owned game has nothing to buy). Each page inserts this cluster into CORE_COLUMNS right
 // after its own identity/page-specific columns via `insertColumnsAfter`, and populates the
 // fields these columns read (`bestDealPrice`/`bestDealCut`/`bestDealShop`/`lowAll`/`lowY1`/
-// `lowM3`/`priceCurrency`) itself, via its own `loadPrices`/`loadWishlistPrices` — this file only
+// `lowM3`/`priceCurrency`) itself, via its own `loadPrices` — this file only
 // defines how those fields render/sort/group, not how they're fetched. `panel.js`'s Price card
 // reads the exact same fields, off whichever page put them on the row.
 export const PRICE_COLUMNS: ColumnDef<Row>[] = [
@@ -1223,7 +1196,7 @@ export const PRICE_COLUMNS: ColumnDef<Row>[] = [
     category: 'Pricing',
   },
   // How much cheaper the best deal is than Steam Full Price (`discountPct`, computed by each
-  // page's own loadPrices/loadWishlistPrices — see its own comment above for why this is
+  // ListRoute.tsx's loadPrices — see its own comment above for why this is
   // computed against Steam's price rather than taken from ITAD's own per-deal "cut" field).
   // Rendered with a leading "-" (`renderCut`) and "—" for a deal that isn't actually any cheaper
   // than Steam (`0`) — real data, not a missing value, but not worth a "-0%" reading either.
@@ -1239,8 +1212,7 @@ export const PRICE_COLUMNS: ColumnDef<Row>[] = [
     render: renderCut,
     compare: compareNumMissingLast,
     defaultSortDir: 'desc',
-    groupValue: withMissingGroup(bucketNumericRange(25)),
-    groupFormat: formatMissingGroup(formatNumericRange(25, '%')),
+    ...numericRangeGroup(25, '%', '—'),
     keepVisibleWhenGrouped: true,
     category: 'Pricing',
   },

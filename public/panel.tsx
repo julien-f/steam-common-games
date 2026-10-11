@@ -8,8 +8,10 @@ import {
   fmtH,
   fmtLastPlayed,
   computeSteamdbRating,
+  PROTON_TIER_COLORS,
 } from './utils.ts';
 import { openLightbox, closeLightbox, isLightboxOpen, lightboxShot } from './lightbox.tsx';
+import { decideSwipeAxis, type SwipeAxis } from './lightboxSwipe.ts';
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
 import { buildMediaItems, mediaLabel, resolveShotIndex } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
@@ -19,18 +21,7 @@ import { sortOwners, ownerMeterPct } from './ownerList.ts';
 import type { GameOwner } from './accountData.ts';
 import { ACCOUNT_CHANGED_EVENT, getEffectiveCurrentAccount } from './accountsStore.ts';
 import { achievementsAccountKey } from './achievementsRequest.ts';
-import {
-  peekNews,
-  fetchNews,
-  peekAchievements,
-  fetchAchievements,
-  peekPrice,
-  fetchPrice,
-  peekBundles,
-  fetchBundles,
-  fetchDlc,
-  isItadOff,
-} from './panelData.ts';
+import { fetchNews, fetchAchievements, fetchPrice, fetchBundles, fetchDlc, isItadOff } from './panelData.ts';
 import type {
   DlcEntry,
   GameBundle,
@@ -464,12 +455,9 @@ const panelData = createRoot(() => {
   const isForced = (info: { refetching: boolean | unknown }) => info.refetching !== false;
 
   const [news, { refetch: refetchNews }] = createResource<PanelNews, number>(openAppid, (appid, info) => {
-    const force = isForced(info);
-    const cached = peekNews(appid);
-    // Returning the cached value rather than a promise resolves the resource synchronously —
-    // no `pending` tick, so reopening a game paints its real News card instead of flashing the
-    // loading skeleton at it again.
-    return !force && cached !== undefined ? cached : fetchNews(appid, { force });
+    // A cached value comes back synchronously, so reopening a game paints its real News card
+    // instead of flashing the loading skeleton at it again.
+    return fetchNews(appid, { force: isForced(info) });
   });
 
   const [achievements, { refetch: refetchAchievements }] = createResource<PanelAchievements, string>(
@@ -480,11 +468,10 @@ const panelData = createRoot(() => {
       // a resource fetcher runs untracked, so reading the game here subscribes to nothing.
       const g = panelGame();
       if (!g) return null;
-      const members = currentMembers();
-      const force = isForced(info);
-      const cached = peekAchievements(g.appid, members);
-      if (!force && cached !== undefined) return cached;
-      return fetchAchievements(g.appid, members, { force, achievementCount: g.details?.meta?.achievementCount });
+      return fetchAchievements(g.appid, currentMembers(), {
+        force: isForced(info),
+        achievementCount: g.details?.meta?.achievementCount,
+      });
     },
   );
 
@@ -518,15 +505,11 @@ const panelData = createRoot(() => {
   });
 
   const [price, { refetch: refetchPrice }] = createResource<PanelPrice, number>(priceSource, (appid, info) => {
-    const force = isForced(info);
-    const cached = peekPrice(appid);
-    return !force && cached !== undefined ? cached : fetchPrice(appid, { force });
+    return fetchPrice(appid, { force: isForced(info) });
   });
 
   const [bundles, { refetch: refetchBundles }] = createResource<PanelBundles, number>(openAppid, (appid, info) => {
-    const force = isForced(info);
-    const cached = peekBundles(appid);
-    return !force && cached !== undefined ? cached : fetchBundles(appid, { force });
+    return fetchBundles(appid, { force: isForced(info) });
   });
 
   // DLC is the one card whose fetch is gated behind actually expanding it (see panelData.ts's
@@ -722,14 +705,6 @@ function jumpToPanelSection(target: string) {
 // result to its own provisionalTier before it ever reaches the client, flagged `pd.pending`
 // (see GlanceGrid below) so it can still be shown, just visibly marked low-confidence rather
 // than presented as equal to a confirmed tier of the same name.
-const PROTON_TIER_COLORS: Record<string, string> = {
-  borked: '#b91c1c',
-  bronze: '#8b4513',
-  silver: '#757575',
-  gold: '#b8860b',
-  platinum: '#5b6b85',
-  native: '#15803d',
-};
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // Compact review-count suffix for the reviews line, e.g. 465234 -> "465k", 2100000 -> "2.1m".
@@ -2443,8 +2418,7 @@ function initHeroSwipe() {
   let startX = 0,
     startY = 0,
     tracking = false,
-    decided = false,
-    isHoriz = false;
+    axis: SwipeAxis | null = null;
 
   hero.addEventListener(
     'touchstart',
@@ -2454,8 +2428,7 @@ function initHeroSwipe() {
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       tracking = true;
-      decided = false;
-      isHoriz = false;
+      axis = null;
     },
     { passive: true },
   );
@@ -2466,11 +2439,7 @@ function initHeroSwipe() {
       if (!tracking || e.touches.length !== 1) return;
       const dx = e.touches[0].clientX - startX;
       const dy = e.touches[0].clientY - startY;
-      if (!decided) {
-        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-        isHoriz = Math.abs(dx) > Math.abs(dy) * 1.2;
-        decided = true;
-      }
+      axis ??= decideSwipeAxis(dx, dy, 8);
     },
     { passive: true },
   );
@@ -2478,7 +2447,7 @@ function initHeroSwipe() {
   hero.addEventListener(
     'touchend',
     (e) => {
-      if (!tracking || !isHoriz) {
+      if (!tracking || axis !== 'x') {
         tracking = false;
         return;
       }
@@ -2504,8 +2473,7 @@ function initPanelSwipe() {
   let startX = 0,
     startY = 0,
     tracking = false,
-    decided = false,
-    horiz = false;
+    axis: SwipeAxis | null = null;
 
   panel.addEventListener(
     'touchstart',
@@ -2517,8 +2485,7 @@ function initPanelSwipe() {
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       tracking = true;
-      decided = false;
-      horiz = false;
+      axis = null;
       panel.style.transition = 'none';
     },
     { passive: true },
@@ -2530,12 +2497,8 @@ function initPanelSwipe() {
       if (!tracking || e.touches.length !== 1) return;
       const dx = e.touches[0].clientX - startX;
       const dy = e.touches[0].clientY - startY;
-      if (!decided) {
-        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-        horiz = Math.abs(dx) > Math.abs(dy) * 1.2;
-        decided = true;
-      }
-      if (!horiz || dx <= 0) return;
+      axis ??= decideSwipeAxis(dx, dy, 6);
+      if (axis !== 'x' || dx <= 0) return;
       e.preventDefault();
       panel.style.transform = `translateX(${dx}px)`;
     },
@@ -2546,7 +2509,7 @@ function initPanelSwipe() {
     if (!tracking) return;
     tracking = false;
     const dx = clientX - startX;
-    if (horiz && dx > 80) {
+    if (axis === 'x' && dx > 80) {
       panel.style.transition = 'transform 0.2s ease';
       panel.style.transform = 'translateX(100%)';
       setTimeout(() => {

@@ -1,17 +1,9 @@
-// Shared "apply an ITAD /api/prices response to a row" logic — extracted from library.js's
-// loadWishlistPrices and bundles.js's loadPrices, which map the identical response shape onto
-// the identical set of row fields and fall back to the identical "don't leave it stuck on its
-// loading placeholder forever" null-out on failure (see docs/dev/integrations.md
-// sections). Chunking (library.js only — a wishlist can run past the server's batch cap, a
-// bundle's game list never does) and the no-ITAD-configured check (library.js only — bundles.js
-// hides its whole page instead) stay local to each caller, since neither is actually shared.
-//
-// Takes `discountPct` (gameColumns.js) as a parameter rather than importing it directly — same
-// reasoning panel.js's own Price card gives for not importing gameColumns.js itself: that file
-// pulls in `@vates/data-table-core`, meaningless for this module and for its Node unit tests.
-// Both callers already import discountPct for their own column definitions anyway.
-import type { PriceFields } from './types.ts';
-import { fetchJson } from './utils.ts';
+// Shared "apply an ITAD /api/prices response to a row" logic — the POST /api/prices call, the
+// response-to-row-fields mapping, and the "don't leave it stuck on its loading placeholder
+// forever" null-out on failure (see docs/dev/integrations.md). Chunking and the
+// no-ITAD-configured check stay with the caller (ListRoute.tsx's loadPrices).
+import type { PriceAmount, PriceFields } from './types.ts';
+import { discountPct, fetchJson } from './utils.ts';
 
 // Same wording as the server's 503 for /bundles (server.js), so the two read as one cause.
 export const PRICES_UNAVAILABLE = "Prices aren't available on this instance: it isn't connected to IsThereAnyDeal.";
@@ -29,10 +21,6 @@ export const PRICE_FIELDS = [
 
 // The shape of one game's entry in a `POST /games/prices/v3` response, as extracted server-side
 // (lib/itad.js's extractPriceInfo) — only the fields read below.
-interface PriceAmount {
-  amount: number;
-  currency: string;
-}
 interface PriceInfo {
   steamRegular?: PriceAmount | null;
   bestDeal?: { price?: PriceAmount | null; shop?: string | null; url?: string | null } | null;
@@ -44,13 +32,8 @@ interface PriceInfo {
 // Every figure in one /games/prices/v3 response is in the same requested-country currency, so
 // any of them is an equally valid source for priceCurrency — see the matching comment on
 // formatMoney (utils.ts)/renderPrice (gameColumns.ts) for why priceCurrency and a bundle's own
-// tierCurrency can legitimately disagree. `discountPct` (gameColumns.ts) is passed in rather than
-// imported — see the file-header note; its signature here matches utils.ts's own.
-export function applyPriceInfo(
-  row: PriceFields,
-  info: PriceInfo | null | undefined,
-  discountPct: (bestDealAmt: number | null, steamRegularAmt: number | null) => number | null,
-): void {
+// tierCurrency can legitimately disagree.
+export function applyPriceInfo(row: PriceFields, info: PriceInfo | null | undefined): void {
   row.steamRegular = info?.steamRegular?.amount ?? null;
   row.bestDealPrice = info?.bestDeal?.price?.amount ?? null;
   row.bestDealShop = info?.bestDeal?.shop ?? null;

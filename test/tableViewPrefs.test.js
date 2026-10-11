@@ -65,21 +65,21 @@ function withLocation(search, fn) {
 }
 
 test('restoreTableView: an incoming param wins for this visit only — applied, not stored, stripped from the URL', () => {
-  withLocation('?lv=%7B%22pageSize%22%3A25%7D', () => {
+  withLocation('?tv=%7B%22pageSize%22%3A25%7D', () => {
     const { getPref, setPref } = require('../public/prefs.ts');
     setPref('libraryView', { pageSize: 10 });
     const table = fakeTable();
-    assert.equal(restoreTableView(table, 'libraryView', 'lv'), true, 'reports a shared view');
+    assert.equal(restoreTableView(table, 'libraryView'), true, 'reports a shared view');
     assert.deepEqual(table.getViewState(), { pageSize: 25 });
     assert.deepEqual(getPref('libraryView'), { pageSize: 10 }, "the viewer's own view is untouched");
-    assert.equal(new URLSearchParams(location.search).has('lv'), false, 'param consumed');
+    assert.equal(new URLSearchParams(location.search).has('tv'), false, 'param consumed');
   });
 });
 
 test('restoreTableView: a malformed param falls through to the stored default', () => {
-  withLocation('?lv=not-json', () => {
+  withLocation('?tv=not-json', () => {
     const table = fakeTable();
-    assert.equal(restoreTableView(table, 'libraryView', 'lv'), false);
+    assert.equal(restoreTableView(table, 'libraryView'), false);
     assert.deepEqual(table.getViewState(), {}, 'no stored pref yet either');
   });
 });
@@ -89,17 +89,17 @@ test('restoreTableView: no param at all falls back to whatever is already stored
     const { setPref } = require('../public/prefs.ts');
     setPref('libraryView', { pageSize: 10 });
     const table = fakeTable();
-    restoreTableView(table, 'libraryView', 'lv');
+    restoreTableView(table, 'libraryView');
     assert.deepEqual(table.getViewState(), { pageSize: 10 });
   });
 });
 
 test('resetTableView: blanks the view and clears the URL param', () => {
-  withLocation('?lv=%7B%22pageSize%22%3A25%7D', () => {
+  withLocation('?tv=%7B%22pageSize%22%3A25%7D', () => {
     const table = fakeTable({ pageSize: 25 });
-    resetTableView(table, 'libraryView', 'lv');
+    resetTableView(table, 'libraryView');
     assert.deepEqual(table.getViewState(), {});
-    assert.equal(new URLSearchParams(location.search).has('lv'), false);
+    assert.equal(new URLSearchParams(location.search).has('tv'), false);
   });
 });
 
@@ -198,10 +198,10 @@ test('shareTableView: copies a link with the view snapshotted into the param, wi
       };
       Object.defineProperty(globalThis, 'navigator', { value: stubNav, configurable: true });
       const btn = { textContent: 'Share view', childNodes: [], replaceChildren() {} };
-      shareTableView(table, 'lv', btn);
+      shareTableView(table, btn);
       await Promise.resolve();
       await Promise.resolve(); // let writeText()'s .then() microtask run
-      assert.match(copied, /\?lv=%7B%22pageSize%22%3A25%7D/);
+      assert.match(copied, /\?tv=%7B%22pageSize%22%3A25%7D/);
       assert.equal(location.search, '', 'live URL left untouched');
     });
   } finally {
@@ -216,7 +216,7 @@ test('shareTableView: an unchanged view sends no param, so the link opens on the
       let copied = null;
       const stubNav = { clipboard: { writeText: async (text) => (copied = text) } };
       Object.defineProperty(globalThis, 'navigator', { value: stubNav, configurable: true });
-      shareTableView(fakeTable({}), 'tv', { textContent: 'Share view', childNodes: [], replaceChildren() {} });
+      shareTableView(fakeTable({}), { textContent: 'Share view', childNodes: [], replaceChildren() {} });
       await Promise.resolve();
       await Promise.resolve();
       assert.equal(new URL(copied).searchParams.has('tv'), false);
@@ -243,7 +243,6 @@ test('shareTableView: adds extra params, but never over one the URL already sets
       await withLocation(search, async () => {
         shareTableView(
           fakeTable({}),
-          'tv',
           { textContent: 'Share view', childNodes: [], replaceChildren() {} },
           { u: 'alice' },
         );

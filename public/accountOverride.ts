@@ -13,9 +13,14 @@
 // AppShell.tsx drives this once for the whole app (a createEffect on the router's own
 // `location.search`), rather than each route doing it — the shell outlives every navigation, and
 // a `?u=` link is honored identically on all of them.
-import { parseAccountParam } from './urlState.ts';
+import { parseAccountParam, urlWithoutAccountParam } from './urlState.ts';
 import { resolveAccountSummary } from './accountData.ts';
-import { accountIdFor, setAccountOverride, notifyAccountChanged } from './accountsStore.ts';
+import {
+  accountSlotFromSummary,
+  setAccountOverride,
+  setCurrentAccount,
+  notifyAccountChanged,
+} from './accountsStore.ts';
 import { createStaleGuard } from './staleGuard.ts';
 import type { AccountSlot } from './types.ts';
 
@@ -84,16 +89,7 @@ export function createAccountOverrideSync() {
     resolveAccountSummary(identifiers).then(
       (summary) => {
         if (guard.isStale(gen)) return;
-        const account: AccountSlot = {
-          id: accountIdFor(summary.members),
-          members: summary.members,
-          rawInputs: identifiers,
-          label: summary.label,
-          avatarUrl: summary.avatarUrl ?? undefined,
-          vanities: summary.vanities,
-          lastUsedAt: Date.now(),
-        };
-        setAccountOverride(account);
+        setAccountOverride(accountSlotFromSummary(summary, identifiers));
         setState({ state: 'ready', identifiers });
       },
       (err: Error) => {
@@ -111,6 +107,20 @@ const defaultSync = createAccountOverrideSync();
 export const getAccountOverrideState = defaultSync.getState;
 export const syncAccountOverrideFromUrl = defaultSync.syncFromUrl;
 export const clearAccountOverride = defaultSync.clear;
+
+// An explicit account pick — a fresh resolve, a recents click, adopting what a `?u=` link showed.
+// Storing it also consumes the override, param and all, rather than leaving the link overriding
+// the preference just set. Through the router (replacing, not pushing), not a bare
+// history.replaceState: see urlWithoutAccountParam's own comment.
+export function adoptAccount(
+  account: AccountSlot,
+  navigate: (to: string, options: { replace: boolean }) => void,
+  location: { pathname: string; search: string },
+): void {
+  clearAccountOverride();
+  setCurrentAccount(account);
+  navigate(urlWithoutAccountParam(location.pathname, location.search), { replace: true });
+}
 
 // The one-line status a route shows in place of its own content while a `?u=` link is being
 // resolved or has failed — shared by HomeRoute and ListRoute so both explain a link that didn't
