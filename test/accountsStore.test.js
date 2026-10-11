@@ -92,11 +92,37 @@ test('setCurrentAccount: a re-pick resolved without player summaries keeps the s
   };
   setCurrentAccount(makeAccount('acc1', known));
   // What accountSlotFrom builds when Steam's player summaries fail: placeholders, no display fields.
-  setCurrentAccount(makeAccount('acc1', { rawInputs: ['typed'], vanities: {} }));
+  setCurrentAccount(makeAccount('acc1', { rawInputs: ['typed'], vanities: {}, unresolved: ['acc1'] }));
 
   for (const slot of [getCurrentAccount(), getRecentAccounts()[0]]) {
     assert.deepEqual({ ...slot, lastUsedAt: 0 }, makeAccount('acc1', { ...known, rawInputs: ['typed'] }));
   }
+});
+
+test('setCurrentAccount: a resolved re-pick drops fields the user cleared on Steam', () => {
+  const { setCurrentAccount, getCurrentAccount } = store();
+  setCurrentAccount(makeAccount('acc1', { label: 'Alice', vanities: { acc1: 'alice' }, realName: 'Alice A.' }));
+  setCurrentAccount(makeAccount('acc1', { label: 'Alice', vanities: {} }));
+  assert.deepEqual({ ...getCurrentAccount(), lastUsedAt: 0 }, makeAccount('acc1', { label: 'Alice', vanities: {} }));
+});
+
+test('setCurrentAccount: a Family keeps only its unresolved members’ stored names', () => {
+  const { setCurrentAccount, getCurrentAccount } = store();
+  const family = { members: ['a', 'b'], rawInputs: ['a', 'b'] };
+  setCurrentAccount(makeAccount('a+b', { ...family, label: 'A + B', vanities: { a: 'old-a', b: 'bee' } }));
+  setCurrentAccount(makeAccount('a+b', { ...family, vanities: {}, unresolved: ['b'] }));
+  assert.deepEqual(
+    { ...getCurrentAccount(), lastUsedAt: 0 },
+    makeAccount('a+b', { ...family, label: 'A + B', vanities: { b: 'bee' } }),
+  );
+});
+
+test('setCurrentAccount: an unresolved pick finds the stored slot in myAccount too', () => {
+  const { setMyAccount, setCurrentAccount, getCurrentAccount, clearRecentAccounts } = store();
+  setMyAccount(makeAccount('acc1', { label: 'Alice' }));
+  clearRecentAccounts();
+  setCurrentAccount(makeAccount('acc1', { vanities: {}, unresolved: ['acc1'] }));
+  assert.equal(getCurrentAccount().label, 'Alice');
 });
 
 test('getRecentAccounts: most-recently-used first', async () => {

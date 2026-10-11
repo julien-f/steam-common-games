@@ -129,7 +129,9 @@ export function accountSlotFrom(players: SlotPlayer[], rawInputs: string[]): Acc
   const members = players.map((p) => p.steamid).sort();
   const { label, avatarUrl, vanities } = accountInfoFrom(players);
   const sole = players.length === 1 ? players[0] : null;
+  const unresolved = players.filter((p) => p.placeholder).map((p) => p.steamid);
   return {
+    ...(unresolved.length && { unresolved }),
     id: accountIdFor(members),
     members,
     rawInputs,
