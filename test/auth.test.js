@@ -180,8 +180,7 @@ test('setUserPref: a write always replaces whatever was there, regardless of upd
   const steamid = '76561198000000107';
   upsertUser(steamid);
   setUserPref(steamid, 'a', 'old', 1000);
-  const applied = setUserPref(steamid, 'a', 'new', 2000);
-  assert.equal(applied, true);
+  setUserPref(steamid, 'a', 'new', 2000);
   const sessionId = createSession(steamid);
   assert.deepEqual(getSessionUser(sessionId).prefs.a, { value: 'new', updatedAt: 2000 });
 });
@@ -190,8 +189,7 @@ test('setUserPref: an "older" updatedAt still overwrites — the server no longe
   const steamid = '76561198000000108';
   upsertUser(steamid);
   setUserPref(steamid, 'a', 'new', 2000);
-  const applied = setUserPref(steamid, 'a', 'later-but-lower-updatedAt', 1000);
-  assert.equal(applied, true);
+  setUserPref(steamid, 'a', 'later-but-lower-updatedAt', 1000);
   const sessionId = createSession(steamid);
   assert.deepEqual(getSessionUser(sessionId).prefs.a, { value: 'later-but-lower-updatedAt', updatedAt: 1000 });
 });
