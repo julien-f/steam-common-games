@@ -42,6 +42,11 @@ test('doneTimes: the first commit since the start naming an item, whole word onl
   assert.deepEqual([...done], [['C1', 100]]);
 });
 
+test('doneTimes: a later follow-up naming the item keeps the earliest commit', () => {
+  const log = '\x1e300\nFollow-up\n\nAfter C1.\n\x1e100\nFix a\n\nCloses C1.\n';
+  assert.deepEqual([...doneTimes(['C1'], 0, log)], [['C1', 100]]);
+});
+
 test("laneStatus: a lane's own pace once it has finished an item, the history's before", () => {
   const manifest = {
     start: 0,

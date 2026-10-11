@@ -94,14 +94,16 @@ function historyRates(history) {
   };
 }
 
-// Item id → epoch seconds of the first non-merge commit since `since` naming it.
+// Item id → epoch seconds of the earliest non-merge commit since `since` naming it (git log lists newest
+// first, and a later follow-up can name the item too).
 function doneTimes(ids, since, logText) {
   const done = new Map();
   for (const entry of logText.split('\x1e')) {
     const [ct, ...msg] = entry.trim().split('\n');
     if (!ct || Number(ct) < since) continue;
     const text = msg.join('\n');
-    for (const id of ids) if (new RegExp(`\\b${id}\\b`).test(text) && !done.has(id)) done.set(id, Number(ct));
+    for (const id of ids)
+      if (new RegExp(`\\b${id}\\b`).test(text)) done.set(id, Math.min(done.get(id) ?? Infinity, Number(ct)));
   }
   return done;
 }
