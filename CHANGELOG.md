@@ -93,6 +93,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The mock server's resolve-failed state makes one bundle game fail to resolve to Steam.
 - Large code-fix/ux-fix batches run as parallel lanes, with planning, progress and time-left estimates from scripts/batch.js
 - Parallel fix-batch lanes can defer the pre-commit e2e run, and the pre-commit hook no longer shares git's stash between worktrees
+- scripts/setup-facts.js --agents reports each subagent's time, turns, cache reads, failed calls and time in tests, e2e and commits
 
 ## [0.10.0] - 2026-10-10
 

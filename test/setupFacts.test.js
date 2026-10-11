@@ -2,7 +2,15 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { callers, argsWithoutUsage, commandKey, parseSession, skillRuns, summarize } = require('../scripts/setup-facts');
+const {
+  callers,
+  argsWithoutUsage,
+  commandKey,
+  parseSession,
+  skillRuns,
+  summarize,
+  agentSummary,
+} = require('../scripts/setup-facts');
 
 test('callers matches script paths and relative requires, not substrings', () => {
   const files = [
@@ -28,6 +36,8 @@ test('commandKey keeps the command and subcommand, never arguments', () => {
   assert.equal(commandKey('git diff --stat'), 'git diff');
   assert.equal(commandKey('node scripts/x.js up'), 'node scripts/x.js');
   assert.equal(commandKey('grep -rn secret .'), 'grep');
+  assert.equal(commandKey('E2E_PORT=1 git -C /wt commit -F m'), 'git commit');
+  assert.equal(commandKey('npm --prefix /wt run test:one a.js'), 'npm run test:one');
 });
 
 test('parseSession pairs each call with its result: output size, elapsed time, classifier denial, user rejection', () => {
@@ -51,10 +61,44 @@ test('parseSession pairs each call with its result: output size, elapsed time, c
     ]),
   ]);
   assert.deepEqual(calls, [
-    { key: 'npm test', bytes: 4, ms: 3000, denied: false, rejected: false },
-    { key: 'Read', bytes: 37, ms: 1000, denied: true, rejected: false },
-    { key: 'Edit', bytes: 33, ms: 1000, denied: false, rejected: true },
+    { key: 'npm test', bytes: 4, ms: 3000, error: false, denied: false, rejected: false },
+    { key: 'Read', bytes: 37, ms: 1000, error: true, denied: true, rejected: false },
+    { key: 'Edit', bytes: 33, ms: 1000, error: true, denied: false, rejected: true },
   ]);
+});
+
+test("agentSummary: wall time, turns and cache reads per response, failed calls, and the gates' share", () => {
+  const usage = (id, cache) => ({ id, usage: { cache_read_input_tokens: cache } });
+  const lines = [
+    { type: 'assistant', timestamp: '2026-01-01T00:00:00Z', message: { ...usage('m1', 10), content: [] } },
+    {
+      type: 'assistant',
+      timestamp: '2026-01-01T00:00:00Z',
+      message: {
+        ...usage('m1', 100),
+        content: [{ type: 'tool_use', id: 'a', name: 'Bash', input: { command: 'E2E_PORT=1 git commit -F m' } }],
+      },
+    },
+    {
+      type: 'user',
+      timestamp: '2026-01-01T00:00:30Z',
+      message: { content: [{ type: 'tool_result', tool_use_id: 'a', content: 'ok' }] },
+    },
+    {
+      type: 'assistant',
+      timestamp: '2026-01-01T00:00:30Z',
+      message: {
+        ...usage('m2', 200),
+        content: [{ type: 'tool_use', id: 'b', name: 'Bash', input: { command: 'ls' } }],
+      },
+    },
+    {
+      type: 'user',
+      timestamp: '2026-01-01T00:01:00Z',
+      message: { content: [{ type: 'tool_result', tool_use_id: 'b', is_error: true, content: 'x' }] },
+    },
+  ].map((l) => JSON.stringify(l));
+  assert.deepEqual(agentSummary(lines), { minutes: 1, turns: 2, cacheRead: 300, calls: 2, errors: 1, gateSec: 30 });
 });
 
 test('summarize ranks by output and time, and keeps only pairs seen in two sessions', () => {

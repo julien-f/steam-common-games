@@ -8,6 +8,8 @@
 //   node scripts/setup-facts.js --transcripts[=N]  the last N (default 20) sessions' largest outputs, slowest
 //                                                  calls, repeated command pairs, denied and rejected calls; commands are
 //                                                  reduced to their first words, so no arguments (or secrets) print
+//   node scripts/setup-facts.js --agents[=ID]      per subagent of session ID (default: the newest with any):
+//                                                  time, turns, cache reads, failed calls, time in tests/e2e/commits
 
 const fs = require('node:fs');
 const os = require('node:os');
@@ -37,7 +39,11 @@ function commandKey(command) {
       .split(/&&|\|\||[|;\n]/)
       .map((s) => s.trim())
       .find((s) => s && !/^cd\s/.test(s)) ?? '';
-  const words = segment.split(/\s+/).filter((w) => !/^\w+=/.test(w));
+  // Env assignments, and the options naming a directory (`git -C <dir>`, `npm --prefix <dir>`), say nothing.
+  const words = segment
+    .split(/\s+/)
+    .filter((w) => !/^\w+=/.test(w))
+    .filter((w, i, all) => !['-C', '--prefix'].includes(w) && !['-C', '--prefix'].includes(all[i - 1]));
   const [cmd, sub, third] = words;
   if (!['npm', 'npx', 'git', 'node', 'gh'].includes(cmd)) return cmd ?? '';
   return [cmd, sub, sub === 'run' ? third : undefined].filter(Boolean).join(' ');
@@ -45,7 +51,7 @@ function commandKey(command) {
 
 const text = (content) => (typeof content === 'string' ? content : (content ?? []).map((c) => c.text ?? '').join(''));
 
-// One session's JSONL lines → its tool calls, in order: `{ key, bytes, ms, denied, rejected }`.
+// One session's JSONL lines → its tool calls, in order: `{ key, bytes, ms, error, denied, rejected }`.
 function parseSession(lines) {
   const calls = new Map();
   for (const line of lines) {
@@ -60,6 +66,7 @@ function parseSession(lines) {
         Object.assign(call, {
           bytes: out.length,
           ms: Date.parse(entry.timestamp) - call.start,
+          error: Boolean(part.is_error),
           denied: Boolean(part.is_error) && /^Permission for this action was denied/.test(out),
           rejected: Boolean(part.is_error) && /^The user doesn't want to proceed/.test(out),
         });
@@ -150,6 +157,52 @@ function summarize(sessions) {
   };
 }
 
+// Commands whose time is the gates' (tests, e2e, commit hooks), not the agent's thinking.
+const GATE = /^(npm test|npm run test(:one|:e2e)?|node scripts\/e2e\.js|git commit)$/;
+
+// One subagent's JSONL lines → `{ minutes, turns, cacheRead, calls, errors, gateSec }`. A response
+// spans several lines, each repeating its usage so far, so each field's max per message id counts.
+function agentSummary(lines) {
+  const entries = lines.map((line) => JSON.parse(line));
+  const stamps = entries.filter((e) => e.timestamp).map((e) => Date.parse(e.timestamp));
+  const cache = new Map();
+  for (const e of entries)
+    if (e.type === 'assistant' && e.message?.id)
+      cache.set(e.message.id, Math.max(cache.get(e.message.id) ?? 0, e.message.usage?.cache_read_input_tokens ?? 0));
+  const calls = parseSession(lines);
+  return {
+    minutes: stamps.length ? (Math.max(...stamps) - Math.min(...stamps)) / 60000 : 0,
+    turns: cache.size,
+    cacheRead: [...cache.values()].reduce((a, b) => a + b, 0),
+    calls: calls.length,
+    errors: calls.filter((c) => c.error).length,
+    gateSec: calls.filter((c) => GATE.test(c.key)).reduce((s, c) => s + c.ms, 0) / 1000,
+  };
+}
+
+function agents(sessionId) {
+  const dir = path.join(os.homedir(), '.claude', 'projects', ROOT.replace(/[^\w]/g, '-'));
+  const withAgents = fs
+    .readdirSync(dir)
+    .filter((d) => fs.existsSync(path.join(dir, d, 'subagents')))
+    .sort(
+      (a, b) =>
+        fs.statSync(path.join(dir, b, 'subagents')).mtimeMs - fs.statSync(path.join(dir, a, 'subagents')).mtimeMs,
+    );
+  const session = sessionId ?? withAgents[0];
+  if (!session || !withAgents.includes(session)) throw new Error(`no subagents for session ${session ?? '(none)'}`);
+  const sub = path.join(dir, session, 'subagents');
+  for (const file of fs.readdirSync(sub).filter((f) => f.endsWith('.jsonl'))) {
+    const metaFile = path.join(sub, file.replace(/\.jsonl$/, '.meta.json'));
+    const label = fs.existsSync(metaFile) ? JSON.parse(fs.readFileSync(metaFile, 'utf8')).description : file;
+    const s = agentSummary(fs.readFileSync(path.join(sub, file), 'utf8').split('\n').filter(Boolean));
+    const gatePct = s.minutes ? Math.round((s.gateSec / 60 / s.minutes) * 100) : 0;
+    console.log(
+      `${label}: ${s.minutes.toFixed(1)} min · ${s.turns} turns · ${(s.cacheRead / 1e6).toFixed(1)}M cache read · ${s.calls} calls (${s.errors} failed) · gates ${Math.round(s.gateSec)} s (${gatePct}%)`,
+    );
+  }
+}
+
 const kb = (bytes) => `${(bytes / 1024).toFixed(1)} KB`;
 
 function cost() {
@@ -213,14 +266,21 @@ function scripts() {
 
 if (require.main === module) {
   const [flag, ...rest] = process.argv.slice(2);
-  const limit = Number(flag?.split('=')[1] ?? 20);
-  if (rest.length || (flag && !/^--(cost|transcripts(=\d+)?)$/.test(flag)) || !(limit > 0)) {
-    console.error('Usage: node scripts/setup-facts.js [--cost | --transcripts[=N]]');
+  const limit = Number(flag?.startsWith('--transcripts') ? (flag.split('=')[1] ?? 20) : 20);
+  if (rest.length || (flag && !/^--(cost|transcripts(=\d+)?|agents(=[\w-]+)?)$/.test(flag)) || !(limit > 0)) {
+    console.error('Usage: node scripts/setup-facts.js [--cost | --transcripts[=N] | --agents[=SESSION_ID]]');
     process.exit(1);
   }
-  if (flag === '--cost') cost();
+  if (flag?.startsWith('--agents')) {
+    try {
+      agents(flag.split('=')[1]);
+    } catch (err) {
+      console.error(err.message);
+      process.exit(1);
+    }
+  } else if (flag === '--cost') cost();
   else if (flag?.startsWith('--transcripts')) transcripts(limit);
   else scripts();
 }
 
-module.exports = { callers, argsWithoutUsage, commandKey, parseSession, skillRuns, summarize };
+module.exports = { callers, argsWithoutUsage, commandKey, parseSession, skillRuns, summarize, agentSummary };
