@@ -28,9 +28,11 @@ export function refKey(ref: ListRef): string {
 
 // Every source a combine can currently be built from — any recent account's Owned/Wishlist,
 // Recently Looked Up, or any existing user list. A bundle arrives only as an existing list's
-// source, when editing it (see HomeRoute.tsx's header comment and options() below). `excludeListId` keeps a dynamic
-// list being edited from being offered as a source for itself.
-export function sourceOptions(excludeListId?: string): SourceOption[] {
+// source, when editing it (see HomeRoute.tsx's header comment), which is what `keep` is for: a
+// list's current sources this enumeration doesn't offer (a bundle, a `?u=` account), listed first
+// so they stay selectable. `excludeListId` keeps a list being edited from being offered as a
+// source for itself.
+export function sourceOptions(excludeListId?: string, keep: readonly ListRef[] = []): SourceOption[] {
   const naming = createDefaultNaming();
   const refs: ListRef[] = [
     ...getRecentAccounts().flatMap((acc): ListRef[] => [
@@ -42,11 +44,15 @@ export function sourceOptions(excludeListId?: string): SourceOption[] {
       .filter((l) => l.id !== excludeListId)
       .map((list): ListRef => ({ kind: 'user', listId: list.id })),
   ];
-  return refs.map((ref) => ({ key: refKey(ref), label: describeListRef(ref, naming).label, ref }));
+  const keys = new Set(refs.map(refKey));
+  return [...keep.filter((ref) => !keys.has(refKey(ref))), ...refs].map((ref) => ({
+    key: refKey(ref),
+    label: describeListRef(ref, naming).label,
+    ref,
+  }));
 }
 
 export interface CombineFormProps {
-  initialName?: string;
   initialOp?: CombineOp;
   initialSources?: ListRef[];
   excludeListId?: string;
@@ -60,7 +66,7 @@ export interface CombineFormProps {
 }
 
 export function CombineForm(props: CombineFormProps) {
-  const [name, setName] = createSignal(props.initialName ?? '');
+  const [name, setName] = createSignal('');
   const [op, setOp] = createSignal<CombineOp>(props.initialOp ?? 'union');
   // Pick order, not options()'s fixed enumeration order — significant for `subtract`, where the
   // first source is the base set the rest are removed from (see combine.ts's subtract).
@@ -71,15 +77,8 @@ export function CombineForm(props: CombineFormProps) {
     return props.showName ?? true;
   }
 
-  // Plus any prefilled source the usual enumeration doesn't offer (a bundle, a `?u=` account).
   function options(): SourceOption[] {
-    const base = sourceOptions(props.excludeListId);
-    const keys = new Set(base.map((o) => o.key));
-    const naming = createDefaultNaming();
-    const extra = (props.initialSources ?? [])
-      .filter((ref) => !keys.has(refKey(ref)))
-      .map((ref) => ({ key: refKey(ref), label: describeListRef(ref, naming).label, ref }));
-    return [...extra, ...base];
+    return sourceOptions(props.excludeListId, props.initialSources);
   }
 
   function selectedSources(): ListRef[] {

@@ -798,16 +798,7 @@ export default function ListRoute() {
   const [editingRankedSource, setEditingRankedSource] = createSignal(false);
   function rankedSourceOptions(): SourceOption[] {
     const list = userList();
-    const options = sourceOptions(list?.id);
-    // sourceOptions offers no bundles, so a bundle source is added back to stay selectable.
-    if (list?.source && !options.some((o) => o.key === refKey(list.source!))) {
-      options.unshift({
-        key: refKey(list.source),
-        label: describeListRef(list.source, createDefaultNaming()).label,
-        ref: list.source,
-      });
-    }
-    return options;
+    return sourceOptions(list?.id, list?.source ? [list.source] : []);
   }
   function handleChangeRankedSource(key: string): void {
     const list = userList();
