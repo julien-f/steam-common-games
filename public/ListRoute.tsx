@@ -1275,6 +1275,8 @@ export default function ListRoute() {
       disposeTable();
       disposeTable = null;
     }
+    unsyncView?.();
+    unsyncView = null;
     table = null;
     setGroupCount(0);
     setRowsStore([]);
