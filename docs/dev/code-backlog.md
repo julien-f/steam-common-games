@@ -39,7 +39,6 @@ Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-
 - **C117 · cleanup · S** — smaller hand-rolls: `RankRoute.tsx:179`'s `closest('input, select, textarea')` guard instead of `utils.ts`'s `isTextEntry` (a focused checkbox stops blocking shortcuts); `ranking.ts:46` `clone()` instead of structuredClone on plain JSON state; `PROTON_TIER_COLORS` copied into `panel.tsx:738` to avoid importing the lazy `gameColumns.ts` — move it to `utils.ts` like `scoreColor`.
 - **C119 · cleanup · S** — `lib/hltb.js:68-85` hand-rolls a semaphore with a delayed release that `createSemaphore(3, UPSTREAM_MIN_INTERVAL_MS, …)` already is (and would put HLTB's queue in `/api/metrics`); `lib/itad.js` requires `lib/steam.js` only for `createSemaphore`, `upstreamError` is copied in both (`steam.js:90`, `itad.js:31`), `createSemaphore`'s defaults are never used, and observability.md calls it "exported purely for unit testing". Move both into a shared `lib/` module, use it in HLTB, drop the defaults, fix the doc.
 - **C120 · cleanup · S** — `server.js` route boilerplate: the `playerById` fallback (`:527`, `:596`) can't fire since `getPlayerSummaries` returns one entry per id (and would drop `placeholder: true`); `/api/common-games`, `/api/wishlist` and `/api/friends` repeat members validation, `MAX_USERS`, `refresh` parsing and id resolve (`:492`, `:558`, `:614`); the `Number(req.params.appid)` check is repeated in four limiter `skip`s and five routes. Index `playerList` directly, one parseMembers helper, `app.param('appid', …)`.
-- **C121 · cleanup · S** — `setUserPref` (`lib/auth.js:172`) always returns `true`, a leftover of the removed last-write-wins guard; `PUT /api/me/prefs/:key` still replies `applied` (`server.js:1275`), read only by `e2e/mockApi.ts:276` and tests, and `server.js:1263`'s comment still describes the guard. Return nothing, reply `{ ok: true }`, fix the comment.
 - **C122 · cleanup · S** — `lib/metrics.js`: `buildBucket` (`:214`) wraps its result in `{ groups }` both callers unwrap, and `chargeBudget`'s hourly and daily blocks (`:75-100`) are copies; `lib/steam.js:827`/`:866`'s `Promise.resolve().then(() => res.text())` is `res.text()`; `lib/hltb.js` `pickBestMatch` repeats `getHLTB`'s `™®©` strip, a no-op `?? null` and a rebuild only to drop `sim`. Return the map, loop the windows, simplify.
 
 ## Correctness
@@ -59,7 +58,6 @@ None open.
 ## Reliability
 
 - **C1 · minor · M** — dependency updates wait on a manual `dependency-audit` run. Dependabot or Renovate could open them, since CI (`.github/workflows/ci.yml`) runs `check` and the e2e suite on PRs, but their PRs lack the `CHANGELOG.md` entry the pre-commit hook requires (CI doesn't check it) and skip `npm run build`, so each still needs a local pass through dependency-audit's Applying.
-- **C123 · minor · S** — `server.js:8` requires `morgan` unconditionally, but `package.json` lists it under devDependencies, so a production install with `--omit=dev` crashes at startup (today's plain `npm install` hides it). Move it to dependencies, or require it only where it's used.
 
 ## Compliance
 

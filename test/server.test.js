@@ -2565,11 +2565,11 @@ test('PUT /api/me/prefs/:key: merges into existing prefs, leaving other keys unt
   assert.deepEqual(res.body.prefs, { region: { value: 1, updatedAt: 1000 }, lists: { value: 2, updatedAt: 1000 } });
 });
 
-test('PUT /api/me/prefs/:key: a later write replaces an earlier one, and reports applied: true', async (t) => {
+test('PUT /api/me/prefs/:key: a later write replaces an earlier one, and replies { ok: true }', async (t) => {
   const agent = await loginAs(t, '76561198000000207');
   await agent.put('/api/me/prefs/region').send({ value: 'old', updatedAt: 1000 }).expect(200);
   const res = await agent.put('/api/me/prefs/region').send({ value: 'new', updatedAt: 2000 }).expect(200);
-  assert.equal(res.body.applied, true);
+  assert.deepEqual(res.body, { ok: true });
   const me = await agent.get('/api/me').expect(200);
   assert.deepEqual(me.body.prefs.region, { value: 'new', updatedAt: 2000 });
 });
@@ -2577,8 +2577,7 @@ test('PUT /api/me/prefs/:key: a later write replaces an earlier one, and reports
 test('PUT /api/me/prefs/:key: a write always overwrites, even with a lower updatedAt than what is stored', async (t) => {
   const agent = await loginAs(t, '76561198000000208');
   await agent.put('/api/me/prefs/region').send({ value: 'new', updatedAt: 2000 }).expect(200);
-  const res = await agent.put('/api/me/prefs/region').send({ value: 'explicit-save', updatedAt: 1000 }).expect(200);
-  assert.equal(res.body.applied, true);
+  await agent.put('/api/me/prefs/region').send({ value: 'explicit-save', updatedAt: 1000 }).expect(200);
   const me = await agent.get('/api/me').expect(200);
   assert.deepEqual(me.body.prefs.region, { value: 'explicit-save', updatedAt: 1000 });
 });

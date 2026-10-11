@@ -272,8 +272,7 @@ export function respond(
         : { steamid: null, prefs: null },
     );
   // Accepted, not stored: the next /api/me still answers the fixture prefs.
-  if (states.has('signed-in') && method === 'PUT' && path.startsWith('/api/me/prefs/'))
-    return json({ ok: true, applied: true });
+  if (states.has('signed-in') && method === 'PUT' && path.startsWith('/api/me/prefs/')) return json({ ok: true });
 
   // A refresh is fetched now; otherwise as of server start, or 12 days before it under `stale`.
   const accountFetchedAt = () => (body.refresh ? Date.now() : states.has('stale') ? NOW - 12 * 86400_000 : NOW);
