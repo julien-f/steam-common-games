@@ -1309,7 +1309,7 @@ export default function ListRoute() {
   }
 
   function renderPanelNav(game: Game): void {
-    renderPanelNavShared({ table: activeTable(), game, getGameList, onOpen: openGame, onReroll: pickRandomGame });
+    renderPanelNavShared({ hasList: !!activeTable(), game, getGameList, onOpen: openGame, onReroll: pickRandomGame });
   }
 
   function openGame(game: Game, { isRandom = false }: { isRandom?: boolean } = {}): void {

@@ -162,8 +162,7 @@ export default function SearchRoute() {
 
   // The minimal Game[] shape panelNav.ts's stepGameList/renderPanelNav and panel.tsx's
   // pickRandomFrom need — unrelated to what backs the visible table (GameSearchResult is enough
-  // for that). `true` stands in for renderPanelNav's `table` param, which it only checks for
-  // truthiness.
+  // for that).
   function getGameList(): Game[] {
     return results().map((r) => ({ appid: r.appid, name: r.name, loading: true, details: null }) as Game);
   }
@@ -201,7 +200,7 @@ export default function SearchRoute() {
     panelOpen(placeholder);
     setPanelParam(appid);
     renderPanelNav({
-      table: true,
+      hasList: true,
       game: placeholder,
       getGameList,
       onOpen: (g) => openResult(g.appid, g.name, null),

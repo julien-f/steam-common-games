@@ -6,25 +6,23 @@
 
 import type { Game } from './types.ts';
 
-// `game.standalone` (a "look up any game" result not part of any loaded table) and no `table`
-// yet both mean there's no natural list to page through. `table` is only ever checked for
-// truthiness (a real table exists yet?), not read for its own properties — typed as `unknown`
-// rather than pulling in the @vates instance type for a null-check.
+// `game.standalone` (a "look up any game" result not part of any loaded table) and no list yet
+// (`hasList` false: ListRoute before its table exists) both mean there's nothing to page through.
 export function renderPanelNav({
-  table,
+  hasList,
   game,
   getGameList,
   onOpen,
   onReroll,
 }: {
-  table: unknown;
+  hasList: boolean;
   game: Game;
   getGameList: () => Game[];
   onOpen: (g: Game) => void;
   onReroll: () => void;
 }): void {
   const nav = document.getElementById('panel-nav')!;
-  if (!table || game.standalone) {
+  if (!hasList || game.standalone) {
     nav.innerHTML = '';
     return;
   }
