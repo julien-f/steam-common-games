@@ -1283,6 +1283,18 @@ test('F1.1-4: look up one game from the nav search, in place', async ({ page }) 
   expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT');
 });
 
+test('F1 edge: Enter opens the highlighted recently looked-up game', async ({ page }) => {
+  await asPlayer(page, ALICE, { recentGames: [620, 1145360] });
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await page.keyboard.press('/');
+  await expect(page.locator('.game-search-result')).toHaveCount(2);
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/[?&]game=1145360\b/);
+});
+
 test("I1 edge: on a phone, a bundle's table starts high, its other actions behind ⋯", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout only');
   await asPlayer(page, ALICE);
