@@ -43,19 +43,6 @@ export interface RankingOptions {
   order?: number[]; // the table's sort: these are asked first, in this order
 }
 
-function clone(state: RankingState): RankingState {
-  return {
-    groups: state.groups.map((g) => [...g]),
-    excluded: [...state.excluded],
-    skipped: [...state.skipped],
-    ...(state.hints ? { hints: { ...state.hints } } : {}),
-    ...(state.focus ? { focus: [...state.focus] } : {}),
-    ...(state.cursor
-      ? { cursor: { ...state.cursor, ...(state.cursor.gallop ? { gallop: { ...state.cursor.gallop } } : {}) } }
-      : {}),
-  };
-}
-
 function liveIndices(state: RankingState, source: Set<number>, lo = 0, hi = state.groups.length): number[] {
   const out: number[] = [];
   for (let i = lo; i < hi; i++) if (state.groups[i].some((id) => source.has(id))) out.push(i);
@@ -137,7 +124,7 @@ export function nextPair(
   opts: RankingOptions = {},
 ): { state: RankingState; pair: RankingPair | null } {
   const { focus } = opts;
-  const state = clone(input);
+  const state = structuredClone(input);
   // An insertion left mid-way outside the focus restarts later rather than being asked now.
   if (state.cursor && (!source.has(state.cursor.appid) || (focus && !focus.has(state.cursor.appid))))
     delete state.cursor;
@@ -169,7 +156,7 @@ export function answer(
 ): { state: RankingState; pair: RankingPair | null } {
   const { state: current, pair } = nextPair(input, source, opts);
   if (!pair) return { state: current, pair: null };
-  const state = clone(current);
+  const state = structuredClone(current);
   const cursor = state.cursor as RankingCursor;
   const { index: mid, phase } = probe(state, source) as Probe;
   switch (ans) {
@@ -209,7 +196,7 @@ export function answer(
 // Takes a game out of the ranking (and out of excluded/skipped) so it's asked again, starting
 // next to where it was: a game it was tied with, else the one below it, else the one above.
 export function rerank(input: RankingState, appid: number): RankingState {
-  const state = clone(input);
+  const state = structuredClone(input);
   if (state.cursor?.appid === appid) delete state.cursor;
   dropHint(state, appid);
   const g = state.groups.findIndex((group) => group.includes(appid));
@@ -251,7 +238,7 @@ export interface RankingProgress {
 }
 
 export function withFocus(state: RankingState, focus: number[] | undefined): RankingState {
-  const next = clone(state);
+  const next = structuredClone(state);
   if (focus?.length) next.focus = [...focus];
   else delete next.focus;
   return next;

@@ -39,7 +39,14 @@ import {
   formatLogRange,
 } from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
-import { scoreColor, dealRecordTier, DEAL_RECORD_TIERS, formatMoney, compareByOrder } from './utils.ts';
+import {
+  scoreColor,
+  dealRecordTier,
+  DEAL_RECORD_TIERS,
+  formatMoney,
+  compareByOrder,
+  PROTON_TIER_COLORS,
+} from './utils.ts';
 import { convert } from './currency.ts';
 
 // Rows are assembled in the still-untyped library.js/bundles.js from several independent async
@@ -87,14 +94,6 @@ function renderScoreNum(v: unknown): Node {
 // what arrives here is always one of the real tiers above, just possibly flagged `pending`
 // (see row.protondbPending / renderProtonBadge below) to mark it as low-confidence.
 const PROTON_TIER_ORDER: string[] = ['borked', 'bronze', 'silver', 'gold', 'platinum', 'native'];
-export const PROTON_TIER_COLORS: Record<string, string> = {
-  borked: '#b91c1c',
-  bronze: '#8b4513',
-  silver: '#757575',
-  gold: '#b8860b',
-  platinum: '#5b6b85',
-  native: '#15803d',
-};
 
 // Backing value is the plain capitalized tier name ("Gold", "Platinum") — @vates/data-table-core
 // 0.7.0 added a per-column `compare` option (see the ProtonDB column below) precisely so a

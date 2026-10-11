@@ -101,6 +101,16 @@ export function computeProductionTier({
   return 'Indie';
 }
 
+// Each ProtonDB tier's badge color — the ProtonDB column's and the side panel's.
+export const PROTON_TIER_COLORS: Record<string, string> = {
+  borked: '#b91c1c',
+  bronze: '#8b4513',
+  silver: '#757575',
+  gold: '#b8860b',
+  platinum: '#5b6b85',
+  native: '#15803d',
+};
+
 // A column `compare` ordering values by their place in `order` (a categorical column's tiers).
 export function compareByOrder(
   order: readonly string[],

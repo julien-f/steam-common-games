@@ -24,7 +24,7 @@ import { setBaseTitle } from './pageTitle.ts';
 import { panelOpen, panelClose, isPanelOpen, getPanelGame } from './panel.tsx';
 import { isLightboxOpen } from './lightbox.tsx';
 import { withAccountParam } from './urlState.ts';
-import { computeSteamdbRating, scoreColor } from './utils.ts';
+import { computeSteamdbRating, isTextEntry, scoreColor } from './utils.ts';
 import type { Game, GameDetails } from './types.ts';
 
 const MAX_UNDO = 100;
@@ -181,7 +181,7 @@ export default function RankRoute() {
   // the panel's media stepping, and Esc can still see whether it's about to close the panel.
   function onKeydown(e: KeyboardEvent): void {
     if (isLightboxOpen()) return;
-    if (e.target instanceof Element && e.target.closest('input, select, textarea')) return;
+    if (isTextEntry(e.target as Element | null)) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const key = e.key;
     // AppShell's handler closes the shortcuts dialog or the panel first, when one is open.

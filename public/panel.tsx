@@ -8,6 +8,7 @@ import {
   fmtH,
   fmtLastPlayed,
   computeSteamdbRating,
+  PROTON_TIER_COLORS,
 } from './utils.ts';
 import { openLightbox, closeLightbox, isLightboxOpen, lightboxShot } from './lightbox.tsx';
 import { decideSwipeAxis, type SwipeAxis } from './lightboxSwipe.ts';
@@ -704,14 +705,6 @@ function jumpToPanelSection(target: string) {
 // result to its own provisionalTier before it ever reaches the client, flagged `pd.pending`
 // (see GlanceGrid below) so it can still be shown, just visibly marked low-confidence rather
 // than presented as equal to a confirmed tier of the same name.
-const PROTON_TIER_COLORS: Record<string, string> = {
-  borked: '#b91c1c',
-  bronze: '#8b4513',
-  silver: '#757575',
-  gold: '#b8860b',
-  platinum: '#5b6b85',
-  native: '#15803d',
-};
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // Compact review-count suffix for the reviews line, e.g. 465234 -> "465k", 2100000 -> "2.1m".
