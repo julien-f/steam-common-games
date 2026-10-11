@@ -52,6 +52,7 @@ None open.
 ## Reliability
 
 - **C1 · minor · M** — dependency updates wait on a manual `dependency-audit` run. Dependabot or Renovate could open them, since CI (`.github/workflows/ci.yml`) runs `check` and the e2e suite on PRs, but their PRs lack the `CHANGELOG.md` entry the pre-commit hook requires (CI doesn't check it) and skip `npm run build`, so each still needs a local pass through dependency-audit's Applying.
+- **C125 · minor · S** — `lib/itad.js:172`'s `infoLimit` semaphore (`itad-info`) is missing from `GET /api/metrics`' `semaphores`: `getSemaphoreStats` (`lib/steam.js:126`) reports only store/tag/proton, so a queue building up behind ITAD's per-gid info lookups isn't visible. Report it there too.
 
 ## Compliance
 
