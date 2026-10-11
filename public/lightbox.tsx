@@ -83,6 +83,12 @@ function attachLbVideo() {
 function detachLbVideo() {
   lbVideoEl.remove();
 }
+function lbShowingVideo() {
+  return lbVideoEl.isConnected;
+}
+function lbShowingImage() {
+  return document.querySelector<HTMLElement>('#screenshot-lightbox .lb-img')?.style.display !== 'none';
+}
 type LbFlashEl = HTMLElement & { _flashTimer?: ReturnType<typeof setTimeout> };
 
 const LB_SEEK_SECONDS = 5;
@@ -168,6 +174,10 @@ export function lightboxShot(): { appid: number; shotId: string } | null {
 // the lightbox is covering. Whatever had focus in here keeps it, so holding ↓ on the caption
 // button doesn't walk focus away mid-click; the close button is the fallback, as on a real open.
 // `dir` only drives the enter animation's direction — 0 (R, which has no direction) skips it.
+function stepGameNav(dir: number) {
+  stepGameFromLightbox(() => _onGameNav(dir), dir);
+}
+
 function stepGameFromLightbox(step: () => void, dir = 0) {
   const lb = document.getElementById('screenshot-lightbox')!;
   const before = document.activeElement;
@@ -358,8 +368,6 @@ function applyLbTransform() {
 
 function resetLbZoom() {
   lbZoom = 1;
-  lbPanX = 0;
-  lbPanY = 0;
   applyLbTransform();
 }
 
@@ -373,16 +381,19 @@ function lbZoomTowardPoint(clientX: number, clientY: number) {
   lbPanX = -(clientX - rect.left - rect.width / 2);
   lbPanY = -(clientY - rect.top - rect.height / 2);
   applyLbTransform();
-  img.style.cursor = 'grab';
+}
+
+// Double-click, double-tap and the zoom button: 2x toward the point, or back.
+function toggleLbZoomAt(clientX: number, clientY: number) {
+  if (lbZoom > 1) resetLbZoom();
+  else lbZoomTowardPoint(clientX, clientY);
 }
 
 // The visible way to what double-click, double-tap and pinch do: 2x on the image's centre, or back.
 function toggleLbZoom() {
-  const img = document.querySelector<HTMLImageElement>('#screenshot-lightbox .lb-img');
-  if (!img || img.style.display === 'none') return;
-  if (lbZoom > 1) return resetLbZoom();
-  const r = img.getBoundingClientRect();
-  lbZoomTowardPoint(r.left + r.width / 2, r.top + r.height / 2);
+  if (!lbShowingImage()) return;
+  const r = document.querySelector('#screenshot-lightbox .lb-img')!.getBoundingClientRect();
+  toggleLbZoomAt(r.left + r.width / 2, r.top + r.height / 2);
 }
 
 // ── Video seeking (keyboard arrows + touch double-tap) ─────────────────────
@@ -562,8 +573,8 @@ function wireButtons(lb: HTMLElement) {
   lb.querySelector('.lb-error-retry')!.addEventListener('click', retryCurrentShot);
   lb.querySelector('.lb-prev')!.addEventListener('click', () => stepLightbox(-1));
   lb.querySelector('.lb-next')!.addEventListener('click', () => stepLightbox(1));
-  lb.querySelector('.lb-game-prev')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav(-1), -1));
-  lb.querySelector('.lb-game-next')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav(1), 1));
+  lb.querySelector('.lb-game-prev')!.addEventListener('click', () => stepGameNav(-1));
+  lb.querySelector('.lb-game-next')!.addEventListener('click', () => stepGameNav(1));
   lb.querySelector('.lb-fullscreen')!.addEventListener('click', () => toggleLbFullscreen(lb));
   lb.querySelector('.lb-zoom')!.addEventListener('click', toggleLbZoom);
 }
@@ -597,8 +608,7 @@ function wireKeyboard(lb: HTMLElement) {
         return;
       }
 
-      const vc = lb.querySelector<HTMLElement>('.lb-vctrls');
-      const vid = vc && vc.style.display !== 'none' ? lbVideoEl : null;
+      const vid = lbShowingVideo() ? lbVideoEl : null;
 
       if ((!onScrub || e.shiftKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
@@ -620,8 +630,7 @@ function wireKeyboard(lb: HTMLElement) {
       }
       if (!onScrub && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
         e.preventDefault();
-        const dir = e.key === 'ArrowDown' ? 1 : -1;
-        stepGameFromLightbox(() => _onGameNav(dir), dir);
+        stepGameNav(e.key === 'ArrowDown' ? 1 : -1);
       }
       // R, the same random pick the panel offers — page-level shortcuts are all blocked while the
       // lightbox is open (panelKeyboard.ts hands it the keyboard wholesale), so it has to be bound
@@ -650,14 +659,10 @@ function wireMouseHandlers(lb: HTMLElement) {
   lb.addEventListener(
     'wheel',
     (e) => {
-      if (lb.querySelector<HTMLImageElement>('.lb-img')!.style.display === 'none') return;
+      if (!lbShowingImage()) return;
       e.preventDefault();
       const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
       lbZoom = Math.max(1, Math.min(4, lbZoom * factor));
-      if (lbZoom === 1) {
-        lbPanX = 0;
-        lbPanY = 0;
-      }
       applyLbTransform();
     },
     { passive: false },
@@ -698,10 +703,7 @@ function wireMouseHandlers(lb: HTMLElement) {
     },
     { signal: _lbSignal },
   );
-  lbImg.addEventListener('dblclick', (e) => {
-    if (lbZoom > 1) resetLbZoom();
-    else lbZoomTowardPoint(e.clientX, e.clientY);
-  });
+  lbImg.addEventListener('dblclick', (e) => toggleLbZoomAt(e.clientX, e.clientY));
 }
 
 // ── Swipe drag ─────────────────────────────────────────────────────────────
@@ -709,9 +711,8 @@ function wireMouseHandlers(lb: HTMLElement) {
 // The media element on screen — the one a swipe drags. Zoom/pan owns `.lb-img`'s transform
 // too, but a drag only ever runs at zoom 1, so the two never write it at once.
 function lbMediaEl(): HTMLElement | null {
-  const img = document.querySelector<HTMLElement>('#screenshot-lightbox .lb-img');
-  if (img && img.style.display !== 'none') return img;
-  return lbVideoEl.isConnected ? lbVideoEl : null;
+  if (lbShowingImage()) return document.querySelector<HTMLElement>('#screenshot-lightbox .lb-img');
+  return lbShowingVideo() ? lbVideoEl : null;
 }
 
 function setLbDrag(el: HTMLElement, x: number, y: number) {
@@ -757,7 +758,7 @@ function wireTouchHandlers(lb: HTMLElement) {
     'touchstart',
     (e) => {
       if (e.touches.length === 2) {
-        if (lb.querySelector<HTMLImageElement>('.lb-img')!.style.display === 'none') return;
+        if (!lbShowingImage()) return;
         pinchStartDist = Math.hypot(
           e.touches[1].clientX - e.touches[0].clientX,
           e.touches[1].clientY - e.touches[0].clientY,
@@ -795,16 +796,12 @@ function wireTouchHandlers(lb: HTMLElement) {
     'touchmove',
     (e) => {
       if (e.touches.length === 2) {
-        if (lb.querySelector<HTMLImageElement>('.lb-img')!.style.display === 'none') return;
+        if (!lbShowingImage()) return;
         const dist = Math.hypot(
           e.touches[1].clientX - e.touches[0].clientX,
           e.touches[1].clientY - e.touches[0].clientY,
         );
         lbZoom = Math.max(1, Math.min(4, (pinchStartZoom * dist) / pinchStartDist));
-        if (lbZoom === 1) {
-          lbPanX = 0;
-          lbPanY = 0;
-        }
         applyLbTransform();
         e.preventDefault();
       } else if (e.touches.length === 1 && touchPanning) {
@@ -853,14 +850,13 @@ function wireTouchHandlers(lb: HTMLElement) {
         if (el) clearLbDrag(el, !action);
         if (action === 'media-prev' || action === 'media-next') stepLightbox(action === 'media-next' ? 1 : -1);
         else if (action) {
-          const dir = action === 'game-next' ? 1 : -1;
-          stepGameFromLightbox(() => _onGameNav(dir), dir);
+          stepGameNav(action === 'game-next' ? 1 : -1);
         }
         return;
       }
       const isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
-      const showingImg = lb.querySelector<HTMLImageElement>('.lb-img')!.style.display !== 'none';
-      const showingVid = lbVideoEl.isConnected;
+      const showingImg = lbShowingImage();
+      const showingVid = lbShowingVideo();
       if (isTap && (showingImg || showingVid)) {
         const now = Date.now();
         const tapDist = Math.hypot(endX - lbLastTapX, endY - lbLastTapY);
@@ -869,8 +865,7 @@ function wireTouchHandlers(lb: HTMLElement) {
           if (showingImg) {
             // Or the browser follows up with a dblclick, whose handler would toggle the zoom back.
             e.preventDefault();
-            if (lbZoom > 1) resetLbZoom();
-            else lbZoomTowardPoint(endX, endY);
+            toggleLbZoomAt(endX, endY);
           } else {
             // Video: double-tap the left/right third to seek, YouTube-style.
             // The middle third is left alone — a plain single tap already
@@ -944,7 +939,7 @@ function wireVideoControls(lb: HTMLElement) {
     playBtn.innerHTML = LB_PLAY_ICON;
     playBtn.setAttribute('aria-label', 'Play');
     syncLbPaused();
-    if (!vid2.isConnected) return; // stopHls' own pause, on a close or a step off the trailer
+    if (!lbShowingVideo()) return; // stopHls' own pause, on a close or a step off the trailer
     showLbChrome();
     schedHideLbChrome();
   });
@@ -976,7 +971,7 @@ function wireVideoControls(lb: HTMLElement) {
   document.addEventListener(
     'visibilitychange',
     () => {
-      if (document.visibilityState === 'hidden' && vid2.isConnected) vid2.pause();
+      if (document.visibilityState === 'hidden' && lbShowingVideo()) vid2.pause();
     },
     { signal: _lbSignal },
   );
@@ -1032,7 +1027,7 @@ function wireVideoControls(lb: HTMLElement) {
 // The large play button shows over a trailer that isn't playing — autoplay refused, paused, ended.
 function syncLbPaused() {
   const lb = document.getElementById('screenshot-lightbox');
-  lb?.classList.toggle('lb--paused', lbVideoEl.isConnected && lbVideoEl.paused);
+  lb?.classList.toggle('lb--paused', lbShowingVideo() && lbVideoEl.paused);
 }
 
 // ── Mount ────────────────────────────────────────────────────────────────
@@ -1231,7 +1226,6 @@ function renderLightbox() {
     img.style.display = 'none';
     lb.classList.remove('lb--loading');
     attachLbVideo();
-    vid.style.display = 'block';
     lb.classList.add('lb--unstarted');
     vid.poster = shot.thumb || '';
     vid.setAttribute('aria-label', label);
@@ -1285,10 +1279,12 @@ function renderLightbox() {
   // Preload prev and next images so navigation feels instant; for a video,
   // warm its poster the same way and prime its HLS manifest in the HTTP
   // cache so stepping onto it doesn't pay the full fetch latency cold.
+  const keep = new Set<string>();
   for (const offset of [-1, 1]) {
     const adjacent = list[(i + offset + list.length) % list.length];
     if (!adjacent) continue;
     const preloadSrc = adjacent.type === 'video' ? adjacent.thumb : adjacent.main;
+    if (preloadSrc) keep.add(preloadSrc);
     if (preloadSrc && preloadSrc !== shot.main) {
       let pre = lb.querySelector<HTMLImageElement>(`.lb-preload[data-src="${CSS.escape(preloadSrc)}"]`);
       if (!pre) {
@@ -1307,15 +1303,6 @@ function renderLightbox() {
     }
   }
   // Drop stale preloads (keep only prev/next)
-  const keep = new Set<string>(
-    [-1, 1]
-      .map((o) => {
-        const s = list[(i + o + list.length) % list.length];
-        const src = s && (s.type === 'video' ? s.thumb : s.main);
-        return src ?? '';
-      })
-      .filter((src) => src !== ''),
-  );
   lb.querySelectorAll<HTMLImageElement>('.lb-preload').forEach((el) => {
     if (!keep.has(el.dataset.src ?? '')) el.remove();
   });

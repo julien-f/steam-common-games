@@ -2704,7 +2704,7 @@ body.lb-open {
   width: 100vw;
   height: 100vh;
   object-fit: contain;
-  display: none;
+  display: block;
   cursor: pointer;
 }
 .lb-vctrls {
