@@ -4,6 +4,8 @@ const { test } = require('node:test');
 process.env.OUTBOUND_HOURLY_MAX = '5';
 process.env.OUTBOUND_DAILY_MAX = '50';
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const {
   trackedFetch,
   recordLimiterTrip,
@@ -318,6 +320,23 @@ test('getMetrics: reports per-group budget usage', async (t) => {
   assert.equal(b.hourUsed, 1);
   assert.equal(b.dayUsed, 1);
   assert.equal(b.hourMax, Number(process.env.OUTBOUND_HOURLY_MAX));
+});
+
+test('getMetrics: lists every outbound group at 0 used before its first call', () => {
+  _reset();
+  const libDir = path.join(__dirname, '../lib');
+  const called = new Set();
+  for (const file of fs.readdirSync(libDir)) {
+    const src = fs.readFileSync(path.join(libDir, file), 'utf8');
+    for (const [, group] of src.matchAll(/trackedFetch\(\s*'([^']+)'/g)) called.add(group);
+  }
+  assert.ok(called.size > 0);
+  const { budgets } = getMetrics();
+  assert.deepEqual(Object.keys(budgets).sort(), [...called].sort());
+  for (const b of Object.values(budgets)) {
+    assert.equal(b.hourUsed, 0);
+    assert.equal(b.dayUsed, 0);
+  }
 });
 
 test('trackedFetch: refuses calls past the daily budget until the day rolls over', async (t) => {
