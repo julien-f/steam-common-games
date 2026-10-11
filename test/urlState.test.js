@@ -49,37 +49,11 @@ test('parseUrlState: game is null when absent', () => {
   assert.equal(game, null);
 });
 
-test('parseUrlState: parses shot param', () => {
-  assert.equal(parseUrlState('?shot=banner').shot, 'banner');
-  assert.equal(parseUrlState('?shot=v256810').shot, 'v256810');
-  assert.equal(parseUrlState('?shot=s0').shot, 's0');
-});
-
-test('parseUrlState: shot is null when absent', () => {
-  assert.equal(parseUrlState('?game=12345').shot, null);
-});
-
-// ── parseUrlState — sort ──────────────────────────────────────────────────────
-
-test('parseUrlState: parses descending sort', () => {
-  const { sort } = parseUrlState('?sort=-score');
-  assert.deepEqual(sort, { col: 'score', dir: -1 });
-});
-
-test('parseUrlState: parses ascending sort', () => {
-  const { sort } = parseUrlState('?sort=name');
-  assert.deepEqual(sort, { col: 'name', dir: 1 });
-});
-
-test('parseUrlState: sort is null when absent', () => {
-  assert.equal(parseUrlState('?u=alice').sort, null);
-});
-
 // ── reorderUrlParams ────────────────────────────────────────────────────────
 
 test('reorderUrlParams: sorts known params into a fixed canonical order regardless of input order', () => {
-  const params = new URLSearchParams('?tv=abc&game=440&u=alice&sort=-score');
-  assert.equal(reorderUrlParams(params).toString(), 'u=alice&sort=-score&game=440&tv=abc');
+  const params = new URLSearchParams('?tv=abc&game=440&u=alice&q=portal');
+  assert.equal(reorderUrlParams(params).toString(), 'u=alice&q=portal&game=440&tv=abc');
 });
 
 test('reorderUrlParams: two equivalent states with fields set in different orders serialize identically', () => {
