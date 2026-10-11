@@ -4,10 +4,8 @@ const { test } = require('node:test');
 process.env.OUTBOUND_HOURLY_MAX = '5';
 process.env.OUTBOUND_DAILY_MAX = '50';
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const {
-  trackedFetch,
+  createTrackedFetch,
   recordLimiterTrip,
   recordDedupHit,
   recordCacheEvent,
@@ -19,7 +17,7 @@ test.beforeEach(() => _reset());
 
 test('trackedFetch: calls fetch with the same url/opts and returns its result', async () => {
   let seen;
-  const t = trackedFetch.bind(null, 'grp', 'label');
+  const t = createTrackedFetch('grp').bind(null, 'label');
   const restore = globalThis.fetch;
   globalThis.fetch = async (url, opts) => {
     seen = { url, opts };
@@ -38,10 +36,10 @@ test('getMetrics: counts requests per group/label independently (sinceRestart)',
   const restore = globalThis.fetch;
   globalThis.fetch = async () => ({ ok: true, status: 200 });
   try {
-    await trackedFetch('steam-api', 'getOwnedGames', 'u1');
-    await trackedFetch('steam-api', 'getOwnedGames', 'u2');
-    await trackedFetch('steam-api', 'getWishlist', 'u3');
-    await trackedFetch('itad', 'getPrices', 'u4');
+    await createTrackedFetch('steam-api')('getOwnedGames', 'u1');
+    await createTrackedFetch('steam-api')('getOwnedGames', 'u2');
+    await createTrackedFetch('steam-api')('getWishlist', 'u3');
+    await createTrackedFetch('itad')('getPrices', 'u4');
 
     const { sinceRestart } = getMetrics();
     assert.equal(sinceRestart.groups['steam-api'].getOwnedGames.requests, 2);
@@ -56,9 +54,9 @@ test('getMetrics: distinguishes labels within the same group (e.g. resolveItadId
   const restore = globalThis.fetch;
   globalThis.fetch = async () => ({ ok: true, status: 200 });
   try {
-    await trackedFetch('itad', 'resolveItadIds', 'u1');
-    await trackedFetch('itad', 'resolveItadIds', 'u2');
-    await trackedFetch('itad', 'resolveItadIds', 'u3');
+    await createTrackedFetch('itad')('resolveItadIds', 'u1');
+    await createTrackedFetch('itad')('resolveItadIds', 'u2');
+    await createTrackedFetch('itad')('resolveItadIds', 'u3');
     // getPrices never called — should be absent, not present with requests: 0 — so it doesn't
     // look the same as "resolveItadIds is also stalled".
     const { sinceRestart } = getMetrics();
@@ -75,7 +73,7 @@ test('getMetrics: sinceRestart buckets outcomes by raw HTTP status code, not a b
   const restore = globalThis.fetch;
   globalThis.fetch = async () => ({ ok: statuses[i] < 400, status: statuses[i++] });
   try {
-    for (let n = 0; n < statuses.length; n++) await trackedFetch('steam-store', 'getAppDetails', 'u');
+    for (let n = 0; n < statuses.length; n++) await createTrackedFetch('steam-store')('getAppDetails', 'u');
 
     const entry = getMetrics().sinceRestart.groups['steam-store'].getAppDetails;
     assert.equal(entry.requests, 4);
@@ -91,7 +89,7 @@ test('getMetrics: sinceRestart counts a thrown/network fetch failure separately 
     throw new Error('timeout');
   };
   try {
-    await assert.rejects(() => trackedFetch('hltb', 'search', 'u'));
+    await assert.rejects(() => createTrackedFetch('hltb')('search', 'u'));
     const entry = getMetrics().sinceRestart.groups.hltb.search;
     assert.equal(entry.requests, 1);
     assert.equal(entry.networkErrors, 1);
@@ -106,9 +104,9 @@ test('getMetrics: lastHour mirrors sinceRestart while everything happened within
   const restore = globalThis.fetch;
   globalThis.fetch = async () => ({ ok: true, status: 200 });
   try {
-    await trackedFetch('hltb', 'search', 'u1');
+    await createTrackedFetch('hltb')('search', 'u1');
     t.mock.timers.tick(10 * 60 * 1000); // 10 minutes later
-    await trackedFetch('hltb', 'search', 'u2');
+    await createTrackedFetch('hltb')('search', 'u2');
 
     const { sinceRestart, lastHour } = getMetrics();
     assert.equal(sinceRestart.groups.hltb.search.requests, 2);
@@ -124,9 +122,9 @@ test('getMetrics: lastHour drops entries older than an hour but sinceRestart kee
   const restore = globalThis.fetch;
   globalThis.fetch = async () => ({ ok: true, status: 200 });
   try {
-    await trackedFetch('hltb', 'search', 'u1'); // this one will age out
+    await createTrackedFetch('hltb')('search', 'u1'); // this one will age out
     t.mock.timers.tick(61 * 60 * 1000); // 61 minutes later
-    await trackedFetch('hltb', 'search', 'u2');
+    await createTrackedFetch('hltb')('search', 'u2');
 
     const { sinceRestart, lastHour } = getMetrics();
     assert.equal(sinceRestart.groups.hltb.search.requests, 2); // lifetime total unaffected
@@ -141,7 +139,7 @@ test('getMetrics: lastHour re-filters at read time even with no writes since agi
   const restore = globalThis.fetch;
   globalThis.fetch = async () => ({ ok: true, status: 200 });
   try {
-    await trackedFetch('hltb', 'search', 'u1');
+    await createTrackedFetch('hltb')('search', 'u1');
     assert.equal(getMetrics().lastHour.groups.hltb.search.requests, 1);
 
     t.mock.timers.tick(61 * 60 * 1000); // idle for over an hour — no new requests
@@ -161,7 +159,7 @@ test('getMetrics: sinceRestart/lastHour report avg/max latency per label', async
     return { ok: true, status: 200 };
   };
   try {
-    for (let n = 0; n < durations.length; n++) await trackedFetch('steam-store', 'getAppDetails', 'u');
+    for (let n = 0; n < durations.length; n++) await createTrackedFetch('steam-store')('getAppDetails', 'u');
 
     const { sinceRestart, lastHour } = getMetrics();
     const entry = sinceRestart.groups['steam-store'].getAppDetails;
@@ -183,7 +181,7 @@ test('getMetrics: a thrown/network failure still counts toward latency (not just
     throw new Error('timeout');
   };
   try {
-    await assert.rejects(() => trackedFetch('hltb', 'search', 'u'));
+    await assert.rejects(() => createTrackedFetch('hltb')('search', 'u'));
     const entry = getMetrics().sinceRestart.groups.hltb.search;
     assert.equal(entry.avgLatencyMs, 50);
     assert.equal(entry.maxLatencyMs, 50);
@@ -270,7 +268,7 @@ test('_reset: clears all counters, including rate-limiter trips, dedup hits, and
   const restore = globalThis.fetch;
   globalThis.fetch = async () => ({ ok: true, status: 200 });
   try {
-    await trackedFetch('hltb', 'search', 'u1');
+    await createTrackedFetch('hltb')('search', 'u1');
     recordLimiterTrip('details');
     recordDedupHit('steam');
     recordCacheEvent('library', 'hits');
@@ -298,12 +296,12 @@ test('trackedFetch: refuses calls past the hourly budget, per group', async (t) 
   t.mock.method(console, 'warn', () => {});
 
   const max = Number(process.env.OUTBOUND_HOURLY_MAX);
-  for (let i = 0; i < max; i++) await trackedFetch('grp', 'label', 'u');
-  await assert.rejects(() => trackedFetch('grp', 'label', 'u'), /budget for grp exhausted/);
+  for (let i = 0; i < max; i++) await createTrackedFetch('grp')('label', 'u');
+  await assert.rejects(() => createTrackedFetch('grp')('label', 'u'), /budget for grp exhausted/);
   // A refused call isn't a request this process made, so it must not be counted as one.
   assert.equal(getMetrics().sinceRestart.groups.grp.label.requests, max);
   // Budgets are per group — another service is unaffected.
-  await trackedFetch('other', 'label', 'u');
+  await createTrackedFetch('other')('label', 'u');
   assert.equal(getMetrics().sinceRestart.groups.other.label.requests, 1);
 });
 
@@ -315,28 +313,38 @@ test('getMetrics: reports per-group budget usage', async (t) => {
     globalThis.fetch = restore;
   });
 
-  await trackedFetch('grp', 'label', 'u');
+  await createTrackedFetch('grp')('label', 'u');
   const b = getMetrics().budgets.grp;
   assert.equal(b.hourUsed, 1);
   assert.equal(b.dayUsed, 1);
   assert.equal(b.hourMax, Number(process.env.OUTBOUND_HOURLY_MAX));
 });
 
-test('getMetrics: lists every outbound group at 0 used before its first call', () => {
+test('getMetrics: lists a bound outbound group at 0 used before its first call', () => {
+  createTrackedFetch('bound-only');
+  assert.deepEqual(getMetrics().budgets['bound-only'], {
+    hourUsed: 0,
+    hourMax: Number(process.env.OUTBOUND_HOURLY_MAX),
+    dayUsed: 0,
+    dayMax: Number(process.env.OUTBOUND_DAILY_MAX),
+  });
+});
+
+test('getMetrics: reading budgets does not start a group’s window', async (t) => {
   _reset();
-  const libDir = path.join(__dirname, '../lib');
-  const called = new Set();
-  for (const file of fs.readdirSync(libDir)) {
-    const src = fs.readFileSync(path.join(libDir, file), 'utf8');
-    for (const [, group] of src.matchAll(/trackedFetch\(\s*'([^']+)'/g)) called.add(group);
-  }
-  assert.ok(called.size > 0);
-  const { budgets } = getMetrics();
-  assert.deepEqual(Object.keys(budgets).sort(), [...called].sort());
-  for (const b of Object.values(budgets)) {
-    assert.equal(b.hourUsed, 0);
-    assert.equal(b.dayUsed, 0);
-  }
+  t.mock.timers.enable({ apis: ['Date'] });
+  const restore = globalThis.fetch;
+  globalThis.fetch = async () => ({ status: 200 });
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
+
+  getMetrics();
+  t.mock.timers.tick(50 * 60 * 1000);
+  await createTrackedFetch('hltb')('search', 'u');
+  t.mock.timers.tick(15 * 60 * 1000);
+  // The hour runs from the first call, not from the earlier read.
+  assert.equal(getMetrics().budgets.hltb.hourUsed, 1);
 });
 
 test('trackedFetch: refuses calls past the daily budget until the day rolls over', async (t) => {
@@ -353,15 +361,15 @@ test('trackedFetch: refuses calls past the daily budget until the day rolls over
   const hourly = Number(process.env.OUTBOUND_HOURLY_MAX);
   const daily = Number(process.env.OUTBOUND_DAILY_MAX);
   for (let spent = 0; spent < daily; spent += hourly) {
-    for (let i = 0; i < hourly; i++) await trackedFetch('grp', 'label', 'u');
+    for (let i = 0; i < hourly; i++) await createTrackedFetch('grp')('label', 'u');
     t.mock.timers.tick(60 * 60 * 1000);
   }
-  await assert.rejects(() => trackedFetch('grp', 'label', 'u'), /budget for grp exhausted/);
+  await assert.rejects(() => createTrackedFetch('grp')('label', 'u'), /budget for grp exhausted/);
   assert.ok(warnMock.mock.calls.some((c) => /daily outbound budget exhausted/.test(c.arguments[0])));
   assert.equal(getMetrics().budgets.grp.dayUsed, daily);
 
   // 24 h after the day's first call, the count starts over.
   t.mock.timers.setTime(24 * 60 * 60 * 1000);
-  await trackedFetch('grp', 'label', 'u');
+  await createTrackedFetch('grp')('label', 'u');
   assert.equal(getMetrics().budgets.grp.dayUsed, 1);
 });

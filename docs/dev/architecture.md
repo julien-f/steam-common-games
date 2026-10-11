@@ -31,7 +31,7 @@ Setup and dev commands are in [README.md](../../README.md); tests and hooks in [
 - **`lib/fanatical.js`** — Fanatical's storefront feed, for pick-and-mix tier prices ([integrations.md](integrations.md#fanatical--pick-and-mix-tier-prices)).
 - **`lib/upstream.js`** — `createSemaphore` (concurrency cap + per-slot pacing, registered for `GET /api/metrics`) and `upstreamError`, shared by the upstream clients.
 - **`lib/circuitBreaker.js`** — one 403-storm breaker per blocking-prone upstream (Steam store, HLTB, ProtonDB).
-- **`lib/metrics.js`** — `trackedFetch`, outbound budgets and the counters behind `GET /api/metrics` ([observability.md](observability.md)).
+- **`lib/metrics.js`** — `createTrackedFetch`, outbound budgets and the counters behind `GET /api/metrics` ([observability.md](observability.md)).
 - **`lib/auth.js`** — Steam OpenID 2.0 sign-in, cookie sessions and per-key user prefs, behind `/auth/*` and `/api/me*`.
 
 The dedup map, semaphores, breakers and metrics are process-local: correct for the single-process deployment, but several instances would each get their own and multiply upstream traffic silently.

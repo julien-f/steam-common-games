@@ -23,7 +23,7 @@ No auth, same trust level as `GET /api/health`. In memory, reset on restart (exc
 
 ### Outbound — `groups`
 
-- Every outbound call goes through `trackedFetch(group, label, url, opts)` (`lib/metrics.js`), a drop-in for `fetch`.
+- Every outbound call goes through `trackedFetch` (`lib/metrics.js`), a drop-in for `fetch`. Modules reach it only through `createTrackedFetch(group)`, bound once per group at load; it returns `(label, url, opts)` and registers the group, which is how `budgets` lists it from startup.
 - `group` is the service or routing boundary: `steam-store` (`fetchStoreApi`/`storeLimit`), `steam-browse` (`tagLimit`), `steam-api` (the keyed `api.steampowered.com` calls), `steam-openid`, `protondb`, `hltb`, `itad`, `fanatical`. `label` is the calling function, so one operation stalling shows apart from its siblings.
 - `statusCounts` is a `{ [status]: count }` map, deliberately not one "errors" count: several non-2xx answers are expected outcomes (403 = private profile or no stats on achievements, 404 = no ProtonDB reports; see [integrations.md](integrations.md)). Read it against what's expected for that label.
 - `networkErrors`: `fetch()` itself threw (timeout, DNS, abort); never an expected outcome.
@@ -51,7 +51,7 @@ No auth, same trust level as `GET /api/health`. In memory, reset on restart (exc
 - `chargeBudget(group)` runs at the top of `trackedFetch` and caps calls per service per hour and per day (`OUTBOUND_HOURLY_MAX`/`OUTBOUND_DAILY_MAX`, see [configuration.md](../user/configuration.md); `0` disables).
 - The only limit that isn't per client: it protects a key's quota from all clients together, and from the app's own retry loops.
 - Past a ceiling it throws an `isUpstream` error, so routes answer 502 with no new error path. Refused calls aren't counted as requests.
-- Fixed windows, not sliding: it runs on every call and stays O(1).
+- Fixed windows, not sliding: it runs on every call and stays O(1). A window starts at the group's first call once the previous one has ended; reading `budgets` never starts one.
 
 ## Log warnings
 
