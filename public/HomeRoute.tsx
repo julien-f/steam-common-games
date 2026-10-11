@@ -18,7 +18,7 @@ import {
   getMyAccount,
   setMyAccount,
   getEffectiveCurrentAccount,
-  setCurrentAccount,
+  accountSlotFromSummary,
   getRecentAccounts,
   removeRecentAccount,
   clearRecentAccounts,
@@ -28,15 +28,8 @@ import {
   refreshAccountInfo,
   ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
-import { getAccountOverrideState, clearAccountOverride, accountOverrideStatusText } from './accountOverride.ts';
-import {
-  withAccountParam,
-  urlWithoutAccountParam,
-  urlWithParams,
-  parseUrlState,
-  compareUrl,
-  COMPARE_PATH,
-} from './urlState.ts';
+import { getAccountOverrideState, adoptAccount, accountOverrideStatusText } from './accountOverride.ts';
+import { withAccountParam, urlWithParams, parseUrlState, compareUrl, COMPARE_PATH } from './urlState.ts';
 import { resolveAccountSummary, fetchAccountOverview, fetchAccountWishlist, accountInfoFrom } from './accountData.ts';
 import type { AccountPlayer } from './accountData.ts';
 import { normalizeInput, steamVanity, fmtAge, countryFlag } from './utils.ts';
@@ -231,20 +224,7 @@ export default function HomeRoute() {
     setResolving(true);
     setResolveError('');
     try {
-      const summary = await resolveAccountSummary(trimmed);
-      const account: AccountSlot = {
-        id: [...summary.members].sort().join('+'),
-        members: summary.members,
-        rawInputs: trimmed,
-        label: summary.label,
-        avatarUrl: summary.avatarUrl ?? undefined,
-        vanities: summary.vanities,
-        memberSince: summary.memberSince ?? undefined,
-        countryCode: summary.countryCode ?? undefined,
-        realName: summary.realName ?? undefined,
-        lastUsedAt: Date.now(),
-      };
-      pickAccount(account);
+      pickAccount(accountSlotFromSummary(await resolveAccountSummary(trimmed), trimmed));
       setResolveInputs(['']);
     } catch (err) {
       setResolveError((err as Error).message);
@@ -253,23 +233,13 @@ export default function HomeRoute() {
     }
   }
 
-  function selectAccount(account: AccountSlot): void {
-    pickAccount(account);
-  }
-
   // The one place an *explicit* account pick lands — a fresh resolve, a recents click, or
   // adopting whatever a `?u=` link was showing. Beyond storing it, this consumes the override:
   // the param has served its purpose once the user has chosen, so it's dropped from state and
   // stripped from the URL (replaceState) rather than left there to keep overriding the very
   // preference that was just set. See docs/dev/lists-and-accounts.md's `?u=` section.
   function pickAccount(account: AccountSlot): void {
-    clearAccountOverride();
-    setCurrentAccount(account);
-    // Through the router (replacing, not pushing), not a bare history.replaceState — see
-    // urlWithoutAccountParam's own comment: the router's location signal is what every
-    // withAccountParam-built href is derived from, so stripping the param behind the router's
-    // back leaves all of them pointed at an account the URL no longer names.
-    navigate(urlWithoutAccountParam(location.pathname, location.search), { replace: true });
+    adoptAccount(account, navigate, location);
     refreshAccounts();
   }
 
@@ -643,7 +613,7 @@ export default function HomeRoute() {
             <For each={recents()}>
               {(account) => (
                 <li>
-                  <button type="button" onClick={() => selectAccount(account)}>
+                  <button type="button" onClick={() => pickAccount(account)}>
                     {myAccount()?.id === account.id ? '★ ' : ''}
                     {accountDisplayLabel(account)}
                   </button>

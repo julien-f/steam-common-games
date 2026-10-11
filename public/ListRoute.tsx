@@ -143,7 +143,7 @@ import {
 import {
   getEffectiveCurrentAccount,
   accountIdentifiers,
-  accountIdFor,
+  accountSlotFromSummary,
   accountDisplayLabel,
   getMyAccount,
   ACCOUNT_CHANGED_EVENT,
@@ -1905,18 +1905,7 @@ export default function ListRoute() {
       setListTitle(slots.map((slot) => slot.join(' + ')).join(' vs. '));
       setStatusText('Resolving accounts…');
       const settled = await Promise.allSettled(
-        slots.map(async (identifiers): Promise<AccountSlot> => {
-          const summary = await resolveAccountSummary(identifiers);
-          return {
-            id: accountIdFor(summary.members),
-            members: summary.members,
-            rawInputs: identifiers,
-            label: summary.label,
-            avatarUrl: summary.avatarUrl ?? undefined,
-            vanities: summary.vanities,
-            lastUsedAt: Date.now(),
-          };
-        }),
+        slots.map(async (identifiers) => accountSlotFromSummary(await resolveAccountSummary(identifiers), identifiers)),
       );
       if (loadGuard.isStale(gen)) return;
       const failures = settled.flatMap((r, i) =>

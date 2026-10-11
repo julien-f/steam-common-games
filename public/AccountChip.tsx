@@ -23,13 +23,12 @@ import {
   getAccountOverride,
   getRecentAccounts,
   getMyAccount,
-  setCurrentAccount,
   accountDisplayLabel,
   accountIdentifiers,
   ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
-import { getAccountOverrideState, clearAccountOverride, accountOverrideStatusText } from './accountOverride.ts';
-import { withAccountParam, urlWithoutAccountParam } from './urlState.ts';
+import { getAccountOverrideState, adoptAccount, accountOverrideStatusText } from './accountOverride.ts';
+import { withAccountParam } from './urlState.ts';
 import { bindNavPopover } from './navPopover.ts';
 import { CopyButton } from './CopyButton.tsx';
 import { getAuthUser, signOut, AUTH_CHANGED_EVENT } from './authStore.ts';
@@ -76,15 +75,8 @@ export function AccountChip(): JSX.Element {
     return withAccountParam(path, location.search);
   }
 
-  // The same explicit-pick semantics as Home's own `pickAccount` — storing the account also
-  // consumes any `?u=` override, param and all, rather than leaving the link still overriding the
-  // preference just set. Kept as its own small copy rather than lifted into accountsStore.ts:
-  // this half of it is routing (the router's navigate, this route's own location), which that
-  // file deliberately has none of.
   function pick(acc: AccountSlot): void {
-    clearAccountOverride();
-    setCurrentAccount(acc);
-    navigate(urlWithoutAccountParam(location.pathname, location.search), { replace: true });
+    adoptAccount(acc, navigate, location);
     detailsEl.open = false;
     refresh();
   }

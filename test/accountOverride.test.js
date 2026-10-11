@@ -79,6 +79,9 @@ test('syncFromUrl: resolves ?u= into an override, leaving the stored account unt
     label: 'Alice',
     avatarUrl: 'a.jpg',
     vanities: { 1: 'alice' }, // carried onto the slot, so the copyable identifier needs no fetch
+    memberSince: undefined,
+    countryCode: undefined,
+    realName: undefined,
     lastUsedAt: getAccountOverride().lastUsedAt,
   });
   assert.equal(getEffectiveCurrentAccount().id, '1');
