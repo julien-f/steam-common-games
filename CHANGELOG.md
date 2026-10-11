@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The Played (h) filter has a "never played" button, so finding your unplayed games is one click
 - A comparison has a Played column for each player, so you can find games none of you has played much
 - The ? dialog lists Enter on a game panel's main image to open the lightbox
+- On a phone, a 🎲 in the table's toolbar picks a random game without opening one first.
 
 ### Changed
 

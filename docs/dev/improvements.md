@@ -45,7 +45,7 @@ None open.
 
 ## Phone
 
-- **U33 · minor · F3** — no random pick on phone until a panel is open (the 🎲 lives in the panel's nav).
+None open.
 
 ## Accounts and first visit
 

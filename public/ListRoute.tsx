@@ -1773,7 +1773,21 @@ export default function ListRoute() {
   }
 
   function viewActions() {
-    return <ViewActions onShare={handleShareView} onReset={handleResetView} shareDisabledReason={shareViewFailure()} />;
+    return (
+      <>
+        {/* Phone only (CSS): there, the panel nav's 🎲 is out of reach until a game is open. */}
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm list-random-pick"
+          aria-label="Pick a random game"
+          title="Pick a random game (R)"
+          onClick={() => pickRandomGame()}
+        >
+          🎲
+        </button>
+        <ViewActions onShare={handleShareView} onReset={handleResetView} shareDisabledReason={shareViewFailure()} />
+      </>
+    );
   }
 
   async function load({ refresh = false }: { refresh?: boolean } = {}): Promise<void> {

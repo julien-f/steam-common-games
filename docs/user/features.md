@@ -120,7 +120,7 @@ Table layouts are the exception: changing a table stays on this device, and the 
 
 ## Keyboard shortcuts
 
-Press `?` for the full list. The essentials: `/` focuses search, `Esc` closes what's open, `↑`/`↓` move through the list, `←`/`→` through a game's media, and `R` picks a random game, even with no panel open. The first Tab on a page is a **Skip to table** link.
+Press `?` for the full list. The essentials: `/` focuses search, `Esc` closes what's open, `↑`/`↓` move through the list, `←`/`→` through a game's media, and `R` picks a random game, even with no panel open (on a phone, the 🎲 in the table's toolbar). The first Tab on a page is a **Skip to table** link.
 
 ## How fresh is this?
 

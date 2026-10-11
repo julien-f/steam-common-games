@@ -281,7 +281,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   3. filter to never played
   4. sort by HLTB (shortest first) or rating
   5. **🎲 Pick for me** ◇ (or **R**) for a random pick, or browse with ↑/↓
-- **Done when**: HLTB and rating fill in without a reload; the random pick draws only from the filtered rows and works on a phone ◇; the filter survives a reload (L3).
+- **Done when**: HLTB and rating fill in without a reload; the random pick draws only from the filtered rows and works on a phone; the filter survives a reload (L3).
 - **Edges**: games with no HLTB entry (where do they sort?); a Family account (whose playtime counts?).
 
 ## Sharing
