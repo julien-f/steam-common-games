@@ -1,5 +1,4 @@
 import { getPref, setPref } from './prefs.ts';
-import { REGION_CURRENCY } from './currency.ts';
 
 // The region preference's data and logic — the curated list, the detection heuristic, and
 // get/set/resolve for the stored value — with no DOM/UI code of its own (see prefsPopover.js
@@ -16,25 +15,26 @@ import { REGION_CURRENCY } from './currency.ts';
 // region cares about; the concept being selected is "Europe", not specifically Germany.
 export interface CountryOption {
   code: string;
+  currency: string; // the currency the region prices in
   label: string;
 }
 export const COUNTRY_OPTIONS: CountryOption[] = [
-  { code: 'US', label: 'United States (USD)' },
-  { code: 'GB', label: 'United Kingdom (GBP)' },
-  { code: 'DE', label: 'Europe / Germany (EUR)' },
-  { code: 'CA', label: 'Canada (CAD)' },
-  { code: 'AU', label: 'Australia (AUD)' },
-  { code: 'JP', label: 'Japan (JPY)' },
-  { code: 'BR', label: 'Brazil (BRL)' },
-  { code: 'RU', label: 'Russia (RUB)' },
-  { code: 'TR', label: 'Turkey (TRY)' },
-  { code: 'UA', label: 'Ukraine (UAH)' },
-  { code: 'AR', label: 'Argentina (ARS)' },
-  { code: 'IN', label: 'India (INR)' },
-  { code: 'CN', label: 'China (CNY)' },
-  { code: 'KR', label: 'South Korea (KRW)' },
-  { code: 'MX', label: 'Mexico (MXN)' },
-];
+  ['US', 'United States', 'USD'],
+  ['GB', 'United Kingdom', 'GBP'],
+  ['DE', 'Europe / Germany', 'EUR'],
+  ['CA', 'Canada', 'CAD'],
+  ['AU', 'Australia', 'AUD'],
+  ['JP', 'Japan', 'JPY'],
+  ['BR', 'Brazil', 'BRL'],
+  ['RU', 'Russia', 'RUB'],
+  ['TR', 'Turkey', 'TRY'],
+  ['UA', 'Ukraine', 'UAH'],
+  ['AR', 'Argentina', 'ARS'],
+  ['IN', 'India', 'INR'],
+  ['CN', 'China', 'CNY'],
+  ['KR', 'South Korea', 'KRW'],
+  ['MX', 'Mexico', 'MXN'],
+].map(([code, name, currency]) => ({ code, currency, label: `${name} (${currency})` }));
 
 // IANA timezone → curated COUNTRY_OPTIONS code, used by detectCountry below as a stronger
 // location signal than `navigator.language` (see its own comment). Deliberately not
@@ -188,7 +188,8 @@ export function currentRegion(): string {
 
 // The currency prices are shown in for the current region.
 export function regionCurrency(): string {
-  return REGION_CURRENCY[currentRegion()] ?? 'USD';
+  const region = currentRegion();
+  return COUNTRY_OPTIONS.find((c) => c.code === region)?.currency ?? 'USD';
 }
 
 // `initRegionSelect` (the region <select>'s only remaining populator, public/prefsPopover.js)

@@ -223,17 +223,17 @@ export async function fetchAccountWishlist(
   return { items: data.items, fetchedAt: data.fetchedAt ?? null };
 }
 
-// Both halves of what myOwnership.ts keeps per account — the owned-appid set behind the ✓/☆
-// markers, and the per-member breakdown behind the panel's "Owned by" card — from one request,
+// Both halves of what myOwnership.ts keeps per account — the owned games (with their playtime)
+// behind the ✓/☆ markers, and the per-member breakdown behind the panel's "Owned by" card — from one request,
 // since /api/common-games returns both in the same response. `fetchedAt` rides along for the
 // third caller (listResolve.ts's createDefaultFetchers): a comparison or a dynamic list is built
 // out of these sets, and its own hero has to be able to say how old they are.
 export async function fetchAccountOwnedData(
   accountId: string,
   opts: { refresh?: boolean } = {},
-): Promise<{ appids: Set<number>; owners: Map<number, GameOwner[]>; fetchedAt: number | null }> {
+): Promise<{ games: Map<number, AccountLibraryGame>; owners: Map<number, GameOwner[]>; fetchedAt: number | null }> {
   const { games, owners, fetchedAt } = await fetchAccountOverview(membersFromAccountId(accountId), opts);
-  return { appids: new Set(games.map((g) => g.appid)), owners, fetchedAt };
+  return { games: new Map(games.map((g) => [g.appid, g])), owners, fetchedAt };
 }
 
 export interface AccountFriend {
