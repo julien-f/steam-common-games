@@ -610,12 +610,15 @@ export default function ListRoute() {
     setRefreshingPrices(true);
     setPriceFetchedAt(undefined);
     try {
-      const gen = loadGuard.current();
-      if (kind === 'bundle' && resolvedBundleGames) await loadPrices(resolvedBundleGames, gen, true);
-      else if (hasPrices()) await loadPrices(rowsStore, gen, true);
+      const targets = priceTargets();
+      if (targets) await loadPrices(targets, loadGuard.current(), true);
     } finally {
       setRefreshingPrices(false);
     }
+  }
+  // A bundle's games are priced by their resolved ITAD gid, a priced list's rows by appid.
+  function priceTargets(): readonly { appid: number; gid?: string }[] | null {
+    return resolvedBundleGames ?? (hasPrices() ? rowsStore : null);
   }
 
   async function handleRefreshList(): Promise<void> {
@@ -1851,7 +1854,6 @@ export default function ListRoute() {
     }
 
     let initialRows: Game[];
-    let streamTargets: { appid: number }[];
     resolvedBundleGames = null;
     let pendingGroups: MembershipGroup[] | null = null;
     // Not cleared on a ↻ Refresh of the list already on screen, for the same reason heroTitle
@@ -1985,7 +1987,6 @@ export default function ListRoute() {
       const { appids } = resolved;
       pendingGroups = resolved.groups;
       initialRows = [...appids].map((appid) => ({ appid, name: '', loading: true, details: null }));
-      streamTargets = [...appids].map((appid) => ({ appid }));
     } else if (kind === 'user') {
       // A manual list, or a dynamic one using any op other than group-by-membership, renders as
       // one flat table (flattened via flattenCombineResult, same as when it's resolved as
@@ -2028,7 +2029,6 @@ export default function ListRoute() {
         details: null,
         ...(rankOf ? { rank: rankOf.get(appid) ?? null } : {}),
       }));
-      streamTargets = [...appids].map((appid) => ({ appid }));
     } else if (kind === 'shared') {
       // Another dynamic list's formula, decoded straight from ?f= (listShare.ts) — same "resolve
       // an in-memory dynamic list through the normal listResolve.ts/listLabels.ts path" idea
@@ -2061,7 +2061,6 @@ export default function ListRoute() {
         loading: true,
         details: null,
       }));
-      streamTargets = [...appids].map((appid) => ({ appid }));
     } else if (kind === 'recent') {
       setListTitle('Recently Looked Up');
       const recents = loadRecentGames();
@@ -2080,7 +2079,6 @@ export default function ListRoute() {
         loading: true,
         details: null,
       }));
-      streamTargets = recents;
     } else if (kind === 'bundle') {
       setStatusText('Resolving games to Steam…');
       try {
@@ -2130,7 +2128,6 @@ export default function ListRoute() {
           loading: true,
           details: null,
         }));
-        streamTargets = resolved;
       } catch (err) {
         if (loadGuard.isStale(gen)) return;
         setStatusText(loadErrorText(err));
@@ -2179,7 +2176,6 @@ export default function ListRoute() {
             loading: true,
             details: null,
           }));
-          streamTargets = games;
         } else {
           const { items, fetchedAt: at } = await fetchAccountWishlist(account.members, { refresh });
           if (loadGuard.isStale(gen)) return;
@@ -2192,7 +2188,6 @@ export default function ListRoute() {
             loading: true,
             details: null,
           }));
-          streamTargets = items;
         }
       } catch (err) {
         if (loadGuard.isStale(gen)) return;
@@ -2353,7 +2348,7 @@ export default function ListRoute() {
     // rows come from the same path the game itself lives at, everything else is contextual state
     // layered on top of a route that already has its own identity). Placed after the table/rows
     // are built (openGame/openOrAddRecentGame both need rowStore/table to already exist) and
-    // before the streamTargets-empty early return below, since a first-ever /game/:appid lookup
+    // before the empty-list early return below, since a first-ever /game/:appid lookup
     // can arrive with an otherwise-empty recents list. Only the *first* load needs to do this
     // here — a later appid-only change is handled by load()'s own fast path above instead.
     // This list is being rebuilt, so its own random-pick history no longer describes its
@@ -2384,7 +2379,7 @@ export default function ListRoute() {
     // it, streamGameDetails needs its own guard too: the server 400s a `games: []` stream
     // request outright ("Provide at least one game"), confirmed live the first time this path
     // was actually reachable through the UI.
-    if (streamTargets.length === 0) {
+    if (initialRows.length === 0) {
       setStatusText('');
       const account = heroAccount();
       const whose = account ? `${accountDisplayLabel(account)}'s` : "This account's";
@@ -2399,10 +2394,10 @@ export default function ListRoute() {
       return;
     }
 
-    if (hasPrices()) loadPrices(streamTargets, gen); // runs concurrently, not awaited
-    if (kind === 'bundle' && resolvedBundleGames) loadPrices(resolvedBundleGames, gen); // ditto
+    const targets = priceTargets();
+    if (targets) loadPrices(targets, gen); // runs concurrently, not awaited
     if (stampsOwnership) loadMyOwnership(gen); // ditto
-    const toStream = kept ? streamTargets.filter((target) => !kept.has(target.appid)) : streamTargets;
+    const toStream = kept ? initialRows.filter((row) => !kept.has(row.appid)) : initialRows;
     if (toStream.length) await streamGameDetails(toStream, gen);
     if (loadGuard.isStale(gen)) return;
     restorePendingShot(); // now that the open game's screenshots/videos have actually arrived
