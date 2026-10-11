@@ -1187,6 +1187,37 @@ test('F1 edge: after ↓ finds no game to step to, → still slides the next scr
   expect(anims).toContain('lb-img lb-anim-right');
 });
 
+test('F1 edge: stepping past the last media or game slides back in from the other side', async ({ page }) => {
+  await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
+  await page.goto('/game/1145360?shot=s1');
+  await expect(page.locator('.lb-caption-pos')).toHaveText('Game 2 of 3');
+  await page.keyboard.press('End');
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 3 of 3');
+  const anims = async (step: () => Promise<void>) => {
+    await page.locator('#screenshot-lightbox .lb-img').evaluate((img) => {
+      const w = window as unknown as { lbAnims: string[] };
+      w.lbAnims = [];
+      new MutationObserver(() => w.lbAnims.push(img.className)).observe(img, { attributeFilter: ['class'] });
+    });
+    await step();
+    return page.evaluate(() => (window as unknown as { lbAnims: string[] }).lbAnims);
+  };
+  expect(
+    await anims(async () => {
+      await page.keyboard.press('ArrowRight');
+      await expect(page.locator('.lb-counter')).toHaveText('Cover');
+    }),
+  ).toContain('lb-img lb-anim-left');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.lb-caption-pos')).toHaveText('Game 3 of 3');
+  expect(
+    await anims(async () => {
+      await page.keyboard.press('ArrowDown');
+      await expect(page.locator('.lb-caption-pos')).toHaveText('Game 1 of 3');
+    }),
+  ).toContain('lb-img lb-anim-top');
+});
+
 test('F1 edge: stepping games with hidden controls flashes the game name too', async ({ page }) => {
   await page.clock.install();
   await asPlayer(page, ALICE);

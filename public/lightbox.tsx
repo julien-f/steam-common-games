@@ -175,8 +175,11 @@ export function lightboxShot(): { appid: number; shotId: string } | null {
 // the lightbox is covering. Whatever had focus in here keeps it, so holding ↓ on the caption
 // button doesn't walk focus away mid-click; the close button is the fallback, as on a real open.
 // `dir` only drives the enter animation's direction — 0 (R, which has no direction) skips it.
+// A wrap past either end of the list enters from the other side, the cue that it went back round.
 function stepGameNav(dir: number) {
-  stepGameFromLightbox(() => _onGameNav(dir), dir);
+  const pos = _getGamePosition();
+  const wraps = pos !== null && pos.index === (dir > 0 ? pos.total - 1 : 0);
+  stepGameFromLightbox(() => _onGameNav(dir), wraps ? -dir : dir);
 }
 
 function stepGameFromLightbox(step: () => void, dir = 0) {
@@ -1142,10 +1145,11 @@ function stepLightbox(dir: number) {
   // The viewer has taken over: whatever is on screen from here on is their choice, so the latch
   // must never move it under them.
   _awaitingMedia = null;
-  lbLastDir = dir;
   lbLastAxis = 'x';
   const list = shots();
   const next = (idx() + dir + list.length) % list.length;
+  // Entering from the side actually moved toward, so a wrap to the Cover slides in from the left.
+  lbLastDir = Math.sign(next - idx()) || dir;
   setIdx(next);
   _onLightboxParamChange(list[next].shotId);
 }

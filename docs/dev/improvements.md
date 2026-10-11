@@ -55,7 +55,6 @@ None open.
 
 ## Consistency and polish
 
-- **U118 · polish · F1** — stepping past the last media wraps to the Cover, and past the last game to game 1, with nothing but the counter changing. A wrap cue (direction of the enter animation, or a brief "back to start").
 - **U120 · polish · F1** — stepping back to a game just left in the lightbox lands on its first item of the kind being left, not where you were (Hades Screenshot 2 → ↓ → ↑ → Screenshot 1). Remember the last item per game for the session.
 - **U119 · polish · I2** — the `?` dialog lists no way to open the lightbox from the panel (Enter on the hero works); add it under Game panel.
 
