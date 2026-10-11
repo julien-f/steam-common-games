@@ -972,6 +972,22 @@ test('F1 edge: stepping media leaves hidden controls hidden, flashing only the c
   await expect(lb).not.toHaveClass(/lb-idle/);
 });
 
+test('F1 edge: after ↓ finds no game to step to, → still slides the next screenshot in sideways', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist?game=1145360&shot=s1'); // Hades: not on the wishlist, so no game to step to
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await page.locator('#screenshot-lightbox .lb-img').evaluate((img) => {
+    const w = window as unknown as { lbAnims: string[] };
+    w.lbAnims = [];
+    new MutationObserver(() => w.lbAnims.push(img.className)).observe(img, { attributeFilter: ['class'] });
+  });
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+  const anims = await page.evaluate(() => (window as unknown as { lbAnims: string[] }).lbAnims);
+  expect(anims).toContain('lb-img lb-anim-right');
+});
+
 test('F1 edge: stepping games with hidden controls flashes the game name too', async ({ page }) => {
   await page.clock.install();
   await asPlayer(page, ALICE);
