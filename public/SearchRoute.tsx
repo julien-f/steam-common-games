@@ -18,7 +18,7 @@ import { peekMyOwnershipStatus, onMyOwnershipReady } from './myOwnership.ts';
 import { GAME_SEARCH_DEBOUNCE_MS, GAME_SEARCH_MIN_CHARS, ownershipMarkersHtml, searchGames } from './gameSearch.ts';
 import type { GameSearchResult } from './gameSearch.ts';
 import type { Game, GameDetails } from './types.ts';
-import { fetchJson } from './utils.ts';
+import { fetchJson, focusGameRow } from './utils.ts';
 
 // Mirrors CORE_COLUMNS' own identity pair (gameColumns.ts) — a fixed-width thumb column plus a
 // Name column with inline ownership badges — but over GameSearchResult's bare {appid, name,
@@ -166,12 +166,7 @@ export default function SearchRoute() {
   // need a visible ring since the row it opens was just clicked, and does benefit from `moveTo`'s
   // free group-expand/page-jump, which this route's single-page, ungrouped table never needed.
   function focusRow(appid: number): void {
-    requestAnimationFrame(() => {
-      const row = tableWrapEl?.querySelector<HTMLElement>(`tr.dt-tr[data-row-key="${appid}"]`);
-      if (!row) return; // not on screen (or not one of this search's own rows) — nothing to do
-      row.focus({ preventScroll: true });
-      row.scrollIntoView({ block: 'nearest' });
-    });
+    requestAnimationFrame(() => focusGameRow(tableWrapEl, appid));
   }
 
   let lookupToken = 0;

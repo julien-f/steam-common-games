@@ -9,6 +9,7 @@ import {
   fmtLastPlayed,
   computeSteamdbRating,
   PROTON_TIER_COLORS,
+  focusGameRow,
 } from './utils.ts';
 import { openLightbox, lightboxShot } from './lightbox.tsx';
 import { decideSwipeAxis, type SwipeAxis } from './lightboxSwipe.ts';
@@ -655,8 +656,7 @@ export function panelClose({ leavingRoute = false } = {}) {
   document.getElementById('game-panel')!.classList.remove('open');
   clearPanelNav();
   // The shown game's row first: after ↑/↓ or a deep link, the opener is a stale row or the panel itself.
-  // `data-row-key` is @vates/data-table-solid's undocumented internal (see SearchRoute's focusRow).
-  (document.querySelector<HTMLElement>(`main tr.dt-tr[data-row-key="${game.appid}"]`) ?? panelPrevFocus)?.focus();
+  if (!focusGameRow(document.querySelector('main'), game.appid)) panelPrevFocus?.focus();
   panelPrevFocus = null;
   // Every close path funnels through here — the × button is bound straight to this function
   // (see initPanel above), and swipe-to-close calls it directly too — so this is the one place
