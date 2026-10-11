@@ -32,7 +32,7 @@ function measureScript({ fresh, state, name, routes }) {
     await page.evaluate(() => localStorage.clear());
     await page.goto(base + '/');
     await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('alice');
-    await page.getByRole('button', { name: 'Set as current account' }).click();
+    await page.getByRole('button', { name: 'Look up', exact: true }).click();
     await page.waitForTimeout(500);
   }
   const errors = [];
