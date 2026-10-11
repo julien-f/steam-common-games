@@ -20,6 +20,8 @@ Last reviewed: never · Transcripts read up to: never.
 - **P7 · CLAUDE.md · S** — the doc-prose rule covers `docs/`: current behavior only, each number in one place. Measure: `node scripts/setup-facts.js --cost`'s largest docs — frontend.md 49.8 KB, integrations.md 26.2 KB (73 and 43 KB before the 2026-10-11 trim) → no growth without a feature to account for it.
 - **P8 · setup-review · S** — `setup-facts.js --transcripts` counts doc reads (whole or narrowed, subagents included) and `--cost` lists the largest docs, for a new **Docs** check on how docs are split. Measure: the next run judges doc structure from those numbers (none before).
 
+- **P9 · batch.js · S** — `status` shows each finished lane's idle minutes and `record` stores `lanesMin`/`laneIdleMin`, to decide on faster batches (line-range lane planning, per-lane review) from numbers. On 2026-10-11 lane D held 12 of 19 items, all tied by `ListRoute.tsx`. Measure: this batch's recorded `laneIdleMin` and `afterLanesMin`, the baseline for whichever change follows.
+
 ## Open
 
 None.

@@ -106,7 +106,8 @@ function doneTimes(ids, since, logText) {
   return done;
 }
 
-// Per lane: done/total, minutes left at the lane's own pace (the history's until its first item).
+// Per lane: done/total, minutes left at the lane's own pace (the history's until its first item), and
+// minutes a finished lane has sat idle since its last item (the wait on slower lanes).
 function laneStatus(manifest, done, nowSec, rates) {
   return manifest.lanes.map((lane) => {
     const finished = lane.items.filter((it) => done.has(it.id));
@@ -119,6 +120,7 @@ function laneStatus(manifest, done, nowSec, rates) {
       done: finished.length,
       total: lane.items.length,
       minLeft: Math.max(0, unitsLeft * pace - (nowSec - last) / 60),
+      idleMin: finished.length === lane.items.length ? (nowSec - last) / 60 : 0,
     };
   });
 }
@@ -127,12 +129,13 @@ function formatStatus(lanes, rates) {
   const done = lanes.reduce((s, l) => s + l.done, 0);
   const total = lanes.reduce((s, l) => s + l.total, 0);
   const lanesLeft = Math.max(0, ...lanes.map((l) => l.minLeft));
+  const idle = lanes.reduce((s, l) => s + l.idleMin, 0);
   const lines = lanes.map(
     (l) =>
-      `  lane ${l.name}: ${l.done}/${l.total}${l.done === l.total ? ' done' : `, ~${Math.ceil(l.minLeft)} min left`}`,
+      `  lane ${l.name}: ${l.done}/${l.total}${l.done === l.total ? ` done, idle ${Math.round(l.idleMin)} min` : `, ~${Math.ceil(l.minLeft)} min left`}`,
   );
   return [
-    `batch ${done}/${total} · ~${Math.ceil(lanesLeft + rates.afterLanesMin)} min left (lanes ~${Math.ceil(lanesLeft)}, then merge/review ~${rates.afterLanesMin})`,
+    `batch ${done}/${total} · ~${Math.ceil(lanesLeft + rates.afterLanesMin)} min left (lanes ~${Math.ceil(lanesLeft)}, then merge/review ~${rates.afterLanesMin})${idle >= 1 ? ` · ${Math.round(idle)} lane-min idle` : ''}`,
     ...lines,
   ].join('\n');
 }
@@ -234,6 +237,7 @@ function record() {
   const date = new Date(manifest.start * 1000).toISOString().slice(0, 10);
   const rows = [];
   let lanesEnd = manifest.start;
+  const laneEnds = [];
   for (const lane of manifest.lanes) {
     let prev = manifest.start;
     for (const it of lane.items.filter((i) => done.has(i.id)).sort((a, b) => done.get(a.id) - done.get(b.id))) {
@@ -247,8 +251,15 @@ function record() {
       prev = done.get(it.id);
     }
     lanesEnd = Math.max(lanesEnd, prev);
+    laneEnds.push(prev);
   }
-  rows.push({ date, afterLanesMin: Math.round((Date.now() / 1000 - lanesEnd) / 60) });
+  // lanesMin and laneIdleMin (finished lanes waiting on the slowest) show whether the lanes were balanced.
+  rows.push({
+    date,
+    afterLanesMin: Math.round((Date.now() / 1000 - lanesEnd) / 60),
+    lanesMin: Math.round((lanesEnd - manifest.start) / 60),
+    laneIdleMin: Math.round(laneEnds.reduce((s, end) => s + (lanesEnd - end), 0) / 60),
+  });
   fs.appendFileSync(HISTORY, rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
   fs.rmSync(MANIFEST);
   console.log(`recorded ${rows.length - 1} items`);
