@@ -1052,10 +1052,8 @@ export default function ListRoute() {
   }
   // The comparison a load has already done, in both spellings of it — see load()'s own guard.
   let loadedCompareKeys = new Set<string>();
-  function compareKey(): string {
-    return `${compareOp()}|${compareSlots()
-      .map((slot) => slot.join(','))
-      .join('|')}`;
+  function compareKey(op = compareOp(), slots = compareSlots()): string {
+    return `${op}|${slots.map((slot) => slot.join(',')).join('|')}`;
   }
   // Names this comparison's own accounts in the formula/group headings. They're resolved from the
   // URL, so they're typically in no store at all — createDefaultNaming would fall back to naming
@@ -1952,7 +1950,7 @@ export default function ListRoute() {
       // a `?u=` override follows (see docs/dev/lists-and-accounts.md).
       const canonicalSlots = normalizeSlots(accounts.map((a) => a.members));
       const canonical = compareUrl(canonicalSlots, compareOp());
-      loadedCompareKeys.add(`${compareOp()}|${canonicalSlots.map((slot) => slot.join(',')).join('|')}`);
+      loadedCompareKeys.add(compareKey(compareOp(), canonicalSlots));
       if (canonical !== routerLocation.pathname + routerLocation.search) navigate(canonical, { replace: true });
 
       const list = inMemoryDynamicList(
