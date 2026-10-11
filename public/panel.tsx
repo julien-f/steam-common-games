@@ -68,6 +68,7 @@ function bundleTierText(b: GameBundle): string {
 // The shell's hooks, passed once to initPanel.
 export interface PanelOptions {
   onTagClick: (dim: string, val: string) => void;
+  tagsFilterable: () => boolean; // false: tags render as plain pills
   isTagActive: (dim: string, val: string) => boolean;
   onRefresh: (game: ReadonlyGame) => void;
   onNavigateGame: (appid: number, name: string) => void;
@@ -731,15 +732,26 @@ function TagCloud(props: { groups: { kind: TagKind; dim: string; items?: string[
         <div class="panel-tags">
           <For each={pills()}>
             {({ kind, dim, v }) => {
+              const dot = <span class="panel-tag-dot" style={{ background: TAG_KIND_META[kind].color }} />;
               return (
-                <button
-                  class="panel-tag panel-tag-btn"
-                  classList={{ active: panelOptions.isTagActive(dim, v) }}
-                  onClick={() => panelOptions.onTagClick(dim, v)}
+                <Show
+                  when={panelOptions.tagsFilterable()}
+                  fallback={
+                    <span class="panel-tag">
+                      {dot}
+                      {v}
+                    </span>
+                  }
                 >
-                  <span class="panel-tag-dot" style={{ background: TAG_KIND_META[kind].color }} />
-                  {v}
-                </button>
+                  <button
+                    class="panel-tag panel-tag-btn"
+                    classList={{ active: panelOptions.isTagActive(dim, v) }}
+                    onClick={() => panelOptions.onTagClick(dim, v)}
+                  >
+                    {dot}
+                    {v}
+                  </button>
+                </Show>
               );
             }}
           </For>

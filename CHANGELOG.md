@@ -73,6 +73,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The server log no longer repeats a line for every request refused once an outbound budget is spent
 - An account Steam returns no profile for is named by what you typed rather than its bare Steam ID
 - Stepping to another screenshot while Retry is loading one now keeps the screenshot you stepped to
+- On the ranking screen, the side panel's ↻ Refresh re-fetches the game's details, and its tags no longer look like filter buttons
 
 ### Development
 
