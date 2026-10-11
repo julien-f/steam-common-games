@@ -1552,17 +1552,7 @@ export default function ListRoute() {
         // its place in the list rather than jumping to the front on every visit.
         renameRecentGame(row.appid, row.name, capsule);
       }
-      // The open panel needs no notification of the mutation above — it reads this row's fields
-      // straight off the store. renderPanelNav is NOT called here either, even for this exact
-      // row: apply() runs inside flushNow()'s own batch(), and renderPanelNav's own list comes
-      // from the *table's* processedData(), a Solid memo derived from rowsStore; batch() defers
-      // that recomputation until the batch itself returns, so a read here would still see this row
-      // (and anything else applied earlier in this same flush) as it was *before* this flush — for
-      // a flush that's just this one row (exactly the case a fresh single-game lookup hits), that
-      // means an empty list, a "0 / 0" position stuck on screen, and a crash on Previous/Next
-      // (confirmed live before this fix: `list[(idx - 1 + list.length) % list.length]` with
-      // `idx = -1, list = []` reads `list[NaN]`, and onOpen(undefined) throws). onFlush below runs
-      // right after the batch instead.
+      // The open panel reads this row straight off the store, and panelNav tracks the list itself.
       if (isPanelOpen() && getPanelGame()?.appid === row.appid) {
         // A `&shot=` deep link waits on *this* row's media, not the whole stream: replaying it
         // only once every game in the list had finished meant a 115-game wishlist sat for ~20
@@ -1572,11 +1562,7 @@ export default function ListRoute() {
       }
     },
     isStale: (gen) => loadGuard.isStale(gen),
-    onFlush: () => {
-      updateStatus();
-      const g = getPanelGame();
-      if (g) renderPanelNav(g);
-    },
+    onFlush: updateStatus,
   });
 
   async function streamGameDetails(games: { appid: number }[], gen: number): Promise<void> {
