@@ -44,6 +44,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - In the viewer with the controls hidden, a media step right after a game step no longer keeps showing the game's name.
 - A list no longer hides its prices for the whole visit when the server's health check fails once.
 - Reverting a comparison to a saved layout without its grouping no longer ungroups it
+- A list refresh that fails, or a first load that fails, keeps the Updated tile to retry from
 
 ### Development
 

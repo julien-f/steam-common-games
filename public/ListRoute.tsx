@@ -606,8 +606,12 @@ export default function ListRoute() {
   // a manual list, the recent list) — which is not the same as `null`, "fetched fresh just now".
   const [fetchedAt, setFetchedAt] = createSignal<number | null | undefined>(undefined);
   // A comparison/dynamic list is built from several account fetches, each with its own age.
+  // A refresh keeps the previous age on screen until its first fetch replaces it.
+  let replaceFetchedAt = false;
   function noteFetchedAt(at: number | null): void {
-    setFetchedAt((prev) => oldestFetchedAt(prev, at));
+    const replace = replaceFetchedAt;
+    replaceFetchedAt = false;
+    setFetchedAt((prev) => oldestFetchedAt(replace ? undefined : prev, at));
   }
   const [refreshing, setRefreshing] = createSignal(false);
   // The Prices tile's own refresh (wishlist/bundle kinds). Deliberately one control
@@ -1961,11 +1965,15 @@ export default function ListRoute() {
       setHeroTitle('');
       setHeroAccount(null);
     }
-    setListSources([]);
     bundleLeftOut = new Map();
     // Every kind that has one re-reports it during this load; a kind that doesn't (manual list,
-    // recents) must not keep showing the previous list's.
-    setFetchedAt(undefined);
+    // recents) must not keep showing the previous list's. A refresh keeps both until replaced, so
+    // a failed one leaves the Updated tile and the formula line to try again from.
+    replaceFetchedAt = refresh;
+    if (!refresh) {
+      setListSources([]);
+      setFetchedAt(undefined);
+    }
 
     let initialRows: Game[];
     let streamTargets: { appid: number }[];
@@ -2819,11 +2827,13 @@ export default function ListRoute() {
     // Owned/wishlist state their own fetch's age; a comparison or a dynamic list states the
     // oldest of the account fetches it was built from (noteFetchedAt), which is why this is
     // gated on there *being* an age rather than on the kind — a manual list is assembled from
-    // stored appids and has none, and neither does the recent list.
-    if (fetchedAt() !== undefined || refreshing()) {
+    // stored appids and has none, and neither does the recent list. The kinds always built from
+    // account fetches keep it without one too: a first load that failed is when a retry is wanted.
+    const accountBuilt = kind === 'owned' || kind === 'wishlist' || kind === 'compare';
+    if (fetchedAt() !== undefined || refreshing() || accountBuilt) {
       tiles.push({
         label: 'Updated',
-        value: refreshTileValue(refreshing() ? 'Refreshing…' : fmtAge(fetchedAt())),
+        value: refreshTileValue(refreshing() ? 'Refreshing…' : fetchedAt() === undefined ? '—' : fmtAge(fetchedAt())),
         title:
           kind === 'owned' || kind === 'wishlist'
             ? "How old the server's cached copy of this account's list is — click to force a fresh fetch"

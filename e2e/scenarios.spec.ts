@@ -610,6 +610,36 @@ test('D1 edge: Updated ↻ keeps the rows and the selection while it refreshes',
   await expect(row(page, 'Portal 2').getByRole('checkbox')).toBeChecked();
 });
 
+test('D1 edge: a failed Updated ↻ leaves the tile there to try again', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare?u=alice&u=bob');
+  await expect(groupRows(page)).toHaveCount(3);
+  await page.route('**/api/common-games', (route) =>
+    route.fulfill({ status: 502, json: { error: 'Steam request failed' } }),
+  );
+  const updated = page.locator('.list-stat', { hasText: 'Updated' });
+  await updated.click();
+  await expect(page.getByRole('main')).toContainText('Steam request failed');
+  await expect(updated).not.toContainText('Refreshing');
+  await expect(page.locator('.list-formula')).toBeVisible();
+
+  await page.unroute('**/api/common-games');
+  await updated.click();
+  await expect(page.getByRole('main')).not.toContainText('Steam request failed');
+});
+
+test('D1 edge: an Owned list that failed to load still offers Updated ↻', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.route('**/api/common-games', (route) =>
+    route.fulfill({ status: 502, json: { error: 'Steam request failed' } }),
+  );
+  await page.goto('/lists/owned');
+  await expect(page.getByRole('main')).toContainText('Steam request failed');
+  await page.unroute('**/api/common-games');
+  await page.locator('.list-stat', { hasText: 'Updated' }).click();
+  await expect(rows(page)).toHaveCount(6);
+});
+
 test('D2.1-2: with upstreams down, every game is still listed', async ({ page }) => {
   await mockApi(page, { states: ['upstream-down'] });
   await asPlayer(page, ALICE);
