@@ -2474,13 +2474,22 @@ export default function ListRoute() {
     };
   }
 
+  // The open bundle's appid -> ITAD gid, rebuilt only when load() replaces its games.
+  let gidMapFor: ResolvedGame[] | null | undefined;
+  let gidMap = new Map<number, string>();
+  function gidOf(appid: number): string | undefined {
+    if (gidMapFor !== resolvedBundleGames) {
+      gidMapFor = resolvedBundleGames;
+      gidMap = new Map((resolvedBundleGames ?? []).map((g) => [g.appid, g.gid]));
+    }
+    return gidMap.get(appid);
+  }
   // How many picks the selection takes in a pick-and-mix bundle — one per ITAD game, so a Steam
   // package spanning several rows counts once — and the cheapest way to buy them.
   function onePerGid(rows: readonly Game[]): Game[] {
-    const gidOf = new Map((resolvedBundleGames ?? []).map((g) => [g.appid, g.gid]));
     const seen = new Set<string | number>();
     return rows.filter((r) => {
-      const key = gidOf.get(r.appid) ?? r.appid;
+      const key = gidOf(r.appid) ?? r.appid;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -2526,20 +2535,19 @@ export default function ListRoute() {
   function fanaticalPicks(): { url: string; names: string[]; byHand: string[] } | null {
     const { url, fanaticalNames } = bundleLinks();
     if (!url || !fanaticalNames || !pickPlan()) return null;
-    const gidOf = new Map((resolvedBundleGames ?? []).map((g) => [g.appid, g.gid]));
     const names: string[] = [];
     const byHand: string[] = [];
     for (const r of onePerGid(selectedRows())) {
-      const name = fanaticalNames[gidOf.get(r.appid) ?? ''];
+      const name = fanaticalNames[gidOf(r.appid) ?? ''];
       if (name) names.push(name);
       else byHand.push(r.bundlePackage?.title || r.name);
     }
     return names.length ? { url: fanaticalBuyUrl(url, names), names, byHand } : null;
   }
-  // The selection's summed best deals in the plan's currency, null until every one is priced —
-  // once per gid, since a package's rows each carry the whole package's deal.
-  function selectedBestDeals(currency: string): number | null {
-    const deals = onePerGid(selectedRows()).map((r) =>
+  // `rows`' summed best deals in `currency`, null until every one is priced — once per gid, since a
+  // package's rows each carry the whole package's deal.
+  function sumBestDeals(rows: readonly Game[], currency: string): number | null {
+    const deals = onePerGid(rows).map((r) =>
       r.bestDealPrice == null ? null : convert(r.bestDealPrice, r.priceCurrency ?? currency, currency),
     );
     return deals.every((d) => d != null) ? deals.reduce((sum, d) => sum! + d!, 0)! : null;
@@ -2596,11 +2604,7 @@ export default function ListRoute() {
     if (account && rowsStore.length > 0 && rowsStore.every((r) => r.inLibrary != null)) {
       const fresh = rowsStore.filter((r) => !r.inLibrary);
       const target = regionCurrency();
-      // Once per gid: a package's rows each carry the whole package's deal.
-      const priced = onePerGid(fresh).map((r) =>
-        r.bestDealPrice == null ? null : convert(r.bestDealPrice, r.priceCurrency ?? target, target),
-      );
-      const total = priced.every((p) => p != null) ? priced.reduce((sum, p) => sum! + p!, 0)! : null;
+      const total = sumBestDeals(fresh, target);
       tiles.push({
         label: 'New to you',
         value: `${fresh.length} of ${rowsStore.length}`,
@@ -3325,7 +3329,7 @@ export default function ListRoute() {
                   </span>
                   <span class="selection-pick-detail">{pickPlanDetail(plan(), selectedPickCount())}</span>
                 </span>
-                <Show when={selectedBestDeals(plan().currency)}>
+                <Show when={sumBestDeals(selectedRows(), plan().currency)}>
                   {(deals) => (
                     <span
                       class="selection-pick-savings"
