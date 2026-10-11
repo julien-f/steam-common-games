@@ -51,7 +51,7 @@ None open.
 
 ## Accounts and first visit
 
-- **U34 · minor · A1** — first-visit Home doesn't say what the app does; the main button reads "Set as current account". One-line intro; "Look up".
+None open.
 
 ## Consistency and polish
 

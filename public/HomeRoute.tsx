@@ -435,7 +435,15 @@ export default function HomeRoute() {
             Family, where no single persona/profile/presence describes the whole thing. Everything
             beyond the label/avatar comes from `players()` (fetched live, see the effect above),
             not from the stored AccountSlot, so it can't show a stale persona or presence. */}
-        <Show when={currentAccount()} fallback={<p>No account selected yet.</p>}>
+        <Show
+          when={currentAccount()}
+          fallback={
+            <p class="home-intro">
+              Browse a Steam library with ratings, completion times and prices, and compare it with friends'. Start by
+              looking up your account.
+            </p>
+          }
+        >
           {(account) => (
             <div class="account-header">
               <Show when={solePlayer()?.avatarUrl || account().avatarUrl}>
@@ -597,7 +605,7 @@ export default function HomeRoute() {
             + Add Steam Family account
           </button>
           <button type="submit" disabled={resolving()}>
-            {resolving() ? 'Resolving…' : 'Set as current account'}
+            {resolving() ? 'Looking up…' : 'Look up'}
           </button>
         </form>
         {resolveError() && <p class="error">{resolveError()}</p>}
