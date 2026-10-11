@@ -625,7 +625,10 @@ export function panelOpen(game: ReadonlyGame) {
   setPanelGame(game);
   setHeroIdx(0);
   setMoreLinksOpen(false);
-  panelPrevFocus = document.activeElement as HTMLElement | null;
+  // A reopen from inside the panel or its lightbox (↑/↓, a DLC hop) keeps the original opener.
+  const active = document.activeElement as HTMLElement | null;
+  if (active && active !== document.body && !active.closest('#game-panel, #screenshot-lightbox'))
+    panelPrevFocus = active;
   document.getElementById('panel-body')!.scrollTop = 0;
   // No load* calls here: news/achievements/owners/ownership/price are resources keyed on the
   // open game (see "Per-game async data" above), so setting `panelGame` above is itself what

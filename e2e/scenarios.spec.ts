@@ -1840,6 +1840,38 @@ test('I2 edge: Esc closing the panel returns focus to the row it was showing', a
   await expect(page.locator('tr.dt-tr:focus')).toHaveCount(1);
 });
 
+test('I2 edge: × closing the panel returns focus to the row it was showing', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Hades').getByText('Hades').click();
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('#panel-title')).not.toHaveText('Hades');
+  const shown = new URL(page.url()).searchParams.get('game');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.locator('.game-panel')).toBeHidden();
+  await expect(page.locator(`tr.dt-tr[data-row-key="${shown}"]`)).toBeFocused();
+});
+
+test('I2 edge: closing a game with no row returns focus to the row it was opened from', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  // The DLC hopped to has no fixture details; the store not answering is enough here.
+  await page.route(/\/api\/game-details\/9000\d\d$/, (route) =>
+    route.fulfill({ json: { appid: 900001, meta: null, failed: ['meta'] } }),
+  );
+  await page.goto('/lists/owned');
+  await row(page, 'Hades').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const card = page.locator('#panel-section-dlc');
+  await card.getByRole('button', { name: /DLC · 25 available/ }).click();
+  await card.locator('.panel-dlc-item').first().click();
+  await expect(page.locator('#panel-title')).not.toHaveText('Hades');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.game-panel')).toBeHidden();
+  await expect(row(page, 'Hades')).toBeFocused();
+});
+
 test('I2 edge: the shortcuts dialog says how to open the lightbox from the panel', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
