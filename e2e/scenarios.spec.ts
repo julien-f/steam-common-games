@@ -2,7 +2,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mockApi, respond } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
-import { ALICE, BOB, BUNDLE, SYNCED_LIST } from './fixtures.ts';
+import { ALICE, BOB, BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
 
 let pageErrors: string[];
 test.beforeEach(async ({ page }) => {
@@ -189,6 +189,20 @@ test('C1.4: compare three players — one table grouped from "all" to "only one"
   expect(await page.evaluate(() => localStorage.getItem('steam.isonoe.net:prefs') ?? '')).not.toContain(
     'currentAccount',
   );
+});
+
+test('C1 edge: reverting to a saved ungrouped layout keeps the comparison grouped', async ({ page }) => {
+  await mockApi(page, { states: ['signed-in'] });
+  // The account's saved comparison view, with the grouping removed.
+  const now = Date.now();
+  const compareListView = { value: { groupBy: [], sorts: [{ key: 'name', dir: 'asc' }] }, updatedAt: now };
+  const prefs = { ...signedInPrefs(now), compareListView };
+  await page.route('**/api/me', (route) => route.fulfill({ json: { steamid: SIGNED_IN.steamid, prefs } }));
+  await page.goto('/lists/compare?u=alice&u=bob');
+  await expect(groupRows(page)).toHaveCount(3);
+  await page.getByRole('button', { name: 'Revert' }).click();
+  await expect(row(page, 'Hades')).toBeVisible(); // the reverted name sort applies…
+  await expect(groupRows(page)).toHaveCount(3); // …but the comparison stays grouped
 });
 
 test('C1 edge: my account comes first, is prefilled, and only once', async ({ page }) => {

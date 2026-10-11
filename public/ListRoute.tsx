@@ -733,6 +733,17 @@ export default function ListRoute() {
   let table: TableState<Game> | null = null;
   let disposeTable: (() => void) | null = null;
   let unsyncView: (() => void) | null = null;
+  let tableGrouped = false;
+  // Every view applied to the table (restored, shared, reset, reverted) goes through this, so a
+  // group-by-membership table stays grouped by it and a flat one never is.
+  function applyView(view: object): void {
+    if (!table) return;
+    table.setViewState(view);
+    const applied = table.getViewState();
+    const adjusted = tableGrouped ? withMembershipGrouping(applied) : withoutMembershipGrouping(applied);
+    if (adjusted !== applied) table.setViewState(adjusted);
+  }
+  const viewTable = { setViewState: applyView, getViewState: () => table?.getViewState() ?? {} };
   // Set only for kind === 'user' — its own per-list tableView, not a shared pref key. A signal
   // (not a plain variable, unlike most of this component's other imperative state) specifically
   // because the selection toolbar's JSX reads it reactively: /lists/:listId is one route
@@ -1820,7 +1831,7 @@ export default function ListRoute() {
   const [viewingShared, setViewingShared] = createSignal(false);
   function handleDiscardSharedView(): void {
     const list = userList();
-    table?.setViewState(list ? (getList(list.id)?.tableView ?? {}) : getPref(viewPrefKey(), {}));
+    applyView(list ? (getList(list.id)?.tableView ?? {}) : getPref(viewPrefKey(), {}));
     setViewingShared(false);
   }
 
@@ -1848,13 +1859,13 @@ export default function ListRoute() {
     if (!table) return;
     const list = userList();
     if (list) {
-      table.setViewState({});
+      applyView({});
       setListTableView(list.id, {});
       const urlParams = new URLSearchParams(routerLocation.search);
       urlParams.delete(viewParamName());
       history.replaceState(null, '', urlWithParams(urlParams));
     } else {
-      resetTableView(table, viewPrefKey(), viewParamName());
+      resetTableView(viewTable, viewPrefKey(), viewParamName());
     }
   }
 
@@ -1870,7 +1881,7 @@ export default function ListRoute() {
   }
   function handleRevertView(): void {
     if (!table) return;
-    revertTableViewToServer(table, viewPrefKey());
+    revertTableViewToServer(viewTable, viewPrefKey());
   }
 
   function viewActions() {
@@ -2462,6 +2473,7 @@ export default function ListRoute() {
         return state;
       });
       table = ts;
+      tableGrouped = !!groups;
       const disposeView = render(
         () =>
           DataTableView<Game>({
@@ -2492,16 +2504,13 @@ export default function ListRoute() {
         // reuse that helper directly — same reasoning handleResetView gives on the reset side.
         const list = userList()!;
         const shared = takeSharedView(viewParamName());
-        table.setViewState(shared ?? list.tableView ?? {});
+        applyView(shared ?? list.tableView ?? {});
         setViewingShared(shared != null);
         unsyncView = bindSolidViewPersistence(table, (view) => setListTableView(list.id, view), viewingShared);
       } else {
-        setViewingShared(restoreTableView(table, viewPrefKey(), viewParamName()));
+        setViewingShared(restoreTableView(viewTable, viewPrefKey(), viewParamName()));
         unsyncView = bindSolidViewPersistence(table, (view) => setPref(viewPrefKey(), view), viewingShared);
       }
-      const restored = table.getViewState();
-      const adjusted = groups ? withMembershipGrouping(restored) : withoutMembershipGrouping(restored);
-      if (adjusted !== restored) table.setViewState(adjusted);
       if (keptSelection?.size) table.selection.setAll(tableData().filter((row) => keptSelection.has(row.appid)));
       setTableReady(true);
     }
