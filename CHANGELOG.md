@@ -46,6 +46,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Deleting a list that a deleted list still drew from no longer drops its games from the lists built on them
 - The account menu now drops removed recent accounts and updates its ★ as soon as they change on Home
 - Home's account card no longer shows the previous account's age, or "Refreshing…", after switching accounts
+- Copying twice in a row no longer leaves a copy button reading "✓ Copied!" for good
 
 ### Development
 
