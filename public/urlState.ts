@@ -12,7 +12,7 @@
 // the way e.g. `game`/`shot` can. See tableViewPrefs.ts's own restoreTableView/shareTableView/
 // resetTableView and ListRoute.tsx's viewParamName. Unlike most other params here, it's not
 // written automatically on every table interaction — only by the table's own "🔗 Share view" button.
-const PARAM_ORDER = ['u', 'op', 'tab', 'sort', 'q', 'game', 'shot', 'tv'];
+const PARAM_ORDER = ['u', 'op', 'q', 'game', 'shot', 'tv'];
 
 export function reorderUrlParams(params: URLSearchParams): URLSearchParams {
   const ordered = new URLSearchParams();
@@ -105,8 +105,6 @@ export function setSearchQueryParam(term: string): void {
 export interface UrlState {
   slots: string[][];
   game: number | null;
-  shot: string | null;
-  sort: { col: string; dir: 1 | -1 } | null;
 }
 // One `u=` value per slot, comma-joined identifiers within it (a Steam Family) — see the
 // URL & sharing section in docs/dev/frontend.md. Shared by parseUrlState and parseAccountParam below so the
@@ -125,18 +123,9 @@ function parseSlots(params: URLSearchParams): string[][] {
 
 export function parseUrlState(search: string): UrlState {
   const params = new URLSearchParams(search);
-  const slots = parseSlots(params);
-  const sortParam = params.get('sort');
   return {
-    slots,
+    slots: parseSlots(params),
     game: Number(params.get('game')) || null,
-    shot: params.get('shot'),
-    sort: sortParam
-      ? {
-          col: sortParam.startsWith('-') ? sortParam.slice(1) : sortParam,
-          dir: sortParam.startsWith('-') ? -1 : 1,
-        }
-      : null,
   };
 }
 
