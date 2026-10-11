@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Soundtracks, videos, demos and other non-game items are no longer looked up on HowLongToBeat
 - Stepping to another game in the screenshot viewer briefly shows that game's name, even with the controls hidden
 - Picking, linking or comparing an account no longer fetches its Steam wishlist just to resolve it
+- With a mouse, the lightbox shows its ↑/↓ game stepper and game position along with its other controls, not only while hovering the game name
 
 ### Fixed
 

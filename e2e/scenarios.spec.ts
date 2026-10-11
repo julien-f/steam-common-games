@@ -1373,27 +1373,12 @@ test("F3 edge: the panel's ↑/↓ follow the table's current search, and hide o
   await expect(page.locator('#panel-title')).toHaveText('Hades');
 });
 
-test("F1 edge: the viewer's game stepper shows on hover or focus with a mouse, always on touch", async ({
-  page,
-}, testInfo) => {
+test("F1 edge: the viewer's game stepper shows with its other controls, not only on hover", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
-  const pos = page.locator('.lb-caption-pos');
-  const prev = page.locator('#screenshot-lightbox .lb-game-prev');
-  if (testInfo.project.name === 'phone') {
-    await expect(pos).toHaveCSS('opacity', '1');
-    await expect(prev).toHaveCSS('opacity', '1');
-    return;
-  }
-  await expect(pos).toHaveCSS('opacity', '0');
-  await expect(prev).toHaveCSS('opacity', '0');
-  await page.locator('.lb-caption-text').hover();
-  await expect(pos).toHaveCSS('opacity', '1');
-  await expect(prev).toHaveCSS('opacity', '1');
   await page.mouse.move(720, 450);
-  await expect(pos).toHaveCSS('opacity', '0');
-  await prev.focus();
-  await expect(prev).toHaveCSS('opacity', '1');
+  for (const sel of ['.lb-caption-pos', '.lb-game-prev', '.lb-game-next'])
+    await expect(page.locator(`#screenshot-lightbox ${sel}`)).toHaveCSS('opacity', '1');
 });
 
 test("F1 edge: the viewer's ↑/↓ game buttons stay put from game to game", async ({ page }) => {
