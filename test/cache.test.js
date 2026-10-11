@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { getCached, getCachedAt, setCache, getCacheStats, getCacheEntryCounts, _reset } = require('../lib/cache');
+const { getCached, getCachedAt, setCache, getCacheEntryCounts, _reset } = require('../lib/cache');
 const { LIBRARY_CACHE_TTL_MS, BUNDLES_CACHE_TTL_MS } = require('../lib/config');
 
 // ── getCached ─────────────────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ test('setCache: overwrites an existing entry and resets timestamp', () => {
   assert.equal(getCached('games:k'), 'new');
 });
 
-// ── getCacheEntryCounts / getCacheStats ────────────────────────────────────────
+// ── getCacheEntryCounts ───────────────────────────────────────────────────────
 
 test('getCacheEntryCounts: counts rows per group label, zero for an untouched group', () => {
   _reset();
@@ -77,19 +77,6 @@ test('getCacheEntryCounts: a deleted (expired, then read) entry is no longer cou
   _reset([['games:k', { value: 'stale', ts: Date.now() - LIBRARY_CACHE_TTL_MS - 1 }]]);
   getCached('games:k'); // triggers the expired-entry delete
   assert.equal(getCacheEntryCounts().library, 0);
-});
-
-test('getCacheStats: entries is the sum of every group in getCacheEntryCounts', () => {
-  _reset();
-  setCache('games:a', 1);
-  setCache('resolve:x', 'id');
-  setCache('rating:y', 2);
-
-  assert.equal(
-    getCacheStats().entries,
-    Object.values(getCacheEntryCounts()).reduce((a, b) => a + b, 0),
-  );
-  assert.equal(getCacheStats().entries, 3);
 });
 
 // ── getCachedAt ───────────────────────────────────────────────────────────────

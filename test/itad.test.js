@@ -48,11 +48,14 @@ test('getSteamShopId: throws when no Steam entry is present', async (t) => {
   );
 });
 
+// One page of the bundle list, as server.js's parseBundlesQuery builds it.
+const PAGE = { country: 'US', offset: 0, limit: 20, sort: '-publish', expired: false };
+
 test('getBundles: throws on upstream error', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
   await assert.rejects(
-    () => getBundles(),
+    () => getBundles(PAGE),
     (err) => err.isUpstream === true,
   );
 });
@@ -65,11 +68,11 @@ test('getBundles: returns and caches the bundle list', async (t) => {
     calls++;
     return { ok: true, json: async () => bundles };
   });
-  const result = await getBundles({ country: 'US', offset: 0, limit: 20 });
+  const result = await getBundles(PAGE);
   assert.deepEqual(result, bundles);
-  await getBundles({ country: 'US', offset: 0, limit: 20 });
+  await getBundles(PAGE);
   assert.equal(calls, 1, 'identical params should hit the cache');
-  await getBundles({ country: 'DE', offset: 0, limit: 20 });
+  await getBundles({ ...PAGE, country: 'DE' });
   assert.equal(calls, 2, 'a different country is a different cache key');
 });
 
@@ -85,7 +88,7 @@ test('getBundles: always asks ITAD to include mature-flagged bundles', async (t)
     requested = new URL(url);
     return { ok: true, json: async () => [] };
   });
-  await getBundles({ country: 'US', offset: 0, limit: 20 });
+  await getBundles(PAGE);
   assert.equal(requested.searchParams.get('mature'), 'true');
 });
 
@@ -522,10 +525,10 @@ test('getBundles: { force: true } bypasses the cache and re-fetches', async (t) 
     calls++;
     return { ok: true, json: async () => [{ id: 1, title: 'B' }] };
   });
-  await getBundles({ country: 'US' });
-  await getBundles({ country: 'US' });
+  await getBundles(PAGE);
+  await getBundles(PAGE);
   assert.equal(calls, 1, 'second call served from cache');
-  await getBundles({ country: 'US', force: true });
+  await getBundles({ ...PAGE, force: true });
   assert.equal(calls, 2, 'forced call re-fetches');
 });
 

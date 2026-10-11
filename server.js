@@ -12,15 +12,7 @@ const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 const rateLimit = require('express-rate-limit');
 
-const {
-  getCached,
-  getCachedAt,
-  isCached,
-  setCache,
-  capExpiry,
-  getCacheStats,
-  getCacheEntryCounts,
-} = require('./lib/cache');
+const { getCached, getCachedAt, isCached, setCache, capExpiry, getCacheEntryCounts } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
 const { getMetrics, recordLimiterTrip } = require('./lib/metrics');
 const { getCircuitBreakers } = require('./lib/circuitBreaker');
@@ -411,7 +403,7 @@ app.get('/api/health', (_req, res) => {
     ok: true,
     configured: !!process.env.STEAM_API_KEY,
     itadConfigured: isItadConfigured(),
-    cache: getCacheStats(),
+    cache: { entries: Object.values(getCacheEntryCounts()).reduce((sum, n) => sum + n, 0) },
   });
 });
 
