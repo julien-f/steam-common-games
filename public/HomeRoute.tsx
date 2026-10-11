@@ -142,10 +142,9 @@ export default function HomeRoute() {
   function loadAccountData(account: AccountSlot, { refresh = false }: { refresh?: boolean } = {}): void {
     setCounts({ owned: null, wishlist: null });
     setPlayers([]);
-    if (refresh) {
-      setRefreshing(true);
-      setFetchedAt(null);
-    }
+    // Every load, not just a refresh: a superseded one never settles these for the next account.
+    setRefreshing(refresh);
+    setFetchedAt(null);
     const members = account.members;
     // Guards every setter below: switching accounts again before this fetch settles (e.g.
     // adopting a `?u=` override right after landing on it, which fires this same effect for
@@ -194,6 +193,7 @@ export default function HomeRoute() {
         setCounts({ owned: null, wishlist: null });
         setPlayers([]);
         setFetchedAt(null);
+        setRefreshing(false);
         return;
       }
       loadAccountData(account);
