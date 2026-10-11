@@ -1,5 +1,3 @@
-'use strict';
-
 import { getPref, setPref } from './prefs.ts';
 import { REGION_CURRENCY } from './currency.ts';
 
