@@ -13,16 +13,14 @@ if (!DB_PATH) {
 
 const db = new DatabaseSync(DB_PATH);
 
-const CACHE_TABLES = ['cache_library', 'cache_resolve', 'cache_rating', 'cache_meta'];
+const cacheTables = db
+  .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'cache\\_%' ESCAPE '\\'")
+  .all()
+  .map((row) => row.name);
 
 let total = 0;
-for (const table of CACHE_TABLES) {
-  try {
-    const result = db.prepare(`DELETE FROM ${table}`).run();
-    total += result.changes;
-  } catch {
-    // Table doesn't exist yet — nothing to clear.
-  }
+for (const table of cacheTables) {
+  total += db.prepare(`DELETE FROM ${table}`).run().changes;
 }
 
 console.log(`Cleared ${total} cache entr${total === 1 ? 'y' : 'ies'} from ${DB_PATH}.`);
