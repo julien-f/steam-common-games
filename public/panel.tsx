@@ -640,7 +640,8 @@ export function panelOpen(game: ReadonlyGame) {
 // `leavingRoute`: the route is unmounting under a navigation — its host keeps `?game=` on the
 // history entry being left (see `onClose`), so Back to it reopens the game.
 export function panelClose({ leavingRoute = false } = {}) {
-  if (!panelGame()) return;
+  const game = panelGame();
+  if (!game) return;
   setPanelGame(null);
   // Closing the panel ends whatever DLC browsing trail was in progress — including a hop that
   // was handed off but never opened (a bad appid, a failed lookup), which must not be left armed
@@ -649,7 +650,9 @@ export function panelClose({ leavingRoute = false } = {}) {
   pendingHopAppid = null;
   document.getElementById('game-panel')!.classList.remove('open');
   clearPanelNav();
-  panelPrevFocus?.focus();
+  // The shown game's row first: after ↑/↓ or a deep link, the opener is a stale row or the panel itself.
+  // `data-row-key` is @vates/data-table-solid's undocumented internal (see SearchRoute's focusRow).
+  (document.querySelector<HTMLElement>(`main tr.dt-tr[data-row-key="${game.appid}"]`) ?? panelPrevFocus)?.focus();
   panelPrevFocus = null;
   // Every close path funnels through here — the × button is bound straight to this function
   // (see initPanel above), and swipe-to-close calls it directly too — so this is the one place

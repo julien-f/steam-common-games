@@ -30,6 +30,7 @@ const SHORTCUT_SECTIONS: Section[] = [
     rows: [
       { keys: ['↑', '↓'], label: 'Previous / next game in the list' },
       { keys: ['←', '→'], label: 'Previous / next media' },
+      { keys: ['Enter'], label: 'Open the media in the lightbox (from the main image, focused on open)' },
       { keys: ['Enter'], label: 'Open the focused table row' },
     ],
   },

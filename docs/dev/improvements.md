@@ -41,7 +41,7 @@ None open.
 
 ## Keyboard and accessibility
 
-- **U115 · minor · I2** — Esc closing the panel (after the lightbox or not) drops focus on `<body>`, so the next ↓ moves nothing and there's no visible focus. Return focus to the row the panel was showing.
+None open.
 
 ## Phone
 
@@ -52,8 +52,6 @@ None open.
 None open.
 
 ## Consistency and polish
-
-- **U119 · polish · I2** — the `?` dialog lists no way to open the lightbox from the panel (Enter on the hero works); add it under Game panel.
 
 - **U112 · polish** — every table shows a "Page 1 of 1" pager with all buttons disabled when everything fits. Needs an upstream change: hide the pager when there's a single page (an option or the default in `@vates/data-table-solid`, vatesfr/data-table#41).
 - **U39 · polish** — nav items shift sideways between routes; missing thumbnails have no placeholder; "Demo" pills look like primary buttons; the "Updated" age has very low contrast; Compare's op `<select>` is an unstyled native white control; wishlisted/owned name colours have no legend (still true in Recently Looked Up).
