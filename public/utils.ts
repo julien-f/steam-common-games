@@ -65,7 +65,7 @@ const FREE_AAA_REVIEW_THRESHOLD = 200000; // the only lever available for F2P ti
 // Steam's appdetails `type` field, values other than 'game' — see the `type` comment in
 // lib/steam.js's extractAppDetails. Shared with public/library.js's Type column so the two
 // don't drift into disagreeing about what counts as "not really a game".
-export const NON_GAME_TYPES = new Set([
+const NON_GAME_TYPES = new Set([
   'dlc',
   'demo',
   'music',

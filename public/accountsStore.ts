@@ -136,7 +136,7 @@ export function getRecentAccounts({ includeRemoved = false }: { includeRemoved?:
 // Adds a new recent entry, or bumps an existing one's lastUsedAt (and clears any soft-remove) —
 // dedupe key is AccountSlot.id, so re-picking the same Family updates one entry rather than
 // piling up duplicates.
-export function upsertRecentAccount(account: AccountSlot): void {
+function upsertRecentAccount(account: AccountSlot): void {
   const recents = readRecents();
   const idx = recents.findIndex((a) => a.id === account.id);
   const entry: AccountSlot = { ...account, lastUsedAt: Date.now(), removedAt: undefined };

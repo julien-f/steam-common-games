@@ -69,7 +69,7 @@ export const fmt = {
 // `computeSteamdbRating` returns unrounded precision (0-100) so sort/group operate on the full
 // number rather than the display-rounded integer — round only where displayed (here, and in
 // `fmt.numRound`/`applyDetailsEvent` below).
-export function renderScoreNum(v: unknown): Node {
+function renderScoreNum(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');
   if (v === null) return document.createTextNode('—');
   const rounded = Math.round(Number(v));
@@ -88,7 +88,7 @@ export function renderScoreNum(v: unknown): Node {
 // (too-few-reports) result to its own provisionalTier before it ever reaches the client, so
 // what arrives here is always one of the real tiers above, just possibly flagged `pending`
 // (see row.protondbPending / renderProtonBadge below) to mark it as low-confidence.
-export const PROTON_TIER_ORDER: string[] = ['borked', 'bronze', 'silver', 'gold', 'platinum', 'native'];
+const PROTON_TIER_ORDER: string[] = ['borked', 'bronze', 'silver', 'gold', 'platinum', 'native'];
 export const PROTON_TIER_COLORS: Record<string, string> = {
   borked: '#b91c1c',
   bronze: '#8b4513',
@@ -118,7 +118,7 @@ const PROTON_NO_REPORT = 'No report';
 const PROTON_DIDNT_ANSWER = "Didn't answer";
 const isProtonMissing = (v: unknown): boolean =>
   v == null || v === '' || v === PROTON_NO_REPORT || v === PROTON_DIDNT_ANSWER;
-export const compareProtonTier = compareMissingLast(
+const compareProtonTier = compareMissingLast(
   (a, b) => PROTON_TIER_ORDER.indexOf(String(a).toLowerCase()) - PROTON_TIER_ORDER.indexOf(String(b).toLowerCase()),
   isProtonMissing,
 );
@@ -128,7 +128,7 @@ export const compareProtonTier = compareMissingLast(
 // (set from extractProtonDb's own `pending` flag — see PROTON_TIER_ORDER's comment above) marks a
 // provisional tier assigned from too few reports for ProtonDB itself to be confident in — faded and
 // suffixed with "?" rather than rendered identically to a confirmed tier of the same name.
-export function renderProtonBadge(v: unknown, row: Row): Node {
+function renderProtonBadge(v: unknown, row: Row): Node {
   if (v === undefined) return document.createTextNode('…');
   if (isProtonMissing(v)) return document.createTextNode('—');
   const span = document.createElement('span');
@@ -147,7 +147,7 @@ export function renderProtonBadge(v: unknown, row: Row): Node {
 // the same color and dark-on-blue text the side panel's "🎮 Try the Free Demo" banner already
 // uses (`.panel-demo-banner`, style.css) — so the two read as the same "this game has a demo"
 // signifier rather than introducing a new color/shape just for this column.
-export function renderDemoBadge(v: unknown): Node {
+function renderDemoBadge(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');
   if (!v) return document.createTextNode('—');
   const span = document.createElement('span');
@@ -246,8 +246,8 @@ export const TYPE_LABELS = {
 // (public/utils.js) already returns null for "not enough signal to guess" (DLC, or a priced game
 // with no price data) — `compareMissingLast` handles that the same way every other heuristic/
 // possibly-absent column here does, pinning it last regardless of sort direction.
-export const PRODUCTION_TIER_ORDER: string[] = ['Indie', 'AA', 'AAA'];
-export const compareProductionTier = compareMissingLast(
+const PRODUCTION_TIER_ORDER: string[] = ['Indie', 'AA', 'AAA'];
+const compareProductionTier = compareMissingLast(
   (a, b) => PRODUCTION_TIER_ORDER.indexOf(String(a)) - PRODUCTION_TIER_ORDER.indexOf(String(b)),
 );
 
@@ -342,7 +342,7 @@ export const compareDateMissingLast = compareMissingLast(
 // not final" the same way a middling score does elsewhere in the table. Backed by Steam's own
 // `comingSoon` flag (see extractAppDetails in lib/steam.js), not by comparing the parsed date
 // to today — a coarse placeholder like "Coming soon" has no parseable date to compare at all.
-export function renderReleaseDate(v: unknown, row: Row): Node {
+function renderReleaseDate(v: unknown, row: Row): Node {
   if (v === undefined) return document.createTextNode('…');
   if (!v) return document.createTextNode('—');
   const span = document.createElement('span');
@@ -415,7 +415,7 @@ export function scoreBucket(value: unknown): number {
   if (!(n >= SCORE_BUCKET_FLOOR)) return -1; // below the floor (or NaN) — the single "< 60" bucket
   return Math.min(Math.floor(n / SCORE_BUCKET_STEP) * SCORE_BUCKET_STEP, 100 - SCORE_BUCKET_STEP);
 }
-export function formatScoreBucket(keyPart: string): string {
+function formatScoreBucket(keyPart: string): string {
   const n = Number(keyPart);
   if (n === -1) return `< ${SCORE_BUCKET_FLOOR}`;
   return `${n}–${n + SCORE_BUCKET_STEP}`;
@@ -542,7 +542,7 @@ export function renderBestDeal(v: unknown, row: Row): Node {
 // `null`/`undefined`, which mean "no data"/"still loading") renders the same as missing data: a
 // flat "0%" reads as noise next to every other row's real discount, and nothing else in this
 // column set treats a confirmed zero differently from "nothing to show" either.
-export function renderCut(v: unknown): Node {
+function renderCut(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');
   if (v == null || v === 0) return document.createTextNode('—');
   return document.createTextNode(`-${v}%`);
@@ -588,11 +588,11 @@ export const PRICE_STATUS_TIERS: PriceStatusTier[] = [
     .reverse()
     .map((t) => ({ label: t.statusLabel, color: t.color, icon: ' ' + t.icon, bold: t.bold })),
 ];
-export const PRICE_STATUS_ORDER = PRICE_STATUS_TIERS.map((t) => t.label);
-export const comparePriceStatus = compareMissingLast(
+const PRICE_STATUS_ORDER = PRICE_STATUS_TIERS.map((t) => t.label);
+const comparePriceStatus = compareMissingLast(
   (a, b) => PRICE_STATUS_ORDER.indexOf(String(a)) - PRICE_STATUS_ORDER.indexOf(String(b)),
 );
-export function renderPriceStatus(v: unknown): Node {
+function renderPriceStatus(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');
   if (v == null) return document.createTextNode('—');
   const sv = String(v);
@@ -604,7 +604,7 @@ export function renderPriceStatus(v: unknown): Node {
   span.textContent = sv + tier.icon!;
   return span;
 }
-export const PRICE_STATUS_COLUMN: ColumnDef<Row> = {
+const PRICE_STATUS_COLUMN: ColumnDef<Row> = {
   key: 'priceStatus',
   label: 'Price Status',
   groupable: true,
@@ -665,17 +665,17 @@ export function computeOwnershipStatus(row: Row): string | null {
 // color, not Wishlisted's green — already owning it is what actually matters for a buy decision
 // regardless of wishlist status — but keeps the bold weight, since it's still the most
 // information any one status carries.
-export const OWNERSHIP_STATUS_TIERS: { label: string; color?: string; icon?: string; bold?: boolean }[] = [
+const OWNERSHIP_STATUS_TIERS: { label: string; color?: string; icon?: string; bold?: boolean }[] = [
   { label: 'Not Owned' },
   { label: 'Wishlisted', color: '#2ecc71', icon: ' ☆', bold: true },
   { label: 'Owned', color: '#f1c40f', icon: ' ✓' },
   { label: 'Owned & Wishlisted', color: '#f1c40f', icon: ' ✓', bold: true },
 ];
-export const OWNERSHIP_STATUS_ORDER = OWNERSHIP_STATUS_TIERS.map((t) => t.label);
-export const compareOwnershipStatus = compareMissingLast(
+const OWNERSHIP_STATUS_ORDER = OWNERSHIP_STATUS_TIERS.map((t) => t.label);
+const compareOwnershipStatus = compareMissingLast(
   (a, b) => OWNERSHIP_STATUS_ORDER.indexOf(String(a)) - OWNERSHIP_STATUS_ORDER.indexOf(String(b)),
 );
-export function renderOwnershipStatus(v: unknown): Node {
+function renderOwnershipStatus(v: unknown): Node {
   if (v == null) return document.createTextNode('—');
   const sv = String(v);
   const tier = OWNERSHIP_STATUS_TIERS.find((t) => t.label === sv);

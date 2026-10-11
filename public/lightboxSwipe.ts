@@ -8,7 +8,7 @@ export type SwipeAction = 'media-prev' | 'media-next' | 'game-prev' | 'game-next
 
 // Past this the gesture is a drag, not a tap — and the axis it locks onto is final. Matches
 // the lightbox's own tap threshold, so a gesture is never both.
-export const LB_SWIPE_AXIS_LOCK = 10;
+const LB_SWIPE_AXIS_LOCK = 10;
 export const LB_SWIPE_X_DISTANCE = 50;
 export const LB_SWIPE_Y_DISTANCE = 80;
 // A short flick commits below the distance thresholds — the intent is just as clear.

@@ -15,7 +15,7 @@ interface Section {
 
 // Kept as data rather than inline markup so the list reads as the reference it is — and so a
 // shortcut added to panelKeyboard.ts/lightbox.tsx has one obvious place to be documented.
-export const SHORTCUT_SECTIONS: Section[] = [
+const SHORTCUT_SECTIONS: Section[] = [
   {
     title: 'Always',
     rows: [

@@ -17,7 +17,7 @@ import { getPref, setPref } from './prefs.ts';
 // account or another user list can (a "recent-games" ListRef just reads this list directly, see
 // listResolve.ts), so there's no soft-delete concern to carry over.
 
-export const RECENT_GAMES_PREF_KEY = 'recentGames';
+const RECENT_GAMES_PREF_KEY = 'recentGames';
 export const MAX_RECENT_GAMES = 10;
 
 export interface RecentGame {
@@ -30,7 +30,7 @@ export function loadRecentGames(): RecentGame[] {
   return getPref<RecentGame[]>(RECENT_GAMES_PREF_KEY, []);
 }
 
-export function saveRecentGames(list: RecentGame[]): void {
+function saveRecentGames(list: RecentGame[]): void {
   setPref(RECENT_GAMES_PREF_KEY, list);
 }
 

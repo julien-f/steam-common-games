@@ -1124,7 +1124,7 @@ export function closeLightbox() {
   _lbPrevFocus = null;
 }
 
-export function stepLightbox(dir: number) {
+function stepLightbox(dir: number) {
   // The viewer has taken over: whatever is on screen from here on is their choice, so the latch
   // must never move it under them.
   _awaitingMedia = null;
