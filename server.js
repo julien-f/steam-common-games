@@ -257,6 +257,35 @@ app.get('/opensearch.xml', (req, res) => {
     );
 });
 
+// Every `:appid` route: rejected before its limiter, so handlers and skips get a valid `req.appid`.
+app.param('appid', (req, res, next, raw) => {
+  const appid = Number(raw);
+  if (!Number.isInteger(appid) || appid <= 0) return res.status(400).json({ error: 'Invalid appid' });
+  req.appid = appid;
+  next();
+});
+
+// The account-list routes' (common-games, wishlist, friends) body: replies 400 and returns null
+// when invalid.
+function parseMembers(req, res) {
+  const { members } = req.body;
+  if (
+    !Array.isArray(members) ||
+    members.length < 1 ||
+    !members.every((u) => typeof u === 'string' && u.trim().length > 0)
+  ) {
+    res.status(400).json({ error: 'Provide at least 1 player' });
+    return null;
+  }
+  if (members.length > MAX_USERS) {
+    res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
+    return null;
+  }
+  return members;
+}
+const isBodyRefresh = (req) => req.body.refresh === true;
+const resolveSteamIds = async (raw) => [...new Set(await Promise.all(raw.map(resolveSteamId)))];
+
 // Stricter limit for searches — each uncached user triggers Steam API calls. Shared by
 // POST /api/common-games and POST /api/wishlist below, same "cache hits don't count"
 // rule detailsLimit/gameSearchLimit/etc. already apply — a re-search for accounts already
@@ -270,7 +299,7 @@ const searchLimit = namedRateLimit('search', {
   skip: (req) => {
     // A full refresh always re-fetches every account, so it must always count — same rule
     // isForceRefresh gets elsewhere in this file.
-    if (req.body.refresh === true) return false;
+    if (isBodyRefresh(req)) return false;
 
     const ids = cachedSteamIds(req.body.members);
     if (!ids) return false;
@@ -288,7 +317,7 @@ const friendsLimit = namedRateLimit('friends', {
   max: FRIENDS_RATE_LIMIT_MAX,
   message: { error: 'Too many friends lookups. Please wait a minute and try again.' },
   skip: (req) => {
-    if (req.body.refresh === true) return false;
+    if (isBodyRefresh(req)) return false;
     const ids = cachedSteamIds(req.body.members);
     return !!ids && [...ids].every((id) => isCached(`friends:${id}`));
   },
@@ -301,8 +330,8 @@ const detailsLimit = namedRateLimit('details', {
   max: DETAILS_RATE_LIMIT_MAX,
   skip: (req) => {
     if (isForceRefresh(req)) return false; // force-refresh always re-fetches, so it must always count
-    const appid = Number(req.params.appid);
-    if (!Number.isInteger(appid) || appid <= 0) return false;
+    const { appid } = req;
+    if (appid === undefined) return false; // POST /api/game-details/stream has no :appid
     return (
       isCached(`rating:${appid}`) &&
       isCached(`hltb:${appid}`) &&
@@ -318,8 +347,7 @@ const detailsLimit = namedRateLimit('details', {
 const metaLimit = namedRateLimit('meta', {
   max: DETAILS_RATE_LIMIT_MAX,
   skip: (req) => {
-    const appid = Number(req.params.appid);
-    return Number.isInteger(appid) && appid > 0 && isCached(`meta:${appid}`);
+    return isCached(`meta:${req.appid}`);
   },
 });
 
@@ -334,9 +362,7 @@ const newsLimit = namedRateLimit('news', {
   max: DETAILS_RATE_LIMIT_MAX,
   skip: (req) => {
     if (isForceRefresh(req)) return false;
-    const appid = Number(req.params.appid);
-    if (!Number.isInteger(appid) || appid <= 0) return false;
-    return isCached(`news:${appid}`);
+    return isCached(`news:${req.appid}`);
   },
 });
 
@@ -365,8 +391,7 @@ const achievementsLimit = namedRateLimit('achievements', {
   max: ACHIEVEMENTS_RATE_LIMIT_MAX,
   skip: (req) => {
     if (isForceRefresh(req)) return false;
-    const appid = Number(req.params.appid);
-    if (!Number.isInteger(appid) || appid <= 0) return false;
+    const { appid } = req;
     if (!isCached(`schema:${appid}`)) return false;
     if (!isCached(`achrarity:${appid}`)) return false;
     const ids = (req.query.steamids || '')
@@ -482,33 +507,23 @@ const gameBundlesLimit = namedRateLimit('gameBundles', {
   max: BUNDLES_RATE_LIMIT_MAX,
   skip: (req) => {
     if (isForceRefresh(req)) return false;
-    const gid = getCached(`itad-gid:${Number(req.params.appid)}`, { record: false });
+    const gid = getCached(`itad-gid:${req.appid}`, { record: false });
     if (gid === undefined) return false;
     return gid === null || isCached(gameBundlesCacheKey(gid, parseCountry(req)));
   },
 });
 
 app.post('/api/common-games', searchLimit, async (req, res) => {
-  const members = req.body.members;
-
-  if (
-    !Array.isArray(members) ||
-    members.length < 1 ||
-    !members.every((u) => typeof u === 'string' && u.trim().length > 0)
-  ) {
-    return res.status(400).json({ error: 'Provide at least 1 player' });
-  }
-  if (members.length > MAX_USERS) {
-    return res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
-  }
+  const members = parseMembers(req, res);
+  if (!members) return;
 
   // Explicit refresh (a user-clicked "↻ Refresh", not a normal search) bypasses the
   // library-tier cache (owned games + player summaries) so a just-bought game or a
   // changed display name shows up immediately, without waiting out the TTL.
-  const refresh = req.body.refresh === true;
+  const refresh = isBodyRefresh(req);
 
   try {
-    const ids = [...new Set(await Promise.all(members.map(resolveSteamId)))];
+    const ids = await resolveSteamIds(members);
     const [playerList, libraries] = await Promise.all([
       getPlayerSummaries(ids, { force: refresh }),
       Promise.all(ids.map((id) => getOwnedGames(id, { force: refresh }))),
@@ -524,9 +539,8 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
     const games = [...merged.values()].sort((a, b) => a.name.localeCompare(b.name));
 
     // `gameCount` rides along so the frontend can show it next to an account without a second request.
-    const playerById = new Map(playerList.map((p) => [p.steamid, p]));
-    const players = ids.map((id, i) => ({
-      ...(playerById.get(id) || { steamid: id, personaname: id, profileurl: '' }),
+    const players = playerList.map((player, i) => ({
+      ...player,
       gameCount: libraries[i].length,
     }));
 
@@ -555,23 +569,13 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
 // wishlists of whichever accounts the Library Explorer page has loaded,
 // same as it unions their owned-game libraries.
 app.post('/api/wishlist', searchLimit, async (req, res) => {
-  const members = req.body.members;
+  const members = parseMembers(req, res);
+  if (!members) return;
 
-  if (
-    !Array.isArray(members) ||
-    members.length < 1 ||
-    !members.every((u) => typeof u === 'string' && u.trim().length > 0)
-  ) {
-    return res.status(400).json({ error: 'Provide at least 1 player' });
-  }
-  if (members.length > MAX_USERS) {
-    return res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
-  }
-
-  const refresh = req.body.refresh === true;
+  const refresh = isBodyRefresh(req);
 
   try {
-    const ids = [...new Set(await Promise.all(members.map(resolveSteamId)))];
+    const ids = await resolveSteamIds(members);
     const [playerList, lists] = await Promise.all([
       getPlayerSummaries(ids, { force: refresh }),
       Promise.all(ids.map((id) => getWishlist(id, { force: refresh }))),
@@ -593,9 +597,8 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
 
     // Player summaries + per-account wishlist size, same shape/purpose as /api/common-games'
     // `players` — lets the frontend show an accounts bar on the Wishlist tab too.
-    const playerById = new Map(playerList.map((p) => [p.steamid, p]));
-    const players = ids.map((id, i) => ({
-      ...(playerById.get(id) || { steamid: id, personaname: id, profileurl: '' }),
+    const players = playerList.map((player, i) => ({
+      ...player,
       itemCount: lists[i].length,
     }));
 
@@ -611,23 +614,13 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
 // excluded from the union (reported separately in `unavailable`) rather than failing the
 // whole request.
 app.post('/api/friends', friendsLimit, async (req, res) => {
-  const members = req.body.members;
+  const members = parseMembers(req, res);
+  if (!members) return;
 
-  if (
-    !Array.isArray(members) ||
-    members.length < 1 ||
-    !members.every((u) => typeof u === 'string' && u.trim().length > 0)
-  ) {
-    return res.status(400).json({ error: 'Provide at least 1 player' });
-  }
-  if (members.length > MAX_USERS) {
-    return res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
-  }
-
-  const refresh = req.body.refresh === true;
+  const refresh = isBodyRefresh(req);
 
   try {
-    const ids = [...new Set(await Promise.all(members.map(resolveSteamId)))];
+    const ids = await resolveSteamIds(members);
     const lists = await Promise.all(ids.map((id) => getFriendList(id, { force: refresh })));
 
     const unavailable = ids.filter((id, i) => lists[i] === null);
@@ -911,10 +904,7 @@ app.post('/api/prices', pricesLimit, requireItad, async (req, res) => {
 });
 
 app.get('/api/game-bundles/:appid', gameBundlesLimit, requireItad, async (req, res) => {
-  const appid = Number(req.params.appid);
-  if (!Number.isInteger(appid) || appid <= 0) {
-    return res.status(400).json({ error: 'Invalid appid' });
-  }
+  const { appid } = req;
   try {
     const gid = (await resolveItadIds([appid])).get(appid);
     if (!gid) return res.json({ bundles: [] });
@@ -927,18 +917,12 @@ app.get('/api/game-bundles/:appid', gameBundlesLimit, requireItad, async (req, r
 });
 
 app.get('/api/game-details/:appid', detailsLimit, async (req, res) => {
-  const appid = Number(req.params.appid);
-  if (!Number.isInteger(appid) || appid <= 0) {
-    return res.status(400).json({ error: 'Invalid appid' });
-  }
+  const { appid } = req;
   res.json(await fetchGameDetails(appid, { force: isForceRefresh(req) }));
 });
 
 app.get('/api/game-meta/:appid', metaLimit, async (req, res) => {
-  const appid = Number(req.params.appid);
-  if (!Number.isInteger(appid) || appid <= 0) {
-    return res.status(400).json({ error: 'Invalid appid' });
-  }
+  const { appid } = req;
   try {
     res.json({ meta: await getAppDetails(appid) });
   } catch (err) {
@@ -951,10 +935,7 @@ app.get('/api/game-meta/:appid', metaLimit, async (req, res) => {
 // route rather than folded into fetchGameDetails/the SSE stream. Fetched by the side panel
 // (public/panel.js's loadNews) once per game, only when that game's panel actually opens.
 app.get('/api/game-news/:appid', newsLimit, async (req, res) => {
-  const appid = Number(req.params.appid);
-  if (!Number.isInteger(appid) || appid <= 0) {
-    return res.status(400).json({ error: 'Invalid appid' });
-  }
+  const { appid } = req;
   try {
     const news = await getGameNews(appid, { force: isForceRefresh(req) });
     res.json({ news });
@@ -972,10 +953,7 @@ app.get('/api/game-news/:appid', newsLimit, async (req, res) => {
 // /api/common-games unions owned games: an achievement counts as unlocked for the group if
 // any member has it, keeping the earliest unlock time among those that do.
 app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
-  const appid = Number(req.params.appid);
-  if (!Number.isInteger(appid) || appid <= 0) {
-    return res.status(400).json({ error: 'Invalid appid' });
-  }
+  const { appid } = req;
   // Player progress (steamids) is optional — the achievement *list* (names, descriptions,
   // icons, community-wide rarity) is store metadata, not tied to any account, so it's still
   // useful with nobody loaded (e.g. a standalone "look up any game" lookup). Only the
@@ -992,7 +970,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
 
   const force = isForceRefresh(req);
   try {
-    const steamIds = [...new Set(await Promise.all(rawIds.map(resolveSteamId)))];
+    const steamIds = await resolveSteamIds(rawIds);
 
     // Cheap short-circuit: appdetails (already fetched/cached for this game via
     // fetchGameDetails, well before any panel opens) already tells us — for free — whether
@@ -1081,7 +1059,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
 // This does the exact same per-appid work (rating/HLTB/meta/tags/ProtonDB) as
 // GET /api/game-details/:appid above and is meant to be throttled by the same budget — it's
 // just delivered as one SSE batch instead of N separate requests — so it shares detailsLimit
-// rather than going unthrottled. Its skip() keys off req.params.appid, which doesn't exist on
+// rather than going unthrottled. Its skip() keys off req.appid (app.param), which isn't set on
 // this array-bodied route, so every stream request counts fully against the budget (no
 // cache-hit exemption here, unlike the single-appid route); that's the safe direction to be
 // wrong in. STREAM_MAX_GAMES also caps how much work one request can queue up regardless of
