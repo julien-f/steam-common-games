@@ -240,6 +240,22 @@ test('setAccountOverride/setCurrentAccount: broadcast ACCOUNT_CHANGED_EVENT', ()
   assert.deepEqual(events, [ACCOUNT_CHANGED_EVENT, ACCOUNT_CHANGED_EVENT]);
 });
 
+test('setMyAccount/removeRecentAccount/clearRecentAccounts: broadcast ACCOUNT_CHANGED_EVENT once each', () => {
+  const { setMyAccount, setCurrentAccount, removeRecentAccount, clearRecentAccounts, ACCOUNT_CHANGED_EVENT } = store();
+  setCurrentAccount(makeAccount('a'));
+  setCurrentAccount(makeAccount('b'));
+  setCurrentAccount(makeAccount('c'));
+  const events = [];
+  global.window = { dispatchEvent: (e) => events.push(e.type) };
+
+  setMyAccount(makeAccount('a'));
+  removeRecentAccount('b');
+  clearRecentAccounts();
+  delete global.window;
+
+  assert.deepEqual(events, [ACCOUNT_CHANGED_EVENT, ACCOUNT_CHANGED_EVENT, ACCOUNT_CHANGED_EVENT]);
+});
+
 test('setAccountOverride: re-setting the same account id broadcasts nothing', () => {
   const events = [];
   global.window = { dispatchEvent: (e) => events.push(e.type) };

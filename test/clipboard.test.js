@@ -103,3 +103,16 @@ test('copyWithFeedback: leaves the button alone when the copy failed', async (t)
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(btn.textContent, '🔗');
 });
+
+test('copyWithFeedback: a second copy while confirming still restores the original label', async (t) => {
+  withNavigator(t, { writeText: async () => {} });
+  const btn = fakeBtn();
+  copyWithFeedback(btn, 'a');
+  await new Promise((r) => setTimeout(r, COPIED_MS / 2));
+  copyWithFeedback(btn, 'b');
+  await new Promise((r) => setTimeout(r, COPIED_MS / 2 + 10));
+  assert.equal(btn.textContent, '✓ Copied!'); // the first timer no longer cuts the second short
+  await new Promise((r) => setTimeout(r, COPIED_MS / 2 + 10));
+  assert.equal(btn.textContent, '🔗');
+  assert.equal(btn.title, 'Copy link');
+});

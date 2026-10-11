@@ -65,6 +65,48 @@ test('A2.1-2,4: explore a friend, then switch back to my ★ account from the na
   await expect(page.getByRole('navigation')).toContainText('Alice');
 });
 
+test('A2 edge: an account picked mid-refresh does not read "Refreshing…" while it loads', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await expect(page.locator('.account-counts')).toContainText('Owned: 6');
+  // Holds Alice's refresh and Bob's load (not the resolve, sent by name), so both are in flight.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/common-games', async (route) => {
+    const body = route.request().postData() ?? '';
+    if (body.includes(ALICE.steamid) || body.includes(BOB.steamid)) await held;
+    await route.fallback();
+  });
+  const updated = page.locator('.account-updated-btn');
+  await updated.click();
+  await expect(updated).toContainText('Refreshing');
+
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
+  await page.getByRole('button', { name: 'Set as current account' }).click();
+  await expect(page.getByRole('navigation')).toContainText('Bob');
+  await expect(updated).not.toContainText('Refreshing');
+  release();
+  await expect(page.locator('.account-counts')).toContainText('Owned: 4');
+});
+
+test("A2 edge: a picked account whose library fails doesn't show the previous one's age", async ({ page }) => {
+  await mockApi(page, { states: ['stale'] });
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  const updated = page.locator('.account-updated-btn');
+  await expect(updated).toContainText('12 days ago');
+  await page.route('**/api/common-games', (route) =>
+    route.request().postData()?.includes(BOB.steamid)
+      ? route.fulfill({ status: 502, json: { error: 'Steam request failed' } })
+      : route.fallback(),
+  );
+
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
+  await page.getByRole('button', { name: 'Set as current account' }).click();
+  await expect(page.locator('.account-counts')).toContainText("Owned: couldn't load");
+  await expect(updated).not.toContainText('12 days ago');
+});
+
 test('S3 edge: an unknown path says so and links Home', async ({ page }) => {
   await page.goto('/compare');
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();

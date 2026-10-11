@@ -59,16 +59,26 @@ export function copyWithFeedback(btn: HTMLElement, text: string, opts: CopyFeedb
   });
 }
 
+// Per button, the label to restore and the pending restore: a re-flash keeps the original label.
+const flashing = new WeakMap<
+  HTMLElement,
+  { nodes: ChildNode[]; title: string; timer: ReturnType<typeof setTimeout> }
+>();
+
 function flash(btn: HTMLElement, { copiedText = '✓ Copied!', copiedClass }: CopyFeedback): void {
+  const pending = flashing.get(btn);
+  if (pending) clearTimeout(pending.timer);
   // Nodes, not text: a label may carry markup (an icon and a label hidden on a phone).
-  const prevNodes = [...btn.childNodes];
-  const prevTitle = btn.title;
+  const nodes = pending?.nodes ?? [...btn.childNodes];
+  const title = pending?.title ?? btn.title;
   btn.textContent = copiedText;
   btn.title = 'Copied!';
   if (copiedClass) btn.classList.add(copiedClass);
-  setTimeout(() => {
-    btn.replaceChildren(...prevNodes);
-    btn.title = prevTitle;
+  const timer = setTimeout(() => {
+    flashing.delete(btn);
+    btn.replaceChildren(...nodes);
+    btn.title = title;
     if (copiedClass) btn.classList.remove(copiedClass);
   }, COPIED_MS);
+  flashing.set(btn, { nodes, title, timer });
 }
