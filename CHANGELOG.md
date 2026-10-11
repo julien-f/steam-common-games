@@ -87,6 +87,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On a phone, the ranking screen keeps both games side by side with Tie, Skip and Undo in view, inside a side margin
 - The lightbox's ↑/↓ game buttons stay in place from one game to the next, so they can be clicked repeatedly
 - Closing a game's panel with Esc puts focus back on that game's row, so the arrow keys keep working
+- Refreshing a game from the ranking's side panel keeps your place in the panel, and says when the refresh fails
 
 ### Development
 

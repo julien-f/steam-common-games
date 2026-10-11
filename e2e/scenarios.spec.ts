@@ -476,9 +476,30 @@ test("R1 edge: the ranking's side panel shows tags as plain pills and its Refres
   await expect(panel.locator('.panel-tag').first()).toBeVisible();
   await expect(panel.getByRole('button')).toHaveCount(0);
 
-  const refetch = page.waitForRequest((req) => /\/api\/game-details\/\d+\?refresh=1$/.test(req.url()));
+  // The refreshed game updates in place: no reopen, so no jump to the top or focus move to the hero.
+  const body = page.locator('#panel-body');
+  await body.evaluate((el) => (el.scrollTop = 120));
+  const scrollTop = await body.evaluate((el) => el.scrollTop);
+  expect(scrollTop).toBeGreaterThan(0);
+  const refetch = page.waitForResponse((res) => /\/api\/game-details\/\d+\?refresh=1$/.test(res.url()));
   await page.getByRole('button', { name: 'Refresh details' }).click();
   await refetch;
+  await expect(page.getByRole('button', { name: 'Refresh details' })).toBeEnabled();
+  expect(await body.evaluate((el) => el.scrollTop)).toBe(scrollTop);
+  expect(await page.evaluate(() => document.activeElement?.closest('#panel-hero') == null)).toBe(true);
+});
+
+test("R1 edge: a failed Refresh on the ranking's side panel says so", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
+  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
+  await page.getByRole('button', { name: 'ℹ Details' }).first().click();
+  await page.route(/\/api\/game-details\/\d+\?refresh=1$/, (route) =>
+    route.fulfill({ status: 502, json: { error: 'Steam did not answer' } }),
+  );
+  await page.getByRole('button', { name: 'Refresh details' }).click();
+  await expect(page.locator('.rank-route .list-status')).toHaveText('Refresh failed: Steam did not answer');
 });
 
 test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo without scrolling, inside a gutter', async ({
