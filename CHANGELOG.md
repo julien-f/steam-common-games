@@ -42,6 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - When the server is unreachable behind a proxy that answers with an error page, the app says what failed ("Failed to fetch wishlist"…) instead of showing a JSON parse error, including when looking up an account on Home
 - Tab moves through the screenshot viewer's controls again on a game with only a cover, instead of staying on ×
 - In the viewer with the controls hidden, a media step right after a game step no longer keeps showing the game's name.
+- A list no longer hides its prices for the whole visit when the server's health check fails once.
 
 ### Development
 

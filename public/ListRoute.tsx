@@ -182,7 +182,7 @@ import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { rememberBundle } from './bundleSnapshots.ts';
 import { fanaticalBuyUrl, FANATICAL_BOOKMARKLET } from './fanaticalPicks.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, PRICES_UNAVAILABLE } from './priceLoading.ts';
-import { isItadConfigured } from './panelData.ts';
+import { isItadConfigured, isItadOff } from './panelData.ts';
 import { getStoredRegion, resolveRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { openPrefsPopover } from './prefsPopover.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
@@ -1620,7 +1620,8 @@ export default function ListRoute() {
     if (failure) setStatusText(`Details stream failed: ${failure}`);
   }
 
-  const itadConfiguredPromise = isItadConfigured();
+  // A health check that didn't answer isn't "off": the price lookup itself says if ITAD is down.
+  const itadConfiguredPromise = isItadConfigured().then(() => !isItadOff());
   const [itadOff, setItadOff] = createSignal(false);
   void itadConfiguredPromise.then((ok) => setItadOff(!ok));
 

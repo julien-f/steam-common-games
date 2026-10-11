@@ -565,6 +565,15 @@ test('B2 edge: with no ITAD key, the Wishlist hides prices and says why', async 
   await expect(page.locator('.panel-bundles')).toHaveCount(0); // the line above already says why
 });
 
+test("B2 edge: a health check that didn't answer doesn't hide the Wishlist's prices", async ({ page }) => {
+  await page.route('**/api/health', (route) => route.fulfill({ status: 502, json: { error: 'Bad gateway' } }));
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await expect(rows(page)).toHaveCount(4);
+  await expect(page.locator('thead th').filter({ hasText: /^Best Deal/ })).toHaveCount(1);
+  await expect(page.getByRole('main')).not.toContainText("Prices aren't available on this instance");
+});
+
 test('D1 edge: Updated ↻ keeps the rows and the selection while it refreshes', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
