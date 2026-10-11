@@ -22,14 +22,7 @@
 import { createSignal, createEffect, onMount, onCleanup, Show } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { withAccountParam } from './urlState.ts';
-import {
-  createTableState,
-  DataTableView,
-  bucketDatePart,
-  formatDatePart,
-  bucketNumericRange,
-  formatNumericRange,
-} from '@vates/data-table-solid';
+import { createTableState, DataTableView, datePartGroup, numericRangeGroup } from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
 import {
   fmt,
@@ -207,8 +200,7 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     format: fmt.num,
     defaultSortDir: 'desc',
     compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)),
-    groupFormat: formatMissingGroup(formatNumericRange(10)),
+    ...numericRangeGroup(10, '', '—'),
   },
   {
     // Bucketed against the same PRICE_TIERS staircase every game-table price column uses, and
@@ -251,8 +243,7 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     compare: compareDateMissingLast,
     defaultSortDir: 'desc',
     defaultValueSort: { by: 'alpha', dir: 'desc' },
-    groupValue: withMissingGroup(bucketDatePart('month'), (v) => v == null || v === ''),
-    groupFormat: formatMissingGroup(formatDatePart('month')),
+    ...datePartGroup('month', undefined, '—'),
   },
   // Hidden by default, the publish-side counterpart of "Ends in" below, and what the hero's "New"
   // tile toggles.
@@ -274,8 +265,7 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     render: renderEnds,
     compare: compareDateMissingLast,
     defaultValueSort: { by: 'alpha', dir: 'asc' },
-    groupValue: withMissingGroup(bucketDatePart('month'), (v) => v == null || v === ''),
-    groupFormat: formatMissingGroup(formatDatePart('month')),
+    ...datePartGroup('month', undefined, '—'),
   },
   // Hidden by default: the Ends column already carries each row's own countdown, so this one
   // exists to filter/group *by* urgency — and it's what the hero card's "Ending soon" tile

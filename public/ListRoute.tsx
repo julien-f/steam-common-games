@@ -64,7 +64,7 @@ import {
 import { createStore, produce } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { A, useParams, useLocation, useNavigate } from '@solidjs/router';
-import { createTableState, DataTableView, bucketDatePart, formatDatePart } from '@vates/data-table-solid';
+import { createTableState, DataTableView, datePartGroup } from '@vates/data-table-solid';
 import type { ColumnDef, SortEntry, TableState } from '@vates/data-table-solid';
 import {
   fmt,
@@ -300,8 +300,7 @@ const LAST_PLAYED_COLUMN: ColumnDef<Record<string, any>> = {
   compare: compareDateMissingLast,
   defaultSortDir: 'desc',
   defaultValueSort: { by: 'alpha', dir: 'desc' },
-  groupValue: withMissingGroup(bucketDatePart('year'), (v: unknown) => v == null || v === ''),
-  groupFormat: formatMissingGroup(formatDatePart('year')),
+  ...datePartGroup('year', undefined, '—'),
   keepVisibleWhenGrouped: true,
   category: 'Play Time & Dates',
 };
@@ -323,8 +322,7 @@ const WISHLIST_DATE_ADDED_COLUMN: ColumnDef<Record<string, any>> = {
   compare: compareDateMissingLast,
   defaultSortDir: 'desc',
   defaultValueSort: { by: 'alpha', dir: 'desc' },
-  groupValue: withMissingGroup(bucketDatePart('year')),
-  groupFormat: formatMissingGroup(formatDatePart('year')),
+  ...datePartGroup('year', undefined, '—'),
   keepVisibleWhenGrouped: true,
   category: 'Play Time & Dates',
 };

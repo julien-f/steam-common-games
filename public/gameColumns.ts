@@ -33,10 +33,8 @@
 // second, otherwise-unnecessary direct dependency on core.
 import {
   compareMissingLast,
-  bucketNumericRange,
-  bucketDatePart,
-  formatNumericRange,
-  formatDatePart,
+  numericRangeGroup,
+  datePartGroup,
   bucketLogRange,
   formatLogRange,
 } from '@vates/data-table-solid';
@@ -421,23 +419,14 @@ function formatScoreBucket(keyPart: string): string {
   return `${n}–${n + SCORE_BUCKET_STEP}`;
 }
 
-// A `groupValue` that returns `null`/`undefined` for a missing value ends up keyed by the empty
-// string once the table's own internals stringify it (`null ?? ''`) — but bucketNumericRange/
-// bucketDatePart don't know that convention; each calls `String(value)`/coerces it *before* any
-// such check, so a genuinely missing `null` column value (a failed rating fetch, an unparseable
-// release date) would come out the other end as the literal string `"null"` and show up as a
-// group header that reads "null" rather than "—". Checking for "missing" ourselves before ever
-// calling the underlying bucket function sidesteps that regardless of which one's used.
-export function withMissingGroup(
-  bucketFn: (v: unknown, row: Row) => unknown,
-  isMissing: (v: unknown) => boolean = (v) => v == null,
-) {
-  return (value: unknown, row: Row) => (isMissing(value) ? null : bucketFn(value, row));
+// For the hand-rolled bucketers here (scores, review counts, price tiers), which coerce a missing
+// value to 0 (`Number(null)`) and would fold it into a real group. A `null` group value is keyed by
+// the empty string, which formatMissingGroup below labels. (The library's own numericRangeGroup/
+// datePartGroup already handle missing values.)
+export function withMissingGroup(bucketFn: (v: unknown, row: Row) => unknown) {
+  return (value: unknown, row: Row) => (value == null ? null : bucketFn(value, row));
 }
-// Pairs with withMissingGroup above — the empty-string group key it produces for a missing value
-// needs its own label rather than being handed to a real formatter that has no idea what to do
-// with it (formatDatePart('year') on '' would print '' itself: `new Date('')` is invalid, but
-// still not NaN in a way that function checks for).
+// Pairs with withMissingGroup above: labels its empty-string group key.
 export function formatMissingGroup(
   formatFn: (keyPart: string) => string,
   missingLabel = '—',
@@ -919,7 +908,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   // open-world completionist runs into the 300-500h range, nothing like reviewsTotal's spread
   // into the millions) — a plain linear step stays meaningful across that whole range, unlike
   // that one, so a 10h `bucketNumericRange` is the right tool here rather than the log buckets
-  // above. `null` (no HLTB match found) needs the same `withMissingGroup` treatment.
+  // above. `null` (no HLTB match found) groups as "—".
   {
     key: 'hltbAll',
     label: 'HLTB (h)',
@@ -927,8 +916,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
     groupable: true,
     format: fmt.dec1,
     compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)),
-    groupFormat: formatMissingGroup(formatNumericRange(10, 'h')),
+    ...numericRangeGroup(10, 'h', '—'),
     keepVisibleWhenGrouped: true,
     category: 'How Long To Beat',
   },
@@ -939,8 +927,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
     groupable: true,
     format: fmt.dec1,
     compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)),
-    groupFormat: formatMissingGroup(formatNumericRange(10, 'h')),
+    ...numericRangeGroup(10, 'h', '—'),
     keepVisibleWhenGrouped: true,
     category: 'How Long To Beat',
   },
@@ -951,8 +938,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
     groupable: true,
     format: fmt.dec1,
     compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)),
-    groupFormat: formatMissingGroup(formatNumericRange(10, 'h')),
+    ...numericRangeGroup(10, 'h', '—'),
     keepVisibleWhenGrouped: true,
     category: 'How Long To Beat',
   },
@@ -963,8 +949,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
     groupable: true,
     format: fmt.dec1,
     compare: compareNumMissingLast,
-    groupValue: withMissingGroup(bucketNumericRange(10)),
-    groupFormat: formatMissingGroup(formatNumericRange(10, 'h')),
+    ...numericRangeGroup(10, 'h', '—'),
     keepVisibleWhenGrouped: true,
     category: 'How Long To Beat',
   },
@@ -986,8 +971,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
     render: renderReleaseDate,
     defaultSortDir: 'desc',
     defaultValueSort: { by: 'alpha', dir: 'desc' },
-    groupValue: withMissingGroup(bucketDatePart('year', endOfReleasePeriod)),
-    groupFormat: formatMissingGroup(formatDatePart('year')),
+    ...datePartGroup('year', endOfReleasePeriod, '—'),
     keepVisibleWhenGrouped: true,
     category: 'Play Time & Dates',
   },
@@ -1238,8 +1222,7 @@ export const PRICE_COLUMNS: ColumnDef<Row>[] = [
     render: renderCut,
     compare: compareNumMissingLast,
     defaultSortDir: 'desc',
-    groupValue: withMissingGroup(bucketNumericRange(25)),
-    groupFormat: formatMissingGroup(formatNumericRange(25, '%')),
+    ...numericRangeGroup(25, '%', '—'),
     keepVisibleWhenGrouped: true,
     category: 'Pricing',
   },
