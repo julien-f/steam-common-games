@@ -121,6 +121,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `setup-facts.js --agents` shows each agent's tool time and its top commands
 - Fix batches default to six lanes and review each lane as it merges
 - `batch.js plan` reads UX items listing several scenarios or none
+- The Price card's ITAD-failure e2e test now covers a failed price lookup, not only a failed health check
 
 ## [0.10.0] - 2026-10-10
 

@@ -888,22 +888,26 @@ test("F1 edge: the panel doesn't link an upstream URL that isn't http(s)", async
   await expect(chip).not.toHaveAttribute('href', /.*/);
 });
 
-test("F1 edge: the Price card says when ITAD didn't answer, and the panel's ↻ retries it", async ({ page }) => {
-  let down = true;
-  // Both the health check and the price lookup fail until the "upstream" is back.
-  await page.route(/\/api\/(health|prices)$/, (route) =>
-    down ? route.fulfill({ status: 502, json: { error: 'IsThereAnyDeal request failed' } }) : route.fallback(),
-  );
-  await asPlayer(page, ALICE);
-  await page.goto('/lists/owned?game=1145360');
-  const card = page.locator('#panel-section-price');
-  await expect(card).toContainText("IsThereAnyDeal didn't answer");
-  await expect(card).not.toContainText('No pricing data available');
+// A failed health check stops the panel before its price lookup, so each failure gets its own run.
+for (const failing of ['health', 'prices']) {
+  test(`F1 edge: the Price card says when ITAD didn't answer its ${failing} call, and the panel's ↻ retries it`, async ({
+    page,
+  }) => {
+    let down = true;
+    await page.route(new RegExp(`/api/${failing}(\\?|$)`), (route) =>
+      down ? route.fulfill({ status: 502, json: { error: 'IsThereAnyDeal request failed' } }) : route.fallback(),
+    );
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned?game=1145360');
+    const card = page.locator('#panel-section-price');
+    await expect(card).toContainText("IsThereAnyDeal didn't answer");
+    await expect(card).not.toContainText('No pricing data available');
 
-  down = false;
-  await page.getByRole('button', { name: 'Refresh details' }).click();
-  await expect(card).toContainText('Buy at Test Shop');
-});
+    down = false;
+    await page.getByRole('button', { name: 'Refresh details' }).click();
+    await expect(card).toContainText('Buy at Test Shop');
+  });
+}
 
 test('F1 edge: the DLC card lists 20 entries from store metadata, then more on request', async ({ page }) => {
   const requested: string[] = [];
