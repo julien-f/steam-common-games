@@ -12,7 +12,7 @@
 // form below can pick any recent account's Owned/Wishlist, Recently Looked Up, or any existing
 // user list as a source. A bundle joins it only from its own page ("What does this add?" opens a
 // /lists/shared link, saved from there) — offering every bundle here would need a bundle picker.
-import { createSignal, createEffect, createMemo, on, onCleanup, onMount, For, Index, Show, type JSX } from 'solid-js';
+import { createSignal, createEffect, createMemo, on, onCleanup, For, Index, Show, type JSX } from 'solid-js';
 import { A, useLocation, useNavigate } from '@solidjs/router';
 import {
   getMyAccount,
@@ -29,7 +29,7 @@ import {
   ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
 import { getAccountOverrideState, adoptAccount, accountOverrideStatusText } from './accountOverride.ts';
-import { withAccountParam, urlWithParams, parseUrlState, compareUrl, COMPARE_PATH } from './urlState.ts';
+import { withAccountParam, parseUrlState, compareUrl, COMPARE_PATH } from './urlState.ts';
 import { resolveAccountSummary, fetchAccountOverview, fetchAccountWishlist, accountInfoFrom } from './accountData.ts';
 import type { AccountPlayer } from './accountData.ts';
 import { normalizeInput, steamVanity, fmtAge, countryFlag } from './utils.ts';

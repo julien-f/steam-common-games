@@ -110,6 +110,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The setup review counts which docs agents read, and how often whole, to judge how the docs are split
 - GET /api/metrics now reports HLTB's and ITAD's request queues alongside Steam's
 - The fix batch status shows how long finished lanes wait on the slowest one
+- The typecheck fails on unused imports and locals
 
 ## [0.10.0] - 2026-10-10
 

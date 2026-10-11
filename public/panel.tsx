@@ -42,7 +42,7 @@ import { PRICES_UNAVAILABLE } from './priceLoading.ts';
 import { TIER_RANGE_TITLE } from './bundleData.ts';
 import { withAccountParam, urlWithoutPanel } from './urlState.ts';
 import { copyWithFeedback } from './clipboard.ts';
-import type { DetailsAges, Game, PriceFields, ReadonlyGame } from './types.ts';
+import type { DetailsAges, PriceFields, ReadonlyGame } from './types.ts';
 
 import { createSignal, createEffect, createMemo, createResource, createRoot, For, Show, type JSX } from 'solid-js';
 import { render } from 'solid-js/web';

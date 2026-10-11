@@ -1,6 +1,8 @@
 {
   "compilerOptions": {
     "strict": true,
+    // Catches imports and locals a change leaves dead; ESLint here has no such rule.
+    "noUnusedLocals": true,
     "noEmit": true,
     "target": "ESNext",
     "module": "ESNext",

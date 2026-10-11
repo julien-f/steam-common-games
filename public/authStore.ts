@@ -14,7 +14,6 @@ import {
   accountSlotFromSummary,
 } from './accountsStore.ts';
 import { resolveAccountSummary } from './accountData.ts';
-import type { AccountSlot } from './types.ts';
 
 export const AUTH_CHANGED_EVENT = 'steam-auth-changed';
 

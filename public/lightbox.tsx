@@ -3,7 +3,6 @@ import { urlWithoutShot } from './urlState.ts';
 import { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
 import type { Game, ReadonlyGame } from './types.ts';
-import type Hls from 'hls.js';
 import { fmtTime } from './lightboxTime.ts';
 import { decideSwipeAxis, resolveSwipe, LB_SWIPE_RESISTANCE } from './lightboxSwipe.ts';
 import type { SwipeAxis } from './lightboxSwipe.ts';
