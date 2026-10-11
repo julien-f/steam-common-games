@@ -57,7 +57,7 @@ import {
   type BundleListItem,
   type BundleRow,
 } from './bundleRows.ts';
-import { getStoredRegion, resolveRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
+import { currentRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { setBrowsedBundles } from './bundleBrowseStore.ts';
 import { openPrefsPopover } from './prefsPopover.ts';
 import {
@@ -364,7 +364,7 @@ export default function BundlesBrowseRoute() {
 
   async function fetchPage(force = false): Promise<BundleListItem[]> {
     const qs = new URLSearchParams({
-      country: resolveRegion(getStoredRegion()),
+      country: currentRegion(),
       sort: FETCH_SORT,
       expired: String(includeExpired()),
       offset: String(offset),
@@ -420,10 +420,10 @@ export default function BundlesBrowseRoute() {
 
   // See ListRoute's own listener — the ⚙ popover broadcasts, and every surface showing prices
   // has to react or silently keep showing the previous region's.
-  const [regionCode, setRegionCode] = createSignal(resolveRegion(getStoredRegion()));
+  const [regionCode, setRegionCode] = createSignal(currentRegion());
   onMount(() => {
     const onRegionChange = () => {
-      setRegionCode(resolveRegion(getStoredRegion()));
+      setRegionCode(currentRegion());
       void load();
     };
     window.addEventListener(REGION_CHANGED_EVENT, onRegionChange);
