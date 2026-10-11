@@ -465,6 +465,15 @@ test("R1 edge: a ranking card's HLTB time is the table's, rounded and labelled",
   await expect(page.locator('.rank-route')).toContainText('44.5 h to beat');
 });
 
+test("R1 edge: the ranking's keyboard hints show only with a mouse", async ({ page }, testInfo) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
+  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
+  await expect(page.locator('.rank-question')).toBeVisible();
+  await expect(page.locator('.rank-hint')).toBeVisible({ visible: testInfo.project.name !== 'phone' });
+});
+
 test("R1 edge: the ranking's side panel shows tags as plain pills and its Refresh re-fetches", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
