@@ -44,6 +44,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - In the viewer with the controls hidden, a media step right after a game step no longer keeps showing the game's name.
 - A list no longer hides its prices for the whole visit when the server's health check fails once.
 - Deleting a list that a deleted list still drew from no longer drops its games from the lists built on them
+- The account menu now drops removed recent accounts and updates its ★ as soon as they change on Home
 
 ### Development
 

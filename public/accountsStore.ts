@@ -59,6 +59,7 @@ export function getMyAccount(): AccountSlot | null {
 export function setMyAccount(account: AccountSlot | null): void {
   setPref(MY_ACCOUNT_KEY, account);
   if (account) upsertRecentAccount(account);
+  notifyAccountChanged();
 }
 
 export function getCurrentAccount(): AccountSlot | null {
@@ -107,7 +108,7 @@ export function getEffectiveCurrentAccount(): AccountSlot | null {
 }
 
 // Broadcast on any change to what getEffectiveCurrentAccount() returns — a `?u=` override
-// resolving/clearing, or an explicit account pick. A plain window CustomEvent, the same
+// resolving/clearing, or an explicit account pick — and on any change to ★ or recents. A plain window CustomEvent, the same
 // mechanism region.ts's REGION_CHANGED_EVENT already uses (and for the same reason): this file
 // is deliberately a plain module with no Solid reactivity of its own, so a route that needs to
 // react subscribes to this and bumps a signal of its own, and nothing here needs to know who's
@@ -178,6 +179,12 @@ export function refreshAccountInfo(
 // same shape as listsStore.ts's deleteList. Never touches myAccount/currentAccount even if
 // they happen to hold the same id, since those are stored independently.
 export function removeRecentAccount(id: string): { softRemoved: boolean } {
+  const result = removeRecent(id);
+  notifyAccountChanged();
+  return result;
+}
+
+function removeRecent(id: string): { softRemoved: boolean } {
   const recents = readRecents();
   const idx = recents.findIndex((a) => a.id === id);
   if (idx === -1) return { softRemoved: false };
@@ -195,8 +202,9 @@ export function removeRecentAccount(id: string): { softRemoved: boolean } {
 // single removeRecentAccount call, just applied across the whole list.
 export function clearRecentAccounts(): void {
   readRecents().forEach((a) => {
-    if (!a.removedAt) removeRecentAccount(a.id);
+    if (!a.removedAt) removeRecent(a.id);
   });
+  notifyAccountChanged();
 }
 
 // Permanently purges any soft-removed account no longer referenced by anything — listsStore.ts's
