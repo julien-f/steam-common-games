@@ -3415,9 +3415,7 @@ export default function ListRoute() {
         <Show when={failedSummary()}>{(text) => <span class="list-failed">{text()}</span>}</Show>
         <Show when={bundleFailedCount()}>
           {(n) => (
-            <span class="list-failed">
-              Steam didn't answer for {n()} of this bundle's game{n() === 1 ? '' : 's'} — reload to retry
-            </span>
+            <span class="list-failed">Steam didn't answer for {n()} of this bundle's games — reload to retry</span>
           )}
         </Show>
       </div>

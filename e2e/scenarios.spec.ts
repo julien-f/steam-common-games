@@ -586,7 +586,7 @@ test('B1 edge: a bundle game whose Steam lookup failed says so, rather than read
   await mockApi(page, { states: ['resolve-failed'] }); // registered last, so it answers first
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
   await expect(rows(page)).toHaveCount(3);
-  await expect(page.getByText("Steam didn't answer for 1 of this bundle's game")).toBeVisible();
+  await expect(page.getByText("Steam didn't answer for 1 of this bundle's games")).toBeVisible();
   await expect(page.getByRole('button', { name: /1 more in this bundle, not on Steam/ })).toBeVisible();
 });
 
