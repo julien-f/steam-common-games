@@ -3,16 +3,14 @@
 // Lists references in the docs, CLAUDE.md, README.md and the skills that no longer resolve: backticked
 // camelCase identifiers (`cheapestPicks`, `pickRate()`) found nowhere in the code, relative links to
 // missing files or headings, `npm run` scripts package.json lacks, and `scripts/*.js` files or flags that don't exist.
-// Run by `npm run check`; a name a doc mentions on purpose as removed or rejected goes in HISTORY.
+// Run by `npm run check`; a name a doc mentions on purpose as removed or rejected goes in HISTORY, and
+// leaves it once no doc mentions it.
 
 const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
 const HISTORY = new Set([
-  ...['newsLoading', 'newsError', 'achievementsLoading', 'achievementsAccountId', 'dlcLoading'], // frontend.md: gone from `Game`
-  ...['scheduleFlush', 'updateLastPlayedTooltip', 'processData', 'searchData'], // frontend.md: pre-redesign pages
-  'bundlesPricesLimit', // integrations.md: the name `pricesLimit` deliberately isn't
   'fullPage', // screenshots skill: the Playwright option it explains not using
 ]);
 const CODE_DIRS = ['public', 'lib', 'scripts', 'e2e', 'test'];
@@ -82,6 +80,10 @@ function staleRefs(doc, text, ctx) {
   return stale;
 }
 
+// HISTORY names no doc text mentions any more.
+const unusedHistory = (texts, history = HISTORY) =>
+  [...history].filter((name) => !texts.some((t) => t.includes(`\`${name}`)));
+
 function main() {
   const code = [
     ...CODE_DIRS.flatMap((d) => walk(path.join(ROOT, d), (p) => /\.(js|mjs|ts|tsx|css|html)$/.test(p))),
@@ -105,9 +107,13 @@ function main() {
     path.join(ROOT, 'CLAUDE.md'),
     path.join(ROOT, 'README.md'),
   ];
-  const stale = docs.flatMap((f) =>
-    staleRefs(path.relative(ROOT, f).split(path.sep).join('/'), fs.readFileSync(f, 'utf8'), ctx),
-  );
+  const texts = docs.map((f) => fs.readFileSync(f, 'utf8'));
+  const stale = [
+    ...docs.flatMap((f, i) => staleRefs(path.relative(ROOT, f).split(path.sep).join('/'), texts[i], ctx)),
+    ...unusedHistory(texts).map(
+      (name) => `scripts/doc-refs.js: HISTORY's \`${name}\` is in no doc any more; remove it`,
+    ),
+  ];
   if (stale.length) {
     console.error(`Stale references (fix the doc, or add a deliberate name to HISTORY):\n${stale.join('\n')}`);
     process.exit(1);
@@ -116,4 +122,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { headingSlugs, staleRefs };
+module.exports = { headingSlugs, staleRefs, unusedHistory };

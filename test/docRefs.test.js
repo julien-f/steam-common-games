@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 
-const { headingSlugs, staleRefs } = require('../scripts/doc-refs');
+const { headingSlugs, staleRefs, unusedHistory } = require('../scripts/doc-refs');
 
 const ctx = {
   words: new Set(['pickRate']),
@@ -45,4 +45,9 @@ test('staleRefs: a missing identifier, link target, heading, npm script, script 
 test('headingSlugs: GitHub anchors, repeats numbered, code fences skipped', () => {
   const md = ['# Setup', '## Fanatical — `pick` [tiers](x.md)', '## Setup', '```', '# not a heading', '```'].join('\n');
   assert.deepStrictEqual([...headingSlugs(md)], ['setup', 'fanatical--pick-tiers', 'setup-1']);
+});
+
+test('unusedHistory: names no doc mentions in backticks', () => {
+  const history = new Set(['keptName', 'goneName', 'bareName']);
+  assert.deepStrictEqual(unusedHistory(['`keptName` is gone', 'bareName in prose'], history), ['goneName', 'bareName']);
 });

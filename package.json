@@ -18,6 +18,7 @@
     "check": "node scripts/check.js",
     "check:changelog": "node scripts/changelog-check.js",
     "check:css": "node scripts/css-overrides.js",
+    "check:doc-lint": "node scripts/doc-lint.js",
     "check:doc-refs": "node scripts/doc-refs.js",
     "check:journeys": "node scripts/journey-coverage.js --check",
     "check:setup": "node scripts/setup-lint.js",
