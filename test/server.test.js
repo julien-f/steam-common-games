@@ -1638,6 +1638,22 @@ test("GET /api/achievements/:appid: unlocked counts only the schema's achievemen
   assert.equal(res.body.unlocked, 1);
 });
 
+test('GET /api/achievements/:appid: a member with a real unlock time wins over one whose time is unknown (0), in either order', async (t) => {
+  for (const ids of [`${ID1},${ID2}`, `${ID2},${ID1}`]) {
+    _reset();
+    const base = makeAchievementsFetch({ achieved: ['ACH_1'] });
+    t.mock.method(globalThis, 'fetch', async (url) => {
+      const res = await base(url);
+      if (!url.includes('GetPlayerAchievements') || !url.includes(ID1)) return res;
+      const body = await res.json();
+      body.playerstats.achievements[0].unlocktime = 0;
+      return { ok: true, json: async () => body };
+    });
+    const res = await api.get(`/api/achievements/400?steamids=${ids}`).expect(200);
+    assert.equal(res.body.achievements.find((a) => a.apiname === 'ACH_1').unlocktime, 1700000000, ids);
+  }
+});
+
 test('GET /api/achievements/:appid: ?refresh=1 re-fetches the schema, rarity and player progress', async (t) => {
   _reset();
   const achievementsFetch = makeAchievementsFetch();

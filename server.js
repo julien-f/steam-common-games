@@ -1025,7 +1025,9 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
       for (const a of list) {
         if (!a.achieved) continue;
         const prev = unlockedAt.get(a.apiname);
-        if (prev === undefined || (a.unlocktime && a.unlocktime < prev)) unlockedAt.set(a.apiname, a.unlocktime || 0);
+        // 0 is an unknown time, so any real one replaces it
+        if (prev === undefined || (a.unlocktime && (!prev || a.unlocktime < prev)))
+          unlockedAt.set(a.apiname, a.unlocktime || 0);
       }
     }
 
