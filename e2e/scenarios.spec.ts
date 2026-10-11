@@ -1410,6 +1410,53 @@ test('F1 edge: stepping past the last media or game slides back in from the othe
   ).toContain('lb-img lb-anim-top');
 });
 
+test('F1 edge: on a phone, a swipe past the last media or game slides in with the finger', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'touch only');
+  await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
+  await page.goto('/game/1145360?shot=s3');
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 3 of 3');
+  const img = page.locator('#screenshot-lightbox .lb-img');
+  const cdp = await page.context().newCDPSession(page);
+  const swipe = async (points: [number, number][]) => {
+    await img.evaluate((el) => {
+      const w = window as unknown as { lbAnims: string[] };
+      w.lbAnims = [];
+      new MutationObserver(() => w.lbAnims.push(el.className)).observe(el, { attributeFilter: ['class'] });
+    });
+    const [[x0, y0], ...moves] = points;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x0, y: y0 }] });
+    for (const [x, y] of moves)
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+  const anims = () => page.evaluate(() => (window as unknown as { lbAnims: string[] }).lbAnims);
+  const box = (await img.boundingBox())!;
+  const cx = box.x + box.width / 2,
+    cy = box.y + box.height / 2;
+  // Left, past the last screenshot: the Cover comes in from the right, under the finger.
+  await swipe([
+    [cx + 80, cy],
+    [cx + 40, cy],
+    [cx - 20, cy],
+    [cx - 100, cy],
+  ]);
+  await expect(page.locator('.lb-counter')).toHaveText('Cover');
+  expect(await anims()).toContain('lb-img lb-anim-right');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.lb-caption-pos')).toHaveText('Game 3 of 3');
+  // Up, past the last game: game 1 comes in from the bottom.
+  await swipe([
+    [cx, cy + 60],
+    [cx, cy + 30],
+    [cx, cy - 20],
+    [cx, cy - 100],
+  ]);
+  await expect(page.locator('.lb-caption-pos')).toHaveText('Game 1 of 3');
+  expect(await anims()).toContain('lb-img lb-anim-bottom');
+});
+
 test('F1 edge: stepping games with hidden controls flashes the game name too', async ({ page }) => {
   await page.clock.install();
   await asPlayer(page, ALICE);

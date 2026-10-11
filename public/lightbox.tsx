@@ -175,10 +175,11 @@ export function lightboxShot(): { appid: number; shotId: string } | null {
 // the lightbox is covering. Whatever had focus in here keeps it, so holding ↓ on the caption
 // button doesn't walk focus away mid-click; the close button is the fallback, as on a real open.
 // `dir` only drives the enter animation's direction — 0 (R, which has no direction) skips it.
-// A wrap past either end of the list enters from the other side, the cue that it went back round.
-function stepGameNav(dir: number) {
+// A wrap past either end of the list enters from the other side, the cue that it went back round —
+// except after a swipe, where the new game follows the finger.
+function stepGameNav(dir: number, swipe = false) {
   const pos = _getGamePosition();
-  const wraps = pos !== null && pos.index === (dir > 0 ? pos.total - 1 : 0);
+  const wraps = !swipe && pos !== null && pos.index === (dir > 0 ? pos.total - 1 : 0);
   stepGameFromLightbox(() => _onGameNav(dir), wraps ? -dir : dir);
 }
 
@@ -858,9 +859,9 @@ function wireTouchHandlers(lb: HTMLElement) {
         dragAxis = null;
         const el = lbMediaEl();
         if (el) clearLbDrag(el, !action);
-        if (action === 'media-prev' || action === 'media-next') stepLightbox(action === 'media-next' ? 1 : -1);
+        if (action === 'media-prev' || action === 'media-next') stepLightbox(action === 'media-next' ? 1 : -1, true);
         else if (action) {
-          stepGameNav(action === 'game-next' ? 1 : -1);
+          stepGameNav(action === 'game-next' ? 1 : -1, true);
         }
         return;
       }
@@ -1160,7 +1161,7 @@ export function lightboxHandleEscape() {
   if (!isFullscreen()) closeLightbox();
 }
 
-function stepLightbox(dir: number) {
+function stepLightbox(dir: number, swipe = false) {
   // The viewer has taken over: whatever is on screen from here on is their choice, so the latch
   // must never move it under them.
   _awaitingMedia = null;
@@ -1168,8 +1169,9 @@ function stepLightbox(dir: number) {
   lbLastAxis = 'x';
   const list = shots();
   const next = (idx() + dir + list.length) % list.length;
-  // Entering from the side actually moved toward, so a wrap to the Cover slides in from the left.
-  lbLastDir = Math.sign(next - idx()) || dir;
+  // Entering from the side actually moved toward, so a wrap to the Cover slides in from the left —
+  // except after a swipe, where it follows the finger.
+  lbLastDir = swipe ? dir : Math.sign(next - idx()) || dir;
   setIdx(next);
   _onLightboxParamChange(list[next].shotId);
 }
