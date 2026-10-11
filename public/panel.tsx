@@ -2495,7 +2495,6 @@ function initHeroSwipe() {
         isHoriz = Math.abs(dx) > Math.abs(dy) * 1.2;
         decided = true;
       }
-      if (isHoriz) e.stopPropagation(); // don't let panel-close swipe fire
     },
     { passive: true },
   );
@@ -2535,7 +2534,8 @@ function initPanelSwipe() {
   panel.addEventListener(
     'touchstart',
     (e) => {
-      if (e.touches.length !== 1 || (e.target as Element).closest('.panel-filmstrip')) return;
+      // The hero has its own swipe, which decides later and so can't reliably stop this one.
+      if (e.touches.length !== 1 || (e.target as Element).closest('.panel-filmstrip, .panel-hero')) return;
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       tracking = true;

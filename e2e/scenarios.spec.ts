@@ -1066,6 +1066,33 @@ test("F1 edge: on a phone, a swipe past the panel's last item stays on it", asyn
   await expect(current).toHaveAccessibleName('Screenshot 2 of 3');
 });
 
+test("F1 edge: on a phone, a slow right swipe on the panel's media steps it, without closing the panel", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'touch only');
+  await page.clock.install();
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const current = page.locator('.panel-film-item[aria-current="true"]');
+  await page.getByRole('button', { name: 'Screenshot 2 of 3' }).click();
+  // Synthetic events: Chromium holds back real touchmoves within its slop, the ones that matter here.
+  await page.locator('#panel-hero .panel-hero-img').evaluate((img) => {
+    const y = img.getBoundingClientRect().top + 20;
+    const fire = (type: string, x: number) => {
+      const touch = new Touch({ identifier: 1, target: img, clientX: x, clientY: y });
+      const touches = type === 'touchend' ? [] : [touch];
+      img.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches, changedTouches: [touch] }));
+    };
+    fire('touchstart', 100);
+    // 7 px decides the panel's own swipe (6 px) before the hero's (8 px).
+    for (const x of [107, 115, 160, 220]) fire('touchmove', x);
+    fire('touchend', 220);
+  });
+  await expect(current).toHaveAccessibleName('Screenshot 1 of 3');
+  await page.clock.runFor(500);
+  await expect(page.locator('#panel-title')).toBeVisible();
+});
+
 test('F1 edge: on a phone, the ‹ › buttons sit clear of the media and its controls', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout');
   await fakePlayback(page);

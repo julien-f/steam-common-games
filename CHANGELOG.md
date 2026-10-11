@@ -46,6 +46,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Pressing Enter on a highlighted game under the search box's Recently looked up now opens it
 - Esc closing a menu in the nav bar or the search box's suggestions no longer also closes the open game, or leaves a ranking
 - On a phone, swiping past the game panel's last image no longer leaves its ‹ button and back swipe doing nothing
+- On a phone, a slow sideways swipe on the game panel's images no longer also closes the panel
 
 ### Development
 
