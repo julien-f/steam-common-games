@@ -21,7 +21,7 @@ const groupRows = (page: Page) => page.locator('.dt-group-row');
 test('A1: first visit — resolve my account, then open my library', async ({ page }) => {
   await page.goto('/');
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('alice');
-  await page.getByRole('button', { name: 'Set as current account' }).click();
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
   await expect(page.getByRole('main')).toContainText('Owned: 6');
   await expect(page.getByText('Friends (private)')).toBeVisible(); // the mock's friends lists are private
 
@@ -32,6 +32,12 @@ test('A1: first visit — resolve my account, then open my library', async ({ pa
   await page.reload();
   await expect(page.getByRole('navigation')).toContainText('Alice');
   await expect(rows(page)).toHaveCount(6);
+});
+
+test('A1 edge: a first visit says what the app does, and the account field looks it up', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.home-intro')).toContainText('ratings, completion times and prices');
+  await expect(page.getByRole('button', { name: 'Look up', exact: true })).toBeVisible();
 });
 
 test('A1 edge: Owned with no account points to Home rather than showing 0 games', async ({ page }) => {
@@ -55,7 +61,7 @@ test('A2.1-2,4: explore a friend, then switch back to my ★ account from the na
   await asPlayer(page, ALICE);
   await page.goto('/');
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
-  await page.getByRole('button', { name: 'Set as current account' }).click();
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
   await expect(page.getByRole('navigation')).toContainText('Bob');
 
   await page.getByRole('navigation').getByText('Bob', { exact: true }).click();
@@ -82,7 +88,7 @@ test('A2 edge: an account picked mid-refresh does not read "Refreshing…" while
   await expect(updated).toContainText('Refreshing');
 
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
-  await page.getByRole('button', { name: 'Set as current account' }).click();
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
   await expect(page.getByRole('navigation')).toContainText('Bob');
   await expect(updated).not.toContainText('Refreshing');
   release();
@@ -102,7 +108,7 @@ test("A2 edge: a picked account whose library fails doesn't show the previous on
   );
 
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
-  await page.getByRole('button', { name: 'Set as current account' }).click();
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
   await expect(page.locator('.account-counts')).toContainText("Owned: couldn't load");
   await expect(updated).not.toContainText('12 days ago');
 });
@@ -888,22 +894,26 @@ test("F1 edge: the panel doesn't link an upstream URL that isn't http(s)", async
   await expect(chip).not.toHaveAttribute('href', /.*/);
 });
 
-test("F1 edge: the Price card says when ITAD didn't answer, and the panel's ↻ retries it", async ({ page }) => {
-  let down = true;
-  // Both the health check and the price lookup fail until the "upstream" is back.
-  await page.route(/\/api\/(health|prices)$/, (route) =>
-    down ? route.fulfill({ status: 502, json: { error: 'IsThereAnyDeal request failed' } }) : route.fallback(),
-  );
-  await asPlayer(page, ALICE);
-  await page.goto('/lists/owned?game=1145360');
-  const card = page.locator('#panel-section-price');
-  await expect(card).toContainText("IsThereAnyDeal didn't answer");
-  await expect(card).not.toContainText('No pricing data available');
+// A failed health check stops the panel before its price lookup, so each failure gets its own run.
+for (const failing of ['health', 'prices']) {
+  test(`F1 edge: the Price card says when ITAD didn't answer its ${failing} call, and the panel's ↻ retries it`, async ({
+    page,
+  }) => {
+    let down = true;
+    await page.route(new RegExp(`/api/${failing}(\\?|$)`), (route) =>
+      down ? route.fulfill({ status: 502, json: { error: 'IsThereAnyDeal request failed' } }) : route.fallback(),
+    );
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned?game=1145360');
+    const card = page.locator('#panel-section-price');
+    await expect(card).toContainText("IsThereAnyDeal didn't answer");
+    await expect(card).not.toContainText('No pricing data available');
 
-  down = false;
-  await page.getByRole('button', { name: 'Refresh details' }).click();
-  await expect(card).toContainText('Buy at Test Shop');
-});
+    down = false;
+    await page.getByRole('button', { name: 'Refresh details' }).click();
+    await expect(card).toContainText('Buy at Test Shop');
+  });
+}
 
 test('F1 edge: the DLC card lists 20 entries from store metadata, then more on request', async ({ page }) => {
   const requested: string[] = [];

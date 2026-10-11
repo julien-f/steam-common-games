@@ -80,6 +80,25 @@ test('setMyAccount: also upserts into recentAccounts (starring is itself a use)'
   );
 });
 
+test('setCurrentAccount: a re-pick resolved without player summaries keeps the stored display fields', () => {
+  const { setCurrentAccount, getCurrentAccount, getRecentAccounts } = store();
+  const known = {
+    label: 'Alice',
+    avatarUrl: 'https://avatars/a.jpg',
+    vanities: { acc1: 'alice' },
+    memberSince: '2010-01-01',
+    countryCode: 'FR',
+    realName: 'Alice A.',
+  };
+  setCurrentAccount(makeAccount('acc1', known));
+  // What accountSlotFrom builds when Steam's player summaries fail: placeholders, no display fields.
+  setCurrentAccount(makeAccount('acc1', { rawInputs: ['typed'], vanities: {} }));
+
+  for (const slot of [getCurrentAccount(), getRecentAccounts()[0]]) {
+    assert.deepEqual({ ...slot, lastUsedAt: 0 }, makeAccount('acc1', { ...known, rawInputs: ['typed'] }));
+  }
+});
+
 test('getRecentAccounts: most-recently-used first', async () => {
   const { setCurrentAccount, getRecentAccounts } = store();
   setCurrentAccount(makeAccount('older'));

@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Stepping to another game in the screenshot viewer briefly shows that game's name, even with the controls hidden
 - Picking, linking or comparing an account no longer fetches its Steam wishlist just to resolve it
 - GET /api/metrics lists every outbound budget from startup, so the ceilings show before the first call
+- A first visit to Home says what the app does, and the account field's button reads "Look up"
 
 ### Fixed
 
@@ -76,6 +77,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Stepping to another screenshot while Retry is loading one now keeps the screenshot you stepped to
 - A combined or shared list whose first load failed keeps its Updated ↻ tile to retry from
 - A comparison's 🔗 Share view link now applies its layout
+- Re-picking a known account while Steam doesn't answer keeps its name, avatar and custom URL
 
 ### Development
 
@@ -123,6 +125,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `setup-facts.js --agents` shows each agent's tool time and its top commands
 - Fix batches default to six lanes and review each lane as it merges
 - `batch.js plan` reads UX items listing several scenarios or none
+- The Price card's ITAD-failure e2e test now covers a failed price lookup, not only a failed health check
 
 ## [0.10.0] - 2026-10-10
 

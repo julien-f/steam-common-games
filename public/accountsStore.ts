@@ -56,7 +56,8 @@ export function getMyAccount(): AccountSlot | null {
 
 // Setting myAccount also upserts it into recentAccounts — starring an account is itself a use
 // of it, and it should show up there the same as any other resolve/pick would.
-export function setMyAccount(account: AccountSlot | null): void {
+export function setMyAccount(picked: AccountSlot | null): void {
+  const account = picked && withStoredDisplay(picked, MY_ACCOUNT_KEY);
   setPref(MY_ACCOUNT_KEY, account);
   if (account) upsertRecentAccount(account);
   notifyAccountChanged();
@@ -66,10 +67,24 @@ export function getCurrentAccount(): AccountSlot | null {
   return getPref<AccountSlot | null>(CURRENT_ACCOUNT_KEY, null);
 }
 
-export function setCurrentAccount(account: AccountSlot | null): void {
+export function setCurrentAccount(picked: AccountSlot | null): void {
+  const account = picked && withStoredDisplay(picked, CURRENT_ACCOUNT_KEY);
   setPref(CURRENT_ACCOUNT_KEY, account);
   if (account) upsertRecentAccount(account);
   notifyAccountChanged();
+}
+
+const DISPLAY_FIELDS = ['label', 'avatarUrl', 'vanities', 'memberSince', 'countryCode', 'realName'] as const;
+
+// A slot resolved while Steam's player summaries failed carries no display fields (accountInfoFrom
+// leaves them out), so a re-pick keeps the stored ones instead of blanking them until the next refresh.
+function withStoredDisplay(account: AccountSlot, key: string): AccountSlot {
+  const stored = [getPref<AccountSlot | null>(key, null), ...readRecents()].find((a) => a?.id === account.id);
+  if (!stored) return account;
+  const isBlank = (v: unknown) =>
+    v === undefined || v === '' || (typeof v === 'object' && v !== null && !Object.keys(v).length);
+  const kept = Object.fromEntries(DISPLAY_FIELDS.filter((k) => isBlank(account[k])).map((k) => [k, stored[k]]));
+  return { ...account, ...kept };
 }
 
 // ── The `?u=` override ───────────────────────────────────────────────────────────────────────
