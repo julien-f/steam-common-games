@@ -45,9 +45,11 @@ function headingSlugs(markdown) {
   return slugs;
 }
 
+// node_modules skipped: a worktree has none, so a dependency's names must not count as this repo's code.
 const walk = (dir, keep) =>
   fs
     .readdirSync(dir, { recursive: true })
+    .filter((f) => !f.split(path.sep).includes('node_modules'))
     .map((f) => path.join(dir, f))
     .filter(keep);
 
