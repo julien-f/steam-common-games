@@ -202,17 +202,25 @@ function webkitDoc(): Document & { webkitFullscreenElement?: Element | null; web
   return document as Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void };
 }
 
+function isFullscreen() {
+  return !!(document.fullscreenElement || webkitDoc().webkitFullscreenElement);
+}
+
+function exitFullscreen() {
+  (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
+}
+
 function syncLightboxFullscreenBtn() {
   const btn = document.querySelector('#screenshot-lightbox .lb-fullscreen');
   if (!btn) return;
-  const isFs = !!(document.fullscreenElement || webkitDoc().webkitFullscreenElement);
+  const isFs = isFullscreen();
   btn.innerHTML = isFs ? LB_FS_EXIT : LB_FS_ENTER;
   btn.setAttribute('aria-label', isFs ? 'Exit fullscreen' : 'Enter fullscreen');
 }
 
 function toggleLbFullscreen(lb: HTMLElement) {
-  if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
-    (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
+  if (isFullscreen()) {
+    exitFullscreen();
   } else {
     (
       lb.requestFullscreen?.() ??
@@ -227,7 +235,7 @@ function toggleLbFullscreen(lb: HTMLElement) {
 // unsupported (desktop, iOS) — nothing to do then.
 function lockLbLandscape() {
   const o = screen.orientation as ScreenOrientation & { lock?: (type: string) => Promise<void> };
-  if (!(document.fullscreenElement || webkitDoc().webkitFullscreenElement)) return;
+  if (!isFullscreen()) return;
   o?.lock?.('landscape').catch(() => {});
 }
 
@@ -1119,13 +1127,16 @@ export function closeLightbox() {
   );
   lbRenderedAppid = undefined;
   document.body.classList.remove('lb-open');
-  if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
-    (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
-  }
+  if (isFullscreen()) exitFullscreen();
   _onLightboxParamChange(null);
   popOverlayEntry('lightbox');
   (_lbPrevFocus as HTMLElement | null)?.focus();
   _lbPrevFocus = null;
+}
+
+// The browser's own Escape exits fullscreen first; the lightbox stays open then.
+export function lightboxHandleEscape() {
+  if (!isFullscreen()) closeLightbox();
 }
 
 function stepLightbox(dir: number) {

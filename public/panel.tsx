@@ -10,7 +10,7 @@ import {
   computeSteamdbRating,
   PROTON_TIER_COLORS,
 } from './utils.ts';
-import { openLightbox, closeLightbox, isLightboxOpen, lightboxShot } from './lightbox.tsx';
+import { openLightbox, lightboxShot } from './lightbox.tsx';
 import { decideSwipeAxis, type SwipeAxis } from './lightboxSwipe.ts';
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
 import { buildMediaItems, mediaLabel, resolveShotIndex } from './mediaItems.ts';
@@ -307,26 +307,6 @@ export function isPanelOpen() {
 }
 export function getPanelGame() {
   return panelGame();
-}
-
-// Shared Escape-key handling: close the lightbox first (unless the browser's own Escape is
-// about to exit fullscreen instead — bail and leave the lightbox open, same as the lightbox's
-// own fullscreen behavior expects), else close the panel. Exposed as a function rather than a
-// document-level listener panel.tsx binds itself, since a host page's own Escape handling may
-// need to check something else first with higher priority (app.ts's/library.ts's keyboard-
-// shortcuts help modal) — a host calls this only once nothing more specific has already
-// claimed the keypress.
-export function panelHandleEscape() {
-  if (isLightboxOpen()) {
-    if (
-      document.fullscreenElement ||
-      (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement
-    )
-      return; // browser exits FS; keep lightbox open
-    closeLightbox();
-    return;
-  }
-  panelClose();
 }
 
 // Forces a fresh rating/HLTB/store-metadata/tags fetch for the open game, bypassing

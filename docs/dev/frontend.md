@@ -253,7 +253,7 @@ The "look up any game" box is one nav-bar search in the shell, not one per route
 
 ## The side panel
 
-`panel.tsx` is a single instance mounted by `AppShell.tsx` — routes only open/close it (`panelOpen(game)`/`panelClose()`/`isPanelOpen()`/`getPanelGame()`/`panelStepHero()`/`panelHandleEscape()`). `AppShell.tsx` passes every `PanelOptions` hook (close, navigate, refresh, tag click/active, owners), each relayed to the mounted route through `routeHandlers`; only `ListRoute.tsx` registers them, so on `/rank` they no-op.
+`panel.tsx` is a single instance mounted by `AppShell.tsx` — routes only open/close it (`panelOpen(game)`/`panelClose()`/`isPanelOpen()`/`getPanelGame()`/`panelStepHero()`). `AppShell.tsx` passes every `PanelOptions` hook (close, navigate, refresh, tag click/active, owners), each relayed to the mounted route through `routeHandlers`; only `ListRoute.tsx` registers them, so on `/rank` they no-op.
 
 **Tag pills filter the table.** A tag/genre/category/developer/publisher pill toggles that value in the matching column's `include` filter — `initPanel({ onTagClick, isTagActive })` forwards through `routeHandlers` to `ListRoute.tsx`'s `onTagClick`/`isTagActive` (`table.filter.setValues(...)`/`.include()`). The panel's keys (`tags`/`genres`/`categories`/`developers`/`publishers`) are the table's column keys.
 
