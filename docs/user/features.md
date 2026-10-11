@@ -4,16 +4,19 @@ Everything the app shows is a **list of games** — an account's owned games, it
 
 ![A bundle's games in the table — tier price, best deal, weighted rating, completion time — with one game's detail panel open beside it](../images/list-table-and-panel.png)
 
-There is no account to create and nothing is stored on the server. The accounts you look at, the lists you build and your preferences all live in your own browser.
+There is no account to create. The accounts you look at, the lists you build and your preferences live in your own browser — unless you sign in with Steam to [sync them](#sync) across devices.
 
 - [Accounts](#accounts)
 - [Lists](#lists)
   - [Combining lists](#combining-lists)
+  - [Ranking a list](#ranking-a-list)
   - [Comparing libraries](#comparing-libraries)
 - [Bundles](#bundles)
 - [Prices](#prices)
 - [The game panel](#the-game-panel)
+- [Search by URL](#search-by-url)
 - [Sharing](#sharing)
+- [Sync](#sync)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [How fresh is this?](#how-fresh-is-this)
 
@@ -32,7 +35,7 @@ A private profile or wishlist looks identical to an empty one from the outside; 
 
 - **Owned** and **Wishlist** for the current account, and one list per **bundle** you browse, are always live — never stored, never stale.
 - **Recently Looked Up** collects the last 10 games you searched for, latest first (its **Looked up** column), browsable like any other list.
-- **Your own lists** come in three kinds: a **manual** list you add and remove games from, a **dynamic** list defined as a formula over other lists, recomputed every time you open it, and a **ranked** list that orders another list by your preferences (see [Ranking a list](#ranking-a-list)). A dynamic list can be **frozen** into a manual one, keeping its current contents and dropping the formula.
+- **Your own lists** come in three kinds: a **manual** list you add and remove games from, a **dynamic** list defined as a formula over other lists, recomputed every time you open it, and a **ranked** list that orders another list by your preferences (see [Ranking a list](#ranking-a-list)).
 - Lists live in a **folder tree** you can rename, nest and organize — **Move to…** on any list or folder puts it elsewhere in the tree.
 
 ![The home page: the current account's card, the four always-available lists, and your own folder tree of lists](../images/home-lists.png)
@@ -48,7 +51,7 @@ Pick two or more lists and an operation:
 
 Naming the combined list is optional: leave the name empty and it's called by what it does — "Alice — Owned ∩ Bob — Owned" — in your list tree and on its own page, updating by itself if you later change its sources or rename an account. Type a name whenever you'd rather have one.
 
-The result is a live list: save it as dynamic (it re-resolves each time), or freeze it. A dynamic list's page states its formula, names every source, and says what each contributed.
+The result is saved as a dynamic list, re-resolved every time you open it. Its page states its formula, names every source, and says what each contributed.
 
 A bundle joins a combine from its own page: **What does this add?** shows that bundle minus your Owned games right away, unsaved and shareable. **Save as a list** keeps it; **Edit sources** then changes it — a Family's Owned, or Group by membership with a friend's. Once IsThereAnyDeal stops listing an ended bundle, a list using it keeps the bundle's last-known games and says so.
 
@@ -80,7 +83,7 @@ The result is a link. Copy the address and whoever opens it sees the same compar
 
 ## Bundles
 
-Browse current Steam game bundles (sourced from IsThereAnyDeal, and only available if the app is configured with an ITAD key). Open one and its games become a list like any other, with the bundle's tier price alongside each game's rating, playtime estimates and current best price anywhere. Games in a bundle with no Steam listing are listed separately below the table rather than quietly dropped. The header's counts are clickable: "New" narrows the table to the bundles published in the last week, "Ending soon" to the ones ending within 48 hours, and clicking either again brings the rest back. "Updated" re-fetches the list (it replaces the old ↻ Refresh button — the same is true of the Owned and Wishlist headers), and "Prices" opens the region setting. A bundle's **New to you** figure counts the games in it you don't own and what they'd cost at their best deals right now; **What does this add?** shows those games as a list (see [Combining lists](#combining-lists)).
+Browse current Steam game bundles (sourced from IsThereAnyDeal, and only available if the app is configured with an ITAD key). Open one and its games become a list like any other, with the bundle's tier price alongside each game's rating, playtime estimates and current best price anywhere. Games in a bundle with no Steam listing are listed separately below the table rather than quietly dropped. The header's counts are clickable: "New" narrows the table to the bundles published in the last week, "Ending soon" to the ones ending within 48 hours, and clicking either again brings the rest back. "Updated" re-fetches the list, and "Prices" opens the region setting. A bundle's **New to you** figure counts the games in it you don't own and what they'd cost at their best deals right now; **What does this add?** shows those games as a list (see [Combining lists](#combining-lists)).
 
 Fanatical's **Build your own** bundles price by how many games you pick (e.g. 5 for €5.99, 10 for €9.99), taken from Fanatical itself since IsThereAnyDeal doesn't carry those prices. Every game you pick costs the per-game rate of the largest tier you reach (6 games at 5 for €5.99 cost 6 × €1.198). The tiers show in the bundle's header, each game's Tier Price is the rate for the current selection (the smallest tier's with nothing selected), and selecting games in the table shows what they'd cost: at that rate, or a larger tier when its price is lower (any picks left free), and, in green or red, what that saves or costs over the same games at their best deals. A Steam package (a game plus its DLC sold as one) counts as one pick: its rows are marked **package · N games** and ticking one ticks them all.
 
@@ -108,6 +111,12 @@ Clicking any row opens a detail panel beside the table — not over it, so the l
 - Add `?u=` to any list link to share the account you're exploring. It never changes the recipient's own default account, and a game link deliberately doesn't carry it.
 - A comparison's link names its players the same way, one `?u=` each — including links made by older versions of this app, which still work.
 - **🔗 Share view** copies a link with your current table layout — columns, sort, grouping, filters — baked in. On Owned and Wishlist it also carries the account (`?u=`), so the recipient sees your games, not their own. The recipient sees it for that visit only, with **Keep as my layout** to make it theirs or **Use my own** to go back; nothing of their own setup changes otherwise. It's off on your own saved lists, whose link only opens in your browser: a combined list has **🔗 Share list** instead; manual and ranked lists can't be shared yet.
+
+## Sync
+
+**Sign in with Steam** (in the nav-bar account chip) to keep your accounts, lists, rankings, recently looked-up games and region the same on every device. Signing in is optional; it also sets your account if you hadn't picked one. Changes sync as you make them, and the newest edit of each setting wins. A device signing in for the first time takes the account's settings rather than overwriting them.
+
+Table layouts are the exception: changing a table stays on this device, and the table then offers **Save** (make it your account's layout) or **Revert** (go back to the saved one).
 
 ## Keyboard shortcuts
 
