@@ -1445,7 +1445,7 @@ test('getProtonDbStatus: a "pending" tier with no provisionalTier returns null',
 
 test('getProtonDbStatus: throws isUpstream for a non-404 error', async (t) => {
   _reset();
-  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503, text: async () => '' }));
   await assert.rejects(
     () => getProtonDbStatus(400),
     (err) => err.isUpstream === true,
