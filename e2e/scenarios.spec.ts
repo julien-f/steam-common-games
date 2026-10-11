@@ -1658,6 +1658,23 @@ test("F1 edge: the viewer's game stepper shows with its other controls, not only
 
 test("F1 edge: the viewer's ↑/↓ game buttons stay put from game to game", async ({ page }) => {
   await asPlayer(page, ALICE);
+  // Hades with 24 screenshots, for a counter as long as a real game's.
+  await page.route('**/api/game-details/stream', (route) => {
+    const req = route.request();
+    const full = respond(req.method(), new URL(req.url()), req.postData());
+    const body = full.body
+      .split('\n\n')
+      .map((line: string) => {
+        if (!line.startsWith('data: ')) return line;
+        const event = JSON.parse(line.slice(6));
+        if (event.appid !== 1145360) return line;
+        const [shot] = event.meta.screenshots;
+        const screenshots = Array.from({ length: 24 }, (_, i) => ({ ...shot, id: i + 1 }));
+        return `data: ${JSON.stringify({ ...event, meta: { ...event.meta, screenshots } })}`;
+      })
+      .join('\n\n');
+    return route.fulfill({ ...full, body });
+  });
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const boxes = () =>
     page.evaluate(() =>
@@ -1677,6 +1694,15 @@ test("F1 edge: the viewer's ↑/↓ game buttons stay put from game to game", as
     await expect(page.locator('.lb-caption-text')).not.toHaveText(name);
   }
   expect(names.size).toBe(6);
+  // Nor from one media counter to the next, short or long.
+  for (const [key, label] of [
+    ['Home', 'Cover'],
+    ['End', 'Screenshot 24 of 24'],
+  ]) {
+    await page.keyboard.press(key);
+    await expect(page.locator('.lb-counter')).toHaveText(label);
+    expect(await boxes()).toEqual(first);
+  }
 });
 
 test('F1 edge: nothing of the page shows around the media', async ({ page }) => {

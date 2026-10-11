@@ -86,7 +86,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Re-picking a known account while Steam doesn't answer keeps its name, avatar and custom URL
 - On the ranking screen, the side panel's ↻ Refresh re-fetches the game's details, and its tags no longer look like filter buttons
 - On a phone, the ranking screen keeps both games side by side with Tie, Skip and Undo in view, inside a side margin
-- The lightbox's ↑/↓ game buttons stay in place from one game to the next, so they can be clicked repeatedly
+- The lightbox's ↑/↓ game buttons stay in place from one game or item to the next, so they can be clicked repeatedly
 - Closing a game's panel with Esc puts focus back on that game's row, so the arrow keys keep working
 
 ### Development
