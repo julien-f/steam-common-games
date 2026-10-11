@@ -1939,9 +1939,10 @@ export default function ListRoute() {
       // in `recentAccounts` — comparing someone isn't picking them as your account, the same rule
       // a `?u=` override follows (see docs/dev/lists-and-accounts.md).
       const canonicalSlots = normalizeSlots(accounts.map((a) => a.members));
-      const canonical = compareUrl(canonicalSlots, compareOp(), routerLocation.search);
+      // Live `location`, not `routerLocation`: that lags the panel's and a shared view's replaceState.
+      const canonical = compareUrl(canonicalSlots, compareOp(), location.search);
       loadedCompareKeys.add(compareKey(compareOp(), canonicalSlots));
-      if (canonical !== routerLocation.pathname + routerLocation.search) navigate(canonical, { replace: true });
+      if (canonical !== location.pathname + location.search) navigate(canonical, { replace: true });
 
       const list = inMemoryDynamicList(
         compareOp(),
