@@ -1,0 +1,171 @@
+'use strict';
+
+// Evaluates the skills by running them headless (`claude -p`), in a throwaway clone of the repo so
+// nothing lands in it or in the session transcripts (`--no-session-persistence`).
+//   node scripts/skill-evals.js [--ref=REF] [--repeat=N] [--dry-run] [--budget=USD] [SKILL...]
+// Each `.claude/skills/<name>/evals.json` holds `routing`: `{ prompt, expect }` cases, `expect` being the
+// skill (a built-in one too) the prompt should load, or `-` for none; and, for a skill safe to run
+// unattended, `dryRun`: the command to run it with. Routing stops each run at its first tool call;
+// --dry-run also runs each `dryRun` to the end (budget-capped, about $0.50–$2 each) and reports its
+// failed and denied calls. The clone is of the working tree (uncommitted changes included) or of REF,
+// to compare a skill change before and after.
+// Verified on Claude Code 2.1.296: stream-json emits each `tool_use` before running it, the `result`
+// event carries `total_cost_usd`, and --no-session-persistence writes no transcript.
+
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { execFileSync, spawn } = require('node:child_process');
+const { parseSession, sessionEvents } = require('./setup-facts');
+
+const ROOT = path.join(__dirname, '..');
+const PARALLEL = 4;
+const ROUTING_FLAGS = ['--disallowedTools', 'Bash Edit Write NotebookEdit Agent Workflow', '--max-budget-usd', '0.5'];
+
+// A clone sharing ROOT's objects, with no remote; `ref` undefined: HEAD plus the working tree's changes.
+function cloneTree(ref, withModules) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-evals-'));
+  const git = (args, opts) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', ...opts });
+  git(['clone', '-q', '--shared', '--no-checkout', ROOT, dir]);
+  git(['-C', dir, 'remote', 'remove', 'origin']);
+  git(['-C', dir, 'checkout', '-q', '--detach', ref ?? git(['rev-parse', 'HEAD']).trim()]);
+  if (ref === undefined) {
+    const diff = git(['diff', '--binary', 'HEAD']);
+    if (diff) git(['-C', dir, 'apply', '--whitespace=nowarn'], { input: diff });
+    for (const f of git(['ls-files', '--others', '--exclude-standard']).split('\n').filter(Boolean)) {
+      fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true });
+      fs.copyFileSync(path.join(ROOT, f), path.join(dir, f));
+    }
+  }
+  // A copy, not a symlink: a dry run may install packages. Reflinked where the filesystem allows.
+  if (withModules) execFileSync('cp', ['-a', '--reflink=auto', path.join(ROOT, 'node_modules'), dir]);
+  return dir;
+}
+
+// Runs `claude -p prompt` in `cwd`; `stop(entry)` returning true ends it early. Resolves to the
+// stream's entries (assistant and user turns, the `result`).
+function runClaude(cwd, prompt, flags, stop = () => false) {
+  return new Promise((resolve) => {
+    const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--no-session-persistence', ...flags];
+    const child = spawn('claude', args, { cwd, stdio: ['ignore', 'pipe', 'ignore'] });
+    const entries = [];
+    let buffer = '';
+    let stopped = false;
+    child.stdout.on('data', (chunk) => {
+      buffer += chunk;
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines.filter((l) => l.startsWith('{'))) {
+        const entry = JSON.parse(line);
+        if (stopped || !['assistant', 'user', 'result'].includes(entry.type)) continue;
+        entries.push(entry);
+        if (stop(entry)) {
+          stopped = true;
+          child.kill();
+        }
+      }
+    });
+    child.on('close', () => resolve(entries));
+  });
+}
+
+const firstTool = (entry) =>
+  entry.type === 'assistant' &&
+  (entry.message?.content ?? []).find((c) => c.type === 'tool_use' && c.name !== 'ToolSearch');
+
+// A routing run's entries → the skill its first tool call loaded, or `-` (with the tool, if any).
+function routedTo(entries) {
+  const tool = entries.map(firstTool).find(Boolean);
+  if (tool?.name === 'Skill') return tool.input.skill;
+  return tool ? `- (${tool.name})` : '-';
+}
+
+// A dry run's entries → `{ cost, turns, minutes, calls, denied, errors }`, errors as `key: first line`;
+// a call needing an approval nobody can give headless counts as denied.
+function dryRunSummary(entries, names) {
+  const lines = entries.filter((e) => e.type !== 'result').map((e) => JSON.stringify(e));
+  const result = entries.find((e) => e.type === 'result') ?? {};
+  const calls = parseSession(lines);
+  const failed = sessionEvents(lines, names).filter((e) => e.kind === 'error');
+  const unapproved = (e) => /requires approval|can't be checked/.test(e.text);
+  return {
+    cost: result.total_cost_usd ?? 0,
+    turns: result.num_turns ?? 0,
+    minutes: (result.duration_ms ?? 0) / 60000,
+    calls: calls.length,
+    denied: calls.filter((c) => c.denied).length + failed.filter(unapproved).length,
+    errors: failed.filter((e) => !unapproved(e)).map((e) => `${e.key}: ${e.text}`),
+  };
+}
+
+// Runs `jobs` (async thunks) `limit` at a time, results in order.
+async function pool(jobs, limit) {
+  const results = [];
+  let next = 0;
+  const worker = async () => {
+    while (next < jobs.length) {
+      const i = next++;
+      results[i] = await jobs[i]();
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, jobs.length) }, worker));
+  return results;
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const option = (name) => args.find((a) => a.startsWith(`--${name}=`))?.split('=')[1];
+  const ref = option('ref');
+  const repeat = Number(option('repeat') ?? 1);
+  const budget = option('budget') ?? '2';
+  const dryRun = args.includes('--dry-run');
+  const only = args.filter((a) => !a.startsWith('--'));
+  const known = /^--(ref=\S+|repeat=\d+|budget=[\d.]+|dry-run)$/;
+  if (args.some((a) => a.startsWith('--') && !known.test(a)) || !(repeat > 0)) {
+    console.error('Usage: node scripts/skill-evals.js [--ref=REF] [--repeat=N] [--dry-run] [--budget=USD] [SKILL...]');
+    process.exit(1);
+  }
+  const dir = cloneTree(ref, dryRun);
+  try {
+    const skillsDir = path.join(dir, '.claude', 'skills');
+    const names = fs.readdirSync(skillsDir);
+    const evals = names
+      .filter((name) => !only.length || only.includes(name))
+      .map((name) => [name, path.join(skillsDir, name, 'evals.json')])
+      .filter(([, file]) => fs.existsSync(file))
+      .map(([name, file]) => ({ name, ...JSON.parse(fs.readFileSync(file, 'utf8')) }));
+    console.log(`Evaluating ${ref ?? 'the working tree'} (${evals.map((e) => e.name).join(', ')})\n\nRouting:`);
+    const cases = evals.flatMap((e) => e.routing.map((c) => ({ skill: e.name, ...c })));
+    const got = await pool(
+      cases.flatMap((c) =>
+        Array.from({ length: repeat }, () => () => runClaude(dir, c.prompt, ROUTING_FLAGS, firstTool).then(routedTo)),
+      ),
+      PARALLEL,
+    );
+    let passed = 0;
+    cases.forEach((c, i) => {
+      const runs = got.slice(i * repeat, (i + 1) * repeat);
+      const ok = runs.filter((r) => r === c.expect || (c.expect === '-' && r.startsWith('-'))).length;
+      passed += ok;
+      console.log(`  ${ok === repeat ? '✓' : '✗'} ${c.skill}: "${c.prompt}" → ${runs.join(', ')} (want ${c.expect})`);
+    });
+    console.log(`  ${passed}/${cases.length * repeat} routed as expected`);
+    if (!dryRun) return;
+    console.log('\nDry runs:');
+    for (const e of evals.filter((e) => e.dryRun)) {
+      // `auto`, as in an interactive session: the classifier's denials are part of what's measured.
+      const entries = await runClaude(dir, e.dryRun, ['--permission-mode', 'auto', '--max-budget-usd', budget]);
+      const s = dryRunSummary(entries, names);
+      console.log(
+        `  ${e.dryRun}: $${s.cost.toFixed(2)} · ${s.minutes.toFixed(1)} min · ${s.turns} turns · ${s.calls} calls · ${s.denied} denied · ${s.errors.length} failed`,
+      );
+      for (const error of s.errors) console.log(`    ✗ ${error}`);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+if (require.main === module) main();
+
+module.exports = { routedTo, dryRunSummary, pool };

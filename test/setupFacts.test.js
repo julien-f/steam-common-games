@@ -7,7 +7,12 @@ const {
   argsWithoutUsage,
   commandKey,
   parseSession,
+  linesSince,
   skillRuns,
+  answerOutcome,
+  sessionEvents,
+  digest,
+  answerStats,
   summarize,
   agentSummary,
 } = require('../scripts/setup-facts');
@@ -65,6 +70,18 @@ test('parseSession pairs each call with its result: output size, elapsed time, c
     { key: 'Read', bytes: 37, ms: 1000, error: true, denied: true, rejected: false },
     { key: 'Edit', bytes: 33, ms: 1000, error: true, denied: false, rejected: true },
   ]);
+});
+
+test('linesSince keeps entries after the date, and the untimed ones', () => {
+  const lines = [
+    { timestamp: '2026-01-01T00:00:00Z', n: 1 },
+    { n: 2 },
+    { timestamp: '2026-01-02T00:00:00Z', n: 3 },
+  ].map((l) => JSON.stringify(l));
+  assert.deepEqual(
+    linesSince(lines, Date.parse('2026-01-01T00:00:00Z')).map((l) => JSON.parse(l).n),
+    [2, 3],
+  );
 });
 
 test("agentSummary: wall time, turns and cache reads per response, failed calls, and the gates' share", () => {
@@ -143,4 +160,77 @@ test('skillRuns counts slash commands and Skill calls of known skills, each runn
     { skill: 'ux-review', ms: 60_000 },
     { skill: 'ux-fix', ms: 120_000 },
   ]);
+});
+
+test('summarize leaves out pairs involving a tool or a read-only command', () => {
+  const call = (key) => ({ key, bytes: 1, ms: 1, denied: false, rejected: false });
+  const session = [call('Read'), call('grep'), call('Edit'), call('npm test'), call('git commit')];
+  assert.deepEqual(
+    summarize([session, session]).pairs.map((p) => p.pair),
+    ['npm test → git commit'],
+  );
+});
+
+test('answerOutcome: recommended (marked, else first), another option, free text, clarify or dismiss', () => {
+  const q = { options: [{ label: 'A' }, { label: 'B (Recommended)' }, { label: 'C' }] };
+  assert.equal(answerOutcome(q, 'B (Recommended)'), 'recommended');
+  assert.equal(answerOutcome({ options: [{ label: 'A' }, { label: 'C' }] }, 'A'), 'recommended');
+  assert.equal(answerOutcome(q, 'A, C'), 'other');
+  assert.equal(answerOutcome(q, 'B, then C28'), 'own');
+  assert.equal(answerOutcome(q, '', 'The user wants to clarify these questions.'), 'clarify');
+  assert.equal(answerOutcome(q, '', ''), 'dismissed');
+});
+
+test('sessionEvents: prompts with the reply before, skill runs, answers, rejections, interrupts and errors', () => {
+  const entry = (type, content, extra) => JSON.stringify({ type, message: { content }, ...extra });
+  const use = (id, name, input) => entry('assistant', [{ type: 'tool_use', id, name, input }]);
+  const result = (id, content, extra) =>
+    entry('user', [{ type: 'tool_result', tool_use_id: id, content, is_error: extra?.error }], extra?.entry);
+  const question = { question: 'Apply the skill change?', options: [{ label: 'Apply' }, { label: 'Skip' }] };
+  const events = sessionEvents(
+    [
+      entry('user', '<command-name>/setup-review</command-name>'),
+      use('q', 'AskUserQuestion', { questions: [question] }),
+      result('q', 'answered', { entry: { toolUseResult: { answers: { [question.question]: 'Skip' } } } }),
+      entry('assistant', [{ type: 'text', text: 'Done. Key sk_' + 'x'.repeat(30) }]),
+      entry('user', 'no, keep the old one'),
+      use('b', 'Bash', { command: 'npm run lint -- --fix' }),
+      result('b', 'lint broke\nmore', { error: true }),
+      use('e', 'Edit', {}),
+      result(
+        'e',
+        "The user doesn't want to proceed with this tool use. To tell you how to proceed, the user said:\nnot this file\n\nNote: x",
+        { error: true },
+      ),
+      entry('user', [{ type: 'text', text: '[Request interrupted by user for tool use]' }]),
+    ],
+    ['setup-review'],
+  );
+  assert.deepEqual(events, [
+    { kind: 'skill', skill: 'setup-review' },
+    {
+      kind: 'answer',
+      skill: 'setup-review',
+      question: 'Apply the skill change?',
+      answer: 'Skip',
+      outcome: 'other',
+      setup: true,
+    },
+    { kind: 'prompt', text: 'no, keep the old one', reply: 'Done. Key […]' },
+    { kind: 'error', key: 'npm run lint', text: 'lint broke' },
+    { kind: 'rejected', key: 'Edit', reason: 'not this file' },
+    { kind: 'interrupt', key: 'Edit' },
+  ]);
+  assert.match(digest(events), /^== skill setup-review\n {2}\? \[other, setup\] Apply the skill change\? → Skip\n/);
+});
+
+test('answerStats counts outcomes per running skill, setup proposals apart', () => {
+  const answer = (skill, outcome, setup = false) => ({ kind: 'answer', skill, outcome, setup });
+  assert.deepEqual(
+    answerStats([[answer('ux-fix', 'recommended'), answer('ux-fix', 'own')], [answer(undefined, 'other', true)]]),
+    [
+      { name: '- (setup proposals)', recommended: 0, other: 1, own: 0, clarify: 0, dismissed: 0 },
+      { name: 'ux-fix', recommended: 1, other: 0, own: 1, clarify: 0, dismissed: 0 },
+    ],
+  );
 });

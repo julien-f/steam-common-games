@@ -1,0 +1,16 @@
+{
+  "routing": [
+    {
+      "prompt": "fix C91",
+      "expect": "code-fix"
+    },
+    {
+      "prompt": "do the code fixes C40 and C70",
+      "expect": "code-fix"
+    },
+    {
+      "prompt": "fix U73",
+      "expect": "ux-fix"
+    }
+  ]
+}

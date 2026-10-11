@@ -24,6 +24,12 @@
   2. afterwards, `restore --file` and `demo-restore.js`, then confirm `steam.isonoe.net:prefs.backup` is gone.
   - Seeding refuses while a backup exists: restore that one first, never overwrite it.
 
+## Skill evals
+
+- `node scripts/skill-evals.js [SKILL...]` runs each `.claude/skills/<name>/evals.json` routing case through headless `claude -p` and reports which skill it loaded (~30 s for all; each run stops at its first tool call). `--repeat=N` measures how stable a route is; a single run can pass by luck.
+- `--dry-run` also runs each skill's `dryRun` command to the end in `auto` permission mode (about $1 and 1–2 min each, capped by `--budget`) and reports its denied and failed calls. Only skills safe to run unattended have one.
+- Runs use a throwaway clone (no remote, `node_modules` reflinked) of the working tree, or of `--ref=<REF>` to compare a skill change before and after, and write no session transcripts. Not part of `check`: it costs real tokens.
+
 ## Hooks
 
 - `pre-commit` (`.githooks/pre-commit`, enabled by `npm install`): `git diff --cached --check`, then `npm run check`'s steps in parallel on the staged content only (unstaged edits are set aside, then restored) — typecheck, lint, the CSS check and desktop e2e only when `public/`, `e2e/` or a frontend config is staged. It blocks the commit on failure.

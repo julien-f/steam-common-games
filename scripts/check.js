@@ -27,6 +27,7 @@ function steps(staged, files = [], { deferE2e = process.env.E2E_DEFER === '1' } 
       : []),
     ['doc-refs', ['check:doc-refs']],
     ['journeys', ['check:journeys']],
+    ['setup', ['check:setup']],
     // Desktop only: the pre-push hook runs both widths before anything reaches CI.
     ...(ui && staged !== undefined && !deferE2e
       ? [['e2e', ['test:e2e', '--', '--if-changed', '--project=desktop']]]

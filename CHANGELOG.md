@@ -94,6 +94,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Large code-fix/ux-fix batches run as parallel lanes, with planning, progress and time-left estimates from scripts/batch.js
 - Parallel fix-batch lanes can defer the pre-commit e2e run, and the pre-commit hook no longer shares git's stash between worktrees
 - scripts/setup-facts.js --agents reports each subagent's time, turns, cache reads, failed calls and time in tests, e2e and commits
+- setup-review keeps its proposals in docs/dev/setup-backlog.md and re-measures applied ones on its next run, reading only the transcripts since
+- setup-facts --transcripts reports interrupts and how the user answered each skill's questions, and --digest writes a compact per-session digest for setup-review's transcript reader
+- npm run check also lints the Claude Code setup: skill frontmatter, and permission allows that would pre-approve an ask-first action
+- node scripts/skill-evals.js checks which skill each realistic request loads, and with --dry-run runs the read-only skills headless to catch denied and failed steps; setup-review uses it to test a skill change before and after
 
 ## [0.10.0] - 2026-10-10
 

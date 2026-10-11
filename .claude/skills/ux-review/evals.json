@@ -1,0 +1,16 @@
+{
+  "routing": [
+    {
+      "prompt": "Shall we start an UX review, mainly focused on the new header's dropdown menu for data-table?",
+      "expect": "ux-review"
+    },
+    {
+      "prompt": "Do a design review of the sharing flow on phone",
+      "expect": "ux-review"
+    },
+    {
+      "prompt": "Take a new screenshot of the home page for the README",
+      "expect": "screenshots"
+    }
+  ]
+}

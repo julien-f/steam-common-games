@@ -1,0 +1,16 @@
+{
+  "routing": [
+    {
+      "prompt": "Cut a release",
+      "expect": "release"
+    },
+    {
+      "prompt": "Let's tag 0.11.0",
+      "expect": "release"
+    },
+    {
+      "prompt": "Add a changelog entry for the HLTB fix",
+      "expect": "-"
+    }
+  ]
+}

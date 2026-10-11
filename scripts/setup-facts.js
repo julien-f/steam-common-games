@@ -5,9 +5,16 @@
 //                                                  a script only they mention has no caller), and which read
 //                                                  arguments without printing a usage line
 //   node scripts/setup-facts.js --cost             time and output size of the gates an agent runs
-//   node scripts/setup-facts.js --transcripts[=N]  the last N (default 20) sessions' largest outputs, slowest
-//                                                  calls, repeated command pairs, denied and rejected calls; commands are
-//                                                  reduced to their first words, so no arguments (or secrets) print
+//   node scripts/setup-facts.js --transcripts[=N|=DATE]  the last N (default 20) sessions', or everything
+//                                                  after DATE's, largest outputs, slowest calls, repeated command
+//                                                  pairs, denied and rejected calls, and the newest entry read;
+//                                                  commands are reduced to their first words, so no arguments
+//                                                  (or secrets) print; then interrupts and how the user answered
+//                                                  each skill's questions
+//     --digest=DIR                                 also writes one file per session to DIR: prompts, the reply
+//                                                  before each, skill runs, failed calls, interrupts, rejections
+//                                                  with the user's reason, questions and answers — long tokens
+//                                                  redacted, for the subagent that reads for judgment
 //   node scripts/setup-facts.js --agents[=ID]      per subagent of session ID (default: the newest with any):
 //                                                  time, turns, cache reads, failed calls, time in tests/e2e/commits
 
@@ -107,6 +114,115 @@ function skillRuns(lines, names) {
   return runs;
 }
 
+// One line, long tokens (keys, hashes) redacted, cut at `max` characters.
+function clip(value, max) {
+  const flat = value
+    .replace(/[\w+/=-]{24,}/g, '[…]')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+}
+
+// A question about the Claude Code setup, by its text and option labels (descriptions mention scripts too often).
+const SETUP = /CLAUDE\.md|SKILL\.md|settings(\.local)?\.json|scripts\/|\b(skill|hook|memory)s?\b/i;
+
+// One AskUserQuestion question and its answer → `recommended` (the first option, or the one marked so),
+// `other` (another option), `own` (free text) or `clarify`/`dismissed` when the user rejected the call.
+function answerOutcome(question, answer, rejection) {
+  if (rejection !== undefined) return /clarify/.test(rejection) ? 'clarify' : 'dismissed';
+  const labels = question.options.map((o) => o.label);
+  const recommended = labels.find((l) => /\(Recommended\)/.test(l)) ?? labels[0];
+  if (answer === recommended) return 'recommended';
+  return answer.split(', ').every((a) => labels.includes(a)) ? 'other' : 'own';
+}
+
+// One session's JSONL lines → what a reader needs for judgment, in order: `{ kind, … }` with kind
+// `prompt` (`text`, `reply`: the last assistant text before it), `skill`, `error` (`key`, `text`),
+// `interrupt` (`key`: the call before it), `rejected` (`key`, `reason`) or `answer` (`skill`: the
+// one running, `question`, `answer`, `outcome`, `setup`: it proposes a setup change).
+function sessionEvents(lines, names) {
+  const events = [];
+  const calls = new Map();
+  let reply = '';
+  let skill;
+  let lastKey;
+  for (const line of lines) {
+    const entry = JSON.parse(line);
+    const content = entry.message?.content;
+    const started = typeof content === 'string' && content.match(/<command-name>\/([\w:-]+)<\/command-name>/)?.[1];
+    if (names.includes(started)) events.push({ kind: 'skill', skill: (skill = started) });
+    else if (isPrompt(entry)) {
+      const prompt = text(content);
+      if (prompt.startsWith('[Request interrupted by user')) events.push({ kind: 'interrupt', key: lastKey });
+      else {
+        skill = undefined;
+        events.push({ kind: 'prompt', text: clip(prompt, 500), reply: clip(reply, 200) });
+      }
+    }
+    for (const part of Array.isArray(content) ? content : []) {
+      if (entry.type === 'assistant' && part.type === 'text' && part.text.trim()) reply = part.text;
+      if (part.type === 'tool_use') {
+        const key = part.name === 'Bash' ? commandKey(part.input.command ?? '') : part.name;
+        calls.set(part.id, { key, input: part.input });
+        if (part.name === 'Skill' && names.includes(part.input.skill))
+          events.push({ kind: 'skill', skill: (skill = part.input.skill) });
+      }
+      if (part.type !== 'tool_result' || !calls.has(part.tool_use_id)) continue;
+      const { key, input } = calls.get(part.tool_use_id);
+      lastKey = key;
+      const out = text(part.content);
+      const rejection = /^The user doesn't want to proceed/.test(out)
+        ? (out.split('the user said:\n')[1] ?? '').split('\n\nNote')[0]
+        : undefined;
+      if (key === 'AskUserQuestion' && (rejection !== undefined || !part.is_error)) {
+        const answers = entry.toolUseResult?.answers ?? {};
+        for (const question of input.questions ?? [])
+          events.push({
+            kind: 'answer',
+            skill,
+            question: clip(question.question, 200),
+            answer: clip(answers[question.question] ?? '', 200),
+            outcome: answerOutcome(question, answers[question.question] ?? '', rejection),
+            setup: SETUP.test([question.question, ...question.options.map((o) => o.label)].join(' ')),
+          });
+      } else if (rejection !== undefined) events.push({ kind: 'rejected', key, reason: clip(rejection, 300) });
+      else if (part.is_error && !/^Permission for this action was denied/.test(out))
+        events.push({ kind: 'error', key, text: clip(out.split('\n').find((l) => l.trim()) ?? '', 150) });
+    }
+  }
+  return events;
+}
+
+// A digest file's text for `sessionEvents`' output.
+function digest(events) {
+  const show = {
+    prompt: (e) => `${e.reply ? `  (agent: ${e.reply})\n` : ''}> ${e.text}`,
+    skill: (e) => `== skill ${e.skill}`,
+    error: (e) => `  ✗ ${e.key}: ${e.text}`,
+    interrupt: (e) => `  ⏹ interrupted after ${e.key ?? 'a reply'}`,
+    rejected: (e) => `  ⊘ rejected ${e.key}${e.reason ? `: ${e.reason}` : ''}`,
+    answer: (e) => `  ? [${e.outcome}${e.setup ? ', setup' : ''}] ${e.question} → ${e.answer}`,
+  };
+  return events.map((e) => show[e.kind](e)).join('\n') + '\n';
+}
+
+// Per running skill (or `-`): how the user answered its questions, setup proposals counted apart.
+function answerStats(sessions) {
+  const stats = new Map();
+  for (const e of sessions.flat().filter((e) => e.kind === 'answer')) {
+    const name = e.setup ? `${e.skill ?? '-'} (setup proposals)` : (e.skill ?? '-');
+    const s = stats.get(name) ?? { name, recommended: 0, other: 0, own: 0, clarify: 0, dismissed: 0 };
+    s[e.outcome]++;
+    stats.set(name, s);
+  }
+  return [...stats.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Shell commands that only read or inspect, and tools (capitalized or MCP): a pair with one of them is
+// exploring or editing, not a procedure to script.
+const READS = new Set(['grep', 'rg', 'sed', 'cat', 'head', 'tail', 'ls', 'find', 'wc', 'awk', 'python3', 'jq', 'echo']);
+const isCommand = (key) => !/^[A-Z]|^mcp__/.test(key) && !READS.has(key);
+
 // `sessions`: arrays of parseSession's calls.
 function summarize(sessions) {
   const byKey = new Map();
@@ -148,7 +264,7 @@ function summarize(sessions) {
       (k) => k.maxMs,
     ),
     pairs: top(
-      [...pairs.values()].filter((p) => p.sessions.size >= 2),
+      [...pairs.values()].filter((p) => p.sessions.size >= 2 && p.pair.split(' → ').every(isCommand)),
       (p) => p.sessions.size * 1000 + p.count,
     ).map((p) => ({ pair: p.pair, count: p.count, sessions: p.sessions.size })),
     denied: keys
@@ -218,20 +334,41 @@ function cost() {
   }
 }
 
-function transcripts(limit) {
+// A session's JSONL lines after `since` (ms); lines without a timestamp stay with their neighbours.
+function linesSince(lines, since) {
+  return lines.filter((line) => {
+    const t = JSON.parse(line).timestamp;
+    return !t || Date.parse(t) > since;
+  });
+}
+
+// `{ limit }` or `{ since }` (ms): the newest `limit` sessions, or every entry after `since`.
+function transcripts({ limit, since }, digestDir) {
   const dir = path.join(os.homedir(), '.claude', 'projects', ROOT.replace(/[^\w]/g, '-'));
-  const files = fs
+  const sorted = fs
     .readdirSync(dir)
     .filter((f) => f.endsWith('.jsonl'))
     .map((f) => path.join(dir, f))
-    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)
-    .slice(0, limit);
-  const logs = files.map((f) => fs.readFileSync(f, 'utf8').split('\n').filter(Boolean));
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+  const files = since === undefined ? sorted.slice(0, limit) : sorted.filter((f) => fs.statSync(f).mtimeMs > since);
+  const read = files
+    .map((f) => [path.basename(f, '.jsonl'), fs.readFileSync(f, 'utf8').split('\n').filter(Boolean)])
+    .map(([id, lines]) => [id, since === undefined ? lines : linesSince(lines, since)])
+    .filter(([, lines]) => lines.length);
+  const logs = read.map(([, lines]) => lines);
   const sessions = logs.map(parseSession);
+  const newest = logs
+    .flat()
+    .reduce((max, line) => Math.max(max, Date.parse(JSON.parse(line).timestamp ?? '') || 0), since ?? 0);
   const names = fs.readdirSync(path.join(ROOT, '.claude', 'skills'));
+  const events = logs.map((lines) => sessionEvents(lines, names));
+  if (digestDir) {
+    fs.mkdirSync(digestDir, { recursive: true });
+    read.forEach(([id], i) => fs.writeFileSync(path.join(digestDir, `${id}.txt`), digest(events[i])));
+  }
   const { output, slow, pairs, denied } = summarize(sessions);
   console.log(
-    `${files.length} sessions, ${sessions.flat().length} tool calls\n\nLargest output (total · max · calls):`,
+    `${logs.length} sessions, ${sessions.flat().length} tool calls, newest entry ${newest ? new Date(newest).toISOString() : 'none'}\n\nLargest output (total · max · calls):`,
   );
   for (const k of output) console.log(`  ${k.key}: ${kb(k.bytes)} · ${kb(k.maxBytes)} · ${k.count}`);
   console.log('\nSlowest call (elapsed, including any permission wait):');
@@ -248,6 +385,16 @@ function transcripts(limit) {
     const longest = all.length ? `${Math.round(Math.max(...all.map((r) => r.ms)) / 60000)} min` : 'never run';
     console.log(`  ${name}: ${all.length} · ${mine.filter((r) => r.length).length} · ${longest}`);
   }
+  const interrupts = events.flat().filter((e) => e.kind === 'interrupt');
+  console.log(
+    `\nInterrupts: ${interrupts.length} in ${events.filter((s) => s.some((e) => e.kind === 'interrupt')).length} sessions`,
+  );
+  console.log(
+    '\nQuestions by running skill (recommended taken · other option · own answer · asked to clarify · dismissed):',
+  );
+  for (const s of answerStats(events))
+    console.log(`  ${s.name}: ${s.recommended} · ${s.other} · ${s.own} · ${s.clarify} · ${s.dismissed}`);
+  if (digestDir) console.log(`\nDigests: ${read.length} files in ${digestDir}`);
 }
 
 function scripts() {
@@ -265,10 +412,21 @@ function scripts() {
 }
 
 if (require.main === module) {
-  const [flag, ...rest] = process.argv.slice(2);
-  const limit = Number(flag?.startsWith('--transcripts') ? (flag.split('=')[1] ?? 20) : 20);
-  if (rest.length || (flag && !/^--(cost|transcripts(=\d+)?|agents(=[\w-]+)?)$/.test(flag)) || !(limit > 0)) {
-    console.error('Usage: node scripts/setup-facts.js [--cost | --transcripts[=N] | --agents[=SESSION_ID]]');
+  const [flag, ...more] = process.argv.slice(2);
+  const digestDir = flag?.startsWith('--transcripts')
+    ? more.find((a) => a.startsWith('--digest='))?.slice(9)
+    : undefined;
+  const rest = more.filter((a) => digestDir === undefined || a !== `--digest=${digestDir}`);
+  const value = flag?.startsWith('--transcripts') ? (flag.split('=')[1] ?? '20') : '20';
+  const range = /^\d+$/.test(value) ? { limit: Number(value) } : { since: Date.parse(value) };
+  if (
+    rest.length ||
+    (flag && !/^--(cost|transcripts(=[\w:.+-]+)?|agents(=[\w-]+)?)$/.test(flag)) ||
+    !(range.limit > 0 || range.since > 0)
+  ) {
+    console.error(
+      'Usage: node scripts/setup-facts.js [--cost | --transcripts[=N|=DATE] [--digest=DIR] | --agents[=SESSION_ID]]',
+    );
     process.exit(1);
   }
   if (flag?.startsWith('--agents')) {
@@ -279,8 +437,21 @@ if (require.main === module) {
       process.exit(1);
     }
   } else if (flag === '--cost') cost();
-  else if (flag?.startsWith('--transcripts')) transcripts(limit);
+  else if (flag?.startsWith('--transcripts')) transcripts(range, digestDir);
   else scripts();
 }
 
-module.exports = { callers, argsWithoutUsage, commandKey, parseSession, skillRuns, summarize, agentSummary };
+module.exports = {
+  callers,
+  argsWithoutUsage,
+  commandKey,
+  parseSession,
+  linesSince,
+  skillRuns,
+  answerOutcome,
+  sessionEvents,
+  digest,
+  answerStats,
+  summarize,
+  agentSummary,
+};
