@@ -13,6 +13,10 @@
       "expect": "code-audit"
     },
     {
+      "prompt": "Are the docs still accurate against the code?",
+      "expect": "code-audit"
+    },
+    {
       "prompt": "Review my current diff for bugs",
       "expect": "code-review"
     },

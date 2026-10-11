@@ -1,6 +1,6 @@
 ---
 name: code-audit
-description: Audit the codebase (not a diff) for simplification, correctness, security, performance, reliability, upstream-compliance and test-coverage issues, record verified findings in docs/dev/code-backlog.md, and report them ranked. Use when asked to review, audit or assess the code or app as a whole, or one dimension of it (e.g. "security review of the app", "where can the code be simpler").
+description: Audit the codebase (not a diff) for simplification, correctness, security, performance, reliability, upstream-compliance, test-coverage and doc-accuracy issues, record verified findings in docs/dev/code-backlog.md, and report them ranked. Use when asked to review, audit or assess the code or app as a whole, or one dimension of it (e.g. "security review of the app", "where can the code be simpler", "are the docs still accurate?").
 ---
 
 # Code audit
@@ -34,6 +34,7 @@ Read the doc each dimension names first; it defines what "wrong" means here.
 - **perf** — [data.md](../../../docs/dev/data.md)'s cache tiers and TTLs vs. what the code does; outbound calls vs. [observability.md](../../../docs/dev/observability.md)'s budgets (N+1 fetches, missing dedup via `lib/dedup.js`); sqlite queries without an index; chunk sizes and what lands in the initial bundle; [frontend.md](../../../docs/dev/frontend.md)'s reactivity rules in hot paths (the game table, streaming loads).
 - **reliability** — routes not mapping errors through `routeErrorStatus`; optional sources (HLTB, ProtonDB, reviews) failing the request instead of degrading with a `[tag]` warning; fetches without a timeout; unhandled rejections; races on stale responses (`public/staleGuard.ts`).
 - **compliance** — anything raising request volume or changing request shape toward an upstream, against [integrations.md](../../../docs/dev/integrations.md)'s trust tiers; inferred upstream rules in code that integrations.md doesn't record.
+- **docs** — each `docs/` file against the code it describes, one `Agent` per doc instead of per area: behavior, numbers (vs. `default.env`), module and route lists, keys, design described as built (a feature the doc names that the code lacks), [features.md](../../../docs/user/features.md) vs. what the UI does. `npm run check` already covers names, links and prose shape; this is what it can't see. The `file:line` is the doc's; a code bug found on the way goes under its own dimension.
 - **tests** — `lib/` modules and `server.js` routes with no test in `test/`; branches the tests never reach (error and degrade paths first); journey steps no e2e test locks (`node scripts/journey-coverage.js`).
 
 ## 3. The finding bar
