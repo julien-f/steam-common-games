@@ -2139,9 +2139,6 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   border-color: rgba(26, 159, 255, 0.4);
   color: var(--accent);
 }
-.panel-tag-playtime {
-  color: var(--text1);
-}
 
 /* Tags/genres/categories/developer-publisher merged into one cloud (tagCloud() in
    panel.js) instead of four near-identical "uppercase title + pill row" sections —
@@ -4335,6 +4332,7 @@ kbd {
 .rank-route {
   max-width: 1000px;
   margin: 0 auto;
+  padding: 36px 20px 60px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -4467,9 +4465,20 @@ kbd {
   padding: 24px;
   text-align: center;
 }
+/* Phone: the pair stays side by side, so Tie/Skip/Undo stay above the fold. */
 @media (max-width: 600px) {
+  .rank-route {
+    padding: 16px 12px 40px;
+    gap: 12px;
+  }
   .rank-pair {
-    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .rank-card-name {
+    font-size: 14px;
+  }
+  .rank-card-actions {
+    flex-direction: column;
   }
 }
 

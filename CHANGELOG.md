@@ -78,6 +78,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A combined or shared list whose first load failed keeps its Updated ↻ tile to retry from
 - A comparison's 🔗 Share view link now applies its layout
 - Re-picking a known account while Steam doesn't answer keeps its name, avatar and custom URL
+- On the ranking screen, the side panel's ↻ Refresh re-fetches the game's details, and its tags no longer look like filter buttons
+- On a phone, the ranking screen keeps both games side by side with Tie, Skip and Undo in view, inside a side margin
 
 ### Development
 

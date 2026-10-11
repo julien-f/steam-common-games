@@ -465,6 +465,44 @@ test("R1 edge: a ranking card's HLTB time is the table's, rounded and labelled",
   await expect(page.locator('.rank-route')).toContainText('44.5 h to beat');
 });
 
+test("R1 edge: the ranking's side panel shows tags as plain pills and its Refresh re-fetches", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
+  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
+  await page.getByRole('button', { name: 'ℹ Details' }).first().click();
+
+  const panel = page.locator('.panel-tags');
+  await expect(panel.locator('.panel-tag').first()).toBeVisible();
+  await expect(panel.getByRole('button')).toHaveCount(0);
+
+  const refetch = page.waitForRequest((req) => /\/api\/game-details\/\d+\?refresh=1$/.test(req.url()));
+  await page.getByRole('button', { name: 'Refresh details' }).click();
+  await refetch;
+});
+
+test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo without scrolling, inside a gutter', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout');
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
+  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
+  await expect(page.locator('.rank-card-name').nth(1)).not.toHaveText(/^App /);
+
+  const viewport = page.viewportSize()!;
+  const undo = (await page.locator('.rank-actions').boundingBox())!;
+  expect(undo.y + undo.height).toBeLessThanOrEqual(viewport.height);
+  for (const box of [
+    await page.locator('.rank-pair').boundingBox(),
+    await page.locator('.rank-header').boundingBox(),
+  ]) {
+    expect(box!.x).toBeGreaterThanOrEqual(12);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width - 12);
+  }
+});
+
 test('R1.1,3-6: rank chosen games, stop, resume on the same ones', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

@@ -66,10 +66,14 @@ interface RouteHandlers {
   getOwners?: (appid: number) => GameOwner[] | null; // null: the current account's own (panel.tsx)
 }
 let routeHandlers: RouteHandlers = {};
+// A signal, unlike routeHandlers: the panel's tag pills render as buttons only while it holds.
+const [tagsFilterable, setTagsFilterable] = createSignal(false);
 export function registerRouteHandlers(handlers: RouteHandlers): () => void {
   routeHandlers = handlers;
+  setTagsFilterable(handlers.onTagClick != null);
   return () => {
     routeHandlers = {};
+    setTagsFilterable(false);
   };
 }
 
@@ -195,9 +199,9 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       // The panel's own "↻ Refresh" button (force-refreshes this game's details, news, price and
       // DLC). Delegated to the mounted route rather than implemented here: the refreshed details
       // have to land on that route's own store-backed row, not just on the panel's plain copy.
-      // Only ListRoute registers it; RankRoute also opens the panel but registers no handlers (C124).
       onRefresh: (game) => routeHandlers.refreshGame?.(game),
       onTagClick: (dim, value) => routeHandlers.onTagClick?.(dim, value),
+      tagsFilterable,
       getOwners: (appid) => routeHandlers.getOwners?.(appid) ?? null,
       isTagActive: (dim, value) => routeHandlers.isTagActive?.(dim, value) ?? false,
     });

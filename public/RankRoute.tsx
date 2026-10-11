@@ -24,7 +24,8 @@ import { setBaseTitle } from './pageTitle.ts';
 import { panelOpen, panelClose, isPanelOpen, getPanelGame } from './panel.tsx';
 import { isLightboxOpen } from './lightbox.tsx';
 import { withAccountParam } from './urlState.ts';
-import { computeSteamdbRating, isTextEntry, scoreColor } from './utils.ts';
+import { computeSteamdbRating, fetchJson, isTextEntry, scoreColor } from './utils.ts';
+import { registerRouteHandlers } from './AppShell.tsx';
 import type { Game, GameDetails } from './types.ts';
 
 const MAX_UNDO = 100;
@@ -145,6 +146,19 @@ export default function RankRoute() {
     const open = getPanelGame();
     if (open?.loading && details[open.appid]) openPanel(open.appid);
   });
+  // The panel's ↻ Refresh; tags stay plain pills, since nothing here filters by them.
+  async function refreshGame(game: Game): Promise<void> {
+    try {
+      setDetails(
+        game.appid,
+        await fetchJson<GameDetails>(`/api/game-details/${game.appid}?refresh=1`, undefined, 'Refresh failed'),
+      );
+      if (getPanelGame()?.appid === game.appid) openPanel(game.appid);
+    } catch {
+      /* the panel keeps the details it had */
+    }
+  }
+  onCleanup(registerRouteHandlers({ refreshGame }));
   // The panel stays open only while its game is still one of the pair.
   function syncPanel(): void {
     const open = getPanelGame();
