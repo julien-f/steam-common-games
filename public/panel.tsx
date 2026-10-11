@@ -2535,8 +2535,10 @@ function initPanelSwipe() {
   panel.addEventListener(
     'touchstart',
     (e) => {
-      // The hero has its own swipe, which decides later and so can't reliably stop this one.
-      if (e.touches.length !== 1 || (e.target as Element).closest('.panel-filmstrip, .panel-hero')) return;
+      const target = e.target as Element;
+      // A hero with something to step to has its own swipe, which decides later than this one.
+      const heroSwipes = !!target.closest('.panel-hero') && getPanelItems().length > 1;
+      if (e.touches.length !== 1 || target.closest('.panel-filmstrip') || heroSwipes) return;
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       tracking = true;
