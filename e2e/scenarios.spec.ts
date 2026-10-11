@@ -260,6 +260,15 @@ test('C1 edge: an unknown player is named, and the others still compare', async 
   await expect(groupRows(page)).toHaveCount(3);
 });
 
+test('C1 edge: the bare Compare link after an unknown player starts clean', async ({ page }) => {
+  await page.goto('/lists/compare?u=alice&u=nobody-here');
+  await expect(page.getByRole('alert')).toContainText('nobody-here');
+  await page.getByRole('navigation').getByRole('link', { name: 'Compare' }).click();
+  await expect(page.locator('.compare-form')).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.locator('.compare-token.is-invalid')).toHaveCount(0);
+});
+
 test('L1.1-3: select games, add them to a new list, open it', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

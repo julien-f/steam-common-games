@@ -1997,6 +1997,8 @@ export default function ListRoute() {
     if (kind === 'compare') {
       const slots = compareSlots();
       loadedCompareKeys = new Set([compareKey()]);
+      setCompareFailures([]);
+      if (!refresh) setEditingPlayers(false);
       // Under two players there's nothing to compare — the players form renders in place of the
       // table (see the JSX below), so this is an empty state, not an error.
       if (slots.length < 2) {
@@ -2006,7 +2008,6 @@ export default function ListRoute() {
 
       setListTitle(slots.map((slot) => slot.join(' + ')).join(' vs. '));
       setStatusText('Resolving accounts…');
-      setCompareFailures([]);
       const settled = await Promise.allSettled(
         slots.map(async (identifiers): Promise<AccountSlot> => {
           const summary = await resolveAccountSummary(identifiers);
