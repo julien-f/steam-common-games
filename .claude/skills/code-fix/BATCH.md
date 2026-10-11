@@ -5,7 +5,7 @@ Above about five items, code-fix and ux-fix run as parallel lanes: one backgroun
 ## 1. Plan (before any go-ahead)
 
 - Commit the backlog first: a worktree only sees committed items.
-- `node scripts/batch.js plan [--lanes=4] <items…>` groups the items into lanes that share no file, writes the manifest (`.claude/batch/`, gitignored) and prints an estimate from past batches. Place by hand what it lists as naming no file.
+- `node scripts/batch.js plan [--lanes=4] <items…>` groups the items into lanes that share no file, writes the manifest (`.claude/batch/`, gitignored) and prints an estimate from past batches. A bare `name.ts` counts when it names exactly one tracked file. Place by hand what it lists as naming no file.
 - Pull out of the lanes, to do yourself on `main` after the merges: an item whose fix changes what callers in other lanes read (a helper's return shape), and an item with an open fork.
 - Present the recommended items (and why not the others), the lanes, the serial items and the estimate in one `AskUserQuestion`.
 
@@ -15,7 +15,7 @@ One `Agent` per lane, all in one message, `isolation: "worktree"`, with the lane
 
 ## 3. Merge each lane as it reports
 
-- `node scripts/batch.js merge <branch> <its closed items>`: merges `--no-ff --no-commit`, keeps both sides of CHANGELOG conflicts and drops the closed items from the backlog. Narrow, rather than drop, an item the lane narrowed. Commit (`Merge lane <X>: …`, body naming the items; its hook runs the e2e the lane's commits deferred), then `git worktree remove` and `git branch -d`.
+- `node scripts/batch.js merge <branch> <its closed items>`: merges `--no-ff --no-commit`, keeps both sides of CHANGELOG conflicts, resolves a backlog conflict (lanes closing their own items) to `main`'s side, and drops the closed items from the backlog. Narrow, rather than drop, an item the lane narrowed. Commit (`Merge lane <X>: …`, body naming the items; its hook runs the e2e the lane's commits deferred), then `git worktree remove` and `git branch -d`.
 - Record what a lane reports as new problems, once verified, as backlog items.
 
 ## 4. After the lanes
@@ -27,7 +27,8 @@ The serial items, then the skill's look (ux-fix step 3; code-fix's UI-visible it
 ```
 You fix <items> from <backlog file> in this repo, in your own git worktree (your working directory); commit on its branch, never touch main or push. The user approved the plan, which covers one commit per item.
 - First run `git merge --ff-only main`: worktrees branch from origin/main, which lags local main (pitfalls.md).
-- Follow .claude/skills/<code-fix|ux-fix>/SKILL.md steps 0–<last step before the look>, one commit per item, but don't edit the backlog file (the lead closes items at merge), skip the dev:mock look and /code-review.
+- Follow .claude/skills/<code-fix|ux-fix>/SKILL.md steps 0–<last step before the look>, one commit per item, skip the dev:mock look and /code-review. Each fix commit deletes its own item's line from <backlog file> and touches no other item (narrow it instead when narrowed).
+- Blocked by something outside your items (a check red on main, a hook): SendMessage the lead with the cause and keep going on what you can; don't end the run.
 - A real fork (fix widens past the item, a dependency, more upstream traffic): skip the item and report it.
 - Stay in your worktree: no `git -C <main checkout>`, `--prefix` or `cwd` parameter; one plain command per Bash call, no `&&`/`;` chains or heredocs.
 - Commit messages: write them to <scratchpad>/msg-<lane>.txt (the scratchpad is shared, a generic name gets overwritten), then `E2E_DEFER=1 E2E_PORT=<2899x> git commit -F <file>`; prefix every e2e run with the same E2E_PORT.

@@ -19,6 +19,12 @@ test('parseItems: effort from a C-item, M for a U-item, the files each one names
   assert.deepEqual(items.get('U4').files, []);
 });
 
+test('parseItems: a bare file name counts when it names exactly one tracked file', () => {
+  const text = '- **C5 · minor · S** — in `panel.tsx:12` and `index.ts`, see `CopyButton.tsx`. Fix.';
+  const items = parseItems(text, ['public/panel.tsx', 'public/index.ts', 'lib/index.ts']);
+  assert.deepEqual(items.get('C5').files, ['public/panel.tsx']);
+});
+
 test('planLanes: items sharing a file share a lane; an item naming none is left to place by hand', () => {
   const items = [...parseItems(BACKLOG).values()];
   const { lanes, unplaced } = planLanes(items, 4);

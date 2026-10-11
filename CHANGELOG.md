@@ -103,6 +103,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - npm run check also lints the Claude Code setup: skill frontmatter, and permission allows that would pre-approve an ask-first action
 - node scripts/skill-evals.js checks which skill each realistic request loads, and with --dry-run runs the read-only skills headless to catch denied and failed steps; setup-review uses it to test a skill change before and after
 - doc-refs no longer counts names from installed packages as this repo's code
+- Fix batches: lanes close their own backlog items, and lane planning sees bare file names
 
 ## [0.10.0] - 2026-10-10
 

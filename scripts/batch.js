@@ -23,15 +23,24 @@ const DEFAULT_AFTER_LANES_MIN = 45;
 
 const ITEM_LINE = /^- \*\*([CU]\d+) · (\w+) · ([\w\d]+)\*\* — (.*)$/;
 const FILE_REF = /\b(?:server\.js|(?:public|lib|test|e2e|scripts)\/[\w./-]+\.\w+)/g;
+// A bare `name.ext` in backticks (audits often drop the directory), resolved against `knownFiles`.
+const BARE_REF = /`([\w-]+\.(?:js|mjs|ts|tsx))[`:]/g;
 
-function parseItems(text) {
+// `knownFiles`: the repo's tracked paths; a bare name naming exactly one of them counts as that file.
+function parseItems(text, knownFiles = []) {
+  const byBase = new Map();
+  for (const f of knownFiles) {
+    const base = path.basename(f);
+    byBase.set(base, byBase.has(base) ? null : f);
+  }
   const items = new Map();
   for (const line of text.split('\n')) {
     const m = ITEM_LINE.exec(line);
     if (!m) continue;
     const [, id, severity, third, body] = m;
     const effort = id.startsWith('C') && third in UNITS ? third : 'M';
-    items.set(id, { id, severity, effort, files: [...new Set(body.match(FILE_REF) ?? [])] });
+    const bare = [...body.matchAll(BARE_REF)].map(([, base]) => byBase.get(base)).filter(Boolean);
+    items.set(id, { id, severity, effort, files: [...new Set([...(body.match(FILE_REF) ?? []), ...bare])] });
   }
   return items;
 }
@@ -132,7 +141,10 @@ const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8'
 const gitLog = (since) => git('log', '--all', '--no-merges', `--since=${since}`, '--format=%x1e%ct%n%B');
 
 function readBacklogs() {
-  return new Map(Object.values(BACKLOGS).flatMap((f) => [...parseItems(fs.readFileSync(path.join(ROOT, f), 'utf8'))]));
+  const tracked = git('ls-files').split('\n').filter(Boolean);
+  return new Map(
+    Object.values(BACKLOGS).flatMap((f) => [...parseItems(fs.readFileSync(path.join(ROOT, f), 'utf8'), tracked)]),
+  );
 }
 
 function plan(ids, maxLanes) {
@@ -203,9 +215,14 @@ function merge(branch, ids) {
   const edit = (file, fn) =>
     fs.writeFileSync(path.join(ROOT, file), fn(fs.readFileSync(path.join(ROOT, file), 'utf8')));
   if (conflicted.includes('CHANGELOG.md')) edit('CHANGELOG.md', unionConflicts);
+  // Lanes delete their own items' lines, so a backlog conflict is two closures side by side: keep
+  // main's side, then close this lane's items on it.
+  for (const file of Object.values(BACKLOGS).filter((f) => conflicted.includes(f)))
+    git('checkout', '--ours', '--', file);
   for (const file of Object.values(BACKLOGS)) edit(file, (t) => closeItems(t, ids));
   git('add', 'CHANGELOG.md', ...Object.values(BACKLOGS));
-  const left = conflicted.filter((f) => f !== 'CHANGELOG.md');
+  const resolved = ['CHANGELOG.md', ...Object.values(BACKLOGS)];
+  const left = conflicted.filter((f) => !resolved.includes(f));
   console.log(left.length ? `resolve by hand: ${left.join(' ')}` : 'merged, not committed: review, then commit');
   if (left.length) process.exitCode = 1;
 }
