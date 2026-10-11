@@ -831,7 +831,8 @@ app.get('/api/bundles/:id', bundlesByIdLimit, requireItad, async (req, res) => {
 // POST /api/game-details/stream pipeline every other page already uses. A gid resolves to a
 // plain number (the common case), an array of numbers (a Steam "sub"/"bundle" spanning several
 // apps — see lib/itad.js's resolveSteamAppIds), or null for a gid with no Steam listing at all
-// — the frontend renders those as the separate "not on Steam" list.
+// — the frontend renders those as the separate "not on Steam" list. `failed` lists the gids whose
+// lookup errored, so the frontend doesn't read them as "not on Steam".
 const MAX_BUNDLE_RESOLVE_GAMES = 500;
 app.post('/api/bundles/resolve', bundlesResolveLimit, requireItad, async (req, res) => {
   const gids = req.body.gids;
@@ -842,8 +843,10 @@ app.post('/api/bundles/resolve', bundlesResolveLimit, requireItad, async (req, r
     return res.status(400).json({ error: `Too many games — maximum is ${MAX_BUNDLE_RESOLVE_GAMES}` });
   }
   try {
-    const resolved = await resolveSteamAppIds([...new Set(gids)]);
-    res.json({ appids: Object.fromEntries(resolved) });
+    const unique = [...new Set(gids)];
+    const resolved = await resolveSteamAppIds(unique);
+    const failed = unique.filter((gid) => !resolved.has(gid));
+    res.json({ appids: Object.fromEntries(resolved), ...(failed.length && { failed }) });
   } catch (err) {
     const status = routeErrorStatus('bundles-resolve', err);
     res.status(status).json({ error: err.message });

@@ -222,9 +222,10 @@ export async function resolveBundleSource(
   onLeftOut?: (bundleId: string, notOnSteam: number) => void,
 ): Promise<Set<number>> {
   try {
-    const { title, appids, notOnSteam } = await fetchContents(bundleId);
+    const { title, appids, notOnSteam, failed } = await fetchContents(bundleId);
     if (notOnSteam) onLeftOut?.(bundleId, notOnSteam);
-    if (isBundleReferenced(bundleId)) rememberBundle(bundleId, title, appids);
+    // A load missing games that failed to resolve would shorten the snapshot an orphan list keeps
+    if (!failed && isBundleReferenced(bundleId)) rememberBundle(bundleId, title, appids);
     return appids;
   } catch (err) {
     if (err instanceof BundleNotFoundError) return new Set(orphanBundle(bundleId)?.appids ?? []);

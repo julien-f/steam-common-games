@@ -141,16 +141,16 @@ test('fetchBundleById: throws with the server error message on a non-2xx respons
 
 // ── resolveBundleAppids ──────────────────────────────────────────────────────────────────────
 
-test('resolveBundleAppids: posts gids, returns the gid->appid map as-is', async (t) => {
+test('resolveBundleAppids: posts gids, returns the gid->appid map as-is, and no failed gids when none are listed', async (t) => {
   let seenBody;
   withFetch(t, async (url, opts) => {
     seenBody = JSON.parse(opts.body);
     return { ok: true, json: async () => ({ appids: { a: 440, b: null } }) };
   });
 
-  const map = await resolveBundleAppids(['a', 'b']);
+  const res = await resolveBundleAppids(['a', 'b']);
   assert.deepEqual(seenBody, { gids: ['a', 'b'] });
-  assert.deepEqual(map, { a: 440, b: null });
+  assert.deepEqual(res, { appids: { a: 440, b: null }, failed: [] });
 });
 
 test('resolveBundleAppids: throws with the server error message on a non-2xx response', async (t) => {
@@ -172,6 +172,25 @@ test('resolveBundleGames: splits into resolved (with appid)/unresolved, preservi
   assert.deepEqual(
     unresolved.map((g) => g.gid),
     ['b'],
+  );
+});
+
+test('resolveBundleGames: a gid the server failed to resolve is failed, not one with no Steam listing', async (t) => {
+  const bundle = { tiers: [{ price: null, games: [game('a'), game('b'), game('c')], addon: false }] };
+  withFetch(t, async () => ({ ok: true, json: async () => ({ appids: { a: 440, b: null }, failed: ['c'] }) }));
+
+  const { resolved, unresolved, failed } = await resolveBundleGames(bundle);
+  assert.deepEqual(
+    resolved.map((g) => g.appid),
+    [440],
+  );
+  assert.deepEqual(
+    unresolved.map((g) => g.gid),
+    ['b'],
+  );
+  assert.deepEqual(
+    failed.map((g) => g.gid),
+    ['c'],
   );
 });
 

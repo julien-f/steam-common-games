@@ -703,6 +703,8 @@ export default function ListRoute() {
   // How many of the bundle's games made it into the table. `total` (the plain counter updateStatus
   // reads) is the same number, but it isn't reactive — the hero card's Games tile needs a signal.
   const [bundleResolvedCount, setBundleResolvedCount] = createSignal(0);
+  // The bundle's games whose Steam lookup errored: neither in the table nor "not on Steam".
+  const [bundleFailedCount, setBundleFailedCount] = createSignal(0);
 
   const [rowsStore, setRowsStore] = createStore<Game[]>([]);
   // "HowLongToBeat didn't answer for 6 games", per source: a hidden column's failure still shows.
@@ -1937,6 +1939,7 @@ export default function ListRoute() {
     setUnresolvedGames([]);
     setUnresolvedOpen(false);
     setBundleResolvedCount(0);
+    setBundleFailedCount(0);
     // Same reasoning one kind over: the hero describes the list being left until the new one has
     // resolved its own name/account, so it's cleared rather than left standing (setBaseTitle is
     // deliberately untouched — <title> keeps naming the last real list until the next one loads,
@@ -2246,12 +2249,13 @@ export default function ListRoute() {
           tiers: bundleTierSummary(bundle, regionCur),
           picks,
         });
-        const { resolved, unresolved } = await resolveBundleGames(bundle);
+        const { resolved, unresolved, failed } = await resolveBundleGames(bundle);
         if (loadGuard.isStale(gen)) return;
         setUnresolvedGames(unresolved);
         setBundleResolvedCount(resolved.length);
+        setBundleFailedCount(failed.length);
         if (resolved.length === 0) {
-          setStatusText('No games in this bundle could be matched to a Steam listing.');
+          setStatusText(failed.length ? '' : 'No games in this bundle could be matched to a Steam listing.');
           return;
         }
         resolvedBundleGames = resolved;
@@ -3387,6 +3391,13 @@ export default function ListRoute() {
           )}
         </Show>
         <Show when={failedSummary()}>{(text) => <span class="list-failed">{text()}</span>}</Show>
+        <Show when={bundleFailedCount()}>
+          {(n) => (
+            <span class="list-failed">
+              Steam didn't answer for {n()} of this bundle's game{n() === 1 ? '' : 's'} — reload to retry
+            </span>
+          )}
+        </Show>
       </div>
       <Show when={hasPrices() || kind === 'bundle'}>
         <div class="price-status">{priceStatusText()}</div>

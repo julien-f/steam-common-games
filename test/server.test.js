@@ -2081,6 +2081,25 @@ test('POST /api/bundles/resolve: 200 with resolved appids map', async (t) => {
   assert.deepEqual(res.body, { appids: { 'gid-1': 400, 'gid-2': null } });
 });
 
+test('POST /api/bundles/resolve: a gid whose Steam expansion errored is reported as failed, not as no Steam listing', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  t.mock.method(globalThis, 'fetch', async (url, opts) => {
+    const u = String(url);
+    if (u.includes('/service/shops/')) return { ok: true, json: async () => [{ id: 61, title: 'Steam' }] };
+    if (u.includes('/lookup/shop/')) {
+      const gids = JSON.parse(opts.body);
+      return { ok: true, json: async () => Object.fromEntries(gids.map((g) => [g, ['sub/1234']])) };
+    }
+    return { ok: false, status: 500 }; // packagedetails and the games/info/v2 fallback
+  });
+  const res = await api
+    .post('/api/bundles/resolve')
+    .send({ gids: ['gid-1'] })
+    .expect(200);
+  assert.deepEqual(res.body, { appids: {}, failed: ['gid-1'] });
+});
+
 test('POST /api/prices: 503 when ITAD_API_KEY is not configured', async () => {
   const prev = process.env.ITAD_API_KEY;
   delete process.env.ITAD_API_KEY;

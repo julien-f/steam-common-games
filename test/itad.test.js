@@ -291,7 +291,7 @@ test('resolveSteamAppIds: runs at most 3 games/info/v2 fallbacks at once', async
   assert.ok(maxInFlight <= 3, `${maxInFlight} at once`);
 });
 
-test('resolveSteamAppIds: a games/info/v2 fallback that errored is not cached as "not on Steam"', async (t) => {
+test('resolveSteamAppIds: a games/info/v2 fallback that errored is left out, not cached as "not on Steam"', async (t) => {
   _reset();
   const base = makeResolveFetch({
     shopEntries: { 'gid-sub-only': ['sub/1234'] },
@@ -303,7 +303,7 @@ test('resolveSteamAppIds: a games/info/v2 fallback that errored is not cached as
     infoCalls++;
     return { ok: false, status: 500 };
   });
-  assert.equal((await resolveSteamAppIds(['gid-sub-only'])).get('gid-sub-only'), null);
+  assert.equal((await resolveSteamAppIds(['gid-sub-only'])).has('gid-sub-only'), false);
   await resolveSteamAppIds(['gid-sub-only']);
   assert.equal(infoCalls, 2, 'retried on the next resolve');
 });
@@ -322,7 +322,7 @@ test('resolveSteamAppIds: a failed Steam-side expansion falls back to games/info
   assert.equal(result.get('gid-sub-only'), 292030);
 });
 
-test('resolveSteamAppIds: a games/info/v2 fallback that throws leaves only that gid unresolved', async (t) => {
+test('resolveSteamAppIds: a games/info/v2 fallback that throws leaves out only that gid', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async (url, opts) => {
     if (String(url).includes('/games/info/')) throw new Error('network error');
@@ -333,7 +333,7 @@ test('resolveSteamAppIds: a games/info/v2 fallback that throws leaves only that 
   });
   const result = await resolveSteamAppIds(['gid-app', 'gid-sub-only']);
   assert.equal(result.get('gid-app'), 100);
-  assert.equal(result.get('gid-sub-only'), null);
+  assert.equal(result.has('gid-sub-only'), false);
 });
 
 test('resolveSteamAppIds: a gid with no shop entry at all never triggers the games/info/v2 fallback', async (t) => {

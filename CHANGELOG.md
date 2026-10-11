@@ -46,6 +46,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A game that added achievements after they were cached no longer shows more unlocked than it has ("52 / 50").
 - An achievement unlocked by several members no longer loses its unlock date when one of them has none.
 - A soundtrack or other game HowLongToBeat doesn't time now shows its real data age in the side panel instead of always "just now".
+- A bundle game Steam didn't answer for is no longer listed as not on Steam, nor dropped from a saved list's remembered copy of the bundle.
 
 ### Development
 
@@ -69,6 +70,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `node scripts/backlog-next.js <C|U>` gives the next code or UX backlog number, never one a closed item already used.
 - The pre-commit hook sets unstaged edits aside with `git stash` instead of a hand-rolled patch file.
 - Mock data gives Terraria and Hollow Knight trailers and screenshots, so stepping games in the lightbox lands on real media
+- The mock server's resolve-failed state makes one bundle game fail to resolve to Steam.
 
 ## [0.10.0] - 2026-10-10
 
