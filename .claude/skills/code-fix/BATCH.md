@@ -1,6 +1,6 @@
 # Fix batch
 
-Above about five items, code-fix and ux-fix run as parallel lanes: one background agent per lane, in its own worktree, merged `--no-ff`. The first run (2026-10-11, 24 C-items) took ~65 min end to end against an estimated ~3× that sequentially.
+Above about five items, code-fix and ux-fix run as parallel lanes: one background agent per lane, in its own worktree, merged `--no-ff`. The first run (2026-10-11, 24 C-items) took ~65 min end to end.
 
 ## 1. Plan (before any go-ahead)
 
@@ -20,12 +20,12 @@ One `Agent` per lane, all in one message, `isolation: "worktree"`, with the lane
 
 ## 4. After the lanes
 
-The serial items, then the skill's look (ux-fix step 3; code-fix's UI-visible items), then `/code-review` over the whole batch, then `node scripts/batch.js record` (feeds the next estimate).
+The serial items, then the skill's look (ux-fix step 3; code-fix's UI-visible items), then `/code-review` over the whole batch, then `node scripts/batch.js record` (feeds the next estimate) and `node scripts/setup-facts.js --agents` (each agent's time, turns, failed calls and gate time) for the report.
 
 ## Lane template
 
 ```
-You fix <items> from <backlog file> in /home/julien/dev/julien-f/steam-common-games, in your own git worktree; commit on its branch, never touch main or push. The user approved the plan, which covers one commit per item.
+You fix <items> from <backlog file> in this repo, in your own git worktree (your working directory); commit on its branch, never touch main or push. The user approved the plan, which covers one commit per item.
 - First run `git merge --ff-only main`: worktrees branch from origin/main, which lags local main (pitfalls.md).
 - Follow .claude/skills/<code-fix|ux-fix>/SKILL.md steps 0–<last step before the look>, one commit per item, but don't edit the backlog file (the lead closes items at merge), skip the dev:mock look and /code-review.
 - A real fork (fix widens past the item, a dependency, more upstream traffic): skip the item and report it.

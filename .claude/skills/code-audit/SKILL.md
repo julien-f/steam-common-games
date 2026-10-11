@@ -10,6 +10,7 @@ Judges the code against this repo's own rules and docs, not general taste. A dif
 ## Scope
 
 - **Argument**: one dimension (below), optionally a path (`lib/`, `public/panel.tsx`). No argument: ask which dimension through `AskUserQuestion`, recommending the one with the oldest last audit in [code-backlog.md](../../../docs/dev/code-backlog.md)'s header.
+- **One dimension over the whole codebase**: one `Agent` per area (backend · `ListRoute` · panel and lightbox · table and routes · stores), launched in one message, each given the dimension's checklist, the finding bar and what's out of scope; verify every finding yourself before recording it.
 - **`all`** runs every dimension: one `Agent` subagent per dimension, launched in one message, each given its checklist below and the finding bar. It's expensive — only on an explicit request.
 - Say what was covered and what was skipped, and why.
 
