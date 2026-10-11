@@ -8,10 +8,12 @@ export interface LoadSample {
 
 // Null until there's enough to go on (samples at least 3 s apart within the window), or when the
 // load has stalled over it.
-export function etaSeconds(samples: LoadSample[], total: number, windowMs = 20_000): number | null {
+const WINDOW_MS = 20_000;
+
+export function etaSeconds(samples: LoadSample[], total: number): number | null {
   const last = samples[samples.length - 1];
   if (!last) return null;
-  const first = samples.find((s) => s.t >= last.t - windowMs)!;
+  const first = samples.find((s) => s.t >= last.t - WINDOW_MS)!;
   const seconds = (last.t - first.t) / 1000;
   const gained = last.loaded - first.loaded;
   if (seconds < 3 || gained <= 0) return null;

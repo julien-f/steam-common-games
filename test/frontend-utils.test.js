@@ -94,14 +94,6 @@ test('scoreColor: 49 returns red (bottom tier)', () => {
 
 // ── fmtH ─────────────────────────────────────────────────────────────────────
 
-test('fmtH: returns dim dash for null', () => {
-  assert.equal(fmtH(null), '<span class="dim">—</span>');
-});
-
-test('fmtH: returns dim dash for undefined', () => {
-  assert.equal(fmtH(undefined), '<span class="dim">—</span>');
-});
-
 test('fmtH: formats integer hours without decimal', () => {
   assert.equal(fmtH(10), '10h');
 });

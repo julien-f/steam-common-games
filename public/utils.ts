@@ -242,8 +242,7 @@ export function discountPct(
   return Math.round((1 - bestDealAmt / steamRegularAmt) * 100);
 }
 
-export function fmtH(h: number | null | undefined): string {
-  if (!h) return '<span class="dim">—</span>';
+export function fmtH(h: number): string {
   return h % 1 === 0 ? `${h}h` : `${h.toFixed(1)}h`;
 }
 
