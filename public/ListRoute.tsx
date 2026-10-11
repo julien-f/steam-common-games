@@ -796,13 +796,17 @@ export default function ListRoute() {
     const list = userList();
     return list && list.kind !== 'ranked' ? { kind: 'user', listId: list.id } : null;
   }
+  // The rows a filter left visible; null when no filter hides any.
+  function filteredRows(): Game[] | null {
+    if (!tableReady() || !table) return null; // `table` isn't a signal; tableReady() is
+    const visible = table.processedData();
+    return visible.length < table.data().length ? visible : null;
+  }
   // What "Rank this list" asks about first: the selection, else the filtered rows (null = all, [] = the filter hides every row).
   function rankThisListFocus(): number[] | null {
     const selected = selectedRows();
     if (selected.length) return selected.map((r) => r.appid);
-    if (!tableReady() || !table) return null; // `table` isn't a signal; tableReady() is
-    const visible = table.processedData();
-    return visible.length < table.data().length ? visible.map((r) => r.appid) : null;
+    return filteredRows()?.map((r) => r.appid) ?? null;
   }
   function rankThisListLabel(): string {
     const focus = rankThisListFocus();
@@ -885,12 +889,14 @@ export default function ListRoute() {
     table?.selection.clear();
     navigate(`/lists/${list.id}/rank`, { state: { rankFocus: focus, rankOrder: focus } });
   }
+  // Those of `rows` neither ranked nor excluded yet.
+  function unrankedOf(rows: readonly Game[]): number[] {
+    const excluded = new Set(ranking()?.excluded ?? []);
+    return rows.filter((r) => r.rank == null && !excluded.has(r.appid)).map((r) => r.appid);
+  }
   // The selected games still to be ranked — what "Compare selected" asks about.
   function selectedUnranked(): number[] {
-    const excluded = new Set(ranking()?.excluded ?? []);
-    return selectedRows()
-      .filter((r) => r.rank == null && !excluded.has(r.appid))
-      .map((r) => r.appid);
+    return unrankedOf(selectedRows());
   }
   // The unranked games in the table's current sort (filters included — what's left out is asked
   // after, in source order), so whatever the user sorted first gets ranked first.
@@ -901,11 +907,8 @@ export default function ListRoute() {
   // it survives a reload of the compare screen and is gone once it's navigated away from.
   // The shown games still to be ranked when a filter hides some — what "Compare" then asks about.
   function filteredUnranked(): number[] | null {
-    if (!tableReady() || !table) return null;
-    const visible = table.processedData();
-    if (visible.length >= table.data().length) return null;
-    const excluded = new Set(ranking()?.excluded ?? []);
-    return visible.filter((r) => r.rank == null && !excluded.has(r.appid)).map((r) => r.appid);
+    const visible = filteredRows();
+    return visible && unrankedOf(visible);
   }
   function compareLabel(): string {
     const focus = filteredUnranked();
@@ -1380,12 +1383,16 @@ export default function ListRoute() {
     openLightbox(game, shot);
   }
 
+  // Says so in the status line when it isn't.
+  function isValidAppid(appid: number): boolean {
+    if (Number.isInteger(appid) && appid > 0) return true;
+    setStatusText('Invalid game id.');
+    return false;
+  }
+
   async function openStandaloneInPlace(appid: number): Promise<void> {
     const token = ++standaloneLookupToken;
-    if (!Number.isInteger(appid) || appid <= 0) {
-      setStatusText('Invalid game id.');
-      return;
-    }
+    if (!isValidAppid(appid)) return;
     // No `App <appid>` placeholder in the data — panel.tsx's own title renders that fallback, so
     // the empty name here stays honest ("not resolved yet") for everything else that reads it.
     setStandaloneRows(appid, { appid, name: '', loading: true, details: null, standalone: true } as Game);
@@ -1439,10 +1446,7 @@ export default function ListRoute() {
       openGame(existing);
       return;
     }
-    if (!Number.isInteger(appid) || appid <= 0) {
-      setStatusText('Invalid game id.');
-      return;
-    }
+    if (!isValidAppid(appid)) return;
     const placeholder: Game = { appid, name: '', loading: true, details: null };
     const rows = [placeholder, ...rowsStore];
     setRowsStore(rows);
@@ -2340,12 +2344,7 @@ export default function ListRoute() {
       if (params.appid) openOrAddRecentGame(Number(params.appid));
     } else {
       const gameParam = new URLSearchParams(routerLocation.search).get('game');
-      if (gameParam) {
-        const focusAppid = Number(gameParam);
-        const existing = rowStore.getRow(focusAppid);
-        if (existing) openGame(existing);
-        else openStandaloneInPlace(focusAppid);
-      }
+      if (gameParam) handleOpenGameRequest(Number(gameParam));
     }
 
     // An empty result set was practically unreachable before row-selection-based remove-from-
