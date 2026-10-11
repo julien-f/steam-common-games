@@ -23,7 +23,7 @@ Setup and dev commands are in [README.md](../../README.md); tests and hooks in [
 - **`server.js`** — Express setup and route handlers only; all upstream work lives in `lib/*`.
 - **`lib/config.js`** — loads `.env` over `default.env` and exports the TTLs, budgets, session lifetime and upstream pacing shared across modules.
 - **`lib/db.js`** — opens `db.sqlite` and applies its append-only `MIGRATIONS` ([data.md](data.md)).
-- **`lib/cache.js`** — persistent cache over `db.sqlite` (`getCached`, `setCache`, `GROUPS`); `cachedFetch` wraps a single-key upstream getter in cache + dedup.
+- **`lib/cache.js`** — persistent cache over `db.sqlite` (`getCached`, `setCache`, `GROUPS`); `createCachedFetch` binds a module's dedup into its `cachedFetch(key, { force }, load)`, the cache-then-dedup skeleton of a single-key upstream getter.
 - **`lib/dedup.js`** — `createDedup`: concurrent calls for the same key share one promise.
 - **`lib/steam.js`** — Steam Web API and store calls (`resolveSteamId`, `getOwnedGames`, `getWishlist`, `getFriendList`, `getPlayerSummaries`, `getGameRating`, `getAppDetails`, `getSteamTags`, `getGameDemo`, `searchStoreGames`, `getGameNews`, …), ProtonDB, and their per-host semaphores (`storeLimit`/`tagLimit`/`protonLimit`).
 - **`lib/hltb.js`** — HLTB auth + search (`getHLTB`), behind its own semaphore (`hltbLimit`).

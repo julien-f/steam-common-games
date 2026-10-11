@@ -2,7 +2,8 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { getCached, getCachedAt, setCache, getCacheEntryCounts, _reset } = require('../lib/cache');
+const { getCached, getCachedAt, setCache, getCacheEntryCounts, createCachedFetch, _reset } = require('../lib/cache');
+const { createDedup } = require('../lib/dedup');
 const { LIBRARY_CACHE_TTL_MS, BUNDLES_CACHE_TTL_MS } = require('../lib/config');
 
 // ── getCached ─────────────────────────────────────────────────────────────────
@@ -151,4 +152,30 @@ test('every key prefix has an explicit TTL group, and an unknown one throws', ()
   assert.equal(getCached('itad-gamebundles:US:gid'), undefined, 'bundles tier, not the 30-day library tier');
   assert.deepEqual(getCached('playerach:1:440'), [], 'library tier');
   assert.throws(() => setCache('nope:1', 1), /no TTL group for key nope:1/);
+});
+
+// ── createCachedFetch ─────────────────────────────────────────────────────────
+
+test('createCachedFetch: a hit skips the load; concurrent misses load once; force reloads', async () => {
+  _reset();
+  const cachedFetch = createCachedFetch(createDedup());
+  let loads = 0;
+  const load = async () => ({ value: `v${++loads}` });
+  const [a, b] = await Promise.all([cachedFetch('games:k', {}, load), cachedFetch('games:k', {}, load)]);
+  assert.deepEqual([a, b, loads], ['v1', 'v1', 1]);
+  assert.equal(await cachedFetch('games:k', {}, load), 'v1');
+  assert.equal(await cachedFetch('games:k', { force: true }, load), 'v2');
+});
+
+test("createCachedFetch: the load's ttlMs sets the entry's expiry; a throw caches nothing", async () => {
+  _reset();
+  const cachedFetch = createCachedFetch(createDedup());
+  await cachedFetch('games:short', {}, async () => ({ value: null, ttlMs: -1 }));
+  assert.equal(getCached('games:short'), undefined, 'expired at once');
+  await assert.rejects(
+    cachedFetch('games:bad', {}, async () => {
+      throw new Error('upstream');
+    }),
+  );
+  assert.equal(getCached('games:bad'), undefined);
 });
