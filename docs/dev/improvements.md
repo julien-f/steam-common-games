@@ -55,7 +55,6 @@ None open.
 
 ## Consistency and polish
 
-- **U116 · minor · F1** — the lightbox caption's ↑/↓ buttons sit on either side of the game name, so they slide sideways with each name's width (Hades → Stardew Valley: 64 px): after one click on ↓ the pointer is over "Game 4 of 6" and the next clicks do nothing. Keep both buttons at a fixed spot (e.g. both after the name, or a fixed-width name).
 - **U117 · minor · F1** — with a mouse, the lightbox shows the game name alone; the ↑/↓ game stepper and "Game 3 of 6" appear only while hovering that name, so nothing on screen says other games can be reached from here. Show the stepper while the chrome is visible.
 - **U118 · polish · F1** — stepping past the last media wraps to the Cover, and past the last game to game 1, with nothing but the counter changing. A wrap cue (direction of the enter animation, or a brief "back to start").
 - **U120 · polish · F1** — stepping back to a game just left in the lightbox lands on its first item of the kind being left, not where you were (Hades Screenshot 2 → ↓ → ↑ → Screenshot 1). Remember the last item per game for the session.

@@ -1396,6 +1396,29 @@ test("F1 edge: the viewer's game stepper shows on hover or focus with a mouse, a
   await expect(prev).toHaveCSS('opacity', '1');
 });
 
+test("F1 edge: the viewer's ↑/↓ game buttons stay put from game to game", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const boxes = () =>
+    page.evaluate(() =>
+      ['.lb-game-prev', '.lb-game-next'].map((sel) => {
+        const r = document.querySelector(`#screenshot-lightbox ${sel}`)!.getBoundingClientRect();
+        return [Math.round(r.x), Math.round(r.y)];
+      }),
+    );
+  await expect(page.locator('.lb-caption-pos')).toHaveText(/^Game \d+ of 6$/);
+  const first = await boxes();
+  const names = new Set<string>();
+  for (let i = 0; i < 6; i++) {
+    const name = (await page.locator('.lb-caption-text').textContent())!;
+    names.add(name);
+    expect(await boxes()).toEqual(first);
+    await page.keyboard.press('ArrowDown');
+    await expect(page.locator('.lb-caption-text')).not.toHaveText(name);
+  }
+  expect(names.size).toBe(6);
+});
+
 test('F1 edge: nothing of the page shows around the media', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
