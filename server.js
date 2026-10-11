@@ -12,7 +12,15 @@ const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 const rateLimit = require('express-rate-limit');
 
-const { getCached, getCachedAt, isCached, capExpiry, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
+const {
+  getCached,
+  getCachedAt,
+  isCached,
+  setCache,
+  capExpiry,
+  getCacheStats,
+  getCacheEntryCounts,
+} = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
 const { getMetrics, recordLimiterTrip } = require('./lib/metrics');
 const { getCircuitBreakers } = require('./lib/circuitBreaker');
@@ -661,9 +669,12 @@ function fetchGameDetails(appid, { force = false } = {}) {
     // versus searching HLTB in parallel with an already-known, trusted name (e.g. an owned
     // game's name from Steam's library API) — that's the trade for not trusting the client.
     // A meta failure fails HLTB too, so it reads as failed, not as "no data".
-    const hltbPromise = metaPromise.then((meta) =>
-      NOT_PLAYED_TYPES.has(meta?.type) ? null : getHLTB(appid, meta?.name || '', { force }),
-    );
+    const hltbPromise = metaPromise.then((meta) => {
+      if (meta?.name && !NOT_PLAYED_TYPES.has(meta.type)) return getHLTB(appid, meta.name, { force });
+      // Skipped by design, cached as a miss so the source has an age and counts as cached
+      if (force || !isCached(`hltb:${appid}`)) setCache(`hltb:${appid}`, [], { ttlMs: MISS_CACHE_TTL_MS });
+      return null;
+    });
 
     return Promise.allSettled([
       getGameRating(appid, { force }),

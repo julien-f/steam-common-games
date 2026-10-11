@@ -45,6 +45,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A list no longer hides its prices for the whole visit when the server's health check fails once.
 - A game that added achievements after they were cached no longer shows more unlocked than it has ("52 / 50").
 - An achievement unlocked by several members no longer loses its unlock date when one of them has none.
+- A soundtrack or other game HowLongToBeat doesn't time now shows its real data age in the side panel instead of always "just now".
 
 ### Development
 

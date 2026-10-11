@@ -729,6 +729,19 @@ test("GET /api/game-details/:appid: a soundtrack isn't searched on HLTB, and rea
   assert.ok(!fetchMock.mock.calls.some((c) => String(c.arguments[0]).includes('howlongtobeat')));
 });
 
+test("GET /api/game-details/:appid: a soundtrack's skipped HLTB lookup is cached as a short-lived miss, so it has an age", async (t) => {
+  _reset();
+  _resetAuth();
+  t.mock.method(globalThis, 'fetch', makeDetailsFetch({ type: 'music' }));
+
+  const res = await api.get('/api/game-details/413').expect(200);
+  assert.notEqual(res.body.fetchedAts.hltb, null);
+  assert.notEqual(res.body.fetchedAt, null);
+  const later = Date.now() + MISS_CACHE_TTL_MS + 1;
+  t.mock.method(Date, 'now', () => later);
+  assert.equal(getCachedAt('hltb:413'), undefined);
+});
+
 test('GET /api/game-details/:appid: 200 with null rating when reviews fetch fails', async (t) => {
   _reset();
   _resetAuth();
