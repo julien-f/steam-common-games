@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { ruleMatches, permissionProblems, skillProblems } = require('../scripts/setup-lint');
+const { ruleMatches, permissionProblems, skillProblems, ledgerProblems } = require('../scripts/setup-lint');
 
 test('ruleMatches follows the Bash rule syntax: bare, exact, legacy prefix, wildcard', () => {
   assert.equal(ruleMatches('Bash', 'rm x'), true);
@@ -30,4 +30,14 @@ test('skillProblems checks the name, the "Use when" and the description length',
   ]);
   assert.match(skillProblems('a', skill('a', `Use when ${'x'.repeat(1100)}`))[0], /max 1024/);
   assert.deepEqual(skillProblems('a', '# no frontmatter'), ['a: SKILL.md has no frontmatter']);
+});
+
+test('ledgerProblems flags an undated header once the ledger holds items', () => {
+  const ledger = (dates, items) => `# Setup backlog\n\nLast reviewed: ${dates}.\n\n## Watching\n\n${items}\n`;
+  assert.deepEqual(ledgerProblems(ledger('never · Transcripts read up to: never', 'None.')), []);
+  assert.equal(ledgerProblems(ledger('never · Transcripts read up to: never', '- **P1 · x · S** — y.')).length, 1);
+  assert.deepEqual(
+    ledgerProblems(ledger('2026-10-11 · Transcripts read up to: 2026-10-11', '- **P1 · x · S** — y.')),
+    [],
+  );
 });

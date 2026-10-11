@@ -1,6 +1,6 @@
 # Fix batch
 
-Above about five items, code-fix and ux-fix run as parallel lanes: one background agent per lane, in its own worktree, merged `--no-ff`. The first run (2026-10-11, 24 C-items) took ~65 min end to end.
+Above about five items, code-fix and ux-fix run as parallel lanes: one background agent per lane, in its own worktree, merged `--no-ff`.
 
 ## 1. Plan (before any go-ahead)
 
@@ -11,7 +11,7 @@ Above about five items, code-fix and ux-fix run as parallel lanes: one backgroun
 
 ## 2. Launch
 
-One `Agent` per lane, all in one message, `isolation: "worktree"`, with the lane template below. Then run `node scripts/batch.js status --watch` under `Monitor` and post its line to the user whenever it changes.
+One `Agent` per lane, all in one message, `isolation: "worktree"`, with the lane template below. Then run `node scripts/batch.js status --watch` under `Monitor` and post a line to the user only when a lane finishes or is blocked.
 
 ## 3. Merge each lane as it reports
 

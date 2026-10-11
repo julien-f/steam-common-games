@@ -37,7 +37,7 @@ The smallest change that closes the item, following [frontend.md](../../../docs/
 
 ## 5. Review the batch
 
-Once every item is committed, run `/code-review` over the batch's commits (`<first>^..HEAD`). Verify each finding against the code, fix the confirmed ones as follow-up commits, and list the dropped ones with why in the report.
+As [code-fix's step 4](../code-fix/SKILL.md#4-review-the-batch).
 
 ## Report
 

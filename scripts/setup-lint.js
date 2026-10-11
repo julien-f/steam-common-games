@@ -2,7 +2,8 @@
 
 // Lints the Claude Code setup where a rule is mechanical, so setup-review stops finding it by reading:
 // each skill's frontmatter (name matches its directory, a "Use when" in a description within the limit),
-// and permission allows that would pre-approve an ask-first action — failing for the committed
+// setup-backlog.md's header dates once it holds items, and permission allows that would
+// pre-approve an ask-first action — failing for the committed
 // settings.json, a warning for this machine's settings.local.json (setup-review reports it).
 // Run by `npm run check`; setup-review proposes a rule here for any finding that recurs.
 
@@ -64,6 +65,13 @@ function skillProblems(dir, source) {
   ].filter(Boolean);
 }
 
+// `source`: setup-backlog.md. Undated, the next run re-reads transcripts an earlier one already read.
+function ledgerProblems(source) {
+  if (!/\*\*P\d+ ·/.test(source)) return [];
+  const header = source.match(/^Last reviewed: .*$/m)?.[0] ?? '';
+  return /\bnever\b/.test(header) ? ['docs/dev/setup-backlog.md: holds items but its header dates say "never"'] : [];
+}
+
 function main() {
   const skills = path.join(ROOT, '.claude', 'skills');
   const problems = fs.readdirSync(skills).flatMap((dir) => {
@@ -74,6 +82,7 @@ function main() {
     const file = path.join(ROOT, '.claude', name);
     return fs.existsSync(file) ? permissionProblems(`.claude/${name}`, JSON.parse(fs.readFileSync(file, 'utf8'))) : [];
   };
+  problems.push(...ledgerProblems(fs.readFileSync(path.join(ROOT, 'docs', 'dev', 'setup-backlog.md'), 'utf8')));
   problems.push(...settings('settings.json'));
   for (const warning of settings('settings.local.json')) console.warn(`warning: ${warning}`);
   if (problems.length) {
@@ -84,4 +93,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { ruleMatches, permissionProblems, skillProblems };
+module.exports = { ruleMatches, permissionProblems, skillProblems, ledgerProblems };
