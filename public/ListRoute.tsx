@@ -1855,7 +1855,8 @@ export default function ListRoute() {
 
     let initialRows: Game[];
     resolvedBundleGames = null;
-    let pendingGroups: MembershipGroup[] | null = null;
+    // Cast, not annotated: resolveRows sets it, which flow narrowing from `= null` would miss.
+    let pendingGroups = null as MembershipGroup[] | null;
     // Not cleared on a ↻ Refresh of the list already on screen, for the same reason heroTitle
     // isn't (above): these back the hero's own tiles, and emptying them mid-refresh unmounts the
     // tile strip — including the Updated tile the refresh was just clicked on.
@@ -1870,25 +1871,31 @@ export default function ListRoute() {
     if (!kept) setSelectedRows([]); // a fresh load means a fresh table — nothing carries a prior selection over
     setSelectionActionStatus(null);
 
-    // Resolves a dynamic or user list and shows its sources; a group-by-membership result keeps its
-    // groups. null once stale, or failed (said in the status line).
+    // Resolves a dynamic or user list into placeholder rows and shows its sources; a
+    // group-by-membership result keeps its groups. null once stale, or failed (said in the status line).
     const resolveRows = async (
       list: GameList,
       fetchers: ListResolveFetchers,
       toSources: (sources: ResolvedSource[]) => ReturnType<typeof listSources>,
-    ): Promise<{ appids: Set<number>; groups: MembershipGroup[] | null } | null> => {
+    ): Promise<{ appids: Set<number>; rows: Game[] } | null> => {
       try {
         const { result, sources } = await resolveListWithSources(list, fetchers);
         if (loadGuard.isStale(gen)) return null;
         setListSources(toSources(sources));
-        return Array.isArray(result)
-          ? { appids: new Set(result.flatMap((g) => g.appids)), groups: result }
-          : { appids: flattenCombineResult(result), groups: null };
+        pendingGroups = Array.isArray(result) ? result : null;
+        const appids = Array.isArray(result) ? new Set(result.flatMap((g) => g.appids)) : flattenCombineResult(result);
+        return { appids, rows: [...appids].map((appid) => ({ appid, name: '', loading: true, details: null })) };
       } catch (err) {
         if (!loadGuard.isStale(gen)) setStatusText(`Error: ${(err as Error).message}`);
         return null;
       }
     };
+    const describeWithLeftOut =
+      (list: GameList, naming: ListNaming) =>
+      (sources: ResolvedSource[]): ReturnType<typeof listSources> => {
+        const described = describeSources(list, naming);
+        return sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) }));
+      };
 
     if (kind === 'compare') {
       const slots = compareSlots();
@@ -1984,9 +1991,7 @@ export default function ListRoute() {
         }));
       });
       if (!resolved) return;
-      const { appids } = resolved;
-      pendingGroups = resolved.groups;
-      initialRows = [...appids].map((appid) => ({ appid, name: '', loading: true, details: null }));
+      initialRows = resolved.rows;
     } else if (kind === 'user') {
       // A manual list, or a dynamic one using any op other than group-by-membership, renders as
       // one flat table (flattened via flattenCombineResult, same as when it's resolved as
@@ -2007,28 +2012,18 @@ export default function ListRoute() {
       const resolved = await resolveRows(
         list,
         createDefaultFetchers({ refresh, onFetchedAt, onBundleLeftOut: noteLeftOut }),
-        (sources) => {
-          const described = describeSources(list, createDefaultNaming());
-          return sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) }));
-        },
+        describeWithLeftOut(list, createDefaultNaming()),
       );
       if (!resolved) return;
-      const { appids } = resolved;
-      pendingGroups = resolved.groups;
-      let rankOf: Map<number, number> | null = null;
+      const { appids, rows } = resolved;
+      initialRows = rows;
       if (list.kind === 'ranked') {
         const state = getRanking(list.id);
         setRankedSource(appids);
         setRankingState(state);
-        rankOf = ranks(state, appids);
+        const rankOf = ranks(state, appids);
+        initialRows = rows.map((row) => ({ ...row, rank: rankOf.get(row.appid) ?? null }));
       }
-      initialRows = [...appids].map((appid) => ({
-        appid,
-        name: '',
-        loading: true,
-        details: null,
-        ...(rankOf ? { rank: rankOf.get(appid) ?? null } : {}),
-      }));
     } else if (kind === 'shared') {
       // Another dynamic list's formula, decoded straight from ?f= (listShare.ts) — same "resolve
       // an in-memory dynamic list through the normal listResolve.ts/listLabels.ts path" idea
@@ -2047,20 +2042,10 @@ export default function ListRoute() {
       const resolved = await resolveRows(
         list,
         sharedFetchers(createDefaultFetchers({ refresh, onFetchedAt, onBundleLeftOut: noteLeftOut })),
-        (sources) => {
-          const described = describeSources(list, sharedNaming());
-          return sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) }));
-        },
+        describeWithLeftOut(list, sharedNaming()),
       );
       if (!resolved) return;
-      const { appids } = resolved;
-      pendingGroups = resolved.groups;
-      initialRows = [...appids].map((appid) => ({
-        appid,
-        name: '',
-        loading: true,
-        details: null,
-      }));
+      initialRows = resolved.rows;
     } else if (kind === 'recent') {
       setListTitle('Recently Looked Up');
       const recents = loadRecentGames();
