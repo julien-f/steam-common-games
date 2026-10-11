@@ -34,6 +34,7 @@ export interface PanelKeyboardOptions {
 export function bindPanelKeyboardShortcuts(opts: PanelKeyboardOptions): void {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if (e.defaultPrevented) return; // a popover or the search dropdown took it
       // panelHandleEscape owns the lightbox-close/fullscreen-guard logic shared by all three
       // pages — delegating here means none of them can independently drift from it the way
       // bundles.tsx once did (missing the lightbox-close branch entirely; see its own history).

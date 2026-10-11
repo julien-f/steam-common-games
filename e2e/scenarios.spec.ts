@@ -381,6 +381,20 @@ test('R1.1,3-6: rank chosen games, stop, resume on the same ones', async ({ page
   await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
 });
 
+test('R1 edge: Esc closing a nav popover stays on the ranking', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  for (const name of ['Portal 2', 'Terraria', 'Hades']) await row(page, name).getByRole('checkbox').check();
+  await page.getByRole('button', { name: '🏆 Rank 3 games' }).click();
+  await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
+
+  await page.getByLabel('Preferences').click();
+  await expect(page.locator('.site-nav-prefs')).toHaveAttribute('open');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.site-nav-prefs')).not.toHaveAttribute('open');
+  await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
+});
+
 test("R3 edge: a ranked list's Share view says why it can't be shared", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/wishlist');
@@ -1275,12 +1289,35 @@ test('F1.1-4: look up one game from the nav search, in place', async ({ page }) 
   await expect(page).toHaveURL(/\/lists\/owned\?game=367520/);
   await expect(page.locator('.game-panel')).toContainText('Hollow Knight');
 
-  // Esc closes the panel; a second one leaves the search box, so shortcuts work again.
+  // Esc hides the dropdown, then leaves the search box, so shortcuts work again.
   await page.keyboard.press('/');
   await page.keyboard.type('zz');
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT');
+});
+
+test('F1 edge: Esc closes a nav popover or the search dropdown, not the open game', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', "a phone's panel covers the nav");
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=620');
+  await expect(page.locator('#panel-title')).toHaveText('Portal 2');
+
+  await page.getByLabel('Preferences').click();
+  await expect(page.locator('.site-nav-prefs')).toHaveAttribute('open');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.site-nav-prefs')).not.toHaveAttribute('open');
+  await expect(page.locator('#panel-title')).toBeVisible();
+
+  await page.getByPlaceholder('Look up any game…').fill('hollow');
+  await expect(page.locator('.game-search-result', { hasText: 'Hollow Knight' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#app-search-results')).toBeHidden();
+  await page.keyboard.press('Escape');
+  expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT');
+  await expect(page.locator('#panel-title')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#panel-title')).toBeHidden();
 });
 
 test('F1 edge: Enter opens the highlighted recently looked-up game', async ({ page }) => {

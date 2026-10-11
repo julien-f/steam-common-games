@@ -51,16 +51,19 @@ export function bindNavPopover(details: HTMLDetailsElement, panel: HTMLElement):
     if (details.open && !details.contains(e.target as Node)) details.open = false;
   };
   const onKeydown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && details.open) details.open = false;
+    if (e.key !== 'Escape' || !details.open) return;
+    details.open = false;
+    e.preventDefault(); // the page's own Esc (closing the panel, leaving /rank) skips a handled one
   };
   document.addEventListener('click', onClick);
-  document.addEventListener('keydown', onKeydown);
+  // Window capture: ahead of every document-level Esc handler, RankRoute's capture-phase one included.
+  window.addEventListener('keydown', onKeydown, true);
   details.addEventListener('toggle', reposition);
   window.addEventListener('resize', reposition);
   window.addEventListener('scroll', reposition, true);
   return () => {
     document.removeEventListener('click', onClick);
-    document.removeEventListener('keydown', onKeydown);
+    window.removeEventListener('keydown', onKeydown, true);
     details.removeEventListener('toggle', reposition);
     window.removeEventListener('resize', reposition);
     window.removeEventListener('scroll', reposition, true);

@@ -186,7 +186,8 @@ export default function RankRoute() {
     const key = e.key;
     // AppShell's handler closes the shortcuts dialog or the panel first, when one is open.
     if (key === 'Escape') {
-      if (!isPanelOpen() && !document.querySelector('.shortcuts-modal.open')) navigate(listHref());
+      if (!e.defaultPrevented && !isPanelOpen() && !document.querySelector('.shortcuts-modal.open'))
+        navigate(listHref());
       return;
     }
     if (key === 'z' || key === 'Z' || key === 'Backspace') {
