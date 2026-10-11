@@ -77,12 +77,7 @@ export function createAccountOverrideSync() {
     const key = identifiers.join(',');
     if (key === syncedKey) return;
     syncedKey = key;
-    if (identifiers.length === 0) {
-      guard.next();
-      setAccountOverride(null);
-      setState(NONE);
-      return;
-    }
+    if (identifiers.length === 0) return clear();
     const gen = guard.next();
     setAccountOverride(null); // don't leave a previous link's account showing while this resolves
     setState({ state: 'resolving', identifiers });

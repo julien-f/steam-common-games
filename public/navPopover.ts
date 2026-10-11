@@ -17,20 +17,15 @@
 
 export const POPOVER_MARGIN = 12;
 
-// Right-align the panel to its trigger, then clamp within `[margin, viewportWidth - width -
-// margin]` so it can never run off either edge regardless of where the trigger ended up. The
-// outer `Math.max(maxLeft, margin)` matters for a panel wider than the viewport itself: without
-// it the clamp's own upper bound would fall below its lower one and push the panel off the left.
-// Pure and exported for unit testing — the off-screen case above is the whole reason this
-// positioning is in JS at all.
-export function clampPopoverLeft(
-  triggerRight: number,
-  panelWidth: number,
-  viewportWidth: number,
-  margin = POPOVER_MARGIN,
-): number {
-  const maxLeft = viewportWidth - panelWidth - margin;
-  return Math.min(Math.max(triggerRight - panelWidth, margin), Math.max(maxLeft, margin));
+// Right-align the panel to its trigger, then clamp within `[POPOVER_MARGIN, viewportWidth -
+// width - POPOVER_MARGIN]` so it can never run off either edge regardless of where the trigger
+// ended up. The outer `Math.max(maxLeft, POPOVER_MARGIN)` matters for a panel wider than the
+// viewport itself: without it the clamp's own upper bound would fall below its lower one and push
+// the panel off the left. Pure and exported for unit testing — the off-screen case above is the
+// whole reason this positioning is in JS at all.
+export function clampPopoverLeft(triggerRight: number, panelWidth: number, viewportWidth: number): number {
+  const maxLeft = viewportWidth - panelWidth - POPOVER_MARGIN;
+  return Math.min(Math.max(triggerRight - panelWidth, POPOVER_MARGIN), Math.max(maxLeft, POPOVER_MARGIN));
 }
 
 function positionPanel(details: HTMLDetailsElement, panel: HTMLElement): void {

@@ -15,12 +15,6 @@
 import { produce } from 'solid-js/store';
 
 export interface RowStore<T> {
-  // How many rows are currently loaded — `rowIndex` itself isn't part of this public interface
-  // (see `createRowStore` below): it's swapped out for a whole new `Map` instance on every
-  // `reset()`/`load()`, so a caller that read the field once and held onto that reference would
-  // silently keep operating on a stale, orphaned `Map` with no compile-time signal — this and the
-  // other methods below are the only way to observe/mutate the current one.
-  size(): number;
   // The store's own row for `appid`, or `undefined` if it isn't one of the currently loaded rows.
   // A store proxy: reading a field of it inside a tracked scope subscribes to that one field.
   // Handed out as `Readonly<T>` — a store row can only be written through `mutateRow` below
@@ -47,14 +41,10 @@ export function createRowStore<T extends { appid: number }>(
   store: readonly T[],
   setStore: (idx: number, updater: ReturnType<typeof produce<T>>) => void,
 ): RowStore<T> {
-  // Private to this closure, not exposed on the returned object — see `RowStore.size`'s own doc
-  // comment above for why a caller reading this directly could end up holding a stale `Map`
-  // across a `reset()`/`load()`.
+  // Private to this closure: it's replaced on every `reset()`/`load()`, so a caller holding it
+  // would keep operating on a stale `Map`.
   let rowIndex = new Map<number, number>();
   return {
-    size() {
-      return rowIndex.size;
-    },
     getRow(appid) {
       const idx = rowIndex.get(appid);
       return idx === undefined ? undefined : store[idx];

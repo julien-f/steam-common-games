@@ -189,15 +189,6 @@ export async function fetchAccountOverview(
   return { games, players: data.players.map(toAccountPlayer), owners, fetchedAt: data.fetchedAt ?? null };
 }
 
-// The owned-games half of fetchAccountOverview on its own — what every caller that doesn't care
-// about the member accounts themselves (listResolve.ts's fetchers, ListRoute's owned list) uses.
-export async function fetchAccountOwnedGames(
-  members: string[],
-  opts: { refresh?: boolean } = {},
-): Promise<AccountLibraryGame[]> {
-  return (await fetchAccountOverview(members, opts)).games;
-}
-
 // Fetches one account's wishlist (its members' wishlists unioned, same as /api/wishlist does
 // server-side).
 export async function fetchAccountWishlist(
@@ -214,15 +205,6 @@ export async function fetchAccountWishlist(
     'Failed to fetch wishlist',
   );
   return { items: data.items, fetchedAt: data.fetchedAt ?? null };
-}
-
-// The items half of fetchAccountWishlist on its own — for callers with no "Updated <when>"
-// readout to feed (listResolve.ts's fetchers, Home's counts).
-export async function fetchAccountWishlistItems(
-  members: string[],
-  opts: { refresh?: boolean } = {},
-): Promise<AccountWishlistItem[]> {
-  return (await fetchAccountWishlist(members, opts)).items;
 }
 
 // Both halves of what myOwnership.ts keeps per account — the owned-appid set behind the ✓/☆
@@ -309,34 +291,23 @@ export interface ResolvedAccountSummary {
   memberSince: string | null; // solo-account trivia, same "null for a Family" reasoning as avatarUrl
   countryCode: string | null;
   realName: string | null;
-  ownedCount: number;
-  wishlistCount: number; // 0 if the wishlist call fails (e.g. private profile) — owned
-  // resolving is enough to consider the account itself resolved
 }
 
 // Home's "pick an account" resolve step — there's no standalone "just resolve an identifier"
 // endpoint (see docs/dev/architecture.md's Request flow section), so this is the one place a raw typed
 // identifier (vanity name/URL/steamid) actually becomes a resolved AccountSlot, via the same
-// /api/common-games call every owned-games fetch already makes. Runs the wishlist count
-// alongside it (Promise.all) rather than lazily, so the account header can show both counts as
-// soon as an account is picked, per docs/dev/lists-and-accounts.md.
+// /api/common-games call every owned-games fetch already makes. The account card's counts are
+// fetched by HomeRoute itself, not here.
 export async function resolveAccountSummary(rawInputs: string[]): Promise<ResolvedAccountSummary> {
-  const [ownedData, wishlistRes] = await Promise.all([
-    fetchJson<CommonGamesResponse>(
-      '/api/common-games',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ members: rawInputs }),
-      },
-      'Failed to resolve account',
-    ),
-    fetch('/api/wishlist', {
+  const ownedData = await fetchJson<CommonGamesResponse>(
+    '/api/common-games',
+    {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ members: rawInputs }),
-    }).catch(() => null),
-  ]);
+    },
+    'Failed to resolve account',
+  );
   const players = ownedData.players;
   const members = players.map((p) => p.steamid).sort();
   const label = players.map((p) => p.personaname || p.steamid).join(' + ');
@@ -352,22 +323,8 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
   const memberSince = solePlayer ? fmtLastPlayed(solePlayer.timecreated) || null : null;
   const countryCode = solePlayer?.loccountrycode || null;
   const realName = solePlayer?.realname || null;
-  const ownedCount = ownedData.games.length;
 
-  let wishlistCount = 0;
-  if (wishlistRes && wishlistRes.ok) {
-    const wishlistData = await wishlistRes.json();
-    wishlistCount = wishlistData.items?.length ?? 0;
-  }
-
-  return { members, label, avatarUrl, vanities, memberSince, countryCode, realName, ownedCount, wishlistCount };
-}
-
-export async function fetchAccountWishlistAppids(
-  accountId: string,
-  opts: { refresh?: boolean } = {},
-): Promise<Set<number>> {
-  return (await fetchAccountWishlistData(accountId, opts)).appids;
+  return { members, label, avatarUrl, vanities, memberSince, countryCode, realName };
 }
 
 // The wishlist counterpart of fetchAccountOwnedData — appids plus the age of the server's copy,

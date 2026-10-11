@@ -34,7 +34,7 @@ function demoPrefs(now = Date.now()) {
     myAccount: account,
     currentAccount: account,
     recentAccounts: [account],
-    folders: [{ id: 'demo-folder-weekend', name: 'Weekend', parentId: null, order: 0, createdAt: now }],
+    folders: [{ id: 'demo-folder-weekend', name: 'Weekend', parentId: null, order: 0 }],
     lists: [
       list('demo-list-couch', null, 1, {
         name: 'Couch co-op picks',

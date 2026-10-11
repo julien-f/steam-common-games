@@ -115,7 +115,7 @@ Creating a dynamic list (or previewing one before saving): pick 2+ source lists 
 User lists (not system lists/bundles) live in a **renameable folder/list tree**, arbitrarily nested:
 
 ```
-Folder { id, name, parentId: string | null, order, createdAt }
+Folder { id, name, parentId: string | null, order }
 GameList { ...above..., parentId: string | null, order }
 ```
 
@@ -142,7 +142,7 @@ AccountSlot  id (sorted-joined member steam64 ids) · members[] · rawInputs[] �
              vanities? (steam64 → Steam custom-URL name, for the members that set one)
              memberSince? · countryCode? · realName? (solo-account trivia, last-known like avatarUrl)
              lastUsedAt · removedAt?
-Folder       id · name · parentId (null = root) · order · createdAt
+Folder       id · name · parentId (null = root) · order
 GameList     id · name? (absent = unnamed, labeled by its formula) · parentId · order · createdAt · updatedAt
              orphanOf? { bundleId } (a bundle's last-known games — see Soft-delete)
              kind 'manual'  → appids[]

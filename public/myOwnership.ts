@@ -25,7 +25,7 @@
 // Returns `null` throughout when no account is loaded at all — same as the legacy page's
 // own "no badge at all" behavior.
 import { getEffectiveCurrentAccount } from './accountsStore.ts';
-import { fetchAccountOwnedData, fetchAccountWishlistAppids } from './accountData.ts';
+import { fetchAccountOwnedData, fetchAccountWishlistData } from './accountData.ts';
 import type { GameOwner } from './accountData.ts';
 import { fmtLastPlayed, hoursFromMinutes } from './utils.ts';
 
@@ -103,9 +103,9 @@ export function createMyOwnershipCache() {
         notifyReady();
         return appids;
       });
-    const wishlist: Promise<Set<number>> = fetchAccountWishlistAppids(account.id)
+    const wishlist: Promise<Set<number>> = fetchAccountWishlistData(account.id)
       .then(
-        (s) => ({ s, failed: false }),
+        ({ appids: s }) => ({ s, failed: false }),
         () => ({ s: new Set<number>(), failed: true }),
       )
       .then(({ s, failed }) => {
