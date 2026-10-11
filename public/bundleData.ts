@@ -140,14 +140,16 @@ export async function fetchBundleById(
 // gid -> a Steam appid (the overwhelmingly common case), an array of appids (a Steam "sub"/
 // "bundle" entry that expanded to more than one app — e.g. a base game plus its DLC sold as one
 // SKU, such as EVERSPACE - Ultimate Edition), or null when ITAD has no Steam listing for that
-// game at all. See lib/itad.js's resolveSteamAppIds.
-export async function resolveBundleAppids(gids: string[]): Promise<Record<string, number | number[] | null>> {
-  const data = await fetchJson<{ appids: Record<string, number | number[] | null> }>(
+// game at all. See lib/itad.js's resolveSteamAppIds. `failed`: the gids whose lookup errored.
+export async function resolveBundleAppids(
+  gids: string[],
+): Promise<{ appids: Record<string, number | number[] | null>; failed: string[] }> {
+  const data = await fetchJson<{ appids: Record<string, number | number[] | null>; failed?: string[] }>(
     '/api/bundles/resolve',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gids }) },
     'Resolution failed',
   );
-  return data.appids;
+  return { appids: data.appids, failed: data.failed ?? [] };
 }
 
 // Flattens + resolves + de-dupes-by-appid a whole bundle in one call — the same steps
@@ -160,14 +162,19 @@ export async function resolveBundleAppids(gids: string[]): Promise<Record<string
 // ListRoute.tsx so its own Steam title from game-details/stream fills in, not the package's.
 export async function resolveBundleGames(
   bundle: Bundle,
-): Promise<{ resolved: ResolvedGame[]; unresolved: FlatGame[] }> {
+): Promise<{ resolved: ResolvedGame[]; unresolved: FlatGame[]; failed: FlatGame[] }> {
   const games = flattenBundleGames(bundle);
-  const appidsByGid = await resolveBundleAppids(games.map((g) => g.gid));
+  const { appids: appidsByGid, failed: failedGids } = await resolveBundleAppids(games.map((g) => g.gid));
 
   const resolved: ResolvedGame[] = [];
   const unresolved: FlatGame[] = [];
+  const failed: FlatGame[] = [];
   const seenAppids = new Set<number>();
   for (const g of games) {
+    if (failedGids.includes(g.gid)) {
+      failed.push(g);
+      continue;
+    }
     const appid = appidsByGid[g.gid];
     if (!appid) {
       unresolved.push(g);
@@ -179,14 +186,19 @@ export async function resolveBundleGames(
       resolved.push({ ...g, appid: id });
     }
   }
-  return { resolved, unresolved };
+  return { resolved, unresolved, failed };
 }
 
 // listResolve.ts's bundle source — its title (for bundleSnapshots.ts) and resolved appid set.
 export async function fetchBundleContents(
   bundleId: string,
-): Promise<{ title: string; appids: Set<number>; notOnSteam: number }> {
+): Promise<{ title: string; appids: Set<number>; notOnSteam: number; failed: number }> {
   const { bundle } = await fetchBundleById(Number(bundleId));
-  const { resolved, unresolved } = await resolveBundleGames(bundle);
-  return { title: bundle.title, appids: new Set(resolved.map((g) => g.appid)), notOnSteam: unresolved.length };
+  const { resolved, unresolved, failed } = await resolveBundleGames(bundle);
+  return {
+    title: bundle.title,
+    appids: new Set(resolved.map((g) => g.appid)),
+    notOnSteam: unresolved.length,
+    failed: failed.length,
+  };
 }

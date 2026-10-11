@@ -91,6 +91,7 @@ test('computePriceStatus: loading, no data, record tiers, sale, full price', () 
     ['3-month low', { bestDealPrice: 10, lowAll: 5, lowY1: 8, lowM3: 10, bestDealCut: 50 }, '3-Month Low'],
     ['discounted, not a low', { bestDealPrice: 10, lowAll: 5, lowY1: 8, lowM3: 9, bestDealCut: 25 }, 'On Sale'],
     ['confirmed full price', { bestDealPrice: 20, lowAll: 5, bestDealCut: 0 }, 'Not Discounted'],
+    ['full price that is also the low', { bestDealPrice: 20, lowAll: 20, lowM3: 20, bestDealCut: 0 }, 'Not Discounted'],
     ['no discount data', { bestDealPrice: 20, lowAll: 5, bestDealCut: null }, null],
   ]) {
     assert.equal(computePriceStatus(row), expected, name);

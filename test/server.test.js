@@ -729,6 +729,19 @@ test("GET /api/game-details/:appid: a soundtrack isn't searched on HLTB, and rea
   assert.ok(!fetchMock.mock.calls.some((c) => String(c.arguments[0]).includes('howlongtobeat')));
 });
 
+test("GET /api/game-details/:appid: a soundtrack's skipped HLTB lookup is cached as a short-lived miss, so it has an age", async (t) => {
+  _reset();
+  _resetAuth();
+  t.mock.method(globalThis, 'fetch', makeDetailsFetch({ type: 'music' }));
+
+  const res = await api.get('/api/game-details/413').expect(200);
+  assert.notEqual(res.body.fetchedAts.hltb, null);
+  assert.notEqual(res.body.fetchedAt, null);
+  const later = Date.now() + MISS_CACHE_TTL_MS + 1;
+  t.mock.method(Date, 'now', () => later);
+  assert.equal(getCachedAt('hltb:413'), undefined);
+});
+
 test('GET /api/game-details/:appid: 200 with null rating when reviews fetch fails', async (t) => {
   _reset();
   _resetAuth();
@@ -1622,6 +1635,38 @@ test('GET /api/achievements/:appid: with steamids returns unlock progress and pl
   assert.equal(first.unlocktime, 1700000000);
 });
 
+test("GET /api/achievements/:appid: unlocked counts only the schema's achievements, not ones added since it was cached", async (t) => {
+  _reset();
+  const base = makeAchievementsFetch({ achieved: ['ACH_1'] });
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const res = await base(url);
+    if (!url.includes('GetPlayerAchievements')) return res;
+    const body = await res.json();
+    body.playerstats.achievements.push({ apiname: 'ACH_NEW', achieved: 1, unlocktime: 1700000002 });
+    return { ok: true, json: async () => body };
+  });
+
+  const res = await api.get(`/api/achievements/400?steamids=${ID1}`).expect(200);
+  assert.equal(res.body.total, 2);
+  assert.equal(res.body.unlocked, 1);
+});
+
+test('GET /api/achievements/:appid: a member with a real unlock time wins over one whose time is unknown (0), in either order', async (t) => {
+  for (const ids of [`${ID1},${ID2}`, `${ID2},${ID1}`]) {
+    _reset();
+    const base = makeAchievementsFetch({ achieved: ['ACH_1'] });
+    t.mock.method(globalThis, 'fetch', async (url) => {
+      const res = await base(url);
+      if (!url.includes('GetPlayerAchievements') || !url.includes(ID1)) return res;
+      const body = await res.json();
+      body.playerstats.achievements[0].unlocktime = 0;
+      return { ok: true, json: async () => body };
+    });
+    const res = await api.get(`/api/achievements/400?steamids=${ids}`).expect(200);
+    assert.equal(res.body.achievements.find((a) => a.apiname === 'ACH_1').unlocktime, 1700000000, ids);
+  }
+});
+
 test('GET /api/achievements/:appid: ?refresh=1 re-fetches the schema, rarity and player progress', async (t) => {
   _reset();
   const achievementsFetch = makeAchievementsFetch();
@@ -2034,6 +2079,25 @@ test('POST /api/bundles/resolve: 200 with resolved appids map', async (t) => {
   const res = await api.post('/api/bundles/resolve').send({ gids: ['gid-1', 'gid-2'] });
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, { appids: { 'gid-1': 400, 'gid-2': null } });
+});
+
+test('POST /api/bundles/resolve: a gid whose Steam expansion errored is reported as failed, not as no Steam listing', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  t.mock.method(globalThis, 'fetch', async (url, opts) => {
+    const u = String(url);
+    if (u.includes('/service/shops/')) return { ok: true, json: async () => [{ id: 61, title: 'Steam' }] };
+    if (u.includes('/lookup/shop/')) {
+      const gids = JSON.parse(opts.body);
+      return { ok: true, json: async () => Object.fromEntries(gids.map((g) => [g, ['sub/1234']])) };
+    }
+    return { ok: false, status: 500 }; // packagedetails and the games/info/v2 fallback
+  });
+  const res = await api
+    .post('/api/bundles/resolve')
+    .send({ gids: ['gid-1'] })
+    .expect(200);
+  assert.deepEqual(res.body, { appids: {}, failed: ['gid-1'] });
 });
 
 test('POST /api/prices: 503 when ITAD_API_KEY is not configured', async () => {

@@ -12,7 +12,15 @@ const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 const rateLimit = require('express-rate-limit');
 
-const { getCached, getCachedAt, isCached, capExpiry, getCacheStats, getCacheEntryCounts } = require('./lib/cache');
+const {
+  getCached,
+  getCachedAt,
+  isCached,
+  setCache,
+  capExpiry,
+  getCacheStats,
+  getCacheEntryCounts,
+} = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
 const { getMetrics, recordLimiterTrip } = require('./lib/metrics');
 const { getCircuitBreakers } = require('./lib/circuitBreaker');
@@ -661,9 +669,12 @@ function fetchGameDetails(appid, { force = false } = {}) {
     // versus searching HLTB in parallel with an already-known, trusted name (e.g. an owned
     // game's name from Steam's library API) — that's the trade for not trusting the client.
     // A meta failure fails HLTB too, so it reads as failed, not as "no data".
-    const hltbPromise = metaPromise.then((meta) =>
-      NOT_PLAYED_TYPES.has(meta?.type) ? null : getHLTB(appid, meta?.name || '', { force }),
-    );
+    const hltbPromise = metaPromise.then((meta) => {
+      if (meta?.name && !NOT_PLAYED_TYPES.has(meta.type)) return getHLTB(appid, meta.name, { force });
+      // Skipped by design, cached as a miss so the source has an age and counts as cached
+      if (force || !isCached(`hltb:${appid}`)) setCache(`hltb:${appid}`, [], { ttlMs: MISS_CACHE_TTL_MS });
+      return null;
+    });
 
     return Promise.allSettled([
       getGameRating(appid, { force }),
@@ -820,7 +831,8 @@ app.get('/api/bundles/:id', bundlesByIdLimit, requireItad, async (req, res) => {
 // POST /api/game-details/stream pipeline every other page already uses. A gid resolves to a
 // plain number (the common case), an array of numbers (a Steam "sub"/"bundle" spanning several
 // apps — see lib/itad.js's resolveSteamAppIds), or null for a gid with no Steam listing at all
-// — the frontend renders those as the separate "not on Steam" list.
+// — the frontend renders those as the separate "not on Steam" list. `failed` lists the gids whose
+// lookup errored, so the frontend doesn't read them as "not on Steam".
 const MAX_BUNDLE_RESOLVE_GAMES = 500;
 app.post('/api/bundles/resolve', bundlesResolveLimit, requireItad, async (req, res) => {
   const gids = req.body.gids;
@@ -831,8 +843,10 @@ app.post('/api/bundles/resolve', bundlesResolveLimit, requireItad, async (req, r
     return res.status(400).json({ error: `Too many games — maximum is ${MAX_BUNDLE_RESOLVE_GAMES}` });
   }
   try {
-    const resolved = await resolveSteamAppIds([...new Set(gids)]);
-    res.json({ appids: Object.fromEntries(resolved) });
+    const unique = [...new Set(gids)];
+    const resolved = await resolveSteamAppIds(unique);
+    const failed = unique.filter((gid) => !resolved.has(gid));
+    res.json({ appids: Object.fromEntries(resolved), ...(failed.length && { failed }) });
   } catch (err) {
     const status = routeErrorStatus('bundles-resolve', err);
     res.status(status).json({ error: err.message });
@@ -1025,7 +1039,9 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
       for (const a of list) {
         if (!a.achieved) continue;
         const prev = unlockedAt.get(a.apiname);
-        if (prev === undefined || (a.unlocktime && a.unlocktime < prev)) unlockedAt.set(a.apiname, a.unlocktime || 0);
+        // 0 is an unknown time, so any real one replaces it
+        if (prev === undefined || (a.unlocktime && (!prev || a.unlocktime < prev)))
+          unlockedAt.set(a.apiname, a.unlocktime || 0);
       }
     }
 
@@ -1042,7 +1058,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
     res.json({
       achievements,
       total: achievements.length,
-      unlocked: unlockedAt.size,
+      unlocked: achievements.filter((a) => a.achieved).length,
       // `private:true` when steamIds were given but yielded no usable data (private profile,
       // or nobody in the group has touched this game's stats) — never true when steamIds was
       // empty in the first place, that's what `playerCount` is for instead (see comment above).

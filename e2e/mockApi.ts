@@ -10,6 +10,7 @@
 //   store-down     Steam store pages return nothing (genres, release date, platforms…)
 //   stale          libraries and wishlists read as fetched 12 days ago, until a refresh (D1)
 //   untiered       the Co-op Pack lists every game in its first tier, the pricier one empty (as ITAD sends some)
+//   resolve-failed the Co-op Pack's Portal 2 fails to resolve to Steam (its package lookup errored)
 //   slow-media     every banner, screenshot and trailer poster takes 1.5 s to load (Hades, Terraria and Hollow Knight have media)
 //   signed-in      signed in with Steam as Alice, whose account already has prefs (fixtures.ts's signedInPrefs)
 import type { Page } from '@playwright/test';
@@ -347,7 +348,12 @@ export function respond(
     return json({ bundles: [coopBundleJson(), pickBundleJson()], offset: 0, limit: 50, fetchedAt: NOW });
   }
   if (path === '/api/bundles/resolve') {
-    return json({ appids: Object.fromEntries(bundleGames.map((g) => [g.gid, g.appid])) });
+    const failed = states.has('resolve-failed') ? [BUNDLE.games[0].gid] : [];
+    const resolved = bundleGames.filter((g) => !failed.includes(g.gid));
+    return json({
+      appids: Object.fromEntries(resolved.map((g) => [g.gid, g.appid])),
+      ...(failed.length && { failed }),
+    });
   }
   const bundle = path.match(/^\/api\/bundles\/(\d+)$/);
   if (bundle) {

@@ -513,6 +513,17 @@ test("B3 edge: a list built from a bundle says how many of its games aren't on S
   await expect(page.locator('.list-formula')).toContainText('1 not on Steam');
 });
 
+test('B1 edge: a bundle game whose Steam lookup failed says so, rather than reading as not on Steam', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await mockApi(page, { states: ['resolve-failed'] }); // registered last, so it answers first
+  await page.goto(`/lists/bundle/${BUNDLE.id}`);
+  await expect(rows(page)).toHaveCount(3);
+  await expect(page.getByText("Steam didn't answer for 1 of this bundle's game")).toBeVisible();
+  await expect(page.getByRole('button', { name: /1 more in this bundle, not on Steam/ })).toBeVisible();
+});
+
 test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/bundles');
