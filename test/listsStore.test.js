@@ -216,26 +216,6 @@ test('renameList: an undefined name clears the field, rather than storing an emp
   assert.equal('name' in getList(l.id), false);
 });
 
-test('reorderSiblings: rewrites order for interleaved folders/lists at one parent, ignores refs from elsewhere', () => {
-  const { createFolder, createList, reorderSiblings, getFolders, getList } = store();
-  const f1 = createFolder('F1');
-  const l1 = createList({ name: 'L1', kind: 'manual' });
-  const f2 = createFolder('F2');
-  const elsewhere = createList({ name: 'Elsewhere', kind: 'manual', parentId: f1.id });
-
-  reorderSiblings(null, [
-    { kind: 'folder', id: f2.id },
-    { kind: 'list', id: l1.id },
-    { kind: 'folder', id: f1.id },
-    { kind: 'list', id: elsewhere.id }, // wrong parentId — must be ignored
-  ]);
-
-  assert.equal(getFolders().find((f) => f.id === f2.id).order, 0);
-  assert.equal(getList(l1.id).order, 1);
-  assert.equal(getFolders().find((f) => f.id === f1.id).order, 2);
-  assert.equal(getList(elsewhere.id).order, 0); // untouched — still its original order
-});
-
 // ── Cycle detection ──────────────────────────────────────────────────────────────────────────
 
 test('createList: rejects a dynamic list whose sources reference itself indirectly (would-be self-ref via a fresh id is impossible; covered by updateDynamicList below), but accepts a valid multi-source combine', () => {
@@ -342,19 +322,6 @@ test('deleteList: soft-deletes a list still referenced by a dynamic list, hides 
   );
   assert.equal(
     getLists({ includeDeleted: true }).some((l) => l.id === source.id),
-    true,
-  );
-});
-
-test('restoreList: clears deletedAt and brings the list back into getLists()', () => {
-  const { createList, deleteList, restoreList, getLists } = store();
-  const source = createList({ name: 'Source', kind: 'manual', appids: [1] });
-  createList({ name: 'Watcher', kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: source.id }] });
-  deleteList(source.id);
-
-  restoreList(source.id);
-  assert.equal(
-    getLists().some((l) => l.id === source.id),
     true,
   );
 });

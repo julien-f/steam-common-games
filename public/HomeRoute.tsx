@@ -8,8 +8,7 @@
 // **Current scope, deliberately trimmed for a first pass**: folder/list reorganizing (rename/
 // move/delete) uses plain `window.prompt`/`window.confirm` dialogs rather than a polished drag-
 // and-drop tree UI — real functionality (backed by the fully-built `listsStore.ts`), minimal
-// chrome. No trash/restore UI for soft-deleted lists yet (`listsStore.ts`'s `restoreList`/
-// `getLists({ includeDeleted: true })` are ready for it, just not surfaced here). The combine
+// chrome. No trash/restore UI for soft-deleted lists yet. The combine
 // form below can pick any recent account's Owned/Wishlist, Recently Looked Up, or any existing
 // user list as a source. A bundle joins it only from its own page ("What does this add?" opens a
 // /lists/shared link, saved from there) — offering every bundle here would need a bundle picker.

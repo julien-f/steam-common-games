@@ -231,25 +231,6 @@ export function deleteFolder(id: string, mode: 'promote' | 'delete'): void {
   writeFolders(readFolders().filter((f) => f.id !== id));
 }
 
-// Applies a new sibling order (folders and lists interleaved, sharing one numbering space per
-// parentId — see the module comment) after a drag-and-drop or "Move to…" reorder. Every ref
-// must already belong to `parentId`; this only rewrites `order`, not `parentId` itself.
-export function reorderSiblings(parentId: string | null, orderedRefs: { kind: 'folder' | 'list'; id: string }[]): void {
-  const folders = readFolders();
-  const lists = readLists();
-  orderedRefs.forEach((ref, index) => {
-    if (ref.kind === 'folder') {
-      const f = folders.find((x) => x.id === ref.id && x.parentId === parentId);
-      if (f) f.order = index;
-    } else {
-      const l = lists.find((x) => x.id === ref.id && x.parentId === parentId);
-      if (l) l.order = index;
-    }
-  });
-  writeFolders(folders);
-  writeLists(lists);
-}
-
 // ── List CRUD ────────────────────────────────────────────────────────────────────────────────
 
 export interface CreateListInput {
@@ -412,15 +393,6 @@ export function deleteList(id: string): { softDeleted: boolean } {
   if (removed.kind === 'ranked') dropRanking(id);
   sweepDeletedLists(); // it may have been the last reference to a soft-deleted list
   return { softDeleted: false };
-}
-
-export function restoreList(id: string): void {
-  const lists = readLists();
-  const idx = lists.findIndex((l) => l.id === id);
-  if (idx === -1 || !lists[idx].deletedAt) return;
-  const { deletedAt: _deletedAt, ...rest } = lists[idx];
-  lists[idx] = rest as GameList;
-  writeLists(lists);
 }
 
 // Permanently purges any soft-deleted list no longer referenced by anything — call after any

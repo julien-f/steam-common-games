@@ -117,25 +117,6 @@ test('removeRecentAccount: soft-removes an account still referenced by a dynamic
   assert.equal(getRecentAccounts({ includeRemoved: true }).length, 1);
 });
 
-test('restoreRecentAccount: clears removedAt, account reappears in the default view', () => {
-  const { setCurrentAccount, removeRecentAccount, restoreRecentAccount, getRecentAccounts } = store();
-  const { createList } = require('../public/listsStore.ts');
-  setCurrentAccount(makeAccount('acc1'));
-  createList({
-    name: 'Watcher',
-    kind: 'dynamic',
-    op: 'union',
-    sources: [{ kind: 'account-owned', accountId: 'acc1' }],
-  });
-  removeRecentAccount('acc1');
-
-  restoreRecentAccount('acc1');
-  assert.equal(
-    getRecentAccounts().some((a) => a.id === 'acc1'),
-    true,
-  );
-});
-
 test('clearRecentAccounts: soft-removes referenced accounts, hard-removes the rest', () => {
   const { setCurrentAccount, clearRecentAccounts, getRecentAccounts } = store();
   const { createList } = require('../public/listsStore.ts');

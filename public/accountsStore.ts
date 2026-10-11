@@ -191,15 +191,6 @@ export function removeRecentAccount(id: string): { softRemoved: boolean } {
   return { softRemoved: false };
 }
 
-export function restoreRecentAccount(id: string): void {
-  const recents = readRecents();
-  const idx = recents.findIndex((a) => a.id === id);
-  if (idx === -1 || !recents[idx].removedAt) return;
-  const { removedAt: _removedAt, ...rest } = recents[idx];
-  recents[idx] = rest as AccountSlot;
-  writeRecents(recents);
-}
-
 // "Clear all" — removes every current entry via the same soft-remove-if-referenced rule as a
 // single removeRecentAccount call, just applied across the whole list.
 export function clearRecentAccounts(): void {

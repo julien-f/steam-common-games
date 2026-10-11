@@ -13,7 +13,6 @@ Last audited: simplify 2026-10-10 · security 2026-10-10 · perf 2026-10-10 · r
 
 ## Simplify
 
-- **C5 · cleanup · S** — `reorderSiblings` and `restoreList` (`public/listsStore.ts:242, 422`) and `restoreRecentAccount` (`public/accountsStore.ts:194`) back a trash/drag-and-drop UI never built (`HomeRoute.tsx:11`: "ready for it, just not surfaced"). Delete with their tests; re-add with the UI. Judgment call.
 - **C7 · cleanup · S** — two `/api/health` probes derive `itadConfigured` (`public/panelData.ts:79`, `public/ListRoute.tsx:1597`, the latter on every mount, each counting every cache table). One memoized shared `isItadConfigured()`.
 - **C8 · cleanup · S** — the 11 limiters after `namedRateLimit` (`server.js:121`) each repeat `windowMs`, header flags and the `rateLimitBypassed()` check; `searchLimit` and `friendsLimit` (`server.js:241-283, 289-320`) copy the same cached-steam64 loop. Move the defaults into `namedRateLimit`, extract a shared cached-ids helper.
 - **C11 · cleanup · S** — `stepGameList`'s `table: unknown` at `public/panelNav.ts:51` is only truth-tested and always truthy. Drop it; pass the list instead of a getter.
