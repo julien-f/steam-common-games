@@ -21,6 +21,7 @@ Run before reading code, so the review doesn't spend effort on what tools alread
 - `npm run check` — a failure is a finding as-is; don't re-derive it.
 - `npm run build` — chunk sizes, for **perf**.
 - `node scripts/deps-audit.js` and `npm audit` — for **security** and **simplify**; anything beyond that is dependency-audit's job.
+- `node scripts/dead-exports.js` — for **simplify**: frontend exports no other file uses.
 - Read [code-backlog.md](../../../docs/dev/code-backlog.md) and [pitfalls.md](../../../docs/dev/pitfalls.md): what's already recorded is not a new finding.
 
 ## 2. Review the dimension
@@ -37,13 +38,13 @@ Read the doc each dimension names first; it defines what "wrong" means here.
 
 ## 3. The finding bar
 
-A finding has a `file:line`, a concrete scenario (input or state → wrong result, cost or exposure), a fix direction and an effort (S/M/L). Then verify each one adversarially — re-read the code around it, callers included, trying to prove it wrong — and drop what doesn't survive.
+A finding has a `file:line`, a concrete scenario (input or state → wrong result, cost or exposure), a fix direction and an effort (S/M/L). Then verify each one adversarially — re-read the code around it, callers included, trying to prove it wrong — and drop what doesn't survive. A claim that something has one caller, is always passed or never reached holds only after grepping every route and entry point, not the obvious one (`panelOpen` has two).
 
 Not findings: style (ESLint and Prettier own it), "might need later" generality, a rule's deliberate exceptions (an `eslint-disable` with a reason, a pitfalls.md entry), anything already in the backlog.
 
 ## Record and report
 
-- Record each finding in [code-backlog.md](../../../docs/dev/code-backlog.md) under its dimension: numbered on from `node scripts/backlog-next.js C` (never reuse a closed item's number), `**C<n> · <severity> · <effort>** — problem at \`file:line\`. Direction.` Drop or narrow items the run shows fixed, and set the header's last-audited date (today) for each dimension covered.
+- Record each finding in [code-backlog.md](../../../docs/dev/code-backlog.md) under its dimension: numbered on from `node scripts/backlog-next.js C` (never reuse a closed item's number), `**C<n> · <severity> · <effort>** — problem at \`file:line\`. Direction.` Backtick only names that exist in the code (doc-refs flags the rest); a helper the Direction proposes goes unquoted. Drop or narrow items the run shows fixed, and set the header's last-audited date (today) for each dimension covered.
 - **Severity**: _critical_ (exploitable, or loses or corrupts data) · _major_ (a real bug, cost or risk users or the upstreams feel) · _minor_ · _cleanup_ (simpler code, no behaviour change).
 - Report one table ranked by severity, then effort:
 
