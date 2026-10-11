@@ -96,12 +96,12 @@ test('resolveBundleSource: a successful fetch refreshes the snapshot of a bundle
   assert.equal(m.getBundleSnapshot('9'), undefined, 'not stored for a bundle no list uses');
 });
 
-test("resolveBundleSource: a load where some games failed to resolve doesn't overwrite the snapshot", async () => {
+test("resolveBundleSource: games that failed to resolve stand in from the snapshot, which isn't overwritten", async () => {
   const m = load();
   m.createList({ kind: 'dynamic', op: 'union', sources: [BUNDLE, OWNED] });
   m.rememberBundle('7', 'Pack', [1, 2]);
   const appids = await m.resolveBundleSource('7', async () => ({ title: 'Pack', appids: new Set([1]), failed: 1 }));
-  assert.deepEqual(appids, new Set([1]));
+  assert.deepEqual(appids, new Set([1, 2]));
   assert.deepEqual(m.getBundleSnapshot('7').appids, [1, 2]);
 });
 
