@@ -268,7 +268,7 @@ Above 768px the shell is locked to the viewport and **`.app-scroll` is the page'
 
 **Focus and history.**
 
-- Opening moves focus into the panel (heading/close button) so screen readers announce it; Tab flows freely back to the table.
+- Opening moves focus into the panel (heading/close button) so screen readers announce it; Tab flows freely back to the table. Closing returns focus to the shown game's row (else to the opener), so ↑/↓ carry on from there.
 - Opening the panel, and the lightbox over it, pushes one history entry each (`overlayHistory.ts`), so Back closes the innermost one. Stepping to another game or shot only rewrites the URL, so Back never walks through every game looked at.
 - A close by ×, Esc, the backdrop or a swipe steps back over its entry, so the next Back leaves the page. The entry it lands on is rewritten to the current address minus that overlay, so a game stepped to in the lightbox stays open; for a browser Back that needs the Navigation API (`currententrychange`).
 - Back from a page a panel link led to reopens that game. Entries are tracked by the router's `_depth` stamp, and Back's target keeps the page's URL with the overlay closed (`urlWithoutPanel`/`urlWithoutShot`), so a deep link's Back lands on its list.

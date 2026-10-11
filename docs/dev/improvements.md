@@ -42,7 +42,7 @@ None open.
 
 ## Keyboard and accessibility
 
-- **U115 · minor · I2** — Esc closing the panel (after the lightbox or not) drops focus on `<body>`, so the next ↓ moves nothing and there's no visible focus. Return focus to the row the panel was showing.
+None open.
 
 ## Phone
 

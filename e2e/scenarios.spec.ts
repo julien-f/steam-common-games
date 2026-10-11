@@ -1725,6 +1725,21 @@ test("I2 edge: the open game's row is exposed as current, not only coloured", as
   await expect(current).toHaveCount(0);
 });
 
+test('I2 edge: Esc closing the panel returns focus to the row it was showing', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  await expect(page.locator('.game-panel')).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await expect(page).not.toHaveURL(/[?&]game=1145360\b/);
+  const shown = new URL(page.url()).searchParams.get('game');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.game-panel')).toBeHidden();
+  await expect(page.locator(`tr.dt-tr[data-row-key="${shown}"]`)).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator(`tr.dt-tr[data-row-key="${shown}"]`)).not.toBeFocused();
+  await expect(page.locator('tr.dt-tr:focus')).toHaveCount(1);
+});
+
 test('I2 edge: icon-only controls have names', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
