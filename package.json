@@ -20,6 +20,7 @@
     "check:css": "node scripts/css-overrides.js",
     "check:doc-refs": "node scripts/doc-refs.js",
     "check:journeys": "node scripts/journey-coverage.js --check",
+    "check:setup": "node scripts/setup-lint.js",
     "cache:clear": "node scripts/cache-clear.js",
     "lint": "eslint public",
     "format": "prettier --write --cache .",

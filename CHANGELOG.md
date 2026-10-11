@@ -96,6 +96,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - scripts/setup-facts.js --agents reports each subagent's time, turns, cache reads, failed calls and time in tests, e2e and commits
 - setup-review keeps its proposals in docs/dev/setup-backlog.md and re-measures applied ones on its next run, reading only the transcripts since
 - setup-facts --transcripts reports interrupts and how the user answered each skill's questions, and --digest writes a compact per-session digest for setup-review's transcript reader
+- npm run check also lints the Claude Code setup: skill frontmatter, and permission allows that would pre-approve an ask-first action
 
 ## [0.10.0] - 2026-10-10
 

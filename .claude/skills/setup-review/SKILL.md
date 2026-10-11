@@ -19,6 +19,7 @@ Read [setup-backlog.md](../../../docs/dev/setup-backlog.md). Re-run each **Watch
 ## 1. Facts first
 
 - `npm run check:doc-refs`: stale script names, flags, npm scripts and links in skills and CLAUDE.md. A failure is a finding as-is.
+- `npm run check:setup`: skill frontmatter, and allows covering an ask-first action. A failure or a `settings.local.json` warning is a finding as-is.
 - `node scripts/setup-facts.js`: each script's callers, and which read arguments without a usage line (a script taking only optional flags may not need one).
 - `node scripts/setup-facts.js --cost` (~40 s): time and output size of `check`, `test`, `test:e2e` and `build`, and CLAUDE.md's size — the numbers the **Cost** check judges.
 - Read every skill, CLAUDE.md, both settings files and the memory files in full.
@@ -33,7 +34,7 @@ Read [setup-backlog.md](../../../docs/dev/setup-backlog.md). Re-run each **Watch
 - **Scripts**: ones with no caller, overlapping jobs, missing usage messages on bad arguments.
 - **Memory**: project rules kept in memory (they bind only one machine: move them to CLAUDE.md or a skill), memory repeating CLAUDE.md or a skill, stale entries.
 - **Hooks**: "always do X after Y" rules in CLAUDE.md or a skill that only a hook can guarantee.
-- **Permissions**: allows that pre-approve CLAUDE.md's ask-first actions, and dead one-off entries, in both settings files. For missing allows, propose running the built-in `fewer-permission-prompts` skill (it writes settings) rather than reviewing transcripts by hand.
+- **Permissions**: allows that pre-approve CLAUDE.md's ask-first actions beyond those `check:setup` knows (an ask-first rule it lacks is a finding too), and dead one-off entries, in both settings files. For missing allows, propose running the built-in `fewer-permission-prompts` skill (it writes settings) rather than reviewing transcripts by hand.
 - **Cost**: time and tokens every session pays — CLAUDE.md lines that could load on demand (a skill, a linked doc); commands or skill steps whose output floods the context (prefer a quiet mode or a script printing only what matters); slow steps and work run twice or when nothing it covers changed; skill patterns that fan out agents, snapshot click by click or read whole files where an excerpt does.
 - **Staleness**: rules about code, files or procedures that no longer exist; rules nothing has needed lately (prefer deleting them).
 - **Extensions**: ways to make what exists more useful — a mode or argument a skill lacks, script output a skill re-derives by hand, one skill's result that could feed another, a check that could run earlier (CI → pre-push → pre-commit), a script that could answer a question agents explore for. Speculative ideas are welcome; mark those without usage evidence as such.
@@ -52,7 +53,7 @@ Each pattern comes with the sessions and a short quote. It quotes no secrets, an
 
 ## 4. The finding bar
 
-A finding names a `file:line` (or the sessions), the friction it causes, the change, its target (CLAUDE.md, a skill, a script, a hook, settings) and an effort (S/M/L). Unless it is an **Extensions** idea, it also names its measure: the command whose output shows the friction (a `setup-facts` line, a check, a transcript count), with today's value as the baseline and a target. Verify each one adversarially (re-read the files involved, trying to prove it wrong) and drop what doesn't survive; an **Extensions** idea is checked only for not already existing. Prefer tightening or deleting a rule over adding one.
+A finding names a `file:line` (or the sessions), the friction it causes, the change, its target (CLAUDE.md, a skill, a script, a hook, settings) and an effort (S/M/L). Unless it is an **Extensions** idea, it also names its measure: the command whose output shows the friction (a `setup-facts` line, a check, a transcript count), with today's value as the baseline and a target. Verify each one adversarially (re-read the files involved, trying to prove it wrong) and drop what doesn't survive; an **Extensions** idea is checked only for not already existing. Prefer tightening or deleting a rule over adding one. A kind of finding the ledger shows in two runs, and that a rule can catch, is proposed as a rule in `scripts/setup-lint.js` (or another `check` step) rather than found by reading again.
 
 Not findings: wording taste, Prettier's output, deliberate exceptions recorded with a reason (`HISTORY` in `scripts/doc-refs.js`).
 
