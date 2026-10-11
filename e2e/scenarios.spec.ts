@@ -964,6 +964,11 @@ test('F1 edge: stepping games with hidden controls flashes the game name too', a
   await expect(page.locator('.lb-caption-text')).toHaveText('Terraria');
   expect(await lb.getAttribute('class')).toMatch(/lb-idle/);
   await expect(caption).toHaveCSS('opacity', '1');
+  // A media step before the flash ends shows the counter alone again.
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.lb-counter')).toHaveText(/^Screenshot 2 of/);
+  // Read once: a retrying assertion would just wait out the flash (the clock keeps running).
+  expect(await lb.getAttribute('class')).not.toMatch(/lb--stepped-game/);
   await page.clock.runFor(2000);
   await expect(caption).toHaveCSS('opacity', '0');
 });

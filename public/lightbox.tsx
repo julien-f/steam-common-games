@@ -448,7 +448,7 @@ function schedHideLbChrome() {
 function flashLbCounter(lb: HTMLElement, gameChanged: boolean) {
   if (!lb.classList.contains('lb-idle')) return;
   lb.classList.add('lb--stepped');
-  if (gameChanged) lb.classList.add('lb--stepped-game');
+  lb.classList.toggle('lb--stepped-game', gameChanged);
   clearTimeout(lbCounterTimer);
   lbCounterTimer = setTimeout(() => lb.classList.remove('lb--stepped', 'lb--stepped-game'), 1500);
 }
