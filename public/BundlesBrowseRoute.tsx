@@ -60,18 +60,11 @@ import {
 import { getStoredRegion, resolveRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { setBrowsedBundles } from './bundleBrowseStore.ts';
 import { openPrefsPopover } from './prefsPopover.ts';
-import {
-  restoreTableView,
-  shareTableView,
-  resetTableView,
-  saveTableViewToServer,
-  revertTableViewToServer,
-} from './tableViewPrefs.ts';
-import { isUnsaved, summarizeViewDiff } from './tableViewSync.ts';
-import { getAuthUser } from './authStore.ts';
+import { restoreTableView, shareTableView, resetTableView, bindViewPersistence } from './tableViewPrefs.ts';
 import { createStaleGuard } from './staleGuard.ts';
 import { getPref, setPref } from './prefs.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
+import { UnsavedViewBanner, ViewActions } from './UnsavedViewBanner.tsx';
 import { setBaseTitle } from './pageTitle.ts';
 import { convert, formatWithEstimate } from './currency.ts';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
@@ -89,9 +82,6 @@ const MAX_AUTO_PAGES = 4;
 const FETCH_SORT = '-publish';
 
 const VIEW_PREF_KEY = 'bundlesBrowseView';
-// Same param name every other table in the app shares (see ListRoute.tsx's viewParamName) — only
-// one table is ever on screen per route, so there's nothing for it to collide with.
-const VIEW_PARAM = 'tv';
 
 // ── Cell rendering ────────────────────────────────────────────────────────────────────────────
 
@@ -329,26 +319,12 @@ export default function BundlesBrowseRoute() {
     initialViewState: { pageSize: 50, visibleCols: DEFAULT_VISIBLE, sorts: DEFAULT_SORT },
   });
   // A 🔗 Share view link's layout is shown but not saved until kept (see restoreTableView).
-  const [viewingShared, setViewingShared] = createSignal(restoreTableView(table, VIEW_PREF_KEY, VIEW_PARAM));
-  // tableViewPrefs.ts's own bindViewPersistence needs `table.onViewChange`, which the Solid table
-  // doesn't have — a createEffect re-reading getViewState() (tracking every signal it touches)
-  // reconstructs it. Unlike ListRoute.tsx's own copy this needs no createRoot of its own: the
-  // table is built in this component's body, so the effect is owned by the component and disposed
-  // with it.
-  createEffect(() => {
-    const view = table.getViewState();
-    if (!viewingShared()) setPref(VIEW_PREF_KEY, view);
-  });
+  const [viewingShared, setViewingShared] = createSignal(restoreTableView(table, VIEW_PREF_KEY));
+  // eslint-disable-next-line solid/reactivity -- bindViewPersistence reads it in its own effect
+  onCleanup(bindViewPersistence(table, (view) => setPref(VIEW_PREF_KEY, view), viewingShared));
   function handleDiscardSharedView(): void {
     table.setViewState(getPref(VIEW_PREF_KEY, {}));
     setViewingShared(false);
-  }
-
-  function handleSaveView(): void {
-    saveTableViewToServer(VIEW_PREF_KEY, table.getViewState());
-  }
-  function handleRevertView(): void {
-    revertTableViewToServer(table, VIEW_PREF_KEY);
   }
   // Feeds /lists/bundle/:bundleId's prev/next nav (see bundleBrowseStore.ts) — off processedData,
   // not the raw row list, so ‹/› steps through exactly what's on screen in the order it's shown,
@@ -537,18 +513,7 @@ export default function BundlesBrowseRoute() {
       <Show when={viewingShared()}>
         <SharedViewBanner onKeep={() => setViewingShared(false)} onDiscard={handleDiscardSharedView} />
       </Show>
-      <Show when={getAuthUser() && isUnsaved(VIEW_PREF_KEY, table.getViewState())}>
-        <div class="pref-unsaved-banner">
-          Unsaved changes to this view ({summarizeViewDiff(VIEW_PREF_KEY, table.getViewState()).join(', ')}) — differs
-          from what's saved to your account.
-          <button type="button" class="btn btn-ghost btn-sm" onClick={handleSaveView}>
-            Save
-          </button>
-          <button type="button" class="btn btn-ghost btn-sm" onClick={handleRevertView}>
-            Revert
-          </button>
-        </div>
-      </Show>
+      <UnsavedViewBanner table={table} prefKey={VIEW_PREF_KEY} />
       <Show when={statusText()}>
         <div class="bundles-status">{statusText()}</div>
       </Show>
@@ -558,27 +523,10 @@ export default function BundlesBrowseRoute() {
           rowKey="id"
           onRowClick={(row) => navigate(withAccountParam(`/lists/bundle/${row.id}`))}
           toolbarEnd={
-            <div class="list-view-actions">
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm"
-                aria-label="Share view"
-                title="Copy a link to this table's layout"
-                onClick={(e) => shareTableView(table, VIEW_PARAM, e.currentTarget)}
-              >
-                🔗<span class="btn-label"> Share view</span>
-              </button>
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm"
-                aria-label="Default view"
-                title="Back to the default columns, sort and filters"
-                onClick={() => resetTableView(table, VIEW_PREF_KEY, VIEW_PARAM)}
-              >
-                <span class="btn-icon">↺</span>
-                <span class="btn-label">Default view</span>
-              </button>
-            </div>
+            <ViewActions
+              onShare={(btn) => shareTableView(table, btn)}
+              onReset={() => resetTableView(table, VIEW_PREF_KEY)}
+            />
           }
         />
       </div>

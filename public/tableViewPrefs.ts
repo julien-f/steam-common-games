@@ -1,44 +1,43 @@
 // Shared "share/persist/reset a @vates/data-table-solid view via prefs.js + a one-shot URL
 // param" logic — extracted verbatim from library.js's and bundles.js's own near-identical
 // copies (see docs/dev/frontend.md's table section for the "share on demand, not
-// live-synced" reasoning). Both pages call these the same way: a `table` instance, the prefs.js
-// key that page's view is stored under, and the URL param name that page's "🔗 Share view"
-// button writes to (`lv`/`wv` for library.js, `bv` for bundles.js).
+// live-synced" reasoning). Both pages call these the same way: a `table` instance and the prefs.js
+// key that page's view is stored under.
+import { createEffect, createRoot } from 'solid-js';
 import { getPref, setPref, adoptPrefEntry, pushPrefToServer } from './prefs.ts';
 import { getBaseline, setBaseline, stripTransientViewFields } from './tableViewSync.ts';
 import { urlWithParams } from './urlState.ts';
 import { copyWithFeedback } from './clipboard.ts';
 
 // The @vates/data-table-solid instance these operate on — only the view-state surface the page
-// code actually uses, rather than importing the package's own (internal) types. `onViewChange` is
-// optional: `@vates/data-table-solid` has no equivalent (both pages reconstruct that behavior
-// locally instead — see their own `bindSolidViewPersistence`, a `createEffect`-based
-// reconstruction) — restoreTableView/shareTableView/resetTableView never touch it, so requiring
-// it on every DataTableLike would fail typecheck for a table that only ever calls those three.
-interface DataTableLike {
+// code actually uses, rather than importing the package's own (internal) types.
+export interface DataTableLike {
   setViewState(view: object): void;
   getViewState(): object;
-  onViewChange?(cb: (view: object) => void): () => void;
 }
+
+// The URL param a "🔗 Share view" link carries the view in — one for every table, since a route
+// only ever has one on screen (see urlState.ts's own comment on `tv`).
+export const VIEW_PARAM = 'tv';
 
 // An incoming param (from a shared/bookmarked link) wins over the stored default, for this visit
 // only: applied but not stored, then stripped from the live URL so a later table rebuild (a fresh
 // search, an account refresh) falls back to the viewer's own. Returns whether it applied one — the
 // caller then pauses its view persistence until the viewer keeps or drops it (SharedViewBanner).
-export function restoreTableView(table: DataTableLike, prefKey: string, paramName: string): boolean {
-  const shared = takeSharedView(paramName);
+export function restoreTableView(table: DataTableLike, prefKey: string): boolean {
+  const shared = takeSharedView();
   table.setViewState(shared ?? getPref(prefKey, {}));
   return shared != null;
 }
 
 // The incoming view param, parsed and stripped from the URL; null when absent or malformed.
-export function takeSharedView(paramName: string): object | null {
+export function takeSharedView(): object | null {
   const params = new URLSearchParams(location.search);
-  const raw = params.get(paramName);
+  const raw = params.get(VIEW_PARAM);
   if (!raw) return null;
   try {
     const view = JSON.parse(raw);
-    params.delete(paramName);
+    params.delete(VIEW_PARAM);
     history.replaceState(null, '', urlWithParams(params));
     return view;
   } catch {
@@ -46,44 +45,51 @@ export function takeSharedView(paramName: string): object | null {
   }
 }
 
-// Wires the table to auto-persist every future change under prefKey — the only ongoing side
-// effect table interaction has; the URL stays untouched until explicitly shared. Returns the
-// unsubscribe function (same shape onViewChange itself returns).
-export function bindViewPersistence(table: DataTableLike, prefKey: string): () => void {
-  return table.onViewChange!((view) => setPref(prefKey, view));
+// Saves every future view change — the only ongoing side effect table interaction has; the URL
+// stays untouched until explicitly shared. An effect re-reading getViewState() (tracking every
+// signal it touches), in its own root since a route can bind it from an async load. `paused`:
+// while a shared link's layout is on screen (SharedViewBanner); un-pausing saves it. Returns the
+// dispose function.
+export function bindViewPersistence(
+  table: DataTableLike,
+  save: (view: object) => void,
+  paused: () => boolean,
+): () => void {
+  return createRoot((dispose) => {
+    createEffect(() => {
+      const view = table.getViewState();
+      if (!paused()) save(view);
+    });
+    return dispose;
+  });
 }
 
-// Snapshots the table's current view into `paramName` and copies the resulting link to the
+// Snapshots the table's current view into VIEW_PARAM and copies the resulting link to the
 // clipboard — deliberately does NOT write it to the page's own address bar (no
 // `history.replaceState`): a param left sitting in the visible URL goes stale the moment the
 // user makes one more change to the table, silently showing a snapshot that no longer matches
 // what's on screen. The stored pref (bindViewPersistence above) already captures live state on
 // every change; this link is only for handing the *current* view to someone else.
 // `extraParams` are added only where the URL doesn't already set them.
-export function shareTableView(
-  table: DataTableLike,
-  paramName: string,
-  btn: HTMLElement,
-  extraParams: Record<string, string> = {},
-): void {
+export function shareTableView(table: DataTableLike, btn: HTMLElement, extraParams: Record<string, string> = {}): void {
   const params = new URLSearchParams(location.search);
   for (const [key, value] of Object.entries(extraParams)) if (!params.has(key)) params.set(key, value);
   const view = table.getViewState();
   // An unchanged view is the defaults: sending `{}` would only show the recipient a "shared layout" banner.
-  if (Object.keys(view).length) params.set(paramName, JSON.stringify(view));
-  else params.delete(paramName);
+  if (Object.keys(view).length) params.set(VIEW_PARAM, JSON.stringify(view));
+  else params.delete(VIEW_PARAM);
   const url = `${location.origin}${urlWithParams(params)}`;
   copyWithFeedback(btn, url);
 }
 
-// Clears both the stored default and whatever's currently in `paramName`, then blanks the
+// Clears both the stored default and whatever's currently in VIEW_PARAM, then blanks the
 // table's view state — which resolves back to the table's own `initialViewState` (including
 // its default sort) rather than to nothing, same as `restoreTableView`'s own fallback above.
-export function resetTableView(table: DataTableLike, prefKey: string, paramName: string): void {
+export function resetTableView(table: DataTableLike, prefKey: string): void {
   table.setViewState({});
   setPref(prefKey, {});
   const params = new URLSearchParams(location.search);
-  params.delete(paramName);
+  params.delete(VIEW_PARAM);
   history.replaceState(null, '', urlWithParams(params));
 }
 
