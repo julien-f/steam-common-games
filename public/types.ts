@@ -210,6 +210,12 @@ export interface Achievements {
   _sortedAchievements?: Achievement[];
 }
 
+// One price in an IsThereAnyDeal response (a bundle tier, a deal, a historical low).
+export interface PriceAmount {
+  amount: number;
+  currency: string;
+}
+
 // IsThereAnyDeal-backed price fields, set by priceLoading.ts's applyPriceInfo. Optional because
 // `undefined` is a real, load-bearing state distinct from `null`: "nothing has looked this price
 // up (yet)", which renders as a loading placeholder and is what nullMissingPriceFields keys off

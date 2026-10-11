@@ -2,7 +2,7 @@
 // response-to-row-fields mapping, and the "don't leave it stuck on its loading placeholder
 // forever" null-out on failure (see docs/dev/integrations.md). Chunking and the
 // no-ITAD-configured check stay with the caller (ListRoute.tsx's loadPrices).
-import type { PriceFields } from './types.ts';
+import type { PriceAmount, PriceFields } from './types.ts';
 import { discountPct, fetchJson } from './utils.ts';
 
 // Same wording as the server's 503 for /bundles (server.js), so the two read as one cause.
@@ -21,10 +21,6 @@ export const PRICE_FIELDS = [
 
 // The shape of one game's entry in a `POST /games/prices/v3` response, as extracted server-side
 // (lib/itad.js's extractPriceInfo) — only the fields read below.
-interface PriceAmount {
-  amount: number;
-  currency: string;
-}
 interface PriceInfo {
   steamRegular?: PriceAmount | null;
   bestDeal?: { price?: PriceAmount | null; shop?: string | null; url?: string | null } | null;

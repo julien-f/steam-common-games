@@ -33,7 +33,7 @@ import {
   priceTierBucket,
   formatPriceTier,
 } from './gameColumns.ts';
-import { ApiError, fetchJson, fmtAge, formatMoney, oldestFetchedAt, scoreColor } from './utils.ts';
+import { fmtAge, formatMoney, oldestFetchedAt, scoreColor } from './utils.ts';
 import {
   toBundleRow,
   fmtBundleDateTime,
@@ -61,7 +61,7 @@ import { UnsavedViewBanner, ViewActions } from './UnsavedViewBanner.tsx';
 import { setBaseTitle } from './pageTitle.ts';
 import { convert, formatWithEstimate } from './currency.ts';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
-import { loadErrorText, UnavailableError } from './bundleData.ts';
+import { fetchBundlePage, loadErrorText } from './bundleData.ts';
 
 const PAGE_SIZE = 50; // ITAD's own max per page (lib/itad.js's getBundles `limit`)
 // How many pages load() fetches back-to-back before handing over to the "Load more" button. The
@@ -329,22 +329,16 @@ export default function BundlesBrowseRoute() {
   }
 
   async function fetchPage(force = false): Promise<BundleListItem[]> {
-    const qs = new URLSearchParams({
+    const { bundles, fetchedAt: at } = await fetchBundlePage({
       country: resolveRegion(getStoredRegion()),
       sort: FETCH_SORT,
-      expired: String(includeExpired()),
-      offset: String(offset),
-      limit: String(PAGE_SIZE),
+      expired: includeExpired(),
+      offset,
+      limit: PAGE_SIZE,
+      force,
     });
-    if (force) qs.set('refresh', '1');
-    let data: { bundles: BundleListItem[]; fetchedAt?: number | null };
-    try {
-      data = await fetchJson(`/api/bundles?${qs}`, undefined, 'Failed to load bundles');
-    } catch (err) {
-      throw err instanceof ApiError && err.status === 503 ? new UnavailableError(err.message) : err;
-    }
-    noteFetchedAt(data.fetchedAt ?? null);
-    return data.bundles;
+    noteFetchedAt(at);
+    return bundles;
   }
 
   async function load({

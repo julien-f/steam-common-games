@@ -8,11 +8,7 @@
 // own filter checklists/group keys are built from.
 
 import { compareByOrder, formatMoney } from './utils.ts';
-
-export interface PriceAmount {
-  amount: number;
-  currency: string;
-}
+import type { PriceAmount } from './types.ts';
 
 // ITAD-hosted artwork for one game, as the bundle list itself returns it — `boxart` (300×450
 // portrait) plus banners at 145/300/400/600 wide. Only `banner145` (145×55, ~7KB) is used: it's
