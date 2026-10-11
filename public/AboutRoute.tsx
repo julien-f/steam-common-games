@@ -1,11 +1,9 @@
 // /about — ported verbatim from the legacy about.html (no logic of its own there either, just
 // static content) as part of the SPA route table (see docs/dev/frontend.md).
-import { onMount, onCleanup } from 'solid-js';
-import { setBaseTitle } from './pageTitle.ts';
+import { useBaseTitle } from './pageTitle.ts';
 
 export default function AboutRoute() {
-  onMount(() => setBaseTitle('About'));
-  onCleanup(() => setBaseTitle(null));
+  useBaseTitle(() => 'About');
 
   return (
     <div class="container">

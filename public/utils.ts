@@ -368,3 +368,12 @@ export async function fetchJson<T>(url: string, init: RequestInit | undefined, f
   if (!res.ok || data === undefined) throw new ApiError(data?.error || fallback, res.status);
   return data as T;
 }
+
+// fetchJson for a POST with a JSON body.
+export function postJson<T>(url: string, body: unknown, fallback: string): Promise<T> {
+  return fetchJson<T>(
+    url,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    fallback,
+  );
+}

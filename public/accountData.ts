@@ -5,7 +5,7 @@
 // functions (row-building, table wiring, URL/history updates, accounts-bar rendering) — none of
 // that belongs here; ListRoute.tsx owns the equivalent orchestration generically, for any list
 // kind, not just account-scoped ones.
-import { steamVanity, fmtLastPlayed, fetchJson } from './utils.ts';
+import { steamVanity, fmtLastPlayed, postJson } from './utils.ts';
 import { accountIdFor } from './accountsStore.ts';
 import type { AccountSlot } from './types.ts';
 
@@ -180,13 +180,9 @@ export async function fetchAccountOverview(
   members: string[],
   { refresh = false }: { refresh?: boolean } = {},
 ): Promise<AccountOverview> {
-  const data = await fetchJson<CommonGamesResponse>(
+  const data = await postJson<CommonGamesResponse>(
     '/api/common-games',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ members, refresh }),
-    },
+    { members, refresh },
     'Failed to fetch owned games',
   );
 
@@ -223,15 +219,7 @@ export async function fetchAccountWishlist(
   members: string[],
   { refresh = false }: { refresh?: boolean } = {},
 ): Promise<AccountWishlist> {
-  const data = await fetchJson<WishlistResponse>(
-    '/api/wishlist',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ members, refresh }),
-    },
-    'Failed to fetch wishlist',
-  );
+  const data = await postJson<WishlistResponse>('/api/wishlist', { members, refresh }, 'Failed to fetch wishlist');
   return { items: data.items, fetchedAt: data.fetchedAt ?? null };
 }
 
@@ -287,15 +275,7 @@ export async function fetchAccountFriends(
   members: string[],
   { refresh = false }: { refresh?: boolean } = {},
 ): Promise<AccountFriends> {
-  const data = await fetchJson<FriendsResponse>(
-    '/api/friends',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ members, refresh }),
-    },
-    'Failed to fetch friends',
-  );
+  const data = await postJson<FriendsResponse>('/api/friends', { members, refresh }, 'Failed to fetch friends');
   return {
     friends: data.friends.map((f) => ({
       steamid: f.steamid,
@@ -317,13 +297,9 @@ export async function fetchAccountFriends(
 // /api/common-games call every owned-games fetch already makes. The account card's counts are
 // fetched by HomeRoute itself, not here.
 export async function resolveAccountSlot(rawInputs: string[]): Promise<AccountSlot> {
-  const { players } = await fetchJson<CommonGamesResponse>(
+  const { players } = await postJson<CommonGamesResponse>(
     '/api/common-games',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ members: rawInputs }),
-    },
+    { members: rawInputs },
     'Failed to resolve account',
   );
   return accountSlotFrom(players.map(toAccountPlayer), rawInputs);

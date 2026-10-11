@@ -1,11 +1,9 @@
 // Any path no other route matches — an old link, a typo — rather than a blank page.
-import { onMount, onCleanup } from 'solid-js';
 import { A } from '@solidjs/router';
-import { setBaseTitle } from './pageTitle.ts';
+import { useBaseTitle } from './pageTitle.ts';
 
 export default function NotFoundRoute() {
-  onMount(() => setBaseTitle('Page not found'));
-  onCleanup(() => setBaseTitle(null));
+  useBaseTitle(() => 'Page not found');
 
   return (
     <div class="container">

@@ -48,7 +48,7 @@ import {
   folderPaths,
   isDescendantFolder,
 } from './listsStore.ts';
-import { setBaseTitle } from './pageTitle.ts';
+import { useBaseTitle } from './pageTitle.ts';
 import { createDefaultNaming, listDisplayName } from './listLabels.ts';
 import { CombineForm } from './CombineForm.tsx';
 import type { AccountSlot, Folder, GameList, ListRef, CombineOp } from './types.ts';
@@ -204,7 +204,7 @@ export default function HomeRoute() {
   // loaded, same fallback-to-bare-app-name-when-none convention the old comparison page's own
   // updateTitle() used. The side panel's own game-open title takes over on top of this when a
   // game is opened from here, same as every other route.
-  createEffect(() => setBaseTitle(currentAccount()?.label ?? null));
+  useBaseTitle(() => currentAccount()?.label ?? null);
 
   // An old Comparison-page link — `/?u=alice&u=bob`, several slots — used to land here and be
   // explained away ("showing the first"). It has a real address again, so it's forwarded to it
@@ -213,7 +213,6 @@ export default function HomeRoute() {
     const slots = parseUrlState(location.search).slots;
     if (slots.length > 1) navigate(compareUrl(slots), { replace: true });
   });
-  onCleanup(() => setBaseTitle(null));
 
   async function resolveAndSetCurrent(): Promise<void> {
     const trimmed = resolveInputs()
