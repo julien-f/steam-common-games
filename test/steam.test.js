@@ -27,9 +27,8 @@ const {
   getPlayerAchievements,
   getGlobalAchievementPercentages,
   getGameNews,
-  getSemaphoreStats,
-  createSemaphore,
 } = require('../lib/steam');
+const { getSemaphoreStats, createSemaphore } = require('../lib/upstream');
 const { _reset, setCache } = require('../lib/cache');
 const { getCircuitBreakers, _resetCircuitBreakers } = require('../lib/circuitBreaker');
 
@@ -231,8 +230,7 @@ test('getSemaphoreStats: reports live active/queued and a lifetime queue-depth h
 
 // createSemaphore's maxQueue safety valve is tested directly here (rather than by exhausting
 // storeLimit/tagLimit/protonLimit's real, deliberately-generous 20000-deep queue — see
-// SEMAPHORE_MAX_QUEUE's own comment in lib/steam.js) since createSemaphore is exported
-// specifically for this.
+// SEMAPHORE_MAX_QUEUE's own comment in lib/upstream.js).
 test('createSemaphore: rejected counts calls turned away once maxQueue is hit, active/queued unaffected', async (t) => {
   const warnMock = t.mock.method(console, 'warn', () => {});
   const sem = createSemaphore(1, 0, 1, 'test-sem'); // 1 concurrent slot, queue depth 1
@@ -1447,7 +1445,7 @@ test('getProtonDbStatus: a "pending" tier with no provisionalTier returns null',
 
 test('getProtonDbStatus: throws isUpstream for a non-404 error', async (t) => {
   _reset();
-  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503, text: async () => '' }));
   await assert.rejects(
     () => getProtonDbStatus(400),
     (err) => err.isUpstream === true,

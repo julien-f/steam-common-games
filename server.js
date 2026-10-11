@@ -40,8 +40,8 @@ const {
   getPlayerAchievements,
   getGlobalAchievementPercentages,
   getGameNews,
-  getSemaphoreStats,
 } = require('./lib/steam');
+const { getSemaphoreStats } = require('./lib/upstream');
 const { getHLTB } = require('./lib/hltb');
 const {
   getBundles,

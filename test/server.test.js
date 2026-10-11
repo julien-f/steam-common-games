@@ -213,7 +213,7 @@ test('GET /api/metrics: includes semaphore, cache hit/entry, rate-limiter, and d
 
   const res = await api.get('/api/metrics');
   assert.equal(res.status, 200);
-  for (const name of ['store', 'tag', 'proton']) {
+  for (const name of ['store', 'tag', 'proton', 'hltb', 'itad-info']) {
     assert.equal(typeof res.body.semaphores[name].active, 'number');
     assert.equal(typeof res.body.semaphores[name].queued, 'number');
     assert.equal(typeof res.body.semaphores[name].maxQueueSeen, 'number');

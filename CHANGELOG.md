@@ -108,6 +108,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - deps-audit no longer counts a dependency's own imports as this repo using a package
 - npm run check lints the docs' prose: history phrasing, overlong paragraphs, and docs missing from the indexes
 - The setup review counts which docs agents read, and how often whole, to judge how the docs are split
+- GET /api/metrics now reports HLTB's and ITAD's request queues alongside Steam's
 
 ## [0.10.0] - 2026-10-10
 

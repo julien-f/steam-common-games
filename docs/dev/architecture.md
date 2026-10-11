@@ -25,10 +25,11 @@ Setup and dev commands are in [README.md](../../README.md); tests and hooks in [
 - **`lib/db.js`** — opens `db.sqlite` and applies its append-only `MIGRATIONS` ([data.md](data.md)).
 - **`lib/cache.js`** — persistent cache over `db.sqlite` (`getCached`, `setCache`, `GROUPS`).
 - **`lib/dedup.js`** — `createDedup`: concurrent calls for the same key share one promise.
-- **`lib/steam.js`** — Steam Web API and store calls (`resolveSteamId`, `getOwnedGames`, `getWishlist`, `getFriendList`, `getPlayerSummaries`, `getGameRating`, `getAppDetails`, `getSteamTags`, `getGameDemo`, `searchStoreGames`, `getGameNews`, …), ProtonDB, and the per-host semaphores (`storeLimit`/`tagLimit`/`protonLimit`).
-- **`lib/hltb.js`** — HLTB auth + search (`getHLTB`).
+- **`lib/steam.js`** — Steam Web API and store calls (`resolveSteamId`, `getOwnedGames`, `getWishlist`, `getFriendList`, `getPlayerSummaries`, `getGameRating`, `getAppDetails`, `getSteamTags`, `getGameDemo`, `searchStoreGames`, `getGameNews`, …), ProtonDB, and their per-host semaphores (`storeLimit`/`tagLimit`/`protonLimit`).
+- **`lib/hltb.js`** — HLTB auth + search (`getHLTB`), behind its own semaphore (`hltbLimit`).
 - **`lib/itad.js`** — IsThereAnyDeal calls (`getSteamShopId`, `getBundles`, `resolveSteamAppIds`, prices) behind bundle browsing and every price column.
 - **`lib/fanatical.js`** — Fanatical's storefront feed, for pick-and-mix tier prices ([integrations.md](integrations.md#fanatical--pick-and-mix-tier-prices)).
+- **`lib/upstream.js`** — `createSemaphore` (concurrency cap + per-slot pacing, registered for `GET /api/metrics`) and `upstreamError`, shared by the upstream clients.
 - **`lib/circuitBreaker.js`** — one 403-storm breaker per blocking-prone upstream (Steam store, HLTB, ProtonDB).
 - **`lib/metrics.js`** — `trackedFetch`, outbound budgets and the counters behind `GET /api/metrics` ([observability.md](observability.md)).
 - **`lib/auth.js`** — Steam OpenID 2.0 sign-in, cookie sessions and per-key user prefs, behind `/auth/*` and `/api/me*`.
