@@ -1,0 +1,13 @@
+{
+  "routing": [
+    {
+      "prompt": "Are our dependencies up to date?",
+      "expect": "dependency-audit"
+    },
+    {
+      "prompt": "Check the npm packages for vulnerabilities before the release",
+      "expect": "dependency-audit"
+    }
+  ],
+  "dryRun": "/dependency-audit"
+}

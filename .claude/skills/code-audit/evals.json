@@ -1,0 +1,25 @@
+{
+  "routing": [
+    {
+      "prompt": "Can you audit the security of the app?",
+      "expect": "code-audit"
+    },
+    {
+      "prompt": "Where could the code be simpler?",
+      "expect": "code-audit"
+    },
+    {
+      "prompt": "Review the code as a whole for performance problems",
+      "expect": "code-audit"
+    },
+    {
+      "prompt": "Review my current diff for bugs",
+      "expect": "code-review"
+    },
+    {
+      "prompt": "fix C70",
+      "expect": "code-fix"
+    }
+  ],
+  "dryRun": "/code-audit simplify scripts/"
+}

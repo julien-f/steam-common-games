@@ -9,7 +9,8 @@ Judges the setup against CLAUDE.md's Where things belong and Working style rules
 
 ## Scope
 
-- **Files**: `.claude/skills/*/SKILL.md`, `scripts/`, `.githooks/`, `.github/workflows/`, `.claude/settings.json` and `settings.local.json`, `package.json`'s `scripts`, `CLAUDE.md`, and this repo's Claude memory (`~/.claude/projects/<this repo's slug>/memory/`).
+- **Files**: `.claude/skills/*/SKILL.md` and `evals.json`, `scripts/`, `.githooks/`, `.github/workflows/`, `.claude/settings.json` and `settings.local.json`, `package.json`'s `scripts`, `CLAUDE.md`, and this repo's Claude memory (`~/.claude/projects/<this repo's slug>/memory/`).
+- **Argument `evals`** adds the evals to step 1 (a few minutes, a few dollars).
 - **Transcripts**: step 3 runs by default, over the sessions since the ledger's last read. Argument `no-transcripts` skips it (say so); `transcripts=N` instead reads the last N sessions, ledger aside.
 
 ## 0. The ledger
@@ -22,6 +23,7 @@ Read [setup-backlog.md](../../../docs/dev/setup-backlog.md). Re-run each **Watch
 - `npm run check:setup`: skill frontmatter, and allows covering an ask-first action. A failure or a `settings.local.json` warning is a finding as-is.
 - `node scripts/setup-facts.js`: each script's callers, and which read arguments without a usage line (a script taking only optional flags may not need one).
 - `node scripts/setup-facts.js --cost` (~40 s): time and output size of `check`, `test`, `test:e2e` and `build`, and CLAUDE.md's size — the numbers the **Cost** check judges.
+- With `evals`: `node scripts/skill-evals.js --repeat=3 --dry-run` ([testing.md](../../../docs/dev/testing.md#skill-evals)). A routing miss is a **Triggers** finding; a dry run's denied calls are **Permissions** ones, its failed calls **Staleness** or **Prose → script** ones.
 - Read every skill, CLAUDE.md, both settings files and the memory files in full.
 
 ## 2. Review
@@ -29,7 +31,7 @@ Read [setup-backlog.md](../../../docs/dev/setup-backlog.md). Re-run each **Watch
 - **Contradictions**: a skill that disagrees with CLAUDE.md (CLAUDE.md wins), or two skills that disagree with each other.
 - **Prose → script**: deterministic steps a skill makes the agent do by hand (fixed command sequences, parsing, counting) that a script would make repeatable.
 - **Duplication**: the same procedure in several skills, or a CLAUDE.md rule repeated in a skill. Propose one owner and a link from the others.
-- **Triggers**: skill descriptions whose "Use when" overlaps another skill's, built-in ones included (`/code-review`, `/simplify`, `/security-review`), or misses how the user actually asks.
+- **Triggers**: skill descriptions whose "Use when" overlaps another skill's, built-in ones included (`/code-review`, `/simplify`, `/security-review`), or misses how the user actually asks. A phrasing the transcripts show misrouted, and a skill with no `evals.json`, are findings: propose the routing case with the fix.
 - **Structure**: skills always run back to back or sharing most steps (merge), a skill with independent modes each loading the other's text (split), a name or description that doesn't match how the user asks (rename), a skill nothing has run lately (delete; `--transcripts` counts runs). Changing them needs the user's approval like adding one.
 - **Scripts**: ones with no caller, overlapping jobs, missing usage messages on bad arguments.
 - **Memory**: project rules kept in memory (they bind only one machine: move them to CLAUDE.md or a skill), memory repeating CLAUDE.md or a skill, stale entries.
@@ -72,4 +74,5 @@ Then one `AskUserQuestion`: apply the recommended set, plus any real choice amon
 
 - Update [setup-backlog.md](../../../docs/dev/setup-backlog.md) in the first commit: applied items under Watching (`**P<n> · <target> · <effort>** — change. Measure: \`command\` — baseline → target.`), the rest of the recommended set under Open, the ones the user turned down under Declined with their reason; set the header's dates (today, and the newest entry `--transcripts` printed).
 - Follow CLAUDE.md's Development workflow; a `scripts/` change gets a Development changelog entry and a test.
+- A skill's description or steps change: run `node scripts/skill-evals.js --repeat=3 <skill>` before (`--ref=HEAD`) and after; report both, and keep the change only if routing doesn't regress.
 - Memory edits are outside the repo: say which entries were moved or deleted.

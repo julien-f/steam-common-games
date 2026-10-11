@@ -1,0 +1,12 @@
+{
+  "routing": [
+    {
+      "prompt": "Update the screenshots in the docs after the table redesign",
+      "expect": "screenshots"
+    },
+    {
+      "prompt": "The README's comparison screenshot is outdated, reshoot it",
+      "expect": "screenshots"
+    }
+  ]
+}
