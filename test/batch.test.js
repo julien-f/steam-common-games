@@ -141,3 +141,8 @@ test('closeItems: a section left empty reads None open.', () => {
   assert.equal(closeItems(text, ['C1']), '## A\n\nNone open.\n\n## B\n\n- **C2 · minor · S** — y.\n');
   assert.equal(closeItems(text, ['C2']), '## A\n\n- **C1 · minor · S** — x.\n\n## B\n\nNone open.\n');
 });
+
+test("closeItems: emptying one of a section's blank-separated blocks leaves a single blank line", () => {
+  const text = '## A\n\n- **U1 · polish · F1** — x.\n\n- **U2 · polish** — y.\n';
+  assert.equal(closeItems(text, ['U1']), '## A\n\n- **U2 · polish** — y.\n');
+});

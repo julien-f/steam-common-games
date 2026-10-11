@@ -228,6 +228,7 @@ function closeItems(text, ids) {
     .split('\n')
     .filter((l) => !ids.some((id) => l.startsWith(`- **${id} ·`)))
     .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
     .replace(/^(## [^\n]+\n)\n+(?=## |$(?![\s\S]))/gm, '$1\nNone open.\n\n')
     .replace(/\n\n$/, '\n');
 }
