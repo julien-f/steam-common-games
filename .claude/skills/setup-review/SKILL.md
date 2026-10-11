@@ -9,7 +9,7 @@ Judges the setup against CLAUDE.md's Where things belong and Working style rules
 
 ## Scope
 
-- **Files**: `.claude/skills/*/SKILL.md` and `evals.json`, `scripts/`, `.githooks/`, `.github/workflows/`, `.claude/settings.json` and `settings.local.json`, `package.json`'s `scripts`, `CLAUDE.md`, and this repo's Claude memory (`~/.claude/projects/<this repo's slug>/memory/`).
+- **Files**: `.claude/skills/*/SKILL.md` and `evals.json`, `scripts/`, `.githooks/`, `.github/workflows/`, `.claude/settings.json` and `settings.local.json`, `package.json`'s `scripts`, `CLAUDE.md`, how `docs/` is split and indexed (not what each doc says: that's code-audit's **docs**), and this repo's Claude memory (`~/.claude/projects/<this repo's slug>/memory/`).
 - **Argument `evals`** adds the evals to step 1 (a few minutes, a few dollars).
 - **Transcripts**: step 3 runs by default, over the sessions since the ledger's last read. Argument `no-transcripts` skips it (say so); `transcripts=N` instead reads the last N sessions, ledger aside.
 
@@ -22,7 +22,7 @@ Read [setup-backlog.md](../../../docs/dev/setup-backlog.md). Re-run each **Watch
 - `npm run check:doc-refs`: stale script names, flags, npm scripts and links in skills and CLAUDE.md. A failure is a finding as-is.
 - `npm run check:setup`: skill frontmatter, and allows covering an ask-first action. A failure or a `settings.local.json` warning is a finding as-is.
 - `node scripts/setup-facts.js`: each script's callers, and which read arguments without a usage line (a script taking only optional flags may not need one).
-- `node scripts/setup-facts.js --cost` (~40 s): time and output size of `check`, `test`, `test:e2e` and `build`, and CLAUDE.md's size — the numbers the **Cost** check judges.
+- `node scripts/setup-facts.js --cost` (~40 s): time and output size of `check`, `test`, `test:e2e` and `build`, CLAUDE.md's size and the largest docs — the numbers the **Cost** and **Docs** checks judge.
 - With `evals`: `node scripts/skill-evals.js --repeat=3 --dry-run` ([testing.md](../../../docs/dev/testing.md#skill-evals)). A routing miss is a **Triggers** finding; a dry run's denied calls are **Permissions** ones, its failed calls **Staleness** or **Prose → script** ones.
 - Read every skill, CLAUDE.md, both settings files and the memory files in full.
 
@@ -38,12 +38,13 @@ Read [setup-backlog.md](../../../docs/dev/setup-backlog.md). Re-run each **Watch
 - **Hooks**: "always do X after Y" rules in CLAUDE.md or a skill that only a hook can guarantee.
 - **Permissions**: allows that pre-approve CLAUDE.md's ask-first actions beyond those `check:setup` knows (an ask-first rule it lacks is a finding too), and dead one-off entries, in both settings files. For missing allows, propose running the built-in `fewer-permission-prompts` skill (it writes settings) rather than reviewing transcripts by hand.
 - **Cost**: time and tokens every session pays — CLAUDE.md lines that could load on demand (a skill, a linked doc); commands or skill steps whose output floods the context (prefer a quiet mode or a script printing only what matters); slow steps and work run twice or when nothing it covers changed; skill patterns that fan out agents, snapshot click by click or read whole files where an excerpt does.
+- **Docs**: the transcripts' doc reads against the docs' sizes — a big doc read whole in many sessions for one part (split it, or move that part where it's needed), docs always read together (merge), a doc nobody reads (delete or fold into another), a fact agents explored the code for that no doc holds (add it where they looked first).
 - **Staleness**: rules about code, files or procedures that no longer exist; rules nothing has needed lately (prefer deleting them).
 - **Extensions**: ways to make what exists more useful — a mode or argument a skill lacks, script output a skill re-derives by hand, one skill's result that could feed another, a check that could run earlier (CI → pre-push → pre-commit), a script that could answer a question agents explore for. Speculative ideas are welcome; mark those without usage evidence as such.
 
 ## 3. Transcripts
 
-- `node scripts/setup-facts.js --transcripts=<DATE> --digest=<scratchpad>/digest`, DATE being the ledger's "Transcripts read up to" (`--transcripts` alone, the last 20 sessions, when it says never), counts what needs no judgment over the sessions since: largest outputs and slowest calls by command, command pairs repeated across sessions, calls the permission classifier denied or you rejected, each skill's runs and longest run, interrupts, and how the user answered each skill's questions — a skill whose recommendation is often overridden, answered in free text or sent back to clarify recommends badly or asks what a default would settle.
+- `node scripts/setup-facts.js --transcripts=<DATE> --digest=<scratchpad>/digest`, DATE being the ledger's "Transcripts read up to" (`--transcripts` alone, the last 20 sessions, when it says never), counts what needs no judgment over the sessions since: largest outputs and slowest calls by command, command pairs repeated across sessions, calls the permission classifier denied or you rejected, each skill's runs and longest run, interrupts, which docs were read and how often whole (subagents included), and how the user answered each skill's questions — a skill whose recommendation is often overridden, answered in free text or sent back to clarify recommends badly or asks what a default would settle.
 - One `Agent` subagent then reads the digests (one compact file per session; never the raw `.jsonl`) for what does need judgment, seen in at least two sessions:
   - the user correcting the agent the same way (a rule missing, unclear or ignored), interrupts and rejections included;
   - the same command failing the same way (a pitfalls.md entry or a fix);

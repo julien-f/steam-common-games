@@ -15,6 +15,7 @@
 //                                                  before each, skill runs, failed calls, interrupts, rejections
 //                                                  with the user's reason, questions and answers — long tokens
 //                                                  redacted, for the subagent that reads for judgment
+//                                                  and which docs were read, how often whole
 //   node scripts/setup-facts.js --agents[=ID]      per subagent of session ID (default: the newest with any):
 //                                                  time, turns, cache reads, failed calls, time in tests/e2e/commits
 
@@ -273,6 +274,43 @@ function summarize(sessions) {
   };
 }
 
+// A repo doc a Read call or a shell read (cat, sed, head, tail) opened: CLAUDE.md, README.md or under docs/.
+const DOC = /(?:^|[\s/"'])((?:docs\/[\w/-]+|README|CLAUDE)\.md)\b/g;
+
+// One session's JSONL lines → `{ doc, whole }` per doc opened, `whole` unless the read was narrowed (a Read
+// offset or limit, or sed/head/tail rather than cat).
+function docReads(lines) {
+  const reads = [];
+  for (const line of lines)
+    for (const part of [JSON.parse(line).message?.content].flat()) {
+      if (part?.type !== 'tool_use') continue;
+      const { file_path: file, offset, limit, command } = part.input ?? {};
+      if (part.name === 'Read')
+        for (const [, doc] of ` ${file ?? ''}`.matchAll(DOC))
+          reads.push({ doc, whole: offset === undefined && limit === undefined });
+      if (part.name === 'Bash' && /\b(cat|sed|head|tail)\b/.test(command ?? ''))
+        for (const [, doc] of command.matchAll(DOC)) reads.push({ doc, whole: /\bcat\b/.test(command) });
+    }
+  return reads;
+}
+
+// `sessions`: arrays of docReads' reads → per doc, `{ doc, reads, whole, sessions }`, most read first.
+function docReadStats(sessions) {
+  const stats = new Map();
+  sessions.forEach((reads, session) => {
+    for (const { doc, whole } of reads) {
+      const s = stats.get(doc) ?? { doc, reads: 0, whole: 0, sessions: new Set() };
+      s.reads++;
+      s.whole += whole ? 1 : 0;
+      s.sessions.add(session);
+      stats.set(doc, s);
+    }
+  });
+  return [...stats.values()]
+    .map((s) => ({ ...s, sessions: s.sessions.size }))
+    .sort((a, b) => b.reads - a.reads || a.doc.localeCompare(b.doc));
+}
+
 // Commands whose time is the gates' (tests, e2e, commit hooks), not the agent's thinking.
 const GATE = /^(npm test|npm run test(:one|:e2e)?|node scripts\/e2e\.js|git commit)$/;
 
@@ -324,6 +362,17 @@ const kb = (bytes) => `${(bytes / 1024).toFixed(1)} KB`;
 function cost() {
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   console.log(`CLAUDE.md (loaded every turn): ${kb(fs.statSync(path.join(ROOT, 'CLAUDE.md')).size)}`);
+  const docs = fs
+    .readdirSync(path.join(ROOT, 'docs'), { recursive: true })
+    .filter((f) => f.endsWith('.md'))
+    .map((f) => [`docs/${f.split(path.sep).join('/')}`, fs.statSync(path.join(ROOT, 'docs', f)).size])
+    .sort((a, b) => b[1] - a[1]);
+  console.log(
+    `Largest docs: ${docs
+      .slice(0, 5)
+      .map(([f, size]) => `${f} ${kb(size)}`)
+      .join(', ')}`,
+  );
   for (const script of COST_SCRIPTS) {
     const start = Date.now();
     const { status, stdout, stderr } = spawnSync(npm, ['run', '-s', script], { cwd: ROOT, encoding: 'utf8' });
@@ -394,6 +443,20 @@ function transcripts({ limit, since }, digestDir) {
   );
   for (const s of answerStats(events))
     console.log(`  ${s.name}: ${s.recommended} · ${s.other} · ${s.own} · ${s.clarify} · ${s.dismissed}`);
+  console.log('\nDocs read (reads · whole · transcripts, subagents counted apart):');
+  // Subagents read docs on the session's behalf, so their transcripts count here.
+  const subagentLogs = read.flatMap(([id]) => {
+    const sub = path.join(dir, id, 'subagents');
+    return fs.existsSync(sub)
+      ? fs
+          .readdirSync(sub)
+          .filter((f) => f.endsWith('.jsonl'))
+          .map((f) => fs.readFileSync(path.join(sub, f), 'utf8').split('\n').filter(Boolean))
+      : [];
+  });
+  const existing = (d) => fs.existsSync(path.join(ROOT, d.doc)); // not a test fixture's made-up path
+  for (const d of docReadStats([...logs, ...subagentLogs].map(docReads)).filter(existing))
+    console.log(`  ${d.doc}: ${d.reads} · ${d.whole} · ${d.sessions}`);
   if (digestDir) console.log(`\nDigests: ${read.length} files in ${digestDir}`);
 }
 
@@ -454,4 +517,6 @@ module.exports = {
   answerStats,
   summarize,
   agentSummary,
+  docReads,
+  docReadStats,
 };

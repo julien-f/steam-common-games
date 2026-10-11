@@ -15,6 +15,8 @@ const {
   answerStats,
   summarize,
   agentSummary,
+  docReads,
+  docReadStats,
 } = require('../scripts/setup-facts');
 
 test('callers matches script paths and relative requires, not substrings', () => {
@@ -233,4 +235,37 @@ test('answerStats counts outcomes per running skill, setup proposals apart', () 
       { name: 'ux-fix', recommended: 1, other: 0, own: 1, clarify: 0, dismissed: 0 },
     ],
   );
+});
+
+test('docReads: Read calls and shell reads of repo docs, whole unless narrowed', () => {
+  const use = (name, input) => JSON.stringify({ message: { content: [{ type: 'tool_use', name, input }] } });
+  const lines = [
+    use('Read', { file_path: '/repo/docs/dev/frontend.md' }),
+    use('Read', { file_path: '/repo/docs/dev/frontend.md', offset: 40, limit: 20 }),
+    use('Read', { file_path: '/repo/public/panel.tsx' }),
+    use('Bash', { command: 'cat CLAUDE.md' }),
+    use('Bash', { command: 'grep x docs/dev/data.md' }),
+    use('Bash', { command: 'for f in README.md docs/dev/data.md; do sed -n 1,9p "$f"; done' }),
+  ];
+  assert.deepEqual(docReads(lines), [
+    { doc: 'docs/dev/frontend.md', whole: true },
+    { doc: 'docs/dev/frontend.md', whole: false },
+    { doc: 'CLAUDE.md', whole: true },
+    { doc: 'README.md', whole: false },
+    { doc: 'docs/dev/data.md', whole: false },
+  ]);
+});
+
+test('docReadStats: reads, whole reads and sessions per doc, most read first', () => {
+  const stats = docReadStats([
+    [
+      { doc: 'docs/a.md', whole: true },
+      { doc: 'docs/b.md', whole: false },
+    ],
+    [{ doc: 'docs/b.md', whole: true }],
+  ]);
+  assert.deepEqual(stats, [
+    { doc: 'docs/b.md', reads: 2, whole: 1, sessions: 2 },
+    { doc: 'docs/a.md', reads: 1, whole: 1, sessions: 1 },
+  ]);
 });
