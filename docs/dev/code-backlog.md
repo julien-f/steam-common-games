@@ -13,7 +13,6 @@ Last audited: simplify 2026-10-10 · security 2026-10-10 · perf 2026-10-10 · r
 
 ## Simplify
 
-- **C8 · cleanup · S** — the 11 limiters after `namedRateLimit` (`server.js:121`) each repeat `windowMs`, header flags and the `rateLimitBypassed()` check; `searchLimit` and `friendsLimit` (`server.js:241-283, 289-320`) copy the same cached-steam64 loop. Move the defaults into `namedRateLimit`, extract a shared cached-ids helper.
 - **C11 · cleanup · S** — `stepGameList`'s `table: unknown` at `public/panelNav.ts:51` is only truth-tested and always truthy. Drop it; pass the list instead of a getter.
 
 ## Security

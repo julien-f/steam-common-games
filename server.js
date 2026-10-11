@@ -108,19 +108,39 @@ function parseBundlesQuery(req) {
   };
 }
 
-// Used by searchLimit's skip below (a raw Steam64 id needs no resolve: cache check at all,
-// same short-circuit resolveSteamId itself uses) and by achievementsLimit's further down.
+// Used by cachedSteamIds below and by achievementsLimit's skip further down.
 const STEAM64_RE = /^7656119\d{10}$/;
+
+// The Steam64 ids `members` resolve to without an upstream call, or null when one isn't resolved
+// yet or the body is malformed (the route's own validation rejects it). Mirrors resolveSteamId's
+// own cache key and its short-circuit for a raw Steam64 id.
+function cachedSteamIds(members) {
+  if (!Array.isArray(members) || !members.every((u) => typeof u === 'string' && u.trim().length > 0)) return null;
+  const ids = new Set();
+  for (const raw of members) {
+    const id = raw.trim();
+    const hit = STEAM64_RE.test(id) ? id : getCached(`resolve:${id}`, { record: false });
+    if (hit === undefined) return null;
+    ids.add(hit);
+  }
+  return ids;
+}
 
 // Wraps rateLimit() so every limiter also records when it actually rejects a request — the
 // inbound counterpart to lib/metrics.js's outbound statusCounts. `handler` only runs once a
 // request is actually over budget (not on every request, and not on a skip), so this is a
 // direct trip count, not a coarser proxy. Centralized here rather than repeating a `handler`
 // on each of the limiter definitions below. Mirrors express-rate-limit's own default handler
-// (status + message) after recording the trip — see lib/metrics.js's rateLimiters.
-function namedRateLimit(name, opts) {
+// (status + message) after recording the trip — see lib/metrics.js's rateLimiters. Every
+// limiter shares a one-minute window and the test bypass; `skip` only adds the route's own rule.
+function namedRateLimit(name, { skip, ...opts }) {
   return rateLimit({
+    windowMs: 60 * 1000,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests. Please wait a minute and try again.' },
     ...opts,
+    skip: (req, res) => rateLimitBypassed() || (skip?.(req, res) ?? false),
     handler: (req, res, _next, options) => {
       recordLimiterTrip(name);
       res.status(options.statusCode);
@@ -239,46 +259,19 @@ app.get('/opensearch.xml', (req, res) => {
 // between a handful of already-loaded accounts used to burn the whole per-minute budget on
 // requests that never touched Steam.
 const searchLimit = namedRateLimit('search', {
-  windowMs: 60 * 1000,
   max: SEARCH_RATE_LIMIT_MAX,
-  standardHeaders: true,
-  legacyHeaders: false,
   message: { error: 'Too many searches. Please wait a minute and try again.' },
   skip: (req) => {
-    if (rateLimitBypassed()) return true;
     // A full refresh always re-fetches every account, so it must always count — same rule
     // isForceRefresh gets elsewhere in this file.
     if (req.body.refresh === true) return false;
 
-    const isWishlist = req.path === '/api/wishlist';
-    const rawIdentifiers = req.body.members;
-    if (!Array.isArray(rawIdentifiers)) return false; // let the route's own validation reject it
-
-    if (!rawIdentifiers.every((u) => typeof u === 'string' && u.trim().length > 0)) return false;
-
-    // Mirrors resolveSteamId's own cache key/short-circuit exactly — a raw Steam64 id needs no
-    // resolution at all, so it's never an upstream call regardless of cache state; anything else
-    // not yet in resolve: hasn't been resolved yet, so it must count.
-    const resolvedIds = new Set();
-    for (const raw of rawIdentifiers) {
-      const id = raw.trim();
-      if (STEAM64_RE.test(id)) {
-        resolvedIds.add(id);
-        continue;
-      }
-      const hit = getCached(`resolve:${id}`, { record: false });
-      if (hit === undefined) return false;
-      resolvedIds.add(hit);
-    }
-
-    // Every identifier now resolves to a known Steam64 id — the route's remaining upstream work
-    // is just getPlayerSummaries + getOwnedGames (common-games) or getWishlist (wishlist) per
-    // id, mirroring their own cache keys.
-    for (const id of resolvedIds) {
-      if (!isCached(`player:${id}`)) return false;
-      if (isWishlist ? !isCached(`wishlist:${id}`) : !isCached(`games:${id}`)) return false;
-    }
-    return true;
+    const ids = cachedSteamIds(req.body.members);
+    if (!ids) return false;
+    // The route's remaining upstream work is getPlayerSummaries + getOwnedGames (common-games) or
+    // getWishlist (wishlist) per id, mirroring their own cache keys.
+    const listPrefix = req.path === '/api/wishlist' ? 'wishlist' : 'games';
+    return [...ids].every((id) => isCached(`player:${id}`) && isCached(`${listPrefix}:${id}`));
   },
 });
 
@@ -286,35 +279,12 @@ const searchLimit = namedRateLimit('search', {
 // games:/wishlist: prefixes, so sharing it would check the wrong cache prefix for /api/friends
 // (friends:). Same "cache hits don't count" shape otherwise.
 const friendsLimit = namedRateLimit('friends', {
-  windowMs: 60 * 1000,
   max: FRIENDS_RATE_LIMIT_MAX,
-  standardHeaders: true,
-  legacyHeaders: false,
   message: { error: 'Too many friends lookups. Please wait a minute and try again.' },
   skip: (req) => {
-    if (rateLimitBypassed()) return true;
     if (req.body.refresh === true) return false;
-
-    const rawIdentifiers = req.body.members;
-    if (!Array.isArray(rawIdentifiers) || !rawIdentifiers.every((u) => typeof u === 'string' && u.trim().length > 0))
-      return false;
-
-    const resolvedIds = new Set();
-    for (const raw of rawIdentifiers) {
-      const id = raw.trim();
-      if (STEAM64_RE.test(id)) {
-        resolvedIds.add(id);
-        continue;
-      }
-      const hit = getCached(`resolve:${id}`, { record: false });
-      if (hit === undefined) return false;
-      resolvedIds.add(hit);
-    }
-
-    for (const id of resolvedIds) {
-      if (!isCached(`friends:${id}`)) return false;
-    }
-    return true;
+    const ids = cachedSteamIds(req.body.members);
+    return !!ids && [...ids].every((id) => isCached(`friends:${id}`));
   },
 });
 
@@ -322,13 +292,8 @@ const friendsLimit = namedRateLimit('friends', {
 // no upstream calls, so they must not count — otherwise a refresh of an already
 // loaded comparison (all cache hits) burns the budget and 429s itself.
 const detailsLimit = namedRateLimit('details', {
-  windowMs: 60 * 1000,
   max: DETAILS_RATE_LIMIT_MAX,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many requests. Please wait a minute and try again.' },
   skip: (req) => {
-    if (rateLimitBypassed()) return true;
     if (isForceRefresh(req)) return false; // force-refresh always re-fetches, so it must always count
     const appid = Number(req.params.appid);
     if (!Number.isInteger(appid) || appid <= 0) return false;
@@ -345,13 +310,8 @@ const detailsLimit = namedRateLimit('details', {
 // Store metadata alone (GET /api/game-meta/:appid), for lists of entries that only show a name
 // and capsule (the panel's DLC card): one store call instead of fetchGameDetails' five sources.
 const metaLimit = namedRateLimit('meta', {
-  windowMs: 60 * 1000,
   max: DETAILS_RATE_LIMIT_MAX,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many requests. Please wait a minute and try again.' },
   skip: (req) => {
-    if (rateLimitBypassed()) return true;
     const appid = Number(req.params.appid);
     return Number.isInteger(appid) && appid > 0 && isCached(`meta:${appid}`);
   },
@@ -365,13 +325,8 @@ const metaLimit = namedRateLimit('meta', {
 // actually opens (see loadNews in public/panel.js) — same on-demand shape as achievements
 // (achievementsLimit below), just without the per-account fan-out.
 const newsLimit = namedRateLimit('news', {
-  windowMs: 60 * 1000,
   max: DETAILS_RATE_LIMIT_MAX,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many requests. Please wait a minute and try again.' },
   skip: (req) => {
-    if (rateLimitBypassed()) return true;
     if (isForceRefresh(req)) return false;
     const appid = Number(req.params.appid);
     if (!Number.isInteger(appid) || appid <= 0) return false;
@@ -387,13 +342,9 @@ const normalizeSearchTerm = (raw) => (raw || '').trim().slice(0, 100).toLowerCas
 // term hit the cache), so this can be looser than searchLimit — it never fans out into the
 // dozens of Steam calls a library search does.
 const gameSearchLimit = namedRateLimit('gameSearch', {
-  windowMs: 60 * 1000,
   max: GAME_SEARCH_RATE_LIMIT_MAX,
-  standardHeaders: true,
-  legacyHeaders: false,
   message: { error: 'Too many searches. Please wait a minute and try again.' },
   skip: (req) => {
-    if (rateLimitBypassed()) return true;
     const term = normalizeSearchTerm(req.query.q);
     if (term.length < 2) return true; // no upstream call happens below this length
     return isCached(`search:${term}`);
@@ -405,13 +356,8 @@ const gameSearchLimit = namedRateLimit('gameSearch', {
 // "cache hits don't count" rule as detailsLimit above. Unresolved (non-Steam64, e.g. vanity
 // name) ids can't be cache-checked without resolving them first, so they always count.
 const achievementsLimit = namedRateLimit('achievements', {
-  windowMs: 60 * 1000,
   max: ACHIEVEMENTS_RATE_LIMIT_MAX,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many requests. Please wait a minute and try again.' },
   skip: (req) => {
-    if (rateLimitBypassed()) return true;
     if (isForceRefresh(req)) return false;
     const appid = Number(req.params.appid);
     if (!Number.isInteger(appid) || appid <= 0) return false;
@@ -467,21 +413,10 @@ app.get('/api/metrics', (_req, res) => {
 // reloading the Bundles page a handful of times (every reload re-requests the list, and
 // re-opens whatever bundle is deep-linked — see docs/dev/integrations.md) burns the
 // whole per-minute budget on requests that never actually hit ITAD, and once burned, real
-// upstream calls (a newly-opened bundle) start 429ing with no visible explanation. Named
-// generically (not `bundlesRateLimitOpts`) since `pricesLimit` below also backs the Library
-// Explorer's Wishlist price columns, not just the Bundles page.
-const itadRateLimitOpts = {
-  windowMs: 60 * 1000,
-  max: BUNDLES_RATE_LIMIT_MAX,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many requests. Please wait a minute and try again.' },
-};
-
+// upstream calls (a newly-opened bundle) start 429ing with no visible explanation.
 const bundlesListLimit = namedRateLimit('bundlesList', {
-  ...itadRateLimitOpts,
+  max: BUNDLES_RATE_LIMIT_MAX,
   skip: (req) => {
-    if (rateLimitBypassed()) return true;
     if (isForceRefresh(req)) return false; // force-refresh always re-fetches, so it must always count
     return isCached(bundlesCacheKey(parseBundlesQuery(req)));
   },
@@ -495,15 +430,12 @@ const bundlesListLimit = namedRateLimit('bundlesList', {
 // though it still counts here) — just given a looser budget instead of a skip, since deep
 // links are a comparatively rare action (once per opened bundle) next to list browsing.
 const bundlesByIdLimit = namedRateLimit('bundlesById', {
-  ...itadRateLimitOpts,
   max: BUNDLES_RATE_LIMIT_MAX * 2,
-  skip: () => rateLimitBypassed(),
 });
 
 const bundlesResolveLimit = namedRateLimit('bundlesResolve', {
-  ...itadRateLimitOpts,
+  max: BUNDLES_RATE_LIMIT_MAX,
   skip: (req) => {
-    if (rateLimitBypassed()) return true;
     const gids = req.body.gids;
     if (!Array.isArray(gids) || gids.length === 0) return false; // let the route's own validation reject it
     // Mirrors resolveSteamAppIds' own per-gid cache key (lib/itad.js).
@@ -517,9 +449,8 @@ const bundlesResolveLimit = namedRateLimit('bundlesResolve', {
 // cache key either way; the appids branch additionally checks resolveItadIds' own
 // per-appid cache key, since that resolution step is this route's own internal work too.
 const pricesLimit = namedRateLimit('prices', {
-  ...itadRateLimitOpts,
+  max: BUNDLES_RATE_LIMIT_MAX,
   skip: (req) => {
-    if (rateLimitBypassed()) return true;
     if (isForceRefresh(req)) return false; // force-refresh always re-fetches, so it must always count
     const { gids, appids } = req.body;
     const country = parseCountry(req);
@@ -542,9 +473,8 @@ const pricesLimit = namedRateLimit('prices', {
 // The side panel's "in bundles" lines — one game at a time, so the same appid → gid → cache
 // check as pricesLimit's appids branch.
 const gameBundlesLimit = namedRateLimit('gameBundles', {
-  ...itadRateLimitOpts,
+  max: BUNDLES_RATE_LIMIT_MAX,
   skip: (req) => {
-    if (rateLimitBypassed()) return true;
     if (isForceRefresh(req)) return false;
     const gid = getCached(`itad-gid:${Number(req.params.appid)}`, { record: false });
     if (gid === undefined) return false;
@@ -1245,12 +1175,7 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
 // under the verified steamid, across browsers/devices.
 
 const authLimit = namedRateLimit('auth', {
-  windowMs: 60 * 1000,
   max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => rateLimitBypassed(),
-  message: { error: 'Too many requests. Please wait a minute and try again.' },
 });
 
 function requireAuth(req, res, next) {
