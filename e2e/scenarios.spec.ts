@@ -1047,6 +1047,25 @@ test('F1 edge: on a phone, a swipe steps without bringing the controls back, and
   await expect(lb).not.toHaveClass(/lb-idle/);
 });
 
+test("F1 edge: on a phone, a swipe past the panel's last item stays on it", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'touch only');
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const current = page.locator('.panel-film-item[aria-current="true"]');
+  await page.getByRole('button', { name: 'Screenshot 3 of 3' }).click();
+  await expect(current).toHaveAccessibleName('Screenshot 3 of 3');
+  const box = (await page.locator('#panel-hero .panel-hero-img').boundingBox())!;
+  const y = box.y + box.height / 2;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 300, y }] });
+  for (const x of [260, 200, 120])
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(current).toHaveAccessibleName('Screenshot 3 of 3');
+  await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  await expect(current).toHaveAccessibleName('Screenshot 2 of 3');
+});
+
 test('F1 edge: on a phone, the ‹ › buttons sit clear of the media and its controls', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout');
   await fakePlayback(page);
