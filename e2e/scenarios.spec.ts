@@ -1740,6 +1740,15 @@ test('I2 edge: Esc closing the panel returns focus to the row it was showing', a
   await expect(page.locator('tr.dt-tr:focus')).toHaveCount(1);
 });
 
+test('I2 edge: the shortcuts dialog says how to open the lightbox from the panel', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await page.keyboard.press('?');
+  const section = page.locator('.shortcuts-section').filter({ hasText: 'Game panel' });
+  await expect(section.locator('.shortcuts-row').filter({ hasText: 'lightbox' })).toContainText('Enter');
+});
+
 test('I2 edge: icon-only controls have names', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
