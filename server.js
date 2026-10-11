@@ -117,9 +117,12 @@ function parseBundlesQuery(req) {
   };
 }
 
+const isMemberList = (members) =>
+  Array.isArray(members) && members.every((u) => typeof u === 'string' && u.trim().length > 0);
+
 // `members` as Steam64 ids from resolveSteamId's cache alone, or null if any would need Steam.
 function cachedSteamIds(members) {
-  if (!Array.isArray(members) || !members.every((u) => typeof u === 'string' && u.trim().length > 0)) return null;
+  if (!isMemberList(members)) return null;
   const ids = new Set();
   for (const raw of members) {
     const hit = peekSteamId(raw, { record: false });
@@ -196,6 +199,8 @@ function routeErrorStatus(route, err) {
   return 400;
 }
 
+const sendRouteError = (res, route, err) => res.status(routeErrorStatus(route, err)).json({ error: err.message });
+
 const app = express();
 if (TRUST_PROXY) app.set('trust proxy', TRUST_PROXY);
 // One string per param (the last), so a repeated `?q=a&q=b` can't hand a route an array.
@@ -266,11 +271,7 @@ app.param('appid', (req, res, next, raw) => {
 // when invalid.
 function parseMembers(req, res) {
   const { members } = req.body;
-  if (
-    !Array.isArray(members) ||
-    members.length < 1 ||
-    !members.every((u) => typeof u === 'string' && u.trim().length > 0)
-  ) {
+  if (!isMemberList(members) || members.length < 1) {
     res.status(400).json({ error: 'Provide at least 1 player' });
     return null;
   }
@@ -323,19 +324,16 @@ const friendsLimit = namedRateLimit('friends', {
 // The details limit exists to throttle upstream Steam/HLTB calls. Cache hits make
 // no upstream calls, so they must not count — otherwise a refresh of an already
 // loaded comparison (all cache hits) burns the budget and 429s itself.
+// fetchGameDetails' cached sources: response field -> cache key prefix.
+const DETAILS_SOURCES = { rating: 'rating', hltb: 'hltb', meta: 'meta', tags: 'browse', protondb: 'protondb' };
+
 const detailsLimit = namedRateLimit('details', {
   max: DETAILS_RATE_LIMIT_MAX,
   skip: (req) => {
     if (isForceRefresh(req)) return false; // force-refresh always re-fetches, so it must always count
     const { appid } = req;
     if (appid === undefined) return false; // POST /api/game-details/stream has no :appid
-    return (
-      isCached(`rating:${appid}`) &&
-      isCached(`hltb:${appid}`) &&
-      isCached(`meta:${appid}`) &&
-      isCached(`browse:${appid}`) &&
-      isCached(`protondb:${appid}`)
-    );
+    return Object.values(DETAILS_SOURCES).every((prefix) => isCached(`${prefix}:${appid}`));
   },
 });
 
@@ -384,6 +382,12 @@ const gameSearchLimit = namedRateLimit('gameSearch', {
 // is per (steamid, appid) — skip only once every one of those is already cached, same
 // "cache hits don't count" rule as detailsLimit above. An id (e.g. a vanity name) whose
 // resolution isn't cached always counts.
+const parseSteamIdsQuery = (req) =>
+  (req.query.steamids || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
 const achievementsLimit = namedRateLimit('achievements', {
   max: ACHIEVEMENTS_RATE_LIMIT_MAX,
   skip: (req) => {
@@ -391,10 +395,7 @@ const achievementsLimit = namedRateLimit('achievements', {
     const { appid } = req;
     if (!isCached(`schema:${appid}`)) return false;
     if (!isCached(`achrarity:${appid}`)) return false;
-    const ids = (req.query.steamids || '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const ids = parseSteamIdsQuery(req);
     // No steamids at all (a standalone lookup with no player loaded) only ever needed
     // schema+rarity above, both already confirmed cached — nothing left to check.
     if (!ids.length) return true;
@@ -560,8 +561,7 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
 
     res.json({ games, players, playtime, lastPlayed, fetchedAt: oldestCachedAt(ids.map((id) => `games:${id}`)) });
   } catch (err) {
-    const status = routeErrorStatus('common-games', err);
-    res.status(status).json({ error: err.message });
+    sendRouteError(res, 'common-games', err);
   }
 });
 
@@ -604,8 +604,7 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
 
     res.json({ items, players, fetchedAt: oldestCachedAt(ids.map((id) => `wishlist:${id}`)) });
   } catch (err) {
-    const status = routeErrorStatus('wishlist', err);
-    res.status(status).json({ error: err.message });
+    sendRouteError(res, 'wishlist', err);
   }
 });
 
@@ -639,8 +638,7 @@ app.post('/api/friends', friendsLimit, async (req, res) => {
 
     res.json({ friends, unavailable, fetchedAt: oldestCachedAt(ids.map((id) => `friends:${id}`)) });
   } catch (err) {
-    const status = routeErrorStatus('friends', err);
-    res.status(status).json({ error: err.message });
+    sendRouteError(res, 'friends', err);
   }
 });
 
@@ -726,17 +724,10 @@ function fetchGameDetails(appid, { force = false } = {}) {
       // 90 to 180 days and are cached per source, so one untouched store page dates the whole
       // readout, and "5 months ago" says nothing about the rating fetched yesterday. The panel
       // puts the breakdown in the button's tooltip so the visible figure stays one number.
-      const fetchedAts = {
-        rating: getCachedAt(`rating:${appid}`) ?? null,
-        hltb: getCachedAt(`hltb:${appid}`) ?? null,
-        meta: getCachedAt(`meta:${appid}`) ?? null,
-        tags: getCachedAt(`browse:${appid}`) ?? null,
-        protondb: getCachedAt(`protondb:${appid}`) ?? null,
-      };
-      const ages = Object.values(fetchedAts);
+      const keys = Object.entries(DETAILS_SOURCES).map(([source, prefix]) => [source, `${prefix}:${appid}`]);
       return {
-        fetchedAt: ages.includes(null) ? null : Math.min(...ages),
-        fetchedAts,
+        fetchedAt: oldestCachedAt(keys.map(([, key]) => key)),
+        fetchedAts: Object.fromEntries(keys.map(([source, key]) => [source, getCachedAt(key) ?? null])),
         rating: ratingRes.status === 'fulfilled' ? ratingRes.value : null,
         hltb: hltbRes.status === 'fulfilled' ? hltbRes.value : null,
         meta: metaRes.status === 'fulfilled' ? metaRes.value : null,
@@ -759,8 +750,7 @@ app.get('/api/search-games', gameSearchLimit, async (req, res) => {
     const results = await searchStoreGames(term);
     res.json({ results });
   } catch (err) {
-    const status = routeErrorStatus('search-games', err);
-    res.status(status).json({ error: err.message });
+    sendRouteError(res, 'search-games', err);
   }
 });
 
@@ -785,8 +775,7 @@ app.get('/api/bundles', bundlesListLimit, requireItad, async (req, res) => {
       fetchedAt: getCachedAt(bundlesCacheKey({ country, offset, limit, sort, expired })) ?? null,
     });
   } catch (err) {
-    const status = routeErrorStatus('bundles', err);
-    res.status(status).json({ error: err.message });
+    sendRouteError(res, 'bundles', err);
   }
 });
 
@@ -814,8 +803,7 @@ app.get('/api/bundles/:id', bundlesByIdLimit, requireItad, async (req, res) => {
     const [bundle] = await withPickAndMix([found.bundle], { names: true });
     res.json({ bundle, fetchedAt: getCachedAt(found.cacheKey) ?? null });
   } catch (err) {
-    const status = routeErrorStatus('bundles-by-id', err);
-    res.status(status).json({ error: err.message });
+    sendRouteError(res, 'bundles-by-id', err);
   }
 });
 
@@ -841,8 +829,7 @@ app.post('/api/bundles/resolve', bundlesResolveLimit, requireItad, async (req, r
     const failed = unique.filter((gid) => !resolved.has(gid));
     res.json({ appids: Object.fromEntries(resolved), ...(failed.length && { failed }) });
   } catch (err) {
-    const status = routeErrorStatus('bundles-resolve', err);
-    res.status(status).json({ error: err.message });
+    sendRouteError(res, 'bundles-resolve', err);
   }
 });
 
@@ -898,8 +885,7 @@ app.post('/api/prices', pricesLimit, requireItad, async (req, res) => {
     // is worth stating rather than implying.
     res.json({ prices: out, fetchedAt: oldestCachedAt(gidsToPrice.map((gid) => `itad-price:${country}:${gid}`)) });
   } catch (err) {
-    const status = routeErrorStatus('prices', err);
-    res.status(status).json({ error: err.message });
+    sendRouteError(res, 'prices', err);
   }
 });
 
@@ -911,8 +897,7 @@ app.get('/api/game-bundles/:appid', gameBundlesLimit, requireItad, async (req, r
     const bundles = await getGameBundles(gid, { country: parseCountry(req), force: isForceRefresh(req) });
     res.json({ bundles: extractGameBundles(await withPickAndMix(bundles), gid) });
   } catch (err) {
-    const status = routeErrorStatus('game-bundles', err);
-    res.status(status).json({ error: err.message });
+    sendRouteError(res, 'game-bundles', err);
   }
 });
 
@@ -926,8 +911,7 @@ app.get('/api/game-meta/:appid', metaLimit, async (req, res) => {
   try {
     res.json({ meta: await getAppDetails(appid) });
   } catch (err) {
-    const status = routeErrorStatus('game-meta', err);
-    res.status(status).json({ error: err.message });
+    sendRouteError(res, 'game-meta', err);
   }
 });
 
@@ -940,8 +924,7 @@ app.get('/api/game-news/:appid', newsLimit, async (req, res) => {
     const news = await getGameNews(appid, { force: isForceRefresh(req) });
     res.json({ news });
   } catch (err) {
-    const status = routeErrorStatus('game-news', err);
-    res.status(status).json({ error: err.message });
+    sendRouteError(res, 'game-news', err);
   }
 });
 
@@ -960,10 +943,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
   // achieved/unlocktime state per item depends on steamids being present; see `playerCount`
   // in the response below, which the frontend uses to distinguish "no player was asked about"
   // from "a player was asked about but their data is unavailable" (private:true).
-  const rawIds = (req.query.steamids || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const rawIds = parseSteamIdsQuery(req);
   if (rawIds.length > MAX_USERS) {
     return res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
   }
@@ -1051,8 +1031,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
       ...(rarityFailed && { rarityFailed }),
     });
   } catch (err) {
-    const status = routeErrorStatus('achievements', err);
-    res.status(status).json({ error: err.message });
+    sendRouteError(res, 'achievements', err);
   }
 });
 
