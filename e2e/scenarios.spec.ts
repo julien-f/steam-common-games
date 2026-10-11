@@ -2,7 +2,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mockApi, respond } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
-import { ALICE, BOB, BUNDLE, SYNCED_LIST } from './fixtures.ts';
+import { ALICE, BOB, BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
 
 let pageErrors: string[];
 test.beforeEach(async ({ page }) => {
@@ -233,6 +233,20 @@ test('C1.4: compare three players — one table grouped from "all" to "only one"
   );
 });
 
+test('C1 edge: reverting to a saved ungrouped layout keeps the comparison grouped', async ({ page }) => {
+  await mockApi(page, { states: ['signed-in'] });
+  // The account's saved comparison view, with the grouping removed.
+  const now = Date.now();
+  const compareListView = { value: { groupBy: [], sorts: [{ key: 'name', dir: 'asc' }] }, updatedAt: now };
+  const prefs = { ...signedInPrefs(now), compareListView };
+  await page.route('**/api/me', (route) => route.fulfill({ json: { steamid: SIGNED_IN.steamid, prefs } }));
+  await page.goto('/lists/compare?u=alice&u=bob');
+  await expect(groupRows(page)).toHaveCount(3);
+  await page.getByRole('button', { name: 'Revert' }).click();
+  await expect(row(page, 'Hades')).toBeVisible(); // the reverted name sort applies…
+  await expect(groupRows(page)).toHaveCount(3); // …but the comparison stays grouped
+});
+
 test('C1 edge: my account comes first, is prefilled, and only once', async ({ page }) => {
   await asPlayer(page, BOB); // Bob's steamid sorts after Alice's
   await page.goto('/lists/compare?u=alice&u=bob');
@@ -286,6 +300,44 @@ test('C1 edge: an unknown player is named, and the others still compare', async 
   // Checked by what's gone: the route also rewrites players to canonical steam64 ids.
   await expect(page).not.toHaveURL(/nobody-here/);
   await expect(groupRows(page)).toHaveCount(3);
+});
+
+test('C1 edge: the bare Compare link after an unknown player starts clean', async ({ page }) => {
+  await page.goto('/lists/compare?u=alice&u=nobody-here');
+  await expect(page.getByRole('alert')).toContainText('nobody-here');
+  await page.getByRole('navigation').getByRole('link', { name: 'Compare' }).click();
+  await expect(page.locator('.compare-form')).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.locator('.compare-token.is-invalid')).toHaveCount(0);
+});
+
+test('L1 edge: following a formula link from Edit sources opens the source closed', async ({ page }) => {
+  const list = (id: string, fields: object) => ({
+    id,
+    parentId: null,
+    order: 0,
+    createdAt: 0,
+    updatedAt: 0,
+    ...fields,
+  });
+  const lists = [
+    list('picks', { name: 'Picks', kind: 'manual', appids: [620, 105600] }),
+    list('inner', { name: 'Inner', kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: 'picks' }] }),
+    list('outer', { name: 'Outer', kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: 'inner' }] }),
+  ];
+  await page.addInitScript(
+    (blob) => {
+      if (!sessionStorage.getItem('e2e-seeded')) localStorage.setItem('steam.isonoe.net:prefs', blob);
+      sessionStorage.setItem('e2e-seeded', '1');
+    },
+    JSON.stringify({ schemaVersion: 2, lists: { value: lists, updatedAt: 0 } }),
+  );
+  await page.goto('/lists/outer');
+  await page.getByRole('button', { name: 'Edit sources' }).click();
+  await page.locator('.list-formula').getByRole('link', { name: 'Inner' }).click();
+  await expect(page.getByRole('heading', { name: 'Inner' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit sources' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cancel' })).toHaveCount(0);
 });
 
 test('L1.1-3: select games, add them to a new list, open it', async ({ page }) => {
@@ -610,6 +662,25 @@ test('B1 edge: games ITAD lists under the first tier only show the tier range', 
   await expect(page.locator('#panel-body').getByTitle(/doesn't say which tier/)).toHaveText('€5.00–€12.00 tier');
 });
 
+test("B2 edge: another region's prices state their own age, not the previous region's", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  const threeDaysAgo = Date.now() - 3 * 86400_000;
+  await page.route(/\/api\/prices\?/, (route) => {
+    const req = route.request();
+    const { body } = respond(req.method(), new URL(req.url()), req.postData());
+    return route.fulfill({ json: { ...JSON.parse(body), fetchedAt: threeDaysAgo } });
+  });
+  await page.goto('/lists/wishlist');
+  const prices = page.locator('.list-stat', { hasText: 'Prices' });
+  await expect(prices).toContainText('3 days ago');
+
+  await page.unroute(/\/api\/prices\?/);
+  await page.getByTitle('Preferences').click();
+  await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
+  await expect(prices).toContainText('United States');
+  await expect(prices).toContainText('just now');
+});
+
 test("B4 edge: a friend's empty wishlist says it may be private, where the table would be", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/wishlist?u=carol'); // Carol has no wishlist in the fixtures
@@ -661,6 +732,36 @@ test('D1 edge: Updated ↻ keeps the rows and the selection while it refreshes',
   await expect(page.locator('.list-stat', { hasText: 'Updated' })).not.toContainText('Refreshing');
   await expect(rows(page)).toHaveCount(6);
   await expect(row(page, 'Portal 2').getByRole('checkbox')).toBeChecked();
+});
+
+test('D1 edge: a failed Updated ↻ leaves the tile there to try again', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare?u=alice&u=bob');
+  await expect(groupRows(page)).toHaveCount(3);
+  await page.route('**/api/common-games', (route) =>
+    route.fulfill({ status: 502, json: { error: 'Steam request failed' } }),
+  );
+  const updated = page.locator('.list-stat', { hasText: 'Updated' });
+  await updated.click();
+  await expect(page.getByRole('main')).toContainText('Steam request failed');
+  await expect(updated).not.toContainText('Refreshing');
+  await expect(page.locator('.list-formula')).toBeVisible();
+
+  await page.unroute('**/api/common-games');
+  await updated.click();
+  await expect(page.getByRole('main')).not.toContainText('Steam request failed');
+});
+
+test('D1 edge: an Owned list that failed to load still offers Updated ↻', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.route('**/api/common-games', (route) =>
+    route.fulfill({ status: 502, json: { error: 'Steam request failed' } }),
+  );
+  await page.goto('/lists/owned');
+  await expect(page.getByRole('main')).toContainText('Steam request failed');
+  await page.unroute('**/api/common-games');
+  await page.locator('.list-stat', { hasText: 'Updated' }).click();
+  await expect(rows(page)).toHaveCount(6);
 });
 
 test('D2.1-2: with upstreams down, every game is still listed', async ({ page }) => {
@@ -1206,6 +1307,25 @@ test('F1 edge: on desktop, a trailer sits between the toolbar and its controls, 
   const controls = (await page.locator('.lb-vctrls').boundingBox())!;
   expect(video.y).toBeGreaterThanOrEqual(toolbar.y + toolbar.height);
   expect(video.y + video.height).toBeLessThanOrEqual(controls.y);
+});
+
+test("F3 edge: the panel's ↑/↓ follow the table's current search, and hide once the game is out of it", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const pos = page.locator('.panel-nav-pos');
+  await expect(pos).toHaveText(/ \/ 6$/);
+  const search = page.locator('.dt-search-input');
+
+  await search.fill('Hollow');
+  await expect(pos).toHaveText(''); // Hades isn't in the search any more
+  await expect(page.getByRole('button', { name: 'Next game' })).toBeHidden();
+
+  await search.fill('Ha');
+  await expect(pos).toHaveText('1 / 1');
+  await page.getByRole('button', { name: 'Next game' }).click(); // the search's only game: itself
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
 });
 
 test("F1 edge: the viewer's game stepper shows on hover or focus with a mouse, always on touch", async ({

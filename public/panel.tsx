@@ -46,6 +46,7 @@ import { bestPickRate, bundleUrgency, fmtBundleDateFriendly, pickTiers } from '.
 import { formatWithEstimate } from './currency.ts';
 import { regionCurrency } from './region.ts';
 import { nextHopHistory } from './panelHistory.ts';
+import { clearPanelNav } from './panelNav.ts';
 import type { PanelHistoryEntry } from './panelHistory.ts';
 import { setGameTitle } from './pageTitle.ts';
 import { PRICES_UNAVAILABLE } from './priceLoading.ts';
@@ -690,7 +691,7 @@ export function panelClose({ leavingRoute = false } = {}) {
   setPanelHistory([]);
   pendingHopAppid = null;
   document.getElementById('game-panel')!.classList.remove('open');
-  document.getElementById('panel-nav')?.replaceChildren();
+  clearPanelNav();
   panelPrevFocus?.focus();
   panelPrevFocus = null;
   // Every close path funnels through here — the × button is bound straight to this function

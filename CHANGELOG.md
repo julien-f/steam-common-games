@@ -59,6 +59,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The screenshot viewer no longer reopens with its controls hidden after closing it on a playing trailer, and swiping off a playing trailer no longer brings all its controls back
 - In the screenshot viewer, ↑ or ↓ with no other game to go to no longer makes the next screenshot slide in from below
 - Grouping by price now spreads yen, won, rupee and other far-from-dollar prices across the tiers instead of putting them all in "100+"
+- Reverting a comparison to a saved layout without its grouping no longer ungroups it
+- A list refresh that fails, or a first load that fails, keeps the Updated tile to retry from
+- Prices state their own age after switching list, account or region, not the previous one's
+- The Compare link after a comparison with an unknown player opens a clean form
+- Following a source link from an open Edit sources form opens that list with its form closed
+- The side panel's ↑/↓ follow the table's current sort and filter, and hide when the open game isn't in it
 
 ### Development
 

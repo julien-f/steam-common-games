@@ -606,8 +606,12 @@ export default function ListRoute() {
   // a manual list, the recent list) — which is not the same as `null`, "fetched fresh just now".
   const [fetchedAt, setFetchedAt] = createSignal<number | null | undefined>(undefined);
   // A comparison/dynamic list is built from several account fetches, each with its own age.
+  // A refresh keeps the previous age on screen until its first fetch replaces it.
+  let replaceFetchedAt = false;
   function noteFetchedAt(at: number | null): void {
-    setFetchedAt((prev) => oldestFetchedAt(prev, at));
+    const replace = replaceFetchedAt;
+    replaceFetchedAt = false;
+    setFetchedAt((prev) => oldestFetchedAt(replace ? undefined : prev, at));
   }
   const [refreshing, setRefreshing] = createSignal(false);
   // The Prices tile's own refresh (wishlist/bundle kinds). Deliberately one control
@@ -735,6 +739,17 @@ export default function ListRoute() {
   let table: TableState<Game> | null = null;
   let disposeTable: (() => void) | null = null;
   let unsyncView: (() => void) | null = null;
+  let tableGrouped = false;
+  // Every view applied to the table (restored, shared, reset, reverted) goes through this, so a
+  // group-by-membership table stays grouped by it and a flat one never is.
+  function applyView(view: object): void {
+    if (!table) return;
+    table.setViewState(view);
+    const applied = table.getViewState();
+    const adjusted = tableGrouped ? withMembershipGrouping(applied) : withoutMembershipGrouping(applied);
+    if (adjusted !== applied) table.setViewState(adjusted);
+  }
+  const viewTable = { setViewState: applyView, getViewState: () => table?.getViewState() ?? {} };
   // Set only for kind === 'user' — its own per-list tableView, not a shared pref key. A signal
   // (not a plain variable, unlike most of this component's other imperative state) specifically
   // because the selection toolbar's JSX reads it reactively: /lists/:listId is one route
@@ -806,7 +821,6 @@ export default function ListRoute() {
       setStatusText((err as Error).message);
       return;
     }
-    setEditingRankedSource(false);
     void load();
   }
   // What "Rank this list" ranks — null where there's nothing stable to point at (an unsaved
@@ -1039,7 +1053,6 @@ export default function ListRoute() {
     const list = userList();
     if (!list) return;
     updateDynamicList(list.id, input.op, input.sources);
-    setEditingSources(false);
     void load();
   }
   // kind === 'user', dynamic lists only — "Share list" encodes this list's own formula (inlining
@@ -1085,15 +1098,10 @@ export default function ListRoute() {
   // Names this comparison's own accounts in the formula/group headings. They're resolved from the
   // URL, so they're typically in no store at all — createDefaultNaming would fall back to naming
   // them by raw steam64 id.
-  // Turns the comparison on screen into a real stored list, keeping the same formula — the one
-  // step between "I shared a link with a friend" and "this is a list I keep". Deliberately
-  // unnamed: an unnamed dynamic list is labeled by its own formula everywhere (listLabels.ts),
-  // which is already exactly what a comparison is called, and that label keeps following the
-  // accounts if one of them is renamed later.
+  // Named as its page was ("Alice vs. Bob"): the formula's own label reads differently.
   function handleSaveComparison(): void {
     const list = compareList();
     if (!list) return;
-    // Named as its page was ("Alice vs. Bob"), not by its formula, which reads differently.
     const saved = createList({ kind: 'dynamic', name: heroTitle() || undefined, op: list.op, sources: list.sources });
     navigate(`/lists/${saved.id}`);
   }
@@ -1229,9 +1237,10 @@ export default function ListRoute() {
   function activeTable(): TableState<Game> | null {
     return table;
   }
+  // Reads tableReady so a caller tracking this list (the panel's nav bar) follows a table rebuild.
   function getGameList(): Game[] {
     const t = activeTable();
-    return t ? t.processedData() : [];
+    return tableReady() && t ? t.processedData() : [];
   }
 
   // Scoped by specific id — kind/listId alone would collide between two different bundles/user
@@ -1277,6 +1286,8 @@ export default function ListRoute() {
       disposeTable();
       disposeTable = null;
     }
+    unsyncView?.();
+    unsyncView = null;
     table = null;
     setGroupCount(0);
     setRowsStore([]);
@@ -1311,7 +1322,7 @@ export default function ListRoute() {
   }
 
   function renderPanelNav(game: Game): void {
-    renderPanelNavShared({ hasList: !!activeTable(), game, getGameList, onOpen: openGame, onReroll: pickRandomGame });
+    renderPanelNavShared({ hasList: !!activeTable(), game, getGameList, onStep: stepGame, onReroll: pickRandomGame });
   }
 
   function openGame(game: Game, { isRandom = false }: { isRandom?: boolean } = {}): void {
@@ -1820,7 +1831,7 @@ export default function ListRoute() {
   const [viewingShared, setViewingShared] = createSignal(false);
   function handleDiscardSharedView(): void {
     const list = userList();
-    table?.setViewState(list ? (getList(list.id)?.tableView ?? {}) : getPref(viewPrefKey(), {}));
+    applyView(list ? (getList(list.id)?.tableView ?? {}) : getPref(viewPrefKey(), {}));
     setViewingShared(false);
   }
 
@@ -1848,13 +1859,13 @@ export default function ListRoute() {
     if (!table) return;
     const list = userList();
     if (list) {
-      table.setViewState({});
+      applyView({});
       setListTableView(list.id, {});
       const urlParams = new URLSearchParams(routerLocation.search);
       urlParams.delete(viewParamName());
       history.replaceState(null, '', urlWithParams(urlParams));
     } else {
-      resetTableView(table, viewPrefKey(), viewParamName());
+      resetTableView(viewTable, viewPrefKey(), viewParamName());
     }
   }
 
@@ -1870,7 +1881,7 @@ export default function ListRoute() {
   }
   function handleRevertView(): void {
     if (!table) return;
-    revertTableViewToServer(table, viewPrefKey());
+    revertTableViewToServer(viewTable, viewPrefKey());
   }
 
   function viewActions() {
@@ -1932,6 +1943,9 @@ export default function ListRoute() {
     loadSamples = [];
     slowLoad = false;
     setLoadFraction(null);
+    // Prices are re-fetched for whatever this load lists; the previous list's age and error don't apply.
+    setPriceFetchedAt(undefined);
+    setPriceStatusText('');
     // Bundle-detail state belongs to the bundle being left — stepping ‹/› to the next one reuses
     // this component instance, so a stale card/"not on Steam" list would otherwise sit there
     // describing the previous bundle until the new fetch resolved.
@@ -1951,11 +1965,15 @@ export default function ListRoute() {
       setHeroTitle('');
       setHeroAccount(null);
     }
-    setListSources([]);
     bundleLeftOut = new Map();
     // Every kind that has one re-reports it during this load; a kind that doesn't (manual list,
-    // recents) must not keep showing the previous list's.
-    setFetchedAt(undefined);
+    // recents) must not keep showing the previous list's. A refresh keeps both until replaced, so
+    // a failed one leaves the Updated tile and the formula line to try again from.
+    replaceFetchedAt = refresh;
+    if (!refresh) {
+      setListSources([]);
+      setFetchedAt(undefined);
+    }
 
     let initialRows: Game[];
     let streamTargets: { appid: number }[];
@@ -1969,6 +1987,8 @@ export default function ListRoute() {
       setCompareList(null);
       setRankedSource(null);
       setRankingState(null);
+      setEditingSources(false);
+      setEditingRankedSource(false);
     }
     if (!kept) setSelectedRows([]); // a fresh load means a fresh table — nothing carries a prior selection over
     setSelectionActionStatus(null);
@@ -1976,6 +1996,8 @@ export default function ListRoute() {
     if (kind === 'compare') {
       const slots = compareSlots();
       loadedCompareKeys = new Set([compareKey()]);
+      setCompareFailures([]);
+      if (!refresh) setEditingPlayers(false);
       // Under two players there's nothing to compare — the players form renders in place of the
       // table (see the JSX below), so this is an empty state, not an error.
       if (slots.length < 2) {
@@ -1985,7 +2007,6 @@ export default function ListRoute() {
 
       setListTitle(slots.map((slot) => slot.join(' + ')).join(' vs. '));
       setStatusText('Resolving accounts…');
-      setCompareFailures([]);
       const settled = await Promise.allSettled(
         slots.map(async (identifiers): Promise<AccountSlot> => {
           const summary = await resolveAccountSummary(identifiers);
@@ -2464,6 +2485,7 @@ export default function ListRoute() {
         return state;
       });
       table = ts;
+      tableGrouped = !!groups;
       const disposeView = render(
         () =>
           DataTableView<Game>({
@@ -2494,16 +2516,13 @@ export default function ListRoute() {
         // reuse that helper directly — same reasoning handleResetView gives on the reset side.
         const list = userList()!;
         const shared = takeSharedView(viewParamName());
-        table.setViewState(shared ?? list.tableView ?? {});
+        applyView(shared ?? list.tableView ?? {});
         setViewingShared(shared != null);
         unsyncView = bindSolidViewPersistence(table, (view) => setListTableView(list.id, view), viewingShared);
       } else {
-        setViewingShared(restoreTableView(table, viewPrefKey(), viewParamName()));
+        setViewingShared(restoreTableView(viewTable, viewPrefKey(), viewParamName()));
         unsyncView = bindSolidViewPersistence(table, (view) => setPref(viewPrefKey(), view), viewingShared);
       }
-      const restored = table.getViewState();
-      const adjusted = groups ? withMembershipGrouping(restored) : withoutMembershipGrouping(restored);
-      if (adjusted !== restored) table.setViewState(adjusted);
       if (keptSelection?.size) table.selection.setAll(tableData().filter((row) => keptSelection.has(row.appid)));
       setTableReady(true);
     }
@@ -2812,11 +2831,13 @@ export default function ListRoute() {
     // Owned/wishlist state their own fetch's age; a comparison or a dynamic list states the
     // oldest of the account fetches it was built from (noteFetchedAt), which is why this is
     // gated on there *being* an age rather than on the kind — a manual list is assembled from
-    // stored appids and has none, and neither does the recent list.
-    if (fetchedAt() !== undefined || refreshing()) {
+    // stored appids and has none, and neither does the recent list. The kinds always built from
+    // account fetches keep it without one too: a first load that failed is when a retry is wanted.
+    const accountBuilt = kind === 'owned' || kind === 'wishlist' || kind === 'compare';
+    if (fetchedAt() !== undefined || refreshing() || accountBuilt) {
       tiles.push({
         label: 'Updated',
-        value: refreshTileValue(refreshing() ? 'Refreshing…' : fmtAge(fetchedAt())),
+        value: refreshTileValue(refreshing() ? 'Refreshing…' : fetchedAt() === undefined ? '—' : fmtAge(fetchedAt())),
         title:
           kind === 'owned' || kind === 'wishlist'
             ? "How old the server's cached copy of this account's list is — click to force a fresh fetch"
@@ -3170,6 +3191,7 @@ export default function ListRoute() {
     // from the price lookup.
     const onRegionChange = () => {
       setRegionCode(resolveRegion(getStoredRegion()));
+      setPriceFetchedAt(undefined);
       if (hasPrices())
         void loadWishlistPrices(
           rowsStore.map((r) => ({ appid: r.appid })),
