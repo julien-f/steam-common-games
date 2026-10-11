@@ -313,6 +313,8 @@ test('dealRecordTier: null for a deal with no discount, even at the historical l
   assert.equal(dealRecordTier(20, { lowAll: 20, bestDealCut: 0 }), null);
   assert.equal(dealRecordTier(20, { lowAll: 20, steamRegular: 20 }), null);
   assert.equal(dealRecordTier(19, { lowAll: 20, steamRegular: 20 }).tier, 'all-time');
+  // A sub-1% discount rounds its cut to 0, but it is still below Steam's regular price.
+  assert.equal(dealRecordTier(59.79, { lowAll: 59.89, bestDealCut: 0, steamRegular: 59.99 }).tier, 'all-time');
 });
 
 test('dealRecordTier: a missing individual low is skipped in favor of a matching one further down the list', () => {

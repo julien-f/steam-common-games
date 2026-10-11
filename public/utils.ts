@@ -196,7 +196,8 @@ export function dealRecordTier(
   } | null,
 ): DealRecordTier | null {
   if (price == null) return null;
-  if (lows?.bestDealCut === 0 || (lows?.steamRegular != null && price >= lows.steamRegular)) return null;
+  // The cut is rounded, so it decides only when Steam's regular price is unknown.
+  if (lows?.steamRegular != null ? price >= lows.steamRegular : lows?.bestDealCut === 0) return null;
   for (const t of DEAL_RECORD_TIERS) {
     const low = lows?.[t.low];
     if (low != null && price <= low) return t;
