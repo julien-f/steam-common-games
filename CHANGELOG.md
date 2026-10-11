@@ -65,6 +65,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The Compare link after a comparison with an unknown player opens a clean form
 - Following a source link from an open Edit sources form opens that list with its form closed
 - The side panel's ↑/↓ follow the table's current sort and filter, and hide when the open game isn't in it
+- When the current account's library can't be loaded, games now show their ownership as unknown instead of "Not Owned"
 
 ### Development
 

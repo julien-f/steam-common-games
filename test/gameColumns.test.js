@@ -106,6 +106,9 @@ test('computeOwnershipStatus: unknown vs. each combination', () => {
     [{ inLibrary: true, onWishlist: false }, 'Owned'],
     [{ inLibrary: false, onWishlist: true }, 'Wishlisted'],
     [{ inLibrary: true, onWishlist: true }, 'Owned & Wishlisted'],
+    [{ inLibrary: null, onWishlist: false }, null],
+    [{ inLibrary: null, onWishlist: true }, 'Wishlisted'],
+    [{ inLibrary: false, onWishlist: null }, 'Not Owned'],
   ]) {
     assert.equal(computeOwnershipStatus(row), expected, JSON.stringify(row));
   }

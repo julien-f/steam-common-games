@@ -18,7 +18,6 @@ None open.
 
 ## Correctness
 
-- **C67 · major · S** — a failed owned/wishlist fetch becomes an empty set at `public/myOwnership.ts:89` and `cachedAccountId` stays set, so for the rest of the session every row reads "Not Owned", Played shows "—", panel badges and search ✓ vanish. Keep a per-half failed marker so peeks return unknown, and reset `cachedAccountId` so the next `ensureLoading` retries.
 - **C70 · minor · S** — narrowed: a failed refresh now keeps the Updated tile for every kind, but a dynamic or shared list that failed before it ever fetched still shows no tile, since `public/ListRoute.tsx` only renders it without an age for owned, wishlist and comparison lists. Render it for any list built from account sources (walking its sources), as frontend.md's "rendered unconditionally" asks.
 
 ## Security

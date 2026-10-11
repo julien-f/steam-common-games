@@ -632,10 +632,10 @@ export const PRICE_STATUS_COLUMN: ColumnDef<Row> = {
 // dedicated column is a secondary, sort/group/filter-only view onto the same fact rather than
 // something worth defaulting to visible.
 export function computeOwnershipStatus(row: Row): string | null {
-  if (row.inLibrary == null && row.onWishlist == null) return null;
   if (row.inLibrary && row.onWishlist) return 'Owned & Wishlisted';
   if (row.inLibrary) return 'Owned';
   if (row.onWishlist) return 'Wishlisted';
+  if (row.inLibrary == null) return null; // not loaded yet, or the owned fetch failed
   return 'Not Owned';
 }
 // Single source of truth for both this column's sort order/visual styling AND renderNameCell's

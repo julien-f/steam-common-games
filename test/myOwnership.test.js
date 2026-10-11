@@ -40,9 +40,10 @@ function withFetch(t, handler) {
 
 // A minimal /api/common-games + /api/wishlist responder for one account id ("1" by default),
 // owning `ownedAppids` and wishlisting `wishlistAppids`.
-function fakeAccountFetch({ ownedAppids = [], wishlistAppids = [], failWishlist = false } = {}) {
+function fakeAccountFetch({ ownedAppids = [], wishlistAppids = [], failWishlist = false, failOwned = false } = {}) {
   return async (url) => {
     if (url === '/api/common-games') {
+      if (failOwned) return { ok: false, json: async () => ({ error: 'Steam API error 502' }) };
       return {
         ok: true,
         json: async () => ({
@@ -77,12 +78,22 @@ test('getMyOwnershipStatus: resolves inLibrary/onWishlist against currentAccount
   assert.deepEqual(await getMyOwnershipStatus(999), { inLibrary: false, onWishlist: false });
 });
 
-test('getMyOwnershipStatus: a failed wishlist fetch still resolves inLibrary, wishlisted false rather than throwing', async (t) => {
+test('getMyOwnershipStatus: a failed wishlist fetch still resolves inLibrary, wishlisted unknown rather than throwing', async (t) => {
   withFetch(t, fakeAccountFetch({ ownedAppids: [440], failWishlist: true }));
   setCurrentAccount(makeAccount('1'));
 
   const { getMyOwnershipStatus } = createMyOwnershipCache();
-  assert.deepEqual(await getMyOwnershipStatus(440), { inLibrary: true, onWishlist: false });
+  assert.deepEqual(await getMyOwnershipStatus(440), { inLibrary: true, onWishlist: null });
+});
+
+test('a failed owned fetch reads as unknown, not as owning nothing', async (t) => {
+  withFetch(t, fakeAccountFetch({ wishlistAppids: [620], failOwned: true }));
+  setCurrentAccount(makeAccount('1'));
+
+  const { getMyOwnershipStatus, peekMyOwnershipStatus, peekMyPlaytime } = createMyOwnershipCache();
+  assert.deepEqual(await getMyOwnershipStatus(440), { inLibrary: null, onWishlist: false });
+  assert.deepEqual(peekMyOwnershipStatus(620), { inLibrary: null, onWishlist: true });
+  assert.equal(peekMyPlaytime(440), undefined);
 });
 
 test('getMyOwnershipStatus: only fetches once per loaded account — a second appid check reuses the cached sets', async (t) => {
