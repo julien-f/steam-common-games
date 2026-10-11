@@ -97,11 +97,11 @@ import {
 } from './utils.ts';
 import {
   restoreTableView,
-  takeSharedView,
   shareTableView,
   resetTableView,
   bindViewPersistence,
-  VIEW_PARAM,
+  prefViewStore,
+  type ViewStore,
 } from './tableViewPrefs.ts';
 import { renderPanelNav as renderPanelNavShared, stepGameList } from './panelNav.ts';
 import { createRowStore } from './rowStore.ts';
@@ -121,14 +121,12 @@ import {
 } from './panel.tsx';
 import {
   setPanelParam,
-  urlWithParams,
   withAccountParam,
   parseUrlState,
   normalizeSlots,
   compareUrl,
   DEFAULT_COMPARE_OP,
 } from './urlState.ts';
-import { getPref, setPref } from './prefs.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
 import { UnsavedViewBanner, ViewActions } from './UnsavedViewBanner.tsx';
 import { etaSeconds, formatEta, type LoadSample } from './loadProgress.ts';
@@ -564,9 +562,7 @@ export default function ListRoute() {
   const kind = kindFromPath(routerLocation.pathname, params);
 
   let tableContainer!: HTMLDivElement;
-  // A comparison's players who own each game, for the panel's Owned by (getOwners below).
-  let compareOwners: Map<number, GameOwner[]> | null = null;
-  // Each compared player's label and the games their account owns, in `compareAccounts` order.
+  // Each compared player's label and owned games, in `compareAccounts` order (also the panel's Owned by, see getOwners).
   let comparePlayers: { label: string; owners: Map<number, GameOwner[]> }[] = [];
   const [statusText, setStatusText] = createSignal('');
   const [priceStatusText, setPriceStatusText] = createSignal('');
@@ -610,12 +606,15 @@ export default function ListRoute() {
     setRefreshingPrices(true);
     setPriceFetchedAt(undefined);
     try {
-      const gen = loadGuard.current();
-      if (kind === 'bundle' && resolvedBundleGames) await loadPrices(resolvedBundleGames, gen, true);
-      else if (hasPrices()) await loadPrices(rowsStore, gen, true);
+      const targets = priceTargets();
+      if (targets) await loadPrices(targets, loadGuard.current(), true);
     } finally {
       setRefreshingPrices(false);
     }
+  }
+  // A bundle's games are priced by their resolved ITAD gid, a priced list's rows by appid.
+  function priceTargets(): readonly { appid: number; gid?: string }[] | null {
+    return resolvedBundleGames ?? (hasPrices() ? rowsStore : null);
   }
 
   async function handleRefreshList(): Promise<void> {
@@ -795,13 +794,17 @@ export default function ListRoute() {
     const list = userList();
     return list && list.kind !== 'ranked' ? { kind: 'user', listId: list.id } : null;
   }
+  // The rows a filter left visible; null when no filter hides any.
+  function filteredRows(): Game[] | null {
+    if (!tableReady() || !table) return null; // `table` isn't a signal; tableReady() is
+    const visible = table.processedData();
+    return visible.length < table.data().length ? visible : null;
+  }
   // What "Rank this list" asks about first: the selection, else the filtered rows (null = all, [] = the filter hides every row).
   function rankThisListFocus(): number[] | null {
     const selected = selectedRows();
     if (selected.length) return selected.map((r) => r.appid);
-    if (!tableReady() || !table) return null; // `table` isn't a signal; tableReady() is
-    const visible = table.processedData();
-    return visible.length < table.data().length ? visible.map((r) => r.appid) : null;
+    return filteredRows()?.map((r) => r.appid) ?? null;
   }
   function rankThisListLabel(): string {
     const focus = rankThisListFocus();
@@ -884,12 +887,14 @@ export default function ListRoute() {
     table?.selection.clear();
     navigate(`/lists/${list.id}/rank`, { state: { rankFocus: focus, rankOrder: focus } });
   }
+  // Those of `rows` neither ranked nor excluded yet.
+  function unrankedOf(rows: readonly Game[]): number[] {
+    const excluded = new Set(ranking()?.excluded ?? []);
+    return rows.filter((r) => r.rank == null && !excluded.has(r.appid)).map((r) => r.appid);
+  }
   // The selected games still to be ranked — what "Compare selected" asks about.
   function selectedUnranked(): number[] {
-    const excluded = new Set(ranking()?.excluded ?? []);
-    return selectedRows()
-      .filter((r) => r.rank == null && !excluded.has(r.appid))
-      .map((r) => r.appid);
+    return unrankedOf(selectedRows());
   }
   // The unranked games in the table's current sort (filters included — what's left out is asked
   // after, in source order), so whatever the user sorted first gets ranked first.
@@ -900,11 +905,8 @@ export default function ListRoute() {
   // it survives a reload of the compare screen and is gone once it's navigated away from.
   // The shown games still to be ranked when a filter hides some — what "Compare" then asks about.
   function filteredUnranked(): number[] | null {
-    if (!tableReady() || !table) return null;
-    const visible = table.processedData();
-    if (visible.length >= table.data().length) return null;
-    const excluded = new Set(ranking()?.excluded ?? []);
-    return visible.filter((r) => r.rank == null && !excluded.has(r.appid)).map((r) => r.appid);
+    const visible = filteredRows();
+    return visible && unrankedOf(visible);
   }
   function compareLabel(): string {
     const focus = filteredUnranked();
@@ -1051,10 +1053,8 @@ export default function ListRoute() {
   }
   // The comparison a load has already done, in both spellings of it — see load()'s own guard.
   let loadedCompareKeys = new Set<string>();
-  function compareKey(): string {
-    return `${compareOp()}|${compareSlots()
-      .map((slot) => slot.join(','))
-      .join('|')}`;
+  function compareKey(op = compareOp(), slots = compareSlots()): string {
+    return `${op}|${slots.map((slot) => slot.join(',')).join('|')}`;
   }
   // Names this comparison's own accounts in the formula/group headings. They're resolved from the
   // URL, so they're typically in no store at all — createDefaultNaming would fall back to naming
@@ -1381,12 +1381,16 @@ export default function ListRoute() {
     openLightbox(game, shot);
   }
 
+  // Says so in the status line when it isn't.
+  function isValidAppid(appid: number): boolean {
+    if (Number.isInteger(appid) && appid > 0) return true;
+    setStatusText('Invalid game id.');
+    return false;
+  }
+
   async function openStandaloneInPlace(appid: number): Promise<void> {
     const token = ++standaloneLookupToken;
-    if (!Number.isInteger(appid) || appid <= 0) {
-      setStatusText('Invalid game id.');
-      return;
-    }
+    if (!isValidAppid(appid)) return;
     // No `App <appid>` placeholder in the data — panel.tsx's own title renders that fallback, so
     // the empty name here stays honest ("not resolved yet") for everything else that reads it.
     setStandaloneRows(appid, { appid, name: '', loading: true, details: null, standalone: true } as Game);
@@ -1440,10 +1444,7 @@ export default function ListRoute() {
       openGame(existing);
       return;
     }
-    if (!Number.isInteger(appid) || appid <= 0) {
-      setStatusText('Invalid game id.');
-      return;
-    }
+    if (!isValidAppid(appid)) return;
     const placeholder: Game = { appid, name: '', loading: true, details: null };
     const rows = [placeholder, ...rowsStore];
     setRowsStore(rows);
@@ -1718,7 +1719,7 @@ export default function ListRoute() {
     });
   }
 
-  // Unused for kind === 'user' (its view lives on the list itself, see handleResetView below) —
+  // Unused for kind === 'user' (its view lives on the list itself, see viewStore below) —
   // kept total anyway so a stray call never returns undefined.
   function viewPrefKey(): string {
     if (kind === 'wishlist') return 'wishlistListView';
@@ -1733,17 +1734,19 @@ export default function ListRoute() {
     if (kind === 'recent') return 'recentListView';
     return 'ownedListView';
   }
+  // A user list keeps its own view (GameList.tableView); every other kind shares one pref key per kind.
+  function viewStore(): ViewStore {
+    const list = userList();
+    return list
+      ? { load: () => getList(list.id)?.tableView ?? {}, save: (view) => setListTableView(list.id, view) }
+      : prefViewStore(viewPrefKey());
+  }
   // "🔗 Share view"/"Default view" — see tableViewPrefs.ts for the share-on-demand-only reasoning
-  // (a link written to the live URL goes stale the moment the table changes again). A user list's
-  // view is persisted on the list itself (GameList.tableView, see the single-table branch of
-  // load() below), not through prefs.ts, so its own reset goes around resetTableView rather than
-  // through it — reusing that shared helper here would clear the wrong (shared, kind-generic)
-  // pref key instead of this specific list's own stored view.
+  // (a link written to the live URL goes stale the moment the table changes again).
   // A 🔗 Share view link's layout, on screen but not saved (see restoreTableView).
   const [viewingShared, setViewingShared] = createSignal(false);
   function handleDiscardSharedView(): void {
-    const list = userList();
-    applyView(list ? (getList(list.id)?.tableView ?? {}) : getPref(viewPrefKey(), {}));
+    applyView(viewStore().load());
     setViewingShared(false);
   }
 
@@ -1768,17 +1771,7 @@ export default function ListRoute() {
     shareTableView(table, btn, u ? { u: u.join(',') } : {});
   }
   function handleResetView(): void {
-    if (!table) return;
-    const list = userList();
-    if (list) {
-      applyView({});
-      setListTableView(list.id, {});
-      const urlParams = new URLSearchParams(routerLocation.search);
-      urlParams.delete(VIEW_PARAM);
-      history.replaceState(null, '', urlWithParams(urlParams));
-    } else {
-      resetTableView(viewTable, viewPrefKey());
-    }
+    if (table) resetTableView(viewTable, viewStore());
   }
 
   function viewActions() {
@@ -1851,9 +1844,9 @@ export default function ListRoute() {
     }
 
     let initialRows: Game[];
-    let streamTargets: { appid: number }[];
     resolvedBundleGames = null;
-    let pendingGroups: MembershipGroup[] | null = null;
+    // Cast, not annotated: resolveRows sets it, which flow narrowing from `= null` would miss.
+    let pendingGroups = null as MembershipGroup[] | null;
     // Not cleared on a ↻ Refresh of the list already on screen, for the same reason heroTitle
     // isn't (above): these back the hero's own tiles, and emptying them mid-refresh unmounts the
     // tile strip — including the Updated tile the refresh was just clicked on.
@@ -1868,25 +1861,31 @@ export default function ListRoute() {
     if (!kept) setSelectedRows([]); // a fresh load means a fresh table — nothing carries a prior selection over
     setSelectionActionStatus(null);
 
-    // Resolves a dynamic or user list and shows its sources; a group-by-membership result keeps its
-    // groups. null once stale, or failed (said in the status line).
+    // Resolves a dynamic or user list into placeholder rows and shows its sources; a
+    // group-by-membership result keeps its groups. null once stale, or failed (said in the status line).
     const resolveRows = async (
       list: GameList,
       fetchers: ListResolveFetchers,
       toSources: (sources: ResolvedSource[]) => ReturnType<typeof listSources>,
-    ): Promise<{ appids: Set<number>; groups: MembershipGroup[] | null } | null> => {
+    ): Promise<{ appids: Set<number>; rows: Game[] } | null> => {
       try {
         const { result, sources } = await resolveListWithSources(list, fetchers);
         if (loadGuard.isStale(gen)) return null;
         setListSources(toSources(sources));
-        return Array.isArray(result)
-          ? { appids: new Set(result.flatMap((g) => g.appids)), groups: result }
-          : { appids: flattenCombineResult(result), groups: null };
+        pendingGroups = Array.isArray(result) ? result : null;
+        const appids = Array.isArray(result) ? new Set(result.flatMap((g) => g.appids)) : flattenCombineResult(result);
+        return { appids, rows: [...appids].map((appid) => ({ appid, name: '', loading: true, details: null })) };
       } catch (err) {
         if (!loadGuard.isStale(gen)) setStatusText(`Error: ${(err as Error).message}`);
         return null;
       }
     };
+    const describeWithLeftOut =
+      (list: GameList, naming: ListNaming) =>
+      (sources: ResolvedSource[]): ReturnType<typeof listSources> => {
+        const described = describeSources(list, naming);
+        return sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) }));
+      };
 
     if (kind === 'compare') {
       const slots = compareSlots();
@@ -1945,7 +1944,7 @@ export default function ListRoute() {
       // a `?u=` override follows (see docs/dev/lists-and-accounts.md).
       const canonicalSlots = normalizeSlots(accounts.map((a) => a.members));
       const canonical = compareUrl(canonicalSlots, compareOp());
-      loadedCompareKeys.add(`${compareOp()}|${canonicalSlots.map((slot) => slot.join(',')).join('|')}`);
+      loadedCompareKeys.add(compareKey(compareOp(), canonicalSlots));
       if (canonical !== routerLocation.pathname + routerLocation.search) navigate(canonical, { replace: true });
 
       const list = inMemoryDynamicList(
@@ -1954,18 +1953,13 @@ export default function ListRoute() {
       );
       setCompareList(list);
       setStatusText('Comparing libraries…');
-      const owners = new Map<number, GameOwner[]>();
       const ownersByAccount = new Map<string, Map<number, GameOwner[]>>();
       const fetchers = createDefaultFetchers({
         refresh,
         onFetchedAt,
-        onOwners: (byAppid, accountId) => {
-          ownersByAccount.set(accountId, byAppid);
-          for (const [appid, members] of byAppid) owners.set(appid, [...(owners.get(appid) ?? []), ...members]);
-        },
+        onOwners: (byAppid, accountId) => ownersByAccount.set(accountId, byAppid),
       });
       const resolved = await resolveRows(list, fetchers, (sources) => {
-        compareOwners = owners;
         comparePlayers = shown.map((account) => ({
           label: accountDisplayLabel(account),
           owners: ownersByAccount.get(account.id) ?? new Map(),
@@ -1982,10 +1976,7 @@ export default function ListRoute() {
         }));
       });
       if (!resolved) return;
-      const { appids } = resolved;
-      pendingGroups = resolved.groups;
-      initialRows = [...appids].map((appid) => ({ appid, name: '', loading: true, details: null }));
-      streamTargets = [...appids].map((appid) => ({ appid }));
+      initialRows = resolved.rows;
     } else if (kind === 'user') {
       // A manual list, or a dynamic one using any op other than group-by-membership, renders as
       // one flat table (flattened via flattenCombineResult, same as when it's resolved as
@@ -2006,29 +1997,18 @@ export default function ListRoute() {
       const resolved = await resolveRows(
         list,
         createDefaultFetchers({ refresh, onFetchedAt, onBundleLeftOut: noteLeftOut }),
-        (sources) => {
-          const described = describeSources(list, createDefaultNaming());
-          return sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) }));
-        },
+        describeWithLeftOut(list, createDefaultNaming()),
       );
       if (!resolved) return;
-      const { appids } = resolved;
-      pendingGroups = resolved.groups;
-      let rankOf: Map<number, number> | null = null;
+      const { appids, rows } = resolved;
+      initialRows = rows;
       if (list.kind === 'ranked') {
         const state = getRanking(list.id);
         setRankedSource(appids);
         setRankingState(state);
-        rankOf = ranks(state, appids);
+        const rankOf = ranks(state, appids);
+        initialRows = rows.map((row) => ({ ...row, rank: rankOf.get(row.appid) ?? null }));
       }
-      initialRows = [...appids].map((appid) => ({
-        appid,
-        name: '',
-        loading: true,
-        details: null,
-        ...(rankOf ? { rank: rankOf.get(appid) ?? null } : {}),
-      }));
-      streamTargets = [...appids].map((appid) => ({ appid }));
     } else if (kind === 'shared') {
       // Another dynamic list's formula, decoded straight from ?f= (listShare.ts) — same "resolve
       // an in-memory dynamic list through the normal listResolve.ts/listLabels.ts path" idea
@@ -2047,21 +2027,10 @@ export default function ListRoute() {
       const resolved = await resolveRows(
         list,
         sharedFetchers(createDefaultFetchers({ refresh, onFetchedAt, onBundleLeftOut: noteLeftOut })),
-        (sources) => {
-          const described = describeSources(list, sharedNaming());
-          return sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) }));
-        },
+        describeWithLeftOut(list, sharedNaming()),
       );
       if (!resolved) return;
-      const { appids } = resolved;
-      pendingGroups = resolved.groups;
-      initialRows = [...appids].map((appid) => ({
-        appid,
-        name: '',
-        loading: true,
-        details: null,
-      }));
-      streamTargets = [...appids].map((appid) => ({ appid }));
+      initialRows = resolved.rows;
     } else if (kind === 'recent') {
       setListTitle('Recently Looked Up');
       const recents = loadRecentGames();
@@ -2080,7 +2049,6 @@ export default function ListRoute() {
         loading: true,
         details: null,
       }));
-      streamTargets = recents;
     } else if (kind === 'bundle') {
       setStatusText('Resolving games to Steam…');
       try {
@@ -2130,7 +2098,6 @@ export default function ListRoute() {
           loading: true,
           details: null,
         }));
-        streamTargets = resolved;
       } catch (err) {
         if (loadGuard.isStale(gen)) return;
         setStatusText(loadErrorText(err));
@@ -2179,7 +2146,6 @@ export default function ListRoute() {
             loading: true,
             details: null,
           }));
-          streamTargets = games;
         } else {
           const { items, fetchedAt: at } = await fetchAccountWishlist(account.members, { refresh });
           if (loadGuard.isStale(gen)) return;
@@ -2192,7 +2158,6 @@ export default function ListRoute() {
             loading: true,
             details: null,
           }));
-          streamTargets = items;
         }
       } catch (err) {
         if (loadGuard.isStale(gen)) return;
@@ -2323,23 +2288,9 @@ export default function ListRoute() {
         disposeView();
         disposeTableState();
       };
-      if (userList()) {
-        // A user list's view lives on the list itself (GameList.tableView), not a shared pref
-        // key — every user list keeps its own, unlike the fixed system kinds above which share
-        // one key regardless of instance (see docs/dev/lists-and-accounts.md's storage schema).
-        // Mirrors tableViewPrefs.ts's own restoreTableView (an incoming `?tv=` param — see
-        // handleShareView above — wins, is seeded as the new stored default, then stripped from
-        // the URL) but persists via setListTableView rather than a prefs.ts key, so it can't
-        // reuse that helper directly — same reasoning handleResetView gives on the reset side.
-        const list = userList()!;
-        const shared = takeSharedView();
-        applyView(shared ?? list.tableView ?? {});
-        setViewingShared(shared != null);
-        unsyncView = bindViewPersistence(table, (view) => setListTableView(list.id, view), viewingShared);
-      } else {
-        setViewingShared(restoreTableView(viewTable, viewPrefKey()));
-        unsyncView = bindViewPersistence(table, (view) => setPref(viewPrefKey(), view), viewingShared);
-      }
+      const store = viewStore();
+      setViewingShared(restoreTableView(viewTable, store));
+      unsyncView = bindViewPersistence(table, store, viewingShared);
       if (keptSelection?.size) table.selection.setAll(tableData().filter((row) => keptSelection.has(row.appid)));
       setTableReady(true);
     }
@@ -2353,7 +2304,7 @@ export default function ListRoute() {
     // rows come from the same path the game itself lives at, everything else is contextual state
     // layered on top of a route that already has its own identity). Placed after the table/rows
     // are built (openGame/openOrAddRecentGame both need rowStore/table to already exist) and
-    // before the streamTargets-empty early return below, since a first-ever /game/:appid lookup
+    // before the empty-list early return below, since a first-ever /game/:appid lookup
     // can arrive with an otherwise-empty recents list. Only the *first* load needs to do this
     // here — a later appid-only change is handled by load()'s own fast path above instead.
     // This list is being rebuilt, so its own random-pick history no longer describes its
@@ -2369,12 +2320,7 @@ export default function ListRoute() {
       if (params.appid) openOrAddRecentGame(Number(params.appid));
     } else {
       const gameParam = new URLSearchParams(routerLocation.search).get('game');
-      if (gameParam) {
-        const focusAppid = Number(gameParam);
-        const existing = rowStore.getRow(focusAppid);
-        if (existing) openGame(existing);
-        else openStandaloneInPlace(focusAppid);
-      }
+      if (gameParam) handleOpenGameRequest(Number(gameParam));
     }
 
     // An empty result set was practically unreachable before row-selection-based remove-from-
@@ -2384,7 +2330,7 @@ export default function ListRoute() {
     // it, streamGameDetails needs its own guard too: the server 400s a `games: []` stream
     // request outright ("Provide at least one game"), confirmed live the first time this path
     // was actually reachable through the UI.
-    if (streamTargets.length === 0) {
+    if (initialRows.length === 0) {
       setStatusText('');
       const account = heroAccount();
       const whose = account ? `${accountDisplayLabel(account)}'s` : "This account's";
@@ -2399,10 +2345,10 @@ export default function ListRoute() {
       return;
     }
 
-    if (hasPrices()) loadPrices(streamTargets, gen); // runs concurrently, not awaited
-    if (kind === 'bundle' && resolvedBundleGames) loadPrices(resolvedBundleGames, gen); // ditto
+    const targets = priceTargets();
+    if (targets) loadPrices(targets, gen); // runs concurrently, not awaited
     if (stampsOwnership) loadMyOwnership(gen); // ditto
-    const toStream = kept ? streamTargets.filter((target) => !kept.has(target.appid)) : streamTargets;
+    const toStream = kept ? initialRows.filter((row) => !kept.has(row.appid)) : initialRows;
     if (toStream.length) await streamGameDetails(toStream, gen);
     if (loadGuard.isStale(gen)) return;
     restorePendingShot(); // now that the open game's screenshots/videos have actually arrived
@@ -2992,11 +2938,12 @@ export default function ListRoute() {
       refreshGame,
       onTagClick,
       isTagActive,
-      getOwners: (appid) => (compareOwners ? (compareOwners.get(appid) ?? []) : null),
+      getOwners: (appid) =>
+        comparePlayers.length ? comparePlayers.flatMap((player) => player.owners.get(appid) ?? []) : null,
     });
     onCleanup(() => {
       unregister();
-      if (compareOwners) notifyOwnersChanged();
+      if (comparePlayers.length) notifyOwnersChanged();
     });
 
     // The region preference lives in the nav bar's ⚙ popover, which knows nothing about who's

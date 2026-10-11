@@ -188,7 +188,7 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
 
 **View persistence.** A table's view (visible columns, sort, grouping, filters) auto-persists locally as it changes:
 
-- One `prefs.ts` key per system kind (`ownedListView`, `wishlistListView`, `bundleListView`, `recentListView`, `compareListView`, `sharedListView` — the bundle, compare and shared ones shared across instances — plus `bundlesBrowseView` for `/bundles`; listed in `tableViewKeys.ts`). A user list stores its own `tableView` on the list, so it resets around `resetTableView` rather than through it.
+- One `prefs.ts` key per system kind (`ownedListView`, `wishlistListView`, `bundleListView`, `recentListView`, `compareListView`, `sharedListView` — the bundle, compare and shared ones shared across instances — plus `bundlesBrowseView` for `/bundles`; listed in `tableViewKeys.ts`). A user list stores its own `tableView` on the list; `tableViewPrefs.ts`'s helpers take either as a `ViewStore` (a load/save pair; `prefViewStore(key)` for a pref key).
 - It's applied _after_ `table.setViewState({ sorts: DEFAULT_SORT })`, so a stored view overrides the default sort and a first visit gets the default.
 - It's **not** written to the URL as it changes — a URL left in the address bar would go stale on the next table change. "🔗 Share view" snapshots it into `?tv=` on a copied link only (one param name; one table per route), never calling `history.replaceState`.
   - On Owned/Wishlist it also adds `u=` for the effective account unless the URL has one; other kinds don't, since `u=` there would only swap the recipient's ownership markers.

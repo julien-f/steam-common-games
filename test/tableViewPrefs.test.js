@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const {
   restoreTableView,
   resetTableView,
+  prefViewStore,
   shareTableView,
   saveTableViewToServer,
   revertTableViewToServer,
@@ -69,7 +70,7 @@ test('restoreTableView: an incoming param wins for this visit only — applied, 
     const { getPref, setPref } = require('../public/prefs.ts');
     setPref('libraryView', { pageSize: 10 });
     const table = fakeTable();
-    assert.equal(restoreTableView(table, 'libraryView'), true, 'reports a shared view');
+    assert.equal(restoreTableView(table, prefViewStore('libraryView')), true, 'reports a shared view');
     assert.deepEqual(table.getViewState(), { pageSize: 25 });
     assert.deepEqual(getPref('libraryView'), { pageSize: 10 }, "the viewer's own view is untouched");
     assert.equal(new URLSearchParams(location.search).has('tv'), false, 'param consumed');
@@ -79,8 +80,9 @@ test('restoreTableView: an incoming param wins for this visit only — applied, 
 test('restoreTableView: a malformed param falls through to the stored default', () => {
   withLocation('?tv=not-json', () => {
     const table = fakeTable();
-    assert.equal(restoreTableView(table, 'libraryView'), false);
+    assert.equal(restoreTableView(table, prefViewStore('libraryView')), false);
     assert.deepEqual(table.getViewState(), {}, 'no stored pref yet either');
+    assert.equal(new URLSearchParams(location.search).has('tv'), false, 'param consumed anyway');
   });
 });
 
@@ -89,17 +91,19 @@ test('restoreTableView: no param at all falls back to whatever is already stored
     const { setPref } = require('../public/prefs.ts');
     setPref('libraryView', { pageSize: 10 });
     const table = fakeTable();
-    restoreTableView(table, 'libraryView');
+    restoreTableView(table, prefViewStore('libraryView'));
     assert.deepEqual(table.getViewState(), { pageSize: 10 });
   });
 });
 
-test('resetTableView: blanks the view and clears the URL param', () => {
-  withLocation('?tv=%7B%22pageSize%22%3A25%7D', () => {
+test('resetTableView: blanks the view and the stored default', () => {
+  withLocation('', () => {
+    const { getPref, setPref } = require('../public/prefs.ts');
+    setPref('libraryView', { pageSize: 25 });
     const table = fakeTable({ pageSize: 25 });
-    resetTableView(table, 'libraryView');
+    resetTableView(table, prefViewStore('libraryView'));
     assert.deepEqual(table.getViewState(), {});
-    assert.equal(new URLSearchParams(location.search).has('tv'), false);
+    assert.deepEqual(getPref('libraryView'), {});
   });
 });
 

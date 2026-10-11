@@ -1,19 +1,23 @@
 // Shared "share/persist/reset a @vates/data-table-solid view via prefs.js + a one-shot URL
 // param" logic — extracted verbatim from library.js's and bundles.js's own near-identical
 // copies (see docs/dev/frontend.md's table section for the "share on demand, not
-// live-synced" reasoning). Both pages call these the same way: a `table` instance and the prefs.js
-// key that page's view is stored under.
+// live-synced" reasoning). Both pages call these the same way: a `table` instance and the
+// ViewStore that page's view is kept in.
 import { createEffect, createRoot } from 'solid-js';
+import type { TableViewState, ViewStateApi } from '@vates/data-table-solid';
 import { getPref, setPref, adoptPrefEntry, pushPrefToServer } from './prefs.ts';
 import { getBaseline, setBaseline, stripTransientViewFields } from './tableViewSync.ts';
 import { urlWithParams } from './urlState.ts';
 import { copyWithFeedback } from './clipboard.ts';
 
-// The @vates/data-table-solid instance these operate on — only the view-state surface the page
-// code actually uses, rather than importing the package's own (internal) types.
-export interface DataTableLike {
-  setViewState(view: object): void;
-  getViewState(): object;
+// Where a table's own view is kept: a prefs.ts key, or a user list's own tableView.
+export interface ViewStore {
+  load(): TableViewState;
+  save(view: TableViewState): void;
+}
+
+export function prefViewStore(key: string): ViewStore {
+  return { load: () => getPref<TableViewState>(key, {}), save: (view) => setPref(key, view) };
 }
 
 // The URL param a "🔗 Share view" link carries the view in — one for every table, since a route
@@ -24,22 +28,21 @@ export const VIEW_PARAM = 'tv';
 // only: applied but not stored, then stripped from the live URL so a later table rebuild (a fresh
 // search, an account refresh) falls back to the viewer's own. Returns whether it applied one — the
 // caller then pauses its view persistence until the viewer keeps or drops it (SharedViewBanner).
-export function restoreTableView(table: DataTableLike, prefKey: string): boolean {
+export function restoreTableView(table: ViewStateApi, store: ViewStore): boolean {
   const shared = takeSharedView();
-  table.setViewState(shared ?? getPref(prefKey, {}));
+  table.setViewState(shared ?? store.load());
   return shared != null;
 }
 
-// The incoming view param, parsed and stripped from the URL; null when absent or malformed.
-export function takeSharedView(): object | null {
+// The incoming view param, parsed and stripped from the URL (malformed too); null when absent or malformed.
+function takeSharedView(): TableViewState | null {
   const params = new URLSearchParams(location.search);
   const raw = params.get(VIEW_PARAM);
   if (!raw) return null;
+  params.delete(VIEW_PARAM);
+  history.replaceState(null, '', urlWithParams(params));
   try {
-    const view = JSON.parse(raw);
-    params.delete(VIEW_PARAM);
-    history.replaceState(null, '', urlWithParams(params));
-    return view;
+    return JSON.parse(raw) as TableViewState;
   } catch {
     return null; // malformed — fall back to the stored default
   }
@@ -50,15 +53,11 @@ export function takeSharedView(): object | null {
 // signal it touches), in its own root since a route can bind it from an async load. `paused`:
 // while a shared link's layout is on screen (SharedViewBanner); un-pausing saves it. Returns the
 // dispose function.
-export function bindViewPersistence(
-  table: DataTableLike,
-  save: (view: object) => void,
-  paused: () => boolean,
-): () => void {
+export function bindViewPersistence(table: ViewStateApi, store: ViewStore, paused: () => boolean): () => void {
   return createRoot((dispose) => {
     createEffect(() => {
       const view = table.getViewState();
-      if (!paused()) save(view);
+      if (!paused()) store.save(view);
     });
     return dispose;
   });
@@ -71,7 +70,7 @@ export function bindViewPersistence(
 // what's on screen. The stored pref (bindViewPersistence above) already captures live state on
 // every change; this link is only for handing the *current* view to someone else.
 // `extraParams` are added only where the URL doesn't already set them.
-export function shareTableView(table: DataTableLike, btn: HTMLElement, extraParams: Record<string, string> = {}): void {
+export function shareTableView(table: ViewStateApi, btn: HTMLElement, extraParams: Record<string, string> = {}): void {
   const params = new URLSearchParams(location.search);
   for (const [key, value] of Object.entries(extraParams)) if (!params.has(key)) params.set(key, value);
   const view = table.getViewState();
@@ -82,15 +81,12 @@ export function shareTableView(table: DataTableLike, btn: HTMLElement, extraPara
   copyWithFeedback(btn, url);
 }
 
-// Clears both the stored default and whatever's currently in VIEW_PARAM, then blanks the
-// table's view state — which resolves back to the table's own `initialViewState` (including
-// its default sort) rather than to nothing, same as `restoreTableView`'s own fallback above.
-export function resetTableView(table: DataTableLike, prefKey: string): void {
+// Clears the stored default and blanks the table's view state — which resolves back to the
+// table's own `initialViewState` (including its default sort) rather than to nothing. No
+// VIEW_PARAM to clear: restoreTableView already stripped it.
+export function resetTableView(table: ViewStateApi, store: ViewStore): void {
   table.setViewState({});
-  setPref(prefKey, {});
-  const params = new URLSearchParams(location.search);
-  params.delete(VIEW_PARAM);
-  history.replaceState(null, '', urlWithParams(params));
+  store.save({});
 }
 
 // The two halves of the "unsaved changes" banner (tableViewSync.ts) — a table-view key is never
@@ -104,7 +100,7 @@ export function resetTableView(table: DataTableLike, prefKey: string): void {
 // first (tableViewSync.ts's stripTransientViewFields) — otherwise whatever's currently typed into
 // the search box would silently ride along into the saved view the moment something else genuinely
 // unsaved got Saved, even though the banner never counted it as part of the diff.
-export function saveTableViewToServer(prefKey: string, currentValue: object): void {
+export function saveTableViewToServer(prefKey: string, currentValue: TableViewState): void {
   const updatedAt = Date.now();
   const value = stripTransientViewFields(currentValue);
   pushPrefToServer(prefKey, value, updatedAt);
@@ -120,9 +116,9 @@ export function saveTableViewToServer(prefKey: string, currentValue: object): vo
 // `searchQuery` (Save strips them before storing it) — symmetric with Save, Revert doesn't touch
 // them either, so reverting your columns/sort/filters doesn't also reset whatever you're
 // currently searching for or what page you're on.
-export function revertTableViewToServer(table: DataTableLike, prefKey: string): void {
+export function revertTableViewToServer(table: ViewStateApi, prefKey: string): void {
   const baseline = getBaseline(prefKey);
-  const value = (baseline?.value ?? {}) as object;
+  const value = (baseline?.value ?? {}) as TableViewState;
   table.setViewState(value);
   adoptPrefEntry(prefKey, value, baseline?.updatedAt ?? 0);
 }
