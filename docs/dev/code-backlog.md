@@ -20,7 +20,6 @@ Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-
 ## Correctness
 
 - **C153 · minor · S** — re-picking a known account while Steam's player summaries fail replaces its stored entry whole (`upsertRecentAccount`, `public/accountsStore.ts:139`, also `setPref` of the current account), so its name, avatar and custom-URL names are lost until the next successful refresh, though `accountInfoFrom` leaves the label out of a placeholder precisely to keep the stored one. Keep the stored display fields the new slot doesn't carry.
-- **C91 · minor · S** — a comparison's 🔗 Share view link never applies its layout: `load()`'s compare branch rewrites the URL to `compareUrl(...)` (`public/ListRoute.tsx:2065`), which has no `tv` param, so the replace drops `?tv=` before `takeSharedView` runs at table build. Carry the view param over into the canonical URL (or take it before the rewrite).
 - **C124 · minor · S** — on `/rank` the side panel's tag pills look like filter toggles but do nothing, and ↻ Refresh spins without re-fetching the game's details: `RankRoute.tsx:139` opens the panel but registers no `routeHandlers`, so AppShell's `onTagClick`/`onRefresh` relays (`public/AppShell.tsx:200`) no-op. Register the handlers RankRoute can honour (a details refresh), and render tags as plain pills when no route filters them.
 
 ## Security

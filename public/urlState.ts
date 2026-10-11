@@ -153,8 +153,11 @@ export function normalizeSlots(slots: string[][]): string[][] {
 
 // `op` is this app's own addition, not part of the old convention — omitted for the default, so
 // a URL from the old page and a URL this app writes for the same comparison are the same string.
-export function compareUrl(slots: string[][], op?: string): string {
-  const params = new URLSearchParams();
+// `keep`: a query string whose other params (a shared `tv`, an open `game`) carry over.
+export function compareUrl(slots: string[][], op?: string, keep = ''): string {
+  const params = new URLSearchParams(keep);
+  params.delete('u');
+  params.delete('op');
   for (const slot of normalizeSlots(slots)) params.append('u', slot.join(','));
   if (op && op !== DEFAULT_COMPARE_OP) params.set('op', op);
   return urlWithParams(params, COMPARE_PATH);

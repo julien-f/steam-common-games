@@ -1938,7 +1938,7 @@ export default function ListRoute() {
       // in `recentAccounts` — comparing someone isn't picking them as your account, the same rule
       // a `?u=` override follows (see docs/dev/lists-and-accounts.md).
       const canonicalSlots = normalizeSlots(accounts.map((a) => a.members));
-      const canonical = compareUrl(canonicalSlots, compareOp());
+      const canonical = compareUrl(canonicalSlots, compareOp(), routerLocation.search);
       loadedCompareKeys.add(compareKey(compareOp(), canonicalSlots));
       if (canonical !== routerLocation.pathname + routerLocation.search) navigate(canonical, { replace: true });
 
