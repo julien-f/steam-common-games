@@ -47,6 +47,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Esc closing a menu in the nav bar or the search box's suggestions no longer also closes the open game, or leaves a ranking
 - On a phone, swiping past the game panel's last image no longer leaves its ‹ button and back swipe doing nothing
 - On a phone, a slow sideways swipe on the game panel's images no longer also closes the panel
+- The screenshot viewer no longer reopens with its controls hidden after closing it on a playing trailer, and swiping off a playing trailer no longer brings all its controls back
 
 ### Development
 

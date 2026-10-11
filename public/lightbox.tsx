@@ -942,6 +942,7 @@ function wireVideoControls(lb: HTMLElement) {
     playBtn.innerHTML = LB_PLAY_ICON;
     playBtn.setAttribute('aria-label', 'Play');
     syncLbPaused();
+    if (!vid2.isConnected) return; // stopHls' own pause, on a close or a step off the trailer
     showLbChrome();
     schedHideLbChrome();
   });

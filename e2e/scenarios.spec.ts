@@ -826,7 +826,7 @@ async function fakePlayback(page: Page) {
     };
     HTMLMediaElement.prototype.pause = function (this: HTMLMediaElement) {
       if (!playing.delete(this)) return;
-      this.dispatchEvent(new Event('pause'));
+      queueMicrotask(() => this.dispatchEvent(new Event('pause'))); // queued, as a real pause event is
     };
   });
 }
@@ -1213,6 +1213,41 @@ test("F1 edge: a paused trailer's controls idle out, leaving its large play butt
   await page.clock.runFor(3500);
   await expect(lb).toHaveClass(/lb-idle/);
   await expect(page.getByRole('button', { name: 'Play trailer' })).toBeVisible();
+});
+
+test('F1 edge: the viewer reopened after closing a playing trailer shows its controls', async ({ page }) => {
+  await page.clock.install();
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  await page.getByRole('button', { name: 'Play trailer' }).click();
+  await page.getByRole('button', { name: 'Close lightbox' }).click();
+  await page.clock.runFor(3500);
+  await page.getByRole('button', { name: 'Open in lightbox' }).click();
+  const lb = page.locator('#screenshot-lightbox');
+  await expect(lb).toHaveClass(/\bopen\b/);
+  expect(await lb.getAttribute('class')).not.toMatch(/lb-idle/); // read once: the idle timer runs again
+});
+
+test('F1 edge: on a phone, swiping off a playing trailer leaves hidden controls hidden', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'touch only');
+  await page.clock.install();
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  await page.getByRole('button', { name: 'Play trailer' }).click();
+  const lb = page.locator('#screenshot-lightbox');
+  await page.clock.runFor(3500);
+  await expect(lb).toHaveClass(/lb-idle/);
+  const box = (await page.locator('#screenshot-lightbox .lb-video').boundingBox())!;
+  const y = box.y + box.height / 2;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 300, y }] });
+  for (const x of [260, 200, 120])
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  expect(await lb.getAttribute('class')).toMatch(/lb-idle/); // read once, as above
 });
 
 test('F1 edge: arrows seek a trailer only while it plays, and step past it otherwise', async ({ page }) => {
