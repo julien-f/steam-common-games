@@ -164,14 +164,15 @@ export async function resolveBundleGames(
   bundle: Bundle,
 ): Promise<{ resolved: ResolvedGame[]; unresolved: FlatGame[]; failed: FlatGame[] }> {
   const games = flattenBundleGames(bundle);
-  const { appids: appidsByGid, failed: failedGids } = await resolveBundleAppids(games.map((g) => g.gid));
+  const { appids: appidsByGid, failed: failedList } = await resolveBundleAppids(games.map((g) => g.gid));
+  const failedGids = new Set(failedList);
 
   const resolved: ResolvedGame[] = [];
   const unresolved: FlatGame[] = [];
   const failed: FlatGame[] = [];
   const seenAppids = new Set<number>();
   for (const g of games) {
-    if (failedGids.includes(g.gid)) {
+    if (failedGids.has(g.gid)) {
       failed.push(g);
       continue;
     }
