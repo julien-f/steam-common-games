@@ -67,6 +67,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The side panel's ↑/↓ follow the table's current sort and filter, and hide when the open game isn't in it
 - When the current account's library can't be loaded, games now show their ownership as unknown instead of "Not Owned"
 - A list built on a bundle keeps the games Steam didn't answer for, from its last good load, instead of dropping them
+- A production install that skips development packages no longer fails to start
 
 ### Development
 

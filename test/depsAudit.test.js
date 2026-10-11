@@ -2,6 +2,8 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const { importedPackages, unusedDeps, phantomImports } = require('../scripts/deps-audit');
 
@@ -41,4 +43,12 @@ test('unusedDeps: a name only inside a longer package name is unused; @babel/cor
 
 test('phantomImports: imported but not declared', () => {
   assert.deepStrictEqual(phantomImports(new Set(['express', 'left-pad']), ['express']), ['left-pad']);
+});
+
+test('every package the server requires at runtime is a production dependency', () => {
+  const root = path.join(__dirname, '..');
+  const files = ['server.js', ...fs.readdirSync(path.join(root, 'lib')).map((f) => path.join('lib', f))];
+  const imported = new Set(files.flatMap((f) => [...importedPackages(fs.readFileSync(path.join(root, f), 'utf8'))]));
+  // A dev-only package crashes `npm install --omit=dev` at startup.
+  assert.deepStrictEqual(phantomImports(imported, Object.keys(require('../package.json').dependencies)), []);
 });
