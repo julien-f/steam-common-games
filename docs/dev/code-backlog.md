@@ -52,7 +52,6 @@ None open.
 
 ## Reliability
 
-- **C151 · minor · S** — an exhausted outbound budget throws an `isUpstream` error (`lib/metrics.js:75`), so `routeErrorStatus` (`server.js:190`) and `fetchGameDetails`' logging print it on every refused request, undoing `chargeBudget`'s warn-once; its `isBudgetExhausted` flag is set but never read. Skip logging on it, as for `isCircuitOpen`.
 - **C1 · minor · M** — dependency updates wait on a manual `dependency-audit` run. Dependabot or Renovate could open them, since CI (`.github/workflows/ci.yml`) runs `check` and the e2e suite on PRs, but their PRs lack the `CHANGELOG.md` entry the pre-commit hook requires (CI doesn't check it) and skip `npm run build`, so each still needs a local pass through dependency-audit's Applying.
 
 ## Compliance

@@ -177,7 +177,8 @@ function routeErrorStatus(route, err) {
   // [circuit-breaker] warning logged there at the moment it actually trips. Logging one more
   // near-identical [upstream:...] line per request blocked during the 5-minute window would
   // just repeat information already on record, potentially hundreds of times over.
-  if (err.isCircuitOpen) return 502;
+  // Same for an exhausted outbound budget: chargeBudget warns once per window.
+  if (err.isCircuitOpen || err.isBudgetExhausted) return 502;
   // Only res.json() on an upstream's reply throws one: an HTML page (an error or challenge) with a 200.
   if (err.isUpstream || err.name === 'SyntaxError') {
     console.error(`[upstream:${route}]`, err.stack || err.message);
@@ -676,12 +677,12 @@ function fetchGameDetails(appid, { force = false } = {}) {
       // logErr also appends `.cause` when present: Node's fetch throws a generic "fetch failed"
       // TypeError for any network-level failure (DNS, connection reset, timeout, ...) and buries
       // the actual reason in `.cause` — without it every such failure looks identical and gives
-      // no signal about what actually went wrong. Skips isCircuitOpen errors — same reasoning
+      // no signal about what actually went wrong. Skips isCircuitOpen and isBudgetExhausted errors — same reasoning
       // as routeErrorStatus's own skip: a batch load hits this once per field per appid, so
       // without the skip a single already-logged circuit trip would print potentially hundreds
       // of near-identical lines here alone (rating + meta both go through fetchStoreApi).
       const logErr = (label, err) => {
-        if (err?.isCircuitOpen) return;
+        if (err?.isCircuitOpen || err?.isBudgetExhausted) return;
         console.warn(`[game-details] ${label} (appid ${appid}):`, err?.message, err?.cause ?? '');
       };
       if (ratingRes.status === 'rejected') logErr('rating', ratingRes.reason);
