@@ -41,7 +41,7 @@ Open `http://localhost:58991` in dev (not `:3000` — that serves the last `npm 
 
 CI (`.github/workflows/ci.yml`) runs `npm run check` and the e2e suite, as two parallel jobs on Node 24, on every push to `main` and every PR (the `pre-push` hook runs the same locally first), and lists the journey steps the tests lock in the run's summary.
 
-Application data lives in `db.sqlite` (gitignored); today it holds only cache tables. `npm run cache:clear` empties them without deleting the file.
+Application data lives in `db.sqlite` (gitignored); it holds the upstream caches plus signed-in users, their sessions and synced settings. `npm run cache:clear` empties the cache tables without deleting the file or touching accounts.
 
 ## Documentation
 
