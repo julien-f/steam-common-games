@@ -1,6 +1,6 @@
 ---
 name: setup-review
-description: Review the Claude Code setup — skills, scripts, hooks, settings, CLAUDE.md and Claude memory — for drift, contradictions, duplication, prose steps better scripted, wasted time or tokens and skills better merged, split or renamed, and ways to extend what exists, optionally mining past session transcripts for repeated friction, and report ranked proposals. Use when asked to review, audit or improve the skills, scripts, hooks or agent setup, or how they could be more useful.
+description: Review the Claude Code setup — skills, scripts, hooks, settings, CLAUDE.md and Claude memory — for drift, contradictions, duplication, prose steps better scripted, wasted time or tokens and skills better merged, split or renamed, and ways to extend what exists, mining the session transcripts since its last run for repeated friction, and report ranked proposals. Use when asked to review, audit or improve the skills, scripts, hooks or agent setup, or how they could be more useful.
 ---
 
 # Setup review
@@ -10,7 +10,7 @@ Judges the setup against CLAUDE.md's Where things belong and Working style rules
 ## Scope
 
 - **Files**: `.claude/skills/*/SKILL.md`, `scripts/`, `.githooks/`, `.github/workflows/`, `.claude/settings.json` and `settings.local.json`, `package.json`'s `scripts`, `CLAUDE.md`, and this repo's Claude memory (`~/.claude/projects/<this repo's slug>/memory/`).
-- **Argument `transcripts`** adds step 3. Without it, skip step 3 and say so.
+- **Transcripts**: step 3 runs by default, over the sessions since the ledger's last read. Argument `no-transcripts` skips it (say so); `transcripts=N` instead reads the last N sessions, ledger aside.
 
 ## 0. The ledger
 
@@ -38,13 +38,14 @@ Read [setup-backlog.md](../../../docs/dev/setup-backlog.md). Re-run each **Watch
 - **Staleness**: rules about code, files or procedures that no longer exist; rules nothing has needed lately (prefer deleting them).
 - **Extensions**: ways to make what exists more useful — a mode or argument a skill lacks, script output a skill re-derives by hand, one skill's result that could feed another, a check that could run earlier (CI → pre-push → pre-commit), a script that could answer a question agents explore for. Speculative ideas are welcome; mark those without usage evidence as such.
 
-## 3. Transcripts (only with `transcripts`)
+## 3. Transcripts
 
-- `node scripts/setup-facts.js --transcripts=<DATE>`, DATE being the ledger's "Transcripts read up to" (`--transcripts` alone, the last 20 sessions, when it says never), counts what needs no judgment over the sessions since: largest outputs and slowest calls by command, command pairs repeated across sessions, calls the permission classifier denied or you rejected, and each skill's runs and longest run.
-- One `Agent` subagent then reads the same sessions (entries after DATE) under `~/.claude/projects/<this repo's slug>/*.jsonl`, newest first, for what does need judgment, seen in at least two sessions:
-  - the user correcting the agent the same way (a rule missing, unclear or ignored);
+- `node scripts/setup-facts.js --transcripts=<DATE> --digest=<scratchpad>/digest`, DATE being the ledger's "Transcripts read up to" (`--transcripts` alone, the last 20 sessions, when it says never), counts what needs no judgment over the sessions since: largest outputs and slowest calls by command, command pairs repeated across sessions, calls the permission classifier denied or you rejected, each skill's runs and longest run, interrupts, and how the user answered each skill's questions — a skill whose recommendation is often overridden, answered in free text or sent back to clarify recommends badly or asks what a default would settle.
+- One `Agent` subagent then reads the digests (one compact file per session; never the raw `.jsonl`) for what does need judgment, seen in at least two sessions:
+  - the user correcting the agent the same way (a rule missing, unclear or ignored), interrupts and rejections included;
   - the same command failing the same way (a pitfalls.md entry or a fix);
-  - the script's repeated pairs that are a real procedure (a script or skill candidate), not just reading files;
+  - the script's repeated pairs that are a real procedure (a script or skill candidate);
+  - setup proposals the user turned down or answered in their own words (a Declined ledger entry, or a better proposal);
   - per skill run: steps skipped or improvised (the skill is wrong or missing one), the user correcting the agent during or right after it, a question asked every run that a default would settle, a report the user reshapes.
 
 Each pattern comes with the sessions and a short quote. It quotes no secrets, and nothing from the transcripts leaves the report.
