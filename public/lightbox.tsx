@@ -1081,6 +1081,7 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
   });
   // A deliberate open supersedes any pending "take the media when it lands" latch.
   _awaitingMedia = null;
+  lbShotChosen = true;
   const lb = document.getElementById('screenshot-lightbox')!;
   lb.classList.add('open');
   document.body.classList.add('lb-open');
@@ -1094,23 +1095,31 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
 // being left, which only this module knows: paging through a list is a browse, so it lands on
 // real media rather than on the banner `openLightbox(game, 0)` used to pick (see
 // `preferredShotIndex`).
-// A game paged back to lands on the item it was left on, for the session.
+// A game paged back to lands on the item the viewer picked there, for the session.
 const lbLastShot = new Map<number, string>();
+// Whether the item on screen is the viewer's pick (opened on or stepped to), not a game step's landing.
+let lbShotChosen = false;
+
+// Where `appid`'s remembered item sits in `list`, else where a game step lands leaving `leaving`.
+function landingIndex(appid: number, list: MediaItem[], leaving: MediaItem['type']) {
+  const remembered = list.findIndex((s) => s.shotId === lbLastShot.get(appid));
+  return remembered >= 0 ? remembered : preferredShotIndex(list, leaving);
+}
 
 export function repointLightboxGame(game: ReadonlyGame) {
   const left = shots()[idx()];
   const leavingGame = lbGame();
-  // Not a banner still waiting on its game's media (`_awaitingMedia`): that's no choice of the viewer's.
-  if (left && leavingGame && !_awaitingMedia) lbLastShot.set(leavingGame.appid, left.shotId);
+  // A lone banner is no pick: it stands in while the game's media streams.
+  if (left && leavingGame && lbShotChosen && shots().length > 1) lbLastShot.set(leavingGame.appid, left.shotId);
+  lbShotChosen = false;
   const leaving = left?.type ?? 'image';
   const next = buildMediaItems(game.appid, game.details?.meta);
-  const remembered = next.findIndex((s) => s.shotId === lbLastShot.get(game.appid));
-  const target = remembered >= 0 ? remembered : preferredShotIndex(next, leaving);
+  const target = landingIndex(game.appid, next, leaving);
   // A lone banner means this row's details are still streaming — there is nothing else to show
   // *yet*. Latch the intent so the first real media to arrive is taken (see the effect at the
   // foot of this file); without it the banner would simply stay up, which is the whole reason
   // paging through a list used to be unrewarding.
-  _awaitingMedia = remembered < 0 && next.length === 1 ? leaving : null;
+  _awaitingMedia = next.length === 1 ? leaving : null;
   batch(() => {
     setLbGame(game);
     setIdx(target);
@@ -1153,6 +1162,7 @@ function stepLightbox(dir: number) {
   // The viewer has taken over: whatever is on screen from here on is their choice, so the latch
   // must never move it under them.
   _awaitingMedia = null;
+  lbShotChosen = true;
   lbLastAxis = 'x';
   const list = shots();
   const next = (idx() + dir + list.length) % list.length;
@@ -1167,6 +1177,7 @@ function stepLightbox(dir: number) {
 function gotoLightbox(target: number) {
   if (target === idx()) return;
   _awaitingMedia = null; // same reason as stepLightbox's
+  lbShotChosen = true;
 
   lbLastDir = target > idx() ? 1 : -1;
   lbLastAxis = 'x';
@@ -1355,7 +1366,7 @@ createRoot(() => {
     const leaving = _awaitingMedia;
     if (!leaving || list.length <= 1) return;
     _awaitingMedia = null;
-    const target = preferredShotIndex(list, leaving);
+    const target = landingIndex(lbGame()!.appid, list, leaving);
     if (target === 0) return; // trailers but no screenshots — not worth autoplaying unasked
     setIdx(target);
     _onLightboxParamChange(list[target].shotId);

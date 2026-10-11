@@ -1248,6 +1248,112 @@ test('F1 edge: stepping back to a game just left in the lightbox lands where it 
   await expect(page.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
 });
 
+// Terraria (Hades' ↓ neighbour on /lists/owned) loads without its store metadata, so only its
+// banner; ↻ Refresh refetches it, with its media whenever `withMedia()` says so.
+async function terrariaMediaOnRefresh(page: Page, withMedia: () => boolean) {
+  await page.route('**/api/game-details/stream', (route) => {
+    const req = route.request();
+    const full = respond(req.method(), new URL(req.url()), req.postData());
+    const body = full.body
+      .split('\n\n')
+      .map((line: string) => {
+        if (!line.startsWith('data: ')) return line;
+        const event = JSON.parse(line.slice(6));
+        return event.appid === 105600 ? `data: ${JSON.stringify({ ...event, meta: null })}` : line;
+      })
+      .join('\n\n');
+    return route.fulfill({ ...full, body });
+  });
+  await page.route('**/api/game-details/105600?refresh=1', (route) => {
+    const req = route.request();
+    const full = respond(req.method(), new URL(req.url()), req.postData());
+    return route.fulfill(
+      withMedia() ? full : { ...full, body: JSON.stringify({ ...JSON.parse(full.body), meta: null }) },
+    );
+  });
+}
+
+// The panel's ↻ sits behind the lightbox; clicked there, it refreshes the game the lightbox shows.
+const refreshBehindLightbox = (page: Page) =>
+  page.locator('.panel-refresh-btn').evaluate((b: HTMLElement) => b.click());
+
+test("F1 edge: a banner shown while a game's media streams isn't where paging back to it lands", async ({ page }) => {
+  let media = false;
+  await asPlayer(page, ALICE);
+  await terrariaMediaOnRefresh(page, () => media);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const counter = page.locator('.lb-counter');
+  const name = page.locator('.lb-caption-text');
+  await expect(counter).toHaveText('Screenshot 1 of 3');
+  await page.keyboard.press('ArrowRight');
+  await expect(counter).toHaveText('Screenshot 2 of 3');
+  await page.keyboard.press('ArrowDown');
+  await expect(name).toHaveText('Terraria');
+  await expect(counter).toHaveText('Cover');
+  await page.keyboard.press('ArrowRight'); // nothing else to step to yet
+  await page.keyboard.press('ArrowDown');
+  await expect(name).not.toHaveText('Terraria');
+  await page.keyboard.press('ArrowUp');
+  await expect(name).toHaveText('Terraria');
+  media = true;
+  await refreshBehindLightbox(page);
+  await expect(counter).toHaveText('Screenshot 1 of 2');
+});
+
+test('F1 edge: paging back to a game whose media is still loading lands where it was left once it loads', async ({
+  page,
+}) => {
+  let media = false;
+  await asPlayer(page, ALICE);
+  await terrariaMediaOnRefresh(page, () => media);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const counter = page.locator('.lb-counter');
+  const name = page.locator('.lb-caption-text');
+  await expect(counter).toHaveText('Screenshot 1 of 3');
+  await page.keyboard.press('ArrowDown');
+  await expect(name).toHaveText('Terraria');
+  media = true;
+  await refreshBehindLightbox(page);
+  await expect(counter).toHaveText('Screenshot 1 of 2');
+  await page.keyboard.press('ArrowRight');
+  await expect(counter).toHaveText('Screenshot 2 of 2');
+  await page.keyboard.press('ArrowDown');
+  await expect(name).not.toHaveText('Terraria');
+  await page.keyboard.press('ArrowUp');
+  await expect(counter).toHaveText('Screenshot 2 of 2');
+  // Its media goes away (a refresh the store didn't answer), then comes back.
+  media = false;
+  await refreshBehindLightbox(page);
+  await expect(counter).toHaveText('Cover');
+  await page.keyboard.press('ArrowDown');
+  await expect(name).not.toHaveText('Terraria');
+  await page.keyboard.press('ArrowUp');
+  await expect(name).toHaveText('Terraria');
+  media = true;
+  await refreshBehindLightbox(page);
+  await expect(counter).toHaveText('Screenshot 2 of 2');
+});
+
+test('F1 edge: paging back to a game only passed through lands on the kind being left', async ({ page }) => {
+  // Hollow Knight (screenshots), Hades, Terraria (a trailer).
+  await asPlayer(page, ALICE, { recentGames: [367520, 1145360, 105600] });
+  await page.goto('/game/367520?shot=s1');
+  const counter = page.locator('.lb-counter');
+  const name = page.locator('.lb-caption-text');
+  await expect(page.locator('.lb-caption-pos')).toHaveText('Game 1 of 3');
+  await page.keyboard.press('ArrowDown');
+  await expect(name).toHaveText('Hades');
+  await expect(counter).toHaveText('Screenshot 1 of 3');
+  await page.keyboard.press('ArrowDown');
+  await expect(name).toHaveText('Terraria');
+  await expect(counter).toHaveText('Screenshot 1 of 2');
+  await page.keyboard.press('ArrowLeft');
+  await expect(counter).toHaveText('Trailer 1 of 1');
+  await page.keyboard.press('ArrowUp');
+  await expect(name).toHaveText('Hades');
+  await expect(counter).toHaveText('Trailer 1 of 1');
+});
+
 test('F1 edge: stepping past the last media or game slides back in from the other side', async ({ page }) => {
   await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
   await page.goto('/game/1145360?shot=s1');

@@ -23,7 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A first visit to Home says what the app does, and the account field's button reads "Look up"
 - With a mouse, the lightbox shows its ↑/↓ game stepper and game position along with its other controls, not only while hovering the game name
 - Stepping past the lightbox's last item or last game slides the first one in from the other side, so the wrap back to the start shows
-- Stepping back to a game just left in the lightbox returns to the item you were on, not its first one
+- Stepping back to a game just left in the lightbox returns to the item you picked there, not its first one
 - Dates read the same everywhere: a release, a bundle's end and its publication show as `YYYY-MM-DD` (with the time where it matters) in tables, cards and the panel
 
 ### Fixed
