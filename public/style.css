@@ -2412,22 +2412,15 @@ body.lb-open {
   font-size: 14px;
   font-weight: 600;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  /* A fixed width with the name filling it, so ↑/↓ stay put from game to game. */
+  flex: 0 1 28rem;
   min-width: 0;
   order: 1; /* between the left buttons and the counter, which .lb-toolbar-row lends the toolbar */
-  pointer-events: auto; /* hoverable: it reveals the game stepper below */
-}
-/* Browsing one game's media is the usual case: with a mouse, the list stepper and position show
-   only on hover or focus. Faded rather than hidden, so Tab still reaches the buttons and the name
-   doesn't shift. Touch keeps them, its pointer way to change game. */
-@media (hover: hover) {
-  .lb-caption :is(.lb-game-prev, .lb-game-next, .lb-caption-pos) {
-    transition: opacity 0.15s;
-  }
-  .lb-caption:not(:hover, :focus-within) :is(.lb-game-prev, .lb-game-next, .lb-caption-pos) {
-    opacity: 0;
-  }
+  pointer-events: auto; /* a click on the name doesn't fall through to the backdrop and close */
 }
 .lb-caption-text {
+  flex: 1 1 0;
+  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2446,6 +2439,10 @@ body.lb-open {
 }
 .lb-counter {
   order: 2;
+  /* It shares the centred group with the caption: a steady width keeps the caption from shifting. */
+  min-width: 10em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 .lb-toolbar-right {
   order: 3;
@@ -2718,7 +2715,11 @@ body.lb-open {
   }
   .lb-caption {
     order: 0;
+    flex: none; /* the row's full width instead, which pins ↑/↓ to its ends */
     padding: 0 44px;
+  }
+  .lb-counter {
+    min-width: 0; /* alone between the flanks here, so its width moves nothing */
   }
   /* Thumb-sized trailer controls; the seek bar keeps its thin look inside a taller hit area. */
   .lb-vc-btn {

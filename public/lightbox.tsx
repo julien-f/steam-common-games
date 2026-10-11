@@ -175,8 +175,11 @@ export function lightboxShot(): { appid: number; shotId: string } | null {
 // the lightbox is covering. Whatever had focus in here keeps it, so holding ↓ on the caption
 // button doesn't walk focus away mid-click; the close button is the fallback, as on a real open.
 // `dir` only drives the enter animation's direction — 0 (R, which has no direction) skips it.
+// A wrap past either end of the list enters from the other side, the cue that it went back round.
 function stepGameNav(dir: number) {
-  stepGameFromLightbox(() => _onGameNav(dir), dir);
+  const pos = _getGamePosition();
+  const wraps = pos !== null && pos.index === (dir > 0 ? pos.total - 1 : 0);
+  stepGameFromLightbox(() => _onGameNav(dir), wraps ? -dir : dir);
 }
 
 function stepGameFromLightbox(step: () => void, dir = 0) {
@@ -1091,15 +1094,23 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
 // being left, which only this module knows: paging through a list is a browse, so it lands on
 // real media rather than on the banner `openLightbox(game, 0)` used to pick (see
 // `preferredShotIndex`).
+// A game paged back to lands on the item it was left on, for the session.
+const lbLastShot = new Map<number, string>();
+
 export function repointLightboxGame(game: ReadonlyGame) {
-  const leaving = shots()[idx()]?.type ?? 'image';
+  const left = shots()[idx()];
+  const leavingGame = lbGame();
+  // Not a banner still waiting on its game's media (`_awaitingMedia`): that's no choice of the viewer's.
+  if (left && leavingGame && !_awaitingMedia) lbLastShot.set(leavingGame.appid, left.shotId);
+  const leaving = left?.type ?? 'image';
   const next = buildMediaItems(game.appid, game.details?.meta);
-  const target = preferredShotIndex(next, leaving);
+  const remembered = next.findIndex((s) => s.shotId === lbLastShot.get(game.appid));
+  const target = remembered >= 0 ? remembered : preferredShotIndex(next, leaving);
   // A lone banner means this row's details are still streaming — there is nothing else to show
   // *yet*. Latch the intent so the first real media to arrive is taken (see the effect at the
   // foot of this file); without it the banner would simply stay up, which is the whole reason
   // paging through a list used to be unrewarding.
-  _awaitingMedia = next.length === 1 ? leaving : null;
+  _awaitingMedia = remembered < 0 && next.length === 1 ? leaving : null;
   batch(() => {
     setLbGame(game);
     setIdx(target);
@@ -1142,10 +1153,11 @@ function stepLightbox(dir: number) {
   // The viewer has taken over: whatever is on screen from here on is their choice, so the latch
   // must never move it under them.
   _awaitingMedia = null;
-  lbLastDir = dir;
   lbLastAxis = 'x';
   const list = shots();
   const next = (idx() + dir + list.length) % list.length;
+  // Entering from the side actually moved toward, so a wrap to the Cover slides in from the left.
+  lbLastDir = Math.sign(next - idx()) || dir;
   setIdx(next);
   _onLightboxParamChange(list[next].shotId);
 }

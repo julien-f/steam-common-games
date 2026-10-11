@@ -1235,6 +1235,50 @@ test('F1 edge: after ↓ finds no game to step to, → still slides the next scr
   expect(anims).toContain('lb-img lb-anim-right');
 });
 
+test('F1 edge: stepping back to a game just left in the lightbox lands where it was left', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.lb-caption-text')).not.toHaveText('Hades');
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('.lb-caption-text')).toHaveText('Hades');
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+});
+
+test('F1 edge: stepping past the last media or game slides back in from the other side', async ({ page }) => {
+  await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
+  await page.goto('/game/1145360?shot=s1');
+  await expect(page.locator('.lb-caption-pos')).toHaveText('Game 2 of 3');
+  await page.keyboard.press('End');
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 3 of 3');
+  const anims = async (step: () => Promise<void>) => {
+    await page.locator('#screenshot-lightbox .lb-img').evaluate((img) => {
+      const w = window as unknown as { lbAnims: string[] };
+      w.lbAnims = [];
+      new MutationObserver(() => w.lbAnims.push(img.className)).observe(img, { attributeFilter: ['class'] });
+    });
+    await step();
+    return page.evaluate(() => (window as unknown as { lbAnims: string[] }).lbAnims);
+  };
+  expect(
+    await anims(async () => {
+      await page.keyboard.press('ArrowRight');
+      await expect(page.locator('.lb-counter')).toHaveText('Cover');
+    }),
+  ).toContain('lb-img lb-anim-left');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.lb-caption-pos')).toHaveText('Game 3 of 3');
+  expect(
+    await anims(async () => {
+      await page.keyboard.press('ArrowDown');
+      await expect(page.locator('.lb-caption-pos')).toHaveText('Game 1 of 3');
+    }),
+  ).toContain('lb-img lb-anim-top');
+});
+
 test('F1 edge: stepping games with hidden controls flashes the game name too', async ({ page }) => {
   await page.clock.install();
   await asPlayer(page, ALICE);
@@ -1421,27 +1465,35 @@ test("F3 edge: the panel's ↑/↓ follow the table's current search, and hide o
   await expect(page.locator('#panel-title')).toHaveText('Hades');
 });
 
-test("F1 edge: the viewer's game stepper shows on hover or focus with a mouse, always on touch", async ({
-  page,
-}, testInfo) => {
+test("F1 edge: the viewer's game stepper shows with its other controls, not only on hover", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
-  const pos = page.locator('.lb-caption-pos');
-  const prev = page.locator('#screenshot-lightbox .lb-game-prev');
-  if (testInfo.project.name === 'phone') {
-    await expect(pos).toHaveCSS('opacity', '1');
-    await expect(prev).toHaveCSS('opacity', '1');
-    return;
-  }
-  await expect(pos).toHaveCSS('opacity', '0');
-  await expect(prev).toHaveCSS('opacity', '0');
-  await page.locator('.lb-caption-text').hover();
-  await expect(pos).toHaveCSS('opacity', '1');
-  await expect(prev).toHaveCSS('opacity', '1');
   await page.mouse.move(720, 450);
-  await expect(pos).toHaveCSS('opacity', '0');
-  await prev.focus();
-  await expect(prev).toHaveCSS('opacity', '1');
+  for (const sel of ['.lb-caption-pos', '.lb-game-prev', '.lb-game-next'])
+    await expect(page.locator(`#screenshot-lightbox ${sel}`)).toHaveCSS('opacity', '1');
+});
+
+test("F1 edge: the viewer's ↑/↓ game buttons stay put from game to game", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const boxes = () =>
+    page.evaluate(() =>
+      ['.lb-game-prev', '.lb-game-next'].map((sel) => {
+        const r = document.querySelector(`#screenshot-lightbox ${sel}`)!.getBoundingClientRect();
+        return [Math.round(r.x), Math.round(r.y)];
+      }),
+    );
+  await expect(page.locator('.lb-caption-pos')).toHaveText(/^Game \d+ of 6$/);
+  const first = await boxes();
+  const names = new Set<string>();
+  for (let i = 0; i < 6; i++) {
+    const name = (await page.locator('.lb-caption-text').textContent())!;
+    names.add(name);
+    expect(await boxes()).toEqual(first);
+    await page.keyboard.press('ArrowDown');
+    await expect(page.locator('.lb-caption-text')).not.toHaveText(name);
+  }
+  expect(names.size).toBe(6);
 });
 
 test('F1 edge: nothing of the page shows around the media', async ({ page }) => {
