@@ -25,6 +25,7 @@ const { createDedup } = require('./lib/dedup');
 const { getMetrics, recordLimiterTrip } = require('./lib/metrics');
 const { getCircuitBreakers } = require('./lib/circuitBreaker');
 const {
+  peekSteamId,
   resolveSteamId,
   getOwnedGames,
   getWishlist,
@@ -116,16 +117,12 @@ function parseBundlesQuery(req) {
   };
 }
 
-// Used by cachedSteamIds below and by achievementsLimit's skip further down.
-const STEAM64_RE = /^7656119\d{10}$/;
-
 // `members` as Steam64 ids from resolveSteamId's cache alone, or null if any would need Steam.
 function cachedSteamIds(members) {
   if (!Array.isArray(members) || !members.every((u) => typeof u === 'string' && u.trim().length > 0)) return null;
   const ids = new Set();
   for (const raw of members) {
-    const id = raw.trim();
-    const hit = STEAM64_RE.test(id) ? id : getCached(`resolve:${id}`, { record: false });
+    const hit = peekSteamId(raw, { record: false });
     if (hit === undefined) return null;
     ids.add(hit);
   }
@@ -385,8 +382,8 @@ const gameSearchLimit = namedRateLimit('gameSearch', {
 
 // Schema is per-appid (one call regardless of how many accounts are loaded); player progress
 // is per (steamid, appid) — skip only once every one of those is already cached, same
-// "cache hits don't count" rule as detailsLimit above. Unresolved (non-Steam64, e.g. vanity
-// name) ids can't be cache-checked without resolving them first, so they always count.
+// "cache hits don't count" rule as detailsLimit above. An id (e.g. a vanity name) whose
+// resolution isn't cached always counts.
 const achievementsLimit = namedRateLimit('achievements', {
   max: ACHIEVEMENTS_RATE_LIMIT_MAX,
   skip: (req) => {
@@ -401,7 +398,10 @@ const achievementsLimit = namedRateLimit('achievements', {
     // No steamids at all (a standalone lookup with no player loaded) only ever needed
     // schema+rarity above, both already confirmed cached — nothing left to check.
     if (!ids.length) return true;
-    return ids.every((id) => STEAM64_RE.test(id) && isCached(`playerach:${id}:${appid}`));
+    return ids.every((raw) => {
+      const id = peekSteamId(raw, { record: false });
+      return id && isCached(`playerach:${id}:${appid}`);
+    });
   },
 });
 
