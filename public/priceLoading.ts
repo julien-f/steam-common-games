@@ -3,7 +3,7 @@
 // forever" null-out on failure (see docs/dev/integrations.md). Chunking and the
 // no-ITAD-configured check stay with the caller (ListRoute.tsx's loadPrices).
 import type { PriceAmount, PriceFields } from './types.ts';
-import { discountPct, fetchJson } from './utils.ts';
+import { discountPct, postJson } from './utils.ts';
 
 // Same wording as the server's 503 for /bundles (server.js), so the two read as one cause.
 export const PRICES_UNAVAILABLE = "Prices aren't available on this instance: it isn't connected to IsThereAnyDeal.";
@@ -61,7 +61,7 @@ export function nullMissingPriceFields(row: PriceFields): void {
 // `fetchedAt` is when the oldest price in this batch was written to the server's cache (epoch
 // ms), or null when it was fetched fresh — backs the "Updated <when>" beside a list's own
 // "↻ Refresh prices", the same shape /api/common-games' own fetchedAt has.
-export interface PriceLookup {
+interface PriceLookup {
   prices: Record<string, PriceInfo>;
   fetchedAt: number | null;
 }
@@ -81,13 +81,9 @@ export async function postPrices({
 }): Promise<PriceLookup> {
   const qs = new URLSearchParams({ country });
   if (force) qs.set('refresh', '1');
-  const data = await fetchJson<{ prices?: Record<string, PriceInfo>; fetchedAt?: number | null }>(
+  const data = await postJson<{ prices?: Record<string, PriceInfo>; fetchedAt?: number | null }>(
     `/api/prices?${qs}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(gids ? { gids } : { appids }),
-    },
+    gids ? { gids } : { appids },
     'Price lookup failed',
   );
   return { prices: data.prices ?? {}, fetchedAt: data.fetchedAt ?? null };

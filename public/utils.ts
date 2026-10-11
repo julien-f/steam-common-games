@@ -242,9 +242,15 @@ export function discountPct(
   return Math.round((1 - bestDealAmt / steamRegularAmt) * 100);
 }
 
-export function fmtH(h: number | null | undefined): string {
-  if (!h) return '<span class="dim">—</span>';
+export function fmtH(h: number): string {
   return h % 1 === 0 ? `${h}h` : `${h.toFixed(1)}h`;
+}
+
+// A video's position as m:ss, for the lightbox's player.
+export function fmtTime(s: number) {
+  if (!isFinite(s) || s < 0) return '0:00';
+  const m = Math.floor(s / 60);
+  return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 }
 
 // Format Steam playtime (minutes) as a compact string, e.g. "47m" or "12h". Returns '' for 0.
@@ -360,4 +366,13 @@ export async function fetchJson<T>(url: string, init: RequestInit | undefined, f
   const data = await res.json().catch(() => undefined);
   if (!res.ok || data === undefined) throw new ApiError(data?.error || fallback, res.status);
   return data as T;
+}
+
+// fetchJson for a POST with a JSON body.
+export function postJson<T>(url: string, body: unknown, fallback: string): Promise<T> {
+  return fetchJson<T>(
+    url,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    fallback,
+  );
 }

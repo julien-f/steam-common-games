@@ -2,8 +2,7 @@
 //
 // Only the *rule* lives here, not the state: `panel.tsx` holds the trail in a signal and calls
 // this to work out what the next one should be. Kept as its own plain-`.ts` sibling so it can be
-// unit-tested without a DOM or a panel, the same convention `panelNav.ts`/`lightboxTime.ts`/
-// `achievementsRequest.ts` already follow for panel-adjacent pure logic.
+// unit-tested without a DOM or a panel, the same convention `panelNav.ts` follows.
 export interface PanelHistoryEntry {
   appid: number;
   name: string;

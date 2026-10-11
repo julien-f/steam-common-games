@@ -40,7 +40,7 @@ import {
 } from './compareSlots.ts';
 import type { AccountSlot } from './types.ts';
 
-export interface ComparePlayersFormProps {
+interface ComparePlayersFormProps {
   initialSlots: string[][];
   submitLabel: string;
   onSubmit: (slots: string[][]) => void;

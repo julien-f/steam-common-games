@@ -63,7 +63,7 @@ import {
 import { createStaleGuard } from './staleGuard.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
 import { UnsavedViewBanner, ViewActions } from './UnsavedViewBanner.tsx';
-import { setBaseTitle } from './pageTitle.ts';
+import { useBaseTitle } from './pageTitle.ts';
 import { convert, formatWithEstimate } from './currency.ts';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
 import { fetchBundlePage, loadErrorText } from './bundleData.ts';
@@ -474,8 +474,7 @@ export default function BundlesBrowseRoute() {
   }
 
   onMount(() => load());
-  onMount(() => setBaseTitle('Bundles'));
-  onCleanup(() => setBaseTitle(null));
+  useBaseTitle(() => 'Bundles');
 
   return (
     <div class="bundles-browse-route">

@@ -99,8 +99,8 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "r" | "g:" formula
 - `staleGuard.ts` — generation counters for "a newer load superseded this one".
 - `loadProgress.ts` — the details stream's progress bar and time left.
 - `priceLoading.ts` — the `POST /api/prices` call and the row-field mapping/fallbacks around it.
-- `panel.tsx` / `panelData.ts` / `panelNav.ts` / `panelHistory.ts` / `panelKeyboard.ts` / `ownerList.ts` / `achievementsRequest.ts` — the side panel and its per-game data, prev/next nav, DLC trail rule, keyboard handler, and the pure halves of the "Owned by"/achievements cards.
-- `lightbox.tsx` / `mediaItems.ts` / `lightboxTime.ts` / `lightboxSwipe.ts` — screenshot/video lightbox, its ordered media list, the one pure formatter its test needs, and its swipe thresholds/decision.
+- `panel.tsx` / `panelData.ts` / `panelNav.ts` / `panelHistory.ts` / `panelKeyboard.ts` / `ownerList.ts` — the side panel and its per-game data, prev/next nav, DLC trail rule, keyboard handler, and the pure half of the "Owned by" card.
+- `lightbox.tsx` / `mediaItems.ts` / `lightboxSwipe.ts` — screenshot/video lightbox, its ordered media list, and its swipe thresholds/decision.
 - `overlayHistory.ts` — the history entry each open overlay pushes (see the side panel).
 - `gameSearch.ts` — the combobox/debounce UI for "look up any game" (the shell owns where results go).
 - `urlState.ts` — param parsing, canonical param order, and the `?game=`/`&shot=`/`?u=` writers.
@@ -224,7 +224,7 @@ Per kind:
 - **recent** — says it's local browser history; `params.appid` focuses one game without making it a different kind of view.
 - **user** — its manual-or-op chip with Games/Folder/Sources/Edited. A dynamic list states its formula in the card: each source named (`listLabels.ts`), linked, with what it contributed (`Alice — Owned 343 ∪ Alice — Wishlist 115 = 457`); a dangling source is flagged in place. `group-by-membership` is one table grouped by an "Owned by"/"In" column (`membershipColumn.ts`: each row's `membership` key, in `combine.ts`'s most-sources-first order via the column's `compare`, headers saying who's in and who's missing); every other op flattens to one table.
 - **compare** — an unsaved dynamic list built from the URL: one `account-owned` source per `?u=` slot, combined with `?op=` (default `group-by-membership`), resolved and labeled through the same `listResolve.ts`/`combine.ts`/`listLabels.ts` path as a stored one, so "Save as a list" is `createList()` with the same formula.
-  - It resolves each slot itself (`resolveAccountSummary`), never touching `recentAccounts` — comparing someone isn't picking them; the form's account chips write nothing back either.
+  - It resolves each slot itself (`resolveAccountSlot`), never touching `recentAccounts` — comparing someone isn't picking them; the form's account chips write nothing back either.
   - It rewrites the address to the resolved steam64 ids in canonical order, and orders sources by the same rule, so one URL renders one way.
   - Sources are labeled by the player alone, not "⟨player⟩ — Owned", which would repeat in every group heading.
 

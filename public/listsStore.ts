@@ -114,7 +114,7 @@ function userListDeps(sources: ListRef[]): string[] {
 // user-list dependency graph? Walks the *proposed* sources for `listId` itself, then each
 // other list's *currently stored* sources — so this also catches a cycle introduced by
 // editing some other list further down the chain, not just a fresh self-reference.
-export function wouldCreateCycle(listId: string, sources: ListRef[], lists: GameList[] = readLists()): boolean {
+function wouldCreateCycle(listId: string, sources: ListRef[], lists: GameList[] = readLists()): boolean {
   const visited = new Set<string>();
   const stack = [...userListDeps(sources)];
   while (stack.length) {
@@ -137,11 +137,7 @@ export class CycleError extends Error {
 }
 
 // Is a folder `candidateId` at or below `potentialAncestorId` in the parentId tree?
-export function isDescendantFolder(
-  candidateId: string,
-  potentialAncestorId: string,
-  folders: Folder[] = readFolders(),
-): boolean {
+export function isDescendantFolder(candidateId: string, potentialAncestorId: string, folders: Folder[]): boolean {
   let current: Folder | undefined = folders.find((f) => f.id === candidateId);
   while (current) {
     if (current.id === potentialAncestorId) return true;
@@ -163,8 +159,8 @@ export function isBundleReferenced(bundleId: string, lists: GameList[] = readLis
 }
 
 // Soft-deleted lists count, as for bundles: they still resolve, and name the account by its slot.
-export function isAccountReferenced(accountId: string, lists: GameList[] = readLists()): boolean {
-  return lists.some((l) =>
+export function isAccountReferenced(accountId: string): boolean {
+  return readLists().some((l) =>
     listDeps(l).some((s) => (s.kind === 'account-owned' || s.kind === 'account-wishlist') && s.accountId === accountId),
   );
 }
@@ -293,31 +289,29 @@ export function moveList(id: string, parentId: string | null): void {
   writeLists(lists);
 }
 
-// A manual list's own appids — no cycle concern, nothing to validate beyond existence.
-export function setListAppids(id: string, appids: number[]): void {
+// A manual list's own appids — no cycle concern, nothing to validate beyond existence; a missing
+// or dynamic list is left alone.
+function updateManualAppids(id: string, next: (appids: number[]) => number[]): void {
   const lists = readLists();
   const list = lists.find((l) => l.id === id);
   if (!list || list.kind !== 'manual') return;
-  list.appids = appids;
+  list.appids = next(list.appids ?? []);
   list.updatedAt = Date.now();
   writeLists(lists);
 }
 
-// Row-selection-based add/remove (ListRoute.tsx) — thin wrappers over setListAppids built on
-// the same set arithmetic (combine.ts's union/subtract) a dynamic list's own resolve uses, just
-// applied to a manual list's stored array instead of a live combine. Same no-op-if-missing-or-
-// not-manual guard as setListAppids (redundant with its own check, but avoids reading `.appids`
-// off a dynamic list, which doesn't have one).
+export function setListAppids(id: string, appids: number[]): void {
+  updateManualAppids(id, () => appids);
+}
+
+// Row-selection-based add/remove (ListRoute.tsx), with the same set arithmetic (combine.ts's
+// union/subtract) a dynamic list's own resolve uses.
 export function addAppidsToList(id: string, appids: number[]): void {
-  const list = readLists().find((l) => l.id === id);
-  if (!list || list.kind !== 'manual') return;
-  setListAppids(id, [...union([new Set(list.appids), new Set(appids)])]);
+  updateManualAppids(id, (current) => [...union([new Set(current), new Set(appids)])]);
 }
 
 export function removeAppidsFromList(id: string, appids: number[]): void {
-  const list = readLists().find((l) => l.id === id);
-  if (!list || list.kind !== 'manual') return;
-  setListAppids(id, [...subtract([new Set(list.appids), new Set(appids)])]);
+  updateManualAppids(id, (current) => [...subtract([new Set(current), new Set(appids)])]);
 }
 
 // Edits a dynamic list's formula in place (same id/folder position) — the "Edit sources"

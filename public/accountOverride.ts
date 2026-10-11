@@ -5,7 +5,7 @@
 //
 // Kept separate from accountsStore.ts on purpose: that file is plain AccountSlot state over
 // prefs.ts with no fetching of its own, while resolving an identifier means a real
-// /api/common-games round trip (accountData.ts's resolveAccountSummary — there's no standalone
+// /api/common-games round trip (accountData.ts's resolveAccountSlot — there's no standalone
 // "just resolve this identifier" endpoint, see docs/dev/architecture.md's Request flow section). This module is
 // the policy layer between the two, and it's the one place the param is read; every consumer
 // asks accountsStore.ts's getEffectiveCurrentAccount() instead of parsing the URL itself.
@@ -14,13 +14,8 @@
 // `location.search`), rather than each route doing it — the shell outlives every navigation, and
 // a `?u=` link is honored identically on all of them.
 import { parseAccountParam, urlWithoutAccountParam } from './urlState.ts';
-import { resolveAccountSummary } from './accountData.ts';
-import {
-  accountSlotFromSummary,
-  setAccountOverride,
-  setCurrentAccount,
-  notifyAccountChanged,
-} from './accountsStore.ts';
+import { resolveAccountSlot } from './accountData.ts';
+import { setAccountOverride, setCurrentAccount, notifyAccountChanged } from './accountsStore.ts';
 import { createStaleGuard } from './staleGuard.ts';
 import type { AccountSlot } from './types.ts';
 
@@ -86,10 +81,10 @@ export function createAccountOverrideSync() {
     const gen = guard.next();
     setAccountOverride(null); // don't leave a previous link's account showing while this resolves
     setState({ state: 'resolving', identifiers });
-    resolveAccountSummary(identifiers).then(
-      (summary) => {
+    resolveAccountSlot(identifiers).then(
+      (account) => {
         if (guard.isStale(gen)) return;
-        setAccountOverride(accountSlotFromSummary(summary, identifiers));
+        setAccountOverride(account);
         setState({ state: 'ready', identifiers });
       },
       (err: Error) => {
@@ -106,7 +101,7 @@ export function createAccountOverrideSync() {
 const defaultSync = createAccountOverrideSync();
 export const getAccountOverrideState = defaultSync.getState;
 export const syncAccountOverrideFromUrl = defaultSync.syncFromUrl;
-export const clearAccountOverride = defaultSync.clear;
+const clearAccountOverride = defaultSync.clear;
 
 // An explicit account pick — a fresh resolve, a recents click, adopting what a `?u=` link showed.
 // Storing it also consumes the override, param and all, rather than leaving the link overriding

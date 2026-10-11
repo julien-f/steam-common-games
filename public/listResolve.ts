@@ -193,10 +193,10 @@ export function createDefaultFetchers({
 }: DefaultFetchersOptions = {}): ListResolveFetchers {
   return {
     accountOwned: async (accountId) => {
-      const { appids, owners, fetchedAt } = await fetchAccountOwnedData(accountId, { refresh });
+      const { games, owners, fetchedAt } = await fetchAccountOwnedData(accountId, { refresh });
       onFetchedAt?.(fetchedAt);
       onOwners?.(owners, accountId);
-      return appids;
+      return new Set(games.keys());
     },
     accountWishlist: async (accountId) => {
       const { appids, fetchedAt } = await fetchAccountWishlistData(accountId, { refresh });

@@ -4,9 +4,9 @@
 // (bundle kind) and by listResolve.ts's `bundle` ListRef case, decoupled from bundles.tsx's
 // bespoke table UI, which went away with that page.
 
-import type { BundleListItem, PickAndMixTier } from './bundleRows.ts';
+import type { BundleListItem } from './bundleRows.ts';
 import type { PriceAmount } from './types.ts';
-import { ApiError, fetchJson } from './utils.ts';
+import { ApiError, fetchJson, postJson } from './utils.ts';
 
 export interface FlatGame {
   gid: string;
@@ -24,7 +24,7 @@ export interface FlatGame {
 // A flat game that also resolved to a Steam appid.
 export type ResolvedGame = FlatGame & { appid: number };
 
-export interface BundleTier {
+interface BundleTier {
   price: PriceAmount | null;
   games: { id: string; slug: string; title: string; type: string; assets?: { boxart?: string } | null }[];
   addon: boolean | null;
@@ -36,18 +36,11 @@ export interface BundleTier {
 // both. `isMature` is deliberately still not declared: the app no longer filters on it (see
 // getBundles in lib/itad.js) and doesn't label with it either — the flag proved inaccurate on the
 // very bundle it was hiding, so surfacing it would spread that inaccuracy rather than inform.
-export interface Bundle {
-  id: number;
-  title: string;
-  page: { name?: string } | null;
-  counts: { games?: number } | null;
-  publish: string | null;
-  expiry: string | null;
+export interface Bundle extends Omit<BundleListItem, 'tiers'> {
   note: string | null;
   url: string | null;
   details: string | null;
   tiers: BundleTier[];
-  pickAndMix?: PickAndMixTier[] | null;
   // GET /api/bundles/:id only: ITAD gid -> the name Fanatical's pick-and-mix page shows (matchPickAndMix).
   pickAndMixNames?: Record<string, string> | null;
 }
@@ -95,7 +88,7 @@ export function flattenBundleGames(bundle: Bundle): FlatGame[] {
 // GET /api/bundles/:id's 404: ITAD no longer lists the bundle (see findBundleById in lib/itad.js),
 // as opposed to a transient failure — the one case a saved list's bundle source gets orphaned.
 // A 503: the instance has no IsThereAnyDeal key — a setting, not a failure, so shown without "Error:".
-export class UnavailableError extends Error {
+class UnavailableError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'UnavailableError';
@@ -172,9 +165,9 @@ export async function fetchBundleById(
 export async function resolveBundleAppids(
   gids: string[],
 ): Promise<{ appids: Record<string, number | number[] | null>; failed: string[] }> {
-  const data = await fetchJson<{ appids: Record<string, number | number[] | null>; failed?: string[] }>(
+  const data = await postJson<{ appids: Record<string, number | number[] | null>; failed?: string[] }>(
     '/api/bundles/resolve',
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gids }) },
+    { gids },
     'Resolution failed',
   );
   return { appids: data.appids, failed: data.failed ?? [] };

@@ -20,8 +20,15 @@ import type { OwnershipStatus } from './myOwnership.ts';
 import { sortOwners, ownerMeterPct } from './ownerList.ts';
 import type { GameOwner } from './accountData.ts';
 import { ACCOUNT_CHANGED_EVENT, getEffectiveCurrentAccount } from './accountsStore.ts';
-import { achievementsAccountKey } from './achievementsRequest.ts';
-import { fetchNews, fetchAchievements, fetchPrice, fetchBundles, fetchDlc, isItadOff } from './panelData.ts';
+import {
+  achievementsAccountKey,
+  fetchNews,
+  fetchAchievements,
+  fetchPrice,
+  fetchBundles,
+  fetchDlc,
+  isItadOff,
+} from './panelData.ts';
 import type {
   DlcEntry,
   GameBundle,
@@ -601,9 +608,8 @@ function panelGoBack() {
 }
 
 function getPanelItems() {
-  // Callers all check panelGame() first.
-  const g = panelGame()!;
-  return buildMediaItems(g.appid, g.details?.meta);
+  const g = panelGame();
+  return g ? buildMediaItems(g.appid, g.details?.meta) : [];
 }
 
 // dir: -1 (previous) or 1 (next). wrap: true for keyboard arrow navigation
@@ -1100,6 +1106,9 @@ function setAchievementsFilterFor(appid: number, filter: string) {
 // on the appid but progress depends on which account is loaded. The list itself is still fetched
 // and shown with zero accounts loaded (`playerCount: 0`, no `steamUrl`) — only the
 // achieved/unlocktime/progress-summary parts need an account, gated by `hasProgress` below.
+// Shown once fetched, failure included; PanelSubnav lists the section on the same condition.
+const achievementsShown = () => panelData.achievements() !== undefined;
+
 function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
   // `undefined` means the fetch hasn't been attempted yet — nothing to show and no failure to
   // report either, so stay silent. `null` means it was attempted and failed — that's worth a
@@ -1219,7 +1228,7 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
     <Show
       when={panelData.achievements.loading}
       fallback={
-        <Show when={data() !== undefined}>
+        <Show when={achievementsShown()}>
           <div class="panel-section" id="panel-section-achievements">
             <Show
               when={data()}
@@ -1328,6 +1337,11 @@ function OwnersSection(): JSX.Element {
 // linking straight to the full post, plus a link to the game's full news hub on the Steam
 // store for anything older than what's shown here. Dates use the same plain-ISO convention
 // as fmtLastPlayed/the table's date columns rather than a relative "3 days ago" string.
+const newsShown = () => {
+  const news = panelData.news();
+  return news === null || !!news?.length;
+};
+
 function NewsSection(props: { game: ReadonlyGame }): JSX.Element {
   const items = () => panelData.news();
   return (
@@ -1337,7 +1351,7 @@ function NewsSection(props: { game: ReadonlyGame }): JSX.Element {
         // A failed fetch with nothing to fall back on (`null` — see panelData.ts's fetchNews, which
         // keeps a previous successful load rather than wiping it) is worth a visible message rather
         // than silently looking identical to a game with no news at all.
-        <Show when={items() === null || items()?.length}>
+        <Show when={newsShown()}>
           <div class="panel-section" id="panel-section-news">
             <Show
               when={items()}
@@ -1763,8 +1777,8 @@ function DlcSection(props: { game: ReadonlyGame }): JSX.Element {
 // subtree, same as the original panelStepHero → renderPanelHero's targeted `.outerHTML`
 // update, just done via Solid's own fine-grained reactivity instead of a hand-rolled partial
 // DOM replace.
-function HeroMain(props: { items: MediaItem[] }): JSX.Element {
-  const idx = () => Math.max(0, Math.min(heroIdx(), props.items.length - 1));
+function HeroMain(props: { items: MediaItem[]; idx: number }): JSX.Element {
+  const idx = () => props.idx;
   const current = () => props.items[idx()];
   const name = () => panelGame()?.name ?? '';
   const isShot = () => idx() > 0;
@@ -1777,6 +1791,10 @@ function HeroMain(props: { items: MediaItem[] }): JSX.Element {
   const [loadedSrc, setLoadedSrc] = createSignal<string>();
   const [brokenSrc, setBrokenSrc] = createSignal<string>();
   const loading = () => loadedSrc() !== src() && brokenSrc() !== src();
+  const openCurrent = () => {
+    const g = panelGame();
+    if (g) openLightbox(g, idx());
+  };
   // A broken image (banner guess 404ing, or — as with a video's poster — a genuinely dead
   // upstream Steam CDN asset) used to hide the whole `.panel-hero-main`, which also wiped
   // out the prev/next nav and, for videos, the play-button overlay and click target — even
@@ -1796,15 +1814,11 @@ function HeroMain(props: { items: MediaItem[] }): JSX.Element {
         alt={name()}
         onLoad={(e) => setLoadedSrc(e.currentTarget.getAttribute('src') ?? undefined)}
         onError={(e) => setBrokenSrc(e.currentTarget.getAttribute('src') ?? undefined)}
-        onClick={() => {
-          const g = panelGame();
-          if (g) openLightbox(g, idx());
-        }}
+        onClick={openCurrent}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
-            const g = panelGame();
-            if (g) openLightbox(g, idx());
+            openCurrent();
           }
         }}
       />
@@ -1837,10 +1851,7 @@ function PanelHero(): JSX.Element {
   // (screenshots/videos) asynchronously, without ever replacing the row object itself. Reading
   // the field through the store row is what makes the hero pick that up; it used to need a
   // `revision()` read here for the same reason, back when the row was a plain object.
-  const items = () => {
-    const g = panelGame();
-    return g ? buildMediaItems(g.appid, g.details?.meta) : [];
-  };
+  const items = getPanelItems;
   const idx = () => Math.max(0, Math.min(heroIdx(), items().length - 1));
   const hasMany = () => items().length > 1;
   let filmstripEl: HTMLDivElement | undefined;
@@ -1885,7 +1896,7 @@ function PanelHero(): JSX.Element {
   return (
     <div id="panel-hero" class="panel-hero">
       <Show when={items().length}>
-        <HeroMain items={items()} />
+        <HeroMain items={items()} idx={idx()} />
       </Show>
       <Show when={hasMany()}>
         <div class="panel-filmstrip" ref={onFilmstripRef}>
@@ -1927,12 +1938,14 @@ function PanelHero(): JSX.Element {
 // The HLTB Main/Extra/Completionist breakdown. The glance strip above already carries HLTB's
 // "All PlayStyles" number (see GlanceGrid), so this is the fuller breakdown beneath it, not a
 // second copy of the headline figure.
+const hltbShown = (g: ReadonlyGame) => {
+  const h = g.details?.hltb;
+  return !g.loading && !!h && !!(h.main || h.extra || h.completionist);
+};
+
 function HltbSection(props: { game: ReadonlyGame }): JSX.Element {
   const h = () => props.game.details?.hltb;
-  const present = () => {
-    const x = h();
-    return !props.game.loading && !!x && !!(x.main || x.extra || x.completionist);
-  };
+  const present = () => hltbShown(props.game);
   const parts = () => {
     const x = h();
     return [x?.main && 'Main Story', x?.extra && 'Main + Extra', x?.completionist && 'Completionist'].filter(Boolean);
@@ -2204,18 +2217,15 @@ function PanelSubnav(props: { game: ReadonlyGame }): JSX.Element {
   // goes absent → present as a game loads, so the bar appears at most once per open and never
   // disappears.
   //
-  // Each mirrors its own section component's gating, computed as a plain boolean rather than by
-  // checking a rendered `<Component/>` call's own truthiness (always truthy regardless of what it
-  // renders to, including `null`).
+  // Each shares its section component's show predicate, a plain boolean rather than a rendered
+  // `<Component/>` call's own truthiness (always truthy regardless of what it renders to).
   const items = createMemo(() => {
     const g = props.game;
-    const h = g.details?.hltb;
-    const news = panelData.news();
     return [
       !!panelData.owners()?.length && { label: 'Owned by', target: 'panel-section-owners' },
-      !g.loading && !!h && !!(h.main || h.extra || h.completionist) && { label: 'HLTB', target: 'panel-section-hltb' },
-      (news === null || !!news?.length) && { label: 'News', target: 'panel-section-news' },
-      panelData.achievements() !== undefined && { label: 'Achievements', target: 'panel-section-achievements' },
+      hltbShown(g) && { label: 'HLTB', target: 'panel-section-hltb' },
+      newsShown() && { label: 'News', target: 'panel-section-news' },
+      achievementsShown() && { label: 'Achievements', target: 'panel-section-achievements' },
       !!g.details?.meta?.dlc?.length && { label: 'DLC', target: 'panel-section-dlc' },
     ].filter((it): it is { label: string; target: string } => !!it);
   });

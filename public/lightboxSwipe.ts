@@ -1,10 +1,10 @@
 // The lightbox's touch-swipe decisions, split out of `lightbox.tsx` for the same reason
-// `lightboxTime.ts` and `compareSlots.ts` are: it's the part worth testing, and it needs
+// `compareSlots.ts` is: it's the part worth testing, and it needs
 // neither a DOM nor a store. The handler in `lightbox.tsx` keeps only the DOM work —
 // tracking the finger, moving the media element, and running the resolved action.
 
 export type SwipeAxis = 'x' | 'y';
-export type SwipeAction = 'media-prev' | 'media-next' | 'game-prev' | 'game-next';
+type SwipeAction = 'media-prev' | 'media-next' | 'game-prev' | 'game-next';
 
 // Past this the gesture is a drag, not a tap — and the axis it locks onto is final. Matches
 // the lightbox's own tap threshold, so a gesture is never both.

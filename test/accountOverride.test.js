@@ -37,10 +37,15 @@ function withFetch(t, handler) {
 }
 
 // A /api/common-games + /api/wishlist responder resolving every requested identifier to one
-// player, mirroring what resolveAccountSummary reads (accountData.ts).
+// player, mirroring what resolveAccountSlot reads (accountData.ts).
 function fakeResolveFetch({
   members = [
-    { steamid: '1', personaname: 'Alice', avatarmedium: 'a.jpg', profileurl: 'https://steamcommunity.com/id/alice/' },
+    {
+      steamid: '1',
+      personaname: 'Alice',
+      avatarmedium: 'https://cdn/a.jpg',
+      profileurl: 'https://steamcommunity.com/id/alice/',
+    },
   ],
   fail = false,
 } = {}) {
@@ -77,7 +82,7 @@ test('syncFromUrl: resolves ?u= into an override, leaving the stored account unt
     members: ['1'],
     rawInputs: ['alice'],
     label: 'Alice',
-    avatarUrl: 'a.jpg',
+    avatarUrl: 'https://cdn/a.jpg',
     vanities: { 1: 'alice' }, // carried onto the slot, so the copyable identifier needs no fetch
     memberSince: undefined,
     countryCode: undefined,

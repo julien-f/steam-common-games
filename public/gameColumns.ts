@@ -560,7 +560,7 @@ export function computePriceStatus(row: Row): string | null | undefined {
 // (All-Time Low) first on a fresh click. On Sale/Not Discounted stay plain, uncolored, no icon
 // — not being a record isn't a bad thing worth flagging, so nothing here draws the eye away
 // from the three real record tiers.
-export interface StatusTier {
+interface StatusTier {
   label: string;
   color?: string;
   icon?: string;

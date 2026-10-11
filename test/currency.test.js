@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { convert, formatWithEstimate, RATES_PER_EUR, REGION_CURRENCY } = require('../public/currency.ts');
+const { convert, formatWithEstimate, RATES_PER_EUR } = require('../public/currency.ts');
 const { COUNTRY_OPTIONS } = require('../public/region.ts');
 
 test('convert: same currency is exact, others go through the euro, unknown is null', () => {
@@ -12,11 +12,8 @@ test('convert: same currency is exact, others go through the euro, unknown is nu
   assert.equal(convert(1, 'XYZ', 'EUR'), null);
 });
 
-test('every region the app offers has a currency with a rate', () => {
-  for (const { code } of COUNTRY_OPTIONS) {
-    assert.ok(REGION_CURRENCY[code], code);
-    assert.ok(RATES_PER_EUR[REGION_CURRENCY[code]], code);
-  }
+test('every region the app offers prices in a currency with a rate', () => {
+  for (const { code, currency } of COUNTRY_OPTIONS) assert.ok(RATES_PER_EUR[currency], code);
 });
 
 test('formatWithEstimate: the own price, plus an estimate only in another currency', () => {

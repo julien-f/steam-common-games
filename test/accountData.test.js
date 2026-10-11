@@ -6,7 +6,8 @@ const {
   membersFromAccountId,
   fetchAccountWishlist,
   fetchAccountWishlistData,
-  resolveAccountSummary,
+  resolveAccountSlot,
+  accountSlotFrom,
   fetchAccountOverview,
   toAccountPlayer,
   accountInfoFrom,
@@ -108,9 +109,9 @@ test('fetchAccountWishlistData: resolves an accountId straight to a flat appid S
   assert.deepEqual(appids, new Set([620]));
 });
 
-// ── resolveAccountSummary ────────────────────────────────────────────────────────────────────
+// ── resolveAccountSlot ────────────────────────────────────────────────────────────────────
 
-test('resolveAccountSummary: a single account resolves members/label/avatar/profile trivia', async (t) => {
+test('resolveAccountSlot: a single account resolves members/label/avatar/profile trivia', async (t) => {
   withFetch(t, async () => ({
     ok: true,
     json: async () => ({
@@ -131,17 +132,19 @@ test('resolveAccountSummary: a single account resolves members/label/avatar/prof
     }),
   }));
 
-  const summary = await resolveAccountSummary(['alice']);
-  assert.deepEqual(summary.members, ['1']);
-  assert.equal(summary.label, 'Alice');
-  assert.equal(summary.avatarUrl, 'https://x/a.jpg');
-  assert.deepEqual(summary.vanities, { 1: 'alice' });
-  assert.equal(summary.memberSince, '2015-06-10');
-  assert.equal(summary.countryCode, 'US');
-  assert.equal(summary.realName, 'Alice Smith');
+  const slot = await resolveAccountSlot(['alice']);
+  assert.equal(slot.id, '1');
+  assert.deepEqual(slot.members, ['1']);
+  assert.deepEqual(slot.rawInputs, ['alice']);
+  assert.equal(slot.label, 'Alice');
+  assert.equal(slot.avatarUrl, 'https://x/a.jpg');
+  assert.deepEqual(slot.vanities, { 1: 'alice' });
+  assert.equal(slot.memberSince, '2015-06-10');
+  assert.equal(slot.countryCode, 'US');
+  assert.equal(slot.realName, 'Alice Smith');
 });
 
-test('resolveAccountSummary: a multi-member Family sorts members, joins the label, and has no single avatar', async (t) => {
+test('resolveAccountSlot: a multi-member Family sorts members, joins the label, and has no single avatar', async (t) => {
   withFetch(t, async () => ({
     ok: true,
     json: async () => ({
@@ -155,24 +158,25 @@ test('resolveAccountSummary: a multi-member Family sorts members, joins the labe
     }),
   }));
 
-  const summary = await resolveAccountSummary(['bob', 'alice']);
-  assert.deepEqual(summary.members, ['1', '2']);
-  assert.equal(summary.label, 'Bob + Alice');
-  assert.equal(summary.avatarUrl, null);
+  const slot = await resolveAccountSlot(['bob', 'alice']);
+  assert.equal(slot.id, '1+2');
+  assert.deepEqual(slot.members, ['1', '2']);
+  assert.equal(slot.label, 'Bob + Alice');
+  assert.equal(slot.avatarUrl, undefined);
   // Keyed by steamid, not by position: the response is in the API's order, `members` is sorted.
-  assert.deepEqual(summary.vanities, { 2: 'bob' });
-  // No one profile speaks for a Family — same reasoning as avatarUrl being null above.
-  assert.equal(summary.memberSince, null);
-  assert.equal(summary.countryCode, null);
-  assert.equal(summary.realName, null);
+  assert.deepEqual(slot.vanities, { 2: 'bob' });
+  // No one profile speaks for a Family — same reasoning as avatarUrl being absent above.
+  assert.equal(slot.memberSince, undefined);
+  assert.equal(slot.countryCode, undefined);
+  assert.equal(slot.realName, undefined);
 });
 
-test('resolveAccountSummary: throws with the server error message when the account itself fails to resolve', async (t) => {
+test('resolveAccountSlot: throws with the server error message when the account itself fails to resolve', async (t) => {
   withFetch(t, async () => ({ ok: false, json: async () => ({ error: 'profile not found' }) }));
-  await assert.rejects(() => resolveAccountSummary(['ghost']), /profile not found/);
+  await assert.rejects(() => resolveAccountSlot(['ghost']), /profile not found/);
 });
 
-test('resolveAccountSummary: resolves with the one /api/common-games request, no wishlist fetch', async (t) => {
+test('resolveAccountSlot: resolves with the one /api/common-games request, no wishlist fetch', async (t) => {
   const urls = [];
   withFetch(t, async (url) => {
     urls.push(url);
@@ -187,9 +191,37 @@ test('resolveAccountSummary: resolves with the one /api/common-games request, no
     };
   });
 
-  const summary = await resolveAccountSummary(['alice']);
+  const slot = await resolveAccountSlot(['alice']);
   assert.deepEqual(urls, ['/api/common-games']);
-  assert.equal(summary.label, 'Alice');
+  assert.equal(slot.label, 'Alice');
+});
+
+test('accountSlotFrom: no label while a member is a placeholder, so it reads as what was typed', () => {
+  const slot = accountSlotFrom([toAccountPlayer({ steamid: '1', personaname: '1', placeholder: true })], ['bob']);
+  assert.equal(slot.label, undefined);
+  assert.deepEqual(slot.rawInputs, ['bob']);
+});
+
+test('accountSlotFrom: a friend makes a single-account slot from its own fields', () => {
+  const slot = accountSlotFrom(
+    [
+      {
+        steamid: '1',
+        name: 'Alice',
+        avatarUrl: '',
+        profileUrl: 'https://steamcommunity.com/id/alice/',
+        memberSince: '',
+        countryCode: 'FR',
+        realName: '',
+      },
+    ],
+    ['1'],
+  );
+  assert.equal(slot.label, 'Alice');
+  assert.equal(slot.avatarUrl, undefined);
+  assert.deepEqual(slot.vanities, { 1: 'alice' });
+  assert.equal(slot.memberSince, undefined);
+  assert.equal(slot.countryCode, 'FR');
 });
 
 // ── toAccountPlayer / fetchAccountOverview ───────────────────────────────────
@@ -427,7 +459,7 @@ test('an API error keeps its own message', async (t) => {
   await assert.rejects(fetchAccountWishlist(['1']), { message: 'Profile is private' });
 });
 
-test('resolveAccountSummary: an HTML error page reads as the account failing to resolve, not as a JSON parse error', async (t) => {
+test('resolveAccountSlot: an HTML error page reads as the account failing to resolve, not as a JSON parse error', async (t) => {
   withFetch(t, async () => new Response('<html>502 Bad Gateway</html>', { status: 502 }));
-  await assert.rejects(resolveAccountSummary(['alice']), { message: 'Failed to resolve account' });
+  await assert.rejects(resolveAccountSlot(['alice']), { message: 'Failed to resolve account' });
 });

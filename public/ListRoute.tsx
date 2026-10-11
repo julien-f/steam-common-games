@@ -141,13 +141,12 @@ import {
 import {
   getEffectiveCurrentAccount,
   accountIdentifiers,
-  accountSlotFromSummary,
   accountDisplayLabel,
   getMyAccount,
   ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
 import { getAccountOverrideState, accountOverrideStatusText } from './accountOverride.ts';
-import { fetchAccountOverview, fetchAccountWishlist, resolveAccountSummary, type GameOwner } from './accountData.ts';
+import { fetchAccountOverview, fetchAccountWishlist, resolveAccountSlot, type GameOwner } from './accountData.ts';
 import { loadRecentGames, addRecentGame, renameRecentGame, MAX_RECENT_GAMES } from './recentGames.ts';
 import {
   fetchBundleById,
@@ -1901,9 +1900,7 @@ export default function ListRoute() {
 
       setListTitle(slots.map((slot) => slot.join(' + ')).join(' vs. '));
       setStatusText('Resolving accounts…');
-      const settled = await Promise.allSettled(
-        slots.map(async (identifiers) => accountSlotFromSummary(await resolveAccountSummary(identifiers), identifiers)),
-      );
+      const settled = await Promise.allSettled(slots.map((identifiers) => resolveAccountSlot(identifiers)));
       if (loadGuard.isStale(gen)) return;
       const failures = settled.flatMap((r, i) =>
         r.status === 'rejected' ? [{ identifiers: slots[i], message: (r.reason as Error).message }] : [],

@@ -8,7 +8,7 @@ import { createSignal, createEffect, on, onMount, onCleanup, Show } from 'solid-
 import { useLocation } from '@solidjs/router';
 import { createTableState, DataTableView } from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
-import { setBaseTitle } from './pageTitle.ts';
+import { useBaseTitle } from './pageTitle.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
 import { panelOpen, getPanelGame, pickRandomFrom } from './panel.tsx';
 import { renderPanelNav, stepGameList } from './panelNav.ts';
@@ -85,8 +85,7 @@ export default function SearchRoute() {
   let inputEl: HTMLInputElement | undefined;
   let tableWrapEl: HTMLDivElement | undefined;
 
-  onMount(() => setBaseTitle('Search'));
-  onCleanup(() => setBaseTitle(null));
+  useBaseTitle(() => 'Search');
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   function handleInput(raw: string): void {

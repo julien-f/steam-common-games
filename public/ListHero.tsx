@@ -50,7 +50,7 @@ export interface HeroTile {
   subTitle?: string;
 }
 
-export interface ListHeroProps {
+interface ListHeroProps {
   title: string;
   lead?: JSX.Element; // before the title — the bundle route's ‹/› nav
   chips?: JSX.Element; // after the title — kind/shop/account chips
@@ -91,52 +91,55 @@ export function ListHero(props: ListHeroProps): JSX.Element {
       <Show when={props.tiles?.length}>
         <div class="list-hero-stats">
           <Index each={props.tiles}>
-            {(tile) => (
-              <Dynamic
-                component={tile().onClick && !tile().subOnClick ? 'button' : 'div'}
-                class={tile().onClick && !tile().subOnClick ? 'list-stat list-stat-btn' : 'list-stat'}
-                type={tile().onClick && !tile().subOnClick ? 'button' : undefined}
-                aria-pressed={tile().onClick && !tile().subOnClick ? !!tile().active : undefined}
-                disabled={tile().onClick && !tile().subOnClick ? !!tile().disabled : undefined}
-                onClick={tile().subOnClick ? undefined : () => tile().onClick?.()}
-              >
-                <span class="list-stat-label">{tile().label}</span>
-                {/* Two actions means two buttons side by side inside a plain tile — a button
+            {(tile) => {
+              const isButton = () => !!tile().onClick && !tile().subOnClick;
+              return (
+                <Dynamic
+                  component={isButton() ? 'button' : 'div'}
+                  class={isButton() ? 'list-stat list-stat-btn' : 'list-stat'}
+                  type={isButton() ? 'button' : undefined}
+                  aria-pressed={isButton() ? !!tile().active : undefined}
+                  disabled={isButton() ? !!tile().disabled : undefined}
+                  onClick={tile().subOnClick ? undefined : () => tile().onClick?.()}
+                >
+                  <span class="list-stat-label">{tile().label}</span>
+                  {/* Two actions means two buttons side by side inside a plain tile — a button
                     can't contain another one. With one (or none) the whole tile is the control,
                     which is the bigger, better hit area. */}
-                <Show
-                  when={tile().onClick && tile().subOnClick}
-                  fallback={
-                    <span class="list-stat-value" title={tile().title}>
-                      {tile().value}
-                    </span>
-                  }
-                >
-                  <button
-                    type="button"
-                    class="list-stat-value list-stat-btn"
-                    title={tile().title}
-                    disabled={!!tile().disabled}
-                    onClick={() => tile().onClick?.()}
+                  <Show
+                    when={tile().onClick && tile().subOnClick}
+                    fallback={
+                      <span class="list-stat-value" title={tile().title}>
+                        {tile().value}
+                      </span>
+                    }
                   >
-                    {tile().value}
-                  </button>
-                </Show>
-                <Show when={tile().sub}>
-                  <Show when={tile().subOnClick} fallback={<span class="list-stat-sub">{tile().sub}</span>}>
                     <button
                       type="button"
-                      class="list-stat-sub list-stat-btn"
-                      title={tile().subTitle}
-                      disabled={!!tile().subDisabled}
-                      onClick={() => tile().subOnClick?.()}
+                      class="list-stat-value list-stat-btn"
+                      title={tile().title}
+                      disabled={!!tile().disabled}
+                      onClick={() => tile().onClick?.()}
                     >
-                      {tile().sub}
+                      {tile().value}
                     </button>
                   </Show>
-                </Show>
-              </Dynamic>
-            )}
+                  <Show when={tile().sub}>
+                    <Show when={tile().subOnClick} fallback={<span class="list-stat-sub">{tile().sub}</span>}>
+                      <button
+                        type="button"
+                        class="list-stat-sub list-stat-btn"
+                        title={tile().subTitle}
+                        disabled={!!tile().subDisabled}
+                        onClick={() => tile().subOnClick?.()}
+                      >
+                        {tile().sub}
+                      </button>
+                    </Show>
+                  </Show>
+                </Dynamic>
+              );
+            }}
           </Index>
         </div>
       </Show>

@@ -71,6 +71,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A long wishlist's Prices readout no longer says "just now" when part of its prices are days old
 - Opening achievements for an account entered by vanity name no longer counts against the achievements rate limit once that name is cached
 - The server log no longer repeats a line for every request refused once an outbound budget is spent
+- An account Steam returns no profile for is named by what you typed rather than its bare Steam ID
 
 ### Development
 

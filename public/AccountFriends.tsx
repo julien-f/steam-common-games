@@ -3,8 +3,8 @@
 // account card) so each fetch can key a `createResource` on a plain accountId string — Solid's
 // reactivity rules require a primitive resource source, not the AccountSlot object itself.
 import { createResource, createMemo, For, Show, type JSX } from 'solid-js';
-import { fetchAccountFriends, membersFromAccountId, type AccountFriend } from './accountData.ts';
-import { fmtAge, steamVanity } from './utils.ts';
+import { accountSlotFrom, fetchAccountFriends, membersFromAccountId, type AccountFriend } from './accountData.ts';
+import { fmtAge } from './utils.ts';
 import type { AccountSlot } from './types.ts';
 
 // `info.refetching` is what the ↻ below sets — the same "a refetch means force" convention the
@@ -15,25 +15,6 @@ async function loadFriends(
   info: { refetching: boolean | unknown },
 ): Promise<{ friends: AccountFriend[]; unavailable: string[]; fetchedAt: number | null }> {
   return fetchAccountFriends(membersFromAccountId(accountId), { refresh: info.refetching === true });
-}
-
-// A friend as a single-account AccountSlot, built entirely from data this component already has
-// (no extra resolve fetch needed) — handed to onExplore so the caller can just pickAccount() it,
-// same as picking any other recent/resolved account.
-function toAccountSlot(f: AccountFriend): AccountSlot {
-  const vanity = steamVanity(f.profileUrl);
-  return {
-    id: f.steamid,
-    members: [f.steamid],
-    rawInputs: [f.steamid],
-    label: f.name,
-    avatarUrl: f.avatarUrl || undefined,
-    vanities: vanity ? { [f.steamid]: vanity } : {},
-    memberSince: f.memberSince || undefined,
-    countryCode: f.countryCode || undefined,
-    realName: f.realName || undefined,
-    lastUsedAt: Date.now(),
-  };
 }
 
 export function AccountFriends(props: {
@@ -127,7 +108,7 @@ export function AccountFriends(props: {
                       type="button"
                       class="btn btn-ghost btn-sm"
                       title={`Explore ${f.name}'s library`}
-                      onClick={() => props.onExplore(toAccountSlot(f))}
+                      onClick={() => props.onExplore(accountSlotFrom([f], [f.steamid]))}
                     >
                       Explore →
                     </button>

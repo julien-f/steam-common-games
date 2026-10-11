@@ -26,7 +26,7 @@
 // own "no badge at all" behavior.
 import { getEffectiveCurrentAccount } from './accountsStore.ts';
 import { fetchAccountOwnedData, fetchAccountWishlistData } from './accountData.ts';
-import type { GameOwner } from './accountData.ts';
+import type { AccountLibraryGame, GameOwner } from './accountData.ts';
 import { fmtLastPlayed, hoursFromMinutes } from './utils.ts';
 
 // `null` for a half whose fetch failed: unknown, never "not owned".
@@ -53,12 +53,12 @@ export interface MyPlaytime {
 // tests create their own via `createMyOwnershipCache()` instead.
 export function createMyOwnershipCache() {
   let cachedAccountId: string | null = null;
-  let ownedPromise: Promise<Set<number>> | null = null;
+  let ownedPromise: Promise<unknown> | null = null;
   let wishlistPromise: Promise<Set<number>> | null = null;
-  let ownedSet: Set<number> | null = null;
-  // appid → per-member playtime for the current account, from the very same response ownedSet
+  let ownedGames: Map<number, AccountLibraryGame> | null = null;
+  // appid → per-member playtime for the current account, from the very same response ownedGames
   // comes out of (see fetchAccountOwnedData) — so the panel's "Owned by" card costs no request
-  // of its own. Empty map rather than null once the fetch has failed, same as ownedSet.
+  // of its own. Empty map rather than null once the fetch has failed, same as ownedGames.
   let ownersMap: Map<number, GameOwner[]> = new Map();
   let wishlistSet: Set<number> | null = null;
   let ownedFailed = false;
@@ -66,7 +66,7 @@ export function createMyOwnershipCache() {
   let readyListeners: (() => void)[] = [];
 
   function notifyReady(): void {
-    if (!ownedSet || !wishlistSet) return; // only once both halves have landed
+    if (!ownedGames || !wishlistSet) return; // only once both halves have landed
     const listeners = readyListeners;
     readyListeners = [];
     listeners.forEach((fn) => fn());
@@ -79,29 +79,28 @@ export function createMyOwnershipCache() {
     if (!account) {
       cachedAccountId = null;
       ownedPromise = wishlistPromise = null;
-      ownedSet = wishlistSet = null;
+      ownedGames = wishlistSet = null;
       return false;
     }
     if (account.id === cachedAccountId) return true;
     cachedAccountId = account.id;
-    ownedSet = null;
+    ownedGames = null;
     wishlistSet = null;
     ownedFailed = wishlistFailed = false;
     ownersMap = new Map();
     // Each response writes only while it's still the current fetch: a slower one for an account
     // switched away from must not overwrite the new account's sets.
-    const owned: Promise<Set<number>> = fetchAccountOwnedData(account.id)
+    const owned: Promise<void> = fetchAccountOwnedData(account.id)
       .then(
         (data) => ({ ...data, failed: false }),
-        () => ({ appids: new Set<number>(), owners: new Map<number, GameOwner[]>(), failed: true }),
+        () => ({ games: new Map<number, AccountLibraryGame>(), owners: new Map<number, GameOwner[]>(), failed: true }),
       )
-      .then(({ appids, owners, failed }) => {
-        if (ownedPromise !== owned) return appids;
-        ownedSet = appids;
+      .then(({ games, owners, failed }) => {
+        if (ownedPromise !== owned) return;
+        ownedGames = games;
         ownedFailed = failed;
         ownersMap = owners;
         notifyReady();
-        return appids;
       });
     const wishlist: Promise<Set<number>> = fetchAccountWishlistData(account.id)
       .then(
@@ -131,7 +130,7 @@ export function createMyOwnershipCache() {
 
   function statusOf(appid: number): OwnershipStatus {
     return {
-      inLibrary: ownedFailed ? null : ownedSet!.has(appid),
+      inLibrary: ownedFailed ? null : ownedGames!.has(appid),
       onWishlist: wishlistFailed ? null : wishlistSet!.has(appid),
     };
   }
@@ -143,7 +142,7 @@ export function createMyOwnershipCache() {
   // loading" apart and re-render once it lands).
   function peekMyOwnershipStatus(appid: number): OwnershipStatus | null {
     if (!ensureLoading()) return null;
-    if (!ownedSet || !wishlistSet) return null;
+    if (!ownedGames || !wishlistSet) return null;
     return statusOf(appid);
   }
 
@@ -162,13 +161,10 @@ export function createMyOwnershipCache() {
   // `undefined` while loading, with no account or after a failed fetch, `null` for a game the
   // account doesn't own.
   function peekMyPlaytime(appid: number): MyPlaytime | null | undefined {
-    if (!ensureLoading() || !ownedSet || ownedFailed) return undefined;
-    if (!ownedSet.has(appid)) return null;
-    const owners = ownersMap.get(appid) ?? [];
-    return {
-      playtime: hoursFromMinutes(owners.reduce((sum, o) => sum + o.minutes, 0)),
-      lastPlayed: fmtLastPlayed(Math.max(0, ...owners.map((o) => o.lastPlayedSec))),
-    };
+    if (!ensureLoading() || !ownedGames || ownedFailed) return undefined;
+    const game = ownedGames.get(appid);
+    if (!game) return null;
+    return { playtime: hoursFromMinutes(game.playtimeMinutes), lastPlayed: fmtLastPlayed(game.lastPlayedUnix) };
   }
 
   // One-shot "both sets just became available" notification — fires once (then forgets every

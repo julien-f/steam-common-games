@@ -22,25 +22,6 @@ export const RATES_PER_EUR: Record<string, number> = {
   MXN: 21.6,
 };
 
-// region.ts's COUNTRY_OPTIONS, by the currency each prices in.
-export const REGION_CURRENCY: Record<string, string> = {
-  US: 'USD',
-  GB: 'GBP',
-  DE: 'EUR',
-  CA: 'CAD',
-  AU: 'AUD',
-  JP: 'JPY',
-  BR: 'BRL',
-  RU: 'RUB',
-  TR: 'TRY',
-  UA: 'UAH',
-  AR: 'ARS',
-  IN: 'INR',
-  CN: 'CNY',
-  KR: 'KRW',
-  MX: 'MXN',
-};
-
 // Null when either currency is unknown.
 export function convert(amount: number, from: string, to: string): number | null {
   if (from === to) return amount;

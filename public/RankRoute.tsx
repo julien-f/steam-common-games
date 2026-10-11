@@ -54,10 +54,7 @@ export default function RankRoute() {
     const src = source();
     navigate(location.pathname, { replace: true, state: { rankOrder: location.state?.rankOrder } });
     if (!current || !src) return;
-    const next = nextPair(withFocus(current, undefined), src, { order: opts().order });
-    setState(next.state);
-    setPair(next.pair);
-    setRanking(params.listId!, next.state);
+    showNext(nextPair(withFocus(current, undefined), src, { order: opts().order }));
   }
   const [title, setTitle] = createSignal('');
   const [status, setStatus] = createSignal('Resolving list…');
@@ -73,6 +70,13 @@ export default function RankRoute() {
   const excludeArmed = () => armed() === 'exclude';
   const [details, setDetails] = createStore<Record<number, GameDetails | null>>({});
   let loadToken = 0;
+
+  // Shows the next pair; `save` also stores the ranking it came with.
+  function showNext(next: { state: RankingState; pair: RankingPair | null }, save = true): void {
+    setState(next.state);
+    setPair(next.pair);
+    if (save) setRanking(params.listId!, next.state);
+  }
 
   function listHref(): string {
     return withAccountParam(`/lists/${params.listId}`);
@@ -100,10 +104,8 @@ export default function RankRoute() {
       else if (saved.focus && !pendingFocus(saved, appids)) stored = withFocus(saved, undefined);
       if (stored !== saved) setRanking(list.id, stored);
       setState(stored);
-      const next = nextPair(stored, appids, opts());
       setSource(appids);
-      setState(next.state);
-      setPair(next.pair);
+      showNext(nextPair(stored, appids, opts()), false);
       setUndoStack([]);
       setStatus('');
     } catch (err) {
@@ -154,11 +156,8 @@ export default function RankRoute() {
     const current = state();
     const src = source();
     if (!current || !src || !pair()) return;
-    const next = answer(current, src, ans, opts());
     setUndoStack((stack) => [...stack.slice(-(MAX_UNDO - 1)), current]);
-    setState(next.state);
-    setPair(next.pair);
-    setRanking(params.listId!, next.state);
+    showNext(answer(current, src, ans, opts()));
     setArmed(null);
     syncPanel();
   }
@@ -168,11 +167,8 @@ export default function RankRoute() {
     const src = source();
     if (!stack.length || !src) return;
     const previous = stack[stack.length - 1];
-    const next = nextPair(previous, src, opts());
     setUndoStack(stack.slice(0, -1));
-    setState(next.state);
-    setPair(next.pair);
-    setRanking(params.listId!, next.state);
+    showNext(nextPair(previous, src, opts()));
     setArmed(null);
     syncPanel();
   }

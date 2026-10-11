@@ -4,7 +4,7 @@ import { isLightboxOpen } from './lightbox.tsx';
 import { panelHandleEscape, isPanelOpen, panelClose, panelStepHero } from './panel.tsx';
 import { isTextEntry } from './utils.ts';
 
-export interface PanelKeyboardOptions {
+interface PanelKeyboardOptions {
   pickRandom: () => void;
   stepGame: (dir: 1 | -1) => boolean; // true if it actually stepped, so ↑/↓ only preventDefault then
   shortcuts: { isOpen: () => boolean; toggle: () => void; close: () => void };

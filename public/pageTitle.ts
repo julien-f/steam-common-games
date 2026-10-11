@@ -11,6 +11,8 @@
 // otherwise the loaded context, otherwise the bare app name" convention the old app.tsx/
 // library.tsx pages used (see CLAUDE.md's git history), just split across two setters now that
 // one shared panel serves every route instead of each page owning its own updateTitle().
+import { createEffect, onCleanup } from 'solid-js';
+
 const APP_NAME = 'steam.isonoe.net';
 
 let baseTitle: string | null = null;
@@ -24,6 +26,12 @@ function apply(): void {
 export function setBaseTitle(label: string | null): void {
   baseTitle = label;
   apply();
+}
+
+// A route's base title for as long as it's mounted.
+export function useBaseTitle(label: () => string | null): void {
+  createEffect(() => setBaseTitle(label()));
+  onCleanup(() => setBaseTitle(null));
 }
 
 export function setGameTitle(label: string | null): void {

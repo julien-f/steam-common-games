@@ -1,7 +1,7 @@
 // The slot model behind ComparePlayersForm.tsx — what a player slot holds, how it converts to the
 // plain identifiers the route submits, and how a set of identifiers converts back into named
-// chips. Split out of the component for the same reason lightboxTime.ts is split out of
-// lightbox.tsx: this is the part with rules worth testing, and it needs neither a DOM nor a store.
+// chips. Split out of the component: this is the part with rules worth testing, and it needs
+// neither a DOM nor a store.
 import { normalizeInput } from './utils.ts';
 
 // One of the app's known accounts, as the form needs it. `identifiers` is parallel to `members`
