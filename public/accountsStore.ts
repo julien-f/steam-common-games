@@ -136,14 +136,13 @@ export function getRecentAccounts({ includeRemoved = false }: { includeRemoved?:
 // Adds a new recent entry, or bumps an existing one's lastUsedAt (and clears any soft-remove) —
 // dedupe key is AccountSlot.id, so re-picking the same Family updates one entry rather than
 // piling up duplicates.
-export function upsertRecentAccount(account: AccountSlot): AccountSlot {
+export function upsertRecentAccount(account: AccountSlot): void {
   const recents = readRecents();
   const idx = recents.findIndex((a) => a.id === account.id);
   const entry: AccountSlot = { ...account, lastUsedAt: Date.now(), removedAt: undefined };
   if (idx === -1) recents.push(entry);
   else recents[idx] = entry;
   writeRecents(recents);
-  return entry;
 }
 
 // An account's display fields (label, avatar, custom-URL names) are captured when it's picked
@@ -209,9 +208,8 @@ export function clearRecentAccounts(): void {
 
 // Permanently purges any soft-removed account no longer referenced by anything — listsStore.ts's
 // sweepDeletedLists() calls it after every change that could have removed the last reference.
-export function sweepRemovedAccounts(): number {
+export function sweepRemovedAccounts(): void {
   const recents = readRecents();
   const kept = recents.filter((a) => !a.removedAt || isAccountReferenced(a.id));
   if (kept.length !== recents.length) writeRecents(kept);
-  return recents.length - kept.length;
 }

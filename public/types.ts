@@ -261,7 +261,6 @@ export interface Folder {
   name: string;
   parentId: string | null; // null = root
   order: number; // sibling order — shared numbering space with GameList at the same parentId
-  createdAt: number;
 }
 
 export type CombineOp = 'union' | 'intersect' | 'subtract' | 'group-by-membership';

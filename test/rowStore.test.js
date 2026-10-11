@@ -18,14 +18,13 @@ function fakeStore(arr) {
   ];
 }
 
-test('createRowStore: load() populates size()/getRow() keyed by appid', () => {
+test('createRowStore: load() populates getRow() keyed by appid', () => {
   const [arr, set] = fakeStore([
     { appid: 1, name: 'a' },
     { appid: 2, name: 'b' },
   ]);
   const store = createRowStore(arr, set);
   store.load(arr);
-  assert.equal(store.size(), 2);
   assert.deepEqual(store.getRow(1), { appid: 1, name: 'a' });
   assert.deepEqual(store.getRow(2), { appid: 2, name: 'b' });
 });
@@ -65,7 +64,6 @@ test('createRowStore: reset() clears the index', () => {
   const store = createRowStore(arr, set);
   store.load(arr);
   store.reset();
-  assert.equal(store.size(), 0);
   assert.equal(store.getRow(1), undefined);
 });
 

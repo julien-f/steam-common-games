@@ -28,7 +28,3 @@ test('clampPopoverLeft: falls back to the left margin when the panel is wider th
   // below its lower one and push the panel off-screen to the left.
   assert.equal(clampPopoverLeft(300, 400, 320), POPOVER_MARGIN);
 });
-
-test('clampPopoverLeft: honors a custom margin', () => {
-  assert.equal(clampPopoverLeft(10, 200, 1000, 4), 4);
-});

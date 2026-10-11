@@ -172,7 +172,7 @@ export function isAccountReferenced(accountId: string, lists: GameList[] = readL
 // ── Folder CRUD ──────────────────────────────────────────────────────────────────────────────
 
 export function createFolder(name: string, parentId: string | null = null): Folder {
-  const folder: Folder = { id: genId(), name, parentId, order: nextOrder(parentId), createdAt: Date.now() };
+  const folder: Folder = { id: genId(), name, parentId, order: nextOrder(parentId) };
   writeFolders([...readFolders(), folder]);
   return folder;
 }
@@ -324,30 +324,26 @@ export function removeAppidsFromList(id: string, appids: number[]): void {
 
 // Edits a dynamic list's formula in place (same id/folder position) — the "Edit sources"
 // action reopens the same setup dialog used at creation, pre-filled, and calls this to save.
-export function updateDynamicList(id: string, op: CombineOp, sources: ListRef[]): GameList {
+export function updateDynamicList(id: string, op: CombineOp, sources: ListRef[]): void {
   const lists = readLists();
   const idx = lists.findIndex((l) => l.id === id);
   if (idx === -1 || lists[idx].kind !== 'dynamic') throw new Error('Dynamic list not found');
   if (wouldCreateCycle(id, sources, lists)) throw new CycleError();
-  const updated: GameList = { ...lists[idx], op, sources, updatedAt: Date.now() };
-  lists[idx] = updated;
+  lists[idx] = { ...lists[idx], op, sources, updatedAt: Date.now() };
   writeLists(lists);
   sweepDeletedLists();
-  return updated;
 }
 
 // Changes a ranked list's source in place; its ranking is kept, filtered to the new source at
 // read time (ranking.ts), so switching back restores it.
-export function updateRankedSource(id: string, source: ListRef): GameList {
+export function updateRankedSource(id: string, source: ListRef): void {
   const lists = readLists();
   const idx = lists.findIndex((l) => l.id === id);
   if (idx === -1 || lists[idx].kind !== 'ranked') throw new Error('Ranked list not found');
   if (wouldCreateCycle(id, [source], lists)) throw new CycleError();
-  const updated: GameList = { ...lists[idx], source, updatedAt: Date.now() };
-  lists[idx] = updated;
+  lists[idx] = { ...lists[idx], source, updatedAt: Date.now() };
   writeLists(lists);
   sweepDeletedLists();
-  return updated;
 }
 
 // A ranked list's progress, in its own pref key rather than on the list: it's written once per
