@@ -458,25 +458,32 @@ export function formatMissingGroup(
 // selected region's currency isn't fixed to USD, and a hardcoded "$" would mislabel every other
 // currency's amounts the same way the tierCurrency/priceCurrency split below exists to avoid.
 export const PRICE_TIERS = [0, 5, 15, 30, 50, 75, 100]; // bucket lower bounds; 100 is the open-ended "100+" tier
-// Bounds sit just above Steam's .99 price points, so a currency near dollar scale is bucketed as
-// is (converting €4.99 would push it past 5); only one far from it is converted to USD first.
+// Converting a near-dollar currency would push its .99 prices (€4.99) across the bounds.
 function tierAmount(n: number, currency?: string | null): number {
   const usd = currency ? convert(n, currency, 'USD') : null;
   return usd != null && (usd / n < 0.5 || usd / n > 2) ? usd : n;
 }
-export function priceTierBucket(value: unknown, currency?: string | null): number | null {
-  const n = tierAmount(Number(value), currency);
+// A converted amount's bucket is keyed "$<bound>", so its label says it's in dollars.
+export function priceTierBucket(value: unknown, currency?: string | null): number | string | null {
+  const own = Number(value);
+  const n = tierAmount(own, currency);
   if (n === 0) return -1; // Free — its own bucket, strictly below the "0–5" range of priced games
   if (!(n > 0)) return null; // missing/NaN/negative
-  for (let i = PRICE_TIERS.length - 1; i >= 0; i--) if (n >= PRICE_TIERS[i]) return PRICE_TIERS[i];
-  return PRICE_TIERS[0];
+  let bound = PRICE_TIERS[0];
+  for (let i = PRICE_TIERS.length - 1; i >= 0; i--)
+    if (n >= PRICE_TIERS[i]) {
+      bound = PRICE_TIERS[i];
+      break;
+    }
+  return n === own ? bound : `$${bound}`;
 }
 export function formatPriceTier(keyPart: string): string {
-  const n = Number(keyPart);
+  const unit = keyPart.startsWith('$') ? '$' : '';
+  const n = Number(keyPart.slice(unit.length));
   if (n === -1) return 'Free';
   const top = PRICE_TIERS[PRICE_TIERS.length - 1];
-  if (n === top) return `${top}+`;
-  return `${n}–${PRICE_TIERS[PRICE_TIERS.indexOf(n) + 1]}`;
+  if (n === top) return `${unit}${top}+`;
+  return `${unit}${n}–${unit}${PRICE_TIERS[PRICE_TIERS.indexOf(n) + 1]}`;
 }
 
 // Every price-ish column is shown in the region currently selected (see COUNTRY_OPTIONS/
