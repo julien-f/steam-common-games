@@ -233,7 +233,7 @@ test('getSemaphoreStats: reports live active/queued and a lifetime queue-depth h
 // SEMAPHORE_MAX_QUEUE's own comment in lib/upstream.js).
 test('createSemaphore: rejected counts calls turned away once maxQueue is hit, active/queued unaffected', async (t) => {
   const warnMock = t.mock.method(console, 'warn', () => {});
-  const sem = createSemaphore(1, 0, 1, 'test-sem'); // 1 concurrent slot, queue depth 1
+  const sem = createSemaphore(1, 0, 'test-sem', 1); // 1 concurrent slot, queue depth 1
   let releaseFirst;
   const p1 = sem(
     () =>

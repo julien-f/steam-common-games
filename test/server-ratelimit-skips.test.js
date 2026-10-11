@@ -133,6 +133,7 @@ test('achievements limiter: counts cache misses but never counts cache hits', as
   setCache(`playerach:${PLAYER}:510`, []);
   setCache('achrarity:500', { A: 50 });
   setCache(`playerach:${PLAYER}:500`, []);
+  setCache('resolve:cachedvanity', PLAYER);
 
   const achievements =
     (appid, steamids = '') =>
@@ -146,6 +147,7 @@ test('achievements limiter: counts cache misses but never counts cache hits', as
     over: achievements(502),
     hits: {
       'schema, rarity and player cached': achievements(510, PLAYER),
+      'cached vanity': achievements(510, 'cachedvanity'),
       'no steamids': achievements(510),
     },
   });
