@@ -15,6 +15,7 @@ Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-
 
 ## Simplify
 
+- **C152 · cleanup · S** — `public/style.css:2142`'s `.panel-tag-playtime` rule styles a class nothing renders (found while fixing C126, outside its ranges). Delete it.
 - **C127 · cleanup · M** — 19 cached getters (`lib/steam.js`, 16 × `return withDedup(`; `lib/itad.js:39`, `:92`, `:461`) repeat the getCached → hit → dedup → fetch → `res.ok` or `upstreamError` → setCache skeleton, so a change to how `force` or a miss works is 19 edits. One cached-getter helper in `lib/upstream.js`, the per-outcome TTL left to each fetch function.
 
 ## Correctness
