@@ -107,8 +107,11 @@ function doneTimes(ids, since, logText) {
 }
 
 // Per lane: done/total, minutes left at the lane's own pace (the history's until its first item), and
-// minutes a finished lane has sat idle since its last item (the wait on slower lanes).
+// minutes a finished lane has waited on slower lanes — up to the last lane's end once all are done, so
+// the merge/review phase doesn't count.
 function laneStatus(manifest, done, nowSec, rates) {
+  const allDone = manifest.lanes.every((l) => l.items.every((it) => done.has(it.id)));
+  const until = allDone ? Math.max(manifest.start, ...[...done.values()]) : nowSec;
   return manifest.lanes.map((lane) => {
     const finished = lane.items.filter((it) => done.has(it.id));
     const unitsDone = finished.reduce((s, it) => s + UNITS[it.effort], 0);
@@ -120,7 +123,7 @@ function laneStatus(manifest, done, nowSec, rates) {
       done: finished.length,
       total: lane.items.length,
       minLeft: Math.max(0, unitsLeft * pace - (nowSec - last) / 60),
-      idleMin: finished.length === lane.items.length ? (nowSec - last) / 60 : 0,
+      idleMin: finished.length === lane.items.length ? (until - last) / 60 : 0,
     };
   });
 }
@@ -251,7 +254,7 @@ function record() {
       prev = done.get(it.id);
     }
     lanesEnd = Math.max(lanesEnd, prev);
-    laneEnds.push(prev);
+    if (lane.items.every((i) => done.has(i.id))) laneEnds.push(prev); // a lane not finished wasn't waiting
   }
   // lanesMin and laneIdleMin (finished lanes waiting on the slowest) show whether the lanes were balanced.
   rows.push({

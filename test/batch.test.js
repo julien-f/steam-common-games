@@ -61,10 +61,27 @@ test("laneStatus: a lane's own pace once it has finished an item, the history's 
   assert.deepEqual(b, { name: 'B', done: 0, total: 1, minLeft: 2, idleMin: 0 });
 });
 
-test('laneStatus: a finished lane counts its idle minutes since its last item', () => {
-  const manifest = { start: 0, lanes: [{ name: 'A', items: [{ id: 'C1', effort: 'S' }] }] };
-  const [a] = laneStatus(manifest, new Map([['C1', 120]]), 720, { minPerUnit: 3 });
-  assert.equal(a.idleMin, 10);
+test('laneStatus: a finished lane idles until the last lane ends, not through merge/review', () => {
+  const manifest = {
+    start: 0,
+    lanes: [
+      { name: 'A', items: [{ id: 'C1', effort: 'S' }] },
+      { name: 'B', items: [{ id: 'C2', effort: 'S' }] },
+    ],
+  };
+  const [running] = laneStatus(manifest, new Map([['C1', 120]]), 720, { minPerUnit: 3 });
+  assert.equal(running.idleMin, 10);
+  const [a, b] = laneStatus(
+    manifest,
+    new Map([
+      ['C1', 120],
+      ['C2', 600],
+    ]),
+    4200,
+    { minPerUnit: 3 },
+  );
+  assert.equal(a.idleMin, 8);
+  assert.equal(b.idleMin, 0);
 });
 
 test('unionConflicts: keeps both sides, plain or diff3', () => {
