@@ -327,38 +327,6 @@ header p {
   line-height: 1.5;
 }
 
-/* User inputs */
-#user-inputs {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.user-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.user-row input {
-  flex: 1;
-  min-width: 0;
-  padding: 9px 12px;
-  background: var(--bg0);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  color: var(--text0);
-  font-size: 14px;
-  outline: none;
-  transition: border-color 0.15s;
-}
-.user-row input:focus {
-  border-color: var(--accent);
-}
-.user-row input::placeholder {
-  color: var(--text2);
-}
-
 .btn {
   padding: 9px 18px;
   border: none;
@@ -373,30 +341,6 @@ header p {
   text-decoration: none; /* .btn started out button-only; ListRoute.tsx's "← All bundles" is the
     first <a class="btn ..."> and would otherwise keep the browser's default underline. */
   display: inline-block;
-}
-.btn-remove {
-  flex-shrink: 0;
-  width: 32px;
-  padding: 0;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text1);
-  font-size: 17px;
-  line-height: 30px;
-  text-align: center;
-  border-radius: var(--r);
-  cursor: pointer;
-}
-.btn-remove:hover {
-  background: rgba(200, 60, 60, 0.2);
-  border-color: #cc4040;
-  color: #ff8888;
-}
-
-.actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
 }
 .btn-ghost {
   background: transparent;
@@ -447,72 +391,7 @@ header p {
   cursor: not-allowed;
 }
 
-/* Alerts */
-.alert {
-  padding: 12px 16px;
-  border-radius: var(--r);
-  margin-bottom: 16px;
-  font-size: 13px;
-  line-height: 1.5;
-}
-.alert-error {
-  background: rgba(200, 50, 50, 0.12);
-  border: 1px solid rgba(200, 50, 50, 0.35);
-  color: #ff8888;
-}
-.alert-warn {
-  background: rgba(228, 168, 46, 0.1);
-  border: 1px solid rgba(228, 168, 46, 0.3);
-  color: #e4c46e;
-}
-
-/* Results */
-.results-header {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-}
-.results-header h2 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text0);
-}
-.results-meta {
-  font-size: 12px;
-  color: var(--text1);
-}
-
-/* Progress */
-.progress-wrap {
-  margin-bottom: 14px;
-}
-.progress-text {
-  font-size: 12px;
-  color: var(--text1);
-  margin-bottom: 6px;
-}
-.progress-bar-bg {
-  background: var(--bg3);
-  border-radius: 999px;
-  height: 3px;
-  overflow: hidden;
-}
-.progress-bar {
-  height: 100%;
-  background: var(--accent);
-  transition: width 0.25s ease;
-  border-radius: 999px;
-}
-
 /* Table */
-.table-wrap {
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-}
-
 /* Horizontal-scroll affordance, shared with the data-table library's own
    .dt-table-wrap (library.js/bundles.js) — nothing on either page hints that a
    narrow table has more columns off-screen (confirmed live at 360px: the Comparison
@@ -531,7 +410,6 @@ header p {
    pulled out of its .card (now just wrapping the bundle-detail-header) to match, so
    one cover color is correct for all three (dt-table-wrap's own alternating-row tint
    is a transparent overlay on top of that, not a different base color). */
-.table-wrap,
 .dt-table-wrap {
   background-image:
     linear-gradient(to right, var(--bg0) 0%, var(--bg0) 100%), linear-gradient(to left, var(--bg0) 0%, var(--bg0) 100%),
@@ -580,10 +458,6 @@ tbody td {
 }
 
 /* Thumbnail cell */
-.td-thumb {
-  width: 128px;
-  padding: 0;
-}
 .game-thumb {
   display: block;
   width: 120px;
@@ -592,85 +466,8 @@ tbody td {
   border-radius: 2px;
 }
 
-/* Game name cell */
-.td-name {
-  min-width: 200px;
-}
-.td-name a {
-  color: var(--text0);
-  text-decoration: none;
-  font-weight: 500;
-}
-.td-name a:hover {
-  color: var(--accent2);
-}
-
-/* Score cell */
-.td-score {
-  min-width: 100px;
-}
-.score-num {
-  font-size: 19px;
-  font-weight: 700;
-  line-height: 1;
-}
-.score-label {
-  font-size: 11px;
-  color: var(--text1);
-  margin-top: 2px;
-}
-
-/* HLTB cells */
-.td-hltb {
-  min-width: 80px;
-  font-variant-numeric: tabular-nums;
-}
-
 .dim {
   color: var(--text1);
-}
-
-/* Game groups */
-.game-group {
-  margin-bottom: 32px;
-}
-.group-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-.group-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text0);
-}
-.group-meta {
-  font-size: 12px;
-  color: var(--text1);
-}
-.group-random-btn {
-  margin-left: auto;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  width: 28px;
-  height: 26px;
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  flex-shrink: 0;
-  transition: border-color 0.15s;
-}
-.group-random-btn:hover {
-  border-color: var(--accent);
-}
-.slot-link {
-  color: var(--accent2);
-  text-decoration: none;
 }
 
 /* Skeleton shimmer */
@@ -692,68 +489,12 @@ tbody td {
   animation: shimmer 1.4s linear infinite;
   vertical-align: middle;
 }
-.sk.sm {
-  width: 32px;
-  height: 13px;
-}
 
 /* Spinner */
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
-}
-.spinner {
-  display: inline-block;
-  width: 15px;
-  height: 15px;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.75s linear infinite;
-  vertical-align: middle;
-  margin-right: 7px;
-}
-
-/* Family member sub-rows */
-.player-slot {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.family-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding-left: 40px;
-}
-.btn-add-family {
-  flex-shrink: 0;
-  padding: 0 10px;
-  height: 32px;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text1);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  border-radius: var(--r);
-  cursor: pointer;
-}
-.btn-add-family:hover {
-  background: rgba(26, 159, 255, 0.12);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.family-hint {
-  display: none;
-  font-size: 12px;
-  color: var(--text1);
-  padding-left: 40px;
-  font-style: italic;
-}
-.player-slot:has(.family-row) .family-hint {
-  display: block;
 }
 
 /*
@@ -994,9 +735,6 @@ tbody td {
 }
 
 /* How it works */
-.how-it-works {
-  margin-bottom: 18px;
-}
 .how-steps {
   list-style: none;
   counter-reset: step;
@@ -1035,142 +773,9 @@ tbody td {
 .how-steps li strong {
   color: var(--text0);
 }
-
-/* Filter panel */
-.filter-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-.filter-header h2 {
-  margin-bottom: 0;
-}
-.filter-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-/* Shown only under the max-width:768px rule below — collapsing the filter body only
-   makes sense once it's actually the thing pushing results off-screen (see the mobile
-   block's own comment). Desktop keeps the panel always expanded with no toggle at all. */
-.filter-toggle-btn {
-  display: none;
-}
-.filter-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--accent);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
-  margin-left: 6px;
-  vertical-align: middle;
-}
 .btn-sm {
   padding: 5px 10px;
   font-size: 12px;
-}
-.filter-dims {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-.filter-dim {
-  flex: 1 1 160px;
-}
-.filter-dim-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text1);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 6px;
-}
-.filter-opts {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 160px;
-  overflow-y: auto;
-}
-.filter-opt {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  cursor: pointer;
-  line-height: 1.4;
-  user-select: none;
-}
-.filter-opt input[type='checkbox'] {
-  cursor: pointer;
-  accent-color: var(--accent);
-  flex-shrink: 0;
-}
-.filter-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 14px;
-}
-.filter-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: rgba(26, 159, 255, 0.15);
-  border: 1px solid rgba(26, 159, 255, 0.4);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 500;
-  padding: 3px 8px;
-  border-radius: 12px;
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-}
-.filter-chip:hover {
-  background: rgba(26, 159, 255, 0.28);
-}
-.filter-chip-x {
-  font-size: 14px;
-  line-height: 1;
-  opacity: 0.7;
-}
-.filter-search {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 4px 8px;
-  margin-bottom: 6px;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  color: var(--text0);
-  font-size: 12px;
-}
-.filter-search:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-.filter-name-row {
-  margin-bottom: 12px;
-}
-.filter-name-input {
-  font-size: 14px;
-  padding: 6px 10px;
-}
-
-/* Clickable rows */
-tbody tr.game-row {
-  cursor: pointer;
-}
-tbody tr.game-row.active {
-  background: rgba(26, 159, 255, 0.08) !important;
 }
 
 /* App shell layout (see docs/dev/frontend.md and AppShell.tsx)
@@ -1329,58 +934,6 @@ tbody tr.game-row.active {
   }
   .card {
     padding: 14px 16px;
-  }
-  .game-group {
-    margin-bottom: 20px;
-  }
-  .btn-remove {
-    width: 44px;
-    height: 44px;
-    line-height: 42px;
-  }
-  .td-name {
-    min-width: 140px;
-  }
-  .td-score {
-    min-width: 70px;
-  }
-  .td-hltb {
-    min-width: 60px;
-  }
-  .family-row {
-    padding-left: 20px;
-  }
-  .family-hint {
-    padding-left: 20px;
-  }
-  /* Prevent iOS Safari from zooming on input focus */
-  .user-row input,
-  .filter-search,
-  .filter-name-input {
-    font-size: 16px;
-  }
-  /* Move the Steam Family button below the input+remove row */
-  .user-row {
-    flex-wrap: wrap;
-  }
-  .user-row .btn-remove {
-    order: 1;
-  }
-  .user-row .btn-add-family {
-    order: 2;
-    flex-basis: 100%;
-  }
-
-  /* The filter panel's Tag/Genre/Category/Developer/Publisher dims (each its own
-     independently-scrolling checkbox list) otherwise push the actual results table
-     ~2 screens down before a phone user ever sees a game. Collapsed by default (see
-     filterPanelCollapsed in app.js) behind this toggle so results are visible first;
-     the chips summary of active filters stays visible either way. */
-  .filter-toggle-btn {
-    display: inline-flex;
-  }
-  .filter-body[hidden] {
-    display: none;
   }
 }
 
@@ -3192,25 +2745,6 @@ body.lb-open {
     height: 18px;
   }
 }
-
-/* Site footer */
-.site-footer {
-  text-align: center;
-  font-size: 12px;
-  color: var(--text1);
-  margin-top: 40px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-.site-footer kbd {
-  font-family: inherit;
-  font-size: 11px;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  padding: 1px 5px;
-  color: var(--text1);
-}
 .footer-link {
   color: var(--text1);
   text-decoration: underline;
@@ -4949,9 +4483,6 @@ kbd {
   .dt-td,
   .dt-th {
     padding: 6px 8px;
-  }
-  .td-name {
-    min-width: 0;
   }
   .dt-th {
     white-space: normal;
