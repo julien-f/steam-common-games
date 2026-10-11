@@ -2805,6 +2805,7 @@ kbd {
   width: 340px;
   max-width: calc(100vw - 32px);
   /* Taller than a phone screen otherwise, which pushed its header (and Close) off-screen. */
+  max-height: calc(100vh - 32px);
   max-height: calc(100dvh - 32px);
   display: flex;
   flex-direction: column;
