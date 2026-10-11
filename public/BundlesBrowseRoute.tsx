@@ -246,7 +246,7 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     compare: compareNumMissingLast,
     // withMissingGroup, not a bare priceTierBucket: `Number(null)` is 0, so a null price would
     // otherwise land in its "Free" bucket rather than in the missing/"Varies" one.
-    groupValue: withMissingGroup(priceTierBucket),
+    groupValue: withMissingGroup((v) => priceTierBucket(v, regionCurrency())),
     groupFormat: formatMissingGroup(formatPriceTier, 'Varies'),
   },
   { key: 'tierCount', label: 'Tiers', type: 'number', groupable: true, format: fmt.num },

@@ -137,6 +137,17 @@ test("priceTierBucket: Steam's price tiers, Free apart from cheap", () => {
   assert.equal(withMissingGroup(priceTierBucket)(null), null, 'a missing price is not Free');
 });
 
+test('priceTierBucket: a currency far from dollar scale is bucketed in USD, a near one as is', () => {
+  assert.equal(priceTierBucket(1980, 'JPY'), 5, '¥1,980 is about $13');
+  assert.equal(priceTierBucket(0, 'JPY'), -1, 'Free stays Free');
+  assert.equal(priceTierBucket(4.99, 'EUR'), 0, 'a near currency keeps its .99 tier');
+  assert.equal(priceTierBucket(14.99, 'GBP'), 5);
+  assert.equal(priceTierBucket(1980, 'XYZ'), 100, 'an unknown currency is bucketed as is');
+  const byRow = withMissingGroup((v, row) => priceTierBucket(v, row.priceCurrency));
+  assert.equal(byRow(1980, { priceCurrency: 'JPY' }), 5);
+  assert.equal(byRow(null, { priceCurrency: 'JPY' }), null);
+});
+
 test('scoreBucket: 5-point steps from 60, one bucket below, 100 folded into 95', () => {
   for (const [input, expected] of [
     [0, -1],

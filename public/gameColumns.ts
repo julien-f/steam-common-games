@@ -44,6 +44,7 @@ import {
 } from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
 import { scoreColor, dealRecordTier, DEAL_RECORD_TIERS, formatMoney } from './utils.ts';
+import { convert } from './currency.ts';
 
 // Rows are assembled in the still-untyped library.js/bundles.js from several independent async
 // sources (the game-details stream, price lookups, ...), so `any`-valued access is the honest
@@ -430,10 +431,10 @@ export function formatScoreBucket(keyPart: string): string {
 // group header that reads "null" rather than "—". Checking for "missing" ourselves before ever
 // calling the underlying bucket function sidesteps that regardless of which one's used.
 export function withMissingGroup(
-  bucketFn: (v: unknown) => unknown,
+  bucketFn: (v: unknown, row: Row) => unknown,
   isMissing: (v: unknown) => boolean = (v) => v == null,
 ) {
-  return (value: unknown) => (isMissing(value) ? null : bucketFn(value));
+  return (value: unknown, row: Row) => (isMissing(value) ? null : bucketFn(value, row));
 }
 // Pairs with withMissingGroup above — the empty-string group key it produces for a missing value
 // needs its own label rather than being handed to a real formatter that has no idea what to do
@@ -457,8 +458,14 @@ export function formatMissingGroup(
 // selected region's currency isn't fixed to USD, and a hardcoded "$" would mislabel every other
 // currency's amounts the same way the tierCurrency/priceCurrency split below exists to avoid.
 export const PRICE_TIERS = [0, 5, 15, 30, 50, 75, 100]; // bucket lower bounds; 100 is the open-ended "100+" tier
-export function priceTierBucket(value: unknown): number | null {
-  const n = Number(value);
+// Bounds sit just above Steam's .99 price points, so a currency near dollar scale is bucketed as
+// is (converting €4.99 would push it past 5); only one far from it is converted to USD first.
+function tierAmount(n: number, currency?: string | null): number {
+  const usd = currency ? convert(n, currency, 'USD') : null;
+  return usd != null && (usd / n < 0.5 || usd / n > 2) ? usd : n;
+}
+export function priceTierBucket(value: unknown, currency?: string | null): number | null {
+  const n = tierAmount(Number(value), currency);
   if (n === 0) return -1; // Free — its own bucket, strictly below the "0–5" range of priced games
   if (!(n > 0)) return null; // missing/NaN/negative
   for (let i = PRICE_TIERS.length - 1; i >= 0; i--) if (n >= PRICE_TIERS[i]) return PRICE_TIERS[i];
@@ -1184,7 +1191,7 @@ export const PRICE_COLUMNS: ColumnDef<Row>[] = [
     render: renderPrice,
     compare: compareNumMissingLast,
     defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket),
+    groupValue: withMissingGroup((v, row) => priceTierBucket(v, row.priceCurrency)),
     groupFormat: formatMissingGroup(formatPriceTier),
     keepVisibleWhenGrouped: true,
     category: 'Pricing',
@@ -1205,7 +1212,7 @@ export const PRICE_COLUMNS: ColumnDef<Row>[] = [
     render: renderBestDeal,
     compare: compareNumMissingLast,
     defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket),
+    groupValue: withMissingGroup((v, row) => priceTierBucket(v, row.priceCurrency)),
     groupFormat: formatMissingGroup(formatPriceTier),
     keepVisibleWhenGrouped: true,
     category: 'Pricing',
@@ -1247,7 +1254,7 @@ export const PRICE_COLUMNS: ColumnDef<Row>[] = [
     render: renderPrice,
     compare: compareNumMissingLast,
     defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket),
+    groupValue: withMissingGroup((v, row) => priceTierBucket(v, row.priceCurrency)),
     groupFormat: formatMissingGroup(formatPriceTier),
     keepVisibleWhenGrouped: true,
     category: 'Pricing',
@@ -1261,7 +1268,7 @@ export const PRICE_COLUMNS: ColumnDef<Row>[] = [
     render: renderPrice,
     compare: compareNumMissingLast,
     defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket),
+    groupValue: withMissingGroup((v, row) => priceTierBucket(v, row.priceCurrency)),
     groupFormat: formatMissingGroup(formatPriceTier),
     keepVisibleWhenGrouped: true,
     category: 'Pricing',
@@ -1275,7 +1282,7 @@ export const PRICE_COLUMNS: ColumnDef<Row>[] = [
     render: renderPrice,
     compare: compareNumMissingLast,
     defaultSortDir: 'asc',
-    groupValue: withMissingGroup(priceTierBucket),
+    groupValue: withMissingGroup((v, row) => priceTierBucket(v, row.priceCurrency)),
     groupFormat: formatMissingGroup(formatPriceTier),
     keepVisibleWhenGrouped: true,
     category: 'Pricing',

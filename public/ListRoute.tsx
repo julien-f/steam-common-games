@@ -430,7 +430,7 @@ const TIER_PRICE_COLUMN: ColumnDef<Record<string, any>> = {
   render: renderTierPrice,
   compare: compareNumMissingLast,
   defaultSortDir: 'asc',
-  groupValue: withMissingGroup(priceTierBucket),
+  groupValue: withMissingGroup((v, row) => priceTierBucket(v, row.tierCurrency)),
   groupFormat: formatMissingGroup(formatPriceTier, 'Varies'),
   keepVisibleWhenGrouped: true,
   category: 'Pricing',

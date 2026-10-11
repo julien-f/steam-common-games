@@ -58,6 +58,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On a phone, a slow sideways swipe on the game panel's images no longer also closes the panel
 - The screenshot viewer no longer reopens with its controls hidden after closing it on a playing trailer, and swiping off a playing trailer no longer brings all its controls back
 - In the screenshot viewer, ↑ or ↓ with no other game to go to no longer makes the next screenshot slide in from below
+- Grouping by price now spreads yen, won, rupee and other far-from-dollar prices across the tiers instead of putting them all in "100+"
 
 ### Development
 
