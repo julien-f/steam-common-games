@@ -144,6 +144,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The Price card's ITAD-failure e2e test now covers a failed price lookup, not only a failed health check
 - `batch.js merge` no longer leaves a double blank line when it empties part of a backlog section
 - `batch.js merge` says when a lane's merge needs `SKIP_CHANGELOG=1`
+- Fix batches no longer poll lane progress; lanes re-run only failed e2e tests until green
 
 ## [0.10.0] - 2026-10-10
 
