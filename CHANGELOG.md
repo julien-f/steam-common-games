@@ -47,6 +47,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - An achievement unlocked by several members no longer loses its unlock date when one of them has none.
 - A soundtrack or other game HowLongToBeat doesn't time now shows its real data age in the side panel instead of always "just now".
 - A bundle game Steam didn't answer for is no longer listed as not on Steam, nor dropped from a saved list's remembered copy of the bundle.
+- A game at full price no longer reads as an all-time, 1-year or 3-month low just because it never sold for less.
 
 ### Development
 

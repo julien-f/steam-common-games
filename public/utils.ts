@@ -184,11 +184,19 @@ export const DEAL_RECORD_TIERS: DealRecordTier[] = [
 // no need to destructure at the call site. `<=`, not `<` — the current deal genuinely can BE the
 // historical low itself (it's what set it), not only ever beat it. Returns `null` (not a tier)
 // when `price` is missing or doesn't beat any of the three windows.
+// No tier for a deal with no discount: ITAD's historyLow includes full prices (integrations.md).
 export function dealRecordTier(
   price: number | null | undefined,
-  lows?: { lowAll?: number | null; lowY1?: number | null; lowM3?: number | null } | null,
+  lows?: {
+    lowAll?: number | null;
+    lowY1?: number | null;
+    lowM3?: number | null;
+    bestDealCut?: number | null;
+    steamRegular?: number | null;
+  } | null,
 ): DealRecordTier | null {
   if (price == null) return null;
+  if (lows?.bestDealCut === 0 || (lows?.steamRegular != null && price >= lows.steamRegular)) return null;
   for (const t of DEAL_RECORD_TIERS) {
     const low = lows?.[t.low];
     if (low != null && price <= low) return t;

@@ -308,6 +308,13 @@ test('dealRecordTier: <= not < — a price equal to the historical low still cou
   assert.equal(dealRecordTier(10, { lowAll: 10 }).tier, 'all-time');
 });
 
+// ITAD's historyLow includes undiscounted prices (docs/dev/integrations.md), so a full price can equal it.
+test('dealRecordTier: null for a deal with no discount, even at the historical low', () => {
+  assert.equal(dealRecordTier(20, { lowAll: 20, bestDealCut: 0 }), null);
+  assert.equal(dealRecordTier(20, { lowAll: 20, steamRegular: 20 }), null);
+  assert.equal(dealRecordTier(19, { lowAll: 20, steamRegular: 20 }).tier, 'all-time');
+});
+
 test('dealRecordTier: a missing individual low is skipped in favor of a matching one further down the list', () => {
   const rec = dealRecordTier(20, { lowAll: null, lowY1: null, lowM3: 20 });
   assert.equal(rec.tier, '3mo');
