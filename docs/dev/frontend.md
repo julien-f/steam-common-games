@@ -99,8 +99,8 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "r" | "g:" formula
 - `staleGuard.ts` — generation counters for "a newer load superseded this one".
 - `loadProgress.ts` — the details stream's progress bar and time left.
 - `priceLoading.ts` — the `POST /api/prices` call and the row-field mapping/fallbacks around it.
-- `panel.tsx` / `panelData.ts` / `panelNav.ts` / `panelHistory.ts` / `panelKeyboard.ts` / `ownerList.ts` / `achievementsRequest.ts` — the side panel and its per-game data, prev/next nav, DLC trail rule, keyboard handler, and the pure halves of the "Owned by"/achievements cards.
-- `lightbox.tsx` / `mediaItems.ts` / `lightboxTime.ts` / `lightboxSwipe.ts` — screenshot/video lightbox, its ordered media list, the one pure formatter its test needs, and its swipe thresholds/decision.
+- `panel.tsx` / `panelData.ts` / `panelNav.ts` / `panelHistory.ts` / `panelKeyboard.ts` / `ownerList.ts` — the side panel and its per-game data, prev/next nav, DLC trail rule, keyboard handler, and the pure half of the "Owned by" card.
+- `lightbox.tsx` / `mediaItems.ts` / `lightboxSwipe.ts` — screenshot/video lightbox, its ordered media list, and its swipe thresholds/decision.
 - `overlayHistory.ts` — the history entry each open overlay pushes (see the side panel).
 - `gameSearch.ts` — the combobox/debounce UI for "look up any game" (the shell owns where results go).
 - `urlState.ts` — param parsing, canonical param order, and the `?game=`/`&shot=`/`?u=` writers.

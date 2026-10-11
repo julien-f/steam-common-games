@@ -20,8 +20,15 @@ import type { OwnershipStatus } from './myOwnership.ts';
 import { sortOwners, ownerMeterPct } from './ownerList.ts';
 import type { GameOwner } from './accountData.ts';
 import { ACCOUNT_CHANGED_EVENT, getEffectiveCurrentAccount } from './accountsStore.ts';
-import { achievementsAccountKey } from './achievementsRequest.ts';
-import { fetchNews, fetchAchievements, fetchPrice, fetchBundles, fetchDlc, isItadOff } from './panelData.ts';
+import {
+  achievementsAccountKey,
+  fetchNews,
+  fetchAchievements,
+  fetchPrice,
+  fetchBundles,
+  fetchDlc,
+  isItadOff,
+} from './panelData.ts';
 import type {
   DlcEntry,
   GameBundle,
