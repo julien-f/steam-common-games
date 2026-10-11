@@ -52,6 +52,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A soundtrack or other game HowLongToBeat doesn't time now shows its real data age in the side panel instead of always "just now".
 - A bundle game Steam didn't answer for is no longer listed as not on Steam, nor dropped from a saved list's remembered copy of the bundle.
 - A game at full price no longer reads as an all-time, 1-year or 3-month low just because it never sold for less.
+- Pressing Enter on a highlighted game under the search box's Recently looked up now opens it
+- Esc closing a menu in the nav bar or the search box's suggestions no longer also closes the open game, or leaves a ranking
+- On a phone, swiping past the game panel's last image no longer leaves its ‹ button and back swipe doing nothing
+- On a phone, a slow sideways swipe on the game panel's images no longer also closes the panel
+- The screenshot viewer no longer reopens with its controls hidden after closing it on a playing trailer, and swiping off a playing trailer no longer brings all its controls back
+- In the screenshot viewer, ↑ or ↓ with no other game to go to no longer makes the next screenshot slide in from below
 
 ### Development
 

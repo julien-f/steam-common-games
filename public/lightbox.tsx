@@ -182,7 +182,13 @@ function stepGameFromLightbox(step: () => void, dir = 0) {
     lbLastDir = dir;
     lbLastAxis = 'y';
   }
+  const game = lbGame();
   step();
+  if (lbGame() === game) {
+    // No game to step to: no render consumed the direction, which would animate the next one.
+    lbLastDir = 0;
+    lbLastAxis = 'x';
+  }
   if (lb.contains(document.activeElement)) return;
   ((before && lb.contains(before) ? before : lb.querySelector('.lb-close')) as HTMLElement).focus();
 }
@@ -942,6 +948,7 @@ function wireVideoControls(lb: HTMLElement) {
     playBtn.innerHTML = LB_PLAY_ICON;
     playBtn.setAttribute('aria-label', 'Play');
     syncLbPaused();
+    if (!vid2.isConnected) return; // stopHls' own pause, on a close or a step off the trailer
     showLbChrome();
     schedHideLbChrome();
   });
@@ -1135,6 +1142,7 @@ export function stepLightbox(dir: number) {
   // must never move it under them.
   _awaitingMedia = null;
   lbLastDir = dir;
+  lbLastAxis = 'x';
   const list = shots();
   const next = (idx() + dir + list.length) % list.length;
   setIdx(next);
@@ -1148,6 +1156,7 @@ function gotoLightbox(target: number) {
   _awaitingMedia = null; // same reason as stepLightbox's
 
   lbLastDir = target > idx() ? 1 : -1;
+  lbLastAxis = 'x';
   setIdx(target);
   _onLightboxParamChange?.(shots()[target].shotId);
 }

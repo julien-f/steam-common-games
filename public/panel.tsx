@@ -636,8 +636,8 @@ function getPanelItems() {
 }
 
 // dir: -1 (previous) or 1 (next). wrap: true for keyboard arrow navigation
-// (cycles through all media), false for the hero prev/next buttons (clamps
-// at the ends — the next button is disabled once heroIdx is at the last item).
+// (cycles through all media), false for the hero prev/next buttons and the
+// swipe (clamps at the ends, returning false there).
 export function panelStepHero(dir: number, { wrap = false } = {}) {
   if (!panelGame()) return false;
   const items = getPanelItems();
@@ -645,7 +645,9 @@ export function panelStepHero(dir: number, { wrap = false } = {}) {
     if (items.length <= 1) return false;
     setHeroIdx((heroIdx() + dir + items.length) % items.length);
   } else {
-    setHeroIdx(Math.max(0, heroIdx() + dir));
+    const next = Math.max(0, Math.min(heroIdx() + dir, items.length - 1));
+    if (next === heroIdx()) return false;
+    setHeroIdx(next);
   }
   if (wrap) (document.getElementById('panel-hero')?.querySelector('.panel-hero-img') as HTMLElement | null)?.focus();
   return true;
@@ -2493,7 +2495,6 @@ function initHeroSwipe() {
         isHoriz = Math.abs(dx) > Math.abs(dy) * 1.2;
         decided = true;
       }
-      if (isHoriz) e.stopPropagation(); // don't let panel-close swipe fire
     },
     { passive: true },
   );
@@ -2533,7 +2534,8 @@ function initPanelSwipe() {
   panel.addEventListener(
     'touchstart',
     (e) => {
-      if (e.touches.length !== 1 || (e.target as Element).closest('.panel-filmstrip')) return;
+      // The hero has its own swipe, which decides later and so can't reliably stop this one.
+      if (e.touches.length !== 1 || (e.target as Element).closest('.panel-filmstrip, .panel-hero')) return;
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       tracking = true;

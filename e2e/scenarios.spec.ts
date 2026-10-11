@@ -423,6 +423,20 @@ test('R1.1,3-6: rank chosen games, stop, resume on the same ones', async ({ page
   await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
 });
 
+test('R1 edge: Esc closing a nav popover stays on the ranking', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  for (const name of ['Portal 2', 'Terraria', 'Hades']) await row(page, name).getByRole('checkbox').check();
+  await page.getByRole('button', { name: '🏆 Rank 3 games' }).click();
+  await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
+
+  await page.getByLabel('Preferences').click();
+  await expect(page.locator('.site-nav-prefs')).toHaveAttribute('open');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.site-nav-prefs')).not.toHaveAttribute('open');
+  await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
+});
+
 test("R3 edge: a ranked list's Share view says why it can't be shared", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/wishlist');
@@ -865,7 +879,7 @@ async function fakePlayback(page: Page) {
     };
     HTMLMediaElement.prototype.pause = function (this: HTMLMediaElement) {
       if (!playing.delete(this)) return;
-      this.dispatchEvent(new Event('pause'));
+      queueMicrotask(() => this.dispatchEvent(new Event('pause'))); // queued, as a real pause event is
     };
   });
 }
@@ -1011,6 +1025,22 @@ test('F1 edge: stepping media leaves hidden controls hidden, flashing only the c
   await expect(lb).not.toHaveClass(/lb-idle/);
 });
 
+test('F1 edge: after ↓ finds no game to step to, → still slides the next screenshot in sideways', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist?game=1145360&shot=s1'); // Hades: not on the wishlist, so no game to step to
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await page.locator('#screenshot-lightbox .lb-img').evaluate((img) => {
+    const w = window as unknown as { lbAnims: string[] };
+    w.lbAnims = [];
+    new MutationObserver(() => w.lbAnims.push(img.className)).observe(img, { attributeFilter: ['class'] });
+  });
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+  const anims = await page.evaluate(() => (window as unknown as { lbAnims: string[] }).lbAnims);
+  expect(anims).toContain('lb-img lb-anim-right');
+});
+
 test('F1 edge: stepping games with hidden controls flashes the game name too', async ({ page }) => {
   await page.clock.install();
   await asPlayer(page, ALICE);
@@ -1084,6 +1114,52 @@ test('F1 edge: on a phone, a swipe steps without bringing the controls back, and
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 195, y }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await expect(lb).not.toHaveClass(/lb-idle/);
+});
+
+test("F1 edge: on a phone, a swipe past the panel's last item stays on it", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'touch only');
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const current = page.locator('.panel-film-item[aria-current="true"]');
+  await page.getByRole('button', { name: 'Screenshot 3 of 3' }).click();
+  await expect(current).toHaveAccessibleName('Screenshot 3 of 3');
+  const box = (await page.locator('#panel-hero .panel-hero-img').boundingBox())!;
+  const y = box.y + box.height / 2;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 300, y }] });
+  for (const x of [260, 200, 120])
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(current).toHaveAccessibleName('Screenshot 3 of 3');
+  await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  await expect(current).toHaveAccessibleName('Screenshot 2 of 3');
+});
+
+test("F1 edge: on a phone, a slow right swipe on the panel's media steps it, without closing the panel", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'touch only');
+  await page.clock.install();
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const current = page.locator('.panel-film-item[aria-current="true"]');
+  await page.getByRole('button', { name: 'Screenshot 2 of 3' }).click();
+  // Synthetic events: Chromium holds back real touchmoves within its slop, the ones that matter here.
+  await page.locator('#panel-hero .panel-hero-img').evaluate((img) => {
+    const y = img.getBoundingClientRect().top + 20;
+    const fire = (type: string, x: number) => {
+      const touch = new Touch({ identifier: 1, target: img, clientX: x, clientY: y });
+      const touches = type === 'touchend' ? [] : [touch];
+      img.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches, changedTouches: [touch] }));
+    };
+    fire('touchstart', 100);
+    // 7 px decides the panel's own swipe (6 px) before the hero's (8 px).
+    for (const x of [107, 115, 160, 220]) fire('touchmove', x);
+    fire('touchend', 220);
+  });
+  await expect(current).toHaveAccessibleName('Screenshot 1 of 3');
+  await page.clock.runFor(500);
+  await expect(page.locator('#panel-title')).toBeVisible();
 });
 
 test('F1 edge: on a phone, the ‹ › buttons sit clear of the media and its controls', async ({ page }, testInfo) => {
@@ -1208,6 +1284,41 @@ test("F1 edge: a paused trailer's controls idle out, leaving its large play butt
   await expect(page.getByRole('button', { name: 'Play trailer' })).toBeVisible();
 });
 
+test('F1 edge: the viewer reopened after closing a playing trailer shows its controls', async ({ page }) => {
+  await page.clock.install();
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  await page.getByRole('button', { name: 'Play trailer' }).click();
+  await page.getByRole('button', { name: 'Close lightbox' }).click();
+  await page.clock.runFor(3500);
+  await page.getByRole('button', { name: 'Open in lightbox' }).click();
+  const lb = page.locator('#screenshot-lightbox');
+  await expect(lb).toHaveClass(/\bopen\b/);
+  expect(await lb.getAttribute('class')).not.toMatch(/lb-idle/); // read once: the idle timer runs again
+});
+
+test('F1 edge: on a phone, swiping off a playing trailer leaves hidden controls hidden', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'touch only');
+  await page.clock.install();
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  await page.getByRole('button', { name: 'Play trailer' }).click();
+  const lb = page.locator('#screenshot-lightbox');
+  await page.clock.runFor(3500);
+  await expect(lb).toHaveClass(/lb-idle/);
+  const box = (await page.locator('#screenshot-lightbox .lb-video').boundingBox())!;
+  const y = box.y + box.height / 2;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 300, y }] });
+  for (const x of [260, 200, 120])
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  expect(await lb.getAttribute('class')).toMatch(/lb-idle/); // read once, as above
+});
+
 test('F1 edge: arrows seek a trailer only while it plays, and step past it otherwise', async ({ page }) => {
   await fakePlayback(page);
   await asPlayer(page, ALICE);
@@ -1328,12 +1439,47 @@ test('F1.1-4: look up one game from the nav search, in place', async ({ page }) 
   await expect(page).toHaveURL(/\/lists\/owned\?game=367520/);
   await expect(page.locator('.game-panel')).toContainText('Hollow Knight');
 
-  // Esc closes the panel; a second one leaves the search box, so shortcuts work again.
+  // Esc hides the dropdown, then leaves the search box, so shortcuts work again.
   await page.keyboard.press('/');
   await page.keyboard.type('zz');
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT');
+});
+
+test('F1 edge: Esc closes a nav popover or the search dropdown, not the open game', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', "a phone's panel covers the nav");
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=620');
+  await expect(page.locator('#panel-title')).toHaveText('Portal 2');
+
+  await page.getByLabel('Preferences').click();
+  await expect(page.locator('.site-nav-prefs')).toHaveAttribute('open');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.site-nav-prefs')).not.toHaveAttribute('open');
+  await expect(page.locator('#panel-title')).toBeVisible();
+
+  await page.getByPlaceholder('Look up any game…').fill('hollow');
+  await expect(page.locator('.game-search-result', { hasText: 'Hollow Knight' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#app-search-results')).toBeHidden();
+  await page.keyboard.press('Escape');
+  expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT');
+  await expect(page.locator('#panel-title')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#panel-title')).toBeHidden();
+});
+
+test('F1 edge: Enter opens the highlighted recently looked-up game', async ({ page }) => {
+  await asPlayer(page, ALICE, { recentGames: [620, 1145360] });
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await page.keyboard.press('/');
+  await expect(page.locator('.game-search-result')).toHaveCount(2);
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/[?&]game=1145360\b/);
 });
 
 test("I1 edge: on a phone, a bundle's table starts high, its other actions behind ⋯", async ({ page }, testInfo) => {

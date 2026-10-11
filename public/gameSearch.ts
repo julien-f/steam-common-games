@@ -290,6 +290,7 @@ export function initGameSearch({
 
   inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      e.preventDefault(); // so the page's own Esc doesn't also close the panel
       // Second Esc leaves the box, so the page's own shortcuts work again.
       if (resultsEl.hidden) inputEl.blur();
       else hideResults();
@@ -307,10 +308,14 @@ export function initGameSearch({
     }
     if (e.key !== 'Enter') return;
     e.preventDefault();
-    // The "more" row is the roving selection's last virtual index — check it before the
-    // term-empty bail below, since the recents view's "see all" is reachable with an empty box.
+    // The highlighted row (the "more" row is the roving selection's last virtual index) goes
+    // before the term-empty bail below, since the recents view is reachable with an empty box.
     if (moreRowShown() && activeIdx === lastResults.length) {
       activateMore();
+      return;
+    }
+    if (activeIdx >= 0 && lastResults[activeIdx]) {
+      pick(lastResults[activeIdx]);
       return;
     }
     const term = inputEl.value.trim();
@@ -318,10 +323,6 @@ export function initGameSearch({
     const directAppid = parseDirectAppid(term);
     if (directAppid != null) {
       pick({ appid: directAppid, name: '', tinyImage: null });
-      return;
-    }
-    if (activeIdx >= 0 && lastResults[activeIdx]) {
-      pick(lastResults[activeIdx]);
       return;
     }
     if (lastResults.length) pick(lastResults[0]); // no arrow-key highlight yet — same as clicking the top match
