@@ -19,18 +19,7 @@ import { sortOwners, ownerMeterPct } from './ownerList.ts';
 import type { GameOwner } from './accountData.ts';
 import { ACCOUNT_CHANGED_EVENT, getEffectiveCurrentAccount } from './accountsStore.ts';
 import { achievementsAccountKey } from './achievementsRequest.ts';
-import {
-  peekNews,
-  fetchNews,
-  peekAchievements,
-  fetchAchievements,
-  peekPrice,
-  fetchPrice,
-  peekBundles,
-  fetchBundles,
-  fetchDlc,
-  isItadOff,
-} from './panelData.ts';
+import { fetchNews, fetchAchievements, fetchPrice, fetchBundles, fetchDlc, isItadOff } from './panelData.ts';
 import type {
   DlcEntry,
   GameBundle,
@@ -464,12 +453,9 @@ const panelData = createRoot(() => {
   const isForced = (info: { refetching: boolean | unknown }) => info.refetching !== false;
 
   const [news, { refetch: refetchNews }] = createResource<PanelNews, number>(openAppid, (appid, info) => {
-    const force = isForced(info);
-    const cached = peekNews(appid);
-    // Returning the cached value rather than a promise resolves the resource synchronously —
-    // no `pending` tick, so reopening a game paints its real News card instead of flashing the
-    // loading skeleton at it again.
-    return !force && cached !== undefined ? cached : fetchNews(appid, { force });
+    // A cached value comes back synchronously, so reopening a game paints its real News card
+    // instead of flashing the loading skeleton at it again.
+    return fetchNews(appid, { force: isForced(info) });
   });
 
   const [achievements, { refetch: refetchAchievements }] = createResource<PanelAchievements, string>(
@@ -480,11 +466,10 @@ const panelData = createRoot(() => {
       // a resource fetcher runs untracked, so reading the game here subscribes to nothing.
       const g = panelGame();
       if (!g) return null;
-      const members = currentMembers();
-      const force = isForced(info);
-      const cached = peekAchievements(g.appid, members);
-      if (!force && cached !== undefined) return cached;
-      return fetchAchievements(g.appid, members, { force, achievementCount: g.details?.meta?.achievementCount });
+      return fetchAchievements(g.appid, currentMembers(), {
+        force: isForced(info),
+        achievementCount: g.details?.meta?.achievementCount,
+      });
     },
   );
 
@@ -518,15 +503,11 @@ const panelData = createRoot(() => {
   });
 
   const [price, { refetch: refetchPrice }] = createResource<PanelPrice, number>(priceSource, (appid, info) => {
-    const force = isForced(info);
-    const cached = peekPrice(appid);
-    return !force && cached !== undefined ? cached : fetchPrice(appid, { force });
+    return fetchPrice(appid, { force: isForced(info) });
   });
 
   const [bundles, { refetch: refetchBundles }] = createResource<PanelBundles, number>(openAppid, (appid, info) => {
-    const force = isForced(info);
-    const cached = peekBundles(appid);
-    return !force && cached !== undefined ? cached : fetchBundles(appid, { force });
+    return fetchBundles(appid, { force: isForced(info) });
   });
 
   // DLC is the one card whose fetch is gated behind actually expanding it (see panelData.ts's
