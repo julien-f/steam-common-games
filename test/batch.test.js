@@ -100,3 +100,9 @@ test('closeItems: drops exactly the named items', () => {
   assert.equal(closeItems(BACKLOG, ['C1', 'U4']).split('\n').length, 2);
   assert.match(closeItems(BACKLOG, ['C1']), /C2/);
 });
+
+test('closeItems: a section left empty reads None open.', () => {
+  const text = '## A\n\n- **C1 · minor · S** — x.\n\n## B\n\n- **C2 · minor · S** — y.\n';
+  assert.equal(closeItems(text, ['C1']), '## A\n\nNone open.\n\n## B\n\n- **C2 · minor · S** — y.\n');
+  assert.equal(closeItems(text, ['C2']), '## A\n\n- **C1 · minor · S** — x.\n\n## B\n\nNone open.\n');
+});

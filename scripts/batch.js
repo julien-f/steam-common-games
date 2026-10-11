@@ -206,11 +206,14 @@ function unionConflicts(text) {
   );
 }
 
+// Drops the items' lines; a section left empty reads `None open.`, as the backlogs require.
 function closeItems(text, ids) {
   return text
     .split('\n')
     .filter((l) => !ids.some((id) => l.startsWith(`- **${id} ·`)))
-    .join('\n');
+    .join('\n')
+    .replace(/^(## [^\n]+\n)\n+(?=## |$(?![\s\S]))/gm, '$1\nNone open.\n\n')
+    .replace(/\n\n$/, '\n');
 }
 
 function merge(branch, ids) {
