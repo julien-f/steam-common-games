@@ -1112,6 +1112,30 @@ test('F1 edge: a slow screenshot shows its thumbnail and a spinner until it has 
   await expect(lb).not.toHaveClass(/lb--loading/);
 });
 
+test("F1 edge: a lightbox Retry that lands after a step doesn't paint over the shot stepped to", async ({ page }) => {
+  await mockApi(page, { states: ['slow-media'] });
+  // Screenshot 1's full image fails; its retry answers only after the viewer has moved on.
+  let retried!: () => void;
+  const retryDone = new Promise<void>((resolve) => (retried = resolve));
+  await page.route(/Screenshot%201\.svg\?full/, async (route) => {
+    if (!route.request().url().includes('_retry=')) return route.abort();
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg"/>' });
+    retried();
+  });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const lb = page.locator('#screenshot-lightbox');
+  const img = lb.locator('.lb-img');
+  await page.getByRole('button', { name: 'Retry' }).click();
+  await page.getByRole('button', { name: 'Next screenshot' }).click();
+  await expect(lb.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+  await expect(img).toHaveAttribute('src', /Screenshot%202\.svg\?full/);
+  await retryDone;
+  await page.waitForTimeout(300); // the stale onload's turn
+  await expect(img).toHaveAttribute('src', /Screenshot%202\.svg\?full/);
+});
+
 test('F1 edge: a screenshot zooms from a visible button, or Z', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');

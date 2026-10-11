@@ -469,6 +469,14 @@ export function formatPriceTier(keyPart: string): string {
   if (n === top) return `${unit}${top}+`;
   return `${unit}${n}–${unit}${PRICE_TIERS[PRICE_TIERS.indexOf(n) + 1]}`;
 }
+// `groupValue`/`groupFormat` bucketing a price in `currency(row)`'s tiers — spread into a column
+// like the library's numericRangeGroup.
+export function priceTierGroup(currency: (row: Row) => string | null | undefined, missingLabel?: string) {
+  return {
+    groupValue: withMissingGroup((v, row) => priceTierBucket(v, currency(row))),
+    groupFormat: formatMissingGroup(formatPriceTier, missingLabel),
+  };
+}
 
 // Every price-ish column is shown in the region currently selected (see COUNTRY_OPTIONS/
 // detectCountry in public/region.js) — but NOT necessarily all in the *same* currency as each
@@ -768,6 +776,55 @@ function markFailedSources(columns: ColumnDef<Row>[]): ColumnDef<Row>[] {
   });
 }
 
+// The four "how good is this game" scores share one bucket scheme and sort best first.
+function scoreColumn(key: string, label: string, format: (v: unknown) => string): ColumnDef<Row> {
+  return {
+    key,
+    label,
+    type: 'number',
+    groupable: true,
+    format,
+    render: renderScoreNum,
+    compare: compareNumMissingLast,
+    defaultSortDir: 'desc',
+    groupValue: withMissingGroup(scoreBucket),
+    groupFormat: formatMissingGroup(formatScoreBucket),
+    keepVisibleWhenGrouped: true,
+    category: 'Scores & Reviews',
+  };
+}
+
+function hltbColumn(key: string, label: string): ColumnDef<Row> {
+  return {
+    key,
+    label,
+    type: 'number',
+    groupable: true,
+    format: fmt.dec1,
+    compare: compareNumMissingLast,
+    ...numericRangeGroup(10, 'h', '—'),
+    keepVisibleWhenGrouped: true,
+    category: 'How Long To Beat',
+  };
+}
+
+// A price in the row's own `priceCurrency`, cheapest first.
+function priceColumn(key: string, label: string, render = renderPrice): ColumnDef<Row> {
+  return {
+    key,
+    label,
+    type: 'number',
+    groupable: true,
+    format: fmt.num,
+    render,
+    compare: compareNumMissingLast,
+    defaultSortDir: 'asc',
+    ...priceTierGroup((row) => row.priceCurrency),
+    keepVisibleWhenGrouped: true,
+    category: 'Pricing',
+  };
+}
+
 export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   // ── Identity ────────────────────────────────────────────────────────────────
   {
@@ -798,54 +855,15 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   // a fresh click on any of them should show the best-rated games first, not the worst; without
   // it a first click started every numeric column ascending (worst-first) regardless of what the
   // number actually means.
-  {
-    key: 'steamdbRating',
-    label: 'Weighted Rating',
-    type: 'number',
-    groupable: true,
-    format: fmt.numRound,
-    render: renderScoreNum,
-    compare: compareNumMissingLast,
-    defaultSortDir: 'desc',
-    groupValue: withMissingGroup(scoreBucket),
-    groupFormat: formatMissingGroup(formatScoreBucket),
-    keepVisibleWhenGrouped: true,
-    category: 'Scores & Reviews',
-  },
+  scoreColumn('steamdbRating', 'Weighted Rating', fmt.numRound),
   // Wilson score lower bound — statistically rigorous but harder to explain than SteamDB's
   // current formula (which is why it isn't the default-visible score anymore); kept available
   // for anyone who wants the more conservative, confidence-bound number instead.
-  {
-    key: 'score',
-    label: 'Wilson Score',
-    type: 'number',
-    groupable: true,
-    format: fmt.num,
-    render: renderScoreNum,
-    compare: compareNumMissingLast,
-    defaultSortDir: 'desc',
-    groupValue: withMissingGroup(scoreBucket),
-    groupFormat: formatMissingGroup(formatScoreBucket),
-    keepVisibleWhenGrouped: true,
-    category: 'Scores & Reviews',
-  },
+  scoreColumn('score', 'Wilson Score', fmt.num),
   // Raw positive/total ratio — the plain percentage Steam's own store page shows, as opposed to
   // the two adjusted scores above. No "%" in the cell (the column header already says so) —
   // same bare colored number treatment as the other three score columns for consistency.
-  {
-    key: 'positivePct',
-    label: 'Steam %',
-    type: 'number',
-    groupable: true,
-    format: fmt.num,
-    render: renderScoreNum,
-    compare: compareNumMissingLast,
-    defaultSortDir: 'desc',
-    groupValue: withMissingGroup(scoreBucket),
-    groupFormat: formatMissingGroup(formatScoreBucket),
-    keepVisibleWhenGrouped: true,
-    category: 'Scores & Reviews',
-  },
+  scoreColumn('positivePct', 'Steam %', fmt.num),
   // Grouped with the other user-review scores above rather than off near HLTB — it's a critic
   // (not player) score, but it's still one of the four "how good is this game" numbers, and
   // keeping all of them contiguous makes them easier to compare at a glance. Shares the exact
@@ -853,20 +871,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   // skewed in isolation (no games above 96 in the same sample), but a shared scheme is what lets
   // all four columns' group breakdowns be compared at a glance against each other, which is the
   // more useful property here than each column individually having the tightest-fitting buckets.
-  {
-    key: 'metacritic',
-    label: 'Metacritic Score',
-    type: 'number',
-    groupable: true,
-    format: fmt.num,
-    render: renderScoreNum,
-    compare: compareNumMissingLast,
-    defaultSortDir: 'desc',
-    groupValue: withMissingGroup(scoreBucket),
-    groupFormat: formatMissingGroup(formatScoreBucket),
-    keepVisibleWhenGrouped: true,
-    category: 'Scores & Reviews',
-  },
+  scoreColumn('metacritic', 'Metacritic Score', fmt.num),
   // No compare override here — 0 reviews is a real, meaningful value (not "no data" standing in
   // for one), so the default numeric sort already treats it correctly, unlike the score/HLTB
   // columns above and below. `defaultSortDir: 'desc'` still applies though — the most-reviewed
@@ -899,50 +904,10 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   // into the millions) — a plain linear step stays meaningful across that whole range, unlike
   // that one, so a 10h `bucketNumericRange` is the right tool here rather than the log buckets
   // above. `null` (no HLTB match found) groups as "—".
-  {
-    key: 'hltbAll',
-    label: 'HLTB (h)',
-    type: 'number',
-    groupable: true,
-    format: fmt.dec1,
-    compare: compareNumMissingLast,
-    ...numericRangeGroup(10, 'h', '—'),
-    keepVisibleWhenGrouped: true,
-    category: 'How Long To Beat',
-  },
-  {
-    key: 'hltbMain',
-    label: 'Main (h)',
-    type: 'number',
-    groupable: true,
-    format: fmt.dec1,
-    compare: compareNumMissingLast,
-    ...numericRangeGroup(10, 'h', '—'),
-    keepVisibleWhenGrouped: true,
-    category: 'How Long To Beat',
-  },
-  {
-    key: 'hltbExtra',
-    label: '+Extra (h)',
-    type: 'number',
-    groupable: true,
-    format: fmt.dec1,
-    compare: compareNumMissingLast,
-    ...numericRangeGroup(10, 'h', '—'),
-    keepVisibleWhenGrouped: true,
-    category: 'How Long To Beat',
-  },
-  {
-    key: 'hltbCompletionist',
-    label: '100% (h)',
-    type: 'number',
-    groupable: true,
-    format: fmt.dec1,
-    compare: compareNumMissingLast,
-    ...numericRangeGroup(10, 'h', '—'),
-    keepVisibleWhenGrouped: true,
-    category: 'How Long To Beat',
-  },
+  hltbColumn('hltbAll', 'HLTB (h)'),
+  hltbColumn('hltbMain', 'Main (h)'),
+  hltbColumn('hltbExtra', '+Extra (h)'),
+  hltbColumn('hltbCompletionist', '100% (h)'),
 
   // ── Dates ───────────────────────────────────────────────────────────────────
   // Same year-bucketed grouping, using this column's own `parseDate` (endOfReleasePeriod) so a
@@ -1160,20 +1125,7 @@ export const PRICE_COLUMNS: ColumnDef<Row>[] = [
   // buying" without it; kept as its own column for anyone who wants the exact number, or to
   // sort/group by it. Named "Steam Full Price" rather than the shorter "Steam Price" specifically
   // to make clear it's the non-discounted list price, not whatever Steam happens to charge today.
-  {
-    key: 'steamRegular',
-    label: 'Steam Full Price',
-    type: 'number',
-    groupable: true,
-    format: fmt.num,
-    render: renderPrice,
-    compare: compareNumMissingLast,
-    defaultSortDir: 'asc',
-    groupValue: withMissingGroup((v, row) => priceTierBucket(v, row.priceCurrency)),
-    groupFormat: formatMissingGroup(formatPriceTier),
-    keepVisibleWhenGrouped: true,
-    category: 'Pricing',
-  },
+  priceColumn('steamRegular', 'Steam Full Price'),
   // The cheapest *current* price across every shop ITAD tracks for this game (Steam included) —
   // the "where do I actually buy this for less, right now" answer, as opposed to Steam Full
   // Price (Steam's own non-discounted list price) or the historical lows below (what something
@@ -1181,20 +1133,7 @@ export const PRICE_COLUMNS: ColumnDef<Row>[] = [
   // itself when it's at or below a historical low rather than showing the shop name in the cell
   // — the shop is still available as its own column (`bestDealShop`, hidden by default) for
   // anyone who wants to group/filter by "which shop currently has the best price".
-  {
-    key: 'bestDealPrice',
-    label: 'Best Deal',
-    type: 'number',
-    groupable: true,
-    format: fmt.num,
-    render: renderBestDeal,
-    compare: compareNumMissingLast,
-    defaultSortDir: 'asc',
-    groupValue: withMissingGroup((v, row) => priceTierBucket(v, row.priceCurrency)),
-    groupFormat: formatMissingGroup(formatPriceTier),
-    keepVisibleWhenGrouped: true,
-    category: 'Pricing',
-  },
+  priceColumn('bestDealPrice', 'Best Deal', renderBestDeal),
   // How much cheaper the best deal is than Steam Full Price (`discountPct`, computed by each
   // ListRoute.tsx's loadPrices — see its own comment above for why this is
   // computed against Steam's price rather than taken from ITAD's own per-deal "cut" field).
@@ -1222,46 +1161,7 @@ export const PRICE_COLUMNS: ColumnDef<Row>[] = [
   // low" without a separate column for each of the three windows — kept, not removed outright,
   // since the exact number is still sometimes worth seeing (e.g. how far above the record low
   // the current deal actually is).
-  {
-    key: 'lowAll',
-    label: 'All-Time Low',
-    type: 'number',
-    groupable: true,
-    format: fmt.num,
-    render: renderPrice,
-    compare: compareNumMissingLast,
-    defaultSortDir: 'asc',
-    groupValue: withMissingGroup((v, row) => priceTierBucket(v, row.priceCurrency)),
-    groupFormat: formatMissingGroup(formatPriceTier),
-    keepVisibleWhenGrouped: true,
-    category: 'Pricing',
-  },
-  {
-    key: 'lowY1',
-    label: '1-Year Low',
-    type: 'number',
-    groupable: true,
-    format: fmt.num,
-    render: renderPrice,
-    compare: compareNumMissingLast,
-    defaultSortDir: 'asc',
-    groupValue: withMissingGroup((v, row) => priceTierBucket(v, row.priceCurrency)),
-    groupFormat: formatMissingGroup(formatPriceTier),
-    keepVisibleWhenGrouped: true,
-    category: 'Pricing',
-  },
-  {
-    key: 'lowM3',
-    label: '3-Month Low',
-    type: 'number',
-    groupable: true,
-    format: fmt.num,
-    render: renderPrice,
-    compare: compareNumMissingLast,
-    defaultSortDir: 'asc',
-    groupValue: withMissingGroup((v, row) => priceTierBucket(v, row.priceCurrency)),
-    groupFormat: formatMissingGroup(formatPriceTier),
-    keepVisibleWhenGrouped: true,
-    category: 'Pricing',
-  },
+  priceColumn('lowAll', 'All-Time Low'),
+  priceColumn('lowY1', '1-Year Low'),
+  priceColumn('lowM3', '3-Month Low'),
 ];

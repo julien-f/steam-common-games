@@ -72,14 +72,11 @@ import {
   CORE_COLUMNS,
   PRICE_COLUMNS,
   compareDateMissingLast,
-  withMissingGroup,
-  formatMissingGroup,
   halfDecadeBucket,
   formatHalfDecadeBucket,
   protonDbValue,
   TYPE_LABELS,
-  priceTierBucket,
-  formatPriceTier,
+  priceTierGroup,
   compareNumMissingLast,
   OWNERSHIP_STATUS_COLUMN,
   SOURCE_NAMES,
@@ -179,7 +176,7 @@ import { fanaticalBuyUrl, FANATICAL_BOOKMARKLET } from './fanaticalPicks.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, PRICES_UNAVAILABLE } from './priceLoading.ts';
 import { isItadConfigured, isItadOff } from './panelData.ts';
 import { currentRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
-import { openPrefsPopover } from './prefsPopover.ts';
+import { openPrefsPopover } from './prefsPopover.tsx';
 import { registerRouteHandlers } from './AppShell.tsx';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
 import { ComparePlayersForm } from './ComparePlayersForm.tsx';
@@ -424,8 +421,7 @@ const TIER_PRICE_COLUMN: ColumnDef<Record<string, any>> = {
   render: renderTierPrice,
   compare: compareNumMissingLast,
   defaultSortDir: 'asc',
-  groupValue: withMissingGroup((v, row) => priceTierBucket(v, row.tierCurrency)),
-  groupFormat: formatMissingGroup(formatPriceTier, 'Varies'),
+  ...priceTierGroup((row) => row.tierCurrency, 'Varies'),
   keepVisibleWhenGrouped: true,
   category: 'Pricing',
 };

@@ -104,7 +104,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "r" | "g:" formula
 - `overlayHistory.ts` — the history entry each open overlay pushes (see the side panel).
 - `gameSearch.ts` — the combobox/debounce UI for "look up any game" (the shell owns where results go).
 - `urlState.ts` — param parsing, canonical param order, and the `?game=`/`&shot=`/`?u=` writers.
-- `prefs.ts` / `prefsPopover.ts` / `region.ts` / `navPopover.ts` — the localStorage preference blob; the ⚙ panel's contents; the region preference and its detection; `<details>` popover open/close/positioning.
+- `prefs.ts` / `prefsPopover.tsx` / `region.ts` / `navPopover.ts` — the localStorage preference blob; the ⚙ panel's contents; the region preference and its detection; `<details>` popover open/close/positioning.
 - `tableViewPrefs.ts` / `tableViewKeys.ts` / `tableViewSync.ts` / `SharedViewBanner.tsx` / `UnsavedViewBanner.tsx` — restore/persist/share/reset a table view; the table-view pref keys; the signed-in Save/Revert baseline; the shared-layout and unsaved-changes banners and the Share/Default view buttons.
 - `clipboard.ts` / `CopyButton.tsx` — the one copy-then-confirm helper behind every copy button (`copyWithFeedback` for plain DOM buttons, `<CopyButton>` for JSX), with a `window.prompt` fallback where the Clipboard API isn't available (it needs a secure context, and can be permission-denied).
 - `pageTitle.ts` — the two-layer `document.title` (route context, overridden by an open game).
@@ -253,7 +253,7 @@ The "look up any game" box is one nav-bar search in the shell, not one per route
 
 ## The side panel
 
-`panel.tsx` is a single instance mounted by `AppShell.tsx` — routes only open/close it (`panelOpen(game)`/`panelClose()`/`isPanelOpen()`/`getPanelGame()`/`panelStepHero()`/`panelHandleEscape()`). `AppShell.tsx` passes every `PanelOptions` hook (close, navigate, refresh, tag click/active, owners), each relayed to the mounted route through `routeHandlers`; only `ListRoute.tsx` registers them, so on `/rank` they no-op.
+`panel.tsx` is a single instance mounted by `AppShell.tsx` — routes only open/close it (`panelOpen(game)`/`panelClose()`/`isPanelOpen()`/`getPanelGame()`/`panelStepHero()`). `AppShell.tsx` passes every `PanelOptions` hook (close, navigate, refresh, tag click/active, owners), each relayed to the mounted route through `routeHandlers`; only `ListRoute.tsx` registers them, so on `/rank` they no-op.
 
 **Tag pills filter the table.** A tag/genre/category/developer/publisher pill toggles that value in the matching column's `include` filter — `initPanel({ onTagClick, isTagActive })` forwards through `routeHandlers` to `ListRoute.tsx`'s `onTagClick`/`isTagActive` (`table.filter.setValues(...)`/`.include()`). The panel's keys (`tags`/`genres`/`categories`/`developers`/`publishers`) are the table's column keys.
 
@@ -316,7 +316,7 @@ Above 768px the shell is locked to the viewport and **`.app-scroll` is the page'
 
 `prefs.ts` is one flat `{key: value}` JSON blob under a single localStorage key, so the whole set is enumerable at once; `setPref`'s sync hook is per-key so two preferences changing in different tabs can't race each other's server writes.
 
-Region is the only user-facing preference, in the nav bar's ⚙ popover (`prefsPopover.ts` owns the contents, `AppShell.tsx` only the `<details>` shell). `region.ts` holds a curated list of major Steam pricing regions, `detectCountry()`, and `REGION_CHANGED_EVENT`, which `setStoredRegion` dispatches on `window` so price-showing routes re-price.
+Region is the only user-facing preference, in the nav bar's ⚙ popover (`prefsPopover.tsx` owns the contents, `AppShell.tsx` only the `<details>` shell). `region.ts` holds a curated list of major Steam pricing regions, `detectCountry()`, and `REGION_CHANGED_EVENT`, which `setStoredRegion` dispatches on `window` so price-showing routes re-price.
 
 - The first entry is always "Auto-detect (⟨what it resolves to now⟩)", and `currentRegion` consults `detectCountry()` live on every upstream call.
 - `detectCountry` tries the OS timezone (`Intl.DateTimeFormat().resolvedOptions().timeZone`, via a curated map including Eurozone→`DE`) before `navigator.language` — language is a UI preference and often stays "en-US" anywhere (e.g. `LANG=en_US.UTF-8` in `Europe/Paris`).

@@ -1,7 +1,7 @@
 import { getPref, setPref } from './prefs.ts';
 
 // The region preference's data and logic — the curated list, the detection heuristic, and
-// get/set/resolve for the stored value — with no DOM/UI code of its own (see prefsPopover.js
+// get/set/resolve for the stored value — with no DOM/UI code of its own (see prefsPopover.tsx
 // for the actual `<select>` this backs). An ES module, used on all four pages — bundles.js and
 // library.js's Wishlist tab import `currentRegion` directly for their price
 // lookups.
@@ -127,7 +127,7 @@ export function detectCountry(): string {
 }
 
 // Sentinel value for "always track auto-detection, don't pin a fixed region" — the region
-// picker's own default entry (see prefsPopover.js's initPrefsPopover) and the default when
+// picker's own default entry (see prefsPopover.tsx's PrefsPanel) and the default when
 // nothing has been explicitly chosen yet. Deliberately not one of the real 2-letter ISO codes
 // above, so it can never collide with a genuine country selection.
 export const AUTO_COUNTRY = 'auto';
@@ -192,7 +192,7 @@ export function regionCurrency(): string {
   return COUNTRY_OPTIONS.find((c) => c.code === region)?.currency ?? 'USD';
 }
 
-// `initRegionSelect` (the region <select>'s only remaining populator, public/prefsPopover.js)
+// `initRegionSelect` (the region <select>'s only remaining populator, public/prefsPopover.tsx)
 // used to live here — moved out since this file's own job is the region preference's data and
 // logic (the curated list, detection, get/set, the changed-event), not rendering a picker for
 // it; the DOM-populating half belongs with whichever UI actually owns a `<select>` for it.

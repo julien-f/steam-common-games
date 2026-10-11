@@ -53,7 +53,7 @@ let lbZoom = 1,
   lbVcTimer: ReturnType<typeof setTimeout> | undefined,
   lbCounterTimer: ReturnType<typeof setTimeout> | undefined,
   lbPointerTimer: ReturnType<typeof setTimeout> | undefined;
-// Bumped on every renderLightbox() call; a detached Image()'s onload checks it's still current
+// Bumped on every renderLightbox() call and loadLbImage(); a detached Image()'s onload checks it's still current
 // before touching the shared img element, so a slow load from a shot the viewer already
 // navigated away from can't clobber the one currently displayed — img is reused across shots
 // same as videoEl's _hlsToken guard above.
@@ -82,6 +82,12 @@ function attachLbVideo() {
 }
 function detachLbVideo() {
   lbVideoEl.remove();
+}
+function lbShowingVideo() {
+  return lbVideoEl.isConnected;
+}
+function lbShowingImage() {
+  return document.querySelector<HTMLElement>('#screenshot-lightbox .lb-img')?.style.display !== 'none';
 }
 type LbFlashEl = HTMLElement & { _flashTimer?: ReturnType<typeof setTimeout> };
 
@@ -168,6 +174,10 @@ export function lightboxShot(): { appid: number; shotId: string } | null {
 // the lightbox is covering. Whatever had focus in here keeps it, so holding ↓ on the caption
 // button doesn't walk focus away mid-click; the close button is the fallback, as on a real open.
 // `dir` only drives the enter animation's direction — 0 (R, which has no direction) skips it.
+function stepGameNav(dir: number) {
+  stepGameFromLightbox(() => _onGameNav(dir), dir);
+}
+
 function stepGameFromLightbox(step: () => void, dir = 0) {
   const lb = document.getElementById('screenshot-lightbox')!;
   const before = document.activeElement;
@@ -192,17 +202,25 @@ function webkitDoc(): Document & { webkitFullscreenElement?: Element | null; web
   return document as Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void };
 }
 
+function isFullscreen() {
+  return !!(document.fullscreenElement || webkitDoc().webkitFullscreenElement);
+}
+
+function exitFullscreen() {
+  (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
+}
+
 function syncLightboxFullscreenBtn() {
   const btn = document.querySelector('#screenshot-lightbox .lb-fullscreen');
   if (!btn) return;
-  const isFs = !!(document.fullscreenElement || webkitDoc().webkitFullscreenElement);
+  const isFs = isFullscreen();
   btn.innerHTML = isFs ? LB_FS_EXIT : LB_FS_ENTER;
   btn.setAttribute('aria-label', isFs ? 'Exit fullscreen' : 'Enter fullscreen');
 }
 
 function toggleLbFullscreen(lb: HTMLElement) {
-  if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
-    (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
+  if (isFullscreen()) {
+    exitFullscreen();
   } else {
     (
       lb.requestFullscreen?.() ??
@@ -217,7 +235,7 @@ function toggleLbFullscreen(lb: HTMLElement) {
 // unsupported (desktop, iOS) — nothing to do then.
 function lockLbLandscape() {
   const o = screen.orientation as ScreenOrientation & { lock?: (type: string) => Promise<void> };
-  if (!(document.fullscreenElement || webkitDoc().webkitFullscreenElement)) return;
+  if (!isFullscreen()) return;
   o?.lock?.('landscape').catch(() => {});
 }
 
@@ -305,25 +323,34 @@ function retryCurrentShot() {
     const vid = lbVideoEl;
     playHls(vid, shot.hls);
   } else {
-    const img = document.querySelector<HTMLImageElement>('#screenshot-lightbox .lb-img')!;
-    const lb = document.getElementById('screenshot-lightbox');
-    lb?.classList.add('lb--loading');
     // Cache-bust: a browser that already recorded this exact URL as failed
     // won't necessarily re-attempt the network request otherwise.
-    const bust = shot.main! + (shot.main!.includes('?') ? '&' : '?') + '_retry=' + Date.now();
-    const full = new Image();
-    full.onload = () => {
-      img.src = bust;
-      img.style.opacity = '1';
-      lb?.classList.remove('lb--loading');
-    };
-    full.onerror = () => {
-      img.style.opacity = '0';
-      lb?.classList.remove('lb--loading');
-      showLbError("Couldn't load this image.");
-    };
-    full.src = bust;
+    loadLbImage(shot.main! + (shot.main!.includes('?') ? '&' : '?') + '_retry=' + Date.now());
   }
+}
+
+// Loads `src` off-screen, then swaps it into the shared img — unless a later load or render has
+// started since (see lbImgToken). Left at opacity 0 on error (rather than 1) so the browser's own
+// broken-image icon doesn't show behind the error overlay.
+function loadLbImage(src: string) {
+  const lb = document.getElementById('screenshot-lightbox')!;
+  const img = lb.querySelector<HTMLImageElement>('.lb-img')!;
+  const token = ++lbImgToken;
+  lb.classList.add('lb--loading');
+  const full = new Image();
+  full.onload = () => {
+    if (token !== lbImgToken) return;
+    img.src = src;
+    img.style.opacity = '1';
+    lb.classList.remove('lb--loading');
+  };
+  full.onerror = () => {
+    if (token !== lbImgToken) return;
+    img.style.opacity = '0';
+    lb.classList.remove('lb--loading');
+    showLbError("Couldn't load this image.");
+  };
+  full.src = src;
 }
 
 // ── Zoom / pan ─────────────────────────────────────────────────────────────
@@ -349,8 +376,6 @@ function applyLbTransform() {
 
 function resetLbZoom() {
   lbZoom = 1;
-  lbPanX = 0;
-  lbPanY = 0;
   applyLbTransform();
 }
 
@@ -364,16 +389,19 @@ function lbZoomTowardPoint(clientX: number, clientY: number) {
   lbPanX = -(clientX - rect.left - rect.width / 2);
   lbPanY = -(clientY - rect.top - rect.height / 2);
   applyLbTransform();
-  img.style.cursor = 'grab';
+}
+
+// Double-click, double-tap and the zoom button: 2x toward the point, or back.
+function toggleLbZoomAt(clientX: number, clientY: number) {
+  if (lbZoom > 1) resetLbZoom();
+  else lbZoomTowardPoint(clientX, clientY);
 }
 
 // The visible way to what double-click, double-tap and pinch do: 2x on the image's centre, or back.
 function toggleLbZoom() {
-  const img = document.querySelector<HTMLImageElement>('#screenshot-lightbox .lb-img');
-  if (!img || img.style.display === 'none') return;
-  if (lbZoom > 1) return resetLbZoom();
-  const r = img.getBoundingClientRect();
-  lbZoomTowardPoint(r.left + r.width / 2, r.top + r.height / 2);
+  if (!lbShowingImage()) return;
+  const r = document.querySelector('#screenshot-lightbox .lb-img')!.getBoundingClientRect();
+  toggleLbZoomAt(r.left + r.width / 2, r.top + r.height / 2);
 }
 
 // ── Video seeking (keyboard arrows + touch double-tap) ─────────────────────
@@ -553,8 +581,8 @@ function wireButtons(lb: HTMLElement) {
   lb.querySelector('.lb-error-retry')!.addEventListener('click', retryCurrentShot);
   lb.querySelector('.lb-prev')!.addEventListener('click', () => stepLightbox(-1));
   lb.querySelector('.lb-next')!.addEventListener('click', () => stepLightbox(1));
-  lb.querySelector('.lb-game-prev')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav(-1), -1));
-  lb.querySelector('.lb-game-next')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav(1), 1));
+  lb.querySelector('.lb-game-prev')!.addEventListener('click', () => stepGameNav(-1));
+  lb.querySelector('.lb-game-next')!.addEventListener('click', () => stepGameNav(1));
   lb.querySelector('.lb-fullscreen')!.addEventListener('click', () => toggleLbFullscreen(lb));
   lb.querySelector('.lb-zoom')!.addEventListener('click', toggleLbZoom);
 }
@@ -588,8 +616,7 @@ function wireKeyboard(lb: HTMLElement) {
         return;
       }
 
-      const vc = lb.querySelector<HTMLElement>('.lb-vctrls');
-      const vid = vc && vc.style.display !== 'none' ? lbVideoEl : null;
+      const vid = lbShowingVideo() ? lbVideoEl : null;
 
       if ((!onScrub || e.shiftKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
@@ -611,8 +638,7 @@ function wireKeyboard(lb: HTMLElement) {
       }
       if (!onScrub && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
         e.preventDefault();
-        const dir = e.key === 'ArrowDown' ? 1 : -1;
-        stepGameFromLightbox(() => _onGameNav(dir), dir);
+        stepGameNav(e.key === 'ArrowDown' ? 1 : -1);
       }
       // R, the same random pick the panel offers — page-level shortcuts are all blocked while the
       // lightbox is open (panelKeyboard.ts hands it the keyboard wholesale), so it has to be bound
@@ -641,14 +667,10 @@ function wireMouseHandlers(lb: HTMLElement) {
   lb.addEventListener(
     'wheel',
     (e) => {
-      if (lb.querySelector<HTMLImageElement>('.lb-img')!.style.display === 'none') return;
+      if (!lbShowingImage()) return;
       e.preventDefault();
       const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
       lbZoom = Math.max(1, Math.min(4, lbZoom * factor));
-      if (lbZoom === 1) {
-        lbPanX = 0;
-        lbPanY = 0;
-      }
       applyLbTransform();
     },
     { passive: false },
@@ -689,10 +711,7 @@ function wireMouseHandlers(lb: HTMLElement) {
     },
     { signal: _lbSignal },
   );
-  lbImg.addEventListener('dblclick', (e) => {
-    if (lbZoom > 1) resetLbZoom();
-    else lbZoomTowardPoint(e.clientX, e.clientY);
-  });
+  lbImg.addEventListener('dblclick', (e) => toggleLbZoomAt(e.clientX, e.clientY));
 }
 
 // ── Swipe drag ─────────────────────────────────────────────────────────────
@@ -700,9 +719,8 @@ function wireMouseHandlers(lb: HTMLElement) {
 // The media element on screen — the one a swipe drags. Zoom/pan owns `.lb-img`'s transform
 // too, but a drag only ever runs at zoom 1, so the two never write it at once.
 function lbMediaEl(): HTMLElement | null {
-  const img = document.querySelector<HTMLElement>('#screenshot-lightbox .lb-img');
-  if (img && img.style.display !== 'none') return img;
-  return lbVideoEl.isConnected ? lbVideoEl : null;
+  if (lbShowingImage()) return document.querySelector<HTMLElement>('#screenshot-lightbox .lb-img');
+  return lbShowingVideo() ? lbVideoEl : null;
 }
 
 function setLbDrag(el: HTMLElement, x: number, y: number) {
@@ -748,7 +766,7 @@ function wireTouchHandlers(lb: HTMLElement) {
     'touchstart',
     (e) => {
       if (e.touches.length === 2) {
-        if (lb.querySelector<HTMLImageElement>('.lb-img')!.style.display === 'none') return;
+        if (!lbShowingImage()) return;
         pinchStartDist = Math.hypot(
           e.touches[1].clientX - e.touches[0].clientX,
           e.touches[1].clientY - e.touches[0].clientY,
@@ -786,16 +804,12 @@ function wireTouchHandlers(lb: HTMLElement) {
     'touchmove',
     (e) => {
       if (e.touches.length === 2) {
-        if (lb.querySelector<HTMLImageElement>('.lb-img')!.style.display === 'none') return;
+        if (!lbShowingImage()) return;
         const dist = Math.hypot(
           e.touches[1].clientX - e.touches[0].clientX,
           e.touches[1].clientY - e.touches[0].clientY,
         );
         lbZoom = Math.max(1, Math.min(4, (pinchStartZoom * dist) / pinchStartDist));
-        if (lbZoom === 1) {
-          lbPanX = 0;
-          lbPanY = 0;
-        }
         applyLbTransform();
         e.preventDefault();
       } else if (e.touches.length === 1 && touchPanning) {
@@ -844,14 +858,13 @@ function wireTouchHandlers(lb: HTMLElement) {
         if (el) clearLbDrag(el, !action);
         if (action === 'media-prev' || action === 'media-next') stepLightbox(action === 'media-next' ? 1 : -1);
         else if (action) {
-          const dir = action === 'game-next' ? 1 : -1;
-          stepGameFromLightbox(() => _onGameNav(dir), dir);
+          stepGameNav(action === 'game-next' ? 1 : -1);
         }
         return;
       }
       const isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
-      const showingImg = lb.querySelector<HTMLImageElement>('.lb-img')!.style.display !== 'none';
-      const showingVid = lbVideoEl.isConnected;
+      const showingImg = lbShowingImage();
+      const showingVid = lbShowingVideo();
       if (isTap && (showingImg || showingVid)) {
         const now = Date.now();
         const tapDist = Math.hypot(endX - lbLastTapX, endY - lbLastTapY);
@@ -860,8 +873,7 @@ function wireTouchHandlers(lb: HTMLElement) {
           if (showingImg) {
             // Or the browser follows up with a dblclick, whose handler would toggle the zoom back.
             e.preventDefault();
-            if (lbZoom > 1) resetLbZoom();
-            else lbZoomTowardPoint(endX, endY);
+            toggleLbZoomAt(endX, endY);
           } else {
             // Video: double-tap the left/right third to seek, YouTube-style.
             // The middle third is left alone — a plain single tap already
@@ -935,7 +947,7 @@ function wireVideoControls(lb: HTMLElement) {
     playBtn.innerHTML = LB_PLAY_ICON;
     playBtn.setAttribute('aria-label', 'Play');
     syncLbPaused();
-    if (!vid2.isConnected) return; // stopHls' own pause, on a close or a step off the trailer
+    if (!lbShowingVideo()) return; // stopHls' own pause, on a close or a step off the trailer
     showLbChrome();
     schedHideLbChrome();
   });
@@ -967,7 +979,7 @@ function wireVideoControls(lb: HTMLElement) {
   document.addEventListener(
     'visibilitychange',
     () => {
-      if (document.visibilityState === 'hidden' && vid2.isConnected) vid2.pause();
+      if (document.visibilityState === 'hidden' && lbShowingVideo()) vid2.pause();
     },
     { signal: _lbSignal },
   );
@@ -1023,7 +1035,7 @@ function wireVideoControls(lb: HTMLElement) {
 // The large play button shows over a trailer that isn't playing — autoplay refused, paused, ended.
 function syncLbPaused() {
   const lb = document.getElementById('screenshot-lightbox');
-  lb?.classList.toggle('lb--paused', lbVideoEl.isConnected && lbVideoEl.paused);
+  lb?.classList.toggle('lb--paused', lbShowingVideo() && lbVideoEl.paused);
 }
 
 // ── Mount ────────────────────────────────────────────────────────────────
@@ -1115,13 +1127,16 @@ export function closeLightbox() {
   );
   lbRenderedAppid = undefined;
   document.body.classList.remove('lb-open');
-  if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
-    (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
-  }
+  if (isFullscreen()) exitFullscreen();
   _onLightboxParamChange(null);
   popOverlayEntry('lightbox');
   (_lbPrevFocus as HTMLElement | null)?.focus();
   _lbPrevFocus = null;
+}
+
+// The browser's own Escape exits fullscreen first; the lightbox stays open then.
+export function lightboxHandleEscape() {
+  if (!isFullscreen()) closeLightbox();
 }
 
 function stepLightbox(dir: number) {
@@ -1207,7 +1222,7 @@ function renderLightbox() {
   lbRenderedAppid = appid;
   hideLbError();
   // Invalidate any image preload still in flight from a previous render — see lbImgToken decl.
-  const imgToken = ++lbImgToken;
+  lbImgToken++;
   // Untracked, and this is load-bearing: `_getGamePosition` reaches the route's list, which on
   // a list route is the table's `processedData()` — a signal recomputed on every batch of
   // streaming rows. Reading it in *this* effect subscribed the whole imperative render below to
@@ -1222,7 +1237,6 @@ function renderLightbox() {
     img.style.display = 'none';
     lb.classList.remove('lb--loading');
     attachLbVideo();
-    vid.style.display = 'block';
     lb.classList.add('lb--unstarted');
     vid.poster = shot.thumb || '';
     vid.setAttribute('aria-label', label);
@@ -1267,23 +1281,7 @@ function renderLightbox() {
     } else {
       img.style.opacity = '0';
     }
-    lb.classList.add('lb--loading');
-    const full = new Image();
-    // Left at opacity 0 (rather than 1) so the browser's own broken-image
-    // icon doesn't show behind the error overlay.
-    full.onload = () => {
-      if (imgToken !== lbImgToken) return;
-      img.src = shot.main!;
-      img.style.opacity = '1';
-      lb.classList.remove('lb--loading');
-    };
-    full.onerror = () => {
-      if (imgToken !== lbImgToken) return;
-      img.style.opacity = '0';
-      lb.classList.remove('lb--loading');
-      showLbError("Couldn't load this image.");
-    };
-    full.src = shot.main!;
+    loadLbImage(shot.main!);
     schedHideLbChrome();
   }
   lb.querySelector('.lb-counter')!.textContent = mediaLabel(list, i);
@@ -1292,10 +1290,12 @@ function renderLightbox() {
   // Preload prev and next images so navigation feels instant; for a video,
   // warm its poster the same way and prime its HLS manifest in the HTTP
   // cache so stepping onto it doesn't pay the full fetch latency cold.
+  const keep = new Set<string>();
   for (const offset of [-1, 1]) {
     const adjacent = list[(i + offset + list.length) % list.length];
     if (!adjacent) continue;
     const preloadSrc = adjacent.type === 'video' ? adjacent.thumb : adjacent.main;
+    if (preloadSrc) keep.add(preloadSrc);
     if (preloadSrc && preloadSrc !== shot.main) {
       let pre = lb.querySelector<HTMLImageElement>(`.lb-preload[data-src="${CSS.escape(preloadSrc)}"]`);
       if (!pre) {
@@ -1314,15 +1314,6 @@ function renderLightbox() {
     }
   }
   // Drop stale preloads (keep only prev/next)
-  const keep = new Set<string>(
-    [-1, 1]
-      .map((o) => {
-        const s = list[(i + o + list.length) % list.length];
-        const src = s && (s.type === 'video' ? s.thumb : s.main);
-        return src ?? '';
-      })
-      .filter((src) => src !== ''),
-  );
   lb.querySelectorAll<HTMLImageElement>('.lb-preload').forEach((el) => {
     if (!keep.has(el.dataset.src ?? '')) el.remove();
   });

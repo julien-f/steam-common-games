@@ -24,15 +24,7 @@ import { useNavigate } from '@solidjs/router';
 import { withAccountParam } from './urlState.ts';
 import { createTableState, DataTableView, datePartGroup, numericRangeGroup } from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
-import {
-  fmt,
-  compareDateMissingLast,
-  compareNumMissingLast,
-  withMissingGroup,
-  formatMissingGroup,
-  priceTierBucket,
-  formatPriceTier,
-} from './gameColumns.ts';
+import { fmt, compareDateMissingLast, compareNumMissingLast, priceTierGroup } from './gameColumns.ts';
 import { fmtAge, formatMoney, oldestFetchedAt, scoreColor } from './utils.ts';
 import {
   toBundleRow,
@@ -52,7 +44,7 @@ import {
 } from './bundleRows.ts';
 import { currentRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { setBrowsedBundles } from './bundleBrowseStore.ts';
-import { openPrefsPopover } from './prefsPopover.ts';
+import { openPrefsPopover } from './prefsPopover.tsx';
 import {
   restoreTableView,
   shareTableView,
@@ -231,10 +223,7 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
           ? 'Varies'
           : `${row.pickQuantity ? `${row.pickQuantity} for ` : ''}${formatWithEstimate(row.price, row.currency ?? regionCurrency(), regionCurrency())}`,
     compare: compareNumMissingLast,
-    // withMissingGroup, not a bare priceTierBucket: `Number(null)` is 0, so a null price would
-    // otherwise land in its "Free" bucket rather than in the missing/"Varies" one.
-    groupValue: withMissingGroup((v) => priceTierBucket(v, regionCurrency())),
-    groupFormat: formatMissingGroup(formatPriceTier, 'Varies'),
+    ...priceTierGroup(() => regionCurrency(), 'Varies'),
   },
   { key: 'tierCount', label: 'Tiers', type: 'number', groupable: true, format: fmt.num },
   // Published before Ends — a bundle's own life order, and the default sort's column sits next to
