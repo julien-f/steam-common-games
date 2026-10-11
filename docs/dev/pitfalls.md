@@ -8,6 +8,12 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: upstream calls are paced by `STORE_MIN_INTERVAL_MS` (500 ms) and `UPSTREAM_MIN_INTERVAL_MS` (1000 ms, both in `default.env`), which `npm test` sets to 0.
 - **Fix**: run a single file with `npm run test:one test/<name>.test.js`, which sets them to 0.
 
+## A unit test still sees an earlier test's module state after `delete require.cache[…]`
+
+- **Symptom**: a module-level value (a memoized fetch, a counter) carries over between tests even though each test deletes the module from `require.cache` and requires it again.
+- **Cause**: a `.ts` module's own `import`s go through Node's ESM loader, which `require.cache` doesn't cover, so only the module required directly is reloaded.
+- **Fix**: keep state a test must reset in a factory the test calls (like `createPanelDataCache()`), not at module level in an imported module.
+
 ## `ReferenceError: <name> is not defined` in the browser console mid-edit
 
 - **Symptom**: the console of a page open on a dev server logs `ReferenceError` for a function that exists, with two `ListRoute.tsx?t=…` versions in the stack.

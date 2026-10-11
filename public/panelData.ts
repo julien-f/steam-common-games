@@ -75,7 +75,7 @@ export function createPanelDataCache() {
   const bundles = new Map<number, PanelBundles>();
 
   // Lazily resolved once per session rather than per-call — a plain GET /api/health, cheap to
-  // over-share across every game a price is fetched for.
+  // over-share across every game a price is fetched for and every list mounted (ListRoute.tsx).
   let itadConfiguredPromise: Promise<boolean> | null = null;
   let itadOff = false; // known not configured, as opposed to not yet asked or a failed /api/health
   function isItadConfigured(): Promise<boolean> {
@@ -294,6 +294,7 @@ export function createPanelDataCache() {
     peekBundles,
     fetchBundles,
     fetchDlc,
+    isItadConfigured,
     isItadOff,
   };
 }
@@ -308,4 +309,5 @@ export const fetchPrice = defaultCache.fetchPrice;
 export const peekBundles = defaultCache.peekBundles;
 export const fetchBundles = defaultCache.fetchBundles;
 export const fetchDlc = defaultCache.fetchDlc;
+export const isItadConfigured = defaultCache.isItadConfigured;
 export const isItadOff = defaultCache.isItadOff;

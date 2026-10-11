@@ -182,6 +182,7 @@ import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { rememberBundle } from './bundleSnapshots.ts';
 import { fanaticalBuyUrl, FANATICAL_BOOKMARKLET } from './fanaticalPicks.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, PRICES_UNAVAILABLE } from './priceLoading.ts';
+import { isItadConfigured } from './panelData.ts';
 import { getStoredRegion, resolveRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { openPrefsPopover } from './prefsPopover.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
@@ -1620,10 +1621,7 @@ export default function ListRoute() {
     if (failure) setStatusText(`Details stream failed: ${failure}`);
   }
 
-  const itadConfiguredPromise = fetch('/api/health')
-    .then((res) => res.json())
-    .then((data) => !!data.itadConfigured)
-    .catch(() => false);
+  const itadConfiguredPromise = isItadConfigured();
   const [itadOff, setItadOff] = createSignal(false);
   void itadConfiguredPromise.then((ok) => setItadOff(!ok));
 
