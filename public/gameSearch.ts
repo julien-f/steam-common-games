@@ -1,4 +1,4 @@
-import { esc } from './utils.ts';
+import { esc, fetchJson } from './utils.ts';
 import { peekMyOwnershipStatus, onMyOwnershipReady } from './myOwnership.ts';
 import type { OwnershipStatus } from './myOwnership.ts';
 
@@ -8,28 +8,29 @@ export interface GameSearchResult {
   tinyImage: string | null;
 }
 
-// Shared "look up any game" widget — used by both the comparison page (app.js) and the
-// Library Explorer (library.js) to open the shared game detail side panel (panel.js) for an
-// arbitrary Steam game, independent of anyone's library or wishlist. An ES module, importing
-// `esc()` from utils.js, same as accountsBar.js.
+// The nav bar's "look up any game" widget (AppShell), opening the side panel for an arbitrary
+// Steam game, independent of anyone's library or wishlist.
 //
-// initGameSearch({ inputEl, resultsEl, onSelect }):
+// initGameSearch({ inputEl, resultsEl, onSelect, recents, onSeeAllRecents, onSeeAllResults }):
 //  - inputEl:   the text input the user types a name, appid, or store URL into
 //  - resultsEl: container the dropdown of name-search matches renders into (hidden when empty)
 //  - onSelect({ appid, name }): called when the user picks a result, or presses Enter with a
 //    raw appid/store URL typed in (name is '' in that case — the caller derives it from store
-//    metadata once /api/game-details resolves, same as it already does for wishlist rows with
-//    no name of their own)
-//  - recents(): optional — recently looked-up games, shown in the same dropdown whenever the box
-//    is focused/clicked while empty, so getting back to a game just looked at costs no typing and
-//    no separate widget. Picked exactly like a search match (same shape, same onSelect).
-//  - onSeeAllRecents(): optional — the "see all" row under that list; the caller decides where
-//    that goes (the /game route, for the app shell)
-//  - onSeeAllResults(term): optional — the analogous trailing row under actual search matches
-//    (not recents), leading to /search?q=<term> for the app shell
+//    metadata once /api/game-details resolves)
+//  - recents(): recently looked-up games, shown in the same dropdown whenever the box is
+//    focused/clicked while empty. Picked exactly like a search match (same shape, same onSelect).
+//  - onSeeAllRecents(): the "see all" row under that list
+//  - onSeeAllResults(term): the analogous trailing row under actual search matches
 
 export const GAME_SEARCH_DEBOUNCE_MS = 300;
 export const GAME_SEARCH_MIN_CHARS = 2;
+
+// Throws on a failed request, so callers can tell it from no match.
+export async function searchGames(term: string): Promise<GameSearchResult[]> {
+  const url = `/api/search-games?q=${encodeURIComponent(term)}`;
+  const data = await fetchJson<{ results?: GameSearchResult[] }>(url, undefined, 'Search failed');
+  return data.results || [];
+}
 
 // Recognizes a bare appid ("1245620") or a Steam store URL containing "/app/<id>" — either
 // way, no name search is needed; the appid alone is enough to open the panel.
@@ -46,7 +47,7 @@ export function parseDirectAppid(raw: string): number | null {
 // this dropdown or already open in the panel. `peekMyOwnershipStatus` never blocks (a search
 // result list re-renders on every keystroke) — see its own comment for what `null` means here
 // (no `currentAccount` loaded, or the fetch simply hasn't landed yet).
-function ownershipMarkersHtml(status: OwnershipStatus | null): string {
+export function ownershipMarkersHtml(status: OwnershipStatus | null): string {
   if (!status) return '';
   const marks: string[] = [];
   if (status.inLibrary) marks.push('<span class="game-search-badge owned" title="Owned">✓</span>');
@@ -120,9 +121,9 @@ export function initGameSearch({
   // (recentGames.ts) is injected rather than imported so this file stays the combobox/debounce UI
   // it was carved down to, and so the caller owns what "see all" means (a route to navigate to,
   // which this module knows nothing about).
-  recents?: () => GameSearchResult[];
-  onSeeAllRecents?: () => void;
-  onSeeAllResults?: (term: string) => void;
+  recents: () => GameSearchResult[];
+  onSeeAllRecents: () => void;
+  onSeeAllResults: (term: string) => void;
 }) {
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let lastResults: GameSearchResult[] = [];
@@ -144,7 +145,7 @@ export function initGameSearch({
   // gets called with a non-empty recents list), only alongside actual matches otherwise. It's
   // the roving selection's last virtual index (lastResults.length), one past the real options.
   function moreRowShown(): boolean {
-    return showingRecents || Boolean(onSeeAllResults && lastResults.length);
+    return showingRecents || lastResults.length > 0;
   }
 
   function renderResults() {
@@ -221,13 +222,11 @@ export function initGameSearch({
   async function runSearch(term: string) {
     const fetchId = ++activeFetch;
     try {
-      const res = await fetch(`/api/search-games?q=${encodeURIComponent(term)}`);
-      const data = await res.json();
+      const results = await searchGames(term);
       if (fetchId !== activeFetch) return; // a newer keystroke's request already landed
       lastTerm = term;
-      const results = res.ok ? data.results || [] : [];
       if (results.length) showResults(results);
-      else showEmpty(term, !res.ok);
+      else showEmpty(term, false);
     } catch {
       if (fetchId === activeFetch) showEmpty(term, true);
     }
@@ -249,15 +248,15 @@ export function initGameSearch({
     const term = lastTerm;
     const wasRecents = showingRecents;
     hideResults();
-    if (wasRecents) onSeeAllRecents?.();
-    else onSeeAllResults?.(term);
+    if (wasRecents) onSeeAllRecents();
+    else onSeeAllResults(term);
   }
 
   // Recently looked-up games in the same dropdown, on an empty box — the convention every store
   // and browser search bar already uses, so it costs no nav-bar space of its own and needs no
   // second widget. Returns whether there was anything to show.
   function showRecents(): boolean {
-    const list = recents?.() ?? [];
+    const list = recents();
     if (!list.length) return false;
     showResults(list, { recent: true });
     return true;

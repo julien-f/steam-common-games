@@ -14,8 +14,8 @@
 import { onMount, onCleanup, createEffect, createSignal, on, For, Show, type JSX } from 'solid-js';
 import { A, useNavigate, useLocation, type RouteSectionProps } from '@solidjs/router';
 import { prefsPopoverPanelHtml, initPrefsPopover } from './prefsPopover.ts';
-import { initLightbox, isLightboxOpen, repointLightboxGame } from './lightbox.tsx';
-import { initPanel, isPanelOpen, getPanelGame, panelClose, panelStepHero } from './panel.tsx';
+import { initLightbox, repointLightboxGame } from './lightbox.tsx';
+import { initPanel, isPanelOpen, getPanelGame } from './panel.tsx';
 import { bindPanelKeyboardShortcuts } from './panelKeyboard.ts';
 import { initGameSearch } from './gameSearch.ts';
 import { addRecentGame, loadRecentGames } from './recentGames.ts';
@@ -94,9 +94,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
   let prefsDetailsEl!: HTMLDetailsElement;
   let prefsWrapEl!: HTMLDivElement;
   // The `?` shortcuts dialog — see ShortcutsModal.tsx. State lives here because
-  // bindPanelKeyboardShortcuts' own `shortcuts` option needs it (that option has been supported
-  // all along; nothing has passed it since the pages that owned the old static dialog markup
-  // were deleted, so `?` silently did nothing).
+  // bindPanelKeyboardShortcuts' `shortcuts` option needs it.
   const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
   // Whether the page is scrolled far enough down to be worth offering the ↑ button — the nav bar
   // scrolls away with everything else, so this is the only way back up short of a long drag.
@@ -222,10 +220,6 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
     });
 
     bindPanelKeyboardShortcuts({
-      isLightboxOpen,
-      isPanelOpen,
-      panelClose,
-      panelStepHero,
       pickRandom: () => routeHandlers.pickRandom?.(),
       stepGame: (dir) => routeHandlers.stepGame?.(dir) ?? false,
       focusSearchInput: () => searchInputEl.focus(),
