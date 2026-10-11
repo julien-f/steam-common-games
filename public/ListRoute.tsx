@@ -1079,11 +1079,9 @@ export default function ListRoute() {
       },
     };
   }
-  // True once load() has built the single-table path below (owned/wishlist/bundle/recent/user),
-  // false while loading and permanently false for a group-by-membership list, which renders N
-  // per-group tables instead of one — see this file's own header comment on why view persistence
-  // (and so "🔗 Share view"/"Default view" below) doesn't apply there. Gates that toolbar's own
-  // <Show> rather than leaving it visible-but-broken against a `table` that doesn't exist yet/at all.
+  // True once load() has built the table, false while loading. Gates the "🔗 Share view"/"Default
+  // view" toolbar's own <Show> rather than leaving it visible-but-broken against a `table` that
+  // doesn't exist yet.
   const [tableReady, setTableReady] = createSignal(false);
   // How many membership groups a group-by-membership list has (0 for every other kind/op).
   const [groupCount, setGroupCount] = createSignal(0);
@@ -1197,12 +1195,9 @@ export default function ListRoute() {
     return rowsStore.filter((r) => !r.loading);
   }
 
-  function activeTable(): TableState<Game> | null {
-    return table;
-  }
   // Reads tableReady so a caller tracking this list (the panel's nav bar) follows a table rebuild.
   function getGameList(): Game[] {
-    const t = activeTable();
+    const t = table;
     return tableReady() && t ? t.processedData() : [];
   }
 
@@ -1285,7 +1280,7 @@ export default function ListRoute() {
   }
 
   function renderPanelNav(game: Game): void {
-    renderPanelNavShared({ hasList: !!activeTable(), game, getGameList, onStep: stepGame, onReroll: pickRandomGame });
+    renderPanelNavShared({ hasList: !!table, game, getGameList, onStep: stepGame, onReroll: pickRandomGame });
   }
 
   function openGame(game: Game, { isRandom = false }: { isRandom?: boolean } = {}): void {
@@ -1299,8 +1294,8 @@ export default function ListRoute() {
     // Reveals the newly-open game in the table (expands its group, jumps to its page, scrolls it
     // into view) without stealing real DOM focus from the panel — `@vates/data-table-solid`'s
     // external focus API (>= 0.14), built for exactly this "external nav just changed the current
-    // row" case. No-ops harmlessly for a standalone lookup not in `activeTable()`'s own data.
-    activeTable()?.focus.moveTo(resolved);
+    // row" case. No-ops harmlessly for a standalone lookup not in `table`'s own data.
+    table?.focus.moveTo(resolved);
     // 'recent' is the one kind whose address IS the focused game (see this file's own header
     // comment) — a row click/prev-next/random pick here updates the path, not a `?game=` query
     // param, so the address bar always matches whatever the panel is actually showing. This
@@ -1327,7 +1322,7 @@ export default function ListRoute() {
   // Returns whether it actually picked, the same way `stepGame` does — the lightbox re-points
   // itself at the new game only if there was one (see AppShell's `onGameRandom`).
   function pickRandomGame(): boolean {
-    if (!activeTable() || getPanelGame()?.standalone) return false;
+    if (!table || getPanelGame()?.standalone) return false;
     const pick = pickRandomFrom(getGameList(), randomQueueKey(), getPanelGame()?.appid ?? 0);
     if (!pick) return false;
     openGame(pick as Game, { isRandom: true });
@@ -1339,14 +1334,14 @@ export default function ListRoute() {
   // page through here" cases `stepGameList` returns null for.
   function gamePosition(): { index: number; total: number } | null {
     const game = getPanelGame();
-    if (!activeTable() || !game || game.standalone) return null;
+    if (!table || !game || game.standalone) return null;
     const list = getGameList();
     const index = list.findIndex((g) => g.appid === game.appid);
     return index === -1 ? null : { index, total: list.length };
   }
 
   function stepGame(dir: 1 | -1): boolean {
-    if (!activeTable()) return false;
+    if (!table) return false;
     const next = stepGameList(getGameList(), getPanelGame(), dir);
     if (!next) return false;
     openGame(next);
@@ -1358,12 +1353,12 @@ export default function ListRoute() {
   // `setValues` rather than `cycleValue` so a pill click only ever adds/removes from the include
   // set and never reaches the table filter dropdown's separate exclude state.
   function onTagClick(dim: string, value: string): void {
-    const t = activeTable();
+    const t = table;
     if (!t) return;
     t.filter.setValues(dim, [value], !t.filter.include()[dim]?.has(value));
   }
   function isTagActive(dim: string, value: string): boolean {
-    return activeTable()?.filter.include()[dim]?.has(value) ?? false;
+    return table?.filter.include()[dim]?.has(value) ?? false;
   }
 
   // Opens `appid` as a standalone panel docked to *this* route, without adding it to the route's
@@ -2823,10 +2818,6 @@ export default function ListRoute() {
     return undefined;
   }
 
-  function accountChipLabel(account: AccountSlot): string {
-    return account.label || account.rawInputs.join(' + ');
-  }
-
   // Built once per mount, not per render: `kind` never changes under a mounted route, and every
   // button/link inside reads its own signals, so nothing here needs rebuilding when they change.
   // `undefined` (rather than an empty fragment) for the kinds with no actions at all, so
@@ -3145,7 +3136,7 @@ export default function ListRoute() {
                       when={account().members.length === 1}
                       fallback={
                         <span>
-                          {accountChipLabel(account())}{' '}
+                          {accountDisplayLabel(account())}{' '}
                           <span class="account-count">({account().members.length} accounts merged)</span>
                         </span>
                       }
@@ -3157,7 +3148,7 @@ export default function ListRoute() {
                         rel="noopener noreferrer"
                         title={`Steam ID ${account().members[0]}`}
                       >
-                        {accountChipLabel(account())} <span class="account-profile-arrow">↗</span>
+                        {accountDisplayLabel(account())} <span class="account-profile-arrow">↗</span>
                       </a>
                     </Show>
                   </span>
