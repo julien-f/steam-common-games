@@ -25,6 +25,12 @@ test('parseItems: effort from a C-item, M for a U-item, the files each one names
   assert.deepEqual(items.get('U4').files, []);
 });
 
+test('parseItems: a U-item with several scenarios or none', () => {
+  const items = parseItems('- **U1 · minor · I1, R1** — `public/a.ts`.\n- **U2 · polish** — `public/b.ts`.\n');
+  assert.deepEqual([...items.keys()], ['U1', 'U2']);
+  assert.equal(items.get('U2').effort, 'M');
+});
+
 test('parseItems: a bare file name counts when it names exactly one tracked file', () => {
   const text = '- **C5 · minor · S** — in `panel.tsx:12` and `index.ts`, see `CopyButton.tsx`. Fix.';
   const items = parseItems(text, ['public/panel.tsx', 'public/index.ts', 'lib/index.ts']);

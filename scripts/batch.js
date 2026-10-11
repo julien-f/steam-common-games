@@ -21,7 +21,7 @@ const UNITS = { S: 1, M: 2, L: 4 };
 const DEFAULT_MIN_PER_UNIT = 2.3;
 const DEFAULT_AFTER_LANES_MIN = 45;
 
-const ITEM_LINE = /^- \*\*([CU]\d+) · (\w+) · ([\w\d]+)\*\* — (.*)$/;
+const ITEM_LINE = /^- \*\*([CU]\d+) · (\w+)(?: · ([^*]+?))?\*\* — (.*)$/;
 // A file reference with its optional lines (`:12`, `:7-9`, `:5,30`): a path, a bare `name.ext` in
 // backticks (audits often drop the directory, resolved against the tracked files), or a lone `:200`
 // continuing the previous file.
