@@ -12,7 +12,7 @@ const assert = require('node:assert/strict');
 const supertest = require('supertest');
 const { app } = require('../server');
 const { _reset } = require('../lib/cache');
-const { trackedFetch, _reset: _resetMetrics } = require('../lib/metrics');
+const { createTrackedFetch, _reset: _resetMetrics } = require('../lib/metrics');
 
 const api = supertest(app);
 
@@ -21,7 +21,7 @@ async function exhaust(t, groups) {
   _reset();
   _resetMetrics();
   t.mock.method(globalThis, 'fetch', async () => ({ ok: true, status: 200, json: async () => ({}) }));
-  for (const group of groups) await trackedFetch(group, 'spend', 'https://example.com/');
+  for (const group of groups) await createTrackedFetch(group)('spend', 'https://example.com/');
   const warn = t.mock.method(console, 'warn', () => {});
   const error = t.mock.method(console, 'error', () => {});
   return { warn, error };
