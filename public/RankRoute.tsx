@@ -2,7 +2,7 @@
 // Ranked lists section): asks one "which do you prefer?" pair at a time and feeds each answer to
 // ranking.ts's binary insertion. Every answer is stored right away (listsStore.ts's setRanking),
 // so leaving at any point loses nothing; undo is an in-memory stack of previous states.
-import { createSignal, createEffect, onCleanup, Show, For, type JSX } from 'solid-js';
+import { createSignal, createEffect, onCleanup, onMount, Show, For, type JSX } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { A, useParams, useNavigate, useLocation } from '@solidjs/router';
 import { getList, getRanking, setRanking } from './listsStore.ts';
@@ -158,7 +158,7 @@ export default function RankRoute() {
       setStatus(`Refresh failed: ${(err as Error).message}`);
     }
   }
-  onCleanup(registerRouteHandlers({ refreshGame }));
+  onMount(() => onCleanup(registerRouteHandlers({ refreshGame })));
   // The panel stays open only while its game is still one of the pair.
   function syncPanel(): void {
     const open = getPanelGame();

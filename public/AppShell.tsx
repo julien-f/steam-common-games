@@ -72,6 +72,8 @@ export function registerRouteHandlers(handlers: RouteHandlers): () => void {
   routeHandlers = handlers;
   setTagsFilterable(handlers.onTagClick != null);
   return () => {
+    // A route mounting before the previous one's cleanup has already registered its own.
+    if (routeHandlers !== handlers) return;
     routeHandlers = {};
     setTagsFilterable(false);
   };
