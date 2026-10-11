@@ -623,12 +623,11 @@ export default function ListRoute() {
   // is the one place it's changed (a second control would be a second thing to keep in sync);
   // this just says which one is in effect, since the currency alone doesn't identify it.
   const [regionCode, setRegionCode] = createSignal(resolveRegion(getStoredRegion()));
-  // Oldest price write time seen across this load's price calls (a wishlist chunks into several),
-  // null once anything in the batch was fetched fresh. `undefined` = nothing loaded yet, which
-  // renders no readout at all rather than a premature "just now".
-  const [priceFetchedAt, setPriceFetchedAt] = createSignal<number | null | undefined>(undefined);
+  // Oldest price write time seen across this load's price calls (a wishlist chunks into several).
+  // `undefined` = nothing loaded yet, which renders no readout at all rather than a premature "just now".
+  const [priceFetchedAt, setPriceFetchedAt] = createSignal<number | undefined>(undefined);
   function notePriceFetchedAt(at: number | null): void {
-    setPriceFetchedAt((prev) => (prev === undefined || at === null || prev === null ? at : Math.min(prev, at)));
+    setPriceFetchedAt((prev) => oldestFetchedAt(prev, at));
   }
   async function handleRefreshPrices(): Promise<void> {
     setRefreshingPrices(true);

@@ -681,6 +681,27 @@ test("B2 edge: another region's prices state their own age, not the previous reg
   await expect(prices).toContainText('just now');
 });
 
+test("B2 edge: a long wishlist's Prices age is its stalest chunk's, whatever the order", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  // 501 games: two price calls of up to 500, the first served from a 3-day-old cache, the second fresh.
+  const items = Array.from({ length: 501 }, (_, i) => ({ appid: 900000 + i, priority: 0, dateAdded: '2026-01-01' }));
+  await page.route(/\/api\/wishlist/, (route) => route.fulfill({ json: { items, players: [], fetchedAt: null } }));
+  await page.route(/\/api\/game-details\/stream/, (route) =>
+    route.fulfill({ contentType: 'text/event-stream', body: 'data: {"done":true}\n\n' }),
+  );
+  const ages = [Date.now() - 3 * 86400_000, null];
+  await page.route(/\/api\/prices/, (route) =>
+    route.fulfill({ json: { prices: {}, fetchedAt: ages.shift() ?? null } }),
+  );
+  let priceCalls = 0;
+  const secondChunk = page.waitForResponse((res) => /\/api\/prices/.test(res.url()) && ++priceCalls === 2);
+  await page.goto('/lists/wishlist');
+  // Only the second chunk can get it wrong, so read the readout once it has landed, not before.
+  await secondChunk;
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  expect(await page.locator('.list-stat', { hasText: 'Prices' }).textContent()).toContain('3 days ago');
+});
+
 test("B4 edge: a friend's empty wishlist says it may be private, where the table would be", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/wishlist?u=carol'); // Carol has no wishlist in the fixtures
