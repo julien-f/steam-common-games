@@ -564,9 +564,7 @@ export default function ListRoute() {
   const kind = kindFromPath(routerLocation.pathname, params);
 
   let tableContainer!: HTMLDivElement;
-  // A comparison's players who own each game, for the panel's Owned by (getOwners below).
-  let compareOwners: Map<number, GameOwner[]> | null = null;
-  // Each compared player's label and the games their account owns, in `compareAccounts` order.
+  // Each compared player's label and owned games, in `compareAccounts` order (also the panel's Owned by, see getOwners).
   let comparePlayers: { label: string; owners: Map<number, GameOwner[]> }[] = [];
   const [statusText, setStatusText] = createSignal('');
   const [priceStatusText, setPriceStatusText] = createSignal('');
@@ -1963,18 +1961,13 @@ export default function ListRoute() {
       );
       setCompareList(list);
       setStatusText('Comparing libraries…');
-      const owners = new Map<number, GameOwner[]>();
       const ownersByAccount = new Map<string, Map<number, GameOwner[]>>();
       const fetchers = createDefaultFetchers({
         refresh,
         onFetchedAt,
-        onOwners: (byAppid, accountId) => {
-          ownersByAccount.set(accountId, byAppid);
-          for (const [appid, members] of byAppid) owners.set(appid, [...(owners.get(appid) ?? []), ...members]);
-        },
+        onOwners: (byAppid, accountId) => ownersByAccount.set(accountId, byAppid),
       });
       const resolved = await resolveRows(list, fetchers, (sources) => {
-        compareOwners = owners;
         comparePlayers = shown.map((account) => ({
           label: accountDisplayLabel(account),
           owners: ownersByAccount.get(account.id) ?? new Map(),
@@ -2972,11 +2965,12 @@ export default function ListRoute() {
       refreshGame,
       onTagClick,
       isTagActive,
-      getOwners: (appid) => (compareOwners ? (compareOwners.get(appid) ?? []) : null),
+      getOwners: (appid) =>
+        comparePlayers.length ? comparePlayers.flatMap((player) => player.owners.get(appid) ?? []) : null,
     });
     onCleanup(() => {
       unregister();
-      if (compareOwners) notifyOwnersChanged();
+      if (comparePlayers.length) notifyOwnersChanged();
     });
 
     // The region preference lives in the nav bar's ⚙ popover, which knows nothing about who's
