@@ -9,6 +9,7 @@
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const { missingEntry } = require('./changelog-check');
 
 const ROOT = path.join(__dirname, '..');
 const BACKLOGS = { C: 'docs/dev/code-backlog.md', U: 'docs/dev/improvements.md' };
@@ -233,6 +234,10 @@ function closeItems(text, ids) {
     .replace(/\n\n$/, '\n');
 }
 
+// `files`: the merge's staged paths. A lane whose commits needed no entry makes a merge the hook rejects.
+const mergeHint = (files) =>
+  missingEntry(files) ? 'its commits added no CHANGELOG entry: commit with SKIP_CHANGELOG=1' : '';
+
 function merge(branch, ids) {
   try {
     git('merge', '--no-ff', '--no-commit', branch);
@@ -252,6 +257,8 @@ function merge(branch, ids) {
   const resolved = ['CHANGELOG.md', ...Object.values(BACKLOGS)];
   const left = conflicted.filter((f) => !resolved.includes(f));
   console.log(left.length ? `resolve by hand: ${left.join(' ')}` : 'merged, not committed: review, then commit');
+  const hint = mergeHint(git('diff', '--cached', '--name-only').split('\n').filter(Boolean));
+  if (hint) console.log(hint);
   if (left.length) process.exitCode = 1;
 }
 
@@ -313,4 +320,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { parseItems, planLanes, doneTimes, laneStatus, unionConflicts, closeItems, historyRates };
+module.exports = { parseItems, planLanes, doneTimes, laneStatus, unionConflicts, closeItems, historyRates, mergeHint };

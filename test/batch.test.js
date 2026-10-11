@@ -3,7 +3,15 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { parseItems, planLanes, doneTimes, laneStatus, unionConflicts, closeItems } = require('../scripts/batch');
+const {
+  parseItems,
+  planLanes,
+  doneTimes,
+  laneStatus,
+  unionConflicts,
+  closeItems,
+  mergeHint,
+} = require('../scripts/batch');
 
 const BACKLOG = [
   '- **C1 · major · S** — bug at `public/a.ts:3` and `server.js:9`. Fix.',
@@ -145,4 +153,10 @@ test('closeItems: a section left empty reads None open.', () => {
 test("closeItems: emptying one of a section's blank-separated blocks leaves a single blank line", () => {
   const text = '## A\n\n- **U1 · polish · F1** — x.\n\n- **U2 · polish** — y.\n';
   assert.equal(closeItems(text, ['U1']), '## A\n\n- **U2 · polish** — y.\n');
+});
+
+test('mergeHint: a merge changing app code without a CHANGELOG entry says to skip the check', () => {
+  assert.match(mergeHint(['lib/metrics.js', 'test/metrics.test.js']), /SKIP_CHANGELOG=1/);
+  assert.equal(mergeHint(['lib/metrics.js', 'CHANGELOG.md']), '');
+  assert.equal(mergeHint(['docs/dev/data.md']), '');
 });
