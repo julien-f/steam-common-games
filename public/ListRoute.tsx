@@ -1240,9 +1240,10 @@ export default function ListRoute() {
   function activeTable(): TableState<Game> | null {
     return table;
   }
+  // Reads tableReady so a caller tracking this list (the panel's nav bar) follows a table rebuild.
   function getGameList(): Game[] {
     const t = activeTable();
-    return t ? t.processedData() : [];
+    return tableReady() && t ? t.processedData() : [];
   }
 
   // Scoped by specific id — kind/listId alone would collide between two different bundles/user
@@ -1324,7 +1325,7 @@ export default function ListRoute() {
   }
 
   function renderPanelNav(game: Game): void {
-    renderPanelNavShared({ hasList: !!activeTable(), game, getGameList, onOpen: openGame, onReroll: pickRandomGame });
+    renderPanelNavShared({ hasList: !!activeTable(), game, getGameList, onStep: stepGame, onReroll: pickRandomGame });
   }
 
   function openGame(game: Game, { isRandom = false }: { isRandom?: boolean } = {}): void {

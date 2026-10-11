@@ -1180,6 +1180,25 @@ test('F1 edge: on desktop, a trailer sits between the toolbar and its controls, 
   expect(video.y + video.height).toBeLessThanOrEqual(controls.y);
 });
 
+test("F3 edge: the panel's ↑/↓ follow the table's current search, and hide once the game is out of it", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const pos = page.locator('.panel-nav-pos');
+  await expect(pos).toHaveText(/ \/ 6$/);
+  const search = page.locator('.dt-search-input');
+
+  await search.fill('Hollow');
+  await expect(pos).toHaveText(''); // Hades isn't in the search any more
+  await expect(page.getByRole('button', { name: 'Next game' })).toBeHidden();
+
+  await search.fill('Ha');
+  await expect(pos).toHaveText('1 / 1');
+  await page.getByRole('button', { name: 'Next game' }).click(); // the search's only game: itself
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+});
+
 test("F1 edge: the viewer's game stepper shows on hover or focus with a mouse, always on touch", async ({
   page,
 }, testInfo) => {

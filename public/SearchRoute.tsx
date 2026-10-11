@@ -203,7 +203,7 @@ export default function SearchRoute() {
       hasList: true,
       game: placeholder,
       getGameList,
-      onOpen: (g) => openResult(g.appid, g.name, null),
+      onStep: stepGame,
       onReroll: pickRandomGame,
     });
     focusRow(appid);
