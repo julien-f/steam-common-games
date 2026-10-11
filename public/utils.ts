@@ -376,3 +376,13 @@ export function postJson<T>(url: string, body: unknown, fallback: string): Promi
     fallback,
   );
 }
+
+// Focuses a game's table row without letting focus scroll it, then brings it just into view.
+// `dt-tr`/`data-row-key` are @vates/data-table-solid's undocumented internals (vatesfr/data-table#24).
+export function focusGameRow(root: ParentNode | null | undefined, appid: number): boolean {
+  const row = root?.querySelector<HTMLElement>(`tr.dt-tr[data-row-key="${appid}"]`);
+  if (!row) return false;
+  row.focus({ preventScroll: true });
+  row.scrollIntoView({ block: 'nearest' });
+  return true;
+}
