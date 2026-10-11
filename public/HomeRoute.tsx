@@ -439,8 +439,8 @@ export default function HomeRoute() {
           when={currentAccount()}
           fallback={
             <p class="home-intro">
-              Browse a Steam library with ratings, completion times and prices, and compare it with friends'. Start by
-              looking up your account.
+              Browse a Steam library with ratings, completion times and prices, and compare it with your friends'
+              libraries. Start by looking up your account.
             </p>
           }
         >
