@@ -1,6 +1,6 @@
 ---
 name: setup-review
-description: Review the Claude Code setup — skills, scripts, hooks, settings, CLAUDE.md and Claude memory — for drift, contradictions, duplication, prose steps better scripted, wasted time or tokens and skills better merged, split or renamed, and ways to extend what exists, mining the session transcripts since its last run for repeated friction, and report ranked proposals. Use when asked to review, audit or improve the skills, scripts, hooks or agent setup, or how they could be more useful.
+description: Review the Claude Code setup — skills, scripts, hooks, settings, CLAUDE.md and Claude memory — for drift, contradictions, duplication, prose steps better scripted, wasted time or tokens and skills better merged, split or renamed, and ways to extend what exists, mining the session transcripts since its last run for repeated friction, and report ranked proposals. Use when asked — as a request or a question ("shall we review the skills?") — to review, audit or improve the skills, scripts, hooks, settings, CLAUDE.md (this repo's or ~/.claude's) or agent setup, or how they could be more useful.
 ---
 
 # Setup review
