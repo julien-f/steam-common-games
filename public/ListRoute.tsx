@@ -1096,15 +1096,10 @@ export default function ListRoute() {
   // Names this comparison's own accounts in the formula/group headings. They're resolved from the
   // URL, so they're typically in no store at all — createDefaultNaming would fall back to naming
   // them by raw steam64 id.
-  // Turns the comparison on screen into a real stored list, keeping the same formula — the one
-  // step between "I shared a link with a friend" and "this is a list I keep". Deliberately
-  // unnamed: an unnamed dynamic list is labeled by its own formula everywhere (listLabels.ts),
-  // which is already exactly what a comparison is called, and that label keeps following the
-  // accounts if one of them is renamed later.
+  // Named as its page was ("Alice vs. Bob"): the formula's own label reads differently.
   function handleSaveComparison(): void {
     const list = compareList();
     if (!list) return;
-    // Named as its page was ("Alice vs. Bob"), not by its formula, which reads differently.
     const saved = createList({ kind: 'dynamic', name: heroTitle() || undefined, op: list.op, sources: list.sources });
     navigate(`/lists/${saved.id}`);
   }
