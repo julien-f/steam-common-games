@@ -465,6 +465,15 @@ test("R1 edge: a ranking card's HLTB time is the table's, rounded and labelled",
   await expect(page.locator('.rank-route')).toContainText('44.5 h to beat');
 });
 
+test("R1 edge: the ranking's keyboard hints show only with a mouse", async ({ page }, testInfo) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
+  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
+  await expect(page.locator('.rank-question')).toBeVisible();
+  await expect(page.locator('.rank-hint')).toBeVisible({ visible: testInfo.project.name !== 'phone' });
+});
+
 test("R1 edge: the ranking's side panel shows tags as plain pills and its Refresh re-fetches", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
@@ -476,12 +485,33 @@ test("R1 edge: the ranking's side panel shows tags as plain pills and its Refres
   await expect(panel.locator('.panel-tag').first()).toBeVisible();
   await expect(panel.getByRole('button')).toHaveCount(0);
 
-  const refetch = page.waitForRequest((req) => /\/api\/game-details\/\d+\?refresh=1$/.test(req.url()));
+  // The refreshed game updates in place: no reopen, so no jump to the top or focus move to the hero.
+  const body = page.locator('#panel-body');
+  await body.evaluate((el) => (el.scrollTop = 120));
+  const scrollTop = await body.evaluate((el) => el.scrollTop);
+  expect(scrollTop).toBeGreaterThan(0);
+  const refetch = page.waitForResponse((res) => /\/api\/game-details\/\d+\?refresh=1$/.test(res.url()));
   await page.getByRole('button', { name: 'Refresh details' }).click();
   await refetch;
+  await expect(page.getByRole('button', { name: 'Refresh details' })).toBeEnabled();
+  expect(await body.evaluate((el) => el.scrollTop)).toBe(scrollTop);
+  expect(await page.evaluate(() => document.activeElement?.closest('#panel-hero') == null)).toBe(true);
 });
 
-test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo without scrolling, inside a gutter', async ({
+test("R1 edge: a failed Refresh on the ranking's side panel says so", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
+  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
+  await page.getByRole('button', { name: 'ℹ Details' }).first().click();
+  await page.route(/\/api\/game-details\/\d+\?refresh=1$/, (route) =>
+    route.fulfill({ status: 502, json: { error: 'Steam did not answer' } }),
+  );
+  await page.getByRole('button', { name: 'Refresh details' }).click();
+  await expect(page.locator('.rank-route .list-status')).toHaveText('Refresh failed: Steam did not answer');
+});
+
+test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo without scrolling, inside a gutter, down to 320px wide', async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout');
@@ -492,8 +522,8 @@ test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo wi
   await expect(page.locator('.rank-card-name').nth(1)).not.toHaveText(/^App /);
 
   const viewport = page.viewportSize()!;
-  const undo = (await page.locator('.rank-actions').boundingBox())!;
-  expect(undo.y + undo.height).toBeLessThanOrEqual(viewport.height);
+  const actions = (await page.locator('.rank-actions').boundingBox())!;
+  expect(actions.y + actions.height).toBeLessThanOrEqual(viewport.height);
   for (const box of [
     await page.locator('.rank-pair').boundingBox(),
     await page.locator('.rank-header').boundingBox(),
@@ -501,6 +531,10 @@ test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo wi
     expect(box!.x).toBeGreaterThanOrEqual(12);
     expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width - 12);
   }
+
+  // The narrowest phones: the cards' action buttons wrap rather than push the page sideways.
+  await page.setViewportSize({ width: 320, height: viewport.height });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
 
 test('R1.1,3-6: rank chosen games, stop, resume on the same ones', async ({ page }) => {

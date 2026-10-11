@@ -4463,6 +4463,12 @@ kbd {
   font-size: 12px;
   color: var(--text1);
 }
+/* Touch only: no keyboard to press them with. */
+@media not (any-pointer: fine) {
+  .rank-hint {
+    display: none;
+  }
+}
 .rank-done {
   display: flex;
   flex-direction: column;
@@ -4478,6 +4484,7 @@ kbd {
     gap: 12px;
   }
   .rank-pair {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 8px;
   }
   .rank-card-name {
@@ -4485,6 +4492,9 @@ kbd {
   }
   .rank-card-actions {
     flex-direction: column;
+  }
+  .rank-card-actions .btn {
+    white-space: normal;
   }
 }
 

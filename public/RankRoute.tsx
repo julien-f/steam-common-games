@@ -2,7 +2,7 @@
 // Ranked lists section): asks one "which do you prefer?" pair at a time and feeds each answer to
 // ranking.ts's binary insertion. Every answer is stored right away (listsStore.ts's setRanking),
 // so leaving at any point loses nothing; undo is an in-memory stack of previous states.
-import { createSignal, createEffect, onCleanup, Show, For, type JSX } from 'solid-js';
+import { createSignal, createEffect, onCleanup, onMount, Show, For, type JSX } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { A, useParams, useNavigate, useLocation } from '@solidjs/router';
 import { getList, getRanking, setRanking } from './listsStore.ts';
@@ -69,7 +69,8 @@ export default function RankRoute() {
   // X (exclude) or I (details panel) arms an action; the next ←/→ says which side.
   const [armed, setArmed] = createSignal<'exclude' | 'info' | null>(null);
   const excludeArmed = () => armed() === 'exclude';
-  const [details, setDetails] = createStore<Record<number, GameDetails | null>>({});
+  // Store-backed, so the panel showing one of them updates in place when its details land or refresh.
+  const [games, setGames] = createStore<Record<number, Game>>({});
   let loadToken = 0;
 
   // Shows the next pair; `save` also stores the ranking it came with.
@@ -115,15 +116,23 @@ export default function RankRoute() {
     }
   }
 
+  function getDetails(appid: number, refresh = false): Promise<GameDetails> {
+    return fetchJson<GameDetails>(
+      `/api/game-details/${appid}${refresh ? '?refresh=1' : ''}`,
+      undefined,
+      refresh ? 'Refresh failed' : 'Details failed',
+    );
+  }
+  function setDetails(appid: number, details: GameDetails): void {
+    setGames(appid, { name: details.meta?.name || `App ${appid}`, loading: false, details });
+  }
+
   // Cached per appid for this mount; the server's own cache makes a repeat cheap anyway.
   function fetchDetails(appid: number): void {
-    if (appid in details) return;
-    setDetails(appid, null);
-    fetch(`/api/game-details/${appid}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: GameDetails | null) => {
-        if (data) setDetails(appid, data);
-      })
+    if (appid in games) return;
+    setGames(appid, { appid, name: `App ${appid}`, loading: true, details: null });
+    getDetails(appid)
+      .then((data) => setDetails(appid, data))
       .catch(() => {
         /* card falls back to the header image and appid */
       });
@@ -138,27 +147,18 @@ export default function RankRoute() {
   });
 
   function openPanel(appid: number): void {
-    const d = details[appid];
-    panelOpen({ appid, name: d?.meta?.name || `App ${appid}`, loading: !d, details: d ?? null } as Game);
+    fetchDetails(appid);
+    panelOpen(games[appid]);
   }
-  // Re-opens once details land for a panel opened before they had.
-  createEffect(() => {
-    const open = getPanelGame();
-    if (open?.loading && details[open.appid]) openPanel(open.appid);
-  });
   // The panel's ↻ Refresh; tags stay plain pills, since nothing here filters by them.
   async function refreshGame(game: Game): Promise<void> {
     try {
-      setDetails(
-        game.appid,
-        await fetchJson<GameDetails>(`/api/game-details/${game.appid}?refresh=1`, undefined, 'Refresh failed'),
-      );
-      if (getPanelGame()?.appid === game.appid) openPanel(game.appid);
-    } catch {
-      /* the panel keeps the details it had */
+      setDetails(game.appid, await getDetails(game.appid, true));
+    } catch (err) {
+      setStatus(`Refresh failed: ${(err as Error).message}`);
     }
   }
-  onCleanup(registerRouteHandlers({ refreshGame }));
+  onMount(() => onCleanup(registerRouteHandlers({ refreshGame })));
   // The panel stays open only while its game is still one of the pair.
   function syncPanel(): void {
     const open = getPanelGame();
@@ -266,7 +266,7 @@ export default function RankRoute() {
   }
 
   function card(appid: number, side: 'candidate' | 'opponent', note: JSX.Element): JSX.Element {
-    const d = (): GameDetails | null | undefined => details[appid];
+    const d = (): GameDetails | null | undefined => games[appid]?.details;
     const meta = () => d()?.meta ?? null;
     const year = () => meta()?.releaseDate?.match(/\d{4}/)?.[0];
     // The table's default HLTB figure (all playstyles), so the card and the row agree.

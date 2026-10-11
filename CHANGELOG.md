@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Stepping past the lightbox's last item or last game slides the first one in from the other side, so the wrap back to the start shows
 - Stepping back to a game just left in the lightbox returns to the item you were on, not its first one
 - Dates read the same everywhere: a release, a bundle's end and its publication show as `YYYY-MM-DD` (with the time where it matters) in tables, cards and the panel
+- On a touch-only device, the ranking no longer shows its keyboard shortcuts
 
 ### Fixed
 
@@ -87,6 +88,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On a phone, the ranking screen keeps both games side by side with Tie, Skip and Undo in view, inside a side margin
 - The lightbox's ↑/↓ game buttons stay in place from one game to the next, so they can be clicked repeatedly
 - Closing a game's panel with Esc puts focus back on that game's row, so the arrow keys keep working
+- Refreshing a game from the ranking's side panel keeps your place in the panel, and says when the refresh fails
+- On the narrowest phones, the ranking's Details and exclude buttons wrap instead of pushing the page sideways
 
 ### Development
 
