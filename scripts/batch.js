@@ -1,7 +1,7 @@
 'use strict';
 
 // Parallel fix batches (.claude/skills/code-fix/BATCH.md): plan lanes, track progress, merge a lane.
-//   node scripts/batch.js plan [--lanes=4] <C66 U12 …>   file-disjoint lanes + estimate; writes the manifest
+//   node scripts/batch.js plan [--lanes=4] <C66 U12 …>   lanes sharing no cited code + estimate; writes the manifest
 //   node scripts/batch.js status [--watch]               done/total and time left, per lane
 //   node scripts/batch.js merge <branch> <C66 …>         merge --no-ff --no-commit, union CHANGELOG, close items
 //   node scripts/batch.js record                         appends the batch's per-item times to the history
@@ -22,9 +22,13 @@ const DEFAULT_MIN_PER_UNIT = 2.3;
 const DEFAULT_AFTER_LANES_MIN = 45;
 
 const ITEM_LINE = /^- \*\*([CU]\d+) · (\w+) · ([\w\d]+)\*\* — (.*)$/;
-const FILE_REF = /\b(?:server\.js|(?:public|lib|test|e2e|scripts)\/[\w./-]+\.\w+)/g;
-// A bare `name.ext` in backticks (audits often drop the directory), resolved against `knownFiles`.
-const BARE_REF = /`([\w-]+\.(?:js|mjs|ts|tsx))[`:]/g;
+// A file reference with its optional lines (`:12`, `:7-9`, `:5,30`): a path, a bare `name.ext` in
+// backticks (audits often drop the directory, resolved against the tracked files), or a lone `:200`
+// continuing the previous file.
+const REF =
+  /\b(server\.js|(?:public|lib|test|e2e|scripts)\/[\w./-]+\.\w+)(?::(\d+(?:[-,]\d+)*))?|`(?!server\.js)([\w-]+\.(?:js|mjs|ts|tsx))(?::(\d+(?:[-,]\d+)*))?`|`:(\d+(?:[-,]\d+)*)`/g;
+// Two items citing one file closer than this many lines share a lane: their edits likely overlap.
+const LINE_WINDOW = 80;
 
 // `knownFiles`: the repo's tracked paths; a bare name naming exactly one of them counts as that file.
 function parseItems(text, knownFiles = []) {
@@ -39,23 +43,35 @@ function parseItems(text, knownFiles = []) {
     if (!m) continue;
     const [, id, severity, third, body] = m;
     const effort = id.startsWith('C') && third in UNITS ? third : 'M';
-    const bare = [...body.matchAll(BARE_REF)].map(([, base]) => byBase.get(base)).filter(Boolean);
-    items.set(id, { id, severity, effort, files: [...new Set([...(body.match(FILE_REF) ?? []), ...bare])] });
+    // file → cited lines, or null when the item never cites a line in it (the whole file); a bare
+    // mention beside cited lines is context, not a claim on the whole file.
+    const lines = {};
+    let last;
+    for (const [, full, fullLines, bare, bareLines, more] of body.matchAll(REF)) {
+      const file = full ?? (bare ? byBase.get(bare) : last);
+      if (!file) continue;
+      const cited = (fullLines ?? bareLines ?? more)?.split(/[-,]/).map(Number) ?? [];
+      lines[file] = [...(lines[file] ?? []), ...cited];
+      last = file;
+    }
+    for (const file of Object.keys(lines)) if (!lines[file].length) lines[file] = null;
+    items.set(id, { id, severity, effort, files: Object.keys(lines), lines });
   }
   return items;
 }
 
-// Items sharing a file land in the same lane; components are then packed, largest first, into
-// the least-loaded of `maxLanes` lanes. Items naming no file are returned apart, to place by hand.
+// Whether two items' citations of one file may overlap: either cites it whole, or two lines are close.
+const overlaps = (a, b) => a === null || b === null || a.some((x) => b.some((y) => Math.abs(x - y) < LINE_WINDOW));
+
+// Items citing nearby code in a file land in the same lane (git merges the rest); components are then
+// packed, largest first, into the least-loaded of `maxLanes` lanes. Items naming no file are returned
+// apart, to place by hand.
 function planLanes(items, maxLanes) {
   const parent = new Map(items.map((it) => [it.id, it.id]));
   const find = (x) => (parent.get(x) === x ? x : find(parent.get(x)));
-  const owner = new Map();
-  for (const it of items)
-    for (const f of it.files) {
-      if (owner.has(f)) parent.set(find(it.id), find(owner.get(f)));
-      else owner.set(f, it.id);
-    }
+  for (const [i, a] of items.entries())
+    for (const b of items.slice(i + 1))
+      if (a.files.some((f) => f in b.lines && overlaps(a.lines[f], b.lines[f]))) parent.set(find(a.id), find(b.id));
   const groups = new Map();
   for (const it of items.filter((i) => i.files.length)) {
     const root = find(it.id);

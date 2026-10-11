@@ -5,7 +5,7 @@ Above about five items, code-fix and ux-fix run as parallel lanes: one backgroun
 ## 1. Plan (before any go-ahead)
 
 - Commit the backlog first: a worktree only sees committed items.
-- `node scripts/batch.js plan [--lanes=4] <items…>` groups the items into lanes that share no file, writes the manifest (`.claude/batch/`, gitignored) and prints an estimate from past batches. A bare `name.ts` counts when it names exactly one tracked file. Place by hand what it lists as naming no file.
+- `node scripts/batch.js plan [--lanes=4] <items…>` groups the items into lanes that cite no code within 80 lines of each other (a file mentioned without any line counts whole), writes the manifest (`.claude/batch/`, gitignored) and prints an estimate from past batches. A bare `name.ts` counts when it names exactly one tracked file. Place by hand what it lists as naming no file. Lanes can still meet in code an item doesn't cite (a renamed helper's callers): `merge` then lists the conflicted files to resolve by hand, keeping both lanes' intent.
 - Pull out of the lanes, to do yourself on `main` after the merges: an item whose fix changes what callers in other lanes read (a helper's return shape), and an item with an open fork.
 - Present the recommended items (and why not the others), the lanes, the serial items and the estimate in one `AskUserQuestion`.
 

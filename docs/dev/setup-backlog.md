@@ -22,6 +22,8 @@ Last reviewed: never · Transcripts read up to: never.
 
 - **P9 · batch.js · S** — `status` shows each finished lane's idle minutes and `record` stores `lanesMin`/`laneIdleMin`, to decide on faster batches (line-range lane planning, per-lane review) from numbers. On 2026-10-11 lane D held 12 of 19 items, all tied by `ListRoute.tsx`. Measure: this batch's recorded `laneIdleMin` and `afterLanesMin`, the baseline for whichever change follows.
 
+- **P10 · batch.js · M** — `plan` groups items by cited lines (80-line window; a file mentioned without a line counts whole) instead of whole files. Replayed on the 2026-10-11 simplify batch, the biggest lane drops from 12 items (15 units) to 8 (10). Measure: the next batch's recorded `laneIdleMin` — 41 → under 20, with no more than one hand-resolved merge conflict.
+
 ## Open
 
 None.

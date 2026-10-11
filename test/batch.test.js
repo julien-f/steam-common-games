@@ -14,7 +14,13 @@ const BACKLOG = [
 
 test('parseItems: effort from a C-item, M for a U-item, the files each one names', () => {
   const items = parseItems(BACKLOG);
-  assert.deepEqual(items.get('C1'), { id: 'C1', severity: 'major', effort: 'S', files: ['public/a.ts', 'server.js'] });
+  assert.deepEqual(items.get('C1'), {
+    id: 'C1',
+    severity: 'major',
+    effort: 'S',
+    files: ['public/a.ts', 'server.js'],
+    lines: { 'public/a.ts': [3], 'server.js': [9] },
+  });
   assert.equal(items.get('U4').effort, 'M');
   assert.deepEqual(items.get('U4').files, []);
 });
@@ -23,6 +29,29 @@ test('parseItems: a bare file name counts when it names exactly one tracked file
   const text = '- **C5 · minor · S** — in `panel.tsx:12` and `index.ts`, see `CopyButton.tsx`. Fix.';
   const items = parseItems(text, ['public/panel.tsx', 'public/index.ts', 'lib/index.ts']);
   assert.deepEqual(items.get('C5').files, ['public/panel.tsx']);
+});
+
+test('parseItems: the lines each file is cited at, null for a file only mentioned without one', () => {
+  const text = '- **C6 · minor · S** — `public/a.ts:10` (`:200`), `b.ts:5,30`, `lib/c.js:7-9` and `public/d.ts`. Fix.';
+  const items = parseItems(text, ['public/b.ts']);
+  assert.deepEqual(items.get('C6').lines, {
+    'public/a.ts': [10, 200],
+    'public/b.ts': [5, 30],
+    'lib/c.js': [7, 9],
+    'public/d.ts': null,
+  });
+});
+
+test('planLanes: items far apart in one file get separate lanes; a file cited without a line is shared whole', () => {
+  const text = [
+    '- **C1 · minor · S** — `public/big.ts:100`. Fix.',
+    '- **C2 · minor · S** — `public/big.ts:150`. Fix.',
+    '- **C3 · minor · S** — `public/big.ts:2000`. Fix.',
+  ].join('\n');
+  const ids = (plan) => plan.lanes.map((l) => l.items.map((it) => it.id).sort()).sort();
+  assert.deepEqual(ids(planLanes([...parseItems(text).values()], 4)), [['C1', 'C2'], ['C3']]);
+  const whole = text + '\n- **C4 · minor · S** — `public/big.ts`. Fix.';
+  assert.deepEqual(ids(planLanes([...parseItems(whole).values()], 4)), [['C1', 'C2', 'C3', 'C4']]);
 });
 
 test('planLanes: items sharing a file share a lane; an item naming none is left to place by hand', () => {
