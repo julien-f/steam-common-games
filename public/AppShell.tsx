@@ -197,8 +197,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       // The panel's own "↻ Refresh" button (force-refreshes this game's details, news, price and
       // DLC). Delegated to the mounted route rather than implemented here: the refreshed details
       // have to land on that route's own store-backed row, not just on the panel's plain copy.
-      // Only ListRoute registers it — which covers every case, since a game panel only ever opens
-      // there (`openGameGlobally` navigates to /game/:appid, which *is* ListRoute).
+      // Only ListRoute registers it; RankRoute also opens the panel but registers no handlers (C124).
       onRefresh: (game) => routeHandlers.refreshGame?.(game),
       onTagClick: (dim, value) => routeHandlers.onTagClick?.(dim, value),
       getOwners: (appid) => routeHandlers.getOwners?.(appid) ?? null,

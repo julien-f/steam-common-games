@@ -79,16 +79,14 @@ export interface PanelOptions {
 }
 
 // ── Shared game side panel ──────────────────────────────────────────────────
-// Mounted once by AppShell.tsx's single `initPanel(options)` call (see docs/list-centric-
-// docs/dev/frontend.md), not per-route — ListRoute.tsx (the only caller of `panelOpen` now) just
-// opens/closes it, it never configures it itself; `PanelOptions` are the shell's hooks, which
-// relay to the mounted route. `pricesHandledByHost` is gone: its one reader was the old `loadPrice`, and the price resource's
-// own source answers the same question off the row itself ("has anything already priced this?"). A real Solid component now (converted from the
-// original panel.ts's hand-rolled innerHTML rebuilds): `initPanel(options)` mounts it once into
-// the static `#panel-body` element every page's own markup already has; `panelOpen(game)`/
-// `panelClose()` show/hide it exactly as before. Anything page-specific — tag-click filtering,
-// the nav bar's list of games — is still left to the host page via options or by wrapping
-// panelOpen/panelClose with its own extra logic, unchanged.
+// Mounted once by AppShell.tsx's single `initPanel(options)` call (see docs/dev/frontend.md), not
+// per-route — ListRoute.tsx and RankRoute.tsx (the callers of `panelOpen`) just open/close it,
+// never configure it; `PanelOptions` are the shell's hooks, which relay to the mounted route. A
+// real Solid component (converted from the original panel.ts's hand-rolled innerHTML rebuilds):
+// `initPanel(options)` mounts it once into the static `#panel-body` element every page's own
+// markup already has; `panelOpen(game)`/`panelClose()` show/hide it. Anything page-specific —
+// tag-click filtering, the nav bar's list of games — is left to the host page via options or by
+// wrapping panelOpen/panelClose with its own extra logic.
 //
 // Every exported function below keeps its exact original name/signature (every host page's
 // import is untouched by this conversion) — the one
