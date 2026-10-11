@@ -1471,6 +1471,11 @@ test("F1 edge: the viewer's game stepper shows with its other controls, not only
   await page.mouse.move(720, 450);
   for (const sel of ['.lb-caption-pos', '.lb-game-prev', '.lb-game-next'])
     await expect(page.locator(`#screenshot-lightbox ${sel}`)).toHaveCSS('opacity', '1');
+  // Tab reaches the stepper too.
+  const prev = page.locator('#screenshot-lightbox .lb-game-prev');
+  for (let i = 0; i < 10 && !(await prev.evaluate((el) => el === document.activeElement)); i++)
+    await page.keyboard.press('Tab');
+  await expect(prev).toBeFocused();
 });
 
 test("F1 edge: the viewer's ↑/↓ game buttons stay put from game to game", async ({ page }) => {
