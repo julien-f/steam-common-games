@@ -78,7 +78,6 @@ export function AccountChip(): JSX.Element {
   function pick(acc: AccountSlot): void {
     adoptAccount(acc, navigate, location);
     detailsEl.open = false;
-    refresh();
   }
 
   const otherRecents = () => recents().filter((a) => a.id !== account()?.id);

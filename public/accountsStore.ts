@@ -10,7 +10,6 @@
 import { getPref, setPref } from './prefs.ts';
 import { isAccountReferenced } from './listsStore.ts';
 import type { AccountSlot } from './types.ts';
-import type { ResolvedAccountSummary } from './accountData.ts';
 
 const MY_ACCOUNT_KEY = 'myAccount';
 const CURRENT_ACCOUNT_KEY = 'currentAccount';
@@ -20,22 +19,6 @@ const RECENT_ACCOUNTS_KEY = 'recentAccounts';
 // Family always produces the same id regardless of the order its accounts were entered in.
 export function accountIdFor(members: string[]): string {
   return [...members].sort().join('+');
-}
-
-// The slot a resolve of `rawInputs` produces — everything but the user's own flags.
-export function accountSlotFromSummary(summary: ResolvedAccountSummary, rawInputs: string[]): AccountSlot {
-  return {
-    id: accountIdFor(summary.members),
-    members: summary.members,
-    rawInputs,
-    label: summary.label,
-    avatarUrl: summary.avatarUrl ?? undefined,
-    vanities: summary.vanities,
-    memberSince: summary.memberSince ?? undefined,
-    countryCode: summary.countryCode ?? undefined,
-    realName: summary.realName ?? undefined,
-    lastUsedAt: Date.now(),
-  };
 }
 
 // How an account names itself on screen: its last-known Steam persona/Family label, falling back

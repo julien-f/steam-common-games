@@ -6,6 +6,8 @@
 // that belongs here; ListRoute.tsx owns the equivalent orchestration generically, for any list
 // kind, not just account-scoped ones.
 import { steamVanity, fmtLastPlayed, fetchJson } from './utils.ts';
+import { accountIdFor } from './accountsStore.ts';
+import type { AccountSlot } from './types.ts';
 
 // An AccountSlot.id is itself the sorted-joined resolved member steam64 ids (see
 // accountsStore.ts's accountIdFor) — so resolving an id back to its members is just splitting
@@ -103,9 +105,15 @@ export function toAccountPlayer(p: RawAccountPlayer): AccountPlayer {
   };
 }
 
+// The member fields a slot is built from; a friend (AccountFriend) has them all but `placeholder`.
+type SlotPlayer = Pick<
+  AccountPlayer,
+  'steamid' | 'name' | 'profileUrl' | 'avatarUrl' | 'memberSince' | 'countryCode' | 'realName'
+> & { placeholder?: boolean };
+
 // What refreshAccountInfo should store for an account from its players: no label while any of them
 // is a placeholder, which would overwrite the stored name with a steamid.
-export function accountInfoFrom(ps: AccountPlayer[]) {
+export function accountInfoFrom(ps: SlotPlayer[]) {
   const vanities = Object.fromEntries(
     ps.flatMap((p) => (steamVanity(p.profileUrl) ? [[p.steamid, steamVanity(p.profileUrl)!]] : [])),
   );
@@ -113,6 +121,26 @@ export function accountInfoFrom(ps: AccountPlayer[]) {
     label: ps.some((p) => p.placeholder) ? undefined : ps.map((p) => p.name).join(' + '),
     avatarUrl: ps.length === 1 ? ps[0].avatarUrl : undefined,
     vanities: Object.keys(vanities).length ? vanities : undefined,
+  };
+}
+
+// The slot `players`, resolved from `rawInputs`, make — everything but the user's own flags. The
+// profile trivia, like the avatar, only for a single account: no one profile speaks for a Family.
+export function accountSlotFrom(players: SlotPlayer[], rawInputs: string[]): AccountSlot {
+  const members = players.map((p) => p.steamid).sort();
+  const { label, avatarUrl, vanities } = accountInfoFrom(players);
+  const sole = players.length === 1 ? players[0] : null;
+  return {
+    id: accountIdFor(members),
+    members,
+    rawInputs,
+    label,
+    avatarUrl: avatarUrl || undefined,
+    vanities: vanities ?? {},
+    memberSince: sole?.memberSince || undefined,
+    countryCode: sole?.countryCode || undefined,
+    realName: sole?.realName || undefined,
+    lastUsedAt: Date.now(),
   };
 }
 
@@ -283,23 +311,13 @@ export async function fetchAccountFriends(
   };
 }
 
-export interface ResolvedAccountSummary {
-  members: string[]; // resolved steam64 ids, sorted — becomes AccountSlot.members
-  label: string; // joined persona name(s) ("PersonaName" or "A + B" for a Family)
-  avatarUrl: string | null; // a single account's avatar; null for a Family (no one avatar to show)
-  vanities: Record<string, string>; // steam64 → custom-URL name → AccountSlot.vanities
-  memberSince: string | null; // solo-account trivia, same "null for a Family" reasoning as avatarUrl
-  countryCode: string | null;
-  realName: string | null;
-}
-
 // Home's "pick an account" resolve step — there's no standalone "just resolve an identifier"
 // endpoint (see docs/dev/architecture.md's Request flow section), so this is the one place a raw typed
 // identifier (vanity name/URL/steamid) actually becomes a resolved AccountSlot, via the same
 // /api/common-games call every owned-games fetch already makes. The account card's counts are
 // fetched by HomeRoute itself, not here.
-export async function resolveAccountSummary(rawInputs: string[]): Promise<ResolvedAccountSummary> {
-  const ownedData = await fetchJson<CommonGamesResponse>(
+export async function resolveAccountSlot(rawInputs: string[]): Promise<AccountSlot> {
+  const { players } = await fetchJson<CommonGamesResponse>(
     '/api/common-games',
     {
       method: 'POST',
@@ -308,23 +326,7 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
     },
     'Failed to resolve account',
   );
-  const players = ownedData.players;
-  const members = players.map((p) => p.steamid).sort();
-  const label = players.map((p) => p.personaname || p.steamid).join(' + ');
-  // Keyed by steamid rather than a parallel array: `members` is sorted, `players` is in the
-  // order the API answered in, and the two only coincide by luck.
-  const vanities: Record<string, string> = {};
-  for (const p of players) {
-    const vanity = steamVanity(p.profileurl);
-    if (vanity) vanities[p.steamid] = vanity;
-  }
-  const solePlayer = players.length === 1 ? players[0] : null;
-  const avatarUrl = solePlayer?.avatarmedium || null;
-  const memberSince = solePlayer ? fmtLastPlayed(solePlayer.timecreated) || null : null;
-  const countryCode = solePlayer?.loccountrycode || null;
-  const realName = solePlayer?.realname || null;
-
-  return { members, label, avatarUrl, vanities, memberSince, countryCode, realName };
+  return accountSlotFrom(players.map(toAccountPlayer), rawInputs);
 }
 
 // The wishlist counterpart of fetchAccountOwnedData — appids plus the age of the server's copy,

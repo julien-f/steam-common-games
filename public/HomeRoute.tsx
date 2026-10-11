@@ -18,7 +18,6 @@ import {
   getMyAccount,
   setMyAccount,
   getEffectiveCurrentAccount,
-  accountSlotFromSummary,
   getRecentAccounts,
   removeRecentAccount,
   clearRecentAccounts,
@@ -30,7 +29,7 @@ import {
 } from './accountsStore.ts';
 import { getAccountOverrideState, adoptAccount, accountOverrideStatusText } from './accountOverride.ts';
 import { withAccountParam, parseUrlState, compareUrl, COMPARE_PATH } from './urlState.ts';
-import { resolveAccountSummary, fetchAccountOverview, fetchAccountWishlist, accountInfoFrom } from './accountData.ts';
+import { resolveAccountSlot, fetchAccountOverview, fetchAccountWishlist, accountInfoFrom } from './accountData.ts';
 import type { AccountPlayer } from './accountData.ts';
 import { normalizeInput, steamVanity, fmtAge, countryFlag } from './utils.ts';
 import { CopyButton } from './CopyButton.tsx';
@@ -224,7 +223,7 @@ export default function HomeRoute() {
     setResolving(true);
     setResolveError('');
     try {
-      pickAccount(accountSlotFromSummary(await resolveAccountSummary(trimmed), trimmed));
+      pickAccount(await resolveAccountSlot(trimmed));
       setResolveInputs(['']);
     } catch (err) {
       setResolveError((err as Error).message);
@@ -235,7 +234,6 @@ export default function HomeRoute() {
 
   function pickAccount(account: AccountSlot): void {
     adoptAccount(account, navigate, location);
-    refreshAccounts();
   }
 
   function toggleMyAccount(account: AccountSlot, e: MouseEvent): void {

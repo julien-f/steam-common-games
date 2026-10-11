@@ -52,7 +52,7 @@ function makeAccount(id) {
   return { id, members: [id], rawInputs: [id], lastUsedAt: 0 };
 }
 
-// Same shape resolveAccountSummary's own tests use (test/accountData.test.js) — a single member
+// Same shape resolveAccountSlot's own tests use (test/accountData.test.js) — a single member
 // resolving through /api/common-games (owned) and /api/wishlist.
 function mockResolveFetch(steamid = '76561198000000201') {
   return async (url) => {
