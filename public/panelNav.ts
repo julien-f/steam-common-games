@@ -6,8 +6,7 @@
 
 import type { Game } from './types.ts';
 
-// `game.standalone` (a "look up any game" result not part of any loaded table) and no list yet
-// (`hasList` false: ListRoute before its table exists) both mean there's nothing to page through.
+// Nothing to page through for a standalone lookup, or before ListRoute's table exists (`hasList`).
 export function renderPanelNav({
   hasList,
   game,

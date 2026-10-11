@@ -111,9 +111,7 @@ function parseBundlesQuery(req) {
 // Used by cachedSteamIds below and by achievementsLimit's skip further down.
 const STEAM64_RE = /^7656119\d{10}$/;
 
-// The Steam64 ids `members` resolve to without an upstream call, or null when one isn't resolved
-// yet or the body is malformed (the route's own validation rejects it). Mirrors resolveSteamId's
-// own cache key and its short-circuit for a raw Steam64 id.
+// `members` as Steam64 ids from resolveSteamId's cache alone, or null if any would need Steam.
 function cachedSteamIds(members) {
   if (!Array.isArray(members) || !members.every((u) => typeof u === 'string' && u.trim().length > 0)) return null;
   const ids = new Set();
@@ -131,8 +129,8 @@ function cachedSteamIds(members) {
 // request is actually over budget (not on every request, and not on a skip), so this is a
 // direct trip count, not a coarser proxy. Centralized here rather than repeating a `handler`
 // on each of the limiter definitions below. Mirrors express-rate-limit's own default handler
-// (status + message) after recording the trip — see lib/metrics.js's rateLimiters. Every
-// limiter shares a one-minute window and the test bypass; `skip` only adds the route's own rule.
+// (status + message) after recording the trip — see lib/metrics.js's rateLimiters.
+// The defaults and test bypass every limiter shares; `skip` only adds the route's own rule.
 function namedRateLimit(name, { skip, ...opts }) {
   return rateLimit({
     windowMs: 60 * 1000,

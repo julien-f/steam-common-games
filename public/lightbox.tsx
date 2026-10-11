@@ -443,8 +443,7 @@ function schedHideLbChrome() {
   lbVcTimer = setTimeout(() => lb.classList.add('lb-idle'), 3000);
 }
 
-// A step with the chrome idle leaves it idle, showing only where the viewer now is: the counter,
-// plus the game's name when the step changed game.
+// With the chrome idle, a step flashes only the counter, plus the game's name on a game step.
 function flashLbCounter(lb: HTMLElement, gameChanged: boolean) {
   if (!lb.classList.contains('lb-idle')) return;
   lb.classList.add('lb--stepped');
@@ -455,8 +454,7 @@ function flashLbCounter(lb: HTMLElement, gameChanged: boolean) {
 
 // ── Focus helpers ──────────────────────────────────────────────────────────
 
-// Returns all focusable elements that are rendered: hidden by a stylesheet (the big play button
-// off a trailer, ‹ › with one item) counts too, or the trap's wrap lands on one and focus is lost.
+// Rendered ones only: the trap's wrap landing on a CSS-hidden button (‹ › with one item) loses focus.
 function getFocusable(lb: HTMLElement): HTMLElement[] {
   return [...lb.querySelectorAll<HTMLElement>('button:not([disabled]), input[type="range"]')].filter((el) =>
     el.checkVisibility({ visibilityProperty: true }),
