@@ -47,6 +47,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A list refresh that fails, or a first load that fails, keeps the Updated tile to retry from
 - Prices state their own age after switching list, account or region, not the previous one's
 - The Compare link after a comparison with an unknown player opens a clean form
+- Following a source link from an open Edit sources form opens that list with its form closed
 
 ### Development
 

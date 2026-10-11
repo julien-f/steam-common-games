@@ -819,7 +819,6 @@ export default function ListRoute() {
       setStatusText((err as Error).message);
       return;
     }
-    setEditingRankedSource(false);
     void load();
   }
   // What "Rank this list" ranks — null where there's nothing stable to point at (an unsaved
@@ -1052,7 +1051,6 @@ export default function ListRoute() {
     const list = userList();
     if (!list) return;
     updateDynamicList(list.id, input.op, input.sources);
-    setEditingSources(false);
     void load();
   }
   // kind === 'user', dynamic lists only — "Share list" encodes this list's own formula (inlining
@@ -1990,6 +1988,8 @@ export default function ListRoute() {
       setCompareList(null);
       setRankedSource(null);
       setRankingState(null);
+      setEditingSources(false);
+      setEditingRankedSource(false);
     }
     if (!kept) setSelectedRows([]); // a fresh load means a fresh table — nothing carries a prior selection over
     setSelectionActionStatus(null);

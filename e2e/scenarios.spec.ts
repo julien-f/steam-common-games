@@ -269,6 +269,35 @@ test('C1 edge: the bare Compare link after an unknown player starts clean', asyn
   await expect(page.locator('.compare-token.is-invalid')).toHaveCount(0);
 });
 
+test('L1 edge: following a formula link from Edit sources opens the source closed', async ({ page }) => {
+  const list = (id: string, fields: object) => ({
+    id,
+    parentId: null,
+    order: 0,
+    createdAt: 0,
+    updatedAt: 0,
+    ...fields,
+  });
+  const lists = [
+    list('picks', { name: 'Picks', kind: 'manual', appids: [620, 105600] }),
+    list('inner', { name: 'Inner', kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: 'picks' }] }),
+    list('outer', { name: 'Outer', kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: 'inner' }] }),
+  ];
+  await page.addInitScript(
+    (blob) => {
+      if (!sessionStorage.getItem('e2e-seeded')) localStorage.setItem('steam.isonoe.net:prefs', blob);
+      sessionStorage.setItem('e2e-seeded', '1');
+    },
+    JSON.stringify({ schemaVersion: 2, lists: { value: lists, updatedAt: 0 } }),
+  );
+  await page.goto('/lists/outer');
+  await page.getByRole('button', { name: 'Edit sources' }).click();
+  await page.locator('.list-formula').getByRole('link', { name: 'Inner' }).click();
+  await expect(page.getByRole('heading', { name: 'Inner' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit sources' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cancel' })).toHaveCount(0);
+});
+
 test('L1.1-3: select games, add them to a new list, open it', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
