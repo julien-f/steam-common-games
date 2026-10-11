@@ -161,10 +161,14 @@ function namedRateLimit(name, { skip, ...opts }) {
 // `fetchedAt` field on /api/common-games and /api/wishlist reports. Oldest, not newest, so the
 // UI's "Updated <when>" never claims data is fresher than its stalest part.
 function oldestCachedAt(keys) {
+  return oldestOf(keys.map((key) => getCachedAt(key)));
+}
+
+// The oldest of some write times, or null if any is missing (null or undefined).
+function oldestOf(timestamps) {
   let oldest = null;
-  for (const key of keys) {
-    const ts = getCachedAt(key);
-    if (ts === undefined) return null;
+  for (const ts of timestamps) {
+    if (ts == null) return null;
     if (oldest === null || ts < oldest) oldest = ts;
   }
   return oldest;
@@ -314,11 +318,12 @@ const friendsLimit = namedRateLimit('friends', {
   },
 });
 
+// fetchGameDetails' cached sources: response field -> cache key prefix.
+const DETAILS_SOURCES = { rating: 'rating', hltb: 'hltb', meta: 'meta', tags: 'browse', protondb: 'protondb' };
+
 // The details limit exists to throttle upstream Steam/HLTB calls. Cache hits make
 // no upstream calls, so they must not count — otherwise a refresh of an already
 // loaded comparison (all cache hits) burns the budget and 429s itself.
-// fetchGameDetails' cached sources: response field -> cache key prefix.
-const DETAILS_SOURCES = { rating: 'rating', hltb: 'hltb', meta: 'meta', tags: 'browse', protondb: 'protondb' };
 
 const detailsLimit = namedRateLimit('details', {
   max: DETAILS_RATE_LIMIT_MAX,
@@ -713,14 +718,16 @@ function fetchGameDetails(appid, { force = false } = {}) {
         }
       }
       // Age of the oldest of this game's cached sources, which is what the panel's ↻ shows — plus
-      // each source's own age behind it. The aggregate alone was misleading: these tiers run from
-      // 90 to 180 days and are cached per source, so one untouched store page dates the whole
-      // readout, and "5 months ago" says nothing about the rating fetched yesterday. The panel
-      // puts the breakdown in the button's tooltip so the visible figure stays one number.
-      const keys = Object.entries(DETAILS_SOURCES).map(([source, prefix]) => [source, `${prefix}:${appid}`]);
+      // each source's own age behind it. The aggregate alone was misleading: these tiers run for
+      // months and are cached per source, so one untouched store page dates the whole readout,
+      // and "5 months ago" says nothing about the rating fetched yesterday. The panel puts the
+      // breakdown in the button's tooltip so the visible figure stays one number.
+      const fetchedAts = Object.fromEntries(
+        Object.entries(DETAILS_SOURCES).map(([source, prefix]) => [source, getCachedAt(`${prefix}:${appid}`) ?? null]),
+      );
       return {
-        fetchedAt: oldestCachedAt(keys.map(([, key]) => key)),
-        fetchedAts: Object.fromEntries(keys.map(([source, key]) => [source, getCachedAt(key) ?? null])),
+        fetchedAt: oldestOf(Object.values(fetchedAts)),
+        fetchedAts,
         rating: ratingRes.status === 'fulfilled' ? ratingRes.value : null,
         hltb: hltbRes.status === 'fulfilled' ? hltbRes.value : null,
         meta: metaRes.status === 'fulfilled' ? metaRes.value : null,

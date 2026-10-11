@@ -87,7 +87,8 @@ function lbShowingVideo() {
   return lbVideoEl.isConnected;
 }
 function lbShowingImage() {
-  return document.querySelector<HTMLElement>('#screenshot-lightbox .lb-img')?.style.display !== 'none';
+  const img = document.querySelector<HTMLElement>('#screenshot-lightbox .lb-img');
+  return !!img && img.style.display !== 'none';
 }
 type LbFlashEl = HTMLElement & { _flashTimer?: ReturnType<typeof setTimeout> };
 
@@ -329,9 +330,7 @@ function retryCurrentShot() {
   }
 }
 
-// Loads `src` off-screen, then swaps it into the shared img — unless a later load or render has
-// started since (see lbImgToken). Left at opacity 0 on error (rather than 1) so the browser's own
-// broken-image icon doesn't show behind the error overlay.
+// Swaps `src` in once loaded unless a later load started since; opacity 0 on error hides the broken-image icon.
 function loadLbImage(src: string) {
   const lb = document.getElementById('screenshot-lightbox')!;
   const img = lb.querySelector<HTMLImageElement>('.lb-img')!;

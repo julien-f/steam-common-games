@@ -124,8 +124,7 @@ export function accountInfoFrom(ps: SlotPlayer[]) {
   };
 }
 
-// The slot `players`, resolved from `rawInputs`, make — everything but the user's own flags. The
-// profile trivia, like the avatar, only for a single account: no one profile speaks for a Family.
+// Profile trivia, like the avatar, only for a single account: no one profile speaks for a Family.
 export function accountSlotFrom(players: SlotPlayer[], rawInputs: string[]): AccountSlot {
   const members = players.map((p) => p.steamid).sort();
   const { label, avatarUrl, vanities } = accountInfoFrom(players);

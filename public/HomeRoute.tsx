@@ -204,7 +204,10 @@ export default function HomeRoute() {
   // loaded, same fallback-to-bare-app-name-when-none convention the old comparison page's own
   // updateTitle() used. The side panel's own game-open title takes over on top of this when a
   // game is opened from here, same as every other route.
-  useBaseTitle(() => currentAccount()?.label ?? null);
+  useBaseTitle(() => {
+    const account = currentAccount();
+    return account ? accountDisplayLabel(account) : null;
+  });
 
   // An old Comparison-page link — `/?u=alice&u=bob`, several slots — used to land here and be
   // explained away ("showing the first"). It has a real address again, so it's forwarded to it

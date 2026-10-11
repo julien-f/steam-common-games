@@ -469,8 +469,7 @@ export function formatPriceTier(keyPart: string): string {
   if (n === top) return `${unit}${top}+`;
   return `${unit}${n}–${unit}${PRICE_TIERS[PRICE_TIERS.indexOf(n) + 1]}`;
 }
-// `groupValue`/`groupFormat` bucketing a price in `currency(row)`'s tiers — spread into a column
-// like the library's numericRangeGroup.
+// Spread into a column like the library's numericRangeGroup, bucketing in `currency(row)`'s tiers.
 export function priceTierGroup(currency: (row: Row) => string | null | undefined, missingLabel?: string) {
   return {
     groupValue: withMissingGroup((v, row) => priceTierBucket(v, currency(row))),

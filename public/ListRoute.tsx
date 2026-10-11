@@ -1856,8 +1856,7 @@ export default function ListRoute() {
     if (!kept) setSelectedRows([]); // a fresh load means a fresh table — nothing carries a prior selection over
     setSelectionActionStatus(null);
 
-    // Resolves a dynamic or user list into placeholder rows and shows its sources; a
-    // group-by-membership result keeps its groups. null once stale, or failed (said in the status line).
+    // null once stale, or failed (the status line says so); a group-by-membership result keeps its groups.
     const resolveRows = async (
       list: GameList,
       fetchers: ListResolveFetchers,
@@ -1904,7 +1903,9 @@ export default function ListRoute() {
       if (failures.length) {
         // Named as far as known: a resolved player by name, a failed one as typed.
         setListTitle(
-          settled.map((r, i) => (r.status === 'fulfilled' ? r.value.label : slots[i].join(' + '))).join(' vs. '),
+          settled
+            .map((r, i) => (r.status === 'fulfilled' ? accountDisplayLabel(r.value) : slots[i].join(' + ')))
+            .join(' vs. '),
         );
         setCompareFailures(failures);
         setStatusText('');
@@ -2124,7 +2125,7 @@ export default function ListRoute() {
         return;
       }
       setHeroAccount(account);
-      setListTitle(account.label ? `${account.label}'s ${listLabel}` : listLabel);
+      setListTitle(`${accountDisplayLabel(account)}'s ${listLabel}`);
       setStatusText(kind === 'wishlist' ? 'Fetching wishlist…' : 'Fetching library…');
       try {
         if (kind === 'owned') {

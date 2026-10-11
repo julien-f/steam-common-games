@@ -81,9 +81,7 @@ export function shareTableView(table: ViewStateApi, btn: HTMLElement, extraParam
   copyWithFeedback(btn, url);
 }
 
-// Clears the stored default and blanks the table's view state — which resolves back to the
-// table's own `initialViewState` (including its default sort) rather than to nothing. No
-// VIEW_PARAM to clear: restoreTableView already stripped it.
+// A blank view state resolves to the table's own `initialViewState` (default sort included), not to nothing.
 export function resetTableView(table: ViewStateApi, store: ViewStore): void {
   table.setViewState({});
   store.save({});
