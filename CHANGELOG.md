@@ -82,7 +82,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Stepping to another screenshot while Retry is loading one now keeps the screenshot you stepped to
 - A combined or shared list whose first load failed keeps its Updated ↻ tile to retry from
 - A comparison's 🔗 Share view link now applies its layout
-- Re-picking a known account while Steam doesn't answer keeps its name, avatar and custom URL
+- Re-picking a known account while Steam doesn't answer keeps its name, avatar and custom URL, without restoring ones removed on Steam since
 - On the ranking screen, the side panel's ↻ Refresh re-fetches the game's details, and its tags no longer look like filter buttons
 - On a phone, the ranking screen keeps both games side by side with Tie, Skip and Undo in view, inside a side margin
 - The lightbox's ↑/↓ game buttons stay in place from one game to the next, so they can be clicked repeatedly

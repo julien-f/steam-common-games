@@ -256,6 +256,7 @@ export interface AccountSlot {
   memberSince?: string; // bare ISO date the account was created
   countryCode?: string; // ISO 3166-1 alpha-2
   realName?: string;
+  unresolved?: string[]; // members whose player summaries failed; never stored (accountsStore.ts's withStoredDisplay)
   lastUsedAt: number;
   removedAt?: number; // soft-removed from the recents UI, kept while referenced by a dynamic list
 }

@@ -202,6 +202,13 @@ test('accountSlotFrom: no label while a member is a placeholder, so it reads as 
   assert.deepEqual(slot.rawInputs, ['bob']);
 });
 
+test('accountSlotFrom: flags placeholder members as unresolved, and only those', () => {
+  const alice = toAccountPlayer({ steamid: '1', personaname: 'Alice' });
+  const unknown = toAccountPlayer({ steamid: '2', personaname: '2', placeholder: true });
+  assert.deepEqual(accountSlotFrom([alice, unknown], ['1', '2']).unresolved, ['2']);
+  assert.equal('unresolved' in accountSlotFrom([alice], ['1']), false);
+});
+
 test('accountSlotFrom: a friend makes a single-account slot from its own fields', () => {
   const slot = accountSlotFrom(
     [
