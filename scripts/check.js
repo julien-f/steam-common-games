@@ -11,7 +11,8 @@ const UI =
   /^(public|e2e)\/|^(playwright\.config\.ts|vite\.config\.js|tsconfig[^/]*\.json|eslint\.config\.[^/]*|package(-lock)?\.json)$/;
 
 // `[name, npm script args]` for a full run (`staged` undefined) or a commit against `staged`.
-function steps(staged, files = []) {
+// `deferE2e`: a fix-batch lane commits without e2e and runs it once before reporting (BATCH.md).
+function steps(staged, files = [], { deferE2e = process.env.E2E_DEFER === '1' } = {}) {
   const ui = staged === undefined || files.some((f) => UI.test(f));
   return [
     ['format', ['format:check']],
@@ -27,7 +28,9 @@ function steps(staged, files = []) {
     ['doc-refs', ['check:doc-refs']],
     ['journeys', ['check:journeys']],
     // Desktop only: the pre-push hook runs both widths before anything reaches CI.
-    ...(ui && staged !== undefined ? [['e2e', ['test:e2e', '--', '--if-changed', '--project=desktop']]] : []),
+    ...(ui && staged !== undefined && !deferE2e
+      ? [['e2e', ['test:e2e', '--', '--if-changed', '--project=desktop']]]
+      : []),
   ];
 }
 

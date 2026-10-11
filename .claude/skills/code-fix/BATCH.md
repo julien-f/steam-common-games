@@ -15,7 +15,7 @@ One `Agent` per lane, all in one message, `isolation: "worktree"`, with the lane
 
 ## 3. Merge each lane as it reports
 
-- `node scripts/batch.js merge <branch> <its closed items>`: merges `--no-ff --no-commit`, keeps both sides of CHANGELOG conflicts and drops the closed items from the backlog. Narrow, rather than drop, an item the lane narrowed. Commit (`Merge lane <X>: …`, body naming the items), then `git worktree remove` and `git branch -d`.
+- `node scripts/batch.js merge <branch> <its closed items>`: merges `--no-ff --no-commit`, keeps both sides of CHANGELOG conflicts and drops the closed items from the backlog. Narrow, rather than drop, an item the lane narrowed. Commit (`Merge lane <X>: …`, body naming the items; its hook runs the e2e the lane's commits deferred), then `git worktree remove` and `git branch -d`.
 - Record what a lane reports as new problems, once verified, as backlog items.
 
 ## 4. After the lanes
@@ -30,7 +30,8 @@ You fix <items> from <backlog file> in /home/julien/dev/julien-f/steam-common-ga
 - Follow .claude/skills/<code-fix|ux-fix>/SKILL.md steps 0–<last step before the look>, one commit per item, but don't edit the backlog file (the lead closes items at merge), skip the dev:mock look and /code-review.
 - A real fork (fix widens past the item, a dependency, more upstream traffic): skip the item and report it.
 - Stay in your worktree: no `git -C <main checkout>`, `--prefix` or `cwd` parameter; one plain command per Bash call, no `&&`/`;` chains or heredocs.
-- Commit messages: write them to <scratchpad>/msg-<lane>.txt (the scratchpad is shared, a generic name gets overwritten), then `E2E_PORT=<2899x> git commit -F <file>`; prefix every e2e run with the same E2E_PORT.
+- Commit messages: write them to <scratchpad>/msg-<lane>.txt (the scratchpad is shared, a generic name gets overwritten), then `E2E_DEFER=1 E2E_PORT=<2899x> git commit -F <file>`; prefix every e2e run with the same E2E_PORT.
+- Before reporting, run `E2E_PORT=<2899x> npm run test:e2e` once (both widths) and fix what fails.
 Report: item → commit → how verified; anything skipped or narrowed and why; new problems found.
 ```
 

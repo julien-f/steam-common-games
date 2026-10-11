@@ -5,12 +5,16 @@ set -e
 git diff --cached --check
 
 # The checks run on the working tree, so unstaged edits are set aside for them: a commit must
-# pass on its own. Guarded because, with nothing to stash, `pop` would apply an older stash.
+# pass on its own. A patch in this worktree's own git dir, not `git stash`: the stash is shared by
+# every worktree, so parallel lanes committing at once could pop each other's edits.
 if ! git diff --quiet; then
-  git stash push -q --keep-index -m pre-commit
+  patch="$(git rev-parse --git-dir)/pre-commit-unstaged.patch"
+  git diff --binary > "$patch"
+  git checkout -- .
   restore() {
     trap - EXIT
-    git stash pop -q || echo 'pre-commit: could not restore unstaged changes; they are in the "pre-commit" stash' >&2
+    git apply --whitespace=nowarn "$patch" && rm "$patch" ||
+      echo "pre-commit: could not restore unstaged changes; they are in $patch" >&2
   }
   trap restore EXIT
   trap 'exit 130' INT TERM

@@ -30,3 +30,9 @@ test('steps: a full run has every check but e2e; a commit adds e2e and the UI ch
   assert.deepStrictEqual(names('HEAD', ['package-lock.json']).sort(), [...always, ...ui, 'e2e'].sort());
   assert.deepStrictEqual(steps('HEAD~1')[1][1], ['check:changelog', '--', '--staged=HEAD~1']);
 });
+
+test("steps: E2E_DEFER leaves a commit's e2e to a later run, never its other UI checks", () => {
+  const names = steps('HEAD', ['public/app.tsx'], { deferE2e: true }).map(([name]) => name);
+  assert.ok(!names.includes('e2e'));
+  assert.ok(names.includes('typecheck'));
+});
