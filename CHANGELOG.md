@@ -68,12 +68,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The side panel's ↑/↓ follow the table's current sort and filter, and hide when the open game isn't in it
 - When the current account's library can't be loaded, games now show their ownership as unknown instead of "Not Owned"
 - A list built on a bundle keeps the games Steam didn't answer for, from its last good load, instead of dropping them
-- npm run cache:clear now empties every cache table, including search, news, bundle and ITAD ID caches
-- A production install that skips development packages no longer fails to start
 - A long wishlist's Prices readout no longer says "just now" when part of its prices are days old
 
 ### Development
 
+- npm run cache:clear now empties every cache table, including search, news, bundle and ITAD ID caches
+- A production install that skips development packages no longer fails to start
 - `scripts/setup-facts.js` gathers the setup-review skill's facts: each script's callers and missing usage lines, the gates' time and output (`--cost`), and recent session transcripts' largest outputs, slowest calls, repeated commands and skill runs (`--transcripts`)
 - Unit and e2e test runs print dots instead of every passing test, cutting a full `npm test` from 108 KB of output to 3 KB
 - The pre-commit changelog check validates the staged CHANGELOG.md, so a partial stage that repeats a subsection no longer slips through
