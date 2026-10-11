@@ -15,7 +15,7 @@ Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-
 
 ## Simplify
 
-- **C152 · cleanup · S** — `public/style.css:2142`'s `.panel-tag-playtime` rule styles a class nothing renders (found while fixing C126, outside its ranges). Delete it.
+None open.
 
 ## Correctness
 
