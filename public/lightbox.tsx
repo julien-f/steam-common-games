@@ -90,10 +90,11 @@ const LB_SEEK_SECONDS = 5;
 const LB_DOUBLE_TAP_MS = 300;
 const LB_DOUBLE_TAP_DIST = 30;
 
-let _onLightboxParamChange: ((shotId: string | null) => void) | null = null;
-let _onGameNav: ((dir: number) => void) | null = null;
-let _onGameRandom: (() => void) | null = null;
-let _getGamePosition: (() => { index: number; total: number } | null) | null = null;
+// No-ops until initLightbox sets them; nothing can open the lightbox before that.
+let _onLightboxParamChange: (shotId: string | null) => void = () => {};
+let _onGameNav: (dir: number) => void = () => {};
+let _onGameRandom: () => void = () => {};
+let _getGamePosition: () => { index: number; total: number } | null = () => null;
 // Set when a re-point landed on a banner for want of anything else — see `repointLightboxGame`.
 // Holds the *kind* of shot being left, so the screenshot/trailer that eventually arrives is
 // picked by the same rule the re-point itself would have used.
@@ -116,22 +117,22 @@ const _lbPrefetchedHls = new Set();
 // behind a fullscreen image that never changed. Both re-point through `repointLightboxGame`.
 // `getGamePosition()`: where the open game sits in that list, for the caption — null when there
 // is no list to page through at all (a standalone lookup), which is also what hides the caption's
-// own ↑/↓ buttons. All optional; a host with none of them just no-ops.
+// own ↑/↓ buttons.
 export function initLightbox({
   onParamChange,
   onGameNav,
   onGameRandom,
   getGamePosition,
 }: {
-  onParamChange?: (shotId: string | null) => void;
-  onGameNav?: (dir: number) => void;
-  onGameRandom?: () => void;
-  getGamePosition?: () => { index: number; total: number } | null;
-} = {}) {
-  _onLightboxParamChange = onParamChange ?? null;
-  _onGameNav = onGameNav ?? null;
-  _onGameRandom = onGameRandom ?? null;
-  _getGamePosition = getGamePosition ?? null;
+  onParamChange: (shotId: string | null) => void;
+  onGameNav: (dir: number) => void;
+  onGameRandom: () => void;
+  getGamePosition: () => { index: number; total: number } | null;
+}) {
+  _onLightboxParamChange = onParamChange;
+  _onGameNav = onGameNav;
+  _onGameRandom = onGameRandom;
+  _getGamePosition = getGamePosition;
   _lbTeardown?.();
   const abort = new AbortController();
   _lbSignal = abort.signal;
@@ -553,8 +554,8 @@ function wireButtons(lb: HTMLElement) {
   lb.querySelector('.lb-error-retry')!.addEventListener('click', retryCurrentShot);
   lb.querySelector('.lb-prev')!.addEventListener('click', () => stepLightbox(-1));
   lb.querySelector('.lb-next')!.addEventListener('click', () => stepLightbox(1));
-  lb.querySelector('.lb-game-prev')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav?.(-1), -1));
-  lb.querySelector('.lb-game-next')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav?.(1), 1));
+  lb.querySelector('.lb-game-prev')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav(-1), -1));
+  lb.querySelector('.lb-game-next')!.addEventListener('click', () => stepGameFromLightbox(() => _onGameNav(1), 1));
   lb.querySelector('.lb-fullscreen')!.addEventListener('click', () => toggleLbFullscreen(lb));
   lb.querySelector('.lb-zoom')!.addEventListener('click', toggleLbZoom);
 }
@@ -609,17 +610,17 @@ function wireKeyboard(lb: HTMLElement) {
         e.preventDefault();
         gotoLightbox(e.key === 'Home' ? 0 : shots().length - 1);
       }
-      if (!onScrub && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && _onGameNav) {
+      if (!onScrub && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
         e.preventDefault();
         const dir = e.key === 'ArrowDown' ? 1 : -1;
-        stepGameFromLightbox(() => _onGameNav!(dir), dir);
+        stepGameFromLightbox(() => _onGameNav(dir), dir);
       }
       // R, the same random pick the panel offers — page-level shortcuts are all blocked while the
       // lightbox is open (panelKeyboard.ts hands it the keyboard wholesale), so it has to be bound
       // here to work at all, exactly as ↑/↓ above do.
-      if (!onScrub && (e.key === 'r' || e.key === 'R') && _onGameRandom) {
+      if (!onScrub && (e.key === 'r' || e.key === 'R')) {
         e.preventDefault();
-        stepGameFromLightbox(() => _onGameRandom!());
+        stepGameFromLightbox(_onGameRandom);
       }
       if (e.key === 'f' || e.key === 'F') toggleLbFullscreen(lb);
       if ((e.key === 'z' || e.key === 'Z') && !vid) toggleLbZoom();
@@ -769,7 +770,7 @@ function wireTouchHandlers(lb: HTMLElement) {
         dragAxis = null;
         dragStart = e.timeStamp;
         dragMediaCount = shots().length;
-        dragHasGameList = !!_onGameNav && !!_getGamePosition?.();
+        dragHasGameList = _getGamePosition() !== null;
         if (lbZoom > 1) {
           touchPanning = true;
           touchPanStartX = e.touches[0].clientX;
@@ -845,7 +846,7 @@ function wireTouchHandlers(lb: HTMLElement) {
         if (action === 'media-prev' || action === 'media-next') stepLightbox(action === 'media-next' ? 1 : -1);
         else if (action) {
           const dir = action === 'game-next' ? 1 : -1;
-          stepGameFromLightbox(() => _onGameNav?.(dir), dir);
+          stepGameFromLightbox(() => _onGameNav(dir), dir);
         }
         return;
       }
@@ -1072,7 +1073,7 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
   document.body.classList.add('lb-open');
   // A ring on × after a tap reads as a stray highlight; it's for whoever opened this by keyboard.
   lb.querySelector<HTMLElement>('.lb-close')!.focus({ focusVisible: lastInputWasKey });
-  _onLightboxParamChange?.(newShots[idx()].shotId);
+  _onLightboxParamChange(newShots[idx()].shotId);
 }
 
 // Re-points an already-open lightbox at another game — ↑/↓ and R, via AppShell's `onGameNav`/
@@ -1093,7 +1094,7 @@ export function repointLightboxGame(game: ReadonlyGame) {
     setLbGame(game);
     setIdx(target);
   });
-  _onLightboxParamChange?.(next[target].shotId);
+  _onLightboxParamChange(next[target].shotId);
 }
 
 export function closeLightbox() {
@@ -1118,7 +1119,7 @@ export function closeLightbox() {
   if (document.fullscreenElement || webkitDoc().webkitFullscreenElement) {
     (document.exitFullscreen?.() ?? webkitDoc().webkitExitFullscreen?.())?.catch?.(() => {});
   }
-  _onLightboxParamChange?.(null);
+  _onLightboxParamChange(null);
   popOverlayEntry('lightbox');
   (_lbPrevFocus as HTMLElement | null)?.focus();
   _lbPrevFocus = null;
@@ -1133,7 +1134,7 @@ function stepLightbox(dir: number) {
   const list = shots();
   const next = (idx() + dir + list.length) % list.length;
   setIdx(next);
-  _onLightboxParamChange?.(list[next].shotId);
+  _onLightboxParamChange(list[next].shotId);
 }
 
 // Absolute jump (Home/End) — still animates in the right direction rather
@@ -1145,7 +1146,7 @@ function gotoLightbox(target: number) {
   lbLastDir = target > idx() ? 1 : -1;
   lbLastAxis = 'x';
   setIdx(target);
-  _onLightboxParamChange?.(shots()[target].shotId);
+  _onLightboxParamChange(shots()[target].shotId);
 }
 
 // The caption, rendered on its own rather than as part of `renderLightbox` below. It carries
@@ -1159,7 +1160,7 @@ function renderLbCaption() {
   const lb = document.getElementById('screenshot-lightbox');
   if (!lb) return;
   const name = gameName();
-  const pos = _getGamePosition?.() ?? null;
+  const pos = _getGamePosition();
   const caption = lb.querySelector<HTMLElement>('.lb-caption')!;
   // The two counters wear the same pill (`.lb-counter` is the other), one per axis, so they read
   // as a pair and neither is mistaken for part of the title beside it.
@@ -1214,7 +1215,7 @@ function renderLightbox() {
   // it, so a list still loading behind the overlay restarted the image load several times a
   // second and the lightbox visibly blinked. The caption keeps it live in its own pass instead
   // (`renderLbCaption`); the alt text here is rebuilt on every step anyway.
-  const pos = untrack(() => _getGamePosition?.() ?? null);
+  const pos = untrack(() => _getGamePosition());
   const label =
     `${name ? name + ' — ' : ''}${pos ? `game ${pos.index + 1} of ${pos.total} — ` : ''}` + mediaLabel(list, i);
   lb.querySelector<HTMLElement>('.lb-zoom')!.style.display = shot.type === 'video' ? 'none' : '';
@@ -1356,7 +1357,7 @@ createRoot(() => {
     const target = preferredShotIndex(list, leaving);
     if (target === 0) return; // trailers but no screenshots — not worth autoplaying unasked
     setIdx(target);
-    _onLightboxParamChange?.(list[target].shotId);
+    _onLightboxParamChange(list[target].shotId);
   });
   createEffect(() => {
     const list = shots();
