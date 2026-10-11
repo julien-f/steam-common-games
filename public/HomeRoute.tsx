@@ -233,11 +233,6 @@ export default function HomeRoute() {
     }
   }
 
-  // The one place an *explicit* account pick lands — a fresh resolve, a recents click, or
-  // adopting whatever a `?u=` link was showing. Beyond storing it, this consumes the override:
-  // the param has served its purpose once the user has chosen, so it's dropped from state and
-  // stripped from the URL (replaceState) rather than left there to keep overriding the very
-  // preference that was just set. See docs/dev/lists-and-accounts.md's `?u=` section.
   function pickAccount(account: AccountSlot): void {
     adoptAccount(account, navigate, location);
     refreshAccounts();
