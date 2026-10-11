@@ -143,7 +143,7 @@ Still deliberately imperative: the subnav scroll-spy (measures section positions
   - A game that isn't one of the route's rows (a DLC/base-game link, a standalone lookup) gets `undefined` from `mutateRow`; the caller writes to `standaloneRows` instead.
 - **A streaming/high-frequency `mutateRow` caller must batch**, or the table's live `tableData()` re-sorts/re-filters/re-paginates once per _event_ instead of once per _flush_ (measured: a ~1150-game library took ~33 s of unresponsive main thread unbatched, ~6–7 s batched). Two shapes, two fixes:
   - **Spread over time** (the SSE `/api/game-details/stream` loop, `ListRoute.tsx`'s `streamGameDetails`) — `streamBatcher.ts`'s `createStreamBatcher` queues events and applies them in one `batch()` per ~150 ms flush; its `onFlush` runs `updateStatus`. Each queued event carries its load's generation (`loadGuard`, `staleGuard.ts`) and is dropped if stale by flush time, since two overlapping loads share the queue.
-  - **One synchronous burst** (a price response processed in one loop — `loadWishlistPrices`/`loadBundlePrices`) — the loop is wrapped in a bare `batch()`.
+  - **One synchronous burst** (a price response processed in one loop — `loadPrices`) — the loop is wrapped in a bare `batch()`.
   - Deliberately **not** built into `mutateRow`: one-off writes (an achievements load, a DLC toggle, a ↻ click) must apply immediately.
 
 ## The game table

@@ -495,8 +495,7 @@ export function formatPriceTier(keyPart: string): string {
 // request finished first "won" and silently mislabeled the other's amounts with the wrong
 // currency symbol — right number, wrong currency, easy to miss since only the symbol was wrong).
 // `tierCurrency` (a bundle's own tier data, bundles.js only) backs only the Tier Price column;
-// `priceCurrency` (`/games/prices/v3` data, set in each page's own `loadPrices`/
-// `loadWishlistPrices`) backs every other price column here. `null` means "free"/"no data"
+// `priceCurrency` (`/games/prices/v3` data, set by ListRoute.tsx's `loadPrices`) backs every other price column here. `null` means "free"/"no data"
 // throughout, never rendered as $0 or blank. `formatMoney` itself lives in utils.js, not here —
 // see this file's own header comment for why.
 export function renderPrice(v: unknown, row: Row): Node {
@@ -1179,7 +1178,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
 // (an owned game has nothing to buy). Each page inserts this cluster into CORE_COLUMNS right
 // after its own identity/page-specific columns via `insertColumnsAfter`, and populates the
 // fields these columns read (`bestDealPrice`/`bestDealCut`/`bestDealShop`/`lowAll`/`lowY1`/
-// `lowM3`/`priceCurrency`) itself, via its own `loadPrices`/`loadWishlistPrices` — this file only
+// `lowM3`/`priceCurrency`) itself, via its own `loadPrices` — this file only
 // defines how those fields render/sort/group, not how they're fetched. `panel.js`'s Price card
 // reads the exact same fields, off whichever page put them on the row.
 export const PRICE_COLUMNS: ColumnDef<Row>[] = [
@@ -1223,7 +1222,7 @@ export const PRICE_COLUMNS: ColumnDef<Row>[] = [
     category: 'Pricing',
   },
   // How much cheaper the best deal is than Steam Full Price (`discountPct`, computed by each
-  // page's own loadPrices/loadWishlistPrices — see its own comment above for why this is
+  // ListRoute.tsx's loadPrices — see its own comment above for why this is
   // computed against Steam's price rather than taken from ITAD's own per-deal "cut" field).
   // Rendered with a leading "-" (`renderCut`) and "—" for a deal that isn't actually any cheaper
   // than Steam (`0`) — real data, not a missing value, but not worth a "-0%" reading either.

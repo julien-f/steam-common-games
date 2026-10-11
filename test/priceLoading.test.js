@@ -7,17 +7,13 @@ const { discountPct } = require('../public/utils.ts');
 
 test('applyPriceInfo: maps an ITAD price response onto a row', () => {
   const row = {};
-  applyPriceInfo(
-    row,
-    {
-      steamRegular: { amount: 1999, currency: 'USD' },
-      bestDeal: { price: { amount: 999 }, shop: 'Fanatical', url: 'https://example.com' },
-      lowAll: { amount: 799 },
-      lowY1: { amount: 899 },
-      lowM3: { amount: 999 },
-    },
-    discountPct,
-  );
+  applyPriceInfo(row, {
+    steamRegular: { amount: 1999, currency: 'USD' },
+    bestDeal: { price: { amount: 999 }, shop: 'Fanatical', url: 'https://example.com' },
+    lowAll: { amount: 799 },
+    lowY1: { amount: 899 },
+    lowM3: { amount: 999 },
+  });
   assert.equal(row.steamRegular, 1999);
   assert.equal(row.bestDealPrice, 999);
   assert.equal(row.bestDealShop, 'Fanatical');
@@ -31,7 +27,7 @@ test('applyPriceInfo: maps an ITAD price response onto a row', () => {
 
 test('applyPriceInfo: missing info fields resolve to null, not undefined', () => {
   const row = {};
-  applyPriceInfo(row, {}, discountPct);
+  applyPriceInfo(row, {});
   for (const f of PRICE_FIELDS) assert.equal(row[f], null, f);
   assert.equal(row.priceCurrency, null);
 });

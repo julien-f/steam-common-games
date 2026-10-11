@@ -30,7 +30,7 @@
 // myOwnership.ts's createMyOwnershipCache.
 import { achievementsAccountKey, achievementsRequestUrl, achievementsSteamUrl } from './achievementsRequest.ts';
 import { applyPriceInfo, postPrices } from './priceLoading.ts';
-import { discountPct, fetchJson } from './utils.ts';
+import { fetchJson } from './utils.ts';
 import { getStoredRegion, resolveRegion } from './region.ts';
 import type { Achievements, NewsItem, PriceFields } from './types.ts';
 import type { PickAndMixTier } from './bundleRows.ts';
@@ -200,7 +200,7 @@ export function createPanelDataCache() {
         if (!(await isItadConfigured())) return null;
         const { prices } = await postPrices({ appids: [appid], country: resolveRegion(getStoredRegion()), force });
         const fields = {} as PriceFields;
-        applyPriceInfo(fields, prices[appid], discountPct);
+        applyPriceInfo(fields, prices[appid]);
         return fields;
       },
       force,

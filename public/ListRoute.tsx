@@ -87,7 +87,6 @@ import {
 import {
   computeSteamdbRating,
   computeProductionTier,
-  discountPct,
   fetchJson,
   fmtAge,
   fmtLastPlayed,
@@ -488,7 +487,7 @@ const WISHLIST_NOPRICE_COLUMNS = WISHLIST_COLUMNS.filter((c) => !PRICE_KEYS.has(
 const RANKED_DEFAULT_SORT: SortEntry[] = [{ key: 'rank', dir: 'asc' }];
 
 const DEFAULT_SORT: SortEntry[] = [{ key: 'steamdbRating', dir: 'desc' }];
-const MAX_PRICE_LOOKUP_GAMES = 500; // mirrors the server's own cap — see loadWishlistPrices below
+const MAX_PRICE_LOOKUP_GAMES = 500; // mirrors the server's own cap — see loadPrices below
 
 // The shape of one `data:` line in /api/game-details/stream's SSE response.
 interface DetailsEvent {
@@ -614,13 +613,8 @@ export default function ListRoute() {
     setPriceFetchedAt(undefined);
     try {
       const gen = loadGuard.current();
-      if (kind === 'bundle' && resolvedBundleGames) await loadBundlePrices(resolvedBundleGames, gen, true);
-      else if (hasPrices())
-        await loadWishlistPrices(
-          rowsStore.map((r) => ({ appid: r.appid })),
-          gen,
-          true,
-        );
+      if (kind === 'bundle' && resolvedBundleGames) await loadPrices(resolvedBundleGames, gen, true);
+      else if (hasPrices()) await loadPrices(rowsStore, gen, true);
     } finally {
       setRefreshingPrices(false);
     }
@@ -1593,7 +1587,13 @@ export default function ListRoute() {
   const [itadOff, setItadOff] = createSignal(false);
   void itadConfiguredPromise.then((ok) => setItadOff(!ok));
 
-  async function loadWishlistPrices(items: { appid: number }[], gen: number, force = false): Promise<void> {
+  // Looked up by appid, or by ITAD gid for a bundle's games (already known from its resolve). Chunked:
+  // a wishlist can run past the server's own cap.
+  async function loadPrices(
+    games: readonly { appid: number; gid?: string }[],
+    gen: number,
+    force = false,
+  ): Promise<void> {
     setPriceStatusText('');
     const configured = await itadConfiguredPromise;
     if (loadGuard.isStale(gen)) return;
@@ -1603,29 +1603,31 @@ export default function ListRoute() {
     }
 
     const country = resolveRegion(getStoredRegion());
-    const appids = items.map((i) => i.appid);
-    for (let i = 0; i < appids.length; i += MAX_PRICE_LOOKUP_GAMES) {
+    for (let i = 0; i < games.length; i += MAX_PRICE_LOOKUP_GAMES) {
       if (loadGuard.isStale(gen)) return;
-      const chunk = appids.slice(i, i + MAX_PRICE_LOOKUP_GAMES);
+      const chunk = games.slice(i, i + MAX_PRICE_LOOKUP_GAMES);
+      const byGid = chunk[0].gid != null;
       try {
-        const { prices, fetchedAt: at } = await postPrices({ appids: chunk, country, force });
+        const { prices, fetchedAt: at } = await postPrices(
+          byGid
+            ? { gids: chunk.map((g) => g.gid!), country, force }
+            : { appids: chunk.map((g) => g.appid), country, force },
+        );
         // A wishlist is chunked across several calls, so the readout takes the oldest of them —
         // same "never claim data is fresher than its stalest part" rule as the account routes'.
         notePriceFetchedAt(at);
         if (loadGuard.isStale(gen)) return;
         batch(() => {
-          for (const appid of chunk) {
-            const info = prices[appid];
+          for (const g of chunk) {
+            const info = prices[byGid ? g.gid! : g.appid];
             if (!info) continue;
-            rowStore.mutateRow(appid, (draft) => applyPriceInfo(draft, info, discountPct));
+            rowStore.mutateRow(g.appid, (draft) => applyPriceInfo(draft, info));
           }
         });
       } catch (err) {
         if (loadGuard.isStale(gen)) return;
         batch(() => {
-          for (const appid of chunk) {
-            rowStore.mutateRow(appid, (draft) => nullMissingPriceFields(draft));
-          }
+          for (const g of chunk) rowStore.mutateRow(g.appid, (draft) => nullMissingPriceFields(draft));
         });
         setPriceStatusText(`Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`);
       }
@@ -1658,8 +1660,8 @@ export default function ListRoute() {
 
   // Stamps `inLibrary`/`onWishlist` onto every row currently in `rowsStore`, from myOwnership.ts's
   // own owned/wishlist appid sets, checked against `currentAccount` (whichever account's list this
-  // route itself loaded — see myOwnership.ts's own comment) — unlike loadWishlistPrices/
-  // loadBundlePrices above, this is never a per-row fetch: myOwnership.ts already loads (and
+  // route itself loaded — see myOwnership.ts's own comment) — unlike loadPrices above,
+  // this is never a per-row fetch: myOwnership.ts already loads (and
   // caches) the whole sets once per loaded account, so checking membership for every row here
   // costs nothing extra. `peekMyOwnershipStatus` is a synchronous, non-blocking peek that can
   // return null for "no currentAccount loaded" *or* "still loading" (see its own comment in
@@ -1721,37 +1723,6 @@ export default function ListRoute() {
       if (loadGuard.isStale(gen)) return;
       stampMyOwnership();
     });
-  }
-
-  // Bundle prices are looked up by ITAD gid (already known upfront from the bundle's own
-  // resolved games), not appid — mirrors bundles.tsx's own loadPrices. No chunking: unlike a
-  // wishlist, a single bundle's game list never runs past the server's own cap.
-  async function loadBundlePrices(resolved: ResolvedGame[], gen: number, force = false): Promise<void> {
-    setPriceStatusText('');
-    try {
-      const { prices, fetchedAt: at } = await postPrices({
-        gids: resolved.map((g) => g.gid),
-        country: resolveRegion(getStoredRegion()),
-        force,
-      });
-      notePriceFetchedAt(at);
-      if (loadGuard.isStale(gen)) return;
-      batch(() => {
-        for (const g of resolved) {
-          const info = prices[g.gid];
-          if (!info) continue;
-          rowStore.mutateRow(g.appid, (draft) => applyPriceInfo(draft, info, discountPct));
-        }
-      });
-    } catch (err) {
-      if (loadGuard.isStale(gen)) return;
-      batch(() => {
-        for (const g of resolved) {
-          rowStore.mutateRow(g.appid, (draft) => nullMissingPriceFields(draft));
-        }
-      });
-      setPriceStatusText(`Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`);
-    }
   }
 
   // Unused for kind === 'user' (its view lives on the list itself, see handleResetView below) —
@@ -2174,15 +2145,6 @@ export default function ListRoute() {
           tierPriceMax: g.tierPriceMax,
           bundlePackage: packages.get(g.appid) ?? null,
           addon: g.addon,
-          steamRegular: undefined,
-          bestDealPrice: undefined,
-          bestDealShop: undefined,
-          bestDealUrl: undefined,
-          bestDealCut: undefined,
-          lowAll: undefined,
-          lowY1: undefined,
-          lowM3: undefined,
-          priceCurrency: undefined,
           loading: true,
           details: null,
         }));
@@ -2245,15 +2207,6 @@ export default function ListRoute() {
             name: '',
             priority: item.priority,
             dateAdded: item.dateAdded,
-            steamRegular: undefined,
-            bestDealPrice: undefined,
-            bestDealShop: undefined,
-            bestDealUrl: undefined,
-            bestDealCut: undefined,
-            lowAll: undefined,
-            lowY1: undefined,
-            lowM3: undefined,
-            priceCurrency: undefined,
             loading: true,
             details: null,
           }));
@@ -2464,8 +2417,8 @@ export default function ListRoute() {
       return;
     }
 
-    if (hasPrices()) loadWishlistPrices(streamTargets, gen); // runs concurrently, not awaited
-    if (kind === 'bundle' && resolvedBundleGames) loadBundlePrices(resolvedBundleGames, gen); // ditto
+    if (hasPrices()) loadPrices(streamTargets, gen); // runs concurrently, not awaited
+    if (kind === 'bundle' && resolvedBundleGames) loadPrices(resolvedBundleGames, gen); // ditto
     if (stampsOwnership) loadMyOwnership(gen); // ditto
     const toStream = kept ? streamTargets.filter((target) => !kept.has(target.appid)) : streamTargets;
     if (toStream.length) await streamGameDetails(toStream, gen);
@@ -3074,11 +3027,7 @@ export default function ListRoute() {
     const onRegionChange = () => {
       setRegionCode(resolveRegion(getStoredRegion()));
       setPriceFetchedAt(undefined);
-      if (hasPrices())
-        void loadWishlistPrices(
-          rowsStore.map((r) => ({ appid: r.appid })),
-          loadGuard.current(),
-        );
+      if (hasPrices()) void loadPrices(rowsStore, loadGuard.current());
       else if (kind === 'bundle') void load();
     };
     window.addEventListener(REGION_CHANGED_EVENT, onRegionChange);

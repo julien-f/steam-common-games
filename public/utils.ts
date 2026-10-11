@@ -206,7 +206,7 @@ export function dealRecordTier(
 }
 
 // How much cheaper the best deal is than Steam Full Price, as a whole percentage — computed by
-// each page's own loadPrices/loadWishlistPrices (from the same response's steamRegular/
+// applyPriceInfo (priceLoading.ts, from the same response's steamRegular/
 // bestDeal.price) rather than taken from ITAD's own per-deal `cut` field, deliberately: `cut` is
 // that shop's own discount off *its own* regular price, which shops set independently and isn't
 // consistent from row to row, whereas Steam Full Price is one stable, Valve-set anchor this app
