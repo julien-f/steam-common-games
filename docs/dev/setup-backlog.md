@@ -18,6 +18,7 @@ Last reviewed: 2026-10-11 · Transcripts read up to: 2026-10-11T13:17:25Z.
 - **P14 · ~/.claude/CLAUDE.md · S** — a recommended next step never bundles a push or a release; each is its own option. The user cut such bundles back twice. Measure: the next digests' answers trimming a push or release off a recommendation — 2 → 0.
 - **P16 · ux-fix · S** — "Review the batch" links code-fix's step 4 instead of copying it. Measure: copies of that paragraph in `.claude/skills/` — 2 → 1 (1 when applied).
 - **P17 · setup-facts · S** — `--agents` adds each agent's tool time, its share and top three commands, so model time (the rest) shows next to gate time. On the 2026-10-11 batches tools were 35–58% of a lane, model turns the rest. Measure: the next batch's `node scripts/setup-facts.js --agents` lines — the baseline for P18.
+- **P18 · code-fix BATCH · M** — `batch.js plan` defaults to 6 lanes; lanes run only their item's test before committing (the hook runs the rest); merge commits defer e2e to one run after the last merge; a background `/code-review` per merged lane replaces the end-of-batch review. Measure: the next batch's `batch.js record` and `--agents` — `lanesMin` 12 → ≤ 9, `afterLanesMin` 10 → ≤ 5, gate share per lane 15–25% → ≤ 15%, hand-resolved merge conflicts ≤ 1.
 
 ## Open
 

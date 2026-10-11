@@ -5,7 +5,7 @@ Above about five items, code-fix and ux-fix run as parallel lanes: one backgroun
 ## 1. Plan (before any go-ahead)
 
 - Commit the backlog first: a worktree only sees committed items.
-- `node scripts/batch.js plan [--lanes=4] <items…>` groups the items into lanes that cite no code within 80 lines of each other (a file mentioned without any line counts whole), writes the manifest (`.claude/batch/`, gitignored) and prints an estimate from past batches. A bare `name.ts` counts when it names exactly one tracked file. Place by hand what it lists as naming no file. Lanes can still meet in code an item doesn't cite (a renamed helper's callers): `merge` then lists the conflicted files to resolve by hand, keeping both lanes' intent.
+- `node scripts/batch.js plan [--lanes=6] <items…>` groups the items into lanes that cite no code within 80 lines of each other (a file mentioned without any line counts whole), writes the manifest (`.claude/batch/`, gitignored) and prints an estimate from past batches. A bare `name.ts` counts when it names exactly one tracked file. Place by hand what it lists as naming no file. Lanes can still meet in code an item doesn't cite (a renamed helper's callers): `merge` then lists the conflicted files to resolve by hand, keeping both lanes' intent.
 - Pull out of the lanes, to do yourself on `main` after the merges: an item whose fix changes what callers in other lanes read (a helper's return shape), and an item with an open fork.
 - Present the recommended items (and why not the others), the lanes, the serial items and the estimate in one `AskUserQuestion`.
 
@@ -15,12 +15,13 @@ One `Agent` per lane, all in one message, `isolation: "worktree"`, with the lane
 
 ## 3. Merge each lane as it reports
 
-- `node scripts/batch.js merge <branch> <its closed items>`: merges `--no-ff --no-commit`, keeps both sides of CHANGELOG conflicts, resolves a backlog conflict (lanes closing their own items) to `main`'s side, and drops the closed items from the backlog. Narrow, rather than drop, an item the lane narrowed. Commit (`Merge lane <X>: …`, body naming the items; its hook runs the e2e the lane's commits deferred), then `git worktree remove` and `git branch -d`.
+- `node scripts/batch.js merge <branch> <its closed items>`: merges `--no-ff --no-commit`, keeps both sides of CHANGELOG conflicts, resolves a backlog conflict (lanes closing their own items) to `main`'s side, and drops the closed items from the backlog. Narrow, rather than drop, an item the lane narrowed. Commit with `E2E_DEFER=1` (`Merge lane <X>: …`, body naming the items; the lane ran e2e before reporting), then `git worktree remove` and `git branch -d`.
+- Then launch a background `Agent` to run `/code-review <merge>^1..<merge>` and report its findings without fixing them; it replaces code-fix's step 4 for the batch. Review the conflicts you resolved by hand yourself: a lane's review can't see where two lanes meet.
 - Record what a lane reports as new problems, once verified, as backlog items.
 
 ## 4. After the lanes
 
-The serial items, then the skill's look (ux-fix step 3; code-fix's UI-visible items), then `/code-review` over the whole batch, then `node scripts/batch.js record` (feeds the next estimate) and `node scripts/setup-facts.js --agents` (each agent's time, turns, failed calls, gate and tool time) for the report.
+`npm run test:e2e` once over the merged lanes, then the serial items, then the skill's look (ux-fix step 3; code-fix's UI-visible items), then the lane reviews' findings (verify each, fix the confirmed ones as follow-up commits, list the dropped ones with why), then `node scripts/batch.js record` (feeds the next estimate) and `node scripts/setup-facts.js --agents` (each agent's time, turns, failed calls, gate and tool time) for the report.
 
 ## Lane template
 
@@ -32,8 +33,9 @@ You fix <items> from <backlog file> in this repo, in your own git worktree (your
 - A real fork (fix widens past the item, a dependency, more upstream traffic): skip the item and report it.
 - Stay in your worktree: no `git -C <main checkout>`, `--prefix` or `cwd` parameter; one plain command per Bash call, no `&&`/`;` chains or heredocs.
 - Commit messages: write them to <scratchpad>/msg-<lane>.txt (the scratchpad is shared, a generic name gets overwritten), then `E2E_DEFER=1 E2E_PORT=<2899x> git commit -F <file>`; prefix every e2e run with the same E2E_PORT.
+- Before each commit, run only your item's test file: the commit hook runs the unit suite, typecheck and lint, so don't run them by hand.
 - Before reporting, run `E2E_PORT=<2899x> npm run test:e2e` once (both widths) and fix what fails.
 Report: item → commit → how verified; anything skipped or narrowed and why; new problems found.
 ```
 
-Give each lane its own `E2E_PORT` (28993 up; 28997 for the lead).
+Give each lane its own `E2E_PORT` (28993 up); the lead keeps the default.

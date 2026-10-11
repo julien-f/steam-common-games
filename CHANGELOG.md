@@ -118,6 +118,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fix batches split items in one file across lanes when they touch code far apart
 - `npm run check:setup` fails when the setup backlog holds items but its header dates are unset
 - `setup-facts.js --agents` shows each agent's tool time and its top commands
+- Fix batches default to six lanes and review each lane as it merges
 
 ## [0.10.0] - 2026-10-10
 

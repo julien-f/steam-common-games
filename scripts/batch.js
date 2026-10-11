@@ -1,7 +1,7 @@
 'use strict';
 
 // Parallel fix batches (.claude/skills/code-fix/BATCH.md): plan lanes, track progress, merge a lane.
-//   node scripts/batch.js plan [--lanes=4] <C66 U12 …>   lanes sharing no cited code + estimate; writes the manifest
+//   node scripts/batch.js plan [--lanes=6] <C66 U12 …>   lanes sharing no cited code + estimate; writes the manifest
 //   node scripts/batch.js status [--watch]               done/total and time left, per lane
 //   node scripts/batch.js merge <branch> <C66 …>         merge --no-ff --no-commit, union CHANGELOG, close items
 //   node scripts/batch.js record                         appends the batch's per-item times to the history
@@ -293,12 +293,12 @@ function main() {
   const [cmd, ...args] = process.argv.slice(2);
   const flags = args.filter((a) => a.startsWith('--'));
   const rest = args.filter((a) => !a.startsWith('--'));
-  if (cmd === 'plan') return plan(rest, Number(flags.find((f) => f.startsWith('--lanes='))?.slice(8) ?? 4));
+  if (cmd === 'plan') return plan(rest, Number(flags.find((f) => f.startsWith('--lanes='))?.slice(8) ?? 6));
   if (cmd === 'status') return status(flags.includes('--watch'));
   if (cmd === 'merge' && rest.length) return merge(rest[0], rest.slice(1));
   if (cmd === 'record') return record();
   console.error(
-    'Usage: node scripts/batch.js plan [--lanes=4] <items…> | status [--watch] | merge <branch> <items…> | record',
+    'Usage: node scripts/batch.js plan [--lanes=6] <items…> | status [--watch] | merge <branch> <items…> | record',
   );
   process.exit(1);
 }
