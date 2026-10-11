@@ -21,7 +21,8 @@ test('runAll: every step runs, in order, with its pass/fail and output', async (
 });
 
 test('steps: a full run has every check but e2e; a commit adds e2e and the UI checks only when UI files are staged', () => {
-  const names = (...args) => steps(...args).map(([name]) => name);
+  // Explicit deferE2e: a fix-batch lane runs this under E2E_DEFER=1, which would drop e2e otherwise.
+  const names = (staged, files) => steps(staged, files, { deferE2e: false }).map(([name]) => name);
   const always = ['format', 'changelog', 'test', 'doc-refs', 'journeys', 'setup'];
   const ui = ['typecheck', 'lint', 'css'];
   assert.deepStrictEqual(names().sort(), [...always, ...ui].sort());
