@@ -13,7 +13,7 @@
 // `bindNavPopover`, shared with the account chip's own popover (AccountChip.tsx).
 import { onMount, onCleanup, createEffect, createSignal, on, For, Show, type JSX } from 'solid-js';
 import { A, useNavigate, useLocation, type RouteSectionProps } from '@solidjs/router';
-import { prefsPopoverPanelHtml, initPrefsPopover } from './prefsPopover.ts';
+import { PrefsPanel } from './prefsPopover.tsx';
 import { initLightbox, repointLightboxGame } from './lightbox.tsx';
 import { initPanel, isPanelOpen, getPanelGame } from './panel.tsx';
 import { bindPanelKeyboardShortcuts } from './panelKeyboard.ts';
@@ -92,7 +92,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
   let searchInputEl!: HTMLInputElement;
   let scrollEl!: HTMLDivElement;
   let prefsDetailsEl!: HTMLDetailsElement;
-  let prefsWrapEl!: HTMLDivElement;
+  let prefsPanelEl!: HTMLDivElement;
   // The `?` shortcuts dialog — see ShortcutsModal.tsx. State lives here because
   // bindPanelKeyboardShortcuts' `shortcuts` option needs it.
   const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
@@ -231,10 +231,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       },
     });
 
-    initPrefsPopover();
-    // The panel is inside the innerHTML prefsPopoverPanelHtml() renders, so it's looked up under
-    // the wrapper rather than ref'd directly.
-    onCleanup(bindNavPopover(prefsDetailsEl, prefsWrapEl.querySelector('.site-nav-prefs-panel') as HTMLElement));
+    onCleanup(bindNavPopover(prefsDetailsEl, prefsPanelEl));
   });
 
   return (
@@ -282,10 +279,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
             <summary class="site-nav-link site-nav-prefs-btn" aria-label="Preferences">
               {'\u2699\uFE0F'}
             </summary>
-            {/* eslint-disable-next-line solid/no-innerhtml -- prefsPopoverPanelHtml() is this app's
-                own static markup for the popover's contents (prefsPopover.ts, which then wires the
-                region <select> up imperatively); no external input reaches it. */}
-            <div ref={prefsWrapEl} innerHTML={prefsPopoverPanelHtml()} />
+            <PrefsPanel ref={prefsPanelEl} />
           </details>
         </nav>
 

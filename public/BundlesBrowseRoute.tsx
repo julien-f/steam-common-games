@@ -52,7 +52,7 @@ import {
 } from './bundleRows.ts';
 import { currentRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { setBrowsedBundles } from './bundleBrowseStore.ts';
-import { openPrefsPopover } from './prefsPopover.ts';
+import { openPrefsPopover } from './prefsPopover.tsx';
 import { restoreTableView, shareTableView, resetTableView, bindViewPersistence } from './tableViewPrefs.ts';
 import { createStaleGuard } from './staleGuard.ts';
 import { getPref, setPref } from './prefs.ts';

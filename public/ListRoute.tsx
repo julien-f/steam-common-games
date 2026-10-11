@@ -182,7 +182,7 @@ import { fanaticalBuyUrl, FANATICAL_BOOKMARKLET } from './fanaticalPicks.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, PRICES_UNAVAILABLE } from './priceLoading.ts';
 import { isItadConfigured, isItadOff } from './panelData.ts';
 import { currentRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
-import { openPrefsPopover } from './prefsPopover.ts';
+import { openPrefsPopover } from './prefsPopover.tsx';
 import { registerRouteHandlers } from './AppShell.tsx';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
 import { ComparePlayersForm } from './ComparePlayersForm.tsx';
