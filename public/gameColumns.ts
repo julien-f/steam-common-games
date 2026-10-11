@@ -1,5 +1,3 @@
-'use strict';
-
 // Shared game-table building blocks for the Library Explorer (public/library.js) and Bundles
 // (public/bundles.js) pages — both build a `@vates/data-table-solid` table over a list of
 // games, and the overwhelming majority of what a "game" column even means (score, HLTB,

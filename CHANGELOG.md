@@ -70,6 +70,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A list built on a bundle keeps the games Steam didn't answer for, from its last good load, instead of dropping them
 - npm run cache:clear now empties every cache table, including search, news, bundle and ITAD ID caches
 - A production install that skips development packages no longer fails to start
+- A long wishlist's Prices readout no longer says "just now" when part of its prices are days old
 
 ### Development
 

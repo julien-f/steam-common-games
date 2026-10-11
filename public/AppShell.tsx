@@ -200,7 +200,6 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       // Only ListRoute registers it — which covers every case, since a game panel only ever opens
       // there (`openGameGlobally` navigates to /game/:appid, which *is* ListRoute).
       onRefresh: (game) => routeHandlers.refreshGame?.(game),
-      enableTagFilters: true,
       onTagClick: (dim, value) => routeHandlers.onTagClick?.(dim, value),
       getOwners: (appid) => routeHandlers.getOwners?.(appid) ?? null,
       isTagActive: (dim, value) => routeHandlers.isTagActive?.(dim, value) ?? false,

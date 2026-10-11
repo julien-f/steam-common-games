@@ -177,7 +177,7 @@ function renderDateTime(value: unknown, extra?: Node): Node {
 // column on a bundle *browse* page where "act now" is real information rather than trivia. Colors
 // are scoreColor's own tiers, the same scale every other urgency/quality signal in the app uses
 // (Best Deal's record badges, Price Status), rather than a second palette meaning the same thing.
-function renderEnds(value: unknown, row: BundleRow): Node {
+function renderEnds(value: unknown): Node {
   const urgency = bundleUrgency(value as string | null);
   // `later`'s empty label deliberately renders nothing at all — see bundleUrgency.
   let rel: HTMLSpanElement | undefined;
@@ -189,7 +189,6 @@ function renderEnds(value: unknown, row: BundleRow): Node {
       urgency.tier === 'urgent' ? scoreColor(20) : urgency.tier === 'soon' ? scoreColor(55) : 'var(--text1)';
   }
   // An expired row is dimmed as a whole (see renderBundleTitle), so nothing further here.
-  void row;
   return renderDateTime(value, rel);
 }
 

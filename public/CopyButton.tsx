@@ -4,7 +4,7 @@
 import { createSignal, onCleanup, type JSX } from 'solid-js';
 import { copyText, COPIED_MS } from './clipboard.ts';
 
-export function CopyButton(props: { text: string; label?: string; title: string; class?: string }): JSX.Element {
+export function CopyButton(props: { text: string; title: string }): JSX.Element {
   const [copied, setCopied] = createSignal(false);
   let timer: ReturnType<typeof setTimeout> | undefined;
   onCleanup(() => clearTimeout(timer));
@@ -21,12 +21,12 @@ export function CopyButton(props: { text: string; label?: string; title: string;
   return (
     <button
       type="button"
-      class={`copy-btn${copied() ? ' copy-btn--copied' : ''}${props.class ? ` ${props.class}` : ''}`}
+      class={`copy-btn${copied() ? ' copy-btn--copied' : ''}`}
       title={copied() ? 'Copied!' : props.title}
       aria-label={props.title}
       onClick={copy}
     >
-      {copied() ? '✓' : (props.label ?? '⧉')}
+      {copied() ? '✓' : '⧉'}
     </button>
   );
 }

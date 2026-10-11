@@ -1,5 +1,3 @@
-'use strict';
-
 // The lightbox's touch-swipe decisions, split out of `lightbox.tsx` for the same reason
 // `lightboxTime.ts` and `compareSlots.ts` are: it's the part worth testing, and it needs
 // neither a DOM nor a store. The handler in `lightbox.tsx` keeps only the DOM work —

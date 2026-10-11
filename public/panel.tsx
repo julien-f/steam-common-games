@@ -1,5 +1,3 @@
-'use strict';
-
 import {
   fmtAge,
   fmtPlaytime,
@@ -69,31 +67,22 @@ function bundleTierText(b: GameBundle): string {
   return rate ? `from ${formatWithEstimate(rate.amount, rate.currency, region, '/game')}` : 'Varies';
 }
 
-// Host-page options passed to initPanel. All optional — a page supplies only the hooks it
-// needs; the field names mirror exactly what panel.tsx reads off panelOptions below.
+// The shell's hooks, passed once to initPanel.
 export interface PanelOptions {
-  onTagClick?: (dim: string, val: string) => void;
-  isTagActive?: (dim: string, val: string) => boolean;
-  onRefresh?: (game: ReadonlyGame) => void;
-  onNavigateGame?: (appid: number, name: string) => void;
-  onClose?: (opts?: { leavingRoute?: boolean }) => void;
-  enableTagFilters?: boolean;
+  onTagClick: (dim: string, val: string) => void;
+  isTagActive: (dim: string, val: string) => boolean;
+  onRefresh: (game: ReadonlyGame) => void;
+  onNavigateGame: (appid: number, name: string) => void;
+  onClose: (opts?: { leavingRoute?: boolean }) => void;
   // The route's own owners for a game (a comparison's players), over the current account's.
-  getOwners?: (appid: number) => GameOwner[] | null;
+  getOwners: (appid: number) => GameOwner[] | null;
 }
 
 // ── Shared game side panel ──────────────────────────────────────────────────
 // Mounted once by AppShell.tsx's single `initPanel(options)` call (see docs/list-centric-
 // docs/dev/frontend.md), not per-route — ListRoute.tsx (the only caller of `panelOpen` now) just
-// opens/closes it, it never configures it itself. This used to be
-// used by three separate pages (app.tsx/library.tsx/bundles.tsx), each supplying its own
-// `initPanel` options — that per-page option-supplying shape is why `PanelOptions` still
-// exists as a real interface (a global single-instance app has no *structural* need for one),
-// though only `onNavigateGame` is actually passed today; the rest (`onTagClick`/`isTagActive`/
-// `enableTagFilters`) are dead weight from that era with no current caller — left in place rather
-// than ripped out, since removing them touches more of this file for a change genuinely out of
-// scope for the pass that noticed it (see this file's git history/CHANGELOG for the specifics).
-// `pricesHandledByHost` did go: its one reader was the old `loadPrice`, and the price resource's
+// opens/closes it, it never configures it itself; `PanelOptions` are the shell's hooks, which
+// relay to the mounted route. `pricesHandledByHost` is gone: its one reader was the old `loadPrice`, and the price resource's
 // own source answers the same question off the row itself ("has anything already priced this?"). A real Solid component now (converted from the
 // original panel.ts's hand-rolled innerHTML rebuilds): `initPanel(options)` mounts it once into
 // the static `#panel-body` element every page's own markup already has; `panelOpen(game)`/
@@ -135,7 +124,7 @@ export interface PanelOptions {
 // what the shape below is *for*: `npm run lint`'s `solid/reactivity` rule is what keeps a plain
 // `const x = someSignal()` / `const g = props.game.field` capture from quietly reintroducing the
 // same class of bug.
-let panelOptions: PanelOptions = {};
+let panelOptions: PanelOptions;
 const [panelGame, setPanelGame] = createSignal<ReadonlyGame | null>(null);
 const [heroIdx, setHeroIdx] = createSignal(0);
 let panelPrevFocus: HTMLElement | null = null;
@@ -212,7 +201,7 @@ export function clearAllRandomQueues() {
   randomQueues.clear();
 }
 
-export function initPanel(options: PanelOptions = {}) {
+export function initPanel(options: PanelOptions) {
   panelOptions = options;
 
   document.getElementById('panel-close')!.addEventListener('click', () => panelClose());
@@ -357,7 +346,7 @@ export function panelHandleEscape() {
 // does that and panel.tsx only owns the button's disabled/spinning state and re-render.
 async function handlePanelRefresh() {
   const game = panelGame();
-  if (!game || panelRefreshing() || !panelOptions.onRefresh) return;
+  if (!game || panelRefreshing()) return;
   setPanelRefreshing(true);
   try {
     // Each `refetch()` re-runs that resource's fetcher with `refetching` set, which is what its
@@ -511,7 +500,7 @@ const panelData = createRoot(() => {
   const [owners] = createResource<GameOwner[], string>(ownersKey, () => {
     const appid = openAppid();
     if (appid == null) return [];
-    return panelOptions.getOwners?.(appid) ?? getOwnersFor(appid);
+    return panelOptions.getOwners(appid) ?? getOwnersFor(appid);
   });
 
   const [ownership] = createResource<OwnershipStatus | null, string>(appidAndAccount, () => {
@@ -610,7 +599,7 @@ function panelPriceFields(game: ReadonlyGame): PriceFields | null | undefined {
 // convention as gameSearch.ts's onSelect.
 function navigateToGame(appid: number, name: string) {
   const game = panelGame();
-  if (!game || !panelOptions.onNavigateGame) return;
+  if (!game) return;
   // See nextHopHistory (panelHistory.ts) for the push-vs-pop rule.
   setPanelHistory((hist) => nextHopHistory(hist, { appid: game.appid, name: game.name }, appid));
   pendingHopAppid = appid;
@@ -623,7 +612,7 @@ function navigateToGame(appid: number, name: string) {
 // only ever needs to know "keep whatever's left in the stack", identical in both directions.
 function panelGoBack() {
   const hist = panelHistory();
-  if (!hist.length || !panelOptions.onNavigateGame) return;
+  if (!hist.length) return;
   const prev = hist[hist.length - 1];
   setPanelHistory(hist.slice(0, -1));
   pendingHopAppid = prev.appid;
@@ -699,7 +688,7 @@ export function panelClose({ leavingRoute = false } = {}) {
   // host-specific close cleanup (clearing `?game=`/`&shot=` from the URL, resetting the host's
   // own "active game" state) can hook in without every
   // host having to remember to wrap all of those paths itself.
-  panelOptions.onClose?.({ leavingRoute });
+  panelOptions.onClose({ leavingRoute });
   popOverlayEntry('panel');
 }
 
@@ -756,7 +745,7 @@ function fmtCompactCount(n: number) {
 // title + pill row" section — four near-identical blocks in a row. Merged into one
 // cloud instead, kind distinguished by a small colored dot (+ a legend) rather than
 // by which section a pill happens to sit in. `kind` picks the dot color/legend label;
-// `dim` (may be null when tag-click filtering is disabled) is the actual click-filter
+// `dim` is the actual click-filter
 // dimension, kept separate from `kind` since developers/publishers share one visual
 // kind but are two different filter dimensions.
 type TagKind = keyof typeof TAG_KIND_META;
@@ -767,7 +756,7 @@ const TAG_KIND_META = {
   devpub: { label: 'Developer/Publisher', color: '#b892d6' },
 };
 
-function TagCloud(props: { groups: { kind: TagKind; dim: string | null; items?: string[] | null }[] }): JSX.Element {
+function TagCloud(props: { groups: { kind: TagKind; dim: string; items?: string[] | null }[] }): JSX.Element {
   const present = createMemo(() => props.groups.filter((gr) => gr.items?.length));
   const pills = createMemo(() =>
     present().flatMap(({ kind, dim, items }) => {
@@ -783,24 +772,15 @@ function TagCloud(props: { groups: { kind: TagKind; dim: string | null; items?: 
         <div class="panel-tags">
           <For each={pills()}>
             {({ kind, dim, v }) => {
-              const dot = <span class="panel-tag-dot" style={{ background: TAG_KIND_META[kind].color }} />;
-              if (dim) {
-                return (
-                  <button
-                    class="panel-tag panel-tag-btn"
-                    classList={{ active: !!panelOptions.isTagActive?.(dim, v) }}
-                    onClick={() => panelOptions.onTagClick?.(dim, v)}
-                  >
-                    {dot}
-                    {v}
-                  </button>
-                );
-              }
               return (
-                <span class="panel-tag">
-                  {dot}
+                <button
+                  class="panel-tag panel-tag-btn"
+                  classList={{ active: panelOptions.isTagActive(dim, v) }}
+                  onClick={() => panelOptions.onTagClick(dim, v)}
+                >
+                  <span class="panel-tag-dot" style={{ background: TAG_KIND_META[kind].color }} />
                   {v}
-                </span>
+                </button>
               );
             }}
           </For>
@@ -2060,19 +2040,16 @@ function sameNames(a: string[], b: string[]): boolean {
 // Tags/genres/categories/developer-publisher, as one cloud (see TagCloud above).
 function TagCloudSection(props: { game: ReadonlyGame }): JSX.Element {
   const meta = () => props.game.details?.meta;
-  // The caller passes each of the four TagKind literals; narrowing back to TagKind (not a bare
-  // string) is what lets the TagCloud call below type-check its `kind` field.
-  const tagDim = (key: string) => (panelOptions.enableTagFilters ? (key as TagKind) : null);
   const groups = createMemo(() => {
     const devs = meta()?.developers || [];
     const pubs = meta()?.publishers || [];
     const sameDevPub = sameNames(devs, pubs);
     return [
-      { kind: 'tags' as const, dim: tagDim('tags'), items: props.game.details?.tags },
-      { kind: 'genres' as const, dim: tagDim('genres'), items: meta()?.genres },
-      { kind: 'categories' as const, dim: tagDim('categories'), items: meta()?.categories },
-      { kind: 'devpub' as const, dim: tagDim('developers'), items: devs },
-      ...(sameDevPub ? [] : [{ kind: 'devpub' as const, dim: tagDim('publishers'), items: pubs }]),
+      { kind: 'tags' as const, dim: 'tags', items: props.game.details?.tags },
+      { kind: 'genres' as const, dim: 'genres', items: meta()?.genres },
+      { kind: 'categories' as const, dim: 'categories', items: meta()?.categories },
+      { kind: 'devpub' as const, dim: 'developers', items: devs },
+      ...(sameDevPub ? [] : [{ kind: 'devpub' as const, dim: 'publishers', items: pubs }]),
     ];
   });
   return (
@@ -2173,7 +2150,7 @@ function refreshTitle(game: ReadonlyGame): string {
 function RefreshButton(props: { game: ReadonlyGame }): JSX.Element {
   const age = () => (props.game.detailsFetchedAt === undefined ? '' : fmtAge(props.game.detailsFetchedAt));
   return (
-    <Show when={panelOptions.onRefresh && !props.game.loading}>
+    <Show when={!props.game.loading}>
       <button
         type="button"
         class="panel-refresh-btn"

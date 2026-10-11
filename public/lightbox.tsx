@@ -1,17 +1,10 @@
-'use strict';
-
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
 import { urlWithoutShot } from './urlState.ts';
 import { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
 import type { Game, ReadonlyGame } from './types.ts';
 import type Hls from 'hls.js';
-// Pulled into its own plain-TS module (no JSX) so test/lightbox.test.js can still import it
-// directly — Node's test runner strips TypeScript syntax natively but has no JSX transform,
-// so it can no longer `require()` this file itself once it contains real JSX. Re-exported
-// below so this stays the one public entry point for it either way.
 import { fmtTime } from './lightboxTime.ts';
-export { fmtTime } from './lightboxTime.ts';
 import { decideSwipeAxis, resolveSwipe, LB_SWIPE_RESISTANCE } from './lightboxSwipe.ts';
 import type { SwipeAxis } from './lightboxSwipe.ts';
 
@@ -195,9 +188,6 @@ function stepGameFromLightbox(step: () => void, dir = 0) {
 
 // ── Fullscreen button sync ─────────────────────────────────────────────────
 
-// Lazily cast (not a module-level const) — a `document` reference at module
-// load would throw in the Node test environment (no DOM), which imports this
-// file just for `fmtTime`.
 function webkitDoc(): Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void } {
   return document as Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void };
 }
@@ -410,9 +400,6 @@ function flashSeek(side: 'left' | 'right') {
   el.classList.add('lb-seek-flash--show');
   flash._flashTimer = setTimeout(() => el.classList.remove('lb-seek-flash--show'), 500);
 }
-
-// `fmtTime` itself now lives in `./lightboxTime.ts` (see the import at the top of this file)
-// and is re-exported below.
 
 function lbScrubGradient(pct: number) {
   return `linear-gradient(to right, var(--accent) ${pct}%, rgba(255,255,255,0.25) ${pct}%)`;
