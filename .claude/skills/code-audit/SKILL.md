@@ -49,4 +49,4 @@ Not findings: style (ESLint and Prettier own it), "might need later" generality,
 | C   | Severity | Effort | Dimension | Where | Finding | Direction |
 | --- | -------- | ------ | --------- | ----- | ------- | --------- |
 
-- Fix nothing. The user picks what to fix.
+- Fix nothing. Then offer, in one `AskUserQuestion`, to fix the set you recommend (and why not the rest), planned as in [code-fix's BATCH.md](../code-fix/BATCH.md) step 1.

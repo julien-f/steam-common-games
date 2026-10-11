@@ -7,6 +7,8 @@ description: Fix items from the code backlog (docs/dev/code-backlog.md) — test
 
 Works through the named `C<n>` items in [code-backlog.md](../../../docs/dev/code-backlog.md), in order, one commit each. Finding new problems is [code-audit](../code-audit/SKILL.md)'s job; this one fixes what's there. A UI-visible fix also follows [ux-fix](../ux-fix/SKILL.md)'s step 3 (look at it on `dev:mock`).
 
+Above about five items, run them as a parallel batch: [BATCH.md](BATCH.md).
+
 ## 0. Before starting
 
 - Read every requested item, the doc its dimension names in code-audit, then the code involved, callers included.

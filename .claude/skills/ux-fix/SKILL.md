@@ -7,6 +7,8 @@ description: Fix items from the UX backlog (docs/dev/improvements.md) — test f
 
 Works through the named `U<n>` items in [improvements.md](../../../docs/dev/improvements.md), in order, one commit each. Finding new problems is [ux-review](../ux-review/SKILL.md)'s job; this one fixes what's there.
 
+Above about five items, run them as a parallel batch: [code-fix's BATCH.md](../code-fix/BATCH.md).
+
 ## 0. Before starting
 
 - Read every requested item, the scenario it names in [journeys.md](../../../docs/dev/journeys.md) and the [UI guidelines](../../../docs/dev/ui-guidelines.md) it touches, then the code involved.

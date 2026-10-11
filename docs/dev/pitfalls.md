@@ -73,3 +73,15 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: after `menu.click()`, the next step waits forever for an item of the header menu (`locator.click: Test timeout`); the error context shows the menu closed.
 - **Cause**: the header button sits past the phone's right edge (grouping widens the table; CI's fonts add a few pixels more than local ones). `click()` scrolls `.dt-table-wrap` to reach it, that scroll event fires after the menu opened, and data-table closes a menu on any scroll outside it.
 - **Fix**: `await menu.scrollIntoViewIfNeeded()`, then wait a frame (`page.evaluate(() => new Promise(requestAnimationFrame))`) before the click. To reproduce locally, narrow the viewport until the button straddles the edge (e.g. 370 px).
+
+## A worktree agent's branch lacks the latest commits
+
+- **Symptom**: an agent started with `isolation: "worktree"` doesn't see a commit just made on `main` (e.g. backlog items it was asked to fix: "the section reads None open").
+- **Cause**: the worktree branches from `origin/main`, not local `main`, which is ahead until pushed.
+- **Fix**: have the agent run `git merge --ff-only main` first (BATCH.md's lane template does), and commit what it needs before launching it.
+
+## Two agents' commits swap messages
+
+- **Symptom**: a commit made with `git commit -F <scratchpad>/msg.txt` carries another agent's message.
+- **Cause**: the session scratchpad is shared by every agent, so a generic file name is overwritten between one agent's write and its commit.
+- **Fix**: name message files per agent or lane (`msg-<lane>.txt`).

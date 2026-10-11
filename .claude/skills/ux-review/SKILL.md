@@ -63,4 +63,4 @@ After any real-server visit, restore the demo state; don't finish while `steam.i
 | U   | Severity | Scenario | Where | Finding | Suggestion |
 | --- | -------- | -------- | ----- | ------- | ---------- |
 
-- Findings only — fix nothing. The user picks what to fix; each fix is its own commit, and a re-check closes it.
+- Findings only — fix nothing. Then offer, in one `AskUserQuestion`, to fix the set you recommend (and why not the rest), planned as in [code-fix's BATCH.md](../code-fix/BATCH.md) step 1; each fix is its own commit, and a re-check closes it.

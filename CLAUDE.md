@@ -71,6 +71,7 @@ These add to the user-level `~/.claude/CLAUDE.md` working style.
 - **Message format**: a plain imperative subject, no Conventional Commits prefix — the `feat:`/`fix:` prefixes in older history were dropped; don't reintroduce them.
 - Ordinary changes commit directly to `main` — this is a solo repo with no PR/review process. A complex feature (multiple concerns, significant refactoring, a new subsystem) spanning more than one commit gets a dedicated branch instead.
 - Chasing a CI-only failure: experiment on a branch and run CI there (`gh workflow run CI --ref <branch>`), never by pushing to `main`.
+- A parallel fix batch ([BATCH.md](.claude/skills/code-fix/BATCH.md)) works the same way, one branch per lane.
 - Close such a branch with a real merge commit (`git merge --no-ff`), never a fast-forward or a rebase onto `main` — the branch is the unit of work and the merge commit is what shows it.
 
 ## Development workflow
