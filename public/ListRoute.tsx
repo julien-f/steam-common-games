@@ -1947,6 +1947,9 @@ export default function ListRoute() {
     loadSamples = [];
     slowLoad = false;
     setLoadFraction(null);
+    // Prices are re-fetched for whatever this load lists; the previous list's age and error don't apply.
+    setPriceFetchedAt(undefined);
+    setPriceStatusText('');
     // Bundle-detail state belongs to the bundle being left — stepping ‹/› to the next one reuses
     // this component instance, so a stale card/"not on Steam" list would otherwise sit there
     // describing the previous bundle until the new fetch resolved.
@@ -3187,6 +3190,7 @@ export default function ListRoute() {
     // from the price lookup.
     const onRegionChange = () => {
       setRegionCode(resolveRegion(getStoredRegion()));
+      setPriceFetchedAt(undefined);
       if (hasPrices())
         void loadWishlistPrices(
           rowsStore.map((r) => ({ appid: r.appid })),

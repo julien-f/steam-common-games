@@ -45,6 +45,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A list no longer hides its prices for the whole visit when the server's health check fails once.
 - Reverting a comparison to a saved layout without its grouping no longer ungroups it
 - A list refresh that fails, or a first load that fails, keeps the Updated tile to retry from
+- Prices state their own age after switching list, account or region, not the previous one's
 
 ### Development
 
