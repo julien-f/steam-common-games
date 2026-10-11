@@ -7,6 +7,7 @@ const {
   argsWithoutUsage,
   commandKey,
   parseSession,
+  linesSince,
   skillRuns,
   summarize,
   agentSummary,
@@ -65,6 +66,18 @@ test('parseSession pairs each call with its result: output size, elapsed time, c
     { key: 'Read', bytes: 37, ms: 1000, error: true, denied: true, rejected: false },
     { key: 'Edit', bytes: 33, ms: 1000, error: true, denied: false, rejected: true },
   ]);
+});
+
+test('linesSince keeps entries after the date, and the untimed ones', () => {
+  const lines = [
+    { timestamp: '2026-01-01T00:00:00Z', n: 1 },
+    { n: 2 },
+    { timestamp: '2026-01-02T00:00:00Z', n: 3 },
+  ].map((l) => JSON.stringify(l));
+  assert.deepEqual(
+    linesSince(lines, Date.parse('2026-01-01T00:00:00Z')).map((l) => JSON.parse(l).n),
+    [2, 3],
+  );
 });
 
 test("agentSummary: wall time, turns and cache reads per response, failed calls, and the gates' share", () => {

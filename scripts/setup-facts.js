@@ -5,9 +5,11 @@
 //                                                  a script only they mention has no caller), and which read
 //                                                  arguments without printing a usage line
 //   node scripts/setup-facts.js --cost             time and output size of the gates an agent runs
-//   node scripts/setup-facts.js --transcripts[=N]  the last N (default 20) sessions' largest outputs, slowest
-//                                                  calls, repeated command pairs, denied and rejected calls; commands are
-//                                                  reduced to their first words, so no arguments (or secrets) print
+//   node scripts/setup-facts.js --transcripts[=N|=DATE]  the last N (default 20) sessions', or everything
+//                                                  after DATE's, largest outputs, slowest calls, repeated command
+//                                                  pairs, denied and rejected calls, and the newest entry read;
+//                                                  commands are reduced to their first words, so no arguments
+//                                                  (or secrets) print
 //   node scripts/setup-facts.js --agents[=ID]      per subagent of session ID (default: the newest with any):
 //                                                  time, turns, cache reads, failed calls, time in tests/e2e/commits
 
@@ -218,20 +220,35 @@ function cost() {
   }
 }
 
-function transcripts(limit) {
+// A session's JSONL lines after `since` (ms); lines without a timestamp stay with their neighbours.
+function linesSince(lines, since) {
+  return lines.filter((line) => {
+    const t = JSON.parse(line).timestamp;
+    return !t || Date.parse(t) > since;
+  });
+}
+
+// `{ limit }` or `{ since }` (ms): the newest `limit` sessions, or every entry after `since`.
+function transcripts({ limit, since }) {
   const dir = path.join(os.homedir(), '.claude', 'projects', ROOT.replace(/[^\w]/g, '-'));
-  const files = fs
+  const sorted = fs
     .readdirSync(dir)
     .filter((f) => f.endsWith('.jsonl'))
     .map((f) => path.join(dir, f))
-    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)
-    .slice(0, limit);
-  const logs = files.map((f) => fs.readFileSync(f, 'utf8').split('\n').filter(Boolean));
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+  const files = since === undefined ? sorted.slice(0, limit) : sorted.filter((f) => fs.statSync(f).mtimeMs > since);
+  const logs = files
+    .map((f) => fs.readFileSync(f, 'utf8').split('\n').filter(Boolean))
+    .map((lines) => (since === undefined ? lines : linesSince(lines, since)))
+    .filter((lines) => lines.length);
   const sessions = logs.map(parseSession);
+  const newest = logs
+    .flat()
+    .reduce((max, line) => Math.max(max, Date.parse(JSON.parse(line).timestamp ?? '') || 0), since ?? 0);
   const names = fs.readdirSync(path.join(ROOT, '.claude', 'skills'));
   const { output, slow, pairs, denied } = summarize(sessions);
   console.log(
-    `${files.length} sessions, ${sessions.flat().length} tool calls\n\nLargest output (total · max · calls):`,
+    `${logs.length} sessions, ${sessions.flat().length} tool calls, newest entry ${newest ? new Date(newest).toISOString() : 'none'}\n\nLargest output (total · max · calls):`,
   );
   for (const k of output) console.log(`  ${k.key}: ${kb(k.bytes)} · ${kb(k.maxBytes)} · ${k.count}`);
   console.log('\nSlowest call (elapsed, including any permission wait):');
@@ -266,9 +283,14 @@ function scripts() {
 
 if (require.main === module) {
   const [flag, ...rest] = process.argv.slice(2);
-  const limit = Number(flag?.startsWith('--transcripts') ? (flag.split('=')[1] ?? 20) : 20);
-  if (rest.length || (flag && !/^--(cost|transcripts(=\d+)?|agents(=[\w-]+)?)$/.test(flag)) || !(limit > 0)) {
-    console.error('Usage: node scripts/setup-facts.js [--cost | --transcripts[=N] | --agents[=SESSION_ID]]');
+  const value = flag?.startsWith('--transcripts') ? (flag.split('=')[1] ?? '20') : '20';
+  const range = /^\d+$/.test(value) ? { limit: Number(value) } : { since: Date.parse(value) };
+  if (
+    rest.length ||
+    (flag && !/^--(cost|transcripts(=[\w:.+-]+)?|agents(=[\w-]+)?)$/.test(flag)) ||
+    !(range.limit > 0 || range.since > 0)
+  ) {
+    console.error('Usage: node scripts/setup-facts.js [--cost | --transcripts[=N|=DATE] | --agents[=SESSION_ID]]');
     process.exit(1);
   }
   if (flag?.startsWith('--agents')) {
@@ -279,8 +301,17 @@ if (require.main === module) {
       process.exit(1);
     }
   } else if (flag === '--cost') cost();
-  else if (flag?.startsWith('--transcripts')) transcripts(limit);
+  else if (flag?.startsWith('--transcripts')) transcripts(range);
   else scripts();
 }
 
-module.exports = { callers, argsWithoutUsage, commandKey, parseSession, skillRuns, summarize, agentSummary };
+module.exports = {
+  callers,
+  argsWithoutUsage,
+  commandKey,
+  parseSession,
+  linesSince,
+  skillRuns,
+  summarize,
+  agentSummary,
+};

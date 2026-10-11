@@ -5,12 +5,16 @@ description: Review the Claude Code setup — skills, scripts, hooks, settings, 
 
 # Setup review
 
-Judges the setup against CLAUDE.md's Where things belong and Working style rules. No edits until the user picks from the report. App code goes to [code-audit](../code-audit/SKILL.md), dependencies to [dependency-audit](../dependency-audit/SKILL.md).
+Judges the setup against CLAUDE.md's Where things belong and Working style rules, and keeps its proposals in [setup-backlog.md](../../../docs/dev/setup-backlog.md) so each run checks the last one's. No edits until the user picks from the report. App code goes to [code-audit](../code-audit/SKILL.md), dependencies to [dependency-audit](../dependency-audit/SKILL.md).
 
 ## Scope
 
 - **Files**: `.claude/skills/*/SKILL.md`, `scripts/`, `.githooks/`, `.github/workflows/`, `.claude/settings.json` and `settings.local.json`, `package.json`'s `scripts`, `CLAUDE.md`, and this repo's Claude memory (`~/.claude/projects/<this repo's slug>/memory/`).
 - **Argument `transcripts`** adds step 3. Without it, skip step 3 and say so.
+
+## 0. The ledger
+
+Read [setup-backlog.md](../../../docs/dev/setup-backlog.md). Re-run each **Watching** item's measure: report it as met (remove it) or missed (move it to Open with what the numbers show). Open and Declined items are not new findings; a Declined one comes back only with evidence its reason didn't foresee.
 
 ## 1. Facts first
 
@@ -36,8 +40,8 @@ Judges the setup against CLAUDE.md's Where things belong and Working style rules
 
 ## 3. Transcripts (only with `transcripts`)
 
-- `node scripts/setup-facts.js --transcripts[=N]` counts what needs no judgment over the last N sessions (default 20): largest outputs and slowest calls by command, command pairs repeated across sessions, calls the permission classifier denied or you rejected, and each skill's runs and longest run.
-- One `Agent` subagent then reads the same sessions under `~/.claude/projects/<this repo's slug>/*.jsonl`, newest first, for what does need judgment, seen in at least two sessions:
+- `node scripts/setup-facts.js --transcripts=<DATE>`, DATE being the ledger's "Transcripts read up to" (`--transcripts` alone, the last 20 sessions, when it says never), counts what needs no judgment over the sessions since: largest outputs and slowest calls by command, command pairs repeated across sessions, calls the permission classifier denied or you rejected, and each skill's runs and longest run.
+- One `Agent` subagent then reads the same sessions (entries after DATE) under `~/.claude/projects/<this repo's slug>/*.jsonl`, newest first, for what does need judgment, seen in at least two sessions:
   - the user correcting the agent the same way (a rule missing, unclear or ignored);
   - the same command failing the same way (a pitfalls.md entry or a fix);
   - the script's repeated pairs that are a real procedure (a script or skill candidate), not just reading files;
@@ -47,7 +51,7 @@ Each pattern comes with the sessions and a short quote. It quotes no secrets, an
 
 ## 4. The finding bar
 
-A finding names a `file:line` (or the sessions), the friction it causes, the change, its target (CLAUDE.md, a skill, a script, a hook, settings) and an effort (S/M/L). Verify each one adversarially (re-read the files involved, trying to prove it wrong) and drop what doesn't survive; an **Extensions** idea is checked only for not already existing. Prefer tightening or deleting a rule over adding one.
+A finding names a `file:line` (or the sessions), the friction it causes, the change, its target (CLAUDE.md, a skill, a script, a hook, settings) and an effort (S/M/L). Unless it is an **Extensions** idea, it also names its measure: the command whose output shows the friction (a `setup-facts` line, a check, a transcript count), with today's value as the baseline and a target. Verify each one adversarially (re-read the files involved, trying to prove it wrong) and drop what doesn't survive; an **Extensions** idea is checked only for not already existing. Prefer tightening or deleting a rule over adding one.
 
 Not findings: wording taste, Prettier's output, deliberate exceptions recorded with a reason (`HISTORY` in `scripts/doc-refs.js`).
 
@@ -55,12 +59,15 @@ Not findings: wording taste, Prettier's output, deliberate exceptions recorded w
 
 One table, ranked by how often the friction bites, then effort:
 
-| #   | Target | Where | Friction | Proposed change | Effort | Recommend |
-| --- | ------ | ----- | -------- | --------------- | ------ | --------- |
+| S   | Target | Where | Friction | Proposed change | Measure: baseline → target | Effort | Recommend |
+| --- | ------ | ----- | -------- | --------------- | -------------------------- | ------ | --------- |
+
+Number findings on from `node scripts/backlog-next.js S`; the report also lists the Watching items' results from step 0.
 
 Then one `AskUserQuestion`: apply the recommended set, plus any real choice among the rest. Adding a skill, hook or agent still needs that explicit approval (CLAUDE.md, Ask first).
 
 ## Applying
 
+- Update [setup-backlog.md](../../../docs/dev/setup-backlog.md) in the first commit: applied items under Watching (`**S<n> · <target> · <effort>** — change. Measure: \`command\` — baseline → target.`), the rest of the recommended set under Open, the ones the user turned down under Declined with their reason; set the header's dates (today, and the newest entry `--transcripts` printed).
 - Follow CLAUDE.md's Development workflow; a `scripts/` change gets a Development changelog entry and a test.
 - Memory edits are outside the repo: say which entries were moved or deleted.
