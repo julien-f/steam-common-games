@@ -39,7 +39,7 @@ import {
   formatLogRange,
 } from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
-import { scoreColor, dealRecordTier, DEAL_RECORD_TIERS, formatMoney } from './utils.ts';
+import { scoreColor, dealRecordTier, DEAL_RECORD_TIERS, formatMoney, compareByOrder } from './utils.ts';
 import { convert } from './currency.ts';
 
 // Rows are assembled in the still-untyped library.js/bundles.js from several independent async
@@ -117,7 +117,7 @@ const PROTON_DIDNT_ANSWER = "Didn't answer";
 const isProtonMissing = (v: unknown): boolean =>
   v == null || v === '' || v === PROTON_NO_REPORT || v === PROTON_DIDNT_ANSWER;
 const compareProtonTier = compareMissingLast(
-  (a, b) => PROTON_TIER_ORDER.indexOf(String(a).toLowerCase()) - PROTON_TIER_ORDER.indexOf(String(b).toLowerCase()),
+  compareByOrder(PROTON_TIER_ORDER, (v) => String(v).toLowerCase()),
   isProtonMissing,
 );
 
@@ -245,9 +245,7 @@ export const TYPE_LABELS = {
 // with no price data) — `compareMissingLast` handles that the same way every other heuristic/
 // possibly-absent column here does, pinning it last regardless of sort direction.
 const PRODUCTION_TIER_ORDER: string[] = ['Indie', 'AA', 'AAA'];
-const compareProductionTier = compareMissingLast(
-  (a, b) => PRODUCTION_TIER_ORDER.indexOf(String(a)) - PRODUCTION_TIER_ORDER.indexOf(String(b)),
-);
+const compareProductionTier = compareMissingLast(compareByOrder(PRODUCTION_TIER_ORDER));
 
 // Plain numeric comparator, wrapped so a `null` ("no data" — no reviews, no Metacritic score,
 // no HLTB match) always sorts last regardless of direction. Without this, a `type: 'number'`
@@ -556,20 +554,36 @@ export function computePriceStatus(row: Row): string | null | undefined {
 // tiers' color/icon/bold are pulled straight from DEAL_RECORD_TIERS (public/utils.js, the same
 // list computePriceStatus/renderBestDeal read) rather than restated here, reversed to worst-
 // to-best order and prefixed with the two non-record labels. `PRICE_STATUS_ORDER` (feeding
-// `comparePriceStatus`, same "ordered array + indexOf" shape as PRODUCTION_TIER_ORDER/
-// PROTON_TIER_ORDER above) and renderPriceStatus's badge/color below both derive from this one
+// `comparePriceStatus`, compareByOrder like PRODUCTION_TIER_ORDER/PROTON_TIER_ORDER above) and
+// renderPriceStatus's badge/color below both derive from this one
 // list, so the sort order, the visual ramp, and the Best Deal cell's own badge can't drift out
 // of sync with each other. `defaultSortDir: 'desc'` on the column then shows the best deals
 // (All-Time Low) first on a fresh click. On Sale/Not Discounted stay plain, uncolored, no icon
 // — not being a record isn't a bad thing worth flagging, so nothing here draws the eye away
 // from the three real record tiers.
-export interface PriceStatusTier {
+export interface StatusTier {
   label: string;
   color?: string;
   icon?: string;
   bold?: boolean;
 }
-export const PRICE_STATUS_TIERS: PriceStatusTier[] = [
+
+// A categorical column's cell: its tier's color, weight and icon, or plain text for a tier with no
+// color; "—" for no value.
+function renderTierLabel(tiers: readonly StatusTier[]): (v: unknown) => Node {
+  return (v) => {
+    if (v == null) return document.createTextNode('—');
+    const sv = String(v);
+    const tier = tiers.find((t) => t.label === sv);
+    if (!tier?.color) return document.createTextNode(sv);
+    const span = document.createElement('span');
+    span.style.color = tier.color;
+    if (tier.bold) span.style.fontWeight = '700';
+    span.textContent = sv + tier.icon!;
+    return span;
+  };
+}
+export const PRICE_STATUS_TIERS: StatusTier[] = [
   { label: 'Not Discounted' },
   { label: 'On Sale' },
   ...DEAL_RECORD_TIERS.slice()
@@ -577,20 +591,10 @@ export const PRICE_STATUS_TIERS: PriceStatusTier[] = [
     .map((t) => ({ label: t.statusLabel, color: t.color, icon: ' ' + t.icon, bold: t.bold })),
 ];
 const PRICE_STATUS_ORDER = PRICE_STATUS_TIERS.map((t) => t.label);
-const comparePriceStatus = compareMissingLast(
-  (a, b) => PRICE_STATUS_ORDER.indexOf(String(a)) - PRICE_STATUS_ORDER.indexOf(String(b)),
-);
+const comparePriceStatus = compareMissingLast(compareByOrder(PRICE_STATUS_ORDER));
+const renderPriceTier = renderTierLabel(PRICE_STATUS_TIERS);
 function renderPriceStatus(v: unknown): Node {
-  if (v === undefined) return document.createTextNode('…');
-  if (v == null) return document.createTextNode('—');
-  const sv = String(v);
-  const tier = PRICE_STATUS_TIERS.find((t) => t.label === sv);
-  if (!tier?.color) return document.createTextNode(sv); // On Sale / Not Discounted — plain text
-  const span = document.createElement('span');
-  span.style.color = tier.color;
-  if (tier.bold) span.style.fontWeight = '700';
-  span.textContent = sv + tier.icon!;
-  return span;
+  return v === undefined ? document.createTextNode('…') : renderPriceTier(v);
 }
 const PRICE_STATUS_COLUMN: ColumnDef<Row> = {
   key: 'priceStatus',
@@ -653,34 +657,21 @@ export function computeOwnershipStatus(row: Row): string | null {
 // color, not Wishlisted's green — already owning it is what actually matters for a buy decision
 // regardless of wishlist status — but keeps the bold weight, since it's still the most
 // information any one status carries.
-const OWNERSHIP_STATUS_TIERS: { label: string; color?: string; icon?: string; bold?: boolean }[] = [
+const OWNERSHIP_STATUS_TIERS: StatusTier[] = [
   { label: 'Not Owned' },
   { label: 'Wishlisted', color: '#2ecc71', icon: ' ☆', bold: true },
   { label: 'Owned', color: '#f1c40f', icon: ' ✓' },
   { label: 'Owned & Wishlisted', color: '#f1c40f', icon: ' ✓', bold: true },
 ];
 const OWNERSHIP_STATUS_ORDER = OWNERSHIP_STATUS_TIERS.map((t) => t.label);
-const compareOwnershipStatus = compareMissingLast(
-  (a, b) => OWNERSHIP_STATUS_ORDER.indexOf(String(a)) - OWNERSHIP_STATUS_ORDER.indexOf(String(b)),
-);
-function renderOwnershipStatus(v: unknown): Node {
-  if (v == null) return document.createTextNode('—');
-  const sv = String(v);
-  const tier = OWNERSHIP_STATUS_TIERS.find((t) => t.label === sv);
-  if (!tier?.color) return document.createTextNode(sv); // 'Not Owned' — plain text
-  const span = document.createElement('span');
-  span.style.color = tier.color;
-  if (tier.bold) span.style.fontWeight = '700';
-  span.textContent = sv + tier.icon!;
-  return span;
-}
+const compareOwnershipStatus = compareMissingLast(compareByOrder(OWNERSHIP_STATUS_ORDER));
 export const OWNERSHIP_STATUS_COLUMN: ColumnDef<Row> = {
   key: 'ownershipStatus',
   label: 'Ownership Status',
   groupable: true,
   value: computeOwnershipStatus,
   format: (v) => (v == null ? '—' : String(v)),
-  render: renderOwnershipStatus,
+  render: renderTierLabel(OWNERSHIP_STATUS_TIERS),
   compare: compareOwnershipStatus,
   defaultSortDir: 'desc',
 };

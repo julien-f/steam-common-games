@@ -101,6 +101,14 @@ export function computeProductionTier({
   return 'Indie';
 }
 
+// A column `compare` ordering values by their place in `order` (a categorical column's tiers).
+export function compareByOrder(
+  order: readonly string[],
+  toKey: (v: unknown) => string = String,
+): (a: unknown, b: unknown) => number {
+  return (a, b) => order.indexOf(toKey(a)) - order.indexOf(toKey(b));
+}
+
 export function scoreColor(n: number | null): string {
   if (n == null) return 'var(--text1)';
   if (n >= 80) return '#57cbde';

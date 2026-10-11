@@ -7,7 +7,7 @@
 // operates on a plain scalar (`row.shop`, not `row.page?.name`), which is also what the table's
 // own filter checklists/group keys are built from.
 
-import { formatMoney } from './utils.ts';
+import { compareByOrder, formatMoney } from './utils.ts';
 
 export interface PriceAmount {
   amount: number;
@@ -387,9 +387,7 @@ export function bundleEndsIn(expiry: string | null | undefined, now: number = Da
 
 // Values only, no rows — the shape `ColumnDef.compare` takes, which also orders the column's
 // filter checklist and its group headers.
-export function compareEndsIn(a: unknown, b: unknown): number {
-  return ENDS_IN_ORDER.indexOf(String(a)) - ENDS_IN_ORDER.indexOf(String(b));
-}
+export const compareEndsIn = compareByOrder(ENDS_IN_ORDER);
 
 // The publish-side counterpart of ENDS_IN, for the browse table's hidden "Age" column and the
 // "New" tile that toggles it — "what appeared since I last looked" is the other half of the
@@ -413,9 +411,7 @@ export function bundleAge(publish: string | null | undefined, now: number = Date
 }
 
 // Newest-first, the direction this column is actually read in — see compareEndsIn.
-export function compareBundleAge(a: unknown, b: unknown): number {
-  return BUNDLE_AGE_ORDER.indexOf(String(a)) - BUNDLE_AGE_ORDER.indexOf(String(b));
-}
+export const compareBundleAge = compareByOrder(BUNDLE_AGE_ORDER);
 
 // `now` is a parameter purely so the Active/Expired split is testable without freezing the clock.
 // A bundle with no expiry at all counts as Active — that's how ITAD represents an open-ended one,
