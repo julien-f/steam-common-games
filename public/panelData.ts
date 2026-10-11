@@ -31,7 +31,7 @@
 import { achievementsAccountKey, achievementsRequestUrl, achievementsSteamUrl } from './achievementsRequest.ts';
 import { applyPriceInfo, postPrices } from './priceLoading.ts';
 import { discountPct, fetchJson } from './utils.ts';
-import { getStoredRegion, resolveRegion } from './region.ts';
+import { currentRegion } from './region.ts';
 import type { Achievements, NewsItem, PriceFields } from './types.ts';
 import type { PickAndMixTier } from './bundleRows.ts';
 
@@ -191,7 +191,7 @@ export function createPanelDataCache() {
         price.set(appid, null);
         return null;
       }
-      const { prices } = await postPrices({ appids: [appid], country: resolveRegion(getStoredRegion()), force });
+      const { prices } = await postPrices({ appids: [appid], country: currentRegion(), force });
       const fields = {} as PriceFields;
       applyPriceInfo(fields, prices[appid], discountPct);
       price.set(appid, fields);
@@ -215,7 +215,7 @@ export function createPanelDataCache() {
         bundles.set(appid, null);
         return null;
       }
-      const qs = new URLSearchParams({ country: resolveRegion(getStoredRegion()) });
+      const qs = new URLSearchParams({ country: currentRegion() });
       if (force) qs.set('refresh', '1');
       const data = await fetchJson<{ bundles: PanelBundles }>(
         `/api/game-bundles/${appid}?${qs}`,

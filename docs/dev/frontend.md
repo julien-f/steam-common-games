@@ -318,7 +318,7 @@ Above 768px the shell is locked to the viewport and **`.app-scroll` is the page'
 
 Region is the only user-facing preference, in the nav bar's ⚙ popover (`prefsPopover.ts` owns the contents, `AppShell.tsx` only the `<details>` shell). `region.ts` holds a curated list of major Steam pricing regions, `detectCountry()`, and `REGION_CHANGED_EVENT`, which `setStoredRegion` dispatches on `window` so price-showing routes re-price.
 
-- The first entry is always "Auto-detect (⟨what it resolves to now⟩)", and `resolveRegion` consults `detectCountry()` live on every upstream call.
+- The first entry is always "Auto-detect (⟨what it resolves to now⟩)", and `currentRegion` consults `detectCountry()` live on every upstream call.
 - `detectCountry` tries the OS timezone (`Intl.DateTimeFormat().resolvedOptions().timeZone`, via a curated map including Eurozone→`DE`) before `navigator.language` — language is a UI preference and often stays "en-US" anywhere (e.g. `LANG=en_US.UTF-8` in `Europe/Paris`).
 - The Eurozone label leads with "Europe", not "Germany" — `DE` is only the code Steam/ITAD key Eurozone pricing off.
 - Region is not a URL param: it describes the viewer, so a shared link shouldn't override the recipient's preference.

@@ -1,4 +1,11 @@
-import { COUNTRY_OPTIONS, AUTO_COUNTRY, detectCountry, getStoredRegion, setStoredRegion } from './region.ts';
+import {
+  COUNTRY_OPTIONS,
+  AUTO_COUNTRY,
+  detectCountry,
+  getStoredRegion,
+  regionLabel,
+  setStoredRegion,
+} from './region.ts';
 
 // Contents of the nav bar's ⚙ Preferences popover — public/nav.js owns the surrounding
 // <details>/<summary> shell (part of the nav bar's own structure: rendering it, opening/closing
@@ -28,8 +35,7 @@ export function prefsPopoverPanelHtml(): string {
 // doesn't need to know anything about Bundles/library.js reacting to it (see their own comments).
 export function initPrefsPopover() {
   const select = document.getElementById('nav-region-select') as HTMLSelectElement;
-  const detected = detectCountry();
-  const detectedLabel = COUNTRY_OPTIONS.find((c) => c.code === detected)?.label ?? detected;
+  const detectedLabel = regionLabel(detectCountry());
   select.innerHTML = '';
   const autoOpt = document.createElement('option');
   autoOpt.value = AUTO_COUNTRY;

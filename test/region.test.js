@@ -10,7 +10,7 @@ const {
   REGION_CHANGED_EVENT,
   getStoredRegion,
   setStoredRegion,
-  resolveRegion,
+  currentRegion,
   regionLabel,
 } = require('../public/region.ts');
 
@@ -152,15 +152,17 @@ test('setStoredRegion: never throws when window is undefined (Node/test environm
   assert.doesNotThrow(() => setStoredRegion('GB'));
 });
 
-// ── resolveRegion ────────────────────────────────────────────────────────────
+// ── currentRegion ────────────────────────────────────────────────────────────
 
-test('resolveRegion: passes a real country code straight through', () => {
-  assert.equal(resolveRegion('DE'), 'DE');
+test('currentRegion: passes a stored country code straight through', () => {
+  setStoredRegion('DE');
+  assert.equal(currentRegion(), 'DE');
 });
 
-test('resolveRegion: resolves AUTO_COUNTRY to a live detectCountry() result', () => {
+test('currentRegion: resolves AUTO_COUNTRY to a live detectCountry() result', () => {
   stubTimeZone('Asia/Tokyo');
-  assert.equal(resolveRegion(AUTO_COUNTRY), 'JP');
+  setStoredRegion(AUTO_COUNTRY);
+  assert.equal(currentRegion(), 'JP');
 });
 
 test('regionLabel: resolves a curated code to its label, and passes an unknown one through', () => {

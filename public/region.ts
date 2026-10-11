@@ -4,7 +4,7 @@ import { REGION_CURRENCY } from './currency.ts';
 // The region preference's data and logic — the curated list, the detection heuristic, and
 // get/set/resolve for the stored value — with no DOM/UI code of its own (see prefsPopover.js
 // for the actual `<select>` this backs). An ES module, used on all four pages — bundles.js and
-// library.js's Wishlist tab import `resolveRegion`/`getStoredRegion` directly for their price
+// library.js's Wishlist tab import `currentRegion` directly for their price
 // lookups.
 
 // Curated rather than the full ISO 3166-1 list — these are the regions with meaningfully
@@ -156,7 +156,7 @@ export function getStoredRegion(): string {
 // Wishlist tab dropped their own inline pickers once that existed), but this stays a plain
 // broadcast rather than nav.js reaching into those pages directly, so any future picker (or a
 // synced update from a future Steam-auth account) needs to know nothing about who's listening.
-// Display label for an already-resolved region code (i.e. what resolveRegion returned, never
+// Display label for an already-resolved region code (i.e. what currentRegion returned, never
 // AUTO_COUNTRY) — backs the read-only "Prices in ⟨region⟩" readouts next to the app's price
 // tables, which state which region's prices are on screen without offering a second place to
 // change it (the ⚙ Preferences popover owns that). Falls back to the bare code for a region
@@ -181,13 +181,14 @@ export function setStoredRegion(value: string): void {
 // 2-letter country code to send upstream — the one place `detectCountry()` gets consulted for
 // a *live* value, so "Auto-detect" always tracks the current OS/browser signals rather than
 // freezing whatever they happened to resolve to at picker-population time.
-export function resolveRegion(selected: string): string {
+export function currentRegion(): string {
+  const selected = getStoredRegion();
   return selected === AUTO_COUNTRY ? detectCountry() : selected;
 }
 
 // The currency prices are shown in for the current region.
 export function regionCurrency(): string {
-  return REGION_CURRENCY[resolveRegion(getStoredRegion())] ?? 'USD';
+  return REGION_CURRENCY[currentRegion()] ?? 'USD';
 }
 
 // `initRegionSelect` (the region <select>'s only remaining populator, public/prefsPopover.js)

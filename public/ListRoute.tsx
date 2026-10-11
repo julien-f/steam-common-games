@@ -183,7 +183,7 @@ import { rememberBundle } from './bundleSnapshots.ts';
 import { fanaticalBuyUrl, FANATICAL_BOOKMARKLET } from './fanaticalPicks.ts';
 import { postPrices, applyPriceInfo, nullMissingPriceFields, PRICES_UNAVAILABLE } from './priceLoading.ts';
 import { isItadConfigured, isItadOff } from './panelData.ts';
-import { getStoredRegion, resolveRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
+import { currentRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { openPrefsPopover } from './prefsPopover.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
@@ -622,7 +622,7 @@ export default function ListRoute() {
   // Which region's prices are on screen. Read-only here on purpose — the ⚙ Preferences popover
   // is the one place it's changed (a second control would be a second thing to keep in sync);
   // this just says which one is in effect, since the currency alone doesn't identify it.
-  const [regionCode, setRegionCode] = createSignal(resolveRegion(getStoredRegion()));
+  const [regionCode, setRegionCode] = createSignal(currentRegion());
   // Oldest price write time seen across this load's price calls (a wishlist chunks into several).
   // `undefined` = nothing loaded yet, which renders no readout at all rather than a premature "just now".
   const [priceFetchedAt, setPriceFetchedAt] = createSignal<number | undefined>(undefined);
@@ -1622,7 +1622,7 @@ export default function ListRoute() {
       return;
     }
 
-    const country = resolveRegion(getStoredRegion());
+    const country = currentRegion();
     const appids = items.map((i) => i.appid);
     for (let i = 0; i < appids.length; i += MAX_PRICE_LOOKUP_GAMES) {
       if (loadGuard.isStale(gen)) return;
@@ -1751,7 +1751,7 @@ export default function ListRoute() {
     try {
       const { prices, fetchedAt: at } = await postPrices({
         gids: resolved.map((g) => g.gid),
-        country: resolveRegion(getStoredRegion()),
+        country: currentRegion(),
         force,
       });
       notePriceFetchedAt(at);
@@ -2224,7 +2224,7 @@ export default function ListRoute() {
       setStatusText('Resolving games to Steam…');
       try {
         const { bundle, fetchedAt: bundleFetchedAt } = await fetchBundleById(Number(params.bundleId), {
-          country: resolveRegion(getStoredRegion()),
+          country: currentRegion(),
         });
         if (loadGuard.isStale(gen)) return;
         // Stated, not actionable — the single-bundle endpoint has no force path (see
@@ -3164,7 +3164,7 @@ export default function ListRoute() {
     // its Tier Price comes from the bundle fetch itself (fetchBundleById's own `country`), not
     // from the price lookup.
     const onRegionChange = () => {
-      setRegionCode(resolveRegion(getStoredRegion()));
+      setRegionCode(currentRegion());
       setPriceFetchedAt(undefined);
       if (hasPrices())
         void loadWishlistPrices(
