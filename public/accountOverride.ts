@@ -106,7 +106,7 @@ export function createAccountOverrideSync() {
 const defaultSync = createAccountOverrideSync();
 export const getAccountOverrideState = defaultSync.getState;
 export const syncAccountOverrideFromUrl = defaultSync.syncFromUrl;
-export const clearAccountOverride = defaultSync.clear;
+const clearAccountOverride = defaultSync.clear;
 
 // An explicit account pick — a fresh resolve, a recents click, adopting what a `?u=` link showed.
 // Storing it also consumes the override, param and all, rather than leaving the link overriding

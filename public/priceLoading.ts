@@ -61,7 +61,7 @@ export function nullMissingPriceFields(row: PriceFields): void {
 // `fetchedAt` is when the oldest price in this batch was written to the server's cache (epoch
 // ms), or null when it was fetched fresh — backs the "Updated <when>" beside a list's own
 // "↻ Refresh prices", the same shape /api/common-games' own fetchedAt has.
-export interface PriceLookup {
+interface PriceLookup {
   prices: Record<string, PriceInfo>;
   fetchedAt: number | null;
 }

@@ -24,7 +24,7 @@ export interface FlatGame {
 // A flat game that also resolved to a Steam appid.
 export type ResolvedGame = FlatGame & { appid: number };
 
-export interface BundleTier {
+interface BundleTier {
   price: PriceAmount | null;
   games: { id: string; slug: string; title: string; type: string; assets?: { boxart?: string } | null }[];
   addon: boolean | null;
@@ -95,7 +95,7 @@ export function flattenBundleGames(bundle: Bundle): FlatGame[] {
 // GET /api/bundles/:id's 404: ITAD no longer lists the bundle (see findBundleById in lib/itad.js),
 // as opposed to a transient failure — the one case a saved list's bundle source gets orphaned.
 // A 503: the instance has no IsThereAnyDeal key — a setting, not a failure, so shown without "Error:".
-export class UnavailableError extends Error {
+class UnavailableError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'UnavailableError';

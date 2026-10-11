@@ -50,7 +50,7 @@ export interface HeroTile {
   subTitle?: string;
 }
 
-export interface ListHeroProps {
+interface ListHeroProps {
   title: string;
   lead?: JSX.Element; // before the title — the bundle route's ‹/› nav
   chips?: JSX.Element; // after the title — kind/shop/account chips

@@ -6,7 +6,7 @@
 // of ours beside it does not, so it only serves to reuse an entry.
 // The entry an overlay closes back onto holds the address from when it opened, so a close rewrites
 // it to the current one with the overlay stripped: a game stepped to in the lightbox stays open.
-export type Overlay = 'panel' | 'lightbox';
+type Overlay = 'panel' | 'lightbox';
 
 // `toBase`: the given address with this overlay closed.
 type ToBase = (url: Location | URL) => string;

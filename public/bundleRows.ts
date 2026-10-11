@@ -15,7 +15,7 @@ import type { PriceAmount } from './types.ts';
 // almost exactly the aspect of the game tables' own capsule thumbnails, so a strip of them reads
 // as a bundle "cover" without growing the row. Every asset is optional — an entry ITAD has no
 // artwork for (typically a non-game item: a course, a soundtrack) carries an empty object.
-export interface GameAssets {
+interface GameAssets {
   boxart?: string;
   banner145?: string;
   banner300?: string;
@@ -330,7 +330,7 @@ export function bundleTierSummary(
   }));
 }
 
-export interface BundleUrgency {
+interface BundleUrgency {
   tier: 'ended' | 'urgent' | 'soon' | 'later';
   label: string;
 }

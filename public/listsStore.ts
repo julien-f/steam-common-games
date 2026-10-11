@@ -114,7 +114,7 @@ function userListDeps(sources: ListRef[]): string[] {
 // user-list dependency graph? Walks the *proposed* sources for `listId` itself, then each
 // other list's *currently stored* sources — so this also catches a cycle introduced by
 // editing some other list further down the chain, not just a fresh self-reference.
-export function wouldCreateCycle(listId: string, sources: ListRef[], lists: GameList[] = readLists()): boolean {
+function wouldCreateCycle(listId: string, sources: ListRef[], lists: GameList[] = readLists()): boolean {
   const visited = new Set<string>();
   const stack = [...userListDeps(sources)];
   while (stack.length) {

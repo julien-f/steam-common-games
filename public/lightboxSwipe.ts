@@ -4,7 +4,7 @@
 // tracking the finger, moving the media element, and running the resolved action.
 
 export type SwipeAxis = 'x' | 'y';
-export type SwipeAction = 'media-prev' | 'media-next' | 'game-prev' | 'game-next';
+type SwipeAction = 'media-prev' | 'media-next' | 'game-prev' | 'game-next';
 
 // Past this the gesture is a drag, not a tap — and the axis it locks onto is final. Matches
 // the lightbox's own tap threshold, so a gesture is never both.
