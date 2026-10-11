@@ -4,10 +4,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   membersFromAccountId,
-  fetchAccountOwnedGames,
-  fetchAccountWishlistItems,
   fetchAccountWishlist,
-  fetchAccountWishlistAppids,
+  fetchAccountWishlistData,
   resolveAccountSummary,
   fetchAccountOverview,
   toAccountPlayer,
@@ -31,7 +29,7 @@ test('membersFromAccountId: a single-member account round-trips to a one-element
   assert.deepEqual(membersFromAccountId('1'), ['1']);
 });
 
-test('fetchAccountOwnedGames: sends { members }, sums playtime and maxes lastPlayed across members', async (t) => {
+test('fetchAccountOverview: sends { members }, sums playtime and maxes lastPlayed across members', async (t) => {
   let seenBody;
   withFetch(t, async (url, opts) => {
     seenBody = JSON.parse(opts.body);
@@ -46,12 +44,12 @@ test('fetchAccountOwnedGames: sends { members }, sums playtime and maxes lastPla
     };
   });
 
-  const games = await fetchAccountOwnedGames(['1', '2']);
+  const { games } = await fetchAccountOverview(['1', '2']);
   assert.deepEqual(seenBody, { members: ['1', '2'], refresh: false });
   assert.deepEqual(games, [{ appid: 440, name: 'Team Fortress 2', playtimeMinutes: 150, lastPlayedUnix: 2000 }]);
 });
 
-test('fetchAccountOwnedGames: missing playtime/lastPlayed entries default to 0', async (t) => {
+test('fetchAccountOverview: missing playtime/lastPlayed entries default to 0', async (t) => {
   withFetch(t, async () => ({
     ok: true,
     json: async () => ({
@@ -62,50 +60,50 @@ test('fetchAccountOwnedGames: missing playtime/lastPlayed entries default to 0',
     }),
   }));
 
-  const games = await fetchAccountOwnedGames(['1']);
+  const { games } = await fetchAccountOverview(['1']);
   assert.deepEqual(games, [{ appid: 440, name: 'Team Fortress 2', playtimeMinutes: 0, lastPlayedUnix: 0 }]);
 });
 
-test('fetchAccountOwnedGames: throws with the server error message on a non-2xx response', async (t) => {
+test('fetchAccountOverview: throws with the server error message on a non-2xx response', async (t) => {
   withFetch(t, async () => ({ ok: false, json: async () => ({ error: 'rate limited' }) }));
-  await assert.rejects(() => fetchAccountOwnedGames(['1']), /rate limited/);
+  await assert.rejects(() => fetchAccountOverview(['1']), /rate limited/);
 });
 
-test('fetchAccountOwnedGames: passes refresh through', async (t) => {
+test('fetchAccountOverview: passes refresh through', async (t) => {
   let seenBody;
   withFetch(t, async (url, opts) => {
     seenBody = JSON.parse(opts.body);
     return { ok: true, json: async () => ({ games: [], players: [], playtime: {}, lastPlayed: {} }) };
   });
-  await fetchAccountOwnedGames(['1'], { refresh: true });
+  await fetchAccountOverview(['1'], { refresh: true });
   assert.equal(seenBody.refresh, true);
 });
 
-test('fetchAccountWishlistItems: sends { members }, returns items as-is', async (t) => {
+test('fetchAccountWishlist: sends { members }, returns items as-is', async (t) => {
   let seenBody;
   withFetch(t, async (url, opts) => {
     seenBody = JSON.parse(opts.body);
     return { ok: true, json: async () => ({ items: [{ appid: 620, priority: 1, dateAdded: '2024-01-01' }] }) };
   });
 
-  const items = await fetchAccountWishlistItems(['1']);
+  const { items } = await fetchAccountWishlist(['1']);
   assert.deepEqual(seenBody, { members: ['1'], refresh: false });
   assert.deepEqual(items, [{ appid: 620, priority: 1, dateAdded: '2024-01-01' }]);
 });
 
-test('fetchAccountWishlistItems: throws with the server error message on a non-2xx response', async (t) => {
+test('fetchAccountWishlist: throws with the server error message on a non-2xx response', async (t) => {
   withFetch(t, async () => ({ ok: false, json: async () => ({ error: 'private profile' }) }));
-  await assert.rejects(() => fetchAccountWishlistItems(['1']), /private profile/);
+  await assert.rejects(() => fetchAccountWishlist(['1']), /private profile/);
 });
 
-test('fetchAccountWishlistAppids: resolves an accountId straight to a flat appid Set', async (t) => {
+test('fetchAccountWishlistData: resolves an accountId straight to a flat appid Set', async (t) => {
   let seenBody;
   withFetch(t, async (url, opts) => {
     seenBody = JSON.parse(opts.body);
     return { ok: true, json: async () => ({ items: [{ appid: 620, priority: 1, dateAdded: null }] }) };
   });
 
-  const appids = await fetchAccountWishlistAppids('1+2');
+  const { appids } = await fetchAccountWishlistData('1+2');
   assert.deepEqual(seenBody.members, ['1', '2']);
   assert.deepEqual(appids, new Set([620]));
 });

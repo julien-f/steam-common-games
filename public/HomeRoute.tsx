@@ -37,12 +37,7 @@ import {
   compareUrl,
   COMPARE_PATH,
 } from './urlState.ts';
-import {
-  resolveAccountSummary,
-  fetchAccountOverview,
-  fetchAccountWishlistItems,
-  accountInfoFrom,
-} from './accountData.ts';
+import { resolveAccountSummary, fetchAccountOverview, fetchAccountWishlist, accountInfoFrom } from './accountData.ts';
 import type { AccountPlayer } from './accountData.ts';
 import { normalizeInput, steamVanity, fmtAge, countryFlag } from './utils.ts';
 import { CopyButton } from './CopyButton.tsx';
@@ -133,9 +128,6 @@ export default function HomeRoute() {
   // Counts and per-member profile data aren't stored on AccountSlot itself (they'd go stale —
   // AccountSlot only caches a label/avatar so recents can render instantly) — refetched live
   // whenever currentAccount changes, including on initial mount for whatever was already stored.
-  // fetchAccountOverview, not fetchAccountOwnedGames: the owned count and the member accounts'
-  // own display data come back in the same /api/common-games response, so asking for both costs
-  // one request rather than two identical POSTs.
   // Extracted from the effect below so the card's own ↻ can re-run it with `refresh: true`,
   // which forces the server past its library-tier cache for this account (owned games, wishlist
   // and profile alike) rather than waiting out a TTL now measured in weeks.
@@ -170,8 +162,8 @@ export default function HomeRoute() {
         if (!isStale()) setCounts((c) => ({ ...c, owned: 'failed' }));
       },
     );
-    const wishlist = fetchAccountWishlistItems(members, { refresh }).then(
-      (items) => {
+    const wishlist = fetchAccountWishlist(members, { refresh }).then(
+      ({ items }) => {
         if (!isStale()) setCounts((c) => ({ ...c, wishlist: items.length }));
       },
       () => {

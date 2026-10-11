@@ -189,15 +189,6 @@ export async function fetchAccountOverview(
   return { games, players: data.players.map(toAccountPlayer), owners, fetchedAt: data.fetchedAt ?? null };
 }
 
-// The owned-games half of fetchAccountOverview on its own — what every caller that doesn't care
-// about the member accounts themselves (listResolve.ts's fetchers, ListRoute's owned list) uses.
-export async function fetchAccountOwnedGames(
-  members: string[],
-  opts: { refresh?: boolean } = {},
-): Promise<AccountLibraryGame[]> {
-  return (await fetchAccountOverview(members, opts)).games;
-}
-
 // Fetches one account's wishlist (its members' wishlists unioned, same as /api/wishlist does
 // server-side).
 export async function fetchAccountWishlist(
@@ -214,15 +205,6 @@ export async function fetchAccountWishlist(
     'Failed to fetch wishlist',
   );
   return { items: data.items, fetchedAt: data.fetchedAt ?? null };
-}
-
-// The items half of fetchAccountWishlist on its own — for callers with no "Updated <when>"
-// readout to feed (listResolve.ts's fetchers, Home's counts).
-export async function fetchAccountWishlistItems(
-  members: string[],
-  opts: { refresh?: boolean } = {},
-): Promise<AccountWishlistItem[]> {
-  return (await fetchAccountWishlist(members, opts)).items;
 }
 
 // Both halves of what myOwnership.ts keeps per account — the owned-appid set behind the ✓/☆
@@ -343,13 +325,6 @@ export async function resolveAccountSummary(rawInputs: string[]): Promise<Resolv
   const realName = solePlayer?.realname || null;
 
   return { members, label, avatarUrl, vanities, memberSince, countryCode, realName };
-}
-
-export async function fetchAccountWishlistAppids(
-  accountId: string,
-  opts: { refresh?: boolean } = {},
-): Promise<Set<number>> {
-  return (await fetchAccountWishlistData(accountId, opts)).appids;
 }
 
 // The wishlist counterpart of fetchAccountOwnedData — appids plus the age of the server's copy,
