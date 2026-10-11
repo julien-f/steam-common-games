@@ -308,8 +308,7 @@ export function initGameSearch({
     }
     if (e.key !== 'Enter') return;
     e.preventDefault();
-    // The highlighted row (the "more" row is the roving selection's last virtual index) goes
-    // before the term-empty bail below, since the recents view is reachable with an empty box.
+    // Before the empty-term bail: the recents view, "more" row included, shows with an empty box.
     if (moreRowShown() && activeIdx === lastResults.length) {
       activateMore();
       return;

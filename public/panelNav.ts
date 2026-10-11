@@ -17,8 +17,7 @@ export function clearPanelNav(): void {
 }
 
 // Nothing to page through for a standalone lookup, or before ListRoute's table exists (`hasList`).
-// `getGameList` is read reactively, so "i / N" follows a re-sort or filter; ↑/↓ go through
-// `onStep`, which resolves the list at click time like the keys do.
+// "i / N" tracks `getGameList` reactively; ↑/↓ resolve the list at click time, like the keys.
 export function renderPanelNav({
   hasList,
   game,

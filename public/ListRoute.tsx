@@ -740,8 +740,7 @@ export default function ListRoute() {
   let disposeTable: (() => void) | null = null;
   let unsyncView: (() => void) | null = null;
   let tableGrouped = false;
-  // Every view applied to the table (restored, shared, reset, reverted) goes through this, so a
-  // group-by-membership table stays grouped by it and a flat one never is.
+  // Every view applied goes through this, so a grouped table stays grouped and a flat one flat.
   function applyView(view: object): void {
     if (!table) return;
     table.setViewState(view);
