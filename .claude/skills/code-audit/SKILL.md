@@ -1,6 +1,6 @@
 ---
 name: code-audit
-description: Audit the codebase (not a diff) for simplification, security, performance, reliability, upstream-compliance and test-coverage issues, record verified findings in docs/dev/code-backlog.md, and report them ranked. Use when asked to review, audit or assess the code or app as a whole, or one dimension of it (e.g. "security review of the app", "where can the code be simpler").
+description: Audit the codebase (not a diff) for simplification, correctness, security, performance, reliability, upstream-compliance and test-coverage issues, record verified findings in docs/dev/code-backlog.md, and report them ranked. Use when asked to review, audit or assess the code or app as a whole, or one dimension of it (e.g. "security review of the app", "where can the code be simpler").
 ---
 
 # Code audit
@@ -27,6 +27,7 @@ Run before reading code, so the review doesn't spend effort on what tools alread
 Read the doc each dimension names first; it defines what "wrong" means here.
 
 - **simplify** — CLAUDE.md's Simplicity rules: dead exports, params, flags and branches; duplication across modules (and code better moved to a shared one); abstractions or options with a single caller; temporary code whose removal condition has been met; hand-rolled code a dependency already in use provides.
+- **correctness** — wrong results in a reachable state: state, classes or flags set on one path and never cleared on another; timers restarted without resetting what they guard; callers reading one helper's result differently (e.g. "failed" taken for "off"); edge inputs (empty, one item, repeated, out of order) through branches no test reaches. Races on stale responses stay under **reliability**.
 - **security** — request input (steam IDs, vanity names, list params, query strings) reaching upstream URLs, SQL or file paths; SQL built by interpolation instead of bound parameters (`lib/db.js`, `lib/cache.js`); raw HTML in the frontend (`innerHTML`); `express-rate-limit` coverage per route; security headers; `lib/auth.js` session, cookie and redirect handling; secrets or upstream keys reaching logs, responses or the bundle.
 - **perf** — [data.md](../../../docs/dev/data.md)'s cache tiers and TTLs vs. what the code does; outbound calls vs. [observability.md](../../../docs/dev/observability.md)'s budgets (N+1 fetches, missing dedup via `lib/dedup.js`); sqlite queries without an index; chunk sizes and what lands in the initial bundle; [frontend.md](../../../docs/dev/frontend.md)'s reactivity rules in hot paths (the game table, streaming loads).
 - **reliability** — routes not mapping errors through `routeErrorStatus`; optional sources (HLTB, ProtonDB, reviews) failing the request instead of degrading with a `[tag]` warning; fetches without a timeout; unhandled rejections; races on stale responses (`public/staleGuard.ts`).

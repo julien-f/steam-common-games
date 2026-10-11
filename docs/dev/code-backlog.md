@@ -2,9 +2,10 @@
 
 Code findings from `code-audit` runs, judged against CLAUDE.md's conventions and the docs each dimension names. Severity: **critical** (exploitable, or loses or corrupts data) · **major** · **minor** · **cleanup** (no behaviour change); effort S/M/L. Fix items with the `code-fix` skill; remove an item once it ships.
 
-Last audited: simplify 2026-10-10 · security 2026-10-10 · perf 2026-10-10 · reliability 2026-10-10 · compliance 2026-10-10 · tests 2026-10-10.
+Last audited: simplify 2026-10-10 · correctness never · security 2026-10-10 · perf 2026-10-10 · reliability 2026-10-10 · compliance 2026-10-10 · tests 2026-10-10.
 
 - [Simplify](#simplify)
+- [Correctness](#correctness)
 - [Security](#security)
 - [Performance](#performance)
 - [Reliability](#reliability)
@@ -12,6 +13,10 @@ Last audited: simplify 2026-10-10 · security 2026-10-10 · perf 2026-10-10 · r
 - [Tests](#tests)
 
 ## Simplify
+
+None open.
+
+## Correctness
 
 None open.
 

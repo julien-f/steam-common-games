@@ -33,6 +33,10 @@ The smallest change that closes the item, following [frontend.md](../../../docs/
 - Remove the item from improvements.md, or narrow it to what's left and say so.
 - Then CLAUDE.md's Development workflow and Changelog; the subject says what changed for the user, the body names `U<n>` and why.
 
+## 5. Review the batch
+
+Once every item is committed, run `/code-review` over the batch's commits (`<first>^..HEAD`). Verify each finding against the code, fix the confirmed ones as follow-up commits, and list the dropped ones with why in the report.
+
 ## Report
 
 One table — item, commit, how it was verified (test, measurement) — then anything narrowed rather than closed, and side effects worth knowing (e.g. a new trade-off on phone).

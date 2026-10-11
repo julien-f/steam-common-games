@@ -28,6 +28,10 @@ The smallest change that closes the item, following CLAUDE.md's code conventions
 - Remove the item from code-backlog.md, or narrow it to what's left and say so; a section left empty reads `None open.` (Prettier rejects an empty one).
 - Then CLAUDE.md's Development workflow and Changelog; the commit body names `C<n>`.
 
+## 4. Review the batch
+
+Once every item is committed, run `/code-review` over the batch's commits (`<first>^..HEAD`). Verify each finding against the code, fix the confirmed ones as follow-up commits, and list the dropped ones with why in the report.
+
 ## Report
 
 One table — item, commit, how it was verified (test, measurement) — then anything narrowed rather than closed.
