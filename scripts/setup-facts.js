@@ -17,7 +17,7 @@
 //                                                  redacted, for the subagent that reads for judgment
 //                                                  and which docs were read, how often whole
 //   node scripts/setup-facts.js --agents[=ID]      per subagent of session ID (default: the newest with any):
-//                                                  time, turns, cache reads, failed calls, time in tests/e2e/commits
+//                                                  time, turns, cache reads, failed calls, time in tests/e2e/commits, all tool time and its top commands
 
 const fs = require('node:fs');
 const os = require('node:os');
@@ -314,7 +314,7 @@ function docReadStats(sessions) {
 // Commands whose time is the gates' (tests, e2e, commit hooks), not the agent's thinking.
 const GATE = /^(npm test|npm run test(:one|:e2e)?|node scripts\/e2e\.js|git commit)$/;
 
-// One subagent's JSONL lines → `{ minutes, turns, cacheRead, calls, errors, gateSec }`. A response
+// One subagent's JSONL lines → `{ minutes, turns, cacheRead, calls, errors, gateSec, toolSec, topTools }`. A response
 // spans several lines, each repeating its usage so far, so each field's max per message id counts.
 function agentSummary(lines) {
   const entries = lines.map((line) => JSON.parse(line));
@@ -324,6 +324,8 @@ function agentSummary(lines) {
     if (e.type === 'assistant' && e.message?.id)
       cache.set(e.message.id, Math.max(cache.get(e.message.id) ?? 0, e.message.usage?.cache_read_input_tokens ?? 0));
   const calls = parseSession(lines);
+  const byKey = new Map();
+  for (const c of calls) byKey.set(c.key, (byKey.get(c.key) ?? 0) + c.ms / 1000);
   return {
     minutes: stamps.length ? (Math.max(...stamps) - Math.min(...stamps)) / 60000 : 0,
     turns: cache.size,
@@ -331,6 +333,8 @@ function agentSummary(lines) {
     calls: calls.length,
     errors: calls.filter((c) => c.error).length,
     gateSec: calls.filter((c) => GATE.test(c.key)).reduce((s, c) => s + c.ms, 0) / 1000,
+    toolSec: calls.reduce((s, c) => s + c.ms, 0) / 1000,
+    topTools: [...byKey].sort((a, b) => b[1] - a[1]).slice(0, 3),
   };
 }
 
@@ -350,9 +354,10 @@ function agents(sessionId) {
     const metaFile = path.join(sub, file.replace(/\.jsonl$/, '.meta.json'));
     const label = fs.existsSync(metaFile) ? JSON.parse(fs.readFileSync(metaFile, 'utf8')).description : file;
     const s = agentSummary(fs.readFileSync(path.join(sub, file), 'utf8').split('\n').filter(Boolean));
-    const gatePct = s.minutes ? Math.round((s.gateSec / 60 / s.minutes) * 100) : 0;
+    const pct = (sec) => (s.minutes ? Math.round((sec / 60 / s.minutes) * 100) : 0);
+    const top = s.topTools.map(([key, sec]) => `${key} ${Math.round(sec)} s`).join(', ');
     console.log(
-      `${label}: ${s.minutes.toFixed(1)} min · ${s.turns} turns · ${(s.cacheRead / 1e6).toFixed(1)}M cache read · ${s.calls} calls (${s.errors} failed) · gates ${Math.round(s.gateSec)} s (${gatePct}%)`,
+      `${label}: ${s.minutes.toFixed(1)} min · ${s.turns} turns · ${(s.cacheRead / 1e6).toFixed(1)}M cache read · ${s.calls} calls (${s.errors} failed) · gates ${Math.round(s.gateSec)} s (${pct(s.gateSec)}%) · tools ${Math.round(s.toolSec)} s (${pct(s.toolSec)}%: ${top})`,
     );
   }
 }

@@ -17,6 +17,7 @@ Last reviewed: 2026-10-11 · Transcripts read up to: 2026-10-11T13:17:25Z.
 - **P13 · code-fix BATCH · S** — the lead posts a line only when a lane finishes or is blocked, not on every `status --watch` change (about 25 relay turns in one batch); the stale first-run timing is gone, `batch.js plan` prints the estimate. Measure: relay turns in the next batch's transcript — ~25 → 5 or fewer.
 - **P14 · ~/.claude/CLAUDE.md · S** — a recommended next step never bundles a push or a release; each is its own option. The user cut such bundles back twice. Measure: the next digests' answers trimming a push or release off a recommendation — 2 → 0.
 - **P16 · ux-fix · S** — "Review the batch" links code-fix's step 4 instead of copying it. Measure: copies of that paragraph in `.claude/skills/` — 2 → 1 (1 when applied).
+- **P17 · setup-facts · S** — `--agents` adds each agent's tool time, its share and top three commands, so model time (the rest) shows next to gate time. On the 2026-10-11 batches tools were 35–58% of a lane, model turns the rest. Measure: the next batch's `node scripts/setup-facts.js --agents` lines — the baseline for P18.
 
 ## Open
 

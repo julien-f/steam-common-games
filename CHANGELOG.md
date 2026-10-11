@@ -117,6 +117,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The typecheck fails on unused imports and locals
 - Fix batches split items in one file across lanes when they touch code far apart
 - `npm run check:setup` fails when the setup backlog holds items but its header dates are unset
+- `setup-facts.js --agents` shows each agent's tool time and its top commands
 
 ## [0.10.0] - 2026-10-10
 

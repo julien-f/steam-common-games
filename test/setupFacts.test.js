@@ -86,7 +86,7 @@ test('linesSince keeps entries after the date, and the untimed ones', () => {
   );
 });
 
-test("agentSummary: wall time, turns and cache reads per response, failed calls, and the gates' share", () => {
+test('agentSummary: wall time, turns and cache reads per response, failed calls, gate and tool time', () => {
   const usage = (id, cache) => ({ id, usage: { cache_read_input_tokens: cache } });
   const lines = [
     { type: 'assistant', timestamp: '2026-01-01T00:00:00Z', message: { ...usage('m1', 10), content: [] } },
@@ -117,7 +117,19 @@ test("agentSummary: wall time, turns and cache reads per response, failed calls,
       message: { content: [{ type: 'tool_result', tool_use_id: 'b', is_error: true, content: 'x' }] },
     },
   ].map((l) => JSON.stringify(l));
-  assert.deepEqual(agentSummary(lines), { minutes: 1, turns: 2, cacheRead: 300, calls: 2, errors: 1, gateSec: 30 });
+  assert.deepEqual(agentSummary(lines), {
+    minutes: 1,
+    turns: 2,
+    cacheRead: 300,
+    calls: 2,
+    errors: 1,
+    gateSec: 30,
+    toolSec: 60,
+    topTools: [
+      ['git commit', 30],
+      ['ls', 30],
+    ],
+  });
 });
 
 test('summarize ranks by output and time, and keeps only pairs seen in two sessions', () => {

@@ -20,7 +20,7 @@ One `Agent` per lane, all in one message, `isolation: "worktree"`, with the lane
 
 ## 4. After the lanes
 
-The serial items, then the skill's look (ux-fix step 3; code-fix's UI-visible items), then `/code-review` over the whole batch, then `node scripts/batch.js record` (feeds the next estimate) and `node scripts/setup-facts.js --agents` (each agent's time, turns, failed calls and gate time) for the report.
+The serial items, then the skill's look (ux-fix step 3; code-fix's UI-visible items), then `/code-review` over the whole batch, then `node scripts/batch.js record` (feeds the next estimate) and `node scripts/setup-facts.js --agents` (each agent's time, turns, failed calls, gate and tool time) for the report.
 
 ## Lane template
 
