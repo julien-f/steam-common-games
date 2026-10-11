@@ -182,6 +182,13 @@ test('compareUrl: carries a non-default op, after the slots', () => {
   assert.equal(compareUrl([['alice'], ['bob']], 'intersect'), '/lists/compare?u=alice&u=bob&op=intersect');
 });
 
+test("compareUrl: rebuilds the players and op over the kept params, so a shared view isn't dropped", () => {
+  assert.equal(
+    compareUrl([['1'], ['2']], 'intersect', '?u=alice&tv=%7B%7D&op=union&game=10'),
+    '/lists/compare?u=1&u=2&op=intersect&game=10&tv=%7B%7D',
+  );
+});
+
 test('compareUrl: an old comparison link round-trips through parse and rebuild', () => {
   const { slots } = parseUrlState('?u=bob&u=alice');
   assert.equal(compareUrl(slots), `${COMPARE_PATH}?u=alice&u=bob`);

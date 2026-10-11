@@ -220,6 +220,7 @@ import {
   getRanking,
   setRanking,
   listHasPriceSource,
+  listHasAccountSource,
   rankingsOf,
   listDeps,
 } from './listsStore.ts';
@@ -1937,7 +1938,7 @@ export default function ListRoute() {
       // in `recentAccounts` — comparing someone isn't picking them as your account, the same rule
       // a `?u=` override follows (see docs/dev/lists-and-accounts.md).
       const canonicalSlots = normalizeSlots(accounts.map((a) => a.members));
-      const canonical = compareUrl(canonicalSlots, compareOp());
+      const canonical = compareUrl(canonicalSlots, compareOp(), routerLocation.search);
       loadedCompareKeys.add(compareKey(compareOp(), canonicalSlots));
       if (canonical !== routerLocation.pathname + routerLocation.search) navigate(canonical, { replace: true });
 
@@ -2592,9 +2593,13 @@ export default function ListRoute() {
     // Owned/wishlist state their own fetch's age; a comparison or a dynamic list states the
     // oldest of the account fetches it was built from (noteFetchedAt), which is why this is
     // gated on there *being* an age rather than on the kind — a manual list is assembled from
-    // stored appids and has none, and neither does the recent list. The kinds always built from
-    // account fetches keep it without one too: a first load that failed is when a retry is wanted.
-    const accountBuilt = kind === 'owned' || kind === 'wishlist' || kind === 'compare';
+    // stored appids and has none, and neither does the recent list. A list built from account
+    // fetches keeps it without one too: a first load that failed is when a retry is wanted.
+    const formula = combineList();
+    const accountBuilt =
+      kind === 'owned' ||
+      kind === 'wishlist' ||
+      (!!formula && listHasAccountSource(formula, (id) => sharedSynthetic().get(id) ?? getList(id)));
     if (fetchedAt() !== undefined || refreshing() || accountBuilt) {
       tiles.push({
         label: 'Updated',

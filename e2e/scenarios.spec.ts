@@ -1792,6 +1792,13 @@ test('S1 edge: sharing an unchanged layout sends no layout, so no shared-layout 
   expect(new URL(link).searchParams.has('tv')).toBe(false);
 });
 
+test("S1 edge: a comparison's shared layout survives the link's rewrite to resolved players", async ({ page }) => {
+  const tv = JSON.stringify({ sorts: [{ key: 'name', dir: 'desc' }] });
+  await page.goto(`/lists/compare?u=alice&u=bob&tv=${encodeURIComponent(tv)}`);
+  await expect(page.getByText('This table uses a layout from a shared link')).toBeVisible();
+  await expect(page).not.toHaveURL(/[?&]u=alice/);
+});
+
 test("S2 edge: copying a game's link is announced, not only shown as ✓", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360');

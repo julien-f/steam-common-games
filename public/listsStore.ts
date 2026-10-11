@@ -93,15 +93,29 @@ export function rankingsOf(source: ListRef): GameList[] {
   return getLists().filter((l) => l.kind === 'ranked' && !!l.source && sameRef(l.source, source));
 }
 
-// Whether a list is built, at any depth, from a source that has prices (a wishlist or a bundle).
-export function listHasPriceSource(list: GameList, seen = new Set<string>()): boolean {
+function listReaches(
+  list: GameList,
+  match: (ref: ListRef) => boolean,
+  get: (id: string) => GameList | undefined,
+  seen = new Set<string>(),
+): boolean {
   if (seen.has(list.id)) return false;
   seen.add(list.id);
   return listDeps(list).some((ref) => {
-    if (ref.kind === 'account-wishlist' || ref.kind === 'bundle') return true;
-    const dep = ref.kind === 'user' && ref.listId ? getList(ref.listId) : undefined;
-    return !!dep && listHasPriceSource(dep, seen);
+    if (match(ref)) return true;
+    const dep = ref.kind === 'user' && ref.listId ? get(ref.listId) : undefined;
+    return !!dep && listReaches(dep, match, get, seen);
   });
+}
+
+// Whether a list is built, at any depth, from a source that has prices (a wishlist or a bundle).
+export function listHasPriceSource(list: GameList): boolean {
+  return listReaches(list, (ref) => ref.kind === 'account-wishlist' || ref.kind === 'bundle', getList);
+}
+
+// Whether a list is built, at any depth, from an account fetch; `get` also finds a shared formula's inlined groups.
+export function listHasAccountSource(list: GameList, get: (id: string) => GameList | undefined = getList): boolean {
+  return listReaches(list, (ref) => ref.kind === 'account-owned' || ref.kind === 'account-wishlist', get);
 }
 
 // ── Cycle detection ──────────────────────────────────────────────────────────────────────────
