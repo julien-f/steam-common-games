@@ -15,7 +15,7 @@ No auth, same trust level as `GET /api/health`. In memory, reset on restart (exc
   lastHour:     { …same shape as sinceRestart… },
   budgets:         { [group]: { hourUsed, hourMax, dayUsed, dayMax } },
   circuitBreakers: { 'steam-store' | hltb | protondb: { blockedUntil, tripCount, consecutive403s } },
-  semaphores:      { store | tag | proton: { active, queued, maxQueueSeen, rejected } },
+  semaphores:      { store | tag | proton | hltb | 'itad-info': { active, queued, maxQueueSeen, rejected } },
   cacheEntries:    { [group]: count } }
 ```
 
@@ -43,7 +43,7 @@ No auth, same trust level as `GET /api/health`. In memory, reset on restart (exc
 ### Live snapshots
 
 - `circuitBreakers` (`lib/circuitBreaker.js`; Steam store, HLTB search, ProtonDB): `blockedUntil` (0 = closed), `tripCount` (lifetime, tells "once long ago" from "every 20 minutes"), `consecutive403s` (one more trips it).
-- `semaphores` (`lib/steam.js` `getSemaphoreStats`): `active`/`queued` now, `maxQueueSeen` (lifetime high-water mark), `rejected` (calls turned away by the `SEMAPHORE_MAX_QUEUE` valve; should stay 0). High latency with low `queued` = slow upstream; high `queued` = our own concurrency cap.
+- `semaphores` (`lib/upstream.js` `getSemaphoreStats`, one per `createSemaphore`): `active`/`queued` now, `maxQueueSeen` (lifetime high-water mark), `rejected` (calls turned away by the `SEMAPHORE_MAX_QUEUE` valve; should stay 0). High latency with low `queued` = slow upstream; high `queued` = our own concurrency cap.
 - `budgets`: current usage, see below.
 
 ## Outbound budgets
