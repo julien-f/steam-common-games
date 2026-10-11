@@ -358,7 +358,24 @@ test('dropping the last reference to a soft-deleted list purges it, and leaves a
   );
 });
 
-// ── isAccountReferenced (used by accountsStore.ts) ───────────────────────────────────────────
+test('a soft-deleted list keeps its sources: deleting along a chain soft-deletes, and the sweep purges it head-first', () => {
+  const { createList, deleteList, getList } = store();
+  const a = createList({ name: 'A', kind: 'manual', appids: [1] });
+  const b = createList({ name: 'B', kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: a.id }] });
+  const c = createList({ name: 'C', kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: b.id }] });
+
+  assert.equal(deleteList(b.id).softDeleted, true);
+  // B still resolves for C, so A must stay too.
+  assert.equal(deleteList(a.id).softDeleted, true);
+  assert.ok(getList(a.id));
+
+  // Deleting C leaves an all-deleted chain, purged entirely.
+  assert.equal(deleteList(c.id).softDeleted, false);
+  assert.equal(getList(b.id), undefined);
+  assert.equal(getList(a.id), undefined);
+});
+
+// ── isAccountReferenced (used by accountsStore.ts)───────────────────────────────────────────
 
 test('isAccountReferenced: true only while a dynamic list references that accountId', () => {
   const { createList, isAccountReferenced, updateDynamicList } = store();

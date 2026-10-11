@@ -152,8 +152,9 @@ export function isDescendantFolder(
 
 // ── Referenced-by checks (soft-delete/restore) ──────────────────────────────────────────────
 
+// Soft-deleted lists count: a kept list must still resolve; the sweep purges a deleted chain head-first.
 export function isListReferenced(listId: string, lists: GameList[] = readLists()): boolean {
-  return lists.some((l) => !l.deletedAt && listDeps(l).some((s) => s.kind === 'user' && s.listId === listId));
+  return lists.some((l) => listDeps(l).some((s) => s.kind === 'user' && s.listId === listId));
 }
 
 // Any list, soft-deleted ones included: they're kept only while resolvable, so they resolve too.
