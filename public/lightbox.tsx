@@ -1,7 +1,7 @@
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
 import { urlWithoutShot } from './urlState.ts';
 import { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } from './mediaItems.ts';
-import type { MediaItem } from './mediaItems.ts';
+import type { MediaItem, ShotKind } from './mediaItems.ts';
 import type { Game, ReadonlyGame } from './types.ts';
 import { fmtTime } from './utils.ts';
 import { decideSwipeAxis, resolveSwipe, LB_SWIPE_RESISTANCE } from './lightboxSwipe.ts';
@@ -104,7 +104,7 @@ let _getGamePosition: () => { index: number; total: number } | null = () => null
 // Set when a re-point landed on a banner for want of anything else — see `repointLightboxGame`.
 // Holds the *kind* of shot being left, so the screenshot/trailer that eventually arrives is
 // picked by the same rule the re-point itself would have used.
-let _awaitingMedia: MediaItem['type'] | null = null;
+let _awaitingMedia: ShotKind | null = null;
 let _lbPrevFocus: Element | null = null;
 // How the viewer last interacted — see openLightbox's focus call.
 let lastInputWasKey = false;
@@ -1101,7 +1101,7 @@ const lbLastShot = new Map<number, string>();
 let lbShotChosen = false;
 
 // Where `appid`'s remembered item sits in `list`, else where a game step lands leaving `leaving`.
-function landingIndex(appid: number, list: MediaItem[], leaving: MediaItem['type']) {
+function landingIndex(appid: number, list: MediaItem[], leaving: ShotKind) {
   const remembered = list.findIndex((s) => s.shotId === lbLastShot.get(appid));
   return remembered >= 0 ? remembered : preferredShotIndex(list, leaving);
 }
@@ -1112,7 +1112,9 @@ export function repointLightboxGame(game: ReadonlyGame) {
   // A lone banner is no pick: it stands in while the game's media streams.
   if (left && leavingGame && lbShotChosen && shots().length > 1) lbLastShot.set(leavingGame.appid, left.shotId);
   lbShotChosen = false;
-  const leaving = left?.type ?? 'image';
+  // A pending latch's kind carries on through a game still loading: its lone banner is no Cover.
+  const leaving: ShotKind =
+    _awaitingMedia ?? (left?.shotId === 'banner' && shots().length > 1 ? 'cover' : (left?.type ?? 'image'));
   const next = buildMediaItems(game.appid, game.details?.meta);
   const target = landingIndex(game.appid, next, leaving);
   // A lone banner means this row's details are still streaming — there is nothing else to show
@@ -1367,7 +1369,7 @@ createRoot(() => {
     if (!leaving || list.length <= 1) return;
     _awaitingMedia = null;
     const target = landingIndex(lbGame()!.appid, list, leaving);
-    if (target === 0) return; // trailers but no screenshots — not worth autoplaying unasked
+    if (target === 0) return; // the Cover wanted, or trailers but no screenshots (not worth autoplaying unasked)
     setIdx(target);
     _onLightboxParamChange(list[target].shotId);
   });

@@ -1354,6 +1354,31 @@ test('F1 edge: paging back to a game only passed through lands on the kind being
   await expect(counter).toHaveText('Trailer 1 of 1');
 });
 
+test('F1 edge: paging games from the Cover keeps showing covers', async ({ page }) => {
+  let media = false;
+  await asPlayer(page, ALICE, { recentGames: [1145360, 105600, 367520] });
+  await page.goto('/game/1145360?shot=banner');
+  const counter = page.locator('.lb-counter');
+  const name = page.locator('.lb-caption-text');
+  await expect(page.locator('.lb-caption-pos')).toHaveText('Game 1 of 3');
+  await expect(counter).toHaveText('Cover');
+  for (const next of ['Terraria', 'Hollow Knight']) {
+    await page.keyboard.press('ArrowDown');
+    await expect(name).toHaveText(next);
+    await expect(counter).toHaveText('Cover');
+  }
+  // Onto a game whose media is still loading: its media arriving doesn't move off the Cover.
+  await terrariaMediaOnRefresh(page, () => media);
+  await page.goto('/lists/owned?game=1145360&shot=banner');
+  await expect(counter).toHaveText('Cover');
+  await page.keyboard.press('ArrowDown');
+  await expect(name).toHaveText('Terraria');
+  media = true;
+  await refreshBehindLightbox(page);
+  await expect(page.locator('#screenshot-lightbox .lb-next')).toBeEnabled();
+  await expect(counter).toHaveText('Cover');
+});
+
 test('F1 edge: stepping past the last media or game slides back in from the other side', async ({ page }) => {
   await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
   await page.goto('/game/1145360?shot=s1');
