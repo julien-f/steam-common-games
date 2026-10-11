@@ -37,9 +37,7 @@ npm run format          # Prettier over the whole tree
 
 Open `http://localhost:58991` in dev (not `:3000` — that serves the last `npm run build`).
 
-`.githooks/pre-commit` checks whitespace and runs `npm run check`'s steps in parallel before every commit, on the staged content only (unstaged edits are set aside, then restored) — typecheck, lint and `npm run test:e2e` only when `public/`, `e2e/` or a frontend config changes (~3 s otherwise, ~18 s with them); `npm install` enables it (`core.hooksPath`) and points `git blame` at `.git-blame-ignore-revs`.
-
-CI (`.github/workflows/ci.yml`) runs `npm run check` and the e2e suite, as two parallel jobs on Node 24, on every push to `main` and every PR (the `pre-push` hook runs the same locally first), and lists the journey steps the tests lock in the run's summary.
+Tests, the mocked server and the git hooks (`npm install` enables them; `pre-push` runs what CI runs) are in [testing.md](docs/dev/testing.md).
 
 Application data lives in `db.sqlite` (gitignored); it holds the upstream caches plus signed-in users, their sessions and synced settings. `npm run cache:clear` empties the cache tables without deleting the file or touching accounts.
 
@@ -59,8 +57,11 @@ Application data lives in `db.sqlite` (gitignored); it holds the upstream caches
 - [data.md](docs/dev/data.md) — database, cache tiers, refresh paths
 - [observability.md](docs/dev/observability.md) — metrics endpoint and log warnings
 - [journeys.md](docs/dev/journeys.md) — user journeys, for design reviews and end-to-end tests
-- [improvements.md](docs/dev/improvements.md) — UX backlog from design reviews
-- [decisions.md](docs/dev/decisions.md) — computed ratings and heuristics
+- [ui-guidelines.md](docs/dev/ui-guidelines.md) — UI conventions and the checklist for a new UI feature
+- [testing.md](docs/dev/testing.md) — unit and e2e tests, the mocked server, the git hooks
+- [pitfalls.md](docs/dev/pitfalls.md) — surprising behaviors and their fixes
+- [decisions.md](docs/dev/decisions.md) — computed ratings, heuristics, tooling choices
+- [improvements.md](docs/dev/improvements.md) · [code-backlog.md](docs/dev/code-backlog.md) · [setup-backlog.md](docs/dev/setup-backlog.md) — UX, code and Claude Code setup backlogs
 
 Screenshots used by the docs live in [docs/images/](docs/images).
 

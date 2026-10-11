@@ -32,6 +32,7 @@
 
 ## Hooks
 
-- `pre-commit` (`.githooks/pre-commit`, enabled by `npm install`): `git diff --cached --check`, then `npm run check`'s steps in parallel on the staged content only (unstaged edits are set aside, then restored) — typecheck, lint, the CSS check and desktop e2e only when `public/`, `e2e/` or a frontend config is staged. It blocks the commit on failure.
+- `pre-commit` (`.githooks/pre-commit`, enabled by `npm install`): `git diff --cached --check`, then `npm run check`'s steps in parallel on the staged content only (unstaged edits are set aside, then restored) — typecheck, lint, the CSS check and desktop e2e only when `public/`, `e2e/` or a frontend config is staged (~3 s without them, ~18 s with). It blocks the commit on failure. `npm install` also points `git blame` at `.git-blame-ignore-revs`.
 - `pre-push`: what CI runs (`npm run check`, then both widths of e2e) on HEAD; refuses a push of anything else or from a dirty tree.
+- CI (`.github/workflows/ci.yml`): `npm run check` and the e2e suite as two parallel jobs on Node 24, on every push to `main` and every PR; the run's summary lists the journey steps the tests lock.
 - A doc reference `check` reports is either stale (fix the doc) or deliberate history (add it to `HISTORY` in `scripts/doc-refs.js`).
