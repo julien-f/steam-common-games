@@ -1370,9 +1370,8 @@ export default function ListRoute() {
   }
 
   function stepGame(dir: 1 | -1): boolean {
-    const t = activeTable();
-    if (!t) return false;
-    const next = stepGameList(t, getGameList, getPanelGame(), dir);
+    if (!activeTable()) return false;
+    const next = stepGameList(getGameList(), getPanelGame(), dir);
     if (!next) return false;
     openGame(next);
     return true;

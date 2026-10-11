@@ -13,7 +13,7 @@ Last audited: simplify 2026-10-10 · security 2026-10-10 · perf 2026-10-10 · r
 
 ## Simplify
 
-- **C11 · cleanup · S** — `stepGameList`'s `table: unknown` at `public/panelNav.ts:51` is only truth-tested and always truthy. Drop it; pass the list instead of a getter.
+None open.
 
 ## Security
 

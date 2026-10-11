@@ -46,16 +46,10 @@ export function renderPanelNav({
 // The step `getGameList()` itself does for ArrowLeft/Right-in-the-lightbox nav (see
 // navigateLightboxGame in library.js/bundles.js) — pulled out so both pages' lightbox handler
 // and the nav-bar buttons above share the exact same "current index, wrap around" arithmetic.
-// Returns null when there's nothing to step to (no table yet, a standalone lookup, or the
-// current game somehow isn't in the list).
-export function stepGameList(
-  table: unknown,
-  getGameList: () => Game[],
-  currentGame: Game | null,
-  dir: 1 | -1,
-): Game | null {
-  if (!table || !currentGame || currentGame.standalone) return null;
-  const list = getGameList();
+// Returns null when there's nothing to step to (a standalone lookup, or the current game
+// somehow isn't in the list).
+export function stepGameList(list: Game[], currentGame: Game | null, dir: 1 | -1): Game | null {
+  if (!currentGame || currentGame.standalone) return null;
   const idx = list.findIndex((g) => g.appid === currentGame.appid);
   if (idx === -1) return null;
   return list[(idx + dir + list.length) % list.length];
