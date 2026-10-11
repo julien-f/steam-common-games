@@ -46,7 +46,6 @@ None open.
 
 ## Phone
 
-- **U32 · minor · I1, R1** — the ranking screen stacks cards vertically (Tie/Skip/Undo below the fold) and has no side gutter.
 - **U33 · minor · F3** — no random pick on phone until a panel is open (the 🎲 lives in the panel's nav).
 
 ## Accounts and first visit
@@ -78,4 +77,4 @@ States `npm run dev:mock` can't show yet — each needs a fixture or state in `e
 
 - A4 (no allowed account has a public friends list); Y1–Y3 (needs a Steam sign-in).
 - On a real phone: trailer playback (headless Chromium showed black frames), pinch and double-tap zoom.
-- Partly: R2, R3 at phone width (the rank screen is U32); B4 (the fixture friend's wishlist is empty); D3 (◇ not started).
+- Partly: R2, R3 at phone width; B4 (the fixture friend's wishlist is empty); D3 (◇ not started).

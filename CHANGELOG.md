@@ -74,6 +74,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - An account Steam returns no profile for is named by what you typed rather than its bare Steam ID
 - Stepping to another screenshot while Retry is loading one now keeps the screenshot you stepped to
 - On the ranking screen, the side panel's ↻ Refresh re-fetches the game's details, and its tags no longer look like filter buttons
+- On a phone, the ranking screen keeps both games side by side with Tie, Skip and Undo in view, inside a side margin
 
 ### Development
 
