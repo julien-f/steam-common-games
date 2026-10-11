@@ -61,15 +61,15 @@ Not findings: wording taste, Prettier's output, deliberate exceptions recorded w
 
 One table, ranked by how often the friction bites, then effort:
 
-| S   | Target | Where | Friction | Proposed change | Measure: baseline → target | Effort | Recommend |
+| P   | Target | Where | Friction | Proposed change | Measure: baseline → target | Effort | Recommend |
 | --- | ------ | ----- | -------- | --------------- | -------------------------- | ------ | --------- |
 
-Number findings on from `node scripts/backlog-next.js S`; the report also lists the Watching items' results from step 0.
+Number findings on from `node scripts/backlog-next.js P`; the report also lists the Watching items' results from step 0.
 
 Then one `AskUserQuestion`: apply the recommended set, plus any real choice among the rest. Adding a skill, hook or agent still needs that explicit approval (CLAUDE.md, Ask first).
 
 ## Applying
 
-- Update [setup-backlog.md](../../../docs/dev/setup-backlog.md) in the first commit: applied items under Watching (`**S<n> · <target> · <effort>** — change. Measure: \`command\` — baseline → target.`), the rest of the recommended set under Open, the ones the user turned down under Declined with their reason; set the header's dates (today, and the newest entry `--transcripts` printed).
+- Update [setup-backlog.md](../../../docs/dev/setup-backlog.md) in the first commit: applied items under Watching (`**P<n> · <target> · <effort>** — change. Measure: \`command\` — baseline → target.`), the rest of the recommended set under Open, the ones the user turned down under Declined with their reason; set the header's dates (today, and the newest entry `--transcripts` printed).
 - Follow CLAUDE.md's Development workflow; a `scripts/` change gets a Development changelog entry and a test.
 - Memory edits are outside the repo: say which entries were moved or deleted.
