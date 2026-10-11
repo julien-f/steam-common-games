@@ -11,7 +11,7 @@
 // stores in for routes to use — the same seam listResolve.ts's own createDefaultFetchers() is.
 import type { CombineOp, GameList, ListRef } from './types.ts';
 import { getRecentAccounts, getMyAccount, getEffectiveCurrentAccount, accountDisplayLabel } from './accountsStore.ts';
-import { getLists } from './listsStore.ts';
+import { getLists, listDeps } from './listsStore.ts';
 import { membersFromAccountId } from './accountData.ts';
 import { getBundleSnapshot } from './bundleSnapshots.ts';
 
@@ -144,9 +144,7 @@ export function describeListRef(ref: ListRef, naming: ListNaming): RefDescriptio
 }
 
 export function describeSources(list: GameList, naming: ListNaming): RefDescription[] {
-  if (list.kind === 'ranked') return list.source ? [describeListRef(list.source, naming)] : [];
-  if (list.kind !== 'dynamic') return [];
-  return (list.sources ?? []).map((ref) => describeListRef(ref, naming));
+  return listDeps(list).map((ref) => describeListRef(ref, naming));
 }
 
 // The whole formula as one plain string ("Alice — Owned ∩ Bob — Owned") — for a tooltip, a test,

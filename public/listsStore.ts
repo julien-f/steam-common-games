@@ -79,7 +79,7 @@ export function getList(id: string): GameList | undefined {
 }
 
 // What a list is computed from — a dynamic list's sources, a ranked list's one source.
-export function listDeps(list: GameList): ListRef[] {
+export function listDeps(list: Pick<GameList, 'kind' | 'sources' | 'source'>): ListRef[] {
   if (list.kind === 'dynamic') return list.sources ?? [];
   if (list.kind === 'ranked') return list.source ? [list.source] : [];
   return [];
@@ -249,9 +249,7 @@ export function createList(input: CreateListInput): GameList {
   const parentId = input.parentId ?? null;
   const lists = readLists();
 
-  const deps =
-    input.kind === 'dynamic' ? (input.sources ?? []) : input.kind === 'ranked' && input.source ? [input.source] : [];
-  if (wouldCreateCycle(id, deps, lists)) throw new CycleError();
+  if (wouldCreateCycle(id, listDeps(input), lists)) throw new CycleError();
 
   const now = Date.now();
   const list: GameList = {
