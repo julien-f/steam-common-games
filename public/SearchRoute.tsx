@@ -15,7 +15,7 @@ import { renderPanelNav, stepGameList } from './panelNav.ts';
 import { setPanelParam, setSearchQueryParam, parseUrlState } from './urlState.ts';
 import { addRecentGame } from './recentGames.ts';
 import { peekMyOwnershipStatus, onMyOwnershipReady } from './myOwnership.ts';
-import { GAME_SEARCH_DEBOUNCE_MS, GAME_SEARCH_MIN_CHARS } from './gameSearch.ts';
+import { GAME_SEARCH_DEBOUNCE_MS, GAME_SEARCH_MIN_CHARS, ownershipMarkersHtml, searchGames } from './gameSearch.ts';
 import type { GameSearchResult } from './gameSearch.ts';
 import type { Game, GameDetails } from './types.ts';
 import { fetchJson } from './utils.ts';
@@ -44,21 +44,7 @@ function renderName(_value: unknown, row: GameSearchResult): Node {
   const wrap = document.createElement('span');
   wrap.className = 'game-search-name';
   wrap.appendChild(document.createTextNode(row.name));
-  const status = peekMyOwnershipStatus(row.appid);
-  if (status?.inLibrary) {
-    const b = document.createElement('span');
-    b.className = 'game-search-badge owned';
-    b.title = 'Owned';
-    b.textContent = '✓';
-    wrap.appendChild(b);
-  }
-  if (status?.onWishlist) {
-    const b = document.createElement('span');
-    b.className = 'game-search-badge wishlisted';
-    b.title = 'On wishlist';
-    b.textContent = '☆';
-    wrap.appendChild(b);
-  }
+  wrap.insertAdjacentHTML('beforeend', ownershipMarkersHtml(peekMyOwnershipStatus(row.appid)));
   return wrap;
 }
 
@@ -128,13 +114,9 @@ export default function SearchRoute() {
       }
       setSearching(true);
       setSearchFailed(false);
-      fetch(`/api/search-games?q=${encodeURIComponent(term)}`)
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.json();
-        })
-        .then((data) => {
-          if (token === searchToken) setResults(data.results || []);
+      searchGames(term)
+        .then((list) => {
+          if (token === searchToken) setResults(list);
         })
         .catch(() => {
           if (token !== searchToken) return;

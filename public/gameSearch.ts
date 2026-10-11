@@ -1,4 +1,4 @@
-import { esc } from './utils.ts';
+import { esc, fetchJson } from './utils.ts';
 import { peekMyOwnershipStatus, onMyOwnershipReady } from './myOwnership.ts';
 import type { OwnershipStatus } from './myOwnership.ts';
 
@@ -25,6 +25,13 @@ export interface GameSearchResult {
 export const GAME_SEARCH_DEBOUNCE_MS = 300;
 export const GAME_SEARCH_MIN_CHARS = 2;
 
+// Throws on a failed request, so callers can tell it from no match.
+export async function searchGames(term: string): Promise<GameSearchResult[]> {
+  const url = `/api/search-games?q=${encodeURIComponent(term)}`;
+  const data = await fetchJson<{ results?: GameSearchResult[] }>(url, undefined, 'Search failed');
+  return data.results || [];
+}
+
 // Recognizes a bare appid ("1245620") or a Steam store URL containing "/app/<id>" — either
 // way, no name search is needed; the appid alone is enough to open the panel.
 export function parseDirectAppid(raw: string): number | null {
@@ -40,7 +47,7 @@ export function parseDirectAppid(raw: string): number | null {
 // this dropdown or already open in the panel. `peekMyOwnershipStatus` never blocks (a search
 // result list re-renders on every keystroke) — see its own comment for what `null` means here
 // (no `currentAccount` loaded, or the fetch simply hasn't landed yet).
-function ownershipMarkersHtml(status: OwnershipStatus | null): string {
+export function ownershipMarkersHtml(status: OwnershipStatus | null): string {
   if (!status) return '';
   const marks: string[] = [];
   if (status.inLibrary) marks.push('<span class="game-search-badge owned" title="Owned">✓</span>');
@@ -215,13 +222,11 @@ export function initGameSearch({
   async function runSearch(term: string) {
     const fetchId = ++activeFetch;
     try {
-      const res = await fetch(`/api/search-games?q=${encodeURIComponent(term)}`);
-      const data = await res.json();
+      const results = await searchGames(term);
       if (fetchId !== activeFetch) return; // a newer keystroke's request already landed
       lastTerm = term;
-      const results = res.ok ? data.results || [] : [];
       if (results.length) showResults(results);
-      else showEmpty(term, !res.ok);
+      else showEmpty(term, false);
     } catch {
       if (fetchId === activeFetch) showEmpty(term, true);
     }
