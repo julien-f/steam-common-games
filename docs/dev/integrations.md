@@ -54,7 +54,7 @@ The `howlongtobeat` npm package was removed (it pulled in a vulnerable `axios`);
 
 ## Tags & demo link — store browse data
 
-`getSteamTags` (`lib/steam.js`) reads the user tags shown on the game's own store page (and so on SteamDB and ITAD), not SteamSpy's separate dataset, which it used to and which is sparse for niche or recent games. Two undocumented, key-less endpoints:
+`getSteamTags` (`lib/steam.js`) reads the user tags shown on the game's own store page (and so on SteamDB and ITAD), not SteamSpy's separate dataset, which is sparse for niche or recent games. Two undocumented, key-less endpoints:
 
 - `https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json={"ids":[{"appid":N}],"context":{"language":"english","country_code":"US"},"data_request":{"include_tag_count":30}}` — the app's whole store browse item.
   - `tagids` are already ordered by relevance, as the store page shows them; all are shown.

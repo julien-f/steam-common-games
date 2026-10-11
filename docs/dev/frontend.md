@@ -124,7 +124,7 @@ Three kinds of state, three mechanisms:
 
 Every resource **source** resolves to a _primitive_ (an appid, or an `appid:account` string), never an object literal: `createResource` memoizes its source with `===`, so an object would refetch every time the source recomputed — e.g. the DLC source re-runs whenever any collapsible is toggled.
 
-Why it matters: rows used to be plain objects plus a manual notify that rebuilt the whole panel body ~6 times per open, dropping hover, focus and the scroll-spy's class; now an open rebuilds the subnav once and patches ~30 nodes.
+Why it matters: a manual notify over plain row objects rebuilds the whole panel body on every change (~6 times per open, dropping hover, focus and the scroll-spy's class); with stores and resources an open rebuilds the subnav once and patches ~30 nodes.
 
 Three rules keep it that way:
 
