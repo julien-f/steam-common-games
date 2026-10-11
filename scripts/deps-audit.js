@@ -13,9 +13,11 @@ const SOURCE_FILES = ['server.js', 'vite.config.js', 'eslint.config.mjs', 'playw
 // Required peer of @babel/eslint-parser, never imported (architecture.md's eslint.config.mjs bullet).
 const NOT_IMPORTED = new Set(['@babel/core']);
 
+// node_modules skipped: a dependency's own imports would count as this repo using a package.
 const walk = (dir, keep) =>
   fs
     .readdirSync(dir, { recursive: true })
+    .filter((f) => !f.split(path.sep).includes('node_modules'))
     .map((f) => path.join(dir, f))
     .filter(keep);
 
@@ -75,4 +77,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { importedPackages, unusedDeps, phantomImports };
+module.exports = { importedPackages, unusedDeps, phantomImports, walk };

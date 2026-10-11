@@ -105,6 +105,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - doc-refs no longer counts names from installed packages as this repo's code
 - Fix batches: lanes close their own backlog items, and lane planning sees bare file names
 - New node scripts/dead-exports.js lists frontend exports no other file uses
+- deps-audit no longer counts a dependency's own imports as this repo using a package
 
 ## [0.10.0] - 2026-10-10
 

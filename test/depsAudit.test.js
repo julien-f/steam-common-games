@@ -4,8 +4,9 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 
-const { importedPackages, unusedDeps, phantomImports } = require('../scripts/deps-audit');
+const { importedPackages, unusedDeps, phantomImports, walk } = require('../scripts/deps-audit');
 
 test('importedPackages: bare specifiers from import, export, require and import(), reduced to package names', () => {
   const source = `
@@ -43,6 +44,18 @@ test('unusedDeps: a name only inside a longer package name is unused; @babel/cor
 
 test('phantomImports: imported but not declared', () => {
   assert.deepStrictEqual(phantomImports(new Set(['express', 'left-pad']), ['express']), ['left-pad']);
+});
+
+test("walk: skips node_modules, whose imports are a dependency's, not this repo's", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deps-audit-'));
+  fs.mkdirSync(path.join(dir, 'node_modules/pkg'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'a.js'), '');
+  fs.writeFileSync(path.join(dir, 'node_modules/pkg/b.js'), '');
+  assert.deepStrictEqual(
+    walk(dir, (p) => p.endsWith('.js')),
+    [path.join(dir, 'a.js')],
+  );
+  fs.rmSync(dir, { recursive: true });
 });
 
 test('every package the server requires at runtime is a production dependency', () => {
