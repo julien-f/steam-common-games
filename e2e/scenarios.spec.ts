@@ -502,7 +502,7 @@ test("R1 edge: a failed Refresh on the ranking's side panel says so", async ({ p
   await expect(page.locator('.rank-route .list-status')).toHaveText('Refresh failed: Steam did not answer');
 });
 
-test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo without scrolling, inside a gutter', async ({
+test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo without scrolling, inside a gutter, down to 320px wide', async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout');
@@ -513,8 +513,8 @@ test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo wi
   await expect(page.locator('.rank-card-name').nth(1)).not.toHaveText(/^App /);
 
   const viewport = page.viewportSize()!;
-  const undo = (await page.locator('.rank-actions').boundingBox())!;
-  expect(undo.y + undo.height).toBeLessThanOrEqual(viewport.height);
+  const actions = (await page.locator('.rank-actions').boundingBox())!;
+  expect(actions.y + actions.height).toBeLessThanOrEqual(viewport.height);
   for (const box of [
     await page.locator('.rank-pair').boundingBox(),
     await page.locator('.rank-header').boundingBox(),
@@ -522,6 +522,10 @@ test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo wi
     expect(box!.x).toBeGreaterThanOrEqual(12);
     expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width - 12);
   }
+
+  // The narrowest phones: the cards' action buttons wrap rather than push the page sideways.
+  await page.setViewportSize({ width: 320, height: viewport.height });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
 
 test('R1.1,3-6: rank chosen games, stop, resume on the same ones', async ({ page }) => {

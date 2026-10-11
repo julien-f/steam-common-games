@@ -4478,6 +4478,7 @@ kbd {
     gap: 12px;
   }
   .rank-pair {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 8px;
   }
   .rank-card-name {
@@ -4485,6 +4486,9 @@ kbd {
   }
   .rank-card-actions {
     flex-direction: column;
+  }
+  .rank-card-actions .btn {
+    white-space: normal;
   }
 }
 
