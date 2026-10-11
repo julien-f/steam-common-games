@@ -946,8 +946,9 @@ export default function ListRoute() {
   // A memo, so the load effect re-runs on a new formula only — not on Back dropping `?game=`
   // (overlayHistory.ts), which changes the rest of the query string.
   const sharedFormulaParam = createMemo(() => new URLSearchParams(routerLocation.search).get('f'));
+  const sharedGetList = (id: string): GameList | undefined => sharedSynthetic().get(id) ?? getList(id);
   function sharedFetchers(base: ListResolveFetchers): ListResolveFetchers {
-    return { ...base, getList: (id) => sharedSynthetic().get(id) ?? base.getList(id) };
+    return { ...base, getList: sharedGetList };
   }
   function sharedNaming(): ListNaming {
     const base = createDefaultNaming();
@@ -1772,7 +1773,21 @@ export default function ListRoute() {
   }
 
   function viewActions() {
-    return <ViewActions onShare={handleShareView} onReset={handleResetView} shareDisabledReason={shareViewFailure()} />;
+    return (
+      <>
+        {/* Phone only (CSS): there, the panel nav's 🎲 is out of reach until a game is open. */}
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm list-random-pick"
+          aria-label="Pick a random game"
+          title="Pick a random game (R)"
+          onClick={() => pickRandomGame()}
+        >
+          🎲
+        </button>
+        <ViewActions onShare={handleShareView} onReset={handleResetView} shareDisabledReason={shareViewFailure()} />
+      </>
+    );
   }
 
   async function load({ refresh = false }: { refresh?: boolean } = {}): Promise<void> {
@@ -1939,9 +1954,10 @@ export default function ListRoute() {
       // in `recentAccounts` — comparing someone isn't picking them as your account, the same rule
       // a `?u=` override follows (see docs/dev/lists-and-accounts.md).
       const canonicalSlots = normalizeSlots(accounts.map((a) => a.members));
-      const canonical = compareUrl(canonicalSlots, compareOp(), routerLocation.search);
+      // Live `location`, not `routerLocation`: that lags the panel's and a shared view's replaceState.
+      const canonical = compareUrl(canonicalSlots, compareOp(), location.search);
       loadedCompareKeys.add(compareKey(compareOp(), canonicalSlots));
-      if (canonical !== routerLocation.pathname + routerLocation.search) navigate(canonical, { replace: true });
+      if (canonical !== location.pathname + location.search) navigate(canonical, { replace: true });
 
       const list = inMemoryDynamicList(
         compareOp(),
@@ -2596,12 +2612,14 @@ export default function ListRoute() {
     // gated on there *being* an age rather than on the kind — a manual list is assembled from
     // stored appids and has none, and neither does the recent list. A list built from account
     // fetches keeps it without one too: a first load that failed is when a retry is wanted.
-    const formula = combineList();
-    const accountBuilt =
+    const list = combineList();
+    if (
+      fetchedAt() !== undefined ||
+      refreshing() ||
       kind === 'owned' ||
       kind === 'wishlist' ||
-      (!!formula && listHasAccountSource(formula, (id) => sharedSynthetic().get(id) ?? getList(id)));
-    if (fetchedAt() !== undefined || refreshing() || accountBuilt) {
+      (!!list && listHasAccountSource(list, sharedGetList))
+    ) {
       tiles.push({
         label: 'Updated',
         value: refreshTileValue(refreshing() ? 'Refreshing…' : fetchedAt() === undefined ? '—' : fmtAge(fetchedAt())),
@@ -2618,7 +2636,6 @@ export default function ListRoute() {
       });
     }
     if (hasPrices() && !itadOff()) tiles.push(priceTile());
-    const list = combineList();
     if (list) {
       if (list.kind === 'dynamic') {
         // A comparison names its sources "Players" — they're people, and calling them sources

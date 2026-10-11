@@ -452,19 +452,19 @@ test('listHasPriceSource: a wishlist or bundle source, at any depth, has prices'
 });
 
 test('listHasAccountSource: an account library or wishlist, at any depth, through the given lookup', () => {
-  const { createList, listHasAccountSource } = store();
+  const { createList, getList, listHasAccountSource } = store();
   const owned = createList({ kind: 'dynamic', op: 'union', sources: [{ kind: 'account-owned', accountId: 'a' }] });
   const ranked = createList({ kind: 'ranked', source: { kind: 'user', listId: owned.id } });
   const bundle = createList({ kind: 'ranked', source: { kind: 'bundle', bundleId: '1' } });
   const manual = createList({ name: 'M', kind: 'manual', appids: [1] });
-  assert.equal(listHasAccountSource(owned), true);
-  assert.equal(listHasAccountSource(ranked), true);
-  assert.equal(listHasAccountSource(bundle), false);
-  assert.equal(listHasAccountSource(manual), false);
+  assert.equal(listHasAccountSource(owned, getList), true);
+  assert.equal(listHasAccountSource(ranked, getList), true);
+  assert.equal(listHasAccountSource(bundle, getList), false);
+  assert.equal(listHasAccountSource(manual, getList), false);
   // A shared formula's inlined groups aren't stored: they're found through the caller's lookup.
   const synthetic = { id: 'g1', kind: 'dynamic', op: 'union', sources: [{ kind: 'account-wishlist', accountId: 'a' }] };
   const shared = { id: '', kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: 'g1' }] };
-  assert.equal(listHasAccountSource(shared), false);
+  assert.equal(listHasAccountSource(shared, getList), false);
   assert.equal(
     listHasAccountSource(shared, (id) => (id === 'g1' ? synthetic : undefined)),
     true,

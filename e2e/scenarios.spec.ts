@@ -171,6 +171,24 @@ test('F3 edge: the Played (h) filter has a "never played" preset', async ({ page
   await expect(page.getByRole('button', { name: /Played \(h\): never played/ })).toBeVisible();
 });
 
+test('F3 edge: on a phone, the table toolbar picks a random game from the filtered rows', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout');
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await page.getByRole('button', { name: 'Filter', exact: true }).click();
+  await page.locator('.dt-filter-cols-search').fill('Played');
+  await page.locator('[data-filter-col-key="playtime"]').click();
+  await page.getByRole('button', { name: 'never played' }).click();
+  await expect(rows(page)).toHaveCount(3);
+  await page.keyboard.press('Escape');
+  await page.locator('.dt-toolbar').getByRole('button', { name: 'Pick a random game' }).click();
+  await expect(page.locator('#panel-title')).not.toBeEmpty();
+  await expect(row(page, await page.locator('#panel-title').innerText())).toHaveCount(1); // one of the 3
+});
+
 test("F3 edge: a column header's filter lists values as the cells write them", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

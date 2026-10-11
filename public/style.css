@@ -3066,7 +3066,8 @@ kbd {
   display: flex;
   gap: 8px;
 }
-.list-view-actions .btn-icon {
+.list-view-actions .btn-icon,
+.list-random-pick {
   display: none;
 }
 /* Phone: icons only, and the table library's toolbar spacing tightened, so the rows start higher. */
@@ -3087,6 +3088,9 @@ kbd {
   }
   .list-view-actions .btn-icon {
     display: inline;
+  }
+  .list-random-pick {
+    display: inline-block;
   }
   .list-route .dt-toolbar {
     padding: 6px 0;
