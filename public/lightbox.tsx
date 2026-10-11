@@ -1,7 +1,7 @@
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
 import { urlWithoutShot } from './urlState.ts';
 import { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } from './mediaItems.ts';
-import type { MediaItem } from './mediaItems.ts';
+import type { MediaItem, ShotKind } from './mediaItems.ts';
 import type { Game, ReadonlyGame } from './types.ts';
 import { fmtTime } from './utils.ts';
 import { decideSwipeAxis, resolveSwipe, LB_SWIPE_RESISTANCE } from './lightboxSwipe.ts';
@@ -104,7 +104,7 @@ let _getGamePosition: () => { index: number; total: number } | null = () => null
 // Set when a re-point landed on a banner for want of anything else — see `repointLightboxGame`.
 // Holds the *kind* of shot being left, so the screenshot/trailer that eventually arrives is
 // picked by the same rule the re-point itself would have used.
-let _awaitingMedia: MediaItem['type'] | null = null;
+let _awaitingMedia: ShotKind | null = null;
 let _lbPrevFocus: Element | null = null;
 // How the viewer last interacted — see openLightbox's focus call.
 let lastInputWasKey = false;
@@ -175,10 +175,11 @@ export function lightboxShot(): { appid: number; shotId: string } | null {
 // the lightbox is covering. Whatever had focus in here keeps it, so holding ↓ on the caption
 // button doesn't walk focus away mid-click; the close button is the fallback, as on a real open.
 // `dir` only drives the enter animation's direction — 0 (R, which has no direction) skips it.
-// A wrap past either end of the list enters from the other side, the cue that it went back round.
-function stepGameNav(dir: number) {
+// A wrap past either end of the list enters from the other side, the cue that it went back round —
+// except after a swipe, where the new game follows the finger.
+function stepGameNav(dir: number, swipe = false) {
   const pos = _getGamePosition();
-  const wraps = pos !== null && pos.index === (dir > 0 ? pos.total - 1 : 0);
+  const wraps = !swipe && pos !== null && pos.index === (dir > 0 ? pos.total - 1 : 0);
   stepGameFromLightbox(() => _onGameNav(dir), wraps ? -dir : dir);
 }
 
@@ -858,9 +859,9 @@ function wireTouchHandlers(lb: HTMLElement) {
         dragAxis = null;
         const el = lbMediaEl();
         if (el) clearLbDrag(el, !action);
-        if (action === 'media-prev' || action === 'media-next') stepLightbox(action === 'media-next' ? 1 : -1);
+        if (action === 'media-prev' || action === 'media-next') stepLightbox(action === 'media-next' ? 1 : -1, true);
         else if (action) {
-          stepGameNav(action === 'game-next' ? 1 : -1);
+          stepGameNav(action === 'game-next' ? 1 : -1, true);
         }
         return;
       }
@@ -1081,6 +1082,7 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
   });
   // A deliberate open supersedes any pending "take the media when it lands" latch.
   _awaitingMedia = null;
+  lbShotChosen = true;
   const lb = document.getElementById('screenshot-lightbox')!;
   lb.classList.add('open');
   document.body.classList.add('lb-open');
@@ -1094,23 +1096,33 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
 // being left, which only this module knows: paging through a list is a browse, so it lands on
 // real media rather than on the banner `openLightbox(game, 0)` used to pick (see
 // `preferredShotIndex`).
-// A game paged back to lands on the item it was left on, for the session.
+// A game paged back to lands on the item the viewer picked there, for the session.
 const lbLastShot = new Map<number, string>();
+// Whether the item on screen is the viewer's pick (opened on or stepped to), not a game step's landing.
+let lbShotChosen = false;
+
+// Where `appid`'s remembered item sits in `list`, else where a game step lands leaving `leaving`.
+function landingIndex(appid: number, list: MediaItem[], leaving: ShotKind) {
+  const remembered = list.findIndex((s) => s.shotId === lbLastShot.get(appid));
+  return remembered >= 0 ? remembered : preferredShotIndex(list, leaving);
+}
 
 export function repointLightboxGame(game: ReadonlyGame) {
   const left = shots()[idx()];
   const leavingGame = lbGame();
-  // Not a banner still waiting on its game's media (`_awaitingMedia`): that's no choice of the viewer's.
-  if (left && leavingGame && !_awaitingMedia) lbLastShot.set(leavingGame.appid, left.shotId);
-  const leaving = left?.type ?? 'image';
+  // A lone banner is no pick: it stands in while the game's media streams.
+  if (left && leavingGame && lbShotChosen && shots().length > 1) lbLastShot.set(leavingGame.appid, left.shotId);
+  lbShotChosen = false;
+  // A pending latch's kind carries on through a game still loading: its lone banner is no Cover.
+  const leaving: ShotKind =
+    _awaitingMedia ?? (left?.shotId === 'banner' && shots().length > 1 ? 'cover' : (left?.type ?? 'image'));
   const next = buildMediaItems(game.appid, game.details?.meta);
-  const remembered = next.findIndex((s) => s.shotId === lbLastShot.get(game.appid));
-  const target = remembered >= 0 ? remembered : preferredShotIndex(next, leaving);
+  const target = landingIndex(game.appid, next, leaving);
   // A lone banner means this row's details are still streaming — there is nothing else to show
   // *yet*. Latch the intent so the first real media to arrive is taken (see the effect at the
   // foot of this file); without it the banner would simply stay up, which is the whole reason
   // paging through a list used to be unrewarding.
-  _awaitingMedia = remembered < 0 && next.length === 1 ? leaving : null;
+  _awaitingMedia = next.length === 1 ? leaving : null;
   batch(() => {
     setLbGame(game);
     setIdx(target);
@@ -1149,15 +1161,17 @@ export function lightboxHandleEscape() {
   if (!isFullscreen()) closeLightbox();
 }
 
-function stepLightbox(dir: number) {
+function stepLightbox(dir: number, swipe = false) {
   // The viewer has taken over: whatever is on screen from here on is their choice, so the latch
   // must never move it under them.
   _awaitingMedia = null;
+  lbShotChosen = true;
   lbLastAxis = 'x';
   const list = shots();
   const next = (idx() + dir + list.length) % list.length;
-  // Entering from the side actually moved toward, so a wrap to the Cover slides in from the left.
-  lbLastDir = Math.sign(next - idx()) || dir;
+  // Entering from the side actually moved toward, so a wrap to the Cover slides in from the left —
+  // except after a swipe, where it follows the finger.
+  lbLastDir = swipe ? dir : Math.sign(next - idx()) || dir;
   setIdx(next);
   _onLightboxParamChange(list[next].shotId);
 }
@@ -1167,6 +1181,7 @@ function stepLightbox(dir: number) {
 function gotoLightbox(target: number) {
   if (target === idx()) return;
   _awaitingMedia = null; // same reason as stepLightbox's
+  lbShotChosen = true;
 
   lbLastDir = target > idx() ? 1 : -1;
   lbLastAxis = 'x';
@@ -1355,8 +1370,8 @@ createRoot(() => {
     const leaving = _awaitingMedia;
     if (!leaving || list.length <= 1) return;
     _awaitingMedia = null;
-    const target = preferredShotIndex(list, leaving);
-    if (target === 0) return; // trailers but no screenshots — not worth autoplaying unasked
+    const target = landingIndex(lbGame()!.appid, list, leaving);
+    if (target === 0) return; // the Cover wanted, or trailers but no screenshots (not worth autoplaying unasked)
     setIdx(target);
     _onLightboxParamChange(list[target].shotId);
   });

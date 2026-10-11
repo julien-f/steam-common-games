@@ -37,17 +37,22 @@ export function resolveShotIndex(shots: MediaItem[], idxOrShotId: number | strin
   return Math.max(0, Math.min(idxOrShotId, shots.length - 1));
 }
 
+// What a game step is leaving, for `preferredShotIndex`: the Cover apart from other images.
+export type ShotKind = MediaItem['type'] | 'cover';
+
 // The shot to land on when the lightbox is re-pointed at *another* game (↑/↓, R) rather than
 // opened on one the viewer picked out of the hero themselves. Never the banner when there's
-// anything else: it's Steam's 460×215 header strip — the least rewarding thing to open
-// fullscreen, and the one item with no separate thumbnail to stand in while it loads. A return
-// of 0 therefore means "this game has nothing but its banner", which is also how a caller tells
-// that the details simply haven't streamed in yet.
+// anything else, unless the Cover is what's being left: it's Steam's 460×215 header strip — the
+// least rewarding thing to open fullscreen, and the one item with no separate thumbnail to stand in
+// while it loads. A return of 0 therefore means "this game has nothing but its banner" (which is
+// also how a caller tells that the details simply haven't streamed in yet) or "leaving the Cover".
 //
-// Kind-preserving, so paging on from a trailer keeps landing on trailers — but in that direction
-// only: the lightbox autoplays video, so promoting an image to one would start a trailer
-// unasked on every step through a game that happens to have no screenshots.
-export function preferredShotIndex(shots: MediaItem[], leaving: MediaItem['type']): number {
+// Kind-preserving, so paging on from a trailer keeps landing on trailers, and from the Cover on
+// covers — but never from an image to a trailer: the lightbox autoplays video, so promoting an
+// image to one would start a trailer unasked on every step through a game that happens to have no
+// screenshots.
+export function preferredShotIndex(shots: MediaItem[], leaving: ShotKind): number {
+  if (leaving === 'cover') return 0;
   const firstOfType = (type: MediaItem['type']) => shots.findIndex((s) => s.type === type && s.shotId !== 'banner');
   const sameKind = leaving === 'video' ? firstOfType('video') : -1;
   if (sameKind >= 0) return sameKind;

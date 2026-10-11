@@ -23,10 +23,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - GET /api/metrics lists every outbound budget from startup, so the ceilings show before the first call
 - A first visit to Home says what the app does, and the account field's button reads "Look up"
 - With a mouse, the lightbox shows its ↑/↓ game stepper and game position along with its other controls, not only while hovering the game name
-- Stepping past the lightbox's last item or last game slides the first one in from the other side, so the wrap back to the start shows
-- Stepping back to a game just left in the lightbox returns to the item you were on, not its first one
+- Stepping past the lightbox's last item or last game with a key or button slides the first one in from the other side, so the wrap back to the start shows
+- Stepping back to a game just left in the lightbox returns to the item you picked there, not its first one
 - Dates read the same everywhere: a release, a bundle's end and its publication show as `YYYY-MM-DD` (with the time where it matters) in tables, cards and the panel
 - On a touch-only device, the ranking no longer shows its keyboard shortcuts
+- Paging games in the lightbox from a game's Cover keeps showing each game's Cover
 
 ### Fixed
 
@@ -87,7 +88,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Re-picking a known account while Steam doesn't answer keeps its name, avatar and custom URL, without restoring ones removed on Steam since
 - On the ranking screen, the side panel's ↻ Refresh re-fetches the game's details, and its tags no longer look like filter buttons
 - On a phone, the ranking screen keeps both games side by side with Tie, Skip and Undo in view, inside a side margin
-- The lightbox's ↑/↓ game buttons stay in place from one game to the next, so they can be clicked repeatedly
+- The lightbox's ↑/↓ game buttons stay in place from one game or item to the next, so they can be clicked repeatedly
 - Closing a game's panel with Esc puts focus back on that game's row, so the arrow keys keep working
 - Refreshing a game from the ranking's side panel keeps your place in the panel, and says when the refresh fails
 - On the narrowest phones, the ranking's Details and exclude buttons wrap instead of pushing the page sideways

@@ -134,6 +134,11 @@ test('preferredShotIndex: leaving an image never lands on a video', () => {
   assert.equal(preferredShotIndex(shots, 'video'), 1);
 });
 
+test('preferredShotIndex: leaving the cover lands on the cover', () => {
+  const shots = [BANNER, { type: 'video', shotId: 'v1' }, { type: 'image', shotId: 's0' }];
+  assert.equal(preferredShotIndex(shots, 'cover'), 0);
+});
+
 // 0 is how the caller tells the details haven't streamed in yet — see the latch in lightbox.tsx.
 test('preferredShotIndex: a banner-only game yields 0 whichever kind is being left', () => {
   assert.equal(preferredShotIndex([BANNER], 'image'), 0);

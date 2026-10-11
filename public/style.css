@@ -2439,8 +2439,9 @@ body.lb-open {
 }
 .lb-counter {
   order: 2;
-  /* It shares the centred group with the caption: a steady width keeps the caption from shifting. */
-  min-width: 10em;
+  /* It shares the centred group with the caption: a steady width, fitting "Screenshot 88 of 88",
+     keeps the caption from shifting. */
+  min-width: 12em;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
