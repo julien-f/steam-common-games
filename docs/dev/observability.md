@@ -51,7 +51,7 @@ No auth, same trust level as `GET /api/health`. In memory, reset on restart (exc
 - `chargeBudget(group)` runs at the top of `trackedFetch` and caps calls per service per hour and per day (`OUTBOUND_HOURLY_MAX`/`OUTBOUND_DAILY_MAX`, see [configuration.md](../user/configuration.md); `0` disables).
 - The only limit that isn't per client: it protects a key's quota from all clients together, and from the app's own retry loops.
 - Past a ceiling it throws an `isUpstream` error, so routes answer 502 with no new error path. Refused calls aren't counted as requests.
-- Fixed windows, not sliding: it runs on every call and stays O(1).
+- Fixed windows, not sliding: it runs on every call and stays O(1). A window starts at the group's first call once the previous one has ended; reading `budgets` never starts one.
 
 ## Log warnings
 

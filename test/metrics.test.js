@@ -339,6 +339,23 @@ test('getMetrics: lists every outbound group at 0 used before its first call', (
   }
 });
 
+test('getMetrics: reading budgets does not start a group’s window', async (t) => {
+  _reset();
+  t.mock.timers.enable({ apis: ['Date'] });
+  const restore = globalThis.fetch;
+  globalThis.fetch = async () => ({ status: 200 });
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
+
+  getMetrics();
+  t.mock.timers.tick(50 * 60 * 1000);
+  await trackedFetch('hltb', 'search', 'u');
+  t.mock.timers.tick(15 * 60 * 1000);
+  // The hour runs from the first call, not from the earlier read.
+  assert.equal(getMetrics().budgets.hltb.hourUsed, 1);
+});
+
 test('trackedFetch: refuses calls past the daily budget until the day rolls over', async (t) => {
   _reset();
   t.mock.timers.enable({ apis: ['Date'] });
