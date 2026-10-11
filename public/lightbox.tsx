@@ -53,7 +53,7 @@ let lbZoom = 1,
   lbVcTimer: ReturnType<typeof setTimeout> | undefined,
   lbCounterTimer: ReturnType<typeof setTimeout> | undefined,
   lbPointerTimer: ReturnType<typeof setTimeout> | undefined;
-// Bumped on every renderLightbox() call; a detached Image()'s onload checks it's still current
+// Bumped on every renderLightbox() call and loadLbImage(); a detached Image()'s onload checks it's still current
 // before touching the shared img element, so a slow load from a shot the viewer already
 // navigated away from can't clobber the one currently displayed — img is reused across shots
 // same as videoEl's _hlsToken guard above.
@@ -305,25 +305,34 @@ function retryCurrentShot() {
     const vid = lbVideoEl;
     playHls(vid, shot.hls);
   } else {
-    const img = document.querySelector<HTMLImageElement>('#screenshot-lightbox .lb-img')!;
-    const lb = document.getElementById('screenshot-lightbox');
-    lb?.classList.add('lb--loading');
     // Cache-bust: a browser that already recorded this exact URL as failed
     // won't necessarily re-attempt the network request otherwise.
-    const bust = shot.main! + (shot.main!.includes('?') ? '&' : '?') + '_retry=' + Date.now();
-    const full = new Image();
-    full.onload = () => {
-      img.src = bust;
-      img.style.opacity = '1';
-      lb?.classList.remove('lb--loading');
-    };
-    full.onerror = () => {
-      img.style.opacity = '0';
-      lb?.classList.remove('lb--loading');
-      showLbError("Couldn't load this image.");
-    };
-    full.src = bust;
+    loadLbImage(shot.main! + (shot.main!.includes('?') ? '&' : '?') + '_retry=' + Date.now());
   }
+}
+
+// Loads `src` off-screen, then swaps it into the shared img — unless a later load or render has
+// started since (see lbImgToken). Left at opacity 0 on error (rather than 1) so the browser's own
+// broken-image icon doesn't show behind the error overlay.
+function loadLbImage(src: string) {
+  const lb = document.getElementById('screenshot-lightbox')!;
+  const img = lb.querySelector<HTMLImageElement>('.lb-img')!;
+  const token = ++lbImgToken;
+  lb.classList.add('lb--loading');
+  const full = new Image();
+  full.onload = () => {
+    if (token !== lbImgToken) return;
+    img.src = src;
+    img.style.opacity = '1';
+    lb.classList.remove('lb--loading');
+  };
+  full.onerror = () => {
+    if (token !== lbImgToken) return;
+    img.style.opacity = '0';
+    lb.classList.remove('lb--loading');
+    showLbError("Couldn't load this image.");
+  };
+  full.src = src;
 }
 
 // ── Zoom / pan ─────────────────────────────────────────────────────────────
@@ -1207,7 +1216,7 @@ function renderLightbox() {
   lbRenderedAppid = appid;
   hideLbError();
   // Invalidate any image preload still in flight from a previous render — see lbImgToken decl.
-  const imgToken = ++lbImgToken;
+  lbImgToken++;
   // Untracked, and this is load-bearing: `_getGamePosition` reaches the route's list, which on
   // a list route is the table's `processedData()` — a signal recomputed on every batch of
   // streaming rows. Reading it in *this* effect subscribed the whole imperative render below to
@@ -1267,23 +1276,7 @@ function renderLightbox() {
     } else {
       img.style.opacity = '0';
     }
-    lb.classList.add('lb--loading');
-    const full = new Image();
-    // Left at opacity 0 (rather than 1) so the browser's own broken-image
-    // icon doesn't show behind the error overlay.
-    full.onload = () => {
-      if (imgToken !== lbImgToken) return;
-      img.src = shot.main!;
-      img.style.opacity = '1';
-      lb.classList.remove('lb--loading');
-    };
-    full.onerror = () => {
-      if (imgToken !== lbImgToken) return;
-      img.style.opacity = '0';
-      lb.classList.remove('lb--loading');
-      showLbError("Couldn't load this image.");
-    };
-    full.src = shot.main!;
+    loadLbImage(shot.main!);
     schedHideLbChrome();
   }
   lb.querySelector('.lb-counter')!.textContent = mediaLabel(list, i);

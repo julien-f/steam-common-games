@@ -69,6 +69,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - When the current account's library can't be loaded, games now show their ownership as unknown instead of "Not Owned"
 - A list built on a bundle keeps the games Steam didn't answer for, from its last good load, instead of dropping them
 - A long wishlist's Prices readout no longer says "just now" when part of its prices are days old
+- The screenshot viewer's Retry no longer paints the failed shot over the one you stepped to while it loaded.
 
 ### Development
 
