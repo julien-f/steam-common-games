@@ -22,7 +22,6 @@ None open.
 ## Loading and feedback
 
 - **U7 · minor · L3** — Reset view drops sort/filters instantly with no undo.
-- **U67 · polish · O1** — `GET /api/metrics` shows `budgets: {}` until the first outbound call, so an operator can't see the ceilings before spending against them. List every budget group with 0 used.
 
 ## Lists and selection
 
