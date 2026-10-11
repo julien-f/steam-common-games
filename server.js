@@ -1042,7 +1042,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
     res.json({
       achievements,
       total: achievements.length,
-      unlocked: unlockedAt.size,
+      unlocked: achievements.filter((a) => a.achieved).length,
       // `private:true` when steamIds were given but yielded no usable data (private profile,
       // or nobody in the group has touched this game's stats) — never true when steamIds was
       // empty in the first place, that's what `playerCount` is for instead (see comment above).

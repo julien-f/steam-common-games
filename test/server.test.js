@@ -1622,6 +1622,22 @@ test('GET /api/achievements/:appid: with steamids returns unlock progress and pl
   assert.equal(first.unlocktime, 1700000000);
 });
 
+test("GET /api/achievements/:appid: unlocked counts only the schema's achievements, not ones added since it was cached", async (t) => {
+  _reset();
+  const base = makeAchievementsFetch({ achieved: ['ACH_1'] });
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const res = await base(url);
+    if (!url.includes('GetPlayerAchievements')) return res;
+    const body = await res.json();
+    body.playerstats.achievements.push({ apiname: 'ACH_NEW', achieved: 1, unlocktime: 1700000002 });
+    return { ok: true, json: async () => body };
+  });
+
+  const res = await api.get(`/api/achievements/400?steamids=${ID1}`).expect(200);
+  assert.equal(res.body.total, 2);
+  assert.equal(res.body.unlocked, 1);
+});
+
 test('GET /api/achievements/:appid: ?refresh=1 re-fetches the schema, rarity and player progress', async (t) => {
   _reset();
   const achievementsFetch = makeAchievementsFetch();
