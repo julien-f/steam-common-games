@@ -55,7 +55,6 @@ None open.
 
 ## Consistency and polish
 
-- **U120 · polish · F1** — stepping back to a game just left in the lightbox lands on its first item of the kind being left, not where you were (Hades Screenshot 2 → ↓ → ↑ → Screenshot 1). Remember the last item per game for the session.
 - **U119 · polish · I2** — the `?` dialog lists no way to open the lightbox from the panel (Enter on the hero works); add it under Game panel.
 
 - **U112 · polish** — every table shows a "Page 1 of 1" pager with all buttons disabled when everything fits. Needs an upstream change: hide the pager when there's a single page (an option or the default in `@vates/data-table-solid`, vatesfr/data-table#41).

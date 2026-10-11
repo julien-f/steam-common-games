@@ -1094,15 +1094,23 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
 // being left, which only this module knows: paging through a list is a browse, so it lands on
 // real media rather than on the banner `openLightbox(game, 0)` used to pick (see
 // `preferredShotIndex`).
+// A game paged back to lands on the item it was left on, for the session.
+const lbLastShot = new Map<number, string>();
+
 export function repointLightboxGame(game: ReadonlyGame) {
-  const leaving = shots()[idx()]?.type ?? 'image';
+  const left = shots()[idx()];
+  const leavingGame = lbGame();
+  // Not a banner still waiting on its game's media (`_awaitingMedia`): that's no choice of the viewer's.
+  if (left && leavingGame && !_awaitingMedia) lbLastShot.set(leavingGame.appid, left.shotId);
+  const leaving = left?.type ?? 'image';
   const next = buildMediaItems(game.appid, game.details?.meta);
-  const target = preferredShotIndex(next, leaving);
+  const remembered = next.findIndex((s) => s.shotId === lbLastShot.get(game.appid));
+  const target = remembered >= 0 ? remembered : preferredShotIndex(next, leaving);
   // A lone banner means this row's details are still streaming — there is nothing else to show
   // *yet*. Latch the intent so the first real media to arrive is taken (see the effect at the
   // foot of this file); without it the banner would simply stay up, which is the whole reason
   // paging through a list used to be unrewarding.
-  _awaitingMedia = next.length === 1 ? leaving : null;
+  _awaitingMedia = remembered < 0 && next.length === 1 ? leaving : null;
   batch(() => {
     setLbGame(game);
     setIdx(target);

@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Picking, linking or comparing an account no longer fetches its Steam wishlist just to resolve it
 - With a mouse, the lightbox shows its ↑/↓ game stepper and game position along with its other controls, not only while hovering the game name
 - Stepping past the lightbox's last item or last game slides the first one in from the other side, so the wrap back to the start shows
+- Stepping back to a game just left in the lightbox returns to the item you were on, not its first one
 
 ### Fixed
 

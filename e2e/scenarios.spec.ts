@@ -1187,6 +1187,19 @@ test('F1 edge: after ↓ finds no game to step to, → still slides the next scr
   expect(anims).toContain('lb-img lb-anim-right');
 });
 
+test('F1 edge: stepping back to a game just left in the lightbox lands where it was left', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.lb-caption-text')).not.toHaveText('Hades');
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('.lb-caption-text')).toHaveText('Hades');
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+});
+
 test('F1 edge: stepping past the last media or game slides back in from the other side', async ({ page }) => {
   await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
   await page.goto('/game/1145360?shot=s1');
