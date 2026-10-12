@@ -565,6 +565,28 @@ tbody td {
   color: var(--accent2);
 }
 
+/* 24 px tap areas around controls drawn smaller, without changing how they look. A table header's
+   sort button only grows taller: wider, it would cover its column menu button. */
+.list-tree button,
+.compare-token-remove,
+.dt-th-sort {
+  position: relative;
+}
+.list-tree button::after,
+.compare-token-remove::after,
+.dt-th-sort::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 24px);
+  height: max(100%, 24px);
+  transform: translate(-50%, -50%);
+}
+.dt-th-sort::after {
+  width: 100%;
+}
+
 /*
  * "Look up any game" widget — shared by the comparison page and Library Explorer
  * (public/gameSearch.js). A text input plus a dropdown of name-search matches; picking one

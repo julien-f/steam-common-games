@@ -104,6 +104,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Buttons and fields use the page's font, and the table toolbar's buttons share one height
 - Disabled buttons look disabled, and a saved list's Share view says why it is off instead of hiding it in a tooltip
 - A list's stat labels (Games, Updated, Prices) are easier to read
+- On a phone, table sort headers, Home's Rename and Delete, and a compare chip's × are easier to tap
 
 ### Development
 

@@ -61,7 +61,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Phone
 
-- **U148 · minor · I1** — targets under 24px at 390: sort header buttons (20px, every table), Home's Rename/Delete (20px), a compare chip's × (14×14), "Clear all" under Recent accounts. 24px hit areas (padding or `::after`).
 - **U149 · polish · I1** — Home at 390: the nav search touches the left edge; Home's card starts content at x 45 (20 margin + 24 padding) vs 12 on list pages; Recent-account rows wrap an orphan × / star onto a second line. One 12px gutter; fold row actions into ⋯.
 
 ## Accounts and first visit

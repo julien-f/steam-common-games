@@ -1,5 +1,5 @@
 // docs/dev/journeys.md's journeys, end to end against mocked data (mockApi.ts).
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { mockApi, respond } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
 import { ALICE, BOB, BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
@@ -2070,6 +2070,37 @@ test("I1 edge: on a phone, a bundle's table starts high, its other actions behin
   await expect(page.getByRole('link', { name: '← All bundles' })).toBeHidden();
   await page.getByRole('button', { name: 'More actions' }).click();
   await expect(page.getByRole('link', { name: '← All bundles' })).toBeVisible();
+});
+
+test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout only');
+  // True when a tap 12px from the centre, on each side, still lands on the control.
+  const takes24pxTap = async (control: Locator) => {
+    await control.scrollIntoViewIfNeeded();
+    return control.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const [x, y] = [r.left + r.width / 2, r.top + r.height / 2];
+      const points = [
+        [x, y - 11.5],
+        [x, y + 11.5],
+        [x - 11.5, y],
+        [x + 11.5, y],
+      ];
+      return points.every(([px, py]) => el.contains(document.elementFromPoint(px, py)));
+    });
+  };
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  page.once('dialog', (d) => d.accept('Shortlist'));
+  await page.getByRole('button', { name: '+ New list' }).click();
+  expect(await takes24pxTap(page.locator('.list-tree').getByRole('button', { name: 'Rename' }))).toBe(true);
+  expect(await takes24pxTap(page.locator('.list-tree').getByRole('button', { name: 'Delete' }))).toBe(true);
+
+  await page.goto('/lists/compare');
+  expect(await takes24pxTap(page.getByRole('button', { name: 'Remove Alice' }))).toBe(true);
+
+  await page.goto('/lists/owned');
+  expect(await takes24pxTap(page.locator('.dt-th-sort').first())).toBe(true);
 });
 
 test('I2 edge: the lightbox shows its focus ring when opened from the keyboard, not from a tap', async ({
