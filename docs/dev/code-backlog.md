@@ -43,6 +43,7 @@ None open.
 ## Tests
 
 - **C171 · minor · S** — `test/clipboard.test.js:89` ("restores a label made of several nodes") waits `COPIED_MS + 10` ms of real time for a restore timer that starts only after the copy promise settles, so under load it can assert before the restore: it failed once in a pre-commit run on 2026-10-12, then passed unchanged. Drive the timer with `node:test`'s `mock.timers` instead of sleeping.
+- **C172 · minor · S** — `e2e/scenarios.spec.ts` "I2 edge: Esc closing the panel returns focus to the row it was showing" presses ArrowDown as soon as `.game-panel` is visible, which can be before the table's rows load, so `stepGame` finds no next row, the press is lost and the URL keeps `game=1145360`: it failed once in a pre-commit run on 2026-10-12 and 3 times in 840 repeats. Wait for the rows before pressing.
 
 ## Docs
 
