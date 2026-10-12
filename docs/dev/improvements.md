@@ -17,7 +17,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Sharing
 
-- **U123 · major · S1, S2, C1** — The served HTML has no description or Open Graph/Twitter tags, so every shared link unfurls in WhatsApp, Slack, Discord or iMessage as a bare "steam.isonoe.net" (WhatsApp: the URL alone), saying nothing about what it opens. Static `og:title`/`og:description`/`og:site_name`/`og:image` (1200×630 PNG) and `twitter:card` in `index.html`; add "the link previews in a chat app" to S1/S2's Done when.
 - **U124 · major · S2** — A `/game/<appid>` link's preview doesn't name the game: crawlers don't run JS, so the per-route `document.title` never reaches them. Inject `og:title` (game name) and `og:image` (its Steam header image) server-side for `/game/:appid`, from cached details only so crawler hits add no upstream requests (integrations.md trust tiers).
 - **U125 · minor · S1, C1, S3** — List, bundle and compare links all preview identically, and a `/lists/<id>` list that exists only in the sender's browser can't be described at all. Server-side per-route `og:title` from the path alone (Owned games, Wishlist, Compare libraries, Shared list, bundle name from cache), generic for `/lists/<id>`.
 - **U126 · polish · S1, S2** — No raster icon: the favicon is an emoji data URI and `/favicon.ico` 404s, so previews that show a site icon fall back to a blank one. Ship a PNG icon and `apple-touch-icon`.

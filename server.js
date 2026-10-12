@@ -1231,6 +1231,26 @@ app.put('/api/me/prefs/:key', authLimit, requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// Chat apps' link previews read the served HTML without running the app, so their Open Graph
+// tags are injected here, with the absolute image URL they require built from the request's origin.
+const SITE_NAME = 'steam.isonoe.net';
+const SITE_DESCRIPTION =
+  'Explore Steam libraries as lists of games, with ratings, completion times and current prices in one sortable table.';
+let shellHtml;
+function sendAppShell(req, res, { title = SITE_NAME, image = '/og-image.jpg' } = {}) {
+  shellHtml ??= fs.readFileSync(path.join(STATIC_DIR, 'index.html'), 'utf8');
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const tags = [
+    ['name', 'description', SITE_DESCRIPTION],
+    ['property', 'og:site_name', SITE_NAME],
+    ['property', 'og:title', title],
+    ['property', 'og:description', SITE_DESCRIPTION],
+    ['property', 'og:image', image.startsWith('/') ? origin + image : image],
+    ['name', 'twitter:card', 'summary_large_image'],
+  ].map(([attr, key, value]) => `<meta ${attr}="${key}" content="${escapeXml(value)}" />`);
+  res.type('html').send(shellHtml.replace('</head>', `${tags.join('\n')}\n</head>`));
+}
+
 // SPA fallback: any GET that isn't an /api/* call and doesn't look like a static-asset request
 // (no dot-extension in its path) falls through to the app shell, letting the client-side
 // router (see public/App.tsx) render the right view from the URL — needed once navigation
@@ -1240,8 +1260,8 @@ app.put('/api/me/prefs/:key', authLimit, requireAuth, (req, res) => {
 // and real asset files are still served first; a path that looks like an asset (has a file
 // extension) but genuinely doesn't exist still 404s via Express's default handler instead of
 // being silently rewritten into the shell.
-app.get(/^\/(?!api\/)(?!.*\.[a-zA-Z0-9]+$).*/, (_req, res) => {
-  res.sendFile('index.html', { root: STATIC_DIR });
+app.get(/^\/(?!api\/)(?!.*\.[a-zA-Z0-9]+$).*/, (req, res) => {
+  sendAppShell(req, res);
 });
 
 // Anything a route didn't catch, body-parser's malformed or oversized JSON included: Express's own

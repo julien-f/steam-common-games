@@ -172,6 +172,14 @@ test('GET /some/client-side/route: 200 with the app shell HTML, not a 404', asyn
   assert.match(res.headers['content-type'], /html/);
 });
 
+test('GET /lists/owned: the app shell carries Open Graph tags with an absolute image URL, for chat link previews', async () => {
+  const res = await api.get('/lists/owned').set('Host', 'app.example');
+  assert.match(res.text, /<meta property="og:title" content="steam\.isonoe\.net" \/>/);
+  assert.match(res.text, /<meta property="og:description" content="Explore Steam libraries [^"]+" \/>/);
+  assert.match(res.text, /<meta property="og:image" content="http:\/\/app\.example\/og-image\.jpg" \/>/);
+  assert.match(res.text, /<meta name="twitter:card" content="summary_large_image" \/>/);
+});
+
 test('GET /api/nonexistent-route: still 404s — the SPA fallback never shadows /api/*', async () => {
   const res = await api.get('/api/nonexistent-route');
   assert.equal(res.status, 404);

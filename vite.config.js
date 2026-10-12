@@ -7,11 +7,8 @@
 // own STATIC_DIR comment). Used to be four separate HTML entry points (one full page reload
 // per page navigation); collapsed to one during the list-centric redesign (see
 // docs/list-centric-redesign.md) once client-side routing (@solidjs/router) took over
-// navigation between what used to be separate pages. publicDir is disabled: public/ has no
-// passthrough static assets left once hls.js moved from a vendored public/hls.min.js to a
-// real npm dependency (both dev and this build now resolve it as a real ES import) —
-// enabling it would also collide with Vite's own "publicDir" convention, since our whole
-// frontend source directory happens to be named public/ too.
+// navigation between what used to be separate pages. publicDir is static/, not Vite's default
+// public/: that name is already our whole frontend source directory.
 const { defineConfig } = require('vite');
 const solidPlugin = require('vite-plugin-solid');
 const path = require('node:path');
@@ -50,7 +47,7 @@ const mockApiPlugin = {
 module.exports = defineConfig({
   root: 'public',
   plugins: [solidPlugin(), mock && mockApiPlugin],
-  publicDir: false,
+  publicDir: '../static',
   server: {
     // Local dev: `npm run dev:web` serves public/ (now TypeScript, which the plain
     // express.static fallback in server.js can't parse) with HMR on :58991, proxying

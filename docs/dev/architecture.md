@@ -15,8 +15,8 @@ Setup and dev commands are in [README.md](../../README.md); tests and hooks in [
 
 - `npm run build` (`vite build`) bundles `public/`'s single HTML entry into `dist/` (gitignored). `server.js` serves `dist/` when `dist/index.html` exists, else `public/` raw — which browsers can't run (TypeScript), so a fresh clone needs a build before `npm start`.
 - In dev, Vite (`npm run dev:frontend`, `root: 'public'`) serves the sources and proxies `/api` to Express on `:3000`. Its port is pinned (`server.port`/`strictPort`): a different port is a different origin, so a fallback port would reset localStorage, cookies and sign-in.
-- `publicDir: false`: `public/` is source, not passthrough assets, and the name would collide with Vite's own `publicDir` convention.
-- **SPA fallback**: routes are real paths (`/lists/owned`, `/game/440`), so `server.js` ends with a catch-all (`app.get(/^\/(?!api\/)(?!.*\.[a-zA-Z0-9]+$).*/)`) sending `index.html` after the API routes and static files. Vite's dev server does this by itself.
+- `publicDir: '../static'`: `static/` holds the files copied into `dist/` as-is (the link-preview image); `public/` is source, so it can't be Vite's default `publicDir`.
+- **SPA fallback**: routes are real paths (`/lists/owned`, `/game/440`), so `server.js` ends with a catch-all (`app.get(/^\/(?!api\/)(?!.*\.[a-zA-Z0-9]+$).*/)`) sending `index.html` after the API routes and static files, with Open Graph tags injected for chat link previews (crawlers don't run the SPA). Vite's dev server does the fallback by itself, without the tags.
 
 ## Backend modules
 
