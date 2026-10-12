@@ -49,10 +49,10 @@ module.exports = defineConfig({
   plugins: [solidPlugin(), mock && mockApiPlugin],
   publicDir: '../static',
   server: {
-    // Local dev: `npm run dev:web` serves public/ (now TypeScript, which the plain
-    // express.static fallback in server.js can't parse) with HMR on :58991, proxying
-    // the API to the backend. Run `npm run dev` in a second terminal for the backend;
-    // the old single-`npm start` flow still works against `npm run build`'s dist/.
+    // Local dev: `npm run dev` runs this server (`dev:frontend`), serving public/ (TypeScript,
+    // which the plain express.static fallback in server.js can't parse) with HMR on :58991,
+    // alongside the backend (`dev:backend`), and proxies the API to it; `npm start` still
+    // works on its own against `npm run build`'s dist/.
     // Port is pinned (and strictPort set) rather than left to Vite's default-or-next-free
     // fallback: this machine runs several Vite apps at once, and a plain fallback means the
     // same app can land on a different port between runs — a different origin as far as the
