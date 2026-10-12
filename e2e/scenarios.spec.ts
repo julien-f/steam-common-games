@@ -1112,6 +1112,25 @@ test('B1.1,3-4: a bundle, then what it adds to my library', async ({ page }) => 
   await expect(rows(page)).toHaveCount(2);
 });
 
+test("B1 edge: a bundle's hero keeps All bundles by its ‹ ›, and one primary action among ghost ones", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto(`/lists/bundle/${BUNDLE.id}`);
+  await expect(rows(page)).toHaveCount(4);
+  const titlebar = page.locator('.list-hero-titlebar');
+  await expect(titlebar.getByRole('button', { name: 'Previous bundle' })).toBeVisible();
+  await expect(titlebar.getByRole('link', { name: '← All bundles' })).toBeVisible();
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds the rest behind ⋯
+  if (await more.isVisible()) await more.click();
+  const classes = await page
+    .locator('.list-hero-actions')
+    .locator(':is(a, button, summary):visible')
+    .evaluateAll((els) => els.map((el) => el.className));
+  expect(classes.filter((c) => /\bbtn-primary\b/.test(c))).toHaveLength(1);
+  expect(classes.filter((c) => !/\bbtn-(primary|ghost)\b/.test(c))).toEqual([]);
+});
+
 test("B3 edge: a list built from a bundle says how many of its games aren't on Steam", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
@@ -1139,6 +1158,44 @@ test("B3 edge: what a bundle adds keeps the bundle's prices and links back to it
 });
 
 const sharedUrl = (formula: string) => `/lists/shared?f=${encodeURIComponent(formula)}`;
+
+test("B3 edge: what a bundle adds, once saved, keeps the bundle's Tier Price, in a newly picked region too", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  // The mock only prices in EUR; answer a US request in USD, as ITAD does.
+  await page.route(/\/api\/bundles\/\d+\?/, (route) => {
+    const req = route.request();
+    const url = new URL(req.url());
+    const { body } = respond(req.method(), url, req.postData());
+    return route.fulfill({
+      json: JSON.parse(url.searchParams.get('country') === 'US' ? body.replaceAll('"EUR"', '"USD"') : body),
+    });
+  });
+  await page.goto(sharedUrl(`subtract:(b:${BUNDLE.id};o:${ALICE.steamid})`));
+  await expect(rows(page)).toHaveCount(2);
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  if (await more.isVisible()) await more.click();
+  await page.getByRole('button', { name: 'Save as a list' }).click();
+  await expect(page).toHaveURL(/\/lists\/(?!shared)/);
+  await expect(page.locator('thead th').filter({ hasText: /^Tier Price/ })).toHaveCount(1);
+  await expect(row(page, 'Overcooked! 2')).toContainText('€12.00');
+  await page.getByTitle('Preferences').click();
+  await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
+  await expect(row(page, 'Overcooked! 2')).toContainText('$12.00');
+});
+
+test("B3 edge: a saved list from a pick-and-mix bundle claims no per-game rate it can't know", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto(sharedUrl(`subtract:(b:90002;o:${BOB.steamid})`));
+  await expect(row(page, 'Hades')).toContainText('Varies');
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  if (await more.isVisible()) await more.click();
+  await page.getByRole('button', { name: 'Save as a list' }).click();
+  await expect(page).toHaveURL(/\/lists\/(?!shared)/);
+  await expect(row(page, 'Hades')).toContainText('Varies');
+  await expect(rows(page).filter({ hasText: '/game' })).toHaveCount(0);
+});
 
 test("B3 edge: what a bundle adds shows the bundle's prices in a newly picked region", async ({ page }) => {
   await asPlayer(page, ALICE);
@@ -1283,6 +1340,19 @@ test('B1 edge: with no ITAD key, Bundles says why it is empty', async ({ page })
   await page.goto('/bundles');
   await expect(page.getByRole('main')).toContainText("Bundles and prices aren't available on this instance");
   await expect(page.getByRole('main')).not.toContainText(/ITAD_API_KEY|Error:/);
+});
+
+test('O1 edge: with no ITAD key, Bundles is one card saying how to turn it on, not an empty table', async ({
+  page,
+}) => {
+  await mockApi(page, { states: ['no-itad'] }); // registered last, so it answers first
+  await asPlayer(page, ALICE);
+  await page.goto('/bundles');
+  const card = page.locator('.list-hero');
+  await expect(card).toContainText('IsThereAnyDeal API key');
+  await expect(card.locator('.list-stat')).toHaveCount(0);
+  await expect(page.getByLabel('Include expired')).toHaveCount(0);
+  await expect(page.locator('.table-container')).toHaveCount(0);
 });
 
 test('B1 edge: games ITAD lists under the first tier only show the tier range', async ({ page }) => {
@@ -2670,9 +2740,9 @@ test("I1 edge: on a phone, a bundle's table starts high, its other actions behin
     .first()
     .evaluate((el) => el.getBoundingClientRect().top + scrollY);
   expect(top).toBeLessThan(520); // 761 with the hero's tiles and actions wrapping
-  await expect(page.getByRole('link', { name: '← All bundles' })).toBeHidden();
+  await expect(page.getByRole('link', { name: 'View on IsThereAnyDeal ↗' })).toBeHidden();
   await page.getByRole('button', { name: 'More actions' }).click();
-  await expect(page.getByRole('link', { name: '← All bundles' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View on IsThereAnyDeal ↗' })).toBeVisible();
 });
 
 test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page }, testInfo) => {

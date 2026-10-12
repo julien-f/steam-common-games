@@ -95,6 +95,10 @@ class UnavailableError extends Error {
   }
 }
 
+export function isUnavailable(err: unknown): boolean {
+  return err instanceof UnavailableError;
+}
+
 // The message to show for a failed bundle load.
 export function loadErrorText(err: unknown): string {
   return err instanceof UnavailableError ? err.message : `Error: ${(err as Error).message}`;
