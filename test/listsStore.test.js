@@ -483,3 +483,21 @@ test('rankingsOf: the ranked lists ordering the same source', () => {
     [one.id, two.id],
   );
 });
+
+test('setListTableView: stores the view without page/searchQuery', () => {
+  const { createList, setListTableView, getList } = store();
+  const list = createList({ name: 'M', kind: 'manual' });
+  setListTableView(list.id, { sorts: [{ key: 'name', dir: 'asc' }], page: 3, searchQuery: 'half' });
+  assert.deepEqual(getList(list.id).tableView, { sorts: [{ key: 'name', dir: 'asc' }] });
+});
+
+test('setListTableView: an unchanged view leaves the lists pref untouched', (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1000 });
+  const { createList, setListTableView } = store();
+  const { getAllPrefEntries } = require('../public/prefs.ts');
+  const list = createList({ name: 'M', kind: 'manual' });
+  setListTableView(list.id, { sorts: [{ key: 'name', dir: 'asc' }] });
+  t.mock.timers.tick(1000);
+  setListTableView(list.id, { sorts: [{ key: 'name', dir: 'asc' }], page: 2, searchQuery: 'x' });
+  assert.equal(getAllPrefEntries().lists.updatedAt, 1000);
+});

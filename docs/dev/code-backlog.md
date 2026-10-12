@@ -20,7 +20,6 @@ Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-
 
 ## Correctness
 
-- **C155 · major · M** — a user list's table view is saved into the synced `lists` pref on every view change, transient fields included: `bindViewPersistence` (`public/tableViewPrefs.ts:54`) → `setListTableView` (`public/listsStore.ts:375`) → `setPref('lists')`, pushed at once (`public/prefs.ts:86`), `page`/`searchQuery` not stripped as `TRANSIENT_VIEW_FIELDS` (`public/tableViewSync.ts:37`) are for shared keys. Typing a search or paging fires `PUT /api/me/prefs/lists` per change against `authLimit`'s 20/min; the 429 is swallowed (`pushPrefToServer` ignores `res.ok`), dropping other keys' pushes in that window, and each push bumps `lists`' updatedAt so a view tweak can win last-write-wins over a real list edit on another device. The comment at `public/ListRoute.tsx:3217` ("that one isn't synced") is wrong. Strip transient fields and skip unchanged writes; debounce `lists` like `ranking:` or move user-list views out of `lists`.
 - **C154 · minor · S** — the panel's ↻ Refresh does nothing on `/search`: `public/SearchRoute.tsx:252` registers no `refreshGame` (`public/AppShell.tsx:202` calls `routeHandlers.refreshGame?.`), so the spinner-less click is silently dropped. Register one that refetches `/api/game-details/:appid?refresh=1` and updates the shown result, sharing RankRoute's once its follow-up lands.
 
 ## Security

@@ -86,9 +86,10 @@ export function setPref(key: string, value: unknown): void {
   else pushPrefToServer(key, value, updatedAt);
 }
 
-// Written once per answer on the compare screen (ranking.ts) — pushing each write would trip the
-// server's per-minute limit on PUT /api/me/prefs/:key, so the push waits for a pause instead.
-const DEBOUNCED_PUSH_PREFIXES = ['ranking:'];
+// Written once per answer on the compare screen (ranking.ts), and `lists` on every user list's
+// view change (listsStore.ts) — pushing each write would trip the server's per-minute limit on
+// PUT /api/me/prefs/:key, so the push waits for a pause instead.
+const DEBOUNCED_PUSH_PREFIXES = ['ranking:', 'lists'];
 const PUSH_DEBOUNCE_MS = 3000;
 const pendingPushes = new Map<string, ReturnType<typeof setTimeout>>();
 

@@ -65,7 +65,7 @@ import { createStore, produce } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { A, useParams, useLocation, useNavigate } from '@solidjs/router';
 import { createTableState, DataTableView, datePartGroup } from '@vates/data-table-solid';
-import type { ColumnDef, SortEntry, TableState } from '@vates/data-table-solid';
+import type { ColumnDef, SortEntry, TableState, TableViewState } from '@vates/data-table-solid';
 import {
   fmt,
   insertColumnsAfter,
@@ -1736,9 +1736,17 @@ export default function ListRoute() {
   function viewStore(): ViewStore {
     const list = userList();
     return list
-      ? { load: () => getList(list.id)?.tableView ?? {}, save: (view) => setListTableView(list.id, view) }
+      ? {
+          // tableView drops page/searchQuery, so a rebuild (e.g. after a removal) keeps them from here.
+          load: () => (lastUserListView?.id === list.id ? lastUserListView.view : (getList(list.id)?.tableView ?? {})),
+          save: (view) => {
+            lastUserListView = { id: list.id, view };
+            setListTableView(list.id, view);
+          },
+        }
       : prefViewStore(viewPrefKey());
   }
+  let lastUserListView: { id: string; view: TableViewState } | null = null;
   // "🔗 Share view"/"Default view" — see tableViewPrefs.ts for the share-on-demand-only reasoning
   // (a link written to the live URL goes stale the moment the table changes again).
   // A 🔗 Share view link's layout, on screen but not saved (see restoreTableView).
@@ -3214,7 +3222,7 @@ export default function ListRoute() {
         {selectionActionStatus()?.text}
         <Show when={selectionActionStatus()?.listId}>{(listId) => <A href={`/lists/${listId()}`}>Open list</A>}</Show>
       </div>
-      {/* Never a user list's own view (see viewPrefKey's own comment): that one isn't synced. */}
+      {/* Never a user list's own view: it syncs within `lists` on every change (listsStore.ts), with nothing to Save. */}
       <Show when={tableReady() && !userList()}>
         <UnsavedViewBanner table={viewTable} prefKey={viewPrefKey()} />
       </Show>
