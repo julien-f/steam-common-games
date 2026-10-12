@@ -6,7 +6,7 @@
 // panel.tsx's own `revision` signal uses for plain-object mutation it can't observe directly.
 //
 // **Current scope, deliberately trimmed for a first pass**: folder/list reorganizing (rename/
-// move/delete) uses plain `window.prompt`/`window.confirm` dialogs rather than a polished drag-
+// move/delete) uses an inline name field, a Move select and a `window.confirm` rather than a polished drag-
 // and-drop tree UI — real functionality (backed by the fully-built `listsStore.ts`), minimal
 // chrome. No trash/restore UI for soft-deleted lists yet. The combine
 // form below can pick any recent account's Owned/Wishlist, Recently Looked Up, or any existing
@@ -56,6 +56,8 @@ import type { AccountSlot, Folder, GameList, ListRef, CombineOp } from './types.
 // `personastate`/`gameextrainfo` ride on the same 6h library cache tier as the rest of an
 // account's data (see toAccountPlayer in accountData.ts) — real data, just not live — so the
 // tooltip says "as of the last refresh" rather than implying real-time presence.
+
+const LIST_ICONS = { dynamic: '⚡ ', ranked: '🏆 ', manual: '📄 ' } as const;
 
 interface TreeRow {
   type: 'folder' | 'list';
@@ -256,18 +258,77 @@ export default function HomeRoute() {
     return withAccountParam(path, location.search);
   }
 
-  function handleNewFolder(): void {
-    const name = window.prompt('Folder name?');
-    if (!name) return;
-    createFolder(name);
-    refreshTree();
+  // What the tree's inline name field is naming: a new folder or list (no id), or an existing row.
+  type NameTarget = { kind: 'folder' | 'list'; id?: string };
+  const [nameTarget, setNameTarget] = createSignal<NameTarget | null>(null);
+  let newFolderBtn!: HTMLButtonElement;
+  let newListBtn!: HTMLButtonElement;
+  function newNameTarget(): NameTarget | null {
+    const target = nameTarget();
+    return target && !target.id ? target : null;
   }
 
-  function handleNewList(): void {
-    const name = window.prompt('List name?');
-    if (!name) return;
-    createList({ name, kind: 'manual' });
-    refreshTree();
+  // `name` null = cancelled. An empty name cancels too, except on a dynamic list, where clearing
+  // it hands the list back to being labeled by its formula.
+  function handleNamed(target: NameTarget, name: string | null, viaKey: boolean): void {
+    setNameTarget(null);
+    const trimmed = name?.trim() ?? '';
+    if (name != null) {
+      if (!target.id) {
+        if (trimmed && target.kind === 'folder') createFolder(trimmed);
+        else if (trimmed) createList({ name: trimmed, kind: 'manual' });
+      } else if (target.kind === 'folder') {
+        if (trimmed) renameFolder(target.id, trimmed);
+      } else {
+        const list = lists().find((l) => l.id === target.id);
+        if (list && trimmed !== (list.name ?? '') && (trimmed || list.kind === 'dynamic'))
+          renameList(list.id, trimmed || undefined);
+      }
+      refreshTree();
+    }
+    // A blur already put focus where the user went.
+    if (viaKey)
+      (target.id
+        ? document.querySelector<HTMLElement>(`[data-rename-id="${target.id}"]`)
+        : target.kind === 'folder'
+          ? newFolderBtn
+          : newListBtn
+      )?.focus();
+  }
+
+  function NameField(props: { target: NameTarget; initial: string; placeholder?: string }): JSX.Element {
+    let done = false;
+    function finish(name: string | null, viaKey: boolean): void {
+      if (done) return;
+      done = true;
+      handleNamed(props.target, name, viaKey);
+    }
+    return (
+      <input
+        type="text"
+        class="tree-name-field"
+        aria-label={props.target.kind === 'folder' ? 'Folder name' : 'List name'}
+        value={props.initial}
+        placeholder={props.placeholder}
+        ref={(el) =>
+          queueMicrotask(() => {
+            el.focus();
+            el.select();
+          })
+        }
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            finish(e.currentTarget.value, true);
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            finish(null, true);
+          }
+        }}
+        onBlur={(e) => finish(e.currentTarget.value, false)}
+      />
+    );
   }
 
   // ── Combine setup (creating a dynamic list) ───────────────────────────────────────────────
@@ -280,33 +341,14 @@ export default function HomeRoute() {
   // No name is a valid choice, not a missing field: the list is then labeled by its own formula
   // everywhere, and follows a later source edit (see listLabels.ts).
   function handleCreateCombine(input: { name?: string; op: CombineOp; sources: ListRef[] }): void {
-    createList({ name: input.name, kind: 'dynamic', op: input.op, sources: input.sources });
-    refreshTree();
-    setCombineOpen(false);
+    const list = createList({ name: input.name, kind: 'dynamic', op: input.op, sources: input.sources });
+    navigate(`/lists/${list.id}`);
+    document.querySelector<HTMLElement>('main')?.focus();
   }
 
   // A list's on-screen label — its name, or its formula when it has none (listLabels.ts).
   function listName(list: GameList): string {
     return listDisplayName(list, createDefaultNaming());
-  }
-
-  function handleRenameFolder(folder: Folder): void {
-    const name = window.prompt('Rename folder', folder.name);
-    if (!name) return;
-    renameFolder(folder.id, name);
-    refreshTree();
-  }
-
-  function handleRenameList(list: GameList): void {
-    // Cancel (null) and cleared ('') mean different things here: clearing a dynamic list's name
-    // hands it back to being labeled by its formula. A manual list has no formula to fall back
-    // on, so an empty name is treated as a cancel there, as it always was.
-    const name = window.prompt('Rename list', listName(list));
-    if (name == null) return;
-    const trimmed = name.trim();
-    if (!trimmed && list.kind === 'manual') return;
-    renameList(list.id, trimmed || undefined);
-    refreshTree();
   }
 
   function handleDeleteFolder(folder: Folder): void {
@@ -671,10 +713,10 @@ export default function HomeRoute() {
       <section class="home-tree">
         <h2>Your lists</h2>
         <div class="tree-actions">
-          <button type="button" onClick={handleNewFolder}>
+          <button type="button" ref={newFolderBtn} onClick={() => setNameTarget({ kind: 'folder' })}>
             + New folder
           </button>
-          <button type="button" onClick={handleNewList}>
+          <button type="button" ref={newListBtn} onClick={() => setNameTarget({ kind: 'list' })}>
             + New list
           </button>
           <button type="button" onClick={toggleCombine}>
@@ -685,19 +727,26 @@ export default function HomeRoute() {
         <Show when={combineOpen()}>
           <CombineForm submitLabel="Create combined list" onSubmit={handleCreateCombine} />
         </Show>
-        <Show when={treeRows().length > 0} fallback={<p>No lists yet — create one above.</p>}>
+        <Show when={treeRows().length > 0 || newNameTarget()} fallback={<p>No lists yet — create one above.</p>}>
           <ul class="list-tree">
             <For each={treeRows()}>
               {(row) => (
                 <li style={{ 'padding-left': `${row.depth * 20}px` }}>
                   {row.type === 'folder' ? (
                     <>
-                      <span>📁 {(row.item as Folder).name}</span>
+                      <Show
+                        when={nameTarget()?.id === row.item.id}
+                        fallback={<span>📁 {(row.item as Folder).name}</span>}
+                      >
+                        <span>📁</span>
+                        <NameField target={{ kind: 'folder', id: row.item.id }} initial={(row.item as Folder).name} />
+                      </Show>
                       <MoveSelect row={row} name={(row.item as Folder).name} />
                       <button
                         type="button"
                         aria-label={`Rename ${(row.item as Folder).name}`}
-                        onClick={() => handleRenameFolder(row.item as Folder)}
+                        data-rename-id={row.item.id}
+                        onClick={() => setNameTarget({ kind: 'folder', id: row.item.id })}
                       >
                         Rename
                       </button>
@@ -711,15 +760,28 @@ export default function HomeRoute() {
                     </>
                   ) : (
                     <>
-                      <A href={`/lists/${row.item.id}`}>
-                        {{ dynamic: '⚡ ', ranked: '🏆 ', manual: '📄 ' }[(row.item as GameList).kind]}
-                        <span classList={{ 'derived-name': !row.item.name }}>{listName(row.item as GameList)}</span>
-                      </A>
+                      <Show
+                        when={nameTarget()?.id === row.item.id}
+                        fallback={
+                          <A href={`/lists/${row.item.id}`}>
+                            {LIST_ICONS[(row.item as GameList).kind]}
+                            <span classList={{ 'derived-name': !row.item.name }}>{listName(row.item as GameList)}</span>
+                          </A>
+                        }
+                      >
+                        <span>{LIST_ICONS[(row.item as GameList).kind]}</span>
+                        <NameField
+                          target={{ kind: 'list', id: row.item.id }}
+                          initial={row.item.name ?? ''}
+                          placeholder={listName(row.item as GameList)}
+                        />
+                      </Show>
                       <MoveSelect row={row} name={listName(row.item as GameList)} />
                       <button
                         type="button"
                         aria-label={`Rename ${listName(row.item as GameList)}`}
-                        onClick={() => handleRenameList(row.item as GameList)}
+                        data-rename-id={row.item.id}
+                        onClick={() => setNameTarget({ kind: 'list', id: row.item.id })}
                       >
                         Rename
                       </button>
@@ -735,6 +797,14 @@ export default function HomeRoute() {
                 </li>
               )}
             </For>
+            <Show when={newNameTarget()}>
+              {(target) => (
+                <li>
+                  <span>{target().kind === 'folder' ? '📁' : LIST_ICONS.manual}</span>
+                  <NameField target={target()} initial="" />
+                </li>
+              )}
+            </Show>
           </ul>
         </Show>
       </section>

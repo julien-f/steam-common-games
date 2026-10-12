@@ -3180,6 +3180,11 @@ kbd {
 .list-view-actions .btn-icon {
   display: none;
 }
+.rank-reason {
+  align-self: center;
+  font-size: var(--fs-meta);
+  color: var(--text1);
+}
 /* Phone: icons only, and the table library's toolbar spacing tightened, so the rows start higher. */
 @media (max-width: 768px) {
   /* The library puts its end slot after the search line, a row of its own on a phone: move it up

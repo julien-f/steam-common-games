@@ -844,10 +844,14 @@ export default function ListRoute() {
     if (!focus) return '🏆 Rank this list';
     return focus.length ? `🏆 Rank ${focus.length} games` : '🏆 Rank (none shown)';
   }
+  // Ranking compares games two at a time, so a list needs 2 of them.
+  function rankTooFew(): boolean {
+    return tableReady() && !!table && table.data().length < 2;
+  }
   // `criterion` names a further ranking of the same list ("best JRPG"); the first one keeps the default name.
   function handleRankThisList(criterion = ''): void {
     const source = rankSourceRef();
-    if (!source || rankThisListFocus()?.length === 0) return;
+    if (!source || rankTooFew() || rankThisListFocus()?.length === 0) return;
     const name = criterion.trim()
       ? `Ranking of ${describeListRef(source, createDefaultNaming()).label} (${criterion.trim()})`
       : undefined;
@@ -1032,6 +1036,7 @@ export default function ListRoute() {
   // (per-list view persistence, "remove from this list", the Folder/Edited tiles): a list with no
   // id has no business reaching any of them.
   const [compareList, setCompareList] = createSignal<GameList | null>(null);
+  let editSourcesBtn: HTMLButtonElement | undefined;
   const [compareAccounts, setCompareAccounts] = createSignal<AccountSlot[]>([]);
   const [editingPlayers, setEditingPlayers] = createSignal(false);
   // Players the last comparison couldn't resolve, with why — the rest still compare (U14).
@@ -2897,8 +2902,15 @@ export default function ListRoute() {
           a reactive Show rather than a plain `kind === 'user' && ...` check — the latter would
           freeze at "no list yet" forever, since heroActions itself is only built once. */}
         <Show when={kind === 'user' && userList()?.kind === 'dynamic'}>
-          <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingSources((v) => !v)}>
-            {editingSources() ? 'Cancel' : 'Edit sources'}
+          {/* Stays "Edit sources" while open: the form's own Cancel is the one way out it names. */}
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            ref={editSourcesBtn}
+            aria-expanded={editingSources()}
+            onClick={() => setEditingSources((v) => !v)}
+          >
+            Edit sources
           </button>
           {/* Not offered on a `compare`/`shared` list — a comparison is already shareable via its
             own URL, and a shared link re-shared would just point back at the same page. */}
@@ -2930,15 +2942,25 @@ export default function ListRoute() {
           <Show
             when={tableReady() && existingRankings().length > 0}
             fallback={
-              <button
-                type="button"
-                class={`btn btn-ghost btn-sm${kind === 'bundle' ? ' hero-secondary' : ''}`}
-                title="Create a list ranking these games by comparing them two at a time, in the table's current order (only the selected or filtered games, if any)"
-                disabled={rankThisListFocus()?.length === 0}
-                onClick={() => handleRankThisList()}
-              >
-                {rankThisListLabel()}
-              </button>
+              <>
+                {/* aria-disabled, not disabled: a press has to reach the button for its reason to be read. */}
+                <button
+                  type="button"
+                  class={`btn btn-ghost btn-sm${kind === 'bundle' ? ' hero-secondary' : ''}`}
+                  title="Create a list ranking these games by comparing them two at a time, in the table's current order (only the selected or filtered games, if any)"
+                  disabled={rankThisListFocus()?.length === 0}
+                  aria-disabled={rankTooFew() ? 'true' : undefined}
+                  aria-describedby={rankTooFew() ? 'rank-reason' : undefined}
+                  onClick={() => handleRankThisList()}
+                >
+                  {rankThisListLabel()}
+                </button>
+                <Show when={rankTooFew()}>
+                  <span id="rank-reason" class="rank-reason">
+                    Ranking needs at least 2 games
+                  </span>
+                </Show>
+              </>
             }
           >
             <RankMenu />
@@ -3260,7 +3282,10 @@ export default function ListRoute() {
           excludeListId={userList()!.id}
           showName={false}
           submitLabel="Save sources"
-          onCancel={() => setEditingSources(false)}
+          onCancel={() => {
+            setEditingSources(false);
+            editSourcesBtn?.focus();
+          }}
           onSubmit={handleUpdateDynamicList}
         />
       </Show>

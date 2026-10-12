@@ -565,16 +565,100 @@ test("L1 edge: the new list's toast stays while pointed at", async ({ page }) =>
 test('L1.4: a list moves into the only folder', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
-  page.once('dialog', (d) => d.accept('Shortlist'));
   await page.getByRole('button', { name: '+ New list' }).click();
-  page.once('dialog', (d) => d.accept('Weekend'));
+  await page.getByRole('textbox', { name: 'List name' }).fill('Shortlist');
+  await page.keyboard.press('Enter');
   await page.getByRole('button', { name: '+ New folder' }).click();
+  await page.getByRole('textbox', { name: 'Folder name' }).fill('Weekend');
+  await page.keyboard.press('Enter');
 
   const move = page.getByRole('combobox', { name: 'Move Shortlist to…' });
   await expect(move).toHaveValue(''); // showing "Move to…", so picking the folder is a change
   await move.selectOption({ label: '📁 Weekend' });
   await expect(move.locator('option')).toContainText(['Move to…', 'Top level']); // now inside Weekend
   await expect(move).toHaveValue('');
+});
+
+test('L1 edge: folders and lists are named in place, not in a dialog', async ({ page }) => {
+  page.on('dialog', (d) => {
+    throw new Error(`unexpected ${d.type()} dialog`);
+  });
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  const tree = page.locator('.home-tree');
+  const newFolder = page.getByRole('button', { name: '+ New folder' });
+  await newFolder.click();
+  const field = page.getByRole('textbox', { name: 'Folder name' });
+  await expect(field).toBeFocused();
+  await field.fill('Weekend');
+  await page.keyboard.press('Enter');
+  await expect(tree.getByText('📁 Weekend')).toBeVisible();
+  await expect(newFolder).toBeFocused();
+
+  // Esc cancels, and focus goes back to Rename.
+  const rename = page.getByRole('button', { name: 'Rename Weekend' });
+  await rename.click();
+  await expect(field).toBeFocused();
+  await expect(field).toHaveValue('Weekend');
+  await field.fill('Later');
+  await page.keyboard.press('Escape');
+  await expect(tree.getByText('📁 Weekend')).toBeVisible();
+  await expect(rename).toBeFocused();
+
+  // Leaving the field saves it; an empty name cancels.
+  await rename.click();
+  await field.fill('Co-op');
+  await page.getByRole('heading', { name: 'Your lists' }).click();
+  await expect(tree.getByText('📁 Co-op')).toBeVisible();
+  await page.getByRole('button', { name: '+ New list' }).click();
+  await page.getByRole('textbox', { name: 'List name' }).fill('  ');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('textbox', { name: 'List name' })).toHaveCount(0);
+  await expect(tree.locator('.list-tree li')).toHaveCount(1);
+});
+
+test('L2 edge: creating a combined list opens it', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByRole('button', { name: '+ New combined list' }).click();
+  const form = page.locator('.combine-form');
+  const sources = form.locator('.combine-sources input[type="checkbox"]');
+  await sources.nth(0).check();
+  await sources.nth(1).check();
+  await form.getByRole('button', { name: 'Create combined list' }).click();
+  await expect(page).toHaveURL(/\/lists\/[^/?]+$/);
+  await expect(page.getByRole('button', { name: 'Edit sources' })).toBeVisible();
+});
+
+test('L2 edge: Edit sources has one Cancel, which hands focus back', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByRole('button', { name: '+ New combined list' }).click();
+  const sources = page.locator('.combine-form .combine-sources input[type="checkbox"]');
+  await sources.nth(0).check();
+  await sources.nth(1).check();
+  await page.getByRole('button', { name: 'Create combined list' }).click();
+  const edit = page.getByRole('button', { name: 'Edit sources' });
+  await edit.click();
+  await expect(page.getByRole('button', { name: 'Cancel' })).toHaveCount(1);
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.locator('.combine-form')).toHaveCount(0);
+  await expect(edit).toBeFocused();
+});
+
+test('L1 edge: a list under 2 games says ranking needs 2', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByRole('button', { name: '+ New list' }).click();
+  await page.getByRole('textbox', { name: 'List name' }).fill('Empty');
+  await page.keyboard.press('Enter');
+  await page.locator('.list-tree').getByRole('link', { name: /Empty/ }).click();
+  const rank = page.getByRole('button', { name: /Rank this list/ });
+  await expect(rank).toHaveAttribute('aria-disabled', 'true');
+  await expect(rank).toHaveAccessibleDescription('Ranking needs at least 2 games');
+  await expect(page.getByText('Ranking needs at least 2 games')).toBeVisible();
+  await rank.click({ force: true }); // aria-disabled reads as disabled to Playwright
+  await expect(page).toHaveURL(/\/lists\/[^/]+$/); // stayed: no ranking made
 });
 
 test("L3 edge: the toolbar's two resets say what they do", async ({ page }) => {
@@ -2344,8 +2428,9 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
   };
   await asPlayer(page, ALICE);
   await page.goto('/');
-  page.once('dialog', (d) => d.accept('Shortlist'));
   await page.getByRole('button', { name: '+ New list' }).click();
+  await page.getByRole('textbox', { name: 'List name' }).fill('Shortlist');
+  await page.keyboard.press('Enter');
   expect(await takes24pxTap(page.locator('.list-tree').getByRole('button', { name: 'Rename' }))).toBe(true);
   expect(await takes24pxTap(page.locator('.list-tree').getByRole('button', { name: 'Delete' }))).toBe(true);
 
@@ -2514,8 +2599,9 @@ test('I2 edge: controls name what they act on, and only toggles carry a pressed 
   await asPlayer(page, ALICE);
   await page.goto('/');
   await expect(page.locator('.account-chip-btn')).toHaveAccessibleName(/Alice/);
-  page.once('dialog', (d) => d.accept('Shortlist'));
   await page.getByRole('button', { name: '+ New list' }).click();
+  await page.getByRole('textbox', { name: 'List name' }).fill('Shortlist');
+  await page.keyboard.press('Enter');
   await expect(page.getByRole('button', { name: 'Rename Shortlist' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Delete Shortlist' })).toBeVisible();
 

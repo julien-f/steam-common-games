@@ -59,7 +59,7 @@ A bundle joins a combine from its own page: **What does this add?** shows that b
 
 ### Ranking a list
 
-**🏆 Rank this list** (on Owned, Wishlist, a bundle or any of your lists) creates a ranked list and asks you two games at a time: _which do you prefer?_ It starts from what the table shows: games come up in its current order, and if rows are selected — or, with none selected, a filter is on — only those are asked about (the button then reads **🏆 Rank N games**); the rest wait for a later Compare.
+**🏆 Rank this list** (on Owned, Wishlist, a bundle or any of your lists) creates a ranked list and asks you two games at a time: _which do you prefer?_ It starts from what the table shows: games come up in its current order, and if rows are selected — or, with none selected, a filter is on — only those are asked about (the button then reads **🏆 Rank N games**); the rest wait for a later Compare. A list needs at least 2 games to rank.
 
 - **← / →** pick one, **↓** Tie, **S** Skip (asked again later), **X** then **← / →** or "Haven't played" (on your own games; "Not interested" elsewhere) to exclude a game, **Z** Undo. All are buttons too.
 - **ℹ Details** under a card (or **I** then **← / →**) opens that game in the side panel to help you decide. It stays open while the game is still being compared; meanwhile **← / →** browse its screenshots and videos (pick by clicking a card), and **Esc** closes it.
