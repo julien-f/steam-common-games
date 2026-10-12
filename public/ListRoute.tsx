@@ -500,6 +500,7 @@ const RANKED_COLUMNS = insertColumnsAfter(USER_COLUMNS, 'capsule', RANK_COLUMN);
 const RANKED_DEFAULT_VISIBLE = ['rank', ...RECENT_DEFAULT_VISIBLE];
 // A user list built from a wishlist or a bundle keeps the price columns of its source.
 const USER_PRICED_COLUMNS = insertColumnsAfter(USER_COLUMNS, 'ownershipStatus', ...PRICE_COLUMNS);
+const USER_TIERED_COLUMNS = insertColumnsAfter(USER_COLUMNS, 'ownershipStatus', TIER_PRICE_COLUMN, ...PRICE_COLUMNS);
 const RANKED_PRICED_COLUMNS = insertColumnsAfter(RANKED_COLUMNS, 'ownershipStatus', ...PRICE_COLUMNS);
 const PRICED_DEFAULT_VISIBLE = ['bestDealPrice', 'bestDealCut'];
 // A shared formula with a bundle source ("What does this add?") keeps that bundle's Tier Price too.
@@ -602,6 +603,7 @@ export default function ListRoute() {
   // scope (not load()-local) so the Prices tile's own refresh can re-price exactly what's loaded without
   // re-resolving the bundle. Reset by load() itself on every (re)load.
   let resolvedBundleGames: ResolvedGame[] | null = null;
+  let userListTiered = false; // a saved list's rows carry a bundle source's Tier Price
   // Owned/wishlist kinds only: how old the server's cached copy of this account's list is (epoch
   // ms, null = fetched fresh), and whether a forced re-fetch is in flight — the hero's Updated
   // tile, which is also the control that forces one (see heroTiles). Steam data is cached server-side for weeks (default.env's
@@ -1943,7 +1945,13 @@ export default function ListRoute() {
 
     let initialRows: Game[];
     let tiered = false; // rows carry a bundle source's Tier Price
+    const tiers: ReturnType<typeof bundleTierFields> = new Map();
+    const collectTiers = (games: ResolvedGame[]) => {
+      // No picks: a pick-and-mix rate hangs on a pick count only the bundle page's selection gives.
+      for (const [appid, f] of bundleTierFields(games, [])) if (!tiers.has(appid)) tiers.set(appid, f);
+    };
     resolvedBundleGames = null;
+    userListTiered = false;
     // Cast, not annotated: resolveRows sets it, which flow narrowing from `= null` would miss.
     let pendingGroups = null as MembershipGroup[] | null;
     // Not cleared on a ↻ Refresh of the list already on screen, for the same reason heroTitle
@@ -2095,12 +2103,20 @@ export default function ListRoute() {
       setStatusText('Resolving list…');
       const resolved = await resolveRows(
         list,
-        createDefaultFetchers({ refresh, onFetchedAt, onBundleLeftOut: noteLeftOut }),
+        createDefaultFetchers({
+          refresh,
+          onFetchedAt,
+          onBundleLeftOut: noteLeftOut,
+          onBundleGames: (_bundleId, _bundle, games) => {
+            if (!loadGuard.isStale(gen)) collectTiers(games);
+          },
+        }),
         describeWithLeftOut(list, createDefaultNaming()),
       );
       if (!resolved) return;
       const { appids, rows } = resolved;
-      initialRows = rows;
+      tiered = userListTiered = rows.some((row) => tiers.has(row.appid));
+      initialRows = rows.map((row) => ({ ...row, ...tiers.get(row.appid) }));
       if (list.kind === 'ranked') {
         const state = getRanking(list.id);
         setRankedSource(appids);
@@ -2124,7 +2140,6 @@ export default function ListRoute() {
       setCompareList(list);
       setListTitle(listDisplayName(list, sharedNaming()));
       setStatusText('Resolving shared list…');
-      const tiers: ReturnType<typeof bundleTierFields> = new Map();
       const resolved = await resolveRows(
         list,
         sharedFetchers(
@@ -2137,9 +2152,7 @@ export default function ListRoute() {
               setSharedBundles((prev) =>
                 prev.some((b) => b.id === bundleId) ? prev : [...prev, { id: bundleId, title: bundle.title }],
               );
-              // No picks: a pick-and-mix rate hangs on a pick count only the bundle page's selection gives.
-              const fields = bundleTierFields(games, []);
-              for (const [appid, f] of fields) if (!tiers.has(appid)) tiers.set(appid, f);
+              collectTiers(games);
             },
           }),
         ),
@@ -2314,7 +2327,9 @@ export default function ListRoute() {
             ? BUNDLE_COLUMNS
             : kind === 'user'
               ? priced
-                ? USER_PRICED_COLUMNS
+                ? tiered
+                  ? USER_TIERED_COLUMNS
+                  : USER_PRICED_COLUMNS
                 : USER_COLUMNS
               : kind === 'recent'
                 ? LOOKED_UP_COLUMNS
@@ -2334,7 +2349,7 @@ export default function ListRoute() {
           : kind === 'bundle'
             ? BUNDLE_DEFAULT_VISIBLE
             : (kind === 'user' && priced) || sharedPriced
-              ? [...RECENT_DEFAULT_VISIBLE, ...(sharedPriced && tiered ? ['tierPrice'] : []), ...PRICED_DEFAULT_VISIBLE]
+              ? [...RECENT_DEFAULT_VISIBLE, ...(tiered ? ['tierPrice'] : []), ...PRICED_DEFAULT_VISIBLE]
               : kind === 'recent'
                 ? LOOKED_UP_DEFAULT_VISIBLE
                 : kind === 'compare'
@@ -3106,11 +3121,12 @@ export default function ListRoute() {
     // old currency until something else happened to reload, with no indication anything was
     // stale. A wishlist only needs its prices re-fetched; a bundle needs a full reload, because
     // its Tier Price comes from the bundle fetch itself (fetchBundleById's own `country`), not
-    // from the price lookup. So does a shared list with a bundle source, for the same Tier Price.
+    // from the price lookup. So does a shared or saved list with a bundle source, for the same Tier Price.
     const onRegionChange = () => {
       setRegionCode(currentRegion());
       setPriceFetchedAt(undefined);
-      if (kind === 'bundle' || (kind === 'shared' && sharedBundles().length)) void load();
+      if (kind === 'bundle' || (kind === 'shared' && sharedBundles().length) || (kind === 'user' && userListTiered))
+        void load();
       else if (hasPrices()) void loadPrices(rowsStore, loadGuard.current());
     };
     window.addEventListener(REGION_CHANGED_EVENT, onRegionChange);

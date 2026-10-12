@@ -1119,6 +1119,44 @@ test("B3 edge: what a bundle adds keeps the bundle's prices and links back to it
 
 const sharedUrl = (formula: string) => `/lists/shared?f=${encodeURIComponent(formula)}`;
 
+test("B3 edge: what a bundle adds, once saved, keeps the bundle's Tier Price, in a newly picked region too", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  // The mock only prices in EUR; answer a US request in USD, as ITAD does.
+  await page.route(/\/api\/bundles\/\d+\?/, (route) => {
+    const req = route.request();
+    const url = new URL(req.url());
+    const { body } = respond(req.method(), url, req.postData());
+    return route.fulfill({
+      json: JSON.parse(url.searchParams.get('country') === 'US' ? body.replaceAll('"EUR"', '"USD"') : body),
+    });
+  });
+  await page.goto(sharedUrl(`subtract:(b:${BUNDLE.id};o:${ALICE.steamid})`));
+  await expect(rows(page)).toHaveCount(2);
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  if (await more.isVisible()) await more.click();
+  await page.getByRole('button', { name: 'Save as a list' }).click();
+  await expect(page).toHaveURL(/\/lists\/(?!shared)/);
+  await expect(page.locator('thead th').filter({ hasText: /^Tier Price/ })).toHaveCount(1);
+  await expect(row(page, 'Overcooked! 2')).toContainText('€12.00');
+  await page.getByTitle('Preferences').click();
+  await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
+  await expect(row(page, 'Overcooked! 2')).toContainText('$12.00');
+});
+
+test("B3 edge: a saved list from a pick-and-mix bundle claims no per-game rate it can't know", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto(sharedUrl(`subtract:(b:90002;o:${BOB.steamid})`));
+  await expect(row(page, 'Hades')).toContainText('Varies');
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  if (await more.isVisible()) await more.click();
+  await page.getByRole('button', { name: 'Save as a list' }).click();
+  await expect(page).toHaveURL(/\/lists\/(?!shared)/);
+  await expect(row(page, 'Hades')).toContainText('Varies');
+  await expect(rows(page).filter({ hasText: '/game' })).toHaveCount(0);
+});
+
 test("B3 edge: what a bundle adds shows the bundle's prices in a newly picked region", async ({ page }) => {
   await asPlayer(page, ALICE);
   // The mock only prices in EUR; answer a US request in USD, as ITAD does.

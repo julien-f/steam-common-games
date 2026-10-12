@@ -131,6 +131,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On a phone, the account menu's links, Home's Friends toggle and refresh, the shortcuts dialog's close button and the footer's About link take a 24px tap
 - A game name that wraps in a table keeps its ✓/☆ badge right after it, instead of at the far edge of the cell
 - With one game selected, the rank button reads "Rank 1 game", not "Rank 1 games"
+- A list saved from What does this add? keeps the bundle's Tier Price column
 
 ### Development
 

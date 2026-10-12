@@ -34,8 +34,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Bundles and prices
 
-- **U163 · polish · B3** — "Save as a list" on "What does this add?" keeps Best Deal but drops the bundle's Tier Price, which the unsaved view now shows (U141). The saved list's load could take the same `onBundleGames` hook (`public/listResolve.ts`).
-
 ## Ranking
 
 - **U145 · polish · I1** — `/rank`'s keyboard hint bar shows on touch screens. Hide it under `(hover: none)`.
