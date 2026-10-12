@@ -4,10 +4,10 @@ Every upstream this app talks to, and what is undocumented about each. Cache tie
 
 **Trust tiers.**
 
-- **Sanctioned**: Steam's keyed `api.steampowered.com` endpoints and the IsThereAnyDeal API — documented.
+- **Sanctioned**: Steam's keyed `api.steampowered.com` endpoints (among them `ResolveVanityURL` and `GetOwnedGames`, `lib/steam.js`), Steam OpenID's `check_authentication` (`lib/auth.js`) and the IsThereAnyDeal API — documented.
 - **Untrusted**: everything else here — HLTB's search API, Steam's wishlist/store-search/store-browse/appdetails/appreviews/packagedetails/ajaxresolvebundles endpoints, ProtonDB, Fanatical's storefront feed. Undocumented, reached without a key (sometimes with spoofed browser headers), not guaranteed sanctioned by their terms, liable to break or be blocked without notice. Usage is low-volume and non-commercial; **don't scale up request volume without revisiting these notes.**
 - **Circuit breakers** (`lib/circuitBreaker.js`) on the ones that answer a block with a 403 — Steam's store, HLTB's search, ProtonDB: 2 consecutive 403s leave that upstream alone for 5 minutes, including requests already queued when it trips.
-- **Pacing**: Steam's store takes 2 requests in flight, each slot pausing `STORE_MIN_INTERVAL_MS` before reuse; HLTB's search, ProtonDB and the store browse API take 3 each, pausing `UPSTREAM_MIN_INTERVAL_MS` — enough to keep pace with the store on a cold load. A store 429 pauses every store request for its `Retry-After` (2 s, then 4 s, when it sends none); a request is retried at most twice before failing.
+- **Pacing**: Steam's store takes 2 requests in flight, each slot pausing `STORE_MIN_INTERVAL_MS` before reuse; HLTB's search, ProtonDB and the store browse API take 3 each, pausing `UPSTREAM_MIN_INTERVAL_MS` — enough to keep pace with the store on a cold load. A store 429 pauses every store request for its `Retry-After`, uncapped (2 s, 4 s, then 8 s on successive 429s when it sends none); a request is retried at most twice before failing.
 
 - [HLTB — no npm package](#hltb--no-npm-package)
 - [Wishlist — undocumented endpoint](#wishlist--undocumented-endpoint)
@@ -108,7 +108,7 @@ Documented endpoints whose "no data" answers are error statuses, treated as answ
 
 Bundle browsing (`/bundles`, `/lists/bundle/:bundleId`) and every price column come from the [IsThereAnyDeal API](https://docs.isthereanydeal.com/) via `lib/itad.js` — free, key-gated, with published (if sparse) OpenAPI docs: sanctioned tier.
 
-- **Optional**: gated on `ITAD_API_KEY`. `isItadConfigured()` (`server.js`) is checked per request; `GET /api/bundles`, `POST /api/bundles/resolve` and `POST /api/prices` return 503 when unset, and the frontend hides those surfaces (`GET /api/health`'s `itadConfigured`).
+- **Optional**: gated on `ITAD_API_KEY`. `isItadConfigured()` (`server.js`) is checked per request; `GET /api/bundles`, `GET /api/bundles/:id`, `POST /api/bundles/resolve`, `POST /api/prices` and `GET /api/game-bundles/:appid` return 503 when unset, and the frontend hides those surfaces (`GET /api/health`'s `itadConfigured`).
 - **Batches of 200 ids** (`BATCH_MAX`) for every multi-id call: documented for `/games/prices/v3` (`gids-200`); an assumption for the two `/lookup/` endpoints, whose docs list no cap.
 - **Links are passed through unmodified** — ITAD's terms require prices and links as returned. An opened bundle's hero shows "View on IsThereAnyDeal ↗" (`details`) and "Get this bundle ↗" (`url`, the shop/affiliate link with its tracking params). The one addition anywhere is **Buy on Fanatical**'s `scg=…` parameter ([Fanatical](#fanatical--pick-and-mix-tier-prices)), inside that same link; every tracking parameter is left alone.
 
