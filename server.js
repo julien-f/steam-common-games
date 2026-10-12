@@ -1236,15 +1236,27 @@ app.put('/api/me/prefs/:key', authLimit, requireAuth, (req, res) => {
 const SITE_NAME = 'steam.isonoe.net';
 const SITE_DESCRIPTION =
   'Explore Steam libraries as lists of games, with ratings, completion times and current prices in one sortable table.';
-async function sendAppShell(req, res, { title = SITE_NAME, image = '/og-image.jpg' } = {}) {
+// Steam's short descriptions hold entities (only `&quot;`/`&amp;` across the cache) but no tags.
+const XML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+const decodeEntities = (s) =>
+  s.replace(/&(?:#(\d+)|#x([\da-f]+)|(\w+));/gi, (match, dec, hex, name) => {
+    if (name) return XML_ENTITIES[name] ?? match;
+    const codePoint = parseInt(dec ?? hex, dec ? 10 : 16);
+    return codePoint <= 0x10ffff ? String.fromCodePoint(codePoint) : match;
+  });
+async function sendAppShell(
+  req,
+  res,
+  { title = SITE_NAME, description = SITE_DESCRIPTION, image = '/og-image.jpg' } = {},
+) {
   // Read per request, as sendFile did: a rebuild replaces the hashed asset names it links.
   const shellHtml = await fs.promises.readFile(path.join(STATIC_DIR, 'index.html'), 'utf8');
   const origin = `${req.protocol}://${req.get('host')}`;
   const tags = [
-    ['name', 'description', SITE_DESCRIPTION],
+    ['name', 'description', description],
     ['property', 'og:site_name', SITE_NAME],
     ['property', 'og:title', title],
-    ['property', 'og:description', SITE_DESCRIPTION],
+    ['property', 'og:description', description],
     ['property', 'og:image', image.startsWith('/') ? origin + image : image],
     ['name', 'twitter:card', 'summary_large_image'],
   ].map(([attr, key, value]) => `<meta ${attr}="${key}" content="${escapeXml(value)}" />`);
@@ -1266,7 +1278,11 @@ app.get(/^\/(?!api\/)(?!.*\.[a-zA-Z0-9]+$).*/, async (req, res) => {
   // Not recorded: a page load isn't a meta-tier lookup the cache metrics should count.
   const game = appid && getCached(`meta:${appid}`, { record: false });
   // `||`: Steam's raw details can hold null, which defaults don't replace.
-  await sendAppShell(req, res, { title: game?.name || undefined, image: game?.header_image || undefined });
+  await sendAppShell(req, res, {
+    title: game?.name || undefined,
+    description: game?.short_description ? decodeEntities(game.short_description) : undefined,
+    image: game?.header_image || undefined,
+  });
 });
 
 // Anything a route didn't catch, body-parser's malformed or oversized JSON included: Express's own

@@ -184,18 +184,27 @@ test('GET / and /lists/owned: the app shell carries Open Graph tags with an abso
   }
 });
 
-test('GET /game/:appid: the preview names a cached game and shows its header image, without fetching', async (t) => {
+test('GET /game/:appid: the preview names and describes a cached game and shows its header image, without fetching', async (t) => {
   _reset();
   const fetchMock = t.mock.method(globalThis, 'fetch', async () => assert.fail('no upstream request'));
-  setCache('meta:620', { name: 'Portal <2> & "co"', header_image: 'https://cdn.example/620/header.jpg' });
+  setCache('meta:620', {
+    name: 'Portal <2> & "co"',
+    header_image: 'https://cdn.example/620/header.jpg',
+    short_description: 'Think with &quot;portals&quot; &amp; &#8220;cake&#x201D; &amp;lt; &#9999999;',
+  });
   const res = await api.get('/game/620');
   assert.match(res.text, /<meta property="og:title" content="Portal &lt;2&gt; &amp; &quot;co&quot;" \/>/);
   assert.match(res.text, /<meta property="og:image" content="https:\/\/cdn\.example\/620\/header\.jpg" \/>/);
+  // Steam's entities decoded once, then escaped once: no `&amp;quot;` showing literally.
+  const description = 'Think with &quot;portals&quot; &amp; “cake” &amp;lt; &amp;#9999999;';
+  assert.ok(res.text.includes(`<meta property="og:description" content="${description}" />`));
+  assert.ok(res.text.includes(`<meta name="description" content="${description}" />`));
 
-  setCache('meta:622', { name: null, header_image: null });
+  setCache('meta:622', { name: null, header_image: null, short_description: null });
   const nulls = await api.get('/game/622');
   assert.equal(nulls.status, 200);
   assert.match(nulls.text, /<meta property="og:title" content="steam\.isonoe\.net" \/>/);
+  assert.match(nulls.text, /<meta property="og:description" content="Explore Steam libraries [^"]+" \/>/);
 
   const uncached = await api.get('/game/621');
   assert.match(uncached.text, /<meta property="og:title" content="steam\.isonoe\.net" \/>/);
