@@ -136,6 +136,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A game name that wraps in a table keeps its ✓/☆ badge right after it, instead of at the far edge of the cell
 - With one game selected, the rank button reads "Rank 1 game", not "Rank 1 games"
 - A list saved from What does this add? keeps the bundle's Tier Price column
+- Closing the nav bar's game search with Esc or a pick no longer lets a search still in progress reopen its suggestions
 
 ### Development
 

@@ -2676,6 +2676,52 @@ test('F1 edge: the nav search box empties after a pick and on a second Esc', asy
   await expect(box).toHaveValue('');
 });
 
+test('F1 edge: a first Esc with no dropdown to close leaves the nav search box but keeps its text', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  const box = page.getByPlaceholder('Look up any game…');
+  await box.fill('620');
+  await page.keyboard.press('Escape');
+  await expect(box).not.toBeFocused();
+  await expect(box).toHaveValue('620');
+});
+
+test('F1 edge: a search still pending when Esc or a pick closes the nav dropdown does not reopen it', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  const box = page.getByPlaceholder('Look up any game…');
+  const dropdown = page.locator('#app-search-results');
+
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/search-games?q=hades*', async (route) => {
+    await held;
+    await route.fallback();
+  });
+  const asked = page.waitForRequest(/search-games\?q=hades/);
+  await box.fill('hades');
+  await asked;
+  await page.keyboard.press('Escape');
+  release();
+  await page.waitForResponse(/search-games\?q=hades/);
+  await page.waitForTimeout(200); // let the late answer render, if it would
+  await expect(dropdown).toBeHidden();
+
+  await box.fill('hollow');
+  await expect(page.getByRole('option', { name: /Hollow Knight/ })).toBeVisible();
+  await page.keyboard.press('Backspace');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#panel-title')).toHaveText('Hollow Knight');
+  await page.waitForTimeout(500); // past the search debounce
+  await expect(dropdown).toBeHidden();
+});
+
 test('F1 edge: Esc closes a nav popover or the search dropdown, not the open game', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', "a phone's panel covers the nav");
   await asPlayer(page, ALICE);

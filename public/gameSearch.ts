@@ -135,6 +135,7 @@ export function initGameSearch({
   // the results themselves are the same `GameSearchResult` shape either way (and pick the same
   // way), so this only drives the heading/"see all" chrome around them.
   let showingRecents = false;
+  let escClosedResults = false; // the last Esc closed the dropdown, so the next one empties the box
 
   resultsEl.setAttribute('role', 'listbox');
   inputEl.setAttribute('aria-autocomplete', 'list');
@@ -194,6 +195,9 @@ export function initGameSearch({
   }
 
   function hideResults() {
+    // A pending or in-flight search would reopen what was just closed.
+    if (debounceTimer != null) clearTimeout(debounceTimer);
+    activeFetch++;
     lastResults = [];
     activeIdx = -1;
     showingRecents = false;
@@ -271,7 +275,10 @@ export function initGameSearch({
   inputEl.addEventListener('focus', openRecentsIfEmpty);
   inputEl.addEventListener('click', openRecentsIfEmpty);
 
+  inputEl.addEventListener('blur', () => (escClosedResults = false));
+
   inputEl.addEventListener('input', () => {
+    escClosedResults = false;
     if (debounceTimer != null) clearTimeout(debounceTimer);
     const term = inputEl.value.trim();
     // Cleared back to empty — that's the recents view again, not just an empty dropdown.
@@ -290,11 +297,15 @@ export function initGameSearch({
   inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       e.preventDefault(); // so the page's own Esc doesn't also close the panel
-      // Second Esc clears and leaves the box, so the page's own shortcuts work again.
-      if (resultsEl.hidden) {
-        inputEl.value = '';
-        inputEl.blur();
-      } else hideResults();
+      const wasOpen = !resultsEl.hidden;
+      hideResults();
+      if (wasOpen) {
+        escClosedResults = true;
+        return;
+      }
+      // Leave the box, so the page's own shortcuts work again.
+      if (escClosedResults) inputEl.value = '';
+      inputEl.blur();
       return;
     }
     if (e.key === 'ArrowDown') {
