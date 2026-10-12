@@ -20,6 +20,12 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: hot reload picked up a module between two edits (e.g. a call added before its import).
 - **Fix**: reload the page and check again before treating it as a bug.
 
+## A commit fails on `TypeError: … is not a function` in a test it doesn't include
+
+- **Symptom**: the pre-commit hook's `test` step fails in a new test file that isn't staged, e.g. `TypeError: needsRestart is not a function`.
+- **Cause**: the hook sets aside unstaged edits to tracked files but leaves untracked ones, so a new test for code you haven't staged runs against the old code.
+- **Fix**: commit a script and its new test together, and move other changes' untracked tests out of the tree until their commit.
+
 ## `dev:mock` measures a layout from older CSS
 
 - **Symptom**: after commits in the main checkout, a page measured on `:58993` shows old CSS (a desktop rule missing, a box at its pre-change width) though the file on disk has the change.
