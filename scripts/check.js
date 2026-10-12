@@ -29,6 +29,7 @@ function steps(staged, files = [], { deferE2e = process.env.E2E_DEFER === '1' } 
           ['css', ['check:css']],
         ]
       : []),
+    ['comments', staged === undefined ? ['check:comments'] : ['check:comments', '--', `--staged=${staged}`]],
     ['doc-refs', ['check:doc-refs']],
     ['doc-lint', ['check:doc-lint']],
     ['journeys', ['check:journeys']],

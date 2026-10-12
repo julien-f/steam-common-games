@@ -185,6 +185,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Lint fails on warnings; a fix-batch lane skips e2e when its commits touch no UI file
 - npm run format prints only warnings, not a line per file
 - a CSS check flags desktop media-query rules a later rule silently overrides, not only phone ones
+- npm run check flags new comments over one line in public/
 
 ## [0.10.0] - 2026-10-10
 

@@ -17,6 +17,7 @@
     "test:e2e": "node scripts/e2e.js",
     "check": "node scripts/check.js",
     "check:changelog": "node scripts/changelog-check.js",
+    "check:comments": "node scripts/comment-lines.js",
     "check:css": "node scripts/css-overrides.js",
     "check:doc-lint": "node scripts/doc-lint.js",
     "check:doc-refs": "node scripts/doc-refs.js",

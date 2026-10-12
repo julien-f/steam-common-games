@@ -781,9 +781,7 @@ tbody td {
   color: #2ecc71;
 }
 
-/* Same markers inline after a Name cell's text (gameColumns.ts's renderNameCell, which also sets
-   the name's colour and weight from OWNERSHIP_STATUS_TIERS). Inline, not flex: a wrapping name in
-   a flex row takes the full width and strands its badge. */
+/* Inline, not flex: a wrapping name in a flex row takes the full width and strands its badge. */
 .name-status-badge {
   margin-left: 4px;
   white-space: nowrap;
