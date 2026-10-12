@@ -1818,7 +1818,7 @@ a.panel-glance-chip:focus-visible {
   font-weight: 600;
 }
 
-/* Price card (panel.js's priceHtml) — one line: the best-deal amount (badge/tooltip/color
+/* Price card (panel.tsx's PriceSection) — one line: the best-deal amount (badge/tooltip/color
    mirroring the Best Deal table cell), its discount when there is one, and the shop name.
    Uses the shared .panel-card box (same as the tag cloud/description) rather than the glance
    grid's chip template — deliberately lighter than that, a plain line of text, not another

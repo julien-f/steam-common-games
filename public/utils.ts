@@ -143,8 +143,8 @@ export function formatMoney(v: number, currency?: string | null): string {
 }
 
 // Single source of truth for "is this price a historical record, and how should it look" —
-// shared by renderBestDeal (bundles.js/library.js), panel.js's Price card (priceHtml), and the
-// Price Status column (PRICE_STATUS_TIERS/computePriceStatus, bundles.js/library.js), all of
+// shared by renderBestDeal (gameColumns.ts), panel.tsx's Price card (PriceSection), and the
+// Price Status column (PRICE_STATUS_TIERS/computePriceStatus, gameColumns.ts), all of
 // which used to hand-roll their own copy of this exact tier logic. A 3-month-low tier was once
 // added to the Price Status column before anyone remembered to add it to the other three places
 // too — this function exists specifically so that can't happen again: change the tier list once,
