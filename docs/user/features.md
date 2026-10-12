@@ -33,7 +33,7 @@ A private profile or wishlist looks identical to an empty one from the outside; 
 
 ## Lists
 
-- **Owned** and **Wishlist** for the current account, and one list per **bundle** you browse, are always live — never stored, never stale.
+- **Owned** and **Wishlist** for the current account, and one list per **bundle** you browse, follow their source — nothing to maintain. Their "Updated" figure says how old they are (see [How fresh is this?](#how-fresh-is-this)).
 - **Recently Looked Up** collects the last 10 games you searched for, latest first (its **Looked up** column), browsable like any other list.
 - **Your own lists** come in three kinds: a **manual** list you add and remove games from, a **dynamic** list defined as a formula over other lists, recomputed every time you open it, and a **ranked** list that orders another list by your preferences (see [Ranking a list](#ranking-a-list)).
 - Lists live in a **folder tree** you can rename, nest and organize — **Move to…** on any list or folder puts it elsewhere in the tree.
@@ -79,11 +79,15 @@ A bundle joins a combine from its own page: **What does this add?** shows that b
 
 Each player is a box you drop accounts into: it offers the accounts you've already looked at as you type, and takes a Steam name, profile URL or 64-bit ID for anyone it doesn't know yet. Put two accounts in the _same_ player to compare a Steam Family — or any pair of libraries — as one. Picking an account doesn't add it to your recents or change your current account. If a player can't be found, the page says which one, marks it in **Edit players**, and offers to compare the others.
 
-The result is a link. Copy the address and whoever opens it sees the same comparison — it names the players, so it doesn't depend on anything saved in your browser, and it doesn't change the recipient's own account. Switch it to **Intersect** for a single flat table of what everyone owns, or **Save as a list** to keep it in your own list tree, where it re-resolves every time you open it.
+The result is a link. Copy the address and whoever opens it sees the same comparison — it names the players, so it doesn't depend on anything saved in your browser, and it doesn't change the recipient's own account.
+
+- Each player gets a **Played (h)** column; its "never played" filter preset (on every Played column) finds what a player owns but never launched.
+- The mode menu switches between the four [combine operations](#combining-lists) — e.g. **Intersect** for a single flat table of what everyone owns.
+- **Save as a list** keeps it in your own list tree, where it re-resolves every time you open it.
 
 ## Bundles
 
-Browse current Steam game bundles (sourced from IsThereAnyDeal, and only available if the app is configured with an ITAD key). Open one and its games become a list like any other, with the bundle's tier price alongside each game's rating, playtime estimates and current best price anywhere. Games in a bundle with no Steam listing are listed separately below the table rather than quietly dropped. The header's counts are clickable: "New" narrows the table to the bundles published in the last week, "Ending soon" to the ones ending within 48 hours, and clicking either again brings the rest back. "Updated" re-fetches the list, and "Prices" opens the region setting. A bundle's **New to you** figure counts the games in it you don't own and what they'd cost at their best deals right now; **What does this add?** shows those games as a list (see [Combining lists](#combining-lists)).
+Browse current Steam game bundles (sourced from IsThereAnyDeal, and only available if the app is configured with an ITAD key). Open one and its games become a list like any other, with the bundle's tier price alongside each game's rating, playtime estimates and current best price anywhere. Games in a bundle with no Steam listing are listed separately below the table rather than quietly dropped. The header's counts are clickable: "New" narrows the table to the bundles published in the last week, "Ending soon" to the ones ending within 48 hours, and clicking either again brings the rest back. "Updated" re-fetches the list, and "Prices" opens the region setting. **Include expired** adds ended bundles, dimmed, newest first. A bundle's **New to you** figure counts the games in it you don't own and what they'd cost at their best deals right now; **What does this add?** shows those games as a list (see [Combining lists](#combining-lists)).
 
 Fanatical's **Build your own** bundles price by how many games you pick (e.g. 5 for €5.99, 10 for €9.99), taken from Fanatical itself since IsThereAnyDeal doesn't carry those prices. Every game you pick costs the per-game rate of the largest tier you reach (6 games at 5 for €5.99 cost 6 × €1.198). The tiers show in the bundle's header, each game's Tier Price is the rate for the current selection (the smallest tier's with nothing selected), and selecting games in the table shows what they'd cost: at that rate, or a larger tier when its price is lower (any picks left free), and, in green or red, what that saves or costs over the same games at their best deals. A Steam package (a game plus its DLC sold as one) counts as one pick: its rows are marked **package · N games** and ticking one ticks them all.
 
@@ -99,6 +103,12 @@ Wishlist and bundle lists carry price columns: the best deal across every shop I
 
 Clicking any row opens a detail panel beside the table — not over it, so the list stays usable and clicking another row just swaps the panel's contents. It carries screenshots and trailers, the weighted rating and review counts, How Long To Beat estimates, achievements, recent news from the developer, current price and the current bundles it's in (each opens that bundle's list), DLC and links out. ↻ refetches everything for that one game.
 
+Clicking a screenshot or trailer (or **Enter** on it) opens it full-window:
+
+- **← / →** step through the game's media (while a video plays they seek 5 s; **Shift** keeps them stepping), **↑ / ↓** move to the previous or next game in the list.
+- **F** toggles fullscreen; **Z**, a double-click or a pinch zooms a screenshot; **Space** plays or pauses a video and **M** mutes it.
+- On touch, swipe sideways for media and up or down for games; a double-tap on a video's left or right third seeks 10 s.
+
 ![A game's detail panel: media strip, weighted rating and Metacritic score, How Long To Beat estimate, ProtonDB tier, best price with record-low badges, tags, who owns it, and collapsible HLTB/news/achievements/DLC sections](../images/game-panel.png)
 
 ## Search by URL
@@ -108,6 +118,7 @@ Clicking any row opens a detail panel beside the table — not over it, so the l
 ## Sharing
 
 - A game's own link (`/game/<appid>`) opens that game for anyone, whether or not they own it.
+- Links pasted in a chat (WhatsApp, Slack, Discord, iMessage…) show a preview card; a game link's names the game and shows its header image once the app has looked that game up.
 - Add `?u=` to any list link to share the account you're exploring. It never changes the recipient's own default account, and a game link deliberately doesn't carry it.
 - A comparison's link names its players the same way, one `?u=` each — including links made by older versions of this app, which still work.
 - **🔗 Share view** copies a link with your current table layout — columns, sort, grouping, filters — baked in. On Owned and Wishlist it also carries the account (`?u=`), so the recipient sees your games, not their own. The recipient sees it for that visit only, with **Keep as my layout** to make it theirs or **Use my own** to go back; nothing of their own setup changes otherwise. It's off on your own saved lists, whose link only opens in your browser: a combined list has **🔗 Share list** instead; manual and ranked lists can't be shared yet.
