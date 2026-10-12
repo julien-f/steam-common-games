@@ -40,6 +40,11 @@ test('A1 edge: a first visit says what the app does, and the account field looks
   await expect(page.getByRole('button', { name: 'Look up', exact: true })).toBeVisible();
 });
 
+test('A1 edge: native controls render dark, like the page around them', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator(':root')).toHaveCSS('color-scheme', 'dark');
+});
+
 test('A1 edge: Owned with no account points to Home rather than showing 0 games', async ({ page }) => {
   await page.goto('/lists/owned');
   await expect(page.getByText('No account selected')).toBeVisible();

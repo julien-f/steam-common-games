@@ -72,7 +72,6 @@ None open.
 
 ## Consistency and polish
 
-- **U150 · polish · visual** — `:root` has no `color-scheme`, so native controls render light on the dark UI (white checkboxes, white `<select>`s, light scrollbars). `color-scheme: dark` on `:root`; this is U39's white select.
 - **U151 · polish · visual** — app buttons fall back to Arial while body and data-table buttons use Segoe UI: one toolbar mixes 13px Segoe/25px and 12px Arial/26px buttons. `button, input, select { font: inherit }` and one button size.
 - **U152 · polish · visual** — number columns (rating, HLTB, Played, price, discount) are start-aligned, so digits don't line up. Right-align them and their headers, with `tabular-nums`.
 - **U153 · polish · visual** — 13 size/weight combinations on Home alone (10–20px, incl. 12.5), plus 10.5 and 18 on list pages. One scale: 11 labels, 13 meta/table, 15 body, 18 title.

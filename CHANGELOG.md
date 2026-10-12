@@ -99,6 +99,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Closing a game's panel puts focus back on that game's row, or on the row it was opened from when that one isn't shown, so the arrow keys keep working
 - TRUST_PROXY=1 now takes effect: behind a reverse proxy, rate limits apply per visitor and link previews and sign-in use https
 - Changing a saved list's sort, columns, search or page no longer floods account sync, which could drop other settings' syncs and overwrite a list edit made on another device
+- Checkboxes, selects and scrollbars now render dark, matching the rest of the page
 
 ### Development
 
