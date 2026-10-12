@@ -4463,6 +4463,26 @@ kbd {
   color: var(--text0);
   font-size: var(--fs-ui);
 }
+.list-tree span:has(+ .tree-name-field) {
+  flex: none;
+}
+.tree-name-field {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 8px;
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text0);
+  font-size: var(--fs-ui);
+  outline: none;
+}
+.tree-name-field:focus {
+  border-color: var(--accent);
+}
+.tree-name-field::placeholder {
+  color: var(--text2);
+}
 .list-tree button {
   background: transparent;
   border: 1px solid var(--border);

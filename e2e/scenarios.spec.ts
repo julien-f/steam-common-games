@@ -642,6 +642,45 @@ test('L1 edge: folders and lists are named in place, not in a dialog', async ({ 
   await expect(tree.locator('.list-tree li')).toHaveCount(1);
 });
 
+test("L1 edge: clearing a ranking's name hands it back its default label", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await page.getByRole('button', { name: /Rank this list/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading', { name: 'Ranking of Alice — Wishlist' })).toBeVisible();
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Rename Ranking of Alice — Wishlist' }).click();
+  await page.getByRole('textbox', { name: 'List name' }).fill('Top picks');
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Rename Top picks' }).click();
+  await page.getByRole('textbox', { name: 'List name' }).fill('');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.list-tree').getByRole('link', { name: /Ranking of Alice — Wishlist/ })).toBeVisible();
+});
+
+test('L1 edge: confirming an IME candidate with Enter keeps the name field open', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByRole('button', { name: '+ New list' }).click();
+  const field = page.getByRole('textbox', { name: 'List name' });
+  await field.fill('にほ');
+  await field.dispatchEvent('keydown', { key: 'Enter', isComposing: true });
+  await expect(field).toBeVisible();
+  await expect(page.locator('.list-tree').getByRole('link', { name: /にほ/ })).toHaveCount(0);
+});
+
+test("L1 edge: the name field looks like the app's other text fields", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByRole('button', { name: '+ New folder' }).click();
+  const look = (el: Element) => {
+    const s = getComputedStyle(el);
+    return [s.backgroundColor, s.borderTopStyle, s.borderTopWidth, s.borderRadius, s.color, s.fontSize];
+  };
+  const search = await page.locator('.app-search-wrap > input').evaluate(look);
+  expect(await page.getByRole('textbox', { name: 'Folder name' }).evaluate(look)).toEqual(search);
+});
+
 test('L2 edge: creating a combined list opens it', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
@@ -653,6 +692,17 @@ test('L2 edge: creating a combined list opens it', async ({ page }) => {
   await form.getByRole('button', { name: 'Create combined list' }).click();
   await expect(page).toHaveURL(/\/lists\/[^/?]+$/);
   await expect(page.getByRole('button', { name: 'Edit sources' })).toBeVisible();
+});
+
+test("L2 edge: a combined list created under a link's account opens under it", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/?u=bob');
+  await page.getByRole('button', { name: '+ New combined list' }).click();
+  const sources = page.locator('.combine-form .combine-sources input[type="checkbox"]');
+  await sources.nth(0).check();
+  await sources.nth(1).check();
+  await page.getByRole('button', { name: 'Create combined list' }).click();
+  await expect(page).toHaveURL(/\/lists\/[^/?]+\?u=bob$/);
 });
 
 test('L2 edge: Edit sources has one Cancel, which hands focus back', async ({ page }) => {
