@@ -3642,6 +3642,16 @@ kbd {
   .list-hero-actions:not(.list-hero-actions--open) .hero-secondary {
     display: none;
   }
+  /* Wider fonts shorten a label rather than drop the ⋯ to a line of its own. */
+  .list-hero-actions:not(.list-hero-actions--open):has(.list-hero-more) {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+  .list-hero-actions:not(.list-hero-actions--open):has(.list-hero-more) > .btn-ghost:not(.list-hero-more) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   /* One swipeable row instead of a wrapping grid: the facts stay one swipe away, not a screen. */
   .list-hero-stats {
     flex-wrap: nowrap;
