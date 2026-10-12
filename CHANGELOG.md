@@ -39,6 +39,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A failed price lookup now warns in the same orange as other sources that didn't answer, in plain words, without the raw error
 - The nav's account chip shows the account's initial when it has no avatar, and no longer lights up like a selected page on hover
 - On desktop the nav is an app bar on the same edge as the page: routes left, search in the middle, account and settings right, with less space above the page
+- Text across the app uses one consistent set of sizes and two weights, instead of the near-duplicates that had crept in
 
 ### Fixed
 

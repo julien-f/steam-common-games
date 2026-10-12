@@ -1468,7 +1468,7 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
       <>
         <span
           class="panel-price-amount"
-          style={{ ...(rec() ? { color: rec()!.color } : {}), ...(rec()?.bold ? { 'font-weight': 700 } : {}) }}
+          style={{ ...(rec() ? { color: rec()!.color } : {}), ...(rec()?.bold ? { 'font-weight': 600 } : {}) }}
         >
           {formatMoney(d.bestDealPrice, d.priceCurrency)}
           {rec() ? ' ' + rec()!.icon : ''}

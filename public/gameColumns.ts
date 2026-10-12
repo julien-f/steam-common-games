@@ -183,7 +183,7 @@ export function renderNameCell(v: unknown, row: Row): Node {
   const wrap = document.createElement('span');
   wrap.className = 'game-name-cell';
   wrap.style.color = tier.color;
-  if (tier.bold) wrap.style.fontWeight = '700';
+  if (tier.bold) wrap.style.fontWeight = '600';
   wrap.appendChild(document.createTextNode(nameText));
   if (row.inLibrary) {
     const b = document.createElement('span');
@@ -520,7 +520,7 @@ export function renderBestDeal(v: unknown, row: Row): Node {
   const span = document.createElement('span');
   if (rec) {
     span.style.color = rec.color;
-    if (rec.bold) span.style.fontWeight = '700';
+    if (rec.bold) span.style.fontWeight = '600';
   }
   span.append(renderPrice(v, row));
   if (rec) span.append(' ' + rec.icon);
@@ -591,7 +591,7 @@ function renderTierLabel(tiers: readonly StatusTier[]): (v: unknown) => Node {
     if (!tier?.color) return document.createTextNode(sv);
     const span = document.createElement('span');
     span.style.color = tier.color;
-    if (tier.bold) span.style.fontWeight = '700';
+    if (tier.bold) span.style.fontWeight = '600';
     span.textContent = sv + tier.icon!;
     return span;
   };

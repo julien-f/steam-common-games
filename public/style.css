@@ -20,6 +20,14 @@
   --accent2: #66c0f4;
   --border: #3d5068;
   --r: 6px;
+  /* The type scale (docs/dev/ui-guidelines.md); px sizes are left only to icon glyphs, 22px and up. */
+  --fs-label: 11px;
+  --fs-meta: 12px;
+  --fs-ui: 13px;
+  --fs-body: 14px;
+  --fs-title: 16px;
+  --fs-page: 18px;
+  --fs-figure: 20px;
   /* The side panel's width, and the gutter `.app-shell.panel-open` reserves for it — one
      value, since the panel is `position: fixed` and no longer measures the layout itself. */
   --panel-w: 380px;
@@ -56,7 +64,7 @@ body {
     system-ui,
     -apple-system,
     sans-serif;
-  font-size: 14px;
+  font-size: var(--fs-body);
   min-height: 100vh;
 }
 
@@ -86,7 +94,7 @@ textarea {
 .site-nav-link {
   padding: 6px 14px;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text1);
   text-decoration: none;
   border: 1px solid transparent;
@@ -126,7 +134,7 @@ textarea {
 .site-nav-prefs-btn {
   cursor: pointer;
   list-style: none;
-  font-size: 16px;
+  font-size: var(--fs-title);
   line-height: 1;
 }
 .site-nav-prefs-btn::-webkit-details-marker {
@@ -163,7 +171,7 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text1);
 }
 .site-nav-prefs-row select {
@@ -173,7 +181,7 @@ textarea {
   color: var(--text0);
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
 }
 
 /* Account chip (AccountChip.tsx) — who the app is currently showing, plus that account's
@@ -216,7 +224,7 @@ textarea {
   justify-content: center;
   background: var(--bg3);
   color: var(--text0);
-  font-size: 11px;
+  font-size: var(--fs-label);
   font-weight: 600;
 }
 /* An identity, not a route: no pill fill, so it never reads as a second selected page. */
@@ -231,7 +239,7 @@ textarea {
   white-space: nowrap;
 }
 .account-chip-explore {
-  font-size: 11px;
+  font-size: var(--fs-label);
   flex-shrink: 0;
 }
 .account-chip-panel {
@@ -241,7 +249,7 @@ textarea {
   gap: 8px;
 }
 .account-chip-note {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text1);
   line-height: 1.5;
 }
@@ -256,21 +264,21 @@ textarea {
   border: none;
   cursor: pointer;
   color: var(--accent2);
-  font-size: 12px;
+  font-size: var(--fs-meta);
   text-align: left;
 }
 .account-chip-id {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--fs-meta);
 }
 .account-chip-id code {
   color: var(--text1);
   overflow-wrap: anywhere;
 }
 .account-chip-section {
-  font-size: 11px;
+  font-size: var(--fs-label);
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--text1);
@@ -298,7 +306,7 @@ textarea {
   border-radius: 4px;
   cursor: pointer;
   color: var(--text0);
-  font-size: 13px;
+  font-size: var(--fs-ui);
   text-align: left;
 }
 .account-chip-recent:hover {
@@ -313,7 +321,7 @@ textarea {
 .account-chip-panel-link {
   color: var(--accent2);
   text-decoration: none;
-  font-size: 13px;
+  font-size: var(--fs-ui);
 }
 .account-chip-panel-link:hover {
   text-decoration: underline;
@@ -341,7 +349,7 @@ header h1 {
 header p {
   color: var(--text1);
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
 }
 
 /* Card */
@@ -353,7 +361,7 @@ header p {
   margin-bottom: 18px;
 }
 .card h2 {
-  font-size: 13px;
+  font-size: var(--fs-ui);
   font-weight: 600;
   color: var(--text1);
   text-transform: uppercase;
@@ -361,7 +369,7 @@ header p {
   margin-bottom: 6px;
 }
 .card-subtitle {
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text1);
   margin-bottom: 14px;
   line-height: 1.5;
@@ -372,8 +380,8 @@ header p {
   border: none;
   border-radius: var(--r);
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--fs-ui);
+  font-weight: 400;
   transition:
     background 0.15s,
     color 0.15s;
@@ -412,7 +420,7 @@ header p {
   border: 1px solid var(--border);
   border-radius: var(--r);
   color: var(--text1);
-  font-size: 12px;
+  font-size: var(--fs-meta);
   line-height: 1.4;
   cursor: pointer;
   transition:
@@ -561,16 +569,16 @@ tbody td {
   display: block;
 }
 .account-name {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--fs-ui);
+  font-weight: 400;
 }
 .account-count {
-  font-size: 11px;
+  font-size: var(--fs-label);
   color: var(--text1);
 }
 .account-private {
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--fs-label);
+  font-weight: 400;
   padding: 2px 7px;
   border-radius: 999px;
   background: rgba(228, 168, 46, 0.1);
@@ -580,7 +588,7 @@ tbody td {
 
 .recents-clear {
   position: relative;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text1);
   background: none;
   border: none;
@@ -644,7 +652,7 @@ tbody td {
   border: 1px solid var(--border);
   border-radius: var(--r);
   color: var(--text0);
-  font-size: 14px;
+  font-size: var(--fs-body);
   outline: none;
   transition: border-color 0.15s;
 }
@@ -662,7 +670,7 @@ tbody td {
 }
 .search-page-input > input {
   padding: 13px 16px;
-  font-size: 16px;
+  font-size: var(--fs-title);
 }
 .game-search-results {
   position: absolute;
@@ -687,7 +695,7 @@ tbody td {
   border: none;
   cursor: pointer;
   color: var(--text0);
-  font-size: 13px;
+  font-size: var(--fs-ui);
   text-align: left;
 }
 .game-search-result:hover,
@@ -720,14 +728,14 @@ tbody td {
    listbox's roving ArrowUp/ArrowDown selection, as its last virtual index. */
 .game-search-section {
   padding: 6px 10px 4px;
-  font-size: 11px;
+  font-size: var(--fs-label);
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--text1);
 }
 .game-search-empty {
   padding: 10px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text1);
 }
 .game-search-more {
@@ -738,7 +746,7 @@ tbody td {
   border-top: 1px solid var(--border);
   cursor: pointer;
   color: var(--accent2);
-  font-size: 12px;
+  font-size: var(--fs-meta);
   text-align: left;
   /* Sticky, and opaque rather than transparent: the recents list can be taller than the
      dropdown's own max-height, and a "see all" row scrolled out of sight is one nobody finds. */
@@ -752,7 +760,7 @@ tbody td {
 }
 .game-search-badge {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: var(--fs-meta);
 }
 .game-search-badge.owned {
   color: #f1c40f;
@@ -772,7 +780,7 @@ tbody td {
 .name-status-badge {
   margin-left: 4px;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--fs-meta);
 }
 .name-status-badge.owned {
   color: #f1c40f;
@@ -795,7 +803,7 @@ tbody td {
   border: 1px solid var(--border);
   border-radius: var(--r);
   color: var(--text0);
-  font-size: 13px;
+  font-size: var(--fs-ui);
   outline: none;
   transition: border-color 0.15s;
 }
@@ -821,7 +829,7 @@ tbody td {
   counter-increment: step;
   position: relative;
   padding-left: 32px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text1);
   line-height: 1.5;
 }
@@ -836,8 +844,8 @@ tbody td {
   background: var(--bg2);
   border: 1px solid var(--border);
   color: var(--accent2);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--fs-label);
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -848,7 +856,7 @@ tbody td {
 /* Sized as the table library's .dt-btn, so the two sit in one toolbar at one height. */
 .btn-sm {
   padding: 5px 10px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   line-height: 1;
 }
 
@@ -925,7 +933,7 @@ tbody td {
   border: 1px solid var(--border);
   color: var(--text1);
   cursor: pointer;
-  font-size: 16px;
+  font-size: var(--fs-title);
   line-height: 1;
   display: flex;
   align-items: center;
@@ -1004,7 +1012,7 @@ tbody td {
     margin-bottom: 20px;
   }
   header h1 {
-    font-size: 20px;
+    font-size: var(--fs-figure);
   }
   .card {
     padding: 14px 16px;
@@ -1021,7 +1029,7 @@ tbody td {
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.5);
   color: var(--text0);
-  font-size: 18px;
+  font-size: var(--fs-page);
   line-height: 28px;
   text-align: center;
   cursor: pointer;
@@ -1043,7 +1051,7 @@ tbody td {
     width: 36px;
     height: 36px;
     line-height: 36px;
-    font-size: 20px;
+    font-size: var(--fs-figure);
   }
 }
 
@@ -1259,7 +1267,7 @@ tbody td {
   height: 32px;
   border-radius: var(--r);
   cursor: pointer;
-  font-size: 18px;
+  font-size: var(--fs-page);
   line-height: 1;
   display: flex;
   align-items: center;
@@ -1290,7 +1298,7 @@ tbody td {
   }
 }
 .panel-nav-reroll {
-  font-size: 14px;
+  font-size: var(--fs-body);
   margin-left: 4px;
   position: relative;
 }
@@ -1300,7 +1308,7 @@ tbody td {
   position: absolute;
   bottom: -1px;
   right: 1px;
-  font-size: 8px;
+  font-size: var(--fs-label);
   line-height: 1.3;
   color: var(--text1);
   background: var(--bg3);
@@ -1308,7 +1316,7 @@ tbody td {
   padding: 0 2px;
 }
 .panel-nav-pos {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text1);
   user-select: none;
   flex: 1;
@@ -1368,7 +1376,7 @@ tbody td {
   border: none;
   padding: 0;
   margin-bottom: 8px;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 600;
   color: var(--text1);
   cursor: pointer;
@@ -1398,7 +1406,7 @@ tbody td {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text1);
-  font-size: 11px;
+  font-size: var(--fs-label);
   font-weight: 600;
   padding: 4px 10px;
   min-height: 24px; /* the touch-target minimum (ui-guidelines.md) */
@@ -1473,7 +1481,7 @@ tbody td {
   gap: 8px;
   padding: 8px 12px;
   color: var(--text0);
-  font-size: 13px;
+  font-size: var(--fs-ui);
   text-decoration: none;
   white-space: nowrap;
 }
@@ -1489,7 +1497,7 @@ tbody td {
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text1);
-  font-size: 13px;
+  font-size: var(--fs-ui);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1505,8 +1513,8 @@ tbody td {
 }
 
 .panel-title {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: var(--fs-title);
+  font-weight: 600;
   color: var(--text0);
   line-height: 1.35;
 }
@@ -1544,7 +1552,7 @@ tbody td {
   height: 26px;
   border-radius: var(--r);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--fs-body);
   line-height: 1;
   display: flex;
   align-items: center;
@@ -1572,7 +1580,7 @@ tbody td {
   gap: 5px;
 }
 .panel-refresh-age {
-  font-size: 11px;
+  font-size: var(--fs-label);
   white-space: nowrap;
 }
 .panel-refresh-icon.is-refreshing {
@@ -1586,7 +1594,7 @@ tbody td {
 }
 
 .panel-release {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text1);
 }
 
@@ -1620,8 +1628,8 @@ tbody td {
   border-radius: var(--r);
   background: var(--accent);
   color: #0b1620;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--fs-ui);
+  font-weight: 600;
   text-decoration: none;
   transition: background 0.15s;
 }
@@ -1631,7 +1639,7 @@ tbody td {
   outline: none;
 }
 .panel-demo-banner-icon {
-  font-size: 15px;
+  font-size: var(--fs-title);
 }
 
 /* "In your library" / "On your wishlist" status — sits right under the title, inside the
@@ -1652,8 +1660,8 @@ tbody td {
   gap: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--fs-label);
+  font-weight: 600;
   text-decoration: none;
 }
 .panel-ownership-badge.owned {
@@ -1669,7 +1677,7 @@ tbody td {
    is prose meant to be read, not secondary metadata. Sits directly under the glance grid,
    ahead of the tag cloud, so it reads as "what this game is" before "how it's tagged". */
 .panel-desc {
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text0);
   line-height: 1.5;
   margin-bottom: 18px;
@@ -1682,7 +1690,7 @@ tbody td {
   margin-bottom: 12px;
 }
 .panel-section-title {
-  font-size: 10px;
+  font-size: var(--fs-label);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1709,7 +1717,7 @@ tbody td {
   border-bottom-color: var(--accent2);
 }
 .panel-no-data {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text1);
 }
 .panel-no-data a {
@@ -1734,8 +1742,8 @@ tbody td {
   display: inline-block;
   padding: 4px 12px;
   border-radius: 999px;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--fs-ui);
+  font-weight: 600;
   color: #fff;
   line-height: 1.4;
 }
@@ -1786,13 +1794,13 @@ a.panel-glance-chip:focus-visible {
   min-width: 0;
 }
 .panel-glance-num {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: var(--fs-title);
+  font-weight: 600;
   color: var(--text0);
   font-variant-numeric: tabular-nums;
 }
 .panel-glance-val {
-  font-size: 11px;
+  font-size: var(--fs-label);
   color: var(--text1);
   white-space: nowrap;
   overflow: hidden;
@@ -1818,7 +1826,7 @@ a.panel-glance-chip:focus-visible {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
 }
 a.panel-price-line--link {
   text-decoration: none;
@@ -1842,8 +1850,8 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   color: var(--accent2);
 }
 .panel-price-amount {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: var(--fs-title);
+  font-weight: 600;
   color: var(--text0);
   font-variant-numeric: tabular-nums;
 }
@@ -1867,7 +1875,7 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   margin-top: 4px;
 }
 .panel-price-low {
@@ -1894,14 +1902,14 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   color: var(--accent2);
 }
 .panel-bundle-title {
-  font-size: 13px;
+  font-size: var(--fs-ui);
   font-weight: 600;
 }
 .panel-bundle-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text1);
   padding-left: 1.4em;
 }
@@ -1913,12 +1921,12 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   row-gap: 14px;
 }
 .panel-hltb-label {
-  font-size: 11px;
+  font-size: var(--fs-label);
   color: var(--text1);
   margin-bottom: 3px;
 }
 .panel-hltb-val {
-  font-size: 20px;
+  font-size: var(--fs-figure);
   font-weight: 600;
   color: var(--text0);
 }
@@ -1944,15 +1952,15 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   border-bottom: none;
 }
 .panel-news-title {
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   color: var(--text0);
-  font-weight: 500;
+  font-weight: 400;
 }
 .panel-news-item:hover .panel-news-title {
   color: var(--accent2);
 }
 .panel-news-meta {
-  font-size: 11px;
+  font-size: var(--fs-label);
   color: var(--text1);
 }
 
@@ -1983,9 +1991,9 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   background: var(--bg1);
 }
 .panel-dlc-name {
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   color: var(--text0);
-  font-weight: 500;
+  font-weight: 400;
 }
 .panel-dlc-item:hover .panel-dlc-name {
   color: var(--accent2);
@@ -1994,7 +2002,7 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
    entries already resolved render as normal rows above this, one line per still-pending one. */
 .panel-dlc-loading-more {
   padding: 8px 10px;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text1);
 }
 /* "Show N more" under the first DLC_PAGE entries (see DlcSection in panel.tsx). */
@@ -2004,7 +2012,7 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   border: none;
   background: none;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--accent2);
   text-align: left;
   cursor: pointer;
@@ -2065,15 +2073,15 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
 }
 .panel-achievements-chevron {
   color: var(--accent2);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--fs-body);
+  font-weight: 600;
   flex-shrink: 0;
 }
 /* Fills the numeral's slot for a card with no number to show (HLTB, News) — same
    font-size as panel-glance-num so the row's height/alignment doesn't shift depending on
    whether a card happens to have a numeral or an icon there. */
 .panel-achievements-icon {
-  font-size: 17px;
+  font-size: var(--fs-title);
   line-height: 1;
   flex-shrink: 0;
 }
@@ -2100,7 +2108,7 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text1);
-  font-size: 11px;
+  font-size: var(--fs-label);
   font-weight: 600;
   padding: 3px 10px;
   min-height: 24px; /* the touch-target minimum (ui-guidelines.md) */
@@ -2162,19 +2170,19 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   min-width: 0;
 }
 .panel-achievement-name {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 600;
   color: var(--text0);
 }
 .panel-achievement-desc {
-  font-size: 11px;
+  font-size: var(--fs-label);
   color: var(--text1);
   margin-top: 1px;
 }
 /* Rarity (community-wide unlock %) — kept neutral/muted, not color-coded like the ratings
    elsewhere in the panel, since a low % isn't a "bad" value the way a low score is. */
 .panel-achievement-rarity {
-  font-size: 11px;
+  font-size: var(--fs-label);
   color: var(--text1);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
@@ -2193,7 +2201,7 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   background: rgba(61, 80, 104, 0.5);
   border: 1px solid var(--border);
   color: var(--text1);
-  font-size: 11px;
+  font-size: var(--fs-label);
   padding: 3px 8px;
   border-radius: 3px;
 }
@@ -2230,7 +2238,7 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   flex-wrap: wrap;
   gap: 8px 14px;
   margin-top: 8px;
-  font-size: 10.5px;
+  font-size: var(--fs-label);
   color: var(--text1);
 }
 .panel-tag-legend-item {
@@ -2255,12 +2263,12 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
 }
 .panel-owner-name {
   color: var(--text0);
-  font-weight: 500;
-  font-size: 12.5px;
+  font-weight: 400;
+  font-size: var(--fs-meta);
 }
 .panel-owner-lastplayed {
   color: var(--text1);
-  font-size: 11px;
+  font-size: var(--fs-label);
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -2279,7 +2287,7 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
 .panel-owner-playtime {
   display: block;
   margin-top: 3px;
-  font-size: 11px;
+  font-size: var(--fs-label);
   color: var(--text1);
 }
 .panel-section-subtitle {
@@ -2392,7 +2400,7 @@ body.lb-open {
 .lb-vc-time,
 .lb-vc-dur {
   color: rgba(255, 255, 255, 0.85);
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
   user-select: none;
@@ -2483,7 +2491,7 @@ body.lb-open {
   justify-content: center;
   gap: 8px;
   color: #fff;
-  font-size: 14px;
+  font-size: var(--fs-body);
   font-weight: 600;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
   /* A fixed width with the name filling it, so ↑/↓ stay put from game to game. */
@@ -2506,7 +2514,7 @@ body.lb-open {
   flex: none;
   width: 28px;
   height: 28px;
-  font-size: 15px;
+  font-size: var(--fs-title);
 }
 .lb-toolbar-row {
   display: contents; /* one row with the caption; a phone stacks them again */
@@ -2562,7 +2570,7 @@ body.lb-open {
 .lb-counter,
 .lb-caption-pos {
   color: rgba(255, 255, 255, 0.7);
-  font-size: 13px;
+  font-size: var(--fs-ui);
   font-weight: 400; /* the caption around it is 600 — the counter is not part of the title */
   white-space: nowrap;
   flex: none;
@@ -2653,7 +2661,7 @@ body.lb-open {
 }
 .lb-error-msg {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--fs-body);
 }
 .lb-error-retry {
   background: rgba(26, 159, 255, 0.25);
@@ -2662,7 +2670,7 @@ body.lb-open {
   padding: 6px 16px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--fs-ui);
 }
 .lb-error-retry:hover {
   background: rgba(26, 159, 255, 0.5);
@@ -2676,7 +2684,7 @@ body.lb-open {
   color: #fff;
   padding: 10px 16px;
   border-radius: 24px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   font-weight: 600;
   opacity: 0;
   pointer-events: none;
@@ -2835,7 +2843,7 @@ body.lb-open {
   align-items: center;
   justify-content: center;
   gap: 14px;
-  font-size: 11px;
+  font-size: var(--fs-label);
   color: var(--text1);
 }
 .app-footer-link {
@@ -2850,7 +2858,7 @@ body.lb-open {
 /* Keyboard shortcuts modal */
 kbd {
   font-family: inherit;
-  font-size: 11px;
+  font-size: var(--fs-label);
   background: var(--bg2);
   border: 1px solid var(--border);
   border-bottom-width: 2px;
@@ -2908,7 +2916,7 @@ kbd {
   border-bottom: 1px solid var(--border);
 }
 .shortcuts-title {
-  font-size: 13px;
+  font-size: var(--fs-ui);
   font-weight: 600;
   color: var(--text0);
   letter-spacing: 0.2px;
@@ -2917,7 +2925,7 @@ kbd {
   background: none;
   border: none;
   color: var(--text1);
-  font-size: 20px;
+  font-size: var(--fs-figure);
   line-height: 1;
   cursor: pointer;
   padding: 0 2px;
@@ -2933,7 +2941,7 @@ kbd {
   gap: 16px;
 }
 .shortcuts-section-title {
-  font-size: 10px;
+  font-size: var(--fs-label);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.6px;
@@ -2945,7 +2953,7 @@ kbd {
   align-items: center;
   gap: 6px;
   margin-bottom: 6px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text1);
 }
 .shortcuts-row:last-child {
@@ -2979,7 +2987,7 @@ kbd {
 
 .list-status,
 .bundles-status {
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text1);
   margin-bottom: 10px;
 }
@@ -3002,7 +3010,7 @@ kbd {
   cursor: help;
 }
 .price-status {
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text1);
   margin-bottom: 10px;
 }
@@ -3028,7 +3036,7 @@ kbd {
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.35);
 }
 .selection-count {
-  font-size: 13px;
+  font-size: var(--fs-ui);
   font-weight: 600;
   color: var(--text0);
 }
@@ -3038,7 +3046,7 @@ kbd {
   line-height: 1.2;
 }
 .tier-package small {
-  font-size: 11px;
+  font-size: var(--fs-label);
   color: var(--text1);
 }
 .selection-pick-cost {
@@ -3047,16 +3055,16 @@ kbd {
   line-height: 1.15;
 }
 .selection-pick-total {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: var(--fs-figure);
+  font-weight: 600;
   color: var(--accent2);
 }
 .selection-pick-detail {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text1);
 }
 .selection-pick-savings {
-  font-size: 14px;
+  font-size: var(--fs-body);
   font-weight: 600;
 }
 .selection-fanatical {
@@ -3065,7 +3073,7 @@ kbd {
   gap: 8px;
 }
 .selection-fanatical-bookmarklet {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--accent2);
   border: 1px dashed var(--border);
   border-radius: var(--r);
@@ -3074,7 +3082,7 @@ kbd {
   text-decoration: none;
 }
 .selection-fanatical-by-hand {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text1);
   cursor: help;
 }
@@ -3084,7 +3092,7 @@ kbd {
   border: 1px solid var(--border);
   border-radius: var(--r);
   padding: 6px 10px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
 }
 .selection-toolbar button {
   padding: 6px 12px;
@@ -3092,7 +3100,7 @@ kbd {
   border-radius: var(--r);
   background: transparent;
   color: var(--text0);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   cursor: pointer;
 }
 .selection-toolbar button:hover:not(:disabled) {
@@ -3114,7 +3122,7 @@ kbd {
   align-items: center;
   max-width: calc(100vw - 32px);
   padding: 10px 16px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text0);
   background: var(--bg1);
   border: 1px solid var(--border);
@@ -3135,7 +3143,7 @@ kbd {
   border: 1px solid var(--border);
   border-radius: var(--r);
   padding: 6px 10px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
 }
 
 /* Share view/Default view, in the table toolbar's own line (the library's `toolbarEnd` slot). */
@@ -3159,7 +3167,7 @@ kbd {
   border: 1px solid var(--border);
   border-radius: var(--r);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text0);
 }
 .list-view-actions .btn-icon,
@@ -3203,7 +3211,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--accent2);
   margin-bottom: 10px;
 }
@@ -3259,8 +3267,8 @@ kbd {
   flex-wrap: wrap;
 }
 .compare-slot-label {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--fs-meta);
+  font-weight: 400;
   color: var(--text1);
   min-width: 62px;
 }
@@ -3271,7 +3279,7 @@ kbd {
   border-radius: var(--r);
   padding: 8px 10px;
   color: var(--text0);
-  font-size: 13px;
+  font-size: var(--fs-ui);
 }
 .compare-slot input[type='text']:focus {
   border-color: var(--accent);
@@ -3302,7 +3310,7 @@ kbd {
   outline: none;
   padding: 3px 0;
   color: var(--text0);
-  font-size: 13px;
+  font-size: var(--fs-ui);
 }
 .compare-failures {
   background: var(--bg1);
@@ -3310,7 +3318,7 @@ kbd {
   border-radius: var(--r);
   padding: 12px 16px;
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
 }
 .compare-failures p {
   margin-bottom: 8px;
@@ -3333,7 +3341,7 @@ kbd {
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 2px 4px 2px 4px;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text0);
 }
 .compare-token .account-avatar {
@@ -3351,7 +3359,7 @@ kbd {
   background: transparent;
   border: none;
   color: var(--text1);
-  font-size: 14px;
+  font-size: var(--fs-body);
   line-height: 1;
   padding: 0 3px;
   cursor: pointer;
@@ -3379,7 +3387,7 @@ kbd {
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text0);
   cursor: pointer;
 }
@@ -3394,7 +3402,7 @@ kbd {
   margin-left: auto;
 }
 .compare-form-hint {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text1);
 }
 
@@ -3433,7 +3441,7 @@ kbd {
   display: none;
 }
 .list-hero-outlink {
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text1);
   text-decoration: none;
   border-bottom: 1px solid transparent;
@@ -3461,7 +3469,7 @@ kbd {
   border-radius: var(--r);
   background: transparent;
   color: var(--text0);
-  font-size: 14px;
+  font-size: var(--fs-body);
   cursor: pointer;
 }
 .list-hero-nav button:hover:not(:disabled) {
@@ -3476,8 +3484,8 @@ kbd {
    explicit margin/size reset over the browser's own h1 metrics. */
 .list-hero-title {
   margin: 0;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: var(--fs-page);
+  font-weight: 600;
   color: var(--text0);
 }
 
@@ -3489,8 +3497,8 @@ kbd {
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--bg2);
-  font-size: 11.5px;
-  font-weight: 500;
+  font-size: var(--fs-meta);
+  font-weight: 400;
   color: var(--text1);
   white-space: nowrap;
 }
@@ -3498,7 +3506,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text0);
 }
 
@@ -3530,18 +3538,18 @@ kbd {
   gap: 2px;
 }
 .list-stat-label {
-  font-size: 10.5px;
+  font-size: var(--fs-label);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--stat-label);
 }
 .list-stat-value {
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--text0);
 }
 .list-stat-sub {
-  font-size: 11px;
+  font-size: var(--fs-label);
   color: var(--text1);
 }
 /* A tile that is also a control (`/bundles`' "Ending soon" filter toggle). Button chrome reset so
@@ -3566,12 +3574,12 @@ kbd {
    itself rather than the shared label. */
 .list-stat-value.list-stat-btn {
   position: relative;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--text0);
 }
 .list-stat-sub.list-stat-btn {
   position: relative;
-  font-size: 11px;
+  font-size: var(--fs-label);
   color: var(--text1);
 }
 /* 24 px tap areas without moving the tile: the value's grows up (over the label), the sub-line's
@@ -3597,7 +3605,7 @@ kbd {
   color: var(--accent2);
 }
 .list-stat-icon {
-  font-size: 11px;
+  font-size: var(--fs-label);
   color: var(--text1);
 }
 .list-stat-btn:hover .list-stat-icon,
@@ -3630,7 +3638,7 @@ kbd {
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--bg2);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   color: var(--text0);
   white-space: nowrap;
 }
@@ -3678,7 +3686,7 @@ kbd {
    than folded in among the tiles. */
 .list-hero-note {
   margin-top: 12px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   font-style: italic;
   color: var(--text1);
 }
@@ -3719,7 +3727,7 @@ kbd {
   color: #e4c46e;
 }
 .list-formula-count {
-  font-size: 11px;
+  font-size: var(--fs-label);
   color: var(--text1);
 }
 .list-formula-op {
@@ -3733,7 +3741,7 @@ kbd {
   margin: 6px 0 0;
   padding: 0;
   font-style: normal;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: #e4c46e;
 }
 
@@ -3747,7 +3755,7 @@ kbd {
   border: none;
   padding: 0;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text1);
   cursor: pointer;
 }
@@ -3766,7 +3774,7 @@ kbd {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
 }
 .unresolved-list a {
   color: var(--text0);
@@ -3776,7 +3784,7 @@ kbd {
   color: var(--accent2);
 }
 .unresolved-type {
-  font-size: 11px;
+  font-size: var(--fs-label);
   color: var(--text1);
   text-transform: capitalize;
 }
@@ -3791,7 +3799,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text1);
   cursor: pointer;
 }
@@ -3826,8 +3834,8 @@ kbd {
   display: inline-block;
   padding: 1px 8px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--fs-meta);
+  font-weight: 400;
   white-space: nowrap;
   color: hsl(var(--shop-hue) 60% 72%);
   background: hsl(var(--shop-hue) 60% 72% / 0.12);
@@ -3843,7 +3851,7 @@ kbd {
   line-height: 1.35;
 }
 .bundle-datetime-time {
-  font-size: 11px;
+  font-size: var(--fs-label);
   color: var(--text1);
 }
 
@@ -3886,7 +3894,7 @@ kbd {
   gap: 28px;
 }
 .home-route h2 {
-  font-size: 13px;
+  font-size: var(--fs-ui);
   font-weight: 600;
   color: var(--text1);
   text-transform: uppercase;
@@ -3894,7 +3902,7 @@ kbd {
   margin-bottom: 12px;
 }
 .home-route h3 {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 600;
   color: var(--text1);
   text-transform: uppercase;
@@ -3923,19 +3931,19 @@ kbd {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  font-size: 15px;
+  font-size: var(--fs-title);
   font-weight: 600;
   color: var(--text0);
 }
 .account-counts {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text1);
   margin-top: 2px;
 }
 /* Steam's optional "real name" field, next to the persona name it's never a replacement for
    (plenty of accounts leave it unset) — muted and parenthetical, same weight as .account-count. */
 .account-realname {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 400;
   color: var(--text1);
 }
@@ -3948,7 +3956,7 @@ kbd {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  font-size: 11px;
+  font-size: var(--fs-label);
   color: var(--text2);
   margin-top: 4px;
 }
@@ -4021,7 +4029,7 @@ kbd {
 }
 .account-friends summary {
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 600;
   color: var(--text1);
   text-transform: uppercase;
@@ -4032,7 +4040,7 @@ kbd {
   margin-bottom: 8px;
 }
 .account-friends-note {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text1);
   margin: 0 0 8px;
 }
@@ -4044,7 +4052,7 @@ kbd {
   border: 0;
   padding: 0;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text1);
   cursor: pointer;
   transition: color 0.15s;
@@ -4057,7 +4065,7 @@ kbd {
   cursor: default;
 }
 .account-friends-refresh-icon {
-  font-size: 11px;
+  font-size: var(--fs-label);
 }
 .account-friends-list {
   list-style: none;
@@ -4079,8 +4087,8 @@ kbd {
   margin-left: auto;
 }
 .account-friend-mutual {
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--fs-label);
+  font-weight: 400;
   padding: 2px 7px;
   border-radius: 999px;
   background: rgba(102, 192, 244, 0.1);
@@ -4101,7 +4109,7 @@ kbd {
   border-radius: var(--r);
   padding: 9px 12px;
   color: var(--text0);
-  font-size: 13px;
+  font-size: var(--fs-ui);
 }
 .home-account form input[type='text']:focus {
   border-color: var(--accent);
@@ -4113,7 +4121,7 @@ kbd {
   border-radius: var(--r);
   background: transparent;
   color: var(--text0);
-  font-size: 13px;
+  font-size: var(--fs-ui);
   cursor: pointer;
 }
 .home-account form button[type='submit'] {
@@ -4138,7 +4146,7 @@ kbd {
   margin-bottom: 14px;
 }
 .account-override-status {
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   color: var(--text0);
   margin: 0;
 }
@@ -4152,7 +4160,7 @@ kbd {
   border-radius: var(--r);
   background: transparent;
   color: var(--text0);
-  font-size: 12px;
+  font-size: var(--fs-meta);
   cursor: pointer;
 }
 .account-override-adopt:hover {
@@ -4162,7 +4170,7 @@ kbd {
 
 .error {
   color: #ff8888;
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   margin: 6px 0;
 }
 
@@ -4189,7 +4197,7 @@ kbd {
   background: none;
   border: none;
   color: var(--text0);
-  font-size: 13px;
+  font-size: var(--fs-ui);
   cursor: pointer;
   padding: 2px 0;
 }
@@ -4202,7 +4210,7 @@ kbd {
   border: 1px solid var(--border);
   border-radius: var(--r);
   color: var(--text1);
-  font-size: 11px;
+  font-size: var(--fs-label);
   padding: 4px 8px;
   cursor: pointer;
   white-space: nowrap;
@@ -4226,8 +4234,8 @@ kbd {
   padding: 14px;
   color: var(--text0);
   text-decoration: none;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--fs-ui);
+  font-weight: 400;
   transition:
     border-color 0.15s,
     color 0.15s;
@@ -4255,7 +4263,7 @@ kbd {
   border-radius: var(--r);
   background: transparent;
   color: var(--text0);
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   cursor: pointer;
 }
 .tree-actions button:hover {
@@ -4280,7 +4288,7 @@ kbd {
   border-radius: var(--r);
   padding: 8px 10px;
   color: var(--text0);
-  font-size: 13px;
+  font-size: var(--fs-ui);
 }
 .combine-form input[type='text']:focus,
 .combine-form select:focus {
@@ -4288,7 +4296,7 @@ kbd {
   outline: none;
 }
 .combine-form p {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text1);
 }
 /* A label the app derived rather than one someone typed (an unnamed dynamic list's formula) —
@@ -4309,7 +4317,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text0);
   cursor: pointer;
 }
@@ -4323,7 +4331,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text0);
 }
 .combine-source-index {
@@ -4338,7 +4346,7 @@ kbd {
   border-radius: var(--r);
   background: transparent;
   color: var(--text1);
-  font-size: 11px;
+  font-size: var(--fs-label);
   cursor: pointer;
 }
 .combine-sources-ordered button:hover:not(:disabled) {
@@ -4360,8 +4368,8 @@ kbd {
   border-radius: var(--r);
   background: var(--accent);
   color: #fff;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--fs-ui);
+  font-weight: 400;
   cursor: pointer;
 }
 .combine-form button[type='button'] {
@@ -4370,7 +4378,7 @@ kbd {
   border-radius: var(--r);
   background: transparent;
   color: var(--text1);
-  font-size: 13px;
+  font-size: var(--fs-ui);
   cursor: pointer;
 }
 .combine-form button[type='button']:hover {
@@ -4400,13 +4408,13 @@ kbd {
   border: 1px solid var(--border);
   border-radius: var(--r);
   padding: 3px 6px;
-  font-size: 11.5px;
+  font-size: var(--fs-meta);
 }
 .list-tree a {
   flex: 1;
   color: var(--text0);
   text-decoration: none;
-  font-size: 13px;
+  font-size: var(--fs-ui);
 }
 .list-tree a:hover {
   color: var(--accent2);
@@ -4422,14 +4430,14 @@ kbd {
 .list-tree span {
   flex: 1;
   color: var(--text0);
-  font-size: 13px;
+  font-size: var(--fs-ui);
 }
 .list-tree button {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--r);
   color: var(--text1);
-  font-size: 11px;
+  font-size: var(--fs-label);
   padding: 3px 8px;
   cursor: pointer;
   white-space: nowrap;
@@ -4466,7 +4474,7 @@ kbd {
   flex-wrap: wrap;
 }
 .rank-header h1 {
-  font-size: 20px;
+  font-size: var(--fs-figure);
   color: var(--text0);
 }
 .rank-progress {
@@ -4474,7 +4482,7 @@ kbd {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text1);
 }
 .rank-progress progress {
@@ -4487,7 +4495,7 @@ kbd {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   background: var(--color-background-info);
   border: 1px solid var(--color-border-info);
   color: var(--color-text-info);
@@ -4495,7 +4503,7 @@ kbd {
   padding: 8px 12px;
 }
 .rank-question {
-  font-size: 18px;
+  font-size: var(--fs-page);
   text-align: center;
   color: var(--text0);
 }
@@ -4540,7 +4548,7 @@ kbd {
   background: var(--bg3);
 }
 .rank-card-name {
-  font-size: 16px;
+  font-size: var(--fs-title);
   font-weight: 600;
   padding: 0 12px;
 }
@@ -4554,7 +4562,7 @@ kbd {
 }
 .rank-card-facts,
 .rank-card-note {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text1);
   padding: 0 12px;
 }
@@ -4576,7 +4584,7 @@ kbd {
   justify-content: center;
   gap: 16px;
   flex-wrap: wrap;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text1);
 }
 /* Touch only: no keyboard to press them with. */
@@ -4604,7 +4612,7 @@ kbd {
     gap: 8px;
   }
   .rank-card-name {
-    font-size: 14px;
+    font-size: var(--fs-body);
   }
   .rank-card-actions {
     flex-direction: column;
@@ -4652,7 +4660,7 @@ kbd {
 }
 .account-chip-mine {
   color: var(--accent);
-  font-size: 12px;
+  font-size: var(--fs-meta);
 }
 
 /* Phone: the table's checkboxes at a usable tap size; the library draws them at the native 13 px. */
@@ -4678,7 +4686,7 @@ kbd {
   gap: 6px;
 }
 .rank-menu-heading {
-  font-size: 10.5px;
+  font-size: var(--fs-label);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -4694,7 +4702,7 @@ kbd {
   background: var(--bg1);
   color: var(--text0);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   text-align: left;
   cursor: pointer;
 }
@@ -4752,6 +4760,6 @@ kbd {
 /* A bundle source's games with no Steam listing, beside its count on the formula line. */
 .list-formula-leftout {
   margin-left: 6px;
-  font-size: 11.5px;
+  font-size: var(--fs-meta);
   color: var(--text1);
 }
