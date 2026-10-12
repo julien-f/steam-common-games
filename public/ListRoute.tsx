@@ -1734,19 +1734,24 @@ export default function ListRoute() {
   }
   // A user list keeps its own view (GameList.tableView); every other kind shares one pref key per kind.
   function viewStore(): ViewStore {
-    const list = userList();
-    return list
-      ? {
-          // tableView drops page/searchQuery, so a rebuild (e.g. after a removal) keeps them from here.
-          load: () => (lastUserListView?.id === list.id ? lastUserListView.view : (getList(list.id)?.tableView ?? {})),
-          save: (view) => {
-            lastUserListView = { id: list.id, view };
-            setListTableView(list.id, view);
-          },
-        }
-      : prefViewStore(viewPrefKey());
+    const id = userList()?.id;
+    return id ? userListViewStore(id) : prefViewStore(viewPrefKey());
   }
+  // tableView drops page/searchQuery, so a rebuild (e.g. after a removal) keeps them from here.
   let lastUserListView: { id: string; view: TableViewState } | null = null;
+  function userListViewStore(id: string): ViewStore {
+    return {
+      load: () => {
+        const stored = getList(id)?.tableView ?? {};
+        const last = lastUserListView?.id === id ? lastUserListView.view : null;
+        return last ? { ...stored, page: last.page, searchQuery: last.searchQuery } : stored;
+      },
+      save: (view) => {
+        lastUserListView = { id, view };
+        setListTableView(id, view);
+      },
+    };
+  }
   // "🔗 Share view"/"Default view" — see tableViewPrefs.ts for the share-on-demand-only reasoning
   // (a link written to the live URL goes stale the moment the table changes again).
   // A 🔗 Share view link's layout, on screen but not saved (see restoreTableView).
