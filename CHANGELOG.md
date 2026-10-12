@@ -186,6 +186,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - npm run format prints only warnings, not a line per file
 - a CSS check flags desktop media-query rules a later rule silently overrides, not only phone ones
 - npm run check flags new comments over one line in public/
+- batch.js merge replays a lane's closed and narrowed backlog items itself, and fix lanes review their own commits before reporting
 
 ## [0.10.0] - 2026-10-10
 

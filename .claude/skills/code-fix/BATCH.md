@@ -15,7 +15,7 @@ One `Agent` per lane, all in one message, `isolation: "worktree"`, with the lane
 
 ## 3. Merge each lane as it reports
 
-- `node scripts/batch.js merge <branch> <its closed items>`: merges `--no-ff --no-commit`, keeps both sides of CHANGELOG conflicts, resolves a backlog conflict (lanes closing their own items) to `main`'s side, and drops the closed items from the backlog. Narrow, rather than drop, an item the lane narrowed. Commit with `E2E_DEFER=1`, plus `SKIP_CHANGELOG=1` when `merge` says the lane added no entry (`Merge lane <X>: …`, body naming the items; the lane ran e2e before reporting), then `git worktree remove` and `git branch -d`.
+- `node scripts/batch.js merge <branch>`: merges `--no-ff --no-commit`, keeps both sides of CHANGELOG conflicts, and replays the lane's backlog edits on `main`'s side — lines it deleted are closed, lines it rewrote are narrowed — then prints which. Commit with `E2E_DEFER=1`, plus `SKIP_CHANGELOG=1` when `merge` says the lane added no entry (`Merge lane <X>: …`, body naming the items; the lane ran e2e before reporting), then `git worktree remove` and `git branch -d`.
 - Then launch a background `Agent` to run `/code-review <merge>^1..<merge>` and report its findings without fixing them; it replaces code-fix's step 4 for the batch. Review the conflicts you resolved by hand yourself: a lane's review can't see where two lanes meet.
 - Record what a lane reports as new problems, once verified, as backlog items.
 
@@ -28,14 +28,15 @@ One `Agent` per lane, all in one message, `isolation: "worktree"`, with the lane
 ```
 You fix <items> from <backlog file> in this repo, in your own git worktree (your working directory); commit on its branch, never touch main or push. The user approved the plan, which covers one commit per item.
 - First run `git merge --ff-only main`: worktrees branch from origin/main, which lags local main (pitfalls.md).
-- Follow .claude/skills/<code-fix|ux-fix>/SKILL.md steps 0–<last step before the look>, one commit per item, skip the dev:mock look and /code-review. Each fix commit deletes its own item's line from <backlog file> and touches no other item (narrow it instead when narrowed).
+- Follow .claude/skills/<code-fix|ux-fix>/SKILL.md steps 0–<last step before the look>, one commit per item, skip the dev:mock look. Each fix commit deletes its own item's line from <backlog file> and touches no other item; a narrowed item's line is rewritten to what's left, never deleted.
 - Blocked by something outside your items (a check red on main, a hook): SendMessage the lead with the cause and keep going on what you can; don't end the run.
 - A real fork (fix widens past the item, a dependency, more upstream traffic): skip the item and report it.
 - Stay in your worktree: no `git -C <main checkout>`, `--prefix` or `cwd` parameter; one plain command per Bash call, no `&&`/`;` chains or heredocs.
 - Commit messages: write them to <scratchpad>/msg-<lane>.txt (the scratchpad is shared, a generic name gets overwritten), then `E2E_DEFER=1 E2E_PORT=<2899x> git commit -F <file>`; prefix every e2e run with the same E2E_PORT.
 - Before each commit, run only your item's test file: the commit hook runs the unit suite, typecheck and lint, so don't run them by hand.
 - Before reporting, run `E2E_PORT=<2899x> npm run test:e2e -- --since=main` once (both widths; skipped when your commits touch no UI file) and fix what fails: re-run only the failures (`-- --last-failed`) until green, then the full suite once.
-Report: item → commit → how verified; anything skipped or narrowed and why; new problems found.
+- Then run `/code-review low <your first commit>^..HEAD` and fix each confirmed finding, test first, as a follow-up commit; the lead's review of the merge then only has to catch where lanes meet.
+Report: item → commit → how verified; review findings fixed and dropped (with why); anything skipped or narrowed and why; new problems found.
 ```
 
 Give each lane its own `E2E_PORT` (28993 up); the lead keeps the default.

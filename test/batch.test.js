@@ -10,6 +10,8 @@ const {
   laneStatus,
   unionConflicts,
   closeItems,
+  laneBacklogChanges,
+  applyLaneChanges,
   mergeHint,
 } = require('../scripts/batch');
 
@@ -159,4 +161,22 @@ test('mergeHint: a merge changing app code without a CHANGELOG entry says to ski
   assert.match(mergeHint(['lib/metrics.js', 'test/metrics.test.js']), /SKIP_CHANGELOG=1/);
   assert.equal(mergeHint(['lib/metrics.js', 'CHANGELOG.md']), '');
   assert.equal(mergeHint(['docs/dev/data.md']), '');
+});
+
+test('laneBacklogChanges: a deleted line is closed, a rewritten one narrowed, the rest untouched', () => {
+  const base = '## A\n\n- **U1 · minor · S** — a.\n- **U2 · minor · S** — b.\n- **U3 · minor · S** — c.\n';
+  const branch = '## A\n\n- **U2 · polish · S** — b, what is left.\n- **U3 · minor · S** — c.\n';
+  const changes = laneBacklogChanges(base, branch);
+  assert.deepEqual(changes.closed, ['U1']);
+  assert.deepEqual([...changes.narrowed], [['U2', '- **U2 · polish · S** — b, what is left.']]);
+});
+
+test("applyLaneChanges: replays a lane's closures and narrowings on main's backlog", () => {
+  const main =
+    '## A\n\n- **U1 · minor · S** — a.\n- **U2 · minor · S** — b.\n- **U9 · minor · S** — closed by another lane? no, still open.\n';
+  const changes = { closed: ['U1'], narrowed: new Map([['U2', '- **U2 · polish · S** — b, what is left.']]) };
+  assert.equal(
+    applyLaneChanges(main, changes),
+    '## A\n\n- **U2 · polish · S** — b, what is left.\n- **U9 · minor · S** — closed by another lane? no, still open.\n',
+  );
 });

@@ -3,7 +3,7 @@
 // Parallel fix batches (.claude/skills/code-fix/BATCH.md): plan lanes, track progress, merge a lane.
 //   node scripts/batch.js plan [--lanes=6] <C66 U12 …>   lanes sharing no cited code + estimate; writes the manifest
 //   node scripts/batch.js status                         done/total and time left, per lane
-//   node scripts/batch.js merge <branch> <C66 …>         merge --no-ff --no-commit, union CHANGELOG, close items
+//   node scripts/batch.js merge <branch>                 merge --no-ff --no-commit, union CHANGELOG, apply the lane's closed and narrowed items
 //   node scripts/batch.js record                         appends the batch's per-item times to the history
 
 const { execFileSync } = require('node:child_process');
@@ -227,11 +227,39 @@ function closeItems(text, ids) {
     .replace(/\n\n$/, '\n');
 }
 
+// A lane's backlog edits against the merge base: lines it deleted (closed) and lines it rewrote (narrowed).
+function laneBacklogChanges(baseText, branchText) {
+  const items = (text) =>
+    new Map(
+      text
+        .split('\n')
+        .map((l) => [/^- \*\*([CU]\d+) ·/.exec(l)?.[1], l])
+        .filter(([id]) => id),
+    );
+  const base = items(baseText);
+  const branch = items(branchText);
+  const closed = [...base.keys()].filter((id) => !branch.has(id));
+  const narrowed = new Map([...branch].filter(([id, line]) => base.has(id) && base.get(id) !== line));
+  return { closed, narrowed };
+}
+
+function applyLaneChanges(text, { closed, narrowed }) {
+  const rewritten = text
+    .split('\n')
+    .map((l) => narrowed.get(/^- \*\*([CU]\d+) ·/.exec(l)?.[1]) ?? l)
+    .join('\n');
+  return closeItems(rewritten, closed);
+}
+
 // `files`: the merge's staged paths. A lane whose commits needed no entry makes a merge the hook rejects.
 const mergeHint = (files) =>
   missingEntry(files) ? 'its commits added no CHANGELOG entry: commit with SKIP_CHANGELOG=1' : '';
 
-function merge(branch, ids) {
+function merge(branch) {
+  const base = git('merge-base', 'HEAD', branch).trim();
+  const changes = Object.values(BACKLOGS).map((file) =>
+    laneBacklogChanges(git('show', `${base}:${file}`), git('show', `${branch}:${file}`)),
+  );
   try {
     git('merge', '--no-ff', '--no-commit', branch);
   } catch {
@@ -241,11 +269,13 @@ function merge(branch, ids) {
   const edit = (file, fn) =>
     fs.writeFileSync(path.join(ROOT, file), fn(fs.readFileSync(path.join(ROOT, file), 'utf8')));
   if (conflicted.includes('CHANGELOG.md')) edit('CHANGELOG.md', unionConflicts);
-  // Lanes delete their own items' lines, so a backlog conflict is two closures side by side: keep
-  // main's side, then close this lane's items on it.
+  // A backlog conflict is lanes editing their own items side by side: keep main's side, then replay this lane's edits on it.
   for (const file of Object.values(BACKLOGS).filter((f) => conflicted.includes(f)))
     git('checkout', '--ours', '--', file);
-  for (const file of Object.values(BACKLOGS)) edit(file, (t) => closeItems(t, ids));
+  Object.values(BACKLOGS).forEach((file, i) => edit(file, (t) => applyLaneChanges(t, changes[i])));
+  const closed = changes.flatMap((c) => c.closed);
+  const narrowed = changes.flatMap((c) => [...c.narrowed.keys()]);
+  console.log(`closed: ${closed.join(' ') || 'none'} · narrowed: ${narrowed.join(' ') || 'none'}`);
   git('add', 'CHANGELOG.md', ...Object.values(BACKLOGS));
   const resolved = ['CHANGELOG.md', ...Object.values(BACKLOGS)];
   const left = conflicted.filter((f) => !resolved.includes(f));
@@ -296,9 +326,9 @@ function main() {
   const rest = args.filter((a) => !a.startsWith('--'));
   if (cmd === 'plan') return plan(rest, Number(flags.find((f) => f.startsWith('--lanes='))?.slice(8) ?? 6));
   if (cmd === 'status') return status();
-  if (cmd === 'merge' && rest.length) return merge(rest[0], rest.slice(1));
+  if (cmd === 'merge' && rest.length === 1) return merge(rest[0]);
   if (cmd === 'record') return record();
-  console.error('Usage: node scripts/batch.js plan [--lanes=6] <items…> | status | merge <branch> <items…> | record');
+  console.error('Usage: node scripts/batch.js plan [--lanes=6] <items…> | status | merge <branch> | record');
   process.exit(1);
 }
 
@@ -311,4 +341,15 @@ if (require.main === module) {
   }
 }
 
-module.exports = { parseItems, planLanes, doneTimes, laneStatus, unionConflicts, closeItems, historyRates, mergeHint };
+module.exports = {
+  parseItems,
+  planLanes,
+  doneTimes,
+  laneStatus,
+  unionConflicts,
+  closeItems,
+  laneBacklogChanges,
+  applyLaneChanges,
+  historyRates,
+  mergeHint,
+};
