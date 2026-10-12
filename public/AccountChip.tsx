@@ -78,6 +78,7 @@ export function AccountChip(): JSX.Element {
   function pick(acc: AccountSlot): void {
     adoptAccount(acc, navigate, location);
     detailsEl.open = false;
+    detailsEl.querySelector('summary')!.focus(); // the clicked button is now hidden in the closed popover
   }
 
   const otherRecents = () => recents().filter((a) => a.id !== account()?.id);
@@ -109,7 +110,7 @@ export function AccountChip(): JSX.Element {
       </Show>
 
       <details class="site-nav-popover" ref={detailsEl}>
-        <summary class="site-nav-link account-chip-btn" aria-label="Account">
+        <summary class="site-nav-link account-chip-btn" aria-label={`Account: ${chipLabel()}`}>
           <Show when={account()?.avatarUrl}>
             {(url) => <img class="account-chip-avatar" src={url()} alt="" width="20" height="20" />}
           </Show>

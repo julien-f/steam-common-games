@@ -3531,9 +3531,9 @@ kbd {
   position: absolute;
   inset: 0 0 -11px;
 }
-.list-stat-value.list-stat-btn:hover:not(:disabled),
+.list-stat-value.list-stat-btn:hover:not([aria-disabled='true']),
 .list-stat-value.list-stat-btn:focus-visible,
-.list-stat-sub.list-stat-btn:hover:not(:disabled),
+.list-stat-sub.list-stat-btn:hover:not([aria-disabled='true']),
 .list-stat-sub.list-stat-btn:focus-visible {
   color: var(--accent2);
 }
@@ -3548,10 +3548,10 @@ kbd {
 .list-stat-btn:focus-visible .list-stat-icon {
   color: var(--accent2);
 }
-.list-stat-btn:disabled {
+.list-stat-btn[aria-disabled='true'] {
   cursor: default;
 }
-.list-stat-btn:disabled .list-stat-label {
+.list-stat-btn[aria-disabled='true'] .list-stat-label {
   color: var(--stat-label);
 }
 

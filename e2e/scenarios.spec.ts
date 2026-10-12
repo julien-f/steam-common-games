@@ -101,6 +101,30 @@ test('A2.1-2,4: explore a friend, then switch back to my ★ account from the na
   await expect(page.getByRole('navigation')).toContainText('Alice');
 });
 
+test('A2 edge: switching account from the nav chip leaves focus on the chip', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  await expect(page.getByRole('navigation')).toContainText('Bob');
+
+  await page.locator('.account-chip-btn').click();
+  await page
+    .getByRole('button', { name: /Alice/ })
+    .filter({ has: page.getByTitle(/Your account/) })
+    .click();
+  await expect(page.getByRole('navigation')).toContainText('Alice');
+  await expect(page.locator('.account-chip-btn')).toBeFocused();
+});
+
+test('A3 edge: + Add Steam Family account focuses the field it adds', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: '+ Add Steam Family account' }).click();
+  const fields = page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…');
+  await expect(fields).toHaveCount(2);
+  await expect(fields.nth(1)).toBeFocused();
+});
+
 test('A2 edge: an account picked mid-refresh does not read "Refreshing…" while it loads', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
@@ -343,6 +367,26 @@ test('C3 edge: a saved comparison keeps the name its page had', async ({ page })
   await page.getByRole('button', { name: 'Save as a list' }).click();
   await expect(page).toHaveURL(/\/lists\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('heading', { name: 'Alice vs. Bob' })).toBeVisible();
+});
+
+test('C3 edge: Save as a list moves focus into the saved list, not to the page', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare?u=alice&u=bob');
+  await expect(groupRows(page)).toHaveCount(3);
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  if (await more.isVisible()) await more.click();
+  await page.getByRole('button', { name: 'Save as a list' }).click();
+  await expect(page).toHaveURL(/\/lists\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole('main')).toBeFocused();
+});
+
+test('C1 edge: + Add player focuses the player box it adds', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare');
+  await page.getByRole('button', { name: '+ Add player' }).click();
+  const boxes = page.locator('.compare-form').getByRole('combobox');
+  await expect(boxes).toHaveCount(3);
+  await expect(boxes.nth(2)).toBeFocused();
 });
 
 test('C1 edge: with my account listed first, each group still names the right players', async ({ page }) => {
@@ -623,6 +667,28 @@ test('R1.1,3-6: rank chosen games, stop, resume on the same ones', async ({ page
   await expect(resume).toBeVisible();
   await resume.click();
   await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
+});
+
+test("R1 edge: closing the ranking's side panel returns focus to its ℹ Details", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
+  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
+  const details = page.getByRole('button', { name: 'ℹ Details' }).first();
+  await details.click();
+  await expect(page.locator('.game-panel')).toBeVisible();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.locator('.game-panel')).toBeHidden();
+  await expect(details).toBeFocused();
+
+  // Opened from the keyboard, with nothing focused: focus lands on the shown game's ℹ Details.
+  await page.evaluate(() => (document.activeElement as HTMLElement).blur());
+  await page.keyboard.press('i');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.game-panel')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.game-panel')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'ℹ Details' }).nth(1)).toBeFocused();
 });
 
 test('R1 edge: Esc closing a nav popover stays on the ranking', async ({ page }) => {
@@ -906,6 +972,25 @@ test('D1 edge: Updated ↻ keeps the rows and the selection while it refreshes',
   await expect(page.locator('.list-stat', { hasText: 'Updated' })).not.toContainText('Refreshing');
   await expect(rows(page)).toHaveCount(6);
   await expect(row(page, 'Portal 2').getByRole('checkbox')).toBeChecked();
+});
+
+test('D1 edge: Updated ↻ keeps focus on the tile while it refreshes', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/common-games', async (route) => {
+    await held;
+    await route.fallback();
+  });
+  const tile = page.locator('.list-stat', { hasText: 'Updated' });
+  await tile.click();
+  await expect(tile).toContainText('Refreshing');
+  await expect(tile).toBeFocused();
+  release();
+  await expect(tile).not.toContainText('Refreshing');
+  await expect(tile).toBeFocused();
 });
 
 test('D1 edge: a failed Updated ↻ leaves the tile there to try again', async ({ page }) => {
@@ -2240,6 +2325,55 @@ test('I2 edge: the shortcuts dialog says how to open the lightbox from the panel
   await page.keyboard.press('?');
   const section = page.locator('.shortcuts-section').filter({ hasText: 'Game panel' });
   await expect(section.locator('.shortcuts-row').filter({ hasText: 'lightbox' })).toContainText('Enter');
+});
+
+test('I2 edge: the shortcuts dialog takes focus, keeps it, and gives it back on close', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Hades').focus();
+  await page.keyboard.press('?');
+  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(dialog.getByRole('button', { name: 'Close' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+  await page.keyboard.press('Shift+Tab');
+  expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(row(page, 'Hades')).toBeFocused();
+});
+
+test('I2 edge: controls name what they act on, and only toggles carry a pressed state', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await expect(page.locator('.account-chip-btn')).toHaveAccessibleName(/Alice/);
+  page.once('dialog', (d) => d.accept('Shortlist'));
+  await page.getByRole('button', { name: '+ New list' }).click();
+  await expect(page.getByRole('button', { name: 'Rename Shortlist' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete Shortlist' })).toBeVisible();
+
+  await page.getByRole('button', { name: '+ New combined list' }).click();
+  const form = page.locator('.combine-form');
+  await form.getByRole('combobox', { name: 'How to combine the sources' }).selectOption('subtract');
+  const sources = form.locator('.combine-sources input[type="checkbox"]');
+  await sources.nth(0).check();
+  await sources.nth(1).check();
+  const ordered = form.locator('.combine-sources-ordered li');
+  const first = (await ordered.nth(0).locator('.combine-source-label').innerText()).trim();
+  await expect(ordered.nth(0).getByRole('button', { name: `Move ${first} down` })).toBeVisible();
+
+  await page.goto('/lists/compare?u=alice&u=bob');
+  await expect(page.getByRole('combobox', { name: "How to combine these players' libraries" })).toHaveValue(
+    'group-by-membership',
+  );
+
+  await page.goto('/bundles');
+  const updated = page.locator('.list-stat', { hasText: 'Updated' });
+  await expect(updated).toBeVisible();
+  await expect(updated).not.toHaveAttribute('aria-pressed');
+  await expect(page.locator('.list-stat', { hasText: 'Prices' })).not.toHaveAttribute('aria-pressed');
+  const ending = page.locator('.list-stat', { hasText: 'Ending soon' });
+  if (await ending.count()) await expect(ending).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('I2 edge: icon-only controls have names', async ({ page }) => {

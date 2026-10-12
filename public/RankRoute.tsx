@@ -2,7 +2,7 @@
 // Ranked lists section): asks one "which do you prefer?" pair at a time and feeds each answer to
 // ranking.ts's binary insertion. Every answer is stored right away (listsStore.ts's setRanking),
 // so leaving at any point loses nothing; undo is an in-memory stack of previous states.
-import { createSignal, createEffect, onCleanup, onMount, Show, For, type JSX } from 'solid-js';
+import { createSignal, createEffect, createMemo, onCleanup, onMount, Show, For, type JSX } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { A, useParams, useNavigate, useLocation } from '@solidjs/router';
 import { getList, getRanking, setRanking } from './listsStore.ts';
@@ -146,8 +146,12 @@ export default function RankRoute() {
     }
   });
 
+  // Each card's ℹ Details, by appid: focused before opening, so whatever opened the panel (I + ←/→
+  // included) is where closing it returns focus.
+  const detailsButtons = new Map<number, HTMLButtonElement>();
   function openPanel(appid: number): void {
     fetchDetails(appid);
+    detailsButtons.get(appid)?.focus();
     panelOpen(games[appid]);
   }
   // The panel's ↻ Refresh; tags stay plain pills, since nothing here filters by them.
@@ -253,9 +257,13 @@ export default function RankRoute() {
     setBaseTitle(null);
   });
 
+  // Keyed on rankFocus's content, not location.state: closing the panel pops its history entry,
+  // which hands back an equal but new state object, and reloading then rebuilt the cards (and
+  // dropped the focus returned to one of them).
+  const rankFocusKey = createMemo(() => JSON.stringify(location.state?.rankFocus ?? null));
   createEffect(() => {
     params.listId;
-    location.state;
+    rankFocusKey();
     void load();
   });
 
@@ -313,6 +321,7 @@ export default function RankRoute() {
             type="button"
             class="btn btn-ghost btn-sm"
             title="Open this game's details in the side panel"
+            ref={(el) => detailsButtons.set(appid, el)}
             onClick={() => openPanel(appid)}
           >
             ℹ Details

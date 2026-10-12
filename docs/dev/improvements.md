@@ -34,7 +34,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Comparing
 
-- **U127 · major · C1** — typing `bob` + Enter in a player box adds "Alice + Bob · Family" rather than Bob: `commit` (`public/ComparePlayersForm.tsx:126`) takes `matches()[highlight()]`, highlight defaults to the first match, and an exact name/vanity match isn't ranked first. Rank exact matches first.
 - **U137 · minor · C1, C3** — the union reads `Carol 3 + Alice + Bob 8 = 9`: "+" reads as arithmetic (3 + 8 ≠ 9) and collides with the family name; the saved list uses ∪. Use ∪ here too.
 - **U138 · minor · C1** — "Compare libraries" is disabled with no reason. Say "Add a second player".
 - **U139 · polish · C4** — panel Owned by reads "never played · not played". One phrase.
@@ -55,8 +54,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 ## Keyboard and accessibility
 
 - **U161 · minor · all list routes** — a pressed stat tile's label takes the accent colour, 3.45:1 on the hero, under AA (U146 fixed the unpressed ones). A pressed style that keeps ≥4.5:1.
-- **U129 · minor · I2, A2, A3, C1, C3, D1, R1** — focus drops to `<body>` or stays put after: switching account from the nav chip, "Save as a list", clicking the Updated figure, closing the panel on `/rank`; "+ Add player" / "+ Add Steam Family account" leave focus on the button; the `?` dialog opens without focus and isn't modal. Focus the new field / the dialog; return it to the opener.
-- **U130 · minor · I2** — accessible names: the nav chip is just "Account"; list-tree Rename/Delete and Subtract's Move up/down don't name their object; Compare's mode and op `<select>`s have no label; Bundles' Updated and Prices figures carry `aria-pressed` without being toggles. Names that include the object; drop the stray `aria-pressed`.
 - **U147 · polish · I2** — in the `?` dialog, descriptions start at x 595–677 depending on key count. A two-column grid with a fixed key column.
 
 ## Phone

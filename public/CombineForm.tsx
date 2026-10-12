@@ -136,7 +136,11 @@ export function CombineForm(props: CombineFormProps) {
           onInput={(e) => setName(e.currentTarget.value)}
         />
       </Show>
-      <select value={op()} onChange={(e) => setOp(e.currentTarget.value as CombineOp)}>
+      <select
+        value={op()}
+        aria-label="How to combine the sources"
+        onChange={(e) => setOp(e.currentTarget.value as CombineOp)}
+      >
         <For each={COMBINE_OPS}>{(o) => <option value={o.value}>{o.label}</option>}</For>
       </select>
       {/* Says what leaving the name empty gets you — otherwise "optional" is invisible until after
@@ -163,14 +167,19 @@ export function CombineForm(props: CombineFormProps) {
                 <li>
                   <span class="combine-source-index">{i() + 1}.</span>
                   <span class="combine-source-label">{label()}</span>
-                  <button type="button" disabled={i() === 0} onClick={() => moveSource(i(), -1)} aria-label="Move up">
+                  <button
+                    type="button"
+                    disabled={i() === 0}
+                    onClick={() => moveSource(i(), -1)}
+                    aria-label={`Move ${label()} up`}
+                  >
                     ▲
                   </button>
                   <button
                     type="button"
                     disabled={i() === selected().length - 1}
                     onClick={() => moveSource(i(), 1)}
-                    aria-label="Move down"
+                    aria-label={`Move ${label()} down`}
                   >
                     ▼
                   </button>

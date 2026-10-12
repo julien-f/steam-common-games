@@ -151,6 +151,18 @@ test('filterAccounts: matches on an identifier or a steam64 id too', () => {
   );
 });
 
+test('filterAccounts: an exact name or identifier match comes first, ahead of a Family it is part of', () => {
+  const known = [FAMILY, ALICE, BOB];
+  assert.deepEqual(
+    filterAccounts(known, [[]], 'bob').map((a) => a.label),
+    ['Bob', 'Bob + Carol'],
+  );
+  assert.deepEqual(
+    filterAccounts([account('Bobby', ['1'], ['bobby']), BOB], [[]], 'BOB').map((a) => a.label),
+    ['Bob', 'Bobby'],
+  );
+});
+
 test('filterAccounts: hides accounts already placed anywhere in the form', () => {
   assert.deepEqual(
     filterAccounts(KNOWN, [[picked(ALICE)], []], '').map((a) => a.label),
