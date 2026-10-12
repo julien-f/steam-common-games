@@ -6,7 +6,7 @@
 //
 // Open state lives in AppShell (it has to reach bindPanelKeyboardShortcuts' `shortcuts` option
 // and the `?` key handler), so this component is pure presentation plus its two close paths.
-import { createEffect, For, on, type JSX } from 'solid-js';
+import { createEffect, For, onCleanup, on, type JSX } from 'solid-js';
 
 interface Section {
   title: string;
@@ -64,14 +64,25 @@ const SHORTCUT_SECTIONS: Section[] = [
 export function ShortcutsModal(props: { open: boolean; onClose: () => void }): JSX.Element {
   let closeEl!: HTMLButtonElement;
   let opener: HTMLElement | null = null;
+  // On the document: a click on the dialog's text drops focus to <body>, past a listener on the dialog.
+  const keepTab = (e: KeyboardEvent) => {
+    if (e.key !== 'Tab') return;
+    e.preventDefault();
+    closeEl.focus();
+  };
+  onCleanup(() => document.removeEventListener('keydown', keepTab));
   createEffect(
     on(
       () => props.open,
       (open) => {
         if (open) {
           opener = document.activeElement as HTMLElement | null;
+          document.addEventListener('keydown', keepTab);
           closeEl.focus();
-        } else if (opener?.isConnected) opener.focus();
+        } else {
+          document.removeEventListener('keydown', keepTab);
+          if (opener?.isConnected) opener.focus();
+        }
       },
       { defer: true },
     ),
@@ -87,13 +98,6 @@ export function ShortcutsModal(props: { open: boolean; onClose: () => void }): J
         aria-hidden={props.open ? undefined : 'true'}
         // Hidden with CSS, so without this its Close button was still a Tab stop.
         inert={!props.open}
-        // Modal: Close is its only control, so Tab stays on it rather than leaving for the page.
-        onKeyDown={(e) => {
-          if (e.key === 'Tab') {
-            e.preventDefault();
-            closeEl.focus();
-          }
-        }}
       >
         <div class="shortcuts-header">
           <span class="shortcuts-title">Keyboard shortcuts</span>

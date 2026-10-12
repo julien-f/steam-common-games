@@ -107,8 +107,7 @@ export function filterAccounts(known: KnownAccount[], slots: Slot[], query: stri
     if (!q) return true;
     return account.label.toLowerCase().includes(q) || [...accountTokens(account)].some((t) => t.includes(q));
   });
-  // Enter picks the first row, so typing someone's exact name must put them there — not a Family
-  // they're one member of. namesAccount needs every member, so a Family never counts as exact.
+  // Enter picks the first row; a Family is never exact for one member's name (namesAccount needs all).
   const exact = (account: KnownAccount): boolean => account.label.toLowerCase() === q || namesAccount([q], account);
   return q ? [...found.filter(exact), ...found.filter((a) => !exact(a))] : found;
 }

@@ -2345,6 +2345,10 @@ test('I2 edge: the shortcuts dialog takes focus, keeps it, and gives it back on 
   expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
   await page.keyboard.press('Shift+Tab');
   expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+  // A click on its text drops focus to <body>; Tab must still not leave for the page behind.
+  await dialog.locator('.shortcuts-row').last().click();
+  await page.keyboard.press('Tab');
+  expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(row(page, 'Hades')).toBeFocused();

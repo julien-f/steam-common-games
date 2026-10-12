@@ -146,8 +146,7 @@ export default function RankRoute() {
     }
   });
 
-  // Each card's ℹ Details, by appid: focused before opening, so whatever opened the panel (I + ←/→
-  // included) is where closing it returns focus.
+  // Focused before opening, so closing returns focus there however the panel was opened (I + ←/→ too).
   const detailsButtons = new Map<number, HTMLButtonElement>();
   function openPanel(appid: number): void {
     fetchDetails(appid);
@@ -257,13 +256,13 @@ export default function RankRoute() {
     setBaseTitle(null);
   });
 
-  // Keyed on rankFocus's content, not location.state: closing the panel pops its history entry,
-  // which hands back an equal but new state object, and reloading then rebuilt the cards (and
-  // dropped the focus returned to one of them).
-  const rankFocusKey = createMemo(() => JSON.stringify(location.state?.rankFocus ?? null));
+  // By content: closing the panel hands back an equal new state, and reloading would drop its returned focus.
+  const rankStateKey = createMemo(() =>
+    JSON.stringify([location.state?.rankFocus ?? null, location.state?.rankOrder ?? null]),
+  );
   createEffect(() => {
     params.listId;
-    rankFocusKey();
+    rankStateKey();
     void load();
   });
 

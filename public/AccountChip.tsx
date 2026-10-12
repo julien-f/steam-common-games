@@ -110,7 +110,10 @@ export function AccountChip(): JSX.Element {
       </Show>
 
       <details class="site-nav-popover" ref={detailsEl}>
-        <summary class="site-nav-link account-chip-btn" aria-label={`Account: ${chipLabel()}`}>
+        <summary
+          class="site-nav-link account-chip-btn"
+          aria-label={account() ? `Account: ${chipLabel()}` : chipLabel()}
+        >
           <Show when={account()?.avatarUrl}>
             {(url) => <img class="account-chip-avatar" src={url()} alt="" width="20" height="20" />}
           </Show>
