@@ -79,9 +79,15 @@ test("A1 edge: a pressed stat tile's label still meets AA contrast on the hero",
   await toggle.click();
   const pressed = page.locator('.list-stat-btn[aria-pressed="true"]').first();
   await expect(pressed).toBeVisible();
-  await page.mouse.move(0, 0); // hover and focus have their own colour
+  const label = pressed.locator('.list-stat-label');
+  // Still hovered after the click: pressed must not look like plain hover, or the click shows no change.
+  const hoveredPressed = await label.evaluate((el) => getComputedStyle(el).color);
+  await page.mouse.move(0, 0);
   await pressed.evaluate((el) => (el as HTMLElement).blur());
-  expect(await heroContrast(pressed.locator('.list-stat-label'))).toBeGreaterThanOrEqual(4.5);
+  expect(await heroContrast(label)).toBeGreaterThanOrEqual(4.5);
+  const other = page.locator('.list-stat-btn[aria-pressed="false"]').first();
+  await other.hover();
+  expect(await other.locator('.list-stat-label').evaluate((el) => getComputedStyle(el).color)).not.toBe(hoveredPressed);
 });
 
 test('A1 edge: Owned with no account points to Home rather than showing 0 games', async ({ page }) => {
@@ -432,12 +438,15 @@ test('C1 edge: a disabled Compare libraries says why', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare');
   const submit = page.getByRole('button', { name: 'Compare libraries' });
-  await expect(submit).toBeDisabled();
+  // aria-disabled, not disabled: a disabled button is skipped by Tab, so its reason was never announced.
+  await expect(submit).toHaveAttribute('aria-disabled', 'true');
+  await submit.focus();
+  await expect(submit).toBeFocused();
   await expect(submit).toHaveAccessibleDescription('Add a second player');
   await expect(page.locator('.compare-form-actions').getByText('Add a second player')).toBeVisible();
   const box = await submit.boundingBox();
   await page.locator('.compare-form').getByRole('combobox').nth(1).fill('bob');
-  await expect(submit).toBeEnabled();
+  await expect(submit).not.toHaveAttribute('aria-disabled');
   await expect(page.locator('.compare-form-actions').getByText('Add a second player')).toBeHidden();
   expect(await submit.boundingBox()).toEqual(box);
 });

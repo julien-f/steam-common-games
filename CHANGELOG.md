@@ -32,7 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On a touch-only device, the ranking no longer shows its keyboard shortcuts
 - Paging games in the lightbox from a game's Cover keeps showing each game's Cover
 - Table digits all have one width, so a column's numbers line up better
-- A disabled Compare libraries button now says it needs a second player
+- A disabled Compare libraries button now says how many players it still needs
 - Editing a shared table layout now warns that the change is lost on reload unless you keep it
 - A combined list shows only 🔗 Share list, no longer also a Share view whose link only opens in your browser
 - A comparison's formula joins players with ∪, as a combined list does, instead of a + that read as a sum

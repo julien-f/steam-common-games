@@ -325,7 +325,7 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
         <button
           type="submit"
           class="btn btn-primary btn-sm"
-          disabled={filledCount() < 2}
+          aria-disabled={filledCount() < 2 ? 'true' : undefined}
           aria-describedby={filledCount() < 2 ? whyDisabledId : undefined}
         >
           {props.submitLabel}
@@ -337,8 +337,8 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
             </button>
           )}
         </Show>
-        {/* Hidden rather than removed once enabled, so the row never reflows mid-typing. */}
-        <span id={whyDisabledId} class="compare-form-why" classList={{ 'is-hidden': filledCount() >= 2 }}>
+        {/* Last in the row, so hiding it never moves the buttons. */}
+        <span id={whyDisabledId} class="compare-form-hint" classList={{ 'is-hidden': filledCount() >= 2 }}>
           {filledCount() === 0 ? 'Add two players' : 'Add a second player'}
         </span>
       </div>
