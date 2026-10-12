@@ -444,6 +444,9 @@ header p {
 .table-container .dt-th {
   background: #0f1923 !important;
 }
+.dt-td {
+  font-variant-numeric: tabular-nums;
+}
 
 table {
   width: 100%;

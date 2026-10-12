@@ -164,6 +164,12 @@ test('F3 edge: the Played (h) filter range reads in rounded hours', async ({ pag
   await expect.poll(bounds).toEqual(['—', '20.0']);
 });
 
+test("F3 edge: the table's digits all have one width, so numbers line up", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(row(page, 'Hades').locator('td', { hasText: '44.5' })).toHaveCSS('font-variant-numeric', 'tabular-nums');
+});
+
 test('F3 edge: the Played (h) filter has a "never played" preset', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

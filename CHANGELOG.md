@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Dates read the same everywhere: a release, a bundle's end and its publication show as `YYYY-MM-DD` (with the time where it matters) in tables, cards and the panel
 - On a touch-only device, the ranking no longer shows its keyboard shortcuts
 - Paging games in the lightbox from a game's Cover keeps showing each game's Cover
+- Table digits all have one width, so a column's numbers line up better
 
 ### Fixed
 
