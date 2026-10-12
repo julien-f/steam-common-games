@@ -12,6 +12,7 @@
 - `node scripts/journey-coverage.js` shows which journey steps they lock.
 - Every `/api` call is mocked in the browser (`e2e/mockApi.ts`): no backend, no upstream traffic. Fixtures use made-up accounts only.
 - The pre-commit hook runs the desktop half when `public/`, `e2e/` or a frontend config is staged; the pre-push hook runs all of it. Both skip it when the build (sourcemaps aside), `e2e/` and the test config match the last full passing run (`scripts/e2e.js`). `E2E_DEFER=1` skips the pre-commit e2e, for fix-batch lanes only ([BATCH.md](../../.claude/skills/code-fix/BATCH.md)), which run the suite once before reporting.
+- `npm run test:e2e -- --since=<ref>` skips the run when the commits since `<ref>` touch none of those files (`check.js`'s `touchesUi`): a fix-batch lane's doc- or backend-only work.
 - `E2E_SHOTS=1 npm run test:e2e` keeps each test's final screen, plus any `shot(page, name)` (`e2e/state.ts`), under `test-results/`, one folder per test and width — a way to look at a UI change without touching real prefs.
 
 ## Looking at the UI

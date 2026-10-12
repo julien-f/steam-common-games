@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 
-const { runAll, runRow, steps } = require('../scripts/check');
+const { runAll, runRow, steps, touchesUi } = require('../scripts/check');
 
 test('runAll: every step runs, in order, with its pass/fail and output', async () => {
   const node = process.execPath;
@@ -45,4 +45,10 @@ test('runRow: full run or commit, seconds per step, the failed steps', () => {
   ];
   assert.deepStrictEqual(runRow('HEAD', results), { run: 'commit', seconds: { test: 4.3, lint: 1 }, failed: ['lint'] });
   assert.strictEqual(runRow(undefined, []).run, 'full');
+});
+
+test('touchesUi: frontend, e2e and their configs count; backend, docs and scripts do not', () => {
+  assert.strictEqual(touchesUi(['docs/dev/data.md', 'lib/steam.js', 'scripts/e2e.js']), false);
+  assert.strictEqual(touchesUi(['docs/dev/data.md', 'public/panel.tsx']), true);
+  assert.strictEqual(touchesUi(['vite.config.js']), true);
 });

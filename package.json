@@ -23,7 +23,7 @@
     "check:journeys": "node scripts/journey-coverage.js --check",
     "check:setup": "node scripts/setup-lint.js",
     "cache:clear": "node scripts/cache-clear.js",
-    "lint": "eslint public",
+    "lint": "eslint public --max-warnings=0",
     "format": "prettier --write --cache .",
     "format:check": "prettier --check --cache ."
   },

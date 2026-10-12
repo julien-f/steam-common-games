@@ -3,13 +3,15 @@
 // `npm run test:e2e`: builds the frontend once, then runs Playwright against it. A full passing run
 // records a hash of everything the suite can see (the build minus its sourcemaps, e2e/, the Playwright config, the
 // lockfile, Node's version); with --if-changed (the pre-commit hook), a run whose hash already
-// passed is skipped, since it would test exactly what passed.
-//   node scripts/e2e.js [--if-changed] [playwright args…]
+// passed is skipped, since it would test exactly what passed. With --since=<ref> (a fix-batch lane), a
+// branch whose commits since <ref> touch nothing the suite covers (check.js's UI files) skips it.
+//   node scripts/e2e.js [--if-changed] [--since=<ref>] [playwright args…]
 
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync, spawnSync } = require('node:child_process');
+const { touchesUi } = require('./check');
 
 const ROOT = path.join(__dirname, '..');
 const PORT = Number(process.env.E2E_PORT) || 28992;
@@ -51,7 +53,15 @@ const isFullRun = (pwArgs) => !pwArgs.some((a) => NARROWING.test(a) || !a.starts
 function main() {
   const args = process.argv.slice(2);
   const ifChanged = args.includes('--if-changed');
-  const pwArgs = args.filter((a) => a !== '--if-changed');
+  const since = args.find((a) => a.startsWith('--since='))?.slice(8);
+  const pwArgs = args.filter((a) => a !== '--if-changed' && !a.startsWith('--since='));
+  if (since) {
+    const changed = execFileSync('git', ['diff', '--name-only', `${since}...HEAD`], { cwd: ROOT, encoding: 'utf8' });
+    if (!touchesUi(changed.split('\n').filter(Boolean))) {
+      console.log(`e2e: nothing the suite covers changed since ${since}, skipped`);
+      process.exit(0);
+    }
+  }
 
   execFileSync('npx', ['vite', 'build', '--sourcemap', '--outDir', OUT_DIR, '--logLevel', 'error'], {
     cwd: ROOT,

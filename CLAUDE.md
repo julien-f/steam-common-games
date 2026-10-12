@@ -34,7 +34,7 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
 
 - **Types**: `tsc --noEmit`, strict, over `public/**/*.{ts,tsx}`, plus `e2e/` via `tsconfig.e2e.json` — the backend is plain JS.
 - **Error handling**: routes catch and map through `routeErrorStatus` (client error → 400, upstream → 502, timeout → 504) and reply `{ error }`. An optional source (HLTB, ProtonDB, reviews) that fails logs a `[tag]`-prefixed `console.warn` and degrades instead of failing the request; the UI then says the source didn't answer rather than showing no data.
-- **Lint**: `eslint public`, via eslint-plugin-solid; stays at 0 problems, and the few intended violations carry a targeted `eslint-disable-next-line` with a reason.
+- **Lint**: `eslint public --max-warnings=0`, via eslint-plugin-solid; stays at 0 problems (a warning fails it), and the few intended violations carry a targeted `eslint-disable-next-line` with a reason.
 - **Format**: Prettier over the whole tree (`.prettierrc.json`); `npm run format` rewrites, `npm run format:check` verifies. Let it format instead of hand-formatting, and don't fight its output.
 - **Simplicity**: build for current needs only — no speculative abstractions, options or extension points. Fix root causes rather than stacking special cases (propose it if that widens the change). Delete what the change makes dead (code, params, flags, tests, docs). Temporary code (shims, flags, workarounds) states its removal condition.
 - **Style**: match the existing code; don't reformat code outside the change.

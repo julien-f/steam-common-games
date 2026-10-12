@@ -11,10 +11,13 @@ const { record } = require('./dev-metrics');
 const UI =
   /^(public|e2e)\/|^(playwright\.config\.ts|vite\.config\.js|tsconfig[^/]*\.json|eslint\.config\.[^/]*|package(-lock)?\.json)$/;
 
+// Whether `files` include anything typecheck, lint, the CSS check or the e2e suite covers.
+const touchesUi = (files) => files.some((f) => UI.test(f));
+
 // `[name, npm script args]` for a full run (`staged` undefined) or a commit against `staged`.
 // `deferE2e`: a fix-batch lane commits without e2e and runs it once before reporting (BATCH.md).
 function steps(staged, files = [], { deferE2e = process.env.E2E_DEFER === '1' } = {}) {
-  const ui = staged === undefined || files.some((f) => UI.test(f));
+  const ui = staged === undefined || touchesUi(files);
   return [
     ['format', ['format:check']],
     ['changelog', staged === undefined ? ['check:changelog'] : ['check:changelog', '--', `--staged=${staged}`]],
@@ -83,4 +86,4 @@ async function main() {
 
 if (require.main === module) main();
 
-module.exports = { runAll, runRow, steps };
+module.exports = { runAll, runRow, steps, touchesUi };
