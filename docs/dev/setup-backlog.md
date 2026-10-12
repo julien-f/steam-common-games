@@ -2,7 +2,7 @@
 
 Proposals from `setup-review` runs about the Claude Code setup (skills, scripts, hooks, settings, CLAUDE.md, memory), so each run builds on the last instead of re-proposing. Effort S/M/L; numbered with `node scripts/backlog-next.js P`, never reusing a closed item's number.
 
-Last reviewed: 2026-10-12 · Transcripts read up to: 2026-10-12T08:55:13Z.
+Last reviewed: 2026-10-12 · Transcripts read up to: 2026-10-12T12:29:45Z.
 
 - **Watching**: applied, with the command that measures it, its baseline and its target. The next run re-measures: target met → remove the item; missed → move it to Open with what was learned.
 - **Open**: recommended, not yet picked.
@@ -10,17 +10,14 @@ Last reviewed: 2026-10-12 · Transcripts read up to: 2026-10-12T08:55:13Z.
 
 ## Watching
 
-- **P12 · code-audit · S** — no argument now audits the dimension audited longest ago instead of asking. The question came in 4 of 5 runs, once dismissed then interrupted. Measure: the next `--transcripts` digest's code-audit dimension questions — 4 → 0.
-- **P21 · CLAUDE.md, testing.md · S** — test timings live in testing.md only, re-measured: CLAUDE.md and testing.md said e2e ~20 s, measured 39–51 s. Measure: `setup-facts --cost` against testing.md — 20 s quoted vs 32–51 s (3 runs) → within 25%.
-- **P22 · setup-facts --cost · S** — gate times are kept (`scripts/dev-metrics.js`) and each run prints the change since the last, ⚠ past 25% slower; nothing kept before. Measure: the next `--cost` prints a delta per gate — none → 4 gates.
-- **P23 · setup-facts commandKey · S** — a chain is keyed by its gate: 86 of 110 `git add` calls chained a commit, so commit + hook time read as "git add 27 s". Measure: `--transcripts` slowest calls — `git commit` absent → listed (27 s on 2026-10-12's re-run).
-- **P24 · setup-facts --transcripts · M** — tokens per session and per skill run (main thread). Measure: the next `--transcripts` skill-runs line — no tokens → tokens per skill; baseline ux-review 4.4M in / 24K out per run.
-- **P25 · setup-facts --transcripts · S** — interrupts carry the running skill, counted per skill. Measure: the next digest's interrupts — skill unknown → attributed.
-- **P26 · check.js · S** — every check run (hooks included) logs step times and failures; `--cost` reports blocked commits and by which step. Measure: the next `--cost`'s check-runs line — no record → commits counted.
 - **P27 · skill-evals.js · S** — routing scores and dry-run results are kept; the routing line names the last comparable score. Speculative: eval run frequency unknown. Measure: the next eval run prints the last score — none → shown.
-
-- **P20 · code-fix BATCH · S** — a lane's pre-report e2e runs with `--since=main`, skipped when its commits touch no UI file. 2026-10-12: e2e topped 3 of 6 lanes, max 108 s, doc-only lanes included. Measure: the next batch's `node scripts/setup-facts.js --agents` — max lane e2e 108 s → 90 s, 0 s in doc-only lanes.
-- **P28 · lint · S** — `eslint public --max-warnings=0`: a merged lane brought a solid/reactivity warning past `check` and the hooks. Measure: `npm run lint` warnings on `main` after the next batch — 1 slipped through → 0.
+- **P29 · code-fix BATCH · S** — each lane runs `/code-review` (low) on its own commits and fixes confirmed findings before reporting; the lead still reviews each merge for where lanes meet. 2026-10-12: 10 follow-up commits over 7 lane merges. Measure: follow-up commits per merge in the next batch — 1.4 → ≤ 0.5.
+- **P30 · batch.js · S** — `merge <branch>` takes the closed items from the branch's own backlog diff; a line the lane rewrote is kept as rewritten. 2026-10-12: narrowed items dropped by a hand-listed merge, U163–U165 re-added by hand. Measure: narrowed items re-added by hand in the next batch — 3 → 0.
+- **P31 · mock-server.js · S** — `up` restarts the server when git HEAD moved since it started. 2026-10-12: one stale measurement (search box full width, nav 94 px) after commits in the main checkout. Measure: stale-server measurements in the next ux-fix — 1 → 0.
+- **P32 · css-overrides.js · S** — every media block, not only narrow-screen ones, is checked for rules a later same-selector rule silently overrides. 2026-10-12: two desktop `min-width` rules lost that way, caught only in review. Measure: that class in the next merge reviews — 2 → 0.
+- **P33 · ux-fix · S** — visual or layout items get a before/after mockup page (CSS injected on dev:mock) approved before building. Evidence: one session, mockups asked for twice at go-ahead. Measure: mockup requests at a ux-fix go-ahead — 2 → 0.
+- **P34 · check.js · M** — flags comment blocks of two or more lines added in staged `public/` files (CLAUDE.md's one-line rule). 2026-10-12: 4 of 6 merge reviews flagged long comments. Measure: merge reviews flagging long comments — 4/6 → 0.
+- **P35 · testing.md · S** — the quoted e2e time is gone; `setup-facts --cost` measures it (P21 missed: ~40 s quoted, 44–120 s measured under load). Measure: `doc-refs`/`--cost` — no doc quotes an e2e time → stays so.
 
 ## Open
 
