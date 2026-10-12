@@ -3,12 +3,12 @@
 ## Unit tests
 
 - `node:test` + `supertest`, flat in `test/*.test.{js,ts}`.
-- `npm test` (~4 s) runs with `DB_FILE=`, so no real database is touched.
+- `npm test` (~6 s) runs with `DB_FILE=`, so no real database is touched.
 - Single file: `npm run test:one test/<name>.test.js` — same env as `npm test`, which hardcodes its glob.
 
 ## End-to-end tests
 
-- `npm run test:e2e` (~20 s; Playwright, `e2e/`, against a production build) runs the tests of [journeys.md](journeys.md)'s journeys at desktop (1440×900) and phone (390×844) widths.
+- `npm run test:e2e` (~40 s, both widths; Playwright, `e2e/`, against a production build) runs the tests of [journeys.md](journeys.md)'s journeys at desktop (1440×900) and phone (390×844) widths.
 - `node scripts/journey-coverage.js` shows which journey steps they lock.
 - Every `/api` call is mocked in the browser (`e2e/mockApi.ts`): no backend, no upstream traffic. Fixtures use made-up accounts only.
 - The pre-commit hook runs the desktop half when `public/`, `e2e/` or a frontend config is staged; the pre-push hook runs all of it. Both skip it when the build (sourcemaps aside), `e2e/` and the test config match the last full passing run (`scripts/e2e.js`). `E2E_DEFER=1` skips the pre-commit e2e, for fix-batch lanes only ([BATCH.md](../../.claude/skills/code-fix/BATCH.md)), which run the suite once before reporting.
@@ -28,11 +28,13 @@
 
 - `node scripts/skill-evals.js [SKILL...]` runs each `.claude/skills/<name>/evals.json` routing case through headless `claude -p` and reports which skill it loaded (~30 s for all; each run stops at its first tool call). `--repeat=N` measures how stable a route is; a single run can pass by luck.
 - `--dry-run` also runs each skill's `dryRun` command to the end in `auto` permission mode (about $1 and 1–2 min each, capped by `--budget`) and reports its denied and failed calls. Only skills safe to run unattended have one.
+- Each run's routing score and dry-run results are kept locally (`scripts/dev-metrics.js`), and the routing line names the last comparable run's score.
 - Runs use a throwaway clone (no remote, `node_modules` reflinked) of the working tree, or of `--ref=<REF>` to compare a skill change before and after, and write no session transcripts. Not part of `check`: it costs real tokens.
 
 ## Hooks
 
 - `pre-commit` (`.githooks/pre-commit`, enabled by `npm install`): `git diff --cached --check`, then `npm run check`'s steps in parallel on the staged content only (unstaged edits are set aside, then restored) — typecheck, lint, the CSS check and desktop e2e only when `public/`, `e2e/` or a frontend config is staged (~3 s without them, ~18 s with). It blocks the commit on failure. `npm install` also points `git blame` at `.git-blame-ignore-revs`.
+- Every `scripts/check.js` run (both hooks and `npm run check`) logs its step times and failures to `.git/dev-metrics/` (`scripts/dev-metrics.js`: local, shared by worktrees); `node scripts/setup-facts.js --cost` summarizes them.
 - `pre-push`: what CI runs (`npm run check`, then both widths of e2e) on HEAD; refuses a push of anything else or from a dirty tree.
 - CI (`.github/workflows/ci.yml`): `npm run check` and the e2e suite as two parallel jobs on Node 24, on every push to `main` and every PR; the run's summary lists the journey steps the tests lock.
 - A doc reference `check` reports is either stale (fix the doc) or deliberate history (add it to `HISTORY` in `scripts/doc-refs.js`, which reports an entry no doc mentions any more).

@@ -6,8 +6,11 @@ const {
   callers,
   argsWithoutUsage,
   commandKey,
+  costDelta,
+  checkStats,
   parseSession,
   linesSince,
+  tokens,
   skillRuns,
   answerOutcome,
   sessionEvents,
@@ -45,6 +48,13 @@ test('commandKey keeps the command and subcommand, never arguments', () => {
   assert.equal(commandKey('grep -rn secret .'), 'grep');
   assert.equal(commandKey('E2E_PORT=1 git -C /wt commit -F m'), 'git commit');
   assert.equal(commandKey('npm --prefix /wt run test:one a.js'), 'npm run test:one');
+});
+
+test('commandKey keys a chain by its gate, so a commit is not filed under git add', () => {
+  assert.equal(commandKey('git add a.js && git commit -m x && git log --oneline -1'), 'git commit');
+  assert.equal(commandKey('npm run format && npm run test:one a.js | tail'), 'npm run test:one');
+  assert.equal(commandKey('sed -n 1,5p a && grep x b'), 'sed');
+  assert.equal(commandKey('time npm run -s test:e2e'), 'npm run test:e2e');
 });
 
 test('parseSession pairs each call with its result: output size, elapsed time, classifier denial, user rejection', () => {
@@ -170,10 +180,13 @@ test('skillRuns counts slash commands and Skill calls of known skills, each runn
     ],
     ['ux-review', 'ux-fix'],
   );
-  assert.deepEqual(runs, [
-    { skill: 'ux-review', ms: 60_000 },
-    { skill: 'ux-fix', ms: 120_000 },
-  ]);
+  assert.deepEqual(
+    runs.map(({ skill, ms }) => ({ skill, ms })),
+    [
+      { skill: 'ux-review', ms: 60_000 },
+      { skill: 'ux-fix', ms: 120_000 },
+    ],
+  );
 });
 
 test('summarize leaves out pairs involving a tool or a read-only command', () => {
@@ -195,7 +208,7 @@ test('answerOutcome: recommended (marked, else first), another option, free text
   assert.equal(answerOutcome(q, '', ''), 'dismissed');
 });
 
-test('sessionEvents: prompts with the reply before, skill runs, answers, rejections, interrupts and errors', () => {
+test('sessionEvents: prompts with the reply before, skill runs, answers, rejections, interrupts (with the running skill) and errors', () => {
   const entry = (type, content, extra) => JSON.stringify({ type, message: { content }, ...extra });
   const use = (id, name, input) => entry('assistant', [{ type: 'tool_use', id, name, input }]);
   const result = (id, content, extra) =>
@@ -207,6 +220,7 @@ test('sessionEvents: prompts with the reply before, skill runs, answers, rejecti
       use('q', 'AskUserQuestion', { questions: [question] }),
       result('q', 'answered', { entry: { toolUseResult: { answers: { [question.question]: 'Skip' } } } }),
       entry('assistant', [{ type: 'text', text: 'Done. Key sk_' + 'x'.repeat(30) }]),
+      entry('user', [{ type: 'text', text: '[Request interrupted by user]' }]),
       entry('user', 'no, keep the old one'),
       use('b', 'Bash', { command: 'npm run lint -- --fix' }),
       result('b', 'lint broke\nmore', { error: true }),
@@ -230,10 +244,11 @@ test('sessionEvents: prompts with the reply before, skill runs, answers, rejecti
       outcome: 'other',
       setup: true,
     },
+    { kind: 'interrupt', key: 'AskUserQuestion', skill: 'setup-review' },
     { kind: 'prompt', text: 'no, keep the old one', reply: 'Done. Key […]' },
     { kind: 'error', key: 'npm run lint', text: 'lint broke' },
     { kind: 'rejected', key: 'Edit', reason: 'not this file' },
-    { kind: 'interrupt', key: 'Edit' },
+    { kind: 'interrupt', key: 'Edit', skill: undefined },
   ]);
   assert.match(digest(events), /^== skill setup-review\n {2}\? \[other, setup\] Apply the skill change\? → Skip\n/);
 });
@@ -280,4 +295,71 @@ test('docReadStats: reads, whole reads and sessions per doc, most read first', (
     { doc: 'docs/b.md', reads: 2, whole: 1, sessions: 2 },
     { doc: 'docs/a.md', reads: 1, whole: 1, sessions: 1 },
   ]);
+});
+
+test('costDelta: the change since the last run, flagged past 25% slower; nothing without a last run', () => {
+  assert.equal(costDelta(undefined, 10, undefined), '');
+  assert.equal(costDelta(20, 22, '2026-10-12T08:00:00Z'), ' (+10% since 2026-10-12)');
+  assert.equal(costDelta(20, 40, '2026-10-12T08:00:00Z'), ' (+100% since 2026-10-12) ⚠');
+  assert.equal(costDelta(20, 15, '2026-10-12T08:00:00Z'), ' (-25% since 2026-10-12)');
+});
+
+test('tokens: input with cache writes and reads, and output, the max per response id', () => {
+  const response = (id, usage) => ({ type: 'assistant', message: { id, usage } });
+  const used = tokens([
+    response('m1', {
+      input_tokens: 1,
+      cache_creation_input_tokens: 10,
+      cache_read_input_tokens: 100,
+      output_tokens: 5,
+    }),
+    response('m1', {
+      input_tokens: 1,
+      cache_creation_input_tokens: 10,
+      cache_read_input_tokens: 100,
+      output_tokens: 20,
+    }),
+    response('m2', { input_tokens: 2, output_tokens: 3 }),
+    { type: 'user', message: { content: 'hi' } },
+  ]);
+  assert.deepEqual(used, { input: 113, output: 23 });
+});
+
+test('skillRuns counts the tokens of each run', () => {
+  const runs = skillRuns(
+    [
+      JSON.stringify({
+        timestamp: '2026-01-01T00:00:00Z',
+        type: 'user',
+        message: { content: '<command-name>/ux-fix</command-name>' },
+      }),
+      JSON.stringify({
+        timestamp: '2026-01-01T00:00:01Z',
+        type: 'assistant',
+        message: { id: 'a', usage: { input_tokens: 7, output_tokens: 2 } },
+      }),
+      JSON.stringify({ timestamp: '2026-01-01T00:00:02Z', type: 'user', message: { content: 'next' } }),
+      JSON.stringify({
+        timestamp: '2026-01-01T00:00:03Z',
+        type: 'assistant',
+        message: { id: 'b', usage: { input_tokens: 99, output_tokens: 9 } },
+      }),
+    ],
+    ['ux-fix'],
+  );
+  assert.deepEqual(runs[0].tokens, { input: 7, output: 2 });
+});
+
+test('checkStats: commits blocked and by which step, median run, slowest step; full runs apart', () => {
+  const rows = [
+    { run: 'commit', seconds: { test: 3, e2e: 18 }, failed: [] },
+    { run: 'commit', seconds: { test: 3, lint: 2 }, failed: ['lint'] },
+    { run: 'commit', seconds: { test: 4 }, failed: [] },
+    { run: 'full', seconds: { test: 6 }, failed: [] },
+  ];
+  assert.equal(
+    checkStats(rows),
+    '3 commits (1 blocked: lint ×1), median 4 s, slowest step e2e 18 s · 1 full runs (0 failed), median 6 s, slowest step test 6 s',
+  );
+  assert.equal(checkStats([]), '0 commits (0 blocked) · 0 full runs (0 failed)');
 });

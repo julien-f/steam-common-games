@@ -4,7 +4,9 @@
 //   node scripts/setup-facts.js                    each script's callers (tests and the changelog excluded —
 //                                                  a script only they mention has no caller), and which read
 //                                                  arguments without printing a usage line
-//   node scripts/setup-facts.js --cost             time and output size of the gates an agent runs
+//   node scripts/setup-facts.js --cost             time and output size of the gates an agent runs, and each
+//                                                  gate's change since the last run, and the check runs (hooks
+//                                                  included) since then: blocked commits, timings (scripts/dev-metrics.js)
 //   node scripts/setup-facts.js --transcripts[=N|=DATE]  the last N (default 20) sessions', or everything
 //                                                  after DATE's, largest outputs, slowest calls, repeated command
 //                                                  pairs, denied and rejected calls, and the newest entry read;
@@ -23,6 +25,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync, spawnSync } = require('node:child_process');
+const { record, history } = require('./dev-metrics');
 
 const ROOT = path.join(__dirname, '..');
 const COST_SCRIPTS = ['check', 'test', 'test:e2e', 'build'];
@@ -40,21 +43,29 @@ function argsWithoutUsage(source) {
   return source.includes('process.argv') && !source.includes('Usage');
 }
 
-// `cd x && FOO=1 npm run test:one a.js | tail` → `npm run test:one`.
+const TOOLS = ['npm', 'npx', 'git', 'node', 'gh'];
+
+// Commands whose time is the gates' (tests, e2e, commit hooks), not the agent's thinking.
+const GATE = /^(npm test|npm run test(:one|:e2e)?|node scripts\/e2e\.js|git commit)$/;
+
+// `cd x && FOO=1 npm run test:one a.js | tail` → `npm run test:one`. A chain is keyed by its gate if it
+// has one, where its time goes: `git add a && git commit && git log` → `git commit` (and its hook).
 function commandKey(command) {
-  const segment =
-    command
-      .split(/&&|\|\||[|;\n]/)
-      .map((s) => s.trim())
-      .find((s) => s && !/^cd\s/.test(s)) ?? '';
-  // Env assignments, and the options naming a directory (`git -C <dir>`, `npm --prefix <dir>`), say nothing.
-  const words = segment
-    .split(/\s+/)
-    .filter((w) => !/^\w+=/.test(w))
-    .filter((w, i, all) => !['-C', '--prefix'].includes(w) && !['-C', '--prefix'].includes(all[i - 1]));
-  const [cmd, sub, third] = words;
-  if (!['npm', 'npx', 'git', 'node', 'gh'].includes(cmd)) return cmd ?? '';
-  return [cmd, sub, sub === 'run' ? third : undefined].filter(Boolean).join(' ');
+  const keys = command
+    .split(/&&|\|\||[|;\n]/)
+    .map((s) => s.trim())
+    .filter((s) => s && !/^cd\s/.test(s))
+    .map((segment) => {
+      // Env assignments, `time`, and the options naming a directory (`git -C <dir>`, `npm --prefix <dir>`) say nothing.
+      const words = segment
+        .split(/\s+/)
+        .filter((w, i) => !/^\w+=/.test(w) && !(i === 0 && w === 'time'))
+        .filter((w, i, all) => !['-C', '--prefix'].includes(w) && !['-C', '--prefix'].includes(all[i - 1]));
+      const [cmd, sub, ...rest] = words;
+      if (!TOOLS.includes(cmd)) return cmd ?? '';
+      return [cmd, sub, sub === 'run' ? rest.find((w) => !w.startsWith('-')) : undefined].filter(Boolean).join(' ');
+    });
+  return keys.find((k) => GATE.test(k)) ?? keys[0] ?? '';
 }
 
 const text = (content) => (typeof content === 'string' ? content : (content ?? []).map((c) => c.text ?? '').join(''));
@@ -96,8 +107,25 @@ function isPrompt(entry) {
   );
 }
 
+// Parsed entries → tokens their responses read (`input`: uncached, cache writes and cache reads) and
+// wrote (`output`). A response spans several entries, each repeating its usage so far: the max per id counts.
+function tokens(entries) {
+  const byId = new Map();
+  for (const e of entries) {
+    const u = e.type === 'assistant' && e.message?.id && e.message.usage;
+    if (!u) continue;
+    const input = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
+    const seen = byId.get(e.message.id) ?? { input: 0, output: 0 };
+    byId.set(e.message.id, { input: Math.max(seen.input, input), output: Math.max(seen.output, u.output_tokens ?? 0) });
+  }
+  return [...byId.values()].reduce((sum, t) => ({ input: sum.input + t.input, output: sum.output + t.output }), {
+    input: 0,
+    output: 0,
+  });
+}
+
 // One session's JSONL lines → each run of a skill in `names`, by `/name` or the Skill tool:
-// `{ skill, ms }`, ms running to the next prompt (or the session's end).
+// `{ skill, ms, tokens }`, running to the next prompt (or the session's end); tokens of the main thread only.
 function skillRuns(lines, names) {
   const entries = lines.map((line) => JSON.parse(line));
   const runs = [];
@@ -110,7 +138,11 @@ function skillRuns(lines, names) {
             ?.skill;
     if (!names.includes(skill)) return;
     const end = entries.slice(i + 1).find(isPrompt) ?? entries.findLast((e) => e.timestamp);
-    runs.push({ skill, ms: Date.parse(end.timestamp) - Date.parse(entry.timestamp) });
+    runs.push({
+      skill,
+      ms: Date.parse(end.timestamp) - Date.parse(entry.timestamp),
+      tokens: tokens(entries.slice(i, entries.indexOf(end) + 1)),
+    });
   });
   return runs;
 }
@@ -139,7 +171,7 @@ function answerOutcome(question, answer, rejection) {
 
 // One session's JSONL lines → what a reader needs for judgment, in order: `{ kind, … }` with kind
 // `prompt` (`text`, `reply`: the last assistant text before it), `skill`, `error` (`key`, `text`),
-// `interrupt` (`key`: the call before it), `rejected` (`key`, `reason`) or `answer` (`skill`: the
+// `interrupt` (`key`: the call before it, `skill`: the one running), `rejected` (`key`, `reason`) or `answer` (`skill`: the
 // one running, `question`, `answer`, `outcome`, `setup`: it proposes a setup change).
 function sessionEvents(lines, names) {
   const events = [];
@@ -154,7 +186,7 @@ function sessionEvents(lines, names) {
     if (names.includes(started)) events.push({ kind: 'skill', skill: (skill = started) });
     else if (isPrompt(entry)) {
       const prompt = text(content);
-      if (prompt.startsWith('[Request interrupted by user')) events.push({ kind: 'interrupt', key: lastKey });
+      if (prompt.startsWith('[Request interrupted by user')) events.push({ kind: 'interrupt', key: lastKey, skill });
       else {
         skill = undefined;
         events.push({ kind: 'prompt', text: clip(prompt, 500), reply: clip(reply, 200) });
@@ -311,9 +343,6 @@ function docReadStats(sessions) {
     .sort((a, b) => b.reads - a.reads || a.doc.localeCompare(b.doc));
 }
 
-// Commands whose time is the gates' (tests, e2e, commit hooks), not the agent's thinking.
-const GATE = /^(npm test|npm run test(:one|:e2e)?|node scripts\/e2e\.js|git commit)$/;
-
 // One subagent's JSONL lines → `{ minutes, turns, cacheRead, calls, errors, gateSec, toolSec, topTools }`. A response
 // spans several lines, each repeating its usage so far, so each field's max per message id counts.
 function agentSummary(lines) {
@@ -363,6 +392,7 @@ function agents(sessionId) {
 }
 
 const kb = (bytes) => `${(bytes / 1024).toFixed(1)} KB`;
+const mtok = (t) => `${(t.input / 1e6).toFixed(1)}M in / ${(t.output / 1e3).toFixed(0)}K out`;
 
 function cost() {
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
@@ -378,14 +408,46 @@ function cost() {
       .map(([f, size]) => `${f} ${kb(size)}`)
       .join(', ')}`,
   );
+  const last = history('cost').at(-1);
+  const seconds = {};
   for (const script of COST_SCRIPTS) {
     const start = Date.now();
     const { status, stdout, stderr } = spawnSync(npm, ['run', '-s', script], { cwd: ROOT, encoding: 'utf8' });
     const out = stdout + stderr;
+    seconds[script] = Number(((Date.now() - start) / 1000).toFixed(1));
     console.log(
-      `npm run ${script}: ${((Date.now() - start) / 1000).toFixed(1)} s, ${kb(out.length)}, ${out.split('\n').length} lines${status ? `, exit ${status}` : ''}`,
+      `npm run ${script}: ${seconds[script]} s, ${kb(out.length)}, ${out.split('\n').length} lines${status ? `, exit ${status}` : ''}${costDelta(last?.seconds[script], seconds[script], last?.at)}`,
     );
   }
+  record('cost', { seconds });
+  const since = last?.at ?? '';
+  console.log(
+    `Check runs${since ? ` since ${since.slice(0, 10)}` : ''} (scripts/check.js): ${checkStats(history('checks').filter((r) => r.at > since))}`,
+  );
+}
+
+// Check runs → `12 commits (2 blocked: lint ×2), median 3.1 s, slowest step e2e 18.0 s · 3 full runs (0 failed)`.
+function checkStats(rows) {
+  const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0;
+  const total = (r) => Math.max(0, ...Object.values(r.seconds)); // steps run in parallel
+  const part = (run, label) => {
+    const mine = rows.filter((r) => r.run === run);
+    const failed = mine.filter((r) => r.failed.length);
+    const counts = new Map();
+    for (const name of failed.flatMap((r) => r.failed)) counts.set(name, (counts.get(name) ?? 0) + 1);
+    const why = [...counts].map(([name, n]) => `${name} ×${n}`).join(', ');
+    const slowest = mine.flatMap((r) => Object.entries(r.seconds)).sort((a, b) => b[1] - a[1])[0];
+    return `${mine.length} ${label} (${failed.length} ${run === 'commit' ? 'blocked' : 'failed'}${why ? `: ${why}` : ''})${mine.length ? `, median ${median(mine.map(total))} s, slowest step ${slowest[0]} ${slowest[1]} s` : ''}`;
+  };
+  return `${part('commit', 'commits')} · ${part('full', 'full runs')}`;
+}
+
+// ` (+30% since 2026-10-12) ⚠` against the last --cost run; ⚠ past SLOWER.
+const SLOWER = 0.25;
+function costDelta(before, now, at) {
+  if (!before) return '';
+  const change = (now - before) / before;
+  return ` (${change >= 0 ? '+' : ''}${Math.round(change * 100)}% since ${at.slice(0, 10)})${change > SLOWER ? ' ⚠' : ''}`;
 }
 
 // A session's JSONL lines after `since` (ms); lines without a timestamp stay with their neighbours.
@@ -421,8 +483,9 @@ function transcripts({ limit, since }, digestDir) {
     read.forEach(([id], i) => fs.writeFileSync(path.join(digestDir, `${id}.txt`), digest(events[i])));
   }
   const { output, slow, pairs, denied } = summarize(sessions);
+  const total = tokens(logs.flat().map((line) => JSON.parse(line)));
   console.log(
-    `${logs.length} sessions, ${sessions.flat().length} tool calls, newest entry ${newest ? new Date(newest).toISOString() : 'none'}\n\nLargest output (total · max · calls):`,
+    `${logs.length} sessions, ${sessions.flat().length} tool calls, ${mtok(total)} (main threads), newest entry ${newest ? new Date(newest).toISOString() : 'none'}\n\nLargest output (total · max · calls):`,
   );
   for (const k of output) console.log(`  ${k.key}: ${kb(k.bytes)} · ${kb(k.maxBytes)} · ${k.count}`);
   console.log('\nSlowest call (elapsed, including any permission wait):');
@@ -431,17 +494,23 @@ function transcripts({ limit, since }, digestDir) {
   for (const p of pairs) console.log(`  ${p.pair}: ${p.sessions} · ${p.count}`);
   console.log('\nDenied by the permission classifier · rejected by the user:');
   for (const d of denied) console.log(`  ${d.key}: ${d.denied} · ${d.rejected}`);
-  console.log('\nSkill runs (runs · sessions · longest run to the next prompt):');
+  console.log('\nSkill runs (runs · sessions · longest run to the next prompt · tokens, main thread · interrupts):');
   const runs = logs.map((lines) => skillRuns(lines, names));
+  const interrupts = events.flat().filter((e) => e.kind === 'interrupt');
   for (const name of names) {
     const mine = runs.map((r) => r.filter((run) => run.skill === name));
     const all = mine.flat();
     const longest = all.length ? `${Math.round(Math.max(...all.map((r) => r.ms)) / 60000)} min` : 'never run';
-    console.log(`  ${name}: ${all.length} · ${mine.filter((r) => r.length).length} · ${longest}`);
+    const used = all.reduce((sum, r) => ({ input: sum.input + r.tokens.input, output: sum.output + r.tokens.output }), {
+      input: 0,
+      output: 0,
+    });
+    console.log(
+      `  ${name}: ${all.length} · ${mine.filter((r) => r.length).length} · ${longest} · ${mtok(used)} · ${interrupts.filter((e) => e.skill === name).length}`,
+    );
   }
-  const interrupts = events.flat().filter((e) => e.kind === 'interrupt');
   console.log(
-    `\nInterrupts: ${interrupts.length} in ${events.filter((s) => s.some((e) => e.kind === 'interrupt')).length} sessions`,
+    `\nInterrupts: ${interrupts.length} (${interrupts.filter((e) => !e.skill).length} outside a skill) in ${events.filter((s) => s.some((e) => e.kind === 'interrupt')).length} sessions`,
   );
   console.log(
     '\nQuestions by running skill (recommended taken · other option · own answer · asked to clarify · dismissed):',
@@ -513,8 +582,11 @@ module.exports = {
   callers,
   argsWithoutUsage,
   commandKey,
+  costDelta,
+  checkStats,
   parseSession,
   linesSince,
+  tokens,
   skillRuns,
   answerOutcome,
   sessionEvents,

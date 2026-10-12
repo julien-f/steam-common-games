@@ -11,12 +11,14 @@
 // to compare a skill change before and after.
 // Verified on Claude Code 2.1.296: stream-json emits each `tool_use` before running it, the `result`
 // event carries `total_cost_usd`, and --no-session-persistence writes no transcript.
+// Each run's results go to scripts/dev-metrics.js (`evals`), to compare with earlier runs.
 
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync, spawn } = require('node:child_process');
 const { parseSession, sessionEvents } = require('./setup-facts');
+const { record, history } = require('./dev-metrics');
 
 const ROOT = path.join(__dirname, '..');
 const PARALLEL = 4;
@@ -143,14 +145,22 @@ async function main() {
       PARALLEL,
     );
     let passed = 0;
+    const routing = {};
     cases.forEach((c, i) => {
       const runs = got.slice(i * repeat, (i + 1) * repeat);
       const ok = runs.filter((r) => r === c.expect || (c.expect === '-' && r.startsWith('-'))).length;
       passed += ok;
+      routing[c.skill] = (routing[c.skill] ?? 0) + ok;
       console.log(`  ${ok === repeat ? '✓' : '✗'} ${c.skill}: "${c.prompt}" → ${runs.join(', ')} (want ${c.expect})`);
     });
-    console.log(`  ${passed}/${cases.length * repeat} routed as expected`);
-    if (!dryRun) return;
+    const previous = history('evals').findLast((r) => r.cases === cases.length && r.repeat === repeat);
+    console.log(
+      `  ${passed}/${cases.length * repeat} routed as expected${previous ? ` (last comparable run, ${previous.at.slice(0, 10)}: ${previous.passed})` : ''}`,
+    );
+    // Per skill, passed runs out of cases × repeat, so a later run shows a routing regression.
+    const row = { ref: ref ?? 'working tree', repeat, routing, cases: cases.length, passed };
+    if (!dryRun) return record('evals', row);
+    row.dryRuns = {};
     console.log('\nDry runs:');
     for (const e of evals.filter((e) => e.dryRun)) {
       // `auto`, as in an interactive session: the classifier's denials are part of what's measured.
@@ -160,7 +170,9 @@ async function main() {
         `  ${e.dryRun}: $${s.cost.toFixed(2)} · ${s.minutes.toFixed(1)} min · ${s.turns} turns · ${s.calls} calls · ${s.denied} denied · ${s.errors.length} failed`,
       );
       for (const error of s.errors) console.log(`    ✗ ${error}`);
+      row.dryRuns[e.name] = { cost: s.cost, minutes: s.minutes, denied: s.denied, failed: s.errors.length };
     }
+    record('evals', row);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

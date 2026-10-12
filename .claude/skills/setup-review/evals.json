@@ -13,6 +13,10 @@
       "expect": "setup-review"
     },
     {
+      "prompt": "Let's review our skills/scripts. Are we measuring and logging everything we should?",
+      "expect": "setup-review"
+    },
+    {
       "prompt": "Allow npm run build without asking me",
       "expect": "update-config"
     },

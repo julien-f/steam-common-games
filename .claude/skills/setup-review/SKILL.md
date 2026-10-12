@@ -22,7 +22,7 @@ Read [setup-backlog.md](../../../docs/dev/setup-backlog.md). Re-run each **Watch
 - `npm run check:doc-refs`: stale script names, flags, npm scripts and links in skills and CLAUDE.md. A failure is a finding as-is.
 - `npm run check:setup`: skill frontmatter, and allows covering an ask-first action. A failure or a `settings.local.json` warning is a finding as-is.
 - `node scripts/setup-facts.js`: each script's callers, and which read arguments without a usage line (a script taking only optional flags may not need one).
-- `node scripts/setup-facts.js --cost` (~40 s): time and output size of `check`, `test`, `test:e2e` and `build`, CLAUDE.md's size and the largest docs — the numbers the **Cost** and **Docs** checks judge.
+- `node scripts/setup-facts.js --cost` (~70 s): time and output size of `check`, `test`, `test:e2e` and `build`, each one's change since the last run (⚠ past 25% slower: a **Cost** finding, and any doc quoting that time is stale), the check runs since (blocked commits and by which step), CLAUDE.md's size and the largest docs — the numbers the **Cost** and **Docs** checks judge.
 - With `evals`: `node scripts/skill-evals.js --repeat=3 --dry-run` ([testing.md](../../../docs/dev/testing.md#skill-evals)). A routing miss is a **Triggers** finding; a dry run's denied calls are **Permissions** ones, its failed calls **Staleness** or **Prose → script** ones.
 - Read every skill, CLAUDE.md, both settings files and the memory files in full.
 
@@ -44,7 +44,7 @@ Read [setup-backlog.md](../../../docs/dev/setup-backlog.md). Re-run each **Watch
 
 ## 3. Transcripts
 
-- `node scripts/setup-facts.js --transcripts=<DATE> --digest=<scratchpad>/digest`, DATE being the ledger's "Transcripts read up to" (`--transcripts` alone, the last 20 sessions, when it says never), counts what needs no judgment over the sessions since: largest outputs and slowest calls by command, command pairs repeated across sessions, calls the permission classifier denied or you rejected, each skill's runs and longest run, interrupts, which docs were read and how often whole (subagents included), and how the user answered each skill's questions — a skill whose recommendation is often overridden, answered in free text or sent back to clarify recommends badly or asks what a default would settle.
+- `node scripts/setup-facts.js --transcripts=<DATE> --digest=<scratchpad>/digest`, DATE being the ledger's "Transcripts read up to" (`--transcripts` alone, the last 20 sessions, when it says never), counts what needs no judgment over the sessions since: largest outputs and slowest calls by command, command pairs repeated across sessions, calls the permission classifier denied or you rejected, each skill's runs, longest run, tokens and interrupts, interrupts, which docs were read and how often whole (subagents included), and how the user answered each skill's questions — a skill whose recommendation is often overridden, answered in free text or sent back to clarify recommends badly or asks what a default would settle.
 - One `Agent` subagent then reads the digests (one compact file per session; never the raw `.jsonl`) for what does need judgment, seen in at least two sessions:
   - the user correcting the agent the same way (a rule missing, unclear or ignored), interrupts and rejections included;
   - the same command failing the same way (a pitfalls.md entry or a fix);

@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 
-const { runAll, steps } = require('../scripts/check');
+const { runAll, runRow, steps } = require('../scripts/check');
 
 test('runAll: every step runs, in order, with its pass/fail and output', async () => {
   const node = process.execPath;
@@ -36,4 +36,13 @@ test("steps: E2E_DEFER leaves a commit's e2e to a later run, never its other UI 
   const names = steps('HEAD', ['public/app.tsx'], { deferE2e: true }).map(([name]) => name);
   assert.ok(!names.includes('e2e'));
   assert.ok(names.includes('typecheck'));
+});
+
+test('runRow: full run or commit, seconds per step, the failed steps', () => {
+  const results = [
+    { name: 'test', ok: true, ms: 4321 },
+    { name: 'lint', ok: false, ms: 1000 },
+  ];
+  assert.deepStrictEqual(runRow('HEAD', results), { run: 'commit', seconds: { test: 4.3, lint: 1 }, failed: ['lint'] });
+  assert.strictEqual(runRow(undefined, []).run, 'full');
 });

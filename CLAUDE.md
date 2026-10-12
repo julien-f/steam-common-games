@@ -5,7 +5,7 @@ Working conventions for this repo. Documentation lives in `docs/` — keep it th
 ## Project context
 
 - **Stack**: Node >=22.13 + Express 5 backend, Solid + TypeScript frontend bundled by Vite, `node:sqlite` for `db.sqlite`; npm. Setup, dev servers and ports are in [README.md](README.md).
-- **Tests**: `npm test` (~4 s, no real database), one file with `npm run test:one test/<name>.test.js`; end-to-end `npm run test:e2e` (~20 s, every `/api` call mocked). Details, and the hooks: [testing.md](docs/dev/testing.md).
+- **Tests**: `npm test` (no real database), one file with `npm run test:one test/<name>.test.js`; end-to-end `npm run test:e2e` (every `/api` call mocked). Details, and the hooks: [testing.md](docs/dev/testing.md).
 - **Looking at the UI**: `npm run dev:mock` (or `node scripts/mock-server.js up` from an agent session), not the real dev server — that one writes the user's real prefs, so follow [testing.md](docs/dev/testing.md)'s seed/restore steps before using it.
 
 ## Where things are documented
