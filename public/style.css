@@ -737,13 +737,10 @@ tbody td {
    instead of a second, separately-maintained CSS copy that a tier's styling (e.g. Wishlisted's
    bold weight) could go missing from without anyone noticing, same as it briefly did between this
    file and OWNERSHIP_STATUS_COLUMN's own cell. */
-.game-name-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
+/* Inline, not flex: a wrapping name in a flex row takes the full width and strands its badge. */
 .name-status-badge {
-  flex-shrink: 0;
+  margin-left: 4px;
+  white-space: nowrap;
   font-size: 12px;
 }
 .name-status-badge.owned {

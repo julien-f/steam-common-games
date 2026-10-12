@@ -2234,6 +2234,26 @@ test('F1 edge: Esc closes a nav popover or the search dropdown, not the open gam
   await expect(page.locator('#panel-title')).toBeHidden();
 });
 
+test('C1 edge: a wrapped game name keeps its ✓/☆ badge right after the last word', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'names wrap at phone width');
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare?u=alice&u=bob');
+  await expect(rows(page).first()).toBeVisible();
+  const gaps = await page.locator('.game-name-cell').evaluateAll((cells) =>
+    cells.flatMap((cell) => {
+      const text = cell.firstChild!;
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      const lines = [...range.getClientRects()];
+      if (lines.length < 2) return [];
+      const badge = cell.querySelector('.name-status-badge')!.getBoundingClientRect();
+      return [Math.round(badge.left - lines.at(-1)!.right)];
+    }),
+  );
+  expect(gaps.length).toBeGreaterThan(0);
+  for (const gap of gaps) expect(gap).toBeLessThanOrEqual(8);
+});
+
 test('F1 edge: Enter opens the highlighted recently looked-up game', async ({ page }) => {
   await asPlayer(page, ALICE, { recentGames: [620, 1145360] });
   await page.goto('/lists/owned');

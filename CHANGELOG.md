@@ -117,6 +117,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Screen readers hear which account, list or source a control acts on, a label on the combine selects, and no pressed state on tiles that aren't toggles
 - A pressed stat tile's label is readable at AA contrast
 - On a phone, the account menu's links, Home's Friends toggle and refresh, the shortcuts dialog's close button and the footer's About link take a 24px tap
+- A game name that wraps in a table keeps its ✓/☆ badge right after it, instead of at the far edge of the cell
 
 ### Development
 
