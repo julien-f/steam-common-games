@@ -1131,6 +1131,16 @@ test("B1 edge: a bundle's hero keeps All bundles by its ‹ ›, and one primary
   expect(classes.filter((c) => !/\bbtn-(primary|ghost)\b/.test(c))).toEqual([]);
 });
 
+test("B1 edge: a bundle's All bundles link keeps the account being explored, without reloading", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto(`/lists/bundle/${BUNDLE.id}?u=bob`);
+  await expect(rows(page)).toHaveCount(4);
+  await page.evaluate(() => ((window as unknown as { e2eSamePage: boolean }).e2eSamePage = true));
+  await page.locator('.list-hero-titlebar').getByRole('link', { name: '← All bundles' }).click();
+  await expect(page).toHaveURL(/\/bundles\?u=bob$/);
+  expect(await page.evaluate(() => (window as unknown as { e2eSamePage?: boolean }).e2eSamePage)).toBe(true);
+});
+
 test("B3 edge: a list built from a bundle says how many of its games aren't on Steam", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
@@ -1159,10 +1169,7 @@ test("B3 edge: what a bundle adds keeps the bundle's prices and links back to it
 
 const sharedUrl = (formula: string) => `/lists/shared?f=${encodeURIComponent(formula)}`;
 
-test("B3 edge: what a bundle adds, once saved, keeps the bundle's Tier Price, in a newly picked region too", async ({
-  page,
-}) => {
-  await asPlayer(page, ALICE);
+const saveWhatBundleAdds = async (page: Page) => {
   // The mock only prices in EUR; answer a US request in USD, as ITAD does.
   await page.route(/\/api\/bundles\/\d+\?/, (route) => {
     const req = route.request();
@@ -1178,11 +1185,58 @@ test("B3 edge: what a bundle adds, once saved, keeps the bundle's Tier Price, in
   if (await more.isVisible()) await more.click();
   await page.getByRole('button', { name: 'Save as a list' }).click();
   await expect(page).toHaveURL(/\/lists\/(?!shared)/);
-  await expect(page.locator('thead th').filter({ hasText: /^Tier Price/ })).toHaveCount(1);
   await expect(row(page, 'Overcooked! 2')).toContainText('€12.00');
+};
+
+test("B3 edge: what a bundle adds, once saved, keeps the bundle's Tier Price, in a newly picked region too", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await saveWhatBundleAdds(page);
+  await expect(page.locator('thead th').filter({ hasText: /^Tier Price/ })).toHaveCount(1);
   await page.getByTitle('Preferences').click();
   await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
   await expect(row(page, 'Overcooked! 2')).toContainText('$12.00');
+});
+
+test("B3 edge: a region picked while a saved list's bundle is still loading prices its Tier Price there", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await saveWhatBundleAdds(page);
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(/\/api\/bundles\/\d+\?(?!.*country=US)/, async (route) => {
+    await held;
+    await route.fallback();
+  });
+  const asked = page.waitForRequest(/\/api\/bundles\/\d+\?/);
+  await page.reload();
+  await asked;
+  await page.getByTitle('Preferences').click();
+  await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
+  release();
+  await expect(row(page, 'Overcooked! 2')).toContainText('$12.00');
+});
+
+test("B3 edge: a ranking of a list with a bundle source only re-prices on a new region, it doesn't reload", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await saveWhatBundleAdds(page);
+  await page.getByRole('button', { name: /Rank this list/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading', { name: /^Ranking of/ })).toBeVisible();
+  await expect(rows(page)).toHaveCount(2);
+  const bundleAsks: string[] = [];
+  page.on('request', (req) => {
+    if (/\/api\/bundles\/\d+/.test(req.url())) bundleAsks.push(req.url());
+  });
+  await page.getByTitle('Preferences').click();
+  const repriced = page.waitForResponse(/\/api\/prices\?country=US/);
+  await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
+  await repriced;
+  expect(bundleAsks).toEqual([]);
 });
 
 test("B3 edge: a saved list from a pick-and-mix bundle claims no per-game rate it can't know", async ({ page }) => {

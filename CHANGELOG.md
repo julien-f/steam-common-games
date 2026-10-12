@@ -137,6 +137,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - With one game selected, the rank button reads "Rank 1 game", not "Rank 1 games"
 - A list saved from What does this add? keeps the bundle's Tier Price column
 - Closing the nav bar's game search with Esc or a pick no longer lets a search still in progress reopen its suggestions
+- A saved list built from a bundle shows its Tier Price in a region picked while it was still loading
+- A bundle's ← All bundles keeps the account you're exploring from a shared link
 
 ### Development
 

@@ -228,6 +228,7 @@ import {
   setRanking,
   listHasPriceSource,
   listHasAccountSource,
+  listHasBundleSource,
   rankingsOf,
   listDeps,
 } from './listsStore.ts';
@@ -603,7 +604,6 @@ export default function ListRoute() {
   // scope (not load()-local) so the Prices tile's own refresh can re-price exactly what's loaded without
   // re-resolving the bundle. Reset by load() itself on every (re)load.
   let resolvedBundleGames: ResolvedGame[] | null = null;
-  let userListTiered = false; // a saved list's rows carry a bundle source's Tier Price
   // Owned/wishlist kinds only: how old the server's cached copy of this account's list is (epoch
   // ms, null = fetched fresh), and whether a forced re-fetch is in flight — the hero's Updated
   // tile, which is also the control that forces one (see heroTiles). Steam data is cached server-side for weeks (default.env's
@@ -1836,6 +1836,16 @@ export default function ListRoute() {
     const list = userList();
     return kind === 'wishlist' || (kind === 'user' && !!list && listHasPriceSource(list));
   }
+  // From the list's definition, not load state: a region change mid-load must still reload the Tier Price.
+  function showsTierPrice(): boolean {
+    if (kind === 'bundle') return true;
+    if (kind === 'shared') {
+      const list = compareList();
+      return !!list && listHasBundleSource(list, sharedGetList);
+    }
+    const list = userList();
+    return kind === 'user' && !!list && list.kind !== 'ranked' && listHasBundleSource(list, getList);
+  }
   // A /lists/<id> link only opens here; a dynamic list's 🔗 Share list replaces Share view outright.
   function isDynamicList(): boolean {
     return kind === 'user' && userList()?.kind === 'dynamic';
@@ -1951,7 +1961,6 @@ export default function ListRoute() {
       for (const [appid, f] of bundleTierFields(games, [])) if (!tiers.has(appid)) tiers.set(appid, f);
     };
     resolvedBundleGames = null;
-    userListTiered = false;
     // Cast, not annotated: resolveRows sets it, which flow narrowing from `= null` would miss.
     let pendingGroups = null as MembershipGroup[] | null;
     // Not cleared on a ↻ Refresh of the list already on screen, for the same reason heroTitle
@@ -2115,7 +2124,7 @@ export default function ListRoute() {
       );
       if (!resolved) return;
       const { appids, rows } = resolved;
-      tiered = userListTiered = rows.some((row) => tiers.has(row.appid));
+      tiered = list.kind !== 'ranked' && rows.some((row) => tiers.has(row.appid));
       initialRows = rows.map((row) => ({ ...row, ...tiers.get(row.appid) }));
       if (list.kind === 'ranked') {
         const state = getRanking(list.id);
@@ -2924,9 +2933,9 @@ export default function ListRoute() {
         >
           ›
         </button>
-        <a class="btn btn-ghost btn-sm" href="/bundles">
+        <A class="btn btn-ghost btn-sm" href={withAccountParam('/bundles', routerLocation.search)}>
           ← All bundles
-        </a>
+        </A>
       </div>
     );
 
@@ -3125,8 +3134,7 @@ export default function ListRoute() {
     const onRegionChange = () => {
       setRegionCode(currentRegion());
       setPriceFetchedAt(undefined);
-      if (kind === 'bundle' || (kind === 'shared' && sharedBundles().length) || (kind === 'user' && userListTiered))
-        void load();
+      if (showsTierPrice()) void load();
       else if (hasPrices()) void loadPrices(rowsStore, loadGuard.current());
     };
     window.addEventListener(REGION_CHANGED_EVENT, onRegionChange);
