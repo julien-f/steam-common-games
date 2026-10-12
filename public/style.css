@@ -3446,45 +3446,15 @@ kbd {
 .list-hero-more {
   display: none;
 }
-.list-hero-outlink {
-  font-size: var(--fs-ui);
-  color: var(--text1);
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
-  white-space: nowrap;
-  transition:
-    color 0.15s,
-    border-color 0.15s;
-}
-.list-hero-outlink:hover {
-  color: var(--accent2);
-  border-bottom-color: var(--accent2);
-}
 .list-hero-titlebar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
 }
 .list-hero-nav {
   display: flex;
   gap: 4px;
-}
-.list-hero-nav button {
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  background: transparent;
-  color: var(--text0);
-  font-size: var(--fs-body);
-  cursor: pointer;
-}
-.list-hero-nav button:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent2);
-}
-.list-hero-nav button:disabled {
-  opacity: 0.35;
-  cursor: default;
 }
 /* An <h1>, so a list route has a real document heading rather than a styled <span> — hence the
    explicit margin/size reset over the browser's own h1 metrics. */

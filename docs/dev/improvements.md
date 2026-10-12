@@ -35,7 +35,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 ## Bundles and prices
 
 - **U163 · polish · B3** — "Save as a list" on "What does this add?" keeps Best Deal but drops the bundle's Tier Price, which the unsaved view now shows (U141). The saved list's load could take the same `onBundleGames` hook (`public/listResolve.ts`).
-- **U143 · polish · B1** — the bundle hero has 6 actions in 4 styles, with "← All bundles" far right and ‹ › far left. Put "← All bundles" by ‹ ›; one primary, the rest ghost.
 - **U144 · polish · O1** — without `ITAD_API_KEY`, `/bundles` keeps its toolbar, an empty table, pager, Updated and region figures under a one-line notice. One empty-state card instead.
 
 ## Ranking

@@ -2885,6 +2885,7 @@ export default function ListRoute() {
       <div class="list-hero-nav">
         <button
           type="button"
+          class="btn btn-ghost btn-sm"
           aria-label="Previous bundle"
           title="Previous bundle"
           disabled={prevBundleId() == null}
@@ -2897,6 +2898,7 @@ export default function ListRoute() {
         </button>
         <button
           type="button"
+          class="btn btn-ghost btn-sm"
           aria-label="Next bundle"
           title="Next bundle"
           disabled={nextBundleId() == null}
@@ -2907,6 +2909,9 @@ export default function ListRoute() {
         >
           ›
         </button>
+        <a class="btn btn-ghost btn-sm" href="/bundles">
+          ← All bundles
+        </a>
       </div>
     );
 
@@ -3044,7 +3049,7 @@ export default function ListRoute() {
           <>
             <Show when={bundleLinks().details}>
               {(details) => (
-                <a class="list-hero-outlink hero-secondary" href={details()} target="_blank" rel="noopener">
+                <a class="btn btn-ghost btn-sm hero-secondary" href={details()} target="_blank" rel="noopener">
                   View on IsThereAnyDeal ↗
                 </a>
               )}
@@ -3072,9 +3077,6 @@ export default function ListRoute() {
                 What does this add?
               </A>
             </Show>
-            <a class="btn btn-ghost btn-sm hero-secondary" href="/bundles">
-              ← All bundles
-            </a>
           </>
         )}
       </>
