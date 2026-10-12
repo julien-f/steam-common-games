@@ -19,7 +19,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 - **U124 · major · S2** — A `/game/<appid>` link's preview doesn't name the game: crawlers don't run JS, so the per-route `document.title` never reaches them. Inject `og:title` (game name) and `og:image` (its Steam header image) server-side for `/game/:appid`, from cached details only so crawler hits add no upstream requests (integrations.md trust tiers).
 - **U125 · minor · S1, C1, S3** — List, bundle and compare links all preview identically, and a `/lists/<id>` list that exists only in the sender's browser can't be described at all. Server-side per-route `og:title` from the path alone (Owned games, Wishlist, Compare libraries, Shared list, bundle name from cache), generic for `/lists/<id>`.
-- **U126 · polish · S1, S2** — No raster icon: the favicon is an emoji data URI and `/favicon.ico` 404s, so previews that show a site icon fall back to a blank one. Ship a PNG icon and `apple-touch-icon`.
 
 ## Loading and feedback
 

@@ -122,7 +122,7 @@ test('S3 edge: an unknown path says so and links Home', async ({ page }) => {
 
 test('S3 edge: the page carries its own icon, so the browser asks for no favicon.ico', async ({ page }) => {
   await page.goto('/about');
-  await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', /^data:image\/svg\+xml,/);
+  await expect(page.locator('link[rel="icon"]').first()).toHaveAttribute('href', /^data:image\/svg\+xml,/);
 });
 
 test('S3 edge: About names every data source, ProtonDB included', async ({ page }) => {

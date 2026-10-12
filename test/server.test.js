@@ -14,6 +14,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const zlib = require('node:zlib');
+const fs = require('node:fs');
+const path = require('node:path');
 const supertest = require('supertest');
 const { app } = require('../server');
 const { _reset, setCache, getCachedAt } = require('../lib/cache');
@@ -178,6 +180,13 @@ test('GET /lists/owned: the app shell carries Open Graph tags with an absolute i
   assert.match(res.text, /<meta property="og:description" content="Explore Steam libraries [^"]+" \/>/);
   assert.match(res.text, /<meta property="og:image" content="http:\/\/app\.example\/og-image\.jpg" \/>/);
   assert.match(res.text, /<meta name="twitter:card" content="summary_large_image" \/>/);
+});
+
+test('index.html links raster icons, which link previews fall back to', () => {
+  // The source, not the served shell: that one is a possibly stale dist/ build when one exists.
+  const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
+  assert.match(html, /<link rel="icon" type="image\/png" sizes="512x512" href="\/icon-512\.png" \/>/);
+  assert.match(html, /<link rel="apple-touch-icon" href="\/apple-touch-icon\.png" \/>/);
 });
 
 test('GET /api/nonexistent-route: still 404s — the SPA fallback never shadows /api/*', async () => {
