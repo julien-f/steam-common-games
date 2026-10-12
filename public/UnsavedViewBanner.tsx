@@ -1,4 +1,4 @@
-import { Show, type JSX } from 'solid-js';
+import { Show, createSignal, onCleanup, type JSX } from 'solid-js';
 import { getAuthUser } from './authStore.ts';
 import { isUnsaved, summarizeViewDiff } from './tableViewSync.ts';
 import type { ViewStateApi } from '@vates/data-table-solid';
@@ -32,20 +32,33 @@ export function UnsavedViewBanner(props: { table: ViewStateApi; prefKey: string 
 }
 
 // A table's "🔗 Share view"/"Default view" toolbar buttons — see tableViewPrefs.ts.
+const REASON_MS = 5000;
+
 export function ViewActions(props: {
   onShare: (btn: HTMLElement) => void;
   onReset: () => void;
   shareDisabledReason?: string | null;
 }): JSX.Element {
+  const [reasonShown, setReasonShown] = createSignal(false);
+  let hideTimer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => clearTimeout(hideTimer));
+  function showReason(): void {
+    setReasonShown(true);
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => setReasonShown(false), REASON_MS);
+  }
   return (
     <div class="list-view-actions">
+      {/* aria-disabled, not disabled: a press has to reach us to say why. */}
       <button
         type="button"
         class="btn btn-ghost btn-sm"
         aria-label="Share view"
-        disabled={props.shareDisabledReason != null}
-        title={props.shareDisabledReason == null ? "Copy a link to this table's layout" : undefined}
-        onClick={(e) => props.onShare(e.currentTarget)}
+        aria-disabled={props.shareDisabledReason ? 'true' : undefined}
+        aria-describedby={props.shareDisabledReason ? 'share-view-reason' : undefined}
+        title={props.shareDisabledReason ? undefined : "Copy a link to this table's layout"}
+        onClick={(e) => (props.shareDisabledReason ? showReason() : props.onShare(e.currentTarget))}
+        onBlur={() => setReasonShown(false)}
       >
         🔗<span class="btn-label"> Share view</span>
       </button>
@@ -59,7 +72,20 @@ export function ViewActions(props: {
         <span class="btn-icon">↺</span>
         <span class="btn-label">Default view</span>
       </button>
-      <Show when={props.shareDisabledReason}>{(reason) => <p class="list-view-note">{reason()}</p>}</Show>
+      <Show when={props.shareDisabledReason}>
+        {(reason) => (
+          <>
+            <span id="share-view-reason" hidden>
+              {reason()}
+            </span>
+            <Show when={reasonShown()}>
+              <p class="list-view-reason" role="status">
+                {reason()}
+              </p>
+            </Show>
+          </>
+        )}
+      </Show>
     </div>
   );
 }

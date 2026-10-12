@@ -356,10 +356,11 @@ header p {
   border: 1px solid var(--border);
   color: var(--text0);
 }
-.btn-ghost:hover:not(:disabled) {
+.btn-ghost:hover:not(:disabled, [aria-disabled='true']) {
   background: var(--bg0);
 }
-.btn:disabled {
+.btn:disabled,
+.btn[aria-disabled='true'] {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -395,7 +396,7 @@ header p {
   border-color: #15803d;
   color: #15803d;
 }
-.btn-primary:hover:not(:disabled) {
+.btn-primary:hover:not(:disabled, [aria-disabled='true']) {
   background: #1490e8;
 }
 
@@ -3100,16 +3101,27 @@ kbd {
 
 /* Share view/Default view, in the table toolbar's own line (the library's `toolbarEnd` slot). */
 .list-view-actions {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
 }
-.list-view-note {
-  flex-basis: 100%;
-  text-align: right;
+.list-view-reason {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 24px));
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
   font-size: 12px;
-  color: var(--text1);
+  color: var(--text0);
 }
 .list-view-actions .btn-icon,
 .list-random-pick {

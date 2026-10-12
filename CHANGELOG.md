@@ -104,7 +104,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Opening a game link in a fresh browser lists it under Recently Looked Up right away, instead of saying the list is empty until a reload
 - Checkboxes, selects and scrollbars now render dark, matching the rest of the page
 - Buttons and fields use the page's font, and the table toolbar's buttons share one height
-- Disabled buttons look disabled, and a saved list's Share view says why it is off instead of hiding it in a tooltip
+- Disabled buttons look disabled, and pressing a saved list's dimmed Share view says why it is off instead of hiding the reason in a tooltip
 - A list's stat labels (Games, Updated, Prices) are easier to read
 - On a phone, table sort headers, Home's Rename and Delete, and a compare chip's × are easier to tap
 - Typing a player's exact name and pressing Enter on Compare adds that player, not a Steam Family they belong to

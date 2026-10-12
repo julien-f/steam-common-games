@@ -21,7 +21,7 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 
 - Every action visibly changes something where the user is looking; a result with nothing to see (a copied link) is announced through a live region.
 - Reversible actions (sort, filter, hide a column, switch account) act at once, no confirmation. Clearing many at once (Default view) is where an undo is worth it; deleting is soft or confirmed.
-- Disabled controls look it (`.btn:disabled`: half opacity, `not-allowed` cursor) and say why in text beside them, not only a tooltip (touch and keyboard users never see one), or are hidden when there's nothing to act on.
+- Disabled controls look it (`.btn:disabled`, or `[aria-disabled='true']` when a press must say why: half opacity, `not-allowed` cursor) and say why in text, beside them or on press, not only a tooltip (touch and keyboard users never see one), or are hidden when there's nothing to act on.
 - Empty states say what emptied the screen (no games, a filter matching nothing, a private profile) and offer the way back.
 
 ## Keyboard

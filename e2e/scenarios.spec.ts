@@ -713,11 +713,18 @@ test("R3 edge: a ranked list's Share view says why it can't be shared", async ({
   await expect(page.getByRole('heading', { name: /^Ranking of/ })).toBeVisible();
   // Its /lists/<id> link only opens in this browser.
   const share = page.getByRole('button', { name: 'Share view' });
-  await expect(share).toBeDisabled();
+  await expect(share).toHaveAttribute('aria-disabled', 'true');
   await expect(share).toHaveCSS('opacity', '0.5');
   await expect(share).toHaveCSS('cursor', 'not-allowed');
-  // Shown, not only in `title`: touch and keyboard users never see a tooltip.
-  await expect(page.locator('.list-view-actions')).toContainText("can't be shared");
+  await expect(share).toHaveAccessibleDescription(/can't be shared/);
+  // Said on press rather than beside it: an always-on note made the toolbar wrap on every saved list.
+  const toolbarHeight = (await page.locator('.dt-toolbar').boundingBox())!.height;
+  await expect(page.getByRole('status').filter({ hasText: "can't be shared" })).toHaveCount(0);
+  // Playwright won't click an aria-disabled button; a key press is what a keyboard user does anyway.
+  await share.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('status').filter({ hasText: "can't be shared" })).toBeVisible();
+  expect((await page.locator('.dt-toolbar').boundingBox())!.height).toBe(toolbarHeight);
 });
 
 test("R2 edge: ranking games you don't own offers 'Not interested', not 'Haven't played'", async ({ page }) => {
