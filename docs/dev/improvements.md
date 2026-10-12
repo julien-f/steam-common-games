@@ -17,7 +17,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Sharing
 
-- **U124 · major · S2** — A `/game/<appid>` link's preview doesn't name the game: crawlers don't run JS, so the per-route `document.title` never reaches them. Inject `og:title` (game name) and `og:image` (its Steam header image) server-side for `/game/:appid`, from cached details only so crawler hits add no upstream requests (integrations.md trust tiers).
 - **U125 · minor · S1, C1, S3** — List, bundle and compare links all preview identically, and a `/lists/<id>` list that exists only in the sender's browser can't be described at all. Server-side per-route `og:title` from the path alone (Owned games, Wishlist, Compare libraries, Shared list, bundle name from cache), generic for `/lists/<id>`.
 
 ## Loading and feedback

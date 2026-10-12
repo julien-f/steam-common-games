@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On a phone, a 🎲 in the table's toolbar picks a random game without opening one first.
 - Shared links show a title, description and image when previewed in chat apps (WhatsApp, Slack, Discord, iMessage…)
 - A PNG app icon, shown by chat link previews and when adding the site to a phone's home screen
+- A shared game link's preview shows the game's name and header image
 
 ### Changed
 

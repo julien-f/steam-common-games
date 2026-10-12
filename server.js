@@ -1261,7 +1261,10 @@ function sendAppShell(req, res, { title = SITE_NAME, image = '/og-image.jpg' } =
 // extension) but genuinely doesn't exist still 404s via Express's default handler instead of
 // being silently rewritten into the shell.
 app.get(/^\/(?!api\/)(?!.*\.[a-zA-Z0-9]+$).*/, (req, res) => {
-  sendAppShell(req, res);
+  const appid = /^\/game\/(\d+)\/?$/.exec(req.path)?.[1];
+  // Cache only: a link preview mustn't cost an upstream request (integrations.md's trust tiers).
+  const game = appid && getCached(`meta:${appid}`);
+  sendAppShell(req, res, game ? { title: game.name, image: game.header_image } : undefined);
 });
 
 // Anything a route didn't catch, body-parser's malformed or oversized JSON included: Express's own

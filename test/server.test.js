@@ -182,6 +182,19 @@ test('GET /lists/owned: the app shell carries Open Graph tags with an absolute i
   assert.match(res.text, /<meta name="twitter:card" content="summary_large_image" \/>/);
 });
 
+test('GET /game/:appid: the preview names a cached game and shows its header image, without fetching', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => assert.fail('no upstream request'));
+  setCache('meta:620', { name: 'Portal <2> & "co"', header_image: 'https://cdn.example/620/header.jpg' });
+  const res = await api.get('/game/620');
+  assert.match(res.text, /<meta property="og:title" content="Portal &lt;2&gt; &amp; &quot;co&quot;" \/>/);
+  assert.match(res.text, /<meta property="og:image" content="https:\/\/cdn\.example\/620\/header\.jpg" \/>/);
+
+  const uncached = await api.get('/game/621');
+  assert.match(uncached.text, /<meta property="og:title" content="steam\.isonoe\.net" \/>/);
+  assert.equal(fetchMock.mock.callCount(), 0);
+});
+
 test('index.html links raster icons, which link previews fall back to', () => {
   // The source, not the served shell: that one is a possibly stale dist/ build when one exists.
   const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
