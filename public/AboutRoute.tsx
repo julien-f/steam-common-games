@@ -1,15 +1,14 @@
 // /about — ported verbatim from the legacy about.html (no logic of its own there either, just
 // static content) as part of the SPA route table (see docs/dev/frontend.md).
 import { useBaseTitle } from './pageTitle.ts';
+import { ListHero } from './ListHero.tsx';
 
 export default function AboutRoute() {
   useBaseTitle(() => 'About');
 
   return (
     <div class="container">
-      <header>
-        <h1>About</h1>
-      </header>
+      <ListHero title="About" />
 
       <div class="card">
         <h2>About</h2>

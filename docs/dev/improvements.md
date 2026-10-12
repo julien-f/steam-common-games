@@ -38,7 +38,7 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Phone
 
-- **U149 · polish · I1** — Home at 390: the nav search touches the left edge; Home's card starts content at x 45 (20 margin + 24 padding) vs 12 on list pages; Recent-account rows wrap an orphan × / star onto a second line. One 12px gutter; fold row actions into ⋯.
+None open.
 
 ## Accounts and first visit
 
@@ -47,7 +47,6 @@ None open.
 ## Consistency and polish
 
 - **U152 · polish · visual** — number columns (rating, HLTB, Played, price, discount) are start-aligned (digits are tabular). Right-align them and their headers: blocked on @vates/data-table-solid, whose `th`/`td` carry no column key or class and whose column defs have no align option (vatesfr/data-table#42).
-- **U157 · polish · F2** — `/search` alone has a centred cyan h1 instead of the list hero, and an empty Image column. Its 26px h1 (shared with About and the 404 page) is also off the type scale. Reuse the list hero.
 - **U160 · polish · L3** — data-table popovers: Filter opens on a range slider with no column heading; searching Columns leaves an empty "VISIBLE COLUMNS" header; an open range chip reads "Played (h): 5.0–". Label the pane, hide empty groups, write "≥ 5.0 h". Needs upstream changes in `@vates/data-table-solid` (vatesfr/data-table#42).
 - **U121 · polish · F1** — ←/→ on a game showing only its Cover while its media streams does nothing visible, yet `stepLightbox` (`public/lightbox.tsx:1164`) clears the take-the-media-when-it-lands latch and marks the Cover chosen, so the screenshots never replace it. Return early when there's nothing to step to.
 - **U122 · polish · F1** — a refresh that shrinks a game's media while the lightbox shows it leaves `idx()` past the end: rendering clamps it (`public/lightbox.tsx:1234`), but the caption (`:168`), counter (`:325`) and the leave-memory read (`:1111`) index `shots()[idx()]` unclamped, so paging away records nothing and lands on screenshots. Clamp once where the list changes.

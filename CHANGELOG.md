@@ -49,6 +49,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - "Rank this list" is unavailable below 2 games and says why
 - The keyboard shortcuts dialog lines every description up in one column
 - The nav bar's game search box empties after you pick a game, and on a second Esc
+- On a phone, Home lines up with the list pages' margins, and each recent account's star and remove buttons stay on its row
+- Search, About and the page-not-found screen title themselves like every list page, and search results no longer show an empty image column
 
 ### Fixed
 

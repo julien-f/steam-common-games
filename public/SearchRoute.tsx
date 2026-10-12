@@ -4,11 +4,12 @@
 // uses (a minimal two-column config, not `gameColumns.ts`'s `CORE_COLUMNS`), which is what gets
 // this page its keyboard row navigation for free; opening a result uses the same shared side
 // panel every other route uses, and participates in its usual step/random/lightbox nav.
-import { createSignal, createEffect, on, onMount, onCleanup, Show } from 'solid-js';
+import { createSignal, createEffect, createMemo, on, onMount, onCleanup, Show } from 'solid-js';
 import { useLocation } from '@solidjs/router';
 import { createTableState, DataTableView } from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
 import { useBaseTitle } from './pageTitle.ts';
+import { ListHero } from './ListHero.tsx';
 import { registerRouteHandlers } from './AppShell.tsx';
 import { panelOpen, getPanelGame, pickRandomFrom } from './panel.tsx';
 import { renderPanelNav, stepGameList } from './panelNav.ts';
@@ -62,6 +63,9 @@ const SEARCH_COLUMNS: ColumnDef<GameSearchResult>[] = [
   },
   { key: 'name', label: 'Name', sortable: false, filterable: false, groupable: false, render: renderName },
 ];
+
+// Results without any image (Steam omitted them all) get no empty thumbnail column.
+const NAME_ONLY_COLUMNS = SEARCH_COLUMNS.slice(1);
 
 // A fixed queue key: pickRandomFrom (panel.tsx) already self-heals when the underlying list
 // changes (it validates its queue against the current appid set), so there's no need for a
@@ -139,7 +143,8 @@ export default function SearchRoute() {
     onCleanup(unsub);
   });
 
-  const table = createTableState<GameSearchResult>(results, SEARCH_COLUMNS);
+  const hasImages = createMemo(() => results().some((r) => r.tinyImage));
+  const table = createTableState<GameSearchResult>(results, () => (hasImages() ? SEARCH_COLUMNS : NAME_ONLY_COLUMNS));
 
   // The minimal Game[] shape panelNav.ts's stepGameList/renderPanelNav and panel.tsx's
   // pickRandomFrom need — unrelated to what backs the visible table (GameSearchResult is enough
@@ -258,9 +263,7 @@ export default function SearchRoute() {
 
   return (
     <div class="container">
-      <header>
-        <h1>Search</h1>
-      </header>
+      <ListHero title="Search" />
 
       <div class="game-search-wrap search-page-input">
         <input

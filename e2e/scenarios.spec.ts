@@ -930,6 +930,46 @@ test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo wi
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
 
+test("I1 edge: on a phone, Home keeps the list pages' 12px gutter and each recent account on one row", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout');
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  await expect(page.locator('.recent-accounts li')).toHaveCount(2);
+
+  const viewport = page.viewportSize()!;
+  expect((await page.locator('.app-search-wrap').boundingBox())!.x).toBe(12);
+  const card = (await page.locator('.home-account').boundingBox())!;
+  expect(card.x).toBe(12);
+  expect(card.x + card.width).toBe(viewport.width - 12);
+  expect((await page.locator('.home-account h3').boundingBox())!.x).toBeLessThanOrEqual(25);
+
+  for (const li of await page.locator('.recent-accounts li').all()) {
+    const tops = await li.locator(':scope > *').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top));
+    const box = (await li.boundingBox())!;
+    expect(box.height).toBeLessThan(48);
+    expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(12);
+  }
+  await expect(page.getByRole('button', { name: 'Star Bob as mine' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('button', { name: 'Star Alice as mine' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Remove Bob' }).click();
+  await expect(page.locator('.recent-accounts li')).toHaveCount(1);
+});
+
+test("I1 edge: on a phone with no account yet, the nav's search, account and preferences share one row", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout');
+  await page.goto('/about');
+  await expect(page.locator('.site-nav-account')).toContainText('No account');
+  const search = (await page.locator('.app-search-wrap').boundingBox())!;
+  const prefs = (await page.locator('.site-nav-prefs').boundingBox())!;
+  expect(prefs.y).toBeLessThan(search.y + search.height);
+});
+
 test('R1.1,3-6: rank chosen games, stop, resume on the same ones', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
@@ -2504,6 +2544,33 @@ test("F2 edge: a failed search says so, rather than 'No games found'", async ({ 
   await expect(page.getByText('No games found')).toHaveCount(0);
 });
 
+test("F2 edge: /search, About and the 404 page title themselves with the list routes' hero", async ({ page }) => {
+  for (const [path, title] of [
+    ['/search?q=hades', 'Search'],
+    ['/about', 'About'],
+    ['/compare', 'Page not found'],
+  ]) {
+    await page.goto(path);
+    await expect(page.locator('.list-hero-title')).toHaveText(title);
+    await expect(page.locator('header h1')).toHaveCount(0);
+  }
+});
+
+test('F2 edge: /search shows an image column only when a result has an image', async ({ page }) => {
+  await page.route('**/api/search-games?q=portal*', (route) =>
+    route.fulfill({ json: { results: [{ appid: 620, name: 'Portal 2', tinyImage: '/favicon.svg' }] } }),
+  );
+  await page.goto('/search?q=hades');
+  await expect(rows(page)).toHaveCount(1);
+  const columns = page.locator('.search-table thead th');
+  await expect(columns).toHaveCount(1);
+
+  await page.getByPlaceholder('Search for a game…').fill('portal');
+  await expect(page.locator('.search-table .game-search-thumb')).toHaveCount(1);
+  await expect(columns).toHaveCount(2);
+  await expect(columns.last()).toHaveAttribute('data-col-key', 'name');
+});
+
 test('F1.1-4: look up one game from the nav search, in place', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
@@ -2651,6 +2718,8 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
   await page.goto('/');
   const friends = page.locator('.account-friends summary');
   expect(await takes24pxTap(friends)).toBe(true);
+  expect(await takes24pxTap(page.getByRole('button', { name: 'Star Alice as mine' }))).toBe(true);
+  expect(await takes24pxTap(page.getByRole('button', { name: 'Remove Alice' }))).toBe(true);
   await friends.click();
   expect(await takes24pxTap(page.locator('.account-friends-refresh'))).toBe(true);
 });

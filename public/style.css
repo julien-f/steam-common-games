@@ -99,6 +99,7 @@ b {
   flex-wrap: wrap;
   gap: 4px;
   margin-bottom: 20px;
+  padding: 0 12px;
 }
 .site-nav-link {
   padding: 6px 14px;
@@ -345,23 +346,6 @@ b {
   .account-chip-panel-links {
     display: flex;
   }
-}
-
-/* Header */
-header {
-  text-align: center;
-  margin-bottom: 36px;
-}
-header h1 {
-  font-size: 26px;
-  font-weight: 600;
-  color: var(--accent2);
-  letter-spacing: 0.4px;
-}
-header p {
-  color: var(--text1);
-  margin-top: 6px;
-  font-size: var(--fs-ui);
 }
 
 /* Card */
@@ -798,7 +782,7 @@ tbody td {
    but sized to sit inline in the nav bar rather than fill a page section. */
 .app-search-wrap {
   position: relative;
-  flex: 1 1 220px;
+  flex: 1 1 140px;
   max-width: 320px;
 }
 .app-search-wrap > input {
@@ -1012,12 +996,6 @@ tbody td {
 @media (max-width: 768px) {
   .container {
     padding: 18px 14px 40px;
-  }
-  header {
-    margin-bottom: 20px;
-  }
-  header h1 {
-    font-size: var(--fs-figure);
   }
   .card {
     padding: 14px 16px;
@@ -4215,7 +4193,6 @@ kbd {
 .recent-accounts li {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 8px;
   background: var(--bg2);
   border: 1px solid var(--border);
@@ -4224,6 +4201,10 @@ kbd {
 }
 .recent-accounts li > button:first-child {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   min-height: 24px;
   text-align: left;
   background: none;
@@ -4250,6 +4231,16 @@ kbd {
 .recent-accounts button:not(.copy-btn):hover {
   border-color: var(--accent);
   color: var(--accent2);
+}
+.recent-accounts .recent-icon-btn {
+  flex-shrink: 0;
+  min-width: 24px;
+  padding: 0;
+  font-size: var(--fs-ui);
+  line-height: 1;
+}
+.recent-accounts li > span {
+  white-space: nowrap;
 }
 
 .home-fixed-links {
@@ -4689,8 +4680,13 @@ kbd {
     white-space: normal;
   }
   .list-route,
-  .bundles-browse-route {
+  .bundles-browse-route,
+  .home-route {
     padding: 16px 12px 40px;
+  }
+  .home-account,
+  .home-tree {
+    padding: 14px 12px;
   }
 }
 
