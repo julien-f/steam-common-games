@@ -57,7 +57,6 @@ None open.
 ## Consistency and polish
 
 - **U152 · polish · visual** — number columns (rating, HLTB, Played, price, discount) are start-aligned (digits are tabular). Right-align them and their headers: blocked on @vates/data-table-solid, whose `th`/`td` carry no column key or class and whose column defs have no align option (vatesfr/data-table#42).
-- **U157 · polish · F2** — `/search` alone has a centred cyan h1 instead of the list hero, and an empty Image column. Its 26px h1 (shared with About and the 404 page) is also off the type scale. Reuse the list hero.
 - **U159 · polish · F1** — nav search: a second Esc blurs but keeps the typed text; after a pick the box keeps the game's name. Clear it in both cases.
 - **U160 · polish · L3** — data-table popovers: Filter opens on a range slider with no column heading; searching Columns leaves an empty "VISIBLE COLUMNS" header; an open range chip reads "Played (h): 5.0–". Label the pane, hide empty groups, write "≥ 5.0 h". Needs upstream changes in `@vates/data-table-solid` (vatesfr/data-table#42).
 - **U121 · polish · F1** — ←/→ on a game showing only its Cover while its media streams does nothing visible, yet `stepLightbox` (`public/lightbox.tsx:1164`) clears the take-the-media-when-it-lands latch and marks the Cover chosen, so the screenshots never replace it. Return early when there's nothing to step to.

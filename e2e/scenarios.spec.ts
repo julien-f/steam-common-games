@@ -2533,6 +2533,33 @@ test("F2 edge: a failed search says so, rather than 'No games found'", async ({ 
   await expect(page.getByText('No games found')).toHaveCount(0);
 });
 
+test("F2 edge: /search, About and the 404 page title themselves with the list routes' hero", async ({ page }) => {
+  for (const [path, title] of [
+    ['/search?q=hades', 'Search'],
+    ['/about', 'About'],
+    ['/compare', 'Page not found'],
+  ]) {
+    await page.goto(path);
+    await expect(page.locator('.list-hero-title')).toHaveText(title);
+    await expect(page.locator('header h1')).toHaveCount(0);
+  }
+});
+
+test('F2 edge: /search shows an image column only when a result has an image', async ({ page }) => {
+  await page.route('**/api/search-games?q=portal*', (route) =>
+    route.fulfill({ json: { results: [{ appid: 620, name: 'Portal 2', tinyImage: '/favicon.svg' }] } }),
+  );
+  await page.goto('/search?q=hades');
+  await expect(rows(page)).toHaveCount(1);
+  const columns = page.locator('.search-table thead th');
+  await expect(columns).toHaveCount(1);
+
+  await page.getByPlaceholder('Search for a game…').fill('portal');
+  await expect(page.locator('.search-table .game-search-thumb')).toHaveCount(1);
+  await expect(columns).toHaveCount(2);
+  await expect(columns.last()).toHaveAttribute('data-col-key', 'name');
+});
+
 test('F1.1-4: look up one game from the nav search, in place', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
