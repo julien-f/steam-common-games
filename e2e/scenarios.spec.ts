@@ -642,6 +642,45 @@ test('L1 edge: folders and lists are named in place, not in a dialog', async ({ 
   await expect(tree.locator('.list-tree li')).toHaveCount(1);
 });
 
+test("L1 edge: clearing a ranking's name hands it back its default label", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await page.getByRole('button', { name: /Rank this list/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading', { name: 'Ranking of Alice — Wishlist' })).toBeVisible();
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Rename Ranking of Alice — Wishlist' }).click();
+  await page.getByRole('textbox', { name: 'List name' }).fill('Top picks');
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Rename Top picks' }).click();
+  await page.getByRole('textbox', { name: 'List name' }).fill('');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.list-tree').getByRole('link', { name: /Ranking of Alice — Wishlist/ })).toBeVisible();
+});
+
+test('L1 edge: confirming an IME candidate with Enter keeps the name field open', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByRole('button', { name: '+ New list' }).click();
+  const field = page.getByRole('textbox', { name: 'List name' });
+  await field.fill('にほ');
+  await field.dispatchEvent('keydown', { key: 'Enter', isComposing: true });
+  await expect(field).toBeVisible();
+  await expect(page.locator('.list-tree').getByRole('link', { name: /にほ/ })).toHaveCount(0);
+});
+
+test("L1 edge: the name field looks like the app's other text fields", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByRole('button', { name: '+ New folder' }).click();
+  const look = (el: Element) => {
+    const s = getComputedStyle(el);
+    return [s.backgroundColor, s.borderTopStyle, s.borderTopWidth, s.borderRadius, s.color, s.fontSize];
+  };
+  const search = await page.locator('.app-search-wrap > input').evaluate(look);
+  expect(await page.getByRole('textbox', { name: 'Folder name' }).evaluate(look)).toEqual(search);
+});
+
 test('L2 edge: creating a combined list opens it', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
@@ -653,6 +692,17 @@ test('L2 edge: creating a combined list opens it', async ({ page }) => {
   await form.getByRole('button', { name: 'Create combined list' }).click();
   await expect(page).toHaveURL(/\/lists\/[^/?]+$/);
   await expect(page.getByRole('button', { name: 'Edit sources' })).toBeVisible();
+});
+
+test("L2 edge: a combined list created under a link's account opens under it", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/?u=bob');
+  await page.getByRole('button', { name: '+ New combined list' }).click();
+  const sources = page.locator('.combine-form .combine-sources input[type="checkbox"]');
+  await sources.nth(0).check();
+  await sources.nth(1).check();
+  await page.getByRole('button', { name: 'Create combined list' }).click();
+  await expect(page).toHaveURL(/\/lists\/[^/?]+\?u=bob$/);
 });
 
 test('L2 edge: Edit sources has one Cancel, which hands focus back', async ({ page }) => {
@@ -684,6 +734,30 @@ test('L1 edge: a list under 2 games says ranking needs 2', async ({ page }) => {
   await expect(page.getByText('Ranking needs at least 2 games')).toBeVisible();
   await rank.click({ force: true }); // aria-disabled reads as disabled to Playwright
   await expect(page).toHaveURL(/\/lists\/[^/]+$/); // stayed: no ranking made
+});
+
+test('L1 edge: one selected game is too few to rank, and says so', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await row(page, 'It Takes Two').getByRole('checkbox').check();
+  const rank = page.getByRole('button', { name: '🏆 Rank 1 game', exact: true });
+  await expect(rank).toHaveAttribute('aria-disabled', 'true');
+  await expect(rank).toHaveAccessibleDescription('Ranking needs at least 2 games');
+  await rank.click({ force: true });
+  await expect(page).toHaveURL(/\/lists\/wishlist/);
+
+  // A list already ranked once gates "+ New ranking" the same way.
+  await row(page, 'It Takes Two').getByRole('checkbox').uncheck();
+  await page.getByRole('button', { name: /Rank this list/ }).click();
+  await page.keyboard.press('Escape');
+  await page.goto('/lists/wishlist');
+  await row(page, 'It Takes Two').getByRole('checkbox').check();
+  await page.locator('summary', { hasText: 'Rank 1 game' }).click();
+  const create = page.locator('.rank-menu-panel').getByRole('button', { name: '+ New ranking' });
+  await expect(create).toHaveAttribute('aria-disabled', 'true');
+  await expect(create).toHaveAccessibleDescription('Ranking needs at least 2 games');
+  await create.click({ force: true });
+  await expect(page).toHaveURL(/\/lists\/wishlist/);
 });
 
 test("L3 edge: the toolbar's two resets say what they do", async ({ page }) => {
@@ -1022,6 +1096,83 @@ test("B3 edge: what a bundle adds keeps the bundle's prices and links back to it
   await page.getByRole('link', { name: `← ${BUNDLE.title}` }).click();
   await expect(page).toHaveURL(new RegExp(`/lists/bundle/${BUNDLE.id}`));
   await expect(page.getByRole('heading', { name: BUNDLE.title })).toBeVisible();
+});
+
+const sharedUrl = (formula: string) => `/lists/shared?f=${encodeURIComponent(formula)}`;
+
+test("B3 edge: what a bundle adds shows the bundle's prices in a newly picked region", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  // The mock only prices in EUR; answer a US request in USD, as ITAD does.
+  await page.route(/\/api\/bundles\/\d+\?/, (route) => {
+    const req = route.request();
+    const url = new URL(req.url());
+    const { body } = respond(req.method(), url, req.postData());
+    return route.fulfill({
+      json: JSON.parse(url.searchParams.get('country') === 'US' ? body.replaceAll('"EUR"', '"USD"') : body),
+    });
+  });
+  await page.goto(sharedUrl(`subtract:(b:${BUNDLE.id};o:${ALICE.steamid})`));
+  await expect(row(page, 'Overcooked! 2')).toContainText('€12.00');
+  await page.getByTitle('Preferences').click();
+  await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
+  await expect(row(page, 'Overcooked! 2')).toContainText('$12.00');
+});
+
+test("B3 edge: a shared list left before its bundle answers doesn't link the next one to it", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(/\/api\/bundles\/\d+/, async (route) => {
+    await held;
+    await route.fallback();
+  });
+  await page.goto(sharedUrl(`subtract:(o:${ALICE.steamid};w:${ALICE.steamid})`));
+  await expect(rows(page)).toHaveCount(6);
+  const bundleAsked = page.waitForRequest(/\/api\/bundles\/\d+/);
+  await page.evaluate(
+    (url) => {
+      history.pushState(null, '', url);
+      dispatchEvent(new PopStateEvent('popstate'));
+    },
+    sharedUrl(`subtract:(b:${BUNDLE.id};o:${ALICE.steamid})`),
+  );
+  await bundleAsked;
+  await page.goBack();
+  await expect(rows(page)).toHaveCount(6);
+  release();
+  await page.waitForResponse(/\/api\/bundles\/\d+/);
+  await page.waitForTimeout(200); // let the late answer land, if it would
+  await expect(page.getByRole('link', { name: `← ${BUNDLE.title}` })).toHaveCount(0);
+});
+
+test('B3 edge: a list left with none of its bundle source has no Tier Price, but still links back', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto(sharedUrl(`subtract:(o:${ALICE.steamid};b:${BUNDLE.id})`));
+  await expect(rows(page)).toHaveCount(4);
+  await expect(page.locator('thead th').filter({ hasText: /^Best Deal/ })).toHaveCount(1);
+  await expect(page.locator('thead th').filter({ hasText: /^Tier Price/ })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: `← ${BUNDLE.title}` })).toBeVisible();
+});
+
+test("B3 edge: what a pick-and-mix bundle adds claims no per-game rate it can't know", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  // Alice owns the package's lead game (Hollow Knight), so its mate is left on its own.
+  await page.goto(sharedUrl(`subtract:(b:90002;o:${ALICE.steamid})`));
+  await expect(rows(page)).toHaveCount(1);
+  await expect(row(page, "Don't Starve Together")).not.toContainText('included');
+  await expect(row(page, "Don't Starve Together")).toContainText('Varies');
+  // Bob owns neither Hades nor Hollow Knight: no entry rate passed off as theirs.
+  await page.goto(sharedUrl(`subtract:(b:90002;o:${BOB.steamid})`));
+  await expect(row(page, 'Hades')).toContainText('Varies');
+  await expect(rows(page).filter({ hasText: '/game' })).toHaveCount(0);
+});
+
+test("B3 edge: the link back to a bundle keeps the link's account", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto(`${sharedUrl(`subtract:(b:${BUNDLE.id};o:${BOB.steamid})`)}&u=bob`);
+  await expect(page.getByRole('link', { name: `← ${BUNDLE.title}` })).toHaveAttribute('href', /[?&]u=bob/);
 });
 
 test('B1 edge: a bundle game whose Steam lookup failed says so, rather than reading as not on Steam', async ({

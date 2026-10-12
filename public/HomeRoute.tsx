@@ -268,8 +268,7 @@ export default function HomeRoute() {
     return target && !target.id ? target : null;
   }
 
-  // `name` null = cancelled. An empty name cancels too, except on a dynamic list, where clearing
-  // it hands the list back to being labeled by its formula.
+  // `name` null = cancelled; an empty one too, except on a list labeled without one (all but manual).
   function handleNamed(target: NameTarget, name: string | null, viaKey: boolean): void {
     setNameTarget(null);
     const trimmed = name?.trim() ?? '';
@@ -281,7 +280,7 @@ export default function HomeRoute() {
         if (trimmed) renameFolder(target.id, trimmed);
       } else {
         const list = lists().find((l) => l.id === target.id);
-        if (list && trimmed !== (list.name ?? '') && (trimmed || list.kind === 'dynamic'))
+        if (list && trimmed !== (list.name ?? '') && (trimmed || list.kind !== 'manual'))
           renameList(list.id, trimmed || undefined);
       }
       refreshTree();
@@ -317,7 +316,7 @@ export default function HomeRoute() {
           })
         }
         onKeyDown={(e) => {
-          if (e.key === 'Enter') {
+          if (e.key === 'Enter' && !e.isComposing) {
             e.preventDefault();
             finish(e.currentTarget.value, true);
           } else if (e.key === 'Escape') {
@@ -342,7 +341,7 @@ export default function HomeRoute() {
   // everywhere, and follows a later source edit (see listLabels.ts).
   function handleCreateCombine(input: { name?: string; op: CombineOp; sources: ListRef[] }): void {
     const list = createList({ name: input.name, kind: 'dynamic', op: input.op, sources: input.sources });
-    navigate(`/lists/${list.id}`);
+    navigate(accountLink(`/lists/${list.id}`));
     document.querySelector<HTMLElement>('main')?.focus();
   }
 

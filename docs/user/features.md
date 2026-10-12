@@ -53,13 +53,13 @@ Naming the combined list is optional: leave the name empty and it's called by wh
 
 The result is saved as a dynamic list, re-resolved every time you open it. Its page states its formula, names every source, and says what each contributed.
 
-A bundle joins a combine from its own page: **What does this add?** shows that bundle minus your Owned games right away, unsaved and shareable, with the bundle's Tier Price and Best Deal columns and a link back to the bundle. **Save as a list** keeps it; **Edit sources** then changes it — a Family's Owned, or Group by membership with a friend's. Once IsThereAnyDeal stops listing an ended bundle, a list using it keeps the bundle's last-known games and says so.
+A bundle joins a combine from its own page: **What does this add?** shows that bundle minus your Owned games right away, unsaved and shareable, with the bundle's Tier Price ("Varies" for a pick-and-mix one, whose rate depends on how many you pick) and Best Deal columns and a link back to the bundle. **Save as a list** keeps it; **Edit sources** then changes it — a Family's Owned, or Group by membership with a friend's. Once IsThereAnyDeal stops listing an ended bundle, a list using it keeps the bundle's last-known games and says so.
 
 ![Two lists combined with group by membership: one table grouped by combination — in both lists, then each list's exclusive games — under the formula that produced them](../images/group-by-membership.png)
 
 ### Ranking a list
 
-**🏆 Rank this list** (on Owned, Wishlist, a bundle or any of your lists) creates a ranked list and asks you two games at a time: _which do you prefer?_ It starts from what the table shows: games come up in its current order, and if rows are selected — or, with none selected, a filter is on — only those are asked about (the button then reads **🏆 Rank N games**); the rest wait for a later Compare. A list needs at least 2 games to rank.
+**🏆 Rank this list** (on Owned, Wishlist, a bundle or any of your lists) creates a ranked list and asks you two games at a time: _which do you prefer?_ It starts from what the table shows: games come up in its current order, and if rows are selected — or, with none selected, a filter is on — only those are asked about (the button then reads **🏆 Rank N games**); the rest wait for a later Compare. Ranking needs at least 2 of those games.
 
 - **← / →** pick one, **↓** Tie, **S** Skip (asked again later), **X** then **← / →** or "Haven't played" (on your own games; "Not interested" elsewhere) to exclude a game, **Z** Undo. All are buttons too.
 - **ℹ Details** under a card (or **I** then **← / →**) opens that game in the side panel to help you decide. It stays open while the game is still being compared; meanwhile **← / →** browse its screenshots and videos (pick by clicking a card), and **Esc** closes it.
