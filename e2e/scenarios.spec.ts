@@ -2820,6 +2820,18 @@ test('F1 edge: a search still pending when Esc or a pick closes the nav dropdown
   await expect(dropdown).toBeHidden();
 });
 
+test('F1 edge: tabbing out of the nav search box before its search answers opens no dropdown', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  const box = page.getByPlaceholder('Look up any game…');
+  await box.fill('hades');
+  await page.keyboard.press('Tab');
+  await expect(box).not.toBeFocused();
+  await page.waitForTimeout(500); // past the search debounce
+  await expect(page.locator('#app-search-results')).toBeHidden();
+});
+
 test('F1 edge: Esc closes a nav popover or the search dropdown, not the open game', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', "a phone's panel covers the nav");
   await asPlayer(page, ALICE);

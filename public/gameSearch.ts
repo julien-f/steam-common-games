@@ -228,11 +228,12 @@ export function initGameSearch({
     try {
       const results = await searchGames(term);
       if (fetchId !== activeFetch) return; // a newer keystroke's request already landed
+      if (document.activeElement !== inputEl) return; // left the box (Tab, say) before it answered
       lastTerm = term;
       if (results.length) showResults(results);
       else showEmpty(term, false);
     } catch {
-      if (fetchId === activeFetch) showEmpty(term, true);
+      if (fetchId === activeFetch && document.activeElement === inputEl) showEmpty(term, true);
     }
   }
 
