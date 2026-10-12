@@ -48,6 +48,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Creating a combined list opens it, and Edit sources has a single Cancel
 - "Rank this list" is unavailable below 2 games and says why
 - The keyboard shortcuts dialog lines every description up in one column
+- The nav bar's game search box empties after you pick a game, and on a second Esc
 
 ### Fixed
 
