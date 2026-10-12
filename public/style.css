@@ -102,6 +102,22 @@ textarea {
   font-weight: 600;
   cursor: default;
 }
+/* An app bar on the wide list routes' 1600px column and 20px gutter, so the nav shares the content's edge. */
+@media (min-width: 769px) {
+  .site-nav {
+    justify-content: flex-start;
+    align-items: center;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 12px 20px 0;
+  }
+  .app-search-wrap {
+    max-width: 480px;
+    margin-right: auto;
+  }
+}
 
 /* Nav-bar popovers — the ⚙ Preferences panel (AppShell.tsx) and the account chip's
    (AccountChip.tsx). Both are native <details> for a free, accessible open/close toggle;
@@ -4431,6 +4447,17 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* Under the desktop app bar (see .site-nav): after every route wrapper's own padding, so it wins. */
+@media (min-width: 769px) {
+  .container,
+  .list-route,
+  .bundles-browse-route,
+  .home-route,
+  .rank-route {
+    padding-top: 24px;
+  }
 }
 .rank-header {
   display: flex;

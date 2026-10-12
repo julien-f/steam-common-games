@@ -705,6 +705,20 @@ test("R1 edge: a failed Refresh on the ranking's side panel says so", async ({ p
   await expect(page.locator('.rank-route .list-status')).toHaveText('Refresh failed: Steam did not answer');
 });
 
+test('I1 edge: on desktop the nav starts on the content edge, close above it', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop app bar');
+  await asPlayer(page, ALICE);
+  for (const width of [1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/lists/owned');
+    const nav = (await page.locator('.site-nav').boundingBox())!;
+    const first = (await page.locator('.site-nav > *').first().boundingBox())!;
+    const hero = (await page.locator('.list-hero').boundingBox())!;
+    expect(Math.round(first.x), `at ${width}px`).toBe(Math.round(hero.x));
+    expect(hero.y - (nav.y + nav.height), `at ${width}px`).toBeLessThanOrEqual(28);
+  }
+});
+
 test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo without scrolling, inside a gutter, down to 320px wide', async ({
   page,
 }, testInfo) => {

@@ -62,7 +62,6 @@ None open.
 
 - **U152 · polish · visual** — number columns (rating, HLTB, Played, price, discount) are start-aligned (digits are tabular). Right-align them and their headers: blocked on @vates/data-table-solid, whose `th`/`td` carry no column key or class and whose column defs have no align option.
 - **U153 · polish · visual** — 13 size/weight combinations on Home alone (10–20px, incl. 12.5), plus 10.5 and 18 on list pages. One scale: 11 labels, 13 meta/table, 15 body, 18 title.
-- **U154 · polish · visual** — the nav sits at y 0–32, centred (x 280–1150), with a 56px gap before the full-width hero at x 20: nothing shares an edge. ≈12px top padding, align to the 20px gutter, ≈24px gap.
 - **U157 · polish · F2** — `/search` alone has a centred cyan h1 instead of the list hero, and an empty Image column. Reuse the list hero.
 - **U159 · polish · F1** — nav search: a second Esc blurs but keeps the typed text; after a pick the box keeps the game's name. Clear it in both cases.
 - **U160 · polish · L3** — data-table popovers: Filter opens on a range slider with no column heading; searching Columns leaves an empty "VISIBLE COLUMNS" header; an open range chip reads "Played (h): 5.0–". Label the pane, hide empty groups, write "≥ 5.0 h". Needs upstream changes in `@vates/data-table-solid`.
