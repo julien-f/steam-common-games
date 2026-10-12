@@ -2762,7 +2762,7 @@ export default function ListRoute() {
             )}
           </For>
           {/* The result is this list's own row count — for group-by-membership that's the union
-              across its groups, which is exactly what the "+" join above claims. */}
+              across its groups, which is exactly what the ∪ join above claims. */}
           <Show when={!ranked}>
             <span class="list-formula-op">=</span>
             <span class="list-formula-result">{rowsStore.length}</span>

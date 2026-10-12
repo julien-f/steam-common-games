@@ -32,14 +32,13 @@ export const OP_DESCRIPTIONS: Record<CombineOp, string> = {
   'group-by-membership': 'one table per combination of sources',
 };
 
-// The infix symbol a formula joins its sources with. group-by-membership has no infix meaning —
-// it doesn't reduce its sources to a single set at all — so it joins with a plain "+" and leans
-// on its own label to say what happened.
+// The infix symbol a formula joins its sources with. group-by-membership's rows are the union
+// across its groups, so ∪ — a "+" read as arithmetic and collided with a family's "Alice + Bob".
 export const OP_SYMBOLS: Record<CombineOp, string> = {
   union: '∪',
   intersect: '∩',
   subtract: '−', // U+2212 minus: the set-minus ∖ reads as | in italics
-  'group-by-membership': '+',
+  'group-by-membership': '∪',
 };
 
 export function opLabel(op: CombineOp | undefined): string {

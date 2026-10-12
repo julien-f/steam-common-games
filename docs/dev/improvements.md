@@ -32,7 +32,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Comparing
 
-- **U137 · minor · C1, C3** — the union reads `Carol 3 + Alice + Bob 8 = 9`: "+" reads as arithmetic (3 + 8 ≠ 9) and collides with the family name; the saved list uses ∪. Use ∪ here too.
 - **U138 · minor · C1** — "Compare libraries" is disabled with no reason. Say "Add a second player".
 - **U139 · polish · C4** — panel Owned by reads "never played · not played". One phrase.
 - **U51 · polish · C1** — the membership chip reads "↑ Owned by × ⊞ ×": two identical × (remove sort, remove group) side by side. The table library draws that merged chip, so telling the two apart needs an upstream change.
