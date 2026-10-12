@@ -103,3 +103,9 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: a commit made with `git commit -F <scratchpad>/msg.txt` carries another agent's message.
 - **Cause**: the session scratchpad is shared by every agent, so a generic file name is overwritten between one agent's write and its commit.
 - **Fix**: name message files per agent or lane (`msg-<lane>.txt`).
+
+## A phone e2e layout test fails in CI only, by a few pixels
+
+- **Symptom**: a position check like I1's `expect(top).toBeLessThan(520)` gets `Received: 524.5` in CI, yet passes locally and in the `mcr.microsoft.com/playwright` image.
+- **Cause**: the GitHub runner's fonts run wider, so a row at its 390 px limit (340.4 px of buttons in 340 px) wraps there only.
+- **Fix**: reproduce locally by widening the text (`page.addStyleTag` with `letter-spacing: 1px`), as I1's test does; to see CI's layout, log `getBoundingClientRect()`s from the test on a branch run.

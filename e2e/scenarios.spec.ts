@@ -2896,6 +2896,13 @@ test("I1 edge: on a phone, a bundle's table starts high, its other actions behin
     .first()
     .evaluate((el) => el.getBoundingClientRect().top + scrollY);
   expect(top).toBeLessThan(520); // 761 with the hero's tiles and actions wrapping
+  // CI's fonts run wider than a dev machine's: the ⋯ must not drop to a line of its own there.
+  await page.addStyleTag({ content: '.list-hero-actions { letter-spacing: 1px }' });
+  const rowY = (name: string) => page.getByRole('link', { name }).evaluate((el) => el.getBoundingClientRect().top);
+  const moreY = await page
+    .getByRole('button', { name: 'More actions' })
+    .evaluate((el) => el.getBoundingClientRect().top);
+  expect(Math.abs(moreY - (await rowY('Get this bundle ↗')))).toBeLessThan(5);
   await expect(page.getByRole('link', { name: 'View on IsThereAnyDeal ↗' })).toBeHidden();
   await page.getByRole('button', { name: 'More actions' }).click();
   await expect(page.getByRole('link', { name: 'View on IsThereAnyDeal ↗' })).toBeVisible();

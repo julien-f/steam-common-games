@@ -140,6 +140,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A saved list built from a bundle shows its Tier Price in a region picked while it was still loading
 - A bundle's ← All bundles keeps the account you're exploring from a shared link
 - A recent account's star on Home says on hover whether a click stars or unstars it
+- On a phone, a bundle's ⋯ stays beside its actions instead of dropping to a line of its own
 
 ### Development
 
