@@ -106,8 +106,13 @@ test("B1 edge: /bundles' filter tiles look like toggles, unlike the plain figure
   expect(off.border).not.toBe('0px');
   await toggle.click();
   await page.mouse.move(0, 0);
-  const on = await chrome(page.locator('.list-stat-btn[aria-pressed="true"]').first());
-  expect(on).not.toEqual(off);
+  const pressed = page.locator('.list-stat-btn[aria-pressed="true"]').first();
+  await expect(pressed).toHaveCSS('border-top-color', 'rgb(102, 192, 244)'); // --accent2
+  await expect(pressed).toHaveCSS('box-shadow', /inset/);
+  // Hover and focus show on a pressed chip too.
+  const pressedRest = (await chrome(pressed)).shadow;
+  await pressed.hover();
+  await expect.poll(async () => (await chrome(pressed)).shadow).not.toBe(pressedRest);
 });
 
 test('A1 edge: Owned with no account points to Home rather than showing 0 games', async ({ page }) => {

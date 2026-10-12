@@ -1438,7 +1438,7 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
   const shopUrl = () => safeHref(deal()?.bestDealUrl);
   const tooltip = () => {
     const shop = deal()?.bestDealShop;
-    return shop ? `${shop}${rec() ? ` — ${rec()!.tooltipLabel}` : ''}` : '';
+    return shop ?? '';
   };
 
   // Historical lows (all-time/1yr/3mo) — see the original file's own (much longer) comment,
