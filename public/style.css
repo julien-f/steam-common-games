@@ -7,6 +7,7 @@
 }
 
 :root {
+  color-scheme: dark;
   --bg0: #1b2838;
   --bg1: #2a475e;
   --bg2: #1e3a5f;
@@ -14,6 +15,7 @@
   --text0: #c6d4df;
   --text1: #8f98a0;
   --text2: #4c6b8a; /* placeholders, disabled and decoration only: ~2.7:1, under AA for text */
+  --stat-label: #b0bac3; /* 4.9:1 on --bg1, where --text1 is 3.3:1 */
   --accent: #1a9fff;
   --accent2: #66c0f4;
   --border: #3d5068;
@@ -56,6 +58,13 @@ body {
     sans-serif;
   font-size: 14px;
   min-height: 100vh;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 .container {
@@ -347,8 +356,12 @@ header p {
   border: 1px solid var(--border);
   color: var(--text0);
 }
-.btn-ghost:hover {
+.btn-ghost:hover:not(:disabled) {
   background: var(--bg0);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-primary {
@@ -382,13 +395,8 @@ header p {
   border-color: #15803d;
   color: #15803d;
 }
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   background: #1490e8;
-}
-.btn-primary:disabled {
-  background: var(--bg2);
-  color: var(--text2);
-  cursor: not-allowed;
 }
 
 /* Table */
@@ -435,6 +443,9 @@ header p {
    the new markup's equivalent wrapper (see ListRoute.tsx). */
 .table-container .dt-th {
   background: #0f1923 !important;
+}
+.dt-td {
+  font-variant-numeric: tabular-nums;
 }
 
 table {
@@ -552,6 +563,28 @@ tbody td {
 }
 .recents-clear:hover {
   color: var(--accent2);
+}
+
+/* 24 px tap areas around controls drawn smaller, without changing how they look. A table header's
+   sort button only grows taller: wider, it would cover its column menu button. */
+.list-tree button,
+.compare-token-remove,
+.dt-th-sort {
+  position: relative;
+}
+.list-tree button::after,
+.compare-token-remove::after,
+.dt-th-sort::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 24px);
+  height: max(100%, 24px);
+  transform: translate(-50%, -50%);
+}
+.dt-th-sort::after {
+  width: 100%;
 }
 
 /*
@@ -773,9 +806,11 @@ tbody td {
 .how-steps li strong {
   color: var(--text0);
 }
+/* Sized as the table library's .dt-btn, so the two sit in one toolbar at one height. */
 .btn-sm {
   padding: 5px 10px;
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 1;
 }
 
 /* App shell layout (see docs/dev/frontend.md and AppShell.tsx)
@@ -3066,7 +3101,15 @@ kbd {
 /* Share view/Default view, in the table toolbar's own line (the library's `toolbarEnd` slot). */
 .list-view-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
+}
+.list-view-note {
+  flex-basis: 100%;
+  text-align: right;
+  font-size: 12px;
+  color: var(--text1);
 }
 .list-view-actions .btn-icon,
 .list-random-pick {
@@ -3437,7 +3480,7 @@ kbd {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text1);
+  color: var(--stat-label);
 }
 .list-stat-value {
   font-size: 14px;
@@ -3509,7 +3552,7 @@ kbd {
   cursor: default;
 }
 .list-stat-btn:disabled .list-stat-label {
-  color: var(--text1);
+  color: var(--stat-label);
 }
 
 /* Overrides .bundle-ends-rel's own inline-beside-the-time metrics (shared with the browse table's

@@ -1,5 +1,5 @@
 // docs/dev/journeys.md's journeys, end to end against mocked data (mockApi.ts).
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { mockApi, respond } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
 import { ALICE, BOB, BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
@@ -38,6 +38,36 @@ test('A1 edge: a first visit says what the app does, and the account field looks
   await page.goto('/');
   await expect(page.locator('.home-intro')).toContainText('ratings, completion times and prices');
   await expect(page.getByRole('button', { name: 'Look up', exact: true })).toBeVisible();
+});
+
+test('A1 edge: native controls render dark, like the page around them', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator(':root')).toHaveCSS('color-scheme', 'dark');
+});
+
+test("A1 edge: a list's stat labels meet AA contrast on the hero", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  const label = page.locator('.list-stat-label').first();
+  await expect(label).toBeVisible();
+  const ratio = await label.evaluate((el) => {
+    const rgb = (c: string) =>
+      c
+        .match(/\d+(\.\d+)?/g)!
+        .slice(0, 3)
+        .map(Number);
+    const lum = (c: string) => {
+      const [r, g, b] = rgb(c).map((v) => {
+        const s = v / 255;
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const fg = lum(getComputedStyle(el).color);
+    const bg = lum(getComputedStyle(el.closest('.list-hero')!).backgroundColor);
+    return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
+  });
+  expect(ratio).toBeGreaterThanOrEqual(4.5);
 });
 
 test('A1 edge: Owned with no account points to Home rather than showing 0 games', async ({ page }) => {
@@ -164,6 +194,12 @@ test('F3 edge: the Played (h) filter range reads in rounded hours', async ({ pag
   const bounds = () =>
     page.locator('.dt-range-input').evaluateAll((inputs) => inputs.map((i) => (i as HTMLInputElement).placeholder));
   await expect.poll(bounds).toEqual(['—', '20.0']);
+});
+
+test("F3 edge: the table's digits all have one width, so numbers line up", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(row(page, 'Hades').locator('td', { hasText: '44.5' })).toHaveCSS('font-variant-numeric', 'tabular-nums');
 });
 
 test('F3 edge: the Played (h) filter has a "never played" preset', async ({ page }) => {
@@ -433,6 +469,17 @@ test("L3 edge: the toolbar's two resets say what they do", async ({ page }) => {
   }
 });
 
+test("L3 edge: the toolbar's buttons share one font and one height, the library's and ours", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  const style = (name: string) =>
+    page.getByRole('button', { name }).evaluate((el) => ({
+      font: getComputedStyle(el).fontFamily,
+      height: el.getBoundingClientRect().height,
+    }));
+  expect(await style('Default view')).toEqual(await style('× Clear all'));
+});
+
 test('L3 edge: the column menu undoes the group and filter it set', async ({ page }, testInfo) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
@@ -601,7 +648,10 @@ test("R3 edge: a ranked list's Share view says why it can't be shared", async ({
   // Its /lists/<id> link only opens in this browser.
   const share = page.getByRole('button', { name: 'Share view' });
   await expect(share).toBeDisabled();
-  await expect(share).toHaveAttribute('title', /can't be shared/);
+  await expect(share).toHaveCSS('opacity', '0.5');
+  await expect(share).toHaveCSS('cursor', 'not-allowed');
+  // Shown, not only in `title`: touch and keyboard users never see a tooltip.
+  await expect(page.locator('.list-view-actions')).toContainText("can't be shared");
 });
 
 test("R2 edge: ranking games you don't own offers 'Not interested', not 'Haven't played'", async ({ page }) => {
@@ -2039,6 +2089,37 @@ test("I1 edge: on a phone, a bundle's table starts high, its other actions behin
   await expect(page.getByRole('link', { name: '← All bundles' })).toBeHidden();
   await page.getByRole('button', { name: 'More actions' }).click();
   await expect(page.getByRole('link', { name: '← All bundles' })).toBeVisible();
+});
+
+test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout only');
+  // True when a tap 12px from the centre, on each side, still lands on the control.
+  const takes24pxTap = async (control: Locator) => {
+    await control.scrollIntoViewIfNeeded();
+    return control.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const [x, y] = [r.left + r.width / 2, r.top + r.height / 2];
+      const points = [
+        [x, y - 11.5],
+        [x, y + 11.5],
+        [x - 11.5, y],
+        [x + 11.5, y],
+      ];
+      return points.every(([px, py]) => el.contains(document.elementFromPoint(px, py)));
+    });
+  };
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  page.once('dialog', (d) => d.accept('Shortlist'));
+  await page.getByRole('button', { name: '+ New list' }).click();
+  expect(await takes24pxTap(page.locator('.list-tree').getByRole('button', { name: 'Rename' }))).toBe(true);
+  expect(await takes24pxTap(page.locator('.list-tree').getByRole('button', { name: 'Delete' }))).toBe(true);
+
+  await page.goto('/lists/compare');
+  expect(await takes24pxTap(page.getByRole('button', { name: 'Remove Alice' }))).toBe(true);
+
+  await page.goto('/lists/owned');
+  expect(await takes24pxTap(page.locator('.dt-th-sort').first())).toBe(true);
 });
 
 test('I2 edge: the lightbox shows its focus ring when opened from the keyboard, not from a tap', async ({

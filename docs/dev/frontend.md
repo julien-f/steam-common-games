@@ -201,7 +201,7 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
 - It's applied _after_ `table.setViewState({ sorts: DEFAULT_SORT })`, so a stored view overrides the default sort and a first visit gets the default.
 - It's **not** written to the URL as it changes — a URL left in the address bar would go stale on the next table change. "🔗 Share view" snapshots it into `?tv=` on a copied link only (one param name; one table per route), never calling `history.replaceState`.
   - On Owned/Wishlist it also adds `u=` for the effective account unless the URL has one; other kinds don't, since `u=` there would only swap the recipient's ownership markers.
-  - Disabled on a saved user list (`shareViewFailure`): `/lists/<id>` only resolves in the browser holding it.
+  - Disabled on a saved user list (`shareViewFailure`, shown under the buttons): `/lists/<id>` only resolves in the browser holding it.
 - An incoming `tv` wins for that visit only: `restoreTableView` applies it without storing it and strips it from the URL, and the route pauses view persistence behind `SharedViewBanner` until the viewer keeps it (saving what's on screen) or goes back to their own. Consuming it matters because a table is rebuilt far more often than on page load.
 - A signed-in device never auto-syncs a table-view key; edits stay local until an explicit Save. See [lists-and-accounts.md](lists-and-accounts.md) for the Save/Revert flow (`tableViewSync.ts`, `tableViewPrefs.ts`'s `saveTableViewToServer`/`revertTableViewToServer`).
 

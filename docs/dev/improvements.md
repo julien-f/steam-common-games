@@ -19,7 +19,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 - **U131 · minor · S3** — a shared-layout recipient's own edits (e.g. a sort on top of the link's filter) are lost on reload: the page comes back on the defaults, dropping both the shared layout and the edit. Once edited, keep it as the recipient's layout, or warn in the banner.
 - **U132 · minor · C3, S1** — a saved dynamic list shows "🔗 Share list" (hero) and "🔗 Share view" (toolbar): same icon, different things. One entry, or names that tell them apart ("Share formula" / "Share layout").
-- **U133 · minor · R3, S1** — the ranked list's disabled "Share view" looks enabled (opacity 1, `cursor: pointer`); its reason lives only in `title`, which touch and keyboard users never see. A shared disabled style (≈0.5 opacity, `cursor: not-allowed`) and the reason shown inline.
 - **U125 · minor · S1, C1, S3** — List, bundle and compare links all preview identically, and a `/lists/<id>` list that exists only in the sender's browser can't be described at all. Server-side per-route `og:title` from the path alone (Owned games, Wishlist, Compare libraries, Shared list, bundle name from cache), generic for `/lists/<id>`.
 
 ## Loading and feedback
@@ -57,12 +56,10 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 - **U129 · minor · I2, A2, A3, C1, C3, D1, R1** — focus drops to `<body>` or stays put after: switching account from the nav chip, "Save as a list", clicking the Updated figure, closing the panel on `/rank`; "+ Add player" / "+ Add Steam Family account" leave focus on the button; the `?` dialog opens without focus and isn't modal. Focus the new field / the dialog; return it to the opener.
 - **U130 · minor · I2** — accessible names: the nav chip is just "Account"; list-tree Rename/Delete and Subtract's Move up/down don't name their object; Compare's mode and op `<select>`s have no label; Bundles' Updated and Prices figures carry `aria-pressed` without being toggles. Names that include the object; drop the stray `aria-pressed`.
-- **U146 · minor · all list routes** — stat labels (GAMES, UPDATED, PRICES) are 10.5px at 3.32:1, below AA (U39 covers only Home's Updated age). ≥4.5:1, or 12px+ semibold.
 - **U147 · polish · I2** — in the `?` dialog, descriptions start at x 595–677 depending on key count. A two-column grid with a fixed key column.
 
 ## Phone
 
-- **U148 · minor · I1** — targets under 24px at 390: sort header buttons (20px, every table), Home's Rename/Delete (20px), a compare chip's × (14×14), "Clear all" under Recent accounts. 24px hit areas (padding or `::after`).
 - **U149 · polish · I1** — Home at 390: the nav search touches the left edge; Home's card starts content at x 45 (20 margin + 24 padding) vs 12 on list pages; Recent-account rows wrap an orphan × / star onto a second line. One 12px gutter; fold row actions into ⋯.
 
 ## Accounts and first visit
@@ -71,9 +68,7 @@ None open.
 
 ## Consistency and polish
 
-- **U150 · polish · visual** — `:root` has no `color-scheme`, so native controls render light on the dark UI (white checkboxes, white `<select>`s, light scrollbars). `color-scheme: dark` on `:root`; this is U39's white select.
-- **U151 · polish · visual** — app buttons fall back to Arial while body and data-table buttons use Segoe UI: one toolbar mixes 13px Segoe/25px and 12px Arial/26px buttons. `button, input, select { font: inherit }` and one button size.
-- **U152 · polish · visual** — number columns (rating, HLTB, Played, price, discount) are start-aligned, so digits don't line up. Right-align them and their headers, with `tabular-nums`.
+- **U152 · polish · visual** — number columns (rating, HLTB, Played, price, discount) are start-aligned (digits are tabular). Right-align them and their headers: blocked on @vates/data-table-solid, whose `th`/`td` carry no column key or class and whose column defs have no align option.
 - **U153 · polish · visual** — 13 size/weight combinations on Home alone (10–20px, incl. 12.5), plus 10.5 and 18 on list pages. One scale: 11 labels, 13 meta/table, 15 body, 18 title.
 - **U154 · polish · visual** — the nav sits at y 0–32, centred (x 280–1150), with a 56px gap before the full-width hero at x 20: nothing shares an edge. ≈12px top padding, align to the 20px gutter, ≈24px gap.
 - **U155 · polish · visual** — the account chip has the active route's pill fill, so Owned shows two "selected" pills. Outline or avatar style for the chip.

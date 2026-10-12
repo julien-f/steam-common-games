@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Dates read the same everywhere: a release, a bundle's end and its publication show as `YYYY-MM-DD` (with the time where it matters) in tables, cards and the panel
 - On a touch-only device, the ranking no longer shows its keyboard shortcuts
 - Paging games in the lightbox from a game's Cover keeps showing each game's Cover
+- Table digits all have one width, so a column's numbers line up better
 
 ### Fixed
 
@@ -101,6 +102,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Changing a saved list's sort, columns, search or page no longer floods account sync, which could drop other settings' syncs and overwrite a list edit made on another device
 - When IsThereAnyDeal doesn't answer, price cells show ⚠ and the panel's Price card says so, instead of reading as no data
 - Opening a game link in a fresh browser lists it under Recently Looked Up right away, instead of saying the list is empty until a reload
+- Checkboxes, selects and scrollbars now render dark, matching the rest of the page
+- Buttons and fields use the page's font, and the table toolbar's buttons share one height
+- Disabled buttons look disabled, and a saved list's Share view says why it is off instead of hiding it in a tooltip
+- A list's stat labels (Games, Updated, Prices) are easier to read
+- On a phone, table sort headers, Home's Rename and Delete, and a compare chip's × are easier to tap
 
 ### Development
 
