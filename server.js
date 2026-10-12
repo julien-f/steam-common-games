@@ -65,12 +65,11 @@ const {
   isSyncedPrefKey,
   prefFits,
 } = require('./lib/auth');
-const { SESSION_TTL_MS, MISS_CACHE_TTL_MS } = require('./lib/config');
+const { SESSION_TTL_MS, MISS_CACHE_TTL_MS, TRUST_PROXY } = require('./lib/config');
 
 const HOST = process.env.HOST;
 const PORT = process.env.PORT;
 const MAX_USERS = Number(process.env.MAX_USERS);
-const TRUST_PROXY = process.env.TRUST_PROXY;
 const SEARCH_RATE_LIMIT_MAX = Number(process.env.SEARCH_RATE_LIMIT_MAX);
 const DETAILS_RATE_LIMIT_MAX = Number(process.env.DETAILS_RATE_LIMIT_MAX);
 const GAME_SEARCH_RATE_LIMIT_MAX = Number(process.env.GAME_SEARCH_RATE_LIMIT_MAX);
