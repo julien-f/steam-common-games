@@ -132,6 +132,13 @@ test('S3 edge: About names every data source, ProtonDB included', async ({ page 
     await expect(sources.getByText(name, { exact: true })).toBeVisible();
 });
 
+test('S3 edge: a first game link in a fresh browser lists that game under Recently Looked Up', async ({ page }) => {
+  await page.goto('/game/620');
+  await expect(rows(page)).toHaveCount(1);
+  await expect(row(page, 'Portal 2')).toBeVisible();
+  await expect(page.getByText('No games in this list.')).toHaveCount(0);
+});
+
 test("S3 edge: another browser's list link explains lists are local", async ({ page }) => {
   await page.goto('/lists/not-in-this-browser');
   await expect(page.getByText("This list isn't in this browser")).toBeVisible();

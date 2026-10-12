@@ -100,6 +100,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - TRUST_PROXY=1 now takes effect: behind a reverse proxy, rate limits apply per visitor and link previews and sign-in use https
 - Changing a saved list's sort, columns, search or page no longer floods account sync, which could drop other settings' syncs and overwrite a list edit made on another device
 - When IsThereAnyDeal or Steam achievements don't answer, price cells show ⚠ and the panel says the source didn't answer, instead of reading as no data
+- Opening a game link in a fresh browser lists it under Recently Looked Up right away, instead of saying the list is empty until a reload
 
 ### Development
 

@@ -79,7 +79,6 @@ None open.
 - **U155 · polish · visual** — the account chip has the active route's pill fill, so Owned shows two "selected" pills. Outline or avatar style for the chip.
 - **U156 · polish · visual** — a wrapped game name pushes its ✓/★ badge to the cell's far right ("Hollow / Knight ……✓"). Keep badges inline after the last word.
 - **U157 · polish · F2** — `/search` alone has a centred cyan h1 instead of the list hero, and an empty Image column. Reuse the list hero.
-- **U158 · minor · S2, S3** — on a first visit, `/game/620` shows "GAMES 1" but "No games in this list." until a reload. Render the table from the store the counter reads.
 - **U159 · polish · F1** — nav search: a second Esc blurs but keeps the typed text; after a pick the box keeps the game's name. Clear it in both cases.
 - **U160 · polish · L3** — data-table popovers: Filter opens on a range slider with no column heading; searching Columns leaves an empty "VISIBLE COLUMNS" header; an open range chip reads "Played (h): 5.0–". Label the pane, hide empty groups, write "≥ 5.0 h". Needs upstream changes in `@vates/data-table-solid`.
 - **U121 · polish · F1** — ←/→ on a game showing only its Cover while its media streams does nothing visible, yet `stepLightbox` (`public/lightbox.tsx:1164`) clears the take-the-media-when-it-lands latch and marks the Cover chosen, so the screenshots never replace it. Return early when there's nothing to step to.
