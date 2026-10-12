@@ -193,6 +193,17 @@ test('S3 edge: a first game link in a fresh browser lists that game under Recent
   await expect(page.getByText('No games in this list.')).toHaveCount(0);
 });
 
+test("S3 edge: editing a shared layout warns it's lost on reload unless kept", async ({ page }) => {
+  const tv = JSON.stringify({ sorts: [{ key: 'name', dir: 'desc' }] });
+  await page.goto(`/lists/compare?u=alice&u=bob&tv=${encodeURIComponent(tv)}`);
+  const banner = page.getByRole('status').filter({ hasText: 'shared' });
+  await expect(banner).toContainText('for this visit only');
+  await expect(rows(page).first()).toBeVisible();
+  await page.locator('thead th').filter({ hasText: /^Name/ }).click();
+  await expect(banner).toContainText("You've changed this shared layout — it's lost on reload unless you keep it");
+  await expect(banner.getByRole('button', { name: 'Keep as my layout' })).toBeVisible();
+});
+
 test("S3 edge: another browser's list link explains lists are local", async ({ page }) => {
   await page.goto('/lists/not-in-this-browser');
   await expect(page.getByText("This list isn't in this browser")).toBeVisible();

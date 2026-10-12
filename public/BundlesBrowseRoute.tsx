@@ -305,8 +305,9 @@ export default function BundlesBrowseRoute() {
   });
   // A 🔗 Share view link's layout is shown but not saved until kept (see restoreTableView).
   const [viewingShared, setViewingShared] = createSignal(restoreTableView(table, viewStore));
+  const [sharedViewEdited, setSharedViewEdited] = createSignal(false);
   // eslint-disable-next-line solid/reactivity -- bindViewPersistence reads it in its own effect
-  onCleanup(bindViewPersistence(table, viewStore, viewingShared));
+  onCleanup(bindViewPersistence(table, viewStore, viewingShared, () => setSharedViewEdited(true)));
   function handleDiscardSharedView(): void {
     table.setViewState(viewStore.load());
     setViewingShared(false);
@@ -489,7 +490,11 @@ export default function BundlesBrowseRoute() {
         tiles={heroTiles()}
       />
       <Show when={viewingShared()}>
-        <SharedViewBanner onKeep={() => setViewingShared(false)} onDiscard={handleDiscardSharedView} />
+        <SharedViewBanner
+          edited={sharedViewEdited()}
+          onKeep={() => setViewingShared(false)}
+          onDiscard={handleDiscardSharedView}
+        />
       </Show>
       <UnsavedViewBanner table={table} prefKey={VIEW_PREF_KEY} />
       <Show when={statusText()}>

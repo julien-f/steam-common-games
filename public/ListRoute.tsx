@@ -1762,6 +1762,7 @@ export default function ListRoute() {
   // (a link written to the live URL goes stale the moment the table changes again).
   // A 🔗 Share view link's layout, on screen but not saved (see restoreTableView).
   const [viewingShared, setViewingShared] = createSignal(false);
+  const [sharedViewEdited, setSharedViewEdited] = createSignal(false);
   function handleDiscardSharedView(): void {
     applyView(viewStore().load());
     setViewingShared(false);
@@ -2320,8 +2321,9 @@ export default function ListRoute() {
         disposeTableState();
       };
       const store = viewStore();
+      setSharedViewEdited(false);
       setViewingShared(restoreTableView(viewTable, store));
-      unsyncView = bindViewPersistence(table, store, viewingShared);
+      unsyncView = bindViewPersistence(table, store, viewingShared, () => setSharedViewEdited(true));
       if (keptSelection?.size) table.selection.setAll(tableData().filter((row) => keptSelection.has(row.appid)));
       setTableReady(true);
     }
@@ -3240,7 +3242,11 @@ export default function ListRoute() {
         <UnsavedViewBanner table={viewTable} prefKey={viewPrefKey()} />
       </Show>
       <Show when={tableReady() && viewingShared()}>
-        <SharedViewBanner onKeep={() => setViewingShared(false)} onDiscard={handleDiscardSharedView} />
+        <SharedViewBanner
+          edited={sharedViewEdited()}
+          onKeep={() => setViewingShared(false)}
+          onDiscard={handleDiscardSharedView}
+        />
       </Show>
       <Show when={emptyText()}>
         <p class="list-empty">{emptyText()}</p>
