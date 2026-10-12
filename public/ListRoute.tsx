@@ -1773,13 +1773,15 @@ export default function ListRoute() {
     const list = userList();
     return kind === 'wishlist' || (kind === 'user' && !!list && listHasPriceSource(list));
   }
-  // A saved list's /lists/<id> link only opens in the browser that has the list.
+  // A saved list's /lists/<id> link only opens in the browser that has the list; a dynamic one has
+  // 🔗 Share list instead, so its Share view is hidden rather than dimmed.
+  function isDynamicList(): boolean {
+    return kind === 'user' && userList()?.kind === 'dynamic';
+  }
   function shareViewFailure(): string | null {
     const list = userList();
-    if (kind !== 'user' || !list) return null;
-    return list.kind === 'dynamic'
-      ? "This list's link only opens in this browser — 🔗 Share list sends the list itself"
-      : `${list.kind === 'ranked' ? 'Ranked' : 'Manual'} lists can't be shared yet: their link only opens in this browser`;
+    if (kind !== 'user' || !list || list.kind === 'dynamic') return null;
+    return `${list.kind === 'ranked' ? 'Ranked' : 'Manual'} lists can't be shared yet: their link only opens in this browser`;
   }
   function handleShareView(btn: HTMLElement): void {
     if (!table) return;
@@ -1805,7 +1807,12 @@ export default function ListRoute() {
         >
           🎲
         </button>
-        <ViewActions onShare={handleShareView} onReset={handleResetView} shareDisabledReason={shareViewFailure()} />
+        <ViewActions
+          onShare={handleShareView}
+          onReset={handleResetView}
+          shareDisabledReason={shareViewFailure()}
+          hideShare={isDynamicList()}
+        />
       </>
     );
   }

@@ -33,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Paging games in the lightbox from a game's Cover keeps showing each game's Cover
 - Table digits all have one width, so a column's numbers line up better
 - Editing a shared table layout now warns that the change is lost on reload unless you keep it
+- A combined list shows only 🔗 Share list, no longer also a Share view whose link only opens in your browser
 
 ### Fixed
 

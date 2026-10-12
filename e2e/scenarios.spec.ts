@@ -380,6 +380,20 @@ test('C3 edge: a saved comparison keeps the name its page had', async ({ page })
   await expect(page.getByRole('heading', { name: 'Alice vs. Bob' })).toBeVisible();
 });
 
+test('C3 edge: a saved comparison offers Share list only, not a Share view that only opens here', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare?u=alice&u=bob');
+  await expect(groupRows(page)).toHaveCount(3);
+  await expect(page.getByRole('button', { name: 'Share view' })).toHaveCount(1);
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  if (await more.isVisible()) await more.click();
+  await page.getByRole('button', { name: 'Save as a list' }).click();
+  await expect(page).toHaveURL(/\/lists\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole('button', { name: /Share list/ })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Default view' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Share view' })).toHaveCount(0);
+});
+
 test('C3 edge: Save as a list moves focus into the saved list, not to the page', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare?u=alice&u=bob');

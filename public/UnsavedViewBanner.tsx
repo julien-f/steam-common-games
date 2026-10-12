@@ -38,6 +38,7 @@ export function ViewActions(props: {
   onShare: (btn: HTMLElement) => void;
   onReset: () => void;
   shareDisabledReason?: string | null;
+  hideShare?: boolean;
 }): JSX.Element {
   const [reasonShown, setReasonShown] = createSignal(false);
   let hideTimer: ReturnType<typeof setTimeout> | undefined;
@@ -49,19 +50,21 @@ export function ViewActions(props: {
   }
   return (
     <div class="list-view-actions">
-      {/* aria-disabled, not disabled: a press has to reach us to say why. */}
-      <button
-        type="button"
-        class="btn btn-ghost btn-sm"
-        aria-label="Share view"
-        aria-disabled={props.shareDisabledReason ? 'true' : undefined}
-        aria-describedby={props.shareDisabledReason ? 'share-view-reason' : undefined}
-        title={props.shareDisabledReason ? undefined : "Copy a link to this table's layout"}
-        onClick={(e) => (props.shareDisabledReason ? showReason() : props.onShare(e.currentTarget))}
-        onBlur={() => setReasonShown(false)}
-      >
-        🔗<span class="btn-label"> Share view</span>
-      </button>
+      <Show when={!props.hideShare}>
+        {/* aria-disabled, not disabled: a press has to reach us to say why. */}
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          aria-label="Share view"
+          aria-disabled={props.shareDisabledReason ? 'true' : undefined}
+          aria-describedby={props.shareDisabledReason ? 'share-view-reason' : undefined}
+          title={props.shareDisabledReason ? undefined : "Copy a link to this table's layout"}
+          onClick={(e) => (props.shareDisabledReason ? showReason() : props.onShare(e.currentTarget))}
+          onBlur={() => setReasonShown(false)}
+        >
+          🔗<span class="btn-label"> Share view</span>
+        </button>
+      </Show>
       <button
         type="button"
         class="btn btn-ghost btn-sm"
