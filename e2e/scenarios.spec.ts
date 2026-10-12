@@ -158,6 +158,16 @@ test('A2 edge: the nav chip reads as an account, not as a second selected route'
   expect(await chip.evaluate((el) => getComputedStyle(el).borderColor)).not.toBe('rgba(0, 0, 0, 0)');
 });
 
+test("A2 edge: a recent account's star says on hover what clicking it does", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  await expect(page.locator('.recent-accounts li')).toHaveCount(2);
+  await expect(page.getByRole('button', { name: 'Star Alice as mine' })).toHaveAttribute('title', 'Unstar Alice');
+  await expect(page.getByRole('button', { name: 'Star Bob as mine' })).toHaveAttribute('title', 'Star Bob as mine');
+});
+
 test('A2 edge: switching account from the nav chip leaves focus on the chip', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');

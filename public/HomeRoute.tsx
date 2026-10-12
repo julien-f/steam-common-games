@@ -685,7 +685,11 @@ export default function HomeRoute() {
                   <button
                     type="button"
                     class="recent-icon-btn"
-                    title="Set as my account"
+                    title={
+                      myAccount()?.id === account.id
+                        ? `Unstar ${accountDisplayLabel(account)}`
+                        : `Star ${accountDisplayLabel(account)} as mine`
+                    }
                     aria-label={`Star ${accountDisplayLabel(account)} as mine`}
                     aria-pressed={myAccount()?.id === account.id}
                     onClick={[toggleMyAccount, account]}
