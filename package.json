@@ -24,7 +24,7 @@
     "check:setup": "node scripts/setup-lint.js",
     "cache:clear": "node scripts/cache-clear.js",
     "lint": "eslint public --max-warnings=0",
-    "format": "prettier --write --cache .",
+    "format": "prettier --write --cache --log-level warn .",
     "format:check": "prettier --check --cache ."
   },
   "dependencies": {
