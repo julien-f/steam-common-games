@@ -58,7 +58,7 @@ import { UnsavedViewBanner, ViewActions } from './UnsavedViewBanner.tsx';
 import { useBaseTitle } from './pageTitle.ts';
 import { convert, formatWithEstimate } from './currency.ts';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
-import { fetchBundlePage, loadErrorText } from './bundleData.ts';
+import { fetchBundlePage, isUnavailable, loadErrorText } from './bundleData.ts';
 
 const PAGE_SIZE = 50; // ITAD's own max per page (lib/itad.js's getBundles `limit`)
 // How many pages load() fetches back-to-back before handing over to the "Load more" button. The
@@ -292,6 +292,7 @@ export default function BundlesBrowseRoute() {
   const navigate = useNavigate();
   const [rows, setRows] = createSignal<BundleRow[]>([]);
   const [statusText, setStatusText] = createSignal('');
+  const [unavailable, setUnavailable] = createSignal(false);
   const [includeExpired, setIncludeExpired] = createSignal(false);
   const [moreAvailable, setMoreAvailable] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
@@ -364,10 +365,12 @@ export default function BundlesBrowseRoute() {
       }
       setRows(append ? [...rows(), ...collected] : collected);
       setMoreAvailable(!reachedEnd);
+      setUnavailable(false);
       // The table renders its own row count, so there's nothing left to say once rows exist.
       setStatusText(rows().length ? '' : 'No current bundles');
     } catch (err) {
       if (loadGuard.isStale(gen)) return;
+      setUnavailable(isUnavailable(err));
       setStatusText(loadErrorText(err));
     } finally {
       if (!loadGuard.isStale(gen)) setLoading(false);
@@ -467,57 +470,69 @@ export default function BundlesBrowseRoute() {
   useBaseTitle(() => 'Bundles');
 
   return (
-    <div class="bundles-browse-route">
-      <ListHero
-        title="Bundles"
-        actions={
-          <>
-            {/* A data-scope control, not a view one — it round-trips to ITAD (see load()) — so it
+    <Show
+      when={!unavailable()}
+      fallback={
+        <div class="bundles-browse-route">
+          <ListHero
+            title="Bundles"
+            note={`${statusText()} Whoever runs it can turn Bundles and prices on with a free IsThereAnyDeal API key.`}
+          />
+        </div>
+      }
+    >
+      <div class="bundles-browse-route">
+        <ListHero
+          title="Bundles"
+          actions={
+            <>
+              {/* A data-scope control, not a view one — it round-trips to ITAD (see load()) — so it
                 sits here rather than with the table-view buttons in the toolbar. */}
-            <label class="bundles-expired-toggle">
-              <input
-                type="checkbox"
-                checked={includeExpired()}
-                onChange={(e) => {
-                  setIncludeExpired(e.currentTarget.checked);
-                  load();
-                }}
-              />
-              Include expired
-            </label>
-          </>
-        }
-        tiles={heroTiles()}
-      />
-      <Show when={viewingShared()}>
-        <SharedViewBanner
-          edited={sharedViewEdited()}
-          onKeep={() => setViewingShared(false)}
-          onDiscard={handleDiscardSharedView}
-        />
-      </Show>
-      <UnsavedViewBanner table={table} prefKey={VIEW_PREF_KEY} />
-      <Show when={statusText()}>
-        <div class="bundles-status">{statusText()}</div>
-      </Show>
-      <div class="table-container">
-        <DataTableView<BundleRow>
-          table={table}
-          rowKey="id"
-          onRowClick={(row) => navigate(withAccountParam(`/lists/bundle/${row.id}`))}
-          toolbarEnd={
-            <ViewActions
-              onShare={(btn) => shareTableView(table, btn)}
-              onReset={() => resetTableView(table, viewStore)}
-            />
+              <label class="bundles-expired-toggle">
+                <input
+                  type="checkbox"
+                  checked={includeExpired()}
+                  onChange={(e) => {
+                    setIncludeExpired(e.currentTarget.checked);
+                    load();
+                  }}
+                />
+                Include expired
+              </label>
+            </>
           }
+          tiles={heroTiles()}
         />
+        <Show when={viewingShared()}>
+          <SharedViewBanner
+            edited={sharedViewEdited()}
+            onKeep={() => setViewingShared(false)}
+            onDiscard={handleDiscardSharedView}
+          />
+        </Show>
+        <UnsavedViewBanner table={table} prefKey={VIEW_PREF_KEY} />
+        <Show when={statusText()}>
+          <div class="bundles-status">{statusText()}</div>
+        </Show>
+        <div class="table-container">
+          <DataTableView<BundleRow>
+            table={table}
+            rowKey="id"
+            onRowClick={(row) => navigate(withAccountParam(`/lists/bundle/${row.id}`))}
+            toolbarEnd={
+              <ViewActions
+                onShare={(btn) => shareTableView(table, btn)}
+                onReset={() => resetTableView(table, viewStore)}
+              />
+            }
+          />
+        </div>
+        <Show when={moreAvailable()}>
+          <button type="button" class="btn btn-ghost" disabled={loading()} onClick={() => load({ append: true })}>
+            Load more
+          </button>
+        </Show>
       </div>
-      <Show when={moreAvailable()}>
-        <button type="button" class="btn btn-ghost" disabled={loading()} onClick={() => load({ append: true })}>
-          Load more
-        </button>
-      </Show>
-    </div>
+    </Show>
   );
 }

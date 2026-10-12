@@ -1264,6 +1264,19 @@ test('B1 edge: with no ITAD key, Bundles says why it is empty', async ({ page })
   await expect(page.getByRole('main')).not.toContainText(/ITAD_API_KEY|Error:/);
 });
 
+test('O1 edge: with no ITAD key, Bundles is one card saying how to turn it on, not an empty table', async ({
+  page,
+}) => {
+  await mockApi(page, { states: ['no-itad'] }); // registered last, so it answers first
+  await asPlayer(page, ALICE);
+  await page.goto('/bundles');
+  const card = page.locator('.list-hero');
+  await expect(card).toContainText('IsThereAnyDeal API key');
+  await expect(card.locator('.list-stat')).toHaveCount(0);
+  await expect(page.getByLabel('Include expired')).toHaveCount(0);
+  await expect(page.locator('.table-container')).toHaveCount(0);
+});
+
 test('B1 edge: games ITAD lists under the first tier only show the tier range', async ({ page }) => {
   await mockApi(page, { states: ['untiered'] });
   await asPlayer(page, ALICE);

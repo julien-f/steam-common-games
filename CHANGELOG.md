@@ -48,6 +48,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Creating a combined list opens it, and Edit sources has a single Cancel
 - "Rank this list" is unavailable below 2 games and says why
 - A bundle's page puts ← All bundles next to its ‹ › arrows, and its other actions share one style around Get this bundle
+- Bundles on an instance without IsThereAnyDeal shows one card saying how to turn it on, instead of an empty table
 
 ### Fixed
 
