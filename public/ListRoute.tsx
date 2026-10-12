@@ -433,8 +433,7 @@ const TIER_PRICE_COLUMN: ColumnDef<Record<string, any>> = {
   keepVisibleWhenGrouped: true,
   category: 'Pricing',
 };
-// A bundle's games' Tier Price fields, by appid; a pick-and-mix game costs the per-game rate the
-// selection reaches (see the effect by pickPlan), the entry rate until then.
+// A bundle's games' Tier Price fields by appid; with `picks`, pick-and-mix starts at the entry rate (see the effect by pickPlan).
 function bundleTierFields(
   resolved: ResolvedGame[],
   picks: PickTier[],
@@ -2120,10 +2119,12 @@ export default function ListRoute() {
             onFetchedAt,
             onBundleLeftOut: noteLeftOut,
             onBundleGames: (bundleId, bundle, games) => {
+              if (loadGuard.isStale(gen)) return;
               setSharedBundles((prev) =>
                 prev.some((b) => b.id === bundleId) ? prev : [...prev, { id: bundleId, title: bundle.title }],
               );
-              const fields = bundleTierFields(games, pickTiers(bundle.pickAndMix, regionCurrency()));
+              // No picks: a pick-and-mix rate hangs on a pick count only the bundle page's selection gives.
+              const fields = bundleTierFields(games, []);
               for (const [appid, f] of fields) if (!tiers.has(appid)) tiers.set(appid, f);
             },
           }),
@@ -2131,7 +2132,7 @@ export default function ListRoute() {
         describeWithLeftOut(list, sharedNaming()),
       );
       if (!resolved) return;
-      tiered = tiers.size > 0;
+      tiered = resolved.rows.some((row) => tiers.has(row.appid));
       initialRows = resolved.rows.map((row) => ({ ...row, ...tiers.get(row.appid) }));
     } else if (kind === 'recent') {
       setListTitle('Recently Looked Up');
@@ -2981,7 +2982,7 @@ export default function ListRoute() {
         {kind === 'shared' && (
           <For each={sharedBundles()}>
             {(b) => (
-              <A class="btn btn-ghost btn-sm" href={`/lists/bundle/${b.id}`}>
+              <A class="btn btn-ghost btn-sm" href={withAccountParam(`/lists/bundle/${b.id}`, routerLocation.search)}>
                 ← {b.title}
               </A>
             )}
@@ -3089,12 +3090,12 @@ export default function ListRoute() {
     // old currency until something else happened to reload, with no indication anything was
     // stale. A wishlist only needs its prices re-fetched; a bundle needs a full reload, because
     // its Tier Price comes from the bundle fetch itself (fetchBundleById's own `country`), not
-    // from the price lookup.
+    // from the price lookup. So does a shared list with a bundle source, for the same Tier Price.
     const onRegionChange = () => {
       setRegionCode(currentRegion());
       setPriceFetchedAt(undefined);
-      if (hasPrices()) void loadPrices(rowsStore, loadGuard.current());
-      else if (kind === 'bundle') void load();
+      if (kind === 'bundle' || (kind === 'shared' && sharedBundles().length)) void load();
+      else if (hasPrices()) void loadPrices(rowsStore, loadGuard.current());
     };
     window.addEventListener(REGION_CHANGED_EVENT, onRegionChange);
     onCleanup(() => window.removeEventListener(REGION_CHANGED_EVENT, onRegionChange));
