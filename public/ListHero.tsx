@@ -39,7 +39,8 @@ export interface HeroTile {
   onClick?: () => void;
   active?: boolean;
   // A tile whose action is momentarily unavailable (a refresh already in flight). Still a button,
-  // so the row doesn't reflow as it flips back and forth.
+  // so the row doesn't reflow as it flips back and forth; aria-disabled, not disabled, so the
+  // focus of the click that started it stays put.
   disabled?: boolean;
   // A second action, on the `sub` line — for the one tile that states two facts a reader can act
   // on separately (Prices: the region its value names, opened with the tile's own click, and how
@@ -99,8 +100,8 @@ export function ListHero(props: ListHeroProps): JSX.Element {
                   class={isButton() ? 'list-stat list-stat-btn' : 'list-stat'}
                   type={isButton() ? 'button' : undefined}
                   aria-pressed={isButton() ? !!tile().active : undefined}
-                  disabled={isButton() ? !!tile().disabled : undefined}
-                  onClick={tile().subOnClick ? undefined : () => tile().onClick?.()}
+                  aria-disabled={isButton() && tile().disabled ? 'true' : undefined}
+                  onClick={tile().subOnClick || tile().disabled ? undefined : () => tile().onClick?.()}
                 >
                   <span class="list-stat-label">{tile().label}</span>
                   {/* Two actions means two buttons side by side inside a plain tile — a button
@@ -118,8 +119,8 @@ export function ListHero(props: ListHeroProps): JSX.Element {
                       type="button"
                       class="list-stat-value list-stat-btn"
                       title={tile().title}
-                      disabled={!!tile().disabled}
-                      onClick={() => tile().onClick?.()}
+                      aria-disabled={tile().disabled ? 'true' : undefined}
+                      onClick={() => !tile().disabled && tile().onClick?.()}
                     >
                       {tile().value}
                     </button>
@@ -130,8 +131,8 @@ export function ListHero(props: ListHeroProps): JSX.Element {
                         type="button"
                         class="list-stat-sub list-stat-btn"
                         title={tile().subTitle}
-                        disabled={!!tile().subDisabled}
-                        onClick={() => tile().subOnClick?.()}
+                        aria-disabled={tile().subDisabled ? 'true' : undefined}
+                        onClick={() => !tile().subDisabled && tile().subOnClick?.()}
                       >
                         {tile().sub}
                       </button>

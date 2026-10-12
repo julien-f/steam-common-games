@@ -593,6 +593,8 @@ export default function HomeRoute() {
             {(value, i) => (
               <input
                 type="text"
+                // Only the added ones: the first field is there on load.
+                ref={(el) => i > 0 && queueMicrotask(() => el.focus())}
                 value={value()}
                 placeholder="Steam name, profile URL, or 64-bit ID…"
                 onInput={(e) =>

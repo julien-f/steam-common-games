@@ -78,6 +78,7 @@ export function AccountChip(): JSX.Element {
   function pick(acc: AccountSlot): void {
     adoptAccount(acc, navigate, location);
     detailsEl.open = false;
+    detailsEl.querySelector('summary')!.focus(); // the clicked button is now hidden in the closed popover
   }
 
   const otherRecents = () => recents().filter((a) => a.id !== account()?.id);

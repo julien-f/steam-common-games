@@ -192,8 +192,14 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
   const filledCount = (): number =>
     slots().filter((slot, i) => slotIdentifiers(slot).length > 0 || (openSlot() === i && query().trim())).length;
 
+  let formEl!: HTMLFormElement;
+  function addSlot(): void {
+    setSlots((prev) => [...prev, []]);
+    [...formEl.querySelectorAll<HTMLInputElement>('input[role="combobox"]')].at(-1)?.focus();
+  }
+
   return (
-    <form class="compare-form" onSubmit={handleSubmit}>
+    <form class="compare-form" ref={formEl} onSubmit={handleSubmit}>
       {/* <Index>, not <For>, over the slots — <For> keys by the array's own identity, so adding a
           chip (which replaces that slot's array) would tear down and rebuild the row, taking the
           focused combobox with it. <Index> keys by position, which is what a fixed list of
@@ -312,7 +318,7 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
           Steam Family shape an AccountSlot has everywhere else in the app. */}
       <p class="compare-form-hint">Add more than one account to a player to compare a Steam Family as one library.</p>
       <div class="compare-form-actions">
-        <button type="button" class="btn btn-ghost btn-sm" onClick={() => setSlots((prev) => [...prev, []])}>
+        <button type="button" class="btn btn-ghost btn-sm" onClick={addSlot}>
           + Add player
         </button>
         <button type="submit" class="btn btn-primary btn-sm" disabled={filledCount() < 2}>

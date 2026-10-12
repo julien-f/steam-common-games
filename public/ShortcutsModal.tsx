@@ -6,7 +6,7 @@
 //
 // Open state lives in AppShell (it has to reach bindPanelKeyboardShortcuts' `shortcuts` option
 // and the `?` key handler), so this component is pure presentation plus its two close paths.
-import { For, type JSX } from 'solid-js';
+import { createEffect, For, on, type JSX } from 'solid-js';
 
 interface Section {
   title: string;
@@ -62,6 +62,20 @@ const SHORTCUT_SECTIONS: Section[] = [
 ];
 
 export function ShortcutsModal(props: { open: boolean; onClose: () => void }): JSX.Element {
+  let closeEl!: HTMLButtonElement;
+  let opener: HTMLElement | null = null;
+  createEffect(
+    on(
+      () => props.open,
+      (open) => {
+        if (open) {
+          opener = document.activeElement as HTMLElement | null;
+          closeEl.focus();
+        } else if (opener?.isConnected) opener.focus();
+      },
+      { defer: true },
+    ),
+  );
   return (
     <>
       <div class={`shortcuts-backdrop${props.open ? ' open' : ''}`} onClick={() => props.onClose()} />
@@ -73,10 +87,23 @@ export function ShortcutsModal(props: { open: boolean; onClose: () => void }): J
         aria-hidden={props.open ? undefined : 'true'}
         // Hidden with CSS, so without this its Close button was still a Tab stop.
         inert={!props.open}
+        // Modal: Close is its only control, so Tab stays on it rather than leaving for the page.
+        onKeyDown={(e) => {
+          if (e.key === 'Tab') {
+            e.preventDefault();
+            closeEl.focus();
+          }
+        }}
       >
         <div class="shortcuts-header">
           <span class="shortcuts-title">Keyboard shortcuts</span>
-          <button type="button" class="shortcuts-close" aria-label="Close" onClick={() => props.onClose()}>
+          <button
+            type="button"
+            class="shortcuts-close"
+            aria-label="Close"
+            ref={closeEl}
+            onClick={() => props.onClose()}
+          >
             ×
           </button>
         </div>

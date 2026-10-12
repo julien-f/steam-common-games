@@ -983,7 +983,7 @@ export default function ListRoute() {
       return { kind: 'user', listId: saved.id };
     }
     const saved = createList({ kind: 'dynamic', op: list.op, sources: (list.sources ?? []).map(saveRef) });
-    navigate(`/lists/${saved.id}`);
+    openSavedList(saved.id);
   }
   // ── kind === 'compare' ────────────────────────────────────────────────────────────────────
   // A comparison is a dynamic list that was never saved: the `?u=` slots ARE its formula (one
@@ -1062,7 +1062,12 @@ export default function ListRoute() {
     const list = compareList();
     if (!list) return;
     const saved = createList({ kind: 'dynamic', name: heroTitle() || undefined, op: list.op, sources: list.sources });
-    navigate(`/lists/${saved.id}`);
+    openSavedList(saved.id);
+  }
+  // The Save button is gone on the saved list's page: focus would otherwise drop to <body>.
+  function openSavedList(id: string): void {
+    navigate(`/lists/${id}`);
+    document.querySelector<HTMLElement>('main')?.focus();
   }
 
   function compareNaming(): ListNaming {

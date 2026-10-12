@@ -100,6 +100,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - TRUST_PROXY=1 now takes effect: behind a reverse proxy, rate limits apply per visitor and link previews and sign-in use https
 - Changing a saved list's sort, columns, search or page no longer floods account sync, which could drop other settings' syncs and overwrite a list edit made on another device
 - Typing a player's exact name and pressing Enter on Compare adds that player, not a Steam Family they belong to
+- Keyboard focus no longer drops to the page after switching account, saving a list, refreshing from Updated or closing the ranking's panel; added fields take focus, and the ? dialog takes and returns it
 
 ### Development
 

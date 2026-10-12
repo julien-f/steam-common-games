@@ -55,7 +55,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Keyboard and accessibility
 
-- **U129 · minor · I2, A2, A3, C1, C3, D1, R1** — focus drops to `<body>` or stays put after: switching account from the nav chip, "Save as a list", clicking the Updated figure, closing the panel on `/rank`; "+ Add player" / "+ Add Steam Family account" leave focus on the button; the `?` dialog opens without focus and isn't modal. Focus the new field / the dialog; return it to the opener.
 - **U130 · minor · I2** — accessible names: the nav chip is just "Account"; list-tree Rename/Delete and Subtract's Move up/down don't name their object; Compare's mode and op `<select>`s have no label; Bundles' Updated and Prices figures carry `aria-pressed` without being toggles. Names that include the object; drop the stray `aria-pressed`.
 - **U146 · minor · all list routes** — stat labels (GAMES, UPDATED, PRICES) are 10.5px at 3.32:1, below AA (U39 covers only Home's Updated age). ≥4.5:1, or 12px+ semibold.
 - **U147 · polish · I2** — in the `?` dialog, descriptions start at x 595–677 depending on key count. A two-column grid with a fixed key column.
