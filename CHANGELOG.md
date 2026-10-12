@@ -47,6 +47,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Folders and lists are named and renamed in place on Home instead of in a browser dialog
 - Creating a combined list opens it, and Edit sources has a single Cancel
 - "Rank this list" is unavailable below 2 games and says why
+- On a phone, Home lines up with the list pages' margins, and each recent account's star and remove buttons stay on its row
 
 ### Fixed
 

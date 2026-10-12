@@ -682,10 +682,23 @@ export default function HomeRoute() {
                   <Show when={account.countryCode}>
                     <span class="account-count">{countryFlag(account.countryCode)}</span>
                   </Show>
-                  <button type="button" title="Set as my account" onClick={[toggleMyAccount, account]}>
-                    {myAccount()?.id === account.id ? '☆ unstar' : '★ star as mine'}
+                  <button
+                    type="button"
+                    class="recent-icon-btn"
+                    title="Set as my account"
+                    aria-label={`Star ${accountDisplayLabel(account)} as mine`}
+                    aria-pressed={myAccount()?.id === account.id}
+                    onClick={[toggleMyAccount, account]}
+                  >
+                    {myAccount()?.id === account.id ? '★' : '☆'}
                   </button>
-                  <button type="button" title="Remove" onClick={[handleRemoveRecent, account.id]}>
+                  <button
+                    type="button"
+                    class="recent-icon-btn"
+                    title="Remove"
+                    aria-label={`Remove ${accountDisplayLabel(account)}`}
+                    onClick={[handleRemoveRecent, account.id]}
+                  >
                     ×
                   </button>
                 </li>
