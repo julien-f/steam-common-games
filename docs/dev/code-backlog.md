@@ -33,7 +33,6 @@ None open.
 
 ## Reliability
 
-- **C156 · minor · S** — `vite.config.js:65`/`:74` hard-code the dev proxy target `http://127.0.0.1:3000`, so a `PORT`/`HOST` override in `.env` leaves `npm run dev`'s `/api` and `/auth/` proxying to a dead port, while `docs/user/configuration.md:13` presents them as freely settable. Build the target from `HOST`/`PORT`, loading `.env` as `lib/config.js` does.
 - **C1 · minor · M** — dependency updates wait on a manual `dependency-audit` run. Dependabot or Renovate could open them, since CI (`.github/workflows/ci.yml`) runs `check` and the e2e suite on PRs, but their PRs lack the `CHANGELOG.md` entry the pre-commit hook requires (CI doesn't check it) and skip `npm run build`, so each still needs a local pass through dependency-audit's Applying.
 
 ## Compliance

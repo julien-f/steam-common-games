@@ -12,6 +12,9 @@
 const { defineConfig } = require('vite');
 const solidPlugin = require('vite-plugin-solid');
 const path = require('node:path');
+require('./lib/config'); // loads .env + default.env, so HOST/PORT match the backend's
+
+const backend = `http://${process.env.HOST}:${process.env.PORT}`;
 
 // `npm run dev:mock`: answers /api from e2e/mockApi.ts's fixtures — no backend, no upstream traffic.
 const mock = process.env.MOCK_API === '1';
@@ -62,7 +65,7 @@ module.exports = defineConfig({
     proxy: mock
       ? undefined
       : {
-          '/api': 'http://127.0.0.1:3000',
+          '/api': backend,
           // Steam OpenID sign-in (lib/auth.js) — a real page navigation, not an /api fetch, so it
           // needs its own proxy entry. The trailing slash matters: Vite's proxy keys are plain
           // prefix matches, and '/auth' (no slash) also prefixes '/authStore.ts', this app's own
@@ -71,7 +74,7 @@ module.exports = defineConfig({
           // (text/html) in place of the script, breaking the module load entirely.
           // Keeps the browser's Host: the backend builds Steam's return URL from it, and a
           // rewritten one sent the login back to :3000, where the state cookie isn't sent.
-          '/auth/': { target: 'http://127.0.0.1:3000', changeOrigin: false },
+          '/auth/': { target: backend, changeOrigin: false },
         },
   },
   build: {
