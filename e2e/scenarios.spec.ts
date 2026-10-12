@@ -1251,6 +1251,13 @@ test("F1 edge: the Price card says when a game is in no bundle, and when ITAD di
   await expect(page.locator('.panel-bundles')).toHaveText("Bundles: IsThereAnyDeal didn't answer.");
 });
 
+test('F1 edge: the Price card names its ★ and 🔥 records in visible text, not only in a tooltip', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=892970');
+  await expect(page.locator('.panel-price-line')).toContainText(/★\s*1-year low/);
+  await expect(page.locator('.panel-price-low')).toHaveText(/^all-time low €\d+\.\d\d 🔥$/);
+});
+
 test("F1 edge: the Achievements card says when Steam didn't answer for rarity", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360');

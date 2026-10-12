@@ -41,6 +41,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On desktop the nav is an app bar on the same edge as the list pages: routes left, search in the middle, account and settings right, with less space above the page
 - Text across the app uses one consistent set of sizes and two weights, instead of the near-duplicates that had crept in
 - The New and Ending soon filters above the bundles table now look like toggles, with a clear pressed state
+- The game panel's Price card names its record lows in text ("1-year low", "all-time low €2.49"), not only in a tooltip
 
 ### Fixed
 

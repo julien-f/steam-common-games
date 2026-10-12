@@ -1473,6 +1473,7 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
           {formatMoney(d.bestDealPrice, d.priceCurrency)}
           {rec() ? ' ' + rec()!.icon : ''}
         </span>
+        <Show when={rec()}>{(r) => <span style={{ color: r().color }}>{r().tooltipLabel}</span>}</Show>
         <Show when={d.bestDealCut}>
           <>
             <span class="panel-price-sep">·</span>
@@ -1542,7 +1543,8 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
                   <For each={lowGroups()}>
                     {({ amount, tiers }, i) => {
                       const icons = tiers.map((t) => t.icon).join('');
-                      const label = tiers.map((t) => t.statusLabel).join(' / ');
+                      // "all-time / 1-year low" when two windows share the amount.
+                      const visibleLabel = `${tiers.map((t) => t.tooltipLabel.replace(/ low$/, '')).join(' / ')} low`;
                       const lowColor = tiers[0].color; // rarest tier in the group leads the color too
                       const money = () => formatMoney(amount, deal()?.priceCurrency ?? null);
                       return (
@@ -1550,8 +1552,8 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
                           <Show when={i() > 0}>
                             <span class="panel-price-sep">·</span>
                           </Show>
-                          <span class="panel-price-low" title={`${label}: ${money()}`} style={{ color: lowColor }}>
-                            {money()} {icons}
+                          <span class="panel-price-low" style={{ color: lowColor }}>
+                            {visibleLabel} {money()} {icons}
                           </span>
                         </>
                       );
