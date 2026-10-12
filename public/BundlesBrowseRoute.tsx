@@ -307,7 +307,7 @@ export default function BundlesBrowseRoute() {
   const [viewingShared, setViewingShared] = createSignal(restoreTableView(table, viewStore));
   const [sharedViewEdited, setSharedViewEdited] = createSignal(false);
   // eslint-disable-next-line solid/reactivity -- bindViewPersistence reads it in its own effect
-  onCleanup(bindViewPersistence(table, viewStore, viewingShared, () => setSharedViewEdited(true)));
+  onCleanup(bindViewPersistence(table, viewStore, viewingShared, setSharedViewEdited));
   function handleDiscardSharedView(): void {
     table.setViewState(viewStore.load());
     setViewingShared(false);

@@ -1628,8 +1628,9 @@ export default function ListRoute() {
             });
           }
         });
-      } catch {
+      } catch (err) {
         if (loadGuard.isStale(gen)) return;
+        console.warn('[prices]', err);
         batch(() => {
           for (const g of chunk) rowStore.mutateRow(g.appid, (draft) => nullMissingPriceFields(draft));
         });
@@ -1779,8 +1780,7 @@ export default function ListRoute() {
     const list = userList();
     return kind === 'wishlist' || (kind === 'user' && !!list && listHasPriceSource(list));
   }
-  // A saved list's /lists/<id> link only opens in the browser that has the list; a dynamic one has
-  // 🔗 Share list instead, so its Share view is hidden rather than dimmed.
+  // A /lists/<id> link only opens here; a dynamic list's 🔗 Share list replaces Share view outright.
   function isDynamicList(): boolean {
     return kind === 'user' && userList()?.kind === 'dynamic';
   }
@@ -2336,7 +2336,7 @@ export default function ListRoute() {
       const store = viewStore();
       setSharedViewEdited(false);
       setViewingShared(restoreTableView(viewTable, store));
-      unsyncView = bindViewPersistence(table, store, viewingShared, () => setSharedViewEdited(true));
+      unsyncView = bindViewPersistence(table, store, viewingShared, setSharedViewEdited);
       if (keptSelection?.size) table.selection.setAll(tableData().filter((row) => keptSelection.has(row.appid)));
       setTableReady(true);
     }

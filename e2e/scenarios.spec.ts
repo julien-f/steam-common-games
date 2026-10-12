@@ -219,9 +219,13 @@ test("S3 edge: editing a shared layout warns it's lost on reload unless kept", a
   const banner = page.getByRole('status').filter({ hasText: 'shared' });
   await expect(banner).toContainText('for this visit only');
   await expect(rows(page).first()).toBeVisible();
-  await page.locator('thead th').filter({ hasText: /^Name/ }).click();
+  const toggle = page.locator('.dt-group-row').first().locator('.dt-group-colname');
+  await toggle.click(); // collapse a group
   await expect(banner).toContainText("You've changed this shared layout — it's lost on reload unless you keep it");
   await expect(banner.getByRole('button', { name: 'Keep as my layout' })).toBeVisible();
+  // Back to the link's own layout: nothing of the viewer's is left to lose.
+  await toggle.click();
+  await expect(banner).toContainText('for this visit only');
 });
 
 test("S3 edge: another browser's list link explains lists are local", async ({ page }) => {
@@ -1125,7 +1129,7 @@ test('D2 edge: failed prices warn like the other sources, in plain words', async
   await page.goto('/lists/wishlist');
   await expect(rows(page)).toHaveCount(4);
   const status = page.locator('.price-status');
-  await expect(status).toHaveText("IsThereAnyDeal didn't answer for prices — the Prices tile's ↻ retries");
+  await expect(status).toHaveText("IsThereAnyDeal didn't answer for prices — the Prices tile's ↻ retries.");
   const warnColor = await page.locator('.list-status .list-failed').evaluate((el) => getComputedStyle(el).color);
   await expect(status).toHaveCSS('color', warnColor);
 });

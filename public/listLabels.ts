@@ -32,8 +32,7 @@ export const OP_DESCRIPTIONS: Record<CombineOp, string> = {
   'group-by-membership': 'one table per combination of sources',
 };
 
-// The infix symbol a formula joins its sources with. group-by-membership's rows are the union
-// across its groups, so ∪ — a "+" read as arithmetic and collided with a family's "Alice + Bob".
+// The infix symbol a formula joins its sources with; group-by-membership's rows are a union too.
 export const OP_SYMBOLS: Record<CombineOp, string> = {
   union: '∪',
   intersect: '∩',

@@ -52,13 +52,13 @@ function takeSharedView(): TableViewState | null {
 // stays untouched until explicitly shared. An effect re-reading getViewState() (tracking every
 // signal it touches), in its own root since a route can bind it from an async load. `paused`:
 // while a shared link's layout is on screen (SharedViewBanner); un-pausing saves it.
-// `onPausedEdit`: the viewer changed that shared layout (page/search aside) while paused. Returns
-// the dispose function.
+// `onPausedEdit`: whether that shared layout now differs from the link's (page/search aside).
+// Returns the dispose function.
 export function bindViewPersistence(
   table: ViewStateApi,
   store: ViewStore,
   paused: () => boolean,
-  onPausedEdit: () => void,
+  onPausedEdit: (edited: boolean) => void,
 ): () => void {
   return createRoot((dispose) => {
     let pausedView: string | undefined;
@@ -71,7 +71,7 @@ export function bindViewPersistence(
       }
       const layout = JSON.stringify(stripTransientViewFields(view));
       if (pausedView === undefined) pausedView = layout;
-      else if (layout !== pausedView) onPausedEdit();
+      else onPausedEdit(layout !== pausedView);
     });
     return dispose;
   });
