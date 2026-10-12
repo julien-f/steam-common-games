@@ -58,7 +58,8 @@ import { UnsavedViewBanner, ViewActions } from './UnsavedViewBanner.tsx';
 import { useBaseTitle } from './pageTitle.ts';
 import { convert, formatWithEstimate } from './currency.ts';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
-import { BUNDLES_UNAVAILABLE, fetchBundlePage, isUnavailable, loadErrorText } from './bundleData.ts';
+import { fetchBundlePage, isUnavailable, loadErrorText } from './bundleData.ts';
+import { BUNDLES_UNAVAILABLE } from './priceLoading.ts';
 import { isItadOff } from './panelData.ts';
 
 const PAGE_SIZE = 50; // ITAD's own max per page (lib/itad.js's getBundles `limit`)

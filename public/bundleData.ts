@@ -85,9 +85,6 @@ export function flattenBundleGames(bundle: Bundle): FlatGame[] {
 // several cached list pages, so GET /api/bundles/:id deliberately has no refresh parameter (see
 // server.js). What *is* refreshable on that screen is each game's own details (the panel's ↻)
 // and the whole list's prices (↻ Refresh prices).
-export const BUNDLES_UNAVAILABLE =
-  "Bundles and prices aren't available on this instance: it isn't connected to IsThereAnyDeal.";
-
 // GET /api/bundles/:id's 404: ITAD no longer lists the bundle (see findBundleById in lib/itad.js),
 // as opposed to a transient failure — the one case a saved list's bundle source gets orphaned.
 // A 503: the instance has no IsThereAnyDeal key — a setting, not a failure, so shown without "Error:".

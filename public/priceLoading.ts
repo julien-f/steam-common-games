@@ -6,6 +6,9 @@ import type { PriceAmount, PriceFields } from './types.ts';
 import { discountPct, postJson } from './utils.ts';
 
 // Same wording as the server's 503 for /bundles (server.js), so the two read as one cause.
+// server.js's ITAD_UNAVAILABLE, for the Bundles page to say before asking.
+export const BUNDLES_UNAVAILABLE =
+  "Bundles and prices aren't available on this instance: it isn't connected to IsThereAnyDeal.";
 export const PRICES_UNAVAILABLE = "Prices aren't available on this instance: it isn't connected to IsThereAnyDeal.";
 // No closing period, like the other sources' warning shown above it.
 export const PRICES_FAILED = "IsThereAnyDeal didn't answer for prices — the Prices tile's ↻ retries";
