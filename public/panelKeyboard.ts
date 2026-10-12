@@ -9,7 +9,6 @@ interface PanelKeyboardOptions {
   stepGame: (dir: 1 | -1) => boolean; // true if it actually stepped, so ↑/↓ only preventDefault then
   shortcuts: { isOpen: () => boolean; toggle: () => void; close: () => void };
   focusSearchInput: () => void;
-  onEnterOnFocusedRow: () => boolean; // return true once handled, to short-circuit like every other branch here
 }
 
 export function bindPanelKeyboardShortcuts(opts: PanelKeyboardOptions): void {
@@ -42,7 +41,6 @@ export function bindPanelKeyboardShortcuts(opts: PanelKeyboardOptions): void {
       opts.focusSearchInput();
       return;
     }
-    if (e.key === 'Enter' && opts.onEnterOnFocusedRow()) return;
     // Also with no panel open: the quickest way into a list without the mouse.
     if (e.key === 'r' || e.key === 'R') {
       e.preventDefault();
