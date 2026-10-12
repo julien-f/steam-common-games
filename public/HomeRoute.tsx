@@ -240,6 +240,12 @@ export default function HomeRoute() {
     adoptAccount(account, navigate, location);
   }
 
+  // An action, not a state: the glyph shows the state, and a voice user says what the tooltip says.
+  function starLabel(account: AccountSlot): string {
+    const label = accountDisplayLabel(account);
+    return myAccount()?.id === account.id ? `Unstar ${label}` : `Star ${label} as mine`;
+  }
+
   function toggleMyAccount(account: AccountSlot, e: MouseEvent): void {
     e.stopPropagation();
     setMyAccount(myAccount()?.id === account.id ? null : account);
@@ -685,13 +691,8 @@ export default function HomeRoute() {
                   <button
                     type="button"
                     class="recent-icon-btn"
-                    title={
-                      myAccount()?.id === account.id
-                        ? `Unstar ${accountDisplayLabel(account)}`
-                        : `Star ${accountDisplayLabel(account)} as mine`
-                    }
-                    aria-label={`Star ${accountDisplayLabel(account)} as mine`}
-                    aria-pressed={myAccount()?.id === account.id}
+                    title={starLabel(account)}
+                    aria-label={starLabel(account)}
                     onClick={[toggleMyAccount, account]}
                   >
                     {myAccount()?.id === account.id ? '★' : '☆'}

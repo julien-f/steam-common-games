@@ -158,13 +158,13 @@ test('A2 edge: the nav chip reads as an account, not as a second selected route'
   expect(await chip.evaluate((el) => getComputedStyle(el).borderColor)).not.toBe('rgba(0, 0, 0, 0)');
 });
 
-test("A2 edge: a recent account's star says on hover what clicking it does", async ({ page }) => {
+test("A2 edge: a recent account's star names, and says on hover, what clicking it does", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
   await page.getByRole('button', { name: 'Look up', exact: true }).click();
   await expect(page.locator('.recent-accounts li')).toHaveCount(2);
-  await expect(page.getByRole('button', { name: 'Star Alice as mine' })).toHaveAttribute('title', 'Unstar Alice');
+  await expect(page.getByRole('button', { name: 'Unstar Alice' })).toHaveAttribute('title', 'Unstar Alice');
   await expect(page.getByRole('button', { name: 'Star Bob as mine' })).toHaveAttribute('title', 'Star Bob as mine');
 });
 
@@ -963,8 +963,8 @@ test("I1 edge: on a phone, Home keeps the list pages' 12px gutter and each recen
     expect(box.height).toBeLessThan(48);
     expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(12);
   }
-  await expect(page.getByRole('button', { name: 'Star Bob as mine' })).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByRole('button', { name: 'Star Alice as mine' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Star Bob as mine' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Unstar Alice' })).toBeVisible();
   await page.getByRole('button', { name: 'Remove Bob' }).click();
   await expect(page.locator('.recent-accounts li')).toHaveCount(1);
 });
@@ -2944,7 +2944,7 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
   await page.goto('/');
   const friends = page.locator('.account-friends summary');
   expect(await takes24pxTap(friends)).toBe(true);
-  expect(await takes24pxTap(page.getByRole('button', { name: 'Star Alice as mine' }))).toBe(true);
+  expect(await takes24pxTap(page.getByRole('button', { name: 'Unstar Alice' }))).toBe(true);
   expect(await takes24pxTap(page.getByRole('button', { name: 'Remove Alice' }))).toBe(true);
   await friends.click();
   expect(await takes24pxTap(page.locator('.account-friends-refresh'))).toBe(true);
