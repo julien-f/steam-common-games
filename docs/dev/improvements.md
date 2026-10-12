@@ -56,7 +56,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Phone
 
-- **U162 · minor · I1** — more targets under 24px at 390: nav popover links (18px), Home's "Friends (private)" summary and its "Updated … ↻" (17px), the shortcuts dialog × (15×20), the footer About link (15px). The same centred `::after` tap area, unless a guideline exempts inline links.
 - **U149 · polish · I1** — Home at 390: the nav search touches the left edge; Home's card starts content at x 45 (20 margin + 24 padding) vs 12 on list pages; Recent-account rows wrap an orphan × / star onto a second line. One 12px gutter; fold row actions into ⋯.
 
 ## Accounts and first visit

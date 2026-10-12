@@ -2219,11 +2219,12 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
     return control.evaluate((el) => {
       const r = el.getBoundingClientRect();
       const [x, y] = [r.left + r.width / 2, r.top + r.height / 2];
+      const d = 11.99; // a hit test excludes a box's far edge: exactly 12 would demand 25px
       const points = [
-        [x, y - 11.5],
-        [x, y + 11.5],
-        [x - 11.5, y],
-        [x + 11.5, y],
+        [x, y - d],
+        [x, y + d],
+        [x - d, y],
+        [x + d, y],
       ];
       return points.every(([px, py]) => el.contains(document.elementFromPoint(px, py)));
     });
@@ -2240,6 +2241,20 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
 
   await page.goto('/lists/owned');
   expect(await takes24pxTap(page.locator('.dt-th-sort').first())).toBe(true);
+  expect(await takes24pxTap(page.getByRole('link', { name: 'About' }))).toBe(true);
+  await page.locator('.account-chip-btn').click();
+  expect(await takes24pxTap(page.locator('.account-chip-panel').getByRole('link', { name: 'Wishlist' }))).toBe(true);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('?');
+  expect(
+    await takes24pxTap(page.getByRole('dialog', { name: 'Keyboard shortcuts' }).getByRole('button', { name: 'Close' })),
+  ).toBe(true);
+
+  await page.goto('/');
+  const friends = page.locator('.account-friends summary');
+  expect(await takes24pxTap(friends)).toBe(true);
+  await friends.click();
+  expect(await takes24pxTap(page.locator('.account-friends-refresh'))).toBe(true);
 });
 
 test('I2 edge: the lightbox shows its focus ring when opened from the keyboard, not from a tap', async ({

@@ -570,12 +570,22 @@ tbody td {
    sort button only grows taller: wider, it would cover its column menu button. */
 .list-tree button,
 .compare-token-remove,
-.dt-th-sort {
+.dt-th-sort,
+.account-chip-panel-link,
+.account-friends summary,
+.account-friends-refresh,
+.shortcuts-close,
+.app-footer-link {
   position: relative;
 }
 .list-tree button::after,
 .compare-token-remove::after,
-.dt-th-sort::after {
+.dt-th-sort::after,
+.account-chip-panel-link::after,
+.account-friends summary::after,
+.account-friends-refresh::after,
+.shortcuts-close::after,
+.app-footer-link::after {
   content: '';
   position: absolute;
   top: 50%;

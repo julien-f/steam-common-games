@@ -112,6 +112,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Keyboard focus no longer drops to the page after switching account, saving a list, refreshing from Updated or closing the ranking's panel; added fields take focus, and the ? dialog takes and returns it
 - Screen readers hear which account, list or source a control acts on, a label on the combine selects, and no pressed state on tiles that aren't toggles
 - A pressed stat tile's label is readable at AA contrast
+- On a phone, the account menu's links, Home's Friends toggle and refresh, the shortcuts dialog's close button and the footer's About link take a 24px tap
 
 ### Development
 
