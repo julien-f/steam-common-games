@@ -184,6 +184,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `npm run dev` proxies to the backend at the configured `HOST`/`PORT` instead of always `127.0.0.1:3000`
 - Lint fails on warnings; a fix-batch lane skips e2e when its commits touch no UI file
 - npm run format prints only warnings, not a line per file
+- a CSS check flags desktop media-query rules a later rule silently overrides, not only phone ones
 
 ## [0.10.0] - 2026-10-10
 
