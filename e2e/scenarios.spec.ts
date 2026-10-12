@@ -2758,6 +2758,24 @@ test('I2 edge: the shortcuts dialog says how to open the lightbox from the panel
   await expect(section.locator('.shortcuts-row').filter({ hasText: 'lightbox' })).toContainText('Enter');
 });
 
+test('I2 edge: every shortcut description starts at the same x', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await page.keyboard.press('?');
+  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(dialog).toBeVisible();
+  const lefts = await dialog
+    .locator('.shortcuts-row > span:last-child')
+    .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().left)));
+  expect(lefts.length).toBeGreaterThan(10);
+  expect(new Set(lefts).size).toBe(1);
+  const overflowing = await dialog
+    .locator('.shortcuts-keys')
+    .evaluateAll((els) => els.filter((el) => el.scrollWidth > el.clientWidth).map((el) => el.textContent));
+  expect(overflowing).toEqual([]);
+});
+
 test('I2 edge: the shortcuts dialog takes focus, keeps it, and gives it back on close', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

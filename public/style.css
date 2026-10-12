@@ -2954,9 +2954,11 @@ kbd {
   margin-bottom: 8px;
 }
 .shortcuts-row {
-  display: flex;
+  display: grid;
+  /* Fixed, not max-content: every row's description then starts at the same x, across sections too. */
+  grid-template-columns: 96px 1fr;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   margin-bottom: 6px;
   font-size: var(--fs-ui);
   color: var(--text1);
@@ -2964,8 +2966,9 @@ kbd {
 .shortcuts-row:last-child {
   margin-bottom: 0;
 }
-.shortcuts-row span {
-  margin-left: 4px;
+.shortcuts-keys {
+  display: flex;
+  gap: 4px;
 }
 
 /* ── List route styles (see docs/dev/frontend.md) ─────────────────────── */

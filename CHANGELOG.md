@@ -47,6 +47,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Folders and lists are named and renamed in place on Home instead of in a browser dialog
 - Creating a combined list opens it, and Edit sources has a single Cancel
 - "Rank this list" is unavailable below 2 games and says why
+- The keyboard shortcuts dialog lines every description up in one column
 
 ### Fixed
 
