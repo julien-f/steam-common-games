@@ -34,11 +34,14 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Bundles and prices
 
+- **U163 · polish · B3** — "Save as a list" on "What does this add?" keeps Best Deal but drops the bundle's Tier Price, which the unsaved view now shows (U141). The saved list's load could take the same `onBundleGames` hook (`public/listResolve.ts`).
 - **U143 · polish · B1** — the bundle hero has 6 actions in 4 styles, with "← All bundles" far right and ‹ › far left. Put "← All bundles" by ‹ ›; one primary, the rest ghost.
 - **U144 · polish · O1** — without `ITAD_API_KEY`, `/bundles` keeps its toolbar, an empty table, pager, Updated and region figures under a one-line notice. One empty-state card instead.
 
 ## Ranking
 
+- **U165 · polish · R1** — with one game selected, the rank button reads "🏆 Rank 1 games". Singular for one.
+- **U164 · polish · R1** — the ranking menu's "+ New ranking" (shown once a list has a ranking) still starts one under 2 games, while "Rank this list" says ranking needs 2. The same gate and reason.
 - **U145 · polish · I1** — `/rank`'s keyboard hint bar shows on touch screens. Hide it under `(hover: none)`.
 
 ## Keyboard and accessibility
