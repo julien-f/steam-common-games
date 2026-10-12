@@ -51,13 +51,27 @@ function takeSharedView(): TableViewState | null {
 // Saves every future view change — the only ongoing side effect table interaction has; the URL
 // stays untouched until explicitly shared. An effect re-reading getViewState() (tracking every
 // signal it touches), in its own root since a route can bind it from an async load. `paused`:
-// while a shared link's layout is on screen (SharedViewBanner); un-pausing saves it. Returns the
-// dispose function.
-export function bindViewPersistence(table: ViewStateApi, store: ViewStore, paused: () => boolean): () => void {
+// while a shared link's layout is on screen (SharedViewBanner); un-pausing saves it.
+// `onPausedEdit`: the viewer changed that shared layout (page/search aside) while paused. Returns
+// the dispose function.
+export function bindViewPersistence(
+  table: ViewStateApi,
+  store: ViewStore,
+  paused: () => boolean,
+  onPausedEdit: () => void,
+): () => void {
   return createRoot((dispose) => {
+    let pausedView: string | undefined;
     createEffect(() => {
       const view = table.getViewState();
-      if (!paused()) store.save(view);
+      if (!paused()) {
+        pausedView = undefined;
+        store.save(view);
+        return;
+      }
+      const layout = JSON.stringify(stripTransientViewFields(view));
+      if (pausedView === undefined) pausedView = layout;
+      else if (layout !== pausedView) onPausedEdit();
     });
     return dispose;
   });

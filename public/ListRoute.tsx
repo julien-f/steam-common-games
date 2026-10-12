@@ -174,7 +174,13 @@ import {
 import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { rememberBundle } from './bundleSnapshots.ts';
 import { fanaticalBuyUrl, FANATICAL_BOOKMARKLET } from './fanaticalPicks.ts';
-import { postPrices, applyPriceInfo, nullMissingPriceFields, PRICES_UNAVAILABLE } from './priceLoading.ts';
+import {
+  postPrices,
+  applyPriceInfo,
+  nullMissingPriceFields,
+  PRICES_UNAVAILABLE,
+  PRICES_FAILED,
+} from './priceLoading.ts';
 import { isItadConfigured, isItadOff } from './panelData.ts';
 import { currentRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { openPrefsPopover } from './prefsPopover.tsx';
@@ -1622,12 +1628,12 @@ export default function ListRoute() {
             });
           }
         });
-      } catch (err) {
+      } catch {
         if (loadGuard.isStale(gen)) return;
         batch(() => {
           for (const g of chunk) rowStore.mutateRow(g.appid, (draft) => nullMissingPriceFields(draft));
         });
-        setPriceStatusText(`Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`);
+        setPriceStatusText(PRICES_FAILED);
       }
     }
   }
@@ -1762,6 +1768,7 @@ export default function ListRoute() {
   // (a link written to the live URL goes stale the moment the table changes again).
   // A 🔗 Share view link's layout, on screen but not saved (see restoreTableView).
   const [viewingShared, setViewingShared] = createSignal(false);
+  const [sharedViewEdited, setSharedViewEdited] = createSignal(false);
   function handleDiscardSharedView(): void {
     applyView(viewStore().load());
     setViewingShared(false);
@@ -1772,13 +1779,15 @@ export default function ListRoute() {
     const list = userList();
     return kind === 'wishlist' || (kind === 'user' && !!list && listHasPriceSource(list));
   }
-  // A saved list's /lists/<id> link only opens in the browser that has the list.
+  // A saved list's /lists/<id> link only opens in the browser that has the list; a dynamic one has
+  // 🔗 Share list instead, so its Share view is hidden rather than dimmed.
+  function isDynamicList(): boolean {
+    return kind === 'user' && userList()?.kind === 'dynamic';
+  }
   function shareViewFailure(): string | null {
     const list = userList();
-    if (kind !== 'user' || !list) return null;
-    return list.kind === 'dynamic'
-      ? "This list's link only opens in this browser — 🔗 Share list sends the list itself"
-      : `${list.kind === 'ranked' ? 'Ranked' : 'Manual'} lists can't be shared yet: their link only opens in this browser`;
+    if (kind !== 'user' || !list || list.kind === 'dynamic') return null;
+    return `${list.kind === 'ranked' ? 'Ranked' : 'Manual'} lists can't be shared yet: their link only opens in this browser`;
   }
   function handleShareView(btn: HTMLElement): void {
     if (!table) return;
@@ -1804,7 +1813,12 @@ export default function ListRoute() {
         >
           🎲
         </button>
-        <ViewActions onShare={handleShareView} onReset={handleResetView} shareDisabledReason={shareViewFailure()} />
+        <ViewActions
+          onShare={handleShareView}
+          onReset={handleResetView}
+          shareDisabledReason={shareViewFailure()}
+          hideShare={isDynamicList()}
+        />
       </>
     );
   }
@@ -2320,8 +2334,9 @@ export default function ListRoute() {
         disposeTableState();
       };
       const store = viewStore();
+      setSharedViewEdited(false);
       setViewingShared(restoreTableView(viewTable, store));
-      unsyncView = bindViewPersistence(table, store, viewingShared);
+      unsyncView = bindViewPersistence(table, store, viewingShared, () => setSharedViewEdited(true));
       if (keptSelection?.size) table.selection.setAll(tableData().filter((row) => keptSelection.has(row.appid)));
       setTableReady(true);
     }
@@ -2753,7 +2768,7 @@ export default function ListRoute() {
             )}
           </For>
           {/* The result is this list's own row count — for group-by-membership that's the union
-              across its groups, which is exactly what the "+" join above claims. */}
+              across its groups, which is exactly what the ∪ join above claims. */}
           <Show when={!ranked}>
             <span class="list-formula-op">=</span>
             <span class="list-formula-result">{rowsStore.length}</span>
@@ -3218,7 +3233,9 @@ export default function ListRoute() {
         </Show>
       </div>
       <Show when={hasPrices() || kind === 'bundle'}>
-        <div class="price-status">{priceStatusText()}</div>
+        <div class="price-status" classList={{ 'list-failed': priceStatusText() === PRICES_FAILED }}>
+          {priceStatusText()}
+        </div>
       </Show>
       {/* Outside the selection-gated block below on purpose — "Add"/"Remove" both clear the
           selection right after acting (Add explicitly; Remove via load()'s own reset), and the
@@ -3240,7 +3257,11 @@ export default function ListRoute() {
         <UnsavedViewBanner table={viewTable} prefKey={viewPrefKey()} />
       </Show>
       <Show when={tableReady() && viewingShared()}>
-        <SharedViewBanner onKeep={() => setViewingShared(false)} onDiscard={handleDiscardSharedView} />
+        <SharedViewBanner
+          edited={sharedViewEdited()}
+          onKeep={() => setViewingShared(false)}
+          onDiscard={handleDiscardSharedView}
+        />
       </Show>
       <Show when={emptyText()}>
         <p class="list-empty">{emptyText()}</p>

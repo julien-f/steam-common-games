@@ -17,13 +17,10 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Sharing
 
-- **U131 · minor · S3** — a shared-layout recipient's own edits (e.g. a sort on top of the link's filter) are lost on reload: the page comes back on the defaults, dropping both the shared layout and the edit. Once edited, keep it as the recipient's layout, or warn in the banner.
-- **U132 · minor · C3, S1** — a saved dynamic list shows "🔗 Share list" (hero) and "🔗 Share view" (toolbar): same icon, different things. One entry, or names that tell them apart ("Share formula" / "Share layout").
 - **U125 · minor · S1, C1, S3** — List, bundle and compare links all preview identically, and a `/lists/<id>` list that exists only in the sender's browser can't be described at all. Server-side per-route `og:title` from the path alone (Owned games, Wishlist, Compare libraries, Shared list, bundle name from cache), generic for `/lists/<id>`.
 
 ## Loading and feedback
 
-- **U134 · polish · D2** — the pricing banner shows internals ("IsThereAnyDeal request failed (mock: upstream-down)") and is grey while the reviews/HLTB banner is orange. One warning style, plain wording ("Prices didn't answer — ↻ to retry").
 - **U7 · minor · L3** — Reset view drops sort/filters instantly with no undo.
 
 ## Lists and selection
@@ -34,7 +31,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Comparing
 
-- **U137 · minor · C1, C3** — the union reads `Carol 3 + Alice + Bob 8 = 9`: "+" reads as arithmetic (3 + 8 ≠ 9) and collides with the family name; the saved list uses ∪. Use ∪ here too.
 - **U139 · polish · C4** — panel Owned by reads "never played · not played". One phrase.
 - **U51 · polish · C1** — the membership chip reads "↑ Owned by × ⊞ ×": two identical × (remove sort, remove group) side by side. The table library draws that merged chip, so telling the two apart needs an upstream change.
 

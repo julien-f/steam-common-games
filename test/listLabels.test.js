@@ -176,13 +176,13 @@ test('formatFormula: joins sources with the op symbol', () => {
   );
 });
 
-test('formatFormula: group-by-membership has no infix meaning, so it joins with + and says what it did', () => {
+test('formatFormula: group-by-membership joins with ∪ (its result is the union), never a + a family name uses', () => {
   assert.equal(
     formatFormula(
       dynamicList('group-by-membership', [{ kind: 'account-owned', accountId: 'acc1' }, { kind: 'recent-games' }]),
       NAMING,
     ),
-    'Alice — Owned + Recently Looked Up — grouped by membership',
+    'Alice — Owned ∪ Recently Looked Up — grouped by membership',
   );
 });
 
