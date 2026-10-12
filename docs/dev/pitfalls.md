@@ -32,7 +32,7 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: the close steps history back over the overlay's own entry (`overlayHistory.ts`) with an asynchronous `history.go`, and that traversal aborts the navigation already under way.
 - **Fix**: wait for the step's `popstate` before navigating (see the L4 Recently Looked Up test).
 
-## Exit 144, then `Port 58991 is already in use`, after `pkill -f`
+## Exit 144, then `Port 58991 is already in use` (or 58993), after `pkill -f`
 
 - **Symptom**: `pkill -f vite` (or `node server.js`) ends the command with exit 144, and the next start fails on a busy port or gets connection refused.
 - **Cause**: the pattern matches the shell running the `pkill` command itself, so it kills that shell, and it can miss the server's actual process.
