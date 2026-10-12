@@ -717,6 +717,11 @@ test('I1 edge: on desktop the nav starts on the content edge, close above it', a
     expect(Math.round(first.x), `at ${width}px`).toBe(Math.round(hero.x));
     expect(hero.y - (nav.y + nav.height), `at ${width}px`).toBeLessThanOrEqual(28);
   }
+  // The search fills the middle on a wide screen, and gives way so the bar stays one row on a narrow one.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  expect((await page.locator('.app-search-wrap').boundingBox())!.width).toBeGreaterThan(400);
+  await page.setViewportSize({ width: 800, height: 900 });
+  expect((await page.locator('.site-nav').boundingBox())!.height).toBeLessThan(60);
 });
 
 test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo without scrolling, inside a gutter, down to 320px wide', async ({

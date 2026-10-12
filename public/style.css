@@ -74,6 +74,15 @@ select,
 textarea {
   font: inherit;
 }
+/* The browser's default bold is 700; the scale has 400 and 600 only. */
+h1,
+h2,
+h3,
+h4,
+strong,
+b {
+  font-weight: 600;
+}
 
 .container {
   max-width: 1100px;
@@ -121,7 +130,10 @@ textarea {
     margin: 0 auto;
     padding: 12px 20px 0;
   }
-  .app-search-wrap {
+  /* Shrinks first, so the bar stays one row down to 769px. */
+  .site-nav .app-search-wrap {
+    flex: 1 1 140px;
+    min-width: 0;
     max-width: 480px;
     margin-right: auto;
   }
@@ -769,14 +781,9 @@ tbody td {
   color: #2ecc71;
 }
 
-/* Same markers, inline in the bundle/recent-list table's Name cell (gameColumns.ts's
-   renderNameCell) rather than a dropdown row — same colors as .game-search-badge above. The
-   cell's own color/bold (name text included) is set inline by renderNameCell itself, from
-   OWNERSHIP_STATUS_TIERS (gameColumns.ts) — not here, so there's one shared source for it
-   instead of a second, separately-maintained CSS copy that a tier's styling (e.g. Wishlisted's
-   bold weight) could go missing from without anyone noticing, same as it briefly did between this
-   file and OWNERSHIP_STATUS_COLUMN's own cell. */
-/* Inline, not flex: a wrapping name in a flex row takes the full width and strands its badge. */
+/* Same markers inline after a Name cell's text (gameColumns.ts's renderNameCell, which also sets
+   the name's colour and weight from OWNERSHIP_STATUS_TIERS). Inline, not flex: a wrapping name in
+   a flex row takes the full width and strands its badge. */
 .name-status-badge {
   margin-left: 4px;
   white-space: nowrap;
