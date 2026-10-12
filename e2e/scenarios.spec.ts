@@ -431,6 +431,17 @@ test("L3 edge: the toolbar's two resets say what they do", async ({ page }) => {
   }
 });
 
+test("L3 edge: the toolbar's buttons share one font and one height, the library's and ours", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  const style = (name: string) =>
+    page.getByRole('button', { name }).evaluate((el) => ({
+      font: getComputedStyle(el).fontFamily,
+      height: el.getBoundingClientRect().height,
+    }));
+  expect(await style('Default view')).toEqual(await style('× Clear all'));
+});
+
 test('L3 edge: the column menu undoes the group and filter it set', async ({ page }, testInfo) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

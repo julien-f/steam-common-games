@@ -59,6 +59,13 @@ body {
   min-height: 100vh;
 }
 
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
 .container {
   max-width: 1100px;
   margin: 0 auto;
@@ -774,9 +781,11 @@ tbody td {
 .how-steps li strong {
   color: var(--text0);
 }
+/* Sized as the table library's .dt-btn, so the two sit in one toolbar at one height. */
 .btn-sm {
   padding: 5px 10px;
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 1;
 }
 
 /* App shell layout (see docs/dev/frontend.md and AppShell.tsx)

@@ -100,6 +100,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - TRUST_PROXY=1 now takes effect: behind a reverse proxy, rate limits apply per visitor and link previews and sign-in use https
 - Changing a saved list's sort, columns, search or page no longer floods account sync, which could drop other settings' syncs and overwrite a list edit made on another device
 - Checkboxes, selects and scrollbars now render dark, matching the rest of the page
+- Buttons and fields use the page's font, and the table toolbar's buttons share one height
 
 ### Development
 
