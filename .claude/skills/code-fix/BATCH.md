@@ -35,7 +35,7 @@ You fix <items> from <backlog file> in this repo, in your own git worktree (your
 - Commit messages: write them to <scratchpad>/msg-<lane>.txt (the scratchpad is shared, a generic name gets overwritten), then `E2E_DEFER=1 E2E_PORT=<2899x> git commit -F <file>`; prefix every e2e run with the same E2E_PORT.
 - Before each commit, run only your item's test file: the commit hook runs the unit suite, typecheck and lint, so don't run them by hand.
 - Before reporting, run `E2E_PORT=<2899x> npm run test:e2e -- --since=main` once (both widths; skipped when your commits touch no UI file) and fix what fails: re-run only the failures (`-- --last-failed`) until green, then the full suite once.
-- Then run `/code-review low <your first commit>^..HEAD` and fix each confirmed finding, test first, as a follow-up commit; the lead's review of the merge then only has to catch where lanes meet.
+- Then run `/code-review medium <your first commit>^..HEAD` and fix each confirmed finding, test first, as a follow-up commit; the lead's review of the merge then only has to catch where lanes meet.
 Report: item → commit → how verified; review findings fixed and dropped (with why); anything skipped or narrowed and why; new problems found.
 ```
 
