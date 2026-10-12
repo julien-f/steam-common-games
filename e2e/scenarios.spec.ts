@@ -158,6 +158,16 @@ test('A2 edge: the nav chip reads as an account, not as a second selected route'
   expect(await chip.evaluate((el) => getComputedStyle(el).borderColor)).not.toBe('rgba(0, 0, 0, 0)');
 });
 
+test("A2 edge: a recent account's star names, and says on hover, what clicking it does", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  await expect(page.locator('.recent-accounts li')).toHaveCount(2);
+  await expect(page.getByRole('button', { name: 'Unstar Alice' })).toHaveAttribute('title', 'Unstar Alice');
+  await expect(page.getByRole('button', { name: 'Star Bob as mine' })).toHaveAttribute('title', 'Star Bob as mine');
+});
+
 test('A2 edge: switching account from the nav chip leaves focus on the chip', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
@@ -953,8 +963,8 @@ test("I1 edge: on a phone, Home keeps the list pages' 12px gutter and each recen
     expect(box.height).toBeLessThan(48);
     expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(12);
   }
-  await expect(page.getByRole('button', { name: 'Star Bob as mine' })).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByRole('button', { name: 'Star Alice as mine' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Star Bob as mine' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Unstar Alice' })).toBeVisible();
   await page.getByRole('button', { name: 'Remove Bob' }).click();
   await expect(page.locator('.recent-accounts li')).toHaveCount(1);
 });
@@ -1131,6 +1141,16 @@ test("B1 edge: a bundle's hero keeps All bundles by its ‹ ›, and one primary
   expect(classes.filter((c) => !/\bbtn-(primary|ghost)\b/.test(c))).toEqual([]);
 });
 
+test("B1 edge: a bundle's All bundles link keeps the account being explored, without reloading", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto(`/lists/bundle/${BUNDLE.id}?u=bob`);
+  await expect(rows(page)).toHaveCount(4);
+  await page.evaluate(() => ((window as unknown as { e2eSamePage: boolean }).e2eSamePage = true));
+  await page.locator('.list-hero-titlebar').getByRole('link', { name: '← All bundles' }).click();
+  await expect(page).toHaveURL(/\/bundles\?u=bob$/);
+  expect(await page.evaluate(() => (window as unknown as { e2eSamePage?: boolean }).e2eSamePage)).toBe(true);
+});
+
 test("B3 edge: a list built from a bundle says how many of its games aren't on Steam", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
@@ -1159,10 +1179,7 @@ test("B3 edge: what a bundle adds keeps the bundle's prices and links back to it
 
 const sharedUrl = (formula: string) => `/lists/shared?f=${encodeURIComponent(formula)}`;
 
-test("B3 edge: what a bundle adds, once saved, keeps the bundle's Tier Price, in a newly picked region too", async ({
-  page,
-}) => {
-  await asPlayer(page, ALICE);
+const saveWhatBundleAdds = async (page: Page) => {
   // The mock only prices in EUR; answer a US request in USD, as ITAD does.
   await page.route(/\/api\/bundles\/\d+\?/, (route) => {
     const req = route.request();
@@ -1178,11 +1195,78 @@ test("B3 edge: what a bundle adds, once saved, keeps the bundle's Tier Price, in
   if (await more.isVisible()) await more.click();
   await page.getByRole('button', { name: 'Save as a list' }).click();
   await expect(page).toHaveURL(/\/lists\/(?!shared)/);
-  await expect(page.locator('thead th').filter({ hasText: /^Tier Price/ })).toHaveCount(1);
   await expect(row(page, 'Overcooked! 2')).toContainText('€12.00');
+};
+
+test("B3 edge: what a bundle adds, once saved, keeps the bundle's Tier Price, in a newly picked region too", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await saveWhatBundleAdds(page);
+  await expect(page.locator('thead th').filter({ hasText: /^Tier Price/ })).toHaveCount(1);
   await page.getByTitle('Preferences').click();
   await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
   await expect(row(page, 'Overcooked! 2')).toContainText('$12.00');
+});
+
+test("B3 edge: a region picked while a saved list's bundle is still loading prices its Tier Price there", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await saveWhatBundleAdds(page);
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(/\/api\/bundles\/\d+\?(?!.*country=US)/, async (route) => {
+    await held;
+    await route.fallback();
+  });
+  const asked = page.waitForRequest(/\/api\/bundles\/\d+\?/);
+  await page.reload();
+  await asked;
+  await page.getByTitle('Preferences').click();
+  await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
+  release();
+  await expect(row(page, 'Overcooked! 2')).toContainText('$12.00');
+});
+
+test("B3 edge: a ranking of a list with a bundle source only re-prices on a new region, it doesn't reload", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await saveWhatBundleAdds(page);
+  await page.getByRole('button', { name: /Rank this list/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading', { name: /^Ranking of/ })).toBeVisible();
+  await expect(rows(page)).toHaveCount(2);
+  const bundleAsks: string[] = [];
+  page.on('request', (req) => {
+    if (/\/api\/bundles\/\d+/.test(req.url())) bundleAsks.push(req.url());
+  });
+  await page.getByTitle('Preferences').click();
+  const repriced = page.waitForResponse(/\/api\/prices\?country=US/);
+  await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
+  await repriced;
+  expect(bundleAsks).toEqual([]);
+});
+
+test("B3 edge: a saved list whose bundle didn't answer only re-prices on a new region, it doesn't reload", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await saveWhatBundleAdds(page);
+  await page.route(/\/api\/bundles\/\d+\?/, (route) => route.fulfill({ status: 502, json: { error: 'Bad gateway' } }));
+  await page.reload();
+  await expect(rows(page)).toHaveCount(2); // from the bundle's last good load, with no Tier Price
+  await expect(page.locator('thead th').filter({ hasText: /^Tier Price/ })).toHaveCount(0);
+  const bundleAsks: string[] = [];
+  page.on('request', (req) => {
+    if (/\/api\/bundles\/\d+/.test(req.url())) bundleAsks.push(req.url());
+  });
+  await page.getByTitle('Preferences').click();
+  const repriced = page.waitForResponse(/\/api\/prices\?country=US/);
+  await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
+  await repriced;
+  expect(bundleAsks).toEqual([]);
 });
 
 test("B3 edge: a saved list from a pick-and-mix bundle claims no per-game rate it can't know", async ({ page }) => {
@@ -1351,6 +1435,20 @@ test('O1 edge: with no ITAD key, Bundles is one card saying how to turn it on, n
   const card = page.locator('.list-hero');
   await expect(card).toContainText('IsThereAnyDeal API key');
   await expect(card.locator('.list-stat')).toHaveCount(0);
+  await expect(page.getByLabel('Include expired')).toHaveCount(0);
+  await expect(page.locator('.table-container')).toHaveCount(0);
+});
+
+test('O1 edge: once the instance is known to have no ITAD key, Bundles opens on its card without asking ITAD', async ({
+  page,
+}) => {
+  await mockApi(page, { states: ['no-itad'] }); // registered last, so it answers first
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await expect(page.getByRole('main')).toContainText("Prices aren't available on this instance");
+  await page.route('**/api/bundles?*', () => {}); // never answers: the card can't wait on its 503
+  await page.getByRole('navigation').getByRole('link', { name: 'Bundles' }).click();
+  await expect(page.locator('.list-hero')).toContainText('IsThereAnyDeal API key');
   await expect(page.getByLabel('Include expired')).toHaveCount(0);
   await expect(page.locator('.table-container')).toHaveCount(0);
 });
@@ -2676,6 +2774,64 @@ test('F1 edge: the nav search box empties after a pick and on a second Esc', asy
   await expect(box).toHaveValue('');
 });
 
+test('F1 edge: a first Esc with no dropdown to close leaves the nav search box but keeps its text', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  const box = page.getByPlaceholder('Look up any game…');
+  await box.fill('620');
+  await page.keyboard.press('Escape');
+  await expect(box).not.toBeFocused();
+  await expect(box).toHaveValue('620');
+});
+
+test('F1 edge: a search still pending when Esc or a pick closes the nav dropdown does not reopen it', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  const box = page.getByPlaceholder('Look up any game…');
+  const dropdown = page.locator('#app-search-results');
+
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/search-games?q=hades*', async (route) => {
+    await held;
+    await route.fallback();
+  });
+  const asked = page.waitForRequest(/search-games\?q=hades/);
+  await box.fill('hades');
+  await asked;
+  await page.keyboard.press('Escape');
+  release();
+  await page.waitForResponse(/search-games\?q=hades/);
+  await page.waitForTimeout(200); // let the late answer render, if it would
+  await expect(dropdown).toBeHidden();
+
+  await box.fill('hollow');
+  await expect(page.getByRole('option', { name: /Hollow Knight/ })).toBeVisible();
+  await page.keyboard.press('Backspace');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#panel-title')).toHaveText('Hollow Knight');
+  await page.waitForTimeout(500); // past the search debounce
+  await expect(dropdown).toBeHidden();
+});
+
+test('F1 edge: tabbing out of the nav search box before its search answers opens no dropdown', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  const box = page.getByPlaceholder('Look up any game…');
+  await box.fill('hades');
+  await page.keyboard.press('Tab');
+  await expect(box).not.toBeFocused();
+  await page.waitForTimeout(500); // past the search debounce
+  await expect(page.locator('#app-search-results')).toBeHidden();
+});
+
 test('F1 edge: Esc closes a nav popover or the search dropdown, not the open game', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', "a phone's panel covers the nav");
   await asPlayer(page, ALICE);
@@ -2788,7 +2944,7 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
   await page.goto('/');
   const friends = page.locator('.account-friends summary');
   expect(await takes24pxTap(friends)).toBe(true);
-  expect(await takes24pxTap(page.getByRole('button', { name: 'Star Alice as mine' }))).toBe(true);
+  expect(await takes24pxTap(page.getByRole('button', { name: 'Unstar Alice' }))).toBe(true);
   expect(await takes24pxTap(page.getByRole('button', { name: 'Remove Alice' }))).toBe(true);
   await friends.click();
   expect(await takes24pxTap(page.locator('.account-friends-refresh'))).toBe(true);

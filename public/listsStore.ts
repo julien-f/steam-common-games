@@ -114,6 +114,11 @@ export function listHasPriceSource(list: GameList, get: (id: string) => GameList
   return listReaches(list, (ref) => ref.kind === 'account-wishlist' || ref.kind === 'bundle', get);
 }
 
+// Whether a list is built, at any depth, from a bundle; `get` as listHasAccountSource's.
+export function listHasBundleSource(list: GameList, get: (id: string) => GameList | undefined): boolean {
+  return listReaches(list, (ref) => ref.kind === 'bundle', get);
+}
+
 // Whether a list is built, at any depth, from an account fetch; `get` finds its lists, a shared formula's inlined groups included.
 export function listHasAccountSource(list: GameList, get: (id: string) => GameList | undefined): boolean {
   return listReaches(list, (ref) => ref.kind === 'account-owned' || ref.kind === 'account-wishlist', get);

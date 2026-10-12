@@ -59,6 +59,8 @@ import { useBaseTitle } from './pageTitle.ts';
 import { convert, formatWithEstimate } from './currency.ts';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
 import { fetchBundlePage, isUnavailable, loadErrorText } from './bundleData.ts';
+import { BUNDLES_UNAVAILABLE } from './priceLoading.ts';
+import { isItadOff } from './panelData.ts';
 
 const PAGE_SIZE = 50; // ITAD's own max per page (lib/itad.js's getBundles `limit`)
 // How many pages load() fetches back-to-back before handing over to the "Load more" button. The
@@ -292,7 +294,7 @@ export default function BundlesBrowseRoute() {
   const navigate = useNavigate();
   const [rows, setRows] = createSignal<BundleRow[]>([]);
   const [statusText, setStatusText] = createSignal('');
-  const [unavailable, setUnavailable] = createSignal(false);
+  const [unavailable, setUnavailable] = createSignal(isItadOff());
   const [includeExpired, setIncludeExpired] = createSignal(false);
   const [moreAvailable, setMoreAvailable] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
@@ -466,25 +468,17 @@ export default function BundlesBrowseRoute() {
     return tiles;
   }
 
-  onMount(() => load());
+  onMount(() => {
+    if (!unavailable()) void load();
+  });
   useBaseTitle(() => 'Bundles');
 
   return (
-    <Show
-      when={!unavailable()}
-      fallback={
-        <div class="bundles-browse-route">
-          <ListHero
-            title="Bundles"
-            note={`${statusText()} Whoever runs it can turn Bundles and prices on with a free IsThereAnyDeal API key.`}
-          />
-        </div>
-      }
-    >
-      <div class="bundles-browse-route">
-        <ListHero
-          title="Bundles"
-          actions={
+    <div class="bundles-browse-route">
+      <ListHero
+        title="Bundles"
+        actions={
+          unavailable() ? undefined : (
             <>
               {/* A data-scope control, not a view one — it round-trips to ITAD (see load()) — so it
                 sits here rather than with the table-view buttons in the toolbar. */}
@@ -500,9 +494,16 @@ export default function BundlesBrowseRoute() {
                 Include expired
               </label>
             </>
-          }
-          tiles={heroTiles()}
-        />
+          )
+        }
+        tiles={unavailable() ? undefined : heroTiles()}
+        note={
+          unavailable()
+            ? `${BUNDLES_UNAVAILABLE} Whoever runs it can turn Bundles and prices on with a free IsThereAnyDeal API key.`
+            : undefined
+        }
+      />
+      <Show when={!unavailable()}>
         <Show when={viewingShared()}>
           <SharedViewBanner
             edited={sharedViewEdited()}
@@ -532,7 +533,7 @@ export default function BundlesBrowseRoute() {
             Load more
           </button>
         </Show>
-      </div>
-    </Show>
+      </Show>
+    </div>
   );
 }
