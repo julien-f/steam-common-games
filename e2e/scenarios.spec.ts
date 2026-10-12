@@ -1409,6 +1409,20 @@ test('O1 edge: with no ITAD key, Bundles is one card saying how to turn it on, n
   await expect(page.locator('.table-container')).toHaveCount(0);
 });
 
+test('O1 edge: once the instance is known to have no ITAD key, Bundles opens on its card without asking ITAD', async ({
+  page,
+}) => {
+  await mockApi(page, { states: ['no-itad'] }); // registered last, so it answers first
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await expect(page.getByRole('main')).toContainText("Prices aren't available on this instance");
+  await page.route('**/api/bundles?*', () => {}); // never answers: the card can't wait on its 503
+  await page.getByRole('navigation').getByRole('link', { name: 'Bundles' }).click();
+  await expect(page.locator('.list-hero')).toContainText('IsThereAnyDeal API key');
+  await expect(page.getByLabel('Include expired')).toHaveCount(0);
+  await expect(page.locator('.table-container')).toHaveCount(0);
+});
+
 test('B1 edge: games ITAD lists under the first tier only show the tier range', async ({ page }) => {
   await mockApi(page, { states: ['untiered'] });
   await asPlayer(page, ALICE);
