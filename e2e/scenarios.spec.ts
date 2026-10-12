@@ -899,6 +899,22 @@ test("B3 edge: a list built from a bundle says how many of its games aren't on S
   await expect(page.locator('.list-formula')).toContainText('1 not on Steam');
 });
 
+test("B3 edge: what a bundle adds keeps the bundle's prices and links back to it", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto(`/lists/bundle/${BUNDLE.id}`);
+  await expect(rows(page)).toHaveCount(4);
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds it behind ⋯
+  if (await more.isVisible()) await more.click();
+  await page.getByRole('link', { name: 'What does this add?' }).click();
+  await expect(rows(page)).toHaveCount(2);
+  await expect(page.locator('thead th').filter({ hasText: /^Tier Price/ })).toHaveCount(1);
+  await expect(page.locator('thead th').filter({ hasText: /^Best Deal/ })).toHaveCount(1);
+  await expect(row(page, 'Overcooked! 2')).toContainText('12.00');
+  await page.getByRole('link', { name: `← ${BUNDLE.title}` }).click();
+  await expect(page).toHaveURL(new RegExp(`/lists/bundle/${BUNDLE.id}`));
+  await expect(page.getByRole('heading', { name: BUNDLE.title })).toBeVisible();
+});
+
 test('B1 edge: a bundle game whose Steam lookup failed says so, rather than reading as not on Steam', async ({
   page,
 }) => {

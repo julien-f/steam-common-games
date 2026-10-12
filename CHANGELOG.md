@@ -41,6 +41,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On desktop the nav is an app bar on the same edge as the list pages: routes left, search in the middle, account and settings right, with less space above the page
 - Text across the app uses one consistent set of sizes and two weights, instead of the near-duplicates that had crept in
 - A list's toolbar shows the 🎲 random pick on desktop too, not only on a phone
+- "What does this add?" keeps the bundle's Tier Price and Best Deal columns and links back to the bundle
 
 ### Fixed
 

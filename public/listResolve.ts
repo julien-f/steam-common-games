@@ -15,7 +15,8 @@
 import type { GameList, ListRef, CombineOp } from './types.ts';
 import { combine, type LabeledSet, type CombineResult } from './combine.ts';
 import { fetchAccountOwnedData, fetchAccountWishlistData, type GameOwner } from './accountData.ts';
-import { fetchBundleContents, BundleNotFoundError } from './bundleData.ts';
+import { fetchBundleContents, BundleNotFoundError, type Bundle, type ResolvedGame } from './bundleData.ts';
+import { currentRegion } from './region.ts';
 import { loadRecentGames } from './recentGames.ts';
 import { getList, isBundleReferenced, orphanBundle } from './listsStore.ts';
 import { getBundleSnapshot, rememberBundle } from './bundleSnapshots.ts';
@@ -178,7 +179,9 @@ export interface DefaultFetchersOptions {
   onFetchedAt?: (fetchedAt: number | null) => void;
   onOwners?: (owners: Map<number, GameOwner[]>, accountId: string) => void; // each account-owned source's members who own each game
   onBundleLeftOut?: (bundleId: string, notOnSteam: number) => void; // a bundle's games with no Steam listing
+  onBundleGames?: BundleGamesCallback; // a freshly fetched bundle's games, for their tier prices
 }
+export type BundleGamesCallback = (bundleId: string, bundle: Bundle, resolved: ResolvedGame[]) => void;
 
 // The real ListResolveFetchers, wiring the injectable seam above to actual network calls
 // (accountData.ts/bundleData.ts), localStorage (recentGames.ts), and listsStore.ts's own
@@ -190,6 +193,7 @@ export function createDefaultFetchers({
   onFetchedAt,
   onOwners,
   onBundleLeftOut,
+  onBundleGames,
 }: DefaultFetchersOptions = {}): ListResolveFetchers {
   return {
     accountOwned: async (accountId) => {
@@ -206,7 +210,13 @@ export function createDefaultFetchers({
     // No refresh and no age for the other two: GET /api/bundles/:id has no force path at all
     // (server.js — finding one bundle walks several cached pages, so forcing it costs several
     // upstream calls), and the recent-games list is this browser's own localStorage.
-    bundle: (bundleId) => resolveBundleSource(bundleId, fetchBundleContents, onBundleLeftOut),
+    bundle: (bundleId) =>
+      resolveBundleSource(
+        bundleId,
+        (id) => fetchBundleContents(id, { country: currentRegion() }),
+        onBundleLeftOut,
+        onBundleGames,
+      ),
     recentGames: async () => new Set(loadRecentGames().map((g) => g.appid)),
     getList,
   };
@@ -220,10 +230,12 @@ export async function resolveBundleSource(
   bundleId: string,
   fetchContents: typeof fetchBundleContents = fetchBundleContents,
   onLeftOut?: (bundleId: string, notOnSteam: number) => void,
+  onGames?: BundleGamesCallback,
 ): Promise<Set<number>> {
   try {
-    const { title, appids, notOnSteam, failed } = await fetchContents(bundleId);
+    const { title, appids, notOnSteam, failed, bundle, resolved } = await fetchContents(bundleId);
     if (notOnSteam) onLeftOut?.(bundleId, notOnSteam);
+    onGames?.(bundleId, bundle, resolved);
     if (failed) {
       // Games that failed to resolve stand in from the last good load rather than silently dropping out.
       const snapshot = getBundleSnapshot(bundleId);
