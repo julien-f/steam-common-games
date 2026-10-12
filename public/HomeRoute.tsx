@@ -694,10 +694,18 @@ export default function HomeRoute() {
                     <>
                       <span>📁 {(row.item as Folder).name}</span>
                       <MoveSelect row={row} name={(row.item as Folder).name} />
-                      <button type="button" onClick={() => handleRenameFolder(row.item as Folder)}>
+                      <button
+                        type="button"
+                        aria-label={`Rename ${(row.item as Folder).name}`}
+                        onClick={() => handleRenameFolder(row.item as Folder)}
+                      >
                         Rename
                       </button>
-                      <button type="button" onClick={() => handleDeleteFolder(row.item as Folder)}>
+                      <button
+                        type="button"
+                        aria-label={`Delete ${(row.item as Folder).name}`}
+                        onClick={() => handleDeleteFolder(row.item as Folder)}
+                      >
                         Delete
                       </button>
                     </>
@@ -708,10 +716,18 @@ export default function HomeRoute() {
                         <span classList={{ 'derived-name': !row.item.name }}>{listName(row.item as GameList)}</span>
                       </A>
                       <MoveSelect row={row} name={listName(row.item as GameList)} />
-                      <button type="button" onClick={() => handleRenameList(row.item as GameList)}>
+                      <button
+                        type="button"
+                        aria-label={`Rename ${listName(row.item as GameList)}`}
+                        onClick={() => handleRenameList(row.item as GameList)}
+                      >
                         Rename
                       </button>
-                      <button type="button" onClick={() => handleDeleteList(row.item as GameList)}>
+                      <button
+                        type="button"
+                        aria-label={`Delete ${listName(row.item as GameList)}`}
+                        onClick={() => handleDeleteList(row.item as GameList)}
+                      >
                         Delete
                       </button>
                     </>

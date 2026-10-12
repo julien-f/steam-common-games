@@ -2906,6 +2906,7 @@ export default function ListRoute() {
               <select
                 value={compareOp()}
                 title="How to combine these players' libraries"
+                aria-label="How to combine these players' libraries"
                 onChange={(e) => navigate(compareUrl(compareSlots(), e.currentTarget.value))}
               >
                 <For each={Object.keys(OP_LABELS) as CombineOp[]}>

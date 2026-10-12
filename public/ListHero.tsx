@@ -35,7 +35,8 @@ export interface HeroTile {
   // Makes the tile a real <button> instead of a <div> — for a tile whose number is also a way to
   // act on it (`/bundles`' "Ending soon", which toggles the table down to those rows). `active`
   // is its pressed state, read back from whatever the click applied rather than held here, so
-  // undoing it elsewhere (the table's own Clear filters) unpresses the tile.
+  // undoing it elsewhere (the table's own Clear filters) unpresses the tile. Left out on a plain
+  // action (Updated's refresh), which then carries no aria-pressed: it isn't a toggle.
   onClick?: () => void;
   active?: boolean;
   // A tile whose action is momentarily unavailable (a refresh already in flight). Still a button,
@@ -99,7 +100,7 @@ export function ListHero(props: ListHeroProps): JSX.Element {
                   component={isButton() ? 'button' : 'div'}
                   class={isButton() ? 'list-stat list-stat-btn' : 'list-stat'}
                   type={isButton() ? 'button' : undefined}
-                  aria-pressed={isButton() ? !!tile().active : undefined}
+                  aria-pressed={isButton() && tile().active !== undefined ? tile().active : undefined}
                   aria-disabled={isButton() && tile().disabled ? 'true' : undefined}
                   onClick={tile().subOnClick || tile().disabled ? undefined : () => tile().onClick?.()}
                 >

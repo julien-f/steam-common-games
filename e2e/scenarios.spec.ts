@@ -2243,6 +2243,39 @@ test('I2 edge: the shortcuts dialog takes focus, keeps it, and gives it back on 
   await expect(row(page, 'Hades')).toBeFocused();
 });
 
+test('I2 edge: controls name what they act on, and only toggles carry a pressed state', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await expect(page.locator('.account-chip-btn')).toHaveAccessibleName(/Alice/);
+  page.once('dialog', (d) => d.accept('Shortlist'));
+  await page.getByRole('button', { name: '+ New list' }).click();
+  await expect(page.getByRole('button', { name: 'Rename Shortlist' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete Shortlist' })).toBeVisible();
+
+  await page.getByRole('button', { name: '+ New combined list' }).click();
+  const form = page.locator('.combine-form');
+  await form.getByRole('combobox', { name: 'How to combine the sources' }).selectOption('subtract');
+  const sources = form.locator('.combine-sources input[type="checkbox"]');
+  await sources.nth(0).check();
+  await sources.nth(1).check();
+  const ordered = form.locator('.combine-sources-ordered li');
+  const first = (await ordered.nth(0).locator('.combine-source-label').innerText()).trim();
+  await expect(ordered.nth(0).getByRole('button', { name: `Move ${first} down` })).toBeVisible();
+
+  await page.goto('/lists/compare?u=alice&u=bob');
+  await expect(page.getByRole('combobox', { name: "How to combine these players' libraries" })).toHaveValue(
+    'group-by-membership',
+  );
+
+  await page.goto('/bundles');
+  const updated = page.locator('.list-stat', { hasText: 'Updated' });
+  await expect(updated).toBeVisible();
+  await expect(updated).not.toHaveAttribute('aria-pressed');
+  await expect(page.locator('.list-stat', { hasText: 'Prices' })).not.toHaveAttribute('aria-pressed');
+  const ending = page.locator('.list-stat', { hasText: 'Ending soon' });
+  if (await ending.count()) await expect(ending).toHaveAttribute('aria-pressed', 'false');
+});
+
 test('I2 edge: icon-only controls have names', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
