@@ -240,7 +240,7 @@ export function initGameSearch({
 
   function pick(game: GameSearchResult) {
     hideResults();
-    inputEl.value = game.name || '';
+    inputEl.value = '';
     onSelect(game);
   }
 
@@ -290,9 +290,11 @@ export function initGameSearch({
   inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       e.preventDefault(); // so the page's own Esc doesn't also close the panel
-      // Second Esc leaves the box, so the page's own shortcuts work again.
-      if (resultsEl.hidden) inputEl.blur();
-      else hideResults();
+      // Second Esc clears and leaves the box, so the page's own shortcuts work again.
+      if (resultsEl.hidden) {
+        inputEl.value = '';
+        inputEl.blur();
+      } else hideResults();
       return;
     }
     if (e.key === 'ArrowDown') {

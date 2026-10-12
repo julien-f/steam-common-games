@@ -32,6 +32,12 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: the server kept serving modules from before the commits; a reload doesn't fix it.
 - **Fix**: `node scripts/mock-server.js up` restarts a server it started at another git HEAD. Uncommitted edits don't move HEAD: run `down` then `up` if they look stale.
 
+## A ux-review at 390 px sees desktop-only UI on "phone"
+
+- **Symptom**: a hint or hover affordance hidden on touch screens (e.g. `/rank`'s `.rank-hint`) still shows in a 390×844 Playwright MCP screenshot.
+- **Cause**: `ux-measure.js` and `browser_resize` only shrink the viewport; the browser keeps its mouse, so `(any-pointer: fine)` / `(hover: hover)` still match.
+- **Fix**: check touch-only rules in the e2e `phone` project (`hasTouch: true`), not on a resized desktop browser.
+
 ## A blank page right after starting `npm run dev:mock`
 
 - **Symptom**: the app stays blank; the server logs `The request id ".../node_modules/@solidjs/router/..." is outside of Vite serving allow list`, and the browser gets a 403 for it.

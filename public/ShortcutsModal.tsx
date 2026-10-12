@@ -119,7 +119,9 @@ export function ShortcutsModal(props: { open: boolean; onClose: () => void }): J
                 <For each={section.rows}>
                   {(row) => (
                     <div class="shortcuts-row">
-                      <For each={row.keys}>{(k) => <kbd>{k}</kbd>}</For>
+                      <span class="shortcuts-keys">
+                        <For each={row.keys}>{(k) => <kbd>{k}</kbd>}</For>
+                      </span>
                       <span>{row.label}</span>
                     </div>
                   )}

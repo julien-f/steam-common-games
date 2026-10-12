@@ -2522,6 +2522,23 @@ test('F1.1-4: look up one game from the nav search, in place', async ({ page }) 
   expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT');
 });
 
+test('F1 edge: the nav search box empties after a pick and on a second Esc', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  const box = page.getByPlaceholder('Look up any game…');
+  await box.fill('hollow');
+  await page.getByRole('option', { name: /Hollow Knight/ }).click();
+  await expect(page.locator('.game-panel')).toContainText('Hollow Knight');
+  await expect(box).toHaveValue('');
+
+  await box.fill('zz');
+  await page.keyboard.press('Escape');
+  await expect(box).toHaveValue('zz');
+  await page.keyboard.press('Escape');
+  await expect(box).toHaveValue('');
+});
+
 test('F1 edge: Esc closes a nav popover or the search dropdown, not the open game', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', "a phone's panel covers the nav");
   await asPlayer(page, ALICE);
@@ -2756,6 +2773,24 @@ test('I2 edge: the shortcuts dialog says how to open the lightbox from the panel
   await page.keyboard.press('?');
   const section = page.locator('.shortcuts-section').filter({ hasText: 'Game panel' });
   await expect(section.locator('.shortcuts-row').filter({ hasText: 'lightbox' })).toContainText('Enter');
+});
+
+test('I2 edge: every shortcut description starts at the same x', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await page.keyboard.press('?');
+  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(dialog).toBeVisible();
+  const lefts = await dialog
+    .locator('.shortcuts-row > span:last-child')
+    .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().left)));
+  expect(lefts.length).toBeGreaterThan(10);
+  expect(new Set(lefts).size).toBe(1);
+  const overflowing = await dialog
+    .locator('.shortcuts-keys')
+    .evaluateAll((els) => els.filter((el) => el.scrollWidth > el.clientWidth).map((el) => el.textContent));
+  expect(overflowing).toEqual([]);
 });
 
 test('I2 edge: the shortcuts dialog takes focus, keeps it, and gives it back on close', async ({ page }) => {
