@@ -57,7 +57,6 @@ interface RouteHandlers {
   pickRandom?: () => boolean; // true if it actually picked — same idiom as stepGame below
   stepGame?: (dir: 1 | -1) => boolean;
   gamePosition?: () => { index: number; total: number } | null;
-  onEnterOnFocusedRow?: () => boolean;
   openGame?: (appid: number) => boolean;
   onGameClose?: () => void;
   refreshGame?: (game: Game) => Promise<void>;
@@ -229,7 +228,6 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       pickRandom: () => routeHandlers.pickRandom?.(),
       stepGame: (dir) => routeHandlers.stepGame?.(dir) ?? false,
       focusSearchInput: () => searchInputEl.focus(),
-      onEnterOnFocusedRow: () => routeHandlers.onEnterOnFocusedRow?.() ?? false,
       shortcuts: {
         isOpen: shortcutsOpen,
         toggle: () => setShortcutsOpen((v) => !v),

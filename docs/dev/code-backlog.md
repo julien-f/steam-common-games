@@ -15,7 +15,6 @@ Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-
 
 ## Simplify
 
-- **C157 · cleanup · S** — `onEnterOnFocusedRow` (`public/AppShell.tsx:60`, `public/panelKeyboard.ts:12`) is registered by no route, so its Enter branch always returns false. Remove the hook and its plumbing.
 - **C158 · cleanup · S** — stale code comments: `vite.config.js:52` (names a `dev:web` script that doesn't exist; `npm run dev` runs both), `server.js:1271` ("line 113"), `server.js:352`/`:920` (`public/panel.js`, now `panelData.ts`), `lib/metrics.js:282` (`resolve:` is 180 days, not 90), `lib/steam.js` 482/575/664/696/746 (meta tier is 365 days, not 60), `lib/itad.js:35` (`itad-shop:` uses `ITAD_ID_CACHE_TTL_MINUTES`), `lib/itad.js:189-195` (wrong lookup endpoints; a null mapping is cached on the miss TTL) and `lib/itad.js:5-7` (calls ITAD untrusted; integrations.md puts it in the sanctioned tier). Fix each, pointing at `default.env` instead of repeating numbers.
 
 ## Correctness
