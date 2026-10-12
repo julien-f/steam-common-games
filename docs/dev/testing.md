@@ -8,7 +8,7 @@
 
 ## End-to-end tests
 
-- `npm run test:e2e` (~40 s, both widths; Playwright, `e2e/`, against a production build) runs the tests of [journeys.md](journeys.md)'s journeys at desktop (1440×900) and phone (390×844) widths.
+- `npm run test:e2e` (both widths, timed by `node scripts/setup-facts.js --cost`; Playwright, `e2e/`, against a production build) runs the tests of [journeys.md](journeys.md)'s journeys at desktop (1440×900) and phone (390×844) widths.
 - `node scripts/journey-coverage.js` shows which journey steps they lock.
 - Every `/api` call is mocked in the browser (`e2e/mockApi.ts`): no backend, no upstream traffic. Fixtures use made-up accounts only.
 - The pre-commit hook runs the desktop half when `public/`, `e2e/` or a frontend config is staged; the pre-push hook runs all of it. Both skip it when the build (sourcemaps aside), `e2e/` and the test config match the last full passing run (`scripts/e2e.js`). `E2E_DEFER=1` skips the pre-commit e2e, for fix-batch lanes only ([BATCH.md](../../.claude/skills/code-fix/BATCH.md)), which run the suite once before reporting.
