@@ -19,3 +19,11 @@ test('parseTrustProxy: booleans and address lists pass through as Express reads 
   assert.equal(parseTrustProxy('false'), false);
   assert.equal(parseTrustProxy('loopback, 10.0.0.0/8'), 'loopback, 10.0.0.0/8');
 });
+
+test('backendOrigin: where a local client reaches the server, wildcard binds as loopback', () => {
+  const { backendOrigin } = require('../lib/config');
+  assert.equal(backendOrigin('127.0.0.2', '4321'), 'http://127.0.0.2:4321');
+  assert.equal(backendOrigin('0.0.0.0', '3000'), 'http://127.0.0.1:3000');
+  assert.equal(backendOrigin('::', '3000'), 'http://127.0.0.1:3000');
+  assert.equal(backendOrigin('::1', '3000'), 'http://[::1]:3000');
+});

@@ -12,9 +12,9 @@
 const { defineConfig } = require('vite');
 const solidPlugin = require('vite-plugin-solid');
 const path = require('node:path');
-require('./lib/config'); // loads .env + default.env, so HOST/PORT match the backend's
+const { backendOrigin } = require('./lib/config'); // loads .env + default.env, as the backend does
 
-const backend = `http://${process.env.HOST}:${process.env.PORT}`;
+const backend = backendOrigin();
 
 // `npm run dev:mock`: answers /api from e2e/mockApi.ts's fixtures — no backend, no upstream traffic.
 const mock = process.env.MOCK_API === '1';
