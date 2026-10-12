@@ -355,8 +355,12 @@ header p {
   border: 1px solid var(--border);
   color: var(--text0);
 }
-.btn-ghost:hover {
+.btn-ghost:hover:not(:disabled) {
   background: var(--bg0);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-primary {
@@ -390,13 +394,8 @@ header p {
   border-color: #15803d;
   color: #15803d;
 }
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   background: #1490e8;
-}
-.btn-primary:disabled {
-  background: var(--bg2);
-  color: var(--text2);
-  cursor: not-allowed;
 }
 
 /* Table */
@@ -3079,7 +3078,15 @@ kbd {
 /* Share view/Default view, in the table toolbar's own line (the library's `toolbarEnd` slot). */
 .list-view-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
+}
+.list-view-note {
+  flex-basis: 100%;
+  text-align: right;
+  font-size: 12px;
+  color: var(--text1);
 }
 .list-view-actions .btn-icon,
 .list-random-pick {

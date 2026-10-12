@@ -19,7 +19,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 - **U131 · minor · S3** — a shared-layout recipient's own edits (e.g. a sort on top of the link's filter) are lost on reload: the page comes back on the defaults, dropping both the shared layout and the edit. Once edited, keep it as the recipient's layout, or warn in the banner.
 - **U132 · minor · C3, S1** — a saved dynamic list shows "🔗 Share list" (hero) and "🔗 Share view" (toolbar): same icon, different things. One entry, or names that tell them apart ("Share formula" / "Share layout").
-- **U133 · minor · R3, S1** — the ranked list's disabled "Share view" looks enabled (opacity 1, `cursor: pointer`); its reason lives only in `title`, which touch and keyboard users never see. A shared disabled style (≈0.5 opacity, `cursor: not-allowed`) and the reason shown inline.
 - **U125 · minor · S1, C1, S3** — List, bundle and compare links all preview identically, and a `/lists/<id>` list that exists only in the sender's browser can't be described at all. Server-side per-route `og:title` from the path alone (Owned games, Wishlist, Compare libraries, Shared list, bundle name from cache), generic for `/lists/<id>`.
 
 ## Loading and feedback

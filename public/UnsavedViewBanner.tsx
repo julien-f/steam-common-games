@@ -44,7 +44,7 @@ export function ViewActions(props: {
         class="btn btn-ghost btn-sm"
         aria-label="Share view"
         disabled={props.shareDisabledReason != null}
-        title={props.shareDisabledReason ?? "Copy a link to this table's layout"}
+        title={props.shareDisabledReason == null ? "Copy a link to this table's layout" : undefined}
         onClick={(e) => props.onShare(e.currentTarget)}
       >
         🔗<span class="btn-label"> Share view</span>
@@ -59,6 +59,7 @@ export function ViewActions(props: {
         <span class="btn-icon">↺</span>
         <span class="btn-label">Default view</span>
       </button>
+      <Show when={props.shareDisabledReason}>{(reason) => <p class="list-view-note">{reason()}</p>}</Show>
     </div>
   );
 }
