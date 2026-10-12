@@ -841,10 +841,13 @@ export default function ListRoute() {
   function rankThisListLabel(): string {
     const focus = rankThisListFocus();
     if (!focus) return '🏆 Rank this list';
-    return focus.length ? `🏆 Rank ${focus.length} games` : '🏆 Rank (none shown)';
+    if (!focus.length) return '🏆 Rank (none shown)';
+    return `🏆 Rank ${focus.length} game${focus.length === 1 ? '' : 's'}`;
   }
-  // Ranking compares games two at a time, so a list needs 2 of them.
+  // Ranking compares games two at a time, so what it ranks needs 2 of them; none shown is disabled outright.
   function rankTooFew(): boolean {
+    const focus = rankThisListFocus();
+    if (focus) return focus.length === 1;
     return tableReady() && !!table && table.data().length < 2;
   }
   // `criterion` names a further ranking of the same list ("best JRPG"); the first one keeps the default name.
@@ -906,9 +909,20 @@ export default function ListRoute() {
               aria-label="What are you ranking by?"
               placeholder="Ranked by… (optional)"
             />
-            <button type="submit" class="btn btn-primary btn-sm" disabled={rankThisListFocus()?.length === 0}>
+            <button
+              type="submit"
+              class="btn btn-primary btn-sm"
+              disabled={rankThisListFocus()?.length === 0}
+              aria-disabled={rankTooFew() ? 'true' : undefined}
+              aria-describedby={rankTooFew() ? 'rank-reason' : undefined}
+            >
               + New ranking
             </button>
+            <Show when={rankTooFew()}>
+              <span id="rank-reason" class="rank-reason">
+                Ranking needs at least 2 games
+              </span>
+            </Show>
           </form>
         </div>
       </details>

@@ -736,6 +736,30 @@ test('L1 edge: a list under 2 games says ranking needs 2', async ({ page }) => {
   await expect(page).toHaveURL(/\/lists\/[^/]+$/); // stayed: no ranking made
 });
 
+test('L1 edge: one selected game is too few to rank, and says so', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await row(page, 'It Takes Two').getByRole('checkbox').check();
+  const rank = page.getByRole('button', { name: '🏆 Rank 1 game', exact: true });
+  await expect(rank).toHaveAttribute('aria-disabled', 'true');
+  await expect(rank).toHaveAccessibleDescription('Ranking needs at least 2 games');
+  await rank.click({ force: true });
+  await expect(page).toHaveURL(/\/lists\/wishlist/);
+
+  // A list already ranked once gates "+ New ranking" the same way.
+  await row(page, 'It Takes Two').getByRole('checkbox').uncheck();
+  await page.getByRole('button', { name: /Rank this list/ }).click();
+  await page.keyboard.press('Escape');
+  await page.goto('/lists/wishlist');
+  await row(page, 'It Takes Two').getByRole('checkbox').check();
+  await page.locator('summary', { hasText: 'Rank 1 game' }).click();
+  const create = page.locator('.rank-menu-panel').getByRole('button', { name: '+ New ranking' });
+  await expect(create).toHaveAttribute('aria-disabled', 'true');
+  await expect(create).toHaveAccessibleDescription('Ranking needs at least 2 games');
+  await create.click({ force: true });
+  await expect(page).toHaveURL(/\/lists\/wishlist/);
+});
+
 test("L3 edge: the toolbar's two resets say what they do", async ({ page }) => {
   await asPlayer(page, ALICE);
   for (const route of ['/lists/owned', '/bundles']) {

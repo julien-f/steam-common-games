@@ -40,8 +40,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Ranking
 
-- **U165 · polish · R1** — with one game selected, the rank button reads "🏆 Rank 1 games". Singular for one.
-- **U164 · polish · R1** — the ranking menu's "+ New ranking" (shown once a list has a ranking) still starts one under 2 games, while "Rank this list" says ranking needs 2. The same gate and reason.
 - **U145 · polish · I1** — `/rank`'s keyboard hint bar shows on touch screens. Hide it under `(hover: none)`.
 
 ## Keyboard and accessibility
