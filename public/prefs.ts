@@ -77,10 +77,10 @@ export function setPref(key: string, value: unknown): void {
   writeEntries(entries);
   // Per-key push to the server once signed in (authStore.ts calls setSignedInSteamid on
   // sign-in/out) — deliberately never a whole-blob PUT, so two preferences changing around the
-  // same time (different tabs/devices) can't race each other's writes. A table-view key is the
-  // one exception: it's never auto-pushed at all, local-only until the user explicitly hits Save
-  // on the "unsaved changes" banner (tableViewSync.ts) — every edit to a table would otherwise
-  // silently overwrite whatever's saved to the account before the user ever saw a diff.
+  // same time (different tabs/devices) can't race each other's writes. A table-view key is never
+  // auto-pushed at all, local-only until the user explicitly hits Save on the "unsaved changes"
+  // banner (tableViewSync.ts) — every edit to a table would otherwise silently overwrite whatever's
+  // saved to the account before the user ever saw a diff; `lists` and `ranking:` keys are debounced.
   if (!signedInSteamid || TABLE_VIEW_PREF_KEYS.includes(key)) return;
   if (DEBOUNCED_PUSH_PREFIXES.some((p) => key.startsWith(p))) schedulePush(key);
   else pushPrefToServer(key, value, updatedAt);
@@ -125,6 +125,8 @@ if (typeof document !== 'undefined') {
 // not the other way around.
 let signedInSteamid: string | null = null;
 export function setSignedInSteamid(steamid: string | null): void {
+  // Pending pushes belong to the account they were written under: send them before it changes.
+  if (steamid !== signedInSteamid) for (const key of [...pendingPushes.keys()]) flushPush(key);
   signedInSteamid = steamid;
 }
 
@@ -141,17 +143,21 @@ export function _resetSignedInSteamid(): void {
 // as it worked before server sync existed at all. Not retried here: authStore.ts's merge, which
 // runs on every sign-in check (not just the first), pushes any key whose local `updatedAt` still
 // beats the server's, so a failed push is naturally retried the next time this device checks in.
+const KEEPALIVE_MAX_BYTES = 60_000;
+
 export function pushPrefToServer(
   key: string,
   value: unknown,
   updatedAt: number,
   { keepalive = false } = {},
 ): Promise<void> {
+  const body = JSON.stringify({ value, updatedAt });
   return fetch(`/api/me/prefs/${encodeURIComponent(key)}`, {
     method: 'PUT',
-    keepalive,
+    // Browsers reject keepalive bodies past 64 KiB (in flight, in total): a big `lists` goes plain.
+    keepalive: keepalive && body.length <= KEEPALIVE_MAX_BYTES,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ value, updatedAt }),
+    body,
   })
     .then(() => undefined)
     .catch((err) => console.error(`[prefs] failed to sync "${key}" to the server`, err));

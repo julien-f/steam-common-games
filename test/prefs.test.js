@@ -264,3 +264,44 @@ test('setPref: debounces the push of the lists key, so repeated view changes coa
     [['/api/me/prefs/lists', [2]]],
   );
 });
+
+test('setSignedInSteamid: signing out first pushes what is pending, under the account it was written for', async (t) => {
+  const restore = globalThis.fetch;
+  const seen = [];
+  globalThis.fetch = async (url, opts) => {
+    seen.push({ url, value: JSON.parse(opts.body).value });
+    return { ok: true, json: async () => ({}) };
+  };
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+
+  const { setPref, setSignedInSteamid } = require('../public/prefs.ts');
+  setSignedInSteamid('76561198000000001');
+  setPref('lists', [{ id: 'a', name: 'renamed' }]);
+  setSignedInSteamid(null);
+  assert.deepEqual(seen, [{ url: '/api/me/prefs/lists', value: [{ id: 'a', name: 'renamed' }] }]);
+  t.mock.timers.tick(3000);
+  assert.equal(seen.length, 1);
+});
+
+test('flushPendingPushes: a body over the browser keepalive limit is sent without keepalive', async (t) => {
+  const restore = globalThis.fetch;
+  const seen = [];
+  globalThis.fetch = async (url, opts) => {
+    seen.push(opts.keepalive);
+    return { ok: true, json: async () => ({}) };
+  };
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+
+  const { setPref, setSignedInSteamid, flushPendingPushes } = require('../public/prefs.ts');
+  setSignedInSteamid('76561198000000001');
+  setPref('lists', [{ id: 'a', appids: Array.from({ length: 20000 }, (_, i) => i) }]);
+  setPref('ranking:abc', { n: 1 });
+  flushPendingPushes();
+  assert.deepEqual(seen.sort(), [false, true]);
+});
