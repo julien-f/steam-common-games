@@ -25,8 +25,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Lists and selection
 
-- **U135 · minor · F3** — at 1440 with the panel closed, random pick has no visible control (R only); phone has a 🎲 in the toolbar. Show the same 🎲 on desktop.
-- **U136 · polish · L1, L2** — folder naming uses a native `prompt()` while list naming is inline; "Create combined list" stays on Home while "Save as a list" opens the list; Edit sources shows two Cancel buttons; "Rank this list" is enabled on 0 games. Inline naming, open the new list, one Cancel, disable ranking under 2 games with a reason.
 - **U76 · polish · F3** — with **All** chosen, the chip still reads "Genres: Action, RPG", the same as **Any**, though it shows 3 rows instead of 6. Needs an upstream change: say "all of" in the chip (vatesfr/data-table#35).
 
 ## Comparing
@@ -36,7 +34,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Bundles and prices
 
-- **U141 · minor · B3** — "What does this add?" drops the bundle's Tier Price and Best Deal columns and has no way back to the bundle. Keep the price columns when a bundle is a source; add a "← <bundle>" link.
 - **U143 · polish · B1** — the bundle hero has 6 actions in 4 styles, with "← All bundles" far right and ‹ › far left. Put "← All bundles" by ‹ ›; one primary, the rest ghost.
 - **U144 · polish · O1** — without `ITAD_API_KEY`, `/bundles` keeps its toolbar, an empty table, pager, Updated and region figures under a one-line notice. One empty-state card instead.
 

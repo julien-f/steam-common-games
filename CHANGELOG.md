@@ -42,6 +42,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Text across the app uses one consistent set of sizes and two weights, instead of the near-duplicates that had crept in
 - The New and Ending soon filters above the bundles table now look like toggles, with a clear pressed state
 - The game panel's Price card names its record lows in text ("1-year low", "all-time low €2.49"), not only in a tooltip
+- A list's toolbar shows the 🎲 random pick on desktop too, not only on a phone
+- "What does this add?" keeps the bundle's Tier Price and Best Deal columns and links back to the bundle
+- Folders and lists are named and renamed in place on Home instead of in a browser dialog
+- Creating a combined list opens it, and Edit sources has a single Cancel
+- "Rank this list" is unavailable below 2 games and says why
 
 ### Fixed
 

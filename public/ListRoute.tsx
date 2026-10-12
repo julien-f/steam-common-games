@@ -433,6 +433,28 @@ const TIER_PRICE_COLUMN: ColumnDef<Record<string, any>> = {
   keepVisibleWhenGrouped: true,
   category: 'Pricing',
 };
+// A bundle's games' Tier Price fields, by appid; a pick-and-mix game costs the per-game rate the
+// selection reaches (see the effect by pickPlan), the entry rate until then.
+function bundleTierFields(
+  resolved: ResolvedGame[],
+  picks: PickTier[],
+): Map<number, Pick<Game, 'tierPrice' | 'tierCurrency' | 'tierPerGame' | 'tierPriceMax' | 'bundlePackage' | 'addon'>> {
+  const entryRate = pickRate(picks, 0);
+  const packages = bundlePackages(resolved);
+  return new Map(
+    resolved.map((g) => [
+      g.appid,
+      {
+        tierPrice: g.tierPrice ?? (entryRate ? entryRate.amount : null),
+        tierCurrency: g.tierPrice == null && entryRate ? entryRate.currency : g.tierCurrency,
+        tierPerGame: g.tierPrice == null && !!entryRate,
+        tierPriceMax: g.tierPriceMax,
+        bundlePackage: packages.get(g.appid) ?? null,
+        addon: g.addon,
+      },
+    ]),
+  );
+}
 const ADDON_COLUMN: ColumnDef<Record<string, any>> = {
   key: 'addon',
   label: 'Add-on',
@@ -481,6 +503,14 @@ const RANKED_DEFAULT_VISIBLE = ['rank', ...RECENT_DEFAULT_VISIBLE];
 const USER_PRICED_COLUMNS = insertColumnsAfter(USER_COLUMNS, 'ownershipStatus', ...PRICE_COLUMNS);
 const RANKED_PRICED_COLUMNS = insertColumnsAfter(RANKED_COLUMNS, 'ownershipStatus', ...PRICE_COLUMNS);
 const PRICED_DEFAULT_VISIBLE = ['bestDealPrice', 'bestDealCut'];
+// A shared formula with a bundle source ("What does this add?") keeps that bundle's Tier Price too.
+const SHARED_PRICED_COLUMNS = insertColumnsAfter(RECENT_COLUMNS, 'ownershipStatus', ...PRICE_COLUMNS);
+const SHARED_TIERED_COLUMNS = insertColumnsAfter(
+  RECENT_COLUMNS,
+  'ownershipStatus',
+  TIER_PRICE_COLUMN,
+  ...PRICE_COLUMNS,
+);
 const PRICE_KEYS = new Set(PRICE_COLUMNS.map((c) => c.key));
 const WISHLIST_NOPRICE_COLUMNS = WISHLIST_COLUMNS.filter((c) => !PRICE_KEYS.has(c.key));
 const RANKED_DEFAULT_SORT: SortEntry[] = [{ key: 'rank', dir: 'asc' }];
@@ -814,10 +844,14 @@ export default function ListRoute() {
     if (!focus) return '🏆 Rank this list';
     return focus.length ? `🏆 Rank ${focus.length} games` : '🏆 Rank (none shown)';
   }
+  // Ranking compares games two at a time, so a list needs 2 of them.
+  function rankTooFew(): boolean {
+    return tableReady() && !!table && table.data().length < 2;
+  }
   // `criterion` names a further ranking of the same list ("best JRPG"); the first one keeps the default name.
   function handleRankThisList(criterion = ''): void {
     const source = rankSourceRef();
-    if (!source || rankThisListFocus()?.length === 0) return;
+    if (!source || rankTooFew() || rankThisListFocus()?.length === 0) return;
     const name = criterion.trim()
       ? `Ranking of ${describeListRef(source, createDefaultNaming()).label} (${criterion.trim()})`
       : undefined;
@@ -949,6 +983,8 @@ export default function ListRoute() {
   // them and to reconstruct real saved lists on "Save as a list" — see sharedFetchers/
   // sharedNaming/handleSaveShared below.
   const [sharedSynthetic, setSharedSynthetic] = createSignal<Map<string, GameList>>(new Map());
+  // The formula's bundle sources as last fetched, for a link back to each.
+  const [sharedBundles, setSharedBundles] = createSignal<{ id: string; title: string }[]>([]);
   // A memo, so the load effect re-runs on a new formula only — not on Back dropping `?game=`
   // (overlayHistory.ts), which changes the rest of the query string.
   const sharedFormulaParam = createMemo(() => new URLSearchParams(routerLocation.search).get('f'));
@@ -1000,6 +1036,7 @@ export default function ListRoute() {
   // (per-list view persistence, "remove from this list", the Folder/Edited tiles): a list with no
   // id has no business reaching any of them.
   const [compareList, setCompareList] = createSignal<GameList | null>(null);
+  let editSourcesBtn: HTMLButtonElement | undefined;
   const [compareAccounts, setCompareAccounts] = createSignal<AccountSlot[]>([]);
   const [editingPlayers, setEditingPlayers] = createSignal(false);
   // Players the last comparison couldn't resolve, with why — the rest still compare (U14).
@@ -1775,8 +1812,12 @@ export default function ListRoute() {
     setViewingShared(false);
   }
 
-  // Wishlist prices, by appid: the Wishlist itself, and a saved list built from one or a bundle.
+  // Wishlist prices, by appid: the Wishlist itself, and a saved or shared list built from one or a bundle.
   function hasPrices(): boolean {
+    if (kind === 'shared') {
+      const list = compareList();
+      return !!list && listHasPriceSource(list, sharedGetList);
+    }
     const list = userList();
     return kind === 'wishlist' || (kind === 'user' && !!list && listHasPriceSource(list));
   }
@@ -1803,10 +1844,9 @@ export default function ListRoute() {
   function viewActions() {
     return (
       <>
-        {/* Phone only (CSS): there, the panel nav's 🎲 is out of reach until a game is open. */}
         <button
           type="button"
-          class="btn btn-ghost btn-sm list-random-pick"
+          class="btn btn-ghost btn-sm"
           aria-label="Pick a random game"
           title="Pick a random game (R)"
           onClick={() => pickRandomGame()}
@@ -1889,6 +1929,7 @@ export default function ListRoute() {
     }
 
     let initialRows: Game[];
+    let tiered = false; // rows carry a bundle source's Tier Price
     resolvedBundleGames = null;
     // Cast, not annotated: resolveRows sets it, which flow narrowing from `= null` would miss.
     let pendingGroups = null as MembershipGroup[] | null;
@@ -2065,17 +2106,33 @@ export default function ListRoute() {
         return;
       }
       setSharedSynthetic(decoded.synthetic);
+      if (!refresh) setSharedBundles([]);
       const list = inMemoryDynamicList(decoded.op, decoded.sources);
       setCompareList(list);
       setListTitle(listDisplayName(list, sharedNaming()));
       setStatusText('Resolving shared list…');
+      const tiers: ReturnType<typeof bundleTierFields> = new Map();
       const resolved = await resolveRows(
         list,
-        sharedFetchers(createDefaultFetchers({ refresh, onFetchedAt, onBundleLeftOut: noteLeftOut })),
+        sharedFetchers(
+          createDefaultFetchers({
+            refresh,
+            onFetchedAt,
+            onBundleLeftOut: noteLeftOut,
+            onBundleGames: (bundleId, bundle, games) => {
+              setSharedBundles((prev) =>
+                prev.some((b) => b.id === bundleId) ? prev : [...prev, { id: bundleId, title: bundle.title }],
+              );
+              const fields = bundleTierFields(games, pickTiers(bundle.pickAndMix, regionCurrency()));
+              for (const [appid, f] of fields) if (!tiers.has(appid)) tiers.set(appid, f);
+            },
+          }),
+        ),
         describeWithLeftOut(list, sharedNaming()),
       );
       if (!resolved) return;
-      initialRows = resolved.rows;
+      tiered = tiers.size > 0;
+      initialRows = resolved.rows.map((row) => ({ ...row, ...tiers.get(row.appid) }));
     } else if (kind === 'recent') {
       setListTitle('Recently Looked Up');
       const recents = loadRecentGames();
@@ -2108,7 +2165,6 @@ export default function ListRoute() {
         setBundleLinks({ details: bundle.details, url: bundle.url, fanaticalNames: bundle.pickAndMixNames ?? null });
         const regionCur = regionCurrency();
         const picks = pickTiers(bundle.pickAndMix, regionCur);
-        const entryRate = pickRate(picks, 0);
         setBundleMeta({
           shop: bundle.page?.name || null,
           publish: bundle.publish,
@@ -2128,21 +2184,18 @@ export default function ListRoute() {
           return;
         }
         resolvedBundleGames = resolved;
-        const packages = bundlePackages(resolved);
-        initialRows = resolved.map((g) => ({
-          appid: g.appid,
-          // A package's rows share ITAD's package title; each takes its own Steam name instead.
-          name: packages.has(g.appid) ? '' : g.title,
-          // A pick-and-mix game costs the per-game rate the selection reaches; see the effect by pickPlan.
-          tierPrice: g.tierPrice ?? (entryRate ? entryRate.amount : null),
-          tierCurrency: g.tierPrice == null && entryRate ? entryRate.currency : g.tierCurrency,
-          tierPerGame: g.tierPrice == null && !!entryRate,
-          tierPriceMax: g.tierPriceMax,
-          bundlePackage: packages.get(g.appid) ?? null,
-          addon: g.addon,
-          loading: true,
-          details: null,
-        }));
+        const tiers = bundleTierFields(resolved, picks);
+        initialRows = resolved.map((g) => {
+          const fields = tiers.get(g.appid)!;
+          return {
+            appid: g.appid,
+            // A package's rows share ITAD's package title; each takes its own Steam name instead.
+            name: fields.bundlePackage ? '' : g.title,
+            ...fields,
+            loading: true,
+            details: null,
+          };
+        });
       } catch (err) {
         if (loadGuard.isStale(gen)) return;
         setStatusText(loadErrorText(err));
@@ -2233,6 +2286,7 @@ export default function ListRoute() {
     {
       const isRanked = userList()?.kind === 'ranked';
       const priced = kind === 'user' && pricesShown;
+      const sharedPriced = kind === 'shared' && pricesShown;
       const columns = (isRanked
         ? priced
           ? RANKED_PRICED_COLUMNS
@@ -2252,7 +2306,11 @@ export default function ListRoute() {
                 : kind === 'compare'
                   ? insertColumnsAfter(RECENT_COLUMNS, 'hltbCompletionist', ...comparePlayers.map(playedByColumn))
                   : kind === 'shared'
-                    ? RECENT_COLUMNS
+                    ? sharedPriced
+                      ? tiered
+                        ? SHARED_TIERED_COLUMNS
+                        : SHARED_PRICED_COLUMNS
+                      : RECENT_COLUMNS
                     : OWNED_COLUMNS) as unknown as ColumnDef<Game>[];
       const defaultVisible = isRanked
         ? [...RANKED_DEFAULT_VISIBLE, ...(priced ? PRICED_DEFAULT_VISIBLE : [])]
@@ -2260,8 +2318,8 @@ export default function ListRoute() {
           ? WISHLIST_DEFAULT_VISIBLE.filter((key) => pricesShown || !PRICE_KEYS.has(key))
           : kind === 'bundle'
             ? BUNDLE_DEFAULT_VISIBLE
-            : kind === 'user' && priced
-              ? [...RECENT_DEFAULT_VISIBLE, ...PRICED_DEFAULT_VISIBLE]
+            : (kind === 'user' && priced) || sharedPriced
+              ? [...RECENT_DEFAULT_VISIBLE, ...(sharedPriced && tiered ? ['tierPrice'] : []), ...PRICED_DEFAULT_VISIBLE]
               : kind === 'recent'
                 ? LOOKED_UP_DEFAULT_VISIBLE
                 : kind === 'compare'
@@ -2844,8 +2902,15 @@ export default function ListRoute() {
           a reactive Show rather than a plain `kind === 'user' && ...` check — the latter would
           freeze at "no list yet" forever, since heroActions itself is only built once. */}
         <Show when={kind === 'user' && userList()?.kind === 'dynamic'}>
-          <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingSources((v) => !v)}>
-            {editingSources() ? 'Cancel' : 'Edit sources'}
+          {/* Stays "Edit sources" while open: the form's own Cancel is the one way out it names. */}
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            ref={editSourcesBtn}
+            aria-expanded={editingSources()}
+            onClick={() => setEditingSources((v) => !v)}
+          >
+            Edit sources
           </button>
           {/* Not offered on a `compare`/`shared` list — a comparison is already shareable via its
             own URL, and a shared link re-shared would just point back at the same page. */}
@@ -2877,15 +2942,25 @@ export default function ListRoute() {
           <Show
             when={tableReady() && existingRankings().length > 0}
             fallback={
-              <button
-                type="button"
-                class={`btn btn-ghost btn-sm${kind === 'bundle' ? ' hero-secondary' : ''}`}
-                title="Create a list ranking these games by comparing them two at a time, in the table's current order (only the selected or filtered games, if any)"
-                disabled={rankThisListFocus()?.length === 0}
-                onClick={() => handleRankThisList()}
-              >
-                {rankThisListLabel()}
-              </button>
+              <>
+                {/* aria-disabled, not disabled: a press has to reach the button for its reason to be read. */}
+                <button
+                  type="button"
+                  class={`btn btn-ghost btn-sm${kind === 'bundle' ? ' hero-secondary' : ''}`}
+                  title="Create a list ranking these games by comparing them two at a time, in the table's current order (only the selected or filtered games, if any)"
+                  disabled={rankThisListFocus()?.length === 0}
+                  aria-disabled={rankTooFew() ? 'true' : undefined}
+                  aria-describedby={rankTooFew() ? 'rank-reason' : undefined}
+                  onClick={() => handleRankThisList()}
+                >
+                  {rankThisListLabel()}
+                </button>
+                <Show when={rankTooFew()}>
+                  <span id="rank-reason" class="rank-reason">
+                    Ranking needs at least 2 games
+                  </span>
+                </Show>
+              </>
             }
           >
             <RankMenu />
@@ -2902,6 +2977,15 @@ export default function ListRoute() {
               Save as a list
             </button>
           </Show>
+        )}
+        {kind === 'shared' && (
+          <For each={sharedBundles()}>
+            {(b) => (
+              <A class="btn btn-ghost btn-sm" href={`/lists/bundle/${b.id}`}>
+                ← {b.title}
+              </A>
+            )}
+          </For>
         )}
         {kind === 'compare' && (
           <>
@@ -3198,7 +3282,10 @@ export default function ListRoute() {
           excludeListId={userList()!.id}
           showName={false}
           submitLabel="Save sources"
-          onCancel={() => setEditingSources(false)}
+          onCancel={() => {
+            setEditingSources(false);
+            editSourcesBtn?.focus();
+          }}
           onSubmit={handleUpdateDynamicList}
         />
       </Show>

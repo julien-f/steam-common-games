@@ -109,9 +109,9 @@ function listReaches(
   });
 }
 
-// Whether a list is built, at any depth, from a source that has prices (a wishlist or a bundle).
-export function listHasPriceSource(list: GameList): boolean {
-  return listReaches(list, (ref) => ref.kind === 'account-wishlist' || ref.kind === 'bundle', getList);
+// Whether a list is built, at any depth, from a source that has prices (a wishlist or a bundle); `get` as listHasAccountSource's.
+export function listHasPriceSource(list: GameList, get: (id: string) => GameList | undefined = getList): boolean {
+  return listReaches(list, (ref) => ref.kind === 'account-wishlist' || ref.kind === 'bundle', get);
 }
 
 // Whether a list is built, at any depth, from an account fetch; `get` finds its lists, a shared formula's inlined groups included.
