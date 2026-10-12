@@ -42,7 +42,7 @@ None open.
 
 ## Tests
 
-None open.
+- **C171 · minor · S** — `test/clipboard.test.js:89` ("restores a label made of several nodes") waits `COPIED_MS + 10` ms of real time for a restore timer that starts only after the copy promise settles, so under load it can assert before the restore: it failed once in a pre-commit run on 2026-10-12, then passed unchanged. Drive the timer with `node:test`'s `mock.timers` instead of sleeping.
 
 ## Docs
 
