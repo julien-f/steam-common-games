@@ -389,6 +389,20 @@ test('C1 edge: + Add player focuses the player box it adds', async ({ page }) =>
   await expect(boxes.nth(2)).toBeFocused();
 });
 
+test('C1 edge: a disabled Compare libraries says why', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare');
+  const submit = page.getByRole('button', { name: 'Compare libraries' });
+  await expect(submit).toBeDisabled();
+  await expect(submit).toHaveAccessibleDescription('Add a second player');
+  await expect(page.locator('.compare-form-actions').getByText('Add a second player')).toBeVisible();
+  const box = await submit.boundingBox();
+  await page.locator('.compare-form').getByRole('combobox').nth(1).fill('bob');
+  await expect(submit).toBeEnabled();
+  await expect(page.locator('.compare-form-actions').getByText('Add a second player')).toBeHidden();
+  expect(await submit.boundingBox()).toEqual(box);
+});
+
 test('C1 edge: with my account listed first, each group still names the right players', async ({ page }) => {
   await asPlayer(page, BOB); // Bob sorts after Alice in the URL, but reads first
   await page.goto('/lists/compare?u=alice&u=bob');
