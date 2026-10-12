@@ -760,7 +760,6 @@ const COLUMN_SOURCE: Record<string, string> = {
   steamRegular: 'prices',
   bestDealPrice: 'prices',
   bestDealCut: 'prices',
-  priceStatus: 'prices',
   bestDealShop: 'prices',
   lowAll: 'prices',
   lowY1: 'prices',

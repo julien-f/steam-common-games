@@ -1613,8 +1613,7 @@ export default function ListRoute() {
           for (const g of chunk) {
             const info = prices[byGid ? g.gid! : g.appid];
             rowStore.mutateRow(g.appid, (draft) => {
-              if (info) applyPriceInfo(draft, info);
-              else draft.pricesFailed = false;
+              applyPriceInfo(draft, info);
             });
           }
         });

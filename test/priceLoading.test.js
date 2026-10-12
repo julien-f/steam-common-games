@@ -40,6 +40,19 @@ test('nullMissingPriceFields: only fills fields that are still undefined', () =>
   for (const f of PRICE_FIELDS) assert.notEqual(row[f], undefined, f);
 });
 
+test('nullMissingPriceFields: a row an earlier lookup fully answered keeps its answer, unflagged', () => {
+  const row = {};
+  applyPriceInfo(row, { steamRegular: { amount: 1999, currency: 'USD' } });
+  nullMissingPriceFields(row);
+  assert.equal(row.pricesFailed, false, "ITAD's earlier nulls still mean no data, not didn't answer");
+});
+
+test('nullMissingPriceFields: flags a row the lookup never answered', () => {
+  const row = {};
+  nullMissingPriceFields(row);
+  assert.equal(row.pricesFailed, true);
+});
+
 test('postPrices: sends gids or appids and returns .prices on success', async (t) => {
   const restore = globalThis.fetch;
   let seenBody;

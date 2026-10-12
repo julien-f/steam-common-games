@@ -54,10 +54,14 @@ export function applyPriceInfo(row: PriceFields, info: PriceInfo | null | undefi
 
 // A failed request (rate limited, transient upstream error): fills only whatever this row never
 // got a value for, flagged so it renders as "didn't answer" rather than "no data" — used for a
-// lookup that may have partially succeeded before failing.
+// lookup that may have partially succeeded before failing. A row an earlier lookup answered keeps
+// that answer unflagged: its nulls still mean ITAD has no data.
 export function nullMissingPriceFields(row: PriceFields): void {
-  for (const f of PRICE_FIELDS) if (row[f] === undefined) row[f] = null;
-  row.pricesFailed = true;
+  for (const f of PRICE_FIELDS) {
+    if (row[f] !== undefined) continue;
+    row[f] = null;
+    row.pricesFailed = true;
+  }
 }
 
 // `fetchedAt` is when the oldest price in this batch was written to the server's cache (epoch
