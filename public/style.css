@@ -3177,8 +3177,7 @@ kbd {
   font-size: var(--fs-meta);
   color: var(--text0);
 }
-.list-view-actions .btn-icon,
-.list-random-pick {
+.list-view-actions .btn-icon {
   display: none;
 }
 /* Phone: icons only, and the table library's toolbar spacing tightened, so the rows start higher. */
@@ -3199,9 +3198,6 @@ kbd {
   }
   .list-view-actions .btn-icon {
     display: inline;
-  }
-  .list-random-pick {
-    display: inline-block;
   }
   .list-route .dt-toolbar {
     padding: 6px 0;

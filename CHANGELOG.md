@@ -40,6 +40,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The nav's account chip shows the account's initial when it has no avatar, and no longer lights up like a selected page on hover
 - On desktop the nav is an app bar on the same edge as the list pages: routes left, search in the middle, account and settings right, with less space above the page
 - Text across the app uses one consistent set of sizes and two weights, instead of the near-duplicates that had crept in
+- A list's toolbar shows the 🎲 random pick on desktop too, not only on a phone
 
 ### Fixed
 
