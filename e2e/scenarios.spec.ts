@@ -959,6 +959,17 @@ test("I1 edge: on a phone, Home keeps the list pages' 12px gutter and each recen
   await expect(page.locator('.recent-accounts li')).toHaveCount(1);
 });
 
+test("I1 edge: on a phone with no account yet, the nav's search, account and preferences share one row", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout');
+  await page.goto('/about');
+  await expect(page.locator('.site-nav-account')).toContainText('No account');
+  const search = (await page.locator('.app-search-wrap').boundingBox())!;
+  const prefs = (await page.locator('.site-nav-prefs').boundingBox())!;
+  expect(prefs.y).toBeLessThan(search.y + search.height);
+});
+
 test('R1.1,3-6: rank chosen games, stop, resume on the same ones', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

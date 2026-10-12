@@ -782,7 +782,7 @@ tbody td {
    but sized to sit inline in the nav bar rather than fill a page section. */
 .app-search-wrap {
   position: relative;
-  flex: 1 1 220px;
+  flex: 1 1 140px;
   max-width: 320px;
 }
 .app-search-wrap > input {
