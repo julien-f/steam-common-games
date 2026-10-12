@@ -15,6 +15,7 @@
   --text0: #c6d4df;
   --text1: #8f98a0;
   --text2: #4c6b8a; /* placeholders, disabled and decoration only: ~2.7:1, under AA for text */
+  --stat-label: #b0bac3; /* 4.9:1 on --bg1, where --text1 is 3.3:1 */
   --accent: #1a9fff;
   --accent2: #66c0f4;
   --border: #3d5068;
@@ -3457,7 +3458,7 @@ kbd {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text1);
+  color: var(--stat-label);
 }
 .list-stat-value {
   font-size: 14px;
@@ -3529,7 +3530,7 @@ kbd {
   cursor: default;
 }
 .list-stat-btn:disabled .list-stat-label {
-  color: var(--text1);
+  color: var(--stat-label);
 }
 
 /* Overrides .bundle-ends-rel's own inline-beside-the-time metrics (shared with the browse table's

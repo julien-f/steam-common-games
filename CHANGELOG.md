@@ -103,6 +103,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Checkboxes, selects and scrollbars now render dark, matching the rest of the page
 - Buttons and fields use the page's font, and the table toolbar's buttons share one height
 - Disabled buttons look disabled, and a saved list's Share view says why it is off instead of hiding it in a tooltip
+- A list's stat labels (Games, Updated, Prices) are easier to read
 
 ### Development
 

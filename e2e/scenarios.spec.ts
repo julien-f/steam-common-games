@@ -45,6 +45,31 @@ test('A1 edge: native controls render dark, like the page around them', async ({
   await expect(page.locator(':root')).toHaveCSS('color-scheme', 'dark');
 });
 
+test("A1 edge: a list's stat labels meet AA contrast on the hero", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  const label = page.locator('.list-stat-label').first();
+  await expect(label).toBeVisible();
+  const ratio = await label.evaluate((el) => {
+    const rgb = (c: string) =>
+      c
+        .match(/\d+(\.\d+)?/g)!
+        .slice(0, 3)
+        .map(Number);
+    const lum = (c: string) => {
+      const [r, g, b] = rgb(c).map((v) => {
+        const s = v / 255;
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const fg = lum(getComputedStyle(el).color);
+    const bg = lum(getComputedStyle(el.closest('.list-hero')!).backgroundColor);
+    return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
+  });
+  expect(ratio).toBeGreaterThanOrEqual(4.5);
+});
+
 test('A1 edge: Owned with no account points to Home rather than showing 0 games', async ({ page }) => {
   await page.goto('/lists/owned');
   await expect(page.getByText('No account selected')).toBeVisible();
