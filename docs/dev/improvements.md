@@ -17,35 +17,54 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Sharing
 
+- **U131 · minor · S3** — a shared-layout recipient's own edits (e.g. a sort on top of the link's filter) are lost on reload: the page comes back on the defaults, dropping both the shared layout and the edit. Once edited, keep it as the recipient's layout, or warn in the banner.
+- **U132 · minor · C3, S1** — a saved dynamic list shows "🔗 Share list" (hero) and "🔗 Share view" (toolbar): same icon, different things. One entry, or names that tell them apart ("Share formula" / "Share layout").
+- **U133 · minor · R3, S1** — the ranked list's disabled "Share view" looks enabled (opacity 1, `cursor: pointer`); its reason lives only in `title`, which touch and keyboard users never see. A shared disabled style (≈0.5 opacity, `cursor: not-allowed`) and the reason shown inline.
 - **U125 · minor · S1, C1, S3** — List, bundle and compare links all preview identically, and a `/lists/<id>` list that exists only in the sender's browser can't be described at all. Server-side per-route `og:title` from the path alone (Owned games, Wishlist, Compare libraries, Shared list, bundle name from cache), generic for `/lists/<id>`.
 
 ## Loading and feedback
 
+- **U128 · major · D2, B4** — when ITAD fails, price cells show "—" ("nothing to show"), the panel says "No pricing data available." above "Bundles: IsThereAnyDeal didn't answer", and Achievements says "This game has no achievements." during the same outage. Use the ⚠ "didn't answer" treatment the rating and HLTB tiles already have.
+- **U134 · polish · D2** — the pricing banner shows internals ("IsThereAnyDeal request failed (mock: upstream-down)") and is grey while the reviews/HLTB banner is orange. One warning style, plain wording ("Prices didn't answer — ↻ to retry").
 - **U7 · minor · L3** — Reset view drops sort/filters instantly with no undo.
 
 ## Lists and selection
 
+- **U135 · minor · F3** — at 1440 with the panel closed, random pick has no visible control (R only); phone has a 🎲 in the toolbar. Show the same 🎲 on desktop.
+- **U136 · polish · L1, L2** — folder naming uses a native `prompt()` while list naming is inline; "Create combined list" stays on Home while "Save as a list" opens the list; Edit sources shows two Cancel buttons; "Rank this list" is enabled on 0 games. Inline naming, open the new list, one Cancel, disable ranking under 2 games with a reason.
 - **U76 · polish · F3** — with **All** chosen, the chip still reads "Genres: Action, RPG", the same as **Any**, though it shows 3 rows instead of 6. Needs an upstream change: say "all of" in the chip (vatesfr/data-table#35).
 
 ## Comparing
 
+- **U127 · major · C1** — typing `bob` + Enter in a player box adds "Alice + Bob · Family" rather than Bob: `commit` (`public/ComparePlayersForm.tsx:126`) takes `matches()[highlight()]`, highlight defaults to the first match, and an exact name/vanity match isn't ranked first. Rank exact matches first.
+- **U137 · minor · C1, C3** — the union reads `Carol 3 + Alice + Bob 8 = 9`: "+" reads as arithmetic (3 + 8 ≠ 9) and collides with the family name; the saved list uses ∪. Use ∪ here too.
+- **U138 · minor · C1** — "Compare libraries" is disabled with no reason. Say "Add a second player".
+- **U139 · polish · C4** — panel Owned by reads "never played · not played". One phrase.
 - **U51 · polish · C1** — the membership chip reads "↑ Owned by × ⊞ ×": two identical × (remove sort, remove group) side by side. The table library draws that merged chip, so telling the two apart needs an upstream change.
 
 ## Bundles and prices
 
-None open.
+- **U140 · minor · B1** — `/bundles`' "New 2" and "Ending soon 1" filters look like plain stat figures. Style them as toggle chips with a pressed state.
+- **U141 · minor · B3** — "What does this add?" drops the bundle's Tier Price and Best Deal columns and has no way back to the bundle. Keep the price columns when a bundle is a source; add a "← <bundle>" link.
+- **U142 · minor · F1, B2** — ★ (1-year low) and 🔥 (all-time low) carry their meaning only in `title`. A visible label next to the panel price ("all-time low €8.00").
+- **U143 · polish · B1** — the bundle hero has 6 actions in 4 styles, with "← All bundles" far right and ‹ › far left. Put "← All bundles" by ‹ ›; one primary, the rest ghost.
+- **U144 · polish · O1** — without `ITAD_API_KEY`, `/bundles` keeps its toolbar, an empty table, pager, Updated and region figures under a one-line notice. One empty-state card instead.
 
 ## Ranking
 
-None open.
+- **U145 · polish · I1** — `/rank`'s keyboard hint bar shows on touch screens. Hide it under `(hover: none)`.
 
 ## Keyboard and accessibility
 
-None open.
+- **U129 · minor · I2, A2, A3, C1, C3, D1, R1** — focus drops to `<body>` or stays put after: switching account from the nav chip, "Save as a list", clicking the Updated figure, closing the panel on `/rank`; "+ Add player" / "+ Add Steam Family account" leave focus on the button; the `?` dialog opens without focus and isn't modal. Focus the new field / the dialog; return it to the opener.
+- **U130 · minor · I2** — accessible names: the nav chip is just "Account"; list-tree Rename/Delete and Subtract's Move up/down don't name their object; Compare's mode and op `<select>`s have no label; Bundles' Updated and Prices figures carry `aria-pressed` without being toggles. Names that include the object; drop the stray `aria-pressed`.
+- **U146 · minor · all list routes** — stat labels (GAMES, UPDATED, PRICES) are 10.5px at 3.32:1, below AA (U39 covers only Home's Updated age). ≥4.5:1, or 12px+ semibold.
+- **U147 · polish · I2** — in the `?` dialog, descriptions start at x 595–677 depending on key count. A two-column grid with a fixed key column.
 
 ## Phone
 
-None open.
+- **U148 · minor · I1** — targets under 24px at 390: sort header buttons (20px, every table), Home's Rename/Delete (20px), a compare chip's × (14×14), "Clear all" under Recent accounts. 24px hit areas (padding or `::after`).
+- **U149 · polish · I1** — Home at 390: the nav search touches the left edge; Home's card starts content at x 45 (20 margin + 24 padding) vs 12 on list pages; Recent-account rows wrap an orphan × / star onto a second line. One 12px gutter; fold row actions into ⋯.
 
 ## Accounts and first visit
 
@@ -53,10 +72,21 @@ None open.
 
 ## Consistency and polish
 
+- **U150 · polish · visual** — `:root` has no `color-scheme`, so native controls render light on the dark UI (white checkboxes, white `<select>`s, light scrollbars). `color-scheme: dark` on `:root`; this is U39's white select.
+- **U151 · polish · visual** — app buttons fall back to Arial while body and data-table buttons use Segoe UI: one toolbar mixes 13px Segoe/25px and 12px Arial/26px buttons. `button, input, select { font: inherit }` and one button size.
+- **U152 · polish · visual** — number columns (rating, HLTB, Played, price, discount) are start-aligned, so digits don't line up. Right-align them and their headers, with `tabular-nums`.
+- **U153 · polish · visual** — 13 size/weight combinations on Home alone (10–20px, incl. 12.5), plus 10.5 and 18 on list pages. One scale: 11 labels, 13 meta/table, 15 body, 18 title.
+- **U154 · polish · visual** — the nav sits at y 0–32, centred (x 280–1150), with a 56px gap before the full-width hero at x 20: nothing shares an edge. ≈12px top padding, align to the 20px gutter, ≈24px gap.
+- **U155 · polish · visual** — the account chip has the active route's pill fill, so Owned shows two "selected" pills. Outline or avatar style for the chip.
+- **U156 · polish · visual** — a wrapped game name pushes its ✓/★ badge to the cell's far right ("Hollow / Knight ……✓"). Keep badges inline after the last word.
+- **U157 · polish · F2** — `/search` alone has a centred cyan h1 instead of the list hero, and an empty Image column. Reuse the list hero.
+- **U158 · minor · S2, S3** — on a first visit, `/game/620` shows "GAMES 1" but "No games in this list." until a reload. Render the table from the store the counter reads.
+- **U159 · polish · F1** — nav search: a second Esc blurs but keeps the typed text; after a pick the box keeps the game's name. Clear it in both cases.
+- **U160 · polish · L3** — data-table popovers: Filter opens on a range slider with no column heading; searching Columns leaves an empty "VISIBLE COLUMNS" header; an open range chip reads "Played (h): 5.0–". Label the pane, hide empty groups, write "≥ 5.0 h". Needs upstream changes in `@vates/data-table-solid`.
 - **U121 · polish · F1** — ←/→ on a game showing only its Cover while its media streams does nothing visible, yet `stepLightbox` (`public/lightbox.tsx:1164`) clears the take-the-media-when-it-lands latch and marks the Cover chosen, so the screenshots never replace it. Return early when there's nothing to step to.
 - **U122 · polish · F1** — a refresh that shrinks a game's media while the lightbox shows it leaves `idx()` past the end: rendering clamps it (`public/lightbox.tsx:1234`), but the caption (`:168`), counter (`:325`) and the leave-memory read (`:1111`) index `shots()[idx()]` unclamped, so paging away records nothing and lands on screenshots. Clamp once where the list changes.
 - **U112 · polish** — every table shows a "Page 1 of 1" pager with all buttons disabled when everything fits. Needs an upstream change: hide the pager when there's a single page (an option or the default in `@vates/data-table-solid`, vatesfr/data-table#41).
-- **U39 · polish** — nav items shift sideways between routes; missing thumbnails have no placeholder; "Demo" pills look like primary buttons; the "Updated" age has very low contrast; Compare's op `<select>` is an unstyled native white control; wishlisted/owned name colours have no legend (still true in Recently Looked Up).
+- **U39 · polish** — nav items shift sideways between routes; missing thumbnails have no placeholder; "Demo" pills look like primary buttons; the "Updated" age has very low contrast; wishlisted/owned name colours have no legend (still true in Recently Looked Up).
 
 ## Review tooling
 
@@ -65,6 +95,8 @@ States `npm run dev:mock` can't show yet — each needs a fixture or state in `e
 - avatars, and a large library (thousands of games: A1's edge, how high the table starts at scale);
 - friends lists always private (A4, C4's ◇) and `/api/me` always signed out (Y1–Y3);
 - a static wishlist, so R2's "buying a game drops it from the ranking" can't be shown;
+- prices in any currency but EUR, so B2's repricing can't be judged;
+- a Borked ProtonDB game (C5);
 - a trailer that plays: Hades' fixture trailer has no stream, so playback and its idle-hide can only be seen on the real server.
 
 ## Not yet reviewed
