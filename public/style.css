@@ -194,6 +194,21 @@ textarea {
 .account-chip-avatar--empty {
   background: var(--bg0);
 }
+.account-chip-initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg3);
+  color: var(--text0);
+  font-size: 11px;
+  font-weight: 600;
+}
+/* An identity, not a route: no pill fill, so it never reads as a second selected page. */
+.account-chip-btn:hover,
+.site-nav-popover[open] > .account-chip-btn {
+  background: transparent;
+  border-color: var(--border);
+}
 .account-chip-name {
   overflow: hidden;
   text-overflow: ellipsis;

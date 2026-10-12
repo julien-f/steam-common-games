@@ -37,6 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A combined list shows only 🔗 Share list, no longer also a Share view whose link only opens in your browser
 - A comparison's formula joins players with ∪, as a combined list does, instead of a + that read as a sum
 - A failed price lookup now warns in the same orange as other sources that didn't answer, in plain words, without the raw error
+- The nav's account chip shows the account's initial when it has no avatar, and no longer lights up like a selected page on hover
 
 ### Fixed
 

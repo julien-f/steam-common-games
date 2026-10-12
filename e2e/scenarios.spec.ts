@@ -121,6 +121,18 @@ test('A2.1-2,4: explore a friend, then switch back to my ★ account from the na
   await expect(page.getByRole('navigation')).toContainText('Alice');
 });
 
+test('A2 edge: the nav chip reads as an account, not as a second selected route', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  const chip = page.locator('.account-chip-btn');
+  await expect(chip.locator('.account-chip-initial')).toHaveText('A'); // no avatar in the fixtures
+  await chip.hover();
+  await expect(chip).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  const route = page.locator('.site-nav-link.active');
+  await expect(route).toHaveText('Owned');
+  expect(await chip.evaluate((el) => getComputedStyle(el).borderColor)).not.toBe('rgba(0, 0, 0, 0)');
+});
+
 test('A2 edge: switching account from the nav chip leaves focus on the chip', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');

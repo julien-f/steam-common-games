@@ -114,7 +114,16 @@ export function AccountChip(): JSX.Element {
           class="site-nav-link account-chip-btn"
           aria-label={account() ? `Account: ${chipLabel()}` : chipLabel()}
         >
-          <Show when={account()?.avatarUrl}>
+          <Show
+            when={account()?.avatarUrl}
+            fallback={
+              <Show when={account()}>
+                <span class="account-chip-avatar account-chip-initial" aria-hidden="true">
+                  {Array.from(chipLabel())[0]?.toUpperCase()}
+                </span>
+              </Show>
+            }
+          >
             {(url) => <img class="account-chip-avatar" src={url()} alt="" width="20" height="20" />}
           </Show>
           <span class="account-chip-name">{chipLabel()}</span>
