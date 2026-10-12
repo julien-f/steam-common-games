@@ -62,7 +62,7 @@ A list is a set of appids, usually named — a dynamic one may have no name of i
 - **Focus and order** — `nextPair`/`answer`/`progress` take optional `RankingOptions`: `focus` ("Rank N selected"/"Rank N shown") limits the candidates, `order` (the table's sort — unranked rows of `processedData()`) asks those first, then the rest in source order. Opponents are still picked by binary search, so the final order is unaffected. Both reach `/lists/:listId/rank` as router history state (`rankFocus`/`rankOrder`), not in the URL.
   - The compare screen stores an incoming focus on the ranking (`RankingState.focus`, `withFocus`), so a later visit resumes on it; `pendingFocus` says whether any is left, a used-up focus is dropped on the next visit, "Rank all instead" clears it, a new selection replaces it.
   - While it lasts, the list page shows "Continue: N chosen left" and measures its Ranked tile against it. A mid-way insertion of a game outside the focus is dropped and restarts later.
-- **Progress is its own pref key, `ranking:<listId>`** — `{ groups, excluded, skipped, hints?, cursor? }` (`cursor`: the game mid-insertion, its `lo`/`hi` gap and optional `anchor`/`gallop`). Kept off the `lists` blob since it's written once per answer; its server push is debounced (`prefs.ts`, 3 s, flushed with `keepalive` when the tab is hidden), since `PUT /api/me/prefs/:key` allows 20/min. Set to `null` when the list is hard-deleted.
+- **Progress is its own pref key, `ranking:<listId>`** — `{ groups, excluded, skipped, hints?, cursor?, focus? }` (`cursor`: the game mid-insertion, its `lo`/`hi` gap and optional `anchor`/`gallop`; `focus`: see Focus and order). Kept off the `lists` blob since it's written once per answer; its server push is debounced (see [Sync](#sync)). Set to `null` when the list is hard-deleted.
 - **Never pruned to the source** — games outside the current source are filtered at read time (`ranks`/`progress`/`nextPair` take the resolved source set), so a source that briefly fails, or a "Change source" and back, loses nothing. Binary search runs over _live_ groups; `cursor.lo/hi` index the stored `groups`.
 - **UI** — `/lists/:listId/rank` (`RankRoute.tsx`) asks the pairs; the list page adds the Rank column (default sort), a Ranked tile with the remaining-comparisons estimate, "Change source" and Re-rank/Exclude row actions. "🏆 Rank this list" (owned/wishlist/bundle/user lists; not compare/shared, which have nothing stable to point at) creates one and passes `rankOrder` plus `rankFocus` (the selection, else the filtered rows when a filter hides some). "Continue ranking" does the same over unranked, non-excluded rows. Once a list has rankings, "🏆 Rank this list" becomes a menu of them (`rankingsOf`) plus "+ New ranking", named by an optional criterion.
 - **Side panel** — the compare screen opens the shell's panel (`panelOpen`) with the details it already fetched and closes it once that game leaves the pair. Its key listener runs in the capture phase, ahead of `panelKeyboard.ts`: an armed I/X + ←/→ wins (`stopImmediatePropagation`), plain ←/→ go to the panel's media while it's open, Esc leaves the screen only when no panel/dialog is open. `urlState.ts`'s param rewrites keep `history.state`, so `?game=`/`&shot=` don't drop `rankFocus`.
@@ -115,9 +115,10 @@ GameList { ...above..., parentId: string | null, order }
 Signing in (the account chip's popover, `AccountChip.tsx`) is optional; without it nothing is sent. Signed in, the server holds a second replica, kept eventually consistent; routes in [architecture.md](architecture.md), the `user_prefs` table in [data.md](data.md).
 
 - **Per key, with its own `updatedAt`** (`prefs.ts`'s storage format; `getPref`/`setPref` callers never see it). `setPref` pushes the changed key to `PUT /api/me/prefs/:key`, never a whole blob, so keys changing on different tabs/devices can't clobber each other.
+  - `lists` and `ranking:<listId>`, written on every view change or answer, push after a 3 s pause instead (`DEBOUNCED_PUSH_PREFIXES`; flushed with `keepalive` when the tab is hidden), since `PUT /api/me/prefs/:key` allows 20/min.
 - **The server always accepts a write** (`setUserPref`, `lib/auth.js`); `updatedAt` is stored for display, not a write guard — the client already decided this write wins. It refuses only a key outside `public/syncedPrefKeys.ts` (a new synced key goes there and in `lib/auth.js`'s copy, `isSyncedPrefKey`) and a write taking the account past 2 MB (`PREFS_MAX_BYTES`); a refused push leaves the change on that device.
 - **Every sign-in check merges** (`authStore.ts`'s `syncPrefsWithServer`, from `initAuth` on every page load):
-  - **First sync of a device with an account**: server wins for every key both sides have, whatever the timestamps (a new device's local state may be leftover anonymous browsing); keys only local are pushed.
+  - **First sync of a device with an account** (no `steam.isonoe.net:prefs-synced:<steamid>` localStorage flag — its own key, never synced, so an adopted blob can't carry it): server wins for every key both sides have, whatever the timestamps (a new device's local state may be leftover anonymous browsing); keys only local are pushed.
   - **Every later sync**: per-key last-write-wins both ways; a key on one side propagates; a tie is left alone.
   - Adopting anything from the server reloads the page, since every store seeds its state from `localStorage` once at load.
 - **Signing in fills `myAccount`/`currentAccount` when unset** (`autoPopulateAccountFromLogin`), via the same `resolveAccountSlot` as Home's picker; an existing pick is never overwritten, and a failed resolve retries on the next load.
@@ -127,10 +128,11 @@ Signing in (the account chip's popover, `AccountChip.tsx`) is optional; without 
   - `page`/`searchQuery` are never part of it: `stripTransientViewFields` strips them from the diff, from Save and from Revert.
   - **Save** (`tableViewPrefs.ts`'s `saveTableViewToServer`) pushes the stripped view and advances the baseline. **Revert** (`revertTableViewToServer`) applies the baseline with `setViewState` and stores it through `adoptPrefEntry` (not `setPref`, so it isn't a fresh edit) — no reload either way.
   - Signing out clears every baseline (`resetBaselines`).
+- **A user list's view is not a table-view key**: it is the list's own `tableView`, saved into `lists` on every change (`setListTableView`, minus `page`/`searchQuery`, skipped when unchanged), so it syncs with no Save/Revert banner.
 
 ## Storage schema
 
-One flat `{key: value}` blob in localStorage (`prefs.ts`), with a top-level `schemaVersion`. The interfaces are declared in `public/types.ts`, the source of truth; at a glance:
+One flat blob under the localStorage key `steam.isonoe.net:prefs` (`prefs.ts`): a top-level `schemaVersion` and one `{ value, updatedAt }` entry per key. A v1 blob (raw values) is read as entries with `updatedAt: 0`, older than any real write. The interfaces are declared in `public/types.ts`, the source of truth; at a glance:
 
 ```
 AccountSlot  id (sorted-joined member steam64 ids) · members[] · rawInputs[] · label? · avatarUrl?
@@ -148,6 +150,6 @@ ListRef      kind 'account-owned' | 'account-wishlist' | 'bundle' | 'recent-game
              accountId? (pinned explicitly, never "whichever is current") · bundleId? · listId?
 ```
 
-Pref keys: `schemaVersion`, `myAccount`, `currentAccount`, `recentAccounts`, `lists`, `folders`, `recentGames`, `ranking:<listId>`, `bundleSnapshots`, the table-view keys above (each shared across all bundles/comparisons/shared links; a user list keeps its own `tableView`), with `bundlesBrowseView` for `/bundles`' table of bundles.
+Pref keys: `schemaVersion`, `myAccount`, `currentAccount`, `recentAccounts`, `region`, `lists`, `folders`, `recentGames`, `ranking:<listId>`, `bundleSnapshots`, the table-view keys above (each shared across all bundles/comparisons/shared links; a user list keeps its own `tableView`), with `bundlesBrowseView` for `/bundles`' table of bundles.
 
 **Cross-tab sync**: not implemented. Nothing listens for `storage` events, so two open tabs can hold divergent state until one reloads.

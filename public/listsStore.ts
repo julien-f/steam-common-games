@@ -18,6 +18,7 @@ import { union, subtract } from './combine.ts';
 import { EMPTY_RANKING, type RankingState } from './ranking.ts';
 import { getBundleSnapshot, pruneBundleSnapshots } from './bundleSnapshots.ts';
 import { sweepRemovedAccounts } from './accountsStore.ts';
+import { stripTransientViewFields } from './tableViewSync.ts';
 import type { Folder, GameList, ListRef, CombineOp } from './types.ts';
 
 const LISTS_KEY = 'lists';
@@ -372,11 +373,13 @@ function dropRanking(listId: string): void {
   if (getPref(rankingKey(listId)) != null) setPref(rankingKey(listId), null);
 }
 
+// Saved into the synced `lists` pref, so only the settings, and only when they changed.
 export function setListTableView(id: string, tableView: object): void {
   const lists = readLists();
   const list = lists.find((l) => l.id === id);
-  if (!list) return;
-  list.tableView = tableView;
+  const view = stripTransientViewFields(tableView);
+  if (!list || JSON.stringify(view) === JSON.stringify(list.tableView)) return;
+  list.tableView = view;
   writeLists(lists);
 }
 
