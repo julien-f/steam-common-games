@@ -4,12 +4,12 @@
 // shared by mock-server.js and dev-server.js:
 //   up     reuse the running server, or start one; returns once the app's modules load (not
 //          just its HTML: right after startup Vite can 403 a dependency while it optimizes —
-//          pitfalls.md)
+//          pitfalls.md). A server this script started at another git HEAD is restarted first.
 //   down   stop the server this script started (its whole process group — never `pkill -f`,
 //          whose pattern also matches the shell running it)
 // Logs to .playwright-mcp/<name>.log.
 
-const { spawn } = require('node:child_process');
+const { spawn, execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -54,12 +54,30 @@ async function warm(base, deadline) {
   return true;
 }
 
+const gitHead = () => execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+
+// A running server we started at another HEAD can serve stale modules (pitfalls.md); one we didn't start is left alone.
+function needsRestart({ running, startedHead, head }) {
+  return running && startedHead != null && startedHead !== head;
+}
+
 function cli({ name, npmScript, port }) {
   const BASE = `http://localhost:${port}`;
   const PID_FILE = path.join(DIR, `${name}.pid`);
+  const HEAD_FILE = path.join(DIR, `${name}.head`);
 
   async function up() {
     const deadline = Date.now() + TIMEOUT_MS;
+    const head = gitHead();
+    const startedHead = fs.existsSync(PID_FILE) && fs.existsSync(HEAD_FILE) ? fs.readFileSync(HEAD_FILE, 'utf8') : null;
+    if (needsRestart({ running: (await status(BASE)).ok, startedHead, head })) {
+      console.log(`HEAD moved since ${name} started: restarting`);
+      down();
+      while ((await status(BASE)).ok) {
+        if (Date.now() > deadline) throw new Error(`${BASE} still answering after down`);
+        await sleep(300);
+      }
+    }
     if (!(await status(BASE)).ok) {
       fs.mkdirSync(DIR, { recursive: true });
       const log = fs.openSync(path.join(DIR, `${name}.log`), 'w');
@@ -69,6 +87,7 @@ function cli({ name, npmScript, port }) {
         stdio: ['ignore', log, log],
       });
       fs.writeFileSync(PID_FILE, String(child.pid));
+      fs.writeFileSync(HEAD_FILE, head);
       child.unref();
       while (!(await status(BASE)).ok) {
         if (Date.now() > deadline) throw new Error(`no answer on ${BASE}; see .playwright-mcp/${name}.log`);
@@ -91,6 +110,7 @@ function cli({ name, npmScript, port }) {
       if (err.code !== 'ESRCH') throw err;
     }
     fs.rmSync(PID_FILE);
+    fs.rmSync(HEAD_FILE, { force: true });
     console.log('stopped');
   }
 
@@ -107,4 +127,4 @@ function cli({ name, npmScript, port }) {
   }
 }
 
-module.exports = { cli };
+module.exports = { cli, needsRestart };

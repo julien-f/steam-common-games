@@ -20,6 +20,12 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: hot reload picked up a module between two edits (e.g. a call added before its import).
 - **Fix**: reload the page and check again before treating it as a bug.
 
+## `dev:mock` measures a layout from older CSS
+
+- **Symptom**: after commits in the main checkout, a page measured on `:58993` shows old CSS (a desktop rule missing, a box at its pre-change width) though the file on disk has the change.
+- **Cause**: the server kept serving modules from before the commits; a reload doesn't fix it.
+- **Fix**: `node scripts/mock-server.js up` restarts a server it started at another git HEAD. Uncommitted edits don't move HEAD: run `down` then `up` if they look stale.
+
 ## A blank page right after starting `npm run dev:mock`
 
 - **Symptom**: the app stays blank; the server logs `The request id ".../node_modules/@solidjs/router/..." is outside of Vite serving allow list`, and the browser gets a 403 for it.
