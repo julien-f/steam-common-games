@@ -51,9 +51,9 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "r" | "g:" formula
 - A `user` source pointing at a _manual_ list can't be encoded (no appid-set token): "🔗 Share list" disables itself with a tooltip (`shareFailure()`).
 - The landing offers **only** "Save as a list" (`handleSaveShared`): each synthetic group is `createList()`'d first to mint a real id, substituted into its parent's `sources[]`, then the top level is saved. No "Edit players"/op-select — there's no form for editing an arbitrary decoded tree.
 
-`/game/:appid?` is **both** the Recently Looked Up list and the canonical single-game link: `ListRoute` renders it as kind `recent`, with `params.appid` as an initial focus.
+`/game/:appid?` is **both** the Recently Looked Up list and the canonical single-game link: `ListRoute` renders it as kind `recent`, with `params.appid` as an initial focus. Opening another game there rewrites the path (`/game/<appid>`, `replace`) instead of setting `?game=`, and closing the panel strips it back to `/game` (`onGameClose`).
 
-**Looking up a game never navigates away from a route with a list context of its own** — the nav-bar search box and a panel's DLC/base-game links open in place (a real row if the appid is loaded, a standalone panel via `?game=` otherwise). `/search` counts as having one (its results). Only Home, `/bundles` and `/about` navigate, to `/game/:appid`. See `AppShell.tsx`'s `openGameGlobally`.
+**Looking up a game never navigates away from a route with a list context of its own** — the nav-bar search box and a panel's DLC/base-game links open in place (a real row if the appid is loaded, a standalone panel via `?game=` otherwise). `/search` counts as having one (its results). Only Home, `/bundles`, `/about`, the rank screen (`RankRoute`) and the 404 page navigate, to `/game/:appid`. See `AppShell.tsx`'s `openGameGlobally`.
 
 ## Module map
 
@@ -66,6 +66,8 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "r" | "g:" formula
 - `RankRoute.tsx` — `/lists/:listId/rank`, a ranked list's compare screen (see [lists-and-accounts.md](lists-and-accounts.md#ranked-lists)).
 - `listShare.ts` — encode/decode for `/lists/shared?f=` (see Routes).
 - `HomeRoute.tsx` — account picker/header plus the folder/list tree and combine form. Also forwards an old Comparison-page link (`/?u=alice&u=bob`) to `/lists/compare`.
+- `AccountFriends.tsx` — the home account card's friends list, marking friends shared with the signed-in account.
+- `CombineForm.tsx` — the source/op picker shared by Home (create a dynamic list) and `ListRoute` (Edit sources); it only assembles `{ name, op, sources }` for its `onSubmit`.
 - `ComparePlayersForm.tsx` — the "who is being compared" form (`/lists/compare`'s empty state and "Edit players").
   - Each player slot is a **token input**: chips for who's in it, plus a combobox (`role="combobox"`/`listbox"`, arrow keys + Enter) offering known accounts and accepting a raw identifier. Per slot, so a Steam Family built from two known accounts is buildable.
   - Blur commits whatever is half-typed. It owns the draft slots and reads `accountsStore.ts` once at mount; the route decides what a submitted set means.
@@ -87,9 +89,13 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "r" | "g:" formula
 - `combine.ts` — the pure union/intersect/subtract/group-by-membership engine over resolved sets.
 - `ranking.ts` — the pure binary-insertion engine behind ranked lists.
 - `listLabels.ts` — how an op and a source read on screen, shared by the hero card, Home's combine form, and the tree.
+- `membershipColumn.ts` — the "Owned by"/"In" column a group-by-membership list is grouped by (see each list kind below).
+- `bundleSnapshots.ts` — the last-known title and games of each bundle a saved list uses, kept for when ITAD stops listing it.
 - `myOwnership.ts` — one cached pair of owned/wishlisted appid sets for the effective account, behind both the panel's badge and the search dropdown's markers.
 - `recentGames.ts` — the recently-looked-up list backing `/game`.
 - `bundleData.ts` / `bundleRows.ts` / `bundleBrowseStore.ts` — bundle fetch/flatten/resolve; the flat row shape `/bundles` sorts over; the last-browsed list `/lists/bundle/:bundleId`'s ‹/› nav steps through.
+- `fanaticalPicks.ts` — Buy on Fanatical: the purchase link carrying the picks, and the bookmarklet that adds them there.
+- `authStore.ts` / `syncedPrefKeys.ts` — Steam sign-in status and the prefs merge with the server on sign-in (`syncPrefsWithServer`); the pref keys a signed-in account syncs (the server keeps its own copy, checked equal by a test).
 
 **Table, panel, and shared plumbing**
 
@@ -110,6 +116,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "r" | "g:" formula
 - `pageTitle.ts` — the two-layer `document.title` (route context, overridden by an open game).
 - `types.ts` — `Game`, `ReadonlyGame`, and the account/list interfaces; the single source of truth for row shape.
 - `utils.ts` — shared formatting/scoring helpers (`scoreColor`, `formatMoney`, `computeSteamdbRating`, `dealRecordTier`, `discountPct`, …).
+- `currency.ts` — approximate fixed exchange rates, for ordering and summing mixed-currency prices and their "≈" hint.
 - `style.css` — all styles.
 
 ## Reactivity
@@ -130,7 +137,7 @@ Three rules keep it that way:
 
 1. **One reactive source of truth per row; the only write path is its store's setter.** Enforced by the type system: readers take `ReadonlyGame` (`types.ts`), so `game.field = x` outside a `produce` draft is a typecheck failure rather than a silent no-op. `Readonly` is deliberately shallow — it stops `g.details = …`, not `g.details.rating = …`, and `details` is only ever replaced wholesale.
 2. **Async state belongs in `createResource`, not in booleans on a domain object.** News, achievements, price, DLC and owners therefore aren't on the `Game` shape. (`inLibrary`/`onWishlist` stay — they're the _table's_ copy, stamped onto rows for the ✓/☆ name-cell markers; the panel reads its own `ownership` resource, so a standalone lookup still gets a badge. Both go through `myOwnership.ts`'s one cached pair of sets, so they can't disagree.)
-3. **Never capture a reactive read into a plain `const` in a component body** — read signals and store fields inside JSX or a `createMemo`. This is what `npm run lint`'s `solid/reactivity` rule checks, and why the panel is a set of small components (`PanelSubnav`, `HltbSection`, `RefreshButton`, …): a component function runs once and is not a reactive scope. The one deliberate exception, with an `eslint-disable-next-line` and a reason, is `PanelRest`'s `const g = props.game` — the row _object_ is stable for the mount (`PanelBody` renders it under a `keyed` `<Show>`), and capturing a store row is not capturing a field of it.
+3. **Never capture a reactive read into a plain `const` in a component body** — read signals and store fields inside JSX or a `createMemo`. This is what `npm run lint`'s `solid/reactivity` rule checks, and why the panel is a set of small components (`PanelSubnav`, `HltbSection`, `RefreshButton`, …): a component function runs once and is not a reactive scope. The two deliberate exceptions carry an `eslint-disable-next-line`: `PanelRest`'s `const g = props.game` — the row _object_ is stable for the mount (`PanelBody` renders it under a `keyed` `<Show>`), and capturing a store row is not capturing a field of it — and `BundlesBrowseRoute.tsx` handing its `viewingShared` accessor to `bindViewPersistence`, which reads it in its own effect.
 
 Still deliberately imperative: the subnav scroll-spy (measures section positions, toggles a class, re-run from a `createEffect` when the buttons change); `panelNav.ts` rendering the prev/next/random bar into `#panel-nav` (its "i / N" from one `createEffect` over the route's `getGameList()`, ↑/↓ through the route's `stepGame` at click time, hidden while the open game isn't in the list); and `lightbox.tsx`'s own DOM.
 
@@ -153,14 +160,16 @@ Every list of games — owned, wishlist, bundle, recent, user — renders throug
 - **owned** — Played (h), Last Played, after the HLTB cluster.
 - **wishlist** — Wishlist Rank, then `PRICE_COLUMNS`, plus Added.
 - **bundle** — ownership status, Tier Price, Add-on, then `PRICE_COLUMNS`.
-- **recent** (also compare/shared) — ownership status only.
-- **user** — ownership status, plus Played (h)/Last Played for the **current account** (hidden by default), stamped alongside the ✓/☆ markers from `myOwnership.ts`'s `peekMyPlaytime` — the same library fetch, no extra request. A **ranked** list adds Rank, its default sort.
+- **recent** — ownership status, plus Looked up (the stored newest-first order), its default sort.
+- **compare** — ownership status, plus one Played (h) per player, shown by default and keyed by position (`playtime:<i>`) so a saved layout fits the next comparison.
+- **shared** — ownership status only.
+- **user** — ownership status, plus Played (h)/Last Played for the **current account** (hidden by default), stamped alongside the ✓/☆ markers from `myOwnership.ts`'s `peekMyPlaytime` — the same library fetch, no extra request. A list with a priced source (`listHasPriceSource`: built from a wishlist or a bundle) adds `PRICE_COLUMNS`. A **ranked** list adds Rank, its default sort.
 
-Default sort is Weighted Rating descending, except a bundle (cheapest tier first, then rating). `/bundles` is a table of bundle rows with its own small column set, reusing `gameColumns.ts`'s bucket/compare helpers so its price/date/count columns group and sort like their game-table counterparts.
+Default sort is Weighted Rating descending, except a bundle (cheapest tier first, then rating), recent (Looked up) and a ranked list (Rank). `/bundles` is a table of bundle rows with its own small column set, reusing `gameColumns.ts`'s bucket/compare helpers so its price/date/count columns group and sort like their game-table counterparts.
 
 `gameColumns.ts`:
 
-- `CORE_COLUMNS` (identity, scores, HLTB, dates, classification, compatibility, extras — every kind shows them) and `PRICE_COLUMNS` (Steam Full Price, Best Deal, Discount, Price Status, Best Deal Shop, the three historical lows — wishlist and bundle kinds only), plus `insertColumnsAfter` and helpers (`fmt`, `renderScoreNum`, `renderBestDeal`, `renderPrice`, `renderCut`, `computePriceStatus`, `PRICE_STATUS_TIERS`, `PRICE_TIERS`/`priceTierBucket`/`formatPriceTier`, `TYPE_LABELS`, `protonDbValue`, `renderProtonBadge`, date/log-bucket helpers).
+- `CORE_COLUMNS` (identity, scores, HLTB, dates, classification, compatibility, extras — every kind shows them) and `PRICE_COLUMNS` (Steam Full Price, Best Deal, Discount, Price Status, Best Deal Shop, the three historical lows — wishlist, bundle and priced user lists only), plus `insertColumnsAfter` and helpers (`fmt`, `renderScoreNum`, `renderBestDeal`, `renderPrice`, `renderCut`, `computePriceStatus`, `PRICE_STATUS_TIERS`, `PRICE_TIERS`/`priceTierBucket`/`formatPriceTier`, `TYPE_LABELS`, `protonDbValue`, `renderProtonBadge`, date/log-bucket helpers).
 - Its compare/bucket primitives (`compareMissingLast`, `bucketNumericRange`, …) come from `@vates/data-table-core`, imported through `@vates/data-table-solid`'s re-exports — no direct `@vates/data-table-core` dependency.
 - Per-kind column objects (Tier Price/Add-on's render code, the wishlist and owned columns) stay local to `ListRoute.tsx`.
 - Most columns carry a `category` (`@vates/data-table-core` ≥ 0.13) — `Scores & Reviews`, `How Long To Beat`, `Play Time & Dates`, `Classification` (also Add-on), `Compatibility`, `Extras`, `Pricing` (`PRICE_COLUMNS` plus Tier Price) — so the Columns/Sort/Group/Filter menus collapse into per-category submenus. Identity (`capsule`/`name`) and Wishlist Rank stay uncategorized.
@@ -204,7 +213,7 @@ Every route opens with a **hero card** (`ListHero.tsx`): the list's name as the 
 - **A tile can be a control**: given `onClick` it renders as a `<button aria-pressed>` (plus `disabled` while its action is in flight), its pressed state read back from what the click applied.
 - **A tile that refreshes replaces the route's ↻ Refresh button** (`refreshTileValue` adds a ↻ beside the value), so it's rendered unconditionally — during a load and after one that failed before fetching, when a retry is wanted.
   - `/bundles`: Updated re-fetches, Prices opens the ⚙ popover (`openPrefsPopover`, deferred past the click — `navPopover.ts`'s outside-click listener and Solid's delegated `onClick` share `document`, so `stopPropagation` can't help), New/Ending soon toggle filters.
-  - Owned/wishlist: Updated and Prices do the same. Any list built from an account fetch, at any depth (a comparison; a dynamic, ranked or shared list), gets Updated too: its age is the _oldest_ of the account fetches behind it, and clicking re-resolves them all past the server's cache (`createDefaultFetchers`'s `refresh`/`onFetchedAt`, `listResolve.ts`).
+  - Owned/wishlist: Updated does the same, and so does Prices wherever the list is priced (`hasPrices()`: the wishlist, a user list with a priced source). Any list built from an account fetch, at any depth (a comparison; a dynamic, ranked or shared list), gets Updated too: its age is the _oldest_ of the account fetches behind it, and clicking re-resolves them all past the server's cache (`createDefaultFetchers`'s `refresh`/`onFetchedAt`, `listResolve.ts`).
   - The tile is gated on there being an age, not on the kind: a manual list (stored appids) has none. Owned, wishlist and comparisons keep it without an age ("—") so a failed first load can be retried.
   - Exception: a bundle's own hero tile is a plain `<div>` — finding one bundle walks several cached list pages, so `GET /api/bundles/:id` has no force path. It still states the age of the page the bundle was found on (`findBundleById`'s `cacheKey`).
 - **Prices carries two actions**: its value (the region) opens the ⚙ popover, its sub-line (the price age) re-fetches prices. With a `subOnClick` each half renders as its own button (HTML has no nested buttons); otherwise the whole tile is the control.
@@ -214,15 +223,15 @@ Every route opens with a **hero card** (`ListHero.tsx`): the list's name as the 
 
 Per kind:
 
-- **owned / wishlist** — name the account they show (avatar, profile link, Family merge count) with Games/Updated/Prices tiles. A `?u=` link is authoritative: while it resolves, and if it fails, the stored account is not loaded in its place.
+- **owned / wishlist** — name the account they show (avatar, profile link, Family merge count) with Games/Updated tiles, plus Prices on the wishlist. A `?u=` link is authoritative: while it resolves, and if it fails, the stored account is not loaded in its place.
 - **bundle** — Ends (with a countdown), Games, Tiers as price chips, Published, Prices, plus ITAD's editorial note; ‹/› steps through whatever `/bundles` last showed, in its order (`bundleBrowseStore.ts`). Games with **no Steam listing** (courses, asset packs, shop-exclusive keys) render below the table as a collapsed "N more in this bundle, not on Steam" section, and the status line reads "3 of 13 games matched to a Steam listing", so the table never passes for the whole bundle.
   - **Fanatical pick-and-mix** (`bundle.pickAndMix`, see [integrations.md](integrations.md#fanatical--pick-and-mix-tier-prices)): one chip per quantity tier ("5 for €5.99"); Fanatical charges every pick the per-game rate of the largest tier reached.
     - `cheapestPicks` (`bundleRows.ts`) prices one pick per ITAD gid at that rate, or at a larger tier's price when lower (spare picks free). The plan's chip gets `bundle-tier-chip--active`; the selection toolbar shows the cost (`pickPlanDetail` under it), then the saving or overpay against the same games' best deals (`pickSavings`, green/red).
     - Each row's Tier Price (`tierPerGame`, "/game") is the plan's rate (`pickRate`), rewritten on every row by an effect on selection change — the same on every row, so a sort on it doesn't reorder.
     - With `bundle.pickAndMixNames`, the toolbar adds **Buy N on Fanatical ↗** (`fanaticalBuyUrl`), the draggable **Add to Fanatical** bookmarklet (`FANATICAL_BOOKMARKLET`; clicking it here only says to drag it) and "N to pick by hand" for unmatched picks.
   - **Steam packages**: a gid resolving to several appids is one purchase. `bundlePackages` sets each row's `bundlePackage` ("package · N games" under Tier Price; in a pick-and-mix bundle only the lead row shows the rate, the rest "included"), the selection effect widens every tick to the whole package (`wholePackages`), and the pick count, the selection's best deals and New to you count one row per gid (`onePerGid`) — each package row carries the whole package's price.
-- **recent** — says it's local browser history; `params.appid` focuses one game without making it a different kind of view.
-- **user** — its manual-or-op chip with Games/Folder/Sources/Edited. A dynamic list states its formula in the card: each source named (`listLabels.ts`), linked, with what it contributed (`Alice — Owned 343 ∪ Alice — Wishlist 115 = 457`); a dangling source is flagged in place. `group-by-membership` is one table grouped by an "Owned by"/"In" column (`membershipColumn.ts`: each row's `membership` key, in `combine.ts`'s most-sources-first order via the column's `compare`, headers saying who's in and who's missing); every other op flattens to one table.
+- **recent** — says it's local browser history; `params.appid` focuses one game without making it a different kind of view, and the open game is the path, not `?game=` (see Routes).
+- **user** — its manual-or-op chip with Games/Folder/Sources/Edited, plus Prices with a priced source. A dynamic list states its formula in the card: each source named (`listLabels.ts`), linked, with what it contributed (`Alice — Owned 343 ∪ Alice — Wishlist 115 = 457`); a dangling source is flagged in place. `group-by-membership` is one table grouped by an "Owned by"/"In" column (`membershipColumn.ts`: each row's `membership` key, in `combine.ts`'s most-sources-first order via the column's `compare`, headers saying who's in and who's missing); every other op flattens to one table.
 - **compare** — an unsaved dynamic list built from the URL: one `account-owned` source per `?u=` slot, combined with `?op=` (default `group-by-membership`), resolved and labeled through the same `listResolve.ts`/`combine.ts`/`listLabels.ts` path as a stored one, so "Save as a list" is `createList()` with the same formula.
   - It resolves each slot itself (`resolveAccountSlot`), never touching `recentAccounts` — comparing someone isn't picking them; the form's account chips write nothing back either.
   - It rewrites the address to the resolved steam64 ids in canonical order, and orders sources by the same rule, so one URL renders one way.
@@ -273,7 +282,7 @@ Above 768px the shell is locked to the viewport and **`.app-scroll` is the page'
 - A close by ×, Esc, the backdrop or a swipe steps back over its entry, so the next Back leaves the page. The entry it lands on is rewritten to the current address minus that overlay, so a game stepped to in the lightbox stays open; for a browser Back that needs the Navigation API (`currententrychange`).
 - Back from a page a panel link led to reopens that game. Entries are tracked by the router's `_depth` stamp, and Back's target keeps the page's URL with the overlay closed (`urlWithoutPanel`/`urlWithoutShot`), so a deep link's Back lands on its list.
 
-**Sections**, in order: hero carousel (`PanelHero`, swipeable, feeding `lightbox.tsx`), a demo banner when the game has a free demo, ownership badge, the glance grid (Weighted Rating, HLTB, reviews, ProtonDB…), How Long To Beat, Achievements, "Owned by", News, Price, DLC/base-game links, tags, and the ⋯ More links. Collapsible ones share `CollapsibleCard`; a subnav scroll-spy tracks position.
+**Sections**, in order: hero carousel (`PanelHero`, swipeable, feeding `lightbox.tsx`); a sticky header (DLC trail, name, release date and base-game link, ownership badge, the Steam/ITAD/⋯ More/🔗/↻ icons, the subnav); a demo banner when the game has a free demo; the glance grid (Weighted Rating, HLTB, reviews, ProtonDB…); Price, with the current bundles the game is in below its lines (`PanelBundleLines`); the store description; tags; "Owned by"; How Long To Beat; News; Achievements; DLC. Collapsible ones share `CollapsibleCard`; a subnav scroll-spy tracks position.
 
 - **News** — every headline in the game's own `steam_community_announcements` feed (up to 20, `extractNews`' cap), each linking to the post, collapsed behind a chip whose ↗ goes to the Steam news hub. The server filters to that feed because raw `GetNewsForApp` mixes in syndicated press in any language ([integrations.md](integrations.md)). A game with no official posts renders no card.
 - **Price** — one always-open card: the Best Deal (with the record-low badge, see the game table), its Discount, the shop, and an "IsThereAnyDeal ↗" title link for history. When there's a deal, the _whole line_ below the title links to ITAD's per-deal `url`, unmodified — buying is the point of the card.
@@ -307,7 +316,7 @@ Above 768px the shell is locked to the viewport and **`.app-scroll` is the page'
 
 - `?u=` — **one** slot: which account to show. Parsed and resolved once for the whole app by `AppShell.tsx`, read everywhere via `getEffectiveCurrentAccount()`, forwarded across in-app navigation by `withAccountParam`. Full semantics in [lists-and-accounts.md](lists-and-accounts.md).
 - `?u=` repeated — **several** slots: a comparison, one `u=` per player, comma-joined identifiers within a slot for a Family (the old Comparison page's spelling). Not an account override, so nothing resolves it as one and `withAccountParam` doesn't forward it. `/lists/compare` is its address; `normalizeSlots`/`compareUrl` (`urlState.ts`) write it, canonicalized to server-resolved steam64 ids. `&op=` picks the combine op, omitted for the default.
-- `?game=<appid>` / `&shot=<idx>` — which game the current list has open, and which screenshot. Rewritten with `replaceState`; the one entry pushed per open overlay is `overlayHistory.ts`'s. `/game/:appid` is the canonical address for a game; the panel's 🔗 copy-link omits `?u=`, so a shared game link doesn't send recipients into the sender's account.
+- `?game=<appid>` / `&shot=<idx>` — which game the current list has open, and which screenshot; Recently Looked Up writes the game into its path (`/game/<appid>`) instead. Rewritten with `replaceState`; the one entry pushed per open overlay is `overlayHistory.ts`'s. `/game/:appid` is the canonical address for a game; the panel's 🔗 copy-link omits `?u=`, so a shared game link doesn't send recipients into the sender's account.
 - `?tv=` — a shared table-view snapshot, consumed once on arrival (see the game table).
 - `?q=` — `/search`'s term. Read on mount, written back (`setSearchQueryParam`, `urlState.ts`) as the on-page box is edited, debounced like the nav-bar box. Always `replaceState`.
 - `reorderUrlParams` (`urlState.ts`) puts every URL through one canonical param order, so the same state always serializes to the same string; `urlWithParams` is the single place a `URLSearchParams` becomes a URL, returning a bare path once the last param is deleted.
@@ -328,7 +337,6 @@ Region is the only user-facing preference, in the nav bar's ⚙ popover (`prefsP
 - **Folder/list tree polish** — rename/delete on Home use plain `window.prompt`/`window.confirm`; moving is a per-row "Move to…" menu (`folderPaths`, leaving out a folder's own subtree), with no drag-and-drop, and there's no trash/restore UI for soft-deleted lists.
 - **Per-account playtime in `group-by-membership` lists** — on a comparison, the "Owned by" card lists every owning player with their playtime (`createDefaultFetchers`' `onOwners`, served to the panel through the route's `getOwners`) and the table has one Played column per player; a saved dynamic list grouped by membership still shows only the current account's members, with no per-player columns.
 - **`/bundles`' clock doesn't tick.** Its countdowns and buckets (`renderEnds`'s "⏳ in 6h", the Age/Ends in columns, the hero's New and Ending soon counts) are computed when the table processes its rows, not on a timer. A proper fix re-runs the whole sort/filter/render pass on a timer; ticking only the hero counts would make them disagree with the rows.
-- **The panel self-fetches a price for every opened game**, even on lists that already batch-price their rows — a duplicate (server-cached) request that also fills the panel sooner for a game opened before the batch lands. Not a decision anyone made.
 - **Live reactivity to the account changing** is partial: `ACCOUNT_CHANGED_EVENT` re-runs Home's account card, `ListRoute`'s owned/wishlist load, and the ownership stamps. Anything else a route derives from the account is read once per mount.
 - **`?game=` restore-on-reload is `ListRoute` and `SearchRoute` only** — Home/`/bundles`/`/about` register no route handler with the shell, so `/?game=440` doesn't reopen. Rarely reachable: a lookup from those routes goes to `/game/:appid`.
 - **No cross-tab sync** — see [lists-and-accounts.md](lists-and-accounts.md).
