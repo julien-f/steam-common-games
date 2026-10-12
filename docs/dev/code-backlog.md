@@ -37,6 +37,7 @@ None open.
 
 ## Compliance
 
+- **C170 · minor · S** — `lib/steam.js:72` reads `Retry-After` with `Number(...)`, so its HTTP-date form becomes NaN and the store falls back to 2/4/8 s instead of the wait Steam asked for (integrations.md says it's honoured). Parse a date as the seconds until it.
 - **C40 · minor · S** — players `GetPlayerSummaries` omits are never cached (`lib/steam.js` `fetchPlayerBatch`), so a deleted or invalid account in a friends list is re-requested on every load. Cache the omission briefly once it's confirmed Steam omits only ids that really don't exist (not transiently); record that in integrations.md.
 
 ## Tests
