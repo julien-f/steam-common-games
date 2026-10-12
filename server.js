@@ -349,7 +349,7 @@ const metaLimit = namedRateLimit('meta', {
 // column, nothing to sort/filter on), so fetching it for every game in a whole loaded
 // library/comparison via the SSE stream would mean paying for it on games whose panel is
 // never opened. It's fetched lazily instead, once per game, only when that game's panel
-// actually opens (see loadNews in public/panel.js) — same on-demand shape as achievements
+// actually opens (see public/panelData.ts) — same on-demand shape as achievements
 // (achievementsLimit below), just without the per-account fan-out.
 const newsLimit = namedRateLimit('news', {
   max: DETAILS_RATE_LIMIT_MAX,
@@ -917,7 +917,7 @@ app.get('/api/game-meta/:appid', metaLimit, async (req, res) => {
 
 // Recent news/announcements for one game — see newsLimit above for why this is its own
 // route rather than folded into fetchGameDetails/the SSE stream. Fetched by the side panel
-// (public/panel.js's loadNews) once per game, only when that game's panel actually opens.
+// (public/panelData.ts) once per game, only when that game's panel actually opens.
 app.get('/api/game-news/:appid', newsLimit, async (req, res) => {
   const { appid } = req;
   try {
@@ -1268,7 +1268,7 @@ async function sendAppShell(
 // router (see public/App.tsx) render the right view from the URL — needed once navigation
 // between what used to be separate pages (Comparison/Library Explorer/Bundles/About) became
 // client-side routing instead of real page loads (see docs/dev/architecture.md). Placed
-// after every route above and after the static-file middleware (line 113) so real API calls
+// after every route above and after the static-file middleware (`express.static` above) so real API calls
 // and real asset files are still served first; a path that looks like an asset (has a file
 // extension) but genuinely doesn't exist still 404s via Express's default handler instead of
 // being silently rewritten into the shell.
