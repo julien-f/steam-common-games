@@ -1129,7 +1129,7 @@ test('D2 edge: failed prices warn like the other sources, in plain words', async
   await page.goto('/lists/wishlist');
   await expect(rows(page)).toHaveCount(4);
   const status = page.locator('.price-status');
-  await expect(status).toHaveText("IsThereAnyDeal didn't answer for prices — the Prices tile's ↻ retries.");
+  await expect(status).toHaveText("IsThereAnyDeal didn't answer for prices — the Prices tile's ↻ retries");
   const warnColor = await page.locator('.list-status .list-failed').evaluate((el) => getComputedStyle(el).color);
   await expect(status).toHaveCSS('color', warnColor);
 });
