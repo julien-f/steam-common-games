@@ -35,7 +35,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 ## Comparing
 
 - **U137 · minor · C1, C3** — the union reads `Carol 3 + Alice + Bob 8 = 9`: "+" reads as arithmetic (3 + 8 ≠ 9) and collides with the family name; the saved list uses ∪. Use ∪ here too.
-- **U138 · minor · C1** — "Compare libraries" is disabled with no reason. Say "Add a second player".
 - **U139 · polish · C4** — panel Owned by reads "never played · not played". One phrase.
 - **U51 · polish · C1** — the membership chip reads "↑ Owned by × ⊞ ×": two identical × (remove sort, remove group) side by side. The table library draws that merged chip, so telling the two apart needs an upstream change.
 
@@ -53,12 +52,10 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Keyboard and accessibility
 
-- **U161 · minor · all list routes** — a pressed stat tile's label takes the accent colour, 3.45:1 on the hero, under AA (U146 fixed the unpressed ones). A pressed style that keeps ≥4.5:1.
 - **U147 · polish · I2** — in the `?` dialog, descriptions start at x 595–677 depending on key count. A two-column grid with a fixed key column.
 
 ## Phone
 
-- **U162 · minor · I1** — more targets under 24px at 390: nav popover links (18px), Home's "Friends (private)" summary and its "Updated … ↻" (17px), the shortcuts dialog × (15×20), the footer About link (15px). The same centred `::after` tap area, unless a guideline exempts inline links.
 - **U149 · polish · I1** — Home at 390: the nav search touches the left edge; Home's card starts content at x 45 (20 margin + 24 padding) vs 12 on list pages; Recent-account rows wrap an orphan × / star onto a second line. One 12px gutter; fold row actions into ⋯.
 
 ## Accounts and first visit

@@ -45,12 +45,8 @@ test('A1 edge: native controls render dark, like the page around them', async ({
   await expect(page.locator(':root')).toHaveCSS('color-scheme', 'dark');
 });
 
-test("A1 edge: a list's stat labels meet AA contrast on the hero", async ({ page }) => {
-  await asPlayer(page, ALICE);
-  await page.goto('/lists/owned');
-  const label = page.locator('.list-stat-label').first();
-  await expect(label).toBeVisible();
-  const ratio = await label.evaluate((el) => {
+const heroContrast = (label: Locator) =>
+  label.evaluate((el) => {
     const rgb = (c: string) =>
       c
         .match(/\d+(\.\d+)?/g)!
@@ -67,7 +63,25 @@ test("A1 edge: a list's stat labels meet AA contrast on the hero", async ({ page
     const bg = lum(getComputedStyle(el.closest('.list-hero')!).backgroundColor);
     return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
   });
-  expect(ratio).toBeGreaterThanOrEqual(4.5);
+
+test("A1 edge: a list's stat labels meet AA contrast on the hero", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  const label = page.locator('.list-stat-label').first();
+  await expect(label).toBeVisible();
+  expect(await heroContrast(label)).toBeGreaterThanOrEqual(4.5);
+});
+
+test("A1 edge: a pressed stat tile's label still meets AA contrast on the hero", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/bundles');
+  const toggle = page.locator('.list-stat-btn[aria-pressed="false"]').first();
+  await toggle.click();
+  const pressed = page.locator('.list-stat-btn[aria-pressed="true"]').first();
+  await expect(pressed).toBeVisible();
+  await page.mouse.move(0, 0); // hover and focus have their own colour
+  await pressed.evaluate((el) => (el as HTMLElement).blur());
+  expect(await heroContrast(pressed.locator('.list-stat-label'))).toBeGreaterThanOrEqual(4.5);
 });
 
 test('A1 edge: Owned with no account points to Home rather than showing 0 games', async ({ page }) => {
@@ -387,6 +401,20 @@ test('C1 edge: + Add player focuses the player box it adds', async ({ page }) =>
   const boxes = page.locator('.compare-form').getByRole('combobox');
   await expect(boxes).toHaveCount(3);
   await expect(boxes.nth(2)).toBeFocused();
+});
+
+test('C1 edge: a disabled Compare libraries says why', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare');
+  const submit = page.getByRole('button', { name: 'Compare libraries' });
+  await expect(submit).toBeDisabled();
+  await expect(submit).toHaveAccessibleDescription('Add a second player');
+  await expect(page.locator('.compare-form-actions').getByText('Add a second player')).toBeVisible();
+  const box = await submit.boundingBox();
+  await page.locator('.compare-form').getByRole('combobox').nth(1).fill('bob');
+  await expect(submit).toBeEnabled();
+  await expect(page.locator('.compare-form-actions').getByText('Add a second player')).toBeHidden();
+  expect(await submit.boundingBox()).toEqual(box);
 });
 
 test('C1 edge: with my account listed first, each group still names the right players', async ({ page }) => {
@@ -2191,11 +2219,12 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
     return control.evaluate((el) => {
       const r = el.getBoundingClientRect();
       const [x, y] = [r.left + r.width / 2, r.top + r.height / 2];
+      const d = 11.99; // a hit test excludes a box's far edge: exactly 12 would demand 25px
       const points = [
-        [x, y - 11.5],
-        [x, y + 11.5],
-        [x - 11.5, y],
-        [x + 11.5, y],
+        [x, y - d],
+        [x, y + d],
+        [x - d, y],
+        [x + d, y],
       ];
       return points.every(([px, py]) => el.contains(document.elementFromPoint(px, py)));
     });
@@ -2212,6 +2241,20 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
 
   await page.goto('/lists/owned');
   expect(await takes24pxTap(page.locator('.dt-th-sort').first())).toBe(true);
+  expect(await takes24pxTap(page.getByRole('link', { name: 'About' }))).toBe(true);
+  await page.locator('.account-chip-btn').click();
+  expect(await takes24pxTap(page.locator('.account-chip-panel').getByRole('link', { name: 'Wishlist' }))).toBe(true);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('?');
+  expect(
+    await takes24pxTap(page.getByRole('dialog', { name: 'Keyboard shortcuts' }).getByRole('button', { name: 'Close' })),
+  ).toBe(true);
+
+  await page.goto('/');
+  const friends = page.locator('.account-friends summary');
+  expect(await takes24pxTap(friends)).toBe(true);
+  await friends.click();
+  expect(await takes24pxTap(page.locator('.account-friends-refresh'))).toBe(true);
 });
 
 test('I2 edge: the lightbox shows its focus ring when opened from the keyboard, not from a tap', async ({

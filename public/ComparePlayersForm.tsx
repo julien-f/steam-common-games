@@ -91,6 +91,7 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
   const [query, setQuery] = createSignal('');
   const [highlight, setHighlight] = createSignal(0);
   const listboxId = createUniqueId();
+  const whyDisabledId = createUniqueId();
 
   const matches = createMemo(() => (openSlot() == null ? [] : filterAccounts(known, slots(), query())));
 
@@ -321,7 +322,12 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
         <button type="button" class="btn btn-ghost btn-sm" onClick={addSlot}>
           + Add player
         </button>
-        <button type="submit" class="btn btn-primary btn-sm" disabled={filledCount() < 2}>
+        <button
+          type="submit"
+          class="btn btn-primary btn-sm"
+          disabled={filledCount() < 2}
+          aria-describedby={filledCount() < 2 ? whyDisabledId : undefined}
+        >
           {props.submitLabel}
         </button>
         <Show when={props.onCancel}>
@@ -331,6 +337,10 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
             </button>
           )}
         </Show>
+        {/* Hidden rather than removed once enabled, so the row never reflows mid-typing. */}
+        <span id={whyDisabledId} class="compare-form-why" classList={{ 'is-hidden': filledCount() >= 2 }}>
+          {filledCount() === 0 ? 'Add two players' : 'Add a second player'}
+        </span>
       </div>
     </form>
   );
