@@ -174,12 +174,14 @@ test('GET /some/client-side/route: 200 with the app shell HTML, not a 404', asyn
   assert.match(res.headers['content-type'], /html/);
 });
 
-test('GET /lists/owned: the app shell carries Open Graph tags with an absolute image URL, for chat link previews', async () => {
-  const res = await api.get('/lists/owned').set('Host', 'app.example');
-  assert.match(res.text, /<meta property="og:title" content="steam\.isonoe\.net" \/>/);
-  assert.match(res.text, /<meta property="og:description" content="Explore Steam libraries [^"]+" \/>/);
-  assert.match(res.text, /<meta property="og:image" content="http:\/\/app\.example\/og-image\.jpg" \/>/);
-  assert.match(res.text, /<meta name="twitter:card" content="summary_large_image" \/>/);
+test('GET / and /lists/owned: the app shell carries Open Graph tags with an absolute image URL, for chat link previews', async () => {
+  for (const route of ['/', '/lists/owned']) {
+    const res = await api.get(route).set('Host', 'app.example');
+    assert.match(res.text, /<meta property="og:title" content="steam\.isonoe\.net" \/>/);
+    assert.match(res.text, /<meta property="og:description" content="Explore Steam libraries [^"]+" \/>/);
+    assert.match(res.text, /<meta property="og:image" content="http:\/\/app\.example\/og-image\.jpg" \/>/);
+    assert.match(res.text, /<meta name="twitter:card" content="summary_large_image" \/>/);
+  }
 });
 
 test('GET /game/:appid: the preview names a cached game and shows its header image, without fetching', async (t) => {
@@ -189,6 +191,11 @@ test('GET /game/:appid: the preview names a cached game and shows its header ima
   const res = await api.get('/game/620');
   assert.match(res.text, /<meta property="og:title" content="Portal &lt;2&gt; &amp; &quot;co&quot;" \/>/);
   assert.match(res.text, /<meta property="og:image" content="https:\/\/cdn\.example\/620\/header\.jpg" \/>/);
+
+  setCache('meta:622', { name: null, header_image: null });
+  const nulls = await api.get('/game/622');
+  assert.equal(nulls.status, 200);
+  assert.match(nulls.text, /<meta property="og:title" content="steam\.isonoe\.net" \/>/);
 
   const uncached = await api.get('/game/621');
   assert.match(uncached.text, /<meta property="og:title" content="steam\.isonoe\.net" \/>/);

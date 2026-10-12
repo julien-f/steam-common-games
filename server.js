@@ -232,7 +232,8 @@ if (usingDist) {
   // refetched, not cached alongside them.
   app.use('/assets', express.static(path.join(DIST_DIR, 'assets'), { immutable: true, maxAge: '1y' }));
 }
-app.use(express.static(STATIC_DIR));
+// `index: false`: `/` must reach the SPA fallback, which injects the link-preview tags.
+app.use(express.static(STATIC_DIR, { index: false }));
 
 // OpenSearch descriptor for /search?q=<term> (docs/user/features.md's "Search by URL") — its
 // <link rel="search"> tag in index.html lets Chrome/Firefox offer "add as a search engine" for
@@ -1236,9 +1237,9 @@ app.put('/api/me/prefs/:key', authLimit, requireAuth, (req, res) => {
 const SITE_NAME = 'steam.isonoe.net';
 const SITE_DESCRIPTION =
   'Explore Steam libraries as lists of games, with ratings, completion times and current prices in one sortable table.';
-let shellHtml;
-function sendAppShell(req, res, { title = SITE_NAME, image = '/og-image.jpg' } = {}) {
-  shellHtml ??= fs.readFileSync(path.join(STATIC_DIR, 'index.html'), 'utf8');
+async function sendAppShell(req, res, { title = SITE_NAME, image = '/og-image.jpg' } = {}) {
+  // Read per request, as sendFile did: a rebuild replaces the hashed asset names it links.
+  const shellHtml = await fs.promises.readFile(path.join(STATIC_DIR, 'index.html'), 'utf8');
   const origin = `${req.protocol}://${req.get('host')}`;
   const tags = [
     ['name', 'description', SITE_DESCRIPTION],
@@ -1260,11 +1261,13 @@ function sendAppShell(req, res, { title = SITE_NAME, image = '/og-image.jpg' } =
 // and real asset files are still served first; a path that looks like an asset (has a file
 // extension) but genuinely doesn't exist still 404s via Express's default handler instead of
 // being silently rewritten into the shell.
-app.get(/^\/(?!api\/)(?!.*\.[a-zA-Z0-9]+$).*/, (req, res) => {
+app.get(/^\/(?!api\/)(?!.*\.[a-zA-Z0-9]+$).*/, async (req, res) => {
   const appid = /^\/game\/(\d+)\/?$/.exec(req.path)?.[1];
   // Cache only: a link preview mustn't cost an upstream request (integrations.md's trust tiers).
-  const game = appid && getCached(`meta:${appid}`);
-  sendAppShell(req, res, game ? { title: game.name, image: game.header_image } : undefined);
+  // Not recorded: a page load isn't a meta-tier lookup the cache metrics should count.
+  const game = appid && getCached(`meta:${appid}`, { record: false });
+  // `||`: Steam's raw details can hold null, which defaults don't replace.
+  await sendAppShell(req, res, { title: game?.name || undefined, image: game?.header_image || undefined });
 });
 
 // Anything a route didn't catch, body-parser's malformed or oversized JSON included: Express's own
