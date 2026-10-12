@@ -604,6 +604,7 @@ export default function ListRoute() {
   // scope (not load()-local) so the Prices tile's own refresh can re-price exactly what's loaded without
   // re-resolving the bundle. Reset by load() itself on every (re)load.
   let resolvedBundleGames: ResolvedGame[] | null = null;
+  let tieredLoaded: boolean | undefined; // the last finished load's rows carry a Tier Price; undefined mid-load
   // Owned/wishlist kinds only: how old the server's cached copy of this account's list is (epoch
   // ms, null = fetched fresh), and whether a forced re-fetch is in flight — the hero's Updated
   // tile, which is also the control that forces one (see heroTiles). Steam data is cached server-side for weeks (default.env's
@@ -1827,24 +1828,26 @@ export default function ListRoute() {
     setViewingShared(false);
   }
 
+  // The saved or shared list on screen, with the lookup its sources resolve through.
+  function definedList(): { list: GameList; get: (id: string) => GameList | undefined } | null {
+    const list = kind === 'shared' ? compareList() : kind === 'user' ? userList() : null;
+    return list ? { list, get: kind === 'shared' ? sharedGetList : getList } : null;
+  }
   // Wishlist prices, by appid: the Wishlist itself, and a saved or shared list built from one or a bundle.
   function hasPrices(): boolean {
-    if (kind === 'shared') {
-      const list = compareList();
-      return !!list && listHasPriceSource(list, sharedGetList);
-    }
-    const list = userList();
-    return kind === 'wishlist' || (kind === 'user' && !!list && listHasPriceSource(list));
+    const defined = definedList();
+    return kind === 'wishlist' || (!!defined && listHasPriceSource(defined.list, defined.get));
   }
-  // From the list's definition, not load state: a region change mid-load must still reload the Tier Price.
+  // Mid-load, from the definition alone: a region change then must still reload the Tier Price.
   function showsTierPrice(): boolean {
     if (kind === 'bundle') return true;
-    if (kind === 'shared') {
-      const list = compareList();
-      return !!list && listHasBundleSource(list, sharedGetList);
-    }
-    const list = userList();
-    return kind === 'user' && !!list && list.kind !== 'ranked' && listHasBundleSource(list, getList);
+    const defined = definedList();
+    return (
+      tieredLoaded !== false &&
+      !!defined &&
+      defined.list.kind !== 'ranked' &&
+      listHasBundleSource(defined.list, defined.get)
+    );
   }
   // A /lists/<id> link only opens here; a dynamic list's 🔗 Share list replaces Share view outright.
   function isDynamicList(): boolean {
@@ -1961,6 +1964,7 @@ export default function ListRoute() {
       for (const [appid, f] of bundleTierFields(games, [])) if (!tiers.has(appid)) tiers.set(appid, f);
     };
     resolvedBundleGames = null;
+    tieredLoaded = undefined;
     // Cast, not annotated: resolveRows sets it, which flow narrowing from `= null` would miss.
     let pendingGroups = null as MembershipGroup[] | null;
     // Not cleared on a ↻ Refresh of the list already on screen, for the same reason heroTitle
@@ -2320,6 +2324,7 @@ export default function ListRoute() {
     // Without IsThereAnyDeal, no price columns at all rather than a column of "—" (the status line says why).
     const pricesShown = hasPrices() && (await itadConfiguredPromise);
     if (loadGuard.isStale(gen)) return;
+    tieredLoaded = tiered;
     {
       const isRanked = userList()?.kind === 'ranked';
       const priced = kind === 'user' && pricesShown;

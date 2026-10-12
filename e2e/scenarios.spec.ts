@@ -1249,6 +1249,26 @@ test("B3 edge: a ranking of a list with a bundle source only re-prices on a new 
   expect(bundleAsks).toEqual([]);
 });
 
+test("B3 edge: a saved list whose bundle didn't answer only re-prices on a new region, it doesn't reload", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await saveWhatBundleAdds(page);
+  await page.route(/\/api\/bundles\/\d+\?/, (route) => route.fulfill({ status: 502, json: { error: 'Bad gateway' } }));
+  await page.reload();
+  await expect(rows(page)).toHaveCount(2); // from the bundle's last good load, with no Tier Price
+  await expect(page.locator('thead th').filter({ hasText: /^Tier Price/ })).toHaveCount(0);
+  const bundleAsks: string[] = [];
+  page.on('request', (req) => {
+    if (/\/api\/bundles\/\d+/.test(req.url())) bundleAsks.push(req.url());
+  });
+  await page.getByTitle('Preferences').click();
+  const repriced = page.waitForResponse(/\/api\/prices\?country=US/);
+  await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
+  await repriced;
+  expect(bundleAsks).toEqual([]);
+});
+
 test("B3 edge: a saved list from a pick-and-mix bundle claims no per-game rate it can't know", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto(sharedUrl(`subtract:(b:90002;o:${BOB.steamid})`));
