@@ -178,7 +178,7 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
 **Record-low badges** — `dealRecordTier(price, row)` (`utils.ts`) is the one source for them, over `DEAL_RECORD_TIERS`: bright teal + bold + 🔥 all-time low, green + ★ 1-year, amber + ☆ 3-month, rarest first. `<=`, since the current deal can be the low itself. A deal with no discount gets no tier, since ITAD's lows include full prices ([integrations.md](integrations.md)).
 
 - `renderBestDeal` badges the price instead of putting the shop name in the cell; the shop is in the `title` tooltip (plus the tier's `tooltipLabel`, e.g. " — all-time low") and in the hidden `bestDealShop` column.
-- The panel's Price card (`priceHtml`) keeps its own render code on `dealRecordTier`: importing `renderBestDeal` would pull `@vates/data-table-solid` into the panel.
+- The panel's Price card (`PriceSection`) keeps its own render code on `dealRecordTier`: importing `renderBestDeal` would pull `@vates/data-table-solid` into the panel. Unlike the cell, it spells each badge out ("★ 1-year low", "all-time low €2.49 🔥"), having the room.
 
 **Failed sources are marked apart from no data.** `GET /api/game-details` lists rejected sources in `failed` (absent when none did), kept as `row.failedSources` by `applyDetailsEvent`. The rating, HLTB, ProtonDB, store-page (`meta`) and tag columns (`markFailedSources`) show ⚠ with a tooltip instead of "—", the status line counts them per source (`failedSummary`), and the panel's glance chips say "didn't answer" — its ↻ retries, since failed sources aren't cached. A failed price batch sets `row.pricesFailed` (`nullMissingPriceFields`): the price columns show the same ⚠ and the Price card says IsThereAnyDeal didn't answer; the Prices tile's ↻ retries.
 

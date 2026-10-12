@@ -36,9 +36,7 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Bundles and prices
 
-- **U140 · minor · B1** — `/bundles`' "New 2" and "Ending soon 1" filters look like plain stat figures. Style them as toggle chips with a pressed state.
 - **U141 · minor · B3** — "What does this add?" drops the bundle's Tier Price and Best Deal columns and has no way back to the bundle. Keep the price columns when a bundle is a source; add a "← <bundle>" link.
-- **U142 · minor · F1, B2** — ★ (1-year low) and 🔥 (all-time low) carry their meaning only in `title`. A visible label next to the panel price ("all-time low €8.00").
 - **U143 · polish · B1** — the bundle hero has 6 actions in 4 styles, with "← All bundles" far right and ‹ › far left. Put "← All bundles" by ‹ ›; one primary, the rest ghost.
 - **U144 · polish · O1** — without `ITAD_API_KEY`, `/bundles` keeps its toolbar, an empty table, pager, Updated and region figures under a one-line notice. One empty-state card instead.
 

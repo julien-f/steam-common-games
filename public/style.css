@@ -3559,9 +3559,8 @@ kbd {
   font-size: var(--fs-label);
   color: var(--text1);
 }
-/* A tile that is also a control (`/bundles`' "Ending soon" filter toggle). Button chrome reset so
-   it still reads as one of the tiles beside it, plus a pressed state — the filter it applies is
-   otherwise only visible in the table's own toolbar, several hundred pixels below. */
+/* A tile that is also a control (a refresh, the Prices region, a filter toggle). Button chrome reset
+   so it still reads as one of the tiles beside it; a toggle gets its chip chrome back below. */
 .list-stat-btn {
   border: 0;
   background: none;
@@ -3606,6 +3605,26 @@ kbd {
 .list-stat-sub.list-stat-btn:hover:not([aria-disabled='true']),
 .list-stat-sub.list-stat-btn:focus-visible {
   color: var(--accent2);
+}
+/* A filter toggle wears chip chrome so it doesn't pass for a figure; the negative block margin
+   keeps its label and value on the row's baselines. */
+.list-stat-btn[aria-pressed] {
+  margin-block: -5px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--bg2);
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.list-stat-btn[aria-pressed='false']:hover,
+.list-stat-btn[aria-pressed='false']:focus-visible {
+  border-color: var(--text1);
+}
+.list-stat-btn[aria-pressed='true'] {
+  border-color: var(--accent2);
+  box-shadow: inset 0 0 0 1px var(--accent2);
 }
 /* --accent2, not --accent: 4.8:1 on the hero where --accent is 3.45:1. */
 .list-stat-btn[aria-pressed='true'] .list-stat-label {

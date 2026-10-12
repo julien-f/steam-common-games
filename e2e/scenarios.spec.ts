@@ -90,6 +90,26 @@ test("A1 edge: a pressed stat tile's label still meets AA contrast on the hero",
   expect(await other.locator('.list-stat-label').evaluate((el) => getComputedStyle(el).color)).not.toBe(hoveredPressed);
 });
 
+test("B1 edge: /bundles' filter tiles look like toggles, unlike the plain figures beside them", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/bundles');
+  const chrome = (loc: Locator) =>
+    loc.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { border: s.borderTopWidth, borderColor: s.borderTopColor, shadow: s.boxShadow };
+    });
+  const toggle = page.locator('.list-stat-btn[aria-pressed="false"]').first();
+  await expect(toggle).toBeVisible();
+  const plain = await chrome(page.locator('.list-stat', { hasText: 'Updated' }));
+  const off = await chrome(toggle);
+  expect(plain.border).toBe('0px');
+  expect(off.border).not.toBe('0px');
+  await toggle.click();
+  await page.mouse.move(0, 0);
+  const on = await chrome(page.locator('.list-stat-btn[aria-pressed="true"]').first());
+  expect(on).not.toEqual(off);
+});
+
 test('A1 edge: Owned with no account points to Home rather than showing 0 games', async ({ page }) => {
   await page.goto('/lists/owned');
   await expect(page.getByText('No account selected')).toBeVisible();
@@ -1229,6 +1249,13 @@ test("F1 edge: the Price card says when a game is in no bundle, and when ITAD di
   await mockApi(page, { states: ['upstream-down'] }); // registered last, so it answers first
   await page.goto('/lists/owned?game=1145360');
   await expect(page.locator('.panel-bundles')).toHaveText("Bundles: IsThereAnyDeal didn't answer.");
+});
+
+test('F1 edge: the Price card names its ★ and 🔥 records in visible text, not only in a tooltip', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=892970');
+  await expect(page.locator('.panel-price-line')).toContainText(/★\s*1-year low/);
+  await expect(page.locator('.panel-price-low')).toHaveText(/^all-time low €\d+\.\d\d 🔥$/);
 });
 
 test("F1 edge: the Achievements card says when Steam didn't answer for rarity", async ({ page }) => {
