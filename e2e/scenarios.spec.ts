@@ -896,6 +896,18 @@ test('D2.1-2: with upstreams down, every game is still listed', async ({ page })
   await expect(page.locator('.panel-glance-chip').filter({ hasText: 'HLTB' })).toContainText("didn't answer");
 });
 
+test("D2 edge: with ITAD down, the Wishlist's price cells and Price card say it didn't answer", async ({ page }) => {
+  await mockApi(page, { states: ['upstream-down'] });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await expect(rows(page)).toHaveCount(4);
+  await expect(row(page, 'Overcooked! 2').getByTitle(/IsThereAnyDeal didn't answer/)).not.toHaveCount(0);
+  await row(page, 'Overcooked! 2').getByText('Overcooked! 2').click();
+  const card = page.locator('#panel-section-price');
+  await expect(card).toContainText("IsThereAnyDeal didn't answer");
+  await expect(card).not.toContainText('No pricing data available');
+});
+
 test("D2.3: once the upstream is back, the panel's ↻ fills in what didn't answer", async ({ page }) => {
   await mockApi(page, { states: ['upstream-down'] });
   await asPlayer(page, ALICE);

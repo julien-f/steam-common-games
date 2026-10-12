@@ -42,6 +42,7 @@ export function applyPriceInfo(row: PriceFields, info: PriceInfo | null | undefi
   row.lowAll = info?.lowAll?.amount ?? null;
   row.lowY1 = info?.lowY1?.amount ?? null;
   row.lowM3 = info?.lowM3?.amount ?? null;
+  row.pricesFailed = false;
   row.priceCurrency =
     info?.steamRegular?.currency ??
     info?.bestDeal?.price?.currency ??
@@ -52,10 +53,11 @@ export function applyPriceInfo(row: PriceFields, info: PriceInfo | null | undefi
 }
 
 // A failed request (rate limited, transient upstream error): fills only whatever this row never
-// got a value for, rendered "—" same as any other "no data" case — used for a lookup that may
-// have partially succeeded before failing.
+// got a value for, flagged so it renders as "didn't answer" rather than "no data" — used for a
+// lookup that may have partially succeeded before failing.
 export function nullMissingPriceFields(row: PriceFields): void {
   for (const f of PRICE_FIELDS) if (row[f] === undefined) row[f] = null;
+  row.pricesFailed = true;
 }
 
 // `fetchedAt` is when the oldest price in this batch was written to the server's cache (epoch

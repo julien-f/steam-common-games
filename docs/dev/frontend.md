@@ -180,7 +180,7 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
 - `renderBestDeal` badges the price instead of putting the shop name in the cell; the shop is in the `title` tooltip (plus the tier's `tooltipLabel`, e.g. " — all-time low") and in the hidden `bestDealShop` column.
 - The panel's Price card (`priceHtml`) keeps its own render code on `dealRecordTier`: importing `renderBestDeal` would pull `@vates/data-table-solid` into the panel.
 
-**Failed sources are marked apart from no data.** `GET /api/game-details` lists rejected sources in `failed` (absent when none did), kept as `row.failedSources` by `applyDetailsEvent`. The rating, HLTB, ProtonDB, store-page (`meta`) and tag columns (`markFailedSources`) show ⚠ with a tooltip instead of "—", the status line counts them per source (`failedSummary`), and the panel's glance chips say "didn't answer" — its ↻ retries, since failed sources aren't cached.
+**Failed sources are marked apart from no data.** `GET /api/game-details` lists rejected sources in `failed` (absent when none did), kept as `row.failedSources` by `applyDetailsEvent`. The rating, HLTB, ProtonDB, store-page (`meta`) and tag columns (`markFailedSources`) show ⚠ with a tooltip instead of "—", the status line counts them per source (`failedSummary`), and the panel's glance chips say "didn't answer" — its ↻ retries, since failed sources aren't cached. A failed price batch sets `row.pricesFailed` (`nullMissingPriceFields`): the price columns show the same ⚠ and the Price card says IsThereAnyDeal didn't answer; the Prices tile's ↻ retries.
 
 **Price columns group by bucket, not exact value** (a raw price is near-unique per row):
 

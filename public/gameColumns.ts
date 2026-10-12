@@ -757,7 +757,18 @@ const COLUMN_SOURCE: Record<string, string> = {
   achievementCount: 'meta',
   dlcCount: 'meta',
   tags: 'tags',
+  steamRegular: 'prices',
+  bestDealPrice: 'prices',
+  bestDealCut: 'prices',
+  priceStatus: 'prices',
+  bestDealShop: 'prices',
+  lowAll: 'prices',
+  lowY1: 'prices',
+  lowM3: 'prices',
 };
+// Prices come from the list's own batch, which the panel's ↻ doesn't re-fetch.
+const sourceFailed = (row: Row, source: string) =>
+  source === 'prices' ? !!row.pricesFailed : !!row.failedSources?.includes(source);
 
 // A source that errored shows ⚠ rather than "—", which means it has no data for the game.
 function markFailedSources(columns: ColumnDef<Row>[]): ColumnDef<Row>[] {
@@ -769,11 +780,14 @@ function markFailedSources(columns: ColumnDef<Row>[]): ColumnDef<Row>[] {
       // Store-page lists are [] when missing, not null.
       const raw = (row as Record<string, unknown>)[col.key];
       const missing = raw == null || (Array.isArray(raw) && raw.length === 0);
-      if (missing && row.failedSources?.includes(source)) {
+      if (missing && sourceFailed(row, source)) {
         const mark = document.createElement('span');
         mark.className = 'cell-failed';
         mark.textContent = '⚠';
-        mark.title = `${SOURCE_NAMES[source]} didn't answer — ↻ in the game's panel retries`;
+        mark.title =
+          source === 'prices'
+            ? "IsThereAnyDeal didn't answer — the list's Prices tile ↻ retries"
+            : `${SOURCE_NAMES[source]} didn't answer — ↻ in the game's panel retries`;
         return mark;
       }
       return col.render ? col.render(v, row) : document.createTextNode(col.format ? col.format(v, row) : String(v));
@@ -1126,7 +1140,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
 // `lowM3`/`priceCurrency`) itself, via its own `loadPrices` — this file only
 // defines how those fields render/sort/group, not how they're fetched. `panel.js`'s Price card
 // reads the exact same fields, off whichever page put them on the row.
-export const PRICE_COLUMNS: ColumnDef<Row>[] = [
+export const PRICE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   // Hidden by default on both pages — Best Deal and Discount already answer "is this worth
   // buying" without it; kept as its own column for anyone who wants the exact number, or to
   // sort/group by it. Named "Steam Full Price" rather than the shorter "Steam Price" specifically
@@ -1170,4 +1184,4 @@ export const PRICE_COLUMNS: ColumnDef<Row>[] = [
   priceColumn('lowAll', 'All-Time Low'),
   priceColumn('lowY1', '1-Year Low'),
   priceColumn('lowM3', '3-Month Low'),
-];
+]);

@@ -1234,7 +1234,7 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
               fallback={
                 <>
                   <div class="panel-section-title">Achievements</div>
-                  <div class="panel-no-data">Couldn't load achievements.</div>
+                  <div class="panel-no-data">Steam didn't answer.</div>
                 </>
               }
             >
@@ -1511,7 +1511,7 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
                 <div class="panel-no-data">
                   {isItadOff()
                     ? PRICES_UNAVAILABLE
-                    : p() === null
+                    : p() === null || p()?.pricesFailed
                       ? "IsThereAnyDeal didn't answer."
                       : 'No pricing data available.'}
                 </div>

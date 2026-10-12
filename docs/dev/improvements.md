@@ -24,7 +24,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Loading and feedback
 
-- **U128 · major · D2, B4** — when ITAD fails, price cells show "—" ("nothing to show"), the panel says "No pricing data available." above "Bundles: IsThereAnyDeal didn't answer", and Achievements says "This game has no achievements." during the same outage. Use the ⚠ "didn't answer" treatment the rating and HLTB tiles already have.
 - **U134 · polish · D2** — the pricing banner shows internals ("IsThereAnyDeal request failed (mock: upstream-down)") and is grey while the reviews/HLTB banner is orange. One warning style, plain wording ("Prices didn't answer — ↻ to retry").
 - **U7 · minor · L3** — Reset view drops sort/filters instantly with no undo.
 
