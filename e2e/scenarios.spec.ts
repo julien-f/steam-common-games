@@ -1082,6 +1082,17 @@ test("D2 edge: with ITAD down, the Wishlist's price cells and Price card say it 
   await expect(card).not.toContainText('No pricing data available');
 });
 
+test('D2 edge: failed prices warn like the other sources, in plain words', async ({ page }) => {
+  await mockApi(page, { states: ['upstream-down'] });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await expect(rows(page)).toHaveCount(4);
+  const status = page.locator('.price-status');
+  await expect(status).toHaveText("IsThereAnyDeal didn't answer for prices — the Prices tile's ↻ retries");
+  const warnColor = await page.locator('.list-status .list-failed').evaluate((el) => getComputedStyle(el).color);
+  await expect(status).toHaveCSS('color', warnColor);
+});
+
 test("D2.3: once the upstream is back, the panel's ↻ fills in what didn't answer", async ({ page }) => {
   await mockApi(page, { states: ['upstream-down'] });
   await asPlayer(page, ALICE);

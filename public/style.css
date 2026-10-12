@@ -2952,7 +2952,8 @@ kbd {
   display: none;
 }
 .list-failed,
-.cell-failed {
+.cell-failed,
+.price-status.list-failed {
   color: #e0a83a;
 }
 .list-status > .list-failed:not(:first-child)::before {

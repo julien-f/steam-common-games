@@ -21,7 +21,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Loading and feedback
 
-- **U134 · polish · D2** — the pricing banner shows internals ("IsThereAnyDeal request failed (mock: upstream-down)") and is grey while the reviews/HLTB banner is orange. One warning style, plain wording ("Prices didn't answer — ↻ to retry").
 - **U7 · minor · L3** — Reset view drops sort/filters instantly with no undo.
 
 ## Lists and selection

@@ -174,7 +174,13 @@ import {
 import { getBrowsedBundles } from './bundleBrowseStore.ts';
 import { rememberBundle } from './bundleSnapshots.ts';
 import { fanaticalBuyUrl, FANATICAL_BOOKMARKLET } from './fanaticalPicks.ts';
-import { postPrices, applyPriceInfo, nullMissingPriceFields, PRICES_UNAVAILABLE } from './priceLoading.ts';
+import {
+  postPrices,
+  applyPriceInfo,
+  nullMissingPriceFields,
+  PRICES_UNAVAILABLE,
+  PRICES_FAILED,
+} from './priceLoading.ts';
 import { isItadConfigured, isItadOff } from './panelData.ts';
 import { currentRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
 import { openPrefsPopover } from './prefsPopover.tsx';
@@ -1622,12 +1628,12 @@ export default function ListRoute() {
             });
           }
         });
-      } catch (err) {
+      } catch {
         if (loadGuard.isStale(gen)) return;
         batch(() => {
           for (const g of chunk) rowStore.mutateRow(g.appid, (draft) => nullMissingPriceFields(draft));
         });
-        setPriceStatusText(`Couldn't load Steam pricing (${(err as Error).message}) — other columns are unaffected.`);
+        setPriceStatusText(PRICES_FAILED);
       }
     }
   }
@@ -3227,7 +3233,9 @@ export default function ListRoute() {
         </Show>
       </div>
       <Show when={hasPrices() || kind === 'bundle'}>
-        <div class="price-status">{priceStatusText()}</div>
+        <div class="price-status" classList={{ 'list-failed': priceStatusText() === PRICES_FAILED }}>
+          {priceStatusText()}
+        </div>
       </Show>
       {/* Outside the selection-gated block below on purpose — "Add"/"Remove" both clear the
           selection right after acting (Add explicitly; Remove via load()'s own reset), and the
