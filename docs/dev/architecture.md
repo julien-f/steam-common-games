@@ -23,7 +23,7 @@ Setup and dev commands are in [README.md](../../README.md); tests and hooks in [
 - **`server.js`** — Express setup and route handlers only; all upstream work lives in `lib/*`.
 - **`lib/config.js`** — loads `.env` over `default.env` and exports the TTLs, budgets, session lifetime and upstream pacing shared across modules.
 - **`lib/db.js`** — opens `db.sqlite` and applies its append-only `MIGRATIONS` ([data.md](data.md)).
-- **`lib/cache.js`** — persistent cache over `db.sqlite` (`getCached`, `setCache`, `GROUPS`); `createCachedFetch` binds a module's dedup into its `cachedFetch(key, { force }, load)`, the cache-then-dedup skeleton of a single-key upstream getter.
+- **`lib/cache.js`** — persistent cache over `db.sqlite` (`getCached`, `setCache`, `isCached` for limiter skips, `getCacheEntryCounts` for health and metrics); `createCachedFetch` binds a module's dedup into its `cachedFetch(key, { force }, load)`, the cache-then-dedup skeleton of a single-key upstream getter.
 - **`lib/dedup.js`** — `createDedup`: concurrent calls for the same key share one promise.
 - **`lib/steam.js`** — Steam Web API and store calls (`resolveSteamId`, `getOwnedGames`, `getWishlist`, `getFriendList`, `getPlayerSummaries`, `getGameRating`, `getAppDetails`, `getSteamTags`, `getGameDemo`, `searchStoreGames`, `getGameNews`, …), ProtonDB, and their per-host semaphores (`storeLimit`/`tagLimit`/`protonLimit`).
 - **`lib/hltb.js`** — HLTB auth + search (`getHLTB`), behind its own semaphore (`hltbLimit`).
@@ -63,11 +63,15 @@ The dedup map, semaphores, breakers and metrics are process-local: correct for t
 | `GET /api/me`                                                            | The signed-in user's steamid and every prefs key as `{ value, updatedAt }`, or `{ steamid: null, prefs: null }` signed out — always 200 (`initAuth` calls it on every page load)                                                                                                                        |
 | `PUT /api/me/prefs/:key`                                                 | Writes one prefs key (`{ value, updatedAt }`), so concurrent writes to different keys can't clobber each other; a write always overwrites. 400 for a key the frontend never syncs (`isSyncedPrefKey`, `lib/auth.js`), 413 past 2 MB per account (`PREFS_MAX_BYTES`), 401 without a valid session cookie |
 
-Every route is behind a named `express-rate-limit` instance that `skip`s requests it can answer from cache ([observability.md](observability.md), [data.md](data.md)).
+Rate limits ([observability.md](observability.md), [data.md](data.md)):
+
+- Every route that can reach an upstream, plus the auth routes and the prefs write, is behind a named `express-rate-limit` instance.
+- Most `skip` requests they can answer from cache. Always counting: `bundlesById` (a looser budget instead), `auth` (a fixed `max: 20` in `server.js`), and the stream route (its array body defeats `details`' per-appid skip).
+- No limiter: health, metrics, `GET /api/me`, logout, `/opensearch.xml` and the SPA shell (cache-only, no upstream call).
 
 ## Request flow
 
 1. Frontend POSTs `{ members: ["alice", "bob_family"] }` to `/api/common-games`: one account, or a Steam Family's member accounts, whose libraries are unioned. A comparison makes one call per player and combines them in the browser.
 2. Server resolves every identifier to a Steam64 ID, deduplicates, fetches all libraries in one parallel pass, unions them, and returns `{ games, players, playtime, lastPlayed, fetchedAt }` — `playtime`/`lastPlayed` keyed by appid then by the member who owns it.
 3. The frontend renders rows at once, then POSTs the appids to `POST /api/game-details/stream` (SSE) for rating, HLTB, store metadata and tags over one connection.
-4. The stream route works the list through a bounded worker pool (`STREAM_CONCURRENCY`) pulling from a shared cursor, checking the client is still connected before each appid — dispatching every appid up front would make that check unreachable and let one request fill the shared semaphore queues ahead of everyone else's. It's gzipped when accepted (~5 KB per game, a fifth gzipped) and flushed per event.
+4. The stream route works the list through a bounded worker pool (`STREAM_CONCURRENCY`) pulling from a shared cursor, checking the client is still connected before each appid — dispatching every appid up front would make that check unreachable and let one request fill the shared semaphore queues ahead of everyone else's. It's gzipped when accepted (~5 KB per game, a fifth gzipped) and flushed per event. A client past `STREAM_MAX_PER_IP` open streams gets a 429, so parallel streams can't fill the shared store queue.
