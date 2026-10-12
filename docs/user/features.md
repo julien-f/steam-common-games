@@ -87,7 +87,7 @@ The result is a link. Copy the address and whoever opens it sees the same compar
 
 ## Bundles
 
-Browse current Steam game bundles (sourced from IsThereAnyDeal, and only available if the app is configured with an ITAD key). Open one and its games become a list like any other, with the bundle's tier price alongside each game's rating, playtime estimates and current best price anywhere. Games in a bundle with no Steam listing are listed separately below the table rather than quietly dropped. The header's counts are clickable: "New" narrows the table to the bundles published in the last week, "Ending soon" to the ones ending within 48 hours, and clicking either again brings the rest back. "Updated" re-fetches the list, and "Prices" opens the region setting. **Include expired** adds ended bundles, dimmed, newest first. A bundle's **New to you** figure counts the games in it you don't own and what they'd cost at their best deals right now; **What does this add?** shows those games as a list (see [Combining lists](#combining-lists)).
+Browse current Steam game bundles (sourced from IsThereAnyDeal, and only available if the app is configured with an ITAD key). Open one and its games become a list like any other, with the bundle's tier price alongside each game's rating, playtime estimates and current best price anywhere. Games in a bundle with no Steam listing are listed separately below the table rather than quietly dropped. The header's counts are clickable: "New" narrows the table to the bundles published in the last week, "Ending soon" to the ones ending within 48 hours, and clicking either again brings the rest back. "Updated" re-fetches the list, and "Prices" opens the region setting. **Include expired** adds ended bundles, dimmed; past a few pages, **Load more** fetches the rest. A bundle's **New to you** figure counts the games in it you don't own and what they'd cost at their best deals right now; **What does this add?** shows those games as a list (see [Combining lists](#combining-lists)).
 
 Fanatical's **Build your own** bundles price by how many games you pick (e.g. 5 for €5.99, 10 for €9.99), taken from Fanatical itself since IsThereAnyDeal doesn't carry those prices. Every game you pick costs the per-game rate of the largest tier you reach (6 games at 5 for €5.99 cost 6 × €1.198). The tiers show in the bundle's header, each game's Tier Price is the rate for the current selection (the smallest tier's with nothing selected), and selecting games in the table shows what they'd cost: at that rate, or a larger tier when its price is lower (any picks left free), and, in green or red, what that saves or costs over the same games at their best deals. A Steam package (a game plus its DLC sold as one) counts as one pick: its rows are marked **package · N games** and ticking one ticks them all.
 
@@ -106,6 +106,7 @@ Clicking any row opens a detail panel beside the table — not over it, so the l
 Clicking a screenshot or trailer (or **Enter** on it) opens it full-window:
 
 - **← / →** step through the game's media (while a video plays they seek 5 s; **Shift** keeps them stepping), **↑ / ↓** move to the previous or next game in the list.
+- **R** jumps to a random game, **Home / End** to the first or last media, **Esc** closes.
 - **F** toggles fullscreen; **Z**, a double-click or a pinch zooms a screenshot; **Space** plays or pauses a video and **M** mutes it.
 - On touch, swipe sideways for media and up or down for games; a double-tap on a video's left or right third seeks 10 s.
 
@@ -118,7 +119,7 @@ Clicking a screenshot or trailer (or **Enter** on it) opens it full-window:
 ## Sharing
 
 - A game's own link (`/game/<appid>`) opens that game for anyone, whether or not they own it.
-- Links pasted in a chat (WhatsApp, Slack, Discord, iMessage…) show a preview card; a game link's names the game and shows its header image once the app has looked that game up.
+- Links pasted in a chat (WhatsApp, Slack, Discord, iMessage…) show a preview card; a `/game/…` link's card names the game and shows its header image once the app has looked that game up, other links get the site's card.
 - Add `?u=` to any list link to share the account you're exploring. It never changes the recipient's own default account, and a game link deliberately doesn't carry it.
 - A comparison's link names its players the same way, one `?u=` each — including links made by older versions of this app, which still work.
 - **🔗 Share view** copies a link with your current table layout — columns, sort, grouping, filters — baked in. On Owned and Wishlist it also carries the account (`?u=`), so the recipient sees your games, not their own. The recipient sees it for that visit only, with **Keep as my layout** to make it theirs or **Use my own** to go back; nothing of their own setup changes otherwise. It's off on your own saved lists, whose link only opens in your browser: a combined list has **🔗 Share list** instead; manual and ranked lists can't be shared yet.

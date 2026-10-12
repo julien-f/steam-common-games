@@ -38,7 +38,7 @@ import { bindNavPopover } from './navPopover.ts';
 // `openGame(appid)`: only ListRoute registers this (every one of its kinds can place a looked-up
 // game somewhere sensible — its own row if it has one, otherwise a standalone panel docked to
 // that same route — see ListRoute's own comment on `handleOpenGameRequest`), so it always returns
-// true there. Home/BundlesBrowseRoute/AboutRoute never register it — there's no list/table for a
+// true there. Home/BundlesBrowseRoute/AboutRoute/RankRoute never register it — there's no list/table for a
 // game to be "in the context of" on those routes — so `openGameGlobally` below falls through to
 // navigating to `/game/:appid` (the Recently Looked Up list) instead.
 //
@@ -141,7 +141,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
   // — the currently mounted route's own registered handler if it has one (ListRoute: opens the
   // game in place, never navigating away from whatever list/page is on screen), or `/game/:appid`
   // (the Recently Looked Up list) as the fallback for a route with no game/list context of its
-  // own at all (Home, Bundles browse, About) — see registerRouteHandlers's own comment above.
+  // own at all (Home, Bundles browse, About, Rank, 404) — see registerRouteHandlers's own comment above.
   function openGameGlobally(appid: number): void {
     if (routeHandlers.openGame?.(appid)) return;
     // withAccountParam: a `?u=` link being explored has to survive this navigation, or looking
