@@ -230,6 +230,7 @@ export interface PriceFields {
   lowY1?: number | null;
   lowM3?: number | null;
   priceCurrency?: string | null;
+  pricesFailed?: boolean; // the last lookup errored: a missing price is "didn't answer", not "no data"
 }
 
 // ── List-centric redesign (see docs/dev/lists-and-accounts.md) ──────────────────────────────

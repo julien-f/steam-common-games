@@ -193,7 +193,7 @@ export function createPanelDataCache() {
       achievementsKey(appid, memberIds),
       async () => {
         // The same empty payload the route itself would return — NOT `null`, which renders as
-        // "Couldn't load achievements." rather than "This game has no achievements."
+        // "Steam didn't answer." rather than "This game has no achievements."
         if (achievementCount === 0)
           return {
             achievements: [],

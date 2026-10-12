@@ -1612,8 +1612,10 @@ export default function ListRoute() {
         batch(() => {
           for (const g of chunk) {
             const info = prices[byGid ? g.gid! : g.appid];
-            if (!info) continue;
-            rowStore.mutateRow(g.appid, (draft) => applyPriceInfo(draft, info));
+            rowStore.mutateRow(g.appid, (draft) => {
+              if (info) applyPriceInfo(draft, info);
+              else draft.pricesFailed = false;
+            });
           }
         });
       } catch (err) {
@@ -2355,7 +2357,8 @@ export default function ListRoute() {
     // it, streamGameDetails needs its own guard too: the server 400s a `games: []` stream
     // request outright ("Provide at least one game"), confirmed live the first time this path
     // was actually reachable through the UI.
-    if (initialRows.length === 0) {
+    // rowsStore, not initialRows: a first /game/:appid lookup just added its row above.
+    if (rowsStore.length === 0) {
       setStatusText('');
       const account = heroAccount();
       const whose = account ? `${accountDisplayLabel(account)}'s` : "This account's";
