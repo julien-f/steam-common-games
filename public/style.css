@@ -3556,8 +3556,9 @@ kbd {
 .list-stat-sub.list-stat-btn:focus-visible {
   color: var(--accent2);
 }
+/* --accent2, not --accent: 4.8:1 on the hero where --accent is 3.45:1. */
 .list-stat-btn[aria-pressed='true'] .list-stat-label {
-  color: var(--accent);
+  color: var(--accent2);
 }
 .list-stat-icon {
   font-size: 11px;

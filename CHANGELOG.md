@@ -111,6 +111,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Typing a player's exact name and pressing Enter on Compare adds that player, not a Steam Family they belong to
 - Keyboard focus no longer drops to the page after switching account, saving a list, refreshing from Updated or closing the ranking's panel; added fields take focus, and the ? dialog takes and returns it
 - Screen readers hear which account, list or source a control acts on, a label on the combine selects, and no pressed state on tiles that aren't toggles
+- A pressed stat tile's label is readable at AA contrast
 
 ### Development
 

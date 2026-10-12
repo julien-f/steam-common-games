@@ -52,7 +52,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Keyboard and accessibility
 
-- **U161 · minor · all list routes** — a pressed stat tile's label takes the accent colour, 3.45:1 on the hero, under AA (U146 fixed the unpressed ones). A pressed style that keeps ≥4.5:1.
 - **U147 · polish · I2** — in the `?` dialog, descriptions start at x 595–677 depending on key count. A two-column grid with a fixed key column.
 
 ## Phone

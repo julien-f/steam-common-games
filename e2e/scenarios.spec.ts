@@ -45,12 +45,8 @@ test('A1 edge: native controls render dark, like the page around them', async ({
   await expect(page.locator(':root')).toHaveCSS('color-scheme', 'dark');
 });
 
-test("A1 edge: a list's stat labels meet AA contrast on the hero", async ({ page }) => {
-  await asPlayer(page, ALICE);
-  await page.goto('/lists/owned');
-  const label = page.locator('.list-stat-label').first();
-  await expect(label).toBeVisible();
-  const ratio = await label.evaluate((el) => {
+const heroContrast = (label: Locator) =>
+  label.evaluate((el) => {
     const rgb = (c: string) =>
       c
         .match(/\d+(\.\d+)?/g)!
@@ -67,7 +63,25 @@ test("A1 edge: a list's stat labels meet AA contrast on the hero", async ({ page
     const bg = lum(getComputedStyle(el.closest('.list-hero')!).backgroundColor);
     return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
   });
-  expect(ratio).toBeGreaterThanOrEqual(4.5);
+
+test("A1 edge: a list's stat labels meet AA contrast on the hero", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  const label = page.locator('.list-stat-label').first();
+  await expect(label).toBeVisible();
+  expect(await heroContrast(label)).toBeGreaterThanOrEqual(4.5);
+});
+
+test("A1 edge: a pressed stat tile's label still meets AA contrast on the hero", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/bundles');
+  const toggle = page.locator('.list-stat-btn[aria-pressed="false"]').first();
+  await toggle.click();
+  const pressed = page.locator('.list-stat-btn[aria-pressed="true"]').first();
+  await expect(pressed).toBeVisible();
+  await page.mouse.move(0, 0); // hover and focus have their own colour
+  await pressed.evaluate((el) => (el as HTMLElement).blur());
+  expect(await heroContrast(pressed.locator('.list-stat-label'))).toBeGreaterThanOrEqual(4.5);
 });
 
 test('A1 edge: Owned with no account points to Home rather than showing 0 games', async ({ page }) => {
