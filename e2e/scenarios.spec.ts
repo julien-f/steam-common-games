@@ -481,7 +481,7 @@ test("B2 edge: Taste fit scores the wishlist by the account's taste, once Owned 
   const note = page.locator('.list-score-note');
   await page.goto('/lists/wishlist');
   await expect(page.getByRole('columnheader', { name: /Taste fit/ })).toBeVisible();
-  await expect(note).toHaveText("Taste fit: open Alice's Owned list once on this device to learn their taste");
+  await expect(note).toHaveText("Taste fit needs Alice's Owned list opened on this device");
 
   await page.goto('/lists/owned');
   await expect(page.locator('.list-plays-mostly')).toBeVisible();

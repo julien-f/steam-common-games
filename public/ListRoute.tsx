@@ -322,7 +322,7 @@ interface TasteSource {
 
 function tasteFitNote({ label, taste }: TasteSource): string {
   if (!label) return 'Taste fit needs an account: pick one on Home';
-  if (!taste) return `Taste fit: open ${label}'s Owned list once on this device to learn their taste`;
+  if (!taste) return `Taste fit needs ${label}'s Owned list opened on this device`;
   return `Taste fit: ${label}'s taste as of ${new Date(taste.at).toLocaleDateString()}`;
 }
 
