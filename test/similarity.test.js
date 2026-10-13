@@ -78,3 +78,21 @@ test("playerFits: each game's closeness to each player's profile, null for a pla
 test('playerFits: nothing when no player has a profile', () => {
   assert.equal(playerFits([game(1, { A: 1 })], [() => 10]), null);
 });
+
+test('similarGames: a shared Production Tier breaks a tie between equally tagged games', () => {
+  const target = { ...game(1, { Roguelike: 1 }), productionTier: 'Indie' };
+  const games = [
+    { ...game(2, { Roguelike: 1, Action: 1 }), productionTier: 'AAA' },
+    { ...game(3, { Roguelike: 1, Action: 1 }), productionTier: 'Indie' },
+    { ...game(4, { Farming: 1 }), productionTier: 'AAA' },
+  ];
+  assert.deepEqual(
+    similarGames(target, games, 2).map((s) => s.game.appid),
+    [3, 2],
+  );
+});
+
+test("topPlayedTags: Production Tier shapes the profile but isn't a tag to show", () => {
+  const games = [1, 2, 3, 4, 5].map((id) => ({ ...owned(id, 10, { [`T${id}`]: 1 }), productionTier: 'Indie' }));
+  assert.ok(!topPlayedTags([...games, owned(6, 0, { X: 1 })], 10).some((t) => t.startsWith('tier:')));
+});

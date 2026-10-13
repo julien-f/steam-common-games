@@ -59,6 +59,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Search, About and the page-not-found screen title themselves like every list page, and search results no longer show an empty image column
 - A bundle's page puts ← All bundles next to its ‹ › arrows, and its other actions share one style around Get this bundle
 - Bundles on an instance without IsThereAnyDeal shows one card saying how to turn it on, instead of an empty table
+- Similar games and Group fit also weigh whether games are indie, AA or AAA
 
 ### Fixed
 

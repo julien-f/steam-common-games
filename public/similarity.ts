@@ -1,7 +1,14 @@
 type Weights = Record<string, number | null> | null | undefined;
 type TagWeights = Record<string, number | null>;
 type Vector = Map<string, number>;
-type Tagged = { appid: number; details?: { tagWeights?: Weights } | null };
+type Tagged = { appid: number; productionTier?: string | null; details?: { tagWeights?: Weights } | null };
+
+// Production Tier as one more dimension: budget is something Steam tags don't say (no "AAA" tag).
+const TIER_PREFIX = 'tier:';
+function featuresOf(g: Omit<Tagged, 'appid'>): TagWeights {
+  const tags = g.details!.tagWeights!;
+  return g.productionTier ? { ...tags, [TIER_PREFIX + g.productionTier]: 1 } : tags;
+}
 
 // 0 for a tag every game carries, higher the rarer it is.
 function inverseFrequency(corpus: readonly TagWeights[]): (tag: string) => number {
@@ -31,12 +38,11 @@ export interface Similar<T> {
 // Cosine over tag weights scaled by rarity (IDF), so tags nearly all `games` carry don't make all alike.
 export function similarGames<T extends Tagged>(target: T, games: readonly T[], limit: number): Similar<T>[] {
   const weighted = games.filter((g) => g.appid !== target.appid && g.details?.tagWeights);
-  const targetWeights = target.details?.tagWeights;
-  if (!targetWeights) return [];
-  const idf = inverseFrequency([targetWeights, ...weighted.map((g) => g.details!.tagWeights!)]);
-  const t = vectorOf(targetWeights, idf);
+  if (!target.details?.tagWeights) return [];
+  const idf = inverseFrequency([featuresOf(target), ...weighted.map(featuresOf)]);
+  const t = vectorOf(featuresOf(target), idf);
   return weighted
-    .map((game) => ({ game, score: Math.round(cosine(vectorOf(game.details!.tagWeights!, idf), t) * 100) }))
+    .map((game) => ({ game, score: Math.round(cosine(vectorOf(featuresOf(game), idf), t) * 100) }))
     .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
@@ -55,16 +61,14 @@ function playProfile(played: readonly { hours: number; weights: TagWeights }[], 
 }
 
 export function topPlayedTags(
-  games: readonly { playtime?: number; details?: { tagWeights?: Weights } | null }[],
+  games: readonly (Omit<Tagged, 'appid'> & { playtime?: number })[],
   limit: number,
 ): string[] {
   const weighted = games.filter((g) => g.details?.tagWeights);
-  const idf = inverseFrequency(weighted.map((g) => g.details!.tagWeights!));
-  const played = weighted
-    .filter((g) => g.playtime)
-    .map((g) => ({ hours: g.playtime!, weights: g.details!.tagWeights! }));
+  const idf = inverseFrequency(weighted.map(featuresOf));
+  const played = weighted.filter((g) => g.playtime).map((g) => ({ hours: g.playtime!, weights: featuresOf(g) }));
   return [...(playProfile(played, idf) ?? [])]
-    .filter(([, score]) => score > 0)
+    .filter(([tag, score]) => score > 0 && !tag.startsWith(TIER_PREFIX))
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([tag]) => tag);
@@ -76,17 +80,17 @@ export function playerFits(
   hoursPlayed: readonly ((appid: number) => number | undefined)[],
 ): Map<number, (number | null)[]> | null {
   const weighted = games.filter((g) => g.details?.tagWeights);
-  const idf = inverseFrequency(weighted.map((g) => g.details!.tagWeights!));
+  const idf = inverseFrequency(weighted.map(featuresOf));
   const profiles = hoursPlayed.map((hours) =>
     playProfile(
-      weighted.filter((g) => hours(g.appid)).map((g) => ({ hours: hours(g.appid)!, weights: g.details!.tagWeights! })),
+      weighted.filter((g) => hours(g.appid)).map((g) => ({ hours: hours(g.appid)!, weights: featuresOf(g) })),
       idf,
     ),
   );
   if (!profiles.some(Boolean)) return null;
   return new Map(
     weighted.map((g) => {
-      const v = vectorOf(g.details!.tagWeights!, idf);
+      const v = vectorOf(featuresOf(g), idf);
       return [g.appid, profiles.map((p) => (p ? Math.round(cosine(p, v) * 100) : null))];
     }),
   );
