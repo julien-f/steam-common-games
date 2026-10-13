@@ -2103,16 +2103,19 @@ function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
               )}
             </For>
           </Show>
-          <button
-            class="panel-similar-sort"
-            onClick={() =>
-              panelOptions.setSimilarTo(panelOptions.similarTo() === props.game.appid ? null : props.game.appid)
-            }
-          >
-            {panelOptions.similarTo() === props.game.appid
-              ? '× Stop sorting by similarity'
-              : '⇅ Sort list by similarity'}
-          </button>
+          {/* A standalone lookup isn't a row, so the list has nothing to rank against it. */}
+          <Show when={!props.game.standalone}>
+            <button
+              class="panel-similar-sort"
+              onClick={() =>
+                panelOptions.setSimilarTo(panelOptions.similarTo() === props.game.appid ? null : props.game.appid)
+              }
+            >
+              {panelOptions.similarTo() === props.game.appid
+                ? '× Stop sorting by similarity'
+                : '⇅ Sort list by similarity'}
+            </button>
+          </Show>
         </Show>
       </div>
     </Show>

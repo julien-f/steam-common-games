@@ -506,6 +506,17 @@ test('C1 edge: Tag match averages the filtered tags, or with All takes the weake
   await expect(row(page, 'Portal 2').getByRole('cell', { name: '30%' })).toBeVisible();
 });
 
+test("C1 edge: a game looked up outside the list can't sort the list by similarity to it", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await page.getByPlaceholder('Look up any game…').fill('apex');
+  await page.getByRole('option', { name: /Apex Legends/ }).click();
+  const similar = page.locator('#panel-section-similar');
+  await expect(similar.locator('.panel-similar-item').first()).toBeVisible();
+  await expect(similar.getByRole('button', { name: /Sort list by similarity/ })).toHaveCount(0);
+});
+
 test('C1 edge: a Tag match range keeps the games strongly tagged, and goes with the tag filter', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
