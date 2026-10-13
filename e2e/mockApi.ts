@@ -87,6 +87,9 @@ const media = (appid: number, slow: boolean) => {
   };
 };
 
+// Out of rating order, so sorting by Tag match visibly reorders a co-op filter.
+const COOP_WEIGHT: Record<number, number> = { 620: 0.3, 105600: 0.9, 413150: 0.6, 892970: 1 };
+
 function details(appid: number, slowMedia = false) {
   const g = game(appid);
   return {
@@ -125,7 +128,9 @@ function details(appid: number, slowMedia = false) {
       isFree: false,
       priceInitial: null,
     },
-    tags: g.categories.includes('Co-op') ? ['Co-op'] : ['Singleplayer'],
+    ...(g.categories.includes('Co-op')
+      ? { tags: ['Action', 'Co-op'], tagWeights: { Action: 1, 'Co-op': COOP_WEIGHT[appid] ?? 0.5 } }
+      : { tags: ['Singleplayer'], tagWeights: { Singleplayer: 1 } }),
     demo: null,
     protondb: g.protondb ? { tier: g.protondb, confidence: 'strong', total: 100 } : null,
   };

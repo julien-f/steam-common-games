@@ -703,6 +703,34 @@ export function insertColumnsAfter(
   return [...columns.slice(0, idx + 1), ...newColumns, ...columns.slice(idx + 1)];
 }
 
+// Mean weight of the filtered tags, each relative to the game's top tag (absent: 0), in %.
+export function tagMatchScore(
+  weights: Record<string, number | null> | null | undefined,
+  selected: ReadonlySet<string> | undefined,
+): number | null {
+  if (!weights || !selected?.size) return null;
+  let sum = 0;
+  for (const tag of selected) sum += weights[tag] ?? 0;
+  return Math.round((sum / selected.size) * 100);
+}
+
+export const TAG_MATCH_KEY = 'tagMatch';
+// Ranks a tag filter's matches by how strongly each game carries the filtered tags.
+export function tagMatchColumn(selected: () => ReadonlySet<string> | undefined): ColumnDef<Row> {
+  return {
+    key: TAG_MATCH_KEY,
+    label: 'Tag match',
+    type: 'number',
+    value: (row) => tagMatchScore(row.details?.tagWeights, selected()),
+    format: (v) => (v == null ? '—' : `${v}%`),
+    compare: compareNumMissingLast,
+    defaultSortDir: 'desc',
+    filterable: false,
+    searchable: false,
+    category: 'Classification',
+  };
+}
+
 // ── Core columns — shared by every page's game table: the Library Explorer's Library tab,
 // its Wishlist tab, and Bundles. Grouped into sections (identity → scores → HLTB → dates →
 // classification → compatibility → extras) rather than roughly the order each was added to the

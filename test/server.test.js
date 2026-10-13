@@ -650,7 +650,14 @@ test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) 
     developers: ['Valve'],
     publishers: ['Valve'],
   });
-  setCache('browse:400', { tagids: TAG_IDS, related_items: { demo_appid: [1714800] } });
+  setCache('browse:400', {
+    tagids: TAG_IDS,
+    tags: [
+      { tagid: 1001, weight: 400 },
+      { tagid: 1002, weight: 100 },
+    ],
+    related_items: { demo_appid: [1714800] },
+  });
   setCache('tagnames:all', TAG_NAME_MAP);
   setCache('protondb:400', { tier: 'gold', confidence: 'strong', total: 500 });
 
@@ -666,6 +673,7 @@ test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) 
   assert.equal(res.body.hltb?.main, 10);
   assert.deepEqual(res.body.meta?.genres, ['Action']);
   assert.deepEqual(res.body.tags, ['Action', 'Co-op']);
+  assert.deepEqual(res.body.tagWeights, { Action: 1, 'Co-op': 0.25 });
   assert.equal(res.body.demo, 1714800);
   assert.equal(res.body.protondb?.tier, 'gold');
   assert.equal(fetchCalled, false);

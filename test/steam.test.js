@@ -1136,7 +1136,7 @@ test('getAppDetails: caps movies at 5', async (t) => {
 
 // Routes the shared fetch mock by URL: IStoreBrowseService for the per-app store browse item
 // (tagids + related_items), ajaxgetstoretags for the tagid → name map.
-function mockTagEndpoints(t, { tagids = [], nameMap = {}, demoAppid, browseOk = true, namesOk = true } = {}) {
+function mockTagEndpoints(t, { tagids = [], tags, nameMap = {}, demoAppid, browseOk = true, namesOk = true } = {}) {
   let browseCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (String(url).includes('IStoreBrowseService')) {
@@ -1150,6 +1150,7 @@ function mockTagEndpoints(t, { tagids = [], nameMap = {}, demoAppid, browseOk = 
               {
                 success: 1,
                 tagids,
+                ...(tags ? { tags } : {}),
                 ...(demoAppid != null ? { related_items: { demo_appid: [demoAppid] } } : {}),
               },
             ],
@@ -1177,8 +1178,34 @@ test('getSteamTags: returns every tag in weight order, resolved via the name map
 
   const result = await getSteamTags(400);
   assert.equal(result.length, 30);
-  assert.equal(result[0], 'Tag100');
-  assert.equal(result[29], 'Tag129');
+  assert.equal(result[0].name, 'Tag100');
+  assert.equal(result[29].name, 'Tag129');
+});
+
+test('getSteamTags: weights each tag relative to the top one', async (t) => {
+  _reset();
+  mockTagEndpoints(t, {
+    tagids: [1, 2, 3],
+    tags: [
+      { tagid: 1, weight: 10000 },
+      { tagid: 2, weight: 3333 },
+      { tagid: 3, weight: 154 },
+    ],
+    nameMap: { 1: 'Action', 2: 'Indie', 3: 'Roguelike' },
+  });
+
+  assert.deepEqual(await getSteamTags(400), [
+    { name: 'Action', weight: 1 },
+    { name: 'Indie', weight: 0.33 },
+    { name: 'Roguelike', weight: 0.02 },
+  ]);
+});
+
+test('getSteamTags: a null weight when the item has no tag weights', async (t) => {
+  _reset();
+  mockTagEndpoints(t, { tagids: [1], nameMap: { 1: 'Action' } });
+
+  assert.deepEqual(await getSteamTags(400), [{ name: 'Action', weight: null }]);
 });
 
 test('getSteamTags: returns empty array when the app has no tagids', async (t) => {
@@ -1207,7 +1234,10 @@ test('getSteamTags: drops tagids with no matching name in the map', async (t) =>
   mockTagEndpoints(t, { tagids: [1, 2, 3], nameMap: { 1: 'Action', 3: 'Indie' } });
 
   const result = await getSteamTags(400);
-  assert.deepEqual(result, ['Action', 'Indie']);
+  assert.deepEqual(
+    result.map((t) => t.name),
+    ['Action', 'Indie'],
+  );
 });
 
 test('getSteamTags: throws isUpstream when the tagid fetch fails', async (t) => {
@@ -1287,7 +1317,7 @@ test('getSteamTags and getGameDemo share a single upstream IStoreBrowseService c
   const browseCalls = mockTagEndpoints(t, { tagids: [1], nameMap: { 1: 'Action' }, demoAppid: 555 });
 
   const [tags, demo] = await Promise.all([getSteamTags(400), getGameDemo(400)]);
-  assert.deepEqual(tags, ['Action']);
+  assert.deepEqual(tags, [{ name: 'Action', weight: null }]);
   assert.equal(demo, 555);
   assert.equal(browseCalls(), 1, 'both calls should share one upstream fetch via cache + dedup');
 });

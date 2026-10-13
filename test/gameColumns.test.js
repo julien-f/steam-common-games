@@ -23,6 +23,7 @@ const {
   scoreBucket,
   halfDecadeBucket,
   withMissingGroup,
+  tagMatchScore,
   CORE_COLUMNS,
 } = require('../public/gameColumns.ts');
 
@@ -208,4 +209,18 @@ test('Released year grouping: "Coming soon"/"TBA" keep their own groups, no date
   assert.equal(label('Coming soon'), 'Coming soon');
   assert.equal(label('To be announced'), 'To be announced');
   assert.equal(label(null), '—');
+});
+
+test("tagMatchScore: averages the filtered tags' relative weights, an absent tag counting 0", () => {
+  const weights = { Roguelike: 1, Action: 0.5, Indie: null };
+  assert.equal(tagMatchScore(weights, new Set(['Roguelike'])), 100);
+  assert.equal(tagMatchScore(weights, new Set(['Roguelike', 'Action'])), 75);
+  assert.equal(tagMatchScore(weights, new Set(['Action', 'Co-op'])), 25);
+  assert.equal(tagMatchScore(weights, new Set(['Indie'])), 0);
+});
+
+test('tagMatchScore: no score without a tag filter or tag weights', () => {
+  assert.equal(tagMatchScore({ Action: 1 }, undefined), null);
+  assert.equal(tagMatchScore({ Action: 1 }, new Set()), null);
+  assert.equal(tagMatchScore(null, new Set(['Action'])), null);
 });

@@ -371,6 +371,26 @@ test("C4 edge: on a comparison, the panel's Owned by lists every player who owns
   expect((await owners.allInnerTexts()).sort()).toEqual(['Alice', 'Bob', 'Carol']);
 });
 
+test('C1 edge: a tag filter ranks games by how strongly they carry the tag, until cleared', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  const names = () =>
+    rows(page)
+      .getByRole('checkbox')
+      .evaluateAll((boxes) => boxes.map((b) => b.getAttribute('aria-label')!.replace('Select row ', '')));
+  const byRating = await names();
+  await row(page, 'Portal 2').getByText('Portal 2').click();
+  // Tags lead the cloud, ahead of the category of the same name.
+  const coop = page.locator('.panel-tags').getByRole('button', { name: 'Co-op', exact: true }).first();
+  await coop.click();
+  await expect(page.getByRole('columnheader', { name: /Tag match/ })).toBeVisible();
+  await expect.poll(names).toEqual(['Valheim', 'Terraria', 'Stardew Valley', 'Portal 2']);
+  await coop.click();
+  await expect(page.getByRole('columnheader', { name: /Tag match/ })).toHaveCount(0);
+  await expect.poll(names).toEqual(byRating);
+});
+
 test('C6 edge: a comparison has a Played column per player', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare?u=alice&u=bob');

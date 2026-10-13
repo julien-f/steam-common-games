@@ -62,6 +62,7 @@ export interface GameDetails {
   hltb: Hltb | null;
   meta: GameMeta | null;
   tags: string[] | null;
+  tagWeights?: Record<string, number | null> | null; // relative to the game's top tag, 0–1
   protondb: ProtonDb | null;
   demo: { appid: number } | null;
 }

@@ -731,7 +731,9 @@ function fetchGameDetails(appid, { force = false } = {}) {
         rating: ratingRes.status === 'fulfilled' ? ratingRes.value : null,
         hltb: hltbRes.status === 'fulfilled' ? hltbRes.value : null,
         meta: metaRes.status === 'fulfilled' ? metaRes.value : null,
-        tags: tagsRes.status === 'fulfilled' ? tagsRes.value : null,
+        tags: tagsRes.status === 'fulfilled' ? tagsRes.value.map((t) => t.name) : null,
+        tagWeights:
+          tagsRes.status === 'fulfilled' ? Object.fromEntries(tagsRes.value.map((t) => [t.name, t.weight])) : null,
         demo: demoRes.status === 'fulfilled' ? demoRes.value : null,
         protondb: protondbRes.status === 'fulfilled' ? protondbRes.value : null,
         ...(failed.length && { failed }),
@@ -1130,7 +1132,7 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
         // the per-field failures it already logs (see logErr above) this used to vanish with
         // no trace at all if it ever did fire.
         console.error(`[bug:stream]`, `appid ${appid}:`, err.stack || err.message);
-        send({ appid, rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null });
+        send({ appid, rating: null, hltb: null, meta: null, tags: null, tagWeights: null, demo: null, protondb: null });
       }
     }
   };

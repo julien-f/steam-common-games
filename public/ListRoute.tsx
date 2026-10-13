@@ -69,6 +69,8 @@ import type { ColumnDef, SortEntry, TableState, TableViewState } from '@vates/da
 import {
   fmt,
   insertColumnsAfter,
+  tagMatchColumn,
+  TAG_MATCH_KEY,
   CORE_COLUMNS,
   PRICE_COLUMNS,
   compareDateMissingLast,
@@ -529,12 +531,30 @@ interface DetailsEvent {
   hltb: Hltb | null;
   meta: GameMeta | null;
   tags: string[] | null;
+  tagWeights?: Record<string, number | null> | null;
   demo: { appid: number } | null;
   protondb: ProtonDb | null;
   failed?: string[];
 }
 
 const NO_DETAILS = { rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null };
+
+// A tag filter sorts by Tag match first, shown; clearing it restores the previous sort.
+function syncTagMatchSort(t: TableState<Game>, active: boolean): void {
+  const sorted = t.sort.entries().some((e) => e.key === TAG_MATCH_KEY);
+  const shown = t.columns.visible().has(TAG_MATCH_KEY);
+  if (active) {
+    if (!sorted) {
+      const first = t.sort.entries()[0]?.key;
+      t.sort.appendOrToggle(TAG_MATCH_KEY);
+      if (first) t.sort.move(TAG_MATCH_KEY, first);
+    }
+    if (!shown) t.columns.toggleVisibility(TAG_MATCH_KEY);
+  } else {
+    if (sorted) t.sort.remove(TAG_MATCH_KEY);
+    if (shown) t.columns.toggleVisibility(TAG_MATCH_KEY);
+  }
+}
 
 function applyDetailsEvent(row: Game, event: DetailsEvent) {
   row.detailsFetchedAt = event.fetchedAt ?? null;
@@ -584,6 +604,7 @@ function applyDetailsEvent(row: Game, event: DetailsEvent) {
     hltb: event.hltb,
     meta: event.meta,
     tags: event.tags,
+    tagWeights: event.tagWeights,
     demo: event.demo,
     protondb: event.protondb,
   };
@@ -754,6 +775,8 @@ export default function ListRoute() {
     if (adjusted !== applied) table.setViewState(adjusted);
   }
   const viewTable = { setViewState: applyView, getViewState: () => table?.getViewState() ?? {} };
+  // The table whose tag filter the Tag match column scores against; a signal so it re-sorts.
+  const [filterTable, setFilterTable] = createSignal<TableState<Game> | null>(null);
   // Set only for kind === 'user' — its own per-list tableView, not a shared pref key. A signal
   // (not a plain variable, unlike most of this component's other imperative state) specifically
   // because the selection toolbar's JSX reads it reactively: /lists/:listId is one route
@@ -2329,33 +2352,38 @@ export default function ListRoute() {
       const isRanked = userList()?.kind === 'ranked';
       const priced = kind === 'user' && pricesShown;
       const sharedPriced = kind === 'shared' && pricesShown;
-      const columns = (isRanked
-        ? priced
-          ? RANKED_PRICED_COLUMNS
-          : RANKED_COLUMNS
-        : kind === 'wishlist'
-          ? pricesShown
-            ? WISHLIST_COLUMNS
-            : WISHLIST_NOPRICE_COLUMNS
-          : kind === 'bundle'
-            ? BUNDLE_COLUMNS
-            : kind === 'user'
-              ? priced
-                ? tiered
-                  ? USER_TIERED_COLUMNS
-                  : USER_PRICED_COLUMNS
-                : USER_COLUMNS
-              : kind === 'recent'
-                ? LOOKED_UP_COLUMNS
-                : kind === 'compare'
-                  ? insertColumnsAfter(RECENT_COLUMNS, 'hltbCompletionist', ...comparePlayers.map(playedByColumn))
-                  : kind === 'shared'
-                    ? sharedPriced
-                      ? tiered
-                        ? SHARED_TIERED_COLUMNS
-                        : SHARED_PRICED_COLUMNS
-                      : RECENT_COLUMNS
-                    : OWNED_COLUMNS) as unknown as ColumnDef<Game>[];
+      const columns = insertColumnsAfter(
+        isRanked
+          ? priced
+            ? RANKED_PRICED_COLUMNS
+            : RANKED_COLUMNS
+          : kind === 'wishlist'
+            ? pricesShown
+              ? WISHLIST_COLUMNS
+              : WISHLIST_NOPRICE_COLUMNS
+            : kind === 'bundle'
+              ? BUNDLE_COLUMNS
+              : kind === 'user'
+                ? priced
+                  ? tiered
+                    ? USER_TIERED_COLUMNS
+                    : USER_PRICED_COLUMNS
+                  : USER_COLUMNS
+                : kind === 'recent'
+                  ? LOOKED_UP_COLUMNS
+                  : kind === 'compare'
+                    ? insertColumnsAfter(RECENT_COLUMNS, 'hltbCompletionist', ...comparePlayers.map(playedByColumn))
+                    : kind === 'shared'
+                      ? sharedPriced
+                        ? tiered
+                          ? SHARED_TIERED_COLUMNS
+                          : SHARED_PRICED_COLUMNS
+                        : RECENT_COLUMNS
+                      : OWNED_COLUMNS,
+        'tags',
+        // eslint-disable-next-line solid/reactivity -- read inside the table's own processData memo
+        tagMatchColumn(() => filterTable()?.filter.include().tags),
+      ) as unknown as ColumnDef<Game>[];
       const defaultVisible = isRanked
         ? [...RANKED_DEFAULT_VISIBLE, ...(priced ? PRICED_DEFAULT_VISIBLE : [])]
         : kind === 'wishlist'
@@ -2383,6 +2411,8 @@ export default function ListRoute() {
       const allColumns = groups
         ? [...columns, membershipColumn(groups, [...names.keys()], names, kind === 'compare')]
         : columns;
+      // Set once the stored view is restored, so restoring a tag filter keeps its saved sort.
+      let tagSortArmed = false;
 
       let disposeTableState!: () => void;
       const ts = createRoot((dispose) => {
@@ -2397,6 +2427,13 @@ export default function ListRoute() {
           // The old per-group tables showed every game; a collapsed group would hide them.
           defaultGroupsCollapsed: false,
         });
+        createEffect(
+          on(
+            () => !!state.filter.include().tags?.size,
+            (active) => tagSortArmed && syncTagMatchSort(state, active),
+            { defer: true },
+          ),
+        );
         // Mirrors this table's own selection into a component-level signal so the JSX selection
         // toolbar below stays correct regardless of which load() constructed the table it's
         // currently reading from — disposed alongside the table itself (same createRoot), so a
@@ -2414,6 +2451,7 @@ export default function ListRoute() {
         return state;
       });
       table = ts;
+      setFilterTable(ts);
       tableGrouped = !!groups;
       const disposeView = render(
         () =>
@@ -2439,6 +2477,7 @@ export default function ListRoute() {
       setSharedViewEdited(false);
       setViewingShared(restoreTableView(viewTable, store));
       unsyncView = bindViewPersistence(table, store, viewingShared, setSharedViewEdited);
+      tagSortArmed = true;
       if (keptSelection?.size) table.selection.setAll(tableData().filter((row) => keptSelection.has(row.appid)));
       setTableReady(true);
     }
