@@ -2190,6 +2190,37 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   padding: 3px 8px;
   border-radius: 3px;
 }
+.panel-similar-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 24px;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text0);
+  font: inherit;
+  font-size: var(--fs-meta);
+  text-align: left;
+  cursor: pointer;
+}
+.panel-similar-item:last-child {
+  border-bottom: none;
+}
+.panel-similar-item:hover .panel-similar-name {
+  color: var(--accent2);
+}
+.panel-similar-score {
+  color: var(--text1);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.panel-similar-empty {
+  color: var(--text1);
+  font-size: var(--fs-label);
+}
 .panel-tag-weight {
   position: absolute;
   left: 0;

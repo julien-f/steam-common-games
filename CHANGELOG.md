@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A shared game link's preview shows the game's name, description and header image
 - Filtering by Steam tag ranks the games by how strongly players tagged them with it (a new Tag match column, filterable to keep only the strongly tagged ones), until the filter is cleared
 - A gauge under each Steam tag in a game's panel shows how strongly players tagged the game with it
+- A game's panel lists the most similar games in the open list by Steam tags, with a link to Steam's own "More like this"
 
 ### Changed
 

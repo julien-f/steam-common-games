@@ -63,18 +63,23 @@ interface RouteHandlers {
   onTagClick?: (dim: string, value: string) => void;
   isTagActive?: (dim: string, value: string) => boolean;
   getOwners?: (appid: number) => GameOwner[] | null; // null: the current account's own (panel.tsx)
+  listGames?: () => Game[]; // the table's rows as shown, for the panel's Similar in this list
 }
 let routeHandlers: RouteHandlers = {};
 // A signal, unlike routeHandlers: the panel's tag pills render as buttons only while it holds.
 const [tagsFilterable, setTagsFilterable] = createSignal(false);
+// Likewise: the panel's Similar in this list shows only on a route with a list.
+const [hasList, setHasList] = createSignal(false);
 export function registerRouteHandlers(handlers: RouteHandlers): () => void {
   routeHandlers = handlers;
   setTagsFilterable(handlers.onTagClick != null);
+  setHasList(handlers.listGames != null);
   return () => {
     // A route mounting before the previous one's cleanup has already registered its own.
     if (routeHandlers !== handlers) return;
     routeHandlers = {};
     setTagsFilterable(false);
+    setHasList(false);
   };
 }
 
@@ -204,6 +209,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       onTagClick: (dim, value) => routeHandlers.onTagClick?.(dim, value),
       tagsFilterable,
       getOwners: (appid) => routeHandlers.getOwners?.(appid) ?? null,
+      listGames: () => (hasList() ? routeHandlers.listGames!() : null),
       isTagActive: (dim, value) => routeHandlers.isTagActive?.(dim, value) ?? false,
     });
     initGameSearch({

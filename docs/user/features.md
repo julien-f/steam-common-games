@@ -104,6 +104,8 @@ Wishlist and bundle lists carry price columns: the best deal across every shop I
 
 Clicking any row opens a detail panel beside the table — not over it, so the list stays usable and clicking another row just swaps the panel's contents. It carries screenshots and trailers, the weighted rating and review counts, How Long To Beat estimates, achievements, recent news from the developer, current price and the current bundles it's in (each opens that bundle's list), DLC and links out. ↻ refetches everything for that one game.
 
+**Similar in this list** shows the 5 games of the open list closest to this one by Steam tags (tags nearly every game in the list carries count less), each opening its own panel; ← Back returns. **More like this on Steam ↗** searches the whole store instead, and is all the section shows outside a list (while ranking).
+
 Clicking a screenshot or trailer (or **Enter** on it) opens it full-window:
 
 - **← / →** step through the game's media (while a video plays they seek 5 s; **Shift** keeps them stepping), **↑ / ↓** move to the previous or next game in the list.

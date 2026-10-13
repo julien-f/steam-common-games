@@ -3163,6 +3163,7 @@ export default function ListRoute() {
       isTagActive,
       getOwners: (appid) =>
         comparePlayers.length ? comparePlayers.flatMap((player) => player.owners.get(appid) ?? []) : null,
+      listGames: getGameList,
     });
     onCleanup(() => {
       unregister();

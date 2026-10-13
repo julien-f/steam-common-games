@@ -403,6 +403,22 @@ test("C1 edge: the panel's Steam tags show how strongly players tagged the game 
   expect(ratio).toBeCloseTo(0.3, 1);
 });
 
+test("C1 edge: the panel lists the list's games closest by Steam tags, each opening its own panel", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Valheim').getByText('Valheim').click();
+  const similar = page.locator('#panel-section-similar');
+  await expect(similar.getByRole('link', { name: /More like this on Steam/ })).toHaveAttribute(
+    'href',
+    'https://store.steampowered.com/recommended/morelikethis/app/892970/',
+  );
+  await expect(similar.getByRole('button')).toHaveText([/^Terraria/, /^Stardew Valley/, /^Portal 2/]);
+  await similar.getByRole('button', { name: /^Terraria/ }).click();
+  await expect(page.locator('#panel-title')).toHaveText('Terraria');
+});
+
 test('C1 edge: a Tag match range keeps the games strongly tagged, and goes with the tag filter', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
@@ -909,6 +925,21 @@ test("R1 edge: the ranking's keyboard hints show only with a mouse", async ({ pa
   await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
   await expect(page.locator('.rank-question')).toBeVisible();
   await expect(page.locator('.rank-hint')).toBeVisible({ visible: testInfo.project.name !== 'phone' });
+});
+
+test("R1 edge: the ranking's side panel offers Steam's similar games, with no list to match against", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
+  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
+  await page.getByRole('button', { name: 'ℹ Details' }).first().click();
+  const similar = page.locator('#panel-section-similar');
+  await expect(similar.locator('.panel-section-title')).toHaveText(/^Similar games/);
+  await expect(similar.getByRole('link', { name: /More like this on Steam/ })).toBeVisible();
+  await expect(similar.getByRole('button')).toHaveCount(0);
+  await expect(similar.locator('.panel-similar-empty')).toHaveCount(0);
 });
 
 test("R1 edge: the ranking's side panel shows tags as plain pills and its Refresh re-fetches", async ({ page }) => {
