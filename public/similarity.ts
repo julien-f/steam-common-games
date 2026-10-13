@@ -128,11 +128,16 @@ export function tasteOf(games: readonly (Omit<Tagged, 'appid'> & { playtime?: nu
   };
 }
 
+// Built once per stored taste, not once per scored row.
+const profileVectors = new WeakMap<Taste, Vector>();
+
 // 0–100; null for a game without tag weights.
 export function fitTo(taste: Taste, game: Omit<Tagged, 'appid'>): number | null {
   if (!game.details?.tagWeights) return null;
+  let profile = profileVectors.get(taste);
+  if (!profile) profileVectors.set(taste, (profile = new Map(Object.entries(taste.profile))));
   const v = vectorOf(featuresOf(game), (tag) => taste.idf[tag] ?? taste.unseenIdf);
-  return Math.round(cosine(new Map(Object.entries(taste.profile)), v) * 100);
+  return Math.round(cosine(profile, v) * 100);
 }
 
 // Its own localStorage key, not a pref: device-local cache, recomputed on each Owned visit, never synced.
