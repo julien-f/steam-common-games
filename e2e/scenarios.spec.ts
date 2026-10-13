@@ -517,6 +517,17 @@ test("C1 edge: a game looked up outside the list can't sort the list by similari
   await expect(similar.getByRole('button', { name: /Sort list by similarity/ })).toHaveCount(0);
 });
 
+test('C1 edge: a list filtered down to a few games says it has too few to compare', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Valheim').getByText('Valheim').click();
+  await page.locator('.panel-tags').getByRole('button', { name: 'Co-op', exact: true }).first().click();
+  await expect(rows(page)).toHaveCount(4);
+  const similar = page.locator('#panel-section-similar');
+  await expect(similar).toContainText('Too few games in this list to compare.');
+  await expect(similar.locator('.panel-similar-item')).toHaveCount(0);
+});
+
 test('C1 edge: a Tag match range keeps the games strongly tagged, and goes with the tag filter', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

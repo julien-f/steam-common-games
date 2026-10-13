@@ -74,6 +74,7 @@ import {
   similarGames,
   tasteOf,
   topPlayedTags,
+  type Similar,
   type Taste,
 } from './similarity.ts';
 import {
@@ -227,6 +228,7 @@ import type {
   GameList,
   CombineOp,
   ListRef,
+  ReadonlyGame,
 } from './types.ts';
 import {
   getList,
@@ -613,6 +615,8 @@ interface DetailsEvent {
 const NO_DETAILS = { rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null };
 
 const PLAYS_MOSTLY_SHOWN = 6;
+// Fewer games to compare against and the tags' rarity weights mean little.
+const SIMILAR_MIN_CANDIDATES = 5;
 
 // A score column leads the sort while its source is set; unset, it goes, with its row-hiding range.
 function syncLeadColumn(t: TableState<Game>, key: string, active: boolean): void {
@@ -1365,6 +1369,19 @@ export default function ListRoute() {
 
   function tableData(): Game[] {
     return rowsStore.filter((r) => !r.loading);
+  }
+
+  // Candidates as shown, but tag rarity from every row, as the Similarity column has it: same %.
+  function similarInList(game: ReadonlyGame, limit: number): Similar<ReadonlyGame>[] | null {
+    const shown = new Set(
+      getGameList()
+        .filter((g) => g.appid !== game.appid && g.details?.tagWeights)
+        .map((g) => g.appid),
+    );
+    if (shown.size < SIMILAR_MIN_CANDIDATES) return null;
+    return similarGames<ReadonlyGame>(game, tableData(), Infinity)
+      .filter((s) => shown.has(s.game.appid))
+      .slice(0, limit);
   }
 
   // Reads tableReady so a caller tracking this list (the panel's nav bar) follows a table rebuild.
@@ -3322,7 +3339,7 @@ export default function ListRoute() {
       isTagActive,
       getOwners: (appid) =>
         comparePlayers.length ? comparePlayers.flatMap((player) => player.owners.get(appid) ?? []) : null,
-      listGames: getGameList,
+      similarInList,
       similarTo,
       setSimilarTo,
     });

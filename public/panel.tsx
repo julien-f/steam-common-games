@@ -44,7 +44,7 @@ import { fmtReleaseDate } from './gameColumns.ts';
 import { formatWithEstimate } from './currency.ts';
 import { regionCurrency } from './region.ts';
 import { nextHopHistory } from './panelHistory.ts';
-import { similarGames } from './similarity.ts';
+import type { Similar } from './similarity.ts';
 import { clearPanelNav } from './panelNav.ts';
 import type { PanelHistoryEntry } from './panelHistory.ts';
 import { setGameTitle } from './pageTitle.ts';
@@ -78,7 +78,8 @@ export interface PanelOptions {
   onClose: (opts?: { leavingRoute?: boolean }) => void;
   // The route's own owners for a game (a comparison's players), over the current account's.
   getOwners: (appid: number) => GameOwner[] | null;
-  listGames: () => readonly ReadonlyGame[] | null; // null: the route has no list
+  // undefined: the route has no list; null: too few of its games to compare against
+  similarInList: (game: ReadonlyGame, limit: number) => readonly Similar<ReadonlyGame>[] | null | undefined;
   similarTo: () => number | null;
   setSimilarTo: (appid: number | null) => void;
 }
@@ -2065,21 +2066,15 @@ function TagCloudSection(props: { game: ReadonlyGame }): JSX.Element {
 }
 
 const SIMILAR_SHOWN = 5;
-// Fewer games to compare against and the tags' rarity weights mean little.
-const SIMILAR_MIN_CANDIDATES = 5;
 
 // The list's games closest to this one by Steam tags; Steam's own page covers the whole store.
 function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
-  const list = () => panelOptions.listGames();
-  const similar = createMemo(() => {
-    const others = (list() ?? []).filter((g) => g.appid !== props.game.appid && g.details?.tagWeights);
-    return others.length < SIMILAR_MIN_CANDIDATES ? [] : similarGames(props.game, others, SIMILAR_SHOWN);
-  });
+  const similar = createMemo(() => panelOptions.similarInList(props.game, SIMILAR_SHOWN));
   return (
     <Show when={!props.game.loading && props.game.details?.tags?.length}>
       <div class="panel-section panel-card" id="panel-section-similar">
         <div class="panel-section-title">
-          {list() ? 'Similar in this list' : 'Similar games'}{' '}
+          {similar() !== undefined ? 'Similar in this list' : 'Similar games'}{' '}
           <a
             href={`https://store.steampowered.com/recommended/morelikethis/app/${props.game.appid}/`}
             target="_blank"
@@ -2088,8 +2083,15 @@ function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
             More like this on Steam ↗
           </a>
         </div>
-        <Show when={list()}>
-          <Show when={similar().length} fallback={<div class="panel-similar-empty">No close match in this list.</div>}>
+        <Show when={similar() !== undefined}>
+          <Show
+            when={similar()?.length}
+            fallback={
+              <div class="panel-similar-empty">
+                {similar() === null ? 'Too few games in this list to compare.' : 'No close match in this list.'}
+              </div>
+            }
+          >
             <For each={similar()}>
               {(s) => (
                 <button
