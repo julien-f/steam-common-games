@@ -2217,6 +2217,22 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
+.panel-similar-sort {
+  margin-top: 8px;
+  padding: 3px 8px;
+  min-height: 24px;
+  background: rgba(61, 80, 104, 0.5);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text1);
+  font: inherit;
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+.panel-similar-sort:hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
 .panel-similar-empty {
   color: var(--text1);
   font-size: var(--fs-label);

@@ -79,6 +79,8 @@ export interface PanelOptions {
   // The route's own owners for a game (a comparison's players), over the current account's.
   getOwners: (appid: number) => GameOwner[] | null;
   listGames: () => readonly ReadonlyGame[] | null; // null: the route has no list
+  similarTo: () => number | null;
+  setSimilarTo: (appid: number | null) => void;
 }
 
 // ── Shared game side panel ──────────────────────────────────────────────────
@@ -2101,6 +2103,16 @@ function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
               )}
             </For>
           </Show>
+          <button
+            class="panel-similar-sort"
+            onClick={() =>
+              panelOptions.setSimilarTo(panelOptions.similarTo() === props.game.appid ? null : props.game.appid)
+            }
+          >
+            {panelOptions.similarTo() === props.game.appid
+              ? '× Stop sorting by similarity'
+              : '⇅ Sort list by similarity'}
+          </button>
         </Show>
       </div>
     </Show>

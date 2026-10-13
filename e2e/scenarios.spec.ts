@@ -414,9 +414,37 @@ test("C1 edge: the panel lists the list's games closest by Steam tags, each open
     'href',
     'https://store.steampowered.com/recommended/morelikethis/app/892970/',
   );
-  await expect(similar.getByRole('button')).toHaveText([/^Terraria/, /^Stardew Valley/, /^Portal 2/]);
+  await expect(similar.locator('.panel-similar-item')).toHaveText([/^Terraria/, /^Stardew Valley/, /^Portal 2/]);
   await similar.getByRole('button', { name: /^Terraria/ }).click();
   await expect(page.locator('#panel-title')).toHaveText('Terraria');
+});
+
+test('C1 edge: the panel sorts the list by similarity to its game, until stopped', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  const names = () =>
+    rows(page)
+      .getByRole('checkbox')
+      .evaluateAll((boxes) => boxes.map((b) => b.getAttribute('aria-label')!.replace('Select row ', '')));
+  const byRating = await names();
+  await row(page, 'Valheim').getByText('Valheim').click();
+  await page.getByRole('button', { name: '⇅ Sort list by similarity' }).click();
+  await expect(page.getByRole('columnheader', { name: /Similarity/ })).toBeVisible();
+  // Terraria's tags match Valheim's as closely as Valheim's own, so the two 100% tie.
+  await expect
+    .poll(async () => (await names()).slice(0, 4))
+    .toEqual([...byRating.filter((n) => n === 'Valheim' || n === 'Terraria'), 'Stardew Valley', 'Portal 2']);
+  await page.getByRole('button', { name: '× Stop sorting by similarity' }).click();
+  await expect(page.getByRole('columnheader', { name: /Similarity/ })).toHaveCount(0);
+  await expect.poll(names).toEqual(byRating);
+  // Not kept across a reload: its target game was only this visit's.
+  await page.getByRole('button', { name: '⇅ Sort list by similarity' }).click();
+  await expect(page.getByRole('columnheader', { name: /Similarity/ })).toBeVisible();
+  await page.reload();
+  await expect(rows(page)).toHaveCount(6);
+  await expect(page.getByRole('columnheader', { name: /Similarity/ })).toHaveCount(0);
+  await expect.poll(names).toEqual(byRating);
 });
 
 test('C1 edge: a Tag match range keeps the games strongly tagged, and goes with the tag filter', async ({ page }) => {

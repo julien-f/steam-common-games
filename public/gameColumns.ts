@@ -714,6 +714,22 @@ export function tagMatchScore(
   return Math.round((sum / selected.size) * 100);
 }
 
+export const SIMILARITY_KEY = 'similarity';
+// Ranks the list by closeness to one game, from the panel's Sort list by similarity.
+export function similarityColumn(scores: () => ReadonlyMap<number, number> | null): ColumnDef<Row> {
+  return {
+    key: SIMILARITY_KEY,
+    label: 'Similarity',
+    type: 'number',
+    value: (row) => scores()?.get(row.appid) ?? null,
+    format: (v) => (v == null ? '—' : `${v}%`),
+    compare: compareNumMissingLast,
+    defaultSortDir: 'desc',
+    searchable: false,
+    category: 'Classification',
+  };
+}
+
 export const TAG_MATCH_KEY = 'tagMatch';
 // Ranks a tag filter's matches by how strongly each game carries the filtered tags.
 export function tagMatchColumn(selected: () => ReadonlySet<string> | undefined): ColumnDef<Row> {

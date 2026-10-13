@@ -64,6 +64,8 @@ interface RouteHandlers {
   isTagActive?: (dim: string, value: string) => boolean;
   getOwners?: (appid: number) => GameOwner[] | null; // null: the current account's own (panel.tsx)
   listGames?: () => Game[]; // the table's rows as shown, for the panel's Similar in this list
+  similarTo?: () => number | null; // the game the list is sorted by similarity to
+  setSimilarTo?: (appid: number | null) => void;
 }
 let routeHandlers: RouteHandlers = {};
 // A signal, unlike routeHandlers: the panel's tag pills render as buttons only while it holds.
@@ -210,6 +212,8 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       tagsFilterable,
       getOwners: (appid) => routeHandlers.getOwners?.(appid) ?? null,
       listGames: () => (hasList() ? routeHandlers.listGames!() : null),
+      similarTo: () => (hasList() ? (routeHandlers.similarTo?.() ?? null) : null),
+      setSimilarTo: (appid) => routeHandlers.setSimilarTo?.(appid),
       isTagActive: (dim, value) => routeHandlers.isTagActive?.(dim, value) ?? false,
     });
     initGameSearch({
