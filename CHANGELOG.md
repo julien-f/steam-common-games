@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - "Sort list by similarity" in a game's panel ranks the whole list by how close each game is to it
 - Owned shows the Steam tags the account plays most, each one a click away from filtering the list by it
 - A comparison's Group fit column scores each game by how well it suits the player it suits least
+- A Taste fit column, shown on Wishlist and bundles, scores games by how close they are to the account's taste, learned from its Owned list
 
 ### Changed
 

@@ -95,3 +95,56 @@ export function playerFits(
     }),
   );
 }
+
+// An account's play profile, kept to score games outside its library (a wishlist, a bundle).
+export interface Taste {
+  at: number;
+  profile: Record<string, number>;
+  idf: Record<string, number>; // across the library; a tag it lacks gets `unseenIdf`
+  unseenIdf: number;
+}
+
+const round2 = (x: number) => Math.round(x * 100) / 100;
+
+export function tasteOf(games: readonly (Omit<Tagged, 'appid'> & { playtime?: number })[], at: number): Taste | null {
+  const weighted = games.filter((g) => g.details?.tagWeights);
+  const corpus = weighted.map(featuresOf);
+  const idf = inverseFrequency(corpus);
+  const played = weighted.filter((g) => g.playtime).map((g) => ({ hours: g.playtime!, weights: featuresOf(g) }));
+  const profile = playProfile(played, idf);
+  if (!profile) return null;
+  const tags = new Set(corpus.flatMap(Object.keys));
+  return {
+    at,
+    profile: Object.fromEntries([...profile].map(([tag, x]) => [tag, round2(x)])),
+    idf: Object.fromEntries([...tags].map((tag) => [tag, round2(idf(tag))])),
+    unseenIdf: round2(Math.log(1 + corpus.length)),
+  };
+}
+
+// 0–100; null for a game without tag weights.
+export function fitTo(taste: Taste, game: Omit<Tagged, 'appid'>): number | null {
+  if (!game.details?.tagWeights) return null;
+  const v = vectorOf(featuresOf(game), (tag) => taste.idf[tag] ?? taste.unseenIdf);
+  return Math.round(cosine(new Map(Object.entries(taste.profile)), v) * 100);
+}
+
+// Its own localStorage key, not a pref: device-local cache, recomputed on each Owned visit, never synced.
+const TASTE_STORAGE_PREFIX = 'steam.isonoe.net:taste:';
+
+export function loadTaste(accountId: string): Taste | null {
+  try {
+    const taste = JSON.parse(localStorage.getItem(TASTE_STORAGE_PREFIX + accountId) ?? 'null');
+    return taste?.profile && taste.idf ? taste : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveTaste(accountId: string, taste: Taste): void {
+  try {
+    localStorage.setItem(TASTE_STORAGE_PREFIX + accountId, JSON.stringify(taste));
+  } catch {
+    /* unavailable storage: Taste fit stays unknown elsewhere */
+  }
+}

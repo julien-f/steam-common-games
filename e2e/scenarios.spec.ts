@@ -468,6 +468,29 @@ test('F3 edge: Owned says which tags the account plays most, each filtering the 
   await expect(tags.getByText('Co-op')).toHaveClass(/active/);
 });
 
+test("B2 edge: Taste fit scores the wishlist by the account's taste, once Owned has been opened", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  // 10 h on every game, so Owned has enough played games to learn a taste from.
+  await page.route('**/api/common-games', (route) => {
+    const req = route.request();
+    const body = JSON.parse(respond(req.method(), new URL(req.url()), req.postData()).body);
+    for (const perPlayer of Object.values(body.playtime) as Record<string, number>[])
+      for (const id of Object.keys(perPlayer)) perPlayer[id] = 600;
+    return route.fulfill({ json: body });
+  });
+  const fit = () => rows(page).first().locator('span[title*="taste"]');
+  await page.goto('/lists/wishlist');
+  await expect(page.getByRole('columnheader', { name: /Taste fit/ })).toBeVisible();
+  await expect(fit()).toHaveText('—');
+  await expect(fit()).toHaveAttribute('title', "Open Alice's Owned list once to learn their taste");
+
+  await page.goto('/lists/owned');
+  await expect(page.locator('.list-plays-mostly')).toBeVisible();
+  await page.goto('/lists/wishlist');
+  await expect(fit()).toHaveText(/^\d+%$/);
+  await expect(fit()).toHaveAttribute('title', /^Closeness to Alice's taste, from their Owned list as of /);
+});
+
 test('C1 edge: a Tag match range keeps the games strongly tagged, and goes with the tag filter', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

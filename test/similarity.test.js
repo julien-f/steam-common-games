@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { similarGames, topPlayedTags, playerFits } = require('../public/similarity.ts');
+const { similarGames, topPlayedTags, playerFits, tasteOf, fitTo } = require('../public/similarity.ts');
 
 const game = (appid, tagWeights) => ({ appid, details: { tagWeights } });
 
@@ -95,4 +95,22 @@ test('similarGames: a shared Production Tier breaks a tie between equally tagged
 test("topPlayedTags: Production Tier shapes the profile but isn't a tag to show", () => {
   const games = [1, 2, 3, 4, 5].map((id) => ({ ...owned(id, 10, { [`T${id}`]: 1 }), productionTier: 'Indie' }));
   assert.ok(!topPlayedTags([...games, owned(6, 0, { X: 1 })], 10).some((t) => t.startsWith('tier:')));
+});
+
+test("tasteOf/fitTo: a game outside the library scores by closeness to the account's play profile", () => {
+  const library = [
+    owned(1, 100, { Roguelike: 1, Deckbuilder: 0.8 }),
+    owned(2, 50, { Roguelike: 1 }),
+    owned(3, 5, { Farming: 1 }),
+    owned(4, 5, { Racing: 1 }),
+    owned(5, 5, { Puzzle: 1 }),
+  ];
+  const taste = tasteOf(library, 123);
+  assert.equal(taste.at, 123);
+  const deckbuilder = fitTo(taste, { details: { tagWeights: { Deckbuilder: 1, Roguelike: 0.7 } } });
+  const shooter = fitTo(taste, { details: { tagWeights: { Shooter: 1 } } });
+  assert.ok(deckbuilder > 50, `${deckbuilder}`);
+  assert.equal(shooter, 0);
+  assert.equal(fitTo(taste, { details: null }), null);
+  assert.equal(tasteOf(library.slice(0, 4), 0), null);
 });

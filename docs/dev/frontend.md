@@ -194,6 +194,8 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
 
 **Plays mostly** (Owned's hero note, `playsMostlyNote`): `similarity.ts`'s `topPlayedTags` over the rows once `loadFraction()` is null, so it doesn't reshuffle while details stream; its tags call `onTagClick` like the panel's pills.
 
+**Taste fit** (`tasteFit`, `tasteFitColumn` in `ListRoute.tsx`): `similarity.ts`'s `fitTo` against the current account's stored `Taste` ([lists-and-accounts.md](lists-and-accounts.md#storage-schema)), read once per table build; Owned saves it (`tasteOf`) once its details finish loading.
+
 **Group fit** (compare only, `groupFitColumn` in `ListRoute.tsx`): the minimum over players of `similarity.ts`'s `playerFits` (cosine of the game against each player's play profile), computed once details finish loading; the cell's `title` lists each player's score.
 
 **Similarity** (`similarity`, `similarityColumn`) scores rows against `ListRoute.tsx`'s `similarTo` game (set from the panel through the `similarTo`/`setSimilarTo` route handlers) with `similarity.ts`; the target scores 100, a tagged non-match 0. `syncLeadColumn` shows and sorts it the same way; it's reset on every table build, so a stored view never keeps it.

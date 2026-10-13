@@ -152,4 +152,6 @@ ListRef      kind 'account-owned' | 'account-wishlist' | 'bundle' | 'recent-game
 
 Pref keys: `schemaVersion`, `myAccount`, `currentAccount`, `recentAccounts`, `region`, `lists`, `folders`, `recentGames`, `ranking:<listId>`, `bundleSnapshots`, the table-view keys above (each shared across all bundles/comparisons/shared links; a user list keeps its own `tableView`), with `bundlesBrowseView` for `/bundles`' table of bundles.
 
+Outside the blob: `steam.isonoe.net:taste:<accountId>` (`similarity.ts`'s `Taste`: play profile and the library's tag rarities), rewritten each time that account's Owned list finishes loading and read by every list's Taste fit. A device-local cache: never synced, and kept out of the blob that every pref read parses.
+
 **Cross-tab sync**: not implemented. Nothing listens for `storage` events, so two open tabs can hold divergent state until one reloads.

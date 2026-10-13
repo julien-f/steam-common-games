@@ -66,7 +66,16 @@ import { render } from 'solid-js/web';
 import { A, useParams, useLocation, useNavigate } from '@solidjs/router';
 import { createTableState, DataTableView, datePartGroup } from '@vates/data-table-solid';
 import type { ColumnDef, SortEntry, TableState, TableViewState } from '@vates/data-table-solid';
-import { playerFits, similarGames, topPlayedTags } from './similarity.ts';
+import {
+  fitTo,
+  loadTaste,
+  playerFits,
+  saveTaste,
+  similarGames,
+  tasteOf,
+  topPlayedTags,
+  type Taste,
+} from './similarity.ts';
 import {
   fmt,
   insertColumnsAfter,
@@ -299,6 +308,32 @@ function playedByColumn(
   };
 }
 
+const fmtPercent = (v: unknown) => (v == null ? '—' : `${v}%`);
+
+// How close a game is to the current account's taste; `taste` null: Owned not opened yet.
+function tasteFitColumn(taste: Taste | null, accountLabel: string): ColumnDef<Record<string, any>> {
+  const title = taste
+    ? `Closeness to ${accountLabel}'s taste, from their Owned list as of ${new Date(taste.at).toLocaleDateString()}`
+    : `Open ${accountLabel}'s Owned list once to learn their taste`;
+  return {
+    key: 'tasteFit',
+    label: 'Taste fit',
+    type: 'number',
+    value: (row) => (taste ? fitTo(taste, row) : null),
+    format: fmtPercent,
+    render: (v) => {
+      const cell = document.createElement('span');
+      cell.textContent = fmtPercent(v);
+      cell.title = title;
+      return cell;
+    },
+    compare: compareNumMissingLast,
+    defaultSortDir: 'desc',
+    searchable: false,
+    category: 'Classification',
+  };
+}
+
 const GROUP_FIT_KEY = 'groupFit';
 // How well a game suits the comparison's least suited player, by each one's play profile.
 function groupFitColumn(
@@ -306,7 +341,6 @@ function groupFitColumn(
   labels: string[],
 ): ColumnDef<Record<string, any>> {
   const scores = (appid: number) => fits()?.get(appid) ?? null;
-  const fmtFit = (v: unknown) => (v == null ? '—' : `${v}%`);
   return {
     key: GROUP_FIT_KEY,
     label: 'Group fit',
@@ -315,10 +349,10 @@ function groupFitColumn(
       const known = scores(row.appid)?.filter((s) => s != null);
       return known?.length ? Math.min(...known) : null;
     },
-    format: fmtFit,
+    format: fmtPercent,
     render: (v, row) => {
       const cell = document.createElement('span');
-      cell.textContent = fmtFit(v);
+      cell.textContent = fmtPercent(v);
       const s = scores(row.appid);
       if (s)
         cell.title = s
@@ -409,6 +443,7 @@ const WISHLIST_DEFAULT_VISIBLE = [
   'name',
   'dateAdded',
   'steamdbRating',
+  'tasteFit',
   'hltbAll',
   'releaseDate',
   'genres',
@@ -517,6 +552,7 @@ const BUNDLE_DEFAULT_VISIBLE = [
   'bestDealPrice',
   'bestDealCut',
   'steamdbRating',
+  'tasteFit',
   'hltbAll',
   'releaseDate',
   'genres',
@@ -2403,6 +2439,7 @@ export default function ListRoute() {
     tieredLoaded = tiered;
     {
       const isRanked = userList()?.kind === 'ranked';
+      const tasteAccount = getEffectiveCurrentAccount();
       const priced = kind === 'user' && pricesShown;
       const sharedPriced = kind === 'shared' && pricesShown;
       const columns = insertColumnsAfter(
@@ -2445,6 +2482,10 @@ export default function ListRoute() {
         // eslint-disable-next-line solid/reactivity -- read inside the table's own processData memo
         tagMatchColumn(() => filterTable()?.filter.include().tags),
         similarityColumn(similarityScores),
+        tasteFitColumn(
+          tasteAccount ? loadTaste(tasteAccount.id) : null,
+          tasteAccount ? accountDisplayLabel(tasteAccount) : 'your account',
+        ),
       ) as unknown as ColumnDef<Game>[];
       const defaultVisible = isRanked
         ? [...RANKED_DEFAULT_VISIBLE, ...(priced ? PRICED_DEFAULT_VISIBLE : [])]
@@ -3027,6 +3068,13 @@ export default function ListRoute() {
         )
       : null,
   );
+  // Owned learns its account's taste for Taste fit elsewhere, once every row's details are in.
+  createEffect(() => {
+    if (kind !== 'owned' || loadFraction() != null) return;
+    const account = getEffectiveCurrentAccount();
+    const taste = account && tasteOf(tableData(), Date.now());
+    if (taste) saveTaste(account.id, taste);
+  });
   // Once every row's details are in, so it doesn't reshuffle as they stream.
   const playsMostly = createMemo(() => (loadFraction() == null ? topPlayedTags(tableData(), PLAYS_MOSTLY_SHOWN) : []));
   function playsMostlyNote(): JSX.Element {
