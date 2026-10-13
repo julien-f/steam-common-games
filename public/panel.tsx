@@ -44,7 +44,7 @@ import { fmtReleaseDate } from './gameColumns.ts';
 import { formatWithEstimate } from './currency.ts';
 import { regionCurrency } from './region.ts';
 import { nextHopHistory } from './panelHistory.ts';
-import type { Similar } from './similarity.ts';
+import type { Similar } from './tagTaste.ts';
 import { clearPanelNav } from './panelNav.ts';
 import type { PanelHistoryEntry } from './panelHistory.ts';
 import { setGameTitle } from './pageTitle.ts';

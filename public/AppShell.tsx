@@ -23,7 +23,7 @@ import type { GameOwner } from './accountData.ts';
 import { setPanelParam, setLightboxParam, withAccountParam, COMPARE_PATH } from './urlState.ts';
 import { syncAccountOverrideFromUrl } from './accountOverride.ts';
 import type { Game, ReadonlyGame } from './types.ts';
-import type { Similar } from './similarity.ts';
+import type { Similar } from './tagTaste.ts';
 import { ShortcutsModal } from './ShortcutsModal.tsx';
 import { AccountChip } from './AccountChip.tsx';
 import { initAuth } from './authStore.ts';

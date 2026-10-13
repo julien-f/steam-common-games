@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { similarGames, topPlayedTags, playerFits, tasteOf, fitTo } = require('../public/similarity.ts');
+const { similarGames, topPlayedTags, playerFits, tasteOf, fitTo } = require('../public/tagTaste.ts');
 
 const game = (appid, tagWeights) => ({ appid, details: { tagWeights } });
 

@@ -77,7 +77,7 @@ import {
   type PlayerFits,
   type Similar,
   type Taste,
-} from './similarity.ts';
+} from './tagTaste.ts';
 import {
   fmt,
   insertColumnsAfter,
