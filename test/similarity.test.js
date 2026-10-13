@@ -71,8 +71,9 @@ test("playerFits: each game's closeness to each player's profile, null for a pla
   const alice = { 1: 50, 2: 50, 5: 1, 6: 1, 3: 1 };
   const bob = { 3: 50 };
   const fits = playerFits(games, [(id) => alice[id], (id) => bob[id]]);
-  assert.ok(fits.get(1)[0] > fits.get(3)[0]);
-  assert.equal(fits.get(1)[1], null);
+  assert.ok(fits.byGame.get(1)[0] > fits.byGame.get(3)[0]);
+  assert.equal(fits.byGame.get(1)[1], null);
+  assert.deepEqual(fits.profiled, [true, false]);
 });
 
 test('playerFits: nothing when no player has a profile', () => {

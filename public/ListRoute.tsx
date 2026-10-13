@@ -74,6 +74,7 @@ import {
   similarGames,
   tasteOf,
   topPlayedTags,
+  type PlayerFits,
   type Similar,
   type Taste,
 } from './similarity.ts';
@@ -312,23 +313,28 @@ function playedByColumn(
 
 const fmtPercent = (v: unknown) => (v == null ? '—' : `${v}%`);
 
-// How close a game is to the current account's taste; `taste` null: Owned not opened yet.
-function tasteFitColumn(taste: Taste | null, accountLabel: string): ColumnDef<Record<string, any>> {
-  const title = taste
-    ? `Closeness to ${accountLabel}'s taste, from their Owned list as of ${new Date(taste.at).toLocaleDateString()}`
-    : `Open ${accountLabel}'s Owned list once to learn their taste`;
+const TASTE_FIT_KEY = 'tasteFit';
+// What Taste fit is scored against; said in the list status (tasteFitNote), not only on hover.
+interface TasteSource {
+  label: string | null; // null: no current account
+  taste: Taste | null; // null: its Owned list not opened on this device yet
+}
+
+function tasteFitNote({ label, taste }: TasteSource): string {
+  if (!label) return 'Taste fit needs an account: pick one on Home';
+  if (!taste) return `Taste fit: open ${label}'s Owned list once on this device to learn their taste`;
+  return `Taste fit: ${label}'s taste as of ${new Date(taste.at).toLocaleDateString()}`;
+}
+
+// How close a game is to the current account's taste.
+function tasteFitColumn(source: TasteSource): ColumnDef<Record<string, any>> {
+  const { taste } = source;
   return {
-    key: 'tasteFit',
+    key: TASTE_FIT_KEY,
     label: 'Taste fit',
     type: 'number',
     value: (row) => (taste ? fitTo(taste, row) : null),
     format: fmtPercent,
-    render: (v) => {
-      const cell = document.createElement('span');
-      cell.textContent = fmtPercent(v);
-      cell.title = title;
-      return cell;
-    },
     compare: compareNumMissingLast,
     defaultSortDir: 'desc',
     searchable: false,
@@ -338,23 +344,25 @@ function tasteFitColumn(taste: Taste | null, accountLabel: string): ColumnDef<Re
 
 const GROUP_FIT_KEY = 'groupFit';
 // How well a game suits the comparison's least suited player, by each one's play profile.
-function groupFitColumn(
-  fits: () => ReadonlyMap<number, (number | null)[]> | null,
-  labels: string[],
-): ColumnDef<Record<string, any>> {
-  const scores = (appid: number) => fits()?.get(appid) ?? null;
+function groupFitColumn(fits: () => PlayerFits | null, labels: string[]): ColumnDef<Record<string, any>> {
+  const scores = (appid: number) => fits()?.byGame.get(appid) ?? null;
+  const least = (appid: number) => {
+    let found: { score: number; label: string } | null = null;
+    for (const [i, score] of (scores(appid) ?? []).entries())
+      if (score != null && (!found || score < found.score)) found = { score, label: labels[i] };
+    return found;
+  };
   return {
     key: GROUP_FIT_KEY,
     label: 'Group fit',
     type: 'number',
-    value: (row) => {
-      const known = scores(row.appid)?.filter((s) => s != null);
-      return known?.length ? Math.min(...known) : null;
-    },
+    value: (row) => least(row.appid)?.score ?? null,
     format: fmtPercent,
-    render: (v, row) => {
+    // Names the least suited player; the title has everyone's score.
+    render: (_v, row) => {
       const cell = document.createElement('span');
-      cell.textContent = fmtPercent(v);
+      const l = least(row.appid);
+      cell.textContent = l ? `${l.score}% · ${l.label}` : '—';
       const s = scores(row.appid);
       if (s)
         cell.title = s
@@ -445,7 +453,7 @@ const WISHLIST_DEFAULT_VISIBLE = [
   'name',
   'dateAdded',
   'steamdbRating',
-  'tasteFit',
+  TASTE_FIT_KEY,
   'hltbAll',
   'releaseDate',
   'genres',
@@ -554,7 +562,7 @@ const BUNDLE_DEFAULT_VISIBLE = [
   'bestDealPrice',
   'bestDealCut',
   'steamdbRating',
-  'tasteFit',
+  TASTE_FIT_KEY,
   'hltbAll',
   'releaseDate',
   'genres',
@@ -2457,6 +2465,11 @@ export default function ListRoute() {
     {
       const isRanked = userList()?.kind === 'ranked';
       const tasteAccount = getEffectiveCurrentAccount();
+      const tasteSource: TasteSource = {
+        label: tasteAccount && accountDisplayLabel(tasteAccount),
+        taste: tasteAccount && loadTaste(tasteAccount.id),
+      };
+      setTasteFitSource(tasteSource);
       const priced = kind === 'user' && pricesShown;
       const sharedPriced = kind === 'shared' && pricesShown;
       const columns = insertColumnsAfter(
@@ -2503,10 +2516,7 @@ export default function ListRoute() {
           () => filterTable()?.filter.modes().tags === 'and',
         ),
         similarityColumn(similarityScores),
-        tasteFitColumn(
-          tasteAccount ? loadTaste(tasteAccount.id) : null,
-          tasteAccount ? accountDisplayLabel(tasteAccount) : 'your account',
-        ),
+        tasteFitColumn(tasteSource),
       ) as unknown as ColumnDef<Game>[];
       const defaultVisible = isRanked
         ? [...RANKED_DEFAULT_VISIBLE, ...(priced ? PRICED_DEFAULT_VISIBLE : [])]
@@ -3089,6 +3099,20 @@ export default function ListRoute() {
         )
       : null,
   );
+  // The table's score columns explained in the status line, since a cell's title is hover-only.
+  const [tasteFitSource, setTasteFitSource] = createSignal<TasteSource | null>(null);
+  const scoreNotes = createMemo(() => {
+    const visible = filterTable()?.columns.visible();
+    const notes: string[] = [];
+    const source = tasteFitSource();
+    if (source && visible?.has(TASTE_FIT_KEY)) notes.push(tasteFitNote(source));
+    if (kind === 'compare' && visible?.has(GROUP_FIT_KEY) && loadFraction() == null) {
+      const fits = groupFits();
+      const left = comparePlayers.filter((_, i) => !fits?.profiled[i]).map((p) => p.label);
+      if (left.length) notes.push(`Group fit leaves out ${left.join(', ')}: too few games played here`);
+    }
+    return notes;
+  });
   // Owned learns its account's taste for Taste fit elsewhere, once every row's details are in.
   createEffect(() => {
     if (kind !== 'owned' || loadFraction() != null) return;
@@ -3578,6 +3602,7 @@ export default function ListRoute() {
           )}
         </Show>
         <Show when={failedSummary()}>{(text) => <span class="list-failed">{text()}</span>}</Show>
+        <For each={scoreNotes()}>{(note) => <span class="list-score-note">{note}</span>}</For>
         <Show when={bundleFailedCount()}>
           {(n) => (
             <span class="list-failed">Steam didn't answer for {n()} of this bundle's games — reload to retry</span>

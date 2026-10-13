@@ -478,17 +478,20 @@ test("B2 edge: Taste fit scores the wishlist by the account's taste, once Owned 
       for (const id of Object.keys(perPlayer)) perPlayer[id] = 600;
     return route.fulfill({ json: body });
   });
-  const fit = () => rows(page).first().locator('span[title*="taste"]');
+  const note = page.locator('.list-score-note');
   await page.goto('/lists/wishlist');
   await expect(page.getByRole('columnheader', { name: /Taste fit/ })).toBeVisible();
-  await expect(fit()).toHaveText('—');
-  await expect(fit()).toHaveAttribute('title', "Open Alice's Owned list once to learn their taste");
+  await expect(note).toHaveText("Taste fit: open Alice's Owned list once on this device to learn their taste");
 
   await page.goto('/lists/owned');
   await expect(page.locator('.list-plays-mostly')).toBeVisible();
   await page.goto('/lists/wishlist');
-  await expect(fit()).toHaveText(/^\d+%$/);
-  await expect(fit()).toHaveAttribute('title', /^Closeness to Alice's taste, from their Owned list as of /);
+  await expect(note).toHaveText(/^Taste fit: Alice's taste as of /);
+  await expect(
+    rows(page)
+      .first()
+      .getByRole('cell', { name: /^\d+%$/ }),
+  ).toBeVisible();
 });
 
 test('C1 edge: Tag match averages the filtered tags, or with All takes the weakest', async ({ page }) => {
@@ -562,8 +565,9 @@ test("C1 edge: a comparison's Group fit scores games for its least suited player
   await page.goto('/lists/compare?u=alice&u=bob');
   await expect(page.getByRole('columnheader', { name: /Group fit/ })).toBeVisible();
   const fit = row(page, 'Valheim').locator('span[title^="Alice "]');
-  await expect(fit).toHaveText(/^\d+%$/);
+  await expect(fit).toHaveText(/^\d+% · Alice$/);
   await expect(fit).toHaveAttribute('title', /· Bob: too few games played to tell$/);
+  await expect(page.locator('.list-score-note')).toHaveText('Group fit leaves out Bob: too few games played here');
 });
 
 test('C6 edge: a comparison has a Played column per player', async ({ page }) => {

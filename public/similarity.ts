@@ -74,11 +74,16 @@ export function topPlayedTags(
     .map(([tag]) => tag);
 }
 
-// Per game, how close it is (0–100) to each player's play profile; null for a player without one.
+export interface PlayerFits {
+  byGame: Map<number, (number | null)[]>; // per player, 0–100; null for one without a profile
+  profiled: boolean[];
+}
+
+// Per game, how close it is to each player's play profile; null when no player has one.
 export function playerFits(
   games: readonly Tagged[],
   hoursPlayed: readonly ((appid: number) => number | undefined)[],
-): Map<number, (number | null)[]> | null {
+): PlayerFits | null {
   const weighted = games.filter((g) => g.details?.tagWeights);
   const idf = inverseFrequency(weighted.map(featuresOf));
   const profiles = hoursPlayed.map((hours) =>
@@ -88,12 +93,13 @@ export function playerFits(
     ),
   );
   if (!profiles.some(Boolean)) return null;
-  return new Map(
+  const byGame = new Map(
     weighted.map((g) => {
       const v = vectorOf(featuresOf(g), idf);
       return [g.appid, profiles.map((p) => (p ? Math.round(cosine(p, v) * 100) : null))];
     }),
   );
+  return { byGame, profiled: profiles.map(Boolean) };
 }
 
 // An account's play profile, kept to score games outside its library (a wishlist, a bundle).

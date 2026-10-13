@@ -3043,7 +3043,8 @@ kbd {
 .price-status.list-failed {
   color: #e0a83a;
 }
-.list-status > .list-failed:not(:first-child)::before {
+.list-status > .list-failed:not(:first-child)::before,
+.list-status > .list-score-note:not(:first-child)::before {
   content: ' · ';
   color: var(--text1);
 }

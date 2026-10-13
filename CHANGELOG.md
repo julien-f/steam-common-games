@@ -152,6 +152,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On a phone, a bundle's ⋯ stays beside its actions instead of dropping to a line of its own
 - A game looked up from outside the open list no longer offers to sort the list by similarity to it, which left every row unscored
 - Similar in this list and the Similarity column give a game the same score when the list is filtered, and the panel says when too few games are shown to compare
+- Taste fit and Group fit explain themselves under the list header rather than only on hover, and a Group fit cell names the player it suits least
 
 ### Development
 

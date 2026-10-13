@@ -37,7 +37,7 @@ A private profile or wishlist looks identical to an empty one from the outside; 
 - **Recently Looked Up** collects the last 10 games you searched for, latest first (its **Looked up** column), browsable like any other list.
 - **Your own lists** come in three kinds: a **manual** list you add and remove games from, a **dynamic** list defined as a formula over other lists, recomputed every time you open it, and a **ranked** list that orders another list by your preferences (see [Ranking a list](#ranking-a-list)).
 - Lists live in a **folder tree** you can rename, nest and organize — **Move to…** on any list or folder puts it elsewhere in the tree.
-- **Taste fit** (shown on Wishlist and bundles, available on every list): how close each game is to the current account's taste, learned from its Owned list. Open that account's Owned list once on this device first. It's refreshed on every visit there.
+- **Taste fit** (shown on Wishlist and bundles, available on every list): how close each game is to the current account's taste, learned from its Owned list. Open that account's Owned list once on this device first (the line under the list header says so, or how old the taste is). It's refreshed on every visit there.
 - **Plays mostly**, on Owned once every game's details are in: the Steam tags the account spends its time on (weighted by playtime, tags most of the library carries counting less), shown from 5 played games. Each one filters the list by that tag.
 - **Filtering by Steam tag** (the Tags column, or a tag in a game's panel) ranks the matches by **Tag match**: how strongly players tagged each game with them, from 100% (its top tag) down. With several tags it's their average, or on the filter's **All** mode the weakest one, so a game must carry them all. Filter Tag match (e.g. 50% and up) to keep only the games where the tag really matters. Clearing the tag filter restores the previous sort and drops that Tag match filter. In the game's panel, a gauge under each Steam tag shows that same strength.
 
@@ -85,7 +85,7 @@ Each player is a box you drop accounts into: it offers the accounts you've alrea
 The result is a link. Copy the address and whoever opens it sees the same comparison — it names the players, so it doesn't depend on anything saved in your browser, and it doesn't change the recipient's own account.
 
 - Each player gets a **Played (h)** column; its "never played" filter preset (on every Played column) finds what a player owns but never launched.
-- **Group fit** scores each game for the player it suits least, by each player's taste (the Steam tags of what they play, weighted by playtime); hover for each player's score. A player with fewer than 5 played games here has no taste profile and is left out. Profiles come from the games in the comparison, so on **Intersect** only from the shared ones.
+- **Group fit** scores each game for the player it suits least, by each player's taste (the Steam tags of what they play, weighted by playtime); the cell names that player, and hovering it shows everyone's score. A player with fewer than 5 played games here has no taste profile and is left out, as the line under the list header says. Profiles come from the games in the comparison, so on **Intersect** only from the shared ones.
 - The mode menu switches between the four [combine operations](#combining-lists) — e.g. **Intersect** for a single flat table of what everyone owns.
 - **Save as a list** keeps it in your own list tree, where it re-resolves every time you open it.
 
