@@ -412,7 +412,7 @@ test("C1 edge: the panel lists the list's games closest by Steam tags, each open
   const similar = page.locator('#panel-section-similar');
   await expect(similar.getByRole('link', { name: /More like this on Steam/ })).toHaveAttribute(
     'href',
-    'https://store.steampowered.com/recommended/morelikethis/app/892970/',
+    'https://store.steampowered.com/recommended/morelike/app/892970/',
   );
   await expect(similar.locator('.panel-similar-item')).toHaveText([/^Terraria/, /^Stardew Valley/, /^Portal 2/]);
   await similar.getByRole('button', { name: /^Terraria/ }).click();

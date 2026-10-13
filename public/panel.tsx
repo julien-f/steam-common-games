@@ -2076,7 +2076,7 @@ function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
         <div class="panel-section-title">
           {similar() !== undefined ? 'Similar in this list' : 'Similar games'}{' '}
           <a
-            href={`https://store.steampowered.com/recommended/morelikethis/app/${props.game.appid}/`}
+            href={`https://store.steampowered.com/recommended/morelike/app/${props.game.appid}/`}
             target="_blank"
             rel="noopener"
           >

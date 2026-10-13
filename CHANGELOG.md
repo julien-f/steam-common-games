@@ -154,6 +154,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Similar in this list and the Similarity column give a game the same score when the list is filtered, and the panel says when too few games are shown to compare
 - Taste fit and Group fit explain themselves under the list header rather than only on hover, and a Group fit cell names the player it suits least
 - Taste fit's hint to open the Owned list first is shorter, so a phone shows more of the list
+- The side panel's "More like this on Steam" link opens Steam's similar-games page for that game instead of a generic recommendations page
 
 ### Development
 
