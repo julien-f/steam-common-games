@@ -391,6 +391,18 @@ test('C1 edge: a tag filter ranks games by how strongly they carry the tag, unti
   await expect.poll(names).toEqual(byRating);
 });
 
+test("C1 edge: the panel's Steam tags show how strongly players tagged the game with each", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Portal 2').getByText('Portal 2').click();
+  const coop = page.locator('.panel-tags').getByRole('button', { name: 'Co-op', exact: true }).first();
+  await expect(coop).toHaveAttribute('title', "30% of the top tag's votes");
+  const ratio = await coop.evaluate(
+    (el) => el.querySelector('.panel-tag-weight')!.getBoundingClientRect().width / el.getBoundingClientRect().width,
+  );
+  expect(ratio).toBeCloseTo(0.3, 1);
+});
+
 test('C1 edge: a Tag match range keeps the games strongly tagged, and goes with the tag filter', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

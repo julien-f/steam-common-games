@@ -2178,6 +2178,8 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   gap: 5px;
 }
 .panel-tag {
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   min-height: 24px; /* the touch-target minimum (ui-guidelines.md), kept on plain tags so a row reads even */
@@ -2187,6 +2189,12 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   font-size: var(--fs-label);
   padding: 3px 8px;
   border-radius: 3px;
+}
+.panel-tag-weight {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
 }
 .panel-tag-btn {
   cursor: pointer;

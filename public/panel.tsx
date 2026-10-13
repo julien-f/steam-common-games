@@ -723,12 +723,15 @@ const TAG_KIND_META = {
   devpub: { label: 'Developer/Publisher', color: '#b892d6' },
 };
 
-function TagCloud(props: { groups: { kind: TagKind; dim: string; items?: string[] | null }[] }): JSX.Element {
+// A Steam tag's `weights` entry (relative to the game's top tag) shows as a gauge along its pill's bottom edge.
+function TagCloud(props: {
+  groups: { kind: TagKind; dim: string; items?: string[] | null; weights?: Record<string, number | null> | null }[];
+}): JSX.Element {
   const present = createMemo(() => props.groups.filter((gr) => gr.items?.length));
   const pills = createMemo(() =>
-    present().flatMap(({ kind, dim, items }) => {
+    present().flatMap(({ kind, dim, items, weights }) => {
       const values = kind === 'tags' ? [...items!] : [...items!].sort((a, b) => a.localeCompare(b));
-      return values.map((v) => ({ kind, dim, v }));
+      return values.map((v) => ({ kind, dim, v, w: weights?.[v] ?? null }));
     }),
   );
   const seenKinds = createMemo(() => [...new Set(present().map((gr) => gr.kind))]);
@@ -738,25 +741,36 @@ function TagCloud(props: { groups: { kind: TagKind; dim: string; items?: string[
         <div class="panel-section-title">Tags &amp; details</div>
         <div class="panel-tags">
           <For each={pills()}>
-            {({ kind, dim, v }) => {
+            {({ kind, dim, v, w }) => {
               const dot = <span class="panel-tag-dot" style={{ background: TAG_KIND_META[kind].color }} />;
+              const title = w == null ? undefined : `${Math.round(w * 100)}% of the top tag's votes`;
+              const gauge =
+                w == null ? null : (
+                  <span
+                    class="panel-tag-weight"
+                    style={{ width: `${w * 100}%`, background: TAG_KIND_META[kind].color }}
+                  />
+                );
               return (
                 <Show
                   when={panelOptions.tagsFilterable()}
                   fallback={
-                    <span class="panel-tag">
+                    <span class="panel-tag" title={title}>
                       {dot}
                       {v}
+                      {gauge}
                     </span>
                   }
                 >
                   <button
                     class="panel-tag panel-tag-btn"
                     classList={{ active: panelOptions.isTagActive(dim, v) }}
+                    title={title}
                     onClick={() => panelOptions.onTagClick(dim, v)}
                   >
                     {dot}
                     {v}
+                    {gauge}
                   </button>
                 </Show>
               );
@@ -2032,7 +2046,7 @@ function TagCloudSection(props: { game: ReadonlyGame }): JSX.Element {
     const pubs = meta()?.publishers || [];
     const sameDevPub = sameNames(devs, pubs);
     return [
-      { kind: 'tags' as const, dim: 'tags', items: props.game.details?.tags },
+      { kind: 'tags' as const, dim: 'tags', items: props.game.details?.tags, weights: props.game.details?.tagWeights },
       { kind: 'genres' as const, dim: 'genres', items: meta()?.genres },
       { kind: 'categories' as const, dim: 'categories', items: meta()?.categories },
       { kind: 'devpub' as const, dim: 'developers', items: devs },
