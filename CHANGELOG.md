@@ -61,6 +61,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A bundle's page puts ← All bundles next to its ‹ › arrows, and its other actions share one style around Get this bundle
 - Bundles on an instance without IsThereAnyDeal shows one card saying how to turn it on, instead of an empty table
 - Similar games and Group fit also weigh whether games are indie, AA or AAA
+- On the Tags filter's All mode, Tag match scores a game by its weakest filtered tag
 
 ### Fixed
 

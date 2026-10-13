@@ -219,6 +219,12 @@ test("tagMatchScore: averages the filtered tags' relative weights, an absent tag
   assert.equal(tagMatchScore(weights, new Set(['Indie'])), 0);
 });
 
+test("tagMatchScore: with the filter's All mode, the weakest filtered tag sets the score", () => {
+  const weights = { Roguelike: 1, Action: 0.5 };
+  assert.equal(tagMatchScore(weights, new Set(['Roguelike', 'Action']), true), 50);
+  assert.equal(tagMatchScore(weights, new Set(['Roguelike', 'Co-op']), true), 0);
+});
+
 test('tagMatchScore: no score without a tag filter or tag weights', () => {
   assert.equal(tagMatchScore({ Action: 1 }, undefined), null);
   assert.equal(tagMatchScore({ Action: 1 }, new Set()), null);

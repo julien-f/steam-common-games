@@ -491,6 +491,21 @@ test("B2 edge: Taste fit scores the wishlist by the account's taste, once Owned 
   await expect(fit()).toHaveAttribute('title', /^Closeness to Alice's taste, from their Owned list as of /);
 });
 
+test('C1 edge: Tag match averages the filtered tags, or with All takes the weakest', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await page.getByRole('button', { name: 'Filter', exact: true }).click();
+  await page.locator('.dt-filter-cols-search').fill('Tags');
+  await page.locator('[data-filter-col-key="tags"]').click();
+  await page.getByRole('checkbox', { name: 'Action', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Co-op', exact: true }).click();
+  // Portal 2: Action 100%, Co-op 30%.
+  await expect(row(page, 'Portal 2').getByRole('cell', { name: '65%' })).toBeVisible();
+  await page.getByRole('button', { name: 'All', exact: true }).click();
+  await expect(row(page, 'Portal 2').getByRole('cell', { name: '30%' })).toBeVisible();
+});
+
 test('C1 edge: a Tag match range keeps the games strongly tagged, and goes with the tag filter', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

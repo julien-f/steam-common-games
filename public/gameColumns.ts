@@ -703,15 +703,15 @@ export function insertColumnsAfter(
   return [...columns.slice(0, idx + 1), ...newColumns, ...columns.slice(idx + 1)];
 }
 
-// Mean weight of the filtered tags, each relative to the game's top tag (absent: 0), in %.
+// Filtered tags' weights (relative to the top tag, absent: 0) in %: mean, or minimum on All mode.
 export function tagMatchScore(
   weights: Record<string, number | null> | null | undefined,
   selected: ReadonlySet<string> | undefined,
+  all = false,
 ): number | null {
   if (!weights || !selected?.size) return null;
-  let sum = 0;
-  for (const tag of selected) sum += weights[tag] ?? 0;
-  return Math.round((sum / selected.size) * 100);
+  const each = [...selected].map((tag) => weights[tag] ?? 0);
+  return Math.round((all ? Math.min(...each) : each.reduce((a, b) => a + b) / each.length) * 100);
 }
 
 export const SIMILARITY_KEY = 'similarity';
@@ -732,12 +732,12 @@ export function similarityColumn(scores: () => ReadonlyMap<number, number> | nul
 
 export const TAG_MATCH_KEY = 'tagMatch';
 // Ranks a tag filter's matches by how strongly each game carries the filtered tags.
-export function tagMatchColumn(selected: () => ReadonlySet<string> | undefined): ColumnDef<Row> {
+export function tagMatchColumn(selected: () => ReadonlySet<string> | undefined, all: () => boolean): ColumnDef<Row> {
   return {
     key: TAG_MATCH_KEY,
     label: 'Tag match',
     type: 'number',
-    value: (row) => tagMatchScore(row.details?.tagWeights, selected()),
+    value: (row) => tagMatchScore(row.details?.tagWeights, selected(), all()),
     format: (v) => (v == null ? '—' : `${v}%`),
     compare: compareNumMissingLast,
     defaultSortDir: 'desc',

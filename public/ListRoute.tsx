@@ -2479,8 +2479,12 @@ export default function ListRoute() {
                         : RECENT_COLUMNS
                       : OWNED_COLUMNS,
         'tags',
-        // eslint-disable-next-line solid/reactivity -- read inside the table's own processData memo
-        tagMatchColumn(() => filterTable()?.filter.include().tags),
+        tagMatchColumn(
+          // eslint-disable-next-line solid/reactivity -- read inside the table's own processData memo
+          () => filterTable()?.filter.include().tags,
+          // eslint-disable-next-line solid/reactivity -- same
+          () => filterTable()?.filter.modes().tags === 'and',
+        ),
         similarityColumn(similarityScores),
         tasteFitColumn(
           tasteAccount ? loadTaste(tasteAccount.id) : null,
