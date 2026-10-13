@@ -539,7 +539,7 @@ interface DetailsEvent {
 
 const NO_DETAILS = { rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null };
 
-// A tag filter sorts by Tag match first, shown; clearing it restores the previous sort.
+// A tag filter sorts by Tag match first, shown; clearing it undoes that and drops any Tag match range.
 function syncTagMatchSort(t: TableState<Game>, active: boolean): void {
   const sorted = t.sort.entries().some((e) => e.key === TAG_MATCH_KEY);
   const shown = t.columns.visible().has(TAG_MATCH_KEY);
@@ -553,6 +553,7 @@ function syncTagMatchSort(t: TableState<Game>, active: boolean): void {
   } else {
     if (sorted) t.sort.remove(TAG_MATCH_KEY);
     if (shown) t.columns.toggleVisibility(TAG_MATCH_KEY);
+    if (t.filter.ranges()[TAG_MATCH_KEY]) t.filter.clearColumn(TAG_MATCH_KEY, 'range');
   }
 }
 

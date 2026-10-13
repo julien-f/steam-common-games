@@ -725,7 +725,6 @@ export function tagMatchColumn(selected: () => ReadonlySet<string> | undefined):
     format: (v) => (v == null ? '—' : `${v}%`),
     compare: compareNumMissingLast,
     defaultSortDir: 'desc',
-    filterable: false,
     searchable: false,
     category: 'Classification',
   };

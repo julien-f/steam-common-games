@@ -391,6 +391,27 @@ test('C1 edge: a tag filter ranks games by how strongly they carry the tag, unti
   await expect.poll(names).toEqual(byRating);
 });
 
+test('C1 edge: a Tag match range keeps the games strongly tagged, and goes with the tag filter', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  const coop = page.locator('.panel-tags').getByRole('button', { name: 'Co-op', exact: true }).first();
+  await row(page, 'Portal 2').getByText('Portal 2').click();
+  await coop.click();
+  await expect(rows(page)).toHaveCount(4);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Filter', exact: true }).click();
+  await page.locator('.dt-filter-cols-search').fill('Tag match');
+  await page.locator('[data-filter-col-key="tagMatch"]').click();
+  await page.getByRole('textbox', { name: 'Tag match Min' }).fill('60');
+  await expect(rows(page)).toHaveCount(3);
+  await expect(row(page, 'Portal 2')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await row(page, 'Valheim').getByText('Valheim').click();
+  await coop.click();
+  await expect(rows(page)).toHaveCount(6);
+});
+
 test('C6 edge: a comparison has a Played column per player', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare?u=alice&u=bob');
