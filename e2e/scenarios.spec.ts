@@ -447,6 +447,27 @@ test('C1 edge: the panel sorts the list by similarity to its game, until stopped
   await expect.poll(names).toEqual(byRating);
 });
 
+test('F3 edge: Owned says which tags the account plays most, each filtering the list', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  // 10 h on every game: Alice's own fixture has too few played games for a profile.
+  await page.route('**/api/common-games', (route) => {
+    const req = route.request();
+    const body = JSON.parse(respond(req.method(), new URL(req.url()), req.postData()).body);
+    for (const perPlayer of Object.values(body.playtime) as Record<string, number>[])
+      for (const id of Object.keys(perPlayer)) perPlayer[id] = 600;
+    return route.fulfill({ json: body });
+  });
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  const tags = page.locator('.list-plays-mostly').getByRole('button');
+  // Singleplayer: on fewer games, so rarer here than Action and Co-op.
+  await expect(tags).toHaveText(['Singleplayer', 'Action', 'Co-op']);
+  await tags.getByText('Co-op').click();
+  await expect(rows(page)).toHaveCount(4);
+  await expect(page.getByRole('columnheader', { name: /Tag match/ })).toBeVisible();
+  await expect(tags.getByText('Co-op')).toHaveClass(/active/);
+});
+
 test('C1 edge: a Tag match range keeps the games strongly tagged, and goes with the tag filter', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

@@ -3736,6 +3736,35 @@ kbd {
   color: var(--text1);
 }
 
+.list-plays-mostly {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  font-style: normal; /* a row of values, not .list-hero-note's prose */
+  font-size: var(--fs-label);
+  color: var(--text1);
+}
+.list-plays-mostly-tag {
+  min-height: 24px;
+  padding: 3px 8px;
+  background: rgba(61, 80, 104, 0.5);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text0);
+  font: inherit;
+  cursor: pointer;
+}
+.list-plays-mostly-tag:hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
+.list-plays-mostly-tag.active {
+  background: rgba(26, 159, 255, 0.15);
+  border-color: rgba(26, 159, 255, 0.4);
+  color: var(--accent);
+}
+
 /* A dynamic list's formula — its sources, each linked and carrying what it contributed, joined by
    the op's own symbol. Not italic (it overrides .list-hero-note's prose styling): it's a row of
    values and names, read like the tiles above it rather than like the bundle note it shares a

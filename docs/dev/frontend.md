@@ -192,6 +192,8 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
 
 **Tag match** (`tagMatch`, `tagMatchColumn`) scores each row against the Tags column's include filter: the mean of the filtered tags' `tagWeights` (absent: 0), in %. Its `value()` reads the filter through the `filterTable` signal, so the table's own `processData` memo re-sorts when the filter changes. A transition of that filter between empty and not (`syncLeadColumn`) shows the column and makes it the first sort, or removes both along with any Tag match range (all its values turn `null`, so a leftover range would hide every row); it's armed only after the stored view is restored, so a saved view keeps its own sort.
 
+**Plays mostly** (Owned's hero note, `playsMostlyNote`): `similarity.ts`'s `topPlayedTags` over the rows once `loadFraction()` is null, so it doesn't reshuffle while details stream; its tags call `onTagClick` like the panel's pills.
+
 **Similarity** (`similarity`, `similarityColumn`) scores rows against `ListRoute.tsx`'s `similarTo` game (set from the panel through the `similarTo`/`setSimilarTo` route handlers) with `similarity.ts`; the target scores 100, a tagged non-match 0. `syncLeadColumn` shows and sorts it the same way; it's reset on every table build, so a stored view never keeps it.
 
 **Price Status** (`priceStatus`, hidden by default; `PRICE_STATUS_COLUMN`, `computePriceStatus`) makes "which games are at a record low" a filter or group: `All-Time Low` / `1yr Low` / `3mo Low` (via `dealRecordTier`) / `On Sale` (a real discount, not a record) / `Not Discounted` (`bestDealCut === 0`) / `—` (no data). A `value()` function, so no extra fetch or stored field.

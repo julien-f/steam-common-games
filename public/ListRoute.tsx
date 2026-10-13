@@ -66,7 +66,7 @@ import { render } from 'solid-js/web';
 import { A, useParams, useLocation, useNavigate } from '@solidjs/router';
 import { createTableState, DataTableView, datePartGroup } from '@vates/data-table-solid';
 import type { ColumnDef, SortEntry, TableState, TableViewState } from '@vates/data-table-solid';
-import { similarGames } from './similarity.ts';
+import { similarGames, topPlayedTags } from './similarity.ts';
 import {
   fmt,
   insertColumnsAfter,
@@ -541,6 +541,8 @@ interface DetailsEvent {
 }
 
 const NO_DETAILS = { rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null };
+
+const PLAYS_MOSTLY_SHOWN = 6;
 
 // A score column leads the sort while its source is set; unset, it goes, with its row-hiding range.
 function syncLeadColumn(t: TableState<Game>, key: string, active: boolean): void {
@@ -2967,7 +2969,33 @@ export default function ListRoute() {
       return `The last ${MAX_RECENT_GAMES} games you looked up in this browser — local search history, never sent anywhere.`;
     const list = combineList();
     if (list?.kind === 'dynamic' || list?.kind === 'ranked') return formulaNote(list);
+    if (kind === 'owned') return playsMostlyNote();
     return undefined;
+  }
+
+  // Once every row's details are in, so it doesn't reshuffle as they stream.
+  const playsMostly = createMemo(() => (loadFraction() == null ? topPlayedTags(tableData(), PLAYS_MOSTLY_SHOWN) : []));
+  function playsMostlyNote(): JSX.Element {
+    return (
+      <Show when={playsMostly().length}>
+        <div class="list-plays-mostly">
+          Plays mostly:{' '}
+          <For each={playsMostly()}>
+            {(tag) => (
+              <button
+                type="button"
+                class="list-plays-mostly-tag"
+                classList={{ active: tableReady() && isTagActive('tags', tag) }}
+                title={`Filter by ${tag}, ranked by Tag match`}
+                onClick={() => onTagClick('tags', tag)}
+              >
+                {tag}
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
+    );
   }
 
   // Built once per mount, not per render: `kind` never changes under a mounted route, and every

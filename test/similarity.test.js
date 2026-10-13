@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { similarGames } = require('../public/similarity.ts');
+const { similarGames, topPlayedTags } = require('../public/similarity.ts');
 
 const game = (appid, tagWeights) => ({ appid, details: { tagWeights } });
 
@@ -35,4 +35,26 @@ test("similarGames: nothing without the target's tag weights, and skips games wi
     ranked.map((s) => s.game.appid),
     [3],
   );
+});
+
+const owned = (appid, playtime, tagWeights) => ({ appid, playtime, details: { tagWeights } });
+
+test('topPlayedTags: the tags most played for, ignoring unplayed games and tags every game has', () => {
+  const games = [
+    owned(1, 500, { Roguelike: 1, Singleplayer: 0.5 }),
+    owned(2, 100, { Roguelike: 1, Deckbuilder: 0.8, Singleplayer: 0.5 }),
+    owned(3, 10, { Farming: 1, Singleplayer: 0.5 }),
+    owned(4, 5, { Racing: 1, Singleplayer: 0.5 }),
+    owned(5, 2, { Puzzle: 1, Singleplayer: 0.5 }),
+    owned(6, 0, { Horror: 1, Singleplayer: 0.5 }),
+  ];
+  const top = topPlayedTags(games, 3);
+  assert.deepEqual(top.slice(0, 2), ['Roguelike', 'Deckbuilder']);
+  assert.ok(!top.includes('Singleplayer'));
+  assert.ok(!topPlayedTags(games, 10).includes('Horror'));
+});
+
+test('topPlayedTags: no profile from fewer than 5 played games', () => {
+  const games = [1, 2, 3, 4].map((id) => owned(id, 10, { A: 1 }));
+  assert.deepEqual(topPlayedTags([...games, owned(5, 0, { B: 1 })], 5), []);
 });
