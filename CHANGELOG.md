@@ -209,6 +209,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - npm run check flags new comments over one line in public/
 - batch.js merge replays a lane's closed and narrowed backlog items itself, and fix lanes review their own commits before reporting
 - mock-server.js and dev-server.js up restart a server they started at an older git HEAD
+- npm run check's one-line comment rule also covers new files not yet added to git
 
 ## [0.10.0] - 2026-10-10
 

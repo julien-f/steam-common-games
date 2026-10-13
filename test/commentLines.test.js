@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { longComments } = require('../scripts/comment-lines.js');
+const { addedFileDiff, longComments } = require('../scripts/comment-lines.js');
 
 const diff = (file, start, lines) =>
   `+++ b/${file}\n@@ -0,0 +${start},${lines.length} @@\n${lines.map((l) => `+${l}`).join('\n')}\n`;
@@ -24,4 +24,8 @@ test('longComments: one-line comments, and comments split by code, pass', () => 
 test('longComments: lines from separate hunks are not joined', () => {
   const text = `+++ b/public/a.ts\n@@ -1 +1 @@\n+// one\n@@ -9 +9 @@\n+// two\n`;
   assert.deepEqual(longComments(text), []);
+});
+
+test('addedFileDiff: a new file reads as all added, so its long comments are flagged', () => {
+  assert.deepEqual(longComments(addedFileDiff('public/new.ts', 'const a = 1;\n// one\n// two\n')), ['public/new.ts:2']);
 });
