@@ -11,9 +11,28 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     exit 1
   fi
 done
-if [ -n "$(git status --porcelain)" ]; then
-  echo 'pre-push: commit or stash your changes first: the checks run on the working tree' >&2
+if [ -n "$(git status --porcelain --untracked-files=normal | grep '^??')" ]; then
+  echo 'pre-push: commit, remove or ignore untracked files first: the checks run on the working tree' >&2
   exit 1
+fi
+
+# Uncommitted edits to tracked files are set aside and restored, staged and unstaged apart; a patch
+# in this worktree's own git dir rather than `git stash`, for the same reason as pre-commit's.
+if ! git diff --quiet HEAD; then
+  dir=$(git rev-parse --git-dir)
+  git diff --cached --binary > "$dir/pre-push-staged.patch"
+  git diff --binary > "$dir/pre-push-unstaged.patch"
+  git reset -q
+  git checkout -- .
+  restore() {
+    trap - EXIT
+    git apply --allow-empty --index --whitespace=nowarn "$dir/pre-push-staged.patch" &&
+      git apply --allow-empty --whitespace=nowarn "$dir/pre-push-unstaged.patch" &&
+      rm "$dir/pre-push-staged.patch" "$dir/pre-push-unstaged.patch" ||
+      echo "pre-push: could not restore uncommitted changes; they are in $dir/pre-push-*.patch" >&2
+  }
+  trap restore EXIT
+  trap 'exit 130' INT TERM
 fi
 
 node scripts/check.js
