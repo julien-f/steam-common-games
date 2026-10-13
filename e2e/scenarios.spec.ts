@@ -489,6 +489,23 @@ test('C1 edge: a Tag match range keeps the games strongly tagged, and goes with 
   await expect(rows(page)).toHaveCount(6);
 });
 
+test("C1 edge: a comparison's Group fit scores games for its least suited player", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  // 10 h on every game: Alice gets a profile; Bob's 4 games stay too few for one.
+  await page.route('**/api/common-games', (route) => {
+    const req = route.request();
+    const body = JSON.parse(respond(req.method(), new URL(req.url()), req.postData()).body);
+    for (const perPlayer of Object.values(body.playtime) as Record<string, number>[])
+      for (const id of Object.keys(perPlayer)) perPlayer[id] = 600;
+    return route.fulfill({ json: body });
+  });
+  await page.goto('/lists/compare?u=alice&u=bob');
+  await expect(page.getByRole('columnheader', { name: /Group fit/ })).toBeVisible();
+  const fit = row(page, 'Valheim').locator('span[title^="Alice "]');
+  await expect(fit).toHaveText(/^\d+%$/);
+  await expect(fit).toHaveAttribute('title', /· Bob: too few games played to tell$/);
+});
+
 test('C6 edge: a comparison has a Played column per player', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare?u=alice&u=bob');

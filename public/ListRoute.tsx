@@ -66,7 +66,7 @@ import { render } from 'solid-js/web';
 import { A, useParams, useLocation, useNavigate } from '@solidjs/router';
 import { createTableState, DataTableView, datePartGroup } from '@vates/data-table-solid';
 import type { ColumnDef, SortEntry, TableState, TableViewState } from '@vates/data-table-solid';
-import { similarGames, topPlayedTags } from './similarity.ts';
+import { playerFits, similarGames, topPlayedTags } from './similarity.ts';
 import {
   fmt,
   insertColumnsAfter,
@@ -296,6 +296,40 @@ function playedByColumn(
       const owners = player.owners.get(row.appid);
       return owners ? hoursFromMinutes(owners.reduce((sum, o) => sum + o.minutes, 0)) : null;
     },
+  };
+}
+
+const GROUP_FIT_KEY = 'groupFit';
+// How well a game suits the comparison's least suited player, by each one's play profile.
+function groupFitColumn(
+  fits: () => ReadonlyMap<number, (number | null)[]> | null,
+  labels: string[],
+): ColumnDef<Record<string, any>> {
+  const scores = (appid: number) => fits()?.get(appid) ?? null;
+  const fmtFit = (v: unknown) => (v == null ? '—' : `${v}%`);
+  return {
+    key: GROUP_FIT_KEY,
+    label: 'Group fit',
+    type: 'number',
+    value: (row) => {
+      const known = scores(row.appid)?.filter((s) => s != null);
+      return known?.length ? Math.min(...known) : null;
+    },
+    format: fmtFit,
+    render: (v, row) => {
+      const cell = document.createElement('span');
+      cell.textContent = fmtFit(v);
+      const s = scores(row.appid);
+      if (s)
+        cell.title = s
+          .map((x, i) => (x == null ? `${labels[i]}: too few games played to tell` : `${labels[i]} ${x}%`))
+          .join(' · ');
+      return cell;
+    },
+    compare: compareNumMissingLast,
+    defaultSortDir: 'desc',
+    searchable: false,
+    category: 'Classification',
   };
 }
 
@@ -2391,7 +2425,15 @@ export default function ListRoute() {
                 : kind === 'recent'
                   ? LOOKED_UP_COLUMNS
                   : kind === 'compare'
-                    ? insertColumnsAfter(RECENT_COLUMNS, 'hltbCompletionist', ...comparePlayers.map(playedByColumn))
+                    ? insertColumnsAfter(
+                        RECENT_COLUMNS,
+                        'hltbCompletionist',
+                        ...comparePlayers.map(playedByColumn),
+                        groupFitColumn(
+                          groupFits,
+                          comparePlayers.map((p) => p.label),
+                        ),
+                      )
                     : kind === 'shared'
                       ? sharedPriced
                         ? tiered
@@ -2415,7 +2457,7 @@ export default function ListRoute() {
               : kind === 'recent'
                 ? LOOKED_UP_DEFAULT_VISIBLE
                 : kind === 'compare'
-                  ? [...RECENT_DEFAULT_VISIBLE, ...comparePlayers.map((_, i) => playedByKey(i))]
+                  ? [...RECENT_DEFAULT_VISIBLE, ...comparePlayers.map((_, i) => playedByKey(i)), GROUP_FIT_KEY]
                   : kind === 'user' || kind === 'shared'
                     ? RECENT_DEFAULT_VISIBLE
                     : OWNED_DEFAULT_VISIBLE;
@@ -2973,6 +3015,18 @@ export default function ListRoute() {
     return undefined;
   }
 
+  // Once every row's details are in, like Plays mostly.
+  const groupFits = createMemo(() =>
+    kind === 'compare' && loadFraction() == null
+      ? playerFits(
+          tableData(),
+          comparePlayers.map((player) => (appid) => {
+            const minutes = player.owners.get(appid)?.reduce((sum, o) => sum + o.minutes, 0);
+            return minutes && minutes / 60;
+          }),
+        )
+      : null,
+  );
   // Once every row's details are in, so it doesn't reshuffle as they stream.
   const playsMostly = createMemo(() => (loadFraction() == null ? topPlayedTags(tableData(), PLAYS_MOSTLY_SHOWN) : []));
   function playsMostlyNote(): JSX.Element {

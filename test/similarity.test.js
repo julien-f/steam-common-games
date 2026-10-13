@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { similarGames, topPlayedTags } = require('../public/similarity.ts');
+const { similarGames, topPlayedTags, playerFits } = require('../public/similarity.ts');
 
 const game = (appid, tagWeights) => ({ appid, details: { tagWeights } });
 
@@ -57,4 +57,24 @@ test('topPlayedTags: the tags most played for, ignoring unplayed games and tags 
 test('topPlayedTags: no profile from fewer than 5 played games', () => {
   const games = [1, 2, 3, 4].map((id) => owned(id, 10, { A: 1 }));
   assert.deepEqual(topPlayedTags([...games, owned(5, 0, { B: 1 })], 5), []);
+});
+
+test("playerFits: each game's closeness to each player's profile, null for a player with too few played", () => {
+  const games = [
+    game(1, { Roguelike: 1 }),
+    game(2, { Roguelike: 1, Deckbuilder: 1 }),
+    game(3, { Farming: 1 }),
+    game(4, { Farming: 1, Cozy: 1 }),
+    game(5, { Racing: 1 }),
+    game(6, { Puzzle: 1 }),
+  ];
+  const alice = { 1: 50, 2: 50, 5: 1, 6: 1, 3: 1 };
+  const bob = { 3: 50 };
+  const fits = playerFits(games, [(id) => alice[id], (id) => bob[id]]);
+  assert.ok(fits.get(1)[0] > fits.get(3)[0]);
+  assert.equal(fits.get(1)[1], null);
+});
+
+test('playerFits: nothing when no player has a profile', () => {
+  assert.equal(playerFits([game(1, { A: 1 })], [() => 10]), null);
 });

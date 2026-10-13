@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A game's panel lists the most similar games in the open list by Steam tags, with a link to Steam's own "More like this"
 - "Sort list by similarity" in a game's panel ranks the whole list by how close each game is to it
 - Owned shows the Steam tags the account plays most, each one a click away from filtering the list by it
+- A comparison's Group fit column scores each game by how well it suits the player it suits least
 
 ### Changed
 

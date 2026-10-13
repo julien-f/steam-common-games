@@ -84,6 +84,7 @@ Each player is a box you drop accounts into: it offers the accounts you've alrea
 The result is a link. Copy the address and whoever opens it sees the same comparison — it names the players, so it doesn't depend on anything saved in your browser, and it doesn't change the recipient's own account.
 
 - Each player gets a **Played (h)** column; its "never played" filter preset (on every Played column) finds what a player owns but never launched.
+- **Group fit** scores each game for the player it suits least, by each player's taste (the Steam tags of what they play, weighted by playtime); hover for each player's score. A player with fewer than 5 played games here has no taste profile and is left out. Profiles come from the games in the comparison, so on **Intersect** only from the shared ones.
 - The mode menu switches between the four [combine operations](#combining-lists) — e.g. **Intersect** for a single flat table of what everyone owns.
 - **Save as a list** keeps it in your own list tree, where it re-resolves every time you open it.
 
