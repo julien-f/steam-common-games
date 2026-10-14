@@ -2953,6 +2953,17 @@ test('F2 edge: /search shows an image column only when a result has an image', a
   await expect(columns.last()).toHaveAttribute('data-col-key', 'name');
 });
 
+test('F2 edge: /search marks an owned result even when the library lands after the results', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.route('**/api/common-games', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await route.fallback();
+  });
+  await page.goto('/search?q=hollow');
+  await expect(rows(page)).toHaveCount(1);
+  await expect(row(page, 'Hollow Knight').locator('.game-search-badge.owned')).toBeVisible();
+});
+
 test('F1.1-4: look up one game from the nav search, in place', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

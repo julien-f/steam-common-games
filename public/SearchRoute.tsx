@@ -132,14 +132,10 @@ export default function SearchRoute() {
     }),
   );
 
-  // renderName reads ownership at render time, not through a tracked signal (render returns a
-  // plain Node) — so a badge arriving after the table already drew its rows needs the table to
-  // actually redraw them. Replacing `results()` with a fresh array reference is what triggers
-  // that, the same "force a redraw" role gameSearch.ts's own re-run of renderResults() plays for
-  // its dropdown.
+  // renderName's badges aren't tracked, so redraw with fresh rows: the table keeps rows whose object is unchanged.
   createEffect(() => {
     if (!results().some((r) => peekMyOwnershipStatus(r.appid) === null)) return;
-    const unsub = onMyOwnershipReady(() => setResults((list) => [...list]));
+    const unsub = onMyOwnershipReady(() => setResults((list) => list.map((r) => ({ ...r }))));
     onCleanup(unsub);
   });
 
