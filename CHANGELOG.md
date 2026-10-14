@@ -218,6 +218,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - mock-server.js and dev-server.js up restart a server they started at an older git HEAD
 - npm run check's one-line comment rule also covers new files not yet added to git
 - Unit tests run Solid's browser build, so they can check reactivity
+- Saved preferences are reactive, so anything showing one follows its changes
 
 ## [0.10.0] - 2026-10-10
 

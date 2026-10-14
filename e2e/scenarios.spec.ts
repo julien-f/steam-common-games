@@ -1644,6 +1644,15 @@ test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }
   );
 });
 
+test('B1 edge: picking a region reloads Bundles in it', async ({ page }) => {
+  await page.goto('/bundles');
+  await expect(rows(page).first()).toBeVisible();
+  const asked = page.waitForRequest(/\/api\/bundles\?.*country=US/);
+  await page.getByTitle('Preferences').click();
+  await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
+  await asked;
+});
+
 test('B1 edge: with no ITAD key, Bundles says why it is empty', async ({ page }) => {
   await mockApi(page, { states: ['no-itad'] }); // registered last, so it answers first
   await asPlayer(page, ALICE);

@@ -198,7 +198,7 @@ import {
   PRICES_FAILED,
 } from './priceLoading.ts';
 import { isItadConfigured, isItadOff } from './panelData.ts';
-import { currentRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
+import { currentRegion, regionCurrency, regionLabel } from './region.ts';
 import { openPrefsPopover } from './prefsPopover.tsx';
 import { registerRouteHandlers } from './AppShell.tsx';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
@@ -739,7 +739,7 @@ export default function ListRoute() {
   // Which region's prices are on screen. Read-only here on purpose — the ⚙ Preferences popover
   // is the one place it's changed (a second control would be a second thing to keep in sync);
   // this just says which one is in effect, since the currency alone doesn't identify it.
-  const [regionCode, setRegionCode] = createSignal(currentRegion());
+  const regionCode = createMemo(currentRegion);
   // Oldest price write time seen across this load's price calls (a wishlist chunks into several).
   // `undefined` = nothing loaded yet, which renders no readout at all rather than a premature "just now".
   const [priceFetchedAt, setPriceFetchedAt] = createSignal<number | undefined>(undefined);
@@ -3371,23 +3371,20 @@ export default function ListRoute() {
       unregister();
       if (comparePlayers.length) notifyOwnersChanged();
     });
-
-    // The region preference lives in the nav bar's ⚙ popover, which knows nothing about who's
-    // showing prices — it just broadcasts. Without this listener (lost with bundles.tsx/
-    // library.tsx, which both had one) picking a new region left every price on screen in the
-    // old currency until something else happened to reload, with no indication anything was
-    // stale. A wishlist only needs its prices re-fetched; a bundle needs a full reload, because
-    // its Tier Price comes from the bundle fetch itself (fetchBundleById's own `country`), not
-    // from the price lookup. So does a shared or saved list with a bundle source, for the same Tier Price.
-    const onRegionChange = () => {
-      setRegionCode(currentRegion());
-      setPriceFetchedAt(undefined);
-      if (showsTierPrice()) void load();
-      else if (hasPrices()) void loadPrices(rowsStore, loadGuard.current());
-    };
-    window.addEventListener(REGION_CHANGED_EVENT, onRegionChange);
-    onCleanup(() => window.removeEventListener(REGION_CHANGED_EVENT, onRegionChange));
   });
+
+  // A bundle (or a list with a bundle source) reloads: its Tier Price comes from the bundle fetch, not the price lookup.
+  createEffect(
+    on(
+      regionCode,
+      () => {
+        setPriceFetchedAt(undefined);
+        if (showsTierPrice()) void load();
+        else if (hasPrices()) void loadPrices(rowsStore, loadGuard.current());
+      },
+      { defer: true },
+    ),
+  );
 
   // A plain createEffect, not onMount — /lists/bundle/:bundleId, the generic /lists/:listId, and
   // /game/:appid? are each one route *definition* shared across every id, so navigating from one

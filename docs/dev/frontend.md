@@ -123,11 +123,13 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "r" | "g:" formula
 
 Everything the frontend renders is driven by Solid's own reactivity — there is no "please re-render" call anywhere, and reintroducing one is the mistake this section exists to prevent.
 
-Three kinds of state, three mechanisms:
+Four kinds of state, four mechanisms:
 
 - **A game/row's data** lives in a Solid **store** owned by the route that loaded it (`createStore<Game[]>` in `ListRoute.tsx`, reached through `rowStore.ts`). Writes go through `rowStore.mutateRow(appid, fn)` — `produce(fn)`, so the callback gets an assignable draft — and the store notifies per field, so a streamed field patches only the cells and panel lines that read it. `standaloneRows` (a `createStore<Record<number, Game>>` in the same file) does the same for a game opened as a standalone aside (a nav-bar lookup, a DLC/base-game hop).
 - **The side panel's own UI state** (which game is open, hero index, expanded collapsibles, …) is plain signals in `panel.tsx`, set by its own click handlers.
 - **Everything the panel fetches for itself** (news, achievements, "Owned by", ownership status, price, bundles, DLC) is a `createResource` keyed on the open game, created in one module-level `createRoot` (the panel is a singleton whose data outlives every render). Fetching and session-caching is `panelData.ts`; the resource is only wiring, giving `.loading`, discard of superseded responses and re-rendering for free. `refetch()` is the panel's ↻; each fetcher reads `info.refetching` as "force" (bypass both the session cache and the server's TTL).
+
+- **Shared app state** (prefs, the signed-in user) is a signal owned by its module, read through its getter: `getPref` tracks its key (one signal per key, so a table-view write doesn't rerun a region reader), and `getAuthUser()` the user. A reader in JSX, a memo, an effect or a table cell `render` follows it with no window event, ready callback or tick counter. Keyed reloads go through a primitive memo (`createMemo(currentRegion)`), since `getPref` returns a fresh object on every read. An effect that writes prefs reads its pref inside `on(...)` or `untrack`, or it reruns on its own write. `adoptPrefEntry` is the one silent write (the merge reloads the page right after).
 
 Every resource **source** resolves to a _primitive_ (an appid, or an `appid:account` string), never an object literal: `createResource` memoizes its source with `===`, so an object would refetch every time the source recomputed — e.g. the DLC source re-runs whenever any collapsible is toggled.
 
@@ -336,7 +338,7 @@ Above 768px the shell is locked to the viewport and **`.app-scroll` is the page'
 
 `prefs.ts` is one flat `{key: value}` JSON blob under a single localStorage key, so the whole set is enumerable at once; `setPref`'s sync hook is per-key so two preferences changing in different tabs can't race each other's server writes.
 
-Region is the only user-facing preference, in the nav bar's ⚙ popover (`prefsPopover.tsx` owns the contents, `AppShell.tsx` only the `<details>` shell). `region.ts` holds a curated list of major Steam pricing regions, `detectCountry()`, and `REGION_CHANGED_EVENT`, which `setStoredRegion` dispatches on `window` so price-showing routes re-price.
+Region is the only user-facing preference, in the nav bar's ⚙ popover (`prefsPopover.tsx` owns the contents, `AppShell.tsx` only the `<details>` shell). `region.ts` holds a curated list of major Steam pricing regions and `detectCountry()`; price-showing routes re-price from an effect on `currentRegion()`.
 
 - The first entry is always "Auto-detect (⟨what it resolves to now⟩)", and `currentRegion` consults `detectCountry()` live on every upstream call.
 - `detectCountry` tries the OS timezone (`Intl.DateTimeFormat().resolvedOptions().timeZone`, via a curated map including Eurozone→`DE`) before `navigator.language` — language is a UI preference and often stays "en-US" anywhere (e.g. `LANG=en_US.UTF-8` in `Europe/Paris`).

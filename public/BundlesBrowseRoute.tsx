@@ -19,7 +19,7 @@
 // from gameColumns.ts — but it reuses that file's generic bucket/compare helpers (price tiers,
 // missing-value grouping) so a price/date/count column here groups and sorts the same way its
 // counterpart does in a game table.
-import { createSignal, createEffect, onMount, onCleanup, Show } from 'solid-js';
+import { createSignal, createEffect, createMemo, on, onMount, onCleanup, Show } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { withAccountParam } from './urlState.ts';
 import { createTableState, DataTableView, datePartGroup, numericRangeGroup } from '@vates/data-table-solid';
@@ -42,7 +42,7 @@ import {
   type BundleListItem,
   type BundleRow,
 } from './bundleRows.ts';
-import { currentRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
+import { currentRegion, regionCurrency, regionLabel } from './region.ts';
 import { setBrowsedBundles } from './bundleBrowseStore.ts';
 import { openPrefsPopover } from './prefsPopover.tsx';
 import {
@@ -379,17 +379,9 @@ export default function BundlesBrowseRoute() {
     }
   }
 
-  // See ListRoute's own listener — the ⚙ popover broadcasts, and every surface showing prices
-  // has to react or silently keep showing the previous region's.
-  const [regionCode, setRegionCode] = createSignal(currentRegion());
-  onMount(() => {
-    const onRegionChange = () => {
-      setRegionCode(currentRegion());
-      void load();
-    };
-    window.addEventListener(REGION_CHANGED_EVENT, onRegionChange);
-    onCleanup(() => window.removeEventListener(REGION_CHANGED_EVENT, onRegionChange));
-  });
+  // A memo, so writing the same region again doesn't reload.
+  const regionCode = createMemo(currentRegion);
+  createEffect(on(regionCode, () => void load(), { defer: true }));
 
   // The hero's "Ending soon" tile as a filter toggle over the hidden "Ends in" column — same
   // include-set-only shape as ListRoute.tsx's panel pills, so it never touches the table filter

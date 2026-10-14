@@ -9,6 +9,7 @@
 // account pulls down) without needing to know every individual key up front. This is purely a
 // local-storage convenience, though — it does NOT mean sync itself works on the whole blob (see
 // setPref below).
+import { createSignal } from 'solid-js';
 import { TABLE_VIEW_PREF_KEYS } from './tableViewKeys.ts';
 
 export const PREFS_STORAGE_KEY = 'steam.isonoe.net:prefs';
@@ -61,11 +62,24 @@ function writeEntries(entries: Record<string, PrefEntry>): void {
   }
 }
 
+// Per key, not one for the blob: table views and rankings are written on every edit, and would rerun every reader.
+const versions = new Map<string, { track: () => void; notify: () => void }>();
+
+function version(key: string): { track: () => void; notify: () => void } {
+  let v = versions.get(key);
+  if (!v) {
+    const [track, notify] = createSignal(undefined, { equals: false });
+    versions.set(key, (v = { track, notify: () => notify() }));
+  }
+  return v;
+}
+
 // Returns `fallback` when the key was never set, storage is unavailable (private browsing,
 // cleared site data), or the stored blob itself is corrupted — never throws.
 export function getPref<T = unknown>(key: string): T | undefined;
 export function getPref<T>(key: string, fallback: T): T;
 export function getPref<T = unknown>(key: string, fallback?: T): T | undefined {
+  version(key).track();
   const entries = readEntries();
   return key in entries ? (entries[key].value as T) : (fallback as T);
 }
@@ -75,6 +89,7 @@ export function setPref(key: string, value: unknown): void {
   const updatedAt = Date.now();
   entries[key] = { value, updatedAt };
   writeEntries(entries);
+  version(key).notify();
   // Per-key push to the server once signed in (authStore.ts calls setSignedInSteamid on
   // sign-in/out) — deliberately never a whole-blob PUT, so two preferences changing around the
   // same time (different tabs/devices) can't race each other's writes. A table-view key is never
@@ -171,7 +186,7 @@ export function getAllPrefEntries(): Record<string, PrefEntry> {
 
 // Writes one key's value locally without pushing it back to the server — used when a merge finds
 // the server's copy of that key is newer than this device's own. Bypasses setPref specifically to
-// avoid that echo.
+// avoid that echo. Silent: the merge reloads the page after adopting, and Revert patches its table itself.
 export function adoptPrefEntry(key: string, value: unknown, updatedAt: number): void {
   const entries = readEntries();
   entries[key] = { value, updatedAt };

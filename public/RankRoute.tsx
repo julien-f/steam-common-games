@@ -2,7 +2,7 @@
 // Ranked lists section): asks one "which do you prefer?" pair at a time and feeds each answer to
 // ranking.ts's binary insertion. Every answer is stored right away (listsStore.ts's setRanking),
 // so leaving at any point loses nothing; undo is an in-memory stack of previous states.
-import { createSignal, createEffect, createMemo, onCleanup, onMount, Show, For, type JSX } from 'solid-js';
+import { createSignal, createEffect, createMemo, on, onCleanup, onMount, Show, For, type JSX } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { A, useParams, useNavigate, useLocation } from '@solidjs/router';
 import { getList, getRanking, setRanking } from './listsStore.ts';
@@ -260,11 +260,11 @@ export default function RankRoute() {
   const rankStateKey = createMemo(() =>
     JSON.stringify([location.state?.rankFocus ?? null, location.state?.rankOrder ?? null]),
   );
-  createEffect(() => {
-    params.listId;
-    rankStateKey();
-    void load();
-  });
+  createEffect(
+    on([() => params.listId, rankStateKey], () => {
+      void load();
+    }),
+  );
 
   function currentProgress() {
     const s = state();
