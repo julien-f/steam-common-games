@@ -15,18 +15,13 @@ import { panelOpen, getPanelGame, pickRandomFrom } from './panel.tsx';
 import { renderPanelNav, stepGameList } from './panelNav.ts';
 import { setPanelParam, setSearchQueryParam, parseUrlState } from './urlState.ts';
 import { addRecentGame } from './recentGames.ts';
-import { peekMyOwnershipStatus, onMyOwnershipReady } from './myOwnership.ts';
+import { peekMyOwnershipStatus } from './myOwnership.ts';
 import { GAME_SEARCH_DEBOUNCE_MS, GAME_SEARCH_MIN_CHARS, ownershipMarkersHtml, searchGames } from './gameSearch.ts';
 import type { GameSearchResult } from './gameSearch.ts';
 import type { Game, GameDetails } from './types.ts';
 import { fetchJson, focusGameRow } from './utils.ts';
 
-// Mirrors CORE_COLUMNS' own identity pair (gameColumns.ts) — a fixed-width thumb column plus a
-// Name column with inline ownership badges — but over GameSearchResult's bare {appid, name,
-// tinyImage} rather than a full Game row, and with no sort/filter/group (this is a one-off result
-// set, not a durable list worth those controls). `render` returns a plain DOM Node, the same
-// convention CORE_COLUMNS' own renderThumb/renderNameCell use, not tracked JSX — see the
-// ownership-badge effect below for how a badge arriving late still reaches the screen.
+// CORE_COLUMNS' thumb + Name pair over a bare GameSearchResult; a cell is a tracked scope, so renderName's badge follows ownership landing.
 function renderThumb(_value: unknown, row: GameSearchResult): Node {
   if (!row.tinyImage) {
     const span = document.createElement('span');
@@ -131,13 +126,6 @@ export default function SearchRoute() {
         });
     }),
   );
-
-  // renderName's badges aren't tracked, so redraw with fresh rows: the table keeps rows whose object is unchanged.
-  createEffect(() => {
-    if (!results().some((r) => peekMyOwnershipStatus(r.appid) === null)) return;
-    const unsub = onMyOwnershipReady(() => setResults((list) => list.map((r) => ({ ...r }))));
-    onCleanup(unsub);
-  });
 
   const hasImages = createMemo(() => results().some((r) => r.tinyImage));
   const table = createTableState<GameSearchResult>(results, () => (hasImages() ? SEARCH_COLUMNS : NAME_ONLY_COLUMNS));

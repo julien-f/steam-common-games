@@ -3050,6 +3050,23 @@ test('F1.1-4: look up one game from the nav search, in place', async ({ page }) 
   expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT');
 });
 
+test("F1 edge: the open nav search's ✓ marks follow a link's account resolving", async ({ page }) => {
+  await asPlayer(page, ALICE, { recentGames: [728880] }); // Overcooked! 2: Bob's, not Alice's
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/common-games', async (route) => {
+    if (route.request().postData()?.includes('bob')) await held;
+    await route.fallback();
+  });
+  await page.goto('/about?u=bob');
+  await page.getByPlaceholder('Look up any game…').focus();
+  const option = page.getByRole('option', { name: /Overcooked! 2/ });
+  await expect(option).toBeVisible();
+  await expect(option.locator('.game-search-badge.owned')).toHaveCount(0);
+  release();
+  await expect(option.locator('.game-search-badge.owned')).toBeVisible();
+});
+
 test('F1 edge: the nav search box empties after a pick and on a second Esc', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

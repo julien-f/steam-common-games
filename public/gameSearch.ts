@@ -1,5 +1,6 @@
 import { esc, fetchJson } from './utils.ts';
-import { peekMyOwnershipStatus, onMyOwnershipReady } from './myOwnership.ts';
+import { createEffect, untrack } from 'solid-js';
+import { peekMyOwnershipStatus, trackMyOwnership } from './myOwnership.ts';
 import type { OwnershipStatus } from './myOwnership.ts';
 
 export interface GameSearchResult {
@@ -130,7 +131,6 @@ export function initGameSearch({
   let lastTerm = ''; // the search that produced lastResults, for the "see all results" row's label/target
   let activeFetch = 0; // guards against a slower earlier request clobbering a faster later one
   let activeIdx = -1; // ArrowUp/ArrowDown highlight; -1 = none yet (Enter falls back to the top match)
-  let unsubOwnershipReady: (() => void) | null = null;
   // Whether what's currently in the dropdown is the recents list rather than search matches —
   // the results themselves are the same `GameSearchResult` shape either way (and pick the same
   // way), so this only drives the heading/"see all" chrome around them.
@@ -167,18 +167,6 @@ export function initGameSearch({
       inputEl.setAttribute('aria-activedescendant', `game-search-opt-${lastResults[activeIdx].appid}`);
     else if (moreActive) inputEl.setAttribute('aria-activedescendant', 'game-search-more-opt');
     else inputEl.removeAttribute('aria-activedescendant');
-    // A peek above returning null for any shown result means either "no currentAccount loaded"
-    // or "still loading" — onMyOwnershipReady fires once (only) when the latter resolves, so the
-    // still-showing dropdown picks up real ownership markers instead of staying blank for
-    // whatever was on screen when the fetch kicked off. Re-subscribing on every render (rather
-    // than once) means a fresh search that landed before the previous one's fetch resolved
-    // isn't left watching a stale listener for a dropdown it no longer owns.
-    unsubOwnershipReady?.();
-    unsubOwnershipReady = lastResults.some((r) => peekMyOwnershipStatus(r.appid) === null)
-      ? onMyOwnershipReady(() => {
-          if (!resultsEl.hidden) renderResults();
-        })
-      : null;
   }
 
   function showResults(results: GameSearchResult[], { recent = false }: { recent?: boolean } = {}) {
@@ -205,9 +193,13 @@ export function initGameSearch({
     resultsEl.innerHTML = '';
     inputEl.setAttribute('aria-expanded', 'false');
     inputEl.removeAttribute('aria-activedescendant');
-    unsubOwnershipReady?.();
-    unsubOwnershipReady = null;
   }
+
+  // The open dropdown's ✓/☆ markers follow the ownership cache landing and the account changing.
+  createEffect(() => {
+    trackMyOwnership();
+    if (!resultsEl.hidden) untrack(renderResults);
+  });
 
   // dir: 1 (ArrowDown) or -1 (ArrowUp). Wraps at both ends, same `(idx + dir + len) % len`
   // convention panel.js/library.js use for prev/next game paging — except the very first

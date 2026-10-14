@@ -250,7 +250,7 @@ import {
 } from './listResolve.ts';
 import { CombineForm, sourceOptions, refKey, type SourceOption } from './CombineForm.tsx';
 import type { MembershipGroup } from './combine.ts';
-import { peekMyOwnershipStatus, peekMyPlaytime, onMyOwnershipReady } from './myOwnership.ts';
+import { peekMyOwnershipStatus, peekMyPlaytime, trackMyOwnership } from './myOwnership.ts';
 
 type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user' | 'compare' | 'shared';
 
@@ -1844,20 +1844,7 @@ export default function ListRoute() {
     }
   }
 
-  // Stamps `inLibrary`/`onWishlist` onto every row currently in `rowsStore`, from myOwnership.ts's
-  // own owned/wishlist appid sets, checked against `currentAccount` (whichever account's list this
-  // route itself loaded — see myOwnership.ts's own comment) — unlike loadPrices above,
-  // this is never a per-row fetch: myOwnership.ts already loads (and
-  // caches) the whole sets once per loaded account, so checking membership for every row here
-  // costs nothing extra. `peekMyOwnershipStatus` is a synchronous, non-blocking peek that can
-  // return null for "no currentAccount loaded" *or* "still loading" (see its own comment in
-  // myOwnership.ts) — indistinguishable here, so this just stamps whatever's already resolved,
-  // leaving whichever rows peeked null to the onMyOwnershipReady re-stamp below (a no-op forever
-  // if no currentAccount is ever loaded, same as the panel's own "no badge at all" behavior).
-  //
-  // Reads `rowsStore` live rather than taking the row list as an argument: the two things that
-  // trigger a stamp (a row appearing, the sets landing) each happen at a moment the *other* one's
-  // caller can't see, so both have to look at whatever's actually there when they run.
+  // Stamps ✓/☆ (and a user list's playtime) onto every row in `rowsStore` from myOwnership.ts's cached sets; a still-loading peek is skipped.
   function stampMyOwnership(): void {
     batch(() => {
       for (const item of rowsStore) {
@@ -1885,31 +1872,12 @@ export default function ListRoute() {
   const stampsOwnership =
     kind === 'bundle' || kind === 'recent' || kind === 'user' || kind === 'compare' || kind === 'shared';
 
-  // Driven off the row list itself, not called once per load: rows can appear *after* a load has
-  // finished (openOrAddRecentGame prepends the game a nav-bar lookup just found), and a stamping
-  // pass that only ever ran over load()'s own row list left exactly those rows with no ✓/☆ marker
-  // — confirmed live, and a bug class that comes back the next time another path adds a row.
-  // `on(() => rowsStore.length)` tracks *only* the row count (its callback body runs untracked),
-  // so this stays off the detail stream's own per-row mutations, which never add or remove a row.
+  // Re-stamps when a row appears after the load (openOrAddRecentGame), the sets land, or the account changes.
   createEffect(
-    on(
-      () => rowsStore.length,
-      () => {
-        if (stampsOwnership) stampMyOwnership();
-      },
-    ),
+    on([() => rowsStore.length, trackMyOwnership], () => {
+      if (stampsOwnership) stampMyOwnership();
+    }),
   );
-
-  // The owned/wishlist sets are usually still in flight when a load's own first stamp runs, so
-  // re-stamp once they land. One-shot per load (onMyOwnershipReady forgets its listeners once it
-  // fires), guarded by this load's own generation so a superseded load can't stamp over a newer one.
-  function loadMyOwnership(gen: number): void {
-    stampMyOwnership();
-    onMyOwnershipReady(() => {
-      if (loadGuard.isStale(gen)) return;
-      stampMyOwnership();
-    });
-  }
 
   // Unused for kind === 'user' (its view lives on the list itself, see viewStore below) —
   // kept total anyway so a stray call never returns undefined.
@@ -2668,7 +2636,7 @@ export default function ListRoute() {
 
     const targets = priceTargets();
     if (targets) loadPrices(targets, gen); // runs concurrently, not awaited
-    if (stampsOwnership) loadMyOwnership(gen); // ditto
+    if (stampsOwnership) stampMyOwnership(); // a reload can keep the row count
     const toStream = kept ? initialRows.filter((row) => !kept.has(row.appid)) : initialRows;
     if (toStream.length) await streamGameDetails(toStream, gen);
     if (loadGuard.isStale(gen)) return;
@@ -3387,17 +3355,8 @@ export default function ListRoute() {
   // Owned/Wishlist reload on another account, or a `?u=` link failing to resolve; no other kind depends on it.
   const accountKey = createMemo(() => `${getEffectiveCurrentAccount()?.id ?? ''}:${getAccountOverrideState().state}`);
   const accountId = createMemo(() => getEffectiveCurrentAccount()?.id);
-  // Other kinds keep their rows, but their ✓/☆ stamps and random-pick history belong to the previous account.
-  createEffect(
-    on(
-      accountId,
-      () => {
-        if (stampsOwnership) loadMyOwnership(loadGuard.current());
-        clearAllRandomQueues();
-      },
-      { defer: true },
-    ),
-  );
+  // Other kinds keep their rows, but their random-pick history belongs to the previous account.
+  createEffect(on(accountId, clearAllRandomQueues, { defer: true }));
 
   createEffect(() => {
     params.bundleId;
