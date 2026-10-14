@@ -3084,6 +3084,36 @@ test('F1 edge: the nav search box empties after a pick and on a second Esc', asy
   await expect(box).toHaveValue('');
 });
 
+test('F1 edge: the nav search box’s × empties it and keeps it focused, back on the recents', async ({ page }) => {
+  await asPlayer(page, ALICE, { recentGames: [728880] });
+  await page.goto('/about');
+  const box = page.getByPlaceholder('Look up any game…');
+  const clear = page.locator('.app-search-wrap').getByRole('button', { name: 'Clear search' });
+  await expect(clear).toBeHidden();
+  await box.fill('hollow');
+  await clear.click();
+  await expect(box).toHaveValue('');
+  await expect(box).toBeFocused();
+  await expect(clear).toBeHidden();
+  await expect(page.getByRole('option', { name: /Overcooked! 2/ })).toBeVisible();
+});
+
+test('F2 edge: the /search box’s × empties it, and refocusing it selects its text to type over', async ({ page }) => {
+  await page.goto('/search?q=hades');
+  await expect(rows(page)).toHaveCount(1);
+  await expect(page.locator('.game-panel')).toBeVisible();
+  await page.keyboard.press('Escape'); // the closest match's panel covers the box on a phone
+  const box = page.getByPlaceholder('Search for a game…');
+  await box.click();
+  expect(await box.evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd])).toEqual([0, 5]);
+  await box.blur();
+
+  await page.locator('.search-page-input').getByRole('button', { name: 'Clear search' }).click();
+  await expect(box).toHaveValue('');
+  await expect(box).toBeFocused();
+  await expect(page.getByText('Type a game name to search.')).toBeVisible();
+});
+
 test('F1 edge: a first Esc with no dropdown to close leaves the nav search box but keeps its text', async ({
   page,
 }) => {

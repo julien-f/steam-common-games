@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Search boxes have a × to clear them in one tap, select their text when focused, and show a Search key on phone keyboards
+
 ## [0.11.0] - 2026-10-14
 
 ### Added

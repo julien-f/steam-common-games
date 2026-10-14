@@ -342,9 +342,9 @@ export function initGameSearch({
     pick({ appid: Number(btn.dataset.appid), name: btn.dataset.name ?? '', tinyImage: null });
   });
 
-  // Dismiss the dropdown on outside click, same convention as recentsBar-style widgets.
+  // Dismiss the dropdown on a click outside the input's wrapper (input, clear button, dropdown).
   document.addEventListener('click', (e) => {
-    if (e.target !== inputEl && !resultsEl.contains(e.target as Node)) hideResults();
+    if (!inputEl.parentElement!.contains(e.target as Node)) hideResults();
   });
 }
 

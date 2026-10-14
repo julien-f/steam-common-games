@@ -20,6 +20,7 @@ import { GAME_SEARCH_DEBOUNCE_MS, GAME_SEARCH_MIN_CHARS, ownershipMarkersHtml, s
 import type { GameSearchResult } from './gameSearch.ts';
 import type { Game, GameDetails } from './types.ts';
 import { fetchJson, focusGameRow } from './utils.ts';
+import { SearchClearButton } from './SearchClearButton.tsx';
 
 // CORE_COLUMNS' thumb + Name pair over a bare GameSearchResult; a cell is a tracked scope, so renderName's badge follows ownership landing.
 function renderThumb(_value: unknown, row: GameSearchResult): Node {
@@ -254,7 +255,9 @@ export default function SearchRoute() {
           ref={inputEl}
           type="text"
           placeholder="Search for a game…"
+          enterkeyhint="search"
           value={query()}
+          onFocus={(e) => e.currentTarget.select()}
           onInput={(e) => handleInput(e.currentTarget.value)}
           // `on:keydown`, not `onKeyDown`: Solid delegates onX-style handlers for `keydown`
           // through one listener on `document` — registered lazily, the first time anything in
@@ -276,6 +279,7 @@ export default function SearchRoute() {
             firstRow.focus();
           }}
         />
+        <SearchClearButton />
       </div>
 
       <Show

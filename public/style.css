@@ -668,6 +668,31 @@ tbody td {
   padding: 13px 16px;
   font-size: var(--fs-title);
 }
+/* SearchClearButton.tsx, inside either search box's right edge. */
+.search-clear {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  min-width: 40px;
+  padding: 0 12px;
+  background: none;
+  border: none;
+  color: var(--text2);
+  font-size: 1.4em;
+  line-height: 1;
+  cursor: pointer;
+}
+.search-clear:hover {
+  color: var(--text0);
+}
+input:placeholder-shown + .search-clear {
+  display: none;
+}
+.game-search-wrap > input:not(:placeholder-shown),
+.app-search-wrap > input:not(:placeholder-shown) {
+  padding-right: 40px;
+}
 .game-search-results {
   position: absolute;
   z-index: 5;
