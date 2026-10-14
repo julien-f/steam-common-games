@@ -156,6 +156,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Taste fit's hint to open the Owned list first is shorter, so a phone shows more of the list
 - The side panel's "More like this on Steam" link opens Steam's similar-games page for that game instead of a generic recommendations page
 - /search marks games already in the library again when the library loads after the results
+- The unsaved-view banner on Bundles now shows when sign-in completes after the page has loaded
+- A game's price and bundles in the side panel follow a newly picked region instead of keeping the previous one
+- The nav search's owned and wishlisted marks update when a shared link's account finishes loading
 
 ### Development
 
@@ -216,6 +219,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - batch.js merge replays a lane's closed and narrowed backlog items itself, and fix lanes review their own commits before reporting
 - mock-server.js and dev-server.js up restart a server they started at an older git HEAD
 - npm run check's one-line comment rule also covers new files not yet added to git
+- Unit tests run Solid's browser build, so they can check reactivity
+- Saved preferences are reactive, so anything showing one follows its changes
+- Account state is reactive, replacing the account-changed broadcast
 
 ## [0.10.0] - 2026-10-10
 

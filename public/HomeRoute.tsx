@@ -1,9 +1,5 @@
 // Home — account picker/header and the folder/list tree (see docs/dev/lists-and-accounts.md).
-// `accountsStore.ts`/
-// `listsStore.ts` are both plain modules with no Solid reactivity of their own — every mutation
-// here goes through their exported functions and then explicitly re-reads them into a local
-// signal (`refreshAccounts`/`refreshTree`), the same "mutate, then explicitly notify" pattern
-// panel.tsx's own `revision` signal uses for plain-object mutation it can't observe directly.
+// Accounts come from accountsStore.ts's reactive getters; the list tree is re-read after each mutation (`refreshTree`).
 //
 // **Current scope, deliberately trimmed for a first pass**: folder/list reorganizing (rename/
 // move/delete) uses an inline name field, a Move select and a `window.confirm` rather than a polished drag-
@@ -12,7 +8,7 @@
 // form below can pick any recent account's Owned/Wishlist, Recently Looked Up, or any existing
 // user list as a source. A bundle joins it only from its own page ("What does this add?" opens a
 // /lists/shared link, saved from there) — offering every bundle here would need a bundle picker.
-import { createSignal, createEffect, createMemo, on, onCleanup, For, Index, Show, type JSX } from 'solid-js';
+import { createSignal, createEffect, createMemo, on, For, Index, Show, type JSX } from 'solid-js';
 import { A, useLocation, useNavigate } from '@solidjs/router';
 import {
   getMyAccount,
@@ -25,7 +21,6 @@ import {
   accountDisplayLabel,
   accountIdentifiers,
   refreshAccountInfo,
-  ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
 import { getAccountOverrideState, adoptAccount, accountOverrideStatusText } from './accountOverride.ts';
 import { withAccountParam, parseUrlState, compareUrl, COMPARE_PATH } from './urlState.ts';
@@ -68,15 +63,15 @@ interface TreeRow {
 export default function HomeRoute() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [myAccount, setMyAccountSig] = createSignal<AccountSlot | null>(getMyAccount());
+  const myAccount = getMyAccount;
   // The *effective* current account — a `?u=` link's override when one is being explored,
   // the stored preference otherwise (see accountsStore.ts's own `?u=` section). Everything
   // below (the account card, the counts/players fetch, the document title) reads this, so a
   // shared link renders exactly as a picked account does; only the picker itself (recents,
   // ★ starring) still deals in stored accounts.
-  const [currentAccount, setCurrentAccountSig] = createSignal<AccountSlot | null>(getEffectiveCurrentAccount());
-  const [overrideState, setOverrideState] = createSignal(getAccountOverrideState());
-  const [recents, setRecentsSig] = createSignal<AccountSlot[]>(getRecentAccounts());
+  const currentAccount = getEffectiveCurrentAccount;
+  const overrideState = getAccountOverrideState;
+  const recents = () => getRecentAccounts();
   const [resolveInputs, setResolveInputs] = createSignal<string[]>(['']);
   const [resolveError, setResolveError] = createSignal('');
   const [resolving, setResolving] = createSignal(false);
@@ -100,24 +95,10 @@ export default function HomeRoute() {
   const [folders, setFoldersSig] = createSignal<Folder[]>(getFolders());
   const [lists, setListsSig] = createSignal<GameList[]>(getLists());
 
-  function refreshAccounts(): void {
-    setMyAccountSig(getMyAccount());
-    setCurrentAccountSig(getEffectiveCurrentAccount());
-    setOverrideState(getAccountOverrideState());
-    setRecentsSig(getRecentAccounts());
-  }
   function refreshTree(): void {
     setFoldersSig(getFolders());
     setListsSig(getLists());
   }
-
-  // A `?u=` override resolves asynchronously, after this route has already mounted (AppShell.tsx
-  // kicks it off), so the account card can't just read it once — accountsStore.ts broadcasts
-  // every change to the effective account (and accountOverride.ts every change to how it should
-  // be described), and this re-reads both. Same "plain module + window event, subscriber owns
-  // the signal" shape region.ts/REGION_CHANGED_EVENT already uses elsewhere in the app.
-  window.addEventListener(ACCOUNT_CHANGED_EVENT, refreshAccounts);
-  onCleanup(() => window.removeEventListener(ACCOUNT_CHANGED_EVENT, refreshAccounts));
 
   // Counts and per-member profile data aren't stored on AccountSlot itself (they'd go stale —
   // AccountSlot only caches a label/avatar so recents can render instantly) — refetched live

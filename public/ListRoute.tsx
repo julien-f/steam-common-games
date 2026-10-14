@@ -24,10 +24,7 @@
 // needed, same as when it's resolved as someone *else's* combine source) — but
 // group-by-membership is one table too, grouped by an "Owned by"/"In" column (membershipColumn.ts)
 // — generalizing the old Comparison page's "one table per owner set, most owners to fewest"
-// layout, with one view (sort, filters, columns, saved like any other) and row selection. `currentAccount` is read once per mount, not live-reactive to being changed
-// elsewhere while this route stays open — accountsStore.ts is a plain module with no Solid
-// signal of its own yet, so there's nothing to subscribe to reactively here until one exists (a
-// real follow-up, not an oversight). A bundle's detail card (shop/dates/counts/tiers/note/outbound
+// layout, with one view (sort, filters, columns, saved like any other) and row selection. A bundle's detail card (shop/dates/counts/tiers/note/outbound
 // links) and its unresolved ("not on Steam") games — both listed here as unported for a while —
 // are rendered now; the games table is still the point of this generic viewer, but a table holding
 // only the games that resolved to a Steam listing was quietly passing itself off as the whole
@@ -151,13 +148,7 @@ import {
   withoutMembershipGrouping,
   MEMBERSHIP_KEY,
 } from './membershipColumn.ts';
-import {
-  getEffectiveCurrentAccount,
-  accountIdentifiers,
-  accountDisplayLabel,
-  getMyAccount,
-  ACCOUNT_CHANGED_EVENT,
-} from './accountsStore.ts';
+import { getEffectiveCurrentAccount, accountIdentifiers, accountDisplayLabel, getMyAccount } from './accountsStore.ts';
 import { getAccountOverrideState, accountOverrideStatusText } from './accountOverride.ts';
 import { fetchAccountOverview, fetchAccountWishlist, resolveAccountSlot, type GameOwner } from './accountData.ts';
 import { loadRecentGames, addRecentGame, renameRecentGame, MAX_RECENT_GAMES } from './recentGames.ts';
@@ -198,7 +189,7 @@ import {
   PRICES_FAILED,
 } from './priceLoading.ts';
 import { isItadConfigured, isItadOff } from './panelData.ts';
-import { currentRegion, regionCurrency, regionLabel, REGION_CHANGED_EVENT } from './region.ts';
+import { currentRegion, regionCurrency, regionLabel } from './region.ts';
 import { openPrefsPopover } from './prefsPopover.tsx';
 import { registerRouteHandlers } from './AppShell.tsx';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
@@ -259,7 +250,7 @@ import {
 } from './listResolve.ts';
 import { CombineForm, sourceOptions, refKey, type SourceOption } from './CombineForm.tsx';
 import type { MembershipGroup } from './combine.ts';
-import { peekMyOwnershipStatus, peekMyPlaytime, onMyOwnershipReady } from './myOwnership.ts';
+import { peekMyOwnershipStatus, peekMyPlaytime, trackMyOwnership } from './myOwnership.ts';
 
 type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user' | 'compare' | 'shared';
 
@@ -739,7 +730,7 @@ export default function ListRoute() {
   // Which region's prices are on screen. Read-only here on purpose — the ⚙ Preferences popover
   // is the one place it's changed (a second control would be a second thing to keep in sync);
   // this just says which one is in effect, since the currency alone doesn't identify it.
-  const [regionCode, setRegionCode] = createSignal(currentRegion());
+  const regionCode = createMemo(currentRegion);
   // Oldest price write time seen across this load's price calls (a wishlist chunks into several).
   // `undefined` = nothing loaded yet, which renders no readout at all rather than a premature "just now".
   const [priceFetchedAt, setPriceFetchedAt] = createSignal<number | undefined>(undefined);
@@ -1853,20 +1844,7 @@ export default function ListRoute() {
     }
   }
 
-  // Stamps `inLibrary`/`onWishlist` onto every row currently in `rowsStore`, from myOwnership.ts's
-  // own owned/wishlist appid sets, checked against `currentAccount` (whichever account's list this
-  // route itself loaded — see myOwnership.ts's own comment) — unlike loadPrices above,
-  // this is never a per-row fetch: myOwnership.ts already loads (and
-  // caches) the whole sets once per loaded account, so checking membership for every row here
-  // costs nothing extra. `peekMyOwnershipStatus` is a synchronous, non-blocking peek that can
-  // return null for "no currentAccount loaded" *or* "still loading" (see its own comment in
-  // myOwnership.ts) — indistinguishable here, so this just stamps whatever's already resolved,
-  // leaving whichever rows peeked null to the onMyOwnershipReady re-stamp below (a no-op forever
-  // if no currentAccount is ever loaded, same as the panel's own "no badge at all" behavior).
-  //
-  // Reads `rowsStore` live rather than taking the row list as an argument: the two things that
-  // trigger a stamp (a row appearing, the sets landing) each happen at a moment the *other* one's
-  // caller can't see, so both have to look at whatever's actually there when they run.
+  // Stamps ✓/☆ (and a user list's playtime) onto every row in `rowsStore` from myOwnership.ts's cached sets; a still-loading peek is skipped.
   function stampMyOwnership(): void {
     batch(() => {
       for (const item of rowsStore) {
@@ -1894,31 +1872,12 @@ export default function ListRoute() {
   const stampsOwnership =
     kind === 'bundle' || kind === 'recent' || kind === 'user' || kind === 'compare' || kind === 'shared';
 
-  // Driven off the row list itself, not called once per load: rows can appear *after* a load has
-  // finished (openOrAddRecentGame prepends the game a nav-bar lookup just found), and a stamping
-  // pass that only ever ran over load()'s own row list left exactly those rows with no ✓/☆ marker
-  // — confirmed live, and a bug class that comes back the next time another path adds a row.
-  // `on(() => rowsStore.length)` tracks *only* the row count (its callback body runs untracked),
-  // so this stays off the detail stream's own per-row mutations, which never add or remove a row.
+  // Re-stamps when a row appears after the load (openOrAddRecentGame), the sets land, or the account changes.
   createEffect(
-    on(
-      () => rowsStore.length,
-      () => {
-        if (stampsOwnership) stampMyOwnership();
-      },
-    ),
+    on([() => rowsStore.length, trackMyOwnership], () => {
+      if (stampsOwnership) stampMyOwnership();
+    }),
   );
-
-  // The owned/wishlist sets are usually still in flight when a load's own first stamp runs, so
-  // re-stamp once they land. One-shot per load (onMyOwnershipReady forgets its listeners once it
-  // fires), guarded by this load's own generation so a superseded load can't stamp over a newer one.
-  function loadMyOwnership(gen: number): void {
-    stampMyOwnership();
-    onMyOwnershipReady(() => {
-      if (loadGuard.isStale(gen)) return;
-      stampMyOwnership();
-    });
-  }
 
   // Unused for kind === 'user' (its view lives on the list itself, see viewStore below) —
   // kept total anyway so a stray call never returns undefined.
@@ -2677,7 +2636,7 @@ export default function ListRoute() {
 
     const targets = priceTargets();
     if (targets) loadPrices(targets, gen); // runs concurrently, not awaited
-    if (stampsOwnership) loadMyOwnership(gen); // ditto
+    if (stampsOwnership) stampMyOwnership(); // a reload can keep the row count
     const toStream = kept ? initialRows.filter((row) => !kept.has(row.appid)) : initialRows;
     if (toStream.length) await streamGameDetails(toStream, gen);
     if (loadGuard.isStale(gen)) return;
@@ -2778,7 +2737,6 @@ export default function ListRoute() {
   );
   // "What does this add?": the bundle minus the current account's Owned, as an unsaved shared list.
   function bundleAddsHref(): string | null {
-    accountRev();
     const account = getEffectiveCurrentAccount();
     if (!account || !params.bundleId) return null;
     const sources: ListRef[] = [
@@ -3116,7 +3074,8 @@ export default function ListRoute() {
   // Owned learns its account's taste for Taste fit elsewhere, once every row's details are in.
   createEffect(() => {
     if (kind !== 'owned' || loadFraction() != null) return;
-    const account = getEffectiveCurrentAccount();
+    // Untracked: on an account switch the rows are still the previous account's until the reload.
+    const account = untrack(getEffectiveCurrentAccount);
     const taste = account && tasteOf(tableData(), Date.now());
     if (taste) saveTaste(account.id, taste);
   });
@@ -3371,23 +3330,20 @@ export default function ListRoute() {
       unregister();
       if (comparePlayers.length) notifyOwnersChanged();
     });
-
-    // The region preference lives in the nav bar's ⚙ popover, which knows nothing about who's
-    // showing prices — it just broadcasts. Without this listener (lost with bundles.tsx/
-    // library.tsx, which both had one) picking a new region left every price on screen in the
-    // old currency until something else happened to reload, with no indication anything was
-    // stale. A wishlist only needs its prices re-fetched; a bundle needs a full reload, because
-    // its Tier Price comes from the bundle fetch itself (fetchBundleById's own `country`), not
-    // from the price lookup. So does a shared or saved list with a bundle source, for the same Tier Price.
-    const onRegionChange = () => {
-      setRegionCode(currentRegion());
-      setPriceFetchedAt(undefined);
-      if (showsTierPrice()) void load();
-      else if (hasPrices()) void loadPrices(rowsStore, loadGuard.current());
-    };
-    window.addEventListener(REGION_CHANGED_EVENT, onRegionChange);
-    onCleanup(() => window.removeEventListener(REGION_CHANGED_EVENT, onRegionChange));
   });
+
+  // A bundle (or a list with a bundle source) reloads: its Tier Price comes from the bundle fetch, not the price lookup.
+  createEffect(
+    on(
+      regionCode,
+      () => {
+        setPriceFetchedAt(undefined);
+        if (showsTierPrice()) void load();
+        else if (hasPrices()) void loadPrices(rowsStore, loadGuard.current());
+      },
+      { defer: true },
+    ),
+  );
 
   // A plain createEffect, not onMount — /lists/bundle/:bundleId, the generic /lists/:listId, and
   // /game/:appid? are each one route *definition* shared across every id, so navigating from one
@@ -3396,36 +3352,17 @@ export default function ListRoute() {
   // load() itself (via the outer `params` object) — referencing them here is what makes this
   // effect re-run on a param-only navigation; 'owned'/'wishlist' have no such param and so only
   // ever run once, identically to the old onMount-based call.
-  // `accountRev` is what makes the two account-scoped kinds re-load when the effective account
-  // changes under them — a `?u=` link resolving after this route mounted (the common case: a
-  // cold visit to /lists/owned?u=alice), or an account picked/adopted on Home. accountsStore.ts
-  // is a plain module with no Solid signal of its own, so this subscribes to its window
-  // broadcast and bumps a signal the load effect below reads — the same shape HomeRoute.tsx uses
-  // for its own account card. Only 'owned'/'wishlist' read it: every other kind's data has
-  // nothing to do with which account is current (a bundle, the recents list, a user list's own
-  // pinned account refs), so they must not reload on an unrelated account change.
-  const [accountRev, setAccountRev] = createSignal(0);
-  // Every other kind keeps its rows, but the ✓/☆ ownership stamps on them belong to the account
-  // that was current when they were computed — loadMyOwnership's own one-shot re-stamp has
-  // already fired by then, so without this a bundle/recents/user list would keep showing the
-  // previous account's ownership. Re-stamping is safe at any time: peek returns null until the
-  // new account's sets land, so nothing is cleared in the meantime, then everything is rewritten.
-  const onAccountChanged = () => {
-    setAccountRev((r) => r + 1);
-    if (stampsOwnership) loadMyOwnership(loadGuard.current());
-    // Every account-scoped list's contents change at once, so no list's "already shuffled
-    // through these" history means anything any more — panel.tsx exported clearAllRandomQueues
-    // for exactly this and had no caller since the redesign.
-    clearAllRandomQueues();
-  };
-  window.addEventListener(ACCOUNT_CHANGED_EVENT, onAccountChanged);
-  onCleanup(() => window.removeEventListener(ACCOUNT_CHANGED_EVENT, onAccountChanged));
+  // Owned/Wishlist reload on another account, or a `?u=` link failing to resolve; no other kind depends on it.
+  const accountKey = createMemo(() => `${getEffectiveCurrentAccount()?.id ?? ''}:${getAccountOverrideState().state}`);
+  const accountId = createMemo(() => getEffectiveCurrentAccount()?.id);
+  // Other kinds keep their rows, but their random-pick history belongs to the previous account.
+  createEffect(on(accountId, clearAllRandomQueues, { defer: true }));
 
   createEffect(() => {
     params.bundleId;
     params.listId;
     params.appid;
-    if (kind === 'owned' || kind === 'wishlist') accountRev();
+    if (kind === 'owned' || kind === 'wishlist') accountKey();
     // A comparison lives entirely in the query string, not the path, so *that* is what has to be
     // read here for editing the players (or the op) to reload without a remount. load()'s own
     // guard is what keeps the canonicalizing rewrite from counting as a change.

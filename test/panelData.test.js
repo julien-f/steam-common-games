@@ -84,8 +84,8 @@ test('a failed forced refresh keeps what each source last loaded', async (t) => 
     Promise.all([
       cache.fetchNews(620, opts),
       cache.fetchAchievements(620, members, opts),
-      cache.fetchPrice(620, opts),
-      cache.fetchBundles(620, opts),
+      cache.fetchPrice(620, 'FR', opts),
+      cache.fetchBundles(620, 'FR', opts),
     ]);
 
   const [news, achievements, price, bundles] = await loadAll();
@@ -98,7 +98,24 @@ test('a failed forced refresh keeps what each source last loaded', async (t) => 
   assert.deepEqual(await loadAll({ force: true }), [news, achievements, price, bundles]);
   // An unforced call answers from the cache synchronously, not with a promise.
   assert.equal(cache.fetchAchievements(620, members), achievements);
-  assert.equal(cache.fetchPrice(620), price);
+  assert.equal(cache.fetchPrice(620, 'FR'), price);
+});
+
+test('price and bundles are cached per region, and asked in it', async (t) => {
+  const state = mockPanelRoutes(t, DATA);
+  const cache = createPanelDataCache();
+  await Promise.all([cache.fetchPrice(620, 'FR'), cache.fetchBundles(620, 'FR')]);
+  await Promise.all([cache.fetchPrice(620, 'US'), cache.fetchBundles(620, 'US')]);
+  await Promise.all([cache.fetchPrice(620, 'FR'), cache.fetchBundles(620, 'FR')]);
+  assert.deepEqual(
+    state.urls.filter((url) => url !== '/api/health'),
+    [
+      '/api/prices?country=FR',
+      '/api/game-bundles/620?country=FR',
+      '/api/prices?country=US',
+      '/api/game-bundles/620?country=US',
+    ],
+  );
 });
 
 test("a source that fails before loading anything reads as null (didn't answer)", async (t) => {
@@ -109,8 +126,8 @@ test("a source that fails before loading anything reads as null (didn't answer)"
     await Promise.all([
       cache.fetchNews(620),
       cache.fetchAchievements(620, []),
-      cache.fetchPrice(620),
-      cache.fetchBundles(620),
+      cache.fetchPrice(620, 'FR'),
+      cache.fetchBundles(620, 'FR'),
     ]),
     [null, null, null, null],
   );
@@ -135,8 +152,8 @@ test('isItadOff: only once /api/health says ITAD is not configured', async (t) =
   const state = mockPanelRoutes(t, DATA, { itadConfigured: false });
   const cache = createPanelDataCache();
   assert.equal(cache.isItadOff(), false, 'not asked yet');
-  assert.equal(await cache.fetchPrice(620), null);
-  assert.equal(await cache.fetchBundles(620), null);
+  assert.equal(await cache.fetchPrice(620, 'FR'), null);
+  assert.equal(await cache.fetchBundles(620, 'FR'), null);
   assert.equal(cache.isItadOff(), true);
   assert.deepEqual(state.urls, ['/api/health'], 'asked once, and no ITAD route called');
 });
@@ -151,9 +168,9 @@ test('isItadOff: a failed /api/health is not "off", and is asked again next time
     throw new Error(`Unexpected fetch: ${url}`);
   });
   const cache = createPanelDataCache();
-  assert.equal(await cache.fetchPrice(620), null);
+  assert.equal(await cache.fetchPrice(620, 'FR'), null);
   assert.equal(cache.isItadOff(), false);
-  await cache.fetchPrice(620, { force: true }); // unforced, the cached null answers
+  await cache.fetchPrice(620, 'FR', { force: true }); // unforced, the cached null answers
   assert.equal(healthCalls, 2);
 });
 

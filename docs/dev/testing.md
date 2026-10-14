@@ -5,6 +5,7 @@
 - `node:test` + `supertest`, flat in `test/*.test.{js,ts}`.
 - `npm test` (~6 s) runs with `DB_FILE=`, so no real database is touched.
 - Single file: `npm run test:one test/<name>.test.js` — same env as `npm test`, which hardcodes its glob.
+- `--conditions=browser` loads solid-js's browser build: under Node's default (server build) effects and memos never re-run and `createResource` throws, so reactivity couldn't be tested.
 
 ## End-to-end tests
 

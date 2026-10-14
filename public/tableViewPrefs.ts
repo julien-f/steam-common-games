@@ -3,7 +3,7 @@
 // copies (see docs/dev/frontend.md's table section for the "share on demand, not
 // live-synced" reasoning). Both pages call these the same way: a `table` instance and the
 // ViewStore that page's view is kept in.
-import { createEffect, createRoot } from 'solid-js';
+import { createEffect, createRoot, untrack } from 'solid-js';
 import type { TableViewState, ViewStateApi } from '@vates/data-table-solid';
 import { getPref, setPref, adoptPrefEntry, pushPrefToServer } from './prefs.ts';
 import { getBaseline, setBaseline, stripTransientViewFields } from './tableViewSync.ts';
@@ -66,7 +66,7 @@ export function bindViewPersistence(
       const view = table.getViewState();
       if (!paused()) {
         pausedView = undefined;
-        store.save(view);
+        untrack(() => store.save(view)); // a store's save reads its own pref back
         return;
       }
       const layout = JSON.stringify(stripTransientViewFields(view));

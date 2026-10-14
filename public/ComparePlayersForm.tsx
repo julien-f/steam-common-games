@@ -20,7 +20,7 @@
 // It owns the draft slots being typed and nothing else — no resolving, no navigation, no URL; the
 // route decides what a submitted set of slots means. The one thing it reads is accountsStore.ts,
 // synchronously, once at mount: nothing here can change what's in recents while it's open.
-import { createSignal, createMemo, createUniqueId, For, Index, Show, type JSX } from 'solid-js';
+import { createSignal, createMemo, createUniqueId, untrack, For, Index, Show, type JSX } from 'solid-js';
 import {
   getRecentAccounts,
   getMyAccount,
@@ -81,8 +81,9 @@ function seedSlots(initial: string[][], known: KnownAccount[]): Slot[] {
 }
 
 export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element {
-  const known = knownAccounts();
-  const [slots, setSlots] = createSignal<Slot[]>(seedSlots(props.initialSlots, known));
+  // A memo: a `?u=` account resolving after mount still shows up as a suggestion.
+  const known = createMemo(knownAccounts);
+  const [slots, setSlots] = createSignal<Slot[]>(seedSlots(props.initialSlots, untrack(known)));
   // Which slot's dropdown is open, what's typed in it, and which row the arrow keys are on. One
   // set of signals rather than per-slot state: only one input can be focused at a time, so only
   // one dropdown can be open, and keeping it flat means closing one is never a matter of
@@ -93,7 +94,7 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
   const listboxId = createUniqueId();
   const whyDisabledId = createUniqueId();
 
-  const matches = createMemo(() => (openSlot() == null ? [] : filterAccounts(known, slots(), query())));
+  const matches = createMemo(() => (openSlot() == null ? [] : filterAccounts(known(), slots(), query())));
 
   function closeDropdown(): void {
     setOpenSlot(null);

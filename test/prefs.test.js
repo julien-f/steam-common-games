@@ -305,3 +305,18 @@ test('flushPendingPushes: a body over the browser keepalive limit is sent withou
   flushPendingPushes();
   assert.deepEqual(seen.sort(), [false, true]);
 });
+
+test('getPref is reactive per key: an effect reruns on its own key only', async () => {
+  const { getPref, setPref, adoptPrefEntry } = require('../public/prefs.ts');
+  const { createRoot, createEffect } = await import('solid-js');
+  const seen = [];
+  const dispose = createRoot((dispose) => {
+    createEffect(() => seen.push(getPref('region', null)));
+    return dispose;
+  });
+  setPref('lists', []);
+  setPref('region', 'GB');
+  adoptPrefEntry('region', 'DE', 1); // silent: see adoptPrefEntry
+  dispose();
+  assert.deepEqual(seen, [null, 'GB']);
+});

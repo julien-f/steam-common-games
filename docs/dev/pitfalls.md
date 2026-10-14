@@ -80,6 +80,12 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: `@vates/data-table-solid` touches `window` when it loads.
 - **Fix**: resolve it to `@vates/data-table-core`, which provides the helpers, with a `module.registerHooks` resolve hook in the test (see `test/gameColumns.test.js`; needs Node ≥ 22.15).
 
+## A unit test's effect never re-runs on a module's signal
+
+- **Symptom**: an effect created in a test with `require('solid-js')` runs once and never again when a `public/` module's signal changes.
+- **Cause**: `require` loads solid-js's CommonJS build, while the `.ts` modules `import` its ESM build: two Solid instances that don't see each other's signals.
+- **Fix**: `await import('solid-js')` in the test (see `test/authStore.test.js`).
+
 ## The e2e run fails at start while agents run in parallel
 
 - **Symptom**: `npm run test:e2e` (or the pre-commit hook's e2e step) fails at start with `http://localhost:28992 is already used, make sure that nothing is running on the port/url`.

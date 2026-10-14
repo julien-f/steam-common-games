@@ -24,6 +24,7 @@
 // /lists/wishlist links carry the param along (panel.tsx) so clicking one stays on that account.
 // Returns `null` throughout when no account is loaded at all — same as the legacy page's
 // own "no badge at all" behavior.
+import { createSignal } from 'solid-js';
 import { getEffectiveCurrentAccount } from './accountsStore.ts';
 import { fetchAccountOwnedData, fetchAccountWishlistData } from './accountData.ts';
 import type { AccountLibraryGame, GameOwner } from './accountData.ts';
@@ -63,13 +64,11 @@ export function createMyOwnershipCache() {
   let wishlistSet: Set<number> | null = null;
   let ownedFailed = false;
   let wishlistFailed = false;
-  let readyListeners: (() => void)[] = [];
+  // Bumped once both halves land, so a peek read in JSX, a memo or a table cell re-runs then.
+  const [loaded, notifyLoaded] = createSignal(undefined, { equals: false });
 
   function notifyReady(): void {
-    if (!ownedGames || !wishlistSet) return; // only once both halves have landed
-    const listeners = readyListeners;
-    readyListeners = [];
-    listeners.forEach((fn) => fn());
+    if (ownedGames && wishlistSet) notifyLoaded();
   }
 
   // Starts (or reuses) the two fetches for whatever `currentAccount` currently is. Returns false
@@ -135,12 +134,9 @@ export function createMyOwnershipCache() {
     };
   }
 
-  // Sync, non-blocking peek — for gameSearch.ts's dropdown, which re-renders many result rows
-  // per keystroke and can't await per row. Starts loading as a side effect if not already in
-  // flight; returns `null` for "no currentAccount loaded" *or* "still loading" (indistinguishable
-  // to a caller that can't await — see onMyOwnershipReady below for the way to tell "still
-  // loading" apart and re-render once it lands).
+  // Sync and tracked; starts loading. `null` for "no account" or "still loading": a tracked reader re-runs once it lands.
   function peekMyOwnershipStatus(appid: number): OwnershipStatus | null {
+    loaded();
     if (!ensureLoading()) return null;
     if (!ownedGames || !wishlistSet) return null;
     return statusOf(appid);
@@ -161,25 +157,20 @@ export function createMyOwnershipCache() {
   // `undefined` while loading, with no account or after a failed fetch, `null` for a game the
   // account doesn't own.
   function peekMyPlaytime(appid: number): MyPlaytime | null | undefined {
+    loaded();
     if (!ensureLoading() || !ownedGames || ownedFailed) return undefined;
     const game = ownedGames.get(appid);
     if (!game) return null;
     return { playtime: hoursFromMinutes(game.playtimeMinutes), lastPlayed: fmtLastPlayed(game.lastPlayedUnix) };
   }
 
-  // One-shot "both sets just became available" notification — fires once (then forgets every
-  // registered listener) the next time both halves of the *current* currentAccount's fetch land.
-  // Lets gameSearch.ts's dropdown, which rendered a peek of `null` (still loading) for its
-  // currently-shown results, re-render once real data exists instead of just leaving the
-  // dropdown's ownership markers permanently blank for whatever was on screen at load time.
-  function onMyOwnershipReady(cb: () => void): () => void {
-    readyListeners.push(cb);
-    return () => {
-      readyListeners = readyListeners.filter((fn) => fn !== cb);
-    };
+  // Subscribes an imperative consumer's effect to what the peeks depend on, before it has anything to peek.
+  function trackMyOwnership(): void {
+    loaded();
+    getEffectiveCurrentAccount();
   }
 
-  return { getMyOwnershipStatus, peekMyOwnershipStatus, peekMyPlaytime, getOwnersFor, onMyOwnershipReady };
+  return { getMyOwnershipStatus, peekMyOwnershipStatus, peekMyPlaytime, getOwnersFor, trackMyOwnership };
 }
 
 const defaultCache = createMyOwnershipCache();
@@ -187,4 +178,4 @@ export const getMyOwnershipStatus = defaultCache.getMyOwnershipStatus;
 export const peekMyOwnershipStatus = defaultCache.peekMyOwnershipStatus;
 export const peekMyPlaytime = defaultCache.peekMyPlaytime;
 export const getOwnersFor = defaultCache.getOwnersFor;
-export const onMyOwnershipReady = defaultCache.onMyOwnershipReady;
+export const trackMyOwnership = defaultCache.trackMyOwnership;

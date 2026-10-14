@@ -218,31 +218,47 @@ test('peekMyOwnershipStatus: null when no currentAccount is loaded, with no fetc
   assert.equal(called, false);
 });
 
-test('onMyOwnershipReady: fires once both sets have landed, not before', async (t) => {
+// Runs `read` in an effect and returns what it saw on each run, plus a dispose.
+async function track(read) {
+  const { createRoot, createEffect } = await import('solid-js');
+  const seen = [];
+  const dispose = createRoot((dispose) => {
+    createEffect(() => seen.push(read()));
+    return dispose;
+  });
+  return { seen, dispose };
+}
+
+test('peekMyOwnershipStatus is reactive: a tracked peek re-runs once both sets land', async (t) => {
   withFetch(t, fakeAccountFetch({ ownedAppids: [440], wishlistAppids: [620] }));
   setCurrentAccount(makeAccount('1'));
+  const { getMyOwnershipStatus, peekMyOwnershipStatus } = createMyOwnershipCache();
+  const { seen, dispose } = await track(() => peekMyOwnershipStatus(440));
 
-  const { getMyOwnershipStatus, onMyOwnershipReady } = createMyOwnershipCache();
-  let fired = 0;
-  onMyOwnershipReady(() => {
-    fired++;
-  });
   await getMyOwnershipStatus(440); // drives both fetches to completion
-  assert.equal(fired, 1);
+  dispose();
+
+  assert.deepEqual(seen, [null, { inLibrary: true, onWishlist: false }]);
 });
 
-test('onMyOwnershipReady: the unsubscribe function prevents a later firing', async (t) => {
-  withFetch(t, fakeAccountFetch({ ownedAppids: [440] }));
-  setCurrentAccount(makeAccount('1'));
-
-  const { getMyOwnershipStatus, onMyOwnershipReady } = createMyOwnershipCache();
-  let fired = 0;
-  const unsub = onMyOwnershipReady(() => {
-    fired++;
+test('trackMyOwnership: re-runs on an account switch, without starting a fetch', async (t) => {
+  let fetches = 0;
+  withFetch(t, (...args) => {
+    fetches++;
+    return fakeAccountFetch()(...args);
   });
-  unsub();
-  await getMyOwnershipStatus(440);
-  assert.equal(fired, 0);
+  const { trackMyOwnership } = createMyOwnershipCache();
+  let runs = 0;
+  const { dispose } = await track(() => {
+    trackMyOwnership();
+    runs++;
+  });
+
+  setCurrentAccount(makeAccount('2'));
+  dispose();
+
+  assert.equal(runs, 2);
+  assert.equal(fetches, 0);
 });
 
 test('getMyOwnershipStatus: a ?u= override is what ownership answers for, not the stored account', async (t) => {

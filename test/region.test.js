@@ -7,7 +7,6 @@ const {
   TIMEZONE_COUNTRY,
   detectCountry,
   AUTO_COUNTRY,
-  REGION_CHANGED_EVENT,
   getStoredRegion,
   setStoredRegion,
   currentRegion,
@@ -16,8 +15,7 @@ const {
 
 // region.js reads a handful of global-scoped APIs live on every call (no module-level state of
 // its own to reset between tests — see setPref/getPref's own equivalent note in prefs.js) —
-// localStorage (via prefs.js), Intl.DateTimeFormat/Intl.Locale (detectCountry), and window
-// (setStoredRegion's event broadcast). Each test stubs only what it needs and afterEach restores
+// localStorage (via prefs.js) and Intl.DateTimeFormat/Intl.Locale (detectCountry). Each test stubs only what it needs and afterEach restores
 // the real Intl.DateTimeFormat/Intl.Locale so no test leaks a stub into another.
 function makeMemoryLocalStorage() {
   const store = new Map();
@@ -139,13 +137,17 @@ test('getStoredRegion: falls back to AUTO_COUNTRY for an unrecognized stored val
   assert.equal(getStoredRegion(), AUTO_COUNTRY);
 });
 
-test('setStoredRegion: dispatches REGION_CHANGED_EVENT on window with the new value', () => {
-  const dispatched = [];
-  global.window = { dispatchEvent: (e) => dispatched.push(e) };
+test('currentRegion is reactive: an effect follows setStoredRegion', async () => {
+  const { createRoot, createEffect } = await import('solid-js');
+  setStoredRegion('US');
+  const seen = [];
+  const dispose = createRoot((dispose) => {
+    createEffect(() => seen.push(currentRegion()));
+    return dispose;
+  });
   setStoredRegion('GB');
-  assert.equal(dispatched.length, 1);
-  assert.equal(dispatched[0].type, REGION_CHANGED_EVENT);
-  assert.equal(dispatched[0].detail.region, 'GB');
+  dispose();
+  assert.deepEqual(seen, ['US', 'GB']);
 });
 
 test('setStoredRegion: never throws when window is undefined (Node/test environment)', () => {

@@ -171,7 +171,7 @@ function renderDemoBadge(v: unknown): Node {
 // already is just a heads-up. A no-op everywhere `inLibrary`/`onWishlist` are never populated — the Library/
 // Wishlist tabs' own rows, where "do I own this" is trivially always true/false and not worth
 // flagging — since this only renders whatever's already on the row (ListRoute.tsx's
-// loadMyOwnership is what actually populates them, for the bundle/recent/user lists where the
+// stampMyOwnership is what actually populates them, for the bundle/recent/user lists where the
 // question is a genuine one). Falls straight through to a plain text node when neither applies
 // (`computeOwnershipStatus` returns `null`/`'Not Owned'`, neither of which has a tier `color`),
 // so the common case renders identically to `fmt.str` before this existed.
@@ -623,7 +623,7 @@ const PRICE_STATUS_COLUMN: ColumnDef<Row> = {
 
 // "Is this appid owned/wishlisted by currentAccount" (whichever account's list is actually on
 // screen — see myOwnership.ts's own comment) — turns its `inLibrary`/`onWishlist` fields
-// (stamped onto a row by ListRoute.tsx's own loadMyOwnership, from the sets myOwnership.ts
+// (stamped onto a row by ListRoute.tsx's own stampMyOwnership, from the sets myOwnership.ts
 // already loads once per loaded account — no per-row fetch of its own) into one categorical
 // column, same shape as PRICE_STATUS_COLUMN above. Labeled "Ownership Status", not "My Status"
 // — this app has no real login, so `currentAccount` isn't a verified "this is you" identity,
@@ -633,7 +633,7 @@ const PRICE_STATUS_COLUMN: ColumnDef<Row> = {
 // wishlist") was deliberately kept free of "your"/"my" wording for. `null` (rendered "—") covers
 // both "no account loaded" and "still loading" — same ambiguity myOwnership.ts's own
 // peekMyOwnershipStatus already accepts, for the same reason: a synchronous cell render can't
-// await, and loadMyOwnership re-stamps every row once the real sets land. Not part of
+// await, and stampMyOwnership re-stamps every row once the real sets land. Not part of
 // CORE_COLUMNS — an Owned/Wishlist list's own rows are always trivially 'Owned'/'Wishlisted', so
 // this only earns a place on ListRoute.tsx's BUNDLE_COLUMNS/RECENT_COLUMNS (which 'user' also
 // uses), where it's a genuine question — and even there it's hidden by default (not part of

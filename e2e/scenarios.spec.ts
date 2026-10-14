@@ -616,6 +616,18 @@ test('C1 edge: reverting to a saved ungrouped layout keeps the comparison groupe
   await expect(groupRows(page)).toHaveCount(3); // …but the comparison stays grouped
 });
 
+test('C1 edge: the unsaved-view banner shows when sign-in lands after the table', async ({ page }) => {
+  await mockApi(page, { states: ['signed-in'] });
+  const bundlesBrowseView = { value: { sorts: [{ key: 'title', dir: 'desc' }] }, updatedAt: Date.now() };
+  // Delayed so the banner mounts signed out: its `when` must still pick up the user arriving.
+  await page.route('**/api/me', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await route.fulfill({ json: { steamid: SIGNED_IN.steamid, prefs: { bundlesBrowseView } } });
+  });
+  await page.goto('/bundles');
+  await expect(page.locator('.pref-unsaved-banner')).toContainText('Unsaved changes to this view');
+});
+
 test('C1 edge: my account comes first, is prefilled, and only once', async ({ page }) => {
   await asPlayer(page, BOB); // Bob's steamid sorts after Alice's
   await page.goto('/lists/compare?u=alice&u=bob');
@@ -1629,6 +1641,62 @@ test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }
   await page.goto('/lists/owned?game=620');
   await expect(page.locator('.panel-bundle').filter({ hasText: 'Test Build Your Own Bundle' })).toContainText(
     /from \$1\.17\/game \(≈ €[\d.]+\)/,
+  );
+});
+
+test('B1 edge: picking a region reloads Bundles in it', async ({ page }) => {
+  await page.goto('/bundles');
+  await expect(rows(page).first()).toBeVisible();
+  const asked = page.waitForRequest(/\/api\/bundles\?.*country=US/);
+  await page.getByLabel('Preferences').click();
+  await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
+  await asked;
+});
+
+test('F1 edge: the panel prices a game, and its bundles, in a newly picked region', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.route('**/api/prices?country=US', async (route) => {
+    const req = route.request();
+    const json = JSON.parse(respond(req.method(), new URL(req.url()), req.postData()).body);
+    for (const info of Object.values<Record<string, { currency: string }>>(json.prices))
+      for (const field of Object.values(info)) if (field && typeof field === 'object') field.currency = 'USD';
+    await route.fulfill({ json });
+  });
+  await page.goto('/lists/owned?game=892970');
+  const amount = page.locator('#game-panel .panel-price-amount');
+  await expect(amount).toContainText('€');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#game-panel')).toBeHidden();
+
+  await page.getByLabel('Preferences').click();
+  await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
+  await page.keyboard.press('Escape');
+  const bundlesAsked = page.waitForRequest(/\/api\/game-bundles\/892970\?.*country=US/);
+  await row(page, 'Valheim').getByText('Valheim').click();
+  await expect(amount).toContainText('$');
+  await bundlesAsked;
+});
+
+test("A2 edge: a cold link to someone's Owned list loads theirs once it resolves", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?u=bob');
+  await expect(rows(page)).toHaveCount(BOB.owned.length);
+});
+
+test("B3 edge: a link's account, resolving after the bundle loaded, re-marks what it owns", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  // Bob's resolve lands after the bundle has been marked with Alice's library.
+  await page.route('**/api/common-games', async (route) => {
+    if (route.request().postData()?.includes('bob')) await new Promise((resolve) => setTimeout(resolve, 800));
+    await route.fallback();
+  });
+  await page.goto(`/lists/bundle/${BUNDLE.id}?u=bob&game=728880`);
+  await expect(row(page, 'Overcooked! 2').locator('.name-status-badge.owned')).toBeVisible();
+  await expect(row(page, 'Hades').locator('.name-status-badge.owned')).toHaveCount(0);
+  await expect(page.locator('#game-panel .panel-ownership-badge.owned')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'What does this add?' })).toHaveAttribute(
+    'href',
+    new RegExp(BOB.steamid),
   );
 });
 
@@ -2982,6 +3050,23 @@ test('F1.1-4: look up one game from the nav search, in place', async ({ page }) 
   expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT');
 });
 
+test("F1 edge: the open nav search's ✓ marks follow a link's account resolving", async ({ page }) => {
+  await asPlayer(page, ALICE, { recentGames: [728880] }); // Overcooked! 2: Bob's, not Alice's
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/common-games', async (route) => {
+    if (route.request().postData()?.includes('bob')) await held;
+    await route.fallback();
+  });
+  await page.goto('/about?u=bob');
+  await page.getByPlaceholder('Look up any game…').focus();
+  const option = page.getByRole('option', { name: /Overcooked! 2/ });
+  await expect(option).toBeVisible();
+  await expect(option.locator('.game-search-badge.owned')).toHaveCount(0);
+  release();
+  await expect(option.locator('.game-search-badge.owned')).toBeVisible();
+});
+
 test('F1 edge: the nav search box empties after a pick and on a second Esc', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
@@ -3477,4 +3562,14 @@ test("Y1.1,3: signed in on a new device, the account's lists win over this brows
 
   await page.getByRole('navigation').getByText('Alice', { exact: true }).click();
   await expect(page.getByText('Signed in — your accounts/lists/settings sync')).toBeVisible();
+});
+
+test('Y1 edge: signing out switches the account menu back to signing in', async ({ page }) => {
+  await mockApi(page, { states: ['signed-in'] });
+  await page.route('**/auth/logout', (route) => route.fulfill({ json: { ok: true } }));
+  await page.goto('/about');
+  await page.getByRole('navigation').getByText('Alice', { exact: true }).click();
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page.getByRole('link', { name: 'Sign in with Steam' })).toBeVisible();
+  await expect(page.getByText('Signed in — your accounts/lists/settings sync')).toHaveCount(0);
 });

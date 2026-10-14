@@ -30,7 +30,6 @@
 // myOwnership.ts's createMyOwnershipCache.
 import { applyPriceInfo, postPrices } from './priceLoading.ts';
 import { fetchJson } from './utils.ts';
-import { currentRegion } from './region.ts';
 import type { Achievements, NewsItem, PriceFields } from './types.ts';
 import type { PickAndMixTier } from './bundleRows.ts';
 
@@ -122,9 +121,9 @@ function sessionCached<K, V>(
 export function createPanelDataCache() {
   const news = new Map<number, PanelNews>();
   const achievements = new Map<string, PanelAchievements>();
-  const price = new Map<number, PanelPrice>();
+  const price = new Map<string, PanelPrice>(); // keyed `region:appid`, like bundles
   const dlcEntries = new Map<number, DlcEntry | null>(); // null: the store has no entry for it
-  const bundles = new Map<number, PanelBundles>();
+  const bundles = new Map<string, PanelBundles>();
 
   // Lazily resolved once per session rather than per-call — a plain GET /api/health, cheap to
   // over-share across every game a price is fetched for and every list mounted (ListRoute.tsx).
@@ -220,13 +219,13 @@ export function createPanelDataCache() {
   // panel.tsx's own price source for that check.
   // A failure reads as "IsThereAnyDeal didn't answer" rather than a stuck loading skeleton; the
   // panel's ↻ retries.
-  function fetchPrice(appid: number, { force = false } = {}): PanelPrice | Promise<PanelPrice> {
+  function fetchPrice(appid: number, region: string, { force = false } = {}): PanelPrice | Promise<PanelPrice> {
     return sessionCached(
       price,
-      appid,
+      `${region}:${appid}`,
       async () => {
         if (!(await isItadConfigured())) return null;
-        const { prices } = await postPrices({ appids: [appid], country: currentRegion(), force });
+        const { prices } = await postPrices({ appids: [appid], country: region, force });
         const fields = {} as PriceFields;
         applyPriceInfo(fields, prices[appid]);
         return fields;
@@ -236,13 +235,13 @@ export function createPanelDataCache() {
   }
 
   // Unlike price, fetched even when the row is already priced: no list loads this.
-  function fetchBundles(appid: number, { force = false } = {}): PanelBundles | Promise<PanelBundles> {
+  function fetchBundles(appid: number, region: string, { force = false } = {}): PanelBundles | Promise<PanelBundles> {
     return sessionCached(
       bundles,
-      appid,
+      `${region}:${appid}`,
       async () => {
         if (!(await isItadConfigured())) return null;
-        const qs = new URLSearchParams({ country: currentRegion() });
+        const qs = new URLSearchParams({ country: region });
         if (force) qs.set('refresh', '1');
         const data = await fetchJson<{ bundles: PanelBundles }>(
           `/api/game-bundles/${appid}?${qs}`,

@@ -166,15 +166,8 @@ export function regionLabel(code: string): string {
   return COUNTRY_OPTIONS.find((c) => c.code === code)?.label ?? code;
 }
 
-export const REGION_CHANGED_EVENT = 'scg:region-changed';
-
 export function setStoredRegion(value: string): void {
   setPref(REGION_PREF_KEY, value);
-  try {
-    window.dispatchEvent(new CustomEvent(REGION_CHANGED_EVENT, { detail: { region: value } }));
-  } catch {
-    /* no window (tests) */
-  }
 }
 
 // Resolves whatever the picker is currently set to (a real code, or AUTO_COUNTRY) to an actual

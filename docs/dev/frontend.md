@@ -81,7 +81,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "r" | "g:" formula
 
 **Account and list model** (plain modules over `prefs.ts`, no Solid reactivity of their own — see [lists-and-accounts.md](lists-and-accounts.md))
 
-- `accountsStore.ts` — `myAccount`/`currentAccount`/`recentAccounts` CRUD, `getEffectiveCurrentAccount()`, and the `ACCOUNT_CHANGED_EVENT` broadcast every consumer re-reads on.
+- `accountsStore.ts` — `myAccount`/`currentAccount`/`recentAccounts` CRUD, `getEffectiveCurrentAccount()`, all reactive (`getEffectiveCurrentAccount()` follows the `?u=` override signal and the stored accounts).
 - `accountOverride.ts` — the `?u=` half: parse, resolve, hand to `accountsStore` as an override that is never adopted into the stored preference.
 - `accountData.ts` — owned/wishlist/overview fetches for a resolved account.
 - `listsStore.ts` — folder/list CRUD, soft-delete, and the two structural-cycle guards (a dynamic list can't depend on itself transitively; a folder can't move into its own descendant).
@@ -123,11 +123,17 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "r" | "g:" formula
 
 Everything the frontend renders is driven by Solid's own reactivity — there is no "please re-render" call anywhere, and reintroducing one is the mistake this section exists to prevent.
 
-Three kinds of state, three mechanisms:
+Four kinds of state, four mechanisms:
 
 - **A game/row's data** lives in a Solid **store** owned by the route that loaded it (`createStore<Game[]>` in `ListRoute.tsx`, reached through `rowStore.ts`). Writes go through `rowStore.mutateRow(appid, fn)` — `produce(fn)`, so the callback gets an assignable draft — and the store notifies per field, so a streamed field patches only the cells and panel lines that read it. `standaloneRows` (a `createStore<Record<number, Game>>` in the same file) does the same for a game opened as a standalone aside (a nav-bar lookup, a DLC/base-game hop).
 - **The side panel's own UI state** (which game is open, hero index, expanded collapsibles, …) is plain signals in `panel.tsx`, set by its own click handlers.
 - **Everything the panel fetches for itself** (news, achievements, "Owned by", ownership status, price, bundles, DLC) is a `createResource` keyed on the open game, created in one module-level `createRoot` (the panel is a singleton whose data outlives every render). Fetching and session-caching is `panelData.ts`; the resource is only wiring, giving `.loading`, discard of superseded responses and re-rendering for free. `refetch()` is the panel's ↻; each fetcher reads `info.refetching` as "force" (bypass both the session cache and the server's TTL).
+
+- **Shared app state** (prefs, the signed-in user, the `?u=` override and its resolve state, the ownership cache) is a signal owned by its module, read through its getter, so a reader in JSX, a memo, an effect or a table cell `render` follows it with no window event, ready callback or tick counter.
+  - `getPref` tracks its key: one signal per key, so a table-view write doesn't rerun a region reader. The account getters build on it; `getAuthUser()`, `getAccountOverride()` and `getAccountOverrideState()` read their own signals.
+  - `myOwnership.ts`'s peeks track a signal bumped once the owned/wishlist sets land. An imperative consumer (the nav search dropdown, `ListRoute`'s row stamps) subscribes with `trackMyOwnership()`, which starts no fetch.
+  - Keyed reloads go through a primitive memo (`createMemo(currentRegion)`, an account's `?.id`), since `getPref` returns a fresh object on every read.
+  - An effect that writes prefs reads its pref inside `on(...)` or `untrack`, or it reruns on its own write. `adoptPrefEntry` is the one silent write (the merge reloads the page right after).
 
 Every resource **source** resolves to a _primitive_ (an appid, or an `appid:account` string), never an object literal: `createResource` memoizes its source with `===`, so an object would refetch every time the source recomputed — e.g. the DLC source re-runs whenever any collapsible is toggled.
 
@@ -265,7 +271,7 @@ The "look up any game" box is one nav-bar search in the shell, not one per route
 - `gameSearch.ts` takes the list and the "see all" destination as options rather than importing `recentGames.ts`.
 - Typing a query gets "See all results for '…' →" instead, to `/search?q=…`.
 
-`AccountChip.tsx` says who the app is showing, re-read on `ACCOUNT_CHANGED_EVENT` so a `?u=` link resolving after mount updates it, with a 🔗 marker when a link's account is showing.
+`AccountChip.tsx` says who the app is showing, following a `?u=` link that resolves after mount, with a 🔗 marker when a link's account is showing.
 
 - Both nav popovers (this and ⚙ Preferences) share `navPopover.ts`: `<details>` has no outside-click/Escape close, and the panel is positioned in JS because `.site-nav`'s flex-wrap moves its triggers with viewport width (seen off-screen on a real Galaxy S10, ruling out CSS-only anchoring).
 - It carries **copyable Steam identifiers** (`accountsStore.ts`'s `accountIdentifiers`: the stored custom-URL name, else the steam64 id), read from the slot since the chip fetches nothing: one for the current account, one per member beside each recents row (outside its switch button, which can't nest one).
@@ -336,7 +342,7 @@ Above 768px the shell is locked to the viewport and **`.app-scroll` is the page'
 
 `prefs.ts` is one flat `{key: value}` JSON blob under a single localStorage key, so the whole set is enumerable at once; `setPref`'s sync hook is per-key so two preferences changing in different tabs can't race each other's server writes.
 
-Region is the only user-facing preference, in the nav bar's ⚙ popover (`prefsPopover.tsx` owns the contents, `AppShell.tsx` only the `<details>` shell). `region.ts` holds a curated list of major Steam pricing regions, `detectCountry()`, and `REGION_CHANGED_EVENT`, which `setStoredRegion` dispatches on `window` so price-showing routes re-price.
+Region is the only user-facing preference, in the nav bar's ⚙ popover (`prefsPopover.tsx` owns the contents, `AppShell.tsx` only the `<details>` shell). `region.ts` holds a curated list of major Steam pricing regions and `detectCountry()`; price-showing routes re-price from an effect on `currentRegion()`.
 
 - The first entry is always "Auto-detect (⟨what it resolves to now⟩)", and `currentRegion` consults `detectCountry()` live on every upstream call.
 - `detectCountry` tries the OS timezone (`Intl.DateTimeFormat().resolvedOptions().timeZone`, via a curated map including Eurozone→`DE`) before `navigator.language` — language is a UI preference and often stays "en-US" anywhere (e.g. `LANG=en_US.UTF-8` in `Europe/Paris`).
@@ -349,6 +355,6 @@ Region is the only user-facing preference, in the nav bar's ⚙ popover (`prefsP
 - **Folder/list tree polish** — delete on Home uses a plain `window.confirm`; moving is a per-row "Move to…" menu (`folderPaths`, leaving out a folder's own subtree), with no drag-and-drop, and there's no trash/restore UI for soft-deleted lists.
 - **Per-account playtime in `group-by-membership` lists** — on a comparison, the "Owned by" card lists every owning player with their playtime (`createDefaultFetchers`' `onOwners`, served to the panel through the route's `getOwners`) and the table has one Played column per player; a saved dynamic list grouped by membership still shows only the current account's members, with no per-player columns.
 - **`/bundles`' clock doesn't tick.** Its countdowns and buckets (`renderEnds`'s "⏳ in 6h", the Age/Ends in columns, the hero's New and Ending soon counts) are computed when the table processes its rows, not on a timer. A proper fix re-runs the whole sort/filter/render pass on a timer; ticking only the hero counts would make them disagree with the rows.
-- **Live reactivity to the account changing** is partial: `ACCOUNT_CHANGED_EVENT` re-runs Home's account card, `ListRoute`'s owned/wishlist load, and the ownership stamps. Anything else a route derives from the account is read once per mount.
+- **What a load snapshots doesn't follow the account live** — list labels (`createDefaultNaming`) and the Taste fit source are read when `ListRoute` loads, so a renamed persona shows on the next load.
 - **`?game=` restore-on-reload is `ListRoute` and `SearchRoute` only** — Home/`/bundles`/`/about` register no route handler with the shell and `RankRoute` registers only `refreshGame`, so `/?game=440` doesn't reopen. Rarely reachable: a lookup from those routes goes to `/game/:appid`.
 - **No cross-tab sync** — see [lists-and-accounts.md](lists-and-accounts.md).
