@@ -305,10 +305,10 @@ test('autoPopulateAccountFromLogin: a failed resolve leaves both unset instead o
 
 // ── initAuth / signOut ───────────────────────────────────────────────────────
 
-// window/location stand-ins: records the events dispatched and whether the page reloaded.
+// window/location stand-ins: records whether the page reloaded.
 function withBrowser(t) {
-  const seen = { events: [], reloads: 0 };
-  global.window = { dispatchEvent: (e) => seen.events.push(e.type) };
+  const seen = { reloads: 0 };
+  global.window = { dispatchEvent: () => {} };
   global.location = { reload: () => seen.reloads++ };
   t.after(() => {
     delete global.window;
@@ -352,7 +352,6 @@ test('initAuth (signed in): adopting server prefs reloads the page, and leaves t
   assert.equal(prefs().getPref('region'), 'GB');
   assert.deepEqual(auth().getAuthUser(), { steamid: STEAMID });
   assert.ok(!calls.some((c) => c.url === '/api/common-games'), 'no account resolve before the reload');
-  assert.deepEqual(seen.events, [auth().AUTH_CHANGED_EVENT]);
 });
 
 test('initAuth (signed in): with nothing to adopt, fills in the account from the login and syncs later edits', async (t) => {
@@ -365,7 +364,6 @@ test('initAuth (signed in): with nothing to adopt, fills in the account from the
   assert.deepEqual(auth().getAuthUser(), { steamid: STEAMID });
   assert.deepEqual(accounts().getMyAccount()?.members, [STEAMID]);
   assert.deepEqual(accounts().getCurrentAccount()?.members, [STEAMID]);
-  assert.equal(seen.events.at(-1), auth().AUTH_CHANGED_EVENT);
 
   calls.length = 0;
   prefs().setPref('region', 'DE');
@@ -379,13 +377,11 @@ test('initAuth (signed out): no user, no reload, and edits stay local', async (t
   const seen = withBrowser(t);
   await signIn(t);
   const calls = mockMeFetch(t, { steamid: null, prefs: null });
-  seen.events.length = 0;
 
   await auth().initAuth();
 
   assert.equal(auth().getAuthUser(), null);
   assert.equal(seen.reloads, 0);
-  assert.deepEqual(seen.events, [auth().AUTH_CHANGED_EVENT]);
   prefs().setPref('region', 'DE');
   assert.deepEqual(pushes(calls), []);
 });
@@ -397,13 +393,11 @@ test('initAuth: /api/me failing reads as signed out, without throwing', async (t
   withFetch(t, async () => {
     throw new Error('network down');
   });
-  seen.events.length = 0;
 
   await assert.doesNotReject(auth().initAuth());
 
   assert.equal(auth().getAuthUser(), null);
   assert.equal(seen.reloads, 0);
-  assert.deepEqual(seen.events, [auth().AUTH_CHANGED_EVENT]);
   assert.equal(error.mock.callCount(), 1);
 });
 
@@ -416,14 +410,12 @@ test('signOut: logs out, clears the user, stops syncing edits and drops table-vi
   await auth().initAuth();
   assert.ok(tableViewSync().getBaseline('ownedListView'));
   calls.length = 0;
-  seen.events.length = 0;
 
   await auth().signOut();
 
   assert.deepEqual(calls, [{ url: '/auth/logout', method: 'POST' }]);
   assert.equal(auth().getAuthUser(), null);
   assert.equal(tableViewSync().getBaseline('ownedListView'), undefined);
-  assert.deepEqual(seen.events, [auth().AUTH_CHANGED_EVENT]);
   prefs().setPref('region', 'DE');
   assert.deepEqual(pushes(calls), []);
 });
@@ -438,12 +430,27 @@ test('signOut: a failed logout request still signs out locally', async (t) => {
     if (url === '/auth/logout') throw new Error('network down');
     return { ok: true, json: async () => ({ ok: true }) };
   });
-  seen.events.length = 0;
 
   await assert.doesNotReject(auth().signOut());
 
   assert.equal(auth().getAuthUser(), null);
-  assert.deepEqual(seen.events, [auth().AUTH_CHANGED_EVENT]);
   prefs().setPref('region', 'DE');
   assert.deepEqual(pushes(calls), []);
+});
+
+test('getAuthUser is reactive: an effect follows sign-in and sign-out', async (t) => {
+  withBrowser(t);
+  mockMeFetch(t, { steamid: STEAMID, prefs: null });
+  const { createRoot, createEffect } = await import('solid-js');
+  const users = [];
+  const dispose = createRoot((dispose) => {
+    createEffect(() => users.push(auth().getAuthUser()?.steamid ?? null));
+    return dispose;
+  });
+  t.after(dispose);
+
+  await auth().initAuth();
+  await auth().signOut();
+
+  assert.deepEqual(users, [null, STEAMID, null]);
 });

@@ -1,7 +1,7 @@
-// Steam sign-in status — plain module + window event, subscriber owns the signal, same shape
-// accountsStore.ts/region.ts already use. Backed by lib/auth.js's cookie-session endpoints
+// Steam sign-in status, as a signal so anything reading getAuthUser() reactively follows it. Backed by lib/auth.js's cookie-session endpoints
 // (GET /api/me, POST /auth/logout); "signing in" itself is a plain page navigation to
 // /auth/steam/login (AccountChip.tsx), not something this module drives.
+import { createSignal } from 'solid-js';
 import { getAllPrefEntries, adoptPrefEntry, pushPrefToServer, setSignedInSteamid, type PrefEntry } from './prefs.ts';
 import { TABLE_VIEW_PREF_KEYS } from './tableViewKeys.ts';
 import { isSyncedPrefKey } from './syncedPrefKeys.ts';
@@ -9,16 +9,14 @@ import { setBaseline, clearBaseline, resetBaselines } from './tableViewSync.ts';
 import { getMyAccount, setMyAccount, getCurrentAccount, setCurrentAccount } from './accountsStore.ts';
 import { resolveAccountSlot } from './accountData.ts';
 
-export const AUTH_CHANGED_EVENT = 'steam-auth-changed';
-
 export interface AuthUser {
   steamid: string;
 }
 
-let currentUser: AuthUser | null = null;
+const [currentUser, setCurrentUser] = createSignal<AuthUser | null>(null);
 
 export function getAuthUser(): AuthUser | null {
-  return currentUser;
+  return currentUser();
 }
 
 // Whether this browser has ever completed a prefs sync with this steamid before — gates the one
@@ -150,16 +148,13 @@ export async function initAuth(): Promise<void> {
       prefs: Record<string, PrefEntry> | null;
     };
     if (!steamid) {
-      currentUser = null;
+      setCurrentUser(null);
       setSignedInSteamid(null);
       return;
     }
-    // Deliberately set only after syncPrefsWithServer resolves — a component gating its own
-    // "unsaved changes" banner on getAuthUser() reruns once tableViewSync.ts's baselines are
-    // populated, not a tick earlier while they're still empty (which would flash "unsaved" for
-    // any existing local table customization).
+    // Set only after the merge has filled the table-view baselines, or the banner would flash "unsaved".
     const adopted = await syncPrefsWithServer(steamid, prefs ?? {});
-    currentUser = { steamid };
+    setCurrentUser({ steamid });
     setSignedInSteamid(steamid);
     if (adopted) {
       location.reload();
@@ -168,9 +163,7 @@ export async function initAuth(): Promise<void> {
     await autoPopulateAccountFromLogin(steamid);
   } catch (err) {
     console.error('[auth] failed to check sign-in status', err);
-    currentUser = null;
-  } finally {
-    window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+    setCurrentUser(null);
   }
 }
 
@@ -180,8 +173,7 @@ export async function signOut(): Promise<void> {
   } catch (err) {
     console.error('[auth] sign-out request failed', err);
   }
-  currentUser = null;
+  setCurrentUser(null);
   setSignedInSteamid(null);
   resetBaselines();
-  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 }

@@ -616,6 +616,18 @@ test('C1 edge: reverting to a saved ungrouped layout keeps the comparison groupe
   await expect(groupRows(page)).toHaveCount(3); // …but the comparison stays grouped
 });
 
+test('C1 edge: the unsaved-view banner shows when sign-in lands after the table', async ({ page }) => {
+  await mockApi(page, { states: ['signed-in'] });
+  const bundlesBrowseView = { value: { sorts: [{ key: 'title', dir: 'desc' }] }, updatedAt: Date.now() };
+  // Delayed so the banner mounts signed out: its `when` must still pick up the user arriving.
+  await page.route('**/api/me', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await route.fulfill({ json: { steamid: SIGNED_IN.steamid, prefs: { bundlesBrowseView } } });
+  });
+  await page.goto('/bundles');
+  await expect(page.locator('.pref-unsaved-banner')).toContainText('Unsaved changes to this view');
+});
+
 test('C1 edge: my account comes first, is prefilled, and only once', async ({ page }) => {
   await asPlayer(page, BOB); // Bob's steamid sorts after Alice's
   await page.goto('/lists/compare?u=alice&u=bob');
@@ -3477,4 +3489,14 @@ test("Y1.1,3: signed in on a new device, the account's lists win over this brows
 
   await page.getByRole('navigation').getByText('Alice', { exact: true }).click();
   await expect(page.getByText('Signed in — your accounts/lists/settings sync')).toBeVisible();
+});
+
+test('Y1 edge: signing out switches the account menu back to signing in', async ({ page }) => {
+  await mockApi(page, { states: ['signed-in'] });
+  await page.route('**/auth/logout', (route) => route.fulfill({ json: { ok: true } }));
+  await page.goto('/about');
+  await page.getByRole('navigation').getByText('Alice', { exact: true }).click();
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page.getByRole('link', { name: 'Sign in with Steam' })).toBeVisible();
+  await expect(page.getByText('Signed in — your accounts/lists/settings sync')).toHaveCount(0);
 });
