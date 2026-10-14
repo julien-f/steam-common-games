@@ -42,7 +42,7 @@ import type {
 import { bestPickRate, bundleUrgency, fmtBundleDateTime, pickTiers } from './bundleRows.ts';
 import { fmtReleaseDate } from './gameColumns.ts';
 import { formatWithEstimate } from './currency.ts';
-import { regionCurrency } from './region.ts';
+import { currentRegion, regionCurrency } from './region.ts';
 import { nextHopHistory } from './panelHistory.ts';
 import type { Similar } from './tagTaste.ts';
 import { clearPanelNav } from './panelNav.ts';
@@ -496,15 +496,18 @@ const panelData = createRoot(() => {
   const priceSource = createMemo(() => {
     const g = panelGame();
     if (!g || g.bestDealPrice !== undefined) return null;
-    return g.appid;
+    return `${g.appid}:${currentRegion()}`;
   });
 
-  const [price, { refetch: refetchPrice }] = createResource<PanelPrice, number>(priceSource, (appid, info) => {
-    return fetchPrice(appid, { force: isForced(info) });
+  const [price, { refetch: refetchPrice }] = createResource<PanelPrice, string>(priceSource, (key, info) => {
+    const [appid, region] = key.split(':');
+    return fetchPrice(Number(appid), region, { force: isForced(info) });
   });
 
-  const [bundles, { refetch: refetchBundles }] = createResource<PanelBundles, number>(openAppid, (appid, info) => {
-    return fetchBundles(appid, { force: isForced(info) });
+  const bundlesSource = createMemo(() => (openAppid() == null ? null : `${openAppid()}:${currentRegion()}`));
+  const [bundles, { refetch: refetchBundles }] = createResource<PanelBundles, string>(bundlesSource, (key, info) => {
+    const [appid, region] = key.split(':');
+    return fetchBundles(Number(appid), region, { force: isForced(info) });
   });
 
   // DLC is the one card whose fetch is gated behind actually expanding it (see panelData.ts's

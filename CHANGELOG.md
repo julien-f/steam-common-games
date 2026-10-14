@@ -157,6 +157,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The side panel's "More like this on Steam" link opens Steam's similar-games page for that game instead of a generic recommendations page
 - /search marks games already in the library again when the library loads after the results
 - The unsaved-view banner on Bundles now shows when sign-in completes after the page has loaded
+- A game's price and bundles in the side panel follow a newly picked region instead of keeping the previous one
 
 ### Development
 

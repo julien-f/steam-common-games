@@ -1648,9 +1648,33 @@ test('B1 edge: picking a region reloads Bundles in it', async ({ page }) => {
   await page.goto('/bundles');
   await expect(rows(page).first()).toBeVisible();
   const asked = page.waitForRequest(/\/api\/bundles\?.*country=US/);
-  await page.getByTitle('Preferences').click();
+  await page.getByLabel('Preferences').click();
   await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
   await asked;
+});
+
+test('F1 edge: the panel prices a game, and its bundles, in a newly picked region', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.route('**/api/prices?country=US', async (route) => {
+    const req = route.request();
+    const json = JSON.parse(respond(req.method(), new URL(req.url()), req.postData()).body);
+    for (const info of Object.values<Record<string, { currency: string }>>(json.prices))
+      for (const field of Object.values(info)) if (field && typeof field === 'object') field.currency = 'USD';
+    await route.fulfill({ json });
+  });
+  await page.goto('/lists/owned?game=892970');
+  const amount = page.locator('#game-panel .panel-price-amount');
+  await expect(amount).toContainText('€');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#game-panel')).toBeHidden();
+
+  await page.getByLabel('Preferences').click();
+  await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
+  await page.keyboard.press('Escape');
+  const bundlesAsked = page.waitForRequest(/\/api\/game-bundles\/892970\?.*country=US/);
+  await row(page, 'Valheim').getByText('Valheim').click();
+  await expect(amount).toContainText('$');
+  await bundlesAsked;
 });
 
 test('B1 edge: with no ITAD key, Bundles says why it is empty', async ({ page }) => {
