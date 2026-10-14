@@ -6,222 +6,110 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-14
+
 ### Added
 
-- The Played (h) filter has a "never played" button, so finding your unplayed games is one click
-- A comparison has a Played column for each player, so you can find games none of you has played much
+- Taste fit, a column on Wishlist and bundles scoring each game by how close it is to the account's taste, learned from its Owned list
+- Group fit, a comparison column scoring each game by how well it suits the player it suits least, named in the cell
+- Taste fit and Group fit say under the list header what they rest on
+- A game's panel lists the most similar games in the open list by Steam tags, links to Steam's own "More like this", and can sort the whole list by similarity to it
+- Similarity and Group fit weigh whether games are indie, AA or AAA
+- Filtering by Steam tag ranks games by how strongly players tagged them with it (a Tag match column, filterable; in All mode, by the weakest filtered tag)
+- A gauge under each Steam tag in a game's panel shows how strongly players tagged it
+- Owned shows the Steam tags the account plays most, each one click from filtering by it
+- A comparison has a Played column per player
+- The Played (h) filter has a "never played" button
+- A list's toolbar has a 🎲 random pick
+- Shared links, game links included, show a title, description and image in chat app previews
+- An app icon for the browser tab, link previews and a phone's home screen
 - The ? dialog lists Enter on a game panel's main image to open the lightbox
-- On a phone, a 🎲 in the table's toolbar picks a random game without opening one first.
-- Shared links show a title, description and image when previewed in chat apps (WhatsApp, Slack, Discord, iMessage…)
-- A PNG app icon, shown by chat link previews and when adding the site to a phone's home screen
-- A shared game link's preview shows the game's name, description and header image
-- Filtering by Steam tag ranks the games by how strongly players tagged them with it (a new Tag match column, filterable to keep only the strongly tagged ones), until the filter is cleared
-- A gauge under each Steam tag in a game's panel shows how strongly players tagged the game with it
-- A game's panel lists the most similar games in the open list by Steam tags, with a link to Steam's own "More like this"
-- "Sort list by similarity" in a game's panel ranks the whole list by how close each game is to it
-- Owned shows the Steam tags the account plays most, each one a click away from filtering the list by it
-- A comparison's Group fit column scores each game by how well it suits the player it suits least
-- A Taste fit column, shown on Wishlist and bundles, scores games by how close they are to the account's taste, learned from its Owned list
 
 ### Changed
 
-- Settings synced to a signed-in account are limited to the ones the app uses, up to 2 MB per account
-- Home and About load about half as much code; the table pages load theirs when first opened
-- Soundtracks, videos, demos and other non-game items are no longer looked up on HowLongToBeat
-- Stepping to another game in the screenshot viewer briefly shows that game's name, even with the controls hidden
-- Picking, linking or comparing an account no longer fetches its Steam wishlist just to resolve it
-- GET /api/metrics lists every outbound budget from startup, so the ceilings show before the first call
+- On desktop the nav is an app bar: routes left, search in the middle, account and settings right
+- Text uses one consistent set of sizes and two weights; table digits share one width
+- Dates read `YYYY-MM-DD` everywhere (with the time where it matters)
 - A first visit to Home says what the app does, and the account field's button reads "Look up"
-- With a mouse, the lightbox shows its ↑/↓ game stepper and game position along with its other controls, not only while hovering the game name
-- Stepping past the lightbox's last item or last game with a key or button slides the first one in from the other side, so the wrap back to the start shows
-- Stepping back to a game just left in the lightbox returns to the item you picked there, not its first one
-- Dates read the same everywhere: a release, a bundle's end and its publication show as `YYYY-MM-DD` (with the time where it matters) in tables, cards and the panel
-- On a touch-only device, the ranking no longer shows its keyboard shortcuts
-- Paging games in the lightbox from a game's Cover keeps showing each game's Cover
-- Table digits all have one width, so a column's numbers line up better
-- A disabled Compare libraries button now says how many players it still needs
-- Editing a shared table layout now warns that the change is lost on reload unless you keep it, until you put the layout back
-- A combined list shows only 🔗 Share list, no longer also a Share view whose link only opens in your browser
-- A comparison's formula joins players with ∪, as a combined list does, instead of a + that read as a sum
-- A failed price lookup now warns in the same orange as other sources that didn't answer, in plain words, without the raw error
-- The nav's account chip shows the account's initial when it has no avatar, and no longer lights up like a selected page on hover
-- On desktop the nav is an app bar on the same edge as the list pages: routes left, search in the middle, account and settings right, with less space above the page
-- Text across the app uses one consistent set of sizes and two weights, instead of the near-duplicates that had crept in
-- The New and Ending soon filters above the bundles table now look like toggles, with a clear pressed state
-- The game panel's Price card names its record lows in text ("1-year low", "all-time low €2.49"), not only in a tooltip
-- A list's toolbar shows the 🎲 random pick on desktop too, not only on a phone
-- "What does this add?" keeps the bundle's Tier Price and Best Deal columns and links back to the bundle
+- Home and About load about half as much code; table pages load theirs when first opened
 - Folders and lists are named and renamed in place on Home instead of in a browser dialog
 - Creating a combined list opens it, and Edit sources has a single Cancel
-- "Rank this list" is unavailable below 2 games and says why
-- The keyboard shortcuts dialog lines every description up in one column
-- The nav bar's game search box empties after you pick a game, and on a second Esc
-- On a phone, Home lines up with the list pages' margins, and each recent account's star and remove buttons stay on its row
-- Search, About and the page-not-found screen title themselves like every list page, and search results no longer show an empty image column
-- A bundle's page puts ← All bundles next to its ‹ › arrows, and its other actions share one style around Get this bundle
-- Bundles on an instance without IsThereAnyDeal shows one card saying how to turn it on, instead of an empty table
-- Similar games and Group fit also weigh whether games are indie, AA or AAA
-- On the Tags filter's All mode, Tag match scores a game by its weakest filtered tag
+- A combined list shows only 🔗 Share list; a comparison's formula joins players with ∪
+- Editing a shared table layout warns that the change is lost on reload unless you keep it
+- "What does this add?" keeps the bundle's Tier Price and Best Deal columns, also once saved, and links back to the bundle
+- A bundle's page puts ← All bundles next to its ‹ › arrows; its other actions share one style around Get this bundle
+- Bundles without IsThereAnyDeal shows one card saying how to turn it on, instead of an empty table
+- The New and Ending soon filters above the bundles table look like toggles
+- The game panel's Price card names its record lows in text ("1-year low", "all-time low €2.49")
+- A failed price lookup warns in plain words, in the same orange as other sources that didn't answer
+- Lightbox: ↑/↓ and the game position show along with the other controls; stepping past the end slides the first item in; stepping back to a game returns to the item you picked there; a Cover-paged game keeps showing Covers; another game's name shows briefly even with the controls hidden
+- The nav's account chip shows the account's initial when it has no avatar
+- The nav search box empties after you pick a game, and on a second Esc
+- Search, About and the not-found page title themselves like the list pages
+- "Rank this list" is unavailable below 2 games and says why; the ranking hides keyboard shortcuts on touch-only devices
+- A disabled Compare libraries button says how many players it still needs
+- The keyboard shortcuts dialog lines its descriptions up in one column
+- On a phone, Home lines up with the list pages' margins, and a recent account's buttons stay on its row
+- Settings synced to a signed-in account are limited to the ones the app uses, up to 2 MB per account
+- Picking, linking or comparing an account no longer fetches its wishlist just to resolve it
+- Soundtracks, videos, demos and other non-game items are no longer looked up on HowLongToBeat
+- GET /api/metrics lists every outbound budget from startup, and HLTB's and ITAD's request queues
 
 ### Fixed
 
-- Signing in, signing out and syncing settings no longer fail when another site on the same host has set a cookie that isn't URL-encoded
-- The game panel's Metacritic chip no longer links an address Steam sends that isn't a web page
-- A malformed or unexpected request now gets a short JSON error instead of a server error page
-- When Steam or another service can't be reached, or answers with a web page instead of data, the app reports the service as failing rather than the request as invalid
-- When Steam doesn't answer for players' names, libraries still load, and a saved account keeps its name instead of being renamed to its Steam ID
-- When Steam's store page for a game fails, its HowLongToBeat times show as not answering, with ↻ to retry, instead of as no data
-- The game panel's Achievements card says when Steam didn't answer for achievement rarity, instead of just leaving the percentages out
-- Sharing a table whose layout you haven't changed no longer tells the recipient it uses a shared layout
-- An account you remove from Home's Recent accounts while a list still uses it is now cleared for good once no list uses it, instead of staying hidden and synced forever
-- The Bundles page's Updated age now states its oldest page's age, instead of sometimes understating it when one page was fetched fresh
-- Screen readers now announce the game open in the panel as the current row of the table
-- Screen readers now announce "Copied to clipboard" after any copy button, instead of only showing a ✓
-- The app has a browser tab icon
-- When Steam's store starts refusing requests, the app stops sending the ones it had already queued, instead of letting them hit the block
-- A bundle game whose Steam page couldn't be looked up because a service was down is retried on the next visit, instead of showing as not on Steam for a day
-- When ProtonDB starts refusing requests, the app stops sending the ones it had already queued
-- When HowLongToBeat starts refusing requests, the app stops sending the searches it had already queued
-- On a comparison where your own account isn't first in the link, the "Only …" groups no longer swap players' names
-- When the game panel's ↻ fails to reach Steam or IsThereAnyDeal, its achievements and price keep what they showed, like its news and bundles, instead of switching to "didn't answer"
-- When the server is unreachable behind a proxy that answers with an error page, the app says what failed ("Failed to fetch wishlist"…) instead of showing a JSON parse error, including when looking up an account on Home
-- Tab moves through the screenshot viewer's controls again on a game with only a cover, instead of staying on ×
-- In the viewer with the controls hidden, a media step right after a game step no longer keeps showing the game's name.
-- A list no longer hides its prices for the whole visit when the server's health check fails once.
-- Deleting a list that a deleted list still drew from no longer drops its games from the lists built on them
-- The account menu now drops removed recent accounts and updates its ★ as soon as they change on Home
-- Home's account card no longer shows the previous account's age, or "Refreshing…", after switching accounts
-- Copying twice in a row no longer leaves a copy button reading "✓ Copied!" for good
-- A game that added achievements after they were cached no longer shows more unlocked than it has ("52 / 50").
-- An achievement unlocked by several members no longer loses its unlock date when one of them has none.
-- A soundtrack or other game HowLongToBeat doesn't time now shows its real data age in the side panel instead of always "just now".
-- A bundle game Steam didn't answer for is no longer listed as not on Steam, nor dropped from a saved list's remembered copy of the bundle.
-- A game at full price no longer reads as an all-time, 1-year or 3-month low just because it never sold for less.
-- Pressing Enter on a highlighted game under the search box's Recently looked up now opens it
-- Esc closing a menu in the nav bar or the search box's suggestions no longer also closes the open game, or leaves a ranking
-- On a phone, swiping past the game panel's last image no longer leaves its ‹ button and back swipe doing nothing
-- On a phone, a slow sideways swipe on the game panel's images no longer also closes the panel
-- The screenshot viewer no longer reopens with its controls hidden after closing it on a playing trailer, and swiping off a playing trailer no longer brings all its controls back
-- In the screenshot viewer, ↑ or ↓ with no other game to go to no longer makes the next screenshot slide in from below
-- Grouping by price now spreads yen, won, rupee and other far-from-dollar prices across the tiers instead of putting them all in "100+"
-- Reverting a comparison to a saved layout without its grouping no longer ungroups it
-- A list refresh that fails, or a first load that fails, keeps the Updated tile to retry from
-- Prices state their own age after switching list, account or region, not the previous one's
-- The Compare link after a comparison with an unknown player opens a clean form
-- Following a source link from an open Edit sources form opens that list with its form closed
-- The side panel's ↑/↓ follow the table's current sort and filter, and hide when the open game isn't in it
-- When the current account's library can't be loaded, games now show their ownership as unknown instead of "Not Owned"
-- A list built on a bundle keeps the games Steam didn't answer for, from its last good load, instead of dropping them
-- A long wishlist's Prices readout no longer says "just now" when part of its prices are days old
-- Opening achievements for an account entered by vanity name no longer counts against the achievements rate limit once that name is cached
+- Sign-in and settings sync no longer fail when another site on the same host set a cookie that isn't URL-encoded
+- TRUST_PROXY=1 takes effect: behind a reverse proxy, rate limits apply per visitor, and link previews and sign-in use https
+- A malformed request gets a short JSON error instead of a server error page; an unreachable or misbehaving upstream is reported as failing, not the request as invalid
+- When Steam's store, ProtonDB or HowLongToBeat start refusing requests, the app stops sending the ones already queued
+- When a source doesn't answer, the app says so instead of showing no data: HLTB times after a failed store page, achievement rarity, IsThereAnyDeal prices (⚠ in cells, a note on the Price card), and ownership when the library can't load ("unknown", not "Not Owned")
+- When Steam doesn't answer for players' names, libraries still load, and a saved account keeps its name, avatar and custom URL
+- An account Steam returns no profile for is named by what you typed
+- A bundle game Steam didn't answer for is retried on the next visit, and is no longer listed as not on Steam or dropped from a saved list built on the bundle
+- A game at full price no longer reads as a record low because it never sold for less
+- Grouping by price spreads yen, won, rupee and other far-from-dollar prices across the tiers
+- Prices and the Updated age state their own, oldest age — after switching list, account or region, and on a long wishlist or Bundles page
+- A game's price and bundles in the side panel follow a newly picked region
+- A list no longer hides its prices for the whole visit after one failed health check
+- A failed first load or refresh keeps the Updated ↻ tile to retry from
+- Changing a saved list's sort, columns, search or page no longer floods account sync, which could drop other settings and overwrite edits made on another device
+- The unsaved-view banner on Bundles shows when sign-in completes after the page loaded
+- Deleting a list that a deleted list still drew from no longer drops games from the lists built on them
+- A removed recent account still used by a list is cleared for good once no list uses it
+- The account menu updates its recents and ★ as soon as they change on Home; Home's account card no longer shows the previous account's age after switching
+- Owned and wishlisted marks: /search and the nav search update when the library or a shared link's account finishes loading, and a wrapping game name keeps its badge next to it
+- On a comparison where your account isn't first in the link, the "Only …" groups no longer swap names; reverting to a saved layout without grouping keeps it grouped; 🔗 Share view applies its layout
+- The Compare link after an unknown player opens a clean form; typing a player's exact name adds that player, not their Steam Family
+- Opening a game link in a fresh browser lists it under Recently Looked Up right away
+- A bundle's ← All bundles keeps the account from a shared link; a saved list built from a bundle prices its Tier Price in a region picked while loading
+- Following a source link from Edit sources opens that list with its form closed
+- The side panel's ↑/↓ follow the table's sort and filter, and hide when the open game isn't in it
+- Closing a game's panel puts focus back on its row (or the row it was opened from), so the arrow keys keep working
+- The side panel's ↻ keeps what achievements and price showed when it fails; on the ranking screen it re-fetches details, keeps your place and says when it fails
+- The side panel's "More like this on Steam" opens Steam's similar-games page for that game
+- The Metacritic chip no longer links an address that isn't a web page
+- Achievements: no more "52 / 50" after a game added some, and an unlock several members share keeps its date
+- A soundtrack HowLongToBeat doesn't time shows its real data age instead of "just now"
+- Lightbox: ↑/↓ stay in place from one game to the next; Tab reaches its controls on a cover-only game; it no longer reopens with controls hidden after a trailer; stepping during Retry keeps your step; no stray slide-in from below
+- Phone: swiping past the panel's last image, slow sideways swipes, the ranking's layout and buttons on narrow screens, a bundle's ⋯, and 24px tap targets for small links and buttons
+- Esc closing a nav menu or search suggestions no longer also closes the open game or leaves a ranking; a search still in progress no longer reopens its suggestions
+- Enter on a highlighted Recently looked up game opens it
+- Copy buttons no longer stay on "✓ Copied!", and screen readers hear "Copied to clipboard"
+- Accessibility: focus no longer drops to the page after common actions; screen readers hear the open game as the current row, which account or list a control acts on, and no pressed state on non-toggles; AA contrast on pressed tiles
+- Controls render dark and use the page's font; disabled buttons look disabled, and a dimmed Share view says why when pressed
+- Opening achievements for a cached vanity name no longer counts against its rate limit
 - The server log no longer repeats a line for every request refused once an outbound budget is spent
-- An account Steam returns no profile for is named by what you typed rather than its bare Steam ID
-- Stepping to another screenshot while Retry is loading one now keeps the screenshot you stepped to
-- A combined or shared list whose first load failed keeps its Updated ↻ tile to retry from
-- A comparison's 🔗 Share view link now applies its layout
-- Re-picking a known account while Steam doesn't answer keeps its name, avatar and custom URL, without restoring ones removed on Steam since
-- On the ranking screen, the side panel's ↻ Refresh re-fetches the game's details, and its tags no longer look like filter buttons
-- On a phone, the ranking screen keeps both games side by side with Tie, Skip and Undo in view, inside a side margin
-- The lightbox's ↑/↓ game buttons stay in place from one game or item to the next, so they can be clicked repeatedly
-- Closing a game's panel with Esc puts focus back on that game's row, so the arrow keys keep working
-- Refreshing a game from the ranking's side panel keeps your place in the panel, and says when the refresh fails
-- On the narrowest phones, the ranking's Details and exclude buttons wrap instead of pushing the page sideways
-- The lightbox's ↑/↓ game buttons stay in place from one game to the next, so they can be clicked repeatedly
-- Closing a game's panel puts focus back on that game's row, or on the row it was opened from when that one isn't shown, so the arrow keys keep working
-- TRUST_PROXY=1 now takes effect: behind a reverse proxy, rate limits apply per visitor and link previews and sign-in use https
-- Changing a saved list's sort, columns, search or page no longer floods account sync, which could drop other settings' syncs and overwrite a list edit made on another device
-- When IsThereAnyDeal doesn't answer, price cells show ⚠ and the panel's Price card says so, instead of reading as no data
-- Opening a game link in a fresh browser lists it under Recently Looked Up right away, instead of saying the list is empty until a reload
-- Checkboxes, selects and scrollbars now render dark, matching the rest of the page
-- Buttons and fields use the page's font, and the table toolbar's buttons share one height
-- Disabled buttons look disabled, and pressing a saved list's dimmed Share view says why it is off instead of hiding the reason in a tooltip
-- A list's stat labels (Games, Updated, Prices) are easier to read
-- On a phone, table sort headers, Home's Rename and Delete, and a compare chip's × are easier to tap
-- Typing a player's exact name and pressing Enter on Compare adds that player, not a Steam Family they belong to
-- Keyboard focus no longer drops to the page after switching account, saving a list, refreshing from Updated or closing the ranking's panel; added fields take focus, and the ? dialog takes and returns it
-- Screen readers hear which account, list or source a control acts on, a label on the combine selects, and no pressed state on tiles that aren't toggles
-- A pressed stat tile's label is readable at AA contrast
-- On a phone, the account menu's links, Home's Friends toggle and refresh, the shortcuts dialog's close button and the footer's About link take a 24px tap
-- A game name that wraps in a table keeps its ✓/☆ badge right after it, instead of at the far edge of the cell
-- With one game selected, the rank button reads "Rank 1 game", not "Rank 1 games"
-- A list saved from What does this add? keeps the bundle's Tier Price column
-- Leaving the nav bar's game search with Esc, Tab or a pick no longer lets a search still in progress reopen its suggestions
-- A saved list built from a bundle shows its Tier Price in a region picked while it was still loading
-- A bundle's ← All bundles keeps the account you're exploring from a shared link
-- A recent account's star on Home says on hover whether a click stars or unstars it
-- On a phone, a bundle's ⋯ stays beside its actions instead of dropping to a line of its own
-- A game looked up from outside the open list no longer offers to sort the list by similarity to it, which left every row unscored
-- Similar in this list and the Similarity column give a game the same score when the list is filtered, and the panel says when too few games are shown to compare
-- Taste fit and Group fit explain themselves under the list header rather than only on hover, and a Group fit cell names the player it suits least
-- Taste fit's hint to open the Owned list first is shorter, so a phone shows more of the list
-- The side panel's "More like this on Steam" link opens Steam's similar-games page for that game instead of a generic recommendations page
-- /search marks games already in the library again when the library loads after the results
-- The unsaved-view banner on Bundles now shows when sign-in completes after the page has loaded
-- A game's price and bundles in the side panel follow a newly picked region instead of keeping the previous one
-- The nav search's owned and wishlisted marks update when a shared link's account finishes loading
 
 ### Development
 
-- npm run cache:clear now empties every cache table, including search, news, bundle and ITAD ID caches
-- A production install that skips development packages no longer fails to start
-- `scripts/setup-facts.js` gathers the setup-review skill's facts: each script's callers and missing usage lines, the gates' time and output (`--cost`), and recent session transcripts' largest outputs, slowest calls, repeated commands and skill runs (`--transcripts`)
-- Unit and e2e test runs print dots instead of every passing test, cutting a full `npm test` from 108 KB of output to 3 KB
-- The pre-commit changelog check validates the staged CHANGELOG.md, so a partial stage that repeats a subsection no longer slips through
-- The mock API gives Hades two achievements, and its upstream-down state drops their rarity
-- The end-to-end tests run against a production build instead of the dev server, cutting them from about 30 s to 20 s
-- An end-to-end test checks the column menu's Remove group and Clear filter
-- The UX-workflow pilot is cancelled: its frozen backlog items are open to fixes again, and its PR guard (`scripts/guard.js` and its workflow) is gone
-- The pre-commit hook skips the end-to-end tests when the build and tests are the same as in the last full passing run, so a comment-only frontend edit, or a commit right after a full run, takes seconds
-- A pre-push hook runs what CI runs, so a push that passes it passes CI; commits run only the desktop half of the end-to-end tests; CI runs its checks and end-to-end tests in parallel, on Node 24
-- GET /api/metrics no longer counts a rate limiter's own cache checks as cache hits, which inflated them by about 70%
-- The wishlist lookup no longer sends the Steam API key to Steam's undocumented wishlist endpoint, which answers the same without it
-- An end-to-end test covers retrying a game's sources with the panel's ↻ once a failed upstream is back (journey D2 step 3)
-- The account routes no longer accept a per-account `refreshIds`, which nothing has sent since the legacy pages went away
-- `POST /api/common-games` takes `{ members }` and returns a flat `games` list, like `/api/wishlist`; the multi-slot and legacy `{ users }` request shapes and ownership grouping, unused by the app, are gone
-- The pre-commit hook checks only what is staged, setting unstaged edits aside while it runs, so a partly staged commit can't pass thanks to code it doesn't include
-- `scripts/setup-facts.js --transcripts` also counts the tool calls the user rejected, next to the permission classifier's denials
-- `npm run check:doc-refs` also flags links to a heading that no longer exists.
-- `node scripts/backlog-next.js <C|U>` gives the next code or UX backlog number, never one a closed item already used.
-- The pre-commit hook sets unstaged edits aside with `git stash` instead of a hand-rolled patch file.
-- Mock data gives Terraria and Hollow Knight trailers and screenshots, so stepping games in the lightbox lands on real media
-- The mock server's resolve-failed state makes one bundle game fail to resolve to Steam.
-- Large code-fix/ux-fix batches run as parallel lanes, with planning, progress and time-left estimates from scripts/batch.js
-- Parallel fix-batch lanes can defer the pre-commit e2e run, and the pre-commit hook no longer shares git's stash between worktrees
-- scripts/setup-facts.js --agents reports each subagent's time, turns, cache reads, failed calls and time in tests, e2e and commits
-- setup-review keeps its proposals in docs/dev/setup-backlog.md and re-measures applied ones on its next run, reading only the transcripts since
-- setup-facts --transcripts reports interrupts and how the user answered each skill's questions, and --digest writes a compact per-session digest for setup-review's transcript reader
-- npm run check also lints the Claude Code setup: skill frontmatter, and permission allows that would pre-approve an ask-first action
-- node scripts/skill-evals.js checks which skill each realistic request loads, and with --dry-run runs the read-only skills headless to catch denied and failed steps; setup-review uses it to test a skill change before and after
-- doc-refs no longer counts names from installed packages as this repo's code
-- Fix batches: lanes close their own backlog items, and lane planning sees bare file names
-- New node scripts/dead-exports.js lists frontend exports no other file uses
-- deps-audit no longer counts a dependency's own imports as this repo using a package
-- npm run check lints the docs' prose: history phrasing, overlong paragraphs, and docs missing from the indexes
-- The setup review counts which docs agents read, and how often whole, to judge how the docs are split
-- GET /api/metrics now reports HLTB's and ITAD's request queues alongside Steam's
-- The fix batch status shows how long finished lanes wait on the slowest one
-- The typecheck fails on unused imports and locals
-- Fix batches split items in one file across lanes when they touch code far apart
-- `npm run check:setup` fails when the setup backlog holds items but its header dates are unset
-- `setup-facts.js --agents` shows each agent's tool time and its top commands
-- Fix batches default to six lanes and review each lane as it merges
-- `batch.js plan` reads UX items listing several scenarios or none
-- The Price card's ITAD-failure e2e test now covers a failed price lookup, not only a failed health check
-- `batch.js merge` no longer leaves a double blank line when it empties part of a backlog section
-- `batch.js merge` says when a lane's merge needs `SKIP_CHANGELOG=1`
-- Fix batches no longer poll lane progress; lanes re-run only failed e2e tests until green
-- setup-review measures more: tokens and interrupts per skill run, commit and hook time under its own name, gate-time trends, a log of check runs and skill-eval scores
-- `npm run dev` proxies to the backend at the configured `HOST`/`PORT` instead of always `127.0.0.1:3000`
-- Lint fails on warnings; a fix-batch lane skips e2e when its commits touch no UI file
-- npm run format prints only warnings, not a line per file
-- a CSS check flags desktop media-query rules a later rule silently overrides, not only phone ones
-- npm run check flags new comments over one line in public/
-- batch.js merge replays a lane's closed and narrowed backlog items itself, and fix lanes review their own commits before reporting
-- mock-server.js and dev-server.js up restart a server they started at an older git HEAD
-- npm run check's one-line comment rule also covers new files not yet added to git
-- Unit tests run Solid's browser build, so they can check reactivity
-- Saved preferences are reactive, so anything showing one follows its changes
-- Account state is reactive, replacing the account-changed broadcast
+- `POST /api/common-games` takes `{ members }` and returns a flat `games` list; the legacy `{ users }` and multi-slot shapes and per-account `refreshIds` are gone
+- The wishlist lookup no longer sends the Steam API key to Steam's undocumented wishlist endpoint
+- GET /api/metrics no longer counts a rate limiter's cache checks as cache hits
+- Shared frontend state (prefs, the signed-in user, the `?u=` account, the ownership cache) is reactive Solid state instead of window events and ready callbacks; unit tests run Solid's browser build so they can check it
+- e2e runs against a production build; a pre-push hook runs what CI runs; pre-commit checks only what is staged, runs desktop e2e only, and skips it when nothing changed since the last full pass
+- `npm run check` also lints doc prose, links to missing headings, one-line comments in `public/`, overridden media-query rules and the Claude Code setup; lint fails on warnings, the typecheck on unused locals
+- New scripts: `dead-exports.js`, `backlog-next.js`, `setup-facts.js` and `skill-evals.js` for the setup review, `batch.js` for parallel fix batches
+- npm run cache:clear empties every cache table; a production install without dev packages starts; `npm run dev` proxies to the configured `HOST`/`PORT`
+- Mock data: Hades achievements, Terraria and Hollow Knight media, a bundle game that fails to resolve
 
 ## [0.10.0] - 2026-10-10
 
