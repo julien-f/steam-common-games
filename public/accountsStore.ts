@@ -7,6 +7,7 @@
 // Soft-remove for recentAccounts mirrors listsStore.ts's soft-delete for GameList exactly (same
 // "still referenced by a dynamic list → hide, don't destroy" rule) — isAccountReferenced() is
 // listsStore.ts's own source-scanning logic, reused rather than duplicated here.
+import { batch, createSignal, untrack } from 'solid-js';
 import { getPref, setPref } from './prefs.ts';
 import { isAccountReferenced } from './listsStore.ts';
 import type { AccountSlot } from './types.ts';
@@ -60,7 +61,6 @@ export function setMyAccount(picked: AccountSlot | null): void {
   const account = picked && withStoredDisplay(picked);
   setPref(MY_ACCOUNT_KEY, account);
   if (account) upsertRecentAccount(account);
-  notifyAccountChanged();
 }
 
 export function getCurrentAccount(): AccountSlot | null {
@@ -71,7 +71,6 @@ export function setCurrentAccount(picked: AccountSlot | null): void {
   const account = picked && withStoredDisplay(picked);
   setPref(CURRENT_ACCOUNT_KEY, account);
   if (account) upsertRecentAccount(account);
-  notifyAccountChanged();
 }
 
 // An unresolved member's display fields are unknown, not cleared, so a re-pick keeps the stored ones.
@@ -99,16 +98,15 @@ function withStoredDisplay({ unresolved, ...account }: AccountSlot): AccountSlot
 // one shared link, and persisting it would be exactly the silent adoption the override exists to
 // avoid. It's also deliberately kept out of `recentAccounts` for the same reason — browsing
 // someone's library from a link isn't the same act as picking an account for yourself.
-let accountOverride: AccountSlot | null = null;
+const [accountOverride, setOverride] = createSignal<AccountSlot | null>(null);
 
 export function getAccountOverride(): AccountSlot | null {
-  return accountOverride;
+  return accountOverride();
 }
 
 export function setAccountOverride(account: AccountSlot | null): void {
-  if (accountOverride?.id === account?.id) return; // no real change — don't wake every listener
-  accountOverride = account;
-  notifyAccountChanged();
+  if (untrack(accountOverride)?.id === account?.id) return; // keep the object a reader already has
+  setOverride(account);
 }
 
 // "Whichever account the app is currently showing" — the override when a `?u=` link is being
@@ -117,23 +115,7 @@ export function setAccountOverride(account: AccountSlot | null): void {
 // shared link is honored on every route (the Owned/Wishlist lists, the panel's ownership badges,
 // Home's own account header) rather than only wherever the param happened to be parsed.
 export function getEffectiveCurrentAccount(): AccountSlot | null {
-  return accountOverride ?? getCurrentAccount();
-}
-
-// Broadcast on any change to what getEffectiveCurrentAccount() returns — a `?u=` override
-// resolving/clearing, or an explicit account pick — and on any change to ★ or recents. A plain window CustomEvent, the same
-// mechanism region.ts's REGION_CHANGED_EVENT already uses (and for the same reason): this file
-// is deliberately a plain module with no Solid reactivity of its own, so a route that needs to
-// react subscribes to this and bumps a signal of its own, and nothing here needs to know who's
-// listening. Guarded for a `window`-less environment (Node unit tests), same as region.ts.
-export const ACCOUNT_CHANGED_EVENT = 'scg:account-changed';
-
-export function notifyAccountChanged(): void {
-  try {
-    window.dispatchEvent(new CustomEvent(ACCOUNT_CHANGED_EVENT));
-  } catch {
-    /* no window (tests) */
-  }
+  return accountOverride() ?? getCurrentAccount();
 }
 
 // ── recentAccounts ───────────────────────────────────────────────────────────────────────────
@@ -162,7 +144,7 @@ function upsertRecentAccount(account: AccountSlot): void {
 // and nothing else updates them — so one picked before a field existed, or renamed on Steam
 // since, kept its old face in the chip, recents and list labels. This refreshes them wherever
 // the account is stored, from a fetch that returned newer ones; lastUsedAt is left alone, and
-// nothing is written (or broadcast) when nothing changed.
+// nothing is written when nothing changed.
 export function refreshAccountInfo(
   accountId: string,
   info: { label?: string; avatarUrl?: string; vanities?: Record<string, string> },
@@ -183,7 +165,6 @@ export function refreshAccountInfo(
     writeRecents(recents.map((a) => (a.id === accountId ? { ...a, ...fresh } : a)));
     changed = true;
   }
-  if (changed) notifyAccountChanged();
   return changed;
 }
 
@@ -191,9 +172,7 @@ export function refreshAccountInfo(
 // same shape as listsStore.ts's deleteList. Never touches myAccount/currentAccount even if
 // they happen to hold the same id, since those are stored independently.
 export function removeRecentAccount(id: string): { softRemoved: boolean } {
-  const result = removeRecent(id);
-  notifyAccountChanged();
-  return result;
+  return removeRecent(id);
 }
 
 function removeRecent(id: string): { softRemoved: boolean } {
@@ -213,10 +192,11 @@ function removeRecent(id: string): { softRemoved: boolean } {
 // "Clear all" — removes every current entry via the same soft-remove-if-referenced rule as a
 // single removeRecentAccount call, just applied across the whole list.
 export function clearRecentAccounts(): void {
-  readRecents().forEach((a) => {
-    if (!a.removedAt) removeRecent(a.id);
-  });
-  notifyAccountChanged();
+  batch(() =>
+    readRecents().forEach((a) => {
+      if (!a.removedAt) removeRecent(a.id);
+    }),
+  );
 }
 
 // Permanently purges any soft-removed account no longer referenced by anything — listsStore.ts's

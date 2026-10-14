@@ -1677,6 +1677,29 @@ test('F1 edge: the panel prices a game, and its bundles, in a newly picked regio
   await bundlesAsked;
 });
 
+test("A2 edge: a cold link to someone's Owned list loads theirs once it resolves", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?u=bob');
+  await expect(rows(page)).toHaveCount(BOB.owned.length);
+});
+
+test("B3 edge: a link's account, resolving after the bundle loaded, re-marks what it owns", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  // Bob's resolve lands after the bundle has been marked with Alice's library.
+  await page.route('**/api/common-games', async (route) => {
+    if (route.request().postData()?.includes('bob')) await new Promise((resolve) => setTimeout(resolve, 800));
+    await route.fallback();
+  });
+  await page.goto(`/lists/bundle/${BUNDLE.id}?u=bob&game=728880`);
+  await expect(row(page, 'Overcooked! 2').locator('.name-status-badge.owned')).toBeVisible();
+  await expect(row(page, 'Hades').locator('.name-status-badge.owned')).toHaveCount(0);
+  await expect(page.locator('#game-panel .panel-ownership-badge.owned')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'What does this add?' })).toHaveAttribute(
+    'href',
+    new RegExp(BOB.steamid),
+  );
+});
+
 test('B1 edge: with no ITAD key, Bundles says why it is empty', async ({ page }) => {
   await mockApi(page, { states: ['no-itad'] }); // registered last, so it answers first
   await asPlayer(page, ALICE);

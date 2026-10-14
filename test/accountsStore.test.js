@@ -273,51 +273,54 @@ test('getEffectiveCurrentAccount: null when there is neither an override nor a s
   assert.equal(store().getEffectiveCurrentAccount(), null);
 });
 
-test('setAccountOverride/setCurrentAccount: broadcast ACCOUNT_CHANGED_EVENT', () => {
-  const events = [];
-  global.window = { dispatchEvent: (e) => events.push(e.type) };
-  const { setAccountOverride, setCurrentAccount, ACCOUNT_CHANGED_EVENT } = store();
+// Runs `read` in an effect and returns what it saw on each run, plus a dispose.
+async function track(read) {
+  const { createRoot, createEffect } = await import('solid-js');
+  const seen = [];
+  const dispose = createRoot((dispose) => {
+    createEffect(() => seen.push(read()));
+    return dispose;
+  });
+  return { seen, dispose };
+}
 
-  setAccountOverride(makeAccount('theirs'));
+test('getEffectiveCurrentAccount is reactive: follows the override and the stored account', async () => {
+  const { setAccountOverride, setCurrentAccount, getEffectiveCurrentAccount } = store();
+  const { seen, dispose } = await track(() => getEffectiveCurrentAccount()?.id ?? null);
+
   setCurrentAccount(makeAccount('mine'));
-  delete global.window;
+  setAccountOverride(makeAccount('theirs'));
+  setAccountOverride(null);
+  dispose();
 
-  assert.deepEqual(events, [ACCOUNT_CHANGED_EVENT, ACCOUNT_CHANGED_EVENT]);
+  assert.deepEqual(seen, [null, 'mine', 'theirs', 'mine']);
 });
 
-test('setMyAccount/removeRecentAccount/clearRecentAccounts: broadcast ACCOUNT_CHANGED_EVENT once each', () => {
-  const { setMyAccount, setCurrentAccount, removeRecentAccount, clearRecentAccounts, ACCOUNT_CHANGED_EVENT } = store();
+test('getRecentAccounts is reactive: follows starring, removing and clearing', async () => {
+  const { setMyAccount, setCurrentAccount, removeRecentAccount, clearRecentAccounts, getRecentAccounts } = store();
   setCurrentAccount(makeAccount('a'));
   setCurrentAccount(makeAccount('b'));
-  setCurrentAccount(makeAccount('c'));
-  const events = [];
-  global.window = { dispatchEvent: (e) => events.push(e.type) };
+  const { seen, dispose } = await track(() => getRecentAccounts().length);
 
-  setMyAccount(makeAccount('a'));
+  setMyAccount(makeAccount('c'));
   removeRecentAccount('b');
   clearRecentAccounts();
-  delete global.window;
+  dispose();
 
-  assert.deepEqual(events, [ACCOUNT_CHANGED_EVENT, ACCOUNT_CHANGED_EVENT, ACCOUNT_CHANGED_EVENT]);
+  assert.deepEqual(seen, [2, 3, 2, 0]);
 });
 
-test('setAccountOverride: re-setting the same account id broadcasts nothing', () => {
-  const events = [];
-  global.window = { dispatchEvent: (e) => events.push(e.type) };
-  const { setAccountOverride } = store();
+test('setAccountOverride: re-setting the same account id notifies nothing', async () => {
+  const { setAccountOverride, getAccountOverride } = store();
+  const { seen, dispose } = await track(() => getAccountOverride()?.id ?? null);
 
   setAccountOverride(makeAccount('theirs'));
   setAccountOverride(makeAccount('theirs'));
   setAccountOverride(null);
   setAccountOverride(null);
-  delete global.window;
+  dispose();
 
-  assert.equal(events.length, 2, 'one for the set, one for the clear');
-});
-
-test('setAccountOverride: never throws when window is undefined (Node/test environment)', () => {
-  const { setAccountOverride } = store();
-  assert.doesNotThrow(() => setAccountOverride(makeAccount('theirs')));
+  assert.deepEqual(seen, [null, 'theirs', null]);
 });
 
 // ── accountIdentifiers ───────────────────────────────────────────────────────

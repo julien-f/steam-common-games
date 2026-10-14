@@ -24,10 +24,7 @@
 // needed, same as when it's resolved as someone *else's* combine source) — but
 // group-by-membership is one table too, grouped by an "Owned by"/"In" column (membershipColumn.ts)
 // — generalizing the old Comparison page's "one table per owner set, most owners to fewest"
-// layout, with one view (sort, filters, columns, saved like any other) and row selection. `currentAccount` is read once per mount, not live-reactive to being changed
-// elsewhere while this route stays open — accountsStore.ts is a plain module with no Solid
-// signal of its own yet, so there's nothing to subscribe to reactively here until one exists (a
-// real follow-up, not an oversight). A bundle's detail card (shop/dates/counts/tiers/note/outbound
+// layout, with one view (sort, filters, columns, saved like any other) and row selection. A bundle's detail card (shop/dates/counts/tiers/note/outbound
 // links) and its unresolved ("not on Steam") games — both listed here as unported for a while —
 // are rendered now; the games table is still the point of this generic viewer, but a table holding
 // only the games that resolved to a Steam listing was quietly passing itself off as the whole
@@ -151,13 +148,7 @@ import {
   withoutMembershipGrouping,
   MEMBERSHIP_KEY,
 } from './membershipColumn.ts';
-import {
-  getEffectiveCurrentAccount,
-  accountIdentifiers,
-  accountDisplayLabel,
-  getMyAccount,
-  ACCOUNT_CHANGED_EVENT,
-} from './accountsStore.ts';
+import { getEffectiveCurrentAccount, accountIdentifiers, accountDisplayLabel, getMyAccount } from './accountsStore.ts';
 import { getAccountOverrideState, accountOverrideStatusText } from './accountOverride.ts';
 import { fetchAccountOverview, fetchAccountWishlist, resolveAccountSlot, type GameOwner } from './accountData.ts';
 import { loadRecentGames, addRecentGame, renameRecentGame, MAX_RECENT_GAMES } from './recentGames.ts';
@@ -2778,7 +2769,6 @@ export default function ListRoute() {
   );
   // "What does this add?": the bundle minus the current account's Owned, as an unsaved shared list.
   function bundleAddsHref(): string | null {
-    accountRev();
     const account = getEffectiveCurrentAccount();
     if (!account || !params.bundleId) return null;
     const sources: ListRef[] = [
@@ -3116,7 +3106,8 @@ export default function ListRoute() {
   // Owned learns its account's taste for Taste fit elsewhere, once every row's details are in.
   createEffect(() => {
     if (kind !== 'owned' || loadFraction() != null) return;
-    const account = getEffectiveCurrentAccount();
+    // Untracked: on an account switch the rows are still the previous account's until the reload.
+    const account = untrack(getEffectiveCurrentAccount);
     const taste = account && tasteOf(tableData(), Date.now());
     if (taste) saveTaste(account.id, taste);
   });
@@ -3393,36 +3384,26 @@ export default function ListRoute() {
   // load() itself (via the outer `params` object) — referencing them here is what makes this
   // effect re-run on a param-only navigation; 'owned'/'wishlist' have no such param and so only
   // ever run once, identically to the old onMount-based call.
-  // `accountRev` is what makes the two account-scoped kinds re-load when the effective account
-  // changes under them — a `?u=` link resolving after this route mounted (the common case: a
-  // cold visit to /lists/owned?u=alice), or an account picked/adopted on Home. accountsStore.ts
-  // is a plain module with no Solid signal of its own, so this subscribes to its window
-  // broadcast and bumps a signal the load effect below reads — the same shape HomeRoute.tsx uses
-  // for its own account card. Only 'owned'/'wishlist' read it: every other kind's data has
-  // nothing to do with which account is current (a bundle, the recents list, a user list's own
-  // pinned account refs), so they must not reload on an unrelated account change.
-  const [accountRev, setAccountRev] = createSignal(0);
-  // Every other kind keeps its rows, but the ✓/☆ ownership stamps on them belong to the account
-  // that was current when they were computed — loadMyOwnership's own one-shot re-stamp has
-  // already fired by then, so without this a bundle/recents/user list would keep showing the
-  // previous account's ownership. Re-stamping is safe at any time: peek returns null until the
-  // new account's sets land, so nothing is cleared in the meantime, then everything is rewritten.
-  const onAccountChanged = () => {
-    setAccountRev((r) => r + 1);
-    if (stampsOwnership) loadMyOwnership(loadGuard.current());
-    // Every account-scoped list's contents change at once, so no list's "already shuffled
-    // through these" history means anything any more — panel.tsx exported clearAllRandomQueues
-    // for exactly this and had no caller since the redesign.
-    clearAllRandomQueues();
-  };
-  window.addEventListener(ACCOUNT_CHANGED_EVENT, onAccountChanged);
-  onCleanup(() => window.removeEventListener(ACCOUNT_CHANGED_EVENT, onAccountChanged));
+  // Owned/Wishlist reload on another account, or a `?u=` link failing to resolve; no other kind depends on it.
+  const accountKey = createMemo(() => `${getEffectiveCurrentAccount()?.id ?? ''}:${getAccountOverrideState().state}`);
+  const accountId = createMemo(() => getEffectiveCurrentAccount()?.id);
+  // Other kinds keep their rows, but their ✓/☆ stamps and random-pick history belong to the previous account.
+  createEffect(
+    on(
+      accountId,
+      () => {
+        if (stampsOwnership) loadMyOwnership(loadGuard.current());
+        clearAllRandomQueues();
+      },
+      { defer: true },
+    ),
+  );
 
   createEffect(() => {
     params.bundleId;
     params.listId;
     params.appid;
-    if (kind === 'owned' || kind === 'wishlist') accountRev();
+    if (kind === 'owned' || kind === 'wishlist') accountKey();
     // A comparison lives entirely in the query string, not the path, so *that* is what has to be
     // read here for editing the players (or the op) to reload without a remount. load()'s own
     // guard is what keeps the canonicalizing rewrite from counting as a change.

@@ -13,9 +13,10 @@
 // AppShell.tsx drives this once for the whole app (a createEffect on the router's own
 // `location.search`), rather than each route doing it — the shell outlives every navigation, and
 // a `?u=` link is honored identically on all of them.
+import { createSignal } from 'solid-js';
 import { parseAccountParam, urlWithoutAccountParam } from './urlState.ts';
 import { resolveAccountSlot } from './accountData.ts';
-import { setAccountOverride, setCurrentAccount, notifyAccountChanged } from './accountsStore.ts';
+import { setAccountOverride, setCurrentAccount } from './accountsStore.ts';
 import { createStaleGuard } from './staleGuard.ts';
 import type { AccountSlot } from './types.ts';
 
@@ -39,23 +40,16 @@ const NONE: AccountOverrideState = { state: 'none', identifiers: [] };
 // tests" reset doesn't reach a module-level `let` in a TS-stripped ESM file. The app uses the
 // single instance exported below; tests build their own.
 export function createAccountOverrideSync() {
-  let state: AccountOverrideState = NONE;
+  // A signal: a reader shows "Resolving…" then the error even when the override itself stays null.
+  const [state, setState] = createSignal<AccountOverrideState>(NONE);
   // The identifier set the current state was computed for — `syncFromUrl` is called on *every*
   // URL change (a panel `?game=` write, a lightbox step, a shared table view), so without this
   // key an unrelated param write would re-resolve the same account over and over.
   let syncedKey: string | null = null;
   const guard = createStaleGuard();
 
-  function setState(next: AccountOverrideState): void {
-    state = next;
-    // The override itself may not have changed (a resolve starting, or failing), but what the
-    // UI should say about it has — so this notifies regardless, and setAccountOverride's own
-    // no-real-change guard keeps a redundant one from double-firing anything expensive.
-    notifyAccountChanged();
-  }
-
   function getState(): AccountOverrideState {
-    return state;
+    return state();
   }
 
   // Drops the override and forgets the synced param, so a subsequent syncFromUrl for a URL the

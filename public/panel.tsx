@@ -20,7 +20,7 @@ import { getMyOwnershipStatus, getOwnersFor } from './myOwnership.ts';
 import type { OwnershipStatus } from './myOwnership.ts';
 import { sortOwners, ownerMeterPct } from './ownerList.ts';
 import type { GameOwner } from './accountData.ts';
-import { ACCOUNT_CHANGED_EVENT, getEffectiveCurrentAccount } from './accountsStore.ts';
+import { getEffectiveCurrentAccount } from './accountsStore.ts';
 import {
   achievementsAccountKey,
   fetchNews,
@@ -249,13 +249,6 @@ export function initPanel(options: PanelOptions) {
   initHeroSwipe();
   initSubnavScrollSpy();
 
-  // accountsStore.ts is deliberately a plain module with no reactivity of its own, so its change
-  // event is what makes `currentMembers()` (and with it the achievements/owners/ownership
-  // resources, all keyed on `appid:account`) react to picking a different account or following a
-  // `?u=` link — rather than only re-checking on the next panel open. Registered here, not at
-  // module scope, since panel.tsx is imported by Node unit tests too, which have no `window`.
-  window.addEventListener(ACCOUNT_CHANGED_EVENT, () => setAccountRev((r) => r + 1));
-
   // The one place document.title's "a game is open" layer is driven from (see pageTitle.ts).
   // `game.name` is read inside the effect, so a standalone lookup's placeholder title
   // (`App <appid>`, before store metadata resolves the real one) is replaced as soon as the
@@ -418,20 +411,14 @@ function toggleSection(appid: number, section: string) {
 // than an object literal: `createResource` memoizes its source with `===`, so an object would
 // refetch every time the source merely recomputed — e.g. `dlcSource` re-runs whenever any
 // section anywhere is expanded/collapsed, and must not turn that into a fresh DLC fetch.
-const [accountRev, setAccountRev] = createSignal(0);
 // Bumped by a route whose `getOwners` answer changed (a comparison resolved, or was left).
 const [ownersRev, setOwnersRev] = createSignal(0);
 export function notifyOwnersChanged(): void {
   setOwnersRev((n) => n + 1);
 }
 
-// The account whose progress/ownership the panel is answering for — `getEffectiveCurrentAccount`
-// is a plain non-reactive module (accountsStore.ts, deliberately), so its own change event is
-// what makes this reactive; `initPanel` subscribes. Bumping this re-keys the three
-// account-specific resources below, so switching accounts (or following a `?u=` link) re-fetches
-// instead of leaving another account's progress on screen.
+// The account the panel answers for; reactive, so switching accounts re-keys the account-specific resources below.
 function currentMembers(): string[] {
-  accountRev();
   return getEffectiveCurrentAccount()?.members ?? [];
 }
 

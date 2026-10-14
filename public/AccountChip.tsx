@@ -16,7 +16,7 @@
 // `?u=` exploring state. Resolving a new identifier, ★ starring, per-account refresh, counts,
 // Family member rows and removal all stay on Home — this is a nav affordance, not a second,
 // half-implemented copy of that screen, so it links there instead of growing toward it.
-import { createSignal, onCleanup, onMount, For, Show, type JSX } from 'solid-js';
+import { onCleanup, onMount, For, Show, type JSX } from 'solid-js';
 import { A, useLocation, useNavigate } from '@solidjs/router';
 import {
   getEffectiveCurrentAccount,
@@ -25,7 +25,6 @@ import {
   getMyAccount,
   accountDisplayLabel,
   accountIdentifiers,
-  ACCOUNT_CHANGED_EVENT,
 } from './accountsStore.ts';
 import { getAccountOverrideState, adoptAccount, accountOverrideStatusText } from './accountOverride.ts';
 import { withAccountParam } from './urlState.ts';
@@ -43,22 +42,10 @@ export function AccountChip(): JSX.Element {
   let detailsEl!: HTMLDetailsElement;
   let panelEl!: HTMLDivElement;
 
-  const [account, setAccount] = createSignal<AccountSlot | null>(getEffectiveCurrentAccount());
-  const [overrideState, setOverrideState] = createSignal(getAccountOverrideState());
-  const [override, setOverride] = createSignal<AccountSlot | null>(getAccountOverride());
-  const [recents, setRecents] = createSignal<AccountSlot[]>(getRecentAccounts());
-
-  // A `?u=` link resolves asynchronously, after the shell has mounted, and an account can be
-  // picked from anywhere (Home's picker, this popover). Same "plain module + window event,
-  // subscriber owns the signal" shape HomeRoute and region.ts already use.
-  function refresh(): void {
-    setAccount(getEffectiveCurrentAccount());
-    setOverrideState(getAccountOverrideState());
-    setOverride(getAccountOverride());
-    setRecents(getRecentAccounts());
-  }
-  window.addEventListener(ACCOUNT_CHANGED_EVENT, refresh);
-  onCleanup(() => window.removeEventListener(ACCOUNT_CHANGED_EVENT, refresh));
+  const account = getEffectiveCurrentAccount;
+  const overrideState = getAccountOverrideState;
+  const override = getAccountOverride;
+  const recents = () => getRecentAccounts();
 
   onMount(() => onCleanup(bindNavPopover(detailsEl, panelEl)));
 
