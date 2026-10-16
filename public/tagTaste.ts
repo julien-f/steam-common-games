@@ -102,41 +102,76 @@ export function playerFits(
   return { byGame, profiled: profiles.map(Boolean) };
 }
 
-// An account's play profile, kept to score games outside its library (a wishlist, a bundle).
+export interface LibraryGame {
+  appid: number;
+  name: string;
+  tags: Record<string, number>; // its top LIBRARY_TAGS features
+}
+
+// An account's play profile and library, kept to score games outside it (a wishlist, a bundle, a lookup).
 export interface Taste {
   at: number;
-  profile: Record<string, number>;
+  profile: Record<string, number> | null; // null: too few games played
   idf: Record<string, number>; // across the library; a tag it lacks gets `unseenIdf`
   unseenIdf: number;
+  games: LibraryGame[];
 }
+
+// Keeps a large library's entry small; the weakest tags barely move a cosine.
+const LIBRARY_TAGS = 10;
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
 
-export function tasteOf(games: readonly (Omit<Tagged, 'appid'> & { playtime?: number })[], at: number): Taste | null {
+function topFeatures(g: Omit<Tagged, 'appid'>): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(featuresOf(g))
+      .filter((e): e is [string, number] => !!e[1])
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, LIBRARY_TAGS)
+      .map(([tag, w]) => [tag, round2(w)]),
+  );
+}
+
+export function tasteOf(games: readonly (Tagged & { name: string; playtime?: number })[], at: number): Taste | null {
   const weighted = games.filter((g) => g.details?.tagWeights);
+  if (!weighted.length) return null;
   const corpus = weighted.map(featuresOf);
   const idf = inverseFrequency(corpus);
   const played = weighted.filter((g) => g.playtime).map((g) => ({ hours: g.playtime!, weights: featuresOf(g) }));
   const profile = playProfile(played, idf);
-  if (!profile) return null;
   const tags = new Set(corpus.flatMap(Object.keys));
   return {
     at,
-    profile: Object.fromEntries([...profile].map(([tag, x]) => [tag, round2(x)])),
+    profile: profile && Object.fromEntries([...profile].map(([tag, x]) => [tag, round2(x)])),
     idf: Object.fromEntries([...tags].map((tag) => [tag, round2(idf(tag))])),
     unseenIdf: round2(Math.log(1 + corpus.length)),
+    games: weighted.map((g) => ({ appid: g.appid, name: g.name, tags: topFeatures(g) })),
   };
+}
+
+const idfOf = (taste: Taste) => (tag: string) => taste.idf[tag] ?? taste.unseenIdf;
+
+// The library's games closest to `game`, by the same measure as similarGames.
+export function similarInLibrary(taste: Taste, game: Tagged, limit: number): Similar<LibraryGame>[] {
+  if (!game.details?.tagWeights) return [];
+  const t = vectorOf(topFeatures(game), idfOf(taste));
+  return taste.games
+    .filter((g) => g.appid !== game.appid)
+    .map((g) => ({ game: g, score: Math.round(cosine(vectorOf(g.tags, idfOf(taste)), t) * 100) }))
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
 }
 
 // Built once per stored taste, not once per scored row.
 const profileVectors = new WeakMap<Taste, Vector>();
 
-// 0–100; null for a game without tag weights.
+// 0–100; null for a game without tag weights, or a library with too few games played.
 export function fitTo(taste: Taste, game: Omit<Tagged, 'appid'>): number | null {
-  if (!game.details?.tagWeights) return null;
+  if (!taste.profile || !game.details?.tagWeights) return null;
   let profile = profileVectors.get(taste);
   if (!profile) profileVectors.set(taste, (profile = new Map(Object.entries(taste.profile))));
-  const v = vectorOf(featuresOf(game), (tag) => taste.idf[tag] ?? taste.unseenIdf);
+  const v = vectorOf(featuresOf(game), idfOf(taste));
   return Math.round(cosine(profile, v) * 100);
 }
 
@@ -146,7 +181,7 @@ const TASTE_STORAGE_PREFIX = 'steam.isonoe.net:taste:';
 export function loadTaste(accountId: string): Taste | null {
   try {
     const taste = JSON.parse(localStorage.getItem(TASTE_STORAGE_PREFIX + accountId) ?? 'null');
-    return taste?.profile && taste.idf ? taste : null;
+    return taste?.idf && taste.games ? taste : null;
   } catch {
     return null;
   }

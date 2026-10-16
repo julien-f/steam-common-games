@@ -403,20 +403,31 @@ test("C1 edge: the panel's Steam tags show how strongly players tagged the game 
   expect(ratio).toBeCloseTo(0.3, 1);
 });
 
-test("C1 edge: the panel lists the list's games closest by Steam tags, each opening its own panel", async ({
+test("B2 edge: the panel lists the account's owned games closest by Steam tags, each opening its own panel", async ({
   page,
 }) => {
   await asPlayer(page, ALICE);
-  await page.goto('/lists/owned');
-  await row(page, 'Valheim').getByText('Valheim').click();
+  await page.goto('/lists/wishlist');
+  await row(page, 'It Takes Two').getByText('It Takes Two').click();
   const similar = page.locator('#panel-section-similar');
+  await expect(similar.locator('.panel-section-title')).toHaveText(/^Similar in Alice's library/);
   await expect(similar.getByRole('link', { name: /More like this on Steam/ })).toHaveAttribute(
     'href',
-    'https://store.steampowered.com/recommended/morelike/app/892970/',
+    'https://store.steampowered.com/recommended/morelike/app/1426210/',
   );
-  await expect(similar.locator('.panel-similar-item')).toHaveText([/^Terraria/, /^Stardew Valley/, /^Portal 2/]);
-  await similar.getByRole('button', { name: /^Terraria/ }).click();
-  await expect(page.locator('#panel-title')).toHaveText('Terraria');
+  await similar.getByRole('link', { name: "Alice's Owned list" }).click();
+  await expect(rows(page)).toHaveCount(6);
+  // On Owned itself, a row's closest owned games are the list's own similarity sort.
+  await row(page, 'Valheim').getByText('Valheim').click();
+  await expect(similar.locator('.panel-similar-item')).toHaveCount(0);
+  await expect(similar.getByRole('button', { name: '⇅ Sort list by similarity' })).toBeVisible();
+
+  await page.goto('/lists/wishlist');
+  await row(page, 'It Takes Two').getByText('It Takes Two').click();
+  await expect(similar.locator('.panel-similar-item').first()).toBeVisible();
+  const first = (await similar.locator('.panel-similar-name').first().textContent())!;
+  await similar.locator('.panel-similar-item').first().click();
+  await expect(page.locator('#panel-title')).toHaveText(first);
 });
 
 test('C1 edge: the panel sorts the list by similarity to its game, until stopped', async ({ page }) => {
@@ -518,17 +529,6 @@ test("C1 edge: a game looked up outside the list can't sort the list by similari
   const similar = page.locator('#panel-section-similar');
   await expect(similar.locator('.panel-similar-item').first()).toBeVisible();
   await expect(similar.getByRole('button', { name: /Sort list by similarity/ })).toHaveCount(0);
-});
-
-test('C1 edge: a list filtered down to a few games says it has too few to compare', async ({ page }) => {
-  await asPlayer(page, ALICE);
-  await page.goto('/lists/owned');
-  await row(page, 'Valheim').getByText('Valheim').click();
-  await page.locator('.panel-tags').getByRole('button', { name: 'Co-op', exact: true }).first().click();
-  await expect(rows(page)).toHaveCount(4);
-  const similar = page.locator('#panel-section-similar');
-  await expect(similar).toContainText('Too few games in this list to compare.');
-  await expect(similar.locator('.panel-similar-item')).toHaveCount(0);
 });
 
 test('C1 edge: a Tag match range keeps the games strongly tagged, and goes with the tag filter', async ({ page }) => {
@@ -1069,19 +1069,16 @@ test("R1 edge: the ranking's keyboard hints show only with a mouse", async ({ pa
   await expect(page.locator('.rank-hint')).toBeVisible({ visible: testInfo.project.name !== 'phone' });
 });
 
-test("R1 edge: the ranking's side panel offers Steam's similar games, with no list to match against", async ({
-  page,
-}) => {
+test("R1 edge: the ranking's side panel offers similar owned games, with no list to sort", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
   await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
   await page.getByRole('button', { name: 'ℹ Details' }).first().click();
   const similar = page.locator('#panel-section-similar');
-  await expect(similar.locator('.panel-section-title')).toHaveText(/^Similar games/);
-  await expect(similar.getByRole('link', { name: /More like this on Steam/ })).toBeVisible();
-  await expect(similar.getByRole('button')).toHaveCount(0);
-  await expect(similar.locator('.panel-similar-empty')).toHaveCount(0);
+  await expect(similar.locator('.panel-section-title')).toHaveText(/^Similar in Alice's library/);
+  await expect(similar.locator('.panel-similar-item').first()).toBeVisible();
+  await expect(similar.getByRole('button', { name: /Sort list by similarity/ })).toHaveCount(0);
 });
 
 test("R1 edge: the ranking's side panel shows tags as plain pills and its Refresh re-fetches", async ({ page }) => {

@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { similarGames, topPlayedTags, playerFits, tasteOf, fitTo } = require('../public/tagTaste.ts');
+const { similarGames, similarInLibrary, topPlayedTags, playerFits, tasteOf, fitTo } = require('../public/tagTaste.ts');
 
 const game = (appid, tagWeights) => ({ appid, details: { tagWeights } });
 
@@ -113,5 +113,33 @@ test("tasteOf/fitTo: a game outside the library scores by closeness to the accou
   assert.ok(deckbuilder > 50, `${deckbuilder}`);
   assert.equal(shooter, 0);
   assert.equal(fitTo(taste, { details: null }), null);
-  assert.equal(tasteOf(library.slice(0, 4), 0), null);
+  const fewPlayed = tasteOf(library.slice(0, 4), 0);
+  assert.equal(fewPlayed.profile, null);
+  assert.equal(fitTo(fewPlayed, { details: { tagWeights: { Roguelike: 1 } } }), null);
+  assert.equal(tasteOf([owned(1, 10, null)], 0), null);
+});
+
+test("similarInLibrary: the library's closest games to one outside it, leaving out the game itself", () => {
+  const library = [
+    { ...owned(1, 0, { Roguelike: 1, Deckbuilder: 0.9, Singleplayer: 0.5 }), name: 'Slay' },
+    { ...owned(2, 0, { Roguelike: 1, Shooter: 0.9, Singleplayer: 0.5 }), name: 'Gungeon' },
+    { ...owned(3, 0, { Farming: 1, Singleplayer: 1 }), name: 'Farm' },
+    { ...owned(4, 0, { Racing: 1, Singleplayer: 1 }), name: 'Race' },
+  ];
+  const taste = tasteOf(library, 0);
+  const similar = similarInLibrary(taste, game(9, { Roguelike: 1, Deckbuilder: 0.8, Singleplayer: 0.5 }), 5);
+  assert.deepEqual(
+    similar.map((s) => s.game.name),
+    ['Slay', 'Gungeon'],
+  );
+  assert.ok(!similarInLibrary(taste, library[0], 5).some((s) => s.game.appid === 1));
+  assert.deepEqual(similarInLibrary(taste, game(9, null), 5), []);
+});
+
+test("tasteOf: keeps only each game's top tags, so a large library stays small", () => {
+  const tags = Object.fromEntries([...Array(20)].map((_, i) => [`T${i}`, 1 - i / 20]));
+  const taste = tasteOf([{ ...owned(1, 0, tags), name: 'A', productionTier: 'Indie' }], 0);
+  const kept = Object.keys(taste.games[0].tags);
+  assert.equal(kept.length, 10);
+  assert.ok(kept.includes('tier:Indie') && kept.includes('T0') && !kept.includes('T19'));
 });

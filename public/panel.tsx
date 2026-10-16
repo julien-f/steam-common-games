@@ -20,7 +20,7 @@ import { getMyOwnershipStatus, getOwnersFor } from './myOwnership.ts';
 import type { OwnershipStatus } from './myOwnership.ts';
 import { sortOwners, ownerMeterPct } from './ownerList.ts';
 import type { GameOwner } from './accountData.ts';
-import { getEffectiveCurrentAccount } from './accountsStore.ts';
+import { accountDisplayLabel, getEffectiveCurrentAccount } from './accountsStore.ts';
 import {
   achievementsAccountKey,
   fetchNews,
@@ -44,7 +44,7 @@ import { fmtReleaseDate } from './gameColumns.ts';
 import { formatWithEstimate } from './currency.ts';
 import { currentRegion, regionCurrency } from './region.ts';
 import { nextHopHistory } from './panelHistory.ts';
-import type { Similar } from './tagTaste.ts';
+import { loadTaste, similarInLibrary } from './tagTaste.ts';
 import { clearPanelNav } from './panelNav.ts';
 import type { PanelHistoryEntry } from './panelHistory.ts';
 import { setGameTitle } from './pageTitle.ts';
@@ -78,8 +78,8 @@ export interface PanelOptions {
   onClose: (opts?: { leavingRoute?: boolean }) => void;
   // The route's own owners for a game (a comparison's players), over the current account's.
   getOwners: (appid: number) => GameOwner[] | null;
-  // undefined: the route has no list; null: too few of its games to compare against
-  similarInList: (game: ReadonlyGame, limit: number) => readonly Similar<ReadonlyGame>[] | null | undefined;
+  hasList: () => boolean;
+  isOwnedList: () => boolean;
   similarTo: () => number | null;
   setSimilarTo: (appid: number | null) => void;
 }
@@ -2059,28 +2059,42 @@ const SIMILAR_SHOWN = 5;
 
 const steamMoreLikeUrl = (appid: number): string => `https://store.steampowered.com/recommended/morelike/app/${appid}/`;
 
-// The list's games closest to this one by Steam tags; Steam's own page covers the whole store.
+// The account's owned games closest by tags, from Owned's device cache; Steam's page covers the whole store.
 function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
-  const similar = createMemo(() => panelOptions.similarInList(props.game, SIMILAR_SHOWN));
+  const account = () => getEffectiveCurrentAccount();
+  // On Owned, a row's closest owned games are the list's own Sort list by similarity.
+  const shown = () => account() && !(panelOptions.isOwnedList() && !props.game.standalone);
+  // Per game opened, so a library Owned cached meanwhile shows up.
+  const library = createMemo(() => {
+    const taste = shown() ? loadTaste(account()!.id) : null;
+    return { taste, similar: taste && similarInLibrary(taste, props.game, SIMILAR_SHOWN) };
+  });
   return (
     <Show when={!props.game.loading && props.game.details?.tags?.length}>
       <div class="panel-section panel-card" id="panel-section-similar">
         <div class="panel-section-title">
-          {similar() !== undefined ? 'Similar in this list' : 'Similar games'}{' '}
+          {shown() ? `Similar in ${accountDisplayLabel(account()!)}'s library` : 'Similar games'}{' '}
           <a href={steamMoreLikeUrl(props.game.appid)} target="_blank" rel="noopener">
             More like this on Steam ↗
           </a>
         </div>
-        <Show when={similar() !== undefined}>
+        <Show when={shown()}>
           <Show
-            when={similar()?.length}
+            when={library().similar?.length}
             fallback={
               <div class="panel-similar-empty">
-                {similar() === null ? 'Too few games in this list to compare.' : 'No close match in this list.'}
+                {library().taste?.games.length ? (
+                  'No close match in this library.'
+                ) : (
+                  <>
+                    Open <A href={withAccountParam('/lists/owned')}>{accountDisplayLabel(account()!)}'s Owned list</A>{' '}
+                    once on this device to compare.
+                  </>
+                )}
               </div>
             }
           >
-            <For each={similar()}>
+            <For each={library().similar}>
               {(s) => (
                 <button
                   class="panel-similar-item"
@@ -2093,19 +2107,19 @@ function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
               )}
             </For>
           </Show>
-          {/* A standalone lookup isn't a row, so the list has nothing to rank against it. */}
-          <Show when={!props.game.standalone}>
-            <button
-              class="panel-similar-sort"
-              onClick={() =>
-                panelOptions.setSimilarTo(panelOptions.similarTo() === props.game.appid ? null : props.game.appid)
-              }
-            >
-              {panelOptions.similarTo() === props.game.appid
-                ? '× Stop sorting by similarity'
-                : '⇅ Sort list by similarity'}
-            </button>
-          </Show>
+        </Show>
+        {/* A standalone lookup isn't a row, so the list has nothing to rank against it. */}
+        <Show when={panelOptions.hasList() && !props.game.standalone}>
+          <button
+            class="panel-similar-sort"
+            onClick={() =>
+              panelOptions.setSimilarTo(panelOptions.similarTo() === props.game.appid ? null : props.game.appid)
+            }
+          >
+            {panelOptions.similarTo() === props.game.appid
+              ? '× Stop sorting by similarity'
+              : '⇅ Sort list by similarity'}
+          </button>
         </Show>
       </div>
     </Show>

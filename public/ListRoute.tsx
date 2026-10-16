@@ -72,7 +72,6 @@ import {
   tasteOf,
   topPlayedTags,
   type PlayerFits,
-  type Similar,
   type Taste,
 } from './tagTaste.ts';
 import {
@@ -220,7 +219,6 @@ import type {
   GameList,
   CombineOp,
   ListRef,
-  ReadonlyGame,
 } from './types.ts';
 import {
   getList,
@@ -310,6 +308,9 @@ interface TasteSource {
   label: string | null; // null: no current account
   taste: Taste | null; // null: its Owned list not opened on this device yet
 }
+
+// A library with too few games played has no taste to fit to.
+const withProfile = (taste: Taste | null): Taste | null => (taste?.profile ? taste : null);
 
 function tasteFitNote({ label, taste }: TasteSource): string {
   if (!label) return 'Taste fit needs an account: pick one on Home';
@@ -614,8 +615,6 @@ interface DetailsEvent {
 const NO_DETAILS = { rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null };
 
 const PLAYS_MOSTLY_SHOWN = 6;
-// Fewer games to compare against and the tags' rarity weights mean little.
-const SIMILAR_MIN_CANDIDATES = 5;
 
 // A score column leads the sort while its source is set; unset, it goes, with its row-hiding range.
 function syncLeadColumn(t: TableState<Game>, key: string, active: boolean): void {
@@ -1368,19 +1367,6 @@ export default function ListRoute() {
 
   function tableData(): Game[] {
     return rowsStore.filter((r) => !r.loading);
-  }
-
-  // Candidates as shown, but tag rarity from every row, as the Similarity column has it: same %.
-  function similarInList(game: ReadonlyGame, limit: number): Similar<ReadonlyGame>[] | null {
-    const shown = new Set(
-      getGameList()
-        .filter((g) => g.appid !== game.appid && g.details?.tagWeights)
-        .map((g) => g.appid),
-    );
-    if (shown.size < SIMILAR_MIN_CANDIDATES) return null;
-    return similarGames<ReadonlyGame>(game, tableData(), Infinity)
-      .filter((s) => shown.has(s.game.appid))
-      .slice(0, limit);
   }
 
   // Reads tableReady so a caller tracking this list (the panel's nav bar) follows a table rebuild.
@@ -2426,7 +2412,7 @@ export default function ListRoute() {
       const tasteAccount = getEffectiveCurrentAccount();
       const tasteSource: TasteSource = {
         label: tasteAccount && accountDisplayLabel(tasteAccount),
-        taste: tasteAccount && loadTaste(tasteAccount.id),
+        taste: tasteAccount && withProfile(loadTaste(tasteAccount.id)),
       };
       setTasteFitSource(tasteSource);
       const priced = kind === 'user' && pricesShown;
@@ -3322,7 +3308,7 @@ export default function ListRoute() {
       isTagActive,
       getOwners: (appid) =>
         comparePlayers.length ? comparePlayers.flatMap((player) => player.owners.get(appid) ?? []) : null,
-      similarInList,
+      isOwnedList: kind === 'owned',
       similarTo,
       setSimilarTo,
     });

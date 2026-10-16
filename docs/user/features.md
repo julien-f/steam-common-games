@@ -107,7 +107,7 @@ Wishlist and bundle lists carry price columns: the best deal across every shop I
 
 Clicking any row opens a detail panel beside the table — not over it, so the list stays usable and clicking another row just swaps the panel's contents. It carries screenshots and trailers, the weighted rating and review counts, How Long To Beat estimates, achievements, recent news from the developer, current price and the current bundles it's in (each opens that bundle's list), DLC and links out. ↻ refetches everything for that one game.
 
-**Similar in this list** shows the 5 games the open list shows (filters apply) closest to this one by Steam tags (tags nearly every game in the list carries count less), each opening its own panel; ← Back returns. **⇅ Sort list by similarity** ranks the whole list against that game (a **Similarity** column, first sort) until you stop it or reload. **More like this on Steam ↗** searches the whole store instead, and is all the section shows outside a list (while ranking).
+**Similar in Alice's library** shows the 5 games the current account owns closest to this one by Steam tags (tags nearly every game in the library carries count less), each opening its own panel; ← Back returns. It needs that account's Owned list opened once on this device (the section links it), and isn't shown on Owned's own rows. **⇅ Sort list by similarity** ranks the whole open list against that game (a **Similarity** column, first sort) until you stop it or reload. **More like this on Steam ↗** searches the whole store instead.
 
 Clicking a screenshot or trailer (or **Enter** on it) opens it full-window:
 

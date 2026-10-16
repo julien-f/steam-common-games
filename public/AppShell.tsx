@@ -22,8 +22,7 @@ import { addRecentGame, loadRecentGames } from './recentGames.ts';
 import type { GameOwner } from './accountData.ts';
 import { setPanelParam, setLightboxParam, withAccountParam, COMPARE_PATH } from './urlState.ts';
 import { syncAccountOverrideFromUrl } from './accountOverride.ts';
-import type { Game, ReadonlyGame } from './types.ts';
-import type { Similar } from './tagTaste.ts';
+import type { Game } from './types.ts';
 import { ShortcutsModal } from './ShortcutsModal.tsx';
 import { AccountChip } from './AccountChip.tsx';
 import { initAuth } from './authStore.ts';
@@ -65,25 +64,28 @@ interface RouteHandlers {
   onTagClick?: (dim: string, value: string) => void;
   isTagActive?: (dim: string, value: string) => boolean;
   getOwners?: (appid: number) => GameOwner[] | null; // null: the current account's own (panel.tsx)
-  similarInList?: (game: ReadonlyGame, limit: number) => Similar<ReadonlyGame>[] | null; // null: too few to compare
+  isOwnedList?: boolean; // the panel's similar owned games would only repeat it
   similarTo?: () => number | null; // the game the list is sorted by similarity to
   setSimilarTo?: (appid: number | null) => void;
 }
 let routeHandlers: RouteHandlers = {};
 // A signal, unlike routeHandlers: the panel's tag pills render as buttons only while it holds.
 const [tagsFilterable, setTagsFilterable] = createSignal(false);
-// Likewise: the panel's Similar in this list shows only on a route with a list.
+// Likewise: the panel's Sort list by similarity shows only on a route with a list.
 const [hasList, setHasList] = createSignal(false);
+const [isOwnedList, setIsOwnedList] = createSignal(false);
 export function registerRouteHandlers(handlers: RouteHandlers): () => void {
   routeHandlers = handlers;
   setTagsFilterable(handlers.onTagClick != null);
-  setHasList(handlers.similarInList != null);
+  setHasList(handlers.setSimilarTo != null);
+  setIsOwnedList(!!handlers.isOwnedList);
   return () => {
     // A route mounting before the previous one's cleanup has already registered its own.
     if (routeHandlers !== handlers) return;
     routeHandlers = {};
     setTagsFilterable(false);
     setHasList(false);
+    setIsOwnedList(false);
   };
 }
 
@@ -213,7 +215,8 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       onTagClick: (dim, value) => routeHandlers.onTagClick?.(dim, value),
       tagsFilterable,
       getOwners: (appid) => routeHandlers.getOwners?.(appid) ?? null,
-      similarInList: (game, limit) => (hasList() ? routeHandlers.similarInList!(game, limit) : undefined),
+      hasList,
+      isOwnedList,
       similarTo: () => (hasList() ? (routeHandlers.similarTo?.() ?? null) : null),
       setSimilarTo: (appid) => routeHandlers.setSimilarTo?.(appid),
       isTagActive: (dim, value) => routeHandlers.isTagActive?.(dim, value) ?? false,
