@@ -9,7 +9,8 @@
 //                                                  included) since then: blocked commits, timings (scripts/dev-metrics.js)
 //   node scripts/setup-facts.js --transcripts[=N|=DATE]  the last N (default 20) sessions', or everything
 //                                                  after DATE's, largest outputs, slowest calls, repeated command
-//                                                  pairs, denied and rejected calls, and the newest entry read;
+//                                                  pairs, denied and rejected calls, the newest entry read and,
+//                                                  after DATE, commits made against git commit calls read;
 //                                                  commands are reduced to their first words, so no arguments
 //                                                  (or secrets) print; then interrupts and how the user answered
 //                                                  each skill's questions
@@ -93,6 +94,11 @@ function parseSession(lines) {
     }
   }
   return [...calls.values()].filter((c) => c.bytes !== undefined).map(({ start, ...c }) => c);
+}
+
+// `sessions`: parseSession results.
+function commitCalls(sessions) {
+  return sessions.flat().filter((c) => c.key === 'git commit' && !c.error).length;
 }
 
 // A user turn that is a prompt, not a tool result, a slash command's echo or a loaded skill's text.
@@ -485,8 +491,17 @@ function transcripts({ limit, since }, digestDir) {
   const { output, slow, pairs, denied } = summarize(sessions);
   const total = tokens(logs.flat().map((line) => JSON.parse(line)));
   console.log(
-    `${logs.length} sessions, ${sessions.flat().length} tool calls, ${mtok(total)} (main threads), newest entry ${newest ? new Date(newest).toISOString() : 'none'}\n\nLargest output (total · max · calls):`,
+    `${logs.length} sessions, ${sessions.flat().length} tool calls, ${mtok(total)} (main threads), newest entry ${newest ? new Date(newest).toISOString() : 'none'}`,
   );
+  if (since !== undefined) {
+    // Commits far above the commit calls mean sessions held elsewhere (another machine, the web) went unread.
+    const commits = execFileSync('git', ['rev-list', '--count', `--since=${new Date(since).toISOString()}`, 'HEAD'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    }).trim();
+    console.log(`Commits since then: ${commits} · git commit calls read: ${commitCalls(sessions)}`);
+  }
+  console.log('\nLargest output (total · max · calls):');
   for (const k of output) console.log(`  ${k.key}: ${kb(k.bytes)} · ${kb(k.maxBytes)} · ${k.count}`);
   console.log('\nSlowest call (elapsed, including any permission wait):');
   for (const k of slow) console.log(`  ${k.key}: ${(k.maxMs / 1000).toFixed(0)} s`);
@@ -585,6 +600,7 @@ module.exports = {
   costDelta,
   checkStats,
   parseSession,
+  commitCalls,
   linesSince,
   tokens,
   skillRuns,

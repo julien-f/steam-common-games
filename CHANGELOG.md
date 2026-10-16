@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Development
 
 - The setup check flags permission allows that would pre-approve git clean, git restore, npm publish or deleting a remote branch
+- setup-facts --transcripts=DATE shows commits made since DATE next to the commits its sessions made
 
 ## [0.11.0] - 2026-10-14
 

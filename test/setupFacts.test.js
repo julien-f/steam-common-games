@@ -9,6 +9,7 @@ const {
   costDelta,
   checkStats,
   parseSession,
+  commitCalls,
   linesSince,
   tokens,
   skillRuns,
@@ -82,6 +83,17 @@ test('parseSession pairs each call with its result: output size, elapsed time, c
     { key: 'Read', bytes: 37, ms: 1000, error: true, denied: true, rejected: false },
     { key: 'Edit', bytes: 33, ms: 1000, error: true, denied: false, rejected: true },
   ]);
+});
+
+test('commitCalls counts the git commit calls that succeeded', () => {
+  const call = (key, error = false) => ({ key, bytes: 0, ms: 0, error, denied: false, rejected: false });
+  assert.equal(
+    commitCalls([
+      [call('git commit'), call('git log')],
+      [call('git commit', true), call('git commit')],
+    ]),
+    2,
+  );
 });
 
 test('linesSince keeps entries after the date, and the untimed ones', () => {
