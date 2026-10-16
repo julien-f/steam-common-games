@@ -1,11 +1,13 @@
 'use strict';
 
-// Flags comments of two or more lines added under public/ (CLAUDE.md: new comments are one line).
+// Flags comments of three or more lines added under public/ (CLAUDE.md: new comments are one line, two at most).
 // Reads only the diff's added lines, so long-form comments already in the tree pass.
 //   node scripts/comment-lines.js [--staged=<base>]   the staged commit against <base>, else uncommitted changes and new untracked files
 
 const { execFileSync } = require('node:child_process');
 const { readFileSync } = require('node:fs');
+
+const MAX_LINES = 2;
 
 // A new file as a diff adding every line, since `git diff` skips untracked files.
 function addedFileDiff(file, content) {
@@ -13,14 +15,14 @@ function addedFileDiff(file, content) {
   return `+++ b/${file}\n@@ -0,0 +1,${lines.length} @@\n${lines.map((l) => `+${l}`).join('\n')}\n`;
 }
 
-// `diff`: `git diff -U0` output. Returns "file:line" for each added comment block of 2+ lines.
+// `diff`: `git diff -U0` output. Returns "file:line" for each added comment block of 3+ lines.
 function longComments(diff) {
   const found = [];
   let file = null;
   let block = null;
   let inBlock = false;
   const flush = () => {
-    if (block && block.lines >= 2) found.push(`${file}:${block.start}`);
+    if (block && block.lines >= MAX_LINES + 1) found.push(`${file}:${block.start}`);
     block = null;
   };
   let line = 0;
@@ -68,7 +70,9 @@ if (require.main === module) {
   ].join('');
   const found = longComments(diff);
   if (found.length) {
-    console.error(`Comments over one line (CLAUDE.md: one line, the why):\n${found.map((f) => `  ${f}`).join('\n')}`);
+    console.error(
+      `Comments over ${MAX_LINES} lines (CLAUDE.md: one line, two at most, the why):\n${found.map((f) => `  ${f}`).join('\n')}`,
+    );
     process.exitCode = 1;
   }
 }

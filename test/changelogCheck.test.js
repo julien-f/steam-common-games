@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { structureProblems, missingEntry } = require('../scripts/changelog-check');
+const { structureProblems, missingEntry, entryRequired } = require('../scripts/changelog-check');
 
 test('structureProblems: a repeated or unknown subsection in Unreleased; Development is allowed; released versions are ignored', () => {
   const text =
@@ -20,6 +20,13 @@ test('missingEntry: app code without CHANGELOG.md; tests, docs and tooling alone
   assert.strictEqual(missingEntry(['lib/steam.js', 'test/steam.test.js']), true);
   assert.strictEqual(missingEntry(['server.js', 'CHANGELOG.md']), false);
   assert.strictEqual(missingEntry(['test/steam.test.js', 'docs/dev/data.md', 'scripts/doc-refs.js', '']), false);
+});
+
+test("entryRequired: on main and on any merge commit; a feature branch's own commits wait for its merge", () => {
+  assert.strictEqual(entryRequired({ branch: 'main', merging: false }), true);
+  assert.strictEqual(entryRequired({ branch: 'steam-family', merging: false }), false);
+  assert.strictEqual(entryRequired({ branch: 'main', merging: true }), true);
+  assert.strictEqual(entryRequired({ branch: 'steam-family', merging: true }), true);
 });
 
 // Run from the pre-commit hook, GIT_INDEX_FILE (absolute under `git commit -a`) would point the

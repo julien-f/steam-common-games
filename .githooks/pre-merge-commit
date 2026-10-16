@@ -1,0 +1,5 @@
+#!/bin/sh
+set -e
+
+# A feature branch's commits skip the changelog requirement (scripts/changelog-check.js); its merge into main carries the entries.
+node scripts/changelog-check.js --staged=HEAD
