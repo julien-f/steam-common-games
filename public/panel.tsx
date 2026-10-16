@@ -2057,6 +2057,8 @@ function TagCloudSection(props: { game: ReadonlyGame }): JSX.Element {
 
 const SIMILAR_SHOWN = 5;
 
+const steamMoreLikeUrl = (appid: number): string => `https://store.steampowered.com/recommended/morelike/app/${appid}/`;
+
 // The list's games closest to this one by Steam tags; Steam's own page covers the whole store.
 function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
   const similar = createMemo(() => panelOptions.similarInList(props.game, SIMILAR_SHOWN));
@@ -2065,11 +2067,7 @@ function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
       <div class="panel-section panel-card" id="panel-section-similar">
         <div class="panel-section-title">
           {similar() !== undefined ? 'Similar in this list' : 'Similar games'}{' '}
-          <a
-            href={`https://store.steampowered.com/recommended/morelike/app/${props.game.appid}/`}
-            target="_blank"
-            rel="noopener"
-          >
+          <a href={steamMoreLikeUrl(props.game.appid)} target="_blank" rel="noopener">
             More like this on Steam ↗
           </a>
         </div>
@@ -2134,7 +2132,7 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
       {
         icon: '🔎',
         label: 'More Like This (Steam)',
-        href: `https://store.steampowered.com/recommended/morelike/app/${props.game.appid}/`,
+        href: steamMoreLikeUrl(props.game.appid),
       },
     ].filter((it): it is { icon: string; label: string; href: string } => !!it);
 
