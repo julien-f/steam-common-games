@@ -21,6 +21,19 @@ test('permissionProblems flags allows that cover an ask-first action, not narrow
   assert.ok(problems.some((p) => p.includes('`git commit -m x`')));
 });
 
+test('permissionProblems covers the user-level ask-first list', () => {
+  const allow = [
+    'Bash(git clean *)',
+    'Bash(git restore *)',
+    'Bash(git checkout *)',
+    'Bash(npm publish*)',
+    'Bash(git push origin --delete *)',
+  ];
+  for (const rule of allow) {
+    assert.notDeepEqual(permissionProblems('s.json', { permissions: { allow: [rule] } }), [], rule);
+  }
+});
+
 test('skillProblems checks the name, the "Use when" and the description length', () => {
   const skill = (name, description) => `---\nname: ${name}\ndescription: ${description}\n---\n\n# X`;
   assert.deepEqual(skillProblems('a', skill('a', 'Does x. Use when asked.')), []);

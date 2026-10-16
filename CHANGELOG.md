@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Search boxes have a × to clear them in one tap, select their text when focused, and show a Search key on phone keyboards
 
+### Development
+
+- The setup check flags permission allows that would pre-approve git clean, git restore, npm publish or deleting a remote branch
+
 ## [0.11.0] - 2026-10-14
 
 ### Added
