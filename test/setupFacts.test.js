@@ -7,6 +7,7 @@ const {
   argsWithoutUsage,
   commandKey,
   costDelta,
+  costLine,
   checkStats,
   parseSession,
   commitCalls,
@@ -231,7 +232,7 @@ test('sessionEvents: prompts with the reply before, skill runs, answers, rejecti
       entry('user', '<command-name>/setup-review</command-name>'),
       use('q', 'AskUserQuestion', { questions: [question] }),
       result('q', 'answered', { entry: { toolUseResult: { answers: { [question.question]: 'Skip' } } } }),
-      entry('assistant', [{ type: 'text', text: 'Done. Key sk_' + 'x'.repeat(30) }]),
+      entry('assistant', [{ type: 'text', text: 'Earlier paragraph.\n\nDone. Key sk_' + 'x'.repeat(30) }]),
       entry('user', [{ type: 'text', text: '[Request interrupted by user]' }]),
       entry('user', 'no, keep the old one'),
       use('b', 'Bash', { command: 'npm run lint -- --fix' }),
@@ -285,6 +286,10 @@ test('docReads: Read calls and shell reads of repo docs, whole unless narrowed',
     use('Bash', { command: 'cat CLAUDE.md' }),
     use('Bash', { command: 'grep x docs/dev/data.md' }),
     use('Bash', { command: 'for f in README.md docs/dev/data.md; do sed -n 1,9p "$f"; done' }),
+    use('Read', { file_path: '/home/u/.claude/CLAUDE.md' }),
+    use('Bash', { command: "git commit -F - <<'EOF' | tail -1\nFollow CLAUDE.md\nEOF" }),
+    use('Bash', { command: "python3 - <<'EOF'\nopen('docs/dev/data.md')\nEOF\ncat README.md" }),
+    use('Bash', { command: 'grep -n x CLAUDE.md docs/dev/data.md | head -20 && sed -n 1,5p README.md' }),
   ];
   assert.deepEqual(docReads(lines), [
     { doc: 'docs/dev/frontend.md', whole: true },
@@ -292,6 +297,8 @@ test('docReads: Read calls and shell reads of repo docs, whole unless narrowed',
     { doc: 'CLAUDE.md', whole: true },
     { doc: 'README.md', whole: false },
     { doc: 'docs/dev/data.md', whole: false },
+    { doc: 'README.md', whole: true },
+    { doc: 'README.md', whole: false },
   ]);
 });
 
@@ -314,6 +321,18 @@ test('costDelta: the change since the last run, flagged past 25% slower; nothing
   assert.equal(costDelta(20, 22, '2026-10-12T08:00:00Z'), ' (+10% since 2026-10-12)');
   assert.equal(costDelta(20, 40, '2026-10-12T08:00:00Z'), ' (+100% since 2026-10-12) ⚠');
   assert.equal(costDelta(20, 15, '2026-10-12T08:00:00Z'), ' (-25% since 2026-10-12)');
+});
+
+test('costLine: size and change since the last run; a failed run is marked not recorded, with no change', () => {
+  const last = { at: '2026-10-12T08:00:00Z', seconds: { 'test:e2e': 50 } };
+  assert.equal(
+    costLine('test:e2e', { seconds: 60, out: 'a\nb', status: 0 }, last),
+    'npm run test:e2e: 60 s, 0.0 KB, 2 lines (+20% since 2026-10-12)',
+  );
+  assert.equal(
+    costLine('test:e2e', { seconds: 9.9, out: 'x', status: 1 }, last),
+    'npm run test:e2e: 9.9 s, 0.0 KB, 1 lines, exit 1, not recorded',
+  );
 });
 
 test('tokens: input with cache writes and reads, and output, the max per response id', () => {

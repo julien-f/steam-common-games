@@ -14,8 +14,8 @@
 //                                                  commands are reduced to their first words, so no arguments
 //                                                  (or secrets) print; then interrupts and how the user answered
 //                                                  each skill's questions
-//     --digest=DIR                                 also writes one file per session to DIR: prompts, the reply
-//                                                  before each, skill runs, failed calls, interrupts, rejections
+//     --digest=DIR                                 also writes one file per session to DIR: prompts, the last
+//                                                  paragraph of the reply before each, skill runs, failed calls, interrupts, rejections
 //                                                  with the user's reason, questions and answers — long tokens
 //                                                  redacted, for the subagent that reads for judgment
 //                                                  and which docs were read, how often whole
@@ -162,6 +162,13 @@ function clip(value, max) {
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 }
 
+// Whether a reply ends in a prose question or offer shows only in its last paragraph.
+const lastParagraph = (reply) =>
+  reply
+    .trim()
+    .split(/\n\s*\n/)
+    .at(-1);
+
 // A question about the Claude Code setup, by its text and option labels (descriptions mention scripts too often).
 const SETUP = /CLAUDE\.md|SKILL\.md|settings(\.local)?\.json|scripts\/|\b(skill|hook|memory)s?\b/i;
 
@@ -195,7 +202,7 @@ function sessionEvents(lines, names) {
       if (prompt.startsWith('[Request interrupted by user')) events.push({ kind: 'interrupt', key: lastKey, skill });
       else {
         skill = undefined;
-        events.push({ kind: 'prompt', text: clip(prompt, 500), reply: clip(reply, 200) });
+        events.push({ kind: 'prompt', text: clip(prompt, 500), reply: clip(lastParagraph(reply), 600) });
       }
     }
     for (const part of Array.isArray(content) ? content : []) {
@@ -312,8 +319,12 @@ function summarize(sessions) {
   };
 }
 
-// A repo doc a Read call or a shell read (cat, sed, head, tail) opened: CLAUDE.md, README.md or under docs/.
-const DOC = /(?:^|[\s/"'])((?:docs\/[\w/-]+|README|CLAUDE)\.md)\b/g;
+// A repo doc a Read call or a shell read (cat, sed, head, tail) opened: CLAUDE.md, README.md or under docs/;
+// not ~/.claude/CLAUDE.md.
+const DOC = /(?:^|[\s"']|(?<!\.claude)\/)((?:docs\/[\w/-]+|README|CLAUDE)\.md)\b/g;
+// A heredoc's body (a commit message, an edit script) names docs without reading them; the rest of its line stays.
+const READER = /^(?:(?:do|then)\s+)?(cat|sed|head|tail)\b/;
+const HEREDOC = /<<-?\s*(['"]?)(\w+)\1([^\n]*)\n[\s\S]*?\n[ \t]*\2[ \t]*(?=\n|$)/g;
 
 // One session's JSONL lines → `{ doc, whole }` per doc opened, `whole` unless the read was narrowed (a Read
 // offset or limit, or sed/head/tail rather than cat).
@@ -326,8 +337,15 @@ function docReads(lines) {
       if (part.name === 'Read')
         for (const [, doc] of ` ${file ?? ''}`.matchAll(DOC))
           reads.push({ doc, whole: offset === undefined && limit === undefined });
-      if (part.name === 'Bash' && /\b(cat|sed|head|tail)\b/.test(command ?? ''))
-        for (const [, doc] of command.matchAll(DOC)) reads.push({ doc, whole: /\bcat\b/.test(command) });
+      if (part.name !== 'Bash') continue;
+      // Only a reader's own arguments, or a `for … in` list a reader goes through, not a grep's or wc's.
+      const segments = (command ?? '').replace(HEREDOC, '$3').split(/&&|\|\||[;|\n]/);
+      const readers = segments.map((seg) => seg.trim().match(READER)?.[1]);
+      segments.forEach((seg, i) => {
+        const loop = /^\s*for\s+\w+\s+in\b/.test(seg) && readers.find(Boolean);
+        for (const [, doc] of readers[i] || loop ? seg.matchAll(DOC) : [])
+          reads.push({ doc, whole: (readers[i] ?? loop) === 'cat' });
+      });
     }
   return reads;
 }
@@ -419,11 +437,9 @@ function cost() {
   for (const script of COST_SCRIPTS) {
     const start = Date.now();
     const { status, stdout, stderr } = spawnSync(npm, ['run', '-s', script], { cwd: ROOT, encoding: 'utf8' });
-    const out = stdout + stderr;
-    seconds[script] = Number(((Date.now() - start) / 1000).toFixed(1));
-    console.log(
-      `npm run ${script}: ${seconds[script]} s, ${kb(out.length)}, ${out.split('\n').length} lines${status ? `, exit ${status}` : ''}${costDelta(last?.seconds[script], seconds[script], last?.at)}`,
-    );
+    const run = { seconds: Number(((Date.now() - start) / 1000).toFixed(1)), out: stdout + stderr, status };
+    console.log(costLine(script, run, last));
+    if (!status) seconds[script] = run.seconds;
   }
   record('cost', { seconds });
   const since = last?.at ?? '';
@@ -446,6 +462,13 @@ function checkStats(rows) {
     return `${mine.length} ${label} (${failed.length} ${run === 'commit' ? 'blocked' : 'failed'}${why ? `: ${why}` : ''})${mine.length ? `, median ${median(mine.map(total))} s, slowest step ${slowest[0]} ${slowest[1]} s` : ''}`;
   };
   return `${part('commit', 'commits')} · ${part('full', 'full runs')}`;
+}
+
+// A failed run (e.g. e2e's port taken by another checkout) is no baseline: it isn't recorded or compared.
+function costLine(script, { seconds, out, status }, last) {
+  const size = `${seconds} s, ${kb(out.length)}, ${out.split('\n').length} lines`;
+  if (status) return `npm run ${script}: ${size}, exit ${status}, not recorded`;
+  return `npm run ${script}: ${size}${costDelta(last?.seconds[script], seconds, last?.at)}`;
 }
 
 // ` (+30% since 2026-10-12) ⚠` against the last --cost run; ⚠ past SLOWER.
@@ -598,6 +621,7 @@ module.exports = {
   argsWithoutUsage,
   commandKey,
   costDelta,
+  costLine,
   checkStats,
   parseSession,
   commitCalls,
