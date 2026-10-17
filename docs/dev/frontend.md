@@ -26,6 +26,7 @@ The data model it renders — accounts, lists, combines, the localStorage schema
 | `/lists/compare`          | A comparison of several accounts' libraries, named by `?u=`             |
 | `/lists/shared`           | Someone else's dynamic list formula, named by `?f=`                     |
 | `/lists/bundle/:bundleId` | One bundle's games                                                      |
+| `/lists/developer?name=`  | A developer's games on Steam (`/lists/publisher?name=`: a publisher's)  |
 | `/lists/:listId`          | A user list (manual, dynamic or ranked)                                 |
 | `/lists/:listId/rank`     | A ranked list's one-vs-one compare screen                               |
 | `/bundles`                | Browse/discover bundles — a table of bundles, not of games              |
@@ -34,7 +35,7 @@ The data model it renders — accounts, lists, combines, the localStorage schema
 | `/about`                  | Static about page — linked from the footer, not the nav bar             |
 | anything else             | "Page not found", with a link Home (`NotFoundRoute.tsx`)                |
 
-- Path for "which list", query params for state within it (`?u=`, `?game=`/`&shot=`, view-sharing params).
+- Path for "which list", query params for state within it (`?u=`, `?game=`/`&shot=`, view-sharing params). Except a developer's or publisher's name, in `?name=`: the production SPA fallback 404s on a path ending like a file (`indie.io`), and a `/` in a name doesn't survive a path segment.
 - The fixed `/lists/*` routes are registered before the generic `/lists/:listId` to document intent; `@solidjs/router` ranks by segment specificity, so the order isn't load-bearing.
 - The production catch-all that makes these real paths work on a cold visit is in [architecture.md](architecture.md).
 
@@ -93,6 +94,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "r" | "g:" formula
 - `bundleSnapshots.ts` — the last-known title and games of each bundle a saved list uses, kept for when ITAD stops listing it.
 - `myOwnership.ts` — one cached pair of owned/wishlisted appid sets for the effective account, behind both the panel's badge and the search dropdown's markers.
 - `recentGames.ts` — the recently-looked-up list backing `/game`.
+- `creatorData.ts` — a developer's/publisher's games (`/api/creator-games`), the list's title and path.
 - `bundleData.ts` / `bundleRows.ts` / `bundleBrowseStore.ts` — bundle fetch/flatten/resolve; the flat row shape `/bundles` sorts over; the last-browsed list `/lists/bundle/:bundleId`'s ‹/› nav steps through.
 - `fanaticalPicks.ts` — Buy on Fanatical: the purchase link carrying the picks, and the bookmarklet that adds them there.
 - `authStore.ts` / `syncedPrefKeys.ts` — Steam sign-in status and the prefs merge with the server on sign-in (`syncPrefsWithServer`); the pref keys a signed-in account syncs (the server keeps its own copy, checked equal by a test).
@@ -168,6 +170,7 @@ Every list of games — owned, wishlist, bundle, recent, user — renders throug
 - **bundle** — ownership status, Tier Price, Add-on, then `PRICE_COLUMNS`.
 - **recent** — ownership status, plus Looked up (the stored newest-first order), its default sort.
 - **compare** — ownership status, plus one Played (h) per player, shown by default and keyed by position (`playtime:<i>`) so a saved layout fits the next comparison; the membership column when grouped by membership.
+- **creator** — ownership status, `PRICE_COLUMNS`, and Taste fit shown by default.
 - **shared** — ownership status, plus the membership column when grouped by membership. A priced source adds `PRICE_COLUMNS`, and a bundle source its Tier Price too (`bundleTierFields`, fed by `createDefaultFetchers`' `onBundleGames`; the first bundle wins a game in two), shown once a remaining row has one; a pick-and-mix rate reads "Varies", having no selection to count, and a region change re-fetches the bundle.
 - **user** — ownership status, plus Played (h)/Last Played for the **current account** (hidden by default), stamped alongside the ✓/☆ markers from `myOwnership.ts`'s `peekMyPlaytime` — the same library fetch, no extra request. A list with a priced source (`listHasPriceSource`: built from a wishlist or a bundle) adds `PRICE_COLUMNS`, and a non-ranked one a bundle source's Tier Price, as **shared** does. A **ranked** list adds Rank, its default sort.
 
@@ -213,7 +216,7 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
 
 **View persistence.** A table's view (visible columns, sort, grouping, filters) auto-persists locally as it changes:
 
-- One `prefs.ts` key per system kind (`ownedListView`, `wishlistListView`, `bundleListView`, `recentListView`, `compareListView`, `sharedListView` — the bundle, compare and shared ones shared across instances — plus `bundlesBrowseView` for `/bundles`; listed in `tableViewKeys.ts`). A user list stores its own `tableView` on the list; `tableViewPrefs.ts`'s helpers take either as a `ViewStore` (a load/save pair; `prefViewStore(key)` for a pref key).
+- One `prefs.ts` key per system kind (`ownedListView`, `wishlistListView`, `bundleListView`, `recentListView`, `compareListView`, `sharedListView`, `creatorListView` — the bundle, compare, shared and creator ones shared across instances — plus `bundlesBrowseView` for `/bundles`; listed in `tableViewKeys.ts`). A user list stores its own `tableView` on the list; `tableViewPrefs.ts`'s helpers take either as a `ViewStore` (a load/save pair; `prefViewStore(key)` for a pref key).
 - It's applied _after_ `table.setViewState({ sorts: DEFAULT_SORT })`, so a stored view overrides the default sort and a first visit gets the default.
 - It's **not** written to the URL as it changes — a URL left in the address bar would go stale on the next table change. "🔗 Share view" snapshots it into `?tv=` on a copied link only (one param name; one table per route), never calling `history.replaceState`.
   - On Owned/Wishlist it also adds `u=` for the effective account unless the URL has one; other kinds don't, since `u=` there would only swap the recipient's ownership markers.

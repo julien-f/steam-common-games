@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - Search boxes have a × to clear them in one tap, select their text when focused, and show a Search key on phone keyboards
+- A game's panel links to its developers' and publishers' games on Steam, each opening as a list
 
 ### Changed
 

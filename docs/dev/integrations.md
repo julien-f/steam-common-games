@@ -5,7 +5,7 @@ Every upstream this app talks to, and what is undocumented about each. Cache tie
 **Trust tiers.**
 
 - **Sanctioned**: Steam's keyed `api.steampowered.com` endpoints (among them `ResolveVanityURL` and `GetOwnedGames`, `lib/steam.js`), Steam OpenID's `check_authentication` (`lib/auth.js`) and the IsThereAnyDeal API — documented.
-- **Untrusted**: everything else here — HLTB's search API, Steam's wishlist/store-search/store-browse/appdetails/appreviews/packagedetails/ajaxresolvebundles endpoints, ProtonDB, Fanatical's storefront feed. Undocumented, reached without a key (sometimes with spoofed browser headers), not guaranteed sanctioned by their terms, liable to break or be blocked without notice. Usage is low-volume and non-commercial; **don't scale up request volume without revisiting these notes.**
+- **Untrusted**: everything else here — HLTB's search API, Steam's wishlist/store-search/search-results/store-browse/appdetails/appreviews/packagedetails/ajaxresolvebundles endpoints, ProtonDB, Fanatical's storefront feed. Undocumented, reached without a key (sometimes with spoofed browser headers), not guaranteed sanctioned by their terms, liable to break or be blocked without notice. Usage is low-volume and non-commercial; **don't scale up request volume without revisiting these notes.**
 - **Other people use the live site** (steam.isonoe.net), so their Steam IDs and profiles pass through it: attribution and privacy are real requirements, not a local tool's.
 - **Circuit breakers** (`lib/circuitBreaker.js`) on the ones that answer a block with a 403 — Steam's store, HLTB's search, ProtonDB: 2 consecutive 403s leave that upstream alone for 5 minutes, including requests already queued when it trips.
 - **Pacing**: Steam's store takes 2 requests in flight, each slot pausing `STORE_MIN_INTERVAL_MS` before reuse; HLTB's search, ProtonDB and the store browse API take 3 each, pausing `UPSTREAM_MIN_INTERVAL_MS` — enough to keep pace with the store on a cold load. A store 429 pauses every store request for its `Retry-After`, uncapped (2 s, 4 s, then 8 s on successive 429s when it sends none); a request is retried at most twice before failing.
@@ -20,6 +20,7 @@ Every upstream this app talks to, and what is undocumented about each. Cache tie
 - [Achievements — keyed `ISteamUserStats`](#achievements--keyed-isteamuserstats)
 - [News — `GetNewsForApp`](#news--getnewsforapp)
 - [Looking up an arbitrary game](#looking-up-an-arbitrary-game)
+- [A developer's or publisher's games — store search results](#a-developers-or-publishers-games--store-search-results)
 - [IsThereAnyDeal](#isthereanydeal)
   - [Bundles](#bundles)
   - [Resolving bundle games to Steam](#resolving-bundle-games-to-steam)
@@ -105,6 +106,15 @@ Documented endpoints whose "no data" answers are error statuses, treated as answ
 - **No ownership check**: `GET /api/game-details/:appid` already serves wishlist games, so any appid works.
 - **Never trusts a client-supplied name**: the route resolves the name itself from `getAppDetails(appid)` and searches HLTB with it. A name from the dropdown only avoids a title flash in the panel and is never sent. Cost: HLTB waits for store metadata instead of starting in parallel — a deliberate trade on a public, key-less endpoint.
 - Links and the Recently Looked Up list: [frontend.md](frontend.md).
+
+## A developer's or publisher's games — store search results
+
+`searchCreatorGames` (`lib/steam.js`) wraps the store search page's own results feed: `store.steampowered.com/search/results/?{developer|publisher}=<name>&category1=998&infinite=1&count=100` — untrusted tier, no key, not disallowed by `robots.txt`. Nothing sanctioned covers it: `GetItems` only names a game's creators, `IStoreQueryService/Query` silently ignores an unknown filter (returning the whole catalog), ITAD has no creator lookup.
+
+- **Reply**: `{ total_count, start, results_html }`; no match is `total_count: 0, start: -1`. Appids come from each row's `data-ds-itemkey="App_<id>"` — `category1=998` still lets packages through (`Sub_<id>`, base game plus DLC appids), so those are skipped and `total` overcounts slightly.
+- **Exact, case-sensitive name**: "Supergiant" or "supergiant games" match nothing. The name `appdetails` gives works as-is (23 checked, including "FromSoftware, Inc.", "ZA/UM", "indie.io"). A publisher spelled differently across its games only matches the games with that spelling.
+- **One page, 100 games** in Steam's relevance order: a cold list then costs 1 search call plus ~2 `steam-store` calls per game for its details (~200, ~50 s at the store's pacing, ~4% of `OUTBOUND_HOURLY_MAX`), bounded per client by `STREAM_MAX_PER_IP`. Discovery lists are mostly cold, which is why the cap is one page.
+- Rows also carry `data-ds-crtrids` (creator clan ids, as `GetItems`' `creator_clan_account_id`): a name-independent key, unused.
 
 ## IsThereAnyDeal
 

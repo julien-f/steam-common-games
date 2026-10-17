@@ -249,8 +249,9 @@ import {
 import { CombineForm, sourceOptions, refKey, type SourceOption } from './CombineForm.tsx';
 import type { MembershipGroup } from './combine.ts';
 import { peekMyOwnershipStatus, peekMyPlaytime, trackMyOwnership } from './myOwnership.ts';
+import { creatorTitle, fetchCreatorGames, steamSearchUrl, type CreatorRole } from './creatorData.ts';
 
-type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user' | 'compare' | 'shared';
+type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user' | 'compare' | 'shared' | 'creator';
 
 // /game (bare) and /game/:appid both live here, kind 'recent' either way — see this file's own
 // header comment and AppRoot.tsx.
@@ -259,6 +260,7 @@ function kindFromPath(pathname: string, params: { bundleId?: string; listId?: st
   if (pathname === '/lists/wishlist') return 'wishlist';
   if (pathname === '/lists/compare') return 'compare';
   if (pathname === '/lists/shared') return 'shared';
+  if (pathname === '/lists/developer' || pathname === '/lists/publisher') return 'creator';
   if (params.bundleId) return 'bundle';
   if (pathname === '/game' || pathname.startsWith('/game/')) return 'recent';
   return 'user';
@@ -1118,6 +1120,12 @@ export default function ListRoute() {
   // A memo, so the load effect re-runs on a new formula only — not on Back dropping `?game=`
   // (overlayHistory.ts), which changes the rest of the query string.
   const sharedFormulaParam = createMemo(() => new URLSearchParams(routerLocation.search).get('f'));
+
+  // ── kind === 'creator' ────────────────────────────────────────────────────────────────────
+  // The name rides in ?name=, not the path: the SPA fallback 404s on a path like "indie.io".
+  const creatorRole = (): CreatorRole => (routerLocation.pathname === '/lists/publisher' ? 'publisher' : 'developer');
+  const creatorName = createMemo(() => (new URLSearchParams(routerLocation.search).get('name') ?? '').trim());
+  const [creatorResult, setCreatorResult] = createSignal<{ total: number; capped: boolean } | null>(null);
   const sharedGetList = (id: string): GameList | undefined => sharedSynthetic().get(id) ?? getList(id);
   function sharedFetchers(base: ListResolveFetchers): ListResolveFetchers {
     return { ...base, getList: sharedGetList };
@@ -1382,6 +1390,7 @@ export default function ListRoute() {
     if (kind === 'user') return `list-route:user:${params.listId}`;
     if (kind === 'compare') return `list-route:compare:${compareKey()}`;
     if (kind === 'shared') return `list-route:shared:${sharedFormulaParam() ?? ''}`;
+    if (kind === 'creator') return `list-route:creator:${creatorRole()}:${creatorName()}`;
     return `list-route:${kind}`;
   }
 
@@ -1856,7 +1865,12 @@ export default function ListRoute() {
   // own rows are trivially owned/wishlisted, the same reason OWNERSHIP_STATUS_COLUMN is only part
   // of BUNDLE_COLUMNS/RECENT_COLUMNS.
   const stampsOwnership =
-    kind === 'bundle' || kind === 'recent' || kind === 'user' || kind === 'compare' || kind === 'shared';
+    kind === 'bundle' ||
+    kind === 'recent' ||
+    kind === 'user' ||
+    kind === 'compare' ||
+    kind === 'shared' ||
+    kind === 'creator';
 
   // Re-stamps when a row appears after the load (openOrAddRecentGame), the sets land, or the account changes.
   createEffect(
@@ -1878,6 +1892,7 @@ export default function ListRoute() {
     if (kind === 'shared') return 'sharedListView';
     if (kind === 'bundle') return 'bundleListView';
     if (kind === 'recent') return 'recentListView';
+    if (kind === 'creator') return 'creatorListView';
     return 'ownedListView';
   }
   // A user list keeps its own view (GameList.tableView); every other kind shares one pref key per kind.
@@ -1918,7 +1933,7 @@ export default function ListRoute() {
   // Wishlist prices, by appid: the Wishlist itself, and a saved or shared list built from one or a bundle.
   function hasPrices(): boolean {
     const defined = definedList();
-    return kind === 'wishlist' || (!!defined && listHasPriceSource(defined.list, defined.get));
+    return kind === 'wishlist' || kind === 'creator' || (!!defined && listHasPriceSource(defined.list, defined.get));
   }
   // Mid-load, from the definition alone: a region change then must still reload the Tier Price.
   function showsTierPrice(): boolean {
@@ -2274,6 +2289,26 @@ export default function ListRoute() {
         loading: true,
         details: null,
       }));
+    } else if (kind === 'creator') {
+      const name = creatorName();
+      setCreatorResult(null);
+      setListTitle(creatorTitle(creatorRole(), name));
+      if (!name) {
+        setStatusText('This link names no developer or publisher.');
+        return;
+      }
+      setStatusText(`Searching Steam for games by ${name}…`);
+      try {
+        const data = await fetchCreatorGames(creatorRole(), name, { refresh });
+        if (loadGuard.isStale(gen)) return;
+        noteFetchedAt(data.fetchedAt);
+        setCreatorResult({ total: data.total, capped: data.capped });
+        initialRows = data.appids.map((appid) => ({ appid, name: '', loading: true, details: null }));
+      } catch (err) {
+        if (loadGuard.isStale(gen)) return;
+        setStatusText(`Steam's store search didn't answer (${(err as Error).message}). Click Updated to retry.`);
+        return;
+      }
     } else if (kind === 'bundle') {
       setStatusText('Resolving games to Steam…');
       try {
@@ -2416,7 +2451,7 @@ export default function ListRoute() {
       };
       setTasteFitSource(tasteSource);
       const priced = kind === 'user' && pricesShown;
-      const sharedPriced = kind === 'shared' && pricesShown;
+      const sharedPriced = (kind === 'shared' || kind === 'creator') && pricesShown;
       const columns = insertColumnsAfter(
         isRanked
           ? priced
@@ -2446,7 +2481,7 @@ export default function ListRoute() {
                           comparePlayers.map((p) => p.label),
                         ),
                       )
-                    : kind === 'shared'
+                    : kind === 'shared' || kind === 'creator'
                       ? sharedPriced
                         ? tiered
                           ? SHARED_TIERED_COLUMNS
@@ -2477,7 +2512,9 @@ export default function ListRoute() {
                   ? [...RECENT_DEFAULT_VISIBLE, ...comparePlayers.map((_, i) => playedByKey(i)), GROUP_FIT_KEY]
                   : kind === 'user' || kind === 'shared'
                     ? RECENT_DEFAULT_VISIBLE
-                    : OWNED_DEFAULT_VISIBLE;
+                    : kind === 'creator'
+                      ? [...RECENT_DEFAULT_VISIBLE, TASTE_FIT_KEY]
+                      : OWNED_DEFAULT_VISIBLE;
       const sort = isRanked
         ? RANKED_DEFAULT_SORT
         : kind === 'bundle'
@@ -2615,7 +2652,9 @@ export default function ListRoute() {
           ? `${whose} wishlist is empty, or private on Steam.`
           : kind === 'owned'
             ? `${whose} library is empty, or private on Steam.`
-            : 'No games in this list.',
+            : kind === 'creator'
+              ? `Steam's store has no games under the exact ${creatorRole()} name "${creatorName()}".`
+              : 'No games in this list.',
       );
       return;
     }
@@ -2880,6 +2919,7 @@ export default function ListRoute() {
       refreshing() ||
       kind === 'owned' ||
       kind === 'wishlist' ||
+      kind === 'creator' ||
       (!!list && listHasAccountSource(list, sharedGetList))
     ) {
       tiles.push({
@@ -2888,7 +2928,9 @@ export default function ListRoute() {
         title:
           kind === 'owned' || kind === 'wishlist'
             ? "How old the server's cached copy of this account's list is — click to force a fresh fetch"
-            : 'How old the oldest library this list was built from is — click to re-fetch them all',
+            : kind === 'creator'
+              ? "How old the server's copy of Steam's search is — click to search again"
+              : 'How old the oldest library this list was built from is — click to re-fetch them all',
         // This tile *is* the ↻ Refresh the actions row used to carry: the staleness is stated
         // here, so this is where the reader already is when they decide to do something about it.
         // Prices keep their own age and refresh (a different fetch) on the Prices tile's own
@@ -3028,7 +3070,35 @@ export default function ListRoute() {
     const list = combineList();
     if (list?.kind === 'dynamic' || list?.kind === 'ranked') return formulaNote(list);
     if (kind === 'owned') return playsMostlyNote();
+    if (kind === 'creator') return creatorNote();
     return undefined;
+  }
+
+  function creatorNote(): JSX.Element | undefined {
+    const result = creatorResult();
+    if (!result) return undefined;
+    const name = creatorName();
+    if (!result.total) {
+      return (
+        <a href={steamSearchUrl({ term: name })} target="_blank" rel="noopener">
+          Search the Steam store for "{name}" ↗
+        </a>
+      );
+    }
+    const all = (
+      <a href={steamSearchUrl({ [creatorRole()]: name })} target="_blank" rel="noopener">
+        All on Steam ↗
+      </a>
+    );
+    return result.capped ? (
+      <>
+        Steam's {rowsStore.length} most relevant of about {result.total} — sorting ranks only these. {all}
+      </>
+    ) : (
+      <>
+        Every game on Steam whose {creatorRole()} is exactly "{name}". {all}
+      </>
+    );
   }
 
   // Once every row's details are in, like Plays mostly.
@@ -3357,6 +3427,7 @@ export default function ListRoute() {
     // from one shared link to another (no param change, since /lists/shared has none) has to be
     // read here too, or this component instance would just keep showing the first one.
     if (kind === 'shared') sharedFormulaParam();
+    if (kind === 'creator') creatorName();
     // Untracked: the reads above are the whole dependency list. load()'s fast path reads the open
     // game, so opening another one re-ran it against the not-yet-updated `params.appid`, reopening
     // the game being left.

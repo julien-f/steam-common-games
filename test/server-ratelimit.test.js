@@ -129,6 +129,27 @@ test('game search limiter: counts cache misses but never counts cache hits', asy
   assert.deepEqual(cached.body.results, [{ appid: 900, name: 'Pre-cached', tinyImage: null }]);
 });
 
+// Same rule for the creator-games limiter; its cache key keeps the name's case.
+test('creator games limiter: counts cache misses but never counts cache hits', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ total_count: 1, start: 0, results_html: '<a data-ds-itemkey="App_10">' }),
+  }));
+  setCache('creator:developer:Cached', { appids: [900], total: 1, capped: false });
+
+  for (const name of ['One', 'Two']) {
+    const res = await api.get(`/api/creator-games?role=developer&name=${name}`);
+    assert.equal(res.status, 200, `miss "${name}" should succeed within budget`);
+  }
+  const caseVariant = await api.get('/api/creator-games?role=developer&name=cached');
+  assert.equal(caseVariant.status, 429, 'another case is another name, so a miss');
+
+  const cached = await api.get('/api/creator-games?role=developer&name=Cached');
+  assert.equal(cached.status, 200, 'a cache hit must bypass the limiter');
+  assert.deepEqual(cached.body.appids, [900]);
+});
+
 // Regression test for the bug reported live: switching between a handful of already-loaded
 // accounts used to burn the whole per-minute search budget, since searchLimit's original skip()
 // was just rateLimitBypassed() — every request counted, cache hit or not (unlike every other

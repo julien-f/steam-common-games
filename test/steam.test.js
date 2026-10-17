@@ -22,6 +22,7 @@ const {
   resolveSteamPackageAppids,
   resolveSteamBundleAppids,
   searchStoreGames,
+  searchCreatorGames,
   getProtonDbStatus,
   getGameSchema,
   getPlayerAchievements,
@@ -31,6 +32,8 @@ const {
 const { getSemaphoreStats, createSemaphore } = require('../lib/upstream');
 const { _reset, setCache } = require('../lib/cache');
 const { getCircuitBreakers, _resetCircuitBreakers } = require('../lib/circuitBreaker');
+const { db } = require('../lib/db');
+const { MISS_CACHE_TTL_MS } = require('../lib/config');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
   return {
@@ -1566,6 +1569,96 @@ test('searchStoreGames: throws isUpstream when fetch fails', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
   await assert.rejects(
     () => searchStoreGames('portal'),
+    (err) => err.isUpstream === true,
+  );
+});
+
+// ── searchCreatorGames ────────────────────────────────────────────────────────
+
+const creatorRow = (key, appids = key.slice(4)) => `<a href="x" data-ds-appid="${appids}" data-ds-itemkey="${key}">`;
+
+test('searchCreatorGames: keeps App_ rows only, deduped, and asks for one page of games by exact name', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({
+      total_count: 4,
+      start: 0,
+      results_html: [
+        creatorRow('App_10'),
+        creatorRow('Sub_77', '10,11'),
+        creatorRow('App_12'),
+        creatorRow('App_10'),
+      ].join('\n'),
+    }),
+  }));
+  assert.deepEqual(await searchCreatorGames('publisher', 'Foo, Inc.'), { appids: [10, 12], total: 4, capped: false });
+  const url = new URL(fetchMock.mock.calls[0].arguments[0]);
+  assert.equal(url.pathname, '/search/results/');
+  assert.equal(url.searchParams.get('publisher'), 'Foo, Inc.');
+  assert.equal(url.searchParams.get('category1'), '998');
+  assert.equal(url.searchParams.get('count'), '100');
+});
+
+test('searchCreatorGames: capped once Steam has more than one page', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ total_count: 101, start: 0, results_html: creatorRow('App_10') }),
+  }));
+  assert.equal((await searchCreatorGames('developer', 'Foo')).capped, true);
+});
+
+test('searchCreatorGames: cache key keeps the case, as Steam matches it', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ total_count: 1, start: 0, results_html: creatorRow('App_10') }),
+  }));
+  await searchCreatorGames('developer', 'Foo');
+  await searchCreatorGames('developer', 'Foo');
+  await searchCreatorGames('developer', 'FOO');
+  assert.equal(fetchMock.mock.callCount(), 2);
+});
+
+test('searchCreatorGames: force bypasses the cache', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ total_count: 1, start: 0, results_html: creatorRow('App_10') }),
+  }));
+  await searchCreatorGames('developer', 'Foo');
+  await searchCreatorGames('developer', 'Foo', { force: true });
+  assert.equal(fetchMock.mock.callCount(), 2);
+});
+
+test('searchCreatorGames: no match is an empty list on the short miss expiry', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ total_count: 0, start: -1, results_html: '' }),
+  }));
+  assert.deepEqual(await searchCreatorGames('developer', 'Nobody'), { appids: [], total: 0, capped: false });
+  const { expires } = db.prepare('SELECT expires FROM cache_search WHERE key = ?').get('creator:developer:Nobody');
+  assert.ok(expires - Date.now() <= MISS_CACHE_TTL_MS);
+});
+
+test('searchCreatorGames: an unexpected reply shape throws isUpstream and caches nothing', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({ success: 1 }) }));
+  await assert.rejects(
+    () => searchCreatorGames('developer', 'Foo'),
+    (err) => err.isUpstream === true,
+  );
+  await assert.rejects(() => searchCreatorGames('developer', 'Foo'));
+  assert.equal(fetchMock.mock.callCount(), 2);
+});
+
+test('searchCreatorGames: throws isUpstream when fetch fails', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+  await assert.rejects(
+    () => searchCreatorGames('developer', 'Foo'),
     (err) => err.isUpstream === true,
   );
 });
