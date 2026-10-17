@@ -15,7 +15,7 @@ Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-
 
 ## Simplify
 
-None open.
+- **C173 · minor · M** — `public/ListRoute.tsx`'s column, default-visible and sort choices are three nested ternary chains over 8 list kinds (`columns`, `defaultVisible`, `sort` in `load()`); each new kind adds a level to all three. A per-kind lookup table would state each kind's set once.
 
 ## Correctness
 
