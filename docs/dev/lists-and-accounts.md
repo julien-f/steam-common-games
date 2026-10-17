@@ -48,7 +48,7 @@ A list is a set of appids, usually named — a dynamic one may have no name of i
 
 ### Kinds
 
-- **System lists** (never stored, always live-derived): _Owned_ and _Wishlist_ for `currentAccount`; one per browsed _Bundle_; **Recently Looked Up** (`/game`, `recentGames.ts`) — global local search history, not account-scoped, linked from Home beside Owned/Wishlist/Bundles and usable as a combine source (`ListRef.kind: 'recent-games'`).
+- **System lists** (never stored, always live-derived): _Owned_ and _Wishlist_ for `currentAccount`; one per browsed _Bundle_; one per developer or publisher (`/lists/developer?name=`, `/lists/publisher?name=`; not a `ListRef` kind, so not a combine source); **Recently Looked Up** (`/game`, `recentGames.ts`) — global local search history, not account-scoped, linked from Home beside Owned/Wishlist/Bundles and usable as a combine source (`ListRef.kind: 'recent-games'`).
 - **User lists** (stored, full CRUD):
   - **`manual`** — a stored `appids[]`; games are added from a table's row selection ("Add to list", including a new list) and removed per row or in bulk.
   - **`dynamic`** — a formula (`op` + `sources: ListRef[]`) recomputed on every open. Its hero states the formula: each source named (`listLabels.ts`'s `describeListRef`), linked, with what it contributed (`Alice — Owned 343 ∪ Alice — Wishlist 115 = 457`, from `resolveListWithSources`), a dangling source flagged in place. Its Updated tile states the oldest account fetch behind it and re-resolves them all (`createDefaultFetchers`' `refresh`/`onFetchedAt` — on the real wiring, not the injectable `ListResolveFetchers` seam the resolver's tests use). "Edit sources" reopens the combine form pre-filled and saves in place.
@@ -122,7 +122,7 @@ Signing in (the account chip's popover, `AccountChip.tsx`) is optional; without 
   - **Every later sync**: per-key last-write-wins both ways; a key on one side propagates; a tie is left alone.
   - Adopting anything from the server reloads the page, since every store seeds its state from `localStorage` once at load.
 - **Signing in fills `myAccount`/`currentAccount` when unset** (`autoPopulateAccountFromLogin`), via the same `resolveAccountSlot` as Home's picker; an existing pick is never overwritten, and a failed resolve retries on the next load.
-- **Table-view keys are never auto-synced** (`public/tableViewKeys.ts`: `ownedListView`, `wishlistListView`, `bundleListView`, `recentListView`, `compareListView`, `sharedListView`, `bundlesBrowseView`). Editing a table stays local until the user saves it:
+- **Table-view keys are never auto-synced** (`public/tableViewKeys.ts`: `ownedListView`, `wishlistListView`, `bundleListView`, `recentListView`, `compareListView`, `sharedListView`, `creatorListView`, `bundlesBrowseView`). Editing a table stays local until the user saves it:
   - `public/tableViewSync.ts` keeps an in-memory `baseline` per key — the server's value as of the last `syncPrefsWithServer`.
   - `ListRoute.tsx`/`BundlesBrowseRoute.tsx` compare the live table against it; when they differ, an "Unsaved changes to this view (Sort, Filters) — Save / Revert" banner replaces Share/Reset view, naming the changed parts (`summarizeViewDiff`).
   - `page`/`searchQuery` are never part of it: `stripTransientViewFields` strips them from the diff, from Save and from Revert.
@@ -150,7 +150,7 @@ ListRef      kind 'account-owned' | 'account-wishlist' | 'bundle' | 'recent-game
              accountId? (pinned explicitly, never "whichever is current") · bundleId? · listId?
 ```
 
-Pref keys: `schemaVersion`, `myAccount`, `currentAccount`, `recentAccounts`, `region`, `lists`, `folders`, `recentGames`, `ranking:<listId>`, `bundleSnapshots`, the table-view keys above (each shared across all bundles/comparisons/shared links; a user list keeps its own `tableView`), with `bundlesBrowseView` for `/bundles`' table of bundles.
+Pref keys: `schemaVersion`, `myAccount`, `currentAccount`, `recentAccounts`, `region`, `lists`, `folders`, `recentGames`, `ranking:<listId>`, `bundleSnapshots`, the table-view keys above (each shared across all bundles/comparisons/shared links/developer and publisher lists; a user list keeps its own `tableView`), with `bundlesBrowseView` for `/bundles`' table of bundles.
 
 Outside the blob: `steam.isonoe.net:taste:<accountId>` (`tagTaste.ts`'s `Taste`: play profile, the library's tag rarities and each owned game's top 10 tags — ~325 KB for 1,000 games), rewritten each time that account's Owned list finishes loading and read by every list's Taste fit and the panel's similar owned games. A device-local cache: never synced, and kept out of the blob that every pref read parses.
 

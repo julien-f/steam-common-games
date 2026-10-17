@@ -13,6 +13,8 @@
 //   resolve-failed the Co-op Pack's Portal 2 fails to resolve to Steam (its package lookup errored)
 //   slow-media     every banner, screenshot and trailer poster takes 1.5 s to load (Hades, Terraria and Hollow Knight have media)
 //   signed-in      signed in with Steam as Alice, whose account already has prefs (fixtures.ts's signedInPrefs)
+//   creator-capped a developer's/publisher's list is Steam's first page of 523 games
+//   tagless        no game has Steam tags
 import type { Page } from '@playwright/test';
 import { PLAYERS, CATALOG, BUNDLE, PICK_BUNDLE, SIGNED_IN, signedInPrefs, game, type Player } from './fixtures.ts';
 import { flattenBundleGames, type Bundle } from '../public/bundleData.ts';
@@ -87,6 +89,17 @@ const media = (appid: number, slow: boolean) => {
   };
 };
 
+// Developers and publishers, as appdetails names them; one ends in ".io" and one holds a "/", which
+// a path segment couldn't carry. The rest are Test Studio / Test Publisher.
+const CREATORS: Record<number, { developers: string[]; publishers: string[] }> = {
+  [MEDIA_APPID]: { developers: ['Supergiant Games'], publishers: ['Supergiant Games'] },
+  105600: { developers: ['Re-Logic'], publishers: ['indie.io'] },
+  367520: { developers: ['Team Cherry', 'Supergiant Games'], publishers: ['Feral Interactive (Mac/Linux)'] },
+  1426210: { developers: ['Hazelight Studios'], publishers: ['indie.io'] },
+  728880: { developers: ['Ghost Town Games'], publishers: ['indie.io'] },
+};
+const creators = (appid: number) => CREATORS[appid] ?? { developers: ['Test Studio'], publishers: ['Test Publisher'] };
+
 // Out of rating order, so sorting by Tag match visibly reorders a co-op filter.
 const COOP_WEIGHT: Record<number, number> = { 620: 0.3, 105600: 0.9, 413150: 0.6, 892970: 1 };
 
@@ -108,8 +121,7 @@ function details(appid: number, slowMedia = false) {
       type: 'game',
       genres: g.genres,
       categories: g.categories,
-      developers: ['Test Studio'],
-      publishers: ['Test Publisher'],
+      ...creators(appid),
       description: `${g.name}, a fixture game.`,
       releaseDate: g.release,
       comingSoon: false,
@@ -258,7 +270,9 @@ export function respond(
         }
       : states.has('store-down')
         ? { ...details(appid, slowMedia), meta: null, failed: ['meta'] }
-        : details(appid, slowMedia);
+        : states.has('tagless')
+          ? { ...details(appid, slowMedia), tags: [], tagWeights: {} }
+          : details(appid, slowMedia);
   const mediaPath = path.match(/^\/api\/mock-media\/(.+)\.svg$/);
   if (mediaPath)
     return {
@@ -336,6 +350,15 @@ export function respond(
       tinyImage: '',
     }));
     return json({ results });
+  }
+
+  if (path === '/api/creator-games') {
+    if (states.has('store-down')) return json({ error: 'Steam store search error 500 (mock: store-down)' }, 502);
+    const role = url.searchParams.get('role') as 'developer' | 'publisher';
+    const name = url.searchParams.get('name');
+    const appids = CATALOG.filter((g) => creators(g.appid)[`${role}s`].includes(name!)).map((g) => g.appid);
+    const capped = states.has('creator-capped');
+    return json({ appids, total: capped ? 523 : appids.length, capped, fetchedAt: NOW });
   }
 
   const bundleGames = [...BUNDLE.games, ...PICK_BUNDLE.games];

@@ -2262,6 +2262,22 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   color: var(--text1);
   font-size: var(--fs-label);
 }
+.panel-similar-more {
+  margin-bottom: 6px;
+  line-height: 24px;
+}
+.panel-similar-more a,
+.panel-similar-more-current {
+  display: inline-block;
+  min-height: 24px;
+}
+.panel-similar-more a {
+  color: var(--accent2);
+}
+.panel-similar-role {
+  color: var(--text1);
+  font-size: var(--fs-label);
+}
 .panel-tag-weight {
   position: absolute;
   left: 0;

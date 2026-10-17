@@ -52,11 +52,12 @@ import { PRICES_UNAVAILABLE } from './priceLoading.ts';
 import { TIER_RANGE_TITLE } from './bundleData.ts';
 import { withAccountParam, urlWithoutPanel } from './urlState.ts';
 import { copyWithFeedback } from './clipboard.ts';
-import type { DetailsAges, PriceFields, ReadonlyGame } from './types.ts';
+import type { DetailsAges, GameMeta, PriceFields, ReadonlyGame } from './types.ts';
 
 import { createSignal, createEffect, createMemo, createResource, createRoot, For, Show, type JSX } from 'solid-js';
 import { render } from 'solid-js/web';
-import { A } from '@solidjs/router';
+import { A, useLocation } from '@solidjs/router';
+import { creatorListPath, type CreatorRole } from './creatorData.ts';
 
 // A pick-and-mix bundle has no tier price; its best quantity rate stands in, as on its own page.
 function bundleTierText(b: GameBundle): string {
@@ -2059,18 +2060,73 @@ const SIMILAR_SHOWN = 5;
 
 const steamMoreLikeUrl = (appid: number): string => `https://store.steampowered.com/recommended/morelike/app/${appid}/`;
 
+// Each name once with every role it has here; a developer that also publishes opens as developer.
+function gameCreators(meta: GameMeta | null | undefined): { name: string; role: CreatorRole; label: string }[] {
+  const devs = meta?.developers ?? [];
+  const pubs = meta?.publishers ?? [];
+  return [
+    ...devs.map((name) => ({
+      name,
+      role: 'developer' as const,
+      label: pubs.includes(name) ? 'developer & publisher' : 'developer',
+    })),
+    ...pubs
+      .filter((name) => !devs.includes(name))
+      .map((name) => ({ name, role: 'publisher' as const, label: 'publisher' })),
+  ];
+}
+
+function MoreFrom(props: { game: ReadonlyGame }): JSX.Element {
+  const location = useLocation();
+  const creators = createMemo(() => gameCreators(props.game.details?.meta));
+  const isOpen = (role: CreatorRole, name: string) =>
+    location.pathname === `/lists/${role}` && new URLSearchParams(location.search).get('name')?.trim() === name;
+  return (
+    <Show when={creators().length}>
+      <div class="panel-similar-more">
+        More from:{' '}
+        <For each={creators()}>
+          {(c, i) => (
+            <>
+              {i() > 0 && ' · '}
+              <Show
+                when={!isOpen(c.role, c.name)}
+                fallback={
+                  <span class="panel-similar-more-current" aria-current="page">
+                    {c.name}
+                  </span>
+                }
+              >
+                <a
+                  href={withAccountParam(`${creatorListPath(c.role, c.name)}&game=${props.game.appid}`)}
+                  aria-label={`All games by ${c.name} (${c.label})`}
+                >
+                  {c.name}
+                </a>
+              </Show>{' '}
+              <span class="panel-similar-role">({c.label})</span>
+            </>
+          )}
+        </For>
+      </div>
+    </Show>
+  );
+}
+
 // The account's owned games closest by tags, from Owned's device cache; Steam's page covers the whole store.
 function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
   const account = () => getEffectiveCurrentAccount();
   // On Owned, a row's closest owned games are the list's own Sort list by similarity.
   const shown = () => account() && !(panelOptions.isOwnedList() && !props.game.standalone);
+  const hasTags = () => !!props.game.details?.tags?.length;
   // Per game opened, so a library Owned cached meanwhile shows up.
   const library = createMemo(() => {
     const taste = shown() ? loadTaste(account()!.id) : null;
     return { taste, similar: taste && similarInLibrary(taste, props.game, SIMILAR_SHOWN) };
   });
   return (
-    <Show when={!props.game.loading && props.game.details?.tags?.length}>
+    // A tagless game still gets its More from line.
+    <Show when={!props.game.loading && (hasTags() || gameCreators(props.game.details?.meta).length)}>
       <div class="panel-section panel-card" id="panel-section-similar">
         <div class="panel-section-title">
           {shown() ? `Similar in ${accountDisplayLabel(account()!)}'s library` : 'Similar games'}{' '}
@@ -2078,7 +2134,8 @@ function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
             More like this on Steam ↗
           </a>
         </div>
-        <Show when={shown()}>
+        <MoreFrom game={props.game} />
+        <Show when={shown() && hasTags()}>
           <Show
             when={library().similar?.length}
             fallback={
@@ -2109,7 +2166,7 @@ function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
           </Show>
         </Show>
         {/* A standalone lookup isn't a row, so the list has nothing to rank against it. */}
-        <Show when={panelOptions.hasList() && !props.game.standalone}>
+        <Show when={panelOptions.hasList() && !props.game.standalone && hasTags()}>
           <button
             class="panel-similar-sort"
             onClick={() =>

@@ -1,4 +1,4 @@
-// The shared table-view pref keys — ListRoute.tsx's viewPrefKey (the first five) plus
+// The shared table-view pref keys — ListRoute.tsx's viewPrefKey (all but the last) plus
 // BundlesBrowseRoute.tsx's own VIEW_PREF_KEY (the /bundles picker's table, distinct from
 // 'bundleListView'/a bundle's own detail table). Its own tiny module, with no dependencies, so
 // both prefs.ts and tableViewSync.ts can import it without a runtime import cycle between them
@@ -11,5 +11,6 @@ export const TABLE_VIEW_PREF_KEYS: readonly string[] = [
   'recentListView',
   'compareListView',
   'sharedListView',
+  'creatorListView',
   'bundlesBrowseView',
 ];

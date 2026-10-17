@@ -22,6 +22,7 @@ test('TABLE_VIEW_PREF_KEYS: covers every shared table-view pref key', () => {
     'bundleListView',
     'bundlesBrowseView',
     'compareListView',
+    'creatorListView',
     'ownedListView',
     'recentListView',
     'sharedListView',

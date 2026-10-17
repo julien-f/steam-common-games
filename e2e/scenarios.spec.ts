@@ -3600,3 +3600,92 @@ test('Y1 edge: signing out switches the account menu back to signing in', async 
   await expect(page.getByRole('link', { name: 'Sign in with Steam' })).toBeVisible();
   await expect(page.getByText('Signed in — your accounts/lists/settings sync')).toHaveCount(0);
 });
+
+const moreFrom = (page: Page) => page.locator('#panel-section-similar .panel-similar-more');
+
+test("F4.1-2,5: a game's publisher lists its games, the open game's panel kept, and Back returns", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Terraria').getByText('Terraria').click();
+  await moreFrom(page).getByRole('link', { name: 'All games by indie.io (publisher)' }).click();
+
+  await expect(page).toHaveURL(
+    (url) => url.pathname === '/lists/publisher' && url.searchParams.get('name') === 'indie.io',
+  );
+  await expect(page.locator('.list-hero-title')).toHaveText('Published by indie.io');
+  await expect(page.locator('.list-hero')).toContainText('Every game on Steam whose publisher is exactly "indie.io"');
+  await expect(rows(page)).toHaveCount(3);
+  await expect(page.locator('#panel-title')).toHaveText('Terraria');
+  // The list on screen is named, not linked.
+  await expect(moreFrom(page).locator('[aria-current="page"]')).toHaveText('indie.io');
+
+  // The panel is its own history entry, as on every list: Back closes it, then leaves.
+  await page.goBack();
+  await expect(page.locator('#panel-title')).toBeHidden();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/lists\/owned/);
+});
+
+test('F4 edge: a developer that also publishes is one link, and one developer leads to another', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/game/1145360');
+  await expect(moreFrom(page)).toContainText('Supergiant Games (developer & publisher)');
+  await expect(moreFrom(page).getByRole('link')).toHaveCount(1);
+  await moreFrom(page)
+    .getByRole('link', { name: /Supergiant Games/ })
+    .click();
+  await expect(page.locator('.list-hero-title')).toHaveText('Games by Supergiant Games');
+  await expect(rows(page)).toHaveCount(2);
+
+  await page.goto('/lists/developer?name=Supergiant%20Games&game=367520');
+  await expect(page.locator('#panel-title')).toHaveText('Hollow Knight');
+  await moreFrom(page).getByRole('link', { name: 'All games by Team Cherry (developer)' }).click();
+  await expect(page.locator('.list-hero-title')).toHaveText('Games by Team Cherry');
+  await expect(rows(page)).toHaveCount(1);
+});
+
+test('S3 edge: a publisher\'s list link opens in a fresh browser, "/" in its name included', async ({ page }) => {
+  await page.goto(`/lists/publisher?name=${encodeURIComponent('Feral Interactive (Mac/Linux)')}`);
+  await expect(page.locator('.list-hero-title')).toHaveText('Published by Feral Interactive (Mac/Linux)');
+  await expect(rows(page)).toHaveCount(1);
+});
+
+test("F4 edge: no game under that exact name says so and links Steam's own search", async ({ page }) => {
+  await page.goto('/lists/developer?name=Nobody');
+  await expect(page.locator('.list-empty')).toHaveText(
+    'Steam\'s store has no games under the exact developer name "Nobody".',
+  );
+  await expect(page.getByRole('link', { name: 'Search the Steam store for "Nobody" ↗' })).toHaveAttribute(
+    'href',
+    'https://store.steampowered.com/search/?term=Nobody',
+  );
+});
+
+test("F4 edge: Steam's store search down says so rather than no games, and Updated retries", async ({ page }) => {
+  await mockApi(page, { states: ['store-down'] });
+  await page.goto('/lists/developer?name=Re-Logic');
+  await expect(page.locator('.list-status')).toContainText("Steam's store search didn't answer");
+  await expect(page.locator('.list-empty')).toHaveCount(0);
+  await mockApi(page);
+  await page.locator('.list-stat', { hasText: 'Updated' }).click();
+  await expect(rows(page)).toHaveCount(1);
+});
+
+test("F4 edge: past Steam's first page, the list says only those are ranked", async ({ page }) => {
+  await mockApi(page, { states: ['creator-capped'] });
+  await page.goto('/lists/publisher?name=indie.io');
+  await expect(rows(page)).toHaveCount(3);
+  await expect(page.locator('.list-hero')).toContainText("Steam's 3 most relevant of about 523");
+  await expect(page.getByRole('link', { name: 'All on Steam ↗' })).toHaveAttribute(
+    'href',
+    'https://store.steampowered.com/search/?publisher=indie.io',
+  );
+});
+
+test('F4 edge: a game with no Steam tags still offers More from', async ({ page }) => {
+  await mockApi(page, { states: ['tagless'] });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=105600');
+  await expect(moreFrom(page).getByRole('link', { name: 'All games by Re-Logic (developer)' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '⇅ Sort list by similarity' })).toHaveCount(0);
+});

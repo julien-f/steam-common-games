@@ -109,6 +109,12 @@ Clicking any row opens a detail panel beside the table — not over it, so the l
 
 **Similar in Alice's library** shows the 5 games the current account owns closest to this one by Steam tags (tags nearly every game in the library carries count less), each opening its own panel; ← Back returns. It needs that account's Owned list opened once on this device (the section links it), and isn't shown on Owned's own rows. **⇅ Sort list by similarity** ranks the whole open list against that game (a **Similarity** column, first sort) until you stop it or reload. **More like this on Steam ↗** searches the whole store instead.
 
+**More from** names the game's developers and publishers; each opens a list of their games on Steam — **Games by …** or **Published by …** — with ownership, prices and Taste fit, the panel staying on the game you came from.
+
+- Steam matches the exact name the store gives, so a publisher spelled differently on some of its games only lists the ones spelled this way.
+- Past Steam's first page of results, the list holds only that page's games and says so, linking **All on Steam ↗**.
+- Its **Updated** tile searches Steam again.
+
 Clicking a screenshot or trailer (or **Enter** on it) opens it full-window:
 
 - **← / →** step through the game's media (while a video plays they seek 5 s; **Shift** keeps them stepping), **↑ / ↓** move to the previous or next game in the list.
@@ -125,6 +131,7 @@ Clicking a screenshot or trailer (or **Enter** on it) opens it full-window:
 ## Sharing
 
 - A game's own link (`/game/<appid>`) opens that game for anyone, whether or not they own it.
+- A developer's or publisher's list link opens the same list for anyone.
 - Links pasted in a chat (WhatsApp, Slack, Discord, iMessage…) show a preview card; a `/game/…` link's card names the game and shows its header image once the app has looked that game up, other links get the site's card.
 - Add `?u=` to any list link to share the account you're exploring. It never changes the recipient's own default account, and a game link deliberately doesn't carry it.
 - A comparison's link names its players the same way, one `?u=` each — including links made by older versions of this app, which still work.

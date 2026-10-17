@@ -284,6 +284,18 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Done when**: HLTB and rating fill in without a reload; the random pick draws only from the filtered rows and works on a phone; the filter survives a reload (L3).
 - **Edges**: games with no HLTB entry (where do they sort?); a Family account (whose playtime counts?).
 
+### F4 What else did this studio make?
+
+- **Who / goal**: I liked a game; see what else its developer made or its publisher put out, and which of those I don't own.
+- **Steps**:
+  1. open a game's panel
+  2. **More from** → its developer (or publisher)
+  3. sort by rating, filter to games I don't own
+  4. open one in the panel
+  5. Back to where I came from
+- **Done when**: the list is named for the developer or publisher ("Games by X", "Published by X"); ownership and Taste fit show; the panel opens in place; Back returns.
+- **Edges**: no game under that exact name; more than Steam's first page (only those are ranked); Steam's store search down; a game with no Steam tags; developer = publisher; a name ending in `.io` or holding a `/`; opened from `/game/:appid`; going from one developer's list to another's; phone width; keyboard only.
+
 ## Sharing
 
 ### S1 Send a friend a view
@@ -313,7 +325,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   3. reload
   4. go Home
 - **Done when**: the page works with no local state; their changes are theirs and the link's layout is only the starting point; Home offers no ★ account until they pick one.
-- **Edges**: a `/lists/<id>` link to a list that exists only in the sender's browser (what does the dead link say?); reload with `?game=` on a route that doesn't restore it (frontend.md, Known gaps).
+- **Edges**: a `/lists/<id>` link to a list that exists only in the sender's browser (what does the dead link say?); reload with `?game=` on a route that doesn't restore it (frontend.md, Known gaps); a developer's or publisher's list, which needs nothing local.
 
 ## Sync
 
