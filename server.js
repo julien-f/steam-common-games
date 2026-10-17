@@ -28,6 +28,7 @@ const {
   getSteamTags,
   getGameDemo,
   searchStoreGames,
+  searchCreatorGames,
   getProtonDbStatus,
   getGameSchema,
   getPlayerAchievements,
@@ -373,6 +374,26 @@ const gameSearchLimit = namedRateLimit('gameSearch', {
     const term = normalizeSearchTerm(req.query.q);
     if (term.length < 2) return true; // no upstream call happens below this length
     return isCached(`search:${term}`);
+  },
+});
+
+// Shared by /api/creator-games and its limiter; case kept, since Steam matches the name exactly.
+const CREATOR_ROLES = new Set(['developer', 'publisher']);
+const parseCreatorQuery = (req) => ({
+  role: CREATOR_ROLES.has(req.query.role) ? req.query.role : null,
+  name: String(req.query.name || '')
+    .trim()
+    .slice(0, 200),
+});
+
+const creatorGamesLimit = namedRateLimit('creatorGames', {
+  max: GAME_SEARCH_RATE_LIMIT_MAX,
+  message: { error: 'Too many searches. Please wait a minute and try again.' },
+  skip: (req) => {
+    const { role, name } = parseCreatorQuery(req);
+    if (!role || !name) return true; // rejected below without an upstream call
+    if (isForceRefresh(req)) return false;
+    return isCached(`creator:${role}:${name}`);
   },
 });
 
@@ -753,6 +774,19 @@ app.get('/api/search-games', gameSearchLimit, async (req, res) => {
     res.json({ results });
   } catch (err) {
     sendRouteError(res, 'search-games', err);
+  }
+});
+
+// A developer's or publisher's games, by exact name — see lib/steam.js's searchCreatorGames.
+app.get('/api/creator-games', creatorGamesLimit, async (req, res) => {
+  const { role, name } = parseCreatorQuery(req);
+  if (!role) return res.status(400).json({ error: 'role must be developer or publisher' });
+  if (!name) return res.status(400).json({ error: 'Missing name' });
+  try {
+    const { appids, total, capped } = await searchCreatorGames(role, name, { force: isForceRefresh(req) });
+    res.json({ appids, total, capped, fetchedAt: getCachedAt(`creator:${role}:${name}`) ?? null });
+  } catch (err) {
+    sendRouteError(res, 'creator-games', err);
   }
 });
 

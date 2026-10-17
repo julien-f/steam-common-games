@@ -1463,6 +1463,47 @@ test('POST /api/game-details/stream: does not log [game-details] for rating/meta
 
 // ── GET /api/search-games ─────────────────────────────────────────────────────
 
+// ── GET /api/creator-games ────────────────────────────────────────────────────
+
+test('GET /api/creator-games: 400 (no fetch) on a bad role or an empty name', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => {
+    throw new Error('should not fetch');
+  });
+  assert.equal((await api.get('/api/creator-games?role=studio&name=Foo')).status, 400);
+  assert.equal((await api.get('/api/creator-games?role=developer&name=%20')).status, 400);
+  assert.equal(fetchMock.mock.callCount(), 0);
+});
+
+test('GET /api/creator-games: 200 with appids, total and fetchedAt; refresh=1 re-fetches', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async (url) => {
+    assert.match(url, /search\/results\/\?developer=Foo/);
+    return {
+      ok: true,
+      json: async () => ({ total_count: 1, start: 0, results_html: '<a data-ds-itemkey="App_10">' }),
+    };
+  });
+  const res = await api.get('/api/creator-games?role=developer&name=%20Foo%20');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.appids, [10]);
+  assert.equal(res.body.total, 1);
+  assert.equal(res.body.capped, false);
+  assert.equal(res.body.fetchedAt, getCachedAt('creator:developer:Foo'));
+  await api.get('/api/creator-games?role=developer&name=Foo');
+  assert.equal(fetchMock.mock.callCount(), 1);
+  await api.get('/api/creator-games?role=developer&name=Foo&refresh=1');
+  assert.equal(fetchMock.mock.callCount(), 2);
+});
+
+test('GET /api/creator-games: 502 when the store search fails', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
+  const res = await api.get('/api/creator-games?role=publisher&name=Foo');
+  assert.equal(res.status, 502);
+  assert.ok(res.body.error);
+});
+
 test('GET /api/search-games: empty results (no fetch) when q is missing', async (t) => {
   _reset();
   let fetchCalled = false;
