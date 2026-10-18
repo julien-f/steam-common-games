@@ -1098,14 +1098,22 @@ input:placeholder-shown + .search-clear {
     max-height: 30vh;
   }
 }
+.panel-hero-open {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: none;
+  text-align: left; /* a broken image's alt text stays top-left, not centred like a label */
+  cursor: zoom-in;
+}
 .panel-hero-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
-  cursor: zoom-in;
 }
-.panel-hero-img:focus-visible {
+.panel-hero-open:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: -3px;
 }
@@ -2183,6 +2191,13 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
 .panel-achievement-row.unlocked {
   opacity: 1;
 }
+button.panel-achievement-row {
+  width: 100%;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
 .panel-achievement-row.panel-achievement--spoiler {
   cursor: pointer;
 }
@@ -2203,11 +2218,13 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   min-width: 0;
 }
 .panel-achievement-name {
+  display: block;
   font-size: var(--fs-meta);
   font-weight: 600;
   color: var(--text0);
 }
 .panel-achievement-desc {
+  display: block;
   font-size: var(--fs-label);
   color: var(--text1);
   margin-top: 1px;

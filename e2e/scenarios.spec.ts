@@ -3592,20 +3592,23 @@ test('I2 edge: a hidden achievement is revealed by Enter, and by Space', async (
   await expect(hidden).toHaveCount(0);
 });
 
-test("I2 edge: Enter on the panel's hero opens the lightbox once", async ({ page }) => {
+test("I2 edge: Enter or Space on the panel's hero opens the lightbox once", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   const entries = await page.evaluate(() => history.length);
-  await page.getByRole('button', { name: 'Open in lightbox' }).focus();
-  await page.keyboard.press('Enter');
-  await expect(page.locator('.lb-close')).toBeFocused();
-  await page.waitForTimeout(200); // past a second activation's close
-  await expect(page.locator('#screenshot-lightbox')).toHaveClass(/open/);
-  expect(await page.evaluate(() => history.length)).toBe(entries + 1);
-  await page.goBack();
-  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/open/);
-  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  // A button takes Enter on keydown, Space on keyup: neither may also press the lightbox's Close.
+  for (const key of ['Enter', ' ']) {
+    await page.getByRole('button', { name: 'Open in lightbox' }).focus();
+    await page.keyboard.press(key);
+    await expect(page.locator('.lb-close')).toBeFocused();
+    await page.waitForTimeout(200); // past a second activation's close
+    await expect(page.locator('#screenshot-lightbox')).toHaveClass(/open/);
+    expect(await page.evaluate(() => history.length)).toBe(entries + 1);
+    await page.goBack();
+    await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/open/);
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+  }
 });
 
 // Visible headings' levels, and the unnamed navigation/complementary landmarks.

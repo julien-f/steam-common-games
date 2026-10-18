@@ -55,7 +55,7 @@ import { copyWithFeedback } from './clipboard.ts';
 import type { DetailsAges, GameMeta, PriceFields, ReadonlyGame } from './types.ts';
 
 import { createSignal, createEffect, createMemo, createResource, createRoot, For, Show, type JSX } from 'solid-js';
-import { render } from 'solid-js/web';
+import { Dynamic, render } from 'solid-js/web';
 import { A, useLocation } from '@solidjs/router';
 import { creatorListPath, type CreatorRole } from './creatorData.ts';
 
@@ -605,7 +605,7 @@ export function panelStepHero(dir: number, { wrap = false } = {}) {
     if (next === heroIdx()) return false;
     setHeroIdx(next);
   }
-  if (wrap) (document.getElementById('panel-hero')?.querySelector('.panel-hero-img') as HTMLElement | null)?.focus();
+  if (wrap) (document.getElementById('panel-hero')?.querySelector('.panel-hero-open') as HTMLElement | null)?.focus();
   return true;
 }
 
@@ -633,7 +633,7 @@ export function panelOpen(game: ReadonlyGame) {
   // doesn't.
   document.getElementById('game-panel')!.classList.add('open');
   (
-    (document.getElementById('panel-hero')?.querySelector('.panel-hero-img') ??
+    (document.getElementById('panel-hero')?.querySelector('.panel-hero-open') ??
       document.getElementById('panel-close')!) as HTMLElement
   ).focus();
 }
@@ -1212,34 +1212,27 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
           // Rarity isn't a spoiler — it's shown even for a still-hidden achievement, same as
           // Steam's own profile pages. Fixed to 1 decimal only when it's not a whole number.
           const rarityLabel = a.globalPct == null ? null : fmtRarity(a.globalPct);
-          const onSpoilerActivate = (e: MouseEvent | KeyboardEvent) => {
-            if (spoiler()) {
-              e.preventDefault();
-              revealAchievement(props.game.appid, a.apiname);
-            }
-          };
           return (
-            <div
+            <Dynamic
+              component={spoiler() ? 'button' : 'div'}
+              type={spoiler() ? 'button' : undefined}
               class={`panel-achievement-row${a.achieved ? ' unlocked' : ''}${spoiler() ? ' panel-achievement--spoiler' : ''}`}
               title={title || undefined}
-              role={spoiler() ? 'button' : undefined}
-              tabIndex={spoiler() ? 0 : undefined}
-              onClick={onSpoilerActivate}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') onSpoilerActivate(e);
+              onClick={() => {
+                if (spoiler()) revealAchievement(props.game.appid, a.apiname);
               }}
             >
               <img class="panel-achievement-icon" src={icon} alt="" loading="lazy" />
-              <div class="panel-achievement-text">
-                <div class="panel-achievement-name">{name()}</div>
-                <Show when={desc()}>{(d) => <div class="panel-achievement-desc">{d()}</div>}</Show>
-              </div>
+              <span class="panel-achievement-text">
+                <span class="panel-achievement-name">{name()}</span>
+                <Show when={desc()}>{(d) => <span class="panel-achievement-desc">{d()}</span>}</Show>
+              </span>
               <Show when={rarityLabel != null}>
-                <div class="panel-achievement-rarity" title={`${rarityLabel} of players have unlocked this`}>
+                <span class="panel-achievement-rarity" title={`${rarityLabel} of players have unlocked this`}>
                   {rarityLabel}
-                </div>
+                </span>
               </Show>
-            </div>
+            </Dynamic>
           );
         }}
       </For>
@@ -1841,23 +1834,15 @@ function HeroMain(props: { items: MediaItem[]; idx: number }): JSX.Element {
       class={`panel-hero-main${current().type === 'video' ? ' is-video' : ''}${loading() ? ' panel-hero-main--loading' : ''}`}
       style={loading() && current().thumb !== src() ? { 'background-image': `url("${current().thumb}")` } : undefined}
     >
-      <img
-        class={`panel-hero-img${loading() ? ' loading' : ''}${brokenSrc() === src() ? ' panel-hero-img--broken' : ''}${isShot() ? ' panel-hero-img--shot' : ''}`}
-        tabIndex={0}
-        role="button"
-        aria-label="Open in lightbox"
-        src={src()}
-        alt={name()}
-        onLoad={(e) => setLoadedSrc(e.currentTarget.getAttribute('src') ?? undefined)}
-        onError={(e) => setBrokenSrc(e.currentTarget.getAttribute('src') ?? undefined)}
-        onClick={openCurrent}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            openCurrent();
-          }
-        }}
-      />
+      <button class="panel-hero-open" aria-label="Open in lightbox" onClick={openCurrent}>
+        <img
+          class={`panel-hero-img${loading() ? ' loading' : ''}${brokenSrc() === src() ? ' panel-hero-img--broken' : ''}${isShot() ? ' panel-hero-img--shot' : ''}`}
+          src={src()}
+          alt={name()}
+          onLoad={(e) => setLoadedSrc(e.currentTarget.getAttribute('src') ?? undefined)}
+          onError={(e) => setBrokenSrc(e.currentTarget.getAttribute('src') ?? undefined)}
+        />
+      </button>
       <Show when={hasMany()}>
         <button
           class="panel-hero-btn panel-hero-prev"
