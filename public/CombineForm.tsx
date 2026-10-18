@@ -132,6 +132,7 @@ export function CombineForm(props: CombineFormProps) {
         <input
           type="text"
           placeholder="Combined list name (optional)…"
+          aria-label="Combined list name (optional)"
           value={name()}
           onInput={(e) => setName(e.currentTarget.value)}
         />
@@ -189,19 +190,25 @@ export function CombineForm(props: CombineFormProps) {
           </For>
         </ol>
       </Show>
-      <p>Pick at least 2 sources:</p>
-      <ul class="combine-sources">
-        <For each={options()}>
-          {(opt) => (
-            <li>
-              <label>
-                <input type="checkbox" checked={selected().includes(opt.key)} onChange={() => toggleSource(opt.key)} />
-                {opt.label}
-              </label>
-            </li>
-          )}
-        </For>
-      </ul>
+      <fieldset class="combine-sources-set">
+        <legend>Pick at least 2 sources:</legend>
+        <ul class="combine-sources">
+          <For each={options()}>
+            {(opt) => (
+              <li>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={selected().includes(opt.key)}
+                    onChange={() => toggleSource(opt.key)}
+                  />
+                  {opt.label}
+                </label>
+              </li>
+            )}
+          </For>
+        </ul>
+      </fieldset>
       {error() && <p class="error">{error()}</p>}
       <div class="combine-form-actions">
         <button type="submit">{props.submitLabel}</button>

@@ -626,6 +626,7 @@ export default function HomeRoute() {
                 ref={(el) => i > 0 && queueMicrotask(() => el.focus())}
                 value={value()}
                 placeholder="Steam name, profile URL, or 64-bit ID…"
+                aria-label="Steam name, profile URL, or 64-bit ID"
                 onInput={(e) =>
                   setResolveInputs((prev) => prev.map((v, idx) => (idx === i ? e.currentTarget.value : v)))
                 }

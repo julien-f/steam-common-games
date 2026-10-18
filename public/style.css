@@ -4460,6 +4460,16 @@ kbd {
   font-style: italic;
   color: var(--text1);
 }
+/* Reset to the plain box the sources list sat in; its legend reads like the form's other notes. */
+.combine-sources-set {
+  border: 0;
+  min-inline-size: 0;
+}
+.combine-sources-set > legend {
+  margin-bottom: 8px;
+  font-size: var(--fs-meta);
+  color: var(--text1);
+}
 .combine-sources {
   list-style: none;
   display: flex;

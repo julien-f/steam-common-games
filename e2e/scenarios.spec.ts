@@ -3622,7 +3622,7 @@ const structure = (page: Page) =>
     };
   });
 
-test('I3 edge: each main page and the open game have one h1, first, skip no heading level, and name every landmark', async ({
+test('I3.1-2,4: each main page and the open game have one h1, first, skip no heading level, and name every landmark', async ({
   page,
 }) => {
   await asPlayer(page, ALICE);
@@ -3660,6 +3660,23 @@ test('I3 edge: each main page and the open game have one h1, first, skip no head
   await expect(panel.getByRole('heading', { level: 2, name: 'Hades' })).toBeVisible();
   for (const name of ['Price', 'Owned by', /How Long To Beat/, /Achievements/])
     await expect(panel.getByRole('heading', { level: 3, name })).toBeVisible();
+});
+
+test('I3.3: each field on Home, the combine form and Compare says what it is for', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await expect(page.getByRole('search').getByRole('textbox', { name: 'Look up any game' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Steam name, profile URL, or 64-bit ID' })).toBeVisible();
+  await page.getByRole('button', { name: '+ New combined list' }).click();
+  await expect(page.getByRole('textbox', { name: 'Combined list name (optional)' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'How to combine the sources' })).toBeVisible();
+  await expect(
+    page.getByRole('group', { name: 'Pick at least 2 sources:' }).getByRole('checkbox', { name: 'Alice — Owned' }),
+  ).toBeVisible();
+
+  await page.goto('/lists/compare');
+  await expect(page.getByRole('combobox', { name: 'Player 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Player 2', exact: true })).toBeVisible();
 });
 
 test('I2.1: into a list from the keyboard — skip link, and R with no panel open', async ({ page }) => {

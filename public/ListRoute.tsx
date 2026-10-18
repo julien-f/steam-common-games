@@ -3773,7 +3773,7 @@ export default function ListRoute() {
               </>
             )}
           </Show>
-          <select value={addTarget()} onChange={(e) => setAddTarget(e.currentTarget.value)}>
+          <select value={addTarget()} aria-label="Add to list" onChange={(e) => setAddTarget(e.currentTarget.value)}>
             <option value="">Add to list…</option>
             <For each={manualLists().filter((l) => l.id !== userList()?.id)}>
               {(l) => <option value={l.id}>{l.name}</option>}

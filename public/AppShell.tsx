@@ -290,6 +290,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
               id="app-search-input"
               type="text"
               placeholder="Look up any game…"
+              aria-label="Look up any game"
               autocomplete="off"
               enterkeyhint="search"
               onFocus={(e) => e.currentTarget.select()}
