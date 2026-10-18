@@ -121,10 +121,10 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 
 - **Symptom**: a popover panel sits on the page, in flow under its button, before anything opened it; `toBeHidden()` on it fails.
 - **Cause**: the browser hides a closed popover with a user-agent `display: none`, which any `display` in the app's CSS (`.account-chip-panel`'s `flex`) overrides.
-- **Fix**: restate it for closed panels, `:not(:popover-open) { display: none }`, as `.site-nav-popover-panel` does in `style.css`.
+- **Fix**: restate it for closed panels, `:not(:popover-open) { display: none }`, as `.site-nav-popover-panel` does in `styles/legacy.css`.
 
 ## A `.dt-*` override has no effect
 
 - **Symptom**: a rule restyling the table library (e.g. `.table-container .dt-th { background: … }`) shows in DevTools as overridden by the library's own rule, though its selector is more specific: the header row turns the library's light default.
 - **Cause**: `@vates/data-table-solid` injects an unlayered `<style>`, and an unlayered rule beats any rule in a `@layer`, whatever its specificity or order.
-- **Fix**: keep every `.dt-*` override, and the `html:root { --color-* }` theme, in `style.css`'s unlayered tail, not in a layer.
+- **Fix**: keep every `.dt-*` override, and the `html:root { --color-* }` theme, in the unlayered `styles/vendor-data-table.css`, not in a layer.

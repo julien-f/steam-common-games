@@ -1,0 +1,197 @@
+/* Unlayered, and imported last: @vates/data-table-solid injects an unlayered <style>, which beats
+   any layered rule (pitfalls.md). */
+
+/* Themes @vates/data-table-solid's own internals (its portaled column/filter/group submenus
+   render onto <body>, outside .table-container entirely, so this has to live on html:root —
+   an actual DOM ancestor of the portal — for the custom properties to inherit; a page-scoped
+   selector with higher specificity wouldn't reach a portal mounted as a sibling of <body>).
+   Ported verbatim from the legacy library.html/bundles.html inline <style> blocks (see
+   docs/dev/frontend.md) — both carried this identical block; it's now the one
+   shared copy every list route's table draws from instead of two duplicates. */
+html:root {
+  --color-background-primary: #17212b;
+  --color-background-secondary: #2a475e;
+  --color-text-primary: #c6d4df;
+  --color-text-secondary: #8f98a0;
+  --color-text-tertiary: #4c6b8a;
+  --color-border-secondary: #3d5068;
+  --color-border-tertiary: #2a3f57;
+  --color-background-info: #0d2640;
+  --color-text-info: #66c0f4;
+  --color-border-info: #1a4070;
+  --color-background-warning: #2a1900;
+  --color-text-warning: #e8a040;
+  --color-border-warning: #4a2c00;
+}
+
+/* Horizontal-scroll affordance, shared with the data-table library's own
+   .dt-table-wrap (library.js/bundles.js) — nothing on either page hints that a
+   narrow table has more columns off-screen (confirmed live at 360px: the Comparison
+   page and Library Explorer both scroll horizontally with zero visual cue, so most
+   users never find the columns past "Game"). Pure CSS, no JS: two opaque "cover"
+   gradients attached `local` (they scroll away with the table's own content) sit on
+   top of two soft shadow gradients attached `scroll` (fixed to the wrap's edges).
+   At the very start/end of the scroll range the matching cover still masks its
+   shadow; scroll past it and the cover moves out of the way, revealing the shadow —
+   so the fade only ever shows on the side there's still more to scroll toward. All
+   three pages' wraps sit directly on <body> (var(--bg0)), not a .card — Bundles used
+   to nest its whole detail block (header + table) in one .card, which made the cover
+   color (previously var(--bg1), matching that card) wrong everywhere else: it showed
+   as a mismatched, distinctly-colored 20px strip at both edges of every row on the
+   Comparison page and Library Explorer, confirmed live. Bundles' table area was
+   pulled out of its .card (now just wrapping the bundle-detail-header) to match, so
+   one cover color is correct for all three (dt-table-wrap's own alternating-row tint
+   is a transparent overlay on top of that, not a different base color). */
+.dt-table-wrap {
+  background-image:
+    linear-gradient(to right, var(--bg0) 0%, var(--bg0) 100%), linear-gradient(to left, var(--bg0) 0%, var(--bg0) 100%),
+    linear-gradient(to right, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0)),
+    linear-gradient(to left, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0));
+  background-repeat: no-repeat;
+  background-size:
+    20px 100%,
+    20px 100%,
+    12px 100%,
+    12px 100%;
+  background-position:
+    left top,
+    right top,
+    left top,
+    right top;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* Darkens the data-table library's own header row a shade further than its themed
+   --color-background-secondary default.
+   Ported from the legacy pages' `#table-container .dt-th` rule — `.table-container` is
+   the new markup's equivalent wrapper (see ListRoute.tsx). */
+.table-container .dt-th {
+  background: #0f1923;
+}
+.dt-td {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The 24 px tap area around a header's sort button only grows taller: wider, it would cover its column menu button. */
+.dt-th-sort {
+  position: relative;
+}
+.dt-th-sort::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: max(100%, 24px);
+  transform: translate(-50%, -50%);
+}
+
+/* Phone: the table library's toolbar spacing tightened, so the rows start higher. */
+@media (max-width: 768px) {
+  /* The library puts its end slot after the search line, a row of its own on a phone: move it up
+     to the end of the first line (Columns/Group/Sort), ahead of the search box and what follows.
+     Until the library does it itself: vatesfr/data-table#39. */
+  .dt-toolbar-actions > .dt-search-wrap,
+  .dt-toolbar-actions > .dt-search-wrap ~ * {
+    order: 2;
+  }
+  .dt-toolbar-actions > .dt-toolbar-end {
+    order: 1;
+    margin-left: auto;
+  }
+  .list-route .dt-toolbar {
+    padding: 6px 0;
+  }
+  .list-route .dt-toolbar-divider {
+    display: none;
+  }
+  .list-route .dt-active-bar {
+    padding: 4px 0;
+  }
+}
+
+/* /search's own table (SearchRoute.tsx) — hides @vates/data-table-solid's Columns/Sort/Search/
+   Filter toolbar: none of it applies to a single, unsortable/unfilterable column, and the
+   library's own "Search…" box would sit confusingly right under this page's real one. The
+   row-count line above the table (.dt-active-bar) isn't part of the toolbar and stays.
+   Filed as vatesfr/data-table#25, asking for a toolbar-suppression prop (all-or-nothing, or
+   granular per-control flags). 0.14.0 delivered only `showSearch` and an auto-hiding Sort button
+   (Group already auto-hid) — Columns and Filter are still unconditionally rendered regardless of
+   column config (confirmed in the library's own source, neither wrapped in a length check), so
+   even with `showSearch={false}` this table would still show two dead buttons. This blanket rule
+   stays the only way to get an empty toolbar. */
+.search-table .dt-toolbar {
+  display: none;
+}
+
+/* The library ships no focus styling of its own for a row — needed here since SearchRoute.tsx
+   moves real DOM focus onto a row to keep it in sync with panel/lightbox navigation (its own
+   roving-tabindex "current row" has no separate visual/reactive API, only a real `focus` event —
+   see that file's own comment). Plain :focus, not :focus-visible: a programmatic .focus() call
+   often doesn't satisfy :focus-visible's own heuristics, and this needs to show regardless of
+   whether the last interaction was mouse (the panel's own 🎲/↑/↓ buttons) or keyboard. Same
+   outline treatment as .panel-film-item:focus-visible, offset inward instead of out since this is
+   a table row, not a standalone tile. */
+.search-table .dt-tr:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Dims an expired bundle's whole row. The table library has no per-row class hook, so the row is
+   reached through the marker its Bundle cell carries (renderBundleTitle) — which means dimming
+   stops if that column is hidden, an acceptable degradation for a column nobody hides. Only
+   reachable at all with "Include expired" on; every row is Active otherwise. */
+.dt-tr:has(.bundle-expired) {
+  opacity: 0.45;
+}
+.dt-tr:has(.bundle-expired):hover {
+  opacity: 0.8;
+}
+
+/* The game open in the panel (the tables' currentRow). */
+.dt-tr.dt-tr--current {
+  background: var(--color-background-info);
+}
+.dt-tr.dt-tr--current > .dt-td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* Phone game tables: tighter cells, so rating and length fit beside the name. */
+@media (max-width: 600px) {
+  .dt-td,
+  .dt-th {
+    padding: 6px 8px;
+  }
+  .dt-th {
+    white-space: normal;
+  }
+}
+
+/* Phone: the table's checkboxes at a usable tap size; the library draws them at the native 13 px. */
+@media (max-width: 768px) {
+  .dt-table input[type='checkbox'] {
+    width: 24px;
+    height: 24px;
+    margin: 0;
+  }
+}
+
+/* The Filter popover's column pane: the table library's 150 px cut category and column names
+   short, and its search box ran past the pane's edge, so the pane scrolled sideways. */
+.dt-filter-cols {
+  width: 200px;
+}
+.dt-filter-cols-search {
+  width: 100%;
+  box-sizing: border-box;
+}
+/* Phone: the library's 460 px minimum ran the popover past a 390 px screen. */
+@media (max-width: 768px) {
+  .dt-filter-panel {
+    min-width: 0;
+    width: calc(100vw - 24px);
+  }
+  .dt-filter-cols {
+    width: 45%;
+  }
+}

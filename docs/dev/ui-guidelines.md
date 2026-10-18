@@ -51,7 +51,7 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 
 ## Type
 
-- Sizes come from the `--fs-*` scale in `style.css`'s `:root` (caps labels, meta and chips, tables and controls, prose, card titles, page titles, big figures); px sizes are for icon glyphs only. `test/typeScale.test.js` enforces it for the app's own CSS, not the table library's.
+- Sizes come from the `--fs-*` scale in `styles/legacy.css`'s `:root` (caps labels, meta and chips, tables and controls, prose, card titles, page titles, big figures); px sizes are for icon glyphs only. `test/typeScale.test.js` enforces it for the app's own CSS, not the table library's.
 - Two weights: 400, and 600 for emphasis.
 
 ## Checklist for a new UI feature
