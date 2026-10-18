@@ -109,7 +109,7 @@ export function AccountChip(): JSX.Element {
               </Show>
             }
           >
-            {(url) => <img class="account-chip-avatar" src={url()} alt="" width="20" height="20" />}
+            {(url) => <img class="account-chip-avatar" src={url()} alt="" width="26" height="26" />}
           </Show>
           <span class="account-chip-name">{chipLabel()}</span>
           {/* A link's account is showing, not the stored one — the difference is invisible
@@ -177,7 +177,7 @@ export function AccountChip(): JSX.Element {
                         when={acc.avatarUrl}
                         fallback={<span class="account-chip-avatar account-chip-avatar--empty" />}
                       >
-                        {(url) => <img class="account-chip-avatar" src={url()} alt="" width="20" height="20" />}
+                        {(url) => <img class="account-chip-avatar" src={url()} alt="" width="26" height="26" />}
                       </Show>
                       <span class="account-chip-name">{accountDisplayLabel(acc)}</span>
                       <Show when={acc.id === getMyAccount()?.id}>

@@ -121,7 +121,7 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 
 - **Symptom**: a popover panel sits on the page, in flow under its button, before anything opened it; `toBeHidden()` on it fails.
 - **Cause**: the browser hides a closed popover with a user-agent `display: none`, which any `display` in the app's CSS (`.account-chip-panel`'s `flex`) overrides.
-- **Fix**: restate it for closed panels, `:not(:popover-open) { display: none }`, as `.site-nav-popover-panel` does in `styles/legacy.css`.
+- **Fix**: set a panel's `display` only while open, `:popover-open { display: flex }`, as `.account-chip-panel` does in `styles/components.css`.
 
 ## A `.dt-*` override has no effect
 

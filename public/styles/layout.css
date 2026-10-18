@@ -1,4 +1,103 @@
 @layer layout {
+  /* `.app-scroll` (header, route, footer) scrolls beside the fixed panel: one scrollbar per column,
+     never the document's next to the panel's. */
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .app-scroll {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  /* Pushes the footer to the bottom of a short page. */
+  .app-content {
+    flex: 1;
+  }
+  .app-content:focus:not(:focus-visible) {
+    outline: none;
+  }
+  @media (min-width: 769px) {
+    /* The panel is out of flow: the shell reserves its width, so header and footer shorten with the content. */
+    .app-shell.panel-open {
+      padding-right: var(--panel-w);
+    }
+  }
+  /* Phone: the document scrolls, so the browser's URL bar can collapse; the panel covers the screen. */
+  @media (max-width: 768px) {
+    .app-shell {
+      height: auto;
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow: visible;
+    }
+    .app-scroll {
+      overflow-y: visible;
+    }
+  }
+
+  /* One row on desktop, its content on the wide list routes' 1600px column; the hairline spans the window. */
+  .site-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 16px;
+    min-height: 56px;
+    padding-inline: max(var(--gutter), calc((100% - 1600px) / 2 + var(--gutter)));
+    border-bottom: 1px solid var(--line);
+  }
+  /* The Main landmark around the route links; its links stay items of the bar's flex row. */
+  .site-nav-links {
+    display: contents;
+  }
+  @media (min-width: 769px) {
+    .site-nav .app-search-wrap {
+      flex: 1 1 120px;
+      max-width: 480px;
+      margin-left: auto;
+    }
+  }
+  /* Phone: the brand and route links on the first row, the search, account and preferences under them. */
+  @media (max-width: 768px) {
+    .site-nav {
+      padding-block: 8px;
+      row-gap: 8px;
+    }
+    /* Too wide to share the links' row, so it starts the second one. */
+    .site-nav .app-search-wrap {
+      flex: 1 1 120px;
+      order: 1;
+    }
+    .site-nav-account,
+    .site-nav-prefs {
+      order: 1;
+    }
+  }
+
+  .app-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px var(--gutter) 24px;
+  }
+
+  /* Every route's side margin. */
+  .container,
+  .list-route,
+  .bundles-browse-route,
+  .home-route,
+  .rank-route {
+    padding-inline: var(--gutter);
+  }
+
   /* About's sections, plain rather than boxed. */
   .container > section + section {
     margin-top: 28px;

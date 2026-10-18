@@ -126,6 +126,10 @@ html:root {
   .list-route .dt-toolbar-divider {
     display: none;
   }
+  /* Down from the library's 160px, so the search still fits beside the view actions at 320px. */
+  .dt-search-wrap {
+    min-width: 120px;
+  }
   .list-route .dt-active-bar {
     padding: 4px 0;
   }

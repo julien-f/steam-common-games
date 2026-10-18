@@ -23,6 +23,8 @@
     --ease-out: cubic-bezier(0.2, 0, 0, 1);
     /* Fields and buttons, the table library's included. */
     --control-h: 34px;
+    /* The page's side margin, shell and routes alike (navPopover.ts's POPOVER_MARGIN matches the phone one). */
+    --gutter: 20px;
     /* The type scale (docs/dev/ui-guidelines.md); px sizes are left only to icon glyphs, 22px and up. */
     --fs-label: 11px;
     --fs-meta: 12px;
@@ -34,6 +36,12 @@
     /* Self-hosted (AppRoot.tsx imports them); the fallbacks only show until they load. */
     --font-sans: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+  }
+
+  @media (max-width: 768px) {
+    :root {
+      --gutter: 16px;
+    }
   }
 
   body {

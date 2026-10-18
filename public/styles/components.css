@@ -1,4 +1,330 @@
 @layer components {
+  .skip-link {
+    position: absolute;
+    top: -48px;
+    left: 8px;
+    z-index: 100;
+    padding: 8px 12px;
+    border-radius: var(--radius-3);
+    background: var(--text);
+    color: var(--bg);
+  }
+  .skip-link:focus {
+    top: 8px;
+  }
+
+  /* The header (AppShell.tsx): the wordmark, the route links as plain text, the current one
+     underlined in the accent. */
+  .site-brand {
+    font-size: var(--fs-title);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .site-nav-link {
+    padding-block: 6px;
+    color: var(--muted);
+    font-size: var(--fs-ui);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .site-nav-link:hover {
+    color: var(--text);
+  }
+  .site-nav-link.active {
+    color: var(--text);
+    text-decoration: underline 1px var(--accent);
+    text-underline-offset: 6px;
+  }
+  /* Under 360px the route links fill the first row alone; Home is a link away. */
+  @media (max-width: 359px) {
+    .site-brand {
+      display: none;
+    }
+  }
+
+  .app-search-wrap {
+    position: relative;
+    min-width: 0;
+  }
+  .app-search-wrap > input {
+    width: 100%;
+  }
+  .app-search-wrap > input:not(:placeholder-shown) {
+    padding-right: 40px;
+  }
+
+  .site-nav-account,
+  .account-chip-links {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  /* An identity, not a route: an outline button with the avatar, never the current route's underline. */
+  .account-chip-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 180px;
+    height: var(--control-h);
+    padding: 0 10px 0 3px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-3);
+    background: transparent;
+    color: var(--text);
+    font-size: var(--fs-ui);
+    cursor: pointer;
+  }
+  .account-chip-btn:hover,
+  .site-nav-popover:has(> :popover-open) > .account-chip-btn {
+    border-color: var(--muted);
+  }
+  .account-chip-avatar {
+    display: block;
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-2);
+  }
+  .account-chip-avatar--empty {
+    background: var(--line-strong);
+  }
+  .account-chip-initial {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--line-strong);
+    color: var(--text);
+    font-size: var(--fs-label);
+    font-weight: 600;
+  }
+  .account-chip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .account-chip-explore {
+    flex-shrink: 0;
+    font-size: var(--fs-label);
+  }
+  .account-chip-btn:not(:has(.account-chip-avatar)) {
+    padding-left: 10px;
+  }
+
+  /* ⚙ Preferences: a square icon button. */
+  .site-nav-prefs-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--control-h);
+    height: var(--control-h);
+    border: 0;
+    border-radius: var(--radius-3);
+    background: transparent;
+    font-size: var(--fs-title);
+    line-height: 1;
+    cursor: pointer;
+  }
+  .site-nav-prefs-btn:hover {
+    background: var(--line);
+  }
+
+  /* Nav popovers (⚙, account chip, rank menu), placed by navPopover.ts. Rise and fade in; a panel's
+     display is set only while open, or a closed one shows (pitfalls.md). */
+  .site-nav-popover-panel {
+    position: fixed;
+    inset: auto;
+    max-width: calc(100vw - 2 * var(--gutter));
+    padding: 12px;
+    overflow: visible;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-3);
+    background: var(--surface);
+    color: inherit;
+    opacity: 0;
+    translate: 0 -6px;
+    transition:
+      opacity var(--dur-2) var(--ease-out),
+      translate var(--dur-2) var(--ease-out),
+      display var(--dur-2) allow-discrete,
+      overlay var(--dur-2) allow-discrete;
+  }
+  .site-nav-popover-panel:popover-open {
+    opacity: 1;
+    translate: 0 0;
+  }
+  @starting-style {
+    .site-nav-popover-panel:popover-open {
+      opacity: 0;
+      translate: 0 -6px;
+    }
+  }
+
+  /* A fixed width: the region <select> would otherwise size the panel off its longest option. */
+  .site-nav-prefs-panel {
+    width: 220px;
+  }
+  .site-nav-prefs-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .site-nav-prefs-row select {
+    width: 100%;
+  }
+
+  .account-chip-panel {
+    width: 260px;
+  }
+  .account-chip-panel:popover-open {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .account-chip-note {
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .account-chip-note strong {
+    color: var(--text);
+  }
+  .account-chip-action {
+    display: block;
+    margin-top: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font-size: var(--fs-meta);
+    text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+  .account-chip-id {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--fs-meta);
+  }
+  .account-chip-id code {
+    color: var(--muted);
+    font-family: var(--font-mono);
+    overflow-wrap: anywhere;
+  }
+  .account-chip-section {
+    color: var(--muted);
+    font-size: var(--fs-meta);
+    font-weight: 400;
+  }
+  .account-chip-recents {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .account-chip-recents li {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .account-chip-recent {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    min-height: 32px;
+    padding: 3px 6px;
+    border: 0;
+    border-radius: var(--radius-2);
+    background: none;
+    color: var(--text);
+    font-size: var(--fs-ui);
+    text-align: left;
+    cursor: pointer;
+  }
+  .account-chip-recent:hover {
+    background: var(--line);
+  }
+  .account-chip-mine {
+    color: var(--accent);
+    font-size: var(--fs-meta);
+  }
+  /* Owned/Wishlist sit in the header on desktop, in the popover on a phone: one pair at a time. */
+  .account-chip-panel-links {
+    display: none;
+    gap: 16px;
+  }
+  .account-chip-panel-link {
+    position: relative;
+    font-size: var(--fs-ui);
+  }
+  @media (max-width: 768px) {
+    .account-chip-links {
+      display: none;
+    }
+    .account-chip-panel-links {
+      display: flex;
+    }
+  }
+
+  .app-footer {
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .app-footer-link {
+    position: relative;
+    color: var(--muted);
+  }
+  .app-footer-link:hover {
+    color: var(--text);
+  }
+  /* A 24px tap area around a text-sized link, without moving anything. */
+  .account-chip-panel-link::after,
+  .app-footer-link::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 24px);
+    height: max(100%, 24px);
+    transform: translate(-50%, -50%);
+  }
+
+  /* Back to top: inside the content column's bottom-right corner, under the panel's z-index so the
+     phone's full-screen panel covers it. */
+  .app-to-top {
+    position: fixed;
+    right: var(--gutter);
+    bottom: var(--gutter);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--control-h);
+    height: var(--control-h);
+    padding: 0;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-3);
+    background: var(--surface);
+    color: var(--text);
+    font-size: var(--fs-title);
+    line-height: 1;
+    cursor: pointer;
+    transition: border-color var(--dur-1) var(--ease-out);
+  }
+  .app-to-top:hover {
+    border-color: var(--muted);
+  }
+  @media (min-width: 769px) {
+    .app-shell.panel-open .app-to-top {
+      right: calc(var(--panel-w) + var(--gutter));
+    }
+  }
+
   /* Phone: the table toolbar's own actions are icons only, square, so its first line holds them. */
   @media (max-width: 768px) {
     .list-view-actions .btn {

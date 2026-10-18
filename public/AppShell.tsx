@@ -271,6 +271,10 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           Skip to table
         </a>
         <header id="site-nav" class="site-nav">
+          {/* A plain link: the router's <A> would mark it current on Home, beside the Home link. */}
+          <a href={withAccountParam('/', location.search)} class="site-brand">
+            Common Games
+          </a>
           <nav class="site-nav-links" aria-label="Main">
             <For each={NAV_LINKS}>
               {(link) => (

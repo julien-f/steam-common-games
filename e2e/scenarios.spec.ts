@@ -1125,7 +1125,7 @@ test('I1 edge: on desktop the nav starts on the content edge, close above it', a
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/lists/owned');
     const nav = (await page.locator('.site-nav').boundingBox())!;
-    const first = (await page.locator('.site-nav-link').first().boundingBox())!;
+    const first = (await page.locator('.site-brand').boundingBox())!;
     const hero = (await page.locator('.list-hero').boundingBox())!;
     expect(Math.round(first.x), `at ${width}px`).toBe(Math.round(hero.x));
     expect(hero.y - (nav.y + nav.height), `at ${width}px`).toBeLessThanOrEqual(28);
@@ -1163,7 +1163,7 @@ test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo wi
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
 
-test("I1 edge: on a phone, Home keeps the list pages' 12px gutter and each recent account on one row", async ({
+test("I1 edge: on a phone, Home keeps the list pages' 16px gutter and each recent account on one row", async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout');
@@ -1174,11 +1174,11 @@ test("I1 edge: on a phone, Home keeps the list pages' 12px gutter and each recen
   await expect(page.locator('.recent-accounts li')).toHaveCount(2);
 
   const viewport = page.viewportSize()!;
-  expect((await page.locator('.app-search-wrap').boundingBox())!.x).toBe(12);
+  expect((await page.locator('.app-search-wrap').boundingBox())!.x).toBe(16);
   const card = (await page.locator('.home-account').boundingBox())!;
-  expect(card.x).toBe(12);
-  expect(card.x + card.width).toBe(viewport.width - 12);
-  expect((await page.locator('.home-account h3').boundingBox())!.x).toBeLessThanOrEqual(25);
+  expect(card.x).toBe(16);
+  expect(card.x + card.width).toBe(viewport.width - 16);
+  expect((await page.locator('.home-account h3').boundingBox())!.x).toBeLessThanOrEqual(29);
 
   for (const li of await page.locator('.recent-accounts li').all()) {
     const tops = await li.locator(':scope > *').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top));

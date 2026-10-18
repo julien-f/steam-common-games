@@ -9,6 +9,10 @@ const { clampPopoverLeft, POPOVER_MARGIN } = require('../public/navPopover.ts');
 // to prevent is the whole reason this positioning is in JS rather than CSS (see the module's own
 // comment).
 
+test("POPOVER_MARGIN: the phone's page gutter, so a clamped popover lines up with the page", () => {
+  assert.equal(POPOVER_MARGIN, 16);
+});
+
 test('clampPopoverLeft: right-aligns the panel to its trigger when there is room', () => {
   assert.equal(clampPopoverLeft(500, 200, 1000), 300);
 });

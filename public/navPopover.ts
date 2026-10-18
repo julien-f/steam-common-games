@@ -1,7 +1,7 @@
 // Esc and placement for the nav popovers (⚙ Preferences, account chip, rank menu); the browser opens and dismisses them.
 // Placed in JS: `.site-nav`'s flex-wrap moves a trigger with viewport width, off-screen for CSS anchoring (seen on a Galaxy S10).
 
-export const POPOVER_MARGIN = 12;
+export const POPOVER_MARGIN = 16;
 
 // Right-align the panel to its trigger, then clamp within `[POPOVER_MARGIN, viewportWidth -
 // width - POPOVER_MARGIN]` so it can never run off either edge regardless of where the trigger
