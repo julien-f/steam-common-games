@@ -15,14 +15,22 @@ function addedFileDiff(file, content) {
   return `+++ b/${file}\n@@ -0,0 +1,${lines.length} @@\n${lines.map((l) => `+${l}`).join('\n')}\n`;
 }
 
-// `diff`: `git diff -U0` output. Returns "file:line" for each added comment block of 3+ lines.
+// `diff`: `git diff -U0` output. Returns "file:line" for each added comment block of 3+ lines,
+// except one whose every line the diff also removes: a moved or re-indented comment isn't new.
 function longComments(diff) {
+  const removed = new Set(
+    diff
+      .split('\n')
+      .filter((raw) => raw.startsWith('-') && !raw.startsWith('---'))
+      .map((raw) => raw.slice(1).trim()),
+  );
   const found = [];
   let file = null;
   let block = null;
   let inBlock = false;
   const flush = () => {
-    if (block && block.lines >= MAX_LINES + 1) found.push(`${file}:${block.start}`);
+    if (block && block.lines >= MAX_LINES + 1 && !block.texts.every((t) => removed.has(t)))
+      found.push(`${file}:${block.start}`);
     block = null;
   };
   let line = 0;
@@ -47,8 +55,9 @@ function longComments(diff) {
       if (block && block.next === line) block.lines++;
       else {
         flush();
-        block = { start: line, lines: 1 };
+        block = { start: line, lines: 1, texts: [] };
       }
+      block.texts.push(text);
       block.next = line + 1;
       if (opens) inBlock = true;
       if (inBlock && !opens && /\*\//.test(text)) inBlock = false;
