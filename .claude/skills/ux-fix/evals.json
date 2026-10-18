@@ -7,6 +7,10 @@
     {
       "prompt": "Re-check U73 in the browser now that it is fixed",
       "expect": "ux-review"
+    },
+    {
+      "prompt": "implement U167",
+      "expect": "ux-fix"
     }
   ]
 }

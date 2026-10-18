@@ -56,7 +56,7 @@ After any real-server visit, restore the demo state; don't finish while `steam.i
 
 ## Record and report
 
-- Record every finding in [improvements.md](../../../docs/dev/improvements.md): numbered on from `node scripts/backlog-next.js U` (never reuse a closed item's number), under its area, `**U<n> · <severity> · <scenarios>** — problem. Direction.` Update or drop items the run shows fixed.
+- Record every finding in [improvements.md](../../../docs/dev/improvements.md): numbered on from `node scripts/backlog-next.js U` (never reuse a closed item's number), under its area, `**U<n> · <severity> · <scenarios>** — problem. Direction.` A finding whose cause commit is already known: `--escape` as [code-fix's step 0](../code-fix/SKILL.md#0-before-starting). Update or drop items the run shows fixed.
 - **Severity**: _blocker_ (the goal can't be reached) · _major_ (reached with real confusion or a workaround) · _minor_ (friction) · _polish_.
 - Report one table ranked by severity, then one line on what worked well enough to keep:
 

@@ -37,7 +37,7 @@
 ## Hooks
 
 - `pre-commit` (`.githooks/pre-commit`, enabled by `npm install`): `git diff --cached --check`, then `npm run check`'s steps in parallel on the staged content (unstaged edits to tracked files are set aside, then restored; untracked files stay, so a commit lacking one can still pass) — typecheck, lint, the CSS check and desktop e2e only when `public/`, `e2e/` or a frontend config is staged (`node scripts/setup-facts.js --cost` times it). It blocks the commit on failure. `npm install` also points `git blame` at `.git-blame-ignore-revs`.
-- Every `scripts/check.js` run (both hooks and `npm run check`) logs its step times and failures to `.git/dev-metrics/` (`scripts/dev-metrics.js`: local, shared by worktrees); `node scripts/setup-facts.js --cost` summarizes them.
+- Every `scripts/check.js` run (both hooks and `npm run check`) logs its step times and failures to `.git/dev-metrics/` (`scripts/dev-metrics.js`: local, shared by worktrees), as does `scripts/backlog-run-log.js` (each backlog-run's review yield and its escapes) — project scripts log there, not in `~/.claude/logs`; `node scripts/setup-facts.js --cost` summarizes them.
 - `pre-merge-commit`: the changelog check on the merge's whole diff — a feature branch's own commits skip the entry requirement, so its merge into `main` must carry them.
 - `pre-push`: what CI runs (`npm run check`, then both widths of e2e) on HEAD; refuses a push of anything else or with untracked files, and sets uncommitted edits to tracked files aside for the checks, then restores them.
 - CI (`.github/workflows/ci.yml`): `npm run check` and the e2e suite as two parallel jobs on Node 24, on every push to `main` and every PR; the run's summary lists the journey steps the tests lock.

@@ -1,0 +1,12 @@
+{
+  "routing": [
+    {
+      "prompt": "which backlog item should we do next?",
+      "expect": "backlog-run"
+    },
+    {
+      "prompt": "review both backlogs for conflicts and synergies, pick one and ship it",
+      "expect": "backlog-run"
+    }
+  ]
+}

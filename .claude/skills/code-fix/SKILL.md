@@ -13,6 +13,7 @@ Above about five items, run them as a parallel batch: [BATCH.md](BATCH.md).
 
 - Read every requested item, the doc its dimension names in code-audit, then the code involved, callers included.
 - Re-verify each item still holds; one that doesn't is closed without a commit, and said so.
+- A bug whose cause commit you find: `node scripts/backlog-run-log.js --escape <sha> <C<n>>` ([backlog-run](../backlog-run/SKILL.md#5-log)).
 - Batch the real forks into one `AskUserQuestion`, recommendation first: anything on CLAUDE.md's ask-first list (a new dependency, deleting files), a change raising upstream traffic, a fix that widens past the item. Everything else proceeds on the item's Direction.
 
 ## 1. Test first

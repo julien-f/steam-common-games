@@ -11,7 +11,7 @@ Above about five items, run them as a parallel batch: [code-fix's BATCH.md](../c
 
 ## 0. Before starting
 
-- Read every requested item, the scenario it names in [journeys.md](../../../docs/dev/journeys.md) and the [UI guidelines](../../../docs/dev/ui-guidelines.md) it touches, then the code involved.
+- Read every requested item, the scenario it names in [journeys.md](../../../docs/dev/journeys.md) and the [UI guidelines](../../../docs/dev/ui-guidelines.md) it touches, then the code involved. A bug whose cause commit you find: `--escape` as [code-fix's step 0](../code-fix/SKILL.md#0-before-starting).
 - Batch the real design forks into one `AskUserQuestion`, recommendation first: placement or interaction model, frontend-only vs. a backend change, anything on CLAUDE.md's ask-first list (a new dependency). Everything else proceeds on the obvious fix — an item whose "Direction" already settles it needs no question.
 - A visual or layout item (how it looks, not what it does): before building, mock it on dev:mock by injecting the proposed CSS at runtime, publish a private before/after page at both widths, and ask for the go-ahead on that page.
 

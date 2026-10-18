@@ -27,6 +27,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync, spawnSync } = require('node:child_process');
 const { record, history } = require('./dev-metrics');
+const backlogRuns = require('./backlog-run-log');
 
 const ROOT = path.join(__dirname, '..');
 const COST_SCRIPTS = ['check', 'test', 'test:e2e', 'build'];
@@ -446,6 +447,7 @@ function cost() {
   console.log(
     `Check runs${since ? ` since ${since.slice(0, 10)}` : ''} (scripts/check.js): ${checkStats(history('checks').filter((r) => r.at > since))}`,
   );
+  console.log(backlogRuns.summary(history('backlog-run'), history('backlog-escape'), history('checks')));
 }
 
 // Check runs → `12 commits (2 blocked: lint ×2), median 3.1 s, slowest step e2e 18.0 s · 3 full runs (0 failed)`.

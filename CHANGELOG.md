@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - setup-facts --transcripts=DATE shows commits made since DATE next to the commits its sessions made
 - Feature-branch commits defer their changelog entries to the branch's merge; new code comments may take two lines
 - setup-facts counts only real doc reads, keeps failed runs out of the cost baseline and shows each reply's last paragraph in digests
+- Backlog runs log their review yield and the bugs later traced back to them, summarized for setup reviews
 
 ## [0.11.0] - 2026-10-14
 
