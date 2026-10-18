@@ -57,15 +57,55 @@ html:root {
   background-attachment: local, local, scroll, scroll;
 }
 
-/* The header row on the page's own ground, in the scale's emphasis weight (the library's is 500). */
+/* Hairline rows on the page's own ground: no outer box, no zebra, a faint hover. The header's
+   labels are muted, in the scale's emphasis weight (the library's is 500). */
+.dt-table-wrap {
+  border: 0;
+  border-radius: 0;
+}
 .table-container .dt-th {
   background: var(--bg);
 }
 .dt-th {
+  border-bottom-color: var(--line-strong);
   font-weight: 600;
 }
 .dt-td {
+  border-bottom: 1px solid var(--line);
   font-variant-numeric: tabular-nums;
+}
+.dt-tr--odd .dt-td {
+  background: none;
+}
+.dt-tr--clickable:hover .dt-td {
+  background: var(--surface);
+}
+/* The thumbnail column only as wide as its image: a sized cell takes none of the table's spare width. */
+.dt-td:has(.game-thumb) {
+  width: 1px;
+}
+/* Checked rows: neutral, so the accent stays the open game's. */
+.dt-tr--selected .dt-td {
+  background: var(--line);
+}
+
+/* A group's header row: a flat band, its column name and count muted rather than faded. */
+.dt-group-row {
+  border-left: 0;
+  background: var(--surface);
+}
+.dt-group-row:hover {
+  background: var(--line);
+}
+.dt-group-td {
+  padding: 8px 12px;
+  border-bottom-color: var(--line-strong);
+}
+.dt-group-colname,
+.dt-group-count,
+.dt-group-continued {
+  color: var(--muted);
+  opacity: 1;
 }
 
 /* The library's toolbar controls at the app's control height and look (styles/base.css). */
@@ -173,12 +213,19 @@ html:root {
   opacity: 0.8;
 }
 
-/* The game open in the panel (the tables' currentRow). */
-.dt-tr.dt-tr--current {
+/* The game open in the panel (the tables' currentRow): tinted, with a bar at its start drawn as
+   a border, which forced colors keep (they drop backgrounds and shadows). */
+.dt-tr.dt-tr--current > .dt-td {
   background: var(--color-background-info);
 }
 .dt-tr.dt-tr--current > .dt-td:first-child {
-  box-shadow: inset 3px 0 0 var(--accent);
+  position: relative;
+}
+.dt-tr.dt-tr--current > .dt-td:first-child::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-left: 3px solid var(--accent);
 }
 
 /* Phone game tables: tighter cells, so rating and length fit beside the name. */

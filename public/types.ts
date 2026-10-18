@@ -35,6 +35,7 @@ export interface GameMeta {
   comingSoon: boolean;
   metacritic: { score: number; url: string | null } | null;
   capsule: string;
+  thumb: string | null; // the game tables' larger capsule; `capsule` is its fallback
   banner: string;
   movies: { id: number; thumbnail: string; hls: string | null }[];
   screenshots: { id: number; thumbnail: string; full: string }[];
@@ -89,6 +90,7 @@ export interface Game extends PriceFields {
   // (`row.hltbMian = …`) compile silently. Declaring them is what turns both into typecheck
   // failures — the same reason `ReadonlyGame` below exists for the read paths.
   capsule?: string | null;
+  thumb?: string | null;
   score?: number | null;
   positivePct?: number | null;
   steamdbRating?: number | null;

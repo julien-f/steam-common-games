@@ -14,6 +14,9 @@
     /* Current page, selected row, active tab; text on it is --bg. */
     --accent: #d9a55b;
     --good: #6fbf8e;
+    /* A warning (a source that didn't answer, a middling score) and a bad score: ≥5.5:1 on every surface. */
+    --warn: #e0a83a;
+    --bad: #e5736b;
     --radius-1: 4px;
     --radius-2: 6px;
     --radius-3: 8px;

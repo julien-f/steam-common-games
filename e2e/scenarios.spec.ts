@@ -308,6 +308,44 @@ test("F3 edge: the table's digits all have one width, so numbers line up", async
   await expect(row(page, 'Hades').locator('td', { hasText: '44.5' })).toHaveCSS('font-variant-numeric', 'tabular-nums');
 });
 
+test("F3 edge: a game's thumbnail falls back to its smaller capsule, then hides", async ({ page }, testInfo) => {
+  await page.route('**/capsule_231x87.jpg', (route) => route.fulfill({ status: 404 }));
+  await page.route('**/capsule_184x69.jpg', (route) =>
+    route.request().url().includes('/620/')
+      ? route.fulfill({ status: 404 })
+      : route.fulfill({
+          contentType: 'image/svg+xml',
+          body: '<svg xmlns="http://www.w3.org/2000/svg" width="184" height="69"/>',
+        }),
+  );
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  const thumb = row(page, 'Hades').locator('img.game-thumb');
+  await expect(thumb).toHaveAttribute('src', /capsule_184x69/);
+  await expect(thumb).toBeVisible();
+  // The same box either way, so the row doesn't move as the image loads or fails.
+  expect(await thumb.boundingBox()).toMatchObject(
+    testInfo.project.name === 'phone' ? { width: 96, height: 36 } : { width: 160, height: 60 },
+  );
+  await expect(row(page, 'Portal 2').locator('img.game-thumb')).toHaveCSS('visibility', 'hidden');
+});
+
+test("F3 edge: the open game's row keeps its bar under forced colors, where a tint or shadow is dropped", async ({
+  page,
+}) => {
+  await page.emulateMedia({ forcedColors: 'active' });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const current = row(page, 'Hades');
+  await expect(current).toHaveAttribute('aria-current', 'true');
+  const bar = () =>
+    current
+      .locator('td')
+      .first()
+      .evaluate((el) => getComputedStyle(el, '::before').borderLeftWidth);
+  expect(await bar()).toBe('3px');
+});
+
 test('F3 edge: the Played (h) filter has a "never played" preset', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

@@ -140,8 +140,8 @@ function renderProtonBadge(v: unknown, row: Row): Node {
   return span;
 }
 
-// Same `.status-badge` pill shape as renderProtonBadge above, in the app's own accent blue —
-// the same color and dark-on-blue text the side panel's "🎮 Try the Free Demo" banner already
+// Same `.status-badge` pill shape as renderProtonBadge above, in the app's own accent —
+// the same color and dark-on-accent text the side panel's "🎮 Try the Free Demo" banner already
 // uses (`.panel-demo-banner`, style.css) — so the two read as the same "this game has a demo"
 // signifier rather than introducing a new color/shape just for this column.
 function renderDemoBadge(v: unknown): Node {
@@ -150,7 +150,7 @@ function renderDemoBadge(v: unknown): Node {
   const span = document.createElement('span');
   span.className = 'status-badge';
   span.style.background = 'var(--accent)';
-  span.style.color = '#0b1620';
+  span.style.color = 'var(--bg)';
   span.textContent = 'Demo';
   return span;
 }
@@ -202,18 +202,21 @@ export function renderNameCell(v: unknown, row: Row): Node {
   return wrap;
 }
 
-// Ignores `value` and reads `row.capsule` directly — `value` is forced to null on this column
+// Ignores `value` and reads `row.thumb`/`row.capsule` directly — `value` is forced to null on this column
 // (see CORE_COLUMNS below) so the raw image URL never surfaces in full-text search matches.
 export function renderThumb(_value: unknown, row: Row): Node {
   const img = document.createElement('img');
   img.className = 'game-thumb';
   img.alt = '';
   img.loading = 'lazy';
-  img.width = 120;
-  img.height = 45;
-  if (row.capsule) img.src = row.capsule;
+  img.width = 160;
+  img.height = 60;
+  const fallback = row.thumb && row.capsule !== row.thumb ? row.capsule : null;
+  const src = row.thumb || row.capsule;
+  if (src) img.src = src;
   img.addEventListener('error', () => {
-    img.style.visibility = 'hidden';
+    if (fallback && img.src !== fallback) img.src = fallback;
+    else img.style.visibility = 'hidden';
   });
   return img;
 }
@@ -340,7 +343,7 @@ export const compareDateMissingLast = compareMissingLast(
 );
 
 // Amber-flags still-unreleased games in the Released column — reuses scoreColor's own
-// mid-tier amber (`#e4a82e`) rather than introducing a new color, so it reads as "notable,
+// mid-tier amber (`--warn`) rather than introducing a new color, so it reads as "notable,
 // not final" the same way a middling score does elsewhere in the table. Backed by Steam's own
 // `comingSoon` flag (see extractAppDetails in lib/steam.js), not by comparing the parsed date
 // to today — a coarse placeholder like "Coming soon" has no parseable date to compare at all.
@@ -348,7 +351,7 @@ function renderReleaseDate(v: unknown, row: Row): Node {
   if (v === undefined) return document.createTextNode('…');
   if (!v) return document.createTextNode('—');
   const span = document.createElement('span');
-  if (row.comingSoon) span.style.color = '#e4a82e';
+  if (row.comingSoon) span.style.color = 'var(--warn)';
   span.textContent = fmtReleaseDate(String(v));
   return span;
 }
@@ -892,7 +895,6 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   {
     key: 'capsule',
     label: 'Image',
-    width: 128,
     sortable: false,
     filterable: false,
     groupable: false,

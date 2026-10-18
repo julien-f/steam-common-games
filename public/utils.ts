@@ -125,11 +125,11 @@ export function smoothScroll(): ScrollBehavior {
 }
 
 export function scoreColor(n: number | null): string {
-  if (n == null) return 'var(--text1)';
-  if (n >= 80) return '#57cbde';
-  if (n >= 65) return '#a3cf4e';
-  if (n >= 50) return '#e4a82e';
-  return '#e5736b';
+  if (n == null) return 'var(--muted)';
+  if (n >= 80) return 'var(--good)';
+  if (n >= 65) return 'var(--text-body)';
+  if (n >= 50) return 'var(--warn)';
+  return 'var(--bad)';
 }
 
 // Shared money formatter — imported by public/gameColumns.js's price-column renderers (same as

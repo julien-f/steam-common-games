@@ -128,7 +128,8 @@ function details(appid: number, slowMedia = false) {
       // An unfiltered Steam field: the panel must not link a javascript: URL.
       metacritic: appid === UNSAFE_LINK_APPID ? { score: 85, url: 'javascript:alert(1)' } : null,
       // Public store art; a test's browser blocks it (off localhost), dev:mock shows it.
-      capsule: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`,
+      capsule: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_184x69.jpg`,
+      thumb: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`,
       banner: slowMedia ? mediaUrl(`Banner ${appid}`, true) : null,
       ...media(appid, slowMedia),
       dlc: appid === MEDIA_APPID ? DLC_APPIDS : [],

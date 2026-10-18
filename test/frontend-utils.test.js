@@ -64,32 +64,32 @@ test('steamVanity: no profile URL at all (a profile Steam knew nothing about) is
 
 // ── scoreColor ────────────────────────────────────────────────────────────────
 
-test('scoreColor: returns text1 color for null', () => {
-  assert.equal(scoreColor(null), 'var(--text1)');
+test('scoreColor: returns muted color for null', () => {
+  assert.equal(scoreColor(null), 'var(--muted)');
 });
 
-test('scoreColor: returns text1 color for undefined', () => {
-  assert.equal(scoreColor(undefined), 'var(--text1)');
+test('scoreColor: returns muted color for undefined', () => {
+  assert.equal(scoreColor(undefined), 'var(--muted)');
 });
 
-test('scoreColor: 80 returns blue (top tier)', () => {
-  assert.equal(scoreColor(80), '#57cbde');
-  assert.equal(scoreColor(100), '#57cbde');
+test('scoreColor: 80 returns good (top tier)', () => {
+  assert.equal(scoreColor(80), 'var(--good)');
+  assert.equal(scoreColor(100), 'var(--good)');
 });
 
-test('scoreColor: 79 returns green (second tier)', () => {
-  assert.equal(scoreColor(79), '#a3cf4e');
-  assert.equal(scoreColor(65), '#a3cf4e');
+test('scoreColor: 79 returns body text (second tier)', () => {
+  assert.equal(scoreColor(79), 'var(--text-body)');
+  assert.equal(scoreColor(65), 'var(--text-body)');
 });
 
-test('scoreColor: 64 returns orange (third tier)', () => {
-  assert.equal(scoreColor(64), '#e4a82e');
-  assert.equal(scoreColor(50), '#e4a82e');
+test('scoreColor: 64 returns warn (third tier)', () => {
+  assert.equal(scoreColor(64), 'var(--warn)');
+  assert.equal(scoreColor(50), 'var(--warn)');
 });
 
-test('scoreColor: 49 returns red (bottom tier)', () => {
-  assert.equal(scoreColor(49), '#e5736b');
-  assert.equal(scoreColor(0), '#e5736b');
+test('scoreColor: 49 returns bad (bottom tier)', () => {
+  assert.equal(scoreColor(49), 'var(--bad)');
+  assert.equal(scoreColor(0), 'var(--bad)');
 });
 
 // ── fmtH ─────────────────────────────────────────────────────────────────────

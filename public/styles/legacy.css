@@ -60,15 +60,6 @@
     color: #15803d;
   }
 
-  /* Thumbnail cell */
-  .game-thumb {
-    display: block;
-    width: 120px;
-    height: 45px;
-    object-fit: cover;
-    border-radius: 2px;
-  }
-
   .dim {
     color: var(--text1);
   }
@@ -2488,237 +2479,6 @@
     gap: 4px;
   }
 
-  /* ── List route styles (see docs/dev/frontend.md) ─────────────────────── */
-
-  /* Wide page layout for the two routes built around a big data table — same 1600px cap the
-   legacy Library Explorer/Bundles pages used (`.lib-page`/`.bundles-page`), just renamed to
-   match the new route components. `.container`'s narrower 1100px stays right for every other
-   route (Home, the game route, About). */
-  .list-route,
-  .bundles-browse-route {
-    max-width: 1600px;
-    margin: 0 auto;
-    padding: 36px 20px 60px;
-  }
-
-  .list-progress {
-    display: block;
-    width: 100%;
-    max-width: 420px;
-    height: 6px;
-    margin-top: 6px;
-    accent-color: var(--accent);
-  }
-
-  .list-status,
-  .bundles-status {
-    font-size: var(--fs-ui);
-    color: var(--text1);
-    margin-bottom: 10px;
-  }
-  /* A finished bundle blanks this line (its hero card's Games tile carries the count instead — see
-   ListRoute.tsx's updateStatus), so it has to collapse rather than leave 10px of nothing. */
-  .list-status:empty,
-  .bundles-status:empty {
-    display: none;
-  }
-  .list-failed,
-  .cell-failed,
-  .price-status.list-failed {
-    color: #e0a83a;
-  }
-  .list-status > .list-failed:not(:first-child)::before,
-  .list-status > .list-score-note:not(:first-child)::before {
-    content: ' · ';
-    color: var(--text1);
-  }
-  .cell-failed {
-    cursor: help;
-  }
-  .price-status {
-    font-size: var(--fs-ui);
-    color: var(--text1);
-    margin-bottom: 10px;
-  }
-  .price-status:empty {
-    display: none;
-  }
-
-  /* Row-selection-based add/remove-to-list (ListRoute.tsx) */
-  .selection-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
-    background: var(--bg1);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    padding: 10px 14px;
-    margin-top: 12px;
-    /* Stays in view while selecting rows anywhere in the table. */
-    position: sticky;
-    bottom: 12px;
-    z-index: 5;
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.35);
-  }
-  .selection-count {
-    font-size: var(--fs-ui);
-    font-weight: 600;
-    color: var(--text0);
-  }
-  .tier-package {
-    display: inline-flex;
-    flex-direction: column;
-    line-height: 1.2;
-  }
-  .tier-package small {
-    font-size: var(--fs-label);
-    color: var(--text1);
-  }
-  .selection-pick-cost {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.15;
-  }
-  .selection-pick-total {
-    font-size: var(--fs-figure);
-    font-weight: 600;
-    color: var(--accent2);
-  }
-  .selection-pick-detail {
-    font-size: var(--fs-meta);
-    color: var(--text1);
-  }
-  .selection-pick-savings {
-    font-size: var(--fs-body);
-    font-weight: 600;
-  }
-  .selection-fanatical {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .selection-fanatical-bookmarklet {
-    font-size: var(--fs-meta);
-    color: var(--accent2);
-    border: 1px dashed var(--border);
-    border-radius: var(--r);
-    padding: 4px 8px;
-    cursor: grab;
-    text-decoration: none;
-  }
-  .selection-fanatical-by-hand {
-    font-size: var(--fs-meta);
-    color: var(--text1);
-    cursor: help;
-  }
-  .selection-toolbar button {
-    padding: 6px 12px;
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    background: transparent;
-    color: var(--text0);
-    font-size: var(--fs-meta);
-    cursor: pointer;
-  }
-  .selection-toolbar button:hover:not(:disabled) {
-    border-color: var(--accent);
-    color: var(--accent2);
-  }
-  .selection-toolbar button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  .selection-status {
-    position: fixed;
-    left: 50%;
-    bottom: 24px;
-    transform: translateX(-50%);
-    z-index: 50;
-    display: none;
-    gap: 12px;
-    align-items: center;
-    max-width: calc(100vw - 32px);
-    padding: 10px 16px;
-    font-size: var(--fs-ui);
-    color: var(--text0);
-    background: var(--bg1);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
-  }
-  .selection-status.is-visible {
-    display: flex;
-  }
-  .selection-status a {
-    color: var(--accent);
-    white-space: nowrap;
-  }
-  .selection-new-list-name,
-  .rank-menu-new input {
-    background: var(--bg0);
-    color: var(--text0);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    padding: 6px 10px;
-    font-size: var(--fs-ui);
-  }
-
-  /* Share view/Default view, in the table toolbar's own line (the library's `toolbarEnd` slot). */
-  .list-view-actions {
-    position: relative;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 8px;
-  }
-  .list-view-reason {
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    z-index: 20;
-    width: max-content;
-    max-width: min(320px, calc(100vw - 24px));
-    margin: 0;
-    padding: 8px 10px;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
-    font-size: var(--fs-meta);
-    color: var(--text0);
-  }
-  .list-view-actions .btn-icon {
-    display: none;
-  }
-  .rank-reason {
-    align-self: center;
-    font-size: var(--fs-meta);
-    color: var(--text1);
-  }
-  /* Phone: icons only, and the table library's toolbar spacing tightened, so the rows start higher. */
-  @media (max-width: 768px) {
-    .list-view-actions .btn-label {
-      display: none;
-    }
-    .list-view-actions .btn-icon {
-      display: inline;
-    }
-  }
-
-  .pref-unsaved-banner {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: var(--fs-ui);
-    color: var(--accent2);
-    margin-bottom: 10px;
-  }
-
-  .table-container {
-    margin-bottom: 18px;
-  }
-
   /* The compare route's players form (ComparePlayersForm.tsx) — one row per player, one input per
    identifier within it. Same card treatment as Home's combine form, since it does the same job
    one level up: saying what a list is made of before it exists. */
@@ -3935,8 +3695,6 @@
   /* Under the desktop app bar (see .site-nav): after every route wrapper's own padding, so it wins. */
   @media (min-width: 769px) {
     .container,
-    .list-route,
-    .bundles-browse-route,
     .home-route,
     .rank-route {
       padding-top: 24px;
@@ -4098,15 +3856,7 @@
     }
   }
 
-  /* Phone game tables: a capsule-sized thumbnail and tighter cells, so rating and length fit
-   beside the name rather than off to the right. */
   @media (max-width: 600px) {
-    .game-thumb {
-      width: 64px;
-      height: 24px;
-    }
-    .list-route,
-    .bundles-browse-route,
     .home-route {
       padding: 16px 12px 40px;
     }
@@ -4174,21 +3924,20 @@
   .rank-menu-new input {
     flex: 1;
     min-width: 0;
+    background: var(--bg0);
+    color: var(--text0);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 6px 10px;
+    font-size: var(--fs-ui);
+  }
+  .rank-reason {
+    align-self: center;
+    font-size: var(--fs-meta);
+    color: var(--text1);
   }
   .rank-menu-new .rank-reason {
     flex-basis: 100%;
-  }
-
-  /* A list that loaded with no games: its message stands where the table would be. */
-  .table-container--empty {
-    display: none;
-  }
-  .list-empty {
-    padding: 32px 16px;
-    border: 1px dashed var(--border);
-    border-radius: var(--r);
-    color: var(--text1);
-    text-align: center;
   }
 
   /* A bundle source's games with no Steam listing, beside its count on the formula line. */

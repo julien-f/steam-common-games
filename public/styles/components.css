@@ -325,11 +325,205 @@
     }
   }
 
-  /* Phone: the table toolbar's own actions are icons only, square, so its first line holds them. */
+  /* ── A list route's table and what surrounds it; the table's own look is styles/vendor-data-table.css. ── */
+
+  /* Fixed size, so a row keeps its height while the image loads or after it fails. */
+  .game-thumb {
+    display: block;
+    width: 160px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: var(--radius-1);
+    background: var(--surface);
+  }
+  @media (max-width: 600px) {
+    .game-thumb {
+      width: 96px;
+      height: 36px;
+    }
+  }
+
+  .list-status,
+  .bundles-status,
+  .price-status {
+    margin-bottom: 10px;
+    color: var(--muted);
+    font-size: var(--fs-ui);
+  }
+  /* A finished bundle blanks its status line (the Games tile has the count): no empty gap. */
+  .list-status:empty,
+  .bundles-status:empty,
+  .price-status:empty {
+    display: none;
+  }
+  .list-progress {
+    display: block;
+    width: 100%;
+    max-width: 420px;
+    height: 6px;
+    margin-top: 6px;
+    accent-color: var(--accent);
+  }
+  .list-failed,
+  .cell-failed {
+    color: var(--warn);
+  }
+  .cell-failed {
+    cursor: help;
+  }
+  .list-status > .list-failed:not(:first-child)::before,
+  .list-status > .list-score-note:not(:first-child)::before {
+    content: ' · ';
+    color: var(--muted);
+  }
+
+  .pref-unsaved-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: var(--fs-ui);
+  }
+
+  /* Share view / Default view, in the table toolbar's end slot. */
+  .list-view-actions {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .list-view-reason {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 20;
+    width: max-content;
+    max-width: min(320px, calc(100vw - 24px));
+    padding: 8px 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-2);
+    background: var(--surface);
+    font-size: var(--fs-meta);
+  }
+  .list-view-actions .btn-icon {
+    display: none;
+  }
+  /* Phone: icons only, square, so the toolbar's first line holds them. */
   @media (max-width: 768px) {
     .list-view-actions .btn {
       min-width: var(--control-h);
       padding-inline: 8px;
     }
+    .list-view-actions .btn-label {
+      display: none;
+    }
+    .list-view-actions .btn-icon {
+      display: inline;
+    }
+  }
+
+  .table-container {
+    margin-bottom: 18px;
+  }
+  /* A list that loaded with no games: its message stands where the table would be. */
+  .table-container--empty {
+    display: none;
+  }
+  .list-empty {
+    padding: 32px 16px;
+    border: 1px dashed var(--line-control);
+    border-radius: var(--radius-3);
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* A Steam package's rows: the rate, and what it covers under it. */
+  .tier-package {
+    display: inline-flex;
+    flex-direction: column;
+    line-height: 1.2;
+  }
+  .tier-package small {
+    color: var(--muted);
+    font-size: var(--fs-label);
+  }
+
+  /* Last in the route and stuck to the view's bottom while rows are picked anywhere in the table;
+     an edge, not a shadow, sets it off the rows under it. */
+  .selection-toolbar {
+    position: sticky;
+    bottom: 12px;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-top: 12px;
+    padding: 8px 12px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-3);
+    background: var(--surface);
+  }
+  .selection-count {
+    font-size: var(--fs-ui);
+    font-weight: 600;
+  }
+  .selection-pick-cost {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+  }
+  .selection-pick-total {
+    font-size: var(--fs-figure);
+    font-weight: 600;
+  }
+  .selection-pick-detail {
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .selection-pick-savings {
+    font-weight: 600;
+  }
+  .selection-fanatical {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .selection-fanatical-bookmarklet {
+    padding: 4px 8px;
+    border: 1px dashed var(--line-control);
+    border-radius: var(--radius-2);
+    font-size: var(--fs-meta);
+    text-decoration: none;
+    cursor: grab;
+  }
+  .selection-fanatical-by-hand {
+    color: var(--muted);
+    font-size: var(--fs-meta);
+    cursor: help;
+  }
+  /* What an Add or Remove did, after the selection it acted on is gone. */
+  .selection-status {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    z-index: 50;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    max-width: calc(100vw - 32px);
+    padding: 10px 16px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-3);
+    background: var(--surface);
+    font-size: var(--fs-ui);
+    transform: translateX(-50%);
+  }
+  .selection-status.is-visible {
+    display: flex;
+  }
+  .selection-status a {
+    white-space: nowrap;
   }
 }

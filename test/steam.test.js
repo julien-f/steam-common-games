@@ -847,6 +847,7 @@ test('getAppDetails: handles missing optional fields with empty arrays', async (
     comingSoon: false,
     metacritic: null,
     capsule: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg',
+    thumb: null,
     banner: 'https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg',
     movies: [],
     screenshots: [],
@@ -1037,12 +1038,31 @@ test('getAppDetails: uses capsule_imagev5 when present', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () =>
     makeAppDetailsResponse(400, {
-      capsule_imagev5: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_231x87.jpg',
-      capsule_image: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg',
+      capsule_imagev5: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_184x69.jpg',
+      capsule_image: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_231x87.jpg',
     }),
   );
   const result = await getAppDetails(400);
-  assert.equal(result.capsule, 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_231x87.jpg');
+  assert.equal(result.capsule, 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_184x69.jpg');
+});
+
+test('getAppDetails: the table thumbnail is capsule_image, the 231×87 capsule', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () =>
+    makeAppDetailsResponse(400, {
+      capsule_imagev5: 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/400/capsule_184x69.jpg',
+      capsule_image: 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/400/capsule_231x87.jpg',
+    }),
+  );
+  const result = await getAppDetails(400);
+  assert.equal(
+    result.thumb,
+    'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/400/capsule_231x87.jpg',
+  );
+  assert.equal(
+    result.capsule,
+    'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/400/capsule_184x69.jpg',
+  );
 });
 
 test('getAppDetails: comingSoon reflects release_date.coming_soon', async (t) => {
@@ -1061,11 +1081,11 @@ test('getAppDetails: falls back to capsule_image when capsule_imagev5 is absent'
   _reset();
   t.mock.method(globalThis, 'fetch', async () =>
     makeAppDetailsResponse(400, {
-      capsule_image: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg',
+      capsule_image: 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_231x87.jpg',
     }),
   );
   const result = await getAppDetails(400);
-  assert.equal(result.capsule, 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_sm_120.jpg');
+  assert.equal(result.capsule, 'https://cdn.akamai.steamstatic.com/steam/apps/400/capsule_231x87.jpg');
 });
 
 test('getAppDetails: falls back to constructed sm_120 URL when no capsule fields present', async (t) => {

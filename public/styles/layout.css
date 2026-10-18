@@ -89,6 +89,20 @@
     padding: 16px var(--gutter) 24px;
   }
 
+  /* The routes built around a wide table. */
+  .list-route,
+  .bundles-browse-route {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding-block: 24px 60px;
+  }
+  @media (max-width: 600px) {
+    .list-route,
+    .bundles-browse-route {
+      padding-block: 16px 40px;
+    }
+  }
+
   /* Every route's side margin. */
   .container,
   .list-route,

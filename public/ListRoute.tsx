@@ -641,6 +641,7 @@ function applyDetailsEvent(row: Game, event: DetailsEvent) {
   row.detailsFetchedAts = event.fetchedAts ?? null;
   row.failedSources = event.failed ?? [];
   row.capsule = event.meta?.capsule ?? null;
+  row.thumb = event.meta?.thumb ?? null;
   if (!row.name) row.name = event.meta?.name || row.bundlePackage?.title || '';
   row.score = event.rating?.score ?? null;
   row.positivePct =
@@ -3728,7 +3729,7 @@ export default function ListRoute() {
                   {(deals) => (
                     <span
                       class="selection-pick-savings"
-                      style={{ color: scoreColor(pickSavings(plan(), deals()).overpays ? 20 : 70) }}
+                      style={{ color: pickSavings(plan(), deals()).overpays ? 'var(--bad)' : 'var(--good)' }}
                       title={`vs ${formatMoney(deals(), plan().currency)} for the same games at their best deals`}
                     >
                       {pickSavings(plan(), deals()).text}
