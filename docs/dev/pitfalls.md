@@ -116,3 +116,9 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: the GitHub runner's fonts run wider, so a row at its 390 px limit (340.4 px of buttons in 340 px) wraps there only.
 - **Fix**: reproduce locally by widening the text (`page.addStyleTag` with `letter-spacing: 1px`), as I1's test does; to see CI's layout, log `getBoundingClientRect()`s from the test on a branch run.
 - **Also**: to find the change that broke it, diff against the last green run's commit (`gh run view <id> --json headSha`), not just the newest commit: one push can carry many.
+
+## A closed `[popover]` panel shows anyway
+
+- **Symptom**: a popover panel sits on the page, in flow under its button, before anything opened it; `toBeHidden()` on it fails.
+- **Cause**: the browser hides a closed popover with a user-agent `display: none`, which any `display` in the app's CSS (`.account-chip-panel`'s `flex`) overrides.
+- **Fix**: restate it for closed panels, `:not(:popover-open) { display: none }`, as `.site-nav-popover-panel` does in `style.css`.

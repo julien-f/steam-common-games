@@ -30,7 +30,7 @@ test('A1: first visit — resolve my account, then open my library', async ({ pa
   await expect(row(page, 'Hades')).toContainText('44.5');
 
   await page.reload();
-  await expect(page.getByRole('navigation')).toContainText('Alice');
+  await expect(page.getByRole('banner')).toContainText('Alice');
   await expect(rows(page)).toHaveCount(6);
 });
 
@@ -137,13 +137,13 @@ test('A2.1-2,4: explore a friend, then switch back to my ★ account from the na
   await page.goto('/');
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
   await page.getByRole('button', { name: 'Look up', exact: true }).click();
-  await expect(page.getByRole('navigation')).toContainText('Bob');
+  await expect(page.getByRole('banner')).toContainText('Bob');
 
-  await page.getByRole('navigation').getByText('Bob', { exact: true }).click();
+  await page.getByRole('banner').getByText('Bob', { exact: true }).click();
   const back = page.getByRole('button', { name: /Alice/ }).filter({ has: page.getByTitle(/Your account/) });
   await expect(back).toBeVisible();
   await back.click();
-  await expect(page.getByRole('navigation')).toContainText('Alice');
+  await expect(page.getByRole('banner')).toContainText('Alice');
 });
 
 test('A2 edge: the nav chip reads as an account, not as a second selected route', async ({ page }) => {
@@ -173,14 +173,14 @@ test('A2 edge: switching account from the nav chip leaves focus on the chip', as
   await page.goto('/');
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
   await page.getByRole('button', { name: 'Look up', exact: true }).click();
-  await expect(page.getByRole('navigation')).toContainText('Bob');
+  await expect(page.getByRole('banner')).toContainText('Bob');
 
   await page.locator('.account-chip-btn').click();
   await page
     .getByRole('button', { name: /Alice/ })
     .filter({ has: page.getByTitle(/Your account/) })
     .click();
-  await expect(page.getByRole('navigation')).toContainText('Alice');
+  await expect(page.getByRole('banner')).toContainText('Alice');
   await expect(page.locator('.account-chip-btn')).toBeFocused();
 });
 
@@ -210,7 +210,7 @@ test('A2 edge: an account picked mid-refresh does not read "Refreshing…" while
 
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
   await page.getByRole('button', { name: 'Look up', exact: true }).click();
-  await expect(page.getByRole('navigation')).toContainText('Bob');
+  await expect(page.getByRole('banner')).toContainText('Bob');
   await expect(updated).not.toContainText('Refreshing');
   release();
   await expect(page.locator('.account-counts')).toContainText('Owned: 4');
@@ -284,9 +284,9 @@ test("S3 edge: another browser's list link explains lists are local", async ({ p
 test('A1 edge: an account stored without its name picks it up from Home', async ({ page }) => {
   await asPlayer(page, ALICE, { withLabel: false });
   await page.goto('/');
-  await expect(page.getByRole('navigation')).toContainText('Alice');
+  await expect(page.getByRole('banner')).toContainText('Alice');
   await page.reload();
-  await expect(page.getByRole('navigation')).toContainText('Alice');
+  await expect(page.getByRole('banner')).toContainText('Alice');
 });
 
 test('F3 edge: the Played (h) filter range reads in rounded hours', async ({ page }) => {
@@ -737,7 +737,7 @@ test('C1 edge: an unknown player is named, and the others still compare', async 
 test('C1 edge: the bare Compare link after an unknown player starts clean', async ({ page }) => {
   await page.goto('/lists/compare?u=alice&u=nobody-here');
   await expect(page.getByRole('alert')).toContainText('nobody-here');
-  await page.getByRole('navigation').getByRole('link', { name: 'Compare' }).click();
+  await page.getByRole('navigation', { name: 'Main', exact: true }).getByRole('link', { name: 'Compare' }).click();
   await expect(page.locator('.compare-form')).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.locator('.compare-token.is-invalid')).toHaveCount(0);
@@ -973,7 +973,7 @@ test('L1 edge: one selected game is too few to rank, and says so', async ({ page
   await page.keyboard.press('Escape');
   await page.goto('/lists/wishlist');
   await row(page, 'It Takes Two').getByRole('checkbox').check();
-  await page.locator('summary', { hasText: 'Rank 1 game' }).click();
+  await page.getByRole('button', { name: /Rank 1 game/ }).click();
   const create = page.locator('.rank-menu-panel').getByRole('button', { name: '+ New ranking' });
   await expect(create).toHaveAttribute('aria-disabled', 'true');
   await expect(create).toHaveAccessibleDescription('Ranking needs at least 2 games');
@@ -1125,7 +1125,7 @@ test('I1 edge: on desktop the nav starts on the content edge, close above it', a
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/lists/owned');
     const nav = (await page.locator('.site-nav').boundingBox())!;
-    const first = (await page.locator('.site-nav > *').first().boundingBox())!;
+    const first = (await page.locator('.site-nav-link').first().boundingBox())!;
     const hero = (await page.locator('.list-hero').boundingBox())!;
     expect(Math.round(first.x), `at ${width}px`).toBe(Math.round(hero.x));
     expect(hero.y - (nav.y + nav.height), `at ${width}px`).toBeLessThanOrEqual(28);
@@ -1249,9 +1249,9 @@ test('R1 edge: Esc closing a nav popover stays on the ranking', async ({ page })
   await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
 
   await page.getByLabel('Preferences').click();
-  await expect(page.locator('.site-nav-prefs')).toHaveAttribute('open');
+  await expect(page.locator('.site-nav-prefs-panel')).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.locator('.site-nav-prefs')).not.toHaveAttribute('open');
+  await expect(page.locator('.site-nav-prefs-panel')).toBeHidden();
   await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
 });
 
@@ -1293,7 +1293,7 @@ test('R2 edge: ranking a list again offers its rankings, or a new one by a crite
   await expect(page.getByRole('heading', { name: 'Ranking of Alice — Wishlist' })).toBeVisible();
 
   await page.goto('/lists/wishlist');
-  await page.locator('summary', { hasText: /Rank this list/ }).click();
+  await page.getByRole('button', { name: /Rank this list/ }).click();
   const menu = page.locator('.rank-menu-panel');
   await expect(menu.getByRole('button', { name: /Ranking of Alice — Wishlist/ })).toBeVisible();
   await menu.getByRole('textbox', { name: 'What are you ranking by?' }).fill('co-op');
@@ -1726,7 +1726,7 @@ test('O1 edge: once the instance is known to have no ITAD key, Bundles opens on 
   await page.goto('/lists/wishlist');
   await expect(page.getByRole('main')).toContainText("Prices aren't available on this instance");
   await page.route('**/api/bundles?*', () => {}); // never answers: the card can't wait on its 503
-  await page.getByRole('navigation').getByRole('link', { name: 'Bundles' }).click();
+  await page.getByRole('navigation', { name: 'Main', exact: true }).getByRole('link', { name: 'Bundles' }).click();
   await expect(page.locator('.list-hero')).toContainText('IsThereAnyDeal API key');
   await expect(page.getByLabel('Include expired')).toHaveCount(0);
   await expect(page.locator('.table-container')).toHaveCount(0);
@@ -2999,7 +2999,7 @@ test("F2 edge: /search, About and the 404 page title themselves with the list ro
   ]) {
     await page.goto(path);
     await expect(page.locator('.list-hero-title')).toHaveText(title);
-    await expect(page.locator('header h1')).toHaveCount(0);
+    await expect(page.locator('h1')).toHaveCount(1);
   }
 });
 
@@ -3176,9 +3176,9 @@ test('F1 edge: Esc closes a nav popover or the search dropdown, not the open gam
   await expect(page.locator('#panel-title')).toHaveText('Portal 2');
 
   await page.getByLabel('Preferences').click();
-  await expect(page.locator('.site-nav-prefs')).toHaveAttribute('open');
+  await expect(page.locator('.site-nav-prefs-panel')).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.locator('.site-nav-prefs')).not.toHaveAttribute('open');
+  await expect(page.locator('.site-nav-prefs-panel')).toBeHidden();
   await expect(page.locator('#panel-title')).toBeVisible();
 
   await page.getByPlaceholder('Look up any game…').fill('hollow');
@@ -3422,7 +3422,7 @@ test('I2 edge: every shortcut description starts at the same x', async ({ page }
   const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
   await expect(dialog).toBeVisible();
   const lefts = await dialog
-    .locator('.shortcuts-row > span:last-child')
+    .locator('.shortcuts-row > dd')
     .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().left)));
   expect(lefts.length).toBeGreaterThan(10);
   expect(new Set(lefts).size).toBe(1);
@@ -3496,6 +3496,192 @@ test('I2 edge: icon-only controls have names', async ({ page }) => {
   await expect(page.locator('.dt-dd')).toContainText('Image');
 });
 
+test('I2 edge: Esc in the lightbox closes only it, drops its shot from the URL, and one Back closes the game', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/about');
+  await page.goto('/lists/owned');
+  await row(page, 'Hades').getByText('Hades').click();
+  await page.getByRole('button', { name: 'Open in lightbox' }).click();
+  await expect(page).toHaveURL(/&shot=banner/);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/open/);
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await expect(page).toHaveURL(/\?game=1145360$/);
+  await page.goBack();
+  await expect(page.locator('#game-panel')).toBeHidden();
+  await expect(page).toHaveURL(/\/lists\/owned$/);
+});
+
+test('I2 edge: a click beside the shortcuts dialog closes it', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await page.keyboard.press('?');
+  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(dialog).toBeVisible();
+  await page.mouse.click(5, 5); // a corner the dialog never covers
+  await expect(dialog).toBeHidden();
+});
+
+test('I2 edge: a click outside closes each nav popover, and opening one closes the other', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  // The rank menu only replaces the Rank button once the list has a ranking.
+  await page.getByRole('button', { name: /Rank this list/ }).click();
+  await page.keyboard.press('Escape');
+  await page.goto('/lists/wishlist');
+  await expect(rows(page)).toHaveCount(4);
+
+  const prefs = page.locator('.site-nav-prefs-panel');
+  const account = page.locator('.account-chip-panel');
+  const rank = page.locator('.rank-menu-panel');
+  // In the left gutter, which no popover covers (clampPopoverLeft keeps them 12px in).
+  const outside = async () => {
+    const title = (await page.locator('.list-hero-title').boundingBox())!;
+    await page.mouse.click(5, title.y + title.height / 2);
+  };
+  const triggers = [
+    [prefs, () => page.getByLabel('Preferences').click()],
+    [account, () => page.locator('.account-chip-btn').click()],
+    [rank, () => page.getByText(/Rank this list/).click()],
+  ] as const;
+  for (const [panel, open] of triggers) {
+    await open();
+    await expect(panel).toBeVisible();
+    await outside();
+    await expect(panel).toBeHidden();
+  }
+  // The nav's popovers can cover the rank menu's trigger, so that one only opens first.
+  for (const [[panel, open], [next, openNext]] of [
+    [triggers[0], triggers[1]],
+    [triggers[1], triggers[0]],
+    [triggers[2], triggers[0]],
+  ]) {
+    await open();
+    await expect(panel).toBeVisible();
+    await openNext();
+    await expect(next).toBeVisible();
+    await expect(panel).toBeHidden();
+    await outside();
+  }
+});
+
+test('I2 edge: a hidden achievement is revealed by Enter, and by Space', async ({ page }) => {
+  await page.route('**/api/achievements/**', (route) => {
+    const req = route.request();
+    const body = JSON.parse(respond(req.method(), new URL(req.url()), req.postData()).body);
+    for (const a of body.achievements) Object.assign(a, { hidden: true, achieved: false, unlocktime: null });
+    body.unlocked = 0;
+    return route.fulfill({ json: body });
+  });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const card = page.locator('#panel-section-achievements');
+  await card.getByRole('button', { name: /Achievements/ }).click();
+  const hidden = card.getByRole('button', { name: /Hidden achievement/ });
+  await expect(hidden).toHaveCount(2);
+  await hidden.first().focus();
+  await page.keyboard.press('Enter');
+  await expect(card).toContainText('First steps');
+  await expect(hidden).toHaveCount(1);
+  await hidden.focus();
+  await page.keyboard.press(' ');
+  await expect(card).toContainText('Completionist');
+  await expect(hidden).toHaveCount(0);
+});
+
+test("I2 edge: Enter or Space on the panel's hero opens the lightbox once", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const entries = await page.evaluate(() => history.length);
+  // A button takes Enter on keydown, Space on keyup: neither may also press the lightbox's Close.
+  for (const key of ['Enter', ' ']) {
+    await page.getByRole('button', { name: 'Open in lightbox' }).focus();
+    await page.keyboard.press(key);
+    await expect(page.locator('.lb-close')).toBeFocused();
+    await page.waitForTimeout(200); // past a second activation's close
+    await expect(page.locator('#screenshot-lightbox')).toHaveClass(/open/);
+    expect(await page.evaluate(() => history.length)).toBe(entries + 1);
+    await page.goBack();
+    await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/open/);
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+  }
+});
+
+// Visible headings' levels, and the unnamed navigation/complementary landmarks.
+const structure = (page: Page) =>
+  page.evaluate(() => {
+    const shown = (sel: string) => [...document.querySelectorAll<HTMLElement>(sel)].filter((e) => e.checkVisibility());
+    const named = (e: Element) => e.hasAttribute('aria-label') || e.hasAttribute('aria-labelledby');
+    return {
+      levels: shown('h1, h2, h3, h4, h5, h6, [role=heading]').map((h) =>
+        Number(h.getAttribute('aria-level') ?? h.tagName[1]),
+      ),
+      unnamedNavs: shown('nav, [role=navigation]').filter((e) => !named(e)).length,
+      unnamedPanels: shown('aside, [role=complementary]').filter((e) => !named(e)).length,
+    };
+  });
+
+test('I3.1-2,4: each main page and the open game have one h1, first, skip no heading level, and name every landmark', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await page.getByRole('button', { name: /Rank this list/ }).click();
+  await expect(page).toHaveURL(/\/rank$/);
+  const rank = new URL(page.url()).pathname;
+  for (const [path, ready] of [
+    ['/', page.getByText('Your lists')],
+    ['/lists/owned', rows(page).first()],
+    ['/about', page.getByRole('heading', { name: 'Contact' })],
+    ['/search?q=hades', rows(page).first()],
+    ['/bundles', rows(page).first()],
+    [rank, page.getByText('Which do you prefer?')],
+    ['/lists/owned?game=1145360', page.getByRole('complementary', { name: 'Hades' })],
+  ] as const) {
+    await page.goto(path);
+    await expect(ready).toBeVisible();
+    for (const landmark of [
+      page.getByRole('banner'),
+      page.getByRole('navigation', { name: 'Main', exact: true }),
+      page.getByRole('search'),
+      page.getByRole('main'),
+    ])
+      await expect(landmark, path).toBeVisible();
+    const { levels, unnamedNavs, unnamedPanels } = await structure(page);
+    expect(levels[0], path).toBe(1);
+    expect(levels.filter((l) => l === 1).length, path).toBe(1);
+    for (const [i, level] of levels.entries()) if (i) expect(level, path).toBeLessThanOrEqual(levels[i - 1] + 1);
+    expect(unnamedNavs, path).toBe(0);
+    expect(unnamedPanels, path).toBe(0);
+  }
+  // The open game's sections are headings under its name.
+  const panel = page.getByRole('complementary', { name: 'Hades' });
+  await expect(panel.getByRole('heading', { level: 2, name: 'Hades' })).toBeVisible();
+  for (const name of ['Price', 'Owned by', /How Long To Beat/, /Achievements/])
+    await expect(panel.getByRole('heading', { level: 3, name })).toBeVisible();
+});
+
+test('I3.3: each field on Home, the combine form and Compare says what it is for', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await expect(page.getByRole('search').getByRole('textbox', { name: 'Look up any game' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Steam name, profile URL, or 64-bit ID' })).toBeVisible();
+  await page.getByRole('button', { name: '+ New combined list' }).click();
+  await expect(page.getByRole('textbox', { name: 'Combined list name (optional)' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'How to combine the sources' })).toBeVisible();
+  await expect(
+    page.getByRole('group', { name: 'Pick at least 2 sources:' }).getByRole('checkbox', { name: 'Alice — Owned' }),
+  ).toBeVisible();
+
+  await page.goto('/lists/compare');
+  await expect(page.getByRole('combobox', { name: 'Player 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Player 2', exact: true })).toBeVisible();
+});
+
 test('I2.1: into a list from the keyboard — skip link, and R with no panel open', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
@@ -3506,11 +3692,11 @@ test('I2.1: into a list from the keyboard — skip link, and R with no panel ope
   await page.keyboard.press('Enter');
   expect(await page.evaluate(() => document.activeElement?.closest('tbody') != null)).toBe(true);
 
-  // The closed shortcuts dialog isn't a Tab stop; open, it is.
+  // The closed shortcuts dialog isn't rendered, so it's no Tab stop; open, it is.
   const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts', includeHidden: true });
-  await expect(dialog).toHaveAttribute('inert', '');
+  await expect(dialog).toBeHidden();
   await page.keyboard.press('?');
-  await expect(dialog).not.toHaveAttribute('inert');
+  await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Close' }).click();
 
   await page.keyboard.press('r');
@@ -3581,13 +3767,13 @@ test("Y1.1,3: signed in on a new device, the account's lists win over this brows
   await page.goto('/');
 
   await expect(page.getByRole('main')).toContainText(SYNCED_LIST); // adopted, then reloaded
-  await expect(page.getByRole('navigation')).toContainText('Alice');
+  await expect(page.getByRole('banner')).toContainText('Alice');
   expect(pushed.recentAccounts).toContain(BOB.steamid); // a key the account lacks still goes up
   // Home may refresh Alice's slot (its vanity) and push that; never this browser's Bob.
   expect(pushed.myAccount ?? '').not.toContain(BOB.steamid);
   expect(pushed.currentAccount ?? '').not.toContain(BOB.steamid);
 
-  await page.getByRole('navigation').getByText('Alice', { exact: true }).click();
+  await page.getByRole('banner').getByText('Alice', { exact: true }).click();
   await expect(page.getByText('Signed in — your accounts/lists/settings sync')).toBeVisible();
 });
 
@@ -3595,7 +3781,7 @@ test('Y1 edge: signing out switches the account menu back to signing in', async 
   await mockApi(page, { states: ['signed-in'] });
   await page.route('**/auth/logout', (route) => route.fulfill({ json: { ok: true } }));
   await page.goto('/about');
-  await page.getByRole('navigation').getByText('Alice', { exact: true }).click();
+  await page.getByRole('banner').getByText('Alice', { exact: true }).click();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page.getByRole('link', { name: 'Sign in with Steam' })).toBeVisible();
   await expect(page.getByText('Signed in — your accounts/lists/settings sync')).toHaveCount(0);

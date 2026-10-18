@@ -210,7 +210,9 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
       <Index each={slots()}>
         {(slot, slotIdx) => (
           <div class="compare-slot">
-            <span class="compare-slot-label">Player {slotIdx + 1}</span>
+            <span class="compare-slot-label" id={`${listboxId}-label-${slotIdx}`}>
+              Player {slotIdx + 1}
+            </span>
             {/* focusout with a containment check handles click-away and tabbing out alike, and
                 skips focus moving *within* the slot (a chip's own × button). Each option's own
                 mousedown is prevented below, so picking one never takes focus off the input in
@@ -259,6 +261,7 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
               <input
                 type="text"
                 role="combobox"
+                aria-labelledby={`${listboxId}-label-${slotIdx}`}
                 aria-expanded={openSlot() === slotIdx}
                 aria-controls={listboxId}
                 aria-autocomplete="list"

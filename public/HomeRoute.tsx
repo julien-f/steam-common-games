@@ -432,6 +432,7 @@ export default function HomeRoute() {
 
   return (
     <div class="home-route">
+      <h1 class="visually-hidden">Home</h1>
       <section class="home-account">
         <h2>Account</h2>
 
@@ -625,6 +626,7 @@ export default function HomeRoute() {
                 ref={(el) => i > 0 && queueMicrotask(() => el.focus())}
                 value={value()}
                 placeholder="Steam name, profile URL, or 64-bit ID…"
+                aria-label="Steam name, profile URL, or 64-bit ID"
                 onInput={(e) =>
                   setResolveInputs((prev) => prev.map((v, idx) => (idx === i ? e.currentTarget.value : v)))
                 }
@@ -697,7 +699,7 @@ export default function HomeRoute() {
         </Show>
       </section>
 
-      <section class="home-fixed-links">
+      <nav class="home-fixed-links" aria-label="Lists">
         <A href={accountLink('/lists/owned')}>Owned</A>
         <A href={accountLink('/lists/wishlist')}>Wishlist</A>
         <A href={accountLink('/bundles')}>Bundles</A>
@@ -706,7 +708,7 @@ export default function HomeRoute() {
             account override alongside them would be two different claims about whose games are
             on screen. */}
         <A href={COMPARE_PATH}>Compare libraries</A>
-      </section>
+      </nav>
 
       <section class="home-tree">
         <h2>Your lists</h2>

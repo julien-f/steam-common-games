@@ -255,6 +255,7 @@ export default function SearchRoute() {
           ref={inputEl}
           type="text"
           placeholder="Search for a game…"
+          aria-label="Search for a game"
           enterkeyhint="search"
           value={query()}
           onFocus={(e) => e.currentTarget.select()}

@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - The side panel's similar games now come from the account's library instead of the open list, on every page
+- Screen readers find each page's landmarks, headings and field names; the shortcuts dialog and the nav menus use the browser's own
 
 ### Development
 

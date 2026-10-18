@@ -101,6 +101,10 @@ b {
   margin-bottom: 20px;
   padding: 0 12px;
 }
+/* The Main landmark around the route links; its links stay items of the bar's flex row. */
+.site-nav-links {
+  display: contents;
+}
 .site-nav-link {
   padding: 6px 14px;
   border-radius: 999px;
@@ -140,18 +144,13 @@ b {
   }
 }
 
-/* Nav-bar popovers — the ⚙ Preferences panel (AppShell.tsx) and the account chip's
-   (AccountChip.tsx). Both are native <details> for a free, accessible open/close toggle;
-   outside-click/Escape closing and the panel's own placement are added by hand in
-   navPopover.ts's bindNavPopover, since <details> has neither. */
+/* Nav popovers (⚙ Preferences, account chip, rank menu): native popovers placed by navPopover.ts. */
 .site-nav-prefs-btn {
+  display: block;
+  background: transparent;
   cursor: pointer;
-  list-style: none;
   font-size: var(--fs-title);
   line-height: 1;
-}
-.site-nav-prefs-btn::-webkit-details-marker {
-  display: none;
 }
 .site-nav-popover-panel {
   /* `position: fixed` with `top`/`left` computed in JS (navPopover.ts) rather than anchored via
@@ -175,7 +174,14 @@ b {
      safety net for anything narrower still (down to the ~320px floor this app otherwise
      targets). */
   max-width: calc(100vw - 24px);
-  z-index: 20;
+  /* The UA's [popover] box reset: centred (inset 0), canvas text colour, scrolling. */
+  inset: auto;
+  overflow: visible;
+  color: inherit;
+}
+/* Restated: a panel's own display (flex) would otherwise show it while closed. */
+.site-nav-popover-panel:not(:popover-open) {
+  display: none;
 }
 .site-nav-prefs-panel {
   width: 200px;
@@ -214,12 +220,9 @@ b {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  background: transparent;
   cursor: pointer;
-  list-style: none;
   max-width: 180px;
-}
-.account-chip-btn::-webkit-details-marker {
-  display: none;
 }
 .account-chip-avatar {
   width: 20px;
@@ -242,7 +245,7 @@ b {
 }
 /* An identity, not a route: no pill fill, so it never reads as a second selected page. */
 .account-chip-btn:hover,
-.site-nav-popover[open] > .account-chip-btn {
+.site-nav-popover:has(> :popover-open) > .account-chip-btn {
   background: transparent;
   border-color: var(--border);
 }
@@ -292,6 +295,7 @@ b {
 }
 .account-chip-section {
   font-size: var(--fs-label);
+  font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--text1);
@@ -1093,14 +1097,22 @@ input:placeholder-shown + .search-clear {
     max-height: 30vh;
   }
 }
+.panel-hero-open {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: none;
+  text-align: left; /* a broken image's alt text stays top-left, not centred like a label */
+  cursor: zoom-in;
+}
 .panel-hero-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
-  cursor: zoom-in;
 }
-.panel-hero-img:focus-visible {
+.panel-hero-open:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: -3px;
 }
@@ -1708,6 +1720,10 @@ input:placeholder-shown + .search-clear {
   align-items: center;
   gap: 6px;
 }
+/* The heading inside a title that also holds a link or a subtitle. */
+.panel-section-title > h3 {
+  font: inherit;
+}
 .panel-section--meta .panel-section-title {
   margin-bottom: 5px;
 }
@@ -1900,6 +1916,12 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   padding-top: 8px;
   border-top: 1px solid var(--border);
 }
+.panel-bundle-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .panel-bundles a {
   color: inherit;
   text-decoration: none;
@@ -1979,6 +2001,9 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   display: flex;
   flex-direction: column;
 }
+.panel-dlc-list > ul {
+  list-style: none;
+}
 .panel-dlc-item {
   display: flex;
   align-items: center;
@@ -1987,7 +2012,7 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   text-decoration: none;
   border-bottom: 1px solid var(--border);
 }
-.panel-dlc-item:last-child {
+.panel-dlc-list > ul:last-child > li:last-child > .panel-dlc-item {
   border-bottom: none;
 }
 .panel-dlc-capsule {
@@ -2058,6 +2083,13 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
+}
+/* Wraps the chip as the card's heading, taking its place in the header row. */
+.panel-collapsible-heading {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  font: inherit;
 }
 .panel-achievements-chip {
   flex: 1;
@@ -2158,6 +2190,13 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
 .panel-achievement-row.unlocked {
   opacity: 1;
 }
+button.panel-achievement-row {
+  width: 100%;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
 .panel-achievement-row.panel-achievement--spoiler {
   cursor: pointer;
 }
@@ -2178,11 +2217,13 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   min-width: 0;
 }
 .panel-achievement-name {
+  display: block;
   font-size: var(--fs-meta);
   font-weight: 600;
   color: var(--text0);
 }
 .panel-achievement-desc {
+  display: block;
   font-size: var(--fs-label);
   color: var(--text1);
   margin-top: 1px;
@@ -2330,6 +2371,7 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
    *under* the number, which stays the primary read — color never stands in alone
    for the value. */
 .panel-owners {
+  list-style: none;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -2946,6 +2988,24 @@ kbd {
   color: var(--text0);
   white-space: nowrap;
 }
+/* The <dialog> is only a shell, its UA box and backdrop reset; it stays displayed while its
+   contents fade out. */
+.shortcuts-dialog {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  pointer-events: none; /* its fading-out box mustn't catch clicks; the backdrop and box set their own */
+  transition:
+    display 0.15s allow-discrete,
+    overlay 0.15s allow-discrete;
+}
+.shortcuts-dialog::backdrop {
+  background: transparent;
+}
 .shortcuts-backdrop {
   position: fixed;
   inset: 0;
@@ -2986,6 +3046,16 @@ kbd {
   opacity: 1;
   pointer-events: auto;
   transform: translate(-50%, -50%);
+}
+/* Fades in from the closed state, which a just-opened <dialog> never rendered. */
+@starting-style {
+  .shortcuts-backdrop.open,
+  .shortcuts-modal.open {
+    opacity: 0;
+  }
+  .shortcuts-modal.open {
+    transform: translate(-50%, -48%);
+  }
 }
 .shortcuts-header {
   display: flex;
@@ -4434,6 +4504,16 @@ kbd {
   font-style: italic;
   color: var(--text1);
 }
+/* Reset to the plain box the sources list sat in; its legend reads like the form's other notes. */
+.combine-sources-set {
+  border: 0;
+  min-inline-size: 0;
+}
+.combine-sources-set > legend {
+  margin-bottom: 8px;
+  font-size: var(--fs-meta);
+  color: var(--text1);
+}
 .combine-sources {
   list-style: none;
   display: flex;
@@ -4796,6 +4876,15 @@ kbd {
   }
 }
 
+/* Read by screen readers, not drawn: a heading the layout says visually. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .skip-link {
   position: absolute;
   left: 8px;
@@ -4827,12 +4916,6 @@ kbd {
 }
 
 /* 🏆 Rank this list, once the list has rankings: continue one, or start one by a criterion. */
-.rank-menu > summary {
-  list-style: none;
-}
-.rank-menu > summary::-webkit-details-marker {
-  display: none;
-}
 .rank-menu-panel {
   width: 300px;
   display: flex;

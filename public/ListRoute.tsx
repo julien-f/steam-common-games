@@ -994,15 +994,17 @@ export default function ListRoute() {
     return p.pending ? `${p.ranked} of ${total} ranked` : `${p.ranked} ranked ✓`;
   }
   function RankMenu(): JSX.Element {
-    let details!: HTMLDetailsElement;
+    let trigger!: HTMLButtonElement;
     let panel!: HTMLDivElement;
     let criterion!: HTMLInputElement;
-    onMount(() => onCleanup(bindNavPopover(details, panel)));
+    onMount(() => onCleanup(bindNavPopover(trigger, panel)));
     return (
-      <details ref={details} class={`rank-menu${kind === 'bundle' ? ' hero-secondary' : ''}`}>
-        <summary class="btn btn-ghost btn-sm">{rankThisListLabel()} ▾</summary>
-        <div ref={panel} class="site-nav-popover-panel rank-menu-panel">
-          <div class="rank-menu-heading">Continue</div>
+      <div class={`rank-menu${kind === 'bundle' ? ' hero-secondary' : ''}`}>
+        <button ref={trigger} type="button" class="btn btn-ghost btn-sm" popovertarget="rank-menu-panel">
+          {rankThisListLabel()} ▾
+        </button>
+        <div ref={panel} id="rank-menu-panel" class="site-nav-popover-panel rank-menu-panel" popover>
+          <h2 class="rank-menu-heading">Continue</h2>
           <For each={existingRankings()}>
             {(list) => (
               <button
@@ -1045,7 +1047,7 @@ export default function ListRoute() {
             </Show>
           </form>
         </div>
-      </details>
+      </div>
     );
   }
   function handleRerankSelected(): void {
@@ -3721,9 +3723,9 @@ export default function ListRoute() {
             {(plan) => (
               <>
                 <span class="selection-pick-cost">
-                  <span class="selection-pick-total">
+                  <output class="selection-pick-total" aria-live="polite">
                     {formatWithEstimate(plan().cost, plan().currency, regionCurrency())}
-                  </span>
+                  </output>
                   <span class="selection-pick-detail">{pickPlanDetail(plan(), selectedPickCount())}</span>
                 </span>
                 <Show when={sumBestDeals(selectedRows(), plan().currency)}>
@@ -3773,7 +3775,7 @@ export default function ListRoute() {
               </>
             )}
           </Show>
-          <select value={addTarget()} onChange={(e) => setAddTarget(e.currentTarget.value)}>
+          <select value={addTarget()} aria-label="Add to list" onChange={(e) => setAddTarget(e.currentTarget.value)}>
             <option value="">Add to list…</option>
             <For each={manualLists().filter((l) => l.id !== userList()?.id)}>
               {(l) => <option value={l.id}>{l.name}</option>}

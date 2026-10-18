@@ -62,6 +62,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 
 - `AppRoot.tsx` — mounts `<Router>` with `AppShell` as its `root`.
 - `AppShell.tsx` — the persistent shell: nav bar (`Home · Compare · Bundles`; About is in the footer), ⚙ Preferences popover, global game search, the shared panel + lightbox (mounted once, not per route), and the app-wide `?u=` resolve effect. The Compare link alone opts out of `withAccountParam`: a comparison names its own players.
+  - Landmarks: the bar is the `<header>` (banner), holding the `Main` `<nav>` (`display: contents`, so its links stay items of the bar's flex row), the `<search>` box, the chip and ⚙; then `<main>`, the footer, and the panel as an `<aside>` named by its title. Home's quick links are the `Lists` nav. Every `<nav>` carries a name, telling the two apart.
 - `AccountChip.tsx` — nav-bar chip saying whose lists are on screen, with Owned/Wishlist links (inline when wide, in its popover when narrow) and a recent-account switcher. Deliberately thinner than Home's account section.
 - `ListRoute.tsx` — the generic list viewer (table + docked panel) behind every `/lists/*` and `/game/*` route; owns per-kind loading, columns, price loading, and the hero card's contents.
 - `RankRoute.tsx` — `/lists/:listId/rank`, a ranked list's compare screen (see [lists-and-accounts.md](lists-and-accounts.md#ranked-lists)).
@@ -70,7 +71,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 - `AccountFriends.tsx` — the home account card's friends list, marking friends shared with the starred "My account" (`myAccountId`), not the signed-in one.
 - `CombineForm.tsx` — the source/op picker shared by Home (create a dynamic list) and `ListRoute` (Edit sources); it only assembles `{ name, op, sources }` for its `onSubmit`.
 - `ComparePlayersForm.tsx` — the "who is being compared" form (`/lists/compare`'s empty state and "Edit players").
-  - Each player slot is a **token input**: chips for who's in it, plus a combobox (`role="combobox"`/`listbox"`, arrow keys + Enter) offering known accounts and accepting a raw identifier. Per slot, so a Steam Family built from two known accounts is buildable.
+  - Each player slot is a **token input**: chips for who's in it, plus a combobox (`role="combobox"`/`listbox"`, arrow keys + Enter, named by its "Player N" label) offering known accounts and accepting a raw identifier. Per slot, so a Steam Family built from two known accounts is buildable.
   - Blur commits whatever is half-typed. It owns the draft slots and reads `accountsStore.ts` once at mount; the route decides what a submitted set means.
 - `compareSlots.ts` — that form's slot model (`SlotEntry`, `slotsToIdentifiers`/`slotsFromIdentifiers`, `namesAccount`, `filterAccounts`), split out to be testable without a DOM or store. A slot holds _entries_ (a known account kept whole, or a typed identifier), not strings, since an account with no custom-URL name would otherwise show as a 17-digit id. `slotsFromIdentifiers` matches a `?u=` URL back to named chips for "Edit players".
 - `BundlesBrowseRoute.tsx` — `/bundles`, the bundle picker as a real table.
@@ -112,7 +113,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 - `overlayHistory.ts` — the history entry each open overlay pushes (see the side panel).
 - `gameSearch.ts` — the combobox/debounce UI for "look up any game" (the shell owns where results go).
 - `urlState.ts` — param parsing, canonical param order, and the `?game=`/`&shot=`/`?u=` writers.
-- `prefs.ts` / `prefsPopover.tsx` / `region.ts` / `navPopover.ts` — the localStorage preference blob; the ⚙ panel's contents; the region preference and its detection; `<details>` popover open/close/positioning.
+- `prefs.ts` / `prefsPopover.tsx` / `region.ts` / `navPopover.ts` — the localStorage preference blob; the ⚙ panel's contents; the region preference and its detection; nav popovers' Escape and positioning.
 - `tableViewPrefs.ts` / `tableViewKeys.ts` / `tableViewSync.ts` / `SharedViewBanner.tsx` / `UnsavedViewBanner.tsx` — restore/persist/share/reset a table view; the table-view pref keys; the signed-in Save/Revert baseline; the shared-layout and unsaved-changes banners and the Share/Default view buttons.
 - `clipboard.ts` / `CopyButton.tsx` — the one copy-then-confirm helper behind every copy button (`copyWithFeedback` for plain DOM buttons, `<CopyButton>` for JSX), with a `window.prompt` fallback where the Clipboard API isn't available (it needs a secure context, and can be permission-denied).
 - `pageTitle.ts` — the two-layer `document.title` (route context, overridden by an open game).
@@ -226,12 +227,12 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
 
 ## Each list kind, in practice
 
-Every route opens with a **hero card** (`ListHero.tsx`): the list's name as the page `<h1>`, an optional lead, kind/shop/account chips, the route's own actions, and the list's facts as labelled tiles — all off fetches the route already makes.
+Every route opens with a **hero card** (`ListHero.tsx`, a `<header>`): the list's name as the page `<h1>`, an optional lead, kind/shop/account chips, the route's own actions, and the list's facts as labelled tiles — all off fetches the route already makes.
 
 - **The card is dumb**: no data, no per-kind branching; callers pass formatted values, so "what does a wishlist show" is answered in `ListRoute.tsx` alone. Its dates are ISO, like the tables' (see [ui-guidelines.md](ui-guidelines.md)).
 - **A tile can be a control**: given `onClick` it renders as a `<button>`, `aria-disabled` while its action is in flight (not `disabled`, which would drop the focus of the click). A toggle also passes `active`, rendered as `aria-pressed` and read back from what the click applied.
 - **A tile that refreshes replaces the route's ↻ Refresh button** (`refreshTileValue` adds a ↻ beside the value), so it's rendered unconditionally — during a load and after one that failed before fetching, when a retry is wanted.
-  - `/bundles`: Updated re-fetches, Prices opens the ⚙ popover (`openPrefsPopover`, deferred past the click — `navPopover.ts`'s outside-click listener and Solid's delegated `onClick` share `document`, so `stopPropagation` can't help), New/Ending soon toggle filters.
+  - `/bundles`: Updated re-fetches, Prices opens the ⚙ popover (`openPrefsPopover`), New/Ending soon toggle filters.
   - Owned/wishlist: Updated does the same. Prices shows only where the list is priced (`hasPrices()`: the wishlist, a user list with a priced source), never on owned. Any list built from an account fetch, at any depth (a comparison; a dynamic, ranked or shared list), gets Updated too: its age is the _oldest_ of the account fetches behind it, and clicking re-resolves them all past the server's cache (`createDefaultFetchers`'s `refresh`/`onFetchedAt`, `listResolve.ts`).
   - The tile is gated on there being an age, not on the kind: a manual list (stored appids) has none. Owned, wishlist and comparisons keep it without an age ("—") so a failed first load can be retried.
   - Exception: a bundle's own hero tile is a plain `<div>` — finding one bundle walks several cached list pages, so `GET /api/bundles/:id` has no force path. It still states the age of the page the bundle was found on (`findBundleById`'s `cacheKey`).
@@ -276,7 +277,7 @@ The "look up any game" box is one nav-bar search in the shell, not one per route
 
 `AccountChip.tsx` says who the app is showing, following a `?u=` link that resolves after mount, with a 🔗 marker when a link's account is showing.
 
-- Both nav popovers (this and ⚙ Preferences) share `navPopover.ts`: `<details>` has no outside-click/Escape close, and the panel is positioned in JS because `.site-nav`'s flex-wrap moves its triggers with viewport width (seen off-screen on a real Galaxy S10, ruling out CSS-only anchoring).
+- Both nav popovers (this and ⚙ Preferences), and the rank menu, are native popovers (`button[popovertarget]` + `[popover]`: the browser opens, closes and dismisses them on an outside click) sharing `navPopover.ts`: it closes them on Esc ahead of the page's own Esc handlers, and positions the panel in JS because `.site-nav`'s flex-wrap moves its triggers with viewport width (seen off-screen on a real Galaxy S10, ruling out CSS-only anchoring).
 - It carries **copyable Steam identifiers** (`accountsStore.ts`'s `accountIdentifiers`: the stored custom-URL name, else the steam64 id), read from the slot since the chip fetches nothing: one for the current account, one per member beside each recents row (outside its switch button, which can't nest one).
 
 ## The side panel
@@ -285,7 +286,7 @@ The "look up any game" box is one nav-bar search in the shell, not one per route
 
 **Tag pills filter the table.** On a route that registers no `onTagClick`, they render as plain pills. A tag/genre/category/developer/publisher pill toggles that value in the matching column's `include` filter — `initPanel({ onTagClick, isTagActive })` forwards through `routeHandlers` to `ListRoute.tsx`'s `onTagClick`/`isTagActive` (`table.filter.setValues(...)`/`.include()`). The panel's keys (`tags`/`genres`/`categories`/`developers`/`publishers`) are the table's column keys. A Steam tag pill also carries its `tagWeights` entry as a bottom-edge gauge (`.panel-tag-weight`) and a tooltip.
 
-**Docked, not modal.** Table and panel are two live columns; no backdrop, focus trap or click-outside close — × or Escape closes it, and clicking another row swaps the content. A narrow viewport falls back to a full-screen overlay.
+**Docked, not modal.** Table and panel are two live columns, so the panel is an `<aside>` (complementary), not a dialog; no backdrop, focus trap or click-outside close — × or Escape closes it, and clicking another row swaps the content. A narrow viewport falls back to a full-screen overlay.
 
 **Full-height, out of flow.** The panel is `position: fixed` at the right edge, spanning the viewport height, and `.app-shell` reserves its width (`--panel-w`) as padding while open, so nav and footer shorten with the content. (In flow, it stretched to the document height, breaking `.panel-body`'s scrolling and `.panel-nav`'s pinned bar.)
 
@@ -301,7 +302,7 @@ Above 768px the shell is locked to the viewport and **`.app-scroll` is the page'
 - A close by ×, Esc, the backdrop or a swipe steps back over its entry, so the next Back leaves the page. The entry it lands on is rewritten to the current address minus that overlay, so a game stepped to in the lightbox stays open; for a browser Back that needs the Navigation API (`currententrychange`).
 - Back from a page a panel link led to reopens that game. Entries are tracked by the router's `_depth` stamp, and Back's target keeps the page's URL with the overlay closed (`urlWithoutPanel`/`urlWithoutShot`), so a deep link's Back lands on its list.
 
-**Sections**, in order: hero carousel (`PanelHero`, swipeable, feeding `lightbox.tsx`); a sticky header (DLC trail, name, release date and base-game link, ownership badge, the Steam/ITAD/⋯ More/🔗/↻ icons, the subnav); a demo banner when the game has a free demo; the glance grid (Weighted Rating, Metacritic, HLTB, Linux/Deck — the review count is the Weighted chip's caption); Price, with the current bundles the game is in below its lines (`PanelBundleLines`); the store description; tags; Similar in <account>'s library; "Owned by"; How Long To Beat; News; Achievements; DLC. Collapsible ones share `CollapsibleCard`; a subnav scroll-spy tracks position.
+**Sections**, in order: hero carousel (`PanelHero`, swipeable, feeding `lightbox.tsx`); a sticky header (DLC trail, name, release date and base-game link, ownership badge, the Steam/ITAD/⋯ More/🔗/↻ icons, the subnav); a demo banner when the game has a free demo; the glance grid (Weighted Rating, Metacritic, HLTB, Linux/Deck — the review count is the Weighted chip's caption); Price, with the current bundles the game is in below its lines (`PanelBundleLines`); the store description; tags; Similar in <account>'s library; "Owned by"; How Long To Beat; News; Achievements; DLC. Collapsible ones share `CollapsibleCard`; a subnav scroll-spy tracks position. The name is the panel's `<h2>` and each section a `<section>` titled by an `<h3>` (a collapsible card's is its toggle button, wrapped), so a screen reader jumps between sections by heading.
 
 - **Similar in <account>'s library** — `SimilarSection`: `tagTaste.ts`'s `similarInLibrary`, the IDF-weighted cosine over `tagWeights` plus Production Tier ([decisions.md](decisions.md#production-tier--a-heuristic-not-steam-provided-data)) against the effective account's cached `Taste.games` ([lists-and-accounts.md](lists-and-accounts.md)), so no extra requests. Hidden on Owned's own rows (`isOwnedList` route handler): it would repeat the Similarity sort. Without a cache it links Owned; without an account, only the Steam link. The ⇅ sort button shows on a route registering `setSimilarTo`.
 - **News** — every headline in the game's own `steam_community_announcements` feed (up to 20, `extractNews`' cap), each linking to the post, collapsed behind a chip whose ↗ goes to the Steam news hub. The server filters to that feed because raw `GetNewsForApp` mixes in syndicated press in any language ([integrations.md](integrations.md)). A game with no official posts renders no card.
@@ -345,7 +346,7 @@ Above 768px the shell is locked to the viewport and **`.app-scroll` is the page'
 
 `prefs.ts` is one flat `{key: value}` JSON blob under a single localStorage key, so the whole set is enumerable at once; `setPref`'s sync hook is per-key so two preferences changing in different tabs can't race each other's server writes.
 
-Region is the only user-facing preference, in the nav bar's ⚙ popover (`prefsPopover.tsx` owns the contents, `AppShell.tsx` only the `<details>` shell). `region.ts` holds a curated list of major Steam pricing regions and `detectCountry()`; price-showing routes re-price from an effect on `currentRegion()`.
+Region is the only user-facing preference, in the nav bar's ⚙ popover (`prefsPopover.tsx` owns the panel, `AppShell.tsx` only its button). `region.ts` holds a curated list of major Steam pricing regions and `detectCountry()`; price-showing routes re-price from an effect on `currentRegion()`.
 
 - The first entry is always "Auto-detect (⟨what it resolves to now⟩)", and `currentRegion` consults `detectCountry()` live on every upstream call.
 - `detectCountry` tries the OS timezone (`Intl.DateTimeFormat().resolvedOptions().timeZone`, via a curated map including Eurozone→`DE`) before `navigator.language` — language is a UI preference and often stays "en-US" anywhere (e.g. `LANG=en_US.UTF-8` in `Europe/Paris`).

@@ -107,7 +107,7 @@ const TO_TOP_AFTER_PX = 600;
 export function AppShell(props: RouteSectionProps): JSX.Element {
   let searchInputEl!: HTMLInputElement;
   let scrollEl!: HTMLDivElement;
-  let prefsDetailsEl!: HTMLDetailsElement;
+  let prefsBtnEl!: HTMLButtonElement;
   let prefsPanelEl!: HTMLDivElement;
   // The `?` shortcuts dialog — see ShortcutsModal.tsx. State lives here because
   // bindPanelKeyboardShortcuts' `shortcuts` option needs it.
@@ -250,7 +250,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       },
     });
 
-    onCleanup(bindNavPopover(prefsDetailsEl, prefsPanelEl));
+    onCleanup(bindNavPopover(prefsBtnEl, prefsPanelEl));
   });
 
   return (
@@ -269,41 +269,50 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
         >
           Skip to table
         </a>
-        <nav id="site-nav" class="site-nav">
-          <For each={NAV_LINKS}>
-            {(link) => (
-              <A
-                href={link.noAccountParam ? link.href : withAccountParam(link.href, location.search)}
-                end={link.end}
-                class="site-nav-link"
-                activeClass="active"
-              >
-                {link.label}
-              </A>
-            )}
-          </For>
-          <div class="app-search-wrap">
+        <header id="site-nav" class="site-nav">
+          <nav class="site-nav-links" aria-label="Main">
+            <For each={NAV_LINKS}>
+              {(link) => (
+                <A
+                  href={link.noAccountParam ? link.href : withAccountParam(link.href, location.search)}
+                  end={link.end}
+                  class="site-nav-link"
+                  activeClass="active"
+                >
+                  {link.label}
+                </A>
+              )}
+            </For>
+          </nav>
+          <search class="app-search-wrap">
             <input
               ref={searchInputEl}
               id="app-search-input"
               type="text"
               placeholder="Look up any game…"
+              aria-label="Look up any game"
               autocomplete="off"
               enterkeyhint="search"
               onFocus={(e) => e.currentTarget.select()}
             />
             <SearchClearButton />
             <div id="app-search-results" class="game-search-results" hidden />
-          </div>
+          </search>
           <AccountChip />
-          <details class="site-nav-prefs site-nav-popover" ref={prefsDetailsEl}>
+          <div class="site-nav-prefs site-nav-popover">
             {/* U+FE0F asks for the emoji glyph: the text one renders ~8 px in common fallback fonts. */}
-            <summary class="site-nav-link site-nav-prefs-btn" aria-label="Preferences">
+            <button
+              type="button"
+              class="site-nav-link site-nav-prefs-btn"
+              aria-label="Preferences"
+              popovertarget="nav-prefs-panel"
+              ref={prefsBtnEl}
+            >
               {'\u2699\uFE0F'}
-            </summary>
+            </button>
             <PrefsPanel ref={prefsPanelEl} />
-          </details>
-        </nav>
+          </div>
+        </header>
 
         <main class="app-content" tabindex="-1">
           {props.children}
@@ -319,17 +328,17 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
         </footer>
       </div>
 
-      {/* Docked, not modal — role="complementary" rather than "dialog"/aria-modal, since the
+      {/* Docked, not modal — <aside> (complementary) rather than "dialog"/aria-modal, since the
           rest of the page stays fully interactive while this is open (see panel.tsx's own
           comment and docs/dev/frontend.md). Fixed and full-height, so it sits outside the
           scrolling column entirely (see style.css's .app-shell). */}
-      <div id="game-panel" class="game-panel" role="complementary" aria-labelledby="panel-title">
+      <aside id="game-panel" class="game-panel" aria-labelledby="panel-title">
         <button id="panel-close" class="panel-close" aria-label="Close">
           ×
         </button>
         <div id="panel-nav" class="panel-nav" />
         <div id="panel-body" class="panel-body" />
-      </div>
+      </aside>
 
       <Show when={scrolled()}>
         <button

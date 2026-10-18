@@ -66,7 +66,7 @@ interface ListHeroProps {
 export function ListHero(props: ListHeroProps): JSX.Element {
   const [moreOpen, setMoreOpen] = createSignal(false);
   return (
-    <div class="list-hero">
+    <header class="list-hero">
       <div class="list-hero-header">
         <div class="list-hero-titlebar">
           {props.lead}
@@ -148,7 +148,7 @@ export function ListHero(props: ListHeroProps): JSX.Element {
       <Show when={props.note}>
         <div class="list-hero-note">{props.note}</div>
       </Show>
-    </div>
+    </header>
   );
 }
 
