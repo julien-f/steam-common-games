@@ -411,7 +411,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 
 - **Who / goal**: someone who can't see the screen finds their way around a page and an open game by its structure.
 - **Steps**:
-  1. jump by landmark: banner, Main navigation, search, main, the open game ◇
+  1. jump by landmark: banner, Main navigation, search, main, the open game
   2. jump by heading: one h1 naming the page, the sections below it ◇
   3. fill a form; each field says what it's for ◇
   4. open a game; jump through its sections by heading ◇

@@ -697,7 +697,7 @@ export default function HomeRoute() {
         </Show>
       </section>
 
-      <section class="home-fixed-links">
+      <nav class="home-fixed-links" aria-label="Lists">
         <A href={accountLink('/lists/owned')}>Owned</A>
         <A href={accountLink('/lists/wishlist')}>Wishlist</A>
         <A href={accountLink('/bundles')}>Bundles</A>
@@ -706,7 +706,7 @@ export default function HomeRoute() {
             account override alongside them would be two different claims about whose games are
             on screen. */}
         <A href={COMPARE_PATH}>Compare libraries</A>
-      </section>
+      </nav>
 
       <section class="home-tree">
         <h2>Your lists</h2>

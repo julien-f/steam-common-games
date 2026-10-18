@@ -30,7 +30,7 @@ test('A1: first visit — resolve my account, then open my library', async ({ pa
   await expect(row(page, 'Hades')).toContainText('44.5');
 
   await page.reload();
-  await expect(page.getByRole('navigation')).toContainText('Alice');
+  await expect(page.getByRole('banner')).toContainText('Alice');
   await expect(rows(page)).toHaveCount(6);
 });
 
@@ -137,13 +137,13 @@ test('A2.1-2,4: explore a friend, then switch back to my ★ account from the na
   await page.goto('/');
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
   await page.getByRole('button', { name: 'Look up', exact: true }).click();
-  await expect(page.getByRole('navigation')).toContainText('Bob');
+  await expect(page.getByRole('banner')).toContainText('Bob');
 
-  await page.getByRole('navigation').getByText('Bob', { exact: true }).click();
+  await page.getByRole('banner').getByText('Bob', { exact: true }).click();
   const back = page.getByRole('button', { name: /Alice/ }).filter({ has: page.getByTitle(/Your account/) });
   await expect(back).toBeVisible();
   await back.click();
-  await expect(page.getByRole('navigation')).toContainText('Alice');
+  await expect(page.getByRole('banner')).toContainText('Alice');
 });
 
 test('A2 edge: the nav chip reads as an account, not as a second selected route', async ({ page }) => {
@@ -173,14 +173,14 @@ test('A2 edge: switching account from the nav chip leaves focus on the chip', as
   await page.goto('/');
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
   await page.getByRole('button', { name: 'Look up', exact: true }).click();
-  await expect(page.getByRole('navigation')).toContainText('Bob');
+  await expect(page.getByRole('banner')).toContainText('Bob');
 
   await page.locator('.account-chip-btn').click();
   await page
     .getByRole('button', { name: /Alice/ })
     .filter({ has: page.getByTitle(/Your account/) })
     .click();
-  await expect(page.getByRole('navigation')).toContainText('Alice');
+  await expect(page.getByRole('banner')).toContainText('Alice');
   await expect(page.locator('.account-chip-btn')).toBeFocused();
 });
 
@@ -210,7 +210,7 @@ test('A2 edge: an account picked mid-refresh does not read "Refreshing…" while
 
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
   await page.getByRole('button', { name: 'Look up', exact: true }).click();
-  await expect(page.getByRole('navigation')).toContainText('Bob');
+  await expect(page.getByRole('banner')).toContainText('Bob');
   await expect(updated).not.toContainText('Refreshing');
   release();
   await expect(page.locator('.account-counts')).toContainText('Owned: 4');
@@ -284,9 +284,9 @@ test("S3 edge: another browser's list link explains lists are local", async ({ p
 test('A1 edge: an account stored without its name picks it up from Home', async ({ page }) => {
   await asPlayer(page, ALICE, { withLabel: false });
   await page.goto('/');
-  await expect(page.getByRole('navigation')).toContainText('Alice');
+  await expect(page.getByRole('banner')).toContainText('Alice');
   await page.reload();
-  await expect(page.getByRole('navigation')).toContainText('Alice');
+  await expect(page.getByRole('banner')).toContainText('Alice');
 });
 
 test('F3 edge: the Played (h) filter range reads in rounded hours', async ({ page }) => {
@@ -737,7 +737,7 @@ test('C1 edge: an unknown player is named, and the others still compare', async 
 test('C1 edge: the bare Compare link after an unknown player starts clean', async ({ page }) => {
   await page.goto('/lists/compare?u=alice&u=nobody-here');
   await expect(page.getByRole('alert')).toContainText('nobody-here');
-  await page.getByRole('navigation').getByRole('link', { name: 'Compare' }).click();
+  await page.getByRole('navigation', { name: 'Main', exact: true }).getByRole('link', { name: 'Compare' }).click();
   await expect(page.locator('.compare-form')).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.locator('.compare-token.is-invalid')).toHaveCount(0);
@@ -1125,7 +1125,7 @@ test('I1 edge: on desktop the nav starts on the content edge, close above it', a
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/lists/owned');
     const nav = (await page.locator('.site-nav').boundingBox())!;
-    const first = (await page.locator('.site-nav > *').first().boundingBox())!;
+    const first = (await page.locator('.site-nav-link').first().boundingBox())!;
     const hero = (await page.locator('.list-hero').boundingBox())!;
     expect(Math.round(first.x), `at ${width}px`).toBe(Math.round(hero.x));
     expect(hero.y - (nav.y + nav.height), `at ${width}px`).toBeLessThanOrEqual(28);
@@ -1726,7 +1726,7 @@ test('O1 edge: once the instance is known to have no ITAD key, Bundles opens on 
   await page.goto('/lists/wishlist');
   await expect(page.getByRole('main')).toContainText("Prices aren't available on this instance");
   await page.route('**/api/bundles?*', () => {}); // never answers: the card can't wait on its 503
-  await page.getByRole('navigation').getByRole('link', { name: 'Bundles' }).click();
+  await page.getByRole('navigation', { name: 'Main', exact: true }).getByRole('link', { name: 'Bundles' }).click();
   await expect(page.locator('.list-hero')).toContainText('IsThereAnyDeal API key');
   await expect(page.getByLabel('Include expired')).toHaveCount(0);
   await expect(page.locator('.table-container')).toHaveCount(0);
@@ -3637,15 +3637,22 @@ test('I3 edge: each main page and the open game have one h1 at most, skip no hea
     ['/search?q=hades', rows(page).first()],
     ['/bundles', rows(page).first()],
     [rank, page.getByText('Which do you prefer?')],
-    ['/lists/owned?game=1145360', page.locator('#panel-title')],
+    ['/lists/owned?game=1145360', page.getByRole('complementary', { name: 'Hades' })],
   ] as const) {
     await page.goto(path);
     await expect(ready).toBeVisible();
+    for (const landmark of [
+      page.getByRole('banner'),
+      page.getByRole('navigation', { name: 'Main', exact: true }),
+      page.getByRole('search'),
+      page.getByRole('main'),
+    ])
+      await expect(landmark, path).toBeVisible();
     const { levels, unnamedNavs, unnamedPanels } = await structure(page);
-    // Commits to come: exactly one h1, first; every nav named.
+    // Commit to come: exactly one h1, first.
     expect(levels.filter((l) => l === 1).length, path).toBeLessThanOrEqual(1);
     for (const [i, level] of levels.entries()) if (i) expect(level, path).toBeLessThanOrEqual(levels[i - 1] + 1);
-    expect(unnamedNavs, path).toBeLessThanOrEqual(1);
+    expect(unnamedNavs, path).toBe(0);
     expect(unnamedPanels, path).toBe(0);
   }
 });
@@ -3735,13 +3742,13 @@ test("Y1.1,3: signed in on a new device, the account's lists win over this brows
   await page.goto('/');
 
   await expect(page.getByRole('main')).toContainText(SYNCED_LIST); // adopted, then reloaded
-  await expect(page.getByRole('navigation')).toContainText('Alice');
+  await expect(page.getByRole('banner')).toContainText('Alice');
   expect(pushed.recentAccounts).toContain(BOB.steamid); // a key the account lacks still goes up
   // Home may refresh Alice's slot (its vanity) and push that; never this browser's Bob.
   expect(pushed.myAccount ?? '').not.toContain(BOB.steamid);
   expect(pushed.currentAccount ?? '').not.toContain(BOB.steamid);
 
-  await page.getByRole('navigation').getByText('Alice', { exact: true }).click();
+  await page.getByRole('banner').getByText('Alice', { exact: true }).click();
   await expect(page.getByText('Signed in — your accounts/lists/settings sync')).toBeVisible();
 });
 
@@ -3749,7 +3756,7 @@ test('Y1 edge: signing out switches the account menu back to signing in', async 
   await mockApi(page, { states: ['signed-in'] });
   await page.route('**/auth/logout', (route) => route.fulfill({ json: { ok: true } }));
   await page.goto('/about');
-  await page.getByRole('navigation').getByText('Alice', { exact: true }).click();
+  await page.getByRole('banner').getByText('Alice', { exact: true }).click();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page.getByRole('link', { name: 'Sign in with Steam' })).toBeVisible();
   await expect(page.getByText('Signed in — your accounts/lists/settings sync')).toHaveCount(0);

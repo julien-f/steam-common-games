@@ -38,6 +38,7 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 
 ## Accessibility
 
+- Native element first: a landmark, heading, list, button or form field is the HTML element for it (`<nav>`, `<h2>`, `<button>`, `<fieldset>`…), restyled if needed; a `role` only where no element exists. Each `<nav>` and `<aside>` is named.
 - Every control has an accessible name, icon-only buttons and checkboxes included, saying what it does ("Remove sort", not "×").
 - State is exposed, not only coloured: pressed toggles (`aria-pressed`), the current page or open game (`aria-current`), expanded sections, sort direction.
 - Text and icons meet WCAG AA contrast, ages and secondary text included.

@@ -101,6 +101,10 @@ b {
   margin-bottom: 20px;
   padding: 0 12px;
 }
+/* The Main landmark around the route links; its links stay items of the bar's flex row. */
+.site-nav-links {
+  display: contents;
+}
 .site-nav-link {
   padding: 6px 14px;
   border-radius: 999px;

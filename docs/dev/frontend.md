@@ -62,6 +62,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 
 - `AppRoot.tsx` — mounts `<Router>` with `AppShell` as its `root`.
 - `AppShell.tsx` — the persistent shell: nav bar (`Home · Compare · Bundles`; About is in the footer), ⚙ Preferences popover, global game search, the shared panel + lightbox (mounted once, not per route), and the app-wide `?u=` resolve effect. The Compare link alone opts out of `withAccountParam`: a comparison names its own players.
+  - Landmarks: the bar is the `<header>` (banner), holding the `Main` `<nav>` (`display: contents`, so its links stay items of the bar's flex row), the `<search>` box, the chip and ⚙; then `<main>`, the footer, and the panel as an `<aside>` named by its title. Home's quick links are the `Lists` nav. Every `<nav>` carries a name, telling the two apart.
 - `AccountChip.tsx` — nav-bar chip saying whose lists are on screen, with Owned/Wishlist links (inline when wide, in its popover when narrow) and a recent-account switcher. Deliberately thinner than Home's account section.
 - `ListRoute.tsx` — the generic list viewer (table + docked panel) behind every `/lists/*` and `/game/*` route; owns per-kind loading, columns, price loading, and the hero card's contents.
 - `RankRoute.tsx` — `/lists/:listId/rank`, a ranked list's compare screen (see [lists-and-accounts.md](lists-and-accounts.md#ranked-lists)).
@@ -285,7 +286,7 @@ The "look up any game" box is one nav-bar search in the shell, not one per route
 
 **Tag pills filter the table.** On a route that registers no `onTagClick`, they render as plain pills. A tag/genre/category/developer/publisher pill toggles that value in the matching column's `include` filter — `initPanel({ onTagClick, isTagActive })` forwards through `routeHandlers` to `ListRoute.tsx`'s `onTagClick`/`isTagActive` (`table.filter.setValues(...)`/`.include()`). The panel's keys (`tags`/`genres`/`categories`/`developers`/`publishers`) are the table's column keys. A Steam tag pill also carries its `tagWeights` entry as a bottom-edge gauge (`.panel-tag-weight`) and a tooltip.
 
-**Docked, not modal.** Table and panel are two live columns; no backdrop, focus trap or click-outside close — × or Escape closes it, and clicking another row swaps the content. A narrow viewport falls back to a full-screen overlay.
+**Docked, not modal.** Table and panel are two live columns, so the panel is an `<aside>` (complementary), not a dialog; no backdrop, focus trap or click-outside close — × or Escape closes it, and clicking another row swaps the content. A narrow viewport falls back to a full-screen overlay.
 
 **Full-height, out of flow.** The panel is `position: fixed` at the right edge, spanning the viewport height, and `.app-shell` reserves its width (`--panel-w`) as padding while open, so nav and footer shorten with the content. (In flow, it stretched to the document height, breaking `.panel-body`'s scrolling and `.panel-nav`'s pinned bar.)
 
