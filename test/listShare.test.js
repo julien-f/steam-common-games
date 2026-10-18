@@ -220,3 +220,76 @@ test('encodeListFormula: rejects a `user` source pointing at a ranked list', () 
   };
   assert.deepEqual(encodeListFormula(outer, makeGetList([ranked])), { ok: false, reason: 'ranked-source' });
 });
+
+// ── developer / publisher sources ────────────────────────────────────────────────────────────
+
+const { withAccountParam } = require('../public/urlState.ts');
+
+// What ListRoute.tsx reads back: `?f=` after the one decode URLSearchParams applies.
+function formulaFromUrl(url) {
+  return new URLSearchParams(url.split('?')[1]).get('f');
+}
+
+const AWKWARD = 'Studio (JP); 100% + Ünï:co,de %28';
+
+test('encodeListFormula: encodes developer/publisher sources, escaping the grammar characters in a name', () => {
+  const result = encodeListFormula(
+    {
+      op: 'subtract',
+      sources: [
+        { kind: 'developer', name: 'Studio (JP)' },
+        { kind: 'publisher', name: 'indie.io' },
+      ],
+    },
+    () => undefined,
+  );
+  assert.deepEqual(result, { ok: true, formula: 'subtract:(d:Studio%20%28JP%29;p:indie.io)' });
+});
+
+test('round trip through the real URL: a developer name with grammar and percent characters survives', () => {
+  const sources = [
+    { kind: 'developer', name: AWKWARD },
+    { kind: 'account-owned', accountId: 'idA+idB' },
+  ];
+  const { formula } = encodeListFormula({ op: 'subtract', sources }, () => undefined);
+  for (const url of [shareListUrl(formula), withAccountParam(shareListUrl(formula), '?u=76561190000000001')]) {
+    const decoded = decodeListFormula(formulaFromUrl(url));
+    assert.equal(decoded.op, 'subtract');
+    assert.deepEqual(decoded.sources, sources);
+  }
+});
+
+test('round trip: a developer source nested in a `g:` group', () => {
+  const inner = {
+    id: 'l1',
+    parentId: null,
+    order: 0,
+    createdAt: 0,
+    updatedAt: 0,
+    kind: 'dynamic',
+    op: 'union',
+    sources: [{ kind: 'publisher', name: AWKWARD }, { kind: 'recent-games' }],
+  };
+  const { formula } = encodeListFormula(
+    {
+      op: 'intersect',
+      sources: [
+        { kind: 'user', listId: 'l1' },
+        { kind: 'developer', name: 'A' },
+      ],
+    },
+    (id) => (id === 'l1' ? inner : undefined),
+  );
+  const decoded = decodeListFormula(formulaFromUrl(shareListUrl(formula)));
+  assert.deepEqual(decoded.sources[1], { kind: 'developer', name: 'A' });
+  assert.deepEqual(decoded.synthetic.get(decoded.sources[0].listId).sources, inner.sources);
+});
+
+test('decodeListFormula: a bare `d:` decodes to a nameless developer source', () => {
+  assert.deepEqual(decodeListFormula('union:(d:;r)').sources[0], { kind: 'developer', name: '' });
+});
+
+test('shareListUrl: an old link with an encoded account id still decodes through the real URL', () => {
+  const decoded = decodeListFormula(formulaFromUrl(`${SHARED_LIST_PATH}?f=union:(o:idA%2BidB;o:idC)`));
+  assert.deepEqual(decoded.sources[0], { kind: 'account-owned', accountId: 'idA+idB' });
+});

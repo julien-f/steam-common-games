@@ -23,7 +23,7 @@ const COMBINE_OPS: { value: CombineOp; label: string }[] = (Object.keys(OP_LABEL
 }));
 
 export function refKey(ref: ListRef): string {
-  return [ref.kind, ref.accountId ?? ref.listId ?? ref.bundleId].filter(Boolean).join(':');
+  return [ref.kind, ref.accountId ?? ref.listId ?? ref.bundleId ?? ref.name].filter(Boolean).join(':');
 }
 
 // Every source a combine can currently be built from — any recent account's Owned/Wishlist,

@@ -279,10 +279,11 @@ export type CombineOp = 'union' | 'intersect' | 'subtract' | 'group-by-membershi
 // scoped refs always pin an explicit accountId, never "whichever account is current", so a
 // saved "Alice ∩ Bob" comparison keeps meaning that regardless of what currentAccount becomes.
 export interface ListRef {
-  kind: 'account-owned' | 'account-wishlist' | 'bundle' | 'recent-games' | 'user';
+  kind: 'account-owned' | 'account-wishlist' | 'bundle' | 'recent-games' | 'user' | 'developer' | 'publisher';
   accountId?: string; // AccountSlot.id
   bundleId?: string;
   listId?: string; // → GameList.id
+  name?: string; // kind 'developer'/'publisher': the exact name Steam's store search matches
 }
 
 // A user-created list — either a stored, directly-editable set of appids ('manual'), a

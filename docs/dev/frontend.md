@@ -43,10 +43,10 @@ The data model it renders — accounts, lists, combines, the localStorage schema
 
 ```
 formula ::= op ":(" source (";" source)* ")"
-source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "r" | "g:" formula
+source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" name | "r" | "g:" formula
 ```
 
-- `:;(),` are legal unencoded in a query, so a formula reads as plain text; only each leaf `accountId`/`bundleId` is `encodeURIComponent`'d.
+- `:;(),` are legal unencoded in a query, so a formula reads as plain text; each leaf (`accountId`, `bundleId`, a developer's or publisher's `name`) is `encodeURIComponent`'d plus `(`/`)`, and `shareListUrl` escapes those `%` once more, since the route reads `f` through `URLSearchParams` (one decode). A `?u=` carried along (`withAccountParam`) re-encodes the whole value, so that link isn't readable.
 - A `user` source (another saved list) can't travel as a bare `listId`, so `encodeListFormula` inlines it as a `g:` group, recursing like `listResolve.ts`'s `resolveRef` with the same visited-set cycle guard. Nesting is uncapped (the one-level cap in `listLabels.ts`'s `createDefaultNaming` only limits label length).
 - Decoding turns each `g:` group into a synthetic in-memory `GameList` (`decoded.synthetic`, generated id) referenced as an ordinary `{ kind: 'user', listId }`, so `resolveListWithSources`/`listLabels.ts` are unchanged; only `getList`/`ListNaming.list` check that map first (`ListRoute.tsx`'s `sharedFetchers`/`sharedNaming`, mirroring `compareNaming()`).
 - A `user` source pointing at a _manual_ list can't be encoded (no appid-set token): "🔗 Share list" disables itself with a tooltip (`shareFailure()`).

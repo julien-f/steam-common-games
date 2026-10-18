@@ -14,6 +14,7 @@ import { getRecentAccounts, getMyAccount, getEffectiveCurrentAccount, accountDis
 import { getLists, listDeps } from './listsStore.ts';
 import { membersFromAccountId } from './accountData.ts';
 import { getBundleSnapshot } from './bundleSnapshots.ts';
+import { creatorListPath, creatorTitle } from './creatorData.ts';
 
 // Short form — a chip/label on its own, where surrounding context already says it's a combine.
 export const OP_LABELS: Record<CombineOp, string> = {
@@ -113,6 +114,16 @@ export function describeListRef(ref: ListRef, naming: ListNaming): RefDescriptio
       };
     case 'recent-games':
       return { label: 'Recently Looked Up', href: '/game' };
+    case 'developer':
+    case 'publisher':
+      if (!ref.name)
+        return {
+          label: `Unknown ${ref.kind}`,
+          href: null,
+          problem: `this source names no ${ref.kind}`,
+          countsAsEmpty: true,
+        };
+      return { label: creatorTitle(ref.kind, ref.name), href: creatorListPath(ref.kind, ref.name) };
     case 'user': {
       if (!ref.listId)
         return { label: 'Unknown list', href: null, problem: 'this source names no list', countsAsEmpty: true };

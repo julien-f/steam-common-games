@@ -48,10 +48,10 @@ A list is a set of appids, usually named — a dynamic one may have no name of i
 
 ### Kinds
 
-- **System lists** (never stored, always live-derived): _Owned_ and _Wishlist_ for `currentAccount`; one per browsed _Bundle_; one per developer or publisher (`/lists/developer?name=`, `/lists/publisher?name=`; not a `ListRef` kind, so not a combine source); **Recently Looked Up** (`/game`, `recentGames.ts`) — global local search history, not account-scoped, linked from Home beside Owned/Wishlist/Bundles and usable as a combine source (`ListRef.kind: 'recent-games'`).
+- **System lists** (never stored, always live-derived): _Owned_ and _Wishlist_ for `currentAccount`; one per browsed _Bundle_; one per developer or publisher (`/lists/developer?name=`, `/lists/publisher?name=`; `ListRef.kind: 'developer' | 'publisher'` with its `name`, joining a combine from its own page like a bundle); **Recently Looked Up** (`/game`, `recentGames.ts`) — global local search history, not account-scoped, linked from Home beside Owned/Wishlist/Bundles and usable as a combine source (`ListRef.kind: 'recent-games'`).
 - **User lists** (stored, full CRUD):
   - **`manual`** — a stored `appids[]`; games are added from a table's row selection ("Add to list", including a new list) and removed per row or in bulk.
-  - **`dynamic`** — a formula (`op` + `sources: ListRef[]`) recomputed on every open. Its hero states the formula: each source named (`listLabels.ts`'s `describeListRef`), linked, with what it contributed (`Alice — Owned 343 ∪ Alice — Wishlist 115 = 457`, from `resolveListWithSources`), a dangling source flagged in place. Its Updated tile states the oldest account fetch behind it and re-resolves them all (`createDefaultFetchers`' `refresh`/`onFetchedAt` — on the real wiring, not the injectable `ListResolveFetchers` seam the resolver's tests use). "Edit sources" reopens the combine form pre-filled and saves in place.
+  - **`dynamic`** — a formula (`op` + `sources: ListRef[]`) recomputed on every open. Its hero states the formula: each source named (`listLabels.ts`'s `describeListRef`), linked, with what it contributed (`Alice — Owned 343 ∪ Alice — Wishlist 115 = 457`, from `resolveListWithSources`), a dangling source flagged in place. Its Updated tile states the oldest account or store-search fetch behind it and re-resolves them all (`createDefaultFetchers`' `refresh`/`onFetchedAt` — on the real wiring, not the injectable `ListResolveFetchers` seam the resolver's tests use). "Edit sources" reopens the combine form pre-filled and saves in place.
   - **`ranked`** — one `source: ListRef`, ordered by one-vs-one answers. Resolves to its source's appids; `ListRoute.tsx` applies the order as a Rank column.
 
 ### Ranked lists
@@ -85,7 +85,7 @@ Unsaved combined lists, viewed live with "Save as a list", come from `/lists/com
 - Slots are resolved by the route and **never land in `recentAccounts`**, nor bump `lastUsedAt` — comparing someone isn't picking them, the same rule as a `?u=` override.
 - The players form (`ComparePlayersForm.tsx`) offers `getRecentAccounts()` (which already includes `myAccount`/`currentAccount`, both upserted into recents) plus a `?u=` link's account when one is being explored.
 
-**Sharing a dynamic list — `/lists/shared?f=<formula>`.** The same idea for any dynamic list's formula (owned/wishlist/bundle/recent-games/nested user-list sources, any op): encoded into a compact URL grammar (`listShare.ts`) and resolved in memory on arrival. A `user` source pointing at a _manual_ list has no token in the grammar, so the hero's "🔗 Share list" is disabled with a tooltip. Grammar and nesting: [frontend.md](frontend.md#routes).
+**Sharing a dynamic list — `/lists/shared?f=<formula>`.** The same idea for any dynamic list's formula (owned/wishlist/bundle/developer/publisher/recent-games/nested user-list sources, any op): encoded into a compact URL grammar (`listShare.ts`) and resolved in memory on arrival. A `user` source pointing at a _manual_ list has no token in the grammar, so the hero's "🔗 Share list" is disabled with a tooltip. Grammar and nesting: [frontend.md](frontend.md#routes).
 
 `ListRef`s into account-scoped system lists (`account-owned`/`account-wishlist`) always pin an explicit `accountId`, so a saved "Alice ∩ Bob" keeps meaning that whatever `currentAccount` becomes.
 
@@ -146,8 +146,8 @@ GameList     id · name? (absent = unnamed, labeled by its formula) · parentId 
              kind 'dynamic' → op + sources[] (ListRef)
              kind 'ranked'  → source (ListRef); progress in pref key ranking:<id>
              tableView? · deletedAt?
-ListRef      kind 'account-owned' | 'account-wishlist' | 'bundle' | 'recent-games' | 'user'
-             accountId? (pinned explicitly, never "whichever is current") · bundleId? · listId?
+ListRef      kind 'account-owned' | 'account-wishlist' | 'bundle' | 'recent-games' | 'user' | 'developer' | 'publisher'
+             accountId? (pinned explicitly, never "whichever is current") · bundleId? · listId? · name?
 ```
 
 Pref keys: `schemaVersion`, `myAccount`, `currentAccount`, `recentAccounts`, `region`, `lists`, `folders`, `recentGames`, `ranking:<listId>`, `bundleSnapshots`, the table-view keys above (each shared across all bundles/comparisons/shared links/developer and publisher lists; a user list keeps its own `tableView`), with `bundlesBrowseView` for `/bundles`' table of bundles.

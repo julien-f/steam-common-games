@@ -233,7 +233,7 @@ import {
   getRanking,
   setRanking,
   listHasPriceSource,
-  listHasAccountSource,
+  listHasRefreshableSource,
   listHasBundleSource,
   rankingsOf,
   listDeps,
@@ -2920,7 +2920,7 @@ export default function ListRoute() {
       kind === 'owned' ||
       kind === 'wishlist' ||
       kind === 'creator' ||
-      (!!list && listHasAccountSource(list, sharedGetList))
+      (!!list && listHasRefreshableSource(list, sharedGetList))
     ) {
       tiles.push({
         label: 'Updated',

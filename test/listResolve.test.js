@@ -21,6 +21,7 @@ function makeFetchers(overrides = {}) {
     accountWishlist: overrides.accountWishlist ?? (async () => set()),
     bundle: overrides.bundle ?? (async () => set()),
     recentGames: overrides.recentGames ?? (async () => set()),
+    creator: overrides.creator ?? (async () => set()),
     getList: (id) => lists.get(id),
   };
 }
@@ -278,4 +279,40 @@ test('resolveListWithSources: a ranked list resolves to its one source', async (
   const { result, sources } = await resolveListWithSources(ranked, fetchers);
   assert.deepEqual(result, set(1, 2));
   assert.deepEqual(sources, [{ key: 'list:m1', count: 2 }]);
+});
+
+// ── developer / publisher sources ────────────────────────────────────────────────────────────
+
+test('resolveRef: a developer/publisher source asks the creator fetcher by role and name', async () => {
+  const calls = [];
+  const fetchers = makeFetchers({
+    creator: async (role, name) => {
+      calls.push([role, name]);
+      return set(7);
+    },
+  });
+  assert.deepEqual(await resolveRef({ kind: 'developer', name: 'A' }, fetchers), set(7));
+  assert.deepEqual(await resolveRef({ kind: 'publisher', name: 'B' }, fetchers), set(7));
+  assert.deepEqual(calls, [
+    ['developer', 'A'],
+    ['publisher', 'B'],
+  ]);
+});
+
+test('resolveRef: a nameless developer source resolves to an empty set without calling the fetcher', async () => {
+  let called = false;
+  const fetchers = makeFetchers({
+    creator: async () => {
+      called = true;
+      return set(1);
+    },
+  });
+  assert.deepEqual(await resolveRef({ kind: 'developer', name: '' }, fetchers), set());
+  assert.equal(called, false);
+});
+
+test('resolveListWithSources: a developer source is keyed by its name', async () => {
+  const list = dynamicList('d', 'union', [{ kind: 'developer', name: 'A' }]);
+  const { sources } = await resolveListWithSources(list, makeFetchers({ creator: async () => set(1, 2) }));
+  assert.deepEqual(sources, [{ key: 'developer:A', count: 2 }]);
 });

@@ -20,12 +20,14 @@ import { currentRegion } from './region.ts';
 import { loadRecentGames } from './recentGames.ts';
 import { getList, isBundleReferenced, orphanBundle } from './listsStore.ts';
 import { getBundleSnapshot, rememberBundle } from './bundleSnapshots.ts';
+import { creatorTitle, fetchCreatorGames, type CreatorRole } from './creatorData.ts';
 
 export interface ListResolveFetchers {
   accountOwned(accountId: string): Promise<Set<number>>;
   accountWishlist(accountId: string): Promise<Set<number>>;
   bundle(bundleId: string): Promise<Set<number>>;
   recentGames(): Promise<Set<number>>;
+  creator(role: CreatorRole, name: string): Promise<Set<number>>;
   getList(listId: string): GameList | undefined;
 }
 
@@ -50,6 +52,9 @@ function labelForRef(ref: ListRef, index: number): string {
       return 'recent-games';
     case 'user':
       return `list:${ref.listId ?? index}`;
+    case 'developer':
+    case 'publisher':
+      return `${ref.kind}:${ref.name ?? index}`;
     default:
       return String(index);
   }
@@ -75,6 +80,9 @@ export async function resolveRef(
       return ref.bundleId ? fetchers.bundle(ref.bundleId) : new Set();
     case 'recent-games':
       return fetchers.recentGames();
+    case 'developer':
+    case 'publisher':
+      return ref.name ? fetchers.creator(ref.kind, ref.name) : new Set();
     case 'user': {
       if (!ref.listId) return new Set();
       if (visited.has(ref.listId)) throw new ListCycleError();
@@ -180,6 +188,7 @@ export interface DefaultFetchersOptions {
   onOwners?: (owners: Map<number, GameOwner[]>, accountId: string) => void; // each account-owned source's members who own each game
   onBundleLeftOut?: (bundleId: string, notOnSteam: number) => void; // a bundle's games with no Steam listing
   onBundleGames?: BundleGamesCallback; // a freshly fetched bundle's games, for their tier prices
+  onCreatorCapped?: (role: CreatorRole, name: string, shown: number, total: number) => void; // only Steam's first page
 }
 export type BundleGamesCallback = (bundleId: string, bundle: Bundle, resolved: ResolvedGame[]) => void;
 
@@ -194,6 +203,7 @@ export function createDefaultFetchers({
   onOwners,
   onBundleLeftOut,
   onBundleGames,
+  onCreatorCapped,
 }: DefaultFetchersOptions = {}): ListResolveFetchers {
   return {
     accountOwned: async (accountId) => {
@@ -218,6 +228,19 @@ export function createDefaultFetchers({
         onBundleGames,
       ),
     recentGames: async () => new Set(loadRecentGames().map((g) => g.appid)),
+    creator: async (role, name) => {
+      try {
+        const { appids, total, capped, fetchedAt } = await fetchCreatorGames(role, name, { refresh });
+        onFetchedAt?.(fetchedAt);
+        if (capped) onCreatorCapped?.(role, name, appids.length, total);
+        return new Set(appids);
+      } catch (err) {
+        // The list fails as a whole, so say which source did it.
+        throw new Error(
+          `Steam's store search didn't answer for ${creatorTitle(role, name)} (${(err as Error).message})`,
+        );
+      }
+    },
     getList,
   };
 }
