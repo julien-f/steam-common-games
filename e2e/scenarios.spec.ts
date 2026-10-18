@@ -973,7 +973,7 @@ test('L1 edge: one selected game is too few to rank, and says so', async ({ page
   await page.keyboard.press('Escape');
   await page.goto('/lists/wishlist');
   await row(page, 'It Takes Two').getByRole('checkbox').check();
-  await page.locator('summary', { hasText: 'Rank 1 game' }).click();
+  await page.getByRole('button', { name: /Rank 1 game/ }).click();
   const create = page.locator('.rank-menu-panel').getByRole('button', { name: '+ New ranking' });
   await expect(create).toHaveAttribute('aria-disabled', 'true');
   await expect(create).toHaveAccessibleDescription('Ranking needs at least 2 games');
@@ -1249,9 +1249,9 @@ test('R1 edge: Esc closing a nav popover stays on the ranking', async ({ page })
   await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
 
   await page.getByLabel('Preferences').click();
-  await expect(page.locator('.site-nav-prefs')).toHaveAttribute('open');
+  await expect(page.locator('.site-nav-prefs-panel')).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.locator('.site-nav-prefs')).not.toHaveAttribute('open');
+  await expect(page.locator('.site-nav-prefs-panel')).toBeHidden();
   await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
 });
 
@@ -1293,7 +1293,7 @@ test('R2 edge: ranking a list again offers its rankings, or a new one by a crite
   await expect(page.getByRole('heading', { name: 'Ranking of Alice — Wishlist' })).toBeVisible();
 
   await page.goto('/lists/wishlist');
-  await page.locator('summary', { hasText: /Rank this list/ }).click();
+  await page.getByRole('button', { name: /Rank this list/ }).click();
   const menu = page.locator('.rank-menu-panel');
   await expect(menu.getByRole('button', { name: /Ranking of Alice — Wishlist/ })).toBeVisible();
   await menu.getByRole('textbox', { name: 'What are you ranking by?' }).fill('co-op');
@@ -3176,9 +3176,9 @@ test('F1 edge: Esc closes a nav popover or the search dropdown, not the open gam
   await expect(page.locator('#panel-title')).toHaveText('Portal 2');
 
   await page.getByLabel('Preferences').click();
-  await expect(page.locator('.site-nav-prefs')).toHaveAttribute('open');
+  await expect(page.locator('.site-nav-prefs-panel')).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.locator('.site-nav-prefs')).not.toHaveAttribute('open');
+  await expect(page.locator('.site-nav-prefs-panel')).toBeHidden();
   await expect(page.locator('#panel-title')).toBeVisible();
 
   await page.getByPlaceholder('Look up any game…').fill('hollow');

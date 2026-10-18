@@ -36,10 +36,10 @@ import type { AccountSlot } from './types.ts';
 export function AccountChip(): JSX.Element {
   const location = useLocation();
   const navigate = useNavigate();
-  // The `<details>`/panel pair are always rendered, even with no account at all — the popover
+  // The button/panel pair are always rendered, even with no account at all — the popover
   // still has recents to switch to and a way to Home, and a ref inside a <Show> wouldn't exist
   // yet at onMount time to bind anything to.
-  let detailsEl!: HTMLDetailsElement;
+  let btnEl!: HTMLButtonElement;
   let panelEl!: HTMLDivElement;
 
   const account = getEffectiveCurrentAccount;
@@ -47,7 +47,7 @@ export function AccountChip(): JSX.Element {
   const override = getAccountOverride;
   const recents = () => getRecentAccounts();
 
-  onMount(() => onCleanup(bindNavPopover(detailsEl, panelEl)));
+  onMount(() => onCleanup(bindNavPopover(btnEl, panelEl)));
 
   // Every link out of here carries `?u=` along (withAccountParam), or clicking "Owned" while
   // exploring a shared link would quietly show the *stored* account's library instead. Built off
@@ -59,8 +59,8 @@ export function AccountChip(): JSX.Element {
 
   function pick(acc: AccountSlot): void {
     adoptAccount(acc, navigate, location);
-    detailsEl.open = false;
-    detailsEl.querySelector('summary')!.focus(); // the clicked button is now hidden in the closed popover
+    panelEl.hidePopover();
+    btnEl.focus(); // the clicked button is now hidden in the closed popover
   }
 
   const otherRecents = () => recents().filter((a) => a.id !== account()?.id);
@@ -91,10 +91,13 @@ export function AccountChip(): JSX.Element {
         </div>
       </Show>
 
-      <details class="site-nav-popover" ref={detailsEl}>
-        <summary
+      <div class="site-nav-popover">
+        <button
+          type="button"
           class="site-nav-link account-chip-btn"
           aria-label={account() ? `Account: ${chipLabel()}` : chipLabel()}
+          popovertarget="account-chip-panel"
+          ref={btnEl}
         >
           <Show
             when={account()?.avatarUrl}
@@ -117,9 +120,9 @@ export function AccountChip(): JSX.Element {
               🔗
             </span>
           </Show>
-        </summary>
+        </button>
 
-        <div class="site-nav-popover-panel account-chip-panel" ref={panelEl}>
+        <div id="account-chip-panel" class="site-nav-popover-panel account-chip-panel" popover ref={panelEl}>
           <Show when={accountOverrideStatusText(overrideState())}>
             {(text) => <p class="account-chip-note">{text()}</p>}
           </Show>
@@ -224,13 +227,13 @@ export function AccountChip(): JSX.Element {
             href={link('/')}
             class="account-chip-panel-link"
             onClick={() => {
-              detailsEl.open = false;
+              panelEl.hidePopover();
             }}
           >
             {account() ? 'Manage accounts on Home' : 'Pick an account on Home'}
           </A>
         </div>
-      </details>
+      </div>
     </div>
   );
 }

@@ -113,7 +113,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 - `overlayHistory.ts` — the history entry each open overlay pushes (see the side panel).
 - `gameSearch.ts` — the combobox/debounce UI for "look up any game" (the shell owns where results go).
 - `urlState.ts` — param parsing, canonical param order, and the `?game=`/`&shot=`/`?u=` writers.
-- `prefs.ts` / `prefsPopover.tsx` / `region.ts` / `navPopover.ts` — the localStorage preference blob; the ⚙ panel's contents; the region preference and its detection; `<details>` popover open/close/positioning.
+- `prefs.ts` / `prefsPopover.tsx` / `region.ts` / `navPopover.ts` — the localStorage preference blob; the ⚙ panel's contents; the region preference and its detection; nav popovers' Escape and positioning.
 - `tableViewPrefs.ts` / `tableViewKeys.ts` / `tableViewSync.ts` / `SharedViewBanner.tsx` / `UnsavedViewBanner.tsx` — restore/persist/share/reset a table view; the table-view pref keys; the signed-in Save/Revert baseline; the shared-layout and unsaved-changes banners and the Share/Default view buttons.
 - `clipboard.ts` / `CopyButton.tsx` — the one copy-then-confirm helper behind every copy button (`copyWithFeedback` for plain DOM buttons, `<CopyButton>` for JSX), with a `window.prompt` fallback where the Clipboard API isn't available (it needs a secure context, and can be permission-denied).
 - `pageTitle.ts` — the two-layer `document.title` (route context, overridden by an open game).
@@ -232,7 +232,7 @@ Every route opens with a **hero card** (`ListHero.tsx`, a `<header>`): the list'
 - **The card is dumb**: no data, no per-kind branching; callers pass formatted values, so "what does a wishlist show" is answered in `ListRoute.tsx` alone. Its dates are ISO, like the tables' (see [ui-guidelines.md](ui-guidelines.md)).
 - **A tile can be a control**: given `onClick` it renders as a `<button>`, `aria-disabled` while its action is in flight (not `disabled`, which would drop the focus of the click). A toggle also passes `active`, rendered as `aria-pressed` and read back from what the click applied.
 - **A tile that refreshes replaces the route's ↻ Refresh button** (`refreshTileValue` adds a ↻ beside the value), so it's rendered unconditionally — during a load and after one that failed before fetching, when a retry is wanted.
-  - `/bundles`: Updated re-fetches, Prices opens the ⚙ popover (`openPrefsPopover`, deferred past the click — `navPopover.ts`'s outside-click listener and Solid's delegated `onClick` share `document`, so `stopPropagation` can't help), New/Ending soon toggle filters.
+  - `/bundles`: Updated re-fetches, Prices opens the ⚙ popover (`openPrefsPopover`), New/Ending soon toggle filters.
   - Owned/wishlist: Updated does the same. Prices shows only where the list is priced (`hasPrices()`: the wishlist, a user list with a priced source), never on owned. Any list built from an account fetch, at any depth (a comparison; a dynamic, ranked or shared list), gets Updated too: its age is the _oldest_ of the account fetches behind it, and clicking re-resolves them all past the server's cache (`createDefaultFetchers`'s `refresh`/`onFetchedAt`, `listResolve.ts`).
   - The tile is gated on there being an age, not on the kind: a manual list (stored appids) has none. Owned, wishlist and comparisons keep it without an age ("—") so a failed first load can be retried.
   - Exception: a bundle's own hero tile is a plain `<div>` — finding one bundle walks several cached list pages, so `GET /api/bundles/:id` has no force path. It still states the age of the page the bundle was found on (`findBundleById`'s `cacheKey`).
@@ -277,7 +277,7 @@ The "look up any game" box is one nav-bar search in the shell, not one per route
 
 `AccountChip.tsx` says who the app is showing, following a `?u=` link that resolves after mount, with a 🔗 marker when a link's account is showing.
 
-- Both nav popovers (this and ⚙ Preferences) share `navPopover.ts`: `<details>` has no outside-click/Escape close, and the panel is positioned in JS because `.site-nav`'s flex-wrap moves its triggers with viewport width (seen off-screen on a real Galaxy S10, ruling out CSS-only anchoring).
+- Both nav popovers (this and ⚙ Preferences), and the rank menu, are native popovers (`button[popovertarget]` + `[popover]`: the browser opens, closes and dismisses them on an outside click) sharing `navPopover.ts`: it closes them on Esc ahead of the page's own Esc handlers, and positions the panel in JS because `.site-nav`'s flex-wrap moves its triggers with viewport width (seen off-screen on a real Galaxy S10, ruling out CSS-only anchoring).
 - It carries **copyable Steam identifiers** (`accountsStore.ts`'s `accountIdentifiers`: the stored custom-URL name, else the steam64 id), read from the slot since the chip fetches nothing: one for the current account, one per member beside each recents row (outside its switch button, which can't nest one).
 
 ## The side panel
@@ -346,7 +346,7 @@ Above 768px the shell is locked to the viewport and **`.app-scroll` is the page'
 
 `prefs.ts` is one flat `{key: value}` JSON blob under a single localStorage key, so the whole set is enumerable at once; `setPref`'s sync hook is per-key so two preferences changing in different tabs can't race each other's server writes.
 
-Region is the only user-facing preference, in the nav bar's ⚙ popover (`prefsPopover.tsx` owns the contents, `AppShell.tsx` only the `<details>` shell). `region.ts` holds a curated list of major Steam pricing regions and `detectCountry()`; price-showing routes re-price from an effect on `currentRegion()`.
+Region is the only user-facing preference, in the nav bar's ⚙ popover (`prefsPopover.tsx` owns the panel, `AppShell.tsx` only its button). `region.ts` holds a curated list of major Steam pricing regions and `detectCountry()`; price-showing routes re-price from an effect on `currentRegion()`.
 
 - The first entry is always "Auto-detect (⟨what it resolves to now⟩)", and `currentRegion` consults `detectCountry()` live on every upstream call.
 - `detectCountry` tries the OS timezone (`Intl.DateTimeFormat().resolvedOptions().timeZone`, via a curated map including Eurozone→`DE`) before `navigator.language` — language is a UI preference and often stays "en-US" anywhere (e.g. `LANG=en_US.UTF-8` in `Europe/Paris`).

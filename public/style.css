@@ -144,18 +144,13 @@ b {
   }
 }
 
-/* Nav-bar popovers — the ⚙ Preferences panel (AppShell.tsx) and the account chip's
-   (AccountChip.tsx). Both are native <details> for a free, accessible open/close toggle;
-   outside-click/Escape closing and the panel's own placement are added by hand in
-   navPopover.ts's bindNavPopover, since <details> has neither. */
+/* Nav popovers (⚙ Preferences, account chip, rank menu): native popovers placed by navPopover.ts. */
 .site-nav-prefs-btn {
+  display: block;
+  background: transparent;
   cursor: pointer;
-  list-style: none;
   font-size: var(--fs-title);
   line-height: 1;
-}
-.site-nav-prefs-btn::-webkit-details-marker {
-  display: none;
 }
 .site-nav-popover-panel {
   /* `position: fixed` with `top`/`left` computed in JS (navPopover.ts) rather than anchored via
@@ -179,7 +174,14 @@ b {
      safety net for anything narrower still (down to the ~320px floor this app otherwise
      targets). */
   max-width: calc(100vw - 24px);
-  z-index: 20;
+  /* The UA's [popover] box reset: centred (inset 0), canvas text colour, scrolling. */
+  inset: auto;
+  overflow: visible;
+  color: inherit;
+}
+/* Restated: a panel's own display (flex) would otherwise show it while closed. */
+.site-nav-popover-panel:not(:popover-open) {
+  display: none;
 }
 .site-nav-prefs-panel {
   width: 200px;
@@ -218,12 +220,9 @@ b {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  background: transparent;
   cursor: pointer;
-  list-style: none;
   max-width: 180px;
-}
-.account-chip-btn::-webkit-details-marker {
-  display: none;
 }
 .account-chip-avatar {
   width: 20px;
@@ -246,7 +245,7 @@ b {
 }
 /* An identity, not a route: no pill fill, so it never reads as a second selected page. */
 .account-chip-btn:hover,
-.site-nav-popover[open] > .account-chip-btn {
+.site-nav-popover:has(> :popover-open) > .account-chip-btn {
   background: transparent;
   border-color: var(--border);
 }
@@ -4917,12 +4916,6 @@ kbd {
 }
 
 /* 🏆 Rank this list, once the list has rankings: continue one, or start one by a criterion. */
-.rank-menu > summary {
-  list-style: none;
-}
-.rank-menu > summary::-webkit-details-marker {
-  display: none;
-}
 .rank-menu-panel {
   width: 300px;
   display: flex;

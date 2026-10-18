@@ -107,7 +107,7 @@ const TO_TOP_AFTER_PX = 600;
 export function AppShell(props: RouteSectionProps): JSX.Element {
   let searchInputEl!: HTMLInputElement;
   let scrollEl!: HTMLDivElement;
-  let prefsDetailsEl!: HTMLDetailsElement;
+  let prefsBtnEl!: HTMLButtonElement;
   let prefsPanelEl!: HTMLDivElement;
   // The `?` shortcuts dialog — see ShortcutsModal.tsx. State lives here because
   // bindPanelKeyboardShortcuts' `shortcuts` option needs it.
@@ -250,7 +250,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       },
     });
 
-    onCleanup(bindNavPopover(prefsDetailsEl, prefsPanelEl));
+    onCleanup(bindNavPopover(prefsBtnEl, prefsPanelEl));
   });
 
   return (
@@ -299,13 +299,19 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
             <div id="app-search-results" class="game-search-results" hidden />
           </search>
           <AccountChip />
-          <details class="site-nav-prefs site-nav-popover" ref={prefsDetailsEl}>
+          <div class="site-nav-prefs site-nav-popover">
             {/* U+FE0F asks for the emoji glyph: the text one renders ~8 px in common fallback fonts. */}
-            <summary class="site-nav-link site-nav-prefs-btn" aria-label="Preferences">
+            <button
+              type="button"
+              class="site-nav-link site-nav-prefs-btn"
+              aria-label="Preferences"
+              popovertarget="nav-prefs-panel"
+              ref={prefsBtnEl}
+            >
               {'\u2699\uFE0F'}
-            </summary>
+            </button>
             <PrefsPanel ref={prefsPanelEl} />
-          </details>
+          </div>
         </header>
 
         <main class="app-content" tabindex="-1">

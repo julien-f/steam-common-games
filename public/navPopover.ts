@@ -1,19 +1,5 @@
-// Open/close + positioning mechanics for the nav bar's `<details>` popovers — the ⚙ Preferences
-// panel (AppShell.tsx) and the account chip's own (AccountChip.tsx).
-//
-// `<details>` gives a free, accessible toggle, but has no built-in "close on outside click" or
-// "close on Escape", so both are added by hand; and the panel can't be anchored in CSS alone.
-// `.site-nav`'s flex-wrap re-centers its items as a group once they wrap onto more than one
-// line, so a trigger's own x-position shifts with viewport width in a way a CSS-only anchor
-// can't follow — confirmed live on a real Galaxy S10 (Firefox) as the ⚙ panel running off-screen
-// to the left. So the panel is `position: fixed`, anchored to its own trigger's live position and
-// clamped inside the viewport, recomputed on every toggle/resize/scroll while it's open.
-//
-// One implementation rather than one per popover: this used to be AppShell.tsx's own
-// `bindPrefsPopoverClose`/`bindPrefsPopoverPosition` pair (itself once a deliberate duplicate of
-// the now-deleted nav.tsx's identically-named pair), hardcoded to `.site-nav-prefs`'s selectors.
-// A second popover needing the same behavior is exactly the point at which that becomes two
-// copies free to drift apart.
+// Esc and placement for the nav popovers (⚙ Preferences, account chip, rank menu); the browser opens and dismisses them.
+// Placed in JS: `.site-nav`'s flex-wrap moves a trigger with viewport width, off-screen for CSS anchoring (seen on a Galaxy S10).
 
 export const POPOVER_MARGIN = 12;
 
@@ -28,38 +14,34 @@ export function clampPopoverLeft(triggerRight: number, panelWidth: number, viewp
   return Math.min(Math.max(triggerRight - panelWidth, POPOVER_MARGIN), Math.max(maxLeft, POPOVER_MARGIN));
 }
 
-function positionPanel(details: HTMLDetailsElement, panel: HTMLElement): void {
-  const triggerRect = details.querySelector('summary')!.getBoundingClientRect();
+function positionPanel(trigger: HTMLElement, panel: HTMLElement): void {
+  const triggerRect = trigger.getBoundingClientRect();
   const panelWidth = panel.getBoundingClientRect().width;
   panel.style.left = `${clampPopoverLeft(triggerRect.right, panelWidth, window.innerWidth)}px`;
   panel.style.top = `${triggerRect.bottom + 4}px`;
 }
 
-// Binds one `<details>`/panel pair. Returns a cleanup that removes every listener — the shell's
+// Binds one trigger/panel pair. Returns a cleanup that removes every listener — the shell's
 // own popovers live as long as the app does, but a popover rendered inside a component (the
 // account chip) has to be able to unbind with it.
-export function bindNavPopover(details: HTMLDetailsElement, panel: HTMLElement): () => void {
+export function bindNavPopover(trigger: HTMLElement, panel: HTMLElement): () => void {
+  const isOpen = () => panel.matches(':popover-open');
   const reposition = () => {
-    if (details.open) positionPanel(details, panel);
-  };
-  const onClick = (e: MouseEvent) => {
-    if (details.open && !details.contains(e.target as Node)) details.open = false;
+    if (isOpen()) positionPanel(trigger, panel);
   };
   const onKeydown = (e: KeyboardEvent) => {
-    if (e.key !== 'Escape' || !details.open) return;
-    details.open = false;
+    if (e.key !== 'Escape' || !isOpen()) return;
+    panel.hidePopover();
     e.preventDefault(); // the page's own Esc (closing the panel, leaving /rank) skips a handled one
   };
-  document.addEventListener('click', onClick);
   // Window capture: ahead of every document-level Esc handler, RankRoute's capture-phase one included.
   window.addEventListener('keydown', onKeydown, true);
-  details.addEventListener('toggle', reposition);
+  panel.addEventListener('toggle', reposition);
   window.addEventListener('resize', reposition);
   window.addEventListener('scroll', reposition, true);
   return () => {
-    document.removeEventListener('click', onClick);
     window.removeEventListener('keydown', onKeydown, true);
-    details.removeEventListener('toggle', reposition);
+    panel.removeEventListener('toggle', reposition);
     window.removeEventListener('resize', reposition);
     window.removeEventListener('scroll', reposition, true);
   };
