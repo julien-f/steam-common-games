@@ -1,0 +1,9 @@
+@layer layout {
+  /* About's sections, plain rather than boxed. */
+  .container > section + section {
+    margin-top: 28px;
+  }
+  .container > section > h2 {
+    margin-bottom: 6px;
+  }
+}

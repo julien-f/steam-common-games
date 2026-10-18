@@ -521,7 +521,7 @@ export default function BundlesBrowseRoute() {
           />
         </div>
         <Show when={moreAvailable()}>
-          <button type="button" class="btn btn-ghost" disabled={loading()} onClick={() => load({ append: true })}>
+          <button type="button" class="btn" disabled={loading()} onClick={() => load({ append: true })}>
             Load more
           </button>
         </Show>

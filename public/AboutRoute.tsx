@@ -10,7 +10,7 @@ export default function AboutRoute() {
     <div class="container">
       <ListHero title="About" />
 
-      <section class="card">
+      <section>
         <h2>About</h2>
         <p class="card-subtitle">
           steam.isonoe.net compares Steam libraries across players and helps you browse a single library, with ratings,
@@ -19,7 +19,7 @@ export default function AboutRoute() {
         </p>
       </section>
 
-      <section class="card">
+      <section>
         <h2>Data sources</h2>
         <ol class="how-steps">
           <li>
@@ -45,7 +45,7 @@ export default function AboutRoute() {
         </ol>
       </section>
 
-      <section class="card">
+      <section>
         <h2>What's stored</h2>
         <p class="card-subtitle">
           Only public Steam profile data (Steam ID, name, avatar, owned games/playtime) and the ratings/tags/
@@ -56,7 +56,7 @@ export default function AboutRoute() {
         </p>
       </section>
 
-      <section class="card">
+      <section>
         <h2>Contact</h2>
         <p class="card-subtitle">
           Questions, or want data related to your profile removed from the cache? Open an issue on{' '}

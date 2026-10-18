@@ -119,6 +119,11 @@ export function compareByOrder(
   return (a, b) => order.indexOf(toKey(a)) - order.indexOf(toKey(b));
 }
 
+// Smooth scrolling, unless the user asked the system for reduced motion.
+export function smoothScroll(): ScrollBehavior {
+  return matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+}
+
 export function scoreColor(n: number | null): string {
   if (n == null) return 'var(--text1)';
   if (n >= 80) return '#57cbde';

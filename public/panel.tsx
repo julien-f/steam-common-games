@@ -3,6 +3,7 @@ import {
   fmtPlaytime,
   formatMoney,
   scoreColor,
+  smoothScroll,
   dealRecordTier,
   DEAL_RECORD_TIERS,
   fmtH,
@@ -674,14 +675,14 @@ function jumpToPanelSection(target: string) {
   updateSubnavScrollSpy();
   const body = document.getElementById('panel-body')!;
   if (target === 'top') {
-    body.scrollTo({ top: 0, behavior: 'smooth' });
+    body.scrollTo({ top: 0, behavior: smoothScroll() });
     return;
   }
   const el = document.getElementById(target);
   if (!el) return;
   const headerH = document.querySelector('.panel-header-sticky')?.getBoundingClientRect().height ?? 0;
   const delta = el.getBoundingClientRect().top - body.getBoundingClientRect().top - headerH - 8;
-  body.scrollTo({ top: body.scrollTop + delta, behavior: 'smooth' });
+  body.scrollTo({ top: body.scrollTop + delta, behavior: smoothScroll() });
 }
 
 // ProtonDB's community-reported Linux/Steam Deck compatibility tiers, worst to best.

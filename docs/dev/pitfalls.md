@@ -128,3 +128,9 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: a rule restyling the table library (e.g. `.table-container .dt-th { background: … }`) shows in DevTools as overridden by the library's own rule, though its selector is more specific: the header row turns the library's light default.
 - **Cause**: `@vates/data-table-solid` injects an unlayered `<style>`, and an unlayered rule beats any rule in a `@layer`, whatever its specificity or order.
 - **Fix**: keep every `.dt-*` override, and the `html:root { --color-* }` theme, in the unlayered `styles/vendor-data-table.css`, not in a layer.
+
+## The page freezes opening the table's Filter on a phone, under reduced motion
+
+- **Symptom**: with `prefers-reduced-motion: reduce` (the e2e default) at phone width, clicking the toolbar's Filter never returns: the main thread stays blocked (`locator.click: Timeout`, then any `page.evaluate` hangs).
+- **Cause**: a global reduced-motion rule set `transition-duration` to a near-zero value on every element; with the default `transition-property: all`, every property change on every element became a transition, and something on the table library's filter panel open (not pinned down) then never settles; 0s ends that, 10 ms and 50 ms don't.
+- **Fix**: transitions go to `0s` in that rule (`styles/base.css`); only animations keep a near-zero duration, for the `animationend` the lightbox waits on.

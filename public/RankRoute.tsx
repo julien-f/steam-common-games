@@ -318,7 +318,7 @@ export default function RankRoute() {
         <div class="rank-card-actions">
           <button
             type="button"
-            class="btn btn-ghost btn-sm"
+            class="btn"
             title="Open this game's details in the side panel"
             ref={(el) => detailsButtons.set(appid, el)}
             onClick={() => openPanel(appid)}
@@ -327,7 +327,7 @@ export default function RankRoute() {
           </button>
           <button
             type="button"
-            class="btn btn-ghost btn-sm"
+            class="btn"
             title="Leave this game out of the ranking"
             onClick={() => respond(`exclude-${side}`)}
           >
@@ -341,7 +341,7 @@ export default function RankRoute() {
   return (
     <div class="rank-route">
       <header class="rank-header">
-        <A href={listHref()} class="btn btn-ghost btn-sm">
+        <A href={listHref()} class="btn">
           ← Back to list
         </A>
         <h1>{title()}</h1>
@@ -353,7 +353,7 @@ export default function RankRoute() {
         {(f) => (
           <div class="rank-focus-banner">
             Comparing {f().size} chosen games.
-            <button type="button" class="btn btn-ghost btn-sm" onClick={compareAll}>
+            <button type="button" class="btn" onClick={compareAll}>
               Rank all instead
             </button>
           </div>
@@ -399,7 +399,7 @@ export default function RankRoute() {
               >
                 <p>Every chosen game is ranked.</p>
                 <Show when={source() && state() && progress(state()!, source()!).pending}>
-                  <button type="button" class="btn btn-ghost" onClick={compareAll}>
+                  <button type="button" class="btn" onClick={compareAll}>
                     Rank the rest
                   </button>
                 </Show>
@@ -408,7 +408,7 @@ export default function RankRoute() {
                 See the ranking
               </A>
               <Show when={undoStack().length}>
-                <button type="button" class="btn btn-ghost" onClick={undo}>
+                <button type="button" class="btn" onClick={undo}>
                   Undo last answer
                 </button>
               </Show>
@@ -430,13 +430,13 @@ export default function RankRoute() {
               {card(p().opponent, 'opponent', `Currently #${ranks(state()!, source()!).get(p().opponent) ?? '?'}`)}
             </div>
             <div class="rank-actions">
-              <button type="button" class="btn btn-ghost" onClick={() => respond('tie')}>
+              <button type="button" class="btn" onClick={() => respond('tie')}>
                 Tie <kbd>↓</kbd>
               </button>
-              <button type="button" class="btn btn-ghost" onClick={() => respond('skip')}>
+              <button type="button" class="btn" onClick={() => respond('skip')}>
                 Skip, ask later <kbd>S</kbd>
               </button>
-              <button type="button" class="btn btn-ghost" disabled={!undoStack().length} onClick={undo}>
+              <button type="button" class="btn" disabled={!undoStack().length} onClick={undo}>
                 Undo <kbd>Z</kbd>
               </button>
             </div>

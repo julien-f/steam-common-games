@@ -68,6 +68,31 @@ html:root {
   font-variant-numeric: tabular-nums;
 }
 
+/* The library's toolbar controls at the app's control height and look (styles/base.css). */
+.dt-btn,
+.dt-btn-clear {
+  min-height: var(--control-h);
+  border-width: 1px;
+  font-size: var(--fs-ui);
+}
+.dt-btn {
+  padding: 0 10px;
+  border-radius: var(--radius-3);
+}
+.dt-btn--grouped {
+  border-radius: var(--radius-3) 0 0 var(--radius-3);
+}
+.dt-btn-clear {
+  border-radius: 0 var(--radius-3) var(--radius-3) 0;
+}
+.dt-search-input {
+  height: var(--control-h);
+  border-width: 1px;
+  border-radius: var(--radius-3);
+  background: var(--surface);
+  font-size: var(--fs-ui);
+}
+
 /* The 24 px tap area around a header's sort button only grows taller: wider, it would cover its column menu button. */
 .dt-th-sort {
   position: relative;

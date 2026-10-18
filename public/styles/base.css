@@ -21,6 +21,8 @@
     --dur-2: 180ms;
     --dur-3: 250ms;
     --ease-out: cubic-bezier(0.2, 0, 0, 1);
+    /* Fields and buttons, the table library's included. */
+    --control-h: 34px;
     /* The type scale (docs/dev/ui-guidelines.md); px sizes are left only to icon glyphs, 22px and up. */
     --fs-label: 11px;
     --fs-meta: 12px;
@@ -32,6 +34,183 @@
     /* Self-hosted (AppRoot.tsx imports them); the fallbacks only show until they load. */
     --font-sans: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+  }
+
+  body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: var(--fs-body);
+  }
+
+  a {
+    color: var(--text);
+    text-underline-offset: 2px;
+  }
+  a:hover {
+    color: #fff;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  strong,
+  b {
+    font-weight: 600;
+  }
+  h1 {
+    font-size: var(--fs-page);
+  }
+  h2 {
+    font-size: var(--fs-title);
+  }
+  h3,
+  h4 {
+    font-size: var(--fs-body);
+  }
+
+  p {
+    line-height: 1.5;
+  }
+
+  dt,
+  legend {
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+
+  kbd {
+    padding: 2px 6px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-1);
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    font-size: var(--fs-label);
+    white-space: nowrap;
+  }
+
+  table {
+    border-collapse: collapse;
+  }
+
+  dialog {
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-3);
+    background: var(--surface);
+    color: var(--text);
+  }
+  /* A dialog's only: a popover's backdrop stays clear. */
+  dialog::backdrop {
+    background: rgb(0 0 0 / 0.6);
+  }
+
+  fieldset {
+    min-inline-size: 0;
+    border: 0;
+  }
+
+  :where(ul[class], ol[class]) {
+    list-style: none;
+  }
+
+  :where(button, input, select, textarea) {
+    font: inherit;
+  }
+
+  /* Text fields and selects; the table library sizes its own (styles/vendor-data-table.css). */
+  :where(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file']), select, textarea):where(
+    :not([class*='dt-'])
+  ) {
+    min-width: 0;
+    height: var(--control-h);
+    padding: 0 10px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-3);
+    background: var(--surface);
+    color: var(--text);
+    font-size: var(--fs-ui);
+  }
+  :where(textarea) {
+    height: auto;
+    padding-block: 8px;
+  }
+  ::placeholder {
+    color: var(--muted);
+    opacity: 1;
+  }
+
+  /* An unclassed <button> is the app's button; `.btn` gives the look to a classed one or a link. */
+  :where(button:not([class]), .btn) {
+    min-height: var(--control-h);
+    padding: 0 12px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-3);
+    background: transparent;
+    color: var(--text);
+    font-size: var(--fs-ui);
+    line-height: 1.2;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-1) var(--ease-out),
+      border-color var(--dur-1) var(--ease-out);
+  }
+  /* A link has no button's built-in centring. */
+  :where(a.btn) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  :where(button:not([class]), .btn):where(:hover:not(:disabled, [aria-disabled='true'])) {
+    border-color: var(--muted);
+    background: var(--line);
+    color: var(--text);
+  }
+  .btn-primary {
+    border-color: var(--text);
+    background: var(--text);
+    color: var(--bg);
+  }
+  .btn-primary:hover:not(:disabled, [aria-disabled='true']) {
+    border-color: #fff;
+    background: #fff;
+    color: var(--bg);
+  }
+
+  :where(button, input, select, textarea, .btn):where(:disabled, [aria-disabled='true']):where(:not([class*='dt-'])) {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+  }
+
+  @media (forced-colors: active) {
+    :where(button, .btn, input, select, textarea):where(:disabled, [aria-disabled='true']) {
+      border-color: GrayText;
+      color: GrayText;
+    }
+  }
+
+  /* Animations near-zero rather than none: the lightbox waits for animationend. Transitions 0s, not
+     near-zero: every element's default `transition-property: all` would then animate (pitfalls.md). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      animation-delay: 0s !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0s !important;
+      transition-delay: 0s !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   time,

@@ -79,7 +79,7 @@ export function ListHero(props: ListHeroProps): JSX.Element {
             <Show when={props.secondaryActions}>
               <button
                 type="button"
-                class="btn btn-ghost btn-sm list-hero-more"
+                class="btn list-hero-more"
                 aria-label="More actions"
                 aria-expanded={moreOpen()}
                 onClick={() => setMoreOpen((v) => !v)}

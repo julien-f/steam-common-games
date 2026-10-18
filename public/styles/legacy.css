@@ -1,12 +1,4 @@
 @layer legacy {
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
-
   /* Bridge: the old palette's names, pointed at the new tokens (styles/base.css) until each area is
      rebuilt on them. */
   :root {
@@ -24,30 +16,6 @@
     /* The side panel's width, and the gutter `.app-shell.panel-open` reserves for it — one
      value, since the panel is `position: fixed` and no longer measures the layout itself. */
     --panel-w: 380px;
-  }
-
-  body {
-    background: var(--bg0);
-    color: var(--text0);
-    font-family: var(--font-sans);
-    font-size: var(--fs-body);
-    min-height: 100vh;
-  }
-
-  button,
-  input,
-  select,
-  textarea {
-    font: inherit;
-  }
-  /* The browser's default bold is 700; the scale has 400 and 600 only. */
-  h1,
-  h2,
-  h3,
-  h4,
-  strong,
-  b {
-    font-weight: 600;
   }
 
   .container {
@@ -161,12 +129,6 @@
   }
   .site-nav-prefs-row select {
     width: 100%;
-    padding: 6px 8px;
-    background: var(--bg3);
-    color: var(--text0);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    font-size: var(--fs-ui);
   }
 
   /* Account chip (AccountChip.tsx) — who the app is currently showing, plus that account's
@@ -318,61 +280,11 @@
     }
   }
 
-  /* Card */
-  .card {
-    background: var(--bg1);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    padding: 22px 24px;
-    margin-bottom: 18px;
-  }
-  .card h2 {
-    font-size: var(--fs-ui);
-    font-weight: 600;
-    color: var(--text1);
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    margin-bottom: 6px;
-  }
   .card-subtitle {
     font-size: var(--fs-ui);
     color: var(--text1);
     margin-bottom: 14px;
     line-height: 1.5;
-  }
-
-  .btn {
-    padding: 9px 18px;
-    border: none;
-    border-radius: var(--r);
-    cursor: pointer;
-    font-size: var(--fs-ui);
-    font-weight: 400;
-    transition:
-      background 0.15s,
-      color 0.15s;
-    white-space: nowrap;
-    text-decoration: none; /* .btn started out button-only; ListRoute.tsx's "← All bundles" is the
-    first <a class="btn ..."> and would otherwise keep the browser's default underline. */
-    display: inline-block;
-  }
-  .btn-ghost {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text0);
-  }
-  .btn-ghost:hover:not(:disabled, [aria-disabled='true']) {
-    background: var(--bg0);
-  }
-  .btn:disabled,
-  .btn[aria-disabled='true'] {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .btn-primary {
-    background: var(--accent);
-    color: var(--bg);
   }
 
   /* The ⧉ button CopyButton.tsx renders — currently the "copy this account's Steam identifier"
@@ -400,30 +312,6 @@
   .copy-btn--copied {
     border-color: #15803d;
     color: #15803d;
-  }
-  .btn-primary:hover:not(:disabled, [aria-disabled='true']) {
-    background: #1490e8;
-  }
-
-  /* Table */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  tbody tr {
-    border-bottom: 1px solid rgba(61, 80, 104, 0.4);
-  }
-  tbody tr:last-child {
-    border-bottom: none;
-  }
-  tbody tr:hover {
-    background: rgba(42, 71, 94, 0.45);
-  }
-
-  tbody td {
-    padding: 9px 14px;
-    vertical-align: middle;
   }
 
   /* Thumbnail cell */
@@ -560,20 +448,6 @@
   }
   .game-search-wrap > input {
     width: 100%;
-    padding: 9px 12px;
-    background: var(--bg0);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    color: var(--text0);
-    font-size: var(--fs-body);
-    outline: none;
-    transition: border-color 0.15s;
-  }
-  .game-search-wrap > input:focus {
-    border-color: var(--accent);
-  }
-  .game-search-wrap > input::placeholder {
-    color: var(--text2);
   }
 
   /* /search's own copy (SearchRoute.tsx) is this page's primary control, not a nav-bar accessory —
@@ -582,7 +456,8 @@
     margin-bottom: 16px;
   }
   .search-page-input > input {
-    padding: 13px 16px;
+    height: 48px;
+    padding: 0 16px;
     font-size: var(--fs-title);
   }
   /* SearchClearButton.tsx, inside either search box's right edge. */
@@ -729,20 +604,6 @@
   }
   .app-search-wrap > input {
     width: 100%;
-    padding: 7px 12px;
-    background: var(--bg0);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    color: var(--text0);
-    font-size: var(--fs-ui);
-    outline: none;
-    transition: border-color 0.15s;
-  }
-  .app-search-wrap > input:focus {
-    border-color: var(--accent);
-  }
-  .app-search-wrap > input::placeholder {
-    color: var(--text2);
   }
 
   /* How it works */
@@ -783,12 +644,6 @@
   }
   .how-steps li strong {
     color: var(--text0);
-  }
-  /* Sized as the table library's .dt-btn, so the two sit in one toolbar at one height. */
-  .btn-sm {
-    padding: 5px 10px;
-    font-size: var(--fs-ui);
-    line-height: 1;
   }
 
   /* App shell layout (see docs/dev/frontend.md and AppShell.tsx)
@@ -938,9 +793,6 @@
   @media (max-width: 768px) {
     .container {
       padding: 18px 14px 40px;
-    }
-    .card {
-      padding: 14px 16px;
     }
   }
 
@@ -2894,17 +2746,6 @@
   }
 
   /* Keyboard shortcuts modal */
-  kbd {
-    font-family: inherit;
-    font-size: var(--fs-label);
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-bottom-width: 2px;
-    border-radius: 3px;
-    padding: 2px 6px;
-    color: var(--text0);
-    white-space: nowrap;
-  }
   /* The <dialog> is only a shell, its UA box and backdrop reset; it stays displayed while its
    contents fade out. */
   .shortcuts-dialog {
@@ -3156,14 +2997,6 @@
     color: var(--text1);
     cursor: help;
   }
-  .selection-toolbar select {
-    background: var(--bg0);
-    color: var(--text0);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    padding: 6px 10px;
-    font-size: var(--fs-ui);
-  }
   .selection-toolbar button {
     padding: 6px 12px;
     border: 1px solid var(--border);
@@ -3298,16 +3131,6 @@
   }
   .compare-slot input[type='text'] {
     flex: 1 1 220px;
-    background: var(--bg0);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    padding: 8px 10px;
-    color: var(--text0);
-    font-size: var(--fs-ui);
-  }
-  .compare-slot input[type='text']:focus {
-    border-color: var(--accent);
-    outline: none;
   }
   /* A player slot's token input: the chips already in it, the combobox field, and its dropdown of
    known accounts (ComparePlayersForm.tsx). */
@@ -3330,6 +3153,7 @@
     flex: 1 1 160px;
     min-width: 120px;
     background: transparent;
+    height: auto;
     border: none;
     outline: none;
     padding: 3px 0;
@@ -3684,7 +3508,7 @@
       flex-wrap: nowrap;
       min-width: 0;
     }
-    .list-hero-actions:not(.list-hero-actions--open):has(.list-hero-more) > .btn-ghost:not(.list-hero-more) {
+    .list-hero-actions:not(.list-hero-actions--open):has(.list-hero-more) > .btn:not(.list-hero-more) {
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -4141,16 +3965,6 @@
   }
   .home-account form input[type='text'] {
     flex: 1 1 240px;
-    background: var(--bg0);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    padding: 9px 12px;
-    color: var(--text0);
-    font-size: var(--fs-ui);
-  }
-  .home-account form input[type='text']:focus {
-    border-color: var(--accent);
-    outline: none;
   }
   .home-account form button {
     padding: 9px 14px;
@@ -4331,20 +4145,6 @@
     flex-direction: column;
     gap: 8px;
   }
-  .combine-form input[type='text'],
-  .combine-form select {
-    background: var(--bg0);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    padding: 8px 10px;
-    color: var(--text0);
-    font-size: var(--fs-ui);
-  }
-  .combine-form input[type='text']:focus,
-  .combine-form select:focus {
-    border-color: var(--accent);
-    outline: none;
-  }
   .combine-form p {
     font-size: var(--fs-meta);
     color: var(--text1);
@@ -4355,15 +4155,8 @@
     font-style: italic;
     color: var(--text1);
   }
-  /* Reset to the plain box the sources list sat in; its legend reads like the form's other notes. */
-  .combine-sources-set {
-    border: 0;
-    min-inline-size: 0;
-  }
   .combine-sources-set > legend {
     margin-bottom: 8px;
-    font-size: var(--fs-meta);
-    color: var(--text1);
   }
   .combine-sources {
     list-style: none;
@@ -4498,19 +4291,6 @@
   .tree-name-field {
     flex: 1;
     min-width: 0;
-    padding: 3px 8px;
-    background: var(--bg0);
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    color: var(--text0);
-    font-size: var(--fs-ui);
-    outline: none;
-  }
-  .tree-name-field:focus {
-    border-color: var(--accent);
-  }
-  .tree-name-field::placeholder {
-    color: var(--text2);
   }
   .list-tree button {
     background: transparent;

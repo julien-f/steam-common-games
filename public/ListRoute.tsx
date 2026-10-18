@@ -1000,7 +1000,7 @@ export default function ListRoute() {
     onMount(() => onCleanup(bindNavPopover(trigger, panel)));
     return (
       <div class={`rank-menu${kind === 'bundle' ? ' hero-secondary' : ''}`}>
-        <button ref={trigger} type="button" class="btn btn-ghost btn-sm" popovertarget="rank-menu-panel">
+        <button ref={trigger} type="button" class="btn" popovertarget="rank-menu-panel">
           {rankThisListLabel()} ▾
         </button>
         <div ref={panel} id="rank-menu-panel" class="site-nav-popover-panel rank-menu-panel" popover>
@@ -1033,7 +1033,7 @@ export default function ListRoute() {
             />
             <button
               type="submit"
-              class="btn btn-primary btn-sm"
+              class="btn btn-primary"
               disabled={rankThisListFocus()?.length === 0}
               aria-disabled={rankTooFew() ? 'true' : undefined}
               aria-describedby={rankTooFew() ? 'rank-reason' : undefined}
@@ -1974,7 +1974,7 @@ export default function ListRoute() {
       <>
         <button
           type="button"
-          class="btn btn-ghost btn-sm"
+          class="btn"
           aria-label="Pick a random game"
           title="Pick a random game (R)"
           onClick={() => pickRandomGame()}
@@ -3198,7 +3198,7 @@ export default function ListRoute() {
       <div class="list-hero-nav">
         <button
           type="button"
-          class="btn btn-ghost btn-sm"
+          class="btn"
           aria-label="Previous bundle"
           title="Previous bundle"
           disabled={prevBundleId() == null}
@@ -3211,7 +3211,7 @@ export default function ListRoute() {
         </button>
         <button
           type="button"
-          class="btn btn-ghost btn-sm"
+          class="btn"
           aria-label="Next bundle"
           title="Next bundle"
           disabled={nextBundleId() == null}
@@ -3222,7 +3222,7 @@ export default function ListRoute() {
         >
           ›
         </button>
-        <A class="btn btn-ghost btn-sm" href={withAccountParam('/bundles', routerLocation.search)}>
+        <A class="btn" href={withAccountParam('/bundles', routerLocation.search)}>
           ← All bundles
         </A>
       </div>
@@ -3238,7 +3238,7 @@ export default function ListRoute() {
           {/* Stays "Edit sources" while open: the form's own Cancel is the one way out it names. */}
           <button
             type="button"
-            class="btn btn-ghost btn-sm"
+            class="btn"
             ref={editSourcesBtn}
             aria-expanded={editingSources()}
             onClick={() => setEditingSources((v) => !v)}
@@ -3249,7 +3249,7 @@ export default function ListRoute() {
             own URL, and a shared link re-shared would just point back at the same page. */}
           <button
             type="button"
-            class="btn btn-ghost btn-sm"
+            class="btn"
             disabled={shareFailure() != null}
             title={shareFailure() ?? 'Copy a link anyone can open, live and without saving it themselves'}
             onClick={(e) => handleShareList(e.currentTarget)}
@@ -3260,14 +3260,14 @@ export default function ListRoute() {
         <Show when={kind === 'user' && userList()?.kind === 'ranked'}>
           <button
             type="button"
-            class="btn btn-primary btn-sm"
+            class="btn btn-primary"
             title="Asks about unranked games in the table's current sort order (only the shown ones, when filtered)"
             disabled={filteredUnranked()?.length === 0}
             onClick={handleCompare}
           >
             {compareLabel()}
           </button>
-          <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingRankedSource((v) => !v)}>
+          <button type="button" class="btn" onClick={() => setEditingRankedSource((v) => !v)}>
             {editingRankedSource() ? 'Cancel' : 'Change source'}
           </button>
         </Show>
@@ -3279,7 +3279,7 @@ export default function ListRoute() {
                 {/* aria-disabled, not disabled: a press has to reach the button for its reason to be read. */}
                 <button
                   type="button"
-                  class={`btn btn-ghost btn-sm${kind === 'bundle' ? ' hero-secondary' : ''}`}
+                  class={`btn${kind === 'bundle' ? ' hero-secondary' : ''}`}
                   title="Create a list ranking these games by comparing them two at a time, in the table's current order (only the selected or filtered games, if any)"
                   disabled={rankThisListFocus()?.length === 0}
                   aria-disabled={rankTooFew() ? 'true' : undefined}
@@ -3303,7 +3303,7 @@ export default function ListRoute() {
           <Show when={compareList()}>
             <button
               type="button"
-              class="btn btn-ghost btn-sm"
+              class="btn"
               title="Keep this shared list as one of your own"
               onClick={handleSaveShared}
             >
@@ -3314,7 +3314,7 @@ export default function ListRoute() {
         {kind === 'shared' && (
           <For each={sharedBundles()}>
             {(b) => (
-              <A class="btn btn-ghost btn-sm" href={withAccountParam(`/lists/bundle/${b.id}`, routerLocation.search)}>
+              <A class="btn" href={withAccountParam(`/lists/bundle/${b.id}`, routerLocation.search)}>
                 ← {b.title}
               </A>
             )}
@@ -3325,11 +3325,7 @@ export default function ListRoute() {
             {/* Gated on the players in the URL, not on the ones that resolved: a comparison naming
               a private or misspelled profile is exactly when editing them has to be reachable. */}
             <Show when={compareSlots().length >= 2}>
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm hero-secondary"
-                onClick={() => setEditingPlayers((v) => !v)}
-              >
+              <button type="button" class="btn hero-secondary" onClick={() => setEditingPlayers((v) => !v)}>
                 {editingPlayers() ? 'Cancel' : 'Edit players'}
               </button>
             </Show>
@@ -3349,7 +3345,7 @@ export default function ListRoute() {
               </select>
               <button
                 type="button"
-                class="btn btn-ghost btn-sm hero-secondary"
+                class="btn hero-secondary"
                 title="Keep this comparison as a list of your own"
                 onClick={handleSaveComparison}
               >
@@ -3362,14 +3358,14 @@ export default function ListRoute() {
           <>
             <Show when={bundleLinks().details}>
               {(details) => (
-                <a class="btn btn-ghost btn-sm hero-secondary" href={details()} target="_blank" rel="noopener">
+                <a class="btn hero-secondary" href={details()} target="_blank" rel="noopener">
                   View on IsThereAnyDeal ↗
                 </a>
               )}
             </Show>
             <Show when={bundleLinks().url}>
               {(url) => (
-                <a class="btn btn-primary btn-sm" href={url()} target="_blank" rel="noopener">
+                <a class="btn btn-primary" href={url()} target="_blank" rel="noopener">
                   Get this bundle ↗
                 </a>
               )}
@@ -3377,7 +3373,7 @@ export default function ListRoute() {
             <Show when={bundleResolvedCount() > 0 && notOwnedHref({ kind: 'bundle', bundleId: params.bundleId })}>
               {(href) => (
                 <A
-                  class="btn btn-ghost btn-sm"
+                  class="btn"
                   href={href()}
                   title="This bundle's games minus the ones you own — save it as a list from there"
                   onClick={() =>
@@ -3398,7 +3394,7 @@ export default function ListRoute() {
           <Show when={!!creatorResult()?.total && notOwnedHref({ kind: creatorRole(), name: creatorName() })}>
             {(href) => (
               <A
-                class="btn btn-ghost btn-sm"
+                class="btn"
                 href={href()}
                 title={`This ${creatorRole()}'s games minus the ones you own — save it as a list from there`}
               >
@@ -3574,11 +3570,11 @@ export default function ListRoute() {
           </For>
           <div class="compare-failures-actions">
             <Show when={compareSlots().length - compareFailures().length >= 2}>
-              <button type="button" class="btn btn-primary btn-sm" onClick={compareOthers}>
+              <button type="button" class="btn btn-primary" onClick={compareOthers}>
                 Compare the other {compareSlots().length - compareFailures().length}
               </button>
             </Show>
-            <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingPlayers(true)}>
+            <button type="button" class="btn" onClick={() => setEditingPlayers(true)}>
               Edit players
             </button>
           </div>
@@ -3743,7 +3739,7 @@ export default function ListRoute() {
                   {(picks) => (
                     <span class="selection-fanatical">
                       <a
-                        class="btn btn-primary btn-sm"
+                        class="btn btn-primary"
                         href={picks().url}
                         target="_blank"
                         rel="noopener"

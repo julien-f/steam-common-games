@@ -1,0 +1,9 @@
+@layer components {
+  /* Phone: the table toolbar's own actions are icons only, square, so its first line holds them. */
+  @media (max-width: 768px) {
+    .list-view-actions .btn {
+      min-width: var(--control-h);
+      padding-inline: 8px;
+    }
+  }
+}

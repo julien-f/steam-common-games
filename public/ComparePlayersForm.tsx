@@ -307,12 +307,7 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
               </Show>
             </div>
             <Show when={slots().length > 2}>
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm"
-                title="Remove this player"
-                onClick={() => removeSlot(slotIdx)}
-              >
+              <button type="button" class="btn" title="Remove this player" onClick={() => removeSlot(slotIdx)}>
                 ×
               </button>
             </Show>
@@ -323,12 +318,12 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
           Steam Family shape an AccountSlot has everywhere else in the app. */}
       <p class="compare-form-hint">Add more than one account to a player to compare a Steam Family as one library.</p>
       <div class="compare-form-actions">
-        <button type="button" class="btn btn-ghost btn-sm" onClick={addSlot}>
+        <button type="button" class="btn" onClick={addSlot}>
           + Add player
         </button>
         <button
           type="submit"
-          class="btn btn-primary btn-sm"
+          class="btn btn-primary"
           aria-disabled={filledCount() < 2 ? 'true' : undefined}
           aria-describedby={filledCount() < 2 ? whyDisabledId : undefined}
         >
@@ -336,7 +331,7 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
         </button>
         <Show when={props.onCancel}>
           {(cancel) => (
-            <button type="button" class="btn btn-ghost btn-sm" onClick={() => cancel()()}>
+            <button type="button" class="btn" onClick={() => cancel()()}>
               Cancel
             </button>
           )}

@@ -106,7 +106,7 @@ export function AccountFriends(props: {
                     </Show>
                     <button
                       type="button"
-                      class="btn btn-ghost btn-sm"
+                      class="btn"
                       title={`Explore ${f.name}'s library`}
                       onClick={() => props.onExplore(accountSlotFrom([f], [f.steamid]))}
                     >

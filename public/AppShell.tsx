@@ -28,6 +28,7 @@ import { AccountChip } from './AccountChip.tsx';
 import { initAuth } from './authStore.ts';
 import { bindNavPopover } from './navPopover.ts';
 import { SearchClearButton } from './SearchClearButton.tsx';
+import { smoothScroll } from './utils.ts';
 
 // Route-specific behavior (keyboard shortcuts, and now "open this looked-up game") can't be
 // hardcoded at the shell level — different routes have different "list" contexts, or none at all
@@ -345,7 +346,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           class="app-to-top"
           title="Back to top"
           aria-label="Back to top"
-          onClick={() => scrollPageToTop('smooth')}
+          onClick={() => scrollPageToTop(smoothScroll())}
         >
           ↑
         </button>

@@ -8,10 +8,10 @@ export function SharedViewBanner(props: { edited: boolean; onKeep: () => void; o
       {props.edited
         ? "You've changed this shared layout — it's lost on reload unless you keep it."
         : 'This table uses a layout from a shared link — for this visit only.'}
-      <button type="button" class="btn btn-ghost btn-sm" onClick={() => props.onKeep()}>
+      <button type="button" class="btn" onClick={() => props.onKeep()}>
         Keep as my layout
       </button>
-      <button type="button" class="btn btn-ghost btn-sm" onClick={() => props.onDiscard()}>
+      <button type="button" class="btn" onClick={() => props.onDiscard()}>
         Use my own
       </button>
     </div>

@@ -14,16 +14,12 @@ export function UnsavedViewBanner(props: { table: ViewStateApi; prefKey: string 
         differs from what's saved to your account.
         <button
           type="button"
-          class="btn btn-ghost btn-sm"
+          class="btn"
           onClick={() => saveTableViewToServer(props.prefKey, props.table.getViewState())}
         >
           Save
         </button>
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm"
-          onClick={() => revertTableViewToServer(props.table, props.prefKey)}
-        >
+        <button type="button" class="btn" onClick={() => revertTableViewToServer(props.table, props.prefKey)}>
           Revert
         </button>
       </div>
@@ -54,7 +50,7 @@ export function ViewActions(props: {
         {/* aria-disabled, not disabled: a press has to reach us to say why. */}
         <button
           type="button"
-          class="btn btn-ghost btn-sm"
+          class="btn"
           aria-label="Share view"
           aria-disabled={props.shareDisabledReason ? 'true' : undefined}
           aria-describedby={props.shareDisabledReason ? 'share-view-reason' : undefined}
@@ -67,7 +63,7 @@ export function ViewActions(props: {
       </Show>
       <button
         type="button"
-        class="btn btn-ghost btn-sm"
+        class="btn"
         aria-label="Default view"
         title="Back to the default columns, sort and filters"
         onClick={() => props.onReset()}
