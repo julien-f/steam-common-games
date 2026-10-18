@@ -3622,7 +3622,7 @@ const structure = (page: Page) =>
     };
   });
 
-test('I3 edge: each main page and the open game have one h1 at most, skip no heading level, and name the panel', async ({
+test('I3 edge: each main page and the open game have one h1, first, skip no heading level, and name every landmark', async ({
   page,
 }) => {
   await asPlayer(page, ALICE);
@@ -3649,12 +3649,17 @@ test('I3 edge: each main page and the open game have one h1 at most, skip no hea
     ])
       await expect(landmark, path).toBeVisible();
     const { levels, unnamedNavs, unnamedPanels } = await structure(page);
-    // Commit to come: exactly one h1, first.
-    expect(levels.filter((l) => l === 1).length, path).toBeLessThanOrEqual(1);
+    expect(levels[0], path).toBe(1);
+    expect(levels.filter((l) => l === 1).length, path).toBe(1);
     for (const [i, level] of levels.entries()) if (i) expect(level, path).toBeLessThanOrEqual(levels[i - 1] + 1);
     expect(unnamedNavs, path).toBe(0);
     expect(unnamedPanels, path).toBe(0);
   }
+  // The open game's sections are headings under its name.
+  const panel = page.getByRole('complementary', { name: 'Hades' });
+  await expect(panel.getByRole('heading', { level: 2, name: 'Hades' })).toBeVisible();
+  for (const name of ['Price', 'Owned by', /How Long To Beat/, /Achievements/])
+    await expect(panel.getByRole('heading', { level: 3, name })).toBeVisible();
 });
 
 test('I2.1: into a list from the keyboard — skip link, and R with no panel open', async ({ page }) => {

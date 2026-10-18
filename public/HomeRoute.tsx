@@ -432,6 +432,7 @@ export default function HomeRoute() {
 
   return (
     <div class="home-route">
+      <h1 class="visually-hidden">Home</h1>
       <section class="home-account">
         <h2>Account</h2>
 

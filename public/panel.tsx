@@ -734,7 +734,7 @@ function TagCloud(props: {
   return (
     <Show when={present().length}>
       <div class="panel-section panel-section--meta panel-card">
-        <div class="panel-section-title">Tags &amp; details</div>
+        <h3 class="panel-section-title">Tags &amp; details</h3>
         <div class="panel-tags">
           <For each={pills()}>
             {({ kind, dim, v, w }) => {
@@ -1059,16 +1059,20 @@ function CollapsibleCard(props: {
   return (
     <div class="panel-achievements-card">
       <div class="panel-achievements-card-header">
-        <button
-          type="button"
-          class="panel-achievements-chip panel-collapsible-chip"
-          aria-expanded={expanded() ? 'true' : 'false'}
-          onClick={() => toggleSection(props.appid, props.section)}
-        >
-          {numSpan()}
-          <span class="panel-glance-val">{props.val}</span>
-          <span class="panel-achievements-chevron">{expanded() ? '▾' : '▸'}</span>
-        </button>
+        <h3 class="panel-collapsible-heading">
+          <button
+            type="button"
+            class="panel-achievements-chip panel-collapsible-chip"
+            aria-expanded={expanded() ? 'true' : 'false'}
+            onClick={() => toggleSection(props.appid, props.section)}
+          >
+            {numSpan()}
+            <span class="panel-glance-val">{props.val}</span>
+            <span class="panel-achievements-chevron" aria-hidden="true">
+              {expanded() ? '▾' : '▸'}
+            </span>
+          </button>
+        </h3>
         <Show when={props.linkHref}>
           {(href) => (
             <a
@@ -1243,7 +1247,7 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
               when={data()}
               fallback={
                 <>
-                  <div class="panel-section-title">Achievements</div>
+                  <h3 class="panel-section-title">Achievements</h3>
                   <div class="panel-no-data">Steam didn't answer.</div>
                 </>
               }
@@ -1253,7 +1257,7 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
                   when={d().total}
                   fallback={
                     <>
-                      <div class="panel-section-title">Achievements</div>
+                      <h3 class="panel-section-title">Achievements</h3>
                       <div class="panel-no-data">This game has no achievements.</div>
                     </>
                   }
@@ -1281,7 +1285,7 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
       }
     >
       <div class="panel-section" id="panel-section-achievements">
-        <div class="panel-section-title">Achievements</div>
+        <h3 class="panel-section-title">Achievements</h3>
         <div class="panel-achievements">
           <span class="sk" style={{ width: '100%', height: '48px', 'border-radius': '6px' }} />
         </div>
@@ -1306,7 +1310,7 @@ function OwnersSection(): JSX.Element {
     <Show when={sorted().length > 0}>
       <div class="panel-section panel-card" id="panel-section-owners">
         <div class="panel-section-title">
-          Owned by <span class="panel-section-subtitle">most recently played first</span>
+          <h3>Owned by</h3> <span class="panel-section-subtitle">most recently played first</span>
         </div>
         <div class="panel-owners">
           <For each={sorted()}>
@@ -1366,7 +1370,7 @@ function NewsSection(props: { game: ReadonlyGame }): JSX.Element {
               when={items()}
               fallback={
                 <>
-                  <div class="panel-section-title">News</div>
+                  <h3 class="panel-section-title">News</h3>
                   <div class="panel-no-data">Couldn't load news.</div>
                 </>
               }
@@ -1415,7 +1419,7 @@ function NewsSection(props: { game: ReadonlyGame }): JSX.Element {
       }
     >
       <div class="panel-section" id="panel-section-news">
-        <div class="panel-section-title">News</div>
+        <h3 class="panel-section-title">News</h3>
         <span class="sk" style={{ display: 'block', width: '100%', height: '48px', 'border-radius': '6px' }} />
       </div>
     </Show>
@@ -1511,7 +1515,7 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
         <Show when={p() !== undefined}>
           <div class="panel-section panel-card" id="panel-section-price">
             <div class="panel-section-title">
-              Price{' '}
+              <h3>Price</h3>{' '}
               <a href={`https://isthereanydeal.com/steam/app/${props.game.appid}`} target="_blank" rel="noopener">
                 IsThereAnyDeal ↗
               </a>
@@ -1578,7 +1582,7 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
       }
     >
       <div class="panel-section panel-card" id="panel-section-price">
-        <div class="panel-section-title">Price</div>
+        <h3 class="panel-section-title">Price</h3>
         <span class="sk" style={{ display: 'block', width: '100%', height: '32px', 'border-radius': '6px' }} />
       </div>
     </Show>
@@ -2129,7 +2133,7 @@ function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
     <Show when={!props.game.loading && (hasTags() || gameCreators(props.game.details?.meta).length)}>
       <div class="panel-section panel-card" id="panel-section-similar">
         <div class="panel-section-title">
-          {shown() ? `Similar in ${accountDisplayLabel(account()!)}'s library` : 'Similar games'}{' '}
+          <h3>{shown() ? `Similar in ${accountDisplayLabel(account()!)}'s library` : 'Similar games'}</h3>{' '}
           <a href={steamMoreLikeUrl(props.game.appid)} target="_blank" rel="noopener">
             More like this on Steam ↗
           </a>
@@ -2455,9 +2459,9 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
             {/* The `App <appid>` fallback is presentational only — a game looked up by bare appid
                 has no name at all until store metadata resolves one, and nothing persists this
                 string as if it were a real title (see ListRoute.tsx's recents mapping). */}
-            <div class="panel-title" id="panel-title">
+            <h2 class="panel-title" id="panel-title">
               {g.name || `App ${g.appid}`}
-            </div>
+            </h2>
             <Show when={releaseDate() || hasBaseGame()}>
               <div class="panel-release">
                 {fmtReleaseDate(releaseDate()!)}

@@ -164,7 +164,7 @@ export function AccountChip(): JSX.Element {
           </Show>
 
           <Show when={otherRecents().length > 0}>
-            <div class="account-chip-section">Switch account</div>
+            <h2 class="account-chip-section">Switch account</h2>
             <ul class="account-chip-recents">
               <For each={otherRecents()}>
                 {(acc) => (
@@ -199,7 +199,7 @@ export function AccountChip(): JSX.Element {
           {/* Optional — the app works fully anonymously (see docs/dev/lists-and-accounts.md).
               Signing in with Steam additionally syncs prefs (accounts/lists/settings) to the
               server, so they follow you to another browser/device. */}
-          <div class="account-chip-section">Steam account</div>
+          <h2 class="account-chip-section">Steam account</h2>
           <Show
             when={getAuthUser()}
             // rel="external" is @solidjs/router's documented escape hatch from its own global

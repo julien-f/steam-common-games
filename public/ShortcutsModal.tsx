@@ -94,13 +94,15 @@ export function ShortcutsModal(props: { open: boolean; onClose: () => void }): J
         class={`shortcuts-modal${props.open ? ' open' : ''}`}
         role="dialog"
         aria-modal="true"
-        aria-label="Keyboard shortcuts"
+        aria-labelledby="shortcuts-title"
         aria-hidden={props.open ? undefined : 'true'}
         // Hidden with CSS, so without this its Close button was still a Tab stop.
         inert={!props.open}
       >
         <div class="shortcuts-header">
-          <span class="shortcuts-title">Keyboard shortcuts</span>
+          <h2 class="shortcuts-title" id="shortcuts-title">
+            Keyboard shortcuts
+          </h2>
           <button
             type="button"
             class="shortcuts-close"
@@ -115,7 +117,7 @@ export function ShortcutsModal(props: { open: boolean; onClose: () => void }): J
           <For each={SHORTCUT_SECTIONS}>
             {(section) => (
               <div class="shortcuts-section">
-                <div class="shortcuts-section-title">{section.title}</div>
+                <h3 class="shortcuts-section-title">{section.title}</h3>
                 <For each={section.rows}>
                   {(row) => (
                     <div class="shortcuts-row">

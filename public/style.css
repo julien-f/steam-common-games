@@ -296,6 +296,7 @@ b {
 }
 .account-chip-section {
   font-size: var(--fs-label);
+  font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--text1);
@@ -1712,6 +1713,10 @@ input:placeholder-shown + .search-clear {
   align-items: center;
   gap: 6px;
 }
+/* The heading inside a title that also holds a link or a subtitle. */
+.panel-section-title > h3 {
+  font: inherit;
+}
 .panel-section--meta .panel-section-title {
   margin-bottom: 5px;
 }
@@ -2062,6 +2067,13 @@ a.panel-price-line--link:focus-visible .panel-price-shop {
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
+}
+/* Wraps the chip as the card's heading, taking its place in the header row. */
+.panel-collapsible-heading {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  font: inherit;
 }
 .panel-achievements-chip {
   flex: 1;
@@ -4800,6 +4812,15 @@ kbd {
   }
 }
 
+/* Read by screen readers, not drawn: a heading the layout says visually. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .skip-link {
   position: absolute;
   left: 8px;

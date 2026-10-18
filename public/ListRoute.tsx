@@ -1002,7 +1002,7 @@ export default function ListRoute() {
       <details ref={details} class={`rank-menu${kind === 'bundle' ? ' hero-secondary' : ''}`}>
         <summary class="btn btn-ghost btn-sm">{rankThisListLabel()} ▾</summary>
         <div ref={panel} class="site-nav-popover-panel rank-menu-panel">
-          <div class="rank-menu-heading">Continue</div>
+          <h2 class="rank-menu-heading">Continue</h2>
           <For each={existingRankings()}>
             {(list) => (
               <button
