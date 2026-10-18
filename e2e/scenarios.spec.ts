@@ -3496,6 +3496,160 @@ test('I2 edge: icon-only controls have names', async ({ page }) => {
   await expect(page.locator('.dt-dd')).toContainText('Image');
 });
 
+test('I2 edge: Esc in the lightbox closes only it, drops its shot from the URL, and one Back closes the game', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/about');
+  await page.goto('/lists/owned');
+  await row(page, 'Hades').getByText('Hades').click();
+  await page.getByRole('button', { name: 'Open in lightbox' }).click();
+  await expect(page).toHaveURL(/&shot=banner/);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/open/);
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await expect(page).toHaveURL(/\?game=1145360$/);
+  await page.goBack();
+  await expect(page.locator('#game-panel')).toBeHidden();
+  await expect(page).toHaveURL(/\/lists\/owned$/);
+});
+
+test('I2 edge: a click beside the shortcuts dialog closes it', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await page.keyboard.press('?');
+  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(dialog).toBeVisible();
+  await page.mouse.click(5, 5); // a corner the dialog never covers
+  await expect(dialog).toBeHidden();
+});
+
+test('I2 edge: a click outside closes each nav popover, and opening one closes the other', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  // The rank menu only replaces the Rank button once the list has a ranking.
+  await page.getByRole('button', { name: /Rank this list/ }).click();
+  await page.keyboard.press('Escape');
+  await page.goto('/lists/wishlist');
+  await expect(rows(page)).toHaveCount(4);
+
+  const prefs = page.locator('.site-nav-prefs-panel');
+  const account = page.locator('.account-chip-panel');
+  const rank = page.locator('.rank-menu-panel');
+  // In the left gutter, which no popover covers (clampPopoverLeft keeps them 12px in).
+  const outside = async () => {
+    const title = (await page.locator('.list-hero-title').boundingBox())!;
+    await page.mouse.click(5, title.y + title.height / 2);
+  };
+  const triggers = [
+    [prefs, () => page.getByLabel('Preferences').click()],
+    [account, () => page.locator('.account-chip-btn').click()],
+    [rank, () => page.getByText(/Rank this list/).click()],
+  ] as const;
+  for (const [panel, open] of triggers) {
+    await open();
+    await expect(panel).toBeVisible();
+    await outside();
+    await expect(panel).toBeHidden();
+  }
+  // The nav's popovers can cover the rank menu's trigger, so that one only opens first.
+  for (const [[panel, open], [next, openNext]] of [
+    [triggers[0], triggers[1]],
+    [triggers[1], triggers[0]],
+    [triggers[2], triggers[0]],
+  ]) {
+    await open();
+    await expect(panel).toBeVisible();
+    await openNext();
+    await expect(next).toBeVisible();
+    await expect(panel).toBeHidden();
+    await outside();
+  }
+});
+
+test('I2 edge: a hidden achievement is revealed by Enter, and by Space', async ({ page }) => {
+  await page.route('**/api/achievements/**', (route) => {
+    const req = route.request();
+    const body = JSON.parse(respond(req.method(), new URL(req.url()), req.postData()).body);
+    for (const a of body.achievements) Object.assign(a, { hidden: true, achieved: false, unlocktime: null });
+    body.unlocked = 0;
+    return route.fulfill({ json: body });
+  });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const card = page.locator('#panel-section-achievements');
+  await card.getByRole('button', { name: /Achievements/ }).click();
+  const hidden = card.getByRole('button', { name: /Hidden achievement/ });
+  await expect(hidden).toHaveCount(2);
+  await hidden.first().focus();
+  await page.keyboard.press('Enter');
+  await expect(card).toContainText('First steps');
+  await expect(hidden).toHaveCount(1);
+  await hidden.focus();
+  await page.keyboard.press(' ');
+  await expect(card).toContainText('Completionist');
+  await expect(hidden).toHaveCount(0);
+});
+
+test("I2 edge: Enter on the panel's hero opens the lightbox once", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const entries = await page.evaluate(() => history.length);
+  await page.getByRole('button', { name: 'Open in lightbox' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.lb-close')).toBeFocused();
+  await page.waitForTimeout(200); // past a second activation's close
+  await expect(page.locator('#screenshot-lightbox')).toHaveClass(/open/);
+  expect(await page.evaluate(() => history.length)).toBe(entries + 1);
+  await page.goBack();
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/open/);
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+});
+
+// Visible headings' levels, and the unnamed navigation/complementary landmarks.
+const structure = (page: Page) =>
+  page.evaluate(() => {
+    const shown = (sel: string) => [...document.querySelectorAll<HTMLElement>(sel)].filter((e) => e.checkVisibility());
+    const named = (e: Element) => e.hasAttribute('aria-label') || e.hasAttribute('aria-labelledby');
+    return {
+      levels: shown('h1, h2, h3, h4, h5, h6, [role=heading]').map((h) =>
+        Number(h.getAttribute('aria-level') ?? h.tagName[1]),
+      ),
+      unnamedNavs: shown('nav, [role=navigation]').filter((e) => !named(e)).length,
+      unnamedPanels: shown('aside, [role=complementary]').filter((e) => !named(e)).length,
+    };
+  });
+
+test('I3 edge: each main page and the open game have one h1 at most, skip no heading level, and name the panel', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await page.getByRole('button', { name: /Rank this list/ }).click();
+  await expect(page).toHaveURL(/\/rank$/);
+  const rank = new URL(page.url()).pathname;
+  for (const [path, ready] of [
+    ['/', page.getByText('Your lists')],
+    ['/lists/owned', rows(page).first()],
+    ['/about', page.getByRole('heading', { name: 'Contact' })],
+    ['/search?q=hades', rows(page).first()],
+    ['/bundles', rows(page).first()],
+    [rank, page.getByText('Which do you prefer?')],
+    ['/lists/owned?game=1145360', page.locator('#panel-title')],
+  ] as const) {
+    await page.goto(path);
+    await expect(ready).toBeVisible();
+    const { levels, unnamedNavs, unnamedPanels } = await structure(page);
+    // Commits to come: exactly one h1, first; every nav named.
+    expect(levels.filter((l) => l === 1).length, path).toBeLessThanOrEqual(1);
+    for (const [i, level] of levels.entries()) if (i) expect(level, path).toBeLessThanOrEqual(levels[i - 1] + 1);
+    expect(unnamedNavs, path).toBeLessThanOrEqual(1);
+    expect(unnamedPanels, path).toBe(0);
+  }
+});
+
 test('I2.1: into a list from the keyboard — skip link, and R with no panel open', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
