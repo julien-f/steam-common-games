@@ -6,14 +6,14 @@
 //
 // Grammar:
 //   formula ::= op ":(" source (";" source)* ")"
-//   source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "r" | "g:" formula
+//   source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" name | "r" | "g:" formula
 // `op` is a bare CombineOp string. Parens make a `g:` group's extent unambiguous at any depth —
 // unlike a flat separator, nothing stops a source from itself being a `g:...` group, so this
 // isn't capped at one level of nesting (that cap, in listLabels.ts's createDefaultNaming, guards
 // label *length* only — listResolve.ts already resolves arbitrarily deep). `:;(),` are legal
 // unencoded in a URI query component, so a formula reads as plain text in the address bar; only
-// the individual accountId/bundleId payloads are defensively encodeURIComponent'd, in case one
-// ever contains a character the grammar itself uses.
+// each leaf payload is escaped (escapeLeaf), since a developer's or publisher's name can contain
+// a character the grammar itself uses.
 //
 // A `user` source can't travel as a bare listId (meaningless in someone else's storage) — encode
 // inlines it into a `g:` group built from that list's own op/sources instead, recursing the same
@@ -69,6 +69,11 @@ function encodeFormula(
   return `${op}:(${encoded.join(';')})`;
 }
 
+// encodeURIComponent leaves `(` and `)` alone, which would end a `g:` group early.
+function escapeLeaf(value = ''): string {
+  return encodeURIComponent(value).replaceAll('(', '%28').replaceAll(')', '%29');
+}
+
 function encodeSource(
   ref: ListRef,
   getList: (id: string) => GameList | undefined,
@@ -77,11 +82,15 @@ function encodeSource(
 ): string {
   switch (ref.kind) {
     case 'account-owned':
-      return `o:${encodeURIComponent(ref.accountId ?? '')}`;
+      return `o:${escapeLeaf(ref.accountId)}`;
     case 'account-wishlist':
-      return `w:${encodeURIComponent(ref.accountId ?? '')}`;
+      return `w:${escapeLeaf(ref.accountId)}`;
     case 'bundle':
-      return `b:${encodeURIComponent(ref.bundleId ?? '')}`;
+      return `b:${escapeLeaf(ref.bundleId)}`;
+    case 'developer':
+      return `d:${escapeLeaf(ref.name)}`;
+    case 'publisher':
+      return `p:${escapeLeaf(ref.name)}`;
     case 'recent-games':
       return 'r';
     case 'user': {
@@ -168,6 +177,8 @@ function parseSource(token: string, synthetic: Map<string, GameList>, makeId: ()
   if (token.startsWith('o:')) return { kind: 'account-owned', accountId: decodeURIComponent(token.slice(2)) };
   if (token.startsWith('w:')) return { kind: 'account-wishlist', accountId: decodeURIComponent(token.slice(2)) };
   if (token.startsWith('b:')) return { kind: 'bundle', bundleId: decodeURIComponent(token.slice(2)) };
+  if (token.startsWith('d:')) return { kind: 'developer', name: decodeURIComponent(token.slice(2)) };
+  if (token.startsWith('p:')) return { kind: 'publisher', name: decodeURIComponent(token.slice(2)) };
   if (token.startsWith('g:')) {
     const { op, sources } = parseFormula(token.slice(2), synthetic, makeId);
     const id = makeId();
@@ -181,11 +192,8 @@ function parseSource(token: string, synthetic: Map<string, GameList>, makeId: ()
 
 export const SHARED_LIST_PATH = '/lists/shared';
 
-// `formula` is already URL-safe on its own — only unreserved chars and the sub-delims (`:;(),`)
-// a query component allows unencoded, since every leaf accountId/bundleId was individually
-// encodeURIComponent'd going in (see encodeSource above). Wrapping the whole string in another
-// encodeURIComponent here would both escape those sub-delims (defeating the point of choosing a
-// grammar that doesn't need it) and double-encode each leaf payload.
+// The route reads `?f=` through URLSearchParams (one decode), so the leaves' `%` escapes are
+// escaped again; the sub-delims `:;(),` stay readable.
 export function shareListUrl(formula: string): string {
-  return `${SHARED_LIST_PATH}?f=${formula}`;
+  return `${SHARED_LIST_PATH}?f=${formula.replaceAll('%', '%25')}`;
 }

@@ -290,10 +290,10 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Steps**:
   1. open a game's panel
   2. **More from** → its developer (or publisher)
-  3. sort by rating, filter to games I don't own
+  3. sort by rating; **What don't I own?** for the ones I don't own
   4. open one in the panel
   5. Back to where I came from
-- **Done when**: the list is named for the developer or publisher ("Games by X", "Published by X"); ownership and Taste fit show; the panel opens in place; Back returns.
+- **Done when**: the list is named for the developer or publisher ("Games by X", "Published by X"); ownership and Taste fit show; the ones I don't own open as a shared list I can save; the panel opens in place; Back returns.
 - **Edges**: no game under that exact name; more than Steam's first page (only those are ranked); Steam's store search down; a game with no Steam tags; developer = publisher; a name ending in `.io` or holding a `/`; opened from `/game/:appid`; going from one developer's list to another's; phone width; keyboard only.
 
 ## Sharing

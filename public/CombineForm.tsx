@@ -23,13 +23,13 @@ const COMBINE_OPS: { value: CombineOp; label: string }[] = (Object.keys(OP_LABEL
 }));
 
 export function refKey(ref: ListRef): string {
-  return [ref.kind, ref.accountId ?? ref.listId ?? ref.bundleId].filter(Boolean).join(':');
+  return [ref.kind, ref.accountId ?? ref.listId ?? ref.bundleId ?? ref.name].filter(Boolean).join(':');
 }
 
 // Every source a combine can currently be built from — any recent account's Owned/Wishlist,
 // Recently Looked Up, or any existing user list. A bundle arrives only as an existing list's
 // source, when editing it (see HomeRoute.tsx's header comment), which is what `keep` is for: a
-// list's current sources this enumeration doesn't offer (a bundle, a `?u=` account), listed first
+// list's current sources this enumeration doesn't offer (a bundle, a developer/publisher, a `?u=` account), listed first
 // so they stay selectable. `excludeListId` keeps a list being edited from being offered as a
 // source for itself.
 export function sourceOptions(excludeListId?: string, keep: readonly ListRef[] = []): SourceOption[] {

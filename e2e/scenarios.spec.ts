@@ -3682,6 +3682,62 @@ test("F4 edge: past Steam's first page, the list says only those are ranked", as
   );
 });
 
+test("F4.3: a publisher's games I don't own open as a shared list, linked back and saved as my own", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/publisher?name=indie.io');
+  await expect(rows(page)).toHaveCount(3);
+  await page.getByRole('link', { name: "What don't I own?" }).click();
+
+  await expect(page).toHaveURL(/\/lists\/shared\?f=/);
+  await expect(page.locator('.list-hero-title')).toHaveText('Published by indie.io − Alice — Owned');
+  await expect(rows(page)).toHaveCount(2);
+  await expect(row(page, 'Terraria')).toHaveCount(0);
+  await expect(page.locator('.list-formula').getByRole('link', { name: 'Published by indie.io' })).toHaveAttribute(
+    'href',
+    /\/lists\/publisher\?name=indie\.io/,
+  );
+
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  if (await more.isVisible()) await more.click();
+  await page.getByRole('button', { name: 'Save as a list' }).click();
+  await expect(page).toHaveURL(/\/lists\/(?!shared)/);
+  await expect(rows(page)).toHaveCount(2);
+});
+
+const FERAL = 'p:Feral%20Interactive%20%28Mac%2FLinux%29'; // as encodeListFormula escapes it
+
+test('S3 edge: a shared list with a publisher\'s name holding parens and "/" opens', async ({ page }) => {
+  await page.goto(sharedUrl(`union:(${FERAL};r)`));
+  await expect(page.locator('.list-hero-title')).toHaveText(
+    'Published by Feral Interactive (Mac/Linux) ∪ Recently Looked Up',
+  );
+  await expect(rows(page)).toHaveCount(1);
+});
+
+test("F4 edge: Steam's store search down in a combined list names the source, and Updated retries it", async ({
+  page,
+}) => {
+  await mockApi(page, { states: ['store-down'] });
+  await asPlayer(page, ALICE);
+  await page.goto(sharedUrl(`subtract:(p:indie.io;o:${ALICE.steamid})`));
+  await expect(page.locator('.list-status')).toContainText('Published by indie.io: Steam store search error');
+  await mockApi(page);
+  const forced = page.waitForRequest((req) => /\/api\/creator-games\?.*refresh=1/.test(req.url()));
+  await page.locator('.list-stat', { hasText: 'Updated' }).click();
+  await forced;
+  await expect(rows(page)).toHaveCount(2);
+});
+
+test("F4 edge: past Steam's first page, a combined list's source says only those count", async ({ page }) => {
+  await mockApi(page, { states: ['creator-capped'] });
+  await asPlayer(page, ALICE);
+  await page.goto(sharedUrl(`subtract:(p:indie.io;o:${ALICE.steamid})`));
+  await expect(rows(page)).toHaveCount(2);
+  await expect(page.locator('.list-formula')).toContainText('(first 3 of about 523)');
+});
+
 test('F4 edge: a game with no Steam tags still offers More from', async ({ page }) => {
   await mockApi(page, { states: ['tagless'] });
   await asPlayer(page, ALICE);

@@ -87,7 +87,11 @@ export function listDeps(list: Pick<GameList, 'kind' | 'sources' | 'source'>): L
 }
 
 const sameRef = (a: ListRef, b: ListRef): boolean =>
-  a.kind === b.kind && a.accountId === b.accountId && a.bundleId === b.bundleId && a.listId === b.listId;
+  a.kind === b.kind &&
+  a.accountId === b.accountId &&
+  a.bundleId === b.bundleId &&
+  a.listId === b.listId &&
+  a.name === b.name;
 
 // The ranked lists ordering this source — several can, each by its own criterion.
 export function rankingsOf(source: ListRef): GameList[] {
@@ -109,19 +113,25 @@ function listReaches(
   });
 }
 
-// Whether a list is built, at any depth, from a source that has prices (a wishlist or a bundle); `get` as listHasAccountSource's.
+const isCreatorRef = (ref: ListRef): boolean => ref.kind === 'developer' || ref.kind === 'publisher';
+
+// Whether a list is built, at any depth, from a source that has prices (a wishlist, a bundle, a store search); `get` as listHasRefreshableSource's.
 export function listHasPriceSource(list: GameList, get: (id: string) => GameList | undefined = getList): boolean {
-  return listReaches(list, (ref) => ref.kind === 'account-wishlist' || ref.kind === 'bundle', get);
+  return listReaches(list, (ref) => ref.kind === 'account-wishlist' || ref.kind === 'bundle' || isCreatorRef(ref), get);
 }
 
-// Whether a list is built, at any depth, from a bundle; `get` as listHasAccountSource's.
+// Whether a list is built, at any depth, from a bundle; `get` as listHasRefreshableSource's.
 export function listHasBundleSource(list: GameList, get: (id: string) => GameList | undefined): boolean {
   return listReaches(list, (ref) => ref.kind === 'bundle', get);
 }
 
-// Whether a list is built, at any depth, from an account fetch; `get` finds its lists, a shared formula's inlined groups included.
-export function listHasAccountSource(list: GameList, get: (id: string) => GameList | undefined): boolean {
-  return listReaches(list, (ref) => ref.kind === 'account-owned' || ref.kind === 'account-wishlist', get);
+// Whether a list is built, at any depth, from a fetch with an age and a forced refresh (an account, a store search); `get` finds its lists, a shared formula's inlined groups included.
+export function listHasRefreshableSource(list: GameList, get: (id: string) => GameList | undefined): boolean {
+  return listReaches(
+    list,
+    (ref) => ref.kind === 'account-owned' || ref.kind === 'account-wishlist' || isCreatorRef(ref),
+    get,
+  );
 }
 
 // ── Cycle detection ──────────────────────────────────────────────────────────────────────────

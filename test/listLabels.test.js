@@ -126,6 +126,26 @@ test('describeListRef: a ref saved without its id is reported rather than render
   }
 });
 
+test('describeListRef: a developer/publisher source is named like its own list and links to it', () => {
+  assert.deepEqual(describeListRef({ kind: 'developer', name: 'Studio (JP)' }, NAMING), {
+    label: 'Games by Studio (JP)',
+    href: '/lists/developer?name=Studio+%28JP%29',
+  });
+  assert.deepEqual(describeListRef({ kind: 'publisher', name: 'indie.io' }, NAMING), {
+    label: 'Published by indie.io',
+    href: '/lists/publisher?name=indie.io',
+  });
+});
+
+test('describeListRef: a developer/publisher source with no name is reported, not linked', () => {
+  for (const kind of ['developer', 'publisher']) {
+    const desc = describeListRef({ kind, name: '' }, NAMING);
+    assert.equal(desc.href, null, kind);
+    assert.match(desc.problem, /names no /, kind);
+    assert.equal(desc.countsAsEmpty, true, kind);
+  }
+});
+
 // ── describeSources / formatFormula ──────────────────────────────────────────────────────────
 
 test("describeSources: one description per source, in the list's own order", () => {

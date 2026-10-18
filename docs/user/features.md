@@ -74,7 +74,7 @@ A bundle joins a combine from its own page: **What does this add?** shows that b
 - It follows its source: games added later are queued for comparison; a removed game drops out, and gets its rank back if it returns. **Change source** keeps every answer already given.
 - A list can have several rankings, each by its own criterion. Once it has one, **🏆 Rank this list** opens a menu: continue a ranking (with its progress), or start a new one named by what you're ranking by, e.g. "best JRPG".
 - A ranked list can't be shared via a link yet.
-- A ranked or combined list built from a Wishlist or a bundle keeps its price columns and Prices tile.
+- A ranked or combined list built from a Wishlist, a bundle or a developer's or publisher's games keeps its price columns and Prices tile.
 
 ### Comparing libraries
 
@@ -109,7 +109,7 @@ Clicking any row opens a detail panel beside the table — not over it, so the l
 
 **Similar in Alice's library** shows the 5 games the current account owns closest to this one by Steam tags (tags nearly every game in the library carries count less), each opening its own panel; ← Back returns. It needs that account's Owned list opened once on this device (the section links it), and isn't shown on Owned's own rows. **⇅ Sort list by similarity** ranks the whole open list against that game (a **Similarity** column, first sort) until you stop it or reload. **More like this on Steam ↗** searches the whole store instead.
 
-**More from** names the game's developers and publishers; each opens a list of their games on Steam — **Games by …** or **Published by …** — with ownership, prices and Taste fit, the panel staying on the game you came from.
+**More from** names the game's developers and publishers; each opens a list of their games on Steam — **Games by …** or **Published by …** — with ownership, prices and Taste fit, the panel staying on the game you came from. **What don't I own?** opens the ones you don't own as a list you can save, like a bundle's **What does this add?**.
 
 - Steam matches the exact name the store gives, so a publisher spelled differently on some of its games only lists the ones spelled this way.
 - Past Steam's first page of results, the list holds only that page's games and says so, linking **All on Steam ↗**.
