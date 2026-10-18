@@ -59,8 +59,12 @@ const heroContrast = (label: Locator) =>
       });
       return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     };
+    // The hero draws no ground of its own: the first opaque one behind the label.
+    let ground: Element = el;
+    while (ground.parentElement && Number(getComputedStyle(ground).backgroundColor.match(/[\d.]+/g)![3] ?? 1) < 1)
+      ground = ground.parentElement;
     const fg = lum(getComputedStyle(el).color);
-    const bg = lum(getComputedStyle(el.closest('.list-hero')!).backgroundColor);
+    const bg = lum(getComputedStyle(ground).backgroundColor);
     return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
   });
 
@@ -79,7 +83,7 @@ test("A1 edge: a pressed stat tile's label still meets AA contrast on the hero",
   await toggle.click();
   const pressed = page.locator('.list-stat-btn[aria-pressed="true"]').first();
   await expect(pressed).toBeVisible();
-  const label = pressed.locator('.list-stat-label');
+  const label = page.locator('.list-stat', { has: pressed }).locator('.list-stat-label');
   // Still hovered after the click: pressed must not look like plain hover, or the click shows no change.
   const hoveredPressed = await label.evaluate((el) => getComputedStyle(el).color);
   await page.mouse.move(0, 0);
@@ -87,7 +91,8 @@ test("A1 edge: a pressed stat tile's label still meets AA contrast on the hero",
   expect(await heroContrast(label)).toBeGreaterThanOrEqual(4.5);
   const other = page.locator('.list-stat-btn[aria-pressed="false"]').first();
   await other.hover();
-  expect(await other.locator('.list-stat-label').evaluate((el) => getComputedStyle(el).color)).not.toBe(hoveredPressed);
+  const otherLabel = page.locator('.list-stat', { has: other }).locator('.list-stat-label');
+  expect(await otherLabel.evaluate((el) => getComputedStyle(el).color)).not.toBe(hoveredPressed);
 });
 
 test("B1 edge: /bundles' filter tiles look like toggles, unlike the plain figures beside them", async ({ page }) => {
@@ -96,11 +101,11 @@ test("B1 edge: /bundles' filter tiles look like toggles, unlike the plain figure
   const chrome = (loc: Locator) =>
     loc.evaluate((el) => {
       const s = getComputedStyle(el);
-      return { border: s.borderTopWidth, borderColor: s.borderTopColor, shadow: s.boxShadow };
+      return { border: s.borderTopWidth, borderColor: s.borderTopColor, background: s.backgroundColor };
     });
   const toggle = page.locator('.list-stat-btn[aria-pressed="false"]').first();
   await expect(toggle).toBeVisible();
-  const plain = await chrome(page.locator('.list-stat', { hasText: 'Updated' }));
+  const plain = await chrome(page.locator('.list-stat', { hasText: 'Updated' }).locator('.list-stat-btn'));
   const off = await chrome(toggle);
   expect(plain.border).toBe('0px');
   expect(off.border).not.toBe('0px');
@@ -108,11 +113,12 @@ test("B1 edge: /bundles' filter tiles look like toggles, unlike the plain figure
   await page.mouse.move(0, 0);
   const pressed = page.locator('.list-stat-btn[aria-pressed="true"]').first();
   await expect(pressed).toHaveCSS('border-top-color', 'rgb(217, 165, 91)'); // --accent
-  await expect(pressed).toHaveCSS('box-shadow', /inset/);
-  // Hover and focus show on a pressed chip too.
-  const pressedRest = (await chrome(pressed)).shadow;
+  // A thicker edge, not only a colour: forced colors repaint colours and drop shadows.
+  expect(Number.parseFloat((await chrome(pressed)).border)).toBeGreaterThan(Number.parseFloat(off.border));
+  // Hover shows on a pressed chip too.
+  const pressedRest = (await chrome(pressed)).background;
   await pressed.hover();
-  await expect.poll(async () => (await chrome(pressed)).shadow).not.toBe(pressedRest);
+  await expect.poll(async () => (await chrome(pressed)).background).not.toBe(pressedRest);
 });
 
 test('A1 edge: Owned with no account points to Home rather than showing 0 games', async ({ page }) => {
@@ -1886,7 +1892,7 @@ test('D1 edge: Updated ↻ keeps focus on the tile while it refreshes', async ({
     await held;
     await route.fallback();
   });
-  const tile = page.locator('.list-stat', { hasText: 'Updated' });
+  const tile = page.getByRole('button', { name: /^Updated/ });
   await tile.click();
   await expect(tile).toContainText('Refreshing');
   await expect(tile).toBeFocused();
@@ -3516,11 +3522,12 @@ test('I2 edge: controls name what they act on, and only toggles carry a pressed 
   );
 
   await page.goto('/bundles');
-  const updated = page.locator('.list-stat', { hasText: 'Updated' });
+  // A tile's button is named by its label and value.
+  const updated = page.getByRole('button', { name: /^Updated \S/ });
   await expect(updated).toBeVisible();
   await expect(updated).not.toHaveAttribute('aria-pressed');
-  await expect(page.locator('.list-stat', { hasText: 'Prices' })).not.toHaveAttribute('aria-pressed');
-  const ending = page.locator('.list-stat', { hasText: 'Ending soon' });
+  await expect(page.getByRole('button', { name: /^Prices \S/ })).not.toHaveAttribute('aria-pressed');
+  const ending = page.getByRole('button', { name: /^Ending soon \d/ });
   if (await ending.count()) await expect(ending).toHaveAttribute('aria-pressed', 'false');
 });
 

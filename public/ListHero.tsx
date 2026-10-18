@@ -19,8 +19,7 @@
 // — which a clickable tile (see `onClick`) can't afford, since activating one recomputes the
 // array and the button the user was on would be replaced mid-interaction, dropping keyboard
 // focus. `<Index>` keys by position and patches each tile's contents in place instead.
-import { createSignal, Index, Show, type JSX } from 'solid-js';
-import { Dynamic } from 'solid-js/web';
+import { createSignal, createUniqueId, Index, Show, type JSX } from 'solid-js';
 
 export interface HeroTile {
   // Uppercased by CSS — write it in sentence case ("Ends", "Best deal"), not shouting.
@@ -32,7 +31,7 @@ export interface HeroTile {
   // Native tooltip on the value, for the number this tile is deliberately *not* showing
   // (e.g. ITAD's own game count next to the count this route can actually enumerate).
   title?: string;
-  // Makes the tile a real <button> instead of a <div> — for a tile whose number is also a way to
+  // Puts a real <button> in the tile — for a tile whose number is also a way to
   // act on it (`/bundles`' "Ending soon", which toggles the table down to those rows). `active`
   // is its pressed state, read back from whatever the click applied rather than held here, so
   // undoing it elsewhere (the table's own Clear filters) unpresses the tile. Left out on a plain
@@ -65,6 +64,7 @@ interface ListHeroProps {
 
 export function ListHero(props: ListHeroProps): JSX.Element {
   const [moreOpen, setMoreOpen] = createSignal(false);
+  const uid = createUniqueId();
   return (
     <header class="list-hero">
       <div class="list-hero-header">
@@ -91,59 +91,83 @@ export function ListHero(props: ListHeroProps): JSX.Element {
         </Show>
       </div>
       <Show when={props.tiles?.length}>
-        <div class="list-hero-stats">
+        <dl class="list-hero-stats">
           <Index each={props.tiles}>
-            {(tile) => {
+            {(tile, i) => {
+              const id = `${uid}-${i}`;
               const isButton = () => !!tile().onClick && !tile().subOnClick;
               return (
-                <Dynamic
-                  component={isButton() ? 'button' : 'div'}
-                  class={isButton() ? 'list-stat list-stat-btn' : 'list-stat'}
-                  type={isButton() ? 'button' : undefined}
-                  aria-pressed={isButton() && tile().active !== undefined ? tile().active : undefined}
-                  aria-disabled={isButton() && tile().disabled ? 'true' : undefined}
-                  onClick={tile().subOnClick || tile().disabled ? undefined : () => tile().onClick?.()}
-                >
-                  <span class="list-stat-label">{tile().label}</span>
-                  {/* Two actions means two buttons side by side inside a plain tile — a button
-                    can't contain another one. With one (or none) the whole tile is the control,
-                    which is the bigger, better hit area. */}
-                  <Show
-                    when={tile().onClick && tile().subOnClick}
-                    fallback={
-                      <span class="list-stat-value" title={tile().title}>
-                        {tile().value}
-                      </span>
-                    }
-                  >
-                    <button
-                      type="button"
-                      class="list-stat-value list-stat-btn"
-                      title={tile().title}
-                      aria-disabled={tile().disabled ? 'true' : undefined}
-                      onClick={() => !tile().disabled && tile().onClick?.()}
+                <div class="list-stat">
+                  <dt class="list-stat-label" id={`${id}-label`}>
+                    {tile().label}
+                  </dt>
+                  {/* Two actions: a button per line (no nested buttons); one: value and sub-line in one button. */}
+                  <dd>
+                    <Show
+                      when={isButton()}
+                      fallback={
+                        <>
+                          <Show
+                            when={tile().onClick && tile().subOnClick}
+                            fallback={
+                              <span class="list-stat-value" title={tile().title}>
+                                {tile().value}
+                              </span>
+                            }
+                          >
+                            <button
+                              type="button"
+                              class="list-stat-value list-stat-btn"
+                              id={`${id}-value`}
+                              aria-labelledby={`${id}-label ${id}-value`}
+                              title={tile().title}
+                              aria-disabled={tile().disabled ? 'true' : undefined}
+                              onClick={() => !tile().disabled && tile().onClick?.()}
+                            >
+                              {tile().value}
+                            </button>
+                          </Show>
+                          <Show when={tile().sub}>
+                            <Show when={tile().subOnClick} fallback={<span class="list-stat-sub">{tile().sub}</span>}>
+                              <button
+                                type="button"
+                                class="list-stat-sub list-stat-btn"
+                                id={`${id}-sub`}
+                                aria-labelledby={`${id}-label ${id}-sub`}
+                                title={tile().subTitle}
+                                aria-disabled={tile().subDisabled ? 'true' : undefined}
+                                onClick={() => !tile().subDisabled && tile().subOnClick?.()}
+                              >
+                                {tile().sub}
+                              </button>
+                            </Show>
+                          </Show>
+                        </>
+                      }
                     >
-                      {tile().value}
-                    </button>
-                  </Show>
-                  <Show when={tile().sub}>
-                    <Show when={tile().subOnClick} fallback={<span class="list-stat-sub">{tile().sub}</span>}>
                       <button
                         type="button"
-                        class="list-stat-sub list-stat-btn"
-                        title={tile().subTitle}
-                        aria-disabled={tile().subDisabled ? 'true' : undefined}
-                        onClick={() => !tile().subDisabled && tile().subOnClick?.()}
+                        class="list-stat-btn"
+                        id={`${id}-btn`}
+                        aria-labelledby={`${id}-label ${id}-btn`}
+                        aria-pressed={tile().active}
+                        aria-disabled={tile().disabled ? 'true' : undefined}
+                        onClick={() => !tile().disabled && tile().onClick?.()}
                       >
-                        {tile().sub}
+                        <span class="list-stat-value" title={tile().title}>
+                          {tile().value}
+                        </span>
+                        <Show when={tile().sub}>
+                          <span class="list-stat-sub">{tile().sub}</span>
+                        </Show>
                       </button>
                     </Show>
-                  </Show>
-                </Dynamic>
+                  </dd>
+                </div>
               );
             }}
           </Index>
-        </div>
+        </dl>
       </Show>
       <Show when={props.note}>
         <div class="list-hero-note">{props.note}</div>

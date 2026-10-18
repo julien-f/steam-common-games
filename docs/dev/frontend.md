@@ -64,7 +64,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 - `AppShell.tsx` — the persistent shell: nav bar (`Home · Compare · Bundles`; About is in the footer), ⚙ Preferences popover, global game search, the shared panel + lightbox (mounted once, not per route), and the app-wide `?u=` resolve effect. The Compare link alone opts out of `withAccountParam`: a comparison names its own players.
   - Landmarks: the bar is the `<header>` (banner), holding the `Main` `<nav>` (`display: contents`, so its links stay items of the bar's flex row), the `<search>` box, the chip and ⚙; then `<main>`, the footer, and the panel as an `<aside>` named by its title. Home's quick links are the `Lists` nav. Every `<nav>` carries a name, telling the two apart.
 - `AccountChip.tsx` — nav-bar chip saying whose lists are on screen, with Owned/Wishlist links (inline when wide, in its popover when narrow) and a recent-account switcher. Deliberately thinner than Home's account section.
-- `ListRoute.tsx` — the generic list viewer (table + docked panel) behind every `/lists/*` and `/game/*` route; owns per-kind loading, columns, price loading, and the hero card's contents.
+- `ListRoute.tsx` — the generic list viewer (table + docked panel) behind every `/lists/*` and `/game/*` route; owns per-kind loading, columns, price loading, and the hero's contents.
 - `RankRoute.tsx` — `/lists/:listId/rank`, a ranked list's compare screen (see [lists-and-accounts.md](lists-and-accounts.md#ranked-lists)).
 - `listShare.ts` — encode/decode for `/lists/shared?f=` (see Routes).
 - `HomeRoute.tsx` — account picker/header plus the folder/list tree and combine form. Also forwards an old Comparison-page link (`/?u=alice&u=bob`) to `/lists/compare`.
@@ -79,7 +79,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
   - Not a `ListRoute` kind (results have no ratings/HLTB/price), but renders through `@vates/data-table-solid`'s `DataTableView` with a two-column config (thumb + name) and its toolbar hidden via CSS (`.search-table`).
   - Opening a result reuses `ListRoute.tsx`'s `openStandaloneInPlace`-style placeholder-then-fetch, and registers `stepGame`/`pickRandom`/`gamePosition` with the shell (via `panelNav.ts`'s `stepGameList`/`renderPanelNav` and `panel.tsx`'s `pickRandomFrom`), so ↑/↓/R, the panel nav and lightbox game-stepping work here too.
   - A debounced on-page search box keeps `?q=` in sync, auto-opening the closest match only on the initial landing. The nav-bar box's "See all results for …" row (`gameSearch.ts`) is the other way in.
-- `AboutRoute.tsx`, `NotFoundRoute.tsx`, `ShortcutsModal.tsx`, `ListHero.tsx` — static about page; unknown-path page; the `?` shortcuts dialog (rendered once by the shell); the hero card every list route opens with.
+- `AboutRoute.tsx`, `NotFoundRoute.tsx`, `ShortcutsModal.tsx`, `ListHero.tsx` — static about page; unknown-path page; the `?` shortcuts dialog (rendered once by the shell); the hero every list route opens with.
 
 **Account and list model** (plain modules over `prefs.ts`, no Solid reactivity of their own — see [lists-and-accounts.md](lists-and-accounts.md))
 
@@ -90,7 +90,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 - `listResolve.ts` — resolves a `ListRef`/`GameList` to appids, with every impure dependency injected so its tests never touch the network or localStorage.
 - `combine.ts` — the pure union/intersect/subtract/group-by-membership engine over resolved sets.
 - `ranking.ts` — the pure binary-insertion engine behind ranked lists.
-- `listLabels.ts` — how an op and a source read on screen, shared by the hero card, Home's combine form, and the tree.
+- `listLabels.ts` — how an op and a source read on screen, shared by the hero, Home's combine form, and the tree.
 - `membershipColumn.ts` — the "Owned by"/"In" column a group-by-membership list is grouped by (see each list kind below).
 - `bundleSnapshots.ts` — the last-known title and games of each bundle a saved list uses, kept for when ITAD stops listing it.
 - `myOwnership.ts` — one cached pair of owned/wishlisted appid sets for the effective account, behind both the panel's badge and the search dropdown's markers.
@@ -228,16 +228,16 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
 
 ## Each list kind, in practice
 
-Every route opens with a **hero card** (`ListHero.tsx`, a `<header>`): the list's name as the page `<h1>`, an optional lead, kind/shop/account chips, the route's own actions, and the list's facts as labelled tiles — all off fetches the route already makes.
+Every route opens with a **hero** (`ListHero.tsx`, a `<header>`, a flat section rather than a card): the list's name as the page `<h1>`, an optional lead, kind/shop/account chips, the route's own actions, and the list's facts as a `<dl>` of labelled tiles — all off fetches the route already makes.
 
 - **The card is dumb**: no data, no per-kind branching; callers pass formatted values, so "what does a wishlist show" is answered in `ListRoute.tsx` alone. Its dates are ISO, like the tables' (see [ui-guidelines.md](ui-guidelines.md)).
-- **A tile can be a control**: given `onClick` it renders as a `<button>`, `aria-disabled` while its action is in flight (not `disabled`, which would drop the focus of the click). A toggle also passes `active`, rendered as `aria-pressed` and read back from what the click applied.
+- **A tile can be a control**: given `onClick`, a `<button>` in its `<dd>`, named by the `<dt>` and its own text (`aria-labelledby`), `aria-disabled` while its action is in flight (not `disabled`, which would drop the focus of the click). A toggle also passes `active`, rendered as `aria-pressed` and read back from what the click applied.
 - **A tile that refreshes replaces the route's ↻ Refresh button** (`refreshTileValue` adds a ↻ beside the value), so it's rendered unconditionally — during a load and after one that failed before fetching, when a retry is wanted.
   - `/bundles`: Updated re-fetches, Prices opens the ⚙ popover (`openPrefsPopover`), New/Ending soon toggle filters.
   - Owned/wishlist: Updated does the same. Prices shows only where the list is priced (`hasPrices()`: the wishlist, a user list with a priced source), never on owned. Any list built from an account fetch, at any depth (a comparison; a dynamic, ranked or shared list), gets Updated too: its age is the _oldest_ of the account fetches behind it, and clicking re-resolves them all past the server's cache (`createDefaultFetchers`'s `refresh`/`onFetchedAt`, `listResolve.ts`).
   - The tile is gated on there being an age, not on the kind: a manual list (stored appids) has none. Owned, wishlist and comparisons keep it without an age ("—") so a failed first load can be retried.
   - Exception: a bundle's own hero tile is a plain `<div>` — finding one bundle walks several cached list pages, so `GET /api/bundles/:id` has no force path. It still states the age of the page the bundle was found on (`findBundleById`'s `cacheKey`).
-- **Prices carries two actions**: its value (the region) opens the ⚙ popover, its sub-line (the price age) re-fetches prices. With a `subOnClick` each half renders as its own button (HTML has no nested buttons); otherwise the whole tile is the control.
+- **Prices carries two actions**: its value (the region) opens the ⚙ popover, its sub-line (the price age) re-fetches prices. With a `subOnClick` each half renders as its own button (HTML has no nested buttons); otherwise value and sub-line are one button.
 - **A refresh** (`load({ refresh: true })`) keeps the table, its rows' details and the selection until the new list resolves, then rebuilds with the kept details (`withKept`) and streams only new games. It keeps the previous age, a dynamic list's formula line and `heroTitle` (blanking it would tear down the tile being clicked).
 - Tiles render through `<Index>`, not `<For>`: recomputes build fresh tile objects, and by-reference keying would replace the activated button and drop its focus.
 - On a phone (≤ 768 px) tiles become one swipeable row, and `hero-secondary` actions (a bundle's IsThereAnyDeal link and Rank; a comparison's Edit players and Save) fold behind a ⋯ toggle (`secondaryActions`), so the table starts higher.

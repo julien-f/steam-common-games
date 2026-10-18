@@ -325,6 +325,327 @@
     }
   }
 
+  /* ── A route's hero (ListHero.tsx): a flat section, not a card. Title, chips and actions, then
+     the list's facts as label-over-value pairs. ── */
+  .list-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .list-hero-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .list-hero-titlebar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    min-width: 0;
+  }
+  .list-hero-nav {
+    display: flex;
+    gap: 4px;
+  }
+  .list-hero-title {
+    color: var(--text);
+  }
+  /* What kind of list this is; a bundle's shop chip is .shop-chip, shared with /bundles' cells. */
+  .list-hero-chip {
+    padding: 2px 8px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-1);
+    color: var(--muted);
+    font-size: var(--fs-meta);
+    white-space: nowrap;
+  }
+  .list-hero-account {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--fs-ui);
+  }
+  .list-hero-account .account-profile-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+  }
+  .list-hero-account .account-profile-link:hover {
+    color: var(--text);
+    text-decoration: underline;
+  }
+  .list-hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  /* Phone only: the ⋯ that unfolds the actions marked `hero-secondary`. */
+  .list-hero-more {
+    display: none;
+  }
+
+  .list-hero-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 32px;
+  }
+  .list-stat,
+  .list-stat > dd {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .list-stat-label {
+    font-size: var(--fs-label);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  /* A tile's control: no chrome, so it reads as one of the figures beside it. Declared before the
+     value and sub-line rules, which restate the sizes `font: inherit` resets. */
+  .list-stat-btn {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-height: 24px;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  /* Tables' figures line up; a value can't be told numeric from CSS, so Geist with tabular figures. */
+  .list-stat-value {
+    color: var(--text);
+    font-size: var(--fs-body);
+    font-variant-numeric: tabular-nums;
+  }
+  .list-stat-sub {
+    color: var(--muted);
+    font-size: var(--fs-label);
+  }
+  .list-stat-icon {
+    color: var(--muted);
+    font-size: var(--fs-label);
+  }
+  .list-stat-btn:not([aria-pressed], [aria-disabled='true']):hover .list-stat-value,
+  .list-stat-value.list-stat-btn:not([aria-disabled='true']):hover,
+  .list-stat-sub.list-stat-btn:not([aria-disabled='true']):hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .list-stat-btn:not([aria-disabled='true']):is(:hover, :focus-visible) .list-stat-icon {
+    color: var(--text);
+  }
+  /* A tile carrying two actions has a button per line: 24px tap areas without moving the tile, the
+     value's grown up over the label, the sub-line's down. */
+  .list-stat-value.list-stat-btn,
+  .list-stat-sub.list-stat-btn {
+    min-height: 0;
+  }
+  .list-stat-value.list-stat-btn::after,
+  .list-stat-sub.list-stat-btn::after {
+    content: '';
+    position: absolute;
+    inset: -7px 0 0;
+  }
+  .list-stat-sub.list-stat-btn::after {
+    inset: 0 0 -11px;
+  }
+  .list-stat-btn[aria-disabled='true'] {
+    cursor: default;
+  }
+  /* A filter toggle is an outline chip; pressed, its edge thickens in the accent: a shape forced
+     colors keep, unlike a shadow. */
+  .list-stat-btn[aria-pressed] {
+    padding: 3px 8px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-2);
+    transition:
+      border-color var(--dur-1) var(--ease-out),
+      background-color var(--dur-1) var(--ease-out);
+  }
+  .list-stat-btn[aria-pressed]:hover:not([aria-disabled='true']) {
+    background: var(--line);
+  }
+  .list-stat-btn[aria-pressed='false']:hover:not([aria-disabled='true']) {
+    border-color: var(--muted);
+  }
+  .list-stat-btn[aria-pressed='true'] {
+    padding: 2px 7px;
+    border: 2px solid var(--accent);
+  }
+  /* The label answers its control: lit on hover, in the accent while pressed, which hover leaves
+     alone so a click on a hovered toggle still shows its change. */
+  .list-stat:has(.list-stat-btn:not([aria-disabled='true'], [aria-pressed='true']):is(:hover, :focus-visible))
+    .list-stat-label {
+    color: var(--text);
+  }
+  .list-stat:has(.list-stat-btn[aria-pressed='true']) .list-stat-label {
+    color: var(--accent);
+  }
+  /* Here the countdown is its own line under the date, not a suffix as in /bundles' Ends cell. */
+  .list-stat-sub .bundle-ends-rel {
+    margin-left: 0;
+  }
+
+  /* A bundle's tier prices, each chip's title saying what it unlocks. */
+  .bundle-tier-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .bundle-tier-chip {
+    padding: 1px 8px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-1);
+    font-size: var(--fs-meta);
+    white-space: nowrap;
+  }
+  /* The pick-and-mix tier the selection would be bought at. */
+  .bundle-tier-chip--active {
+    padding: 0 7px;
+    border: 2px solid var(--accent);
+  }
+
+  /* Prose under the facts: ITAD's bundle note, or a dynamic list's formula. */
+  .list-hero-note {
+    color: var(--muted);
+    font-size: var(--fs-ui);
+    font-style: italic;
+  }
+  /* Owned's "Plays mostly" renders nothing until details have loaded: no empty gap meanwhile. */
+  .list-hero-note:empty {
+    display: none;
+  }
+  .list-plays-mostly {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--fs-label);
+    font-style: normal;
+  }
+  .list-plays-mostly-tag {
+    min-height: 24px;
+    padding: 2px 8px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-1);
+    background: none;
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+  }
+  .list-plays-mostly-tag:hover {
+    border-color: var(--muted);
+    background: var(--line);
+  }
+  .list-plays-mostly-tag.active {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .list-formula {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    color: var(--text);
+    font-style: normal;
+  }
+  .list-formula-source {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    padding: 2px 8px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-1);
+    white-space: nowrap;
+  }
+  .list-formula-source a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .list-formula-source a:hover {
+    text-decoration: underline;
+  }
+  /* A dangling source contributes nothing but doesn't break the list: a warning, not an error. */
+  .list-formula-source.has-problem {
+    border-color: var(--warn);
+    color: var(--warn);
+  }
+  .list-formula-count,
+  .list-formula-leftout {
+    color: var(--muted);
+    font-size: var(--fs-label);
+  }
+  .list-formula-leftout {
+    margin-left: 6px;
+  }
+  .list-formula-op {
+    color: var(--muted);
+  }
+  .list-formula-result {
+    font-weight: 600;
+  }
+  .list-formula-problems {
+    margin-top: 6px;
+    list-style: none;
+    color: var(--warn);
+    font-size: var(--fs-meta);
+    font-style: normal;
+  }
+
+  @media (max-width: 768px) {
+    .list-hero {
+      gap: 12px;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+    }
+    .list-hero-more {
+      display: inline-flex;
+      order: 1;
+    }
+    .list-hero-actions:not(.list-hero-actions--open) .hero-secondary {
+      display: none;
+    }
+    /* Wider fonts shorten a label rather than drop the ⋯ to a line of its own. */
+    .list-hero-actions:not(.list-hero-actions--open):has(.list-hero-more) {
+      flex-wrap: nowrap;
+      min-width: 0;
+    }
+    .list-hero-actions:not(.list-hero-actions--open):has(.list-hero-more) > .btn:not(.list-hero-more) {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* One swipeable row: the facts stay one swipe away, not a screen. */
+    .list-hero-stats {
+      flex-wrap: nowrap;
+      gap: 20px;
+      /* Room inside the scroller, which clips, for a sub-line's tap area grown downward. */
+      padding-bottom: 11px;
+      margin-bottom: -11px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      /* Hints at tiles past the edge. */
+      mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+    }
+    .list-stat {
+      flex: none;
+      white-space: nowrap;
+    }
+  }
+
   /* ── A list route's table and what surrounds it; the table's own look is styles/vendor-data-table.css. ── */
 
   /* Fixed size, so a row keeps its height while the image loads or after it fails. */
