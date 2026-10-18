@@ -3692,11 +3692,11 @@ test('I2.1: into a list from the keyboard — skip link, and R with no panel ope
   await page.keyboard.press('Enter');
   expect(await page.evaluate(() => document.activeElement?.closest('tbody') != null)).toBe(true);
 
-  // The closed shortcuts dialog isn't a Tab stop; open, it is.
+  // The closed shortcuts dialog isn't rendered, so it's no Tab stop; open, it is.
   const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts', includeHidden: true });
-  await expect(dialog).toHaveAttribute('inert', '');
+  await expect(dialog).toBeHidden();
   await page.keyboard.press('?');
-  await expect(dialog).not.toHaveAttribute('inert');
+  await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Close' }).click();
 
   await page.keyboard.press('r');

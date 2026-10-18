@@ -5,7 +5,7 @@
 // it. The `.shortcuts-*`/`kbd` CSS it uses survived untouched in style.css.
 //
 // Open state lives in AppShell (it has to reach bindPanelKeyboardShortcuts' `shortcuts` option
-// and the `?` key handler), so this component is pure presentation plus its two close paths.
+// and the `?` key handler), so this component is pure presentation plus its close paths.
 import { createEffect, For, onCleanup, on, type JSX } from 'solid-js';
 
 interface Section {
@@ -62,9 +62,11 @@ const SHORTCUT_SECTIONS: Section[] = [
 ];
 
 export function ShortcutsModal(props: { open: boolean; onClose: () => void }): JSX.Element {
+  let dialogEl!: HTMLDialogElement;
   let closeEl!: HTMLButtonElement;
   let opener: HTMLElement | null = null;
-  // On the document: a click on the dialog's text drops focus to <body>, past a listener on the dialog.
+  // A modal <dialog> lets Tab leave for the browser's UI, so it still wraps here. On the document:
+  // a click on the dialog's text drops focus to <body>, past a listener on the dialog.
   const keepTab = (e: KeyboardEvent) => {
     if (e.key !== 'Tab') return;
     e.preventDefault();
@@ -77,10 +79,12 @@ export function ShortcutsModal(props: { open: boolean; onClose: () => void }): J
       (open) => {
         if (open) {
           opener = document.activeElement as HTMLElement | null;
+          dialogEl.showModal();
           document.addEventListener('keydown', keepTab);
           closeEl.focus();
         } else {
           document.removeEventListener('keydown', keepTab);
+          dialogEl.close();
           if (opener?.isConnected) opener.focus();
         }
       },
@@ -88,17 +92,18 @@ export function ShortcutsModal(props: { open: boolean; onClose: () => void }): J
     ),
   );
   return (
-    <>
+    // A transparent full-viewport shell: the backdrop and the box inside it keep their own fades.
+    <dialog
+      class="shortcuts-dialog"
+      aria-labelledby="shortcuts-title"
+      ref={dialogEl}
+      onCancel={(e) => {
+        e.preventDefault();
+        props.onClose();
+      }}
+    >
       <div class={`shortcuts-backdrop${props.open ? ' open' : ''}`} onClick={() => props.onClose()} />
-      <div
-        class={`shortcuts-modal${props.open ? ' open' : ''}`}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="shortcuts-title"
-        aria-hidden={props.open ? undefined : 'true'}
-        // Hidden with CSS, so without this its Close button was still a Tab stop.
-        inert={!props.open}
-      >
+      <div class={`shortcuts-modal${props.open ? ' open' : ''}`}>
         <div class="shortcuts-header">
           <h2 class="shortcuts-title" id="shortcuts-title">
             Keyboard shortcuts
@@ -135,6 +140,6 @@ export function ShortcutsModal(props: { open: boolean; onClose: () => void }): J
           </For>
         </div>
       </div>
-    </>
+    </dialog>
   );
 }

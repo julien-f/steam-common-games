@@ -2989,6 +2989,24 @@ kbd {
   color: var(--text0);
   white-space: nowrap;
 }
+/* The <dialog> is only a shell, its UA box and backdrop reset; it stays displayed while its
+   contents fade out. */
+.shortcuts-dialog {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  pointer-events: none; /* its fading-out box mustn't catch clicks; the backdrop and box set their own */
+  transition:
+    display 0.15s allow-discrete,
+    overlay 0.15s allow-discrete;
+}
+.shortcuts-dialog::backdrop {
+  background: transparent;
+}
 .shortcuts-backdrop {
   position: fixed;
   inset: 0;
@@ -3029,6 +3047,16 @@ kbd {
   opacity: 1;
   pointer-events: auto;
   transform: translate(-50%, -50%);
+}
+/* Fades in from the closed state, which a just-opened <dialog> never rendered. */
+@starting-style {
+  .shortcuts-backdrop.open,
+  .shortcuts-modal.open {
+    opacity: 0;
+  }
+  .shortcuts-modal.open {
+    transform: translate(-50%, -48%);
+  }
 }
 .shortcuts-header {
   display: flex;
