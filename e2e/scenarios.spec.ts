@@ -3722,9 +3722,7 @@ test("F4 edge: Steam's store search down in a combined list names the source, an
   await mockApi(page, { states: ['store-down'] });
   await asPlayer(page, ALICE);
   await page.goto(sharedUrl(`subtract:(p:indie.io;o:${ALICE.steamid})`));
-  await expect(page.locator('.list-status')).toContainText(
-    "Steam's store search didn't answer for Published by indie.io",
-  );
+  await expect(page.locator('.list-status')).toContainText('Published by indie.io: Steam store search error');
   await mockApi(page);
   const forced = page.waitForRequest((req) => /\/api\/creator-games\?.*refresh=1/.test(req.url()));
   await page.locator('.list-stat', { hasText: 'Updated' }).click();

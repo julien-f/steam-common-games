@@ -71,7 +71,7 @@ function encodeFormula(
 
 // encodeURIComponent leaves `(` and `)` alone, which would end a `g:` group early.
 function escapeLeaf(value = ''): string {
-  return encodeURIComponent(value).replace(/[()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  return encodeURIComponent(value).replaceAll('(', '%28').replaceAll(')', '%29');
 }
 
 function encodeSource(

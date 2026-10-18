@@ -74,7 +74,7 @@ A bundle joins a combine from its own page: **What does this add?** shows that b
 - It follows its source: games added later are queued for comparison; a removed game drops out, and gets its rank back if it returns. **Change source** keeps every answer already given.
 - A list can have several rankings, each by its own criterion. Once it has one, **🏆 Rank this list** opens a menu: continue a ranking (with its progress), or start a new one named by what you're ranking by, e.g. "best JRPG".
 - A ranked list can't be shared via a link yet.
-- A ranked or combined list built from a Wishlist or a bundle keeps its price columns and Prices tile.
+- A ranked or combined list built from a Wishlist, a bundle or a developer's or publisher's games keeps its price columns and Prices tile.
 
 ### Comparing libraries
 

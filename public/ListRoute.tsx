@@ -1931,7 +1931,7 @@ export default function ListRoute() {
     const list = kind === 'shared' ? compareList() : kind === 'user' ? userList() : null;
     return list ? { list, get: kind === 'shared' ? sharedGetList : getList } : null;
   }
-  // Wishlist prices, by appid: the Wishlist itself, and a saved or shared list built from one or a bundle.
+  // Wishlist prices, by appid: the Wishlist itself, and a saved or shared list built from one, a bundle or a developer/publisher.
   function hasPrices(): boolean {
     const defined = definedList();
     return kind === 'wishlist' || kind === 'creator' || (!!defined && listHasPriceSource(defined.list, defined.get));
@@ -3014,7 +3014,7 @@ export default function ListRoute() {
   }
   // Per load: each capped developer/publisher source's total on Steam (createDefaultFetchers' onCreatorCapped).
   let creatorCapped = new Map<string, number>();
-  function noteCapped(role: CreatorRole, name: string, _shown: number, total: number): void {
+  function noteCapped(role: CreatorRole, name: string, total: number): void {
     creatorCapped.set(`${role}:${name}`, total);
   }
   function cappedOf(list: GameList, i: number): number | undefined {

@@ -188,7 +188,7 @@ export interface DefaultFetchersOptions {
   onOwners?: (owners: Map<number, GameOwner[]>, accountId: string) => void; // each account-owned source's members who own each game
   onBundleLeftOut?: (bundleId: string, notOnSteam: number) => void; // a bundle's games with no Steam listing
   onBundleGames?: BundleGamesCallback; // a freshly fetched bundle's games, for their tier prices
-  onCreatorCapped?: (role: CreatorRole, name: string, shown: number, total: number) => void; // only Steam's first page
+  onCreatorCapped?: (role: CreatorRole, name: string, total: number) => void; // only Steam's first page
 }
 export type BundleGamesCallback = (bundleId: string, bundle: Bundle, resolved: ResolvedGame[]) => void;
 
@@ -229,17 +229,17 @@ export function createDefaultFetchers({
       ),
     recentGames: async () => new Set(loadRecentGames().map((g) => g.appid)),
     creator: async (role, name) => {
+      let result;
       try {
-        const { appids, total, capped, fetchedAt } = await fetchCreatorGames(role, name, { refresh });
-        onFetchedAt?.(fetchedAt);
-        if (capped) onCreatorCapped?.(role, name, appids.length, total);
-        return new Set(appids);
+        result = await fetchCreatorGames(role, name, { refresh });
       } catch (err) {
         // The list fails as a whole, so say which source did it.
-        throw new Error(
-          `Steam's store search didn't answer for ${creatorTitle(role, name)} (${(err as Error).message})`,
-        );
+        throw new Error(`${creatorTitle(role, name)}: ${(err as Error).message}`, { cause: err });
       }
+      const { appids, total, capped, fetchedAt } = result;
+      onFetchedAt?.(fetchedAt);
+      if (capped) onCreatorCapped?.(role, name, total);
+      return new Set(appids);
     },
     getList,
   };
