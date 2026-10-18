@@ -3721,9 +3721,9 @@ export default function ListRoute() {
             {(plan) => (
               <>
                 <span class="selection-pick-cost">
-                  <span class="selection-pick-total">
+                  <output class="selection-pick-total" aria-live="polite">
                     {formatWithEstimate(plan().cost, plan().currency, regionCurrency())}
-                  </span>
+                  </output>
                   <span class="selection-pick-detail">{pickPlanDetail(plan(), selectedPickCount())}</span>
                 </span>
                 <Show when={sumBestDeals(selectedRows(), plan().currency)}>

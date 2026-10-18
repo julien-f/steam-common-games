@@ -2999,7 +2999,7 @@ test("F2 edge: /search, About and the 404 page title themselves with the list ro
   ]) {
     await page.goto(path);
     await expect(page.locator('.list-hero-title')).toHaveText(title);
-    await expect(page.locator('header h1')).toHaveCount(0);
+    await expect(page.locator('h1')).toHaveCount(1);
   }
 });
 
@@ -3422,7 +3422,7 @@ test('I2 edge: every shortcut description starts at the same x', async ({ page }
   const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
   await expect(dialog).toBeVisible();
   const lefts = await dialog
-    .locator('.shortcuts-row > span:last-child')
+    .locator('.shortcuts-row > dd')
     .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().left)));
   expect(lefts.length).toBeGreaterThan(10);
   expect(new Set(lefts).size).toBe(1);

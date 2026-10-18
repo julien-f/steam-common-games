@@ -340,12 +340,12 @@ export default function RankRoute() {
 
   return (
     <div class="rank-route">
-      <div class="rank-header">
+      <header class="rank-header">
         <A href={listHref()} class="btn btn-ghost btn-sm">
           ← Back to list
         </A>
         <h1>{title()}</h1>
-      </div>
+      </header>
       <Show when={status()}>
         <div class="list-status">{status()}</div>
       </Show>

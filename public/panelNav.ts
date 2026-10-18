@@ -36,7 +36,7 @@ export function renderPanelNav({
   const nav = document.getElementById('panel-nav')!;
   nav.innerHTML = `
     <button class="panel-nav-btn" id="panel-prev" aria-label="Previous game" title="Previous game (↑)">↑</button>
-    <span class="panel-nav-pos" aria-live="polite"></span>
+    <output class="panel-nav-pos" aria-live="polite"></output>
     <button class="panel-nav-btn" id="panel-next" aria-label="Next game" title="Next game (↓)">↓</button>
     <button class="panel-nav-btn panel-nav-reroll" id="panel-reroll" aria-label="Pick a random game" title="Pick a random game (R)">🎲<span class="panel-nav-kbd">R</span></button>
   `;

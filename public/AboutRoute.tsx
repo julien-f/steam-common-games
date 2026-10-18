@@ -10,16 +10,16 @@ export default function AboutRoute() {
     <div class="container">
       <ListHero title="About" />
 
-      <div class="card">
+      <section class="card">
         <h2>About</h2>
         <p class="card-subtitle">
           steam.isonoe.net compares Steam libraries across players and helps you browse a single library, with ratings,
           playtime, and completion-time estimates. It's a small personal project, not affiliated with or endorsed by
           Valve, Steam, HowLongToBeat, or ProtonDB.
         </p>
-      </div>
+      </section>
 
-      <div class="card">
+      <section class="card">
         <h2>Data sources</h2>
         <ol class="how-steps">
           <li>
@@ -43,9 +43,9 @@ export default function AboutRoute() {
             free API key; the page shows a clear message if one isn't configured.
           </li>
         </ol>
-      </div>
+      </section>
 
-      <div class="card">
+      <section class="card">
         <h2>What's stored</h2>
         <p class="card-subtitle">
           Only public Steam profile data (Steam ID, name, avatar, owned games/playtime) and the ratings/tags/
@@ -54,9 +54,9 @@ export default function AboutRoute() {
           Nothing else is collected: no accounts, no passwords, no analytics or tracking, and no data is shared with
           anyone beyond the API calls needed to show you the page.
         </p>
-      </div>
+      </section>
 
-      <div class="card">
+      <section class="card">
         <h2>Contact</h2>
         <p class="card-subtitle">
           Questions, or want data related to your profile removed from the cache? Open an issue on{' '}
@@ -65,7 +65,7 @@ export default function AboutRoute() {
           </a>
           .
         </p>
-      </div>
+      </section>
     </div>
   );
 }

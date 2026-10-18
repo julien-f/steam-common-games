@@ -733,7 +733,7 @@ function TagCloud(props: {
   const seenKinds = createMemo(() => [...new Set(present().map((gr) => gr.kind))]);
   return (
     <Show when={present().length}>
-      <div class="panel-section panel-section--meta panel-card">
+      <section class="panel-section panel-section--meta panel-card">
         <h3 class="panel-section-title">Tags &amp; details</h3>
         <div class="panel-tags">
           <For each={pills()}>
@@ -783,7 +783,7 @@ function TagCloud(props: {
             )}
           </For>
         </div>
-      </div>
+      </section>
     </Show>
   );
 }
@@ -1095,6 +1095,15 @@ function CollapsibleCard(props: {
   );
 }
 
+// A YYYY-MM-DD date as a <time>, readable by machines; anything else (a coarse "Q4 2026") as plain text.
+function DayText(props: { text: string }): JSX.Element {
+  return (
+    <Show when={/^\d{4}-\d{2}-\d{2}$/.test(props.text)} fallback={props.text}>
+      <time datetime={props.text}>{props.text}</time>
+    </Show>
+  );
+}
+
 // Steam's own percent strings already carry a decimal (e.g. "80.9"), but round numbers
 // parse to a plain integer (100 from "100.0") — toFixed(1) on those would print "100.0%",
 // so only force the decimal when the value isn't already a whole number.
@@ -1242,7 +1251,7 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
       when={panelData.achievements.loading}
       fallback={
         <Show when={achievementsShown()}>
-          <div class="panel-section" id="panel-section-achievements">
+          <section class="panel-section" id="panel-section-achievements">
             <Show
               when={data()}
               fallback={
@@ -1280,16 +1289,16 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
                 </Show>
               )}
             </Show>
-          </div>
+          </section>
         </Show>
       }
     >
-      <div class="panel-section" id="panel-section-achievements">
+      <section class="panel-section" id="panel-section-achievements">
         <h3 class="panel-section-title">Achievements</h3>
         <div class="panel-achievements">
           <span class="sk" style={{ width: '100%', height: '48px', 'border-radius': '6px' }} />
         </div>
-      </div>
+      </section>
     </Show>
   );
 }
@@ -1308,11 +1317,11 @@ function OwnersSection(): JSX.Element {
   const maxMinutes = createMemo(() => Math.max(...sorted().map((o) => o.minutes), 1));
   return (
     <Show when={sorted().length > 0}>
-      <div class="panel-section panel-card" id="panel-section-owners">
+      <section class="panel-section panel-card" id="panel-section-owners">
         <div class="panel-section-title">
           <h3>Owned by</h3> <span class="panel-section-subtitle">most recently played first</span>
         </div>
-        <div class="panel-owners">
+        <ul class="panel-owners">
           <For each={sorted()}>
             {(o) => {
               const lastPlayed = fmtLastPlayed(o.lastPlayedSec);
@@ -1324,10 +1333,12 @@ function OwnersSection(): JSX.Element {
               // when there's no playtime either.
               const lastPlayedText = lastPlayed || (o.minutes > 0 ? 'last played unknown' : 'never played');
               return (
-                <div class="panel-owner">
+                <li class="panel-owner">
                   <div class="panel-owner-top">
                     <span class="panel-owner-name">{o.name}</span>
-                    <span class="panel-owner-lastplayed">{lastPlayedText}</span>
+                    <span class="panel-owner-lastplayed">
+                      <DayText text={lastPlayedText} />
+                    </span>
                   </div>
                   <div class="panel-owner-meter-track">
                     <div
@@ -1336,12 +1347,12 @@ function OwnersSection(): JSX.Element {
                     />
                   </div>
                   <span class="panel-owner-playtime">{playtime ? `${playtime} played` : 'not played'}</span>
-                </div>
+                </li>
               );
             }}
           </For>
-        </div>
-      </div>
+        </ul>
+      </section>
     </Show>
   );
 }
@@ -1365,7 +1376,7 @@ function NewsSection(props: { game: ReadonlyGame }): JSX.Element {
         // keeps a previous successful load rather than wiping it) is worth a visible message rather
         // than silently looking identical to a game with no news at all.
         <Show when={newsShown()}>
-          <div class="panel-section" id="panel-section-news">
+          <section class="panel-section" id="panel-section-news">
             <Show
               when={items()}
               fallback={
@@ -1400,7 +1411,7 @@ function NewsSection(props: { game: ReadonlyGame }): JSX.Element {
                             >
                               <span class="panel-news-title">{n.title}</span>
                               <span class="panel-news-meta">
-                                {fmtLastPlayed(n.date)}
+                                <DayText text={fmtLastPlayed(n.date)} />
                                 {n.feedLabel ? ` · ${n.feedLabel}` : ''}
                               </span>
                             </a>
@@ -1414,14 +1425,14 @@ function NewsSection(props: { game: ReadonlyGame }): JSX.Element {
                 />
               )}
             </Show>
-          </div>
+          </section>
         </Show>
       }
     >
-      <div class="panel-section" id="panel-section-news">
+      <section class="panel-section" id="panel-section-news">
         <h3 class="panel-section-title">News</h3>
         <span class="sk" style={{ display: 'block', width: '100%', height: '48px', 'border-radius': '6px' }} />
-      </div>
+      </section>
     </Show>
   );
 }
@@ -1513,7 +1524,7 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
       when={panelData.price.loading}
       fallback={
         <Show when={p() !== undefined}>
-          <div class="panel-section panel-card" id="panel-section-price">
+          <section class="panel-section panel-card" id="panel-section-price">
             <div class="panel-section-title">
               <h3>Price</h3>{' '}
               <a href={`https://isthereanydeal.com/steam/app/${props.game.appid}`} target="_blank" rel="noopener">
@@ -1577,14 +1588,14 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
               </Show>
             </Show>
             <PanelBundleLines />
-          </div>
+          </section>
         </Show>
       }
     >
-      <div class="panel-section panel-card" id="panel-section-price">
+      <section class="panel-section panel-card" id="panel-section-price">
         <h3 class="panel-section-title">Price</h3>
         <span class="sk" style={{ display: 'block', width: '100%', height: '32px', 'border-radius': '6px' }} />
-      </div>
+      </section>
     </Show>
   );
 }
@@ -1601,45 +1612,49 @@ function PanelBundleLines(): JSX.Element {
         <Show when={panelData.bundles()?.length === 0}>
           <div class="panel-no-data">Not in any current bundle.</div>
         </Show>
-        <For each={panelData.bundles()}>
-          {(b) => {
-            const urgency = bundleUrgency(b.expiry);
-            const shopUrl = safeHref(b.url);
-            return (
-              <div class="panel-bundle">
-                <A class="panel-bundle-title" href={`/lists/bundle/${b.id}`}>
-                  📦 {b.title}
-                </A>
-                <div class="panel-bundle-meta">
-                  <Show when={b.shop}>
-                    <Show when={shopUrl} fallback={<span>{b.shop}</span>}>
-                      <a href={shopUrl!} target="_blank" rel="noopener">
-                        {b.shop} ↗
-                      </a>
-                    </Show>
-                    <span class="panel-price-sep">·</span>
-                  </Show>
-                  <span title={b.tierPriceMax != null ? TIER_RANGE_TITLE : undefined}>{bundleTierText(b)}</span>
-                  <Show when={b.expiry}>
-                    <span class="panel-price-sep">·</span>
-                    <span
-                      style={
-                        urgency?.tier === 'urgent'
-                          ? { color: scoreColor(20) }
-                          : urgency?.tier === 'soon'
-                            ? { color: scoreColor(55) }
-                            : {}
-                      }
-                    >
-                      ends {fmtBundleDateTime(b.expiry)}
-                      {urgency?.label ? ` (${urgency.label})` : ''}
-                    </span>
-                  </Show>
-                </div>
-              </div>
-            );
-          }}
-        </For>
+        <Show when={panelData.bundles()?.length}>
+          <ul class="panel-bundle-list">
+            <For each={panelData.bundles()}>
+              {(b) => {
+                const urgency = bundleUrgency(b.expiry);
+                const shopUrl = safeHref(b.url);
+                return (
+                  <li class="panel-bundle">
+                    <A class="panel-bundle-title" href={`/lists/bundle/${b.id}`}>
+                      📦 {b.title}
+                    </A>
+                    <div class="panel-bundle-meta">
+                      <Show when={b.shop}>
+                        <Show when={shopUrl} fallback={<span>{b.shop}</span>}>
+                          <a href={shopUrl!} target="_blank" rel="noopener">
+                            {b.shop} ↗
+                          </a>
+                        </Show>
+                        <span class="panel-price-sep">·</span>
+                      </Show>
+                      <span title={b.tierPriceMax != null ? TIER_RANGE_TITLE : undefined}>{bundleTierText(b)}</span>
+                      <Show when={b.expiry}>
+                        <span class="panel-price-sep">·</span>
+                        <span
+                          style={
+                            urgency?.tier === 'urgent'
+                              ? { color: scoreColor(20) }
+                              : urgency?.tier === 'soon'
+                                ? { color: scoreColor(55) }
+                                : {}
+                          }
+                        >
+                          ends <time datetime={b.expiry!}>{fmtBundleDateTime(b.expiry)}</time>
+                          {urgency?.label ? ` (${urgency.label})` : ''}
+                        </span>
+                      </Show>
+                    </div>
+                  </li>
+                );
+              }}
+            </For>
+          </ul>
+        </Show>
       </div>
     </Show>
   );
@@ -1705,10 +1720,12 @@ function DlcItem(props: { d: DlcEntry }): JSX.Element {
     navigateToGame(props.d.appid, props.d.name);
   };
   return (
-    <a class="panel-dlc-item" href={withAccountParam(`/game/${props.d.appid}`)} onClick={onClick}>
-      <img class="panel-dlc-capsule" src={props.d.capsule} alt="" loading="lazy" />
-      <span class="panel-dlc-name">{props.d.name}</span>
-    </a>
+    <li>
+      <a class="panel-dlc-item" href={withAccountParam(`/game/${props.d.appid}`)} onClick={onClick}>
+        <img class="panel-dlc-capsule" src={props.d.capsule} alt="" loading="lazy" />
+        <span class="panel-dlc-name">{props.d.name}</span>
+      </a>
+    </li>
   );
 }
 
@@ -1735,7 +1752,9 @@ function DlcSection(props: { game: ReadonlyGame }): JSX.Element {
       const remaining = panelData.dlcShown() - done.length;
       return (
         <div class="panel-dlc-list">
-          <For each={done}>{(d) => <DlcItem d={d} />}</For>
+          <ul>
+            <For each={done}>{(d) => <DlcItem d={d} />}</For>
+          </ul>
           <Show when={remaining}>{(n) => <div class="panel-dlc-loading-more">Loading {n()} more…</div>}</Show>
         </div>
       );
@@ -1751,7 +1770,9 @@ function DlcSection(props: { game: ReadonlyGame }): JSX.Element {
     const notShown = dlcIds().length - panelData.dlcShown();
     return entries.length ? (
       <div class="panel-dlc-list">
-        <For each={sortDlcByRelease(entries)}>{(d) => <DlcItem d={d} />}</For>
+        <ul>
+          <For each={sortDlcByRelease(entries)}>{(d) => <DlcItem d={d} />}</For>
+        </ul>
         <Show when={notShown > 0}>
           <button type="button" class="panel-dlc-more" onClick={() => panelData.showMoreDlc(props.game.appid)}>
             {notShown > DLC_PAGE ? `Show ${DLC_PAGE} more of ${notShown}` : `Show ${notShown} more`}
@@ -1767,7 +1788,7 @@ function DlcSection(props: { game: ReadonlyGame }): JSX.Element {
 
   return (
     <Show when={dlcIds().length}>
-      <div class="panel-section" id="panel-section-dlc">
+      <section class="panel-section" id="panel-section-dlc">
         <CollapsibleCard
           appid={props.game.appid}
           section="dlc"
@@ -1781,7 +1802,7 @@ function DlcSection(props: { game: ReadonlyGame }): JSX.Element {
           linkHref={`https://store.steampowered.com/dlc/${props.game.appid}/`}
           linkTitle="View all DLC on Steam"
         />
-      </div>
+      </section>
     </Show>
   );
 }
@@ -1981,7 +2002,7 @@ function HltbSection(props: { game: ReadonlyGame }): JSX.Element {
 
   return (
     <Show when={present()}>
-      <div class="panel-section" id="panel-section-hltb">
+      <section class="panel-section" id="panel-section-hltb">
         <CollapsibleCard
           appid={props.game.appid}
           section="hltb"
@@ -1993,38 +2014,38 @@ function HltbSection(props: { game: ReadonlyGame }): JSX.Element {
           }
           body={
             <div class="panel-collapsible-body-pad">
-              <div class="panel-hltb">
+              <dl class="panel-hltb">
                 <Show when={h()?.main}>
                   {(v) => (
                     <div class="panel-hltb-item">
-                      <div class="panel-hltb-label">Main Story</div>
-                      <div class="panel-hltb-val">{fmtH(v())}</div>
+                      <dt class="panel-hltb-label">Main Story</dt>
+                      <dd class="panel-hltb-val">{fmtH(v())}</dd>
                     </div>
                   )}
                 </Show>
                 <Show when={h()?.extra}>
                   {(v) => (
                     <div class="panel-hltb-item">
-                      <div class="panel-hltb-label">Main + Extra</div>
-                      <div class="panel-hltb-val">{fmtH(v())}</div>
+                      <dt class="panel-hltb-label">Main + Extra</dt>
+                      <dd class="panel-hltb-val">{fmtH(v())}</dd>
                     </div>
                   )}
                 </Show>
                 <Show when={h()?.completionist}>
                   {(v) => (
                     <div class="panel-hltb-item">
-                      <div class="panel-hltb-label">Completionist</div>
-                      <div class="panel-hltb-val">{fmtH(v())}</div>
+                      <dt class="panel-hltb-label">Completionist</dt>
+                      <dd class="panel-hltb-val">{fmtH(v())}</dd>
                     </div>
                   )}
                 </Show>
-              </div>
+              </dl>
             </div>
           }
           linkHref={h()?.id ? `https://howlongtobeat.com/game/${h()!.id}` : null}
           linkTitle="View on HowLongToBeat"
         />
-      </div>
+      </section>
     </Show>
   );
 }
@@ -2131,7 +2152,7 @@ function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
   return (
     // A tagless game still gets its More from line.
     <Show when={!props.game.loading && (hasTags() || gameCreators(props.game.details?.meta).length)}>
-      <div class="panel-section panel-card" id="panel-section-similar">
+      <section class="panel-section panel-card" id="panel-section-similar">
         <div class="panel-section-title">
           <h3>{shown() ? `Similar in ${accountDisplayLabel(account()!)}'s library` : 'Similar games'}</h3>{' '}
           <a href={steamMoreLikeUrl(props.game.appid)} target="_blank" rel="noopener">
@@ -2182,7 +2203,7 @@ function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
               : '⇅ Sort list by similarity'}
           </button>
         </Show>
-      </div>
+      </section>
     </Show>
   );
 }
@@ -2464,7 +2485,7 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
             </h2>
             <Show when={releaseDate() || hasBaseGame()}>
               <div class="panel-release">
-                {fmtReleaseDate(releaseDate()!)}
+                <Show when={releaseDate()}>{(r) => <DayText text={fmtReleaseDate(r())} />}</Show>
                 <Show when={releaseDate() && hasBaseGame()}>
                   <span class="panel-meta-sep"> · </span>
                 </Show>
@@ -2531,9 +2552,9 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
         <PriceSection game={g} />
       </Show>
       <Show when={description()}>
-        <div class="panel-desc panel-card" id="panel-desc">
+        <p class="panel-desc panel-card" id="panel-desc">
           {decodedDescription()}
-        </div>
+        </p>
       </Show>
       <TagCloudSection game={g} />
       <SimilarSection game={g} />
