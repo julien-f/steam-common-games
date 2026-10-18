@@ -29,6 +29,9 @@
     --fs-title: 16px;
     --fs-page: 18px;
     --fs-figure: 20px;
+    /* Self-hosted (AppRoot.tsx imports them); the fallbacks only show until they load. */
+    --font-sans: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
     /* The side panel's width, and the gutter `.app-shell.panel-open` reserves for it — one
      value, since the panel is `position: fixed` and no longer measures the layout itself. */
     --panel-w: 380px;
@@ -37,11 +40,7 @@
   body {
     background: var(--bg0);
     color: var(--text0);
-    font-family:
-      'Segoe UI',
-      system-ui,
-      -apple-system,
-      sans-serif;
+    font-family: var(--font-sans);
     font-size: var(--fs-body);
     min-height: 100vh;
   }
@@ -1802,6 +1801,7 @@
     font-size: var(--fs-title);
     font-weight: 600;
     color: var(--text0);
+    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
   }
   .panel-price-discount {
@@ -2158,6 +2158,7 @@
   .panel-achievement-rarity {
     font-size: var(--fs-label);
     color: var(--text1);
+    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
     margin-left: 8px;
@@ -2205,6 +2206,7 @@
   }
   .panel-similar-score {
     color: var(--text1);
+    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
   }
@@ -2447,6 +2449,7 @@
   .lb-vc-dur {
     color: rgba(255, 255, 255, 0.85);
     font-size: var(--fs-meta);
+    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
     user-select: none;
@@ -4646,6 +4649,7 @@
     gap: 8px;
   }
   .rank-card-rating {
+    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
   }
   .rank-card-facts,

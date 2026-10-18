@@ -1,5 +1,6 @@
 @layer reset, base, legacy, layout, components;
 
 /* Each partial wraps itself in its layer, except the table library's overrides. */
+@import './styles/base.css';
 @import './styles/legacy.css';
 @import './styles/vendor-data-table.css';

@@ -53,6 +53,7 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 
 - Sizes come from the `--fs-*` scale in `styles/legacy.css`'s `:root` (caps labels, meta and chips, tables and controls, prose, card titles, page titles, big figures); px sizes are for icon glyphs only. `test/typeScale.test.js` enforces it for the app's own CSS, not the table library's.
 - Two weights: 400, and 600 for emphasis.
+- Two faces, self-hosted: Geist (`--font-sans`) for text; Geist Mono (`--font-mono`) with tabular figures for a figure standing alone (`<time>`, `<output>`, a price, a score, a duration). Table cells stay in Geist, with tabular figures, since a cell can't be told numeric from CSS.
 
 ## Checklist for a new UI feature
 

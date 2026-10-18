@@ -62,6 +62,8 @@ module.exports = defineConfig({
     // browser's concerned, so localStorage/cookies/auth silently reset each time.
     port: 58991,
     strictPort: true,
+    // Vite serves only from public/ (it holds a package.json) by default; the fonts' woff2 files sit in node_modules.
+    fs: { allow: [__dirname + '/public', __dirname + '/node_modules/@fontsource-variable'] },
     proxy: mock
       ? undefined
       : {

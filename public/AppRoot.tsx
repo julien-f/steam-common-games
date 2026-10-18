@@ -14,6 +14,8 @@
 // table/nav beside the panel at all) is gone; ListRoute renders it as kind 'recent' the same way
 // it renders /lists/owned etc., just with `params.appid` acting as an initial focus rather than
 // nothing. `/game` bare (no id) is the plain "browse recents" entry point Home links to.
+import '@fontsource-variable/geist';
+import '@fontsource-variable/geist-mono';
 import { lazy } from 'solid-js';
 import { render } from 'solid-js/web';
 import { Router, Route } from '@solidjs/router';
