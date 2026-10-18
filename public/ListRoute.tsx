@@ -883,8 +883,9 @@ export default function ListRoute() {
   // hero's formula line and the per-group table headings; empty until the resolve lands, which is
   // what keeps a half-built "A ∪ = 0" off the screen in the meantime.
   // `leftOut`: a bundle source's games with no Steam listing, which no list can hold.
+  // `capped`: a developer/publisher source holding only Steam's first page of results.
   const [listSources, setListSources] = createSignal<
-    { key: string; count: number; desc: RefDescription; leftOut?: number }[]
+    { key: string; count: number; desc: RefDescription; leftOut?: number; capped?: number }[]
   >([]);
   // kind === 'user', ranked lists only — its resolved source and stored ranking, backing the Rank
   // column, the Ranked tile and the Re-rank/Exclude row actions.
@@ -2044,6 +2045,7 @@ export default function ListRoute() {
       setHeroAccount(null);
     }
     bundleLeftOut = new Map();
+    creatorCapped = new Map();
     // Every kind that has one re-reports it during this load; a kind that doesn't (manual list,
     // recents) must not keep showing the previous list's. A refresh keeps both until replaced, so
     // a failed one leaves the Updated tile and the formula line to try again from.
@@ -2100,7 +2102,12 @@ export default function ListRoute() {
       (list: GameList, naming: ListNaming) =>
       (sources: ResolvedSource[]): ReturnType<typeof listSources> => {
         const described = describeSources(list, naming);
-        return sources.map((source, i) => ({ ...source, desc: described[i], leftOut: leftOutOf(list, i) }));
+        return sources.map((source, i) => ({
+          ...source,
+          desc: described[i],
+          leftOut: leftOutOf(list, i),
+          capped: cappedOf(list, i),
+        }));
       };
 
     if (kind === 'compare') {
@@ -2217,6 +2224,7 @@ export default function ListRoute() {
           refresh,
           onFetchedAt,
           onBundleLeftOut: noteLeftOut,
+          onCreatorCapped: noteCapped,
           onBundleGames: (_bundleId, _bundle, games) => {
             if (!loadGuard.isStale(gen)) collectTiers(games);
           },
@@ -2257,6 +2265,7 @@ export default function ListRoute() {
             refresh,
             onFetchedAt,
             onBundleLeftOut: noteLeftOut,
+            onCreatorCapped: noteCapped,
             onBundleGames: (bundleId, bundle, games) => {
               if (loadGuard.isStale(gen)) return;
               setSharedBundles((prev) =>
@@ -2760,14 +2769,11 @@ export default function ListRoute() {
       },
     ),
   );
-  // "What does this add?": the bundle minus the current account's Owned, as an unsaved shared list.
-  function bundleAddsHref(): string | null {
+  // "What does this add?" / "What don't I own?": `ref` minus the current account's Owned, as an unsaved shared list.
+  function notOwnedHref(ref: ListRef): string | null {
     const account = getEffectiveCurrentAccount();
-    if (!account || !params.bundleId) return null;
-    const sources: ListRef[] = [
-      { kind: 'bundle', bundleId: params.bundleId },
-      { kind: 'account-owned', accountId: account.id },
-    ];
+    if (!account) return null;
+    const sources: ListRef[] = [ref, { kind: 'account-owned', accountId: account.id }];
     const result = encodeListFormula({ op: 'subtract', sources }, () => undefined);
     return result.ok ? withAccountParam(shareListUrl(result.formula), routerLocation.search) : null;
   }
@@ -2930,7 +2936,7 @@ export default function ListRoute() {
             ? "How old the server's cached copy of this account's list is — click to force a fresh fetch"
             : kind === 'creator'
               ? "How old the server's copy of Steam's search is — click to search again"
-              : 'How old the oldest library this list was built from is — click to re-fetch them all',
+              : 'How old the oldest source this list was built from is — click to re-fetch them all',
         // This tile *is* the ↻ Refresh the actions row used to carry: the staleness is stated
         // here, so this is where the reader already is when they decide to do something about it.
         // Prices keep their own age and refresh (a different fetch) on the Prices tile's own
@@ -3006,6 +3012,17 @@ export default function ListRoute() {
     const ref = listDeps(list)[i];
     return ref?.kind === 'bundle' && ref.bundleId ? bundleLeftOut.get(ref.bundleId) : undefined;
   }
+  // Per load: each capped developer/publisher source's total on Steam (createDefaultFetchers' onCreatorCapped).
+  let creatorCapped = new Map<string, number>();
+  function noteCapped(role: CreatorRole, name: string, _shown: number, total: number): void {
+    creatorCapped.set(`${role}:${name}`, total);
+  }
+  function cappedOf(list: GameList, i: number): number | undefined {
+    const ref = listDeps(list)[i];
+    return ref?.kind === 'developer' || ref?.kind === 'publisher'
+      ? creatorCapped.get(`${ref.kind}:${ref.name}`)
+      : undefined;
+  }
   function formulaNote(list: GameList): JSX.Element | undefined {
     const sources = listSources();
     if (!sources.length) return undefined;
@@ -3029,6 +3046,16 @@ export default function ListRoute() {
                     {(n) => (
                       <span class="list-formula-leftout" title="Games in this bundle with no Steam listing">
                         ({n()} not on Steam, left out)
+                      </span>
+                    )}
+                  </Show>
+                  <Show when={source.capped}>
+                    {(total) => (
+                      <span
+                        class="list-formula-leftout"
+                        title="Steam's search returns its most relevant games first; only these count here"
+                      >
+                        (first {source.count} of about {total()})
                       </span>
                     )}
                   </Show>
@@ -3345,23 +3372,38 @@ export default function ListRoute() {
                 </a>
               )}
             </Show>
-            <Show when={bundleResolvedCount() > 0 && bundleAddsHref()}>
-              <A
-                class="btn btn-ghost btn-sm"
-                href={bundleAddsHref()!}
-                title="This bundle's games minus the ones you own — save it as a list from there"
-                onClick={() =>
-                  rememberBundle(
-                    params.bundleId!,
-                    heroTitle(),
-                    (resolvedBundleGames ?? []).map((g) => g.appid),
-                  )
-                }
-              >
-                What does this add?
-              </A>
+            <Show when={bundleResolvedCount() > 0 && notOwnedHref({ kind: 'bundle', bundleId: params.bundleId })}>
+              {(href) => (
+                <A
+                  class="btn btn-ghost btn-sm"
+                  href={href()}
+                  title="This bundle's games minus the ones you own — save it as a list from there"
+                  onClick={() =>
+                    rememberBundle(
+                      params.bundleId!,
+                      heroTitle(),
+                      (resolvedBundleGames ?? []).map((g) => g.appid),
+                    )
+                  }
+                >
+                  What does this add?
+                </A>
+              )}
             </Show>
           </>
+        )}
+        {kind === 'creator' && (
+          <Show when={!!creatorResult()?.total && notOwnedHref({ kind: creatorRole(), name: creatorName() })}>
+            {(href) => (
+              <A
+                class="btn btn-ghost btn-sm"
+                href={href()}
+                title={`This ${creatorRole()}'s games minus the ones you own — save it as a list from there`}
+              >
+                What don't I own?
+              </A>
+            )}
+          </Show>
         )}
       </>
     );
