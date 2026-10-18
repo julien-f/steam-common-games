@@ -88,8 +88,8 @@ test('scoreColor: 64 returns orange (third tier)', () => {
 });
 
 test('scoreColor: 49 returns red (bottom tier)', () => {
-  assert.equal(scoreColor(49), '#cc5050');
-  assert.equal(scoreColor(0), '#cc5050');
+  assert.equal(scoreColor(49), '#e5736b');
+  assert.equal(scoreColor(0), '#e5736b');
 });
 
 // ── fmtH ─────────────────────────────────────────────────────────────────────

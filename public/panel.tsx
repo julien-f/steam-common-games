@@ -972,7 +972,8 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
           />
         )
       );
-    const color = PROTON_TIER_COLORS[pd.tier] || '#52525b';
+    // The tier's badge colour, lightened to read as text on the panel's dark ground.
+    const color = `color-mix(in srgb, ${PROTON_TIER_COLORS[pd.tier] || '#52525b'} 60%, var(--text))`;
     // Kept short (no "reports"/"confidence" words) — the glance chip's one-line caption truncates
     // rather than wraps, and "strong · 336" already reads fine without them.
     const detail = [pd.confidence, pd.total ? fmtCompactCount(pd.total) : ''].filter(Boolean).join(' · ');

@@ -7,31 +7,20 @@
     padding: 0;
   }
 
+  /* Bridge: the old palette's names, pointed at the new tokens (styles/base.css) until each area is
+     rebuilt on them. */
   :root {
-    color-scheme: dark;
-    --bg0: #1b2838;
-    --bg1: #2a475e;
-    --bg2: #1e3a5f;
-    --bg3: #17212b;
-    --text0: #c6d4df;
-    --text1: #8f98a0;
-    --text2: #4c6b8a; /* placeholders, disabled and decoration only: ~2.7:1, under AA for text */
-    --stat-label: #b0bac3; /* 4.9:1 on --bg1, where --text1 is 3.3:1 */
-    --accent: #1a9fff;
-    --accent2: #66c0f4;
-    --border: #3d5068;
-    --r: 6px;
-    /* The type scale (docs/dev/ui-guidelines.md); px sizes are left only to icon glyphs, 22px and up. */
-    --fs-label: 11px;
-    --fs-meta: 12px;
-    --fs-ui: 13px;
-    --fs-body: 14px;
-    --fs-title: 16px;
-    --fs-page: 18px;
-    --fs-figure: 20px;
-    /* Self-hosted (AppRoot.tsx imports them); the fallbacks only show until they load. */
-    --font-sans: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
-    --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+    --bg0: var(--bg);
+    --bg1: var(--line);
+    --bg2: var(--surface);
+    --bg3: var(--surface-2);
+    --text0: var(--text);
+    --text1: var(--muted);
+    --text2: var(--muted);
+    --stat-label: var(--muted);
+    --accent2: var(--accent);
+    --border: var(--line-control);
+    --r: var(--radius-2);
     /* The side panel's width, and the gutter `.app-shell.panel-open` reserves for it — one
      value, since the panel is `position: fixed` and no longer measures the layout itself. */
     --panel-w: 380px;
@@ -383,7 +372,7 @@
 
   .btn-primary {
     background: var(--accent);
-    color: #fff;
+    color: var(--bg);
   }
 
   /* The ⧉ button CopyButton.tsx renders — currently the "copy this account's Steam identifier"
@@ -1371,7 +1360,7 @@
   .panel-subnav-btn.active {
     background: var(--accent);
     border-color: var(--accent);
-    color: #fff;
+    color: var(--bg);
   }
 
   .panel-icon-links {
@@ -2092,7 +2081,7 @@
   .panel-achievements-filter-btn.active {
     background: var(--accent);
     border-color: var(--accent);
-    color: #fff;
+    color: var(--bg);
   }
 
   /* collapsibleCard() (panel.js) is shared by achievements, HLTB breakdown, and news, but
@@ -2175,7 +2164,7 @@
     display: inline-flex;
     align-items: center;
     min-height: 24px; /* the touch-target minimum (ui-guidelines.md), kept on plain tags so a row reads even */
-    background: rgba(61, 80, 104, 0.5);
+    background: var(--line);
     border: 1px solid var(--border);
     color: var(--text1);
     font-size: var(--fs-label);
@@ -2214,7 +2203,7 @@
     margin-top: 8px;
     padding: 3px 8px;
     min-height: 24px;
-    background: rgba(61, 80, 104, 0.5);
+    background: var(--line);
     border: 1px solid var(--border);
     border-radius: 3px;
     color: var(--text1);
@@ -3741,7 +3730,7 @@
   .list-plays-mostly-tag {
     min-height: 24px;
     padding: 3px 8px;
-    background: rgba(61, 80, 104, 0.5);
+    background: var(--line);
     border: 1px solid var(--border);
     border-radius: 3px;
     color: var(--text0);
@@ -4175,7 +4164,7 @@
   .home-account form button[type='submit'] {
     background: var(--accent);
     border-color: var(--accent);
-    color: #fff;
+    color: var(--bg);
   }
   .home-account form button:disabled {
     opacity: 0.6;
@@ -4438,7 +4427,7 @@
     border: none;
     border-radius: var(--r);
     background: var(--accent);
-    color: #fff;
+    color: var(--bg);
     font-size: var(--fs-ui);
     font-weight: 400;
     cursor: pointer;
@@ -4748,7 +4737,7 @@
     z-index: 100;
     padding: 6px 12px;
     background: var(--accent);
-    color: #fff;
+    color: var(--bg);
     border-radius: var(--r);
   }
   .skip-link:focus {

@@ -107,7 +107,7 @@ test("B1 edge: /bundles' filter tiles look like toggles, unlike the plain figure
   await toggle.click();
   await page.mouse.move(0, 0);
   const pressed = page.locator('.list-stat-btn[aria-pressed="true"]').first();
-  await expect(pressed).toHaveCSS('border-top-color', 'rgb(102, 192, 244)'); // --accent2
+  await expect(pressed).toHaveCSS('border-top-color', 'rgb(217, 165, 91)'); // --accent
   await expect(pressed).toHaveCSS('box-shadow', /inset/);
   // Hover and focus show on a pressed chip too.
   const pressedRest = (await chrome(pressed)).shadow;

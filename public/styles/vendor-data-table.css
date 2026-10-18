@@ -1,24 +1,20 @@
 /* Unlayered, and imported last: @vates/data-table-solid injects an unlayered <style>, which beats
    any layered rule (pitfalls.md). */
 
-/* Themes @vates/data-table-solid's own internals (its portaled column/filter/group submenus
-   render onto <body>, outside .table-container entirely, so this has to live on html:root —
-   an actual DOM ancestor of the portal — for the custom properties to inherit; a page-scoped
-   selector with higher specificity wouldn't reach a portal mounted as a sibling of <body>).
-   Ported verbatim from the legacy library.html/bundles.html inline <style> blocks (see
-   docs/dev/frontend.md) — both carried this identical block; it's now the one
-   shared copy every list route's table draws from instead of two duplicates. */
+/* Themes @vates/data-table-solid's own internals on html:root: its column/filter/group submenus
+   are portaled onto <body>, outside .table-container, so only an actual ancestor reaches them. */
 html:root {
-  --color-background-primary: #17212b;
-  --color-background-secondary: #2a475e;
-  --color-text-primary: #c6d4df;
-  --color-text-secondary: #8f98a0;
-  --color-text-tertiary: #4c6b8a;
-  --color-border-secondary: #3d5068;
-  --color-border-tertiary: #2a3f57;
-  --color-background-info: #0d2640;
-  --color-text-info: #66c0f4;
-  --color-border-info: #1a4070;
+  --color-background-primary: var(--surface);
+  --color-background-secondary: var(--line);
+  --color-background-tertiary: var(--surface);
+  --color-text-primary: var(--text);
+  --color-text-secondary: var(--muted);
+  --color-text-tertiary: var(--muted);
+  --color-border-secondary: var(--line-control);
+  --color-border-tertiary: var(--line);
+  --color-background-info: color-mix(in srgb, var(--accent) 12%, var(--bg));
+  --color-text-info: var(--accent);
+  --color-border-info: color-mix(in srgb, var(--accent) 45%, var(--bg));
   --color-background-warning: #2a1900;
   --color-text-warning: #e8a040;
   --color-border-warning: #4a2c00;
@@ -34,7 +30,7 @@ html:root {
    At the very start/end of the scroll range the matching cover still masks its
    shadow; scroll past it and the cover moves out of the way, revealing the shadow —
    so the fade only ever shows on the side there's still more to scroll toward. All
-   three pages' wraps sit directly on <body> (var(--bg0)), not a .card — Bundles used
+   three pages' wraps sit directly on <body> (var(--bg)), not a .card — Bundles used
    to nest its whole detail block (header + table) in one .card, which made the cover
    color (previously var(--bg1), matching that card) wrong everywhere else: it showed
    as a mismatched, distinctly-colored 20px strip at both edges of every row on the
@@ -44,7 +40,7 @@ html:root {
    is a transparent overlay on top of that, not a different base color). */
 .dt-table-wrap {
   background-image:
-    linear-gradient(to right, var(--bg0) 0%, var(--bg0) 100%), linear-gradient(to left, var(--bg0) 0%, var(--bg0) 100%),
+    linear-gradient(to right, var(--bg) 0%, var(--bg) 100%), linear-gradient(to left, var(--bg) 0%, var(--bg) 100%),
     linear-gradient(to right, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0)),
     linear-gradient(to left, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0));
   background-repeat: no-repeat;
@@ -61,12 +57,12 @@ html:root {
   background-attachment: local, local, scroll, scroll;
 }
 
-/* Darkens the data-table library's own header row a shade further than its themed
-   --color-background-secondary default.
-   Ported from the legacy pages' `#table-container .dt-th` rule — `.table-container` is
-   the new markup's equivalent wrapper (see ListRoute.tsx). */
+/* The header row on the page's own ground, in the scale's emphasis weight (the library's is 500). */
 .table-container .dt-th {
-  background: #0f1923;
+  background: var(--bg);
+}
+.dt-th {
+  font-weight: 600;
 }
 .dt-td {
   font-variant-numeric: tabular-nums;

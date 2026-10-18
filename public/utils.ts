@@ -124,7 +124,7 @@ export function scoreColor(n: number | null): string {
   if (n >= 80) return '#57cbde';
   if (n >= 65) return '#a3cf4e';
   if (n >= 50) return '#e4a82e';
-  return '#cc5050';
+  return '#e5736b';
 }
 
 // Shared money formatter — imported by public/gameColumns.js's price-column renderers (same as
