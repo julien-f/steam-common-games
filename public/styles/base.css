@@ -21,6 +21,18 @@
     /* What the account has: owned warns against buying twice, wishlisted is the one to buy. */
     --owned: var(--warn);
     --wishlisted: var(--good);
+    /* The panel's Tags & details dots, one per kind; each kind also has its own dot shape. */
+    --kind-tag: #b48cf2;
+    --kind-genre: #6f9cf0;
+    --kind-category: #48c9b0;
+    --kind-devpub: #e88fc4;
+    /* ProtonDB tiers, under white badge text. */
+    --tier-borked: #b91c1c;
+    --tier-bronze: #8b4513;
+    --tier-silver: #757575;
+    --tier-gold: #8a6a00;
+    --tier-platinum: #5b6b85;
+    --tier-native: #15803d;
     --radius-1: 4px;
     --radius-2: 6px;
     --radius-3: 8px;

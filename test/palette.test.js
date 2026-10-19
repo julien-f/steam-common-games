@@ -78,3 +78,13 @@ test('palette: the primary button keeps --bg text at 4.5:1, hovered too', () => 
   assert.ok(ratio(rgb(tokens.bg), rgb(tokens.accent)) >= 4.5);
   assert.ok(ratio(rgb(tokens.bg), mix(tokens.accent, 85, '#ffffff')) >= 4.5);
 });
+
+test("palette: the panel's tag-kind dots reach 3:1 on every ground", () => {
+  assert.deepEqual(below(['kind-tag', 'kind-genre', 'kind-category', 'kind-devpub'], 3), []);
+});
+
+test('palette: each ProtonDB tier keeps white badge text at 4.5:1', () => {
+  const tiers = ['borked', 'bronze', 'silver', 'gold', 'platinum', 'native'];
+  const low = tiers.filter((t) => !(ratio(rgb(tokens[`tier-${t}`]), rgb('#ffffff')) >= 4.5));
+  assert.deepEqual(low, []);
+});

@@ -1794,11 +1794,24 @@
     border-color: var(--accent);
     color: var(--text);
   }
+  /* Each kind its own shape, so the kinds don't differ by hue alone. */
   .panel-tag-dot {
     flex: none;
-    width: 6px;
-    height: 6px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
+  }
+  .panel-tag-dot--genres {
+    border-radius: 1px;
+  }
+  .panel-tag-dot--categories {
+    border-radius: 1px;
+    rotate: 45deg;
+    scale: 0.85;
+  }
+  .panel-tag-dot--devpub {
+    border-radius: 0;
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
   }
   .panel-tag-weight {
     position: absolute;

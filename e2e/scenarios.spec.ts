@@ -457,8 +457,7 @@ test('C1 edge: a tag filter ranks games by how strongly they carry the tag, unti
       .evaluateAll((boxes) => boxes.map((b) => b.getAttribute('aria-label')!.replace('Select row ', '')));
   const byRating = await names();
   await row(page, 'Portal 2').getByText('Portal 2').click();
-  // Tags lead the cloud, ahead of the category of the same name.
-  const coop = page.locator('.panel-tags').getByRole('button', { name: 'Co-op', exact: true }).first();
+  const coop = page.locator('.panel-tags').getByRole('button', { name: 'Co-op, tag', exact: true });
   await coop.click();
   await expect(page.getByRole('columnheader', { name: /Tag match/ })).toBeVisible();
   await expect.poll(names).toEqual(['Valheim', 'Terraria', 'Stardew Valley', 'Portal 2']);
@@ -471,7 +470,7 @@ test("C1 edge: the panel's Steam tags show how strongly players tagged the game 
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await row(page, 'Portal 2').getByText('Portal 2').click();
-  const coop = page.locator('.panel-tags').getByRole('button', { name: 'Co-op', exact: true }).first();
+  const coop = page.locator('.panel-tags').getByRole('button', { name: 'Co-op, tag', exact: true });
   await expect(coop).toHaveAttribute('title', "30% of the top tag's votes");
   const ratio = await coop.evaluate(
     (el) => el.querySelector('.panel-tag-weight')!.getBoundingClientRect().width / el.getBoundingClientRect().width,
@@ -611,7 +610,7 @@ test('C1 edge: a Tag match range keeps the games strongly tagged, and goes with 
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
-  const coop = page.locator('.panel-tags').getByRole('button', { name: 'Co-op', exact: true }).first();
+  const coop = page.locator('.panel-tags').getByRole('button', { name: 'Co-op, tag', exact: true });
   await row(page, 'Portal 2').getByText('Portal 2').click();
   await coop.click();
   await expect(rows(page)).toHaveCount(4);
@@ -2222,6 +2221,25 @@ test("F1 edge: the panel doesn't link an upstream URL that isn't http(s)", async
   const chip = page.locator('.panel-glance-chip', { hasText: 'Metacritic' });
   await expect(chip).toBeVisible();
   await expect(chip).not.toHaveAttribute('href', /.*/);
+});
+
+test("F1 edge: Tags & details names each chip's kind, and draws each kind's dot its own shape", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=620');
+  const chips = page.locator('.panel-tags').getByRole('button');
+  await expect(chips.first()).toBeVisible();
+  for (const name of ['Co-op, tag', 'Co-op, category'])
+    await expect(page.locator('.panel-tags').getByRole('button', { name, exact: true })).toBeVisible();
+  const names = await chips.evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')));
+  expect(new Set(names).size).toBe(names.length);
+  const shapes = await page.locator('.panel-tag-legend .panel-tag-dot').evaluateAll((dots) =>
+    dots.map((d) => {
+      const s = getComputedStyle(d);
+      return `${s.borderRadius} ${s.rotate} ${s.clipPath}`;
+    }),
+  );
+  expect(shapes.length).toBeGreaterThanOrEqual(3);
+  expect(new Set(shapes).size).toBe(shapes.length);
 });
 
 // A failed health check stops the panel before its price lookup, so each failure gets its own run.

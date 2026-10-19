@@ -46,6 +46,7 @@ import {
   formatMoney,
   compareByOrder,
   PROTON_TIER_COLORS,
+  PROTON_TIER_UNKNOWN,
   fadeInOnLoad,
 } from './utils.ts';
 import { convert } from './currency.ts';
@@ -131,7 +132,7 @@ function renderProtonBadge(v: unknown, row: Row): Node {
   if (isProtonMissing(v)) return document.createTextNode('—');
   const span = document.createElement('span');
   span.className = 'status-badge';
-  span.style.background = PROTON_TIER_COLORS[String(v).toLowerCase()] || '#52525b';
+  span.style.background = PROTON_TIER_COLORS[String(v).toLowerCase()] || PROTON_TIER_UNKNOWN;
   span.textContent = String(v);
   if (row?.protondbPending) {
     span.textContent += ' ?';

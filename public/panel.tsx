@@ -10,6 +10,7 @@ import {
   fmtLastPlayed,
   computeSteamdbRating,
   PROTON_TIER_COLORS,
+  PROTON_TIER_UNKNOWN,
   focusGameRow,
   fadeInOnLoad,
 } from './utils.ts';
@@ -806,10 +807,10 @@ function fmtCompactCount(n: number) {
 // kind but are two different filter dimensions.
 type TagKind = keyof typeof TAG_KIND_META;
 const TAG_KIND_META = {
-  tags: { label: 'Tag', color: '#d97757' },
-  genres: { label: 'Genre', color: '#66c0f4' },
-  categories: { label: 'Category', color: '#66c04f' },
-  devpub: { label: 'Developer/Publisher', color: '#b892d6' },
+  tags: { label: 'Tag', color: 'var(--kind-tag)' },
+  genres: { label: 'Genre', color: 'var(--kind-genre)' },
+  categories: { label: 'Category', color: 'var(--kind-category)' },
+  devpub: { label: 'Developer/Publisher', color: 'var(--kind-devpub)' },
 };
 
 // A Steam tag's `weights` entry (relative to the game's top tag) shows as a gauge along its pill's bottom edge.
@@ -831,7 +832,14 @@ function TagCloud(props: {
         <div class="panel-tags">
           <For each={pills()}>
             {({ kind, dim, v, w }) => {
-              const dot = <span class="panel-tag-dot" style={{ background: TAG_KIND_META[kind].color }} />;
+              const dot = (
+                <span
+                  class={`panel-tag-dot panel-tag-dot--${kind}`}
+                  style={{ background: TAG_KIND_META[kind].color }}
+                />
+              );
+              // "Action" can be both a tag and a genre: two chips a screen reader must tell apart.
+              const kindName = `${v}, ${TAG_KIND_META[kind].label.toLowerCase()}`;
               const title = w == null ? undefined : `${Math.round(w * 100)}% of the top tag's votes`;
               const gauge =
                 w == null ? null : (
@@ -846,7 +854,8 @@ function TagCloud(props: {
                   fallback={
                     <span class="panel-tag" title={title}>
                       {dot}
-                      {v}
+                      <span aria-hidden="true">{v}</span>
+                      <span class="visually-hidden">{kindName}</span>
                       {gauge}
                     </span>
                   }
@@ -855,6 +864,7 @@ function TagCloud(props: {
                     class="panel-tag panel-tag-btn"
                     classList={{ active: panelOptions.isTagActive(dim, v) }}
                     aria-pressed={panelOptions.isTagActive(dim, v)}
+                    aria-label={kindName}
                     title={title}
                     onClick={() => panelOptions.onTagClick(dim, v)}
                   >
@@ -871,7 +881,7 @@ function TagCloud(props: {
           <For each={seenKinds()}>
             {(k) => (
               <span class="panel-tag-legend-item">
-                <span class="panel-tag-dot" style={{ background: TAG_KIND_META[k].color }} />
+                <span class={`panel-tag-dot panel-tag-dot--${k}`} style={{ background: TAG_KIND_META[k].color }} />
                 {TAG_KIND_META[k].label}
               </span>
             )}
@@ -1022,7 +1032,7 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
         )
       );
     // The tier's badge colour, lightened to read as text on the panel's dark ground.
-    const color = `color-mix(in srgb, ${PROTON_TIER_COLORS[pd.tier] || '#52525b'} 60%, var(--text))`;
+    const color = `color-mix(in srgb, ${PROTON_TIER_COLORS[pd.tier] || PROTON_TIER_UNKNOWN} 60%, var(--text))`;
     // Kept short (no "reports"/"confidence" words): a tile is narrow, and "strong · 336" reads fine without them.
     const detail = [pd.confidence, pd.total ? fmtCompactCount(pd.total) : ''].filter(Boolean).join(' · ');
     // pd.pending: too few reports for ProtonDB itself to be confident, showing its provisionalTier
