@@ -115,7 +115,7 @@ test('copyWithFeedback: a second copy while confirming still restores the origin
   await new Promise((r) => setTimeout(r, COPIED_MS / 2));
   copyWithFeedback(btn, 'b');
   await new Promise((r) => setTimeout(r, COPIED_MS / 2 + 10));
-  assert.equal(btn.textContent, '✓ Copied!'); // the first timer no longer cuts the second short
+  assert.equal(btn.textContent, 'Copied!'); // the first timer no longer cuts the second short
   await new Promise((r) => setTimeout(r, COPIED_MS / 2 + 10));
   assert.equal(btn.childNodes[0], before[0]);
   assert.equal(btn.title, 'Copy link');
