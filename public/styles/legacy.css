@@ -2639,50 +2639,6 @@
     display: none;
   }
 
-  /* The bundle's games with no Steam listing (ListRoute.tsx) — collapsed by default, but the count
-   stays visible in the toggle so the table never passes itself off as the whole bundle. */
-  .unresolved-games {
-    margin-bottom: 24px;
-  }
-  .unresolved-summary {
-    background: none;
-    border: none;
-    padding: 0;
-    font: inherit;
-    font-size: var(--fs-ui);
-    color: var(--text1);
-    cursor: pointer;
-  }
-  .unresolved-summary:hover {
-    color: var(--accent2);
-  }
-  .unresolved-list {
-    list-style: none;
-    margin: 8px 0 0;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 4px 18px;
-  }
-  .unresolved-list li {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    font-size: var(--fs-ui);
-  }
-  .unresolved-list a {
-    color: var(--text0);
-    text-decoration: none;
-  }
-  .unresolved-list a:hover {
-    color: var(--accent2);
-  }
-  .unresolved-type {
-    font-size: var(--fs-label);
-    color: var(--text1);
-    text-transform: capitalize;
-  }
-
   /* ── Bundles browse route ──────────────────────────────────────────────────────────────────── */
 
   /* "Include expired" — the one control on this route that reaches ITAD rather than the table, so

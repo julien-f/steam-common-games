@@ -329,9 +329,9 @@ test("F3 edge: a game's thumbnail falls back to its smaller capsule, then hides"
   const thumb = row(page, 'Hades').locator('img.game-thumb');
   await expect(thumb).toHaveAttribute('src', /capsule_184x69/);
   await expect(thumb).toBeVisible();
-  // The same box either way, so the row doesn't move as the image loads or fails.
+  // The same box either way, so the row doesn't move as the image loads or fails (2px each side clipped off).
   expect(await thumb.boundingBox()).toMatchObject(
-    testInfo.project.name === 'phone' ? { width: 96, height: 36 } : { width: 160, height: 60 },
+    testInfo.project.name === 'phone' ? { width: 100, height: 40 } : { width: 164, height: 64 },
   );
   await expect(row(page, 'Portal 2').locator('img.game-thumb')).toHaveCSS('visibility', 'hidden');
 });
@@ -1872,7 +1872,7 @@ test('D1 edge: Updated ↻ keeps the rows and the selection while it refreshes',
     await held;
     await route.fallback();
   });
-  await page.locator('.list-stat', { hasText: 'Updated' }).click();
+  await page.getByRole('button', { name: /^Updated\b/ }).click();
   await expect(page.locator('.list-stat', { hasText: 'Updated' })).toContainText('Refreshing');
   await expect(rows(page)).toHaveCount(6);
   await expect(row(page, 'Hades')).toContainText('44.5'); // details still on screen
@@ -1909,13 +1909,14 @@ test('D1 edge: a failed Updated ↻ leaves the tile there to try again', async (
     route.fulfill({ status: 502, json: { error: 'Steam request failed' } }),
   );
   const updated = page.locator('.list-stat', { hasText: 'Updated' });
-  await updated.click();
+  const updatedBtn = page.getByRole('button', { name: /^Updated\b/ });
+  await updatedBtn.click();
   await expect(page.getByRole('main')).toContainText('Steam request failed');
   await expect(updated).not.toContainText('Refreshing');
   await expect(page.locator('.list-formula')).toBeVisible();
 
   await page.unroute('**/api/common-games');
-  await updated.click();
+  await updatedBtn.click();
   await expect(page.getByRole('main')).not.toContainText('Steam request failed');
 });
 
@@ -1927,7 +1928,7 @@ test('D1 edge: an Owned list that failed to load still offers Updated ↻', asyn
   await page.goto('/lists/owned');
   await expect(page.getByRole('main')).toContainText('Steam request failed');
   await page.unroute('**/api/common-games');
-  await page.locator('.list-stat', { hasText: 'Updated' }).click();
+  await page.getByRole('button', { name: /^Updated\b/ }).click();
   await expect(rows(page)).toHaveCount(6);
 });
 
@@ -3898,7 +3899,7 @@ test("F4 edge: Steam's store search down says so rather than no games, and Updat
   await expect(page.locator('.list-status')).toContainText("Steam's store search didn't answer");
   await expect(page.locator('.list-empty')).toHaveCount(0);
   await mockApi(page);
-  await page.locator('.list-stat', { hasText: 'Updated' }).click();
+  await page.getByRole('button', { name: /^Updated\b/ }).click();
   await expect(rows(page)).toHaveCount(1);
 });
 
@@ -3956,7 +3957,7 @@ test("F4 edge: Steam's store search down in a combined list names the source, an
   await expect(page.locator('.list-status')).toContainText('Published by indie.io: Steam store search error');
   await mockApi(page);
   const forced = page.waitForRequest((req) => /\/api\/creator-games\?.*refresh=1/.test(req.url()));
-  await page.locator('.list-stat', { hasText: 'Updated' }).click();
+  await page.getByRole('button', { name: /^Updated\b/ }).click();
   await forced;
   await expect(rows(page)).toHaveCount(2);
 });

@@ -648,20 +648,62 @@
 
   /* ── A list route's table and what surrounds it; the table's own look is styles/vendor-data-table.css. ── */
 
-  /* Fixed size, so a row keeps its height while the image loads or after it fails. */
+  /* Fixed size, so a row keeps its height while the image loads or after it fails. Drawn 2px larger
+     each way and clipped back: some capsules (Hades, Overcooked! 2) bake a 2px gold frame into the art. */
   .game-thumb {
     display: block;
-    width: 160px;
-    height: 60px;
+    width: 164px;
+    height: 64px;
+    margin: -2px;
     object-fit: cover;
-    border-radius: var(--radius-1);
+    clip-path: inset(2px round var(--radius-1));
     background: var(--surface);
   }
   @media (max-width: 600px) {
     .game-thumb {
-      width: 96px;
-      height: 36px;
+      width: 100px;
+      height: 40px;
     }
+  }
+
+  /* A bundle's games with no Steam listing (ListRoute.tsx), collapsed under a count. */
+  .unresolved-games {
+    margin-bottom: 24px;
+  }
+  .unresolved-summary {
+    min-height: 24px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: var(--fs-ui);
+    cursor: pointer;
+  }
+  .unresolved-summary:hover {
+    color: var(--text);
+  }
+  .unresolved-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 4px 18px;
+    margin-top: 8px;
+  }
+  .unresolved-list li {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: var(--fs-ui);
+  }
+  .unresolved-list a {
+    text-decoration: none;
+  }
+  .unresolved-list a:hover {
+    text-decoration: underline;
+  }
+  .unresolved-type {
+    color: var(--muted);
+    font-size: var(--fs-label);
+    text-transform: capitalize;
   }
 
   .list-status,

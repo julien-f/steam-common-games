@@ -239,13 +239,11 @@ html:root {
   }
 }
 
-/* Phone: the table's checkboxes at a usable tap size; the library draws them at the native 13 px. */
-@media (max-width: 768px) {
-  .dt-table input[type='checkbox'] {
-    width: 24px;
-    height: 24px;
-    margin: 0;
-  }
+/* The table's checkboxes at the 24 px target size; the library draws them at the native 13 px. */
+.dt-table input[type='checkbox'] {
+  width: 24px;
+  height: 24px;
+  margin: 0;
 }
 
 /* The Filter popover's column pane: the table library's 150 px cut category and column names
