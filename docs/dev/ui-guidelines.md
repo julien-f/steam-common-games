@@ -67,7 +67,7 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 - `.lucide` in `styles/base.css` sizes an icon at `1em` in `currentColor` (stroke 1.75): set its size and colour on the element around it.
 - Decorative: an icon gets no `aria-*`, `role` or `title`, so Lucide marks it `aria-hidden`; an icon-only control keeps its `aria-label`.
 - An icon is markup, so it can't go in an `<option>` or a `title`: an option's label drops it, and a tooltip names the control in words.
-- Kept as text, since they are data or keys rather than icons: ↗ on external links, a deal record's ★/☆/🔥, a table cell's ✓/☆/⚠/⏳ (sorted and copied as text), key caps, the set operators ∪∩−, ≈ for an estimate, and the table library's own glyphs.
+- Kept as text, since they are data or keys rather than icons: ↗ on external links, a deal record's ★/☆/🔥, a table cell's ✓/☆/⚠/⏳ (sorted and copied as text), key caps (`Kbd.tsx` draws an arrow key's glyph as a Lucide arrow, keeping the glyph as hidden text), the set operators ∪∩−, ≈ for an estimate, and the table library's own glyphs.
 
 ## Motion
 

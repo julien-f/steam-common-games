@@ -28,6 +28,7 @@ import { isLightboxOpen } from './lightbox.tsx';
 import { withAccountParam } from './urlState.ts';
 import { computeSteamdbRating, fetchJson, isTextEntry, scoreColor } from './utils.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
+import Kbd from './Kbd.tsx';
 import type { Game, GameDetails } from './types.ts';
 
 const MAX_UNDO = 100;
@@ -433,7 +434,7 @@ export default function RankRoute() {
             </div>
             <div class="rank-actions">
               <button type="button" class="btn" onClick={() => respond('tie')}>
-                Tie <kbd>↓</kbd>
+                Tie <Kbd k="↓" />
               </button>
               <button type="button" class="btn" onClick={() => respond('skip')}>
                 Skip, ask later <kbd>S</kbd>
@@ -453,7 +454,7 @@ export default function RankRoute() {
               >
                 {([k, v]) => (
                   <span>
-                    <kbd>{k}</kbd> {v}
+                    <Kbd k={k} /> {v}
                   </span>
                 )}
               </For>

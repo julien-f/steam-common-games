@@ -8,6 +8,7 @@
 // and the `?` key handler), so this component is pure presentation plus its close paths.
 import { createEffect, For, onCleanup, on, type JSX } from 'solid-js';
 import X from 'lucide-solid/icons/x';
+import Kbd from './Kbd.tsx';
 
 interface Section {
   title: string;
@@ -129,7 +130,7 @@ export function ShortcutsModal(props: { open: boolean; onClose: () => void }): J
                     {(row) => (
                       <div class="shortcuts-row">
                         <dt class="shortcuts-keys">
-                          <For each={row.keys}>{(k) => <kbd>{k}</kbd>}</For>
+                          <For each={row.keys}>{(k) => <Kbd k={k} />}</For>
                         </dt>
                         <dd>{row.label}</dd>
                       </div>

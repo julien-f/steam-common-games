@@ -152,3 +152,9 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: `error TS2307: Cannot find module 'lucide-solid/icons/history' or its corresponding type declarations.`, though `node_modules/lucide-solid/dist/source/icons/history.jsx` exists and the dev server renders it.
 - **Cause**: some icon names are aliases kept for renamed icons; they ship as source re-exports with no `.d.ts`.
 - **Fix**: import the canonical name the alias re-exports (`history.jsx` imports `./rotate-ccw-clock`), which has types.
+
+## ← and → draw smaller than ↑ and ↓ (and ↗ looks off)
+
+- **Symptom**: in the same Geist text, ← → (and ↗) render small and thin beside a bold ↑ ↓.
+- **Cause**: `@fontsource-variable/geist`'s latin subset covers U+2191 and U+2193 but not U+2190, U+2192 or U+2197 (its `unicode.json`), so those fall back to a system face.
+- **Fix**: key caps go through `Kbd.tsx`, which draws all four arrows as Lucide icons; elsewhere, check a glyph against `unicode.json` before relying on Geist for it.

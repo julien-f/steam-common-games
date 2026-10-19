@@ -3865,6 +3865,25 @@ test('I2 edge: the shortcuts dialog says how to open the lightbox from the panel
   await expect(section.locator('.shortcuts-row').filter({ hasText: 'lightbox' })).toContainText('Enter');
 });
 
+test('I2 edge: the shortcuts dialog draws all four arrow keys the same size, still read as ← → ↑ ↓', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await page.keyboard.press('?');
+  const arrows = page.getByRole('dialog', { name: 'Keyboard shortcuts' }).locator('kbd', { hasText: /^[←→↑↓]$/ });
+  await expect(arrows.first()).toBeVisible();
+  const caps = await arrows.evaluateAll((els) =>
+    els.map((el) => {
+      const r = el.getBoundingClientRect();
+      return { key: el.textContent, size: `${r.width.toFixed(1)}×${r.height.toFixed(1)}` };
+    }),
+  );
+  expect(new Set(caps.map((c) => c.key))).toEqual(new Set(['←', '→', '↑', '↓']));
+  expect(new Set(caps.map((c) => c.size)).size).toBe(1);
+});
+
 test('I2 edge: every shortcut description starts at the same x', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
