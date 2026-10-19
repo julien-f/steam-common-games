@@ -80,9 +80,10 @@ html:root {
 .dt-tr--clickable:hover .dt-td {
   background: var(--surface);
 }
-/* Press feedback, as for buttons (styles/components.css); not while a control in the row is the one pressed. */
+/* Press feedback, as for buttons (styles/components.css), but less: 0.98 of a 1400px row moves its ends by 14px.
+   Not while a control in the row is the one pressed. */
 .dt-tr--clickable:active:not(:has(:is(button, input, a, label):active)) {
-  scale: 0.98;
+  scale: 0.995;
   transition: scale var(--dur-1) var(--ease-out);
 }
 /* An image column (thumbnails, /bundles' covers) only as wide as its images: a sized cell takes none of the table's spare width. */
