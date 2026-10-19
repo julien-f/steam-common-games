@@ -55,7 +55,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 - **U39 · polish** — the search box shifts sideways as the account chip's label changes length ("Alice" vs. "Alice + Bob + Carol"); missing thumbnails have no placeholder; wishlisted/owned name colours have no legend (still true in Recently Looked Up).
 - **U178 · polish · F1** — the panel's More links menu holds only "More Like This (Steam)", Title Case and without the ↗ external links carry, repeating Similar games' "More like this on Steam ↗". Drop the menu entry, or name it the same.
 - **U179 · polish · I2, I3** — the first Tab stop reads "Skip to table" on pages with no table (Home, Compare's form, About, the rank screen), where it skips to `main`. "Skip to content" there.
-- **U180 · polish · motion** — the skeleton's shimmer animates `background-position` over a 2.4 s loop, against ui-guidelines.md's Motion (only opacity and transform move, durations from `--dur-*`). Sweep a pseudo-element with `translate`. Since b3bd1f5.
 - **U182 · polish · I2** — a second Esc in the nav search blurs it to `<body>`, so the next Tab starts from the page top. Hand focus to the main content's first stop, or back to where `/` was pressed.
 - **U183 · polish · F3** — journeys.md still marks F3's **Pick a random game** ◇, but the table toolbar has it and an e2e edge test locks it. Drop the ◇.
 

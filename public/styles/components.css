@@ -31,22 +31,31 @@
 
   /* Skeleton: a faint band sweeping slowly; reduced motion stops it (styles/base.css). */
   @keyframes shimmer {
-    0% {
-      background-position: -300px 0;
+    from {
+      translate: -100% 0;
     }
-    100% {
-      background-position: 300px 0;
+    to {
+      translate: 100% 0;
     }
   }
   .sk {
+    position: relative;
     display: inline-block;
+    overflow: hidden;
     width: 52px;
     height: 14px;
     border-radius: var(--radius-1);
-    background: linear-gradient(90deg, var(--line) 30%, var(--line-strong) 50%, var(--line) 70%);
-    background-size: 600px 100%;
-    animation: shimmer 2.4s ease-in-out infinite;
+    background: var(--line);
     vertical-align: middle;
+  }
+  .sk::before,
+  .panel-hero-main--loading::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 20%, var(--line-strong) 50%, transparent 80%);
+    pointer-events: none;
+    animation: shimmer var(--dur-loop) ease-in-out infinite;
   }
 
   /* The header (AppShell.tsx): the wordmark, the route links as plain text, the current one
@@ -1089,14 +1098,14 @@
     opacity: 0;
   }
   .panel-hero-main--loading {
-    background: linear-gradient(90deg, var(--surface) 30%, var(--line-strong) 50%, var(--surface) 70%);
-    background-size: 600px 100%;
-    animation: shimmer 2.4s ease-in-out infinite;
+    background-color: var(--surface);
   }
   .panel-hero-main--loading[style*='background-image'] {
     background-size: cover;
     background-position: center;
-    animation: none;
+  }
+  .panel-hero-main--loading[style*='background-image']::before {
+    content: none;
   }
   .panel-hero-img--broken {
     background: var(--surface-2);

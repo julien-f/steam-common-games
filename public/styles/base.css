@@ -39,6 +39,8 @@
     --dur-1: 120ms;
     --dur-2: 180ms;
     --dur-3: 250ms;
+    /* An ambient loop (the skeleton's shimmer), not a change. */
+    --dur-loop: 2.4s;
     --ease-out: cubic-bezier(0.2, 0, 0, 1);
     /* Fields and buttons, the table library's included. */
     --control-h: 34px;
