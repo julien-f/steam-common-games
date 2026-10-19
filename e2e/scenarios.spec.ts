@@ -2086,6 +2086,24 @@ for (const failing of ['health', 'prices']) {
   });
 }
 
+test("F1 edge: a DLC's capsule that fails to load hides, keeping its box", async ({ page }) => {
+  await page.route('**/900001/capsule_231x87.jpg', (route) =>
+    route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="231" height="87"/>',
+    }),
+  );
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const card = page.locator('#panel-section-dlc');
+  await card.getByRole('button', { name: /DLC · 25 available/ }).click();
+  const capsule = (name: string) =>
+    card.locator('.panel-dlc-item', { hasText: new RegExp(`^${name}$`) }).locator('img');
+  await expect(capsule('Expansion 1')).toHaveCSS('visibility', 'visible');
+  await expect(capsule('Expansion 2')).toHaveCSS('visibility', 'hidden');
+  expect(await capsule('Expansion 2').boundingBox()).toMatchObject({ width: 80, height: 30 });
+});
+
 test('F1 edge: the DLC card lists 20 entries from store metadata, then more on request', async ({ page }) => {
   const requested: string[] = [];
   page.on('request', (req) => {

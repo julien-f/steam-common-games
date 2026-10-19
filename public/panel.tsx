@@ -1701,7 +1701,14 @@ function DlcItem(props: { d: DlcEntry }): JSX.Element {
   return (
     <li>
       <a class="panel-dlc-item" href={withAccountParam(`/game/${props.d.appid}`)} onClick={onClick}>
-        <img class="panel-dlc-capsule" src={props.d.capsule} alt="" loading="lazy" />
+        {/* Hidden rather than a broken-image icon, its box kept so the names stay aligned (as renderThumb). */}
+        <img
+          class="panel-dlc-capsule"
+          src={props.d.capsule}
+          alt=""
+          loading="lazy"
+          onError={(e) => (e.currentTarget.style.visibility = 'hidden')}
+        />
         <span class="panel-dlc-name">{props.d.name}</span>
       </a>
     </li>
