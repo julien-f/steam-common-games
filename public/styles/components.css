@@ -2131,8 +2131,17 @@
   #screenshot-lightbox.open.lb-morph {
     transition: none;
   }
-  ::view-transition-new(lb-backdrop) {
+  ::view-transition-new(lb-backdrop),
+  ::view-transition-new(lb-chrome) {
     animation-duration: var(--dur-3);
+  }
+  /* The lightbox (its controls and caption) is captured before its backdrop, its child, so it would
+     paint under it; the moving picture stays on top of both. */
+  ::view-transition-group(lb-chrome) {
+    z-index: 1;
+  }
+  ::view-transition-group(game-art) {
+    z-index: 2;
   }
   body.lb-open {
     overflow: hidden;

@@ -1096,7 +1096,7 @@ function focusLbClose(lb: HTMLElement) {
   lb.querySelector<HTMLElement>('.lb-close')!.focus({ focusVisible: lastInputWasKey });
 }
 
-// The panel hero's picture, clicked, morphs into the lightbox's; the backdrop fades in under it.
+// The panel hero's picture, clicked, morphs into the lightbox's; the backdrop and the chrome fade in around it.
 export function openLightboxFrom(from: HTMLImageElement, game: Game, idxOrShotId: number) {
   const lb = document.getElementById('screenshot-lightbox')!;
   const backdrop = lb.querySelector<HTMLElement>('.lb-backdrop')!;
@@ -1111,10 +1111,12 @@ export function openLightboxFrom(from: HTMLImageElement, game: Game, idxOrShotId
     start: () => {
       lb.classList.add('lb-morph');
       backdrop.style.viewTransitionName = 'lb-backdrop';
+      lb.style.viewTransitionName = 'lb-chrome';
     },
     finish: () => {
       lb.classList.remove('lb-morph');
       backdrop.style.viewTransitionName = '';
+      lb.style.viewTransitionName = '';
     },
   });
 }
