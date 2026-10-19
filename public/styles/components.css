@@ -3066,6 +3066,7 @@
     min-width: 0;
   }
   .list-tree a {
+    padding-block: 8px;
     text-decoration: none;
   }
   .list-tree a:hover {
