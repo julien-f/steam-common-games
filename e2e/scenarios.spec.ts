@@ -2116,6 +2116,31 @@ test('F1 edge: the panel section nav highlights the section it jumped to', async
   await expect(nav.getByRole('button', { name: 'Overview' })).not.toHaveClass(/active/);
 });
 
+test("F1 edge: on a narrow phone, the panel's tabs stay one row and scroll to the current one", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout');
+  await page.setViewportSize({ width: 320, height: 844 });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const list = page.locator('.panel-subnav-list');
+  const last = list.getByRole('button', { name: 'DLC' });
+  await expect(last).toBeAttached();
+  const tops = await list.locator('li').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top));
+  expect(new Set(tops).size).toBe(1);
+
+  await page.locator('#panel-body').evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await expect(last).toHaveClass(/active/);
+  await expect
+    .poll(() =>
+      last.evaluate((el) => {
+        const [b, l] = [el.getBoundingClientRect(), el.closest('ul')!.getBoundingClientRect()];
+        return b.left >= l.left && b.right <= l.right + 1;
+      }),
+    )
+    .toBe(true);
+});
+
 test('F1 edge: the panel closes from its × after scrolling it', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

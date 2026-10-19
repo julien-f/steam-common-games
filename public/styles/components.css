@@ -1176,8 +1176,9 @@
   /* Store, ITAD and ⋯ More leave the page; after the divider, copy link and ↻ act in place. */
   .panel-icon-links {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     margin-top: 10px;
   }
   .panel-icon-link,
@@ -1264,15 +1265,23 @@
 
   /* Section tabs as text; one amber bar under the current one, moved there by the scroll-spy
      (panel.tsx's placeSubnavUnderline), glides between them once placed. */
+  /* One row that scrolls sideways (panel.tsx brings the current tab into view): wrapped, the tabs
+     took two rows of a phone's sticky header. */
   .panel-subnav-list {
     position: relative;
     display: flex;
-    flex-wrap: wrap;
     column-gap: 18px;
     margin-top: 6px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+  .panel-subnav-list > li {
+    flex: none;
+    scroll-snap-align: start;
   }
   .panel-subnav-btn {
-    min-height: 36px;
+    min-height: 32px;
     padding: 0;
     border: 0;
     background: none;
@@ -1395,11 +1404,12 @@
   .panel-ownership-badge.wishlisted {
     color: var(--wishlisted);
   }
+  /* At the action row's end. */
   .panel-ownership-row {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin-top: 6px;
+    margin-left: auto;
   }
   .panel-ownership-badge {
     display: inline-flex;
@@ -1415,6 +1425,12 @@
   }
   .panel-ownership-badge:hover {
     text-decoration: underline;
+  }
+  /* The narrowest phones: the mark alone, so the action row stays one line (the link keeps its name). */
+  @media (max-width: 359px) {
+    .panel-ownership-label {
+      display: none;
+    }
   }
 
   /* ── The panel's body: sections on hairlines, each titled by a small muted <h3>. ── */

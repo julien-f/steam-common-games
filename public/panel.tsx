@@ -320,7 +320,15 @@ function updateSubnavScrollSpy() {
       active = btn;
     } else btn.removeAttribute('aria-current');
   }
-  placeSubnavUnderline(nav.querySelector('ul'), active);
+  const list = nav.querySelector('ul');
+  placeSubnavUnderline(list, active);
+  // The tabs scroll sideways in one row: bring a newly current one into view, leaving a manual swipe alone.
+  if (list && active && list.dataset.active !== activeTarget) {
+    list.dataset.active = activeTarget;
+    const li = active.parentElement!;
+    const left = Math.min(li.offsetLeft, Math.max(list.scrollLeft, li.offsetLeft + li.offsetWidth - list.clientWidth));
+    if (left !== list.scrollLeft) list.scrollTo({ left, behavior: smoothScroll() });
+  }
 }
 
 // The current tab's underline, one bar on the list moved under it; it glides only once placed.
@@ -2318,16 +2326,23 @@ function OwnershipRow(props: { game: ReadonlyGame }): JSX.Element {
     <Show when={own()?.inLibrary || own()?.onWishlist}>
       <div class="panel-ownership-row">
         <Show when={own()?.inLibrary}>
-          <A class="panel-ownership-badge owned" href={withAccountParam(`/lists/owned?game=${props.game.appid}`)}>
-            ✓ In library
+          <A
+            class="panel-ownership-badge owned"
+            href={withAccountParam(`/lists/owned?game=${props.game.appid}`)}
+            aria-label="In library"
+            title="In library"
+          >
+            ✓ <span class="panel-ownership-label">In library</span>
           </A>
         </Show>
         <Show when={own()?.onWishlist}>
           <A
             class="panel-ownership-badge wishlisted"
             href={withAccountParam(`/lists/wishlist?game=${props.game.appid}`)}
+            aria-label="On wishlist"
+            title="On wishlist"
           >
-            ☆ On wishlist
+            ☆ <span class="panel-ownership-label">On wishlist</span>
           </A>
         </Show>
       </div>
@@ -2471,7 +2486,6 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
                 </Show>
               </div>
             </Show>
-            <OwnershipRow game={g} />
           </div>
           <div class="panel-icon-links">
             <a
@@ -2506,6 +2520,7 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
               🔗
             </button>
             <RefreshButton game={g} />
+            <OwnershipRow game={g} />
           </div>
         </div>
         <PanelSubnav game={g} />
