@@ -3474,6 +3474,35 @@ test('I2 edge: × closing the panel returns focus to the row it was showing', as
   await expect(page.locator(`tr.dt-tr[data-row-key="${shown}"]`)).toBeFocused();
 });
 
+test.describe('with motion on', () => {
+  test.use({ reducedMotion: 'no-preference' });
+
+  test('I2 edge: the panel slides in to rest, focus on its hero', async ({ page }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned');
+    await row(page, 'Hades').getByText('Hades').click();
+    const panel = page.locator('.game-panel');
+    await expect(panel).toHaveCSS('opacity', '1');
+    await expect(panel).toHaveCSS('translate', 'none');
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+    await expect(page.locator('.panel-hero-open')).toBeFocused();
+    await expect(page.locator('.panel-hero-img')).toHaveCSS('opacity', '1');
+  });
+
+  test('I2 edge: a nav popover rises to rest and Esc hands focus back', async ({ page }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned');
+    const prefs = page.getByLabel('Preferences');
+    await prefs.click();
+    const panel = page.locator('.site-nav-prefs-panel');
+    await expect(panel).toHaveCSS('opacity', '1');
+    await expect(panel).toHaveCSS('translate', '0px');
+    await page.keyboard.press('Escape');
+    await expect(panel).toBeHidden();
+    await expect(prefs).toBeFocused();
+  });
+});
+
 test('I2 edge: closing a game with no row returns focus to the row it was opened from', async ({ page }) => {
   await asPlayer(page, ALICE);
   // The DLC hopped to has no fixture details; the store not answering is enough here.

@@ -46,6 +46,7 @@ import {
   formatMoney,
   compareByOrder,
   PROTON_TIER_COLORS,
+  fadeInOnLoad,
 } from './utils.ts';
 import { convert } from './currency.ts';
 
@@ -214,6 +215,7 @@ export function renderThumb(_value: unknown, row: Row): Node {
   const fallback = row.thumb && row.capsule !== row.thumb ? row.capsule : null;
   const src = row.thumb || row.capsule;
   if (src) img.src = src;
+  fadeInOnLoad(img);
   img.addEventListener('error', () => {
     if (fallback && img.src !== fallback) img.src = fallback;
     else img.style.visibility = 'hidden';

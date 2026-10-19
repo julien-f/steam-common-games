@@ -11,6 +11,7 @@ import {
   computeSteamdbRating,
   PROTON_TIER_COLORS,
   focusGameRow,
+  fadeInOnLoad,
 } from './utils.ts';
 import { openLightbox, lightboxShot } from './lightbox.tsx';
 import { decideSwipeAxis, type SwipeAxis } from './lightboxSwipe.ts';
@@ -1704,6 +1705,7 @@ function DlcItem(props: { d: DlcEntry }): JSX.Element {
         {/* Hidden rather than a broken-image icon, its box kept so the names stay aligned (as renderThumb). */}
         <img
           class="panel-dlc-capsule"
+          ref={fadeInOnLoad}
           src={props.d.capsule}
           alt=""
           loading="lazy"
@@ -1931,7 +1933,14 @@ function PanelHero(): JSX.Element {
                     aria-current={i() === idx() ? 'true' : undefined}
                     onClick={() => setHeroIdx(i())}
                   >
-                    <img class="panel-film-thumb" src={item.thumb} data-fallback={fallback} alt="" loading="lazy" />
+                    <img
+                      class="panel-film-thumb"
+                      ref={fadeInOnLoad}
+                      src={item.thumb}
+                      data-fallback={fallback}
+                      alt=""
+                      loading="lazy"
+                    />
                   </button>
                 </li>
               );

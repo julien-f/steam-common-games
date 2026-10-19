@@ -25,7 +25,7 @@ import { withAccountParam } from './urlState.ts';
 import { createTableState, DataTableView, datePartGroup, numericRangeGroup } from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
 import { fmt, compareDateMissingLast, compareNumMissingLast, priceTierGroup } from './gameColumns.ts';
-import { fmtAge, formatMoney, oldestFetchedAt, scoreColor } from './utils.ts';
+import { fadeInOnLoad, fmtAge, formatMoney, oldestFetchedAt, scoreColor } from './utils.ts';
 import {
   toBundleRow,
   fmtBundleDateTime,
@@ -95,6 +95,7 @@ function renderCovers(_value: unknown, row: BundleRow): Node {
     img.width = 80;
     img.height = 30;
     img.src = src;
+    fadeInOnLoad(img);
     img.addEventListener('error', () => {
       img.style.visibility = 'hidden';
     });

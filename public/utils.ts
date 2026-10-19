@@ -124,6 +124,16 @@ export function smoothScroll(): ScrollBehavior {
   return matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
 }
 
+// Fades an image in once loaded or failed (`.img-fade`); a cached one shows at once. Call it in the
+// task that sets `src`: the load event is queued, so it can't fire before the listener.
+export function fadeInOnLoad(img: HTMLImageElement): void {
+  if (img.complete && img.getAttribute('src')) return;
+  img.classList.add('img-fade');
+  const done = () => img.classList.add('is-loaded');
+  img.addEventListener('load', done, { once: true });
+  img.addEventListener('error', done, { once: true });
+}
+
 export function scoreColor(n: number | null): string {
   if (n == null) return 'var(--muted)';
   if (n >= 80) return 'var(--good)';

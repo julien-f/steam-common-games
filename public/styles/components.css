@@ -13,6 +13,42 @@
     top: 8px;
   }
 
+  /* Press feedback: eased in, snapped back on release so a menu the click opens measures its trigger
+     at full size. Skipped where a transform already positions the element. */
+  :is(button, .btn):active:not(:disabled, [aria-disabled='true'], .panel-hero-btn, .lb-btn, .lb-bigplay, .dt-dd *) {
+    scale: 0.98;
+    transition: scale var(--dur-1) var(--ease-out);
+  }
+
+  /* An image fades in once loaded (utils.ts's fadeInOnLoad); an element's own opacity and
+     transition, set later in this layer, take over from here. */
+  .img-fade {
+    transition: opacity var(--dur-3) var(--ease-out);
+  }
+  .img-fade:not(.is-loaded) {
+    opacity: 0;
+  }
+
+  /* Skeleton: a faint band sweeping slowly; reduced motion stops it (styles/base.css). */
+  @keyframes shimmer {
+    0% {
+      background-position: -300px 0;
+    }
+    100% {
+      background-position: 300px 0;
+    }
+  }
+  .sk {
+    display: inline-block;
+    width: 52px;
+    height: 14px;
+    border-radius: var(--radius-1);
+    background: linear-gradient(90deg, var(--line) 30%, var(--line-strong) 50%, var(--line) 70%);
+    background-size: 600px 100%;
+    animation: shimmer 2.4s ease-in-out infinite;
+    vertical-align: middle;
+  }
+
   /* The header (AppShell.tsx): the wordmark, the route links as plain text, the current one
      underlined in the accent. */
   .site-brand {
@@ -995,14 +1031,18 @@
     height: 100%;
     object-fit: cover;
   }
+  /* Fades in over the thumbnail once loaded; hidden at once when the next item starts loading. */
+  .panel-hero-img:not(.loading) {
+    transition: opacity var(--dur-2) var(--ease-out);
+  }
   /* Until the item's own image is in (HeroMain): its thumbnail in the frame, or a shimmer. */
   .panel-hero-img.loading {
     opacity: 0;
   }
   .panel-hero-main--loading {
-    background: linear-gradient(90deg, var(--surface) 25%, var(--line-strong) 50%, var(--surface) 75%);
+    background: linear-gradient(90deg, var(--surface) 30%, var(--line-strong) 50%, var(--surface) 70%);
     background-size: 600px 100%;
-    animation: shimmer 1.4s linear infinite;
+    animation: shimmer 2.4s ease-in-out infinite;
   }
   .panel-hero-main--loading[style*='background-image'] {
     background-size: cover;

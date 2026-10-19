@@ -55,6 +55,14 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 - Two weights: 400, and 600 for emphasis.
 - Two faces, self-hosted: Geist (`--font-sans`) for text; Geist Mono (`--font-mono`) with tabular figures for a figure standing alone (`<time>`, `<output>`, `<data>`, a price, a score, a duration). Table cells stay in Geist, with tabular figures, since a cell can't be told numeric from CSS.
 
+## Motion
+
+- Durations and easing from the `--dur-*` / `--ease-out` tokens in `styles/base.css`; motion explains a change (something opening, arriving, pressed), never decorates.
+- Only `opacity` and `transform` (or `translate`/`scale`) move; layout properties never animate. Never transition a table dropdown's (`.dt-dd`) transform: it freezes the page ([pitfalls.md](pitfalls.md)).
+- Press feedback: buttons and clickable rows give to `scale: 0.98` while held, and snap back on release, so a menu the click opens measures its trigger at full size.
+- An image fades in once loaded (`fadeInOnLoad`), so a row or the panel never flashes a half-drawn picture; a cached one shows at once.
+- Reduced motion: `styles/base.css` sets every transition to `0s` and every animation to a near-instant single run, so end states are reached at once; JS smooth scrolls go through `smoothScroll()`.
+
 ## Checklist for a new UI feature
 
 - Keyboard path and touch equivalent.
