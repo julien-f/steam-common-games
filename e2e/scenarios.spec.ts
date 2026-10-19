@@ -17,6 +17,8 @@ test.afterEach(() => {
 const rows = (page: Page) => page.locator('tbody tr:not(.dt-group-row)');
 const row = (page: Page, name: string) => rows(page).filter({ hasText: name });
 const groupRows = (page: Page) => page.locator('.dt-group-row');
+// A Home tree row's ⋯, which holds its Move, Rename and Delete.
+const rowMenu = (page: Page, name: string) => page.getByRole('button', { name: `More actions for ${name}` });
 
 test('A1: first visit — resolve my account, then open my library', async ({ page }) => {
   await page.goto('/');
@@ -885,16 +887,18 @@ test("L1 edge: the new list's toast stays while pointed at", async ({ page }) =>
 test('L1.4: a list moves into the only folder', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
-  await page.getByRole('button', { name: '+ New list' }).click();
+  await page.getByRole('button', { name: 'New list' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('Shortlist');
   await page.keyboard.press('Enter');
-  await page.getByRole('button', { name: '+ New folder' }).click();
+  await page.getByRole('button', { name: 'New folder' }).click();
   await page.getByRole('textbox', { name: 'Folder name' }).fill('Weekend');
   await page.keyboard.press('Enter');
 
+  await rowMenu(page, 'Shortlist').click();
   const move = page.getByRole('combobox', { name: 'Move Shortlist to…' });
   await expect(move).toHaveValue(''); // showing "Move to…", so picking the folder is a change
   await move.selectOption({ label: 'Weekend' });
+  await rowMenu(page, 'Shortlist').click();
   await expect(move.locator('option')).toContainText(['Move to…', 'Top level']); // now inside Weekend
   await expect(move).toHaveValue('');
 });
@@ -906,35 +910,98 @@ test('L1 edge: folders and lists are named in place, not in a dialog', async ({ 
   await asPlayer(page, ALICE);
   await page.goto('/');
   const tree = page.locator('.home-tree');
-  const newFolder = page.getByRole('button', { name: '+ New folder' });
+  const newFolder = page.getByRole('button', { name: 'New folder' });
   await newFolder.click();
   const field = page.getByRole('textbox', { name: 'Folder name' });
   await expect(field).toBeFocused();
   await field.fill('Weekend');
   await page.keyboard.press('Enter');
-  await expect(tree.getByText('📁 Weekend')).toBeVisible();
+  await expect(tree.getByText('Weekend', { exact: true })).toBeVisible();
   await expect(newFolder).toBeFocused();
 
-  // Esc cancels, and focus goes back to Rename.
-  const rename = page.getByRole('button', { name: 'Rename Weekend' });
-  await rename.click();
+  // Esc cancels, and focus goes back to the row's ⋯.
+  const menu = rowMenu(page, 'Weekend');
+  await menu.click();
+  await page.getByRole('button', { name: 'Rename Weekend' }).click();
   await expect(field).toBeFocused();
   await expect(field).toHaveValue('Weekend');
   await field.fill('Later');
   await page.keyboard.press('Escape');
-  await expect(tree.getByText('📁 Weekend')).toBeVisible();
-  await expect(rename).toBeFocused();
+  await expect(tree.getByText('Weekend', { exact: true })).toBeVisible();
+  await expect(menu).toBeFocused();
 
   // Leaving the field saves it; an empty name cancels.
-  await rename.click();
+  await menu.click();
+  await page.getByRole('button', { name: 'Rename Weekend' }).click();
   await field.fill('Co-op');
   await page.getByRole('heading', { name: 'Your lists' }).click();
-  await expect(tree.getByText('📁 Co-op')).toBeVisible();
-  await page.getByRole('button', { name: '+ New list' }).click();
+  await expect(tree.getByText('Co-op', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'New list' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('  ');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('textbox', { name: 'List name' })).toHaveCount(0);
   await expect(tree.locator('.list-tree li')).toHaveCount(1);
+});
+
+test("L1 edge: a row's ⋯ menu works from the keyboard and hands focus back", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  for (const [button, label, name] of [
+    ['New folder', 'Folder name', 'Weekend'],
+    ['New list', 'List name', 'Shortlist'],
+    ['New list', 'List name', 'Later'],
+  ]) {
+    await page.getByRole('button', { name: button }).click();
+    await page.getByRole('textbox', { name: label }).fill(name);
+    await page.keyboard.press('Enter');
+  }
+  const menu = rowMenu(page, 'Shortlist');
+
+  // Enter opens it, Tab goes into it, Esc closes it back onto ⋯.
+  await menu.focus();
+  await page.keyboard.press('Enter');
+  const move = page.getByRole('combobox', { name: 'Move Shortlist to…' });
+  await expect(move).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(move).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(move).toBeHidden();
+  await expect(menu).toBeFocused();
+
+  // Rename closes the menu, then the field takes focus; Enter saves and returns to ⋯.
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Rename Shortlist' }).press('Enter');
+  const field = page.getByRole('textbox', { name: 'List name' });
+  await expect(field).toBeFocused();
+  await expect(page.locator('.tree-menu-panel:popover-open')).toHaveCount(0);
+  await field.fill('Picks');
+  await page.keyboard.press('Enter');
+  await expect(rowMenu(page, 'Picks')).toBeFocused();
+
+  // Move lands on the moved row's ⋯.
+  await page.keyboard.press('Enter');
+  await page.getByRole('combobox', { name: 'Move Picks to…' }).selectOption({ label: 'Weekend' });
+  await expect(rowMenu(page, 'Picks')).toBeFocused();
+
+  // Delete: a cancelled confirm leaves focus on ⋯, an accepted one moves it to the next row's.
+  page.once('dialog', (d) => d.dismiss());
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Delete Picks' }).press('Enter');
+  await expect(rowMenu(page, 'Picks')).toBeFocused();
+  page.once('dialog', (d) => d.accept());
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Delete Picks' }).press('Enter');
+  await expect(rowMenu(page, 'Picks')).toHaveCount(0);
+  await expect(rowMenu(page, 'Later')).toBeFocused();
+
+  // The last row deleted: focus goes to the section's heading.
+  page.once('dialog', (d) => d.accept());
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Delete Later' }).press('Enter');
+  await expect(rowMenu(page, 'Weekend')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Delete Weekend' }).press('Enter');
+  await expect(page.getByRole('heading', { name: 'Your lists' })).toBeFocused();
 });
 
 test("L1 edge: clearing a ranking's name hands it back its default label", async ({ page }) => {
@@ -944,9 +1011,11 @@ test("L1 edge: clearing a ranking's name hands it back its default label", async
   await page.keyboard.press('Escape');
   await expect(page.getByRole('heading', { name: 'Ranking of Alice — Wishlist' })).toBeVisible();
   await page.goto('/');
+  await rowMenu(page, 'Ranking of Alice — Wishlist').click();
   await page.getByRole('button', { name: 'Rename Ranking of Alice — Wishlist' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('Top picks');
   await page.keyboard.press('Enter');
+  await rowMenu(page, 'Top picks').click();
   await page.getByRole('button', { name: 'Rename Top picks' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('');
   await page.keyboard.press('Enter');
@@ -956,7 +1025,7 @@ test("L1 edge: clearing a ranking's name hands it back its default label", async
 test('L1 edge: confirming an IME candidate with Enter keeps the name field open', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
-  await page.getByRole('button', { name: '+ New list' }).click();
+  await page.getByRole('button', { name: 'New list' }).click();
   const field = page.getByRole('textbox', { name: 'List name' });
   await field.fill('にほ');
   await field.dispatchEvent('keydown', { key: 'Enter', isComposing: true });
@@ -967,7 +1036,7 @@ test('L1 edge: confirming an IME candidate with Enter keeps the name field open'
 test("L1 edge: the name field looks like the app's other text fields", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
-  await page.getByRole('button', { name: '+ New folder' }).click();
+  await page.getByRole('button', { name: 'New folder' }).click();
   const look = (el: Element) => {
     const s = getComputedStyle(el);
     return [s.backgroundColor, s.borderTopStyle, s.borderTopWidth, s.borderRadius, s.color, s.fontSize];
@@ -979,7 +1048,7 @@ test("L1 edge: the name field looks like the app's other text fields", async ({ 
 test('L2 edge: creating a combined list opens it', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
-  await page.getByRole('button', { name: '+ New combined list' }).click();
+  await page.getByRole('button', { name: 'New combined list' }).click();
   const form = page.locator('.combine-form');
   const sources = form.locator('.combine-sources input[type="checkbox"]');
   await sources.nth(0).check();
@@ -992,7 +1061,7 @@ test('L2 edge: creating a combined list opens it', async ({ page }) => {
 test("L2 edge: a combined list created under a link's account opens under it", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/?u=bob');
-  await page.getByRole('button', { name: '+ New combined list' }).click();
+  await page.getByRole('button', { name: 'New combined list' }).click();
   const sources = page.locator('.combine-form .combine-sources input[type="checkbox"]');
   await sources.nth(0).check();
   await sources.nth(1).check();
@@ -1003,7 +1072,7 @@ test("L2 edge: a combined list created under a link's account opens under it", a
 test('L2 edge: Edit sources has one Cancel, which hands focus back', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
-  await page.getByRole('button', { name: '+ New combined list' }).click();
+  await page.getByRole('button', { name: 'New combined list' }).click();
   const sources = page.locator('.combine-form .combine-sources input[type="checkbox"]');
   await sources.nth(0).check();
   await sources.nth(1).check();
@@ -1019,7 +1088,7 @@ test('L2 edge: Edit sources has one Cancel, which hands focus back', async ({ pa
 test('L1 edge: a list under 2 games says ranking needs 2', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
-  await page.getByRole('button', { name: '+ New list' }).click();
+  await page.getByRole('button', { name: 'New list' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('Empty');
   await page.keyboard.press('Enter');
   await page.locator('.list-tree').getByRole('link', { name: /Empty/ }).click();
@@ -3433,11 +3502,14 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
   };
   await asPlayer(page, ALICE);
   await page.goto('/');
-  await page.getByRole('button', { name: '+ New list' }).click();
+  await page.getByRole('button', { name: 'New list' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('Shortlist');
   await page.keyboard.press('Enter');
-  expect(await takes24pxTap(page.locator('.list-tree').getByRole('button', { name: 'Rename' }))).toBe(true);
-  expect(await takes24pxTap(page.locator('.list-tree').getByRole('button', { name: 'Delete' }))).toBe(true);
+  expect(await takes24pxTap(rowMenu(page, 'Shortlist'))).toBe(true);
+  await rowMenu(page, 'Shortlist').click();
+  expect(await takes24pxTap(page.getByRole('button', { name: 'Rename Shortlist' }))).toBe(true);
+  expect(await takes24pxTap(page.getByRole('button', { name: 'Delete Shortlist' }))).toBe(true);
+  await page.keyboard.press('Escape');
 
   await page.goto('/lists/compare');
   expect(await takes24pxTap(page.getByRole('button', { name: 'Remove Alice' }))).toBe(true);
@@ -3743,13 +3815,15 @@ test('I2 edge: controls name what they act on, and only toggles carry a pressed 
   await asPlayer(page, ALICE);
   await page.goto('/');
   await expect(page.locator('.account-chip-btn')).toHaveAccessibleName(/Alice/);
-  await page.getByRole('button', { name: '+ New list' }).click();
+  await page.getByRole('button', { name: 'New list' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('Shortlist');
   await page.keyboard.press('Enter');
+  await rowMenu(page, 'Shortlist').click();
   await expect(page.getByRole('button', { name: 'Rename Shortlist' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Delete Shortlist' })).toBeVisible();
+  await page.keyboard.press('Escape');
 
-  await page.getByRole('button', { name: '+ New combined list' }).click();
+  await page.getByRole('button', { name: 'New combined list' }).click();
   const form = page.locator('.combine-form');
   await form.getByRole('combobox', { name: 'How to combine the sources' }).selectOption('subtract');
   const sources = form.locator('.combine-sources input[type="checkbox"]');
@@ -3958,7 +4032,7 @@ test('I3.3: each field on Home, the combine form and Compare says what it is for
   await page.goto('/');
   await expect(page.getByRole('search').getByRole('textbox', { name: 'Look up any game' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Steam name, profile URL, or 64-bit ID' })).toBeVisible();
-  await page.getByRole('button', { name: '+ New combined list' }).click();
+  await page.getByRole('button', { name: 'New combined list' }).click();
   await expect(page.getByRole('textbox', { name: 'Combined list name (optional)' })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'How to combine the sources' })).toBeVisible();
   await expect(

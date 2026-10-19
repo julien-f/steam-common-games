@@ -141,7 +141,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   4. put it in a folder
   5. or, while reading one game's panel, **Add to list** there ◇
 - **Done when**: the list appears in Home's tree; adding/removing games persists across reloads.
-- **Edges**: delete then restore (soft-delete — no restore UI yet, frontend.md's Known gaps); a folder's "Move to…" never offers its own subfolders.
+- **Edges**: delete then restore (soft-delete — no restore UI yet, frontend.md's Known gaps); a folder's "Move to…" never offers its own subfolders; a row's ⋯ menu from the keyboard (Esc, Rename, Move and Delete each leave focus on a row's ⋯, or the heading once the tree is empty).
 
 ### L2 Wishlisted but already owned in the family
 
@@ -406,6 +406,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   5. Esc
   6. rank a pair with keys only
 - **Done when**: focus is always visible and never trapped; Esc closes the innermost thing first.
+- **Edges**: Home's tree, every row's actions behind one ⋯ menu (L1's edge).
 
 ### I3 Screen reader
 
@@ -415,7 +416,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   2. jump by heading: one h1 naming the page, the sections below it
   3. fill a form; each field says what it's for
   4. open a game; jump through its sections by heading
-  5. open and close the shortcuts dialog, the lightbox and the nav menus; focus returns where it was
+  5. open and close the shortcuts dialog, the lightbox, the nav menus and a list's ⋯ menu on Home; focus returns where it was
 - **Done when**: every page has one h1 and no skipped heading level; every navigation and complementary landmark is named; every control is a native element, or has a role, name and state.
 - **Edges**: a hidden achievement reveals from the keyboard; the lightbox's counters say what they count; copying a link is announced.
 

@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { clampPopoverLeft, POPOVER_MARGIN } = require('../public/navPopover.ts');
+const { clampPopoverLeft, popoverTop, POPOVER_MARGIN } = require('../public/navPopover.ts');
 
 // `bindNavPopover` itself needs real elements plus toggle/resize/scroll events to exercise;
 // what's actually worth covering is the clamp it positions with — the off-screen panel it exists
@@ -31,4 +31,16 @@ test('clampPopoverLeft: falls back to the left margin when the panel is wider th
   // maxLeft goes negative here — without the outer Math.max, the clamp's upper bound would fall
   // below its lower one and push the panel off-screen to the left.
   assert.equal(clampPopoverLeft(300, 400, 320), POPOVER_MARGIN);
+});
+
+test('popoverTop: opens below the trigger when it fits', () => {
+  assert.equal(popoverTop(100, 132, 200, 800), 136);
+});
+
+test('popoverTop: opens above the trigger when below would run past the viewport', () => {
+  assert.equal(popoverTop(700, 732, 200, 800), 496);
+});
+
+test('popoverTop: stays below when above has no room either', () => {
+  assert.equal(popoverTop(150, 182, 700, 800), 186);
 });

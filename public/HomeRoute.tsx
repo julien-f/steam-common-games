@@ -8,7 +8,20 @@
 // form below can pick any recent account's Owned/Wishlist, Recently Looked Up, or any existing
 // user list as a source. A bundle joins it only from its own page ("What does this add?" opens a
 // /lists/shared link, saved from there) — offering every bundle here would need a bundle picker.
-import { createSignal, createEffect, createMemo, on, For, Index, Show, type JSX } from 'solid-js';
+import {
+  createSignal,
+  createEffect,
+  createMemo,
+  on,
+  onCleanup,
+  onMount,
+  For,
+  Index,
+  Match,
+  Show,
+  Switch,
+  type JSX,
+} from 'solid-js';
 import { A, useLocation, useNavigate } from '@solidjs/router';
 import {
   getMyAccount,
@@ -41,18 +54,27 @@ import {
   moveList,
   folderPaths,
   isDescendantFolder,
+  getRanking,
 } from './listsStore.ts';
+import { bindNavPopover } from './navPopover.ts';
 import { useBaseTitle } from './pageTitle.ts';
-import { createDefaultNaming, listDisplayName } from './listLabels.ts';
+import { createDefaultNaming, formatFormula, listDisplayName } from './listLabels.ts';
 import { CombineForm } from './CombineForm.tsx';
+import Blend from 'lucide-solid/icons/blend';
+import Ellipsis from 'lucide-solid/icons/ellipsis';
+import FolderIcon from 'lucide-solid/icons/folder';
+import FolderPlus from 'lucide-solid/icons/folder-plus';
 import Heart from 'lucide-solid/icons/heart';
 import RotateCcwClock from 'lucide-solid/icons/rotate-ccw-clock';
 import LibraryBig from 'lucide-solid/icons/library-big';
+import ListIcon from 'lucide-solid/icons/list';
+import ListPlus from 'lucide-solid/icons/list-plus';
 import Lock from 'lucide-solid/icons/lock';
 import Package from 'lucide-solid/icons/package';
 import Plus from 'lucide-solid/icons/plus';
 import RefreshCw from 'lucide-solid/icons/refresh-cw';
 import Star from 'lucide-solid/icons/star';
+import Trophy from 'lucide-solid/icons/trophy';
 import Users from 'lucide-solid/icons/users';
 import X from 'lucide-solid/icons/x';
 import type { AccountSlot, Folder, GameList, ListRef, CombineOp } from './types.ts';
@@ -60,8 +82,6 @@ import type { AccountSlot, Folder, GameList, ListRef, CombineOp } from './types.
 // `personastate`/`gameextrainfo` ride on the same 6h library cache tier as the rest of an
 // account's data (see toAccountPlayer in accountData.ts) — real data, just not live — so the
 // tooltip says "as of the last refresh" rather than implying real-time presence.
-
-const LIST_ICONS = { dynamic: '⚡ ', ranked: '🏆 ', manual: '📄 ' } as const;
 
 interface TreeRow {
   type: 'folder' | 'list';
@@ -298,6 +318,7 @@ export default function HomeRoute() {
   const [nameTarget, setNameTarget] = createSignal<NameTarget | null>(null);
   let newFolderBtn!: HTMLButtonElement;
   let newListBtn!: HTMLButtonElement;
+  let treeHeading!: HTMLHeadingElement;
   function newNameTarget(): NameTarget | null {
     const target = nameTarget();
     return target && !target.id ? target : null;
@@ -321,13 +342,7 @@ export default function HomeRoute() {
       refreshTree();
     }
     // A blur already put focus where the user went.
-    if (viaKey)
-      (target.id
-        ? document.querySelector<HTMLElement>(`[data-rename-id="${target.id}"]`)
-        : target.kind === 'folder'
-          ? newFolderBtn
-          : newListBtn
-      )?.focus();
+    if (viaKey) (target.id ? menuTrigger(target.id) : target.kind === 'folder' ? newFolderBtn : newListBtn)?.focus();
   }
 
   function NameField(props: { target: NameTarget; initial: string; placeholder?: string }): JSX.Element {
@@ -385,7 +400,8 @@ export default function HomeRoute() {
     return listDisplayName(list, createDefaultNaming());
   }
 
-  function handleDeleteFolder(folder: Folder): void {
+  // Each returns whether the row went away (a folder always does: Cancel moves its contents up).
+  function handleDeleteFolder(folder: Folder): boolean {
     const hasChildren =
       folders().some((f) => f.parentId === folder.id) || lists().some((l) => l.parentId === folder.id);
     const mode = hasChildren
@@ -397,14 +413,16 @@ export default function HomeRoute() {
       : 'delete';
     deleteFolder(folder.id, mode);
     refreshTree();
+    return true;
   }
 
-  function handleDeleteList(list: GameList): void {
-    if (!window.confirm(`Delete "${listName(list)}"?`)) return;
+  function handleDeleteList(list: GameList): boolean {
+    if (!window.confirm(`Delete "${listName(list)}"?`)) return false;
     const result = deleteList(list.id);
     if (result.softDeleted)
       window.alert(`"${listName(list)}" is still referenced by another list, so it was hidden instead of deleted.`);
     refreshTree();
+    return true;
   }
 
   function childrenOf(parentId: string | null): { type: 'folder' | 'list'; item: Folder | GameList; order: number }[] {
@@ -462,7 +480,9 @@ export default function HomeRoute() {
           onChange={(e) => {
             const target = e.currentTarget.value;
             e.currentTarget.value = '';
-            if (target) handleMove(props.row, target);
+            if (!target) return;
+            handleMove(props.row, target);
+            menuTrigger(props.row.item.id)?.focus(); // the moved row was rebuilt, its menu with it
           }}
         >
           {/* Without `selected`, the browser skips this disabled option and shows the first folder as already picked. */}
@@ -472,6 +492,87 @@ export default function HomeRoute() {
           <For each={moveTargets(props.row)}>{(t) => <option value={t.id}>{t.label}</option>}</For>
         </select>
       </Show>
+    );
+  }
+
+  function rowName(row: TreeRow): string {
+    return row.type === 'folder' ? (row.item as Folder).name : listName(row.item as GameList);
+  }
+
+  const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
+  // What a row holds, from what's already in memory: no list is resolved for it.
+  function rowSummary(row: TreeRow): string {
+    if (row.type === 'folder') return `Folder · ${plural(childrenOf(row.item.id).length, 'item')}`;
+    const list = row.item as GameList;
+    if (list.kind === 'manual') return `List · ${plural(list.appids?.length ?? 0, 'game')}`;
+    if (list.kind === 'ranked') return `Ranking · ${getRanking(list.id).groups.flat().length} ranked`;
+    const formula = list.name && formatFormula(list, createDefaultNaming());
+    return `Combined · ${formula || plural(list.sources?.length ?? 0, 'source')}`;
+  }
+
+  function TreeIcon(props: { row: TreeRow }): JSX.Element {
+    return (
+      <Switch fallback={<ListIcon class="tree-icon" />}>
+        <Match when={props.row.type === 'folder'}>
+          <FolderIcon class="tree-icon" />
+        </Match>
+        <Match when={(props.row.item as GameList).kind === 'dynamic'}>
+          <Blend class="tree-icon" />
+        </Match>
+        <Match when={(props.row.item as GameList).kind === 'ranked'}>
+          <Trophy class="tree-icon" />
+        </Match>
+      </Switch>
+    );
+  }
+
+  const menuTrigger = (id: string) => document.querySelector<HTMLElement>(`[data-menu-id="${id}"]`);
+
+  // A row's ⋯: Move, Rename and Delete in a popover, which hands focus back to ⋯ when it closes.
+  function TreeMenu(props: { row: TreeRow }): JSX.Element {
+    let trigger!: HTMLButtonElement;
+    let panel!: HTMLDivElement;
+    onMount(() => onCleanup(bindNavPopover(trigger, panel)));
+    // Hidden first, so focus is back on ⋯ before the name field takes it (its blur commits).
+    function rename(): void {
+      panel.hidePopover();
+      setNameTarget({ kind: props.row.type, id: props.row.item.id });
+    }
+    function remove(): void {
+      panel.hidePopover();
+      const index = treeRows().findIndex((r) => r.item.id === props.row.item.id);
+      const deleted =
+        props.row.type === 'folder'
+          ? handleDeleteFolder(props.row.item as Folder)
+          : handleDeleteList(props.row.item as GameList);
+      if (!deleted) return; // cancelled: focus is already back on ⋯
+      const rows = treeRows();
+      const next = rows[Math.min(index, rows.length - 1)];
+      (next ? menuTrigger(next.item.id) : treeHeading)?.focus();
+    }
+    return (
+      <>
+        <button
+          ref={trigger}
+          type="button"
+          class="tree-more"
+          popovertarget={`tree-menu-${props.row.item.id}`}
+          aria-label={`More actions for ${rowName(props.row)}`}
+          title="More actions"
+          data-menu-id={props.row.item.id}
+        >
+          <Ellipsis />
+        </button>
+        <div ref={panel} id={`tree-menu-${props.row.item.id}`} class="site-nav-popover-panel tree-menu-panel" popover>
+          <MoveSelect row={props.row} name={rowName(props.row)} />
+          <button type="button" class="tree-menu-item" aria-label={`Rename ${rowName(props.row)}`} onClick={rename}>
+            Rename
+          </button>
+          <button type="button" class="tree-menu-item" aria-label={`Delete ${rowName(props.row)}`} onClick={remove}>
+            Delete
+          </button>
+        </div>
+      </>
     );
   }
 
@@ -758,16 +859,21 @@ export default function HomeRoute() {
       </section>
 
       <section class="home-tree">
-        <h2>Your lists</h2>
+        <h2 ref={treeHeading} tabindex="-1">
+          Your lists
+        </h2>
         <div class="tree-actions">
-          <button type="button" ref={newFolderBtn} onClick={() => setNameTarget({ kind: 'folder' })}>
-            + New folder
-          </button>
           <button type="button" ref={newListBtn} onClick={() => setNameTarget({ kind: 'list' })}>
-            + New list
+            <ListPlus /> New list
           </button>
           <button type="button" onClick={toggleCombine}>
-            {combineOpen() ? 'Cancel combine' : '+ New combined list'}
+            <Show when={combineOpen()} fallback={<Blend />}>
+              <X />
+            </Show>{' '}
+            {combineOpen() ? 'Cancel combine' : 'New combined list'}
+          </button>
+          <button type="button" ref={newFolderBtn} onClick={() => setNameTarget({ kind: 'folder' })}>
+            <FolderPlus /> New folder
           </button>
         </div>
 
@@ -778,76 +884,39 @@ export default function HomeRoute() {
           <ul class="list-tree">
             <For each={treeRows()}>
               {(row) => (
-                <li style={{ 'padding-left': `${row.depth * 20}px` }}>
-                  {row.type === 'folder' ? (
-                    <>
-                      <Show
-                        when={nameTarget()?.id === row.item.id}
-                        fallback={<span>📁 {(row.item as Folder).name}</span>}
-                      >
-                        <span>📁</span>
-                        <NameField target={{ kind: 'folder', id: row.item.id }} initial={(row.item as Folder).name} />
-                      </Show>
-                      <MoveSelect row={row} name={(row.item as Folder).name} />
-                      <button
-                        type="button"
-                        aria-label={`Rename ${(row.item as Folder).name}`}
-                        data-rename-id={row.item.id}
-                        onClick={() => setNameTarget({ kind: 'folder', id: row.item.id })}
-                      >
-                        Rename
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Delete ${(row.item as Folder).name}`}
-                        onClick={() => handleDeleteFolder(row.item as Folder)}
-                      >
-                        Delete
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <Show
-                        when={nameTarget()?.id === row.item.id}
-                        fallback={
-                          <A href={`/lists/${row.item.id}`}>
-                            {LIST_ICONS[(row.item as GameList).kind]}
-                            <span classList={{ 'derived-name': !row.item.name }}>{listName(row.item as GameList)}</span>
+                <li style={{ 'padding-left': `${row.depth * 24}px` }}>
+                  <TreeIcon row={row} />
+                  <Show
+                    when={nameTarget()?.id === row.item.id}
+                    fallback={
+                      <span class="tree-text">
+                        {row.type === 'folder' ? (
+                          <span class="tree-name">{rowName(row)}</span>
+                        ) : (
+                          <A class="tree-name" href={`/lists/${row.item.id}`}>
+                            <span classList={{ 'derived-name': !row.item.name }}>{rowName(row)}</span>
                           </A>
-                        }
-                      >
-                        <span>{LIST_ICONS[(row.item as GameList).kind]}</span>
-                        <NameField
-                          target={{ kind: 'list', id: row.item.id }}
-                          initial={row.item.name ?? ''}
-                          placeholder={listName(row.item as GameList)}
-                        />
-                      </Show>
-                      <MoveSelect row={row} name={listName(row.item as GameList)} />
-                      <button
-                        type="button"
-                        aria-label={`Rename ${listName(row.item as GameList)}`}
-                        data-rename-id={row.item.id}
-                        onClick={() => setNameTarget({ kind: 'list', id: row.item.id })}
-                      >
-                        Rename
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Delete ${listName(row.item as GameList)}`}
-                        onClick={() => handleDeleteList(row.item as GameList)}
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
+                        )}
+                        <span class="tree-summary">{rowSummary(row)}</span>
+                      </span>
+                    }
+                  >
+                    <NameField
+                      target={{ kind: row.type, id: row.item.id }}
+                      initial={row.item.name ?? ''}
+                      placeholder={row.type === 'list' ? rowName(row) : undefined}
+                    />
+                  </Show>
+                  <TreeMenu row={row} />
                 </li>
               )}
             </For>
             <Show when={newNameTarget()}>
               {(target) => (
                 <li>
-                  <span>{target().kind === 'folder' ? '📁' : LIST_ICONS.manual}</span>
+                  <Show when={target().kind === 'folder'} fallback={<ListIcon class="tree-icon" />}>
+                    <FolderIcon class="tree-icon" />
+                  </Show>
                   <NameField target={target()} initial="" />
                 </li>
               )}

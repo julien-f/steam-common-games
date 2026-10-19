@@ -3250,64 +3250,111 @@
   .home-tree > p {
     color: var(--muted);
   }
+  /* Focused after the last row is deleted, as where the rows were. */
+  .home-tree > h2:focus {
+    outline: none;
+  }
 
+  /* One hairline row each: type icon, name, what it holds, ⋯. */
   .list-tree {
     border-top: 1px solid var(--line);
   }
   .list-tree li {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 4px 8px;
-    min-height: 48px;
+    gap: 10px;
+    min-height: 52px;
     border-bottom: 1px solid var(--line);
   }
-  .list-tree li > :is(a, span) {
-    flex: 1 1 120px;
+  .tree-icon {
+    color: var(--muted);
+    font-size: var(--fs-title);
+  }
+  .tree-text {
+    display: flex;
+    flex: 1;
+    align-items: baseline;
+    gap: 10px;
     min-width: 0;
   }
-  .list-tree a {
-    padding-block: 8px;
+  .tree-name,
+  .tree-summary {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tree-name {
+    flex: 0 1 auto;
+    padding-block: 4px;
     text-decoration: none;
   }
-  .list-tree a:hover {
+  a.tree-name:hover {
     text-decoration: underline;
   }
-  .list-tree span:has(+ .tree-name-field) {
-    flex: none;
+  .tree-summary {
+    flex: 0 1 auto;
+    color: var(--muted);
+    font-size: var(--fs-meta);
   }
   .tree-name-field {
-    flex: 1 1 160px;
+    flex: 1;
   }
-  /* Phone: the name on its own line, the actions under it, their text on its edge. */
+  /* Phone: the summary under the name. */
   @media (max-width: 600px) {
-    .list-tree li {
-      padding-block: 6px;
+    .tree-text {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
     }
-    .list-tree li > :is(a, span):not(:has(+ .tree-name-field)) {
-      flex-basis: 100%;
-    }
-    .list-tree li > :is(a, span) + :is(button, select) {
-      margin-left: -8px;
+    .tree-name {
+      padding-block: 2px;
     }
   }
-  /* Row actions stay quiet until pointed at. */
-  .list-tree button,
-  .tree-move {
-    min-height: 32px;
+  .tree-more {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 32px;
     height: 32px;
-    padding: 0 8px;
+    padding: 0;
     border: 1px solid transparent;
     border-radius: var(--radius-2);
     background: none;
     color: var(--muted);
-    font-size: var(--fs-ui);
+    font-size: var(--fs-title);
     cursor: pointer;
   }
-  .list-tree button:hover,
-  .tree-move:hover {
+  .tree-more:hover,
+  .tree-more:has(+ :popover-open) {
     border-color: var(--line-control);
     color: var(--text);
+  }
+  .tree-menu-panel {
+    width: 220px;
+  }
+  .tree-menu-panel:popover-open {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .tree-menu-panel .tree-move {
+    width: 100%;
+    margin-bottom: 4px;
+  }
+  .tree-menu-item {
+    min-height: 32px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--radius-2);
+    background: none;
+    color: var(--text);
+    font-size: var(--fs-ui);
+    text-align: left;
+    cursor: pointer;
+  }
+  .tree-menu-item:hover {
+    background: var(--line);
   }
 
   /* An unnamed dynamic list's formula, standing in for a name. */
