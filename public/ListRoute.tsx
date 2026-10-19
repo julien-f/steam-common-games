@@ -2825,7 +2825,7 @@ export default function ListRoute() {
                     ? scoreColor(20)
                     : urgency.tier === 'soon'
                       ? scoreColor(55)
-                      : 'var(--text1)',
+                      : 'var(--muted)',
               }}
             >
               ⏳ {urgency.label}

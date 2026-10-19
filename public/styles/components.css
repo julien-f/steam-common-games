@@ -1284,6 +1284,11 @@
   .panel-refresh-icon.is-refreshing {
     animation: spin 0.75s linear infinite;
   }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
   .panel-copy-link-btn--copied,
   .panel-copy-link-btn--copied:hover {
     border-color: var(--good);
@@ -1447,6 +1452,17 @@
     color: var(--muted);
     font-size: var(--fs-label);
     line-height: 1.3;
+  }
+
+  /* A categorical status pill in a table cell: the ProtonDB and Demo columns (gameColumns.ts), which colour it. */
+  .status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: var(--fs-ui);
+    font-weight: 600;
+    color: #fff;
+    line-height: 1.4;
   }
 
   /* Owned / wishlisted marks: table name cells (gameColumns.ts), the search dropdown, the panel. */

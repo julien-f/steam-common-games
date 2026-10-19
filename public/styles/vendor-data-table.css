@@ -200,11 +200,10 @@ html:root {
    roving-tabindex "current row" has no separate visual/reactive API, only a real `focus` event —
    see that file's own comment). Plain :focus, not :focus-visible: a programmatic .focus() call
    often doesn't satisfy :focus-visible's own heuristics, and this needs to show regardless of
-   whether the last interaction was mouse (the panel's own 🎲/↑/↓ buttons) or keyboard. Same
-   outline treatment as .panel-film-item:focus-visible, offset inward instead of out since this is
-   a table row, not a standalone tile. */
+   whether the last interaction was mouse (the panel's own 🎲/↑/↓ buttons) or keyboard. The
+   standard ring (styles/base.css's :focus-visible), offset inward since this is a table row. */
 .search-table .dt-tr:focus {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--text);
   outline-offset: -2px;
 }
 

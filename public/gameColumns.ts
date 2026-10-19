@@ -121,7 +121,7 @@ const compareProtonTier = compareMissingLast(
   isProtonMissing,
 );
 
-// The generic colored-pill treatment (`.status-badge`, shared style.css rule) — shared with
+// The generic colored-pill treatment (`.status-badge`, styles/components.css) — shared with
 // renderDemoBadge below rather than each column inventing its own pill styling. `row.protondbPending`
 // (set from extractProtonDb's own `pending` flag — see PROTON_TIER_ORDER's comment above) marks a
 // provisional tier assigned from too few reports for ProtonDB itself to be confident in — faded and

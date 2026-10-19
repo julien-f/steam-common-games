@@ -170,7 +170,7 @@ function renderEnds(value: unknown): Node {
     rel.className = 'bundle-ends-rel';
     rel.textContent = urgency.tier === 'ended' ? urgency.label : `⏳ ${urgency.label}`;
     rel.style.color =
-      urgency.tier === 'urgent' ? scoreColor(20) : urgency.tier === 'soon' ? scoreColor(55) : 'var(--text1)';
+      urgency.tier === 'urgent' ? scoreColor(20) : urgency.tier === 'soon' ? scoreColor(55) : 'var(--muted)';
   }
   // An expired row is dimmed as a whole (see renderBundleTitle), so nothing further here.
   return renderDateTime(value, rel);
