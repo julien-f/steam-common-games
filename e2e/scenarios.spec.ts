@@ -3474,6 +3474,32 @@ test('I2 edge: × closing the panel returns focus to the row it was showing', as
   await expect(page.locator(`tr.dt-tr[data-row-key="${shown}"]`)).toBeFocused();
 });
 
+test("I2 edge: the panel's ground takes a trace of the game's art, and stays neutral when the art can't be read", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  const panel = page.locator('.game-panel');
+  // The mock's CDN is unreachable: no tint, the plain surface.
+  await page.goto('/lists/owned?game=1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const neutral = await panel.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await panel.evaluate((el) => el.style.getPropertyValue('--panel-tint'))).toBe('');
+  // A red capsule: the ground turns faintly red, dark enough to keep its text's contrast.
+  await page.route(/steamstatic\.com/, (route) =>
+    route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="231" height="87"><rect width="231" height="87" fill="#d22"/></svg>',
+    }),
+  );
+  await page.reload();
+  await expect(panel).toHaveAttribute('style', /--panel-tint: oklch\(0\.17 0\.040 /);
+  await expect(panel).not.toHaveCSS('background-color', neutral);
+  await expect(page.locator('.panel-header-sticky')).toHaveCSS(
+    'background-color',
+    await panel.evaluate((el) => getComputedStyle(el).backgroundColor),
+  );
+});
+
 test.describe('with motion on', () => {
   test.use({ reducedMotion: 'no-preference' });
 

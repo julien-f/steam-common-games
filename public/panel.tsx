@@ -15,6 +15,7 @@ import {
 } from './utils.ts';
 import { openLightbox, openLightboxFrom, lightboxShot } from './lightbox.tsx';
 import { isMorphUpdating, loadedWhen, morph } from './viewTransition.ts';
+import { sampleArtTint } from './artTint.ts';
 import { decideSwipeAxis, type SwipeAxis } from './lightboxSwipe.ts';
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
 import { buildMediaItems, mediaLabel, resolveShotIndex } from './mediaItems.ts';
@@ -454,6 +455,20 @@ export function notifyOwnersChanged(): void {
 function currentMembers(): string[] {
   return getEffectiveCurrentAccount()?.members ?? [];
 }
+
+// The ground's tint from the open game's table thumbnail, the image most likely cached already.
+createRoot(() => {
+  createEffect(() => {
+    const g = panelGame();
+    const panel = document.getElementById('game-panel');
+    panel?.style.removeProperty('--panel-tint');
+    const url = g && (g.thumb || g.capsule);
+    if (!panel || !url) return;
+    void sampleArtTint(url).then((tint) => {
+      if (tint && panelGame() === g) panel.style.setProperty('--panel-tint', tint);
+    });
+  });
+});
 
 const panelData = createRoot(() => {
   const openAppid = createMemo(() => panelGame()?.appid ?? null);

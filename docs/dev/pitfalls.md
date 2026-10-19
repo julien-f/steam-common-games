@@ -140,3 +140,9 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: in a git worktree whose `node_modules` is a symlink to the main checkout's, the app falls back to the system font, and the dev server logs `The request id ".../@fontsource-variable/geist/files/…woff2" is outside of Vite serving allow list`.
 - **Cause**: Vite resolves the symlink to its real path, outside the worktree's root, so it refuses to serve the font files.
 - **Fix**: copy `@fontsource-variable` into the worktree, as a real directory under its own root, rather than reaching it through the link.
+
+## A tainted-canvas fallback can't be tested through `page.route`
+
+- **Symptom**: an image served by `route.fulfill` without `Access-Control-Allow-Origin` still loads with `crossOrigin = 'anonymous'` and its canvas reads fine, so the "no CORS" path never runs (seen checking the panel tint, `artTint.ts`).
+- **Cause**: observed with Playwright's Chromium: a fulfilled cross-origin response passes the CORS check whatever its headers.
+- **Fix**: serve the image from a real server on another origin (`python3 -m http.server` on a spare port) and call the code from the page.

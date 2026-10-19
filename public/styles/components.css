@@ -929,8 +929,10 @@
   /* ── The side panel (panel.tsx): a dark column on a hairline, its hero full-bleed. ── */
   .game-panel {
     --panel-pad: 20px;
+    /* A trace of the game's art (artTint.ts); --surface itself until it's read, or if it can't be. */
+    --panel-ground: color-mix(in oklch, var(--surface), var(--panel-tint, var(--surface)) 12%);
     border-left: 1px solid var(--line-strong);
-    background: var(--surface);
+    background: var(--panel-ground);
   }
   /* Slides in: from the right beside the content, from the bottom over a phone's screen. Its
      content goes on close, so it leaves at once. */
@@ -1183,7 +1185,7 @@
     margin: 0 calc(-1 * var(--panel-pad)) 16px;
     padding: 16px var(--panel-pad) 12px;
     border-bottom: 1px solid var(--line);
-    background: var(--surface);
+    background: var(--panel-ground);
   }
   .panel-header-sticky:has(.panel-subnav) {
     padding-bottom: 0;
@@ -1391,7 +1393,7 @@
     gap: 8px;
     padding: 8px var(--panel-pad);
     border-top: 1px solid var(--line-strong);
-    background: var(--surface);
+    background: var(--panel-ground);
   }
   .panel-nav:empty {
     display: none;
@@ -1588,7 +1590,7 @@
     gap: 2px;
     min-width: 0;
     padding: 10px 12px;
-    background: var(--surface);
+    background: var(--panel-ground);
     color: var(--text);
     text-decoration: none;
     transition: background-color var(--dur-1) var(--ease-out);
