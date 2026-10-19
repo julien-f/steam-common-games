@@ -158,3 +158,9 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: in the same Geist text, ← → (and ↗) render small and thin beside a bold ↑ ↓.
 - **Cause**: `@fontsource-variable/geist`'s latin subset covers U+2191 and U+2193 but not U+2190, U+2192 or U+2197 (its `unicode.json`), so those fall back to a system face.
 - **Fix**: key caps go through `Kbd.tsx`, which draws all four arrows as Lucide icons; elsewhere, check a glyph against `unicode.json` before relying on Geist for it.
+
+## An e2e locator's element goes `null` mid-test while the list looks unchanged
+
+- **Symptom**: `boundingBox()` (or another one-shot read) returns `null` under load, e.g. F1's "a DLC's capsule that fails to load hides" failing 3 in 60 runs beside another suite.
+- **Cause**: a prop passed as `body={body()}` is a getter, so every signal `body()` reads rebuilds its whole DOM; the DLC card swapped its streamed list for a new one when loading finished, detaching the element the locator had found.
+- **Fix**: build the JSX once (`body={body}`) with `<Show>`/`<For>` inside, over one memo for every state, so entries already shown keep their element (as `DlcSection` in `panel.tsx`).

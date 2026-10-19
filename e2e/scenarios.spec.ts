@@ -2298,6 +2298,29 @@ test("F1 edge: a DLC's capsule that fails to load hides, keeping its box", async
   expect(await capsule('Expansion 2').boundingBox()).toMatchObject({ width: 80, height: 30 });
 });
 
+test('F1 edge: DLC entries streamed in stay put, not redrawn, once the rest arrive', async ({ page }) => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/game-meta/900020', async (route) => {
+    await held;
+    await route.fallback();
+  });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const card = page.locator('#panel-section-dlc');
+  await card.getByRole('button', { name: /DLC · 25 available/ }).click();
+  await expect(card.getByText('Loading 1 more…')).toBeVisible();
+  const order = () => card.locator('.panel-dlc-name').allTextContents();
+  const before = await order();
+  await card.locator('.panel-dlc-item').evaluateAll((items) => items.forEach((el) => el.setAttribute('data-seen', '')));
+  release();
+  await expect(card.getByText('Loading 1 more…')).toHaveCount(0);
+  await expect(card.locator('.panel-dlc-item')).toHaveCount(20);
+  // Every entry already on screen is the same element, in the same order: no remount, no reload of its capsule.
+  await expect(card.locator('.panel-dlc-item[data-seen]')).toHaveCount(19);
+  expect((await order()).filter((name) => before.includes(name))).toEqual(before);
+});
+
 test('F1 edge: the DLC card lists 20 entries from store metadata, then more on request', async ({ page }) => {
   const requested: string[] = [];
   page.on('request', (req) => {

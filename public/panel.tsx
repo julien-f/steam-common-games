@@ -1801,48 +1801,43 @@ function DlcSection(props: { game: ReadonlyGame }): JSX.Element {
     </div>
   );
 
-  const body = () => {
-    if (panelData.dlc.loading) {
-      // Stream in whichever entries have already resolved instead of holding the whole card on
-      // its skeleton until every single one settles (see panelData.ts's fetchDlc).
-      const done = loaded();
-      if (!done.length) return skeleton;
-      const remaining = panelData.dlcShown() - done.length;
-      return (
-        <div class="panel-dlc-list">
-          <ul class="panel-dlc-items" role="list">
-            <For each={done}>{(d) => <DlcItem d={d} />}</For>
-          </ul>
-          <Show when={remaining}>{(n) => <div class="panel-dlc-loading-more">Loading {n()} more…</div>}</Show>
-        </div>
-      );
-    }
-    const entries = panelData.dlc();
-    if (entries === null)
-      return (
-        <div class="panel-collapsible-body-pad">
-          <div class="panel-no-data">Couldn't load DLC details.</div>
-        </div>
-      );
-    if (!entries) return skeleton;
-    const notShown = dlcIds().length - panelData.dlcShown();
-    return entries.length ? (
-      <div class="panel-dlc-list">
-        <ul class="panel-dlc-items" role="list">
-          <For each={sortDlcByRelease(entries)}>{(d) => <DlcItem d={d} />}</For>
-        </ul>
-        <Show when={notShown > 0}>
-          <button type="button" class="panel-dlc-more" onClick={() => panelData.showMoreDlc(props.game.appid)}>
-            {notShown > DLC_PAGE ? `Show ${DLC_PAGE} more of ${notShown}` : `Show ${notShown} more`}
-          </button>
-        </Show>
-      </div>
-    ) : (
+  // One list for streaming and done, sorted throughout: entries already shown keep their element
+  // (and capsule) when the rest arrive, instead of a second list replacing the first.
+  const entries = createMemo(() => sortDlcByRelease(panelData.dlc.loading ? loaded() : (panelData.dlc() ?? [])));
+  const empty = () => {
+    if (panelData.dlc.loading || panelData.dlc() === undefined) return skeleton;
+    return (
       <div class="panel-collapsible-body-pad">
-        <div class="panel-no-data">No DLC details available.</div>
+        <div class="panel-no-data">
+          {panelData.dlc() === null ? "Couldn't load DLC details." : 'No DLC details available.'}
+        </div>
       </div>
     );
   };
+  const notShown = () => dlcIds().length - panelData.dlcShown();
+  const body = (
+    <Show when={entries().length} fallback={empty()}>
+      <div class="panel-dlc-list">
+        <ul class="panel-dlc-items" role="list">
+          <For each={entries()}>{(d) => <DlcItem d={d} />}</For>
+        </ul>
+        <Show
+          when={panelData.dlc.loading}
+          fallback={
+            <Show when={notShown() > 0}>
+              <button type="button" class="panel-dlc-more" onClick={() => panelData.showMoreDlc(props.game.appid)}>
+                {notShown() > DLC_PAGE ? `Show ${DLC_PAGE} more of ${notShown()}` : `Show ${notShown()} more`}
+              </button>
+            </Show>
+          }
+        >
+          <Show when={panelData.dlcShown() - entries().length}>
+            {(n) => <div class="panel-dlc-loading-more">Loading {n()} more…</div>}
+          </Show>
+        </Show>
+      </div>
+    </Show>
+  );
 
   return (
     <Show when={dlcIds().length}>
@@ -1856,7 +1851,7 @@ function DlcSection(props: { game: ReadonlyGame }): JSX.Element {
               <b>DLC</b> · {dlcIds().length} available
             </>
           }
-          body={body()}
+          body={body}
           linkHref={`https://store.steampowered.com/dlc/${props.game.appid}/`}
           linkTitle="View all DLC on Steam"
         />
