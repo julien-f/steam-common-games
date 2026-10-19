@@ -1085,6 +1085,24 @@ test('L2 edge: Edit sources has one Cancel, which hands focus back', async ({ pa
   await expect(edit).toBeFocused();
 });
 
+test('L2 edge: on a phone, the combine form fits the page width', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout');
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  const pageWidth = () => page.evaluate(() => document.documentElement.scrollWidth);
+  const viewport = page.viewportSize()!;
+  await page.getByRole('button', { name: 'New combined list' }).click();
+  const sources = page.locator('.combine-form .combine-sources input[type="checkbox"]');
+  await expect(sources.first()).toBeVisible();
+  expect(await pageWidth()).toBeLessThanOrEqual(viewport.width);
+  await sources.nth(0).check();
+  await sources.nth(1).check();
+  await page.getByRole('button', { name: 'Create combined list' }).click();
+  await page.getByRole('button', { name: 'Edit sources' }).click();
+  await expect(page.locator('.combine-form')).toBeVisible();
+  expect(await pageWidth()).toBeLessThanOrEqual(viewport.width);
+});
+
 test('L1 edge: a list under 2 games says ranking needs 2', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');

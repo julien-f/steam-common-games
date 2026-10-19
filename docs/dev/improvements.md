@@ -40,7 +40,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Phone
 
-- **U171 · major · L2, B3, I1** — at 390 px, Home's **New combined list** form and a list's **Edit sources** overflow the page by ~76 px: the mode select (`align-self: start`, `components.css`) sizes to its longest option, "Grouped by membership (one table per combination of sources)", the name field and source rows follow it, and the page scrolls sideways. Cap the select at the form's width. Since 524cb00.
 - **U173 · polish · C1, C3, B1, R1** — the phone hero's ⋯ (More actions) draws its icon 9 px above centre (`.list-hero-more` is `inline-flex` without centring). Since 0663512's Lucide icon.
 
 ## Accounts and first visit
