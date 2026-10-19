@@ -2691,4 +2691,741 @@
     display: flex;
     gap: 4px;
   }
+
+  /* ── Home (HomeRoute.tsx): the account, then the quick links beside the user's lists. ── */
+  .home-account {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px 20px;
+  }
+  .home-account > * {
+    flex: 1 1 100%;
+  }
+  /* The account and the lookup form share a row when there's room. */
+  .home-account > :is(.account-header, .home-intro) {
+    flex: 1 1 260px;
+  }
+  .home-account > .home-lookup {
+    flex: 1 1 340px;
+  }
+  .home-intro {
+    color: var(--text-body);
+  }
+  .home-lookup {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .home-lookup > input {
+    flex: 1 1 220px;
+    height: 38px;
+  }
+  .home-lookup > button {
+    min-height: 38px;
+  }
+  .home-account h3 {
+    margin-bottom: -8px;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+
+  .account-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .account-label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    color: var(--text);
+    font-size: var(--fs-figure);
+    font-weight: 600;
+  }
+  .account-counts {
+    margin-top: 4px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: var(--fs-ui);
+    font-variant-numeric: tabular-nums;
+  }
+  /* The age is the control that refreshes it (ui-guidelines.md). */
+  .account-updated-btn {
+    min-height: 24px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+    cursor: pointer;
+  }
+  .account-updated-btn:hover:not(:disabled) {
+    color: var(--text);
+  }
+
+  /* One Steam account's identity: Home's header, a Family's members, friends, the hero, Compare. */
+  .account-avatar-wrap {
+    flex-shrink: 0;
+  }
+  .account-avatar {
+    display: block;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-1);
+  }
+  .account-avatar-lg .account-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+  }
+  .account-name {
+    font-size: var(--fs-ui);
+  }
+  .account-count,
+  .account-realname {
+    color: var(--muted);
+    font-size: var(--fs-meta);
+    font-weight: 400;
+  }
+  .account-profile-link {
+    color: inherit;
+    text-decoration: none;
+  }
+  .account-profile-link:hover {
+    color: var(--text);
+    text-decoration: underline;
+  }
+  .account-profile-arrow {
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .account-private,
+  .account-friend-mutual {
+    padding: 2px 8px;
+    border-radius: var(--radius-1);
+    background: color-mix(in srgb, currentColor 12%, transparent);
+    font-size: var(--fs-meta);
+    font-weight: 400;
+    white-space: nowrap;
+  }
+  .account-private {
+    color: var(--warn);
+  }
+  .account-friend-mutual {
+    color: var(--good);
+  }
+
+  /* CopyButton.tsx: Home's accounts and the account chip. */
+  .copy-btn {
+    flex-shrink: 0;
+    min-width: 24px;
+    min-height: 24px;
+    padding: 0 6px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-2);
+    background: none;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+    cursor: pointer;
+    transition:
+      color var(--dur-1) var(--ease-out),
+      border-color var(--dur-1) var(--ease-out);
+  }
+  .copy-btn:hover {
+    border-color: var(--muted);
+    color: var(--text);
+  }
+  /* A confirmation, not a hover. */
+  .copy-btn--copied,
+  .copy-btn--copied:hover {
+    border-color: var(--good);
+    color: var(--good);
+  }
+
+  .account-members,
+  .account-friends-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .account-members li,
+  .account-friends-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .account-friends-list {
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .account-friends-list li .btn {
+    margin-left: auto;
+  }
+  .account-friends summary {
+    width: fit-content;
+    padding-block: 6px;
+    color: var(--muted);
+    font-size: var(--fs-ui);
+    cursor: pointer;
+  }
+  .account-friends summary:hover {
+    color: var(--text);
+  }
+  .account-friends-meta,
+  .account-friends-note {
+    margin-block: 4px 8px;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .account-friends-refresh {
+    min-height: 24px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+  }
+  .account-friends-refresh:hover:not(:disabled) {
+    color: var(--text);
+  }
+
+  /* A `?u=` link's account, or a Compare player that didn't resolve: a heads-up, not an error. */
+  .account-override,
+  .compare-failures {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--bg));
+    border-radius: var(--radius-3);
+    background: color-mix(in srgb, var(--warn) 8%, var(--bg));
+    font-size: var(--fs-ui);
+  }
+  .account-override-status .btn {
+    margin-left: 8px;
+  }
+  .compare-failures {
+    margin-bottom: 16px;
+  }
+  .compare-failures-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .error {
+    color: var(--bad);
+    font-size: var(--fs-ui);
+  }
+
+  /* Recent accounts: hairline rows, the account's name the row's main button. */
+  .recent-accounts {
+    border-top: 1px solid var(--line);
+  }
+  .recent-accounts li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    border-bottom: 1px solid var(--line);
+  }
+  .recent-accounts li > span {
+    white-space: nowrap;
+  }
+  .recent-accounts li > button:first-child {
+    flex: 1;
+    min-width: 0;
+    min-height: 32px;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    background: none;
+    color: var(--text);
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .recent-accounts li > button:first-child:hover {
+    text-decoration: underline;
+  }
+  .recent-icon-btn,
+  .recents-clear {
+    border: 0;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .recent-icon-btn {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: var(--radius-2);
+    font-size: var(--fs-body);
+  }
+  .recent-icon-btn:hover,
+  .recents-clear:hover {
+    background: var(--line);
+    color: var(--text);
+  }
+  .home-account > .recents-clear {
+    flex: none;
+  }
+  .recents-clear {
+    min-height: 24px;
+    margin: -8px 0 0 -6px;
+    padding: 0 6px;
+    border-radius: var(--radius-1);
+    font-size: var(--fs-meta);
+  }
+
+  /* The quick links: one hairline row each. */
+  .home-fixed-links {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--line);
+  }
+  .home-fixed-links a {
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    border-bottom: 1px solid var(--line);
+    text-decoration: none;
+    transition: background-color var(--dur-1) var(--ease-out);
+  }
+  .home-fixed-links a:hover {
+    background: var(--surface);
+  }
+  /* Beside "Your lists", level with its first row: under its title line (30px buttons, 12px gap). */
+  @media (min-width: 769px) {
+    .home-fixed-links {
+      margin-top: 42px;
+    }
+  }
+
+  /* "Your lists": the title and the create buttons on one line, the tree as hairline rows. */
+  .home-tree {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 8px;
+  }
+  .home-tree > * {
+    flex: 1 1 100%;
+  }
+  .home-tree > h2 {
+    flex: 1 1 auto;
+  }
+  .home-tree > .tree-actions {
+    flex: 0 1 auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .tree-actions button {
+    min-height: 30px;
+    padding: 0 10px;
+  }
+  .home-tree > p {
+    color: var(--muted);
+  }
+
+  .list-tree {
+    border-top: 1px solid var(--line);
+  }
+  .list-tree li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    min-height: 48px;
+    border-bottom: 1px solid var(--line);
+  }
+  .list-tree li > :is(a, span) {
+    flex: 1 1 120px;
+    min-width: 0;
+  }
+  .list-tree a {
+    text-decoration: none;
+  }
+  .list-tree a:hover {
+    text-decoration: underline;
+  }
+  .list-tree span:has(+ .tree-name-field) {
+    flex: none;
+  }
+  .tree-name-field {
+    flex: 1 1 160px;
+  }
+  /* Phone: the name on its own line, the actions under it, their text on its edge. */
+  @media (max-width: 600px) {
+    .list-tree li {
+      padding-block: 6px;
+    }
+    .list-tree li > :is(a, span):not(:has(+ .tree-name-field)) {
+      flex-basis: 100%;
+    }
+    .list-tree li > :is(a, span) + :is(button, select) {
+      margin-left: -8px;
+    }
+  }
+  /* Row actions stay quiet until pointed at. */
+  .list-tree button,
+  .tree-move {
+    min-height: 32px;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-2);
+    background: none;
+    color: var(--muted);
+    font-size: var(--fs-ui);
+    cursor: pointer;
+  }
+  .list-tree button:hover,
+  .tree-move:hover {
+    border-color: var(--line-control);
+    color: var(--text);
+  }
+
+  /* An unnamed dynamic list's formula, standing in for a name. */
+  .derived-name {
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  /* CombineForm.tsx: on Home under "Your lists", and a dynamic list's Edit sources. */
+  .combine-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 16px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-3);
+  }
+  .combine-form > select {
+    align-self: start;
+  }
+  .combine-form p {
+    color: var(--muted);
+    font-size: var(--fs-ui);
+  }
+  .combine-sources-set > legend {
+    margin-bottom: 4px;
+  }
+  .combine-sources {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .combine-sources label,
+  .combine-sources-ordered li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    font-size: var(--fs-ui);
+  }
+  .combine-sources label {
+    cursor: pointer;
+  }
+  .combine-source-index {
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+  .combine-source-label {
+    flex: 1;
+  }
+  .combine-sources-ordered button {
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+    font-size: var(--fs-meta);
+  }
+  .combine-form-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* ── Compare's players form (ComparePlayersForm.tsx): one row per player, a token field each. ── */
+  .compare-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 760px;
+    margin-bottom: 16px;
+  }
+  .compare-slot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .compare-slot-label {
+    min-width: 64px;
+    color: var(--muted);
+    font-size: var(--fs-ui);
+  }
+  /* Looks like a field: the chips and the combobox inside one border, its focus ring around both. */
+  .compare-tokens {
+    position: relative;
+    flex: 1 1 260px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+    min-height: 38px;
+    padding: 4px 6px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-3);
+    background: var(--surface);
+  }
+  .compare-tokens:has(input:focus-visible) {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+  }
+  .compare-tokens input[type='text'] {
+    flex: 1 1 160px;
+    min-width: 120px;
+    height: 28px;
+    padding: 0 4px;
+    border: 0;
+    background: none;
+    outline: none;
+  }
+  .compare-token {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 26px;
+    padding: 0 0 0 8px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-2);
+    background: var(--surface-2);
+    font-size: var(--fs-ui);
+  }
+  .compare-token:has(.account-avatar) {
+    padding-left: 3px;
+  }
+  .compare-token .account-avatar,
+  .compare-options .account-avatar {
+    width: 20px;
+    height: 20px;
+  }
+  /* A raw identifier nobody has resolved yet reads as provisional, next to a named account. */
+  .compare-token.is-typed .compare-token-label {
+    color: var(--muted);
+    font-style: italic;
+  }
+  .compare-token.is-invalid {
+    border-color: var(--bad);
+    text-decoration: line-through var(--bad);
+  }
+  .compare-token-remove {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-1);
+    background: none;
+    color: var(--muted);
+    font-size: var(--fs-body);
+    line-height: 1;
+    cursor: pointer;
+  }
+  .compare-token-remove:hover {
+    background: var(--line);
+    color: var(--text);
+  }
+  .compare-options {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 20;
+    max-height: 260px;
+    padding: 4px;
+    overflow-y: auto;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-3);
+    background: var(--surface);
+  }
+  .compare-options li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 0 8px;
+    border-radius: var(--radius-2);
+    font-size: var(--fs-ui);
+    cursor: pointer;
+  }
+  .compare-options li.active {
+    background: var(--line);
+  }
+  .compare-options .account-count {
+    margin-left: auto;
+  }
+  .compare-form-hint {
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .compare-form-hint.is-hidden {
+    display: none;
+  }
+  .compare-form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ── Search: /search's own box (SearchRoute.tsx), the header's dropdown (gameSearch.ts). ── */
+  .game-search-wrap {
+    position: relative;
+  }
+  .game-search-wrap > input {
+    width: 100%;
+  }
+  .game-search-wrap > input:not(:placeholder-shown) {
+    padding-right: 40px;
+  }
+  /* The page's one control, larger than the header's copy. */
+  .search-page-input {
+    max-width: 760px;
+    margin-bottom: 16px;
+  }
+  .search-page-input > input {
+    height: 44px;
+    padding: 0 14px;
+    font-size: var(--fs-title);
+  }
+  .search-page-status {
+    color: var(--muted);
+  }
+  /* SearchClearButton.tsx, inside either search box's right edge. */
+  .search-clear {
+    position: absolute;
+    top: 0;
+    right: 0;
+    min-width: 40px;
+    height: 100%;
+    padding: 0 12px;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: var(--fs-figure);
+    line-height: 1;
+    cursor: pointer;
+  }
+  .search-clear:hover {
+    color: var(--text);
+  }
+  input:placeholder-shown + .search-clear {
+    display: none;
+  }
+  .game-search-results {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 5;
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-3);
+    background: var(--surface);
+  }
+  .game-search-result,
+  .game-search-more {
+    width: 100%;
+    min-height: 36px;
+    padding: 0 10px;
+    border: 0;
+    color: var(--text);
+    font-size: var(--fs-ui);
+    text-align: left;
+    cursor: pointer;
+  }
+  .game-search-result {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: none;
+  }
+  .game-search-result:is(:hover, :focus-visible, .active),
+  .game-search-more:is(:hover, .active) {
+    background: var(--line);
+  }
+  .game-search-thumb {
+    flex-shrink: 0;
+    width: 46px;
+    height: 22px;
+    border-radius: var(--radius-1);
+    object-fit: cover;
+  }
+  .game-search-thumb--empty {
+    background: var(--bg);
+  }
+  .game-search-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .game-search-section {
+    padding: 8px 10px 4px;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .game-search-empty {
+    padding: 10px;
+    color: var(--muted);
+    font-size: var(--fs-ui);
+  }
+  /* Sticky and opaque: the recents can outgrow the dropdown, and a "see all" scrolled away is never found. */
+  .game-search-more {
+    position: sticky;
+    bottom: 0;
+    display: block;
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--muted);
+  }
+
+  /* ── About (AboutRoute.tsx) ── */
+  .container > section > p {
+    max-width: 72ch;
+    color: var(--text-body);
+  }
+  .how-steps {
+    max-width: 72ch;
+    margin-top: 8px;
+    counter-reset: step;
+  }
+  /* The number sits in the item's padding, not as a flex sibling that would split a source's name from its text. */
+  .how-steps li {
+    position: relative;
+    padding: 8px 0 8px 32px;
+    border-top: 1px solid var(--line);
+    color: var(--text-body);
+    line-height: 1.5;
+    counter-increment: step;
+  }
+  .how-steps li::before {
+    content: counter(step);
+    position: absolute;
+    top: 8px;
+    left: 0;
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+  .how-steps strong {
+    color: var(--text);
+  }
 }

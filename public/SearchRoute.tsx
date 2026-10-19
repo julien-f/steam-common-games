@@ -283,38 +283,15 @@ export default function SearchRoute() {
         <SearchClearButton />
       </div>
 
-      <Show
-        when={query()}
-        fallback={
-          <div class="card">
-            <p class="card-subtitle">Type a game name to search.</p>
-          </div>
-        }
-      >
-        <Show
-          when={query().length >= GAME_SEARCH_MIN_CHARS}
-          fallback={
-            <div class="card">
-              <p class="card-subtitle">Keep typing…</p>
-            </div>
-          }
-        >
-          <Show
-            when={!searching()}
-            fallback={
-              <div class="card">
-                <p class="card-subtitle">Searching…</p>
-              </div>
-            }
-          >
+      <Show when={query()} fallback={<p class="search-page-status">Type a game name to search.</p>}>
+        <Show when={query().length >= GAME_SEARCH_MIN_CHARS} fallback={<p class="search-page-status">Keep typing…</p>}>
+          <Show when={!searching()} fallback={<p class="search-page-status">Searching…</p>}>
             <Show
               when={results().length}
               fallback={
-                <div class="card">
-                  <p class="card-subtitle">
-                    {searchFailed() ? 'Search failed — try again' : `No games found for "${query()}".`}
-                  </p>
-                </div>
+                <p class="search-page-status">
+                  {searchFailed() ? 'Search failed — try again' : `No games found for "${query()}".`}
+                </p>
               }
             >
               {/* search-table: hides the Columns/Sort/Search/Filter toolbar (style.css) — none of

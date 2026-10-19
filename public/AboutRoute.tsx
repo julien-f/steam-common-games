@@ -12,7 +12,7 @@ export default function AboutRoute() {
 
       <section>
         <h2>About</h2>
-        <p class="card-subtitle">
+        <p>
           steam.isonoe.net compares Steam libraries across players and helps you browse a single library, with ratings,
           playtime, and completion-time estimates. It's a small personal project, not affiliated with or endorsed by
           Valve, Steam, HowLongToBeat, or ProtonDB.
@@ -47,7 +47,7 @@ export default function AboutRoute() {
 
       <section>
         <h2>What's stored</h2>
-        <p class="card-subtitle">
+        <p>
           Only public Steam profile data (Steam ID, name, avatar, owned games/playtime) and the ratings/tags/
           completion-time estimates above are cached temporarily to keep the site fast — cached entries expire
           automatically, from an hour for library data up to a few weeks for slower-changing data like ratings and tags.
@@ -58,12 +58,9 @@ export default function AboutRoute() {
 
       <section>
         <h2>Contact</h2>
-        <p class="card-subtitle">
+        <p>
           Questions, or want data related to your profile removed from the cache? Open an issue on{' '}
-          <a href="https://github.com/julien-f/steam-common-games/issues" class="footer-link">
-            GitHub
-          </a>
-          .
+          <a href="https://github.com/julien-f/steam-common-games/issues">GitHub</a>.
         </p>
       </section>
     </div>

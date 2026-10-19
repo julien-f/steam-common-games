@@ -135,6 +135,46 @@
     }
   }
 
+  /* The routes that aren't a wide table: one centred column. */
+  .container,
+  .home-route {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding-block: 24px 60px;
+  }
+  @media (max-width: 600px) {
+    .container,
+    .home-route {
+      padding-block: 16px 40px;
+    }
+  }
+  /* Home: the account across the top, then the quick links beside the user's lists. */
+  .home-route {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    align-items: start;
+    gap: 40px;
+  }
+  .home-account {
+    grid-column: 1 / -1;
+  }
+  @media (max-width: 768px) {
+    .home-route {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 32px;
+    }
+  }
+
+  /* A route fades in as it mounts: CSS, since the router has no transition hook. */
+  .app-content > * {
+    animation: route-in var(--dur-3) var(--ease-out);
+  }
+  @keyframes route-in {
+    from {
+      opacity: 0;
+    }
+  }
+
   /* Every route's side margin. */
   .container,
   .list-route,

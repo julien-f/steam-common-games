@@ -211,7 +211,9 @@ export function CombineForm(props: CombineFormProps) {
       </fieldset>
       {error() && <p class="error">{error()}</p>}
       <div class="combine-form-actions">
-        <button type="submit">{props.submitLabel}</button>
+        <button type="submit" class="btn btn-primary">
+          {props.submitLabel}
+        </button>
         <Show when={props.onCancel}>
           {(cancel) => (
             <button type="button" onClick={() => cancel()()}>

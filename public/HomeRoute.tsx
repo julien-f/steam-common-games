@@ -434,7 +434,7 @@ export default function HomeRoute() {
     <div class="home-route">
       <h1 class="visually-hidden">Home</h1>
       <section class="home-account">
-        <h2>Account</h2>
+        <h2 class="visually-hidden">Account</h2>
 
         {/* A `?u=` link being explored — see accountsStore.ts's own `?u=` section. Said out loud
             rather than left implicit: the account card below is showing someone the *link*
@@ -451,7 +451,7 @@ export default function HomeRoute() {
                 <p class="account-override-status">
                   Exploring <strong>{accountDisplayLabel(account())}</strong> from this link — your own current account
                   is unchanged.
-                  <button type="button" class="account-override-adopt" onClick={() => pickAccount(account())}>
+                  <button type="button" class="btn" onClick={() => pickAccount(account())}>
                     Set as my current account
                   </button>
                 </p>
@@ -478,7 +478,7 @@ export default function HomeRoute() {
               <Show when={solePlayer()?.avatarUrl || account().avatarUrl}>
                 {(url) => (
                   <span class="account-avatar-wrap account-avatar-lg">
-                    <img class="account-avatar" src={url()} alt="" width="48" height="48" />
+                    <img class="account-avatar" src={url()} alt="" width="64" height="64" />
                   </span>
                 )}
               </Show>
@@ -543,6 +543,43 @@ export default function HomeRoute() {
           )}
         </Show>
 
+        <form
+          class="home-lookup"
+          onSubmit={(e) => {
+            e.preventDefault();
+            resolveAndSetCurrent();
+          }}
+        >
+          {/* <Index>, not <For> — <For> keys each item by the value itself (`===` on the
+              array element), which is exactly wrong for a list of strings the user is actively
+              typing into: changing "a" to "ab" makes the old and new values two *different*
+              strings, so <For> would tear down and recreate that index's whole <input> on every
+              keystroke, dropping focus mid-word. <Index> keys by array position instead — typing
+              updates the same DOM node in place, the same fix Solid's own docs give for this. */}
+          <Index each={resolveInputs()}>
+            {(value, i) => (
+              <input
+                type="text"
+                // Only the added ones: the first field is there on load.
+                ref={(el) => i > 0 && queueMicrotask(() => el.focus())}
+                value={value()}
+                placeholder="Steam name, profile URL, or 64-bit ID…"
+                aria-label="Steam name, profile URL, or 64-bit ID"
+                onInput={(e) =>
+                  setResolveInputs((prev) => prev.map((v, idx) => (idx === i ? e.currentTarget.value : v)))
+                }
+              />
+            )}
+          </Index>
+          <button type="button" onClick={() => setResolveInputs((prev) => [...prev, ''])}>
+            + Add Steam Family account
+          </button>
+          <button type="submit" class="btn btn-primary" disabled={resolving()}>
+            {resolving() ? 'Looking up…' : 'Look up'}
+          </button>
+        </form>
+        {resolveError() && <p class="error">{resolveError()}</p>}
+
         {/* A Steam Family (several accounts unioned into one slot) — one row per member, since
             the header above can only speak for the slot as a whole. */}
         <Show when={players().length > 1}>
@@ -605,42 +642,6 @@ export default function HomeRoute() {
             <AccountFriends accountId={account().id} myAccountId={myAccount()?.id ?? null} onExplore={pickAccount} />
           )}
         </Show>
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            resolveAndSetCurrent();
-          }}
-        >
-          {/* <Index>, not <For> — <For> keys each item by the value itself (`===` on the
-              array element), which is exactly wrong for a list of strings the user is actively
-              typing into: changing "a" to "ab" makes the old and new values two *different*
-              strings, so <For> would tear down and recreate that index's whole <input> on every
-              keystroke, dropping focus mid-word. <Index> keys by array position instead — typing
-              updates the same DOM node in place, the same fix Solid's own docs give for this. */}
-          <Index each={resolveInputs()}>
-            {(value, i) => (
-              <input
-                type="text"
-                // Only the added ones: the first field is there on load.
-                ref={(el) => i > 0 && queueMicrotask(() => el.focus())}
-                value={value()}
-                placeholder="Steam name, profile URL, or 64-bit ID…"
-                aria-label="Steam name, profile URL, or 64-bit ID"
-                onInput={(e) =>
-                  setResolveInputs((prev) => prev.map((v, idx) => (idx === i ? e.currentTarget.value : v)))
-                }
-              />
-            )}
-          </Index>
-          <button type="button" onClick={() => setResolveInputs((prev) => [...prev, ''])}>
-            + Add Steam Family account
-          </button>
-          <button type="submit" disabled={resolving()}>
-            {resolving() ? 'Looking up…' : 'Look up'}
-          </button>
-        </form>
-        {resolveError() && <p class="error">{resolveError()}</p>}
 
         <h3>Recent accounts</h3>
         <Show when={recents().length > 0} fallback={<p>No recent accounts yet.</p>}>
