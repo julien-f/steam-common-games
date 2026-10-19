@@ -163,6 +163,7 @@ test('GET /opensearch.xml: 200 with a search template built from the request hos
   const res = await api.get('/opensearch.xml');
   assert.equal(res.status, 200);
   assert.match(res.headers['content-type'], /application\/opensearchdescription\+xml/);
+  assert.match(res.text, /<ShortName>Playshelf<\/ShortName>/);
   assert.match(res.text, /<Url type="text\/html" template="http:\/\/[^"]+\/search\?q=\{searchTerms\}"\/>/);
 });
 
@@ -177,7 +178,7 @@ test('GET /some/client-side/route: 200 with the app shell HTML, not a 404', asyn
 test('GET / and /lists/owned: the app shell carries Open Graph tags with an absolute image URL, for chat link previews', async () => {
   for (const route of ['/', '/lists/owned']) {
     const res = await api.get(route).set('Host', 'app.example');
-    assert.match(res.text, /<meta property="og:title" content="steam\.isonoe\.net" \/>/);
+    assert.match(res.text, /<meta property="og:title" content="Playshelf" \/>/);
     assert.match(res.text, /<meta property="og:description" content="Explore Steam libraries [^"]+" \/>/);
     assert.match(res.text, /<meta property="og:image" content="http:\/\/app\.example\/og-image\.jpg" \/>/);
     assert.match(res.text, /<meta name="twitter:card" content="summary_large_image" \/>/);
@@ -203,17 +204,19 @@ test('GET /game/:appid: the preview names and describes a cached game and shows 
   setCache('meta:622', { name: null, header_image: null, short_description: null });
   const nulls = await api.get('/game/622');
   assert.equal(nulls.status, 200);
-  assert.match(nulls.text, /<meta property="og:title" content="steam\.isonoe\.net" \/>/);
+  assert.match(nulls.text, /<meta property="og:title" content="Playshelf" \/>/);
   assert.match(nulls.text, /<meta property="og:description" content="Explore Steam libraries [^"]+" \/>/);
 
   const uncached = await api.get('/game/621');
-  assert.match(uncached.text, /<meta property="og:title" content="steam\.isonoe\.net" \/>/);
+  assert.match(uncached.text, /<meta property="og:title" content="Playshelf" \/>/);
   assert.equal(fetchMock.mock.callCount(), 0);
 });
 
-test('index.html links raster icons, which link previews fall back to', () => {
+test('index.html links the SVG favicon, and raster icons, which link previews fall back to', () => {
   // The source, not the served shell: that one is a possibly stale dist/ build when one exists.
   const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
+  assert.match(html, /<link rel="icon" type="image\/svg\+xml" href="\/favicon\.svg" \/>/);
+  assert.ok(fs.existsSync(path.join(__dirname, '../static/favicon.svg')));
   assert.match(html, /<link rel="icon" type="image\/png" sizes="512x512" href="\/icon-512\.png" \/>/);
   assert.match(html, /<link rel="apple-touch-icon" href="\/apple-touch-icon\.png" \/>/);
 });

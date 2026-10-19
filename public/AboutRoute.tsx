@@ -13,7 +13,7 @@ export default function AboutRoute() {
       <section>
         <h2>About</h2>
         <p>
-          steam.isonoe.net compares Steam libraries across players and helps you browse a single library, with ratings,
+          Playshelf compares Steam libraries across players and helps you browse a single library, with ratings,
           playtime, and completion-time estimates. It's a small personal project, not affiliated with or endorsed by
           Valve, Steam, HowLongToBeat, or ProtonDB.
         </p>

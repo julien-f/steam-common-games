@@ -273,7 +273,11 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
         <header id="site-nav" class="site-nav">
           {/* A plain link: the router's <A> would mark it current on Home, beside the Home link. */}
           <a href={withAccountParam('/', location.search)} class="site-brand">
-            Common Games
+            <svg class="site-brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+              <rect width="32" height="32" rx="7" />
+              <path d="M6 7h5v17H6zM12.5 11h4v13h-4zM18.6 12.6l3.8-1.4 4.4 12.2-3.8 1.4zM4 24h24v3H4z" />
+            </svg>
+            Playshelf
           </a>
           <nav class="site-nav-links" aria-label="Main">
             <For each={NAV_LINKS}>

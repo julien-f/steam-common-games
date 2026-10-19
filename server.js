@@ -249,8 +249,8 @@ app.get('/opensearch.xml', (req, res) => {
     .send(
       '<?xml version="1.0" encoding="UTF-8"?>\n' +
         '<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">\n' +
-        '  <ShortName>Steam Games</ShortName>\n' +
-        `  <Description>Search for a game on ${host}</Description>\n` +
+        '  <ShortName>Playshelf</ShortName>\n' +
+        `  <Description>Search for a game on Playshelf (${host})</Description>\n` +
         '  <InputEncoding>UTF-8</InputEncoding>\n' +
         `  <Url type="text/html" template="${origin}/search?q={searchTerms}"/>\n` +
         '</OpenSearchDescription>\n',
@@ -1269,7 +1269,7 @@ app.put('/api/me/prefs/:key', authLimit, requireAuth, (req, res) => {
 
 // Chat apps' link previews read the served HTML without running the app, so their Open Graph
 // tags are injected here, with the absolute image URL they require built from the request's origin.
-const SITE_NAME = 'steam.isonoe.net';
+const SITE_NAME = 'Playshelf';
 const SITE_DESCRIPTION =
   'Explore Steam libraries as lists of games, with ratings, completion times and current prices in one sortable table.';
 // Steam's short descriptions hold entities (only `&quot;`/`&amp;` across the cache) but no tags.
@@ -1339,7 +1339,7 @@ if (require.main === module) {
   }
   if (!isItadConfigured()) console.warn('ITAD_API_KEY is not set: bundles and prices are off (see default.env).');
   app.listen(PORT, HOST, () => {
-    console.log(`\nsteam.isonoe.net → http://${HOST}:${PORT}\n`);
+    console.log(`\nPlayshelf → http://${HOST}:${PORT}\n`);
   });
 }
 

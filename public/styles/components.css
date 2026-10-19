@@ -52,11 +52,24 @@
   /* The header (AppShell.tsx): the wordmark, the route links as plain text, the current one
      underlined in the accent. */
   .site-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     font-size: var(--fs-title);
     font-weight: 600;
     letter-spacing: -0.01em;
     text-decoration: none;
     white-space: nowrap;
+  }
+  /* Same shapes as static/favicon.svg, on the palette's tokens. */
+  .site-brand-mark {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    fill: var(--accent);
+  }
+  .site-brand-mark path {
+    fill: var(--bg);
   }
   .site-nav-link {
     padding-block: 6px;

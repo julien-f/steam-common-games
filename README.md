@@ -1,4 +1,6 @@
-# steam.isonoe.net
+# Playshelf
+
+Live at [steam.isonoe.net](https://steam.isonoe.net).
 
 Explore Steam libraries as lists of games — one account's owned games or wishlist, a bundle, or a list you build yourself — with ratings, completion times and current prices in one sortable table.
 
