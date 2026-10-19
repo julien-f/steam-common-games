@@ -55,7 +55,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   3. **+ add another account**
   4. resolve
   5. open Owned
-- **Done when**: one account slot with several members; a game anyone owns counts as owned; ⧉ copies one identifier per member.
+- **Done when**: one account slot with several members; a game anyone owns counts as owned; the copy button copies one identifier per member.
 
 ### A4 Reach a friend through my friends list
 
@@ -312,7 +312,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 
 - **Steps**:
   1. panel
-  2. 🔗 copy link
+  2. Copy link to this game
   3. open elsewhere
 - **Done when**: `/game/<appid>` opens for anyone and carries no account.
 
@@ -376,7 +376,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Steps**:
   1. open a large Owned or Wishlist
   2. watch the affected column
-  3. retry with ↻ in the panel once the upstream is back
+  3. retry with Refresh details in the panel once the upstream is back
 - **Done when**: the failing column says it failed rather than looking empty; other columns and the rest of the table are unaffected; the ↻ retry works.
 
 ### D3 Back after a month

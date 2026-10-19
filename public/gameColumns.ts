@@ -826,7 +826,7 @@ function markFailedSources(columns: ColumnDef<Row>[]): ColumnDef<Row>[] {
         mark.title =
           source === 'prices'
             ? "IsThereAnyDeal didn't answer — the list's Prices tile ↻ retries"
-            : `${SOURCE_NAMES[source]} didn't answer — ↻ in the game's panel retries`;
+            : `${SOURCE_NAMES[source]} didn't answer — Refresh details in the game's panel retries`;
         return mark;
       }
       return col.render ? col.render(v, row) : document.createTextNode(col.format ? col.format(v, row) : String(v));

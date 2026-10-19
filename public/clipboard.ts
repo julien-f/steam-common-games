@@ -45,7 +45,7 @@ function promptFallback(text: string): boolean {
 }
 
 export interface CopyFeedback {
-  copiedText?: string; // label shown while confirming (default '✓ Copied!')
+  copied?: string | Node; // label shown while confirming (default '✓ Copied!')
   copiedClass?: string; // class added for the same window, for a distinct confirmation color
 }
 
@@ -65,13 +65,13 @@ const flashing = new WeakMap<
   { nodes: ChildNode[]; title: string; timer: ReturnType<typeof setTimeout> }
 >();
 
-function flash(btn: HTMLElement, { copiedText = '✓ Copied!', copiedClass }: CopyFeedback): void {
+function flash(btn: HTMLElement, { copied = '✓ Copied!', copiedClass }: CopyFeedback): void {
   const pending = flashing.get(btn);
   if (pending) clearTimeout(pending.timer);
   // Nodes, not text: a label may carry markup (an icon and a label hidden on a phone).
   const nodes = pending?.nodes ?? [...btn.childNodes];
   const title = pending?.title ?? btn.title;
-  btn.textContent = copiedText;
+  btn.replaceChildren(copied);
   btn.title = 'Copied!';
   if (copiedClass) btn.classList.add(copiedClass);
   const timer = setTimeout(() => {

@@ -832,7 +832,7 @@ export default function ListRoute() {
       const who = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
       return `${who} didn't answer for ${n} game${n === 1 ? '' : 's'}`;
     });
-    return parts.length ? `${parts.join(' · ')} — ↻ in a game's panel retries` : '';
+    return parts.length ? `${parts.join(' · ')} — Refresh details in a game's panel retries` : '';
   });
   const rowStore = createRowStore<Game>(rowsStore, (idx, updater) => setRowsStore(idx, updater));
   // Games opened as a standalone aside rather than as one of this list's own rows (a nav-bar
@@ -2903,7 +2903,7 @@ export default function ListRoute() {
         label: 'Updated',
         value: fmtAge(fetchedAt()),
         title:
-          "How old the server's cached copy of this bundle is. It can't be forced from here — but each game's own details can (the panel's ↻), and so can the prices",
+          "How old the server's cached copy of this bundle is. It can't be forced from here — but each game's own details can (the panel's Refresh details), and so can the prices",
       });
     }
     tiles.push(priceTile());

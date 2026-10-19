@@ -1280,6 +1280,10 @@
       border-color var(--dur-1) var(--ease-out),
       background-color var(--dur-1) var(--ease-out);
   }
+  .panel-icon-link > .lucide,
+  .panel-refresh-icon {
+    font-size: var(--fs-title);
+  }
   .panel-icon-link:hover,
   .panel-refresh-btn:hover:not(:disabled) {
     border-color: var(--muted);
@@ -1452,9 +1456,8 @@
   }
   .panel-nav-reroll {
     margin-left: 4px;
-    font-size: var(--fs-body);
   }
-  /* 🎲 isn't a key, so it carries its key; ↑/↓ are theirs. */
+  /* The dice isn't a key, so it carries its key; ↑/↓ are theirs. */
   .panel-nav-kbd {
     position: absolute;
     right: 2px;
@@ -1715,6 +1718,7 @@
   .panel-bundle-title {
     display: inline-flex;
     align-items: center;
+    gap: 6px;
     min-height: 24px;
     color: var(--text);
     font-size: var(--fs-ui);
@@ -1869,6 +1873,11 @@
       border-color var(--dur-1) var(--ease-out),
       background-color var(--dur-1) var(--ease-out);
   }
+  .panel-similar-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
   .panel-similar-sort:hover,
   .panel-dlc-more:hover {
     border-color: var(--muted);
@@ -1970,6 +1979,10 @@
   .panel-achievements-chevron {
     flex: none;
     color: var(--muted);
+    transition: rotate var(--dur-2) var(--ease-out);
+  }
+  .panel-collapsible-chip[aria-expanded='true'] .panel-achievements-chevron {
+    rotate: 90deg;
   }
   .panel-achievements-chip:hover .panel-achievements-chevron {
     color: var(--text);

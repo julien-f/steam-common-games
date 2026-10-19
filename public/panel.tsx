@@ -62,6 +62,25 @@ import { createSignal, createEffect, createMemo, createResource, createRoot, For
 import { Dynamic, render } from 'solid-js/web';
 import { A, useLocation } from '@solidjs/router';
 import { creatorListPath, type CreatorRole } from './creatorData.ts';
+import ArrowUpDown from 'lucide-solid/icons/arrow-up-down';
+import Check from 'lucide-solid/icons/check';
+import ChevronLeft from 'lucide-solid/icons/chevron-left';
+import ChevronRight from 'lucide-solid/icons/chevron-right';
+import CircleDollarSign from 'lucide-solid/icons/circle-dollar-sign';
+import Ellipsis from 'lucide-solid/icons/ellipsis';
+import Gamepad2 from 'lucide-solid/icons/gamepad-2';
+import Globe from 'lucide-solid/icons/globe';
+import Link from 'lucide-solid/icons/link';
+import Newspaper from 'lucide-solid/icons/newspaper';
+import Package from 'lucide-solid/icons/package';
+import RefreshCw from 'lucide-solid/icons/refresh-cw';
+import Search from 'lucide-solid/icons/search';
+import ShoppingCart from 'lucide-solid/icons/shopping-cart';
+import Star from 'lucide-solid/icons/star';
+import Timer from 'lucide-solid/icons/timer';
+import TriangleAlert from 'lucide-solid/icons/triangle-alert';
+import Wrench from 'lucide-solid/icons/wrench';
+import X from 'lucide-solid/icons/x';
 
 // A pick-and-mix bundle has no tier price; its best quantity rate stands in, as on its own page.
 function bundleTierText(b: GameBundle): string {
@@ -385,11 +404,11 @@ async function handlePanelRefresh() {
 // almost always means the game itself, not "reproduce my exact search too", and a route-local
 // link wouldn't even resolve for a recipient who doesn't already have that same list loaded
 // (an account's Owned/Wishlist, a specific bundle), unlike /game/<appid>, which works for anyone.
-function copyPanelLink(e: MouseEvent) {
+function copyPanelLink(e: MouseEvent, copied: Node) {
   const game = panelGame();
   if (!game) return;
   copyWithFeedback(e.currentTarget as HTMLElement, `${location.origin}/game/${game.appid}`, {
-    copiedText: '✓',
+    copied,
     copiedClass: 'panel-copy-link-btn--copied',
   });
 }
@@ -874,7 +893,7 @@ function TagCloud(props: {
 // certain as a normal chip of the same color/value.
 function GlanceChip(props: {
   href?: string | null;
-  value: string | number | null;
+  value: string | number | JSX.Element;
   color?: string | null;
   label: string;
   detail?: JSX.Element;
@@ -888,7 +907,7 @@ function GlanceChip(props: {
         classList={{ 'panel-glance-num--figure': /^[\d—]/.test(String(props.value)) }}
         style={props.color ? { color: props.color } : undefined}
       >
-        {String(props.value)}
+        {props.value}
       </span>
       <Show when={props.detail}>
         <span class="panel-glance-val">{props.detail}</span>
@@ -921,7 +940,7 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
   // The source errored (server.js's `failed`): said apart from "no data", ↻ above retries it.
   const failedChip = (source: string, label: string, href: string) =>
     props.game.failedSources?.includes(source) ? (
-      <GlanceChip href={href} value="⚠" color="var(--warn)" label={label} detail="didn't answer" />
+      <GlanceChip href={href} value={<TriangleAlert />} color="var(--warn)" label={label} detail="didn't answer" />
     ) : null;
 
   // Every chip stays in the grid even when its source has no data for this game — a missing
@@ -1066,7 +1085,7 @@ function CollapsibleCard(props: {
   section: string;
   num?: JSX.Element;
   numColor?: string | null;
-  icon?: string;
+  icon?: JSX.Element;
   val: JSX.Element;
   body: JSX.Element;
   linkHref?: string | null;
@@ -1093,9 +1112,7 @@ function CollapsibleCard(props: {
           >
             {numSpan()}
             <span class="panel-glance-val">{props.val}</span>
-            <span class="panel-achievements-chevron" aria-hidden="true">
-              {expanded() ? '▾' : '▸'}
-            </span>
+            <ChevronRight class="panel-achievements-chevron" />
           </button>
         </h3>
         <Show when={props.linkHref}>
@@ -1413,7 +1430,7 @@ function NewsSection(props: { game: ReadonlyGame }): JSX.Element {
                 <CollapsibleCard
                   appid={props.game.appid}
                   section="news"
-                  icon="📰"
+                  icon={<Newspaper />}
                   // Spelling out "more on Steam" here (not just relying on the ↗ icon's title
                   // tooltip) makes it explicit that this list is a preview, not the full history.
                   val={
@@ -1644,7 +1661,7 @@ function PanelBundleLines(): JSX.Element {
                 return (
                   <li class="panel-bundle">
                     <A class="panel-bundle-title" href={`/lists/bundle/${b.id}`}>
-                      📦 {b.title}
+                      <Package /> {b.title}
                     </A>
                     <div class="panel-bundle-meta">
                       <Show when={b.shop}>
@@ -1823,7 +1840,7 @@ function DlcSection(props: { game: ReadonlyGame }): JSX.Element {
         <CollapsibleCard
           appid={props.game.appid}
           section="dlc"
-          icon="📦"
+          icon={<Package />}
           val={
             <>
               <b>DLC</b> · {dlcIds().length} available
@@ -2045,7 +2062,7 @@ function HltbSection(props: { game: ReadonlyGame }): JSX.Element {
         <CollapsibleCard
           appid={props.game.appid}
           section="hltb"
-          icon="⏱️"
+          icon={<Timer />}
           val={
             <>
               <b>How Long To Beat</b> · {parts().join(', ')}
@@ -2241,9 +2258,16 @@ function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
               panelOptions.setSimilarTo(panelOptions.similarTo() === props.game.appid ? null : props.game.appid)
             }
           >
-            {panelOptions.similarTo() === props.game.appid
-              ? '× Stop sorting by similarity'
-              : '⇅ Sort list by similarity'}
+            <Show
+              when={panelOptions.similarTo() === props.game.appid}
+              fallback={
+                <>
+                  <ArrowUpDown /> Sort list by similarity
+                </>
+              }
+            >
+              <X /> Stop sorting by similarity
+            </Show>
           </button>
         </Show>
       </section>
@@ -2259,21 +2283,21 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
     [
       !props.game.loading &&
         (props.game.details?.meta?.categories || []).includes('Steam Workshop') && {
-          icon: '🛠️',
+          icon: Wrench,
           label: 'Steam Workshop',
           href: `https://steamcommunity.com/app/${props.game.appid}/workshop/`,
         },
       props.game.details?.meta?.website && {
-        icon: '🌐',
+        icon: Globe,
         label: 'Official Website',
         href: props.game.details.meta.website,
       },
       {
-        icon: '🔎',
+        icon: Search,
         label: 'More Like This (Steam)',
         href: steamMoreLikeUrl(props.game.appid),
       },
-    ].filter((it): it is { icon: string; label: string; href: string } => !!it);
+    ].filter((it): it is { icon: typeof Search; label: string; href: string } => !!it);
 
   return (
     <Show when={items().length}>
@@ -2287,7 +2311,7 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
           aria-label="More links"
           onClick={() => setMoreLinksOpen(!moreLinksOpen())}
         >
-          ⋯
+          <Ellipsis />
         </button>
         <Show when={moreLinksOpen()}>
           <ul class="panel-icon-more-menu">
@@ -2295,7 +2319,7 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
               {(it) => (
                 <li>
                   <a class="panel-icon-more-item" href={safeHref(it.href) || undefined} target="_blank" rel="noopener">
-                    {it.icon} {it.label}
+                    <it.icon /> {it.label}
                   </a>
                 </li>
               )}
@@ -2356,9 +2380,9 @@ function RefreshButton(props: { game: ReadonlyGame }): JSX.Element {
         <Show when={age()}>
           <span class="panel-refresh-age">{panelRefreshing() ? 'Refreshing…' : age()}</span>
         </Show>
-        {/* Only the glyph spins — the animation used to be on the button itself, which now has
+        {/* Only the icon spins — the animation used to be on the button itself, which now has
             text in it. */}
-        <span class={`panel-refresh-icon${panelRefreshing() ? ' is-refreshing' : ''}`}>↻</span>
+        <RefreshCw class={`panel-refresh-icon${panelRefreshing() ? ' is-refreshing' : ''}`} />
       </button>
     </Show>
   );
@@ -2398,7 +2422,7 @@ function OwnershipRow(props: { game: ReadonlyGame }): JSX.Element {
             aria-label="In library"
             title="In library"
           >
-            ✓ <span class="panel-ownership-label">In library</span>
+            <Check /> <span class="panel-ownership-label">In library</span>
           </A>
         </Show>
         <Show when={own()?.onWishlist}>
@@ -2408,7 +2432,7 @@ function OwnershipRow(props: { game: ReadonlyGame }): JSX.Element {
             aria-label="On wishlist"
             title="On wishlist"
           >
-            ☆ <span class="panel-ownership-label">On wishlist</span>
+            <Star /> <span class="panel-ownership-label">On wishlist</span>
           </A>
         </Show>
       </div>
@@ -2510,6 +2534,9 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
   // "← Back" only appears once a DLC hop is actually in progress — a plain table-row click never
   // gets this button, only a game reached by following a DLC link (or by going back through more
   // than one of them) does.
+  // Shown by the copy-link button's flash: created here, where an owner can dispose of it.
+  const copiedIcon = (<Check />) as Node;
+
   const back = () => {
     const hist = panelHistory();
     return hist.length ? hist[hist.length - 1] : null;
@@ -2529,7 +2556,7 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
         <Show when={back()}>
           {(prev) => (
             <button type="button" class="panel-back-btn" title={`Back to ${prev().name}`} onClick={panelGoBack}>
-              &#8249; {prev().name}
+              <ChevronLeft /> {prev().name}
             </button>
           )}
         </Show>
@@ -2562,7 +2589,7 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
               title="Steam Store"
               aria-label="Steam Store"
             >
-              🛒
+              <ShoppingCart />
             </a>
             <a
               class="panel-icon-link"
@@ -2572,7 +2599,7 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
               title="IsThereAnyDeal"
               aria-label="IsThereAnyDeal"
             >
-              $
+              <CircleDollarSign />
             </a>
             <MoreLinks game={g} />
             <span class="panel-icon-divider" role="separator" aria-hidden="true" />
@@ -2581,9 +2608,9 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
               class="panel-icon-link panel-copy-link-btn"
               title="Copy link to this game"
               aria-label="Copy link to this game"
-              onClick={copyPanelLink}
+              onClick={(e) => copyPanelLink(e, copiedIcon)}
             >
-              🔗
+              <Link />
             </button>
             <RefreshButton game={g} />
             <OwnershipRow game={g} />
@@ -2601,7 +2628,7 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
             target="_blank"
             rel="noopener"
           >
-            <span class="panel-demo-banner-icon">🎮</span> Try the Free Demo
+            <Gamepad2 class="panel-demo-banner-icon" /> Try the Free Demo
           </a>
         )}
       </Show>

@@ -467,7 +467,7 @@ test("B2 edge: the panel lists the account's owned games closest by Steam tags, 
   // On Owned itself, a row's closest owned games are the list's own similarity sort.
   await row(page, 'Valheim').getByText('Valheim').click();
   await expect(similar.locator('.panel-similar-item')).toHaveCount(0);
-  await expect(similar.getByRole('button', { name: '⇅ Sort list by similarity' })).toBeVisible();
+  await expect(similar.getByRole('button', { name: 'Sort list by similarity' })).toBeVisible();
 
   await page.goto('/lists/wishlist');
   await row(page, 'It Takes Two').getByText('It Takes Two').click();
@@ -487,17 +487,17 @@ test('C1 edge: the panel sorts the list by similarity to its game, until stopped
       .evaluateAll((boxes) => boxes.map((b) => b.getAttribute('aria-label')!.replace('Select row ', '')));
   const byRating = await names();
   await row(page, 'Valheim').getByText('Valheim').click();
-  await page.getByRole('button', { name: '⇅ Sort list by similarity' }).click();
+  await page.getByRole('button', { name: 'Sort list by similarity' }).click();
   await expect(page.getByRole('columnheader', { name: /Similarity/ })).toBeVisible();
   // Terraria's tags match Valheim's as closely as Valheim's own, so the two 100% tie.
   await expect
     .poll(async () => (await names()).slice(0, 4))
     .toEqual([...byRating.filter((n) => n === 'Valheim' || n === 'Terraria'), 'Stardew Valley', 'Portal 2']);
-  await page.getByRole('button', { name: '× Stop sorting by similarity' }).click();
+  await page.getByRole('button', { name: 'Stop sorting by similarity' }).click();
   await expect(page.getByRole('columnheader', { name: /Similarity/ })).toHaveCount(0);
   await expect.poll(names).toEqual(byRating);
   // Not kept across a reload: its target game was only this visit's.
-  await page.getByRole('button', { name: '⇅ Sort list by similarity' }).click();
+  await page.getByRole('button', { name: 'Sort list by similarity' }).click();
   await expect(page.getByRole('columnheader', { name: /Similarity/ })).toBeVisible();
   await page.reload();
   await expect(rows(page)).toHaveCount(6);
@@ -1973,7 +1973,7 @@ test('D2 edge: failed prices warn like the other sources, in plain words', async
   await expect(status).toHaveCSS('color', warnColor);
 });
 
-test("D2.3: once the upstream is back, the panel's ↻ fills in what didn't answer", async ({ page }) => {
+test("D2.3: once the upstream is back, the panel's Refresh details fills in what didn't answer", async ({ page }) => {
   await mockApi(page, { states: ['upstream-down'] });
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
@@ -2070,7 +2070,7 @@ test("F1 edge: the panel doesn't link an upstream URL that isn't http(s)", async
 
 // A failed health check stops the panel before its price lookup, so each failure gets its own run.
 for (const failing of ['health', 'prices']) {
-  test(`F1 edge: the Price card says when ITAD didn't answer its ${failing} call, and the panel's ↻ retries it`, async ({
+  test(`F1 edge: the Price card says when ITAD didn't answer its ${failing} call, and the panel's Refresh details retries it`, async ({
     page,
   }) => {
     let down = true;
@@ -2428,7 +2428,7 @@ test('F1 edge: stepping back to a game just left in the lightbox lands where it 
 });
 
 // Terraria (Hades' ↓ neighbour on /lists/owned) loads without its store metadata, so only its
-// banner; ↻ Refresh refetches it, with its media whenever `withMedia()` says so.
+// banner; Refresh details refetches it, with its media whenever `withMedia()` says so.
 async function terrariaMediaOnRefresh(page: Page, withMedia: () => boolean) {
   await page.route('**/api/game-details/stream', (route) => {
     const req = route.request();
@@ -2452,7 +2452,7 @@ async function terrariaMediaOnRefresh(page: Page, withMedia: () => boolean) {
   });
 }
 
-// The panel's ↻ sits behind the lightbox; clicked there, it refreshes the game the lightbox shows.
+// The panel's Refresh details sits behind the lightbox; clicked there, it refreshes the game the lightbox shows.
 const refreshBehindLightbox = (page: Page) =>
   page.locator('.panel-refresh-btn').evaluate((b: HTMLElement) => b.click());
 
@@ -4144,5 +4144,5 @@ test('F4 edge: a game with no Steam tags still offers More from', async ({ page 
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=105600');
   await expect(moreFrom(page).getByRole('link', { name: 'All games by Re-Logic (developer)' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '⇅ Sort list by similarity' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sort list by similarity' })).toHaveCount(0);
 });

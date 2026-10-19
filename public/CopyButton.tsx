@@ -1,7 +1,9 @@
-// A small "⧉ copy" button for JSX call sites, over clipboard.ts's copyText. The confirmation is
+// A small copy button for JSX call sites, over clipboard.ts's copyText. The confirmation is
 // a signal rather than clipboard.ts's own DOM-writing flash: inside a Solid component the label
 // is Solid's to own, and a direct textContent write would be silently undone by any re-render.
-import { createSignal, onCleanup, type JSX } from 'solid-js';
+import { createSignal, onCleanup, Show, type JSX } from 'solid-js';
+import Check from 'lucide-solid/icons/check';
+import Copy from 'lucide-solid/icons/copy';
 import { copyText, COPIED_MS } from './clipboard.ts';
 
 export function CopyButton(props: { text: string; title: string }): JSX.Element {
@@ -26,7 +28,9 @@ export function CopyButton(props: { text: string; title: string }): JSX.Element 
       aria-label={props.title}
       onClick={copy}
     >
-      {copied() ? '✓' : '⧉'}
+      <Show when={copied()} fallback={<Copy />}>
+        <Check />
+      </Show>
     </button>
   );
 }
