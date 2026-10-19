@@ -2555,7 +2555,13 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
       <div class="panel-header-sticky">
         <Show when={back()}>
           {(prev) => (
-            <button type="button" class="panel-back-btn" title={`Back to ${prev().name}`} onClick={panelGoBack}>
+            <button
+              type="button"
+              class="panel-back-btn"
+              title={`Back to ${prev().name}`}
+              aria-label={`Back to ${prev().name}`}
+              onClick={panelGoBack}
+            >
               <ChevronLeft /> {prev().name}
             </button>
           )}

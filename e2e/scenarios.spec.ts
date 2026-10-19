@@ -3767,6 +3767,19 @@ test('I2 edge: closing a game with no row returns focus to the row it was opened
   await expect(row(page, 'Hades')).toBeFocused();
 });
 
+test("I3 edge: a DLC's panel names its way back after the game it came from", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.route(/\/api\/game-details\/9000\d\d$/, (route) =>
+    route.fulfill({ json: { appid: 900001, meta: null, failed: ['meta'] } }),
+  );
+  await page.goto('/lists/owned?game=1145360');
+  const card = page.locator('#panel-section-dlc');
+  await card.getByRole('button', { name: /DLC · 25 available/ }).click();
+  await card.locator('.panel-dlc-item').first().click();
+  await page.getByRole('button', { name: 'Back to Hades', exact: true }).click();
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+});
+
 test('I2 edge: the shortcuts dialog says how to open the lightbox from the panel', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
