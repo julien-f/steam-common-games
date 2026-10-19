@@ -1,6 +1,6 @@
 // docs/dev/journeys.md's journeys, end to end against mocked data (mockApi.ts).
 import { test, expect, type Locator, type Page } from '@playwright/test';
-import { mockApi, respond } from './mockApi.ts';
+import { DEMO_OF, mockApi, respond } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
 import { ALICE, BOB, BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
 
@@ -2040,6 +2040,19 @@ test("F1 edge: the Price card says when a game is in no bundle, and when ITAD di
   await mockApi(page, { states: ['upstream-down'] }); // registered last, so it answers first
   await page.goto('/lists/owned?game=1145360');
   await expect(page.locator('.panel-bundles')).toHaveText("Bundles: IsThereAnyDeal didn't answer.");
+});
+
+test('F1 edge: a free demo shows as a neutral Demo pill and a Try the Free Demo button', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  const pill = row(page, 'It Takes Two').locator('.status-badge');
+  await expect(pill).toHaveText('Demo');
+  await expect(pill).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)'); // outlined, not the accent
+  await expect(row(page, 'Overcooked! 2').locator('.status-badge')).toHaveCount(0);
+  await row(page, 'It Takes Two').getByText('It Takes Two').click();
+  const demo = page.getByRole('link', { name: 'Try the Free Demo' });
+  await expect(demo).toHaveAttribute('href', `https://store.steampowered.com/app/${DEMO_OF[1426210]}`);
+  await expect(demo).not.toHaveClass(/btn-primary/);
 });
 
 test('F1 edge: the Price card names its ★ and 🔥 records in visible text, not only in a tooltip', async ({ page }) => {

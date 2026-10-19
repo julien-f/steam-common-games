@@ -57,6 +57,8 @@ const MEDIA: Record<number, { movies: number; screenshots: number; label: string
 };
 const UNSAFE_LINK_APPID = 892970;
 const SLOW_MEDIA_MS = 1500;
+// It Takes Two's made-up free demo: the panel's demo button and the wishlist's Demo pill.
+export const DEMO_OF: Record<number, number> = { 1426210: 3999991 };
 // The media game's DLC: more than the card's first page, so "Show more" appears.
 const DLC_APPIDS = Array.from({ length: 25 }, (_, i) => 900001 + i);
 const dlcMeta = (appid: number) => ({
@@ -144,7 +146,7 @@ function details(appid: number, slowMedia = false) {
     ...(g.categories.includes('Co-op')
       ? { tags: ['Action', 'Co-op'], tagWeights: { Action: 1, 'Co-op': COOP_WEIGHT[appid] ?? 0.5 } }
       : { tags: ['Singleplayer'], tagWeights: { Singleplayer: 1 } }),
-    demo: null,
+    demo: DEMO_OF[appid] ? { appid: DEMO_OF[appid] } : null,
     protondb: g.protondb ? { tier: g.protondb, confidence: 'strong', total: 100 } : null,
   };
 }
