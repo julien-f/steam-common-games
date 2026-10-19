@@ -3052,6 +3052,9 @@ test('F1 edge: a paused trailer offers a large play button', async ({ page }) =>
   await bigPlay.click();
   await expect(bigPlay).toBeHidden();
   await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
+  // The control draws its state: Pause while playing, not Play.
+  await expect(page.locator('.lb-vc-play .lucide-pause')).toBeVisible();
+  await expect(page.locator('.lb-vc-play .lucide-play')).toBeHidden();
 });
 
 test('F1 edge: a trailer not yet played shows its large play button, not the control bar', async ({ page }) => {

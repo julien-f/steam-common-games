@@ -2273,6 +2273,19 @@
   .lb-vc-btn:hover {
     opacity: 1;
   }
+  .lb-vc-btn,
+  .lb-toolbar :is(.lb-fullscreen, .lb-zoom) {
+    font-size: var(--fs-title);
+  }
+  /* A two-state control draws both icons and shows its state's (lightbox.tsx's `lb-on`). */
+  .lb-on > .lb-icon-off,
+  :not(.lb-on) > .lb-icon-on {
+    display: none;
+  }
+  .lb-bigplay .lucide,
+  .lb-vc-play .lucide {
+    fill: currentColor;
+  }
   .lb-vc-time,
   .lb-vc-dur {
     color: rgba(255, 255, 255, 0.85);
@@ -2607,7 +2620,7 @@
   .lb-bigplay svg {
     width: 32px;
     height: 32px;
-    margin-left: 4px; /* the triangle's visual centre sits left of its box */
+    margin-left: 2px; /* the triangle's visual centre sits left of its box */
   }
   /* Delayed, so it doesn't flash up in the moment before autoplay starts. */
   #screenshot-lightbox.lb--paused .lb-bigplay {

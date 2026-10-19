@@ -15,18 +15,15 @@ import ChevronLeft from 'lucide-solid/icons/chevron-left';
 import ChevronRight from 'lucide-solid/icons/chevron-right';
 import ChevronUp from 'lucide-solid/icons/chevron-up';
 import FastForward from 'lucide-solid/icons/fast-forward';
+import Maximize from 'lucide-solid/icons/maximize';
+import Minimize from 'lucide-solid/icons/minimize';
+import Pause from 'lucide-solid/icons/pause';
+import Play from 'lucide-solid/icons/play';
 import Rewind from 'lucide-solid/icons/rewind';
+import Volume2 from 'lucide-solid/icons/volume-2';
+import VolumeX from 'lucide-solid/icons/volume-x';
 import X from 'lucide-solid/icons/x';
-
-// ── Icons ──────────────────────────────────────────────────────────────────
-
-const LB_FS_ENTER = `<svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" aria-hidden="true"><polyline points="4,1 1,1 1,4"/><polyline points="8,1 11,1 11,4"/><polyline points="1,8 1,11 4,11"/><polyline points="11,8 11,11 8,11"/></svg>`;
-const LB_ZOOM_ICON = `<svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="6" r="4.25"/><path d="M9.25 9.25 12.5 12.5M4 6h4M6 4v4"/></svg>`;
-const LB_FS_EXIT = `<svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" aria-hidden="true"><polyline points="1,4 1,1 4,1"/><polyline points="11,4 11,1 8,1"/><polyline points="4,11 1,11 1,8"/><polyline points="8,11 11,11 11,8"/></svg>`;
-const LB_PLAY_ICON = `<svg viewBox="0 0 12 12" width="16" height="16" fill="currentColor" aria-hidden="true"><polygon points="2,1 11,6 2,11"/></svg>`;
-const LB_PAUSE_ICON = `<svg viewBox="0 0 12 12" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="1" y="1" width="4" height="10" rx="0.5"/><rect x="7" y="1" width="4" height="10" rx="0.5"/></svg>`;
-const LB_VOL_ICON = `<svg viewBox="0 0 14 12" width="16" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><polygon points="1,4 5,4 8,1 8,11 5,8 1,8" fill="currentColor" stroke="none"/><path d="M10 3.5c1 .9 1.5 1.7 1.5 2.5S11 8.1 10 9" stroke-linecap="round"/></svg>`;
-const LB_MUTE_ICON = `<svg viewBox="0 0 14 12" width="16" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><polygon points="1,4 5,4 8,1 8,11 5,8 1,8" fill="currentColor" stroke="none"/><line x1="10.5" y1="4" x2="13.5" y2="8" stroke-linecap="round"/><line x1="13.5" y1="4" x2="10.5" y2="8" stroke-linecap="round"/></svg>`;
+import ZoomIn from 'lucide-solid/icons/zoom-in';
 
 // ── State ──────────────────────────────────────────────────────────────────
 // Converted from plain module-level variables to Solid signals for
@@ -227,7 +224,7 @@ function syncLightboxFullscreenBtn() {
   const btn = document.querySelector('#screenshot-lightbox .lb-fullscreen');
   if (!btn) return;
   const isFs = isFullscreen();
-  btn.innerHTML = isFs ? LB_FS_EXIT : LB_FS_ENTER;
+  btn.classList.toggle('lb-on', isFs);
   btn.setAttribute('aria-label', isFs ? 'Exit fullscreen' : 'Enter fullscreen');
 }
 
@@ -525,22 +522,22 @@ function LightboxDom() {
       <div class="lb-seek-flash lb-seek-flash-right" aria-hidden="true">
         {LB_TOUCH_SEEK_SECONDS}s <FastForward />
       </div>
-      {/* eslint-disable-next-line solid/no-innerhtml -- a module-level literal SVG string
-          from the top of this file, not data: nothing here comes from a game, a user, or an
-          API response. Solid's JSX can't express a raw SVG child any other way. */}
-      <button class="lb-bigplay" aria-label="Play trailer" innerHTML={LB_PLAY_ICON} />
+      <button class="lb-bigplay" aria-label="Play trailer">
+        <Play />
+      </button>
       <div class="lb-vctrls" style={{ display: 'none' }}>
-        {/* eslint-disable-next-line solid/no-innerhtml -- a module-level literal SVG string
-            from the top of this file, not data: nothing here comes from a game, a user, or an
-            API response. Solid's JSX can't express a raw SVG child any other way. */}
-        <button class="lb-vc-btn lb-vc-play" aria-label="Play" innerHTML={LB_PLAY_ICON} />
+        {/* Two-state controls draw both icons; `lb-on` picks which shows. */}
+        <button class="lb-vc-btn lb-vc-play" aria-label="Play">
+          <Play class="lb-icon-off" />
+          <Pause class="lb-icon-on" />
+        </button>
         <span class="lb-vc-time">0:00</span>
         <input class="lb-vc-scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek" />
         <span class="lb-vc-dur">0:00</span>
-        {/* eslint-disable-next-line solid/no-innerhtml -- a module-level literal SVG string
-            from the top of this file, not data: nothing here comes from a game, a user, or an
-            API response. Solid's JSX can't express a raw SVG child any other way. */}
-        <button class="lb-vc-btn lb-vc-mute" aria-label="Mute" innerHTML={LB_VOL_ICON} />
+        <button class="lb-vc-btn lb-vc-mute" aria-label="Mute">
+          <Volume2 class="lb-icon-off" />
+          <VolumeX class="lb-icon-on" />
+        </button>
       </div>
       <div class="lb-toolbar">
         {/* The caption doubles as the list stepper: ↑/↓ flanking "<game> · 14 of 343" put the
@@ -559,15 +556,16 @@ function LightboxDom() {
         </div>
         <div class="lb-toolbar-row">
           <div class="lb-toolbar-left">
-            {/* eslint-disable-next-line solid/no-innerhtml -- module-level literal SVG strings
-                (see the top of this file); no external input reaches these. */}
-            <button class="lb-fullscreen" aria-label="Enter fullscreen" innerHTML={LB_FS_ENTER} />
+            <button class="lb-fullscreen" aria-label="Enter fullscreen">
+              <Maximize class="lb-icon-off" />
+              <Minimize class="lb-icon-on" />
+            </button>
           </div>
           <div class="lb-counter" aria-live="polite" aria-atomic="true" />
           <div class="lb-toolbar-right">
-            {/* eslint-disable-next-line solid/no-innerhtml -- module-level literal SVG strings
-                (see the top of this file); no external input reaches these. */}
-            <button class="lb-zoom" aria-label="Zoom" aria-pressed="false" innerHTML={LB_ZOOM_ICON} />
+            <button class="lb-zoom" aria-label="Zoom" aria-pressed="false">
+              <ZoomIn />
+            </button>
             <button class="lb-close" aria-label="Close lightbox">
               <X />
             </button>
@@ -948,14 +946,14 @@ function wireVideoControls(lb: HTMLElement) {
     durEl.textContent = fmtTime(vid2.duration);
   });
   vid2.addEventListener('play', () => {
-    playBtn.innerHTML = LB_PAUSE_ICON;
+    playBtn.classList.add('lb-on');
     playBtn.setAttribute('aria-label', 'Pause');
     document.getElementById('screenshot-lightbox')?.classList.remove('lb--unstarted');
     syncLbPaused();
     schedHideLbChrome();
   });
   vid2.addEventListener('pause', () => {
-    playBtn.innerHTML = LB_PLAY_ICON;
+    playBtn.classList.remove('lb-on');
     playBtn.setAttribute('aria-label', 'Play');
     syncLbPaused();
     if (!lbShowingVideo()) return; // stopHls' own pause, on a close or a step off the trailer
@@ -963,14 +961,14 @@ function wireVideoControls(lb: HTMLElement) {
     schedHideLbChrome();
   });
   vid2.addEventListener('ended', () => {
-    playBtn.innerHTML = LB_PLAY_ICON;
+    playBtn.classList.remove('lb-on');
     playBtn.setAttribute('aria-label', 'Play');
     syncLbPaused();
     showLbChrome();
     schedHideLbChrome();
   });
   vid2.addEventListener('volumechange', () => {
-    muteBtn.innerHTML = vid2.muted ? LB_MUTE_ICON : LB_VOL_ICON;
+    muteBtn.classList.toggle('lb-on', vid2.muted);
     muteBtn.setAttribute('aria-label', vid2.muted ? 'Unmute' : 'Mute');
   });
 
