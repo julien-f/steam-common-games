@@ -413,7 +413,7 @@ test('F3 edge: the Played (h) filter has a "never played" preset', async ({ page
   await expect(page.getByRole('button', { name: /Played \(h\): never played/ })).toBeVisible();
 });
 
-test('F3 edge: the table toolbar picks a random game from the filtered rows', async ({ page }) => {
+test('F3.5: the table toolbar picks a random game from the filtered rows', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
