@@ -3368,7 +3368,16 @@ export default function ListRoute() {
             </Show>
             <Show when={bundleLinks().url}>
               {(url) => (
-                <a class="btn btn-primary" href={url()} target="_blank" rel="noopener">
+                <a
+                  class="btn"
+                  classList={{
+                    // One primary per view: picks to buy on Fanatical take it.
+                    'btn-primary': !fanaticalPicks(),
+                  }}
+                  href={url()}
+                  target="_blank"
+                  rel="noopener"
+                >
                   Get this bundle ↗
                 </a>
               )}

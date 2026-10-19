@@ -1,22 +1,23 @@
 @layer base {
   :root {
     color-scheme: dark;
-    --bg: #0e1014;
-    --surface: #14161b;
-    --surface-2: #15171c;
+    --bg: #0f1420;
+    --surface: #161d2b;
+    --surface-2: #141b29;
     /* Dividers only: under 3:1, so a control's edge uses --line-control. */
-    --line: #1b1e24;
-    --line-strong: #23262d;
-    --line-control: #666c76;
-    --text: #e8e6e3;
-    --text-body: #c4c1bc;
-    --muted: #8b919c;
-    /* Current page, selected row, active tab; text on it is --bg. */
-    --accent: #d9a55b;
-    --good: #6fbf8e;
+    --line: #222c3d;
+    --line-strong: #2c3850;
+    --line-control: #6a7992;
+    --text: #e6ebf2;
+    --text-body: #c3ccd9;
+    --muted: #8d9ab0;
+    /* State (current page or game, pressed, active tab), a view's one primary action and the brand
+       mark; never decoration. Text on it is --bg. test/palette.test.js checks these pairs. */
+    --accent: #4cc2ff;
+    --good: #5ad19a;
     /* A warning (a source that didn't answer, a middling score) and a bad score: ≥5.5:1 on every surface. */
-    --warn: #e0a83a;
-    --bad: #e5736b;
+    --warn: #f2b84b;
+    --bad: #ff7a7a;
     /* What the account has: owned warns against buying twice, wishlisted is the one to buy. */
     --owned: var(--warn);
     --wishlisted: var(--good);
@@ -192,13 +193,13 @@
     color: var(--text);
   }
   .btn-primary {
-    border-color: var(--text);
-    background: var(--text);
+    border-color: var(--accent);
+    background: var(--accent);
     color: var(--bg);
   }
   .btn-primary:hover:not(:disabled, [aria-disabled='true']) {
-    border-color: #fff;
-    background: #fff;
+    border-color: color-mix(in srgb, var(--accent) 85%, #fff);
+    background: color-mix(in srgb, var(--accent) 85%, #fff);
     color: var(--bg);
   }
 

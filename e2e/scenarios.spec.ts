@@ -112,7 +112,7 @@ test("B1 edge: /bundles' filter tiles look like toggles, unlike the plain figure
   await toggle.click();
   await page.mouse.move(0, 0);
   const pressed = page.locator('.list-stat-btn[aria-pressed="true"]').first();
-  await expect(pressed).toHaveCSS('border-top-color', 'rgb(217, 165, 91)'); // --accent
+  await expect(pressed).toHaveCSS('border-top-color', 'rgb(76, 194, 255)'); // --accent
   // A thicker edge, not only a colour: forced colors repaint colours and drop shadows.
   expect(Number.parseFloat((await chrome(pressed)).border)).toBeGreaterThan(Number.parseFloat(off.border));
   // Hover shows on a pressed chip too.

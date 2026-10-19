@@ -12,12 +12,13 @@ html:root {
   --color-text-tertiary: var(--muted);
   --color-border-secondary: var(--line-control);
   --color-border-tertiary: var(--line);
-  --color-background-info: color-mix(in srgb, var(--accent) 12%, var(--bg));
+  /* Also the current row's tint; test/palette.test.js reads this mix. */
+  --color-background-info: color-mix(in srgb, var(--accent) 14%, var(--bg));
   --color-text-info: var(--accent);
-  --color-border-info: color-mix(in srgb, var(--accent) 45%, var(--bg));
-  --color-background-warning: #2a1900;
-  --color-text-warning: #e8a040;
-  --color-border-warning: #4a2c00;
+  --color-border-info: color-mix(in srgb, var(--accent) 55%, var(--bg));
+  --color-background-warning: color-mix(in srgb, var(--warn) 8%, var(--bg));
+  --color-text-warning: var(--warn);
+  --color-border-warning: color-mix(in srgb, var(--warn) 45%, var(--bg));
 }
 
 /* Horizontal-scroll affordance, shared with the data-table library's own
@@ -270,7 +271,7 @@ html:root {
   box-shadow: inset 0 0 0 1px var(--text);
 }
 .dt-table input[type='checkbox']:checked {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='%230e1014' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='%230f1420' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 .dt-table input[type='checkbox']:indeterminate {
   background-image: linear-gradient(var(--bg), var(--bg));

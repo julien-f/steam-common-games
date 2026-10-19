@@ -344,11 +344,8 @@ export const compareDateMissingLast = compareMissingLast(
   (v) => v == null || v === '' || isNaN(releaseSortTimestamp(String(v))),
 );
 
-// Amber-flags still-unreleased games in the Released column — reuses scoreColor's own
-// mid-tier amber (`--warn`) rather than introducing a new color, so it reads as "notable,
-// not final" the same way a middling score does elsewhere in the table. Backed by Steam's own
-// `comingSoon` flag (see extractAppDetails in lib/steam.js), not by comparing the parsed date
-// to today — a coarse placeholder like "Coming soon" has no parseable date to compare at all.
+// A still-unreleased game in `--warn`, like a middling score: notable, not final. By Steam's
+// `comingSoon` flag (lib/steam.js), since a coarse "Coming soon" has no date to compare to today.
 function renderReleaseDate(v: unknown, row: Row): Node {
   if (v === undefined) return document.createTextNode('…');
   if (!v) return document.createTextNode('—');

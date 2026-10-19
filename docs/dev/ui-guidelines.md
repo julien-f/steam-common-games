@@ -49,6 +49,12 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 - Numbers read as the user thinks of them: rounded, with units ("10.5 h to beat", "€5.99"), never raw floats or timestamps; filters, chips and group headers format values as their column does.
 - Dates: ISO everywhere (`YYYY-MM-DD`, plus `HH:MM` where the time matters), so one date reads the same in a table, a card and the panel; a coarse Steam release ("Q4 2026") stays as Steam wrote it.
 
+## Colour
+
+- Tokens only, from `styles/base.css`'s `:root`; `test/palette.test.js` checks their contrast pairs.
+- The accent marks state (the current page or game, a pressed toggle, the active tab), a view's one primary action (`.btn-primary`) and the brand mark; never decoration. A second primary in a view drops to a secondary button.
+- Amber (`--warn`, `--owned`) warns: a source that didn't answer, a middling score, a game already owned.
+
 ## Type
 
 - Sizes come from the `--fs-*` scale in `styles/base.css`'s `:root` (caps labels, meta and chips, tables and controls, prose, card titles, page titles, big figures); px sizes are for icon glyphs only. `test/typeScale.test.js` enforces it for the app's own CSS, not the table library's.

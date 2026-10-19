@@ -1333,7 +1333,7 @@
     background: var(--line);
   }
 
-  /* Section tabs as text; one amber bar under the current one, moved there by the scroll-spy
+  /* Section tabs as text; one accent bar under the current one, moved there by the scroll-spy
      (panel.tsx's placeSubnavUnderline), glides between them once placed. */
   /* One row that scrolls sideways (panel.tsx brings the current tab into view): wrapped, the tabs
      took two rows of a phone's sticky header. */
