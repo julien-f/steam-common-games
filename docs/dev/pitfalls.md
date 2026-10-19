@@ -146,3 +146,9 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: an image served by `route.fulfill` without `Access-Control-Allow-Origin` still loads with `crossOrigin = 'anonymous'` and its canvas reads fine, so the "no CORS" path never runs (seen checking the panel tint, `artTint.ts`).
 - **Cause**: observed with Playwright's Chromium: a fulfilled cross-origin response passes the CORS check whatever its headers.
 - **Fix**: serve the image from a real server on another origin (`python3 -m http.server` on a spare port) and call the code from the page.
+
+## A Lucide icon that exists fails the typecheck
+
+- **Symptom**: `error TS2307: Cannot find module 'lucide-solid/icons/history' or its corresponding type declarations.`, though `node_modules/lucide-solid/dist/source/icons/history.jsx` exists and the dev server renders it.
+- **Cause**: some icon names are aliases kept for renamed icons; they ship as source re-exports with no `.d.ts`.
+- **Fix**: import the canonical name the alias re-exports (`history.jsx` imports `./rotate-ccw-clock`), which has types.

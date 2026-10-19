@@ -62,12 +62,12 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 
 - `AppRoot.tsx` — mounts `<Router>` with `AppShell` as its `root`.
 - `AppShell.tsx` — the persistent shell: nav bar (`Home · Compare · Bundles`; About is in the footer), Preferences popover, global game search, the shared panel + lightbox (mounted once, not per route), and the app-wide `?u=` resolve effect. The Compare link alone opts out of `withAccountParam`: a comparison names its own players.
-  - Landmarks: the bar is the `<header>` (banner), holding the `Main` `<nav>` (`display: contents`, so its links stay items of the bar's flex row), the `<search>` box, the chip and Preferences; then `<main>`, the footer, and the panel as an `<aside>` named by its title. Home's quick links are the `Lists` nav. Every `<nav>` carries a name, telling the two apart.
+  - Landmarks: the bar is the `<header>` (banner), holding the `Main` `<nav>` (`display: contents`, so its links stay items of the bar's flex row), the `<search>` box, the chip and Preferences; then `<main>`, the footer, and the panel as an `<aside>` named by its title. Every `<nav>` carries a name; Home's Explore cards are a list, not a second nav.
 - `AccountChip.tsx` — nav-bar chip saying whose lists are on screen, with Owned/Wishlist links (inline when wide, in its popover when narrow) and a recent-account switcher. Deliberately thinner than Home's account section.
 - `ListRoute.tsx` — the generic list viewer (table + docked panel) behind every `/lists/*` and `/game/*` route; owns per-kind loading, columns, price loading, and the hero's contents.
 - `RankRoute.tsx` — `/lists/:listId/rank`, a ranked list's compare screen (see [lists-and-accounts.md](lists-and-accounts.md#ranked-lists)).
 - `listShare.ts` — encode/decode for `/lists/shared?f=` (see Routes).
-- `HomeRoute.tsx` — the account card (header, lookup form, a Family's members, recent accounts as pills, friends) plus the folder/list tree and combine form. Removing a pill focuses the next pill's Remove, else the lookup field. Also forwards an old Comparison-page link (`/?u=alice&u=bob`) to `/lists/compare`.
+- `HomeRoute.tsx` — the account card (header, lookup form, a Family's members, recent accounts as pills, friends), the Explore cards (one stretched link each) and the folder/list tree with its combine form. Removing a pill focuses the next pill's Remove, else the lookup field. Also forwards an old Comparison-page link (`/?u=alice&u=bob`) to `/lists/compare`.
 - `AccountFriends.tsx` — the home account card's friends list, marking friends shared with the starred "My account" (`myAccountId`), not the signed-in one.
 - `CombineForm.tsx` — the source/op picker shared by Home (create a dynamic list) and `ListRoute` (Edit sources); it only assembles `{ name, op, sources }` for its `onSubmit`.
 - `ComparePlayersForm.tsx` — the "who is being compared" form (`/lists/compare`'s empty state and "Edit players").

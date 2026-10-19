@@ -40,6 +40,16 @@ test('A1 edge: a first visit says what the app does, and the account field looks
   await expect(page.getByRole('button', { name: 'Look up', exact: true })).toBeVisible();
 });
 
+test('A1 edge: an Explore card opens its list from anywhere on the card', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  const card = page.locator('.explore-card').filter({ has: page.getByRole('link', { name: 'Wishlist', exact: true }) });
+  // At the description, which the link's stretched ::after covers.
+  const box = (await card.getByText("The current account's wishlist").boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page).toHaveURL(/\/lists\/wishlist$/);
+});
+
 test('A1 edge: native controls render dark, like the page around them', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator(':root')).toHaveCSS('color-scheme', 'dark');

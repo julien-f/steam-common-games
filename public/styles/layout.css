@@ -163,19 +163,14 @@
     }
   }
 
-  /* Home: the account across the top, then the quick links beside the user's lists. */
+  /* Home: the account card, Explore, then the user's lists, one under the other. */
   .home-route {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-    align-items: start;
+    display: flex;
+    flex-direction: column;
     gap: 40px;
-  }
-  .home-account {
-    grid-column: 1 / -1;
   }
   @media (max-width: 768px) {
     .home-route {
-      grid-template-columns: minmax(0, 1fr);
       gap: 32px;
     }
   }

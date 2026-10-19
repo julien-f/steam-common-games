@@ -41,7 +41,7 @@ A private profile or wishlist looks identical to an empty one from the outside; 
 - **Plays mostly**, on Owned once every game's details are in: the Steam tags the account spends its time on (weighted by playtime, tags most of the library carries counting less), shown from 5 played games. Each one filters the list by that tag.
 - **Filtering by Steam tag** (the Tags column, or a tag in a game's panel) ranks the matches by **Tag match**: how strongly players tagged each game with them, from 100% (its top tag) down. With several tags it's their average, or on the filter's **All** mode the weakest one, so a game must carry them all. Filter Tag match (e.g. 50% and up) to keep only the games where the tag really matters. Clearing the tag filter restores the previous sort and drops that Tag match filter. In the game's panel, a gauge under each Steam tag shows that same strength.
 
-![The home page: the current account's card, the four always-available lists, and your own folder tree of lists](../images/home-lists.png)
+![The home page: the current account's card, the Explore cards (Owned, Wishlist, Compare, Bundles, Recently Looked Up), and your own folder tree of lists](../images/home-lists.png)
 
 ### Combining lists
 

@@ -45,10 +45,15 @@ import {
 import { useBaseTitle } from './pageTitle.ts';
 import { createDefaultNaming, listDisplayName } from './listLabels.ts';
 import { CombineForm } from './CombineForm.tsx';
+import Heart from 'lucide-solid/icons/heart';
+import RotateCcwClock from 'lucide-solid/icons/rotate-ccw-clock';
+import LibraryBig from 'lucide-solid/icons/library-big';
 import Lock from 'lucide-solid/icons/lock';
+import Package from 'lucide-solid/icons/package';
 import Plus from 'lucide-solid/icons/plus';
 import RefreshCw from 'lucide-solid/icons/refresh-cw';
 import Star from 'lucide-solid/icons/star';
+import Users from 'lucide-solid/icons/users';
 import X from 'lucide-solid/icons/x';
 import type { AccountSlot, Folder, GameList, ListRef, CombineOp } from './types.ts';
 
@@ -261,6 +266,32 @@ export default function HomeRoute() {
   function accountLink(path: string): string {
     return withAccountParam(path, location.search);
   }
+
+  // Home's ways into the lists that aren't the user's own; `name` is each link's accessible name.
+  const exploreCards = () => [
+    {
+      name: 'Owned',
+      href: accountLink('/lists/owned'),
+      icon: LibraryBig,
+      description: "The current account's games",
+    },
+    {
+      name: 'Wishlist',
+      href: accountLink('/lists/wishlist'),
+      icon: Heart,
+      description: "The current account's wishlist",
+    },
+    // No `?u=`: a comparison names its own players in the URL, and carrying an unrelated
+    // account override alongside them would be two different claims about whose games are on screen.
+    { name: 'Compare', href: COMPARE_PATH, icon: Users, description: 'Two or more players, grouped by who owns what' },
+    { name: 'Bundles', href: accountLink('/bundles'), icon: Package, description: 'Current Steam game bundles' },
+    {
+      name: 'Recently Looked Up',
+      href: accountLink('/game'),
+      icon: RotateCcwClock,
+      description: 'The last 10 games you searched for',
+    },
+  ];
 
   // What the tree's inline name field is naming: a new folder or list (no id), or an existing row.
   type NameTarget = { kind: 'folder' | 'list'; id?: string };
@@ -707,16 +738,24 @@ export default function HomeRoute() {
         </Show>
       </section>
 
-      <nav class="home-fixed-links" aria-label="Lists">
-        <A href={accountLink('/lists/owned')}>Owned</A>
-        <A href={accountLink('/lists/wishlist')}>Wishlist</A>
-        <A href={accountLink('/bundles')}>Bundles</A>
-        <A href={accountLink('/game')}>Recently Looked Up</A>
-        {/* No `?u=`: a comparison names its own players in the URL, and carrying an unrelated
-            account override alongside them would be two different claims about whose games are
-            on screen. */}
-        <A href={COMPARE_PATH}>Compare libraries</A>
-      </nav>
+      <section class="home-explore">
+        <h2>Explore</h2>
+        <ul class="explore-cards">
+          <For each={exploreCards()}>
+            {(card) => (
+              <li class="explore-card">
+                <span class="explore-icon">
+                  <card.icon />
+                </span>
+                <h3>
+                  <A href={card.href}>{card.name}</A>
+                </h3>
+                <p>{card.description}</p>
+              </li>
+            )}
+          </For>
+        </ul>
+      </section>
 
       <section class="home-tree">
         <h2>Your lists</h2>

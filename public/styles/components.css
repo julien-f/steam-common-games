@@ -2834,7 +2834,7 @@
     gap: 4px;
   }
 
-  /* ── Home (HomeRoute.tsx): the account card, then the quick links beside the user's lists. ── */
+  /* ── Home (HomeRoute.tsx): the account card, Explore, then the user's lists. ── */
   .home-account {
     display: flex;
     flex-wrap: wrap;
@@ -3149,22 +3149,79 @@
     font-size: var(--fs-meta);
   }
 
-  /* The quick links: one hairline row each. */
-  .home-fixed-links {
+  /* Explore: one card per list that isn't the user's own, the whole card its link's target. */
+  .home-explore > h2 {
+    margin-bottom: 12px;
+  }
+  .explore-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .explore-card {
+    position: relative;
     display: flex;
     flex-direction: column;
-    border-top: 1px solid var(--line);
-  }
-  .home-fixed-links a {
-    display: flex;
-    align-items: center;
-    min-height: 48px;
-    border-bottom: 1px solid var(--line);
-    text-decoration: none;
-    transition: background-color var(--dur-1) var(--ease-out);
-  }
-  .home-fixed-links a:hover {
+    gap: 4px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
     background: var(--surface);
+    transition: border-color var(--dur-1) var(--ease-out);
+  }
+  .explore-card:hover {
+    border-color: var(--line-control);
+  }
+  .explore-card:has(a:focus-visible) {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+  }
+  /* Neutral, not the accent: the tiles are decoration (ui-guidelines.md's Colour). */
+  .explore-icon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    background: var(--line);
+    color: var(--text-body);
+    font-size: var(--fs-figure);
+  }
+  .explore-card a {
+    text-decoration: none;
+  }
+  .explore-card a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+  .explore-card a:focus-visible {
+    outline: none;
+  }
+  .explore-card p {
+    color: var(--muted);
+    font-size: var(--fs-meta);
+    line-height: 1.4;
+  }
+  /* Phone: one card per row, the icon beside the text. */
+  @media (max-width: 600px) {
+    .explore-cards {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+    }
+    .explore-card {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 2px 12px;
+      padding: 10px 12px;
+    }
+    .explore-icon {
+      grid-row: span 2;
+      margin-bottom: 0;
+    }
   }
 
   /* "Your lists": the title and the create buttons on one line, the tree as hairline rows. */
