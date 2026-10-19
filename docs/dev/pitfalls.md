@@ -134,3 +134,9 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: with `prefers-reduced-motion: reduce` (the e2e default) at phone width, clicking the toolbar's Filter never returns: the main thread stays blocked (`locator.click: Timeout`, then any `page.evaluate` hangs).
 - **Cause**: a library bug ([vatesfr/data-table#43](https://github.com/vatesfr/data-table/issues/43)) triggered by any transition on a dropdown's `transform`. Its dropdown viewport clamp assumes the `translateX` it writes applies at once, and that write re-runs it through its own `MutationObserver` before a frame paints: under a transition the rect never moves, so the offset grows forever in microtasks. A near-zero `transition-duration` on every element (with the default `transition-property: all`) is enough.
 - **Fix**: transitions go to `0s` in that rule (`styles/base.css`); only animations keep a near-zero duration, for the `animationend` the lightbox waits on. Never give `.dt-dd` a transform transition until #43 is fixed.
+
+## A worktree's dev server renders without Geist
+
+- **Symptom**: in a git worktree whose `node_modules` is a symlink to the main checkout's, the app falls back to the system font, and the dev server logs `The request id ".../@fontsource-variable/geist/files/…woff2" is outside of Vite serving allow list`.
+- **Cause**: Vite resolves the symlink to its real path, outside the worktree's root, so it refuses to serve the font files.
+- **Fix**: copy `@fontsource-variable` into the worktree, as a real directory under its own root, rather than reaching it through the link.
