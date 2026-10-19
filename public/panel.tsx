@@ -755,7 +755,7 @@ function TagCloud(props: {
   const seenKinds = createMemo(() => [...new Set(present().map((gr) => gr.kind))]);
   return (
     <Show when={present().length}>
-      <section class="panel-section panel-section--meta panel-card">
+      <section class="panel-section">
         <h3 class="panel-section-title">Tags &amp; details</h3>
         <div class="panel-tags">
           <For each={pills()}>
@@ -783,6 +783,7 @@ function TagCloud(props: {
                   <button
                     class="panel-tag panel-tag-btn"
                     classList={{ active: panelOptions.isTagActive(dim, v) }}
+                    aria-pressed={panelOptions.isTagActive(dim, v)}
                     title={title}
                     onClick={() => panelOptions.onTagClick(dim, v)}
                   >
@@ -810,8 +811,8 @@ function TagCloud(props: {
   );
 }
 
-// The glance strip: a fixed 2×2 grid (Weighted Rating+Metacritic, then HLTB+Linux/Deck) —
-// every chip built from one template (a value, then a one-line caption) so the four
+// The glance strip: four tiles (Weighted Rating, Metacritic, HLTB, Linux/Deck) —
+// every chip built from one template (a label, a value, a detail line) so the four
 // read as one family. Each chip IS the link to its source; there's no separate
 // "Links" section duplicating them. Only *evaluative* values (the two scores, the
 // Linux/Deck tier) get semantic color — HLTB is a plain duration, not a judgment,
@@ -823,16 +824,24 @@ function GlanceChip(props: {
   href?: string | null;
   value: string | number | null;
   color?: string | null;
-  caption: JSX.Element;
+  label: string;
+  detail?: JSX.Element;
   faded?: boolean;
 }): JSX.Element {
   const inner = () => (
-    <span class="panel-glance-sub">
-      <span class="panel-glance-num" style={props.color ? { color: props.color } : undefined}>
+    <>
+      <span class="panel-glance-label">{props.label}</span>
+      <span
+        class="panel-glance-num"
+        classList={{ 'panel-glance-num--figure': /^[\d—]/.test(String(props.value)) }}
+        style={props.color ? { color: props.color } : undefined}
+      >
         {String(props.value)}
       </span>
-      <span class="panel-glance-val">{props.caption}</span>
-    </span>
+      <Show when={props.detail}>
+        <span class="panel-glance-val">{props.detail}</span>
+      </Show>
+    </>
   );
   const style = () => (props.faded ? { opacity: 0.65 } : undefined);
   return (
@@ -860,16 +869,7 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
   // The source errored (server.js's `failed`): said apart from "no data", ↻ above retries it.
   const failedChip = (source: string, label: string, href: string) =>
     props.game.failedSources?.includes(source) ? (
-      <GlanceChip
-        href={href}
-        value="⚠"
-        color="#e0a83a"
-        caption={
-          <>
-            <b>{label}</b> · didn't answer
-          </>
-        }
-      />
+      <GlanceChip href={href} value="⚠" color="var(--warn)" label={label} detail="didn't answer" />
     ) : null;
 
   // Every chip stays in the grid even when its source has no data for this game — a missing
@@ -883,15 +883,7 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
     if (!r)
       return (
         failedChip('rating', 'Weighted', reviewsUrl()) ?? (
-          <GlanceChip
-            href={reviewsUrl()}
-            value="—"
-            caption={
-              <>
-                <b>Weighted</b> · no rating
-              </>
-            }
-          />
+          <GlanceChip href={reviewsUrl()} value="—" label="Weighted" detail="no rating" />
         )
       );
     const pct = r.total ? Math.round((r.positive / r.total) * 100) : 0;
@@ -901,9 +893,10 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
         href={reviewsUrl()}
         value={steamdbRating}
         color={scoreColor(steamdbRating)}
-        caption={
+        label="Weighted"
+        detail={
           <>
-            <b>Weighted</b> · {pct}% of {fmtCompactCount(r.total)}
+            {pct}% of {fmtCompactCount(r.total)}
           </>
         }
       />
@@ -917,21 +910,11 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
         href={safeHref(mc.url)}
         value={mc.score}
         color={scoreColor(mc.score)}
-        caption={
-          <>
-            <b>Metacritic</b> · critic score
-          </>
-        }
+        label="Metacritic"
+        detail="critic score"
       />
     ) : (
-      <GlanceChip
-        value="—"
-        caption={
-          <>
-            <b>Metacritic</b> · no score
-          </>
-        }
-      />
+      <GlanceChip value="—" label="Metacritic" detail="no score" />
     );
   };
 
@@ -946,35 +929,16 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
           <GlanceChip
             href={`https://howlongtobeat.com/?q=${encodeURIComponent(props.game.name)}`}
             value="—"
-            caption={
-              <>
-                <b>HLTB</b> · search
-              </>
-            }
+            label="HLTB"
+            detail="search"
           />
         )
       );
     const hltbUrl = `https://howlongtobeat.com/game/${h.id}`;
     return h.all ? (
-      <GlanceChip
-        href={hltbUrl}
-        value={`${h.all}h`}
-        caption={
-          <>
-            <b>HLTB</b> · all playstyles
-          </>
-        }
-      />
+      <GlanceChip href={hltbUrl} value={`${h.all}h`} label="HLTB" detail="all playstyles" />
     ) : (
-      <GlanceChip
-        href={hltbUrl}
-        value="—"
-        caption={
-          <>
-            <b>HLTB</b> · no data
-          </>
-        }
-      />
+      <GlanceChip href={hltbUrl} value="—" label="HLTB" detail="no data" />
     );
   };
 
@@ -983,21 +947,12 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
     if (!pd?.tier)
       return (
         failedChip('protondb', 'Linux/Deck', protondbUrl()) ?? (
-          <GlanceChip
-            href={protondbUrl()}
-            value="—"
-            caption={
-              <>
-                <b>Linux/Deck</b> · no reports
-              </>
-            }
-          />
+          <GlanceChip href={protondbUrl()} value="—" label="Linux/Deck" detail="no reports" />
         )
       );
     // The tier's badge colour, lightened to read as text on the panel's dark ground.
     const color = `color-mix(in srgb, ${PROTON_TIER_COLORS[pd.tier] || '#52525b'} 60%, var(--text))`;
-    // Kept short (no "reports"/"confidence" words) — the glance chip's one-line caption truncates
-    // rather than wraps, and "strong · 336" already reads fine without them.
+    // Kept short (no "reports"/"confidence" words): a tile is narrow, and "strong · 336" reads fine without them.
     const detail = [pd.confidence, pd.total ? fmtCompactCount(pd.total) : ''].filter(Boolean).join(' · ');
     // pd.pending: too few reports for ProtonDB itself to be confident, showing its provisionalTier
     // instead of nothing (see extractProtonDb, lib/steam.js) — faded, with a "?" and a
@@ -1009,13 +964,8 @@ function GlanceGrid(props: { game: ReadonlyGame }): JSX.Element {
         value={value}
         color={color}
         faded={pd.pending}
-        caption={
-          <>
-            <b>Linux/Deck</b>
-            {detail ? ` · ${detail}` : ''}
-            {pd.pending ? ' · provisional' : ''}
-          </>
-        }
+        label="Linux/Deck"
+        detail={[detail, pd.pending && 'provisional'].filter(Boolean).join(' · ')}
       />
     );
   };
@@ -1196,6 +1146,7 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
               <button
                 type="button"
                 class={`panel-achievements-filter-btn${filter() === opt ? ' active' : ''}`}
+                aria-pressed={filter() === opt}
                 onClick={() => setAchievementsFilterFor(props.game.appid, opt)}
               >
                 {opt === 'all' ? 'All' : opt === 'unlocked' ? 'Unlocked' : 'Locked'}
@@ -1216,49 +1167,53 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
       <Show when={!visible().length}>
         <div class="panel-no-data">No achievements match this filter.</div>
       </Show>
-      <For each={visible()}>
-        {(a) => {
-          // A hidden achievement not yet unlocked keeps its name/description a surprise by
-          // default, same as Steam's own profile pages — the schema still carries the real text
-          // either way (whether it's still a spoiler depends on which account is loaded, not on
-          // the shared/cached schema), this just withholds it client-side until clicked, rather
-          // than never sending it at all.
-          const revealed = () => revealedAchievements().has(`${props.game.appid}:${a.apiname}`);
-          const spoiler = () => a.hidden && !a.achieved && !revealed();
-          const name = () => (spoiler() ? 'Hidden achievement' : a.name || a.apiname);
-          const desc = () => (spoiler() ? 'Click to reveal' : a.description || '');
-          const icon = a.achieved ? a.icon : a.icongray || a.icon;
-          // Unlock date is real data the server already returns (`unlocktime`, seconds since
-          // epoch) but otherwise has nowhere to show — surfaced as a plain hover tooltip rather
-          // than a fifth line of on-card text.
-          const title = a.achieved && a.unlocktime ? `Unlocked ${fmtLastPlayed(a.unlocktime)}` : '';
-          // Rarity isn't a spoiler — it's shown even for a still-hidden achievement, same as
-          // Steam's own profile pages. Fixed to 1 decimal only when it's not a whole number.
-          const rarityLabel = a.globalPct == null ? null : fmtRarity(a.globalPct);
-          return (
-            <Dynamic
-              component={spoiler() ? 'button' : 'div'}
-              type={spoiler() ? 'button' : undefined}
-              class={`panel-achievement-row${a.achieved ? ' unlocked' : ''}${spoiler() ? ' panel-achievement--spoiler' : ''}`}
-              title={title || undefined}
-              onClick={() => {
-                if (spoiler()) revealAchievement(props.game.appid, a.apiname);
-              }}
-            >
-              <img class="panel-achievement-icon" src={icon} alt="" loading="lazy" />
-              <span class="panel-achievement-text">
-                <span class="panel-achievement-name">{name()}</span>
-                <Show when={desc()}>{(d) => <span class="panel-achievement-desc">{d()}</span>}</Show>
-              </span>
-              <Show when={rarityLabel != null}>
-                <span class="panel-achievement-rarity" title={`${rarityLabel} of players have unlocked this`}>
-                  {rarityLabel}
-                </span>
-              </Show>
-            </Dynamic>
-          );
-        }}
-      </For>
+      <ul class="panel-achievement-list" role="list">
+        <For each={visible()}>
+          {(a) => {
+            // A hidden achievement not yet unlocked keeps its name/description a surprise by
+            // default, same as Steam's own profile pages — the schema still carries the real text
+            // either way (whether it's still a spoiler depends on which account is loaded, not on
+            // the shared/cached schema), this just withholds it client-side until clicked, rather
+            // than never sending it at all.
+            const revealed = () => revealedAchievements().has(`${props.game.appid}:${a.apiname}`);
+            const spoiler = () => a.hidden && !a.achieved && !revealed();
+            const name = () => (spoiler() ? 'Hidden achievement' : a.name || a.apiname);
+            const desc = () => (spoiler() ? 'Click to reveal' : a.description || '');
+            const icon = a.achieved ? a.icon : a.icongray || a.icon;
+            // Unlock date is real data the server already returns (`unlocktime`, seconds since
+            // epoch) but otherwise has nowhere to show — surfaced as a plain hover tooltip rather
+            // than a fifth line of on-card text.
+            const title = a.achieved && a.unlocktime ? `Unlocked ${fmtLastPlayed(a.unlocktime)}` : '';
+            // Rarity isn't a spoiler — it's shown even for a still-hidden achievement, same as
+            // Steam's own profile pages. Fixed to 1 decimal only when it's not a whole number.
+            const rarityLabel = a.globalPct == null ? null : fmtRarity(a.globalPct);
+            return (
+              <li>
+                <Dynamic
+                  component={spoiler() ? 'button' : 'div'}
+                  type={spoiler() ? 'button' : undefined}
+                  class={`panel-achievement-row${a.achieved ? ' unlocked' : ''}${spoiler() ? ' panel-achievement--spoiler' : ''}`}
+                  title={title || undefined}
+                  onClick={() => {
+                    if (spoiler()) revealAchievement(props.game.appid, a.apiname);
+                  }}
+                >
+                  <img class="panel-achievement-icon" src={icon} alt="" loading="lazy" />
+                  <span class="panel-achievement-text">
+                    <span class="panel-achievement-name">{name()}</span>
+                    <Show when={desc()}>{(d) => <span class="panel-achievement-desc">{d()}</span>}</Show>
+                  </span>
+                  <Show when={rarityLabel != null}>
+                    <span class="panel-achievement-rarity" title={`${rarityLabel} of players have unlocked this`}>
+                      {rarityLabel}
+                    </span>
+                  </Show>
+                </Dynamic>
+              </li>
+            );
+          }}
+        </For>
+      </ul>
     </>
   );
 
@@ -1333,11 +1288,11 @@ function OwnersSection(): JSX.Element {
   const maxMinutes = createMemo(() => Math.max(...sorted().map((o) => o.minutes), 1));
   return (
     <Show when={sorted().length > 0}>
-      <section class="panel-section panel-card" id="panel-section-owners">
+      <section class="panel-section" id="panel-section-owners">
         <div class="panel-section-title">
           <h3>Owned by</h3> <span class="panel-section-subtitle">most recently played first</span>
         </div>
-        <ul class="panel-owners">
+        <ul class="panel-owners" role="list">
           <For each={sorted()}>
             {(o) => {
               const lastPlayed = fmtLastPlayed(o.lastPlayedSec);
@@ -1415,10 +1370,10 @@ function NewsSection(props: { game: ReadonlyGame }): JSX.Element {
                     </>
                   }
                   body={
-                    <div class="panel-collapsible-body-pad">
-                      <div class="panel-news">
-                        <For each={list()}>
-                          {(n) => (
+                    <ul class="panel-news" role="list">
+                      <For each={list()}>
+                        {(n) => (
+                          <li>
                             <a
                               class="panel-news-item"
                               href={safeHref(n.url) || undefined}
@@ -1431,10 +1386,10 @@ function NewsSection(props: { game: ReadonlyGame }): JSX.Element {
                                 {n.feedLabel ? ` · ${n.feedLabel}` : ''}
                               </span>
                             </a>
-                          )}
-                        </For>
-                      </div>
-                    </div>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
                   }
                   linkHref={`https://store.steampowered.com/news/app/${props.game.appid}`}
                   linkTitle="View all news on Steam"
@@ -1540,7 +1495,7 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
       when={panelData.price.loading}
       fallback={
         <Show when={p() !== undefined}>
-          <section class="panel-section panel-card" id="panel-section-price">
+          <section class="panel-section" id="panel-section-price">
             <div class="panel-section-title">
               <h3>Price</h3>{' '}
               <a href={`https://isthereanydeal.com/steam/app/${props.game.appid}`} target="_blank" rel="noopener">
@@ -1608,7 +1563,7 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
         </Show>
       }
     >
-      <section class="panel-section panel-card" id="panel-section-price">
+      <section class="panel-section" id="panel-section-price">
         <h3 class="panel-section-title">Price</h3>
         <span class="sk" style={{ display: 'block', width: '100%', height: '32px', 'border-radius': '6px' }} />
       </section>
@@ -1629,7 +1584,7 @@ function PanelBundleLines(): JSX.Element {
           <div class="panel-no-data">Not in any current bundle.</div>
         </Show>
         <Show when={panelData.bundles()?.length}>
-          <ul class="panel-bundle-list">
+          <ul class="panel-bundle-list" role="list">
             <For each={panelData.bundles()}>
               {(b) => {
                 const urgency = bundleUrgency(b.expiry);
@@ -1768,7 +1723,7 @@ function DlcSection(props: { game: ReadonlyGame }): JSX.Element {
       const remaining = panelData.dlcShown() - done.length;
       return (
         <div class="panel-dlc-list">
-          <ul>
+          <ul class="panel-dlc-items" role="list">
             <For each={done}>{(d) => <DlcItem d={d} />}</For>
           </ul>
           <Show when={remaining}>{(n) => <div class="panel-dlc-loading-more">Loading {n()} more…</div>}</Show>
@@ -1786,7 +1741,7 @@ function DlcSection(props: { game: ReadonlyGame }): JSX.Element {
     const notShown = dlcIds().length - panelData.dlcShown();
     return entries.length ? (
       <div class="panel-dlc-list">
-        <ul>
+        <ul class="panel-dlc-items" role="list">
           <For each={sortDlcByRelease(entries)}>{(d) => <DlcItem d={d} />}</For>
         </ul>
         <Show when={notShown > 0}>
@@ -2162,7 +2117,7 @@ function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
   return (
     // A tagless game still gets its More from line.
     <Show when={!props.game.loading && (hasTags() || gameCreators(props.game.details?.meta).length)}>
-      <section class="panel-section panel-card" id="panel-section-similar">
+      <section class="panel-section" id="panel-section-similar">
         <div class="panel-section-title">
           <h3>{shown() ? `Similar in ${accountDisplayLabel(account()!)}'s library` : 'Similar games'}</h3>{' '}
           <a href={steamMoreLikeUrl(props.game.appid)} target="_blank" rel="noopener">
@@ -2186,18 +2141,22 @@ function SimilarSection(props: { game: ReadonlyGame }): JSX.Element {
               </div>
             }
           >
-            <For each={library().similar}>
-              {(s) => (
-                <button
-                  class="panel-similar-item"
-                  title={`${s.score}% similar by Steam tags`}
-                  onClick={() => navigateToGame(s.game.appid, s.game.name)}
-                >
-                  <span class="panel-similar-name">{s.game.name}</span>
-                  <span class="panel-similar-score">{s.score}%</span>
-                </button>
-              )}
-            </For>
+            <ul class="panel-similar-list" role="list">
+              <For each={library().similar}>
+                {(s) => (
+                  <li>
+                    <button
+                      class="panel-similar-item"
+                      title={`${s.score}% similar by Steam tags`}
+                      onClick={() => navigateToGame(s.game.appid, s.game.name)}
+                    >
+                      <span class="panel-similar-name">{s.game.name}</span>
+                      <span class="panel-similar-score">{s.score}%</span>
+                    </button>
+                  </li>
+                )}
+              </For>
+            </ul>
           </Show>
         </Show>
         {/* A standalone lookup isn't a row, so the list has nothing to rank against it. */}
@@ -2570,7 +2529,7 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
         <PriceSection game={g} />
       </Show>
       <Show when={description()}>
-        <p class="panel-desc panel-card" id="panel-desc">
+        <p class="panel-desc" id="panel-desc">
           {decodedDescription()}
         </p>
       </Show>

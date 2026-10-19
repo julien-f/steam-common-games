@@ -664,7 +664,7 @@ export function computeOwnershipStatus(row: Row): string | null {
 // wishlisted pairing this app used everywhere before (checkmark reading as green/affirmative,
 // star reading as yellow/aspirational is the more natural pairing in isolation, e.g. a profile
 // summary), which stopped fitting once the context became specifically "should I buy this".
-// `.game-search-badge`/`.name-status-badge`/`.panel-ownership-badge` (style.css) and
+// `.game-search-badge`/`.name-status-badge`/`.panel-ownership-badge` (the --owned/--wishlisted tokens) and
 // gameSearch.ts's dropdown all follow this same swapped pairing now too, rather than leaving
 // those standalone badges on the old colors — the checkmark right next to this tier's own
 // yellow-highlighted name text is the same fact and needs to read the same color, and the other
@@ -675,9 +675,9 @@ export function computeOwnershipStatus(row: Row): string | null {
 // information any one status carries.
 const OWNERSHIP_STATUS_TIERS: StatusTier[] = [
   { label: 'Not Owned' },
-  { label: 'Wishlisted', color: '#2ecc71', icon: ' ☆', bold: true },
-  { label: 'Owned', color: '#f1c40f', icon: ' ✓' },
-  { label: 'Owned & Wishlisted', color: '#f1c40f', icon: ' ✓', bold: true },
+  { label: 'Wishlisted', color: 'var(--wishlisted)', icon: ' ☆', bold: true },
+  { label: 'Owned', color: 'var(--owned)', icon: ' ✓' },
+  { label: 'Owned & Wishlisted', color: 'var(--owned)', icon: ' ✓', bold: true },
 ];
 const OWNERSHIP_STATUS_ORDER = OWNERSHIP_STATUS_TIERS.map((t) => t.label);
 const compareOwnershipStatus = compareMissingLast(compareByOrder(OWNERSHIP_STATUS_ORDER));

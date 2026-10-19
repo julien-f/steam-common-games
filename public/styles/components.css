@@ -1374,4 +1374,656 @@
     font-size: var(--fs-label);
     line-height: 1.3;
   }
+
+  /* Owned / wishlisted marks: table name cells (gameColumns.ts), the search dropdown, the panel. */
+  .name-status-badge {
+    margin-left: 4px;
+    font-size: var(--fs-meta);
+    white-space: nowrap;
+  }
+  .game-search-badge {
+    flex-shrink: 0;
+    font-size: var(--fs-meta);
+  }
+  .name-status-badge.owned,
+  .game-search-badge.owned,
+  .panel-ownership-badge.owned {
+    color: var(--owned);
+  }
+  .name-status-badge.wishlisted,
+  .game-search-badge.wishlisted,
+  .panel-ownership-badge.wishlisted {
+    color: var(--wishlisted);
+  }
+  .panel-ownership-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .panel-ownership-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 24px;
+    padding: 0 8px;
+    border-radius: var(--radius-2);
+    background: color-mix(in srgb, currentColor 12%, transparent);
+    font-size: var(--fs-meta);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .panel-ownership-badge:hover {
+    text-decoration: underline;
+  }
+
+  /* ── The panel's body: sections on hairlines, each titled by a small muted <h3>. ── */
+  .panel-section,
+  .panel-desc {
+    padding-block: 16px;
+    border-top: 1px solid var(--line);
+  }
+  .panel-glance + .panel-section {
+    padding-top: 0;
+    border-top: 0;
+  }
+  .panel-section-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 8px;
+    margin-bottom: 8px;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+    font-weight: 600;
+  }
+  .panel-section-title > h3 {
+    font: inherit;
+  }
+  .panel-section-title a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    color: var(--muted);
+    font-weight: 400;
+    text-decoration: none;
+  }
+  .panel-section-title a:hover {
+    color: var(--text);
+    text-decoration: underline;
+  }
+  .panel-section-subtitle {
+    font-weight: 400;
+  }
+  .panel-no-data {
+    color: var(--muted);
+    font-size: var(--fs-ui);
+  }
+  .panel-no-data a {
+    color: var(--text-body);
+  }
+
+  /* The one call to action: try the free demo. */
+  .panel-demo-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 40px;
+    margin-bottom: 16px;
+    padding: 0 12px;
+    border-radius: var(--radius-3);
+    background: var(--accent);
+    color: var(--bg);
+    font-size: var(--fs-ui);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .panel-demo-banner:hover {
+    background: color-mix(in srgb, var(--accent) 85%, #fff);
+    color: var(--bg);
+  }
+  .panel-demo-banner-icon {
+    font-size: var(--fs-title);
+  }
+
+  /* At a glance: tiles split by hairlines in one box, four across once the panel is wide enough. */
+  .panel-glance {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-3);
+    background: var(--line-strong);
+  }
+  @media (min-width: 1400px) {
+    .panel-glance {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+  .panel-glance-chip {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: 10px 12px;
+    background: var(--surface);
+    color: var(--text);
+    text-decoration: none;
+    transition: background-color var(--dur-1) var(--ease-out);
+  }
+  a.panel-glance-chip:hover {
+    background: var(--line);
+    color: var(--text);
+  }
+  /* Inside the tile: the box clips. */
+  a.panel-glance-chip:focus-visible {
+    outline-offset: -4px;
+  }
+  .panel-glance-chip--sk {
+    justify-content: center;
+    min-height: 76px;
+  }
+  .panel-glance-label,
+  .panel-glance-val {
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .panel-glance-num {
+    color: var(--text);
+    font-size: var(--fs-title);
+    font-weight: 600;
+    line-height: 1.25;
+    overflow-wrap: break-word;
+  }
+  .panel-glance-num--figure {
+    font-family: var(--font-mono);
+    font-size: var(--fs-figure);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Price: the best deal, a buy link when there is one, the lows under it, then current bundles. */
+  .panel-price-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    color: var(--text-body);
+    font-size: var(--fs-ui);
+  }
+  a.panel-price-line--link {
+    margin: -6px -10px;
+    padding: 6px 10px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-3);
+    color: var(--text-body);
+    text-decoration: none;
+    transition:
+      border-color var(--dur-1) var(--ease-out),
+      background-color var(--dur-1) var(--ease-out);
+  }
+  a.panel-price-line--link:hover {
+    border-color: var(--line-control);
+    background: var(--line);
+    color: var(--text-body);
+  }
+  a.panel-price-line--link:hover .panel-price-shop {
+    text-decoration: underline;
+  }
+  .panel-price-amount {
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: var(--fs-figure);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .panel-price-sep {
+    color: var(--muted);
+  }
+  .panel-price-shop {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .panel-price-lows {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    margin-top: 8px;
+    font-size: var(--fs-meta);
+  }
+  .panel-price-low {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .panel-bundles {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+  .panel-bundle-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .panel-bundle-title {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    color: var(--text);
+    font-size: var(--fs-ui);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .panel-bundle-title:hover {
+    text-decoration: underline;
+  }
+  .panel-bundle-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 6px;
+    padding-left: 1.4em;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .panel-bundle-meta a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    color: var(--text-body);
+    text-decoration: none;
+  }
+  .panel-bundle-meta a:hover {
+    text-decoration: underline;
+  }
+
+  .panel-desc {
+    color: var(--text-body);
+    line-height: 1.6;
+  }
+
+  /* Tags, genres, categories and creators in one cloud, their kind a dot; a Steam tag's share of
+     the top tag's votes a bar along its foot. */
+  .panel-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .panel-tag {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 26px;
+    padding: 2px 8px;
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-2);
+    background: none;
+    color: var(--text-body);
+    font-size: var(--fs-meta);
+  }
+  .panel-tag-btn {
+    cursor: pointer;
+    transition:
+      border-color var(--dur-1) var(--ease-out),
+      color var(--dur-1) var(--ease-out);
+  }
+  .panel-tag-btn:hover {
+    border-color: var(--muted);
+    color: var(--text);
+  }
+  .panel-tag-btn.active {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+  .panel-tag-dot {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+  .panel-tag-weight {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+  }
+  .panel-tag-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: var(--fs-label);
+  }
+  .panel-tag-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Similar in the account's library, and the creators' other games. */
+  .panel-similar-more {
+    margin-bottom: 8px;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+    line-height: 24px;
+  }
+  .panel-similar-more a,
+  .panel-similar-more-current {
+    display: inline-block;
+    min-height: 24px;
+    color: var(--text);
+  }
+  .panel-similar-list > li + li {
+    border-top: 1px solid var(--line);
+  }
+  .panel-similar-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    min-height: 36px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font-size: var(--fs-ui);
+    text-align: left;
+    cursor: pointer;
+  }
+  .panel-similar-item:hover .panel-similar-name {
+    text-decoration: underline;
+  }
+  .panel-similar-score {
+    flex: none;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .panel-similar-empty {
+    color: var(--muted);
+    font-size: var(--fs-ui);
+  }
+  .panel-similar-sort,
+  .panel-dlc-more {
+    min-height: 32px;
+    margin-top: 10px;
+    padding: 0 12px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-3);
+    background: transparent;
+    color: var(--text);
+    font-size: var(--fs-ui);
+    cursor: pointer;
+    transition:
+      border-color var(--dur-1) var(--ease-out),
+      background-color var(--dur-1) var(--ease-out);
+  }
+  .panel-similar-sort:hover,
+  .panel-dlc-more:hover {
+    border-color: var(--muted);
+    background: var(--line);
+  }
+
+  /* Owned by: each member's last play, and their playtime against the most-played member's. */
+  .panel-owners {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .panel-owner-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .panel-owner-name {
+    color: var(--text);
+    font-size: var(--fs-ui);
+  }
+  .panel-owner-lastplayed {
+    flex: none;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+    white-space: nowrap;
+  }
+  .panel-owner-meter-track {
+    height: 4px;
+    margin-top: 6px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: var(--line-strong);
+  }
+  .panel-owner-meter-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--muted);
+  }
+  .panel-owner-playtime {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+
+  /* A collapsible section (CollapsibleCard): its heading is the toggle, its ↗ the source. */
+  .panel-section:has(> .panel-achievements-card) {
+    padding-block: 6px;
+  }
+  .panel-achievements-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-collapsible-heading {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+  }
+  .panel-achievements-chip {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font-size: var(--fs-ui);
+    text-align: left;
+    cursor: pointer;
+  }
+  .panel-achievements-chip .panel-glance-num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .panel-achievements-chip .panel-glance-val {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-body);
+    font-size: var(--fs-ui);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .panel-achievements-chip b {
+    color: var(--text);
+  }
+  .panel-achievements-icon {
+    flex: none;
+    font-size: var(--fs-title);
+    line-height: 1;
+  }
+  .panel-achievements-chevron {
+    flex: none;
+    color: var(--muted);
+  }
+  .panel-achievements-chip:hover .panel-achievements-chevron {
+    color: var(--text);
+  }
+  .panel-achievements-list {
+    padding-bottom: 10px;
+  }
+  .panel-collapsible-body-pad {
+    padding-top: 4px;
+  }
+
+  .panel-hltb {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 28px;
+  }
+  .panel-hltb-val {
+    margin-top: 2px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: var(--fs-figure);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .panel-news > li + li,
+  .panel-achievement-list > li + li,
+  .panel-dlc-items > li + li {
+    border-top: 1px solid var(--line);
+  }
+  .panel-news-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-block: 10px;
+    text-decoration: none;
+  }
+  .panel-news-title {
+    color: var(--text);
+    font-size: var(--fs-ui);
+  }
+  .panel-news-item:hover .panel-news-title {
+    text-decoration: underline;
+  }
+  .panel-news-meta {
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+
+  /* Achievements: unlocked first, a locked one dimmed; a hidden one stays a spoiler until clicked. */
+  .panel-achievements-filter {
+    display: flex;
+    gap: 6px;
+    padding-bottom: 8px;
+  }
+  .panel-achievements-filter-btn {
+    min-height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-2);
+    background: transparent;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+    cursor: pointer;
+  }
+  .panel-achievements-filter-btn:hover {
+    border-color: var(--muted);
+    color: var(--text);
+  }
+  .panel-achievements-filter-btn.active {
+    border-color: var(--text);
+    background: var(--line);
+    color: var(--text);
+  }
+  .panel-achievements-list > .panel-no-data {
+    padding-block: 4px;
+  }
+  .panel-achievement-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding-block: 8px;
+    opacity: 0.6;
+  }
+  .panel-achievement-row.unlocked {
+    opacity: 1;
+  }
+  button.panel-achievement-row {
+    border: 0;
+    background: none;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  button.panel-achievement-row:hover {
+    background: var(--line);
+  }
+  .panel-achievement--spoiler .panel-achievement-desc {
+    font-style: italic;
+  }
+  .panel-achievement-icon {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-1);
+  }
+  .panel-achievement-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .panel-achievement-name {
+    display: block;
+    color: var(--text);
+    font-size: var(--fs-ui);
+    font-weight: 600;
+  }
+  .panel-achievement-desc {
+    display: block;
+    margin-top: 1px;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .panel-achievement-rarity {
+    flex: none;
+    margin-left: 8px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* DLC: each a link to its own page (navigateToGame), the next page of them behind a button. */
+  .panel-dlc-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-block: 8px;
+    text-decoration: none;
+  }
+  .panel-dlc-capsule {
+    flex: none;
+    width: 80px;
+    height: 30px;
+    object-fit: cover;
+    border-radius: var(--radius-1);
+    background: var(--line-strong);
+  }
+  .panel-dlc-name {
+    color: var(--text);
+    font-size: var(--fs-ui);
+  }
+  .panel-dlc-item:hover .panel-dlc-name {
+    text-decoration: underline;
+  }
+  .panel-dlc-loading-more {
+    padding-block: 8px;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
 }
