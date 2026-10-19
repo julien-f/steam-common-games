@@ -2042,6 +2042,32 @@ test("F1 edge: the Price card says when a game is in no bundle, and when ITAD di
   await expect(page.locator('.panel-bundles')).toHaveText("Bundles: IsThereAnyDeal didn't answer.");
 });
 
+test("B1 edge: a bundle's Add-on and Base pills are outlined alike, a fact rather than a state", async ({ page }) => {
+  await page.route(new RegExp(`/api/bundles/${BUNDLE.id}(\\?|$)`), (route) => {
+    const req = route.request();
+    const body = JSON.parse(respond(req.method(), new URL(req.url()), req.postData()).body);
+    body.bundle.tiers.at(-1).addon = true;
+    return route.fulfill({ json: body });
+  });
+  await asPlayer(page, ALICE);
+  await page.goto(`/lists/bundle/${BUNDLE.id}`);
+  await expect(rows(page)).toHaveCount(4);
+  await page.getByRole('button', { name: 'Columns', exact: true }).click();
+  await page
+    .locator('.dt-dd')
+    .getByRole('button', { name: /^Classification/ })
+    .click();
+  await page.locator('.dt-dd').getByRole('button', { name: 'Add-on' }).click();
+  await page.keyboard.press('Escape');
+  const pill = (name: string) => row(page, name).locator('.status-badge');
+  await expect(pill('Overcooked! 2')).toHaveText('Add-on');
+  await expect(pill('Portal 2')).toHaveText('Base');
+  for (const name of ['Overcooked! 2', 'Portal 2']) {
+    await expect(pill(name)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(pill(name)).toHaveCSS('color', 'rgb(195, 204, 217)'); // --text-body
+  }
+});
+
 test('F1 edge: a free demo shows as a neutral Demo pill and a Try the Free Demo button', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/wishlist');

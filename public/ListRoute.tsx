@@ -471,8 +471,7 @@ const WISHLIST_DEFAULT_VISIBLE = [
 function renderAddonBadge(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');
   const span = document.createElement('span');
-  span.className = v ? 'status-badge' : 'status-badge status-badge-neutral';
-  if (v) span.style.background = '#8b4513';
+  span.className = 'status-badge status-badge-neutral';
   span.textContent = v ? 'Add-on' : 'Base';
   return span;
 }
