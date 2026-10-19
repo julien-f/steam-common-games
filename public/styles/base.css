@@ -28,6 +28,8 @@
     --control-h: 34px;
     /* The page's side margin, shell and routes alike (navPopover.ts's POPOVER_MARGIN matches the phone one). */
     --gutter: 20px;
+    /* The side panel's width, and the room .app-shell.panel-open keeps for it. */
+    --panel-w: 380px;
     /* The type scale (docs/dev/ui-guidelines.md); px sizes are left only to icon glyphs, 22px and up. */
     --fs-label: 11px;
     --fs-meta: 12px;
@@ -41,6 +43,11 @@
     --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
   }
 
+  @media (min-width: 1400px) {
+    :root {
+      --panel-w: min(480px, 30vw);
+    }
+  }
   @media (max-width: 768px) {
     :root {
       --gutter: 16px;

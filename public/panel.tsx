@@ -277,6 +277,8 @@ function initSubnavScrollSpy() {
   // Scrolling by hand hands the highlight back to the scroll position.
   for (const type of ['wheel', 'touchstart', 'keydown'] as const)
     body.addEventListener(type, () => (pinnedSubnavTarget = null), { passive: true });
+  // The tabs wrap differently at another width, moving the underline's tab.
+  window.addEventListener('resize', () => requestAnimationFrame(updateSubnavScrollSpy), { passive: true });
 }
 
 // The section a subnav click jumped to, kept highlighted until the user scrolls themselves: one
@@ -309,7 +311,26 @@ function updateSubnavScrollSpy() {
   }
   if (pinnedSubnavTarget && buttons.some((btn) => btn.dataset.target === pinnedSubnavTarget))
     activeTarget = pinnedSubnavTarget;
-  buttons.forEach((btn) => btn.classList.toggle('active', btn.dataset.target === activeTarget));
+  let active: HTMLElement | undefined;
+  for (const btn of buttons) {
+    const on = btn.dataset.target === activeTarget;
+    btn.classList.toggle('active', on);
+    if (on) {
+      btn.setAttribute('aria-current', 'true');
+      active = btn;
+    } else btn.removeAttribute('aria-current');
+  }
+  placeSubnavUnderline(nav.querySelector('ul'), active);
+}
+
+// The current tab's underline, one bar on the list moved under it; it glides only once placed.
+function placeSubnavUnderline(list: HTMLElement | null, btn: HTMLElement | undefined) {
+  if (!list || !btn || !btn.offsetWidth) return;
+  const li = btn.parentElement!;
+  list.style.setProperty('--underline-x', `${li.offsetLeft}px`);
+  list.style.setProperty('--underline-y', `${li.offsetTop + li.offsetHeight}px`);
+  list.style.setProperty('--underline-w', String(li.offsetWidth));
+  if (!list.dataset.glide) requestAnimationFrame(() => (list.dataset.glide = ''));
 }
 
 export function isPanelOpen() {
@@ -1877,7 +1898,7 @@ function PanelHero(): JSX.Element {
   const items = getPanelItems;
   const idx = () => Math.max(0, Math.min(heroIdx(), items().length - 1));
   const hasMany = () => items().length > 1;
-  let filmstripEl: HTMLDivElement | undefined;
+  let filmstripEl: HTMLUListElement | undefined;
 
   // Follows the lightbox over it, so closing that leaves the hero on the last item looked at.
   createEffect(() => {
@@ -1898,7 +1919,7 @@ function PanelHero(): JSX.Element {
   // imperatively via the ref callback instead (same `addEventListener(..., true)` the
   // original file used), delegated once here (not per-<img>) since Solid already only
   // re-renders a given <img> when its own props actually change.
-  const onFilmstripRef = (el: HTMLDivElement) => {
+  const onFilmstripRef = (el: HTMLUListElement) => {
     filmstripEl = el;
     el.addEventListener(
       'error',
@@ -1922,7 +1943,7 @@ function PanelHero(): JSX.Element {
         <HeroMain items={items()} idx={idx()} />
       </Show>
       <Show when={hasMany()}>
-        <div class="panel-filmstrip" ref={onFilmstripRef}>
+        <ul class="panel-filmstrip" ref={onFilmstripRef} aria-label="Media">
           <For each={items()}>
             {(item, i) => {
               // Screenshots have a separate full-res `main` behind the small `thumb` — if
@@ -1932,19 +1953,21 @@ function PanelHero(): JSX.Element {
               // broken-image state.
               const fallback = item.type === 'image' && item.main !== item.thumb ? item.main : '';
               return (
-                <button
-                  type="button"
-                  class={`panel-film-item${i() === idx() ? ' active' : ''}${item.type === 'video' ? ' is-video' : ''}`}
-                  aria-label={mediaLabel(items(), i())}
-                  aria-current={i() === idx() ? 'true' : undefined}
-                  onClick={() => setHeroIdx(i())}
-                >
-                  <img class="panel-film-thumb" src={item.thumb} data-fallback={fallback} alt="" loading="lazy" />
-                </button>
+                <li>
+                  <button
+                    type="button"
+                    class={`panel-film-item${i() === idx() ? ' active' : ''}${item.type === 'video' ? ' is-video' : ''}`}
+                    aria-label={mediaLabel(items(), i())}
+                    aria-current={i() === idx() ? 'true' : undefined}
+                    onClick={() => setHeroIdx(i())}
+                  >
+                    <img class="panel-film-thumb" src={item.thumb} data-fallback={fallback} alt="" loading="lazy" />
+                  </button>
+                </li>
               );
             }}
           </For>
-        </div>
+        </ul>
       </Show>
     </div>
   );
@@ -2234,15 +2257,17 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
           ⋯
         </button>
         <Show when={moreLinksOpen()}>
-          <div class="panel-icon-more-menu">
+          <ul class="panel-icon-more-menu">
             <For each={items()}>
               {(it) => (
-                <a class="panel-icon-more-item" href={safeHref(it.href) || undefined} target="_blank" rel="noopener">
-                  {it.icon} {it.label}
-                </a>
+                <li>
+                  <a class="panel-icon-more-item" href={safeHref(it.href) || undefined} target="_blank" rel="noopener">
+                    {it.icon} {it.label}
+                  </a>
+                </li>
               )}
             </For>
-          </div>
+          </ul>
         </Show>
       </div>
     </Show>
@@ -2392,23 +2417,29 @@ function PanelSubnav(props: { game: ReadonlyGame }): JSX.Element {
 
   return (
     <Show when={items().length >= 2}>
-      <div class="panel-subnav">
-        <button type="button" class="panel-subnav-btn" data-target="top" onClick={() => jumpToPanelSection('top')}>
-          Overview
-        </button>
-        <For each={items()}>
-          {(it) => (
-            <button
-              type="button"
-              class="panel-subnav-btn"
-              data-target={it.target}
-              onClick={() => jumpToPanelSection(it.target)}
-            >
-              {it.label}
+      <nav class="panel-subnav" aria-label="Sections">
+        <ul class="panel-subnav-list">
+          <li>
+            <button type="button" class="panel-subnav-btn" data-target="top" onClick={() => jumpToPanelSection('top')}>
+              Overview
             </button>
-          )}
-        </For>
-      </div>
+          </li>
+          <For each={items()}>
+            {(it) => (
+              <li>
+                <button
+                  type="button"
+                  class="panel-subnav-btn"
+                  data-target={it.target}
+                  onClick={() => jumpToPanelSection(it.target)}
+                >
+                  {it.label}
+                </button>
+              </li>
+            )}
+          </For>
+        </ul>
+      </nav>
     </Show>
   );
 }

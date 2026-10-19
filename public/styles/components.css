@@ -889,4 +889,489 @@
   .selection-status a {
     white-space: nowrap;
   }
+
+  /* ── The side panel (panel.tsx): a dark column on a hairline, its hero full-bleed. ── */
+  .game-panel {
+    --panel-pad: 20px;
+    border-left: 1px solid var(--line-strong);
+    background: var(--surface);
+  }
+  /* Slides in: from the right beside the content, from the bottom over a phone's screen. Its
+     content goes on close, so it leaves at once. */
+  .game-panel.open {
+    transition:
+      opacity var(--dur-3) var(--ease-out),
+      translate var(--dur-3) var(--ease-out);
+  }
+  @starting-style {
+    .game-panel.open {
+      opacity: 0;
+      translate: 24px 0;
+    }
+  }
+  @media (max-width: 768px) {
+    .game-panel {
+      --panel-pad: var(--gutter);
+      border-left: 0;
+    }
+    @starting-style {
+      .game-panel.open {
+        translate: 0 32px;
+      }
+    }
+  }
+
+  .panel-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    /* Over the sticky header, which keeps room for it. */
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-3);
+    background: rgb(0 0 0 / 0.55);
+    color: #fff;
+    font-size: var(--fs-figure);
+    line-height: 1;
+    cursor: pointer;
+  }
+  .panel-close:hover {
+    background: rgb(0 0 0 / 0.8);
+  }
+  @media (max-width: 768px) {
+    .panel-close {
+      width: 40px;
+      height: 40px;
+    }
+  }
+
+  .panel-body {
+    padding: 0 var(--panel-pad) 24px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-control) transparent;
+  }
+
+  /* The hero: Steam's header art at its own ratio, edge to edge. */
+  .panel-hero {
+    margin-inline: calc(-1 * var(--panel-pad));
+  }
+  .panel-hero-main {
+    position: relative;
+    aspect-ratio: 460 / 215;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  /* A landscape phone: the hero leaves room for the title. */
+  @media (max-height: 500px) {
+    .panel-hero-main {
+      max-height: 30vh;
+    }
+  }
+  .panel-hero-open {
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    /* A broken image's alt text stays at the top left. */
+    text-align: left;
+    cursor: zoom-in;
+  }
+  /* Inside the frame, which clips. */
+  .panel-hero-open:focus-visible,
+  .panel-hero-btn:focus-visible {
+    outline-offset: -4px;
+  }
+  .panel-hero-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  /* Until the item's own image is in (HeroMain): its thumbnail in the frame, or a shimmer. */
+  .panel-hero-img.loading {
+    opacity: 0;
+  }
+  .panel-hero-main--loading {
+    background: linear-gradient(90deg, var(--surface) 25%, var(--line-strong) 50%, var(--surface) 75%);
+    background-size: 600px 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+  .panel-hero-main--loading[style*='background-image'] {
+    background-size: cover;
+    background-position: center;
+    animation: none;
+  }
+  .panel-hero-img--broken {
+    background: var(--surface-2);
+  }
+  .panel-hero-btn {
+    position: absolute;
+    top: 50%;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 48px;
+    padding: 0;
+    border: 0;
+    background: rgb(0 0 0 / 0.55);
+    color: #fff;
+    font-size: 26px;
+    line-height: 1;
+    translate: 0 -50%;
+    opacity: 0;
+    cursor: pointer;
+    transition:
+      opacity var(--dur-1) var(--ease-out),
+      background-color var(--dur-1) var(--ease-out);
+  }
+  .panel-hero-main:hover .panel-hero-btn,
+  .panel-hero-btn:focus-visible {
+    opacity: 1;
+  }
+  .panel-hero-btn:hover {
+    background: rgb(0 0 0 / 0.8);
+  }
+  .panel-hero-btn:disabled {
+    visibility: hidden;
+  }
+  .panel-hero-prev {
+    left: 0;
+    border-radius: 0 var(--radius-1) var(--radius-1) 0;
+  }
+  .panel-hero-next {
+    right: 0;
+    border-radius: var(--radius-1) 0 0 var(--radius-1);
+  }
+  .panel-hero-main.is-video::before,
+  .panel-film-item.is-video::after {
+    content: '▶';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    text-shadow: 0 1px 6px rgb(0 0 0 / 0.85);
+    pointer-events: none;
+  }
+  .panel-hero-main.is-video::before {
+    font-size: 48px;
+  }
+  .panel-film-item.is-video::after {
+    font-size: var(--fs-title);
+  }
+
+  /* Its media, a strip of thumbnails; the padding keeps a focus ring inside the scroller, which clips. */
+  .panel-filmstrip {
+    display: flex;
+    gap: 6px;
+    padding: 8px var(--panel-pad) 6px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-control) transparent;
+  }
+  .panel-filmstrip > li {
+    flex: none;
+  }
+  .panel-film-item {
+    position: relative;
+    display: block;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-1);
+    background: none;
+    cursor: pointer;
+  }
+  .panel-film-thumb {
+    display: block;
+    width: 84px;
+    height: 48px;
+    object-fit: cover;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-1);
+    background: var(--surface-2);
+    opacity: 0.7;
+    transition: opacity var(--dur-1) var(--ease-out);
+  }
+  .panel-film-item:hover .panel-film-thumb {
+    opacity: 1;
+  }
+  .panel-film-item.active .panel-film-thumb {
+    border: 2px solid var(--accent);
+    opacity: 1;
+  }
+
+  /* The title, its links and the section tabs stay on top while the rest scrolls under them. */
+  .panel-header-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin: 0 calc(-1 * var(--panel-pad)) 16px;
+    padding: 16px var(--panel-pad) 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .panel-header-sticky:has(.panel-subnav) {
+    padding-bottom: 0;
+  }
+  /* Clear of the close button. */
+  .panel-title-row > :first-child {
+    padding-right: 28px;
+  }
+  @media (max-width: 768px) {
+    .panel-title-row > :first-child {
+      padding-right: 40px;
+    }
+  }
+  .panel-title {
+    color: var(--text);
+    font-size: var(--fs-figure);
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+  .panel-release {
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .panel-basegame-link {
+    color: var(--text-body);
+  }
+  .panel-basegame-link:hover {
+    color: var(--text);
+  }
+  /* "‹ <game>": back along a DLC trail (panelHistory.ts). */
+  .panel-back-btn {
+    display: block;
+    max-width: 100%;
+    min-height: 24px;
+    margin-bottom: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+    font-weight: 600;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .panel-back-btn:hover {
+    color: var(--text);
+  }
+
+  /* Store, ITAD and ⋯ More leave the page; after the divider, copy link and ↻ act in place. */
+  .panel-icon-links {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .panel-icon-link,
+  .panel-refresh-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-2);
+    background: transparent;
+    color: var(--text);
+    font-size: var(--fs-ui);
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      border-color var(--dur-1) var(--ease-out),
+      background-color var(--dur-1) var(--ease-out);
+  }
+  .panel-icon-link:hover,
+  .panel-refresh-btn:hover:not(:disabled) {
+    border-color: var(--muted);
+    background: var(--line);
+    color: var(--text);
+  }
+  .panel-refresh-btn {
+    padding: 0 8px;
+  }
+  .panel-refresh-age {
+    color: var(--muted);
+    font-size: var(--fs-label);
+    white-space: nowrap;
+  }
+  .panel-refresh-icon.is-refreshing {
+    animation: spin 0.75s linear infinite;
+  }
+  .panel-copy-link-btn--copied,
+  .panel-copy-link-btn--copied:hover {
+    border-color: var(--good);
+    color: var(--good);
+  }
+  .panel-icon-divider {
+    width: 1px;
+    height: 20px;
+    margin-inline: 2px;
+    background: var(--line-strong);
+  }
+  .panel-icon-more {
+    position: relative;
+  }
+  .panel-icon-more-btn[aria-expanded='true'] {
+    border-color: var(--text);
+  }
+  .panel-icon-more-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 5;
+    min-width: 200px;
+    padding: 4px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-3);
+    background: var(--surface-2);
+  }
+  .panel-icon-more-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    padding: 0 10px;
+    border-radius: var(--radius-1);
+    color: var(--text);
+    font-size: var(--fs-ui);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .panel-icon-more-item:hover {
+    background: var(--line);
+  }
+
+  /* Section tabs as text; one amber bar under the current one, moved there by the scroll-spy
+     (panel.tsx's placeSubnavUnderline), glides between them once placed. */
+  .panel-subnav-list {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 18px;
+    margin-top: 6px;
+  }
+  .panel-subnav-btn {
+    min-height: 36px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: var(--fs-ui);
+    cursor: pointer;
+    transition: color var(--dur-1) var(--ease-out);
+  }
+  .panel-subnav-btn:hover,
+  .panel-subnav-btn.active {
+    color: var(--text);
+  }
+  .panel-subnav-list::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 2px;
+    background: var(--accent);
+    transform-origin: 0 0;
+    transform: translate(var(--underline-x, 0), calc(var(--underline-y, 2px) - 2px)) scaleX(var(--underline-w, 0));
+  }
+  .panel-subnav-list[data-glide]::after {
+    transition: transform var(--dur-3) var(--ease-out);
+  }
+  /* Forced colors repaint the bar's fill away. */
+  @media (forced-colors: active) {
+    .panel-subnav-btn.active {
+      text-decoration: underline 2px;
+      text-underline-offset: 6px;
+    }
+  }
+
+  /* Prev / position / next / random, pinned to the panel's foot (panelNav.ts); empty for a lookup. */
+  .panel-nav {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px var(--panel-pad);
+    border-top: 1px solid var(--line-strong);
+    background: var(--surface);
+  }
+  .panel-nav:empty {
+    display: none;
+  }
+  .panel-nav:not(:empty) ~ .panel-body {
+    padding-bottom: 84px;
+  }
+  .panel-nav-btn {
+    position: relative;
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-3);
+    background: transparent;
+    color: var(--text);
+    font-size: var(--fs-page);
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      border-color var(--dur-1) var(--ease-out),
+      background-color var(--dur-1) var(--ease-out);
+  }
+  .panel-nav-btn:hover:not(:disabled) {
+    border-color: var(--muted);
+    background: var(--line);
+  }
+  .panel-nav-pos {
+    flex: 1;
+    color: var(--muted);
+    font-size: var(--fs-ui);
+    text-align: center;
+    user-select: none;
+  }
+  .panel-nav-reroll {
+    margin-left: 4px;
+    font-size: var(--fs-body);
+  }
+  /* 🎲 isn't a key, so it carries its key; ↑/↓ are theirs. */
+  .panel-nav-kbd {
+    position: absolute;
+    right: 2px;
+    bottom: 1px;
+    padding: 0 3px;
+    border-radius: 2px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: var(--fs-label);
+    line-height: 1.3;
+  }
 }

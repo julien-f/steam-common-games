@@ -42,6 +42,38 @@
     }
   }
 
+  /* The side panel (AppShell.tsx): docked beside the content, not modal. Fixed and full-height, so its
+     body scrolls on its own; hidden until a game is open. */
+  .game-panel {
+    display: none;
+    position: fixed;
+    top: 0;
+    right: 0;
+    /* Over the content; under the shortcuts dialog and the lightbox. */
+    z-index: 100;
+    flex-direction: column;
+    width: var(--panel-w);
+    max-width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .game-panel.open {
+    display: flex;
+  }
+  .panel-body {
+    flex: 1;
+    overflow-y: auto;
+  }
+  /* Phone: it covers the screen, edge to edge rather than 100vw, which counts the scrollbar. */
+  @media (max-width: 768px) {
+    .game-panel.open {
+      z-index: 101;
+      left: 0;
+      width: auto;
+    }
+  }
+
   /* One row on desktop, its content on the wide list routes' 1600px column; the hairline spans the window. */
   .site-nav {
     display: flex;
