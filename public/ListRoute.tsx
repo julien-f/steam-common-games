@@ -251,6 +251,17 @@ import { CombineForm, sourceOptions, refKey, type SourceOption } from './Combine
 import type { MembershipGroup } from './combine.ts';
 import { peekMyOwnershipStatus, peekMyPlaytime, trackMyOwnership } from './myOwnership.ts';
 import { creatorTitle, fetchCreatorGames, steamSearchUrl, type CreatorRole } from './creatorData.ts';
+import ArrowLeft from 'lucide-solid/icons/arrow-left';
+import Check from 'lucide-solid/icons/check';
+import ChevronDown from 'lucide-solid/icons/chevron-down';
+import ChevronLeft from 'lucide-solid/icons/chevron-left';
+import ChevronRight from 'lucide-solid/icons/chevron-right';
+import Dices from 'lucide-solid/icons/dices';
+import Folder from 'lucide-solid/icons/folder';
+import Link from 'lucide-solid/icons/link';
+import Plus from 'lucide-solid/icons/plus';
+import TriangleAlert from 'lucide-solid/icons/triangle-alert';
+import Trophy from 'lucide-solid/icons/trophy';
 
 type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user' | 'compare' | 'shared' | 'creator';
 
@@ -961,9 +972,9 @@ export default function ListRoute() {
   }
   function rankThisListLabel(): string {
     const focus = rankThisListFocus();
-    if (!focus) return '🏆 Rank this list';
-    if (!focus.length) return '🏆 Rank (none shown)';
-    return `🏆 Rank ${focus.length} game${focus.length === 1 ? '' : 's'}`;
+    if (!focus) return 'Rank this list';
+    if (!focus.length) return 'Rank (none shown)';
+    return `Rank ${focus.length} game${focus.length === 1 ? '' : 's'}`;
   }
   // Ranking compares games two at a time, so what it ranks needs 2 of them; none shown is disabled outright.
   function rankTooFew(): boolean {
@@ -989,10 +1000,16 @@ export default function ListRoute() {
     const source = rankSourceRef();
     return source ? rankingsOf(source) : [];
   }
-  function rankingProgressText(list: GameList): string {
+  function rankingProgressText(list: GameList): JSX.Element {
     const p = progress(getRanking(list.id), new Set(rowsStore.map((r) => r.appid)));
     const total = p.ranked + p.excluded + p.pending;
-    return p.pending ? `${p.ranked} of ${total} ranked` : `${p.ranked} ranked ✓`;
+    return p.pending ? (
+      `${p.ranked} of ${total} ranked`
+    ) : (
+      <>
+        {p.ranked} ranked <Check />
+      </>
+    );
   }
   function RankMenu(): JSX.Element {
     let trigger!: HTMLButtonElement;
@@ -1002,7 +1019,7 @@ export default function ListRoute() {
     return (
       <div class={`rank-menu${kind === 'bundle' ? ' hero-secondary' : ''}`}>
         <button ref={trigger} type="button" class="btn" popovertarget="rank-menu-panel">
-          {rankThisListLabel()} ▾
+          <Trophy /> {rankThisListLabel()} <ChevronDown />
         </button>
         <div ref={panel} id="rank-menu-panel" class="site-nav-popover-panel rank-menu-panel" popover>
           <h2 class="rank-menu-heading">Continue</h2>
@@ -1039,7 +1056,7 @@ export default function ListRoute() {
               aria-disabled={rankTooFew() ? 'true' : undefined}
               aria-describedby={rankTooFew() ? 'rank-reason' : undefined}
             >
-              + New ranking
+              <Plus /> New ranking
             </button>
             <Show when={rankTooFew()}>
               <span id="rank-reason" class="rank-reason">
@@ -1980,7 +1997,7 @@ export default function ListRoute() {
           title="Pick a random game (R)"
           onClick={() => pickRandomGame()}
         >
-          🎲
+          <Dices />
         </button>
         <ViewActions
           onShare={handleShareView}
@@ -2214,7 +2231,7 @@ export default function ListRoute() {
       if (!list) {
         // Also what a /lists/<id> link from someone else's browser lands on.
         setStatusText(
-          "This list isn't in this browser: it was deleted, or it was made in another one — lists live in the browser that created them. Ask for its 🔗 Share list link instead (combined lists only, for now).",
+          "This list isn't in this browser: it was deleted, or it was made in another one — lists live in the browser that created them. Ask for its Share list link instead (combined lists only, for now).",
         );
         return;
       }
@@ -2719,10 +2736,10 @@ export default function ListRoute() {
       // own refresh — but here, next to the age, rather than as a button at the other end of the
       // card. Offered even before anything has priced, so a failed first price load has a retry.
       sub: refreshingPrices()
-        ? 'Refreshing prices… ↻'
+        ? refreshTileValue('Refreshing prices…')
         : priceFetchedAt() === undefined
-          ? 'Refresh prices ↻'
-          : `Updated ${fmtAge(priceFetchedAt())} ↻`,
+          ? refreshTileValue('Refresh prices')
+          : refreshTileValue(`Updated ${fmtAge(priceFetchedAt())}`),
       subTitle: 'Re-fetch current prices and historical lows for every game in this list',
       subOnClick: handleRefreshPrices,
       subDisabled: refreshingPrices(),
@@ -2982,7 +2999,15 @@ export default function ListRoute() {
     const stored = userList();
     if (stored) {
       const folder = folderPathLabel(stored);
-      if (folder) tiles.push({ label: 'Folder', value: `📁 ${folder}` });
+      if (folder)
+        tiles.push({
+          label: 'Folder',
+          value: (
+            <>
+              <Folder /> {folder}
+            </>
+          ),
+        });
       // "Edited", not "Updated": this is when the list's own definition last changed, which for a
       // dynamic list says nothing about how fresh its resolved contents are (those are recomputed
       // on every open) — unlike the owned/wishlist tile above, which is exactly a data age.
@@ -3079,7 +3104,7 @@ export default function ListRoute() {
             <For each={problems}>
               {(problem) => (
                 <li>
-                  ⚠ {problem.desc.label} — {problem.desc.problem}.
+                  <TriangleAlert /> {problem.desc.label} — {problem.desc.problem}.
                   {problem.desc.countsAsEmpty && ' It counts as no games; the rest of the formula still applies.'}
                 </li>
               )}
@@ -3209,7 +3234,7 @@ export default function ListRoute() {
             if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`));
           }}
         >
-          ‹
+          <ChevronLeft />
         </button>
         <button
           type="button"
@@ -3222,10 +3247,10 @@ export default function ListRoute() {
             if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`));
           }}
         >
-          ›
+          <ChevronRight />
         </button>
         <A class="btn" href={withAccountParam('/bundles', routerLocation.search)}>
-          ← All bundles
+          <ArrowLeft /> All bundles
         </A>
       </div>
     );
@@ -3256,7 +3281,7 @@ export default function ListRoute() {
             title={shareFailure() ?? 'Copy a link anyone can open, live and without saving it themselves'}
             onClick={(e) => handleShareList(e.currentTarget)}
           >
-            🔗 Share list
+            <Link /> Share list
           </button>
         </Show>
         <Show when={kind === 'user' && userList()?.kind === 'ranked'}>
@@ -3288,7 +3313,7 @@ export default function ListRoute() {
                   aria-describedby={rankTooFew() ? 'rank-reason' : undefined}
                   onClick={() => handleRankThisList()}
                 >
-                  {rankThisListLabel()}
+                  <Trophy /> {rankThisListLabel()}
                 </button>
                 <Show when={rankTooFew()}>
                   <span id="rank-reason" class="rank-reason">
@@ -3317,7 +3342,7 @@ export default function ListRoute() {
           <For each={sharedBundles()}>
             {(b) => (
               <A class="btn" href={withAccountParam(`/lists/bundle/${b.id}`, routerLocation.search)}>
-                ← {b.title}
+                <ArrowLeft /> {b.title}
               </A>
             )}
           </For>
@@ -3575,7 +3600,7 @@ export default function ListRoute() {
           <For each={compareFailures()}>
             {(f) => (
               <p>
-                ⚠ <strong>{f.identifiers.join(' + ')}</strong> — {f.message}
+                <TriangleAlert /> <strong>{f.identifiers.join(' + ')}</strong> — {f.message}
               </p>
             )}
           </For>
@@ -3702,7 +3727,7 @@ export default function ListRoute() {
             aria-expanded={unresolvedOpen()}
             onClick={() => setUnresolvedOpen(!unresolvedOpen())}
           >
-            {unresolvedOpen() ? '▾' : '▸'} {unresolvedGames().length} more in this bundle, not on Steam
+            <ChevronRight class="unresolved-chevron" /> {unresolvedGames().length} more in this bundle, not on Steam
           </button>
           <Show when={unresolvedOpen()}>
             <ul class="unresolved-list">
@@ -3787,7 +3812,7 @@ export default function ListRoute() {
             <For each={manualLists().filter((l) => l.id !== userList()?.id)}>
               {(l) => <option value={l.id}>{l.name}</option>}
             </For>
-            <option value={NEW_LIST_OPTION}>+ Create new list…</option>
+            <option value={NEW_LIST_OPTION}>Create new list…</option>
           </select>
           <Show when={addTarget() === NEW_LIST_OPTION}>
             <input

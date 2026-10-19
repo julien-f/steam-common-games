@@ -388,10 +388,7 @@ export default function HomeRoute() {
   function moveTargets(row: TreeRow): { id: string; label: string }[] {
     const all = folders();
     const here = row.item.parentId ?? ROOT;
-    return [
-      { id: ROOT, label: 'Top level' },
-      ...folderPaths(all).map((f) => ({ id: f.id, label: `📁 ${f.path}` })),
-    ].filter(
+    return [{ id: ROOT, label: 'Top level' }, ...folderPaths(all).map((f) => ({ id: f.id, label: f.path }))].filter(
       (t) =>
         t.id !== here &&
         !(

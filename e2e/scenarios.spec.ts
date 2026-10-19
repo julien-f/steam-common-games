@@ -699,7 +699,7 @@ test('C3 edge: a saved comparison keeps the name its page had', async ({ page })
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare?u=alice&u=bob');
   await expect(page.getByRole('heading', { name: 'Alice vs. Bob' })).toBeVisible();
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind More actions
   if (await more.isVisible()) await more.click();
   await page.getByRole('button', { name: 'Save as a list' }).click();
   await expect(page).toHaveURL(/\/lists\/[0-9a-f-]{36}$/);
@@ -711,7 +711,7 @@ test('C3 edge: a saved comparison offers Share list only, not a Share view that 
   await page.goto('/lists/compare?u=alice&u=bob');
   await expect(groupRows(page)).toHaveCount(3);
   await expect(page.getByRole('button', { name: 'Share view' })).toHaveCount(1);
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind More actions
   if (await more.isVisible()) await more.click();
   await page.getByRole('button', { name: 'Save as a list' }).click();
   await expect(page).toHaveURL(/\/lists\/[0-9a-f-]{36}$/);
@@ -724,17 +724,17 @@ test('C3 edge: Save as a list moves focus into the saved list, not to the page',
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare?u=alice&u=bob');
   await expect(groupRows(page)).toHaveCount(3);
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind More actions
   if (await more.isVisible()) await more.click();
   await page.getByRole('button', { name: 'Save as a list' }).click();
   await expect(page).toHaveURL(/\/lists\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('main')).toBeFocused();
 });
 
-test('C1 edge: + Add player focuses the player box it adds', async ({ page }) => {
+test('C1 edge: Add player focuses the player box it adds', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare');
-  await page.getByRole('button', { name: '+ Add player' }).click();
+  await page.getByRole('button', { name: 'Add player' }).click();
   const boxes = page.locator('.compare-form').getByRole('combobox');
   await expect(boxes).toHaveCount(3);
   await expect(boxes.nth(2)).toBeFocused();
@@ -826,7 +826,7 @@ test('L1.1-3: select games, add them to a new list, open it', async ({ page }) =
   await row(page, 'Terraria').getByRole('checkbox').check();
 
   const toolbar = page.locator('.selection-toolbar');
-  await toolbar.getByRole('combobox').selectOption({ label: '+ Create new list…' });
+  await toolbar.getByRole('combobox').selectOption({ label: 'Create new list…' });
   await page.getByRole('textbox', { name: 'New list name' }).fill('To play with Bob');
   await page.keyboard.press('Enter');
 
@@ -842,7 +842,7 @@ test("L1 edge: the new list's toast stays while pointed at", async ({ page }) =>
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await row(page, 'Portal 2').getByRole('checkbox').check();
-  await page.locator('.selection-toolbar').getByRole('combobox').selectOption({ label: '+ Create new list…' });
+  await page.locator('.selection-toolbar').getByRole('combobox').selectOption({ label: 'Create new list…' });
   await page.getByRole('textbox', { name: 'New list name' }).fill('Later');
   await page.keyboard.press('Enter');
 
@@ -867,7 +867,7 @@ test('L1.4: a list moves into the only folder', async ({ page }) => {
 
   const move = page.getByRole('combobox', { name: 'Move Shortlist to…' });
   await expect(move).toHaveValue(''); // showing "Move to…", so picking the folder is a change
-  await move.selectOption({ label: '📁 Weekend' });
+  await move.selectOption({ label: 'Weekend' });
   await expect(move.locator('option')).toContainText(['Move to…', 'Top level']); // now inside Weekend
   await expect(move).toHaveValue('');
 });
@@ -1008,20 +1008,20 @@ test('L1 edge: one selected game is too few to rank, and says so', async ({ page
   await asPlayer(page, ALICE);
   await page.goto('/lists/wishlist');
   await row(page, 'It Takes Two').getByRole('checkbox').check();
-  const rank = page.getByRole('button', { name: '🏆 Rank 1 game', exact: true });
+  const rank = page.getByRole('button', { name: 'Rank 1 game', exact: true });
   await expect(rank).toHaveAttribute('aria-disabled', 'true');
   await expect(rank).toHaveAccessibleDescription('Ranking needs at least 2 games');
   await rank.click({ force: true });
   await expect(page).toHaveURL(/\/lists\/wishlist/);
 
-  // A list already ranked once gates "+ New ranking" the same way.
+  // A list already ranked once gates "New ranking" the same way.
   await row(page, 'It Takes Two').getByRole('checkbox').uncheck();
   await page.getByRole('button', { name: /Rank this list/ }).click();
   await page.keyboard.press('Escape');
   await page.goto('/lists/wishlist');
   await row(page, 'It Takes Two').getByRole('checkbox').check();
   await page.getByRole('button', { name: /Rank 1 game/ }).click();
-  const create = page.locator('.rank-menu-panel').getByRole('button', { name: '+ New ranking' });
+  const create = page.locator('.rank-menu-panel').getByRole('button', { name: 'New ranking' });
   await expect(create).toHaveAttribute('aria-disabled', 'true');
   await expect(create).toHaveAccessibleDescription('Ranking needs at least 2 games');
   await create.click({ force: true });
@@ -1103,7 +1103,7 @@ test("R1 edge: a ranking card's HLTB time is the table's, rounded and labelled",
   await expect(page.locator('thead th').filter({ hasText: /^HLTB \(h\)/ })).toHaveCount(1);
   await expect(row(page, 'Hades')).toContainText('44.5');
   for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
+  await page.getByRole('button', { name: 'Rank 2 games' }).click();
   await expect(page.locator('.rank-route')).toContainText('44.5 h to beat');
 });
 
@@ -1111,7 +1111,7 @@ test("R1 edge: the ranking's keyboard hints show only with a mouse", async ({ pa
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
+  await page.getByRole('button', { name: 'Rank 2 games' }).click();
   await expect(page.locator('.rank-question')).toBeVisible();
   await expect(page.locator('.rank-hint')).toBeVisible({ visible: testInfo.project.name !== 'phone' });
 });
@@ -1120,8 +1120,8 @@ test("R1 edge: the ranking's side panel offers similar owned games, with no list
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
-  await page.getByRole('button', { name: 'ℹ Details' }).first().click();
+  await page.getByRole('button', { name: 'Rank 2 games' }).click();
+  await page.getByRole('button', { name: 'Details', exact: true }).first().click();
   const similar = page.locator('#panel-section-similar');
   await expect(similar.locator('.panel-section-title')).toHaveText(/^Similar in Alice's library/);
   await expect(similar.locator('.panel-similar-item').first()).toBeVisible();
@@ -1132,8 +1132,8 @@ test("R1 edge: the ranking's side panel shows tags as plain pills and its Refres
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
-  await page.getByRole('button', { name: 'ℹ Details' }).first().click();
+  await page.getByRole('button', { name: 'Rank 2 games' }).click();
+  await page.getByRole('button', { name: 'Details', exact: true }).first().click();
 
   const panel = page.locator('.panel-tags');
   await expect(panel.locator('.panel-tag').first()).toBeVisible();
@@ -1156,8 +1156,8 @@ test("R1 edge: a failed Refresh on the ranking's side panel says so", async ({ p
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
-  await page.getByRole('button', { name: 'ℹ Details' }).first().click();
+  await page.getByRole('button', { name: 'Rank 2 games' }).click();
+  await page.getByRole('button', { name: 'Details', exact: true }).first().click();
   await page.route(/\/api\/game-details\/\d+\?refresh=1$/, (route) =>
     route.fulfill({ status: 502, json: { error: 'Steam did not answer' } }),
   );
@@ -1191,7 +1191,7 @@ test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo wi
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
+  await page.getByRole('button', { name: 'Rank 2 games' }).click();
   await expect(page.locator('.rank-card-name').nth(1)).not.toHaveText(/^App /);
 
   const viewport = page.viewportSize()!;
@@ -1254,7 +1254,7 @@ test('R1.1,3-6: rank chosen games, stop, resume on the same ones', async ({ page
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Terraria', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 3 games' }).click();
+  await page.getByRole('button', { name: 'Rank 3 games' }).click();
 
   await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
   await page.keyboard.press('ArrowLeft');
@@ -1266,33 +1266,33 @@ test('R1.1,3-6: rank chosen games, stop, resume on the same ones', async ({ page
   await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
 });
 
-test("R1 edge: closing the ranking's side panel returns focus to its ℹ Details", async ({ page }) => {
+test("R1 edge: closing the ranking's side panel returns focus to its Details button", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
-  const details = page.getByRole('button', { name: 'ℹ Details' }).first();
+  await page.getByRole('button', { name: 'Rank 2 games' }).click();
+  const details = page.getByRole('button', { name: 'Details', exact: true }).first();
   await details.click();
   await expect(page.locator('.game-panel')).toBeVisible();
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.locator('.game-panel')).toBeHidden();
   await expect(details).toBeFocused();
 
-  // Opened from the keyboard, with nothing focused: focus lands on the shown game's ℹ Details.
+  // Opened from the keyboard, with nothing focused: focus lands on the shown game's Details button.
   await page.evaluate(() => (document.activeElement as HTMLElement).blur());
   await page.keyboard.press('i');
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('.game-panel')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('.game-panel')).toBeHidden();
-  await expect(page.getByRole('button', { name: 'ℹ Details' }).nth(1)).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Details', exact: true }).nth(1)).toBeFocused();
 });
 
 test('R1 edge: Esc closing a nav popover stays on the ranking', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Terraria', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 3 games' }).click();
+  await page.getByRole('button', { name: 'Rank 3 games' }).click();
   await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
 
   await page.getByLabel('Preferences').click();
@@ -1344,7 +1344,7 @@ test('R2 edge: ranking a list again offers its rankings, or a new one by a crite
   const menu = page.locator('.rank-menu-panel');
   await expect(menu.getByRole('button', { name: /Ranking of Alice — Wishlist/ })).toBeVisible();
   await menu.getByRole('textbox', { name: 'What are you ranking by?' }).fill('co-op');
-  await menu.getByRole('button', { name: '+ New ranking' }).click();
+  await menu.getByRole('button', { name: 'New ranking' }).click();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('heading', { name: 'Ranking of Alice — Wishlist (co-op)' })).toBeVisible();
 });
@@ -1392,7 +1392,7 @@ test('B1.1,3-4: a bundle, then what it adds to my library', async ({ page }) => 
   await expect(rows(page)).toHaveCount(2);
 });
 
-test("B1 edge: a bundle's hero keeps All bundles by its ‹ ›, and one primary action among ghost ones", async ({
+test("B1 edge: a bundle's hero keeps All bundles by its previous/next buttons, and one primary action among ghost ones", async ({
   page,
 }) => {
   await asPlayer(page, ALICE);
@@ -1400,8 +1400,8 @@ test("B1 edge: a bundle's hero keeps All bundles by its ‹ ›, and one primary
   await expect(rows(page)).toHaveCount(4);
   const titlebar = page.locator('.list-hero-titlebar');
   await expect(titlebar.getByRole('button', { name: 'Previous bundle' })).toBeVisible();
-  await expect(titlebar.getByRole('link', { name: '← All bundles' })).toBeVisible();
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds the rest behind ⋯
+  await expect(titlebar.getByRole('link', { name: 'All bundles' })).toBeVisible();
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds the rest behind More actions
   if (await more.isVisible()) await more.click();
   const classes = await page
     .locator('.list-hero-actions')
@@ -1416,7 +1416,7 @@ test("B1 edge: a bundle's All bundles link keeps the account being explored, wit
   await page.goto(`/lists/bundle/${BUNDLE.id}?u=bob`);
   await expect(rows(page)).toHaveCount(4);
   await page.evaluate(() => ((window as unknown as { e2eSamePage: boolean }).e2eSamePage = true));
-  await page.locator('.list-hero-titlebar').getByRole('link', { name: '← All bundles' }).click();
+  await page.locator('.list-hero-titlebar').getByRole('link', { name: 'All bundles' }).click();
   await expect(page).toHaveURL(/\/bundles\?u=bob$/);
   expect(await page.evaluate(() => (window as unknown as { e2eSamePage?: boolean }).e2eSamePage)).toBe(true);
 });
@@ -1425,7 +1425,7 @@ test("B3 edge: a list built from a bundle says how many of its games aren't on S
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
   await expect(rows(page)).toHaveCount(4);
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds it behind ⋯
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds it behind More actions
   if (await more.isVisible()) await more.click();
   await page.getByRole('link', { name: 'What does this add?' }).click();
   await expect(page.locator('.list-formula')).toContainText('1 not on Steam');
@@ -1435,14 +1435,14 @@ test("B3 edge: what a bundle adds keeps the bundle's prices and links back to it
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
   await expect(rows(page)).toHaveCount(4);
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds it behind ⋯
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds it behind More actions
   if (await more.isVisible()) await more.click();
   await page.getByRole('link', { name: 'What does this add?' }).click();
   await expect(rows(page)).toHaveCount(2);
   await expect(page.locator('thead th').filter({ hasText: /^Tier Price/ })).toHaveCount(1);
   await expect(page.locator('thead th').filter({ hasText: /^Best Deal/ })).toHaveCount(1);
   await expect(row(page, 'Overcooked! 2')).toContainText('12.00');
-  await page.getByRole('link', { name: `← ${BUNDLE.title}` }).click();
+  await page.locator('.list-hero-actions').getByRole('link', { name: BUNDLE.title }).click();
   await expect(page).toHaveURL(new RegExp(`/lists/bundle/${BUNDLE.id}`));
   await expect(page.getByRole('heading', { name: BUNDLE.title })).toBeVisible();
 });
@@ -1461,7 +1461,7 @@ const saveWhatBundleAdds = async (page: Page) => {
   });
   await page.goto(sharedUrl(`subtract:(b:${BUNDLE.id};o:${ALICE.steamid})`));
   await expect(rows(page)).toHaveCount(2);
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind More actions
   if (await more.isVisible()) await more.click();
   await page.getByRole('button', { name: 'Save as a list' }).click();
   await expect(page).toHaveURL(/\/lists\/(?!shared)/);
@@ -1543,7 +1543,7 @@ test("B3 edge: a saved list from a pick-and-mix bundle claims no per-game rate i
   await asPlayer(page, ALICE);
   await page.goto(sharedUrl(`subtract:(b:90002;o:${BOB.steamid})`));
   await expect(row(page, 'Hades')).toContainText('Varies');
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind More actions
   if (await more.isVisible()) await more.click();
   await page.getByRole('button', { name: 'Save as a list' }).click();
   await expect(page).toHaveURL(/\/lists\/(?!shared)/);
@@ -1593,7 +1593,7 @@ test("B3 edge: a shared list left before its bundle answers doesn't link the nex
   release();
   await page.waitForResponse(/\/api\/bundles\/\d+/);
   await page.waitForTimeout(200); // let the late answer land, if it would
-  await expect(page.getByRole('link', { name: `← ${BUNDLE.title}` })).toHaveCount(0);
+  await expect(page.locator('.list-hero-actions').getByRole('link', { name: BUNDLE.title })).toHaveCount(0);
 });
 
 test('B3 edge: a list left with none of its bundle source has no Tier Price, but still links back', async ({
@@ -1604,7 +1604,7 @@ test('B3 edge: a list left with none of its bundle source has no Tier Price, but
   await expect(rows(page)).toHaveCount(4);
   await expect(page.locator('thead th').filter({ hasText: /^Best Deal/ })).toHaveCount(1);
   await expect(page.locator('thead th').filter({ hasText: /^Tier Price/ })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: `← ${BUNDLE.title}` })).toBeVisible();
+  await expect(page.locator('.list-hero-actions').getByRole('link', { name: BUNDLE.title })).toBeVisible();
 });
 
 test("B3 edge: what a pick-and-mix bundle adds claims no per-game rate it can't know", async ({ page }) => {
@@ -1623,7 +1623,10 @@ test("B3 edge: what a pick-and-mix bundle adds claims no per-game rate it can't 
 test("B3 edge: the link back to a bundle keeps the link's account", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto(`${sharedUrl(`subtract:(b:${BUNDLE.id};o:${BOB.steamid})`)}&u=bob`);
-  await expect(page.getByRole('link', { name: `← ${BUNDLE.title}` })).toHaveAttribute('href', /[?&]u=bob/);
+  await expect(page.locator('.list-hero-actions').getByRole('link', { name: BUNDLE.title })).toHaveAttribute(
+    'href',
+    /[?&]u=bob/,
+  );
 });
 
 test('B1 edge: a bundle game whose Steam lookup failed says so, rather than reading as not on Steam', async ({
@@ -1863,7 +1866,7 @@ test("B2 edge: a health check that didn't answer doesn't hide the Wishlist's pri
   await expect(page.getByRole('main')).not.toContainText("Prices aren't available on this instance");
 });
 
-test('D1 edge: Updated ↻ keeps the rows and the selection while it refreshes', async ({ page }) => {
+test('D1 edge: the Updated tile keeps the rows and the selection while it refreshes', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
@@ -1885,7 +1888,7 @@ test('D1 edge: Updated ↻ keeps the rows and the selection while it refreshes',
   await expect(row(page, 'Portal 2').getByRole('checkbox')).toBeChecked();
 });
 
-test('D1 edge: Updated ↻ keeps focus on the tile while it refreshes', async ({ page }) => {
+test('D1 edge: the Updated tile keeps focus while it refreshes', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
@@ -1904,7 +1907,7 @@ test('D1 edge: Updated ↻ keeps focus on the tile while it refreshes', async ({
   await expect(tile).toBeFocused();
 });
 
-test('D1 edge: a failed Updated ↻ leaves the tile there to try again', async ({ page }) => {
+test('D1 edge: a failed Updated refresh leaves the tile there to try again', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare?u=alice&u=bob');
   await expect(groupRows(page)).toHaveCount(3);
@@ -1923,7 +1926,7 @@ test('D1 edge: a failed Updated ↻ leaves the tile there to try again', async (
   await expect(page.getByRole('main')).not.toContainText('Steam request failed');
 });
 
-test('D1 edge: an Owned list that failed to load still offers Updated ↻', async ({ page }) => {
+test('D1 edge: an Owned list that failed to load still offers the Updated tile', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.route('**/api/common-games', (route) =>
     route.fulfill({ status: 502, json: { error: 'Steam request failed' } }),
@@ -1968,7 +1971,7 @@ test('D2 edge: failed prices warn like the other sources, in plain words', async
   await page.goto('/lists/wishlist');
   await expect(rows(page)).toHaveCount(4);
   const status = page.locator('.price-status');
-  await expect(status).toHaveText("IsThereAnyDeal didn't answer for prices — the Prices tile's ↻ retries");
+  await expect(status).toHaveText("IsThereAnyDeal didn't answer for prices — refresh them on the Prices tile");
   const warnColor = await page.locator('.list-status .list-failed').evaluate((el) => getComputedStyle(el).color);
   await expect(status).toHaveCSS('color', warnColor);
 });
@@ -2757,7 +2760,9 @@ test("F1 edge: on a phone, a slow right swipe on the panel's media steps it, wit
   await expect(page.locator('#panel-title')).toBeVisible();
 });
 
-test('F1 edge: on a phone, the ‹ › buttons sit clear of the media and its controls', async ({ page }, testInfo) => {
+test('F1 edge: on a phone, the previous/next media buttons sit clear of the media and its controls', async ({
+  page,
+}, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout');
   await fakePlayback(page);
   await asPlayer(page, ALICE);
@@ -3319,7 +3324,9 @@ test('F1 edge: Enter opens the highlighted recently looked-up game', async ({ pa
   await expect(page).toHaveURL(/[?&]game=1145360\b/);
 });
 
-test("I1 edge: on a phone, a bundle's table starts high, its other actions behind ⋯", async ({ page }, testInfo) => {
+test("I1 edge: on a phone, a bundle's table starts high, its other actions behind More actions", async ({
+  page,
+}, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout only');
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
@@ -3328,7 +3335,7 @@ test("I1 edge: on a phone, a bundle's table starts high, its other actions behin
     .first()
     .evaluate((el) => el.getBoundingClientRect().top + scrollY);
   expect(top).toBeLessThan(540); // 761 with the hero's tiles and actions wrapping
-  // CI's fonts run wider than a dev machine's: the ⋯ must not drop to a line of its own there.
+  // CI's fonts run wider than a dev machine's: More actions must not drop to a line of its own there.
   await page.addStyleTag({ content: '.list-hero-actions { letter-spacing: 1px }' });
   const rowY = (name: string) => page.getByRole('link', { name }).evaluate((el) => el.getBoundingClientRect().top);
   const moreY = await page
@@ -4100,7 +4107,7 @@ test("F4.3: a publisher's games I don't own open as a shared list, linked back a
     /\/lists\/publisher\?name=indie\.io/,
   );
 
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind More actions
   if (await more.isVisible()) await more.click();
   await page.getByRole('button', { name: 'Save as a list' }).click();
   await expect(page).toHaveURL(/\/lists\/(?!shared)/);

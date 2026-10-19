@@ -3,6 +3,8 @@
 // Combine section. Kept dumb: it only assembles { name, op, sources } and hands them to onSubmit,
 // which does the actual create/update and decides what happens next (close, navigate, reload).
 import { createSignal, For, Show } from 'solid-js';
+import ChevronDown from 'lucide-solid/icons/chevron-down';
+import ChevronUp from 'lucide-solid/icons/chevron-up';
 import { getRecentAccounts } from './accountsStore.ts';
 import { getLists } from './listsStore.ts';
 import { describeListRef, createDefaultNaming, formatCombine, OP_LABELS, OP_DESCRIPTIONS } from './listLabels.ts';
@@ -174,7 +176,7 @@ export function CombineForm(props: CombineFormProps) {
                     onClick={() => moveSource(i(), -1)}
                     aria-label={`Move ${label()} up`}
                   >
-                    ▲
+                    <ChevronUp />
                   </button>
                   <button
                     type="button"
@@ -182,7 +184,7 @@ export function CombineForm(props: CombineFormProps) {
                     onClick={() => moveSource(i(), 1)}
                     aria-label={`Move ${label()} down`}
                   >
-                    ▼
+                    <ChevronDown />
                   </button>
                 </li>
               );

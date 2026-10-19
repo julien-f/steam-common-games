@@ -196,6 +196,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 6px;
   }
   :where(button:not([class]), .btn):where(:hover:not(:disabled, [aria-disabled='true'])) {
     border-color: var(--muted);

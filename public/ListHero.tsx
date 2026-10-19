@@ -20,6 +20,8 @@
 // array and the button the user was on would be replaced mid-interaction, dropping keyboard
 // focus. `<Index>` keys by position and patches each tile's contents in place instead.
 import { createSignal, createUniqueId, Index, Show, type JSX } from 'solid-js';
+import Ellipsis from 'lucide-solid/icons/ellipsis';
+import RefreshCw from 'lucide-solid/icons/refresh-cw';
 
 export interface HeroTile {
   // Uppercased by CSS — write it in sentence case ("Ends", "Best deal"), not shouting.
@@ -84,7 +86,7 @@ export function ListHero(props: ListHeroProps): JSX.Element {
                 aria-expanded={moreOpen()}
                 onClick={() => setMoreOpen((v) => !v)}
               >
-                ⋯
+                <Ellipsis />
               </button>
             </Show>
           </div>
@@ -183,8 +185,9 @@ export function ListHero(props: ListHeroProps): JSX.Element {
 // tile's click means.
 export function refreshTileValue(text: string): JSX.Element {
   return (
-    <>
-      {text} <span class="list-stat-icon">↻</span>
-    </>
+    // One inline run: a two-action tile's sub-line button is a flex column.
+    <span>
+      {text} <RefreshCw class="list-stat-icon" />
+    </span>
   );
 }

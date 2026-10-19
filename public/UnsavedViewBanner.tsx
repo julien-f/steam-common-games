@@ -1,4 +1,6 @@
 import { Show, createSignal, onCleanup, type JSX } from 'solid-js';
+import Link from 'lucide-solid/icons/link';
+import RotateCcw from 'lucide-solid/icons/rotate-ccw';
 import { getAuthUser } from './authStore.ts';
 import { isUnsaved, summarizeViewDiff } from './tableViewSync.ts';
 import type { ViewStateApi } from '@vates/data-table-solid';
@@ -58,7 +60,8 @@ export function ViewActions(props: {
           onClick={(e) => (props.shareDisabledReason ? showReason() : props.onShare(e.currentTarget))}
           onBlur={() => setReasonShown(false)}
         >
-          🔗<span class="btn-label"> Share view</span>
+          <Link />
+          <span class="btn-label"> Share view</span>
         </button>
       </Show>
       <button
@@ -68,7 +71,7 @@ export function ViewActions(props: {
         title="Back to the default columns, sort and filters"
         onClick={() => props.onReset()}
       >
-        <span class="btn-icon">↺</span>
+        <RotateCcw class="btn-icon" />
         <span class="btn-label">Default view</span>
       </button>
       <Show when={props.shareDisabledReason}>

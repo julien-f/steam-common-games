@@ -731,6 +731,12 @@
   .unresolved-summary:hover {
     color: var(--text);
   }
+  .unresolved-chevron {
+    transition: rotate var(--dur-2) var(--ease-out);
+  }
+  .unresolved-summary[aria-expanded='true'] .unresolved-chevron {
+    rotate: 90deg;
+  }
   .unresolved-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -2386,6 +2392,9 @@
     width: 28px;
     height: 28px;
     font-size: var(--fs-title);
+  }
+  .lb-toolbar .lb-close {
+    font-size: var(--fs-figure);
   }
   .lb-toolbar-row {
     display: contents; /* one row with the caption; a phone stacks them again */

@@ -21,6 +21,9 @@
 // route decides what a submitted set of slots means. The one thing it reads is accountsStore.ts,
 // synchronously, once at mount: nothing here can change what's in recents while it's open.
 import { createSignal, createMemo, createUniqueId, untrack, For, Index, Show, type JSX } from 'solid-js';
+import Plus from 'lucide-solid/icons/plus';
+import Star from 'lucide-solid/icons/star';
+import X from 'lucide-solid/icons/x';
 import {
   getRecentAccounts,
   getMyAccount,
@@ -252,7 +255,7 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
                         aria-label={`Remove ${entryLabel(entry)}`}
                         onClick={() => removeEntry(slotIdx, entryIdx())}
                       >
-                        ×
+                        <X />
                       </button>
                     </span>
                   );
@@ -294,7 +297,9 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
                           {(url) => <img class="account-avatar" src={url()} alt="" width="20" height="20" />}
                         </Show>
                         <span>
-                          {account.starred ? '★ ' : ''}
+                          <Show when={account.starred}>
+                            <Star class="compare-option-star" />{' '}
+                          </Show>
                           {account.label}
                         </span>
                         <Show when={account.members.length > 1}>
@@ -307,8 +312,14 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
               </Show>
             </div>
             <Show when={slots().length > 2}>
-              <button type="button" class="btn" title="Remove this player" onClick={() => removeSlot(slotIdx)}>
-                ×
+              <button
+                type="button"
+                class="btn"
+                title="Remove this player"
+                aria-label="Remove this player"
+                onClick={() => removeSlot(slotIdx)}
+              >
+                <X />
               </button>
             </Show>
           </div>
@@ -319,7 +330,7 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
       <p class="compare-form-hint">Add more than one account to a player to compare a Steam Family as one library.</p>
       <div class="compare-form-actions">
         <button type="button" class="btn" onClick={addSlot}>
-          + Add player
+          <Plus /> Add player
         </button>
         <button
           type="submit"

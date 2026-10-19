@@ -10,6 +10,13 @@ import type { SwipeAxis } from './lightboxSwipe.ts';
 
 import { createSignal, createEffect, createRoot, batch, untrack } from 'solid-js';
 import { render } from 'solid-js/web';
+import ChevronDown from 'lucide-solid/icons/chevron-down';
+import ChevronLeft from 'lucide-solid/icons/chevron-left';
+import ChevronRight from 'lucide-solid/icons/chevron-right';
+import ChevronUp from 'lucide-solid/icons/chevron-up';
+import FastForward from 'lucide-solid/icons/fast-forward';
+import Rewind from 'lucide-solid/icons/rewind';
+import X from 'lucide-solid/icons/x';
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 
@@ -501,22 +508,22 @@ function LightboxDom() {
     <div id="screenshot-lightbox" role="dialog" aria-modal="true" aria-label="Screenshot viewer">
       <div class="lb-backdrop" />
       <button class="lb-btn lb-prev" aria-label="Previous screenshot">
-        &#8249;
+        <ChevronLeft />
       </button>
       <img class="lb-img" src="" alt="Screenshot" />
       <video class="lb-video" playsinline />
       <button class="lb-btn lb-next" aria-label="Next screenshot">
-        &#8250;
+        <ChevronRight />
       </button>
       <div class="lb-error" style={{ display: 'none' }} role="alert">
         <p class="lb-error-msg" />
         <button class="lb-error-retry">Retry</button>
       </div>
       <div class="lb-seek-flash lb-seek-flash-left" aria-hidden="true">
-        ⏪ {LB_TOUCH_SEEK_SECONDS}s
+        <Rewind /> {LB_TOUCH_SEEK_SECONDS}s
       </div>
       <div class="lb-seek-flash lb-seek-flash-right" aria-hidden="true">
-        {LB_TOUCH_SEEK_SECONDS}s ⏩
+        {LB_TOUCH_SEEK_SECONDS}s <FastForward />
       </div>
       {/* eslint-disable-next-line solid/no-innerhtml -- a module-level literal SVG string
           from the top of this file, not data: nothing here comes from a game, a user, or an
@@ -542,12 +549,12 @@ function LightboxDom() {
             through — see `_getGamePosition`. */}
         <div class="lb-caption">
           <button class="lb-game-prev" aria-label="Previous game">
-            &#8593;
+            <ChevronUp />
           </button>
           <span class="lb-caption-text" />
           <span class="lb-caption-pos" />
           <button class="lb-game-next" aria-label="Next game">
-            &#8595;
+            <ChevronDown />
           </button>
         </div>
         <div class="lb-toolbar-row">
@@ -562,7 +569,7 @@ function LightboxDom() {
                 (see the top of this file); no external input reaches these. */}
             <button class="lb-zoom" aria-label="Zoom" aria-pressed="false" innerHTML={LB_ZOOM_ICON} />
             <button class="lb-close" aria-label="Close lightbox">
-              &#215;
+              <X />
             </button>
           </div>
         </div>

@@ -67,7 +67,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   4. back on Home, their friends list marks mutual friends
 - **Done when**: the friend becomes the current account and joins Recent accounts, so Compare's player boxes offer them next.
 - **Or**: 5. select several friends 6. **Compare with me** ◇ 7. lands on C1's result with me plus them, my current account unchanged
-- **Edges**: private friends list; a Family's merged friends list; the list's ↻ after adding a friend on Steam.
+- **Edges**: private friends list; a Family's merged friends list; the list's refresh after adding a friend on Steam.
 
 ## Comparing libraries
 
@@ -181,11 +181,11 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Steps**:
   1. Owned
   2. filter (e.g. played > 5 h)
-  3. **🏆 Rank N games**
+  3. **Rank N games**
   4. answer pairs with ← / → / ↓ / S / X / Z
   5. stop with Esc halfway
   6. later **Continue: N chosen left** (or **Continue ranking**, for the whole list) on the list page to resume
-- **Done when**: no answer lost on stop; the progress bar's estimate shrinks; the list sorts by Rank; **ℹ Details** opens the panel without losing the pair.
+- **Done when**: no answer lost on stop; the progress bar's estimate shrinks; the list sorts by Rank; **Details** opens the panel without losing the pair.
 - **Edges**: Re-rank a selected game; Exclude one, then bring it back; Undo right after resuming; the source gains/loses a game; Change source keeps answers.
 
 ### R2 Rank what to buy next
@@ -193,8 +193,8 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Who / goal**: order my wishlist, or a bundle's games, by how much I want them.
 - **Steps**:
   1. Wishlist
-  2. **🏆 Rank this list**
-  3. answer using ℹ Details (trailer, rating, HLTB) since I haven't played them
+  2. **Rank this list**
+  3. answer using Details (trailer, rating, HLTB) since I haven't played them
   4. sort the ranked list by Rank next to price columns
 - **Done when**: the ranked list shows prices and badges like its source; buying a game (it leaves the Wishlist) drops it from the ranking.
 - **Edges**: the exclude option reads "Not interested" here, not "Haven't played".
@@ -204,7 +204,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Who / goal**: send a friend my top 20.
 - **Steps**:
   1. ranked list
-  2. **🔗 Share view** ◇
+  2. **Share view** ◇
   3. friend opens it
 - **Done when**: the friend sees the order read-only, and can save it or rank the same games themselves; ranked lists can't be shared today.
 
@@ -227,7 +227,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   1. Wishlist
   2. sort by discount or filter record-low badges (🔥 ★ ☆)
   3. Preferences (gear icon) to set region
-- **Done when**: prices state their region and age; ↻ on the Prices figure refreshes them only.
+- **Done when**: prices state their region and age; the refresh on the Prices figure refreshes them only.
 
 ### B3 What does this bundle add for the whole household?
 
@@ -280,7 +280,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   2. show the Played column
   3. filter to never played
   4. sort by HLTB (shortest first) or rating
-  5. **🎲 Pick for me** ◇ (or **R**) for a random pick, or browse with ↑/↓
+  5. **Pick a random game** ◇ (or **R**) for a random pick, or browse with ↑/↓
 - **Done when**: HLTB and rating fill in without a reload; the random pick draws only from the filtered rows and works on a phone; the filter survives a reload (L3).
 - **Edges**: games with no HLTB entry (where do they sort?); a Family account (whose playtime counts?).
 
@@ -303,7 +303,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Who / goal**: show a friend my curated, filtered wishlist.
 - **Steps**:
   1. set up the table
-  2. **🔗 Share view** (carries my account on Owned/Wishlist)
+  2. **Share view** (carries my account on Owned/Wishlist)
   3. friend opens the link
 - **Done when**: the friend sees my account's list with my layout; their own account and saved views are untouched; clicking around keeps the shared account. The link previews in a chat app with the app's name, description and image.
 - **Edges**: sharing a dynamic list (`/lists/shared?f=`) → friend saves it; on a ranked or manual-sourced list the button says why it can't share, before it's clicked ◇.
@@ -377,7 +377,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   1. open a large Owned or Wishlist
   2. watch the affected column
   3. retry with Refresh details in the panel once the upstream is back
-- **Done when**: the failing column says it failed rather than looking empty; other columns and the rest of the table are unaffected; the ↻ retry works.
+- **Done when**: the failing column says it failed rather than looking empty; other columns and the rest of the table are unaffected; the Refresh details retry works.
 
 ### D3 Back after a month
 

@@ -3,6 +3,8 @@
 // ranking.ts's binary insertion. Every answer is stored right away (listsStore.ts's setRanking),
 // so leaving at any point loses nothing; undo is an in-memory stack of previous states.
 import { createSignal, createEffect, createMemo, on, onCleanup, onMount, Show, For, type JSX } from 'solid-js';
+import ArrowLeft from 'lucide-solid/icons/arrow-left';
+import Info from 'lucide-solid/icons/info';
 import { createStore } from 'solid-js/store';
 import { A, useParams, useNavigate, useLocation } from '@solidjs/router';
 import { getList, getRanking, setRanking } from './listsStore.ts';
@@ -323,7 +325,7 @@ export default function RankRoute() {
             ref={(el) => detailsButtons.set(appid, el)}
             onClick={() => openPanel(appid)}
           >
-            ℹ Details
+            <Info /> Details
           </button>
           <button
             type="button"
@@ -342,7 +344,7 @@ export default function RankRoute() {
     <div class="rank-route">
       <header class="rank-header">
         <A href={listHref()} class="btn">
-          ← Back to list
+          <ArrowLeft /> Back to list
         </A>
         <h1>{title()}</h1>
       </header>
