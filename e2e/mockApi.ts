@@ -105,7 +105,22 @@ const creators = (appid: number) => CREATORS[appid] ?? { developers: ['Test Stud
 // Out of rating order, so sorting by Tag match visibly reorders a co-op filter.
 const COOP_WEIGHT: Record<number, number> = { 620: 0.3, 105600: 0.9, 413150: 0.6, 892970: 1 };
 
+// As server.js answers an appid with no store page: 200, every source empty rather than failed.
+const unknownDetails = (appid: number) => ({
+  appid,
+  fetchedAt: NOW,
+  fetchedAts: { rating: NOW, hltb: NOW, meta: NOW, tags: NOW, protondb: NOW },
+  rating: null,
+  hltb: null,
+  meta: null,
+  tags: [],
+  tagWeights: {},
+  demo: null,
+  protondb: null,
+});
+
 function details(appid: number, slowMedia = false) {
+  if (!CATALOG.some((g) => g.appid === appid)) return unknownDetails(appid);
   const g = game(appid);
   return {
     appid,

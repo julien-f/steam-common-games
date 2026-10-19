@@ -66,7 +66,6 @@ States `npm run dev:mock` can't show yet — each needs a fixture or state in `e
 - a static wishlist, so R2's "buying a game drops it from the ranking" can't be shown;
 - prices in any currency but EUR, so B2's repricing can't be judged;
 - search results (`/api/search-games`) and bundles carry no image, so the search dropdown's thumbnails and /bundles' Image column show blank;
-- a lookup of an appid outside the catalog (`/game/<unknown>`) throws in `fixtures.ts`'s `game()` and kills the `dev:mock` server, rather than answering as a failed lookup;
 - a trailer that plays: Hades' fixture trailer has no stream, so playback and its idle-hide can only be seen on the real server.
 
 ## Not yet reviewed
