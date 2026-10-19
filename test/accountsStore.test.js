@@ -86,9 +86,6 @@ test('setCurrentAccount: a re-pick resolved without player summaries keeps the s
     label: 'Alice',
     avatarUrl: 'https://avatars/a.jpg',
     vanities: { acc1: 'alice' },
-    memberSince: '2010-01-01',
-    countryCode: 'FR',
-    realName: 'Alice A.',
   };
   setCurrentAccount(makeAccount('acc1', known));
   // What accountSlotFrom builds when Steam's player summaries fail: placeholders, no display fields.
@@ -101,8 +98,25 @@ test('setCurrentAccount: a re-pick resolved without player summaries keeps the s
 
 test('setCurrentAccount: a resolved re-pick drops fields the user cleared on Steam', () => {
   const { setCurrentAccount, getCurrentAccount } = store();
-  setCurrentAccount(makeAccount('acc1', { label: 'Alice', vanities: { acc1: 'alice' }, realName: 'Alice A.' }));
+  setCurrentAccount(
+    makeAccount('acc1', { label: 'Alice', avatarUrl: 'https://avatars/a.jpg', vanities: { acc1: 'alice' } }),
+  );
   setCurrentAccount(makeAccount('acc1', { label: 'Alice', vanities: {} }));
+  assert.deepEqual({ ...getCurrentAccount(), lastUsedAt: 0 }, makeAccount('acc1', { label: 'Alice', vanities: {} }));
+});
+
+test('a stored slot with keys the app no longer writes still loads, and a re-pick drops them', () => {
+  const legacy = makeAccount('acc1', { label: 'Alice', memberSince: '2010-01-01', countryCode: 'FR', realName: 'A.' });
+  const entry = (value) => ({ value, updatedAt: 1 });
+  global.localStorage.setItem(
+    'steam.isonoe.net:prefs',
+    JSON.stringify({ schemaVersion: 2, currentAccount: entry(legacy), recentAccounts: entry([legacy]) }),
+  );
+  const { setCurrentAccount, getCurrentAccount, getRecentAccounts } = store();
+  assert.equal(getCurrentAccount().label, 'Alice');
+  assert.equal(getRecentAccounts()[0].label, 'Alice');
+
+  setCurrentAccount(makeAccount('acc1', { vanities: {}, unresolved: ['acc1'] }));
   assert.deepEqual({ ...getCurrentAccount(), lastUsedAt: 0 }, makeAccount('acc1', { label: 'Alice', vanities: {} }));
 });
 

@@ -106,10 +106,9 @@ export function toAccountPlayer(p: RawAccountPlayer): AccountPlayer {
 }
 
 // The member fields a slot is built from; a friend (AccountFriend) has them all but `placeholder`.
-type SlotPlayer = Pick<
-  AccountPlayer,
-  'steamid' | 'name' | 'profileUrl' | 'avatarUrl' | 'memberSince' | 'countryCode' | 'realName'
-> & { placeholder?: boolean };
+type SlotPlayer = Pick<AccountPlayer, 'steamid' | 'name' | 'profileUrl' | 'avatarUrl'> & {
+  placeholder?: boolean;
+};
 
 // What refreshAccountInfo should store for an account from its players: no label while any of them
 // is a placeholder, which would overwrite the stored name with a steamid.
@@ -124,11 +123,9 @@ export function accountInfoFrom(ps: SlotPlayer[]) {
   };
 }
 
-// Profile trivia, like the avatar, only for a single account: no one profile speaks for a Family.
 export function accountSlotFrom(players: SlotPlayer[], rawInputs: string[]): AccountSlot {
   const members = players.map((p) => p.steamid).sort();
   const { label, avatarUrl, vanities } = accountInfoFrom(players);
-  const sole = players.length === 1 ? players[0] : null;
   const unresolved = players.filter((p) => p.placeholder).map((p) => p.steamid);
   return {
     ...(unresolved.length && { unresolved }),
@@ -138,9 +135,6 @@ export function accountSlotFrom(players: SlotPlayer[], rawInputs: string[]): Acc
     label,
     avatarUrl: avatarUrl || undefined,
     vanities: vanities ?? {},
-    memberSince: sole?.memberSince || undefined,
-    countryCode: sole?.countryCode || undefined,
-    realName: sole?.realName || undefined,
     lastUsedAt: Date.now(),
   };
 }
