@@ -141,17 +141,12 @@ function renderProtonBadge(v: unknown, row: Row): Node {
   return span;
 }
 
-// Same `.status-badge` pill shape as renderProtonBadge above, in the app's own accent —
-// the same color and dark-on-accent text the side panel's "🎮 Try the Free Demo" banner already
-// uses (`.panel-demo-banner`, style.css) — so the two read as the same "this game has a demo"
-// signifier rather than introducing a new color/shape just for this column.
+// Neutral, not the accent: a fact about the game, neither state nor an action.
 function renderDemoBadge(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');
   if (!v) return document.createTextNode('—');
   const span = document.createElement('span');
-  span.className = 'status-badge';
-  span.style.background = 'var(--accent)';
-  span.style.color = 'var(--bg)';
+  span.className = 'status-badge status-badge-neutral';
   span.textContent = 'Demo';
   return span;
 }
@@ -1128,7 +1123,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   // getGameDemo in lib/steam.js); the side panel's own "🎮 Try the Free Demo" banner
   // (public/panel.js) reads the exact same field. Only a plain has-a-demo boolean here — the
   // demo's own appid isn't useful in a cell with nowhere to link it — outbound links stay in the
-  // panel, not the table. Rendered as a colored badge (renderDemoBadge above) rather than plain
+  // panel, not the table. Rendered as a badge (renderDemoBadge above) rather than plain
   // text/an emoji glyph, so it reads as a quick status chip at a glance, same treatment as
   // ProtonDB right above. `format` still returns plain text for non-visual consumers (filter
   // checklist labels, CSV export) that don't go through `render`. True/false is real data either

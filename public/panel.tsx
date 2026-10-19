@@ -2596,7 +2596,7 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
       <Show when={!g.loading && g.details?.demo}>
         {(demo) => (
           <a
-            class="panel-demo-banner"
+            class="btn panel-demo-banner"
             href={safeHref(`https://store.steampowered.com/app/${demo().appid}`) || undefined}
             target="_blank"
             rel="noopener"

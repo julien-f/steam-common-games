@@ -460,9 +460,8 @@ const WISHLIST_DEFAULT_VISIBLE = [
 function renderAddonBadge(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');
   const span = document.createElement('span');
-  span.className = 'status-badge';
-  span.style.background = v ? '#8b4513' : 'var(--accent)';
-  span.style.color = v ? '#fff' : '#0b1620';
+  span.className = v ? 'status-badge' : 'status-badge status-badge-neutral';
+  if (v) span.style.background = '#8b4513';
   span.textContent = v ? 'Add-on' : 'Base';
   return span;
 }

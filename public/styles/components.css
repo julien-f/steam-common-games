@@ -1477,6 +1477,12 @@
     color: #fff;
     line-height: 1.4;
   }
+  /* Outlined like a tag: a plain fact (a demo, a base game), not the accent's state or action. */
+  .status-badge-neutral {
+    padding: 3px 11px;
+    border: 1px solid var(--line-strong);
+    color: var(--text-body);
+  }
 
   /* Owned / wishlisted marks: table name cells (gameColumns.ts), the search dropdown, the panel. */
   .name-status-badge {
@@ -1573,25 +1579,13 @@
     color: var(--text-body);
   }
 
-  /* The one call to action: try the free demo. */
+  /* Try the free demo: a plain .btn, the accent being kept for state and a view's primary action. */
   .panel-demo-banner {
     display: flex;
-    align-items: center;
-    justify-content: center;
     gap: 8px;
     min-height: 40px;
     margin-bottom: 16px;
-    padding: 0 12px;
-    border-radius: var(--radius-3);
-    background: var(--accent);
-    color: var(--bg);
-    font-size: var(--fs-ui);
     font-weight: 600;
-    text-decoration: none;
-  }
-  .panel-demo-banner:hover {
-    background: color-mix(in srgb, var(--accent) 85%, #fff);
-    color: var(--bg);
   }
   .panel-demo-banner-icon {
     font-size: var(--fs-title);
