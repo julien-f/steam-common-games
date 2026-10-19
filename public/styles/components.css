@@ -3320,9 +3320,6 @@
       align-items: stretch;
       gap: 0;
     }
-    .tree-name {
-      padding-block: 2px;
-    }
   }
   .tree-more {
     display: grid;

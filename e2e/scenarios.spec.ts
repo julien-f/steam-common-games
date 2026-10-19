@@ -3508,6 +3508,7 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
   await page.getByRole('button', { name: 'New list' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('Shortlist');
   await page.keyboard.press('Enter');
+  expect(await takes24pxTap(page.locator('.list-tree').getByRole('link', { name: 'Shortlist' }))).toBe(true);
   expect(await takes24pxTap(rowMenu(page, 'Shortlist'))).toBe(true);
   await rowMenu(page, 'Shortlist').click();
   expect(await takes24pxTap(page.getByRole('button', { name: 'Rename Shortlist' }))).toBe(true);
