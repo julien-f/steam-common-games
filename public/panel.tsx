@@ -663,10 +663,74 @@ export function panelOpen(game: ReadonlyGame) {
   // starts whichever of them this game still needs — and what makes a reopen free when it
   // doesn't.
   document.getElementById('game-panel')!.classList.add('open');
+  if (!morphing) focusPanel();
+}
+
+function focusPanel() {
   (
     (document.getElementById('panel-hero')?.querySelector('.panel-hero-open') ??
       document.getElementById('panel-close')!) as HTMLElement
   ).focus();
+}
+
+// Set while openPanelFromRow's view transition runs `open`: focus waits until the new view is in.
+let morphing = false;
+
+// A pointer click on a row while the panel is closed morphs the row's thumbnail into the panel's
+// hero; any other open, and one without View Transitions or under reduced motion, is instant.
+export function openPanelFromRow(event: MouseEvent | KeyboardEvent, open: () => void): void {
+  const thumb = (event.target as Element | null)?.closest('tr')?.querySelector<HTMLImageElement>('img.game-thumb');
+  if (
+    !('startViewTransition' in document) ||
+    !(event instanceof MouseEvent) ||
+    isPanelOpen() ||
+    !thumb?.naturalWidth ||
+    thumb.style.visibility === 'hidden' ||
+    matchMedia('(prefers-reduced-motion: reduce)').matches ||
+    // The top layer paints over every snapshot, so the morph would run under it.
+    document.querySelector(':popover-open, dialog[open]')
+  )
+    return open();
+  const panel = document.getElementById('game-panel')!;
+  let hero: HTMLElement | null = null;
+  thumb.style.viewTransitionName = 'game-art';
+  panel.classList.add('panel-morph');
+  morphing = true;
+  const transition = document.startViewTransition(async () => {
+    thumb.style.viewTransitionName = '';
+    try {
+      open();
+    } finally {
+      morphing = false;
+    }
+    hero = document.querySelector<HTMLElement>('#panel-hero .panel-hero-main');
+    if (hero) hero.style.viewTransitionName = 'game-art';
+    await heroReady(150);
+  });
+  void transition.updateCallbackDone.finally(() => {
+    if (isPanelOpen() && !panel.contains(document.activeElement)) focusPanel();
+  });
+  void transition.finished.finally(() => {
+    thumb.style.viewTransitionName = '';
+    if (hero) hero.style.viewTransitionName = '';
+    panel.classList.remove('panel-morph');
+  });
+}
+
+// Resolves once the hero's image is in and decoded, or after `ms`, whichever comes first.
+function heroReady(ms: number): Promise<void> {
+  const img = document.querySelector<HTMLImageElement>('#panel-hero .panel-hero-img');
+  if (!img) return Promise.resolve();
+  const loaded = new Promise<void>((resolve) => {
+    if (!img.classList.contains('loading')) return resolve();
+    const observer = new MutationObserver(() => {
+      if (img.classList.contains('loading')) return;
+      observer.disconnect();
+      resolve();
+    });
+    observer.observe(img, { attributes: true, attributeFilter: ['class'] });
+  }).then(() => img.decode().catch(() => {}));
+  return Promise.race([loaded, new Promise<void>((resolve) => setTimeout(resolve, ms))]);
 }
 
 // `leavingRoute`: the route is unmounting under a navigation — its host keeps `?game=` on the
@@ -1808,6 +1872,8 @@ function HeroMain(props: { items: MediaItem[]; idx: number }): JSX.Element {
   const isShot = () => idx() > 0;
   const hasMany = () => props.items.length > 1;
   const src = () => (current().type === 'video' ? current().thumb : current().main);
+  // The cover's stand-in is the table's capsule, likely cached: the cover has no smaller version.
+  const standIn = () => (current().shotId === 'banner' ? panelGame()?.thumb || current().thumb : current().thumb);
   // Which source has finished, rather than a flag the last load cleared: a browser keeps painting
   // the previous image until the next one has loaded, so on a slow connection the hero showed the
   // last item (or the last game's) under the new one's name. Until `src()` itself is in, the image
@@ -1827,7 +1893,7 @@ function HeroMain(props: { items: MediaItem[]; idx: number }): JSX.Element {
   return (
     <div
       class={`panel-hero-main${current().type === 'video' ? ' is-video' : ''}${loading() ? ' panel-hero-main--loading' : ''}`}
-      style={loading() && current().thumb !== src() ? { 'background-image': `url("${current().thumb}")` } : undefined}
+      style={loading() && standIn() !== src() ? { 'background-image': `url("${standIn()}")` } : undefined}
     >
       <button class="panel-hero-open" aria-label="Open in lightbox" onClick={openCurrent}>
         <img

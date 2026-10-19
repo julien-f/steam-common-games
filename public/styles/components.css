@@ -945,6 +945,29 @@
       translate: 24px 0;
     }
   }
+  /* A row click morphs its thumbnail into the hero instead (panel.tsx's openPanelFromRow): the
+     panel itself is just there, under the moving picture. */
+  .game-panel.panel-morph {
+    transition: none;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+  ::view-transition-group(game-art) {
+    animation-duration: var(--dur-3);
+    animation-timing-function: var(--ease-out);
+  }
+  /* The thumbnail (2.56:1) and the hero (460:215) differ in shape: each fills the moving box,
+     cropped, rather than stretching or spilling past it. */
+  ::view-transition-image-pair(game-art) {
+    overflow: clip;
+  }
+  ::view-transition-old(game-art),
+  ::view-transition-new(game-art) {
+    height: 100%;
+    object-fit: cover;
+  }
   @media (max-width: 768px) {
     .game-panel {
       --panel-pad: var(--gutter);

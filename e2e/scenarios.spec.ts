@@ -3489,6 +3489,44 @@ test.describe('with motion on', () => {
     await expect(page.locator('.panel-hero-img')).toHaveCSS('opacity', '1');
   });
 
+  for (const viewTransitions of [true, false]) {
+    test(`I2 edge: a row click opens the panel on its hero, focused, Back closing it (View Transitions ${viewTransitions ? 'on' : 'absent'})`, async ({
+      page,
+    }) => {
+      if (!viewTransitions)
+        await page.addInitScript(() => delete (Document.prototype as Partial<Document>).startViewTransition);
+      // The morph needs a loaded thumbnail; the CDN is otherwise unreachable here.
+      await page.route(/steamstatic\.com/, (route) =>
+        route.fulfill({
+          contentType: 'image/svg+xml',
+          body: '<svg xmlns="http://www.w3.org/2000/svg" width="231" height="87"><rect width="231" height="87" fill="#468"/></svg>',
+        }),
+      );
+      await asPlayer(page, ALICE);
+      await page.goto('/lists/owned');
+      await expect(rows(page)).toHaveCount(6);
+      await expect(row(page, 'Hades').locator('.game-thumb')).toHaveJSProperty('complete', true);
+      const started = page.evaluate(
+        () =>
+          new Promise<boolean>((resolve) => {
+            const start = document.startViewTransition?.bind(document);
+            if (!start) return resolve(false);
+            document.startViewTransition = (cb) => (resolve(true), start(cb));
+          }),
+      );
+      await row(page, 'Hades').getByText('Hades').click();
+      expect(await started).toBe(viewTransitions);
+      await expect(page.locator('#panel-title')).toHaveText('Hades');
+      await expect(page.locator('.panel-hero-open')).toBeFocused();
+      await expect(page.locator('.panel-hero-img')).toHaveCSS('opacity', '1');
+      await expect(page.locator('.game-panel')).toHaveCSS('translate', 'none');
+      await expect(page.locator('[style*="view-transition-name"]')).toHaveCount(0);
+      await page.goBack();
+      await expect(page.locator('.game-panel')).toBeHidden();
+      await expect(page).not.toHaveURL(/[?&]game=/);
+    });
+  }
+
   test('I2 edge: a nav popover rises to rest and Esc hands focus back', async ({ page }) => {
     await asPlayer(page, ALICE);
     await page.goto('/lists/owned');

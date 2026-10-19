@@ -127,6 +127,7 @@ import {
   clearRandomQueue,
   clearAllRandomQueues,
   notifyOwnersChanged,
+  openPanelFromRow,
 } from './panel.tsx';
 import {
   setPanelParam,
@@ -2592,7 +2593,8 @@ export default function ListRoute() {
             table: ts,
             rowKey: 'appid',
             selectable: true,
-            onRowClick: (row) => openGame(rowStore.getRow(row.appid) ?? row),
+            // eslint-disable-next-line solid/reactivity -- runs once per click, inside the view transition's update
+            onRowClick: (row, event) => openPanelFromRow(event, () => openGame(rowStore.getRow(row.appid) ?? row)),
             get currentRow() {
               const appid = getPanelGame()?.appid;
               return appid == null ? null : (rowStore.getRow(appid) ?? null);
