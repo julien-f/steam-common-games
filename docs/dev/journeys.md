@@ -52,7 +52,7 @@ Tests map to journeys by title: `A1: â€¦` covers A1's built steps, `A1.1,3-4: â€
 - **Steps**:
   1. Home
   2. enter one identifier
-  3. **+ add another account**
+  3. **Add Steam Family account**
   4. resolve
   5. open Owned
 - **Done when**: one account slot with several members; a game anyone owns counts as owned; the copy button copies one identifier per member.

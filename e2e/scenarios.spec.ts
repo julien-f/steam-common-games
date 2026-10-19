@@ -174,6 +174,23 @@ test("A2 edge: a recent account's star names, and says on hover, what clicking i
   await expect(page.getByRole('button', { name: 'Star Bob as mine' })).toHaveAttribute('title', 'Star Bob as mine');
 });
 
+test('A2 edge: removing a recent account moves focus to the next one, the last to the lookup field', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  await expect(page.locator('.recent-accounts li')).toHaveCount(2);
+  const first = (await page.locator('.recent-accounts li').first().innerText()).trim();
+  const second = first === 'Bob' ? 'Alice' : 'Bob';
+  await page.getByRole('button', { name: `Remove ${first}` }).click();
+  await expect(page.getByRole('button', { name: `Remove ${second}` })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.recent-accounts li')).toHaveCount(0);
+  await expect(page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…')).toBeFocused();
+});
+
 test('A2 edge: switching account from the nav chip leaves focus on the chip', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
@@ -190,9 +207,9 @@ test('A2 edge: switching account from the nav chip leaves focus on the chip', as
   await expect(page.locator('.account-chip-btn')).toBeFocused();
 });
 
-test('A3 edge: + Add Steam Family account focuses the field it adds', async ({ page }) => {
+test('A3 edge: Add Steam Family account focuses the field it adds', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: '+ Add Steam Family account' }).click();
+  await page.getByRole('button', { name: 'Add Steam Family account' }).click();
   const fields = page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…');
   await expect(fields).toHaveCount(2);
   await expect(fields.nth(1)).toBeFocused();

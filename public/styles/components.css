@@ -2834,12 +2834,16 @@
     gap: 4px;
   }
 
-  /* ── Home (HomeRoute.tsx): the account, then the quick links beside the user's lists. ── */
+  /* ── Home (HomeRoute.tsx): the account card, then the quick links beside the user's lists. ── */
   .home-account {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 16px 20px;
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
   }
   .home-account > * {
     flex: 1 1 100%;
@@ -2866,10 +2870,10 @@
   .home-lookup > button {
     min-height: 38px;
   }
-  .home-account h3 {
-    margin-bottom: -8px;
-    color: var(--muted);
-    font-size: var(--fs-meta);
+  @media (max-width: 600px) {
+    .home-account {
+      padding: 12px;
+    }
   }
 
   .account-header {
@@ -3061,35 +3065,51 @@
     font-size: var(--fs-ui);
   }
 
-  /* Recent accounts: hairline rows, the account's name the row's main button. */
-  .recent-accounts {
+  /* Recent accounts: below a hairline, one pill each — star, name, remove. */
+  .home-recents {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding-top: 16px;
     border-top: 1px solid var(--line);
+  }
+  .home-recents > h3 {
+    flex-basis: 100%;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .home-recents > p {
+    color: var(--muted);
+    font-size: var(--fs-ui);
+  }
+  .recent-accounts {
+    display: contents;
   }
   .recent-accounts li {
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-height: 40px;
-    border-bottom: 1px solid var(--line);
-  }
-  .recent-accounts li > span {
-    white-space: nowrap;
-  }
-  .recent-accounts li > button:first-child {
-    flex: 1;
     min-width: 0;
-    min-height: 32px;
-    padding: 0;
+    max-width: 100%;
+    height: 32px;
+    padding-inline: 2px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+  }
+  .recent-name {
+    min-width: 0;
+    height: 28px;
+    padding: 0 4px;
     overflow: hidden;
     border: 0;
     background: none;
     color: var(--text);
-    text-align: left;
+    font-size: var(--fs-ui);
     text-overflow: ellipsis;
     white-space: nowrap;
     cursor: pointer;
   }
-  .recent-accounts li > button:first-child:hover {
+  .recent-name:hover {
     text-decoration: underline;
   }
   .recent-icon-btn,
@@ -3100,11 +3120,13 @@
     cursor: pointer;
   }
   .recent-icon-btn {
+    display: grid;
     flex-shrink: 0;
+    place-items: center;
     width: 28px;
     height: 28px;
     padding: 0;
-    border-radius: var(--radius-2);
+    border-radius: 999px;
     font-size: var(--fs-body);
   }
   .recent-icon-btn:hover,
@@ -3112,12 +3134,16 @@
     background: var(--line);
     color: var(--text);
   }
-  .home-account > .recents-clear {
-    flex: none;
+  /* Whose account is mine: a state, so the accent. */
+  .recent-star--mine,
+  .recent-star--mine:hover {
+    color: var(--accent);
+  }
+  .recent-star--mine .lucide {
+    fill: currentColor;
   }
   .recents-clear {
     min-height: 24px;
-    margin: -8px 0 0 -6px;
     padding: 0 6px;
     border-radius: var(--radius-1);
     font-size: var(--fs-meta);

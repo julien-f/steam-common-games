@@ -25,9 +25,9 @@ There is no account to create. The accounts you look at, the lists you build and
 Enter a Steam profile URL, vanity name or 64-bit ID on the home page to explore that account. Several identifiers at once resolve into one **Family** — their libraries are merged, so a game anyone in the family owns counts as owned.
 
 - **Current account** — whoever you're exploring right now. The nav bar always says who that is, with one-click links to their **Owned** and **Wishlist** lists.
-- **My account** — star (★) any account in the picker to pin it as your default.
-- **Recent accounts** are remembered, and switchable from the nav-bar chip without going back home.
-- **The copy button copies an account's Steam identifier** — its custom URL name when it has one (`gaben`), its 64-bit ID otherwise — from the home page's account card, from every account in "Recent accounts" and in the nav-bar chip (one ⧉ per member for a Family). Any remembered account's identifier is one click away, current or not. That's the identifier to hand to someone else, or to paste back into the account field here.
+- **My account** — star (★) any account in Home's recent accounts to pin it as your default.
+- **Recent accounts** are remembered, one pill each on the home page's account card (star, pick, remove), and switchable from the nav-bar chip without going back home.
+- **The copy button copies an account's Steam identifier** — its custom URL name when it has one (`gaben`), its 64-bit ID otherwise — from the home page's account card (one per member for a Family) and from every account in the nav-bar chip. Any remembered account's identifier is one click away, current or not. That's the identifier to hand to someone else, or to paste back into the account field here.
 
 A private profile or wishlist looks identical to an empty one from the outside; the app shows what it can see.
 

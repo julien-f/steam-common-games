@@ -19,7 +19,6 @@ import {
   clearRecentAccounts,
   getAccountOverride,
   accountDisplayLabel,
-  accountIdentifiers,
   refreshAccountInfo,
 } from './accountsStore.ts';
 import { getAccountOverrideState, adoptAccount, accountOverrideStatusText } from './accountOverride.ts';
@@ -46,6 +45,11 @@ import {
 import { useBaseTitle } from './pageTitle.ts';
 import { createDefaultNaming, listDisplayName } from './listLabels.ts';
 import { CombineForm } from './CombineForm.tsx';
+import Lock from 'lucide-solid/icons/lock';
+import Plus from 'lucide-solid/icons/plus';
+import RefreshCw from 'lucide-solid/icons/refresh-cw';
+import Star from 'lucide-solid/icons/star';
+import X from 'lucide-solid/icons/x';
 import type { AccountSlot, Folder, GameList, ListRef, CombineOp } from './types.ts';
 
 // `personastate`/`gameextrainfo` ride on the same 6h library cache tier as the rest of an
@@ -232,9 +236,22 @@ export default function HomeRoute() {
     setMyAccount(myAccount()?.id === account.id ? null : account);
   }
 
+  let lookupField!: HTMLInputElement;
+  // The removed pill's Remove goes with it: focus the next one's, else the previous one's, else the lookup field.
   function handleRemoveRecent(id: string, e: MouseEvent): void {
     e.stopPropagation();
+    const pill = (e.currentTarget as HTMLElement).closest('li');
+    const neighbour = (pill?.nextElementSibling ?? pill?.previousElementSibling) as HTMLElement | null;
+    const neighbourId = neighbour?.dataset.accountId;
     removeRecentAccount(id);
+    (
+      (neighbourId && document.querySelector<HTMLElement>(`[data-account-id="${neighbourId}"] .recent-remove`)) ||
+      lookupField
+    ).focus();
+  }
+  function handleClearRecents(): void {
+    clearRecentAccounts();
+    lookupField.focus();
   }
 
   // The fixed list links have to carry a `?u=` override along (`withAccountParam`) or clicking
@@ -508,7 +525,7 @@ export default function HomeRoute() {
                       class="account-private"
                       title="This Steam profile isn't public — some data may be missing or empty"
                     >
-                      🔒 Private
+                      <Lock /> Private
                     </span>
                   </Show>
                 </div>
@@ -532,7 +549,7 @@ export default function HomeRoute() {
                     LIBRARY_CACHE_TTL_MINUTES), so the age of what's on screen is stated outright
                     rather than left to be guessed at — and the statement *is* the control that
                     fixes it, the same shape the list heroes' Updated tile and the side panel's
-                    own ↻ now use, rather than a separate button beside the text. */}
+                    own Refresh details button now use, rather than a separate button beside the text. */}
                 <div class="account-updated">
                   <button
                     type="button"
@@ -542,7 +559,7 @@ export default function HomeRoute() {
                     onClick={() => loadAccountData(account(), { refresh: true })}
                   >
                     Updated {refreshing() ? 'Refreshing…' : fmtAge(fetchedAt())}{' '}
-                    <span class="account-updated-icon">↻</span>
+                    <RefreshCw class="account-updated-icon" />
                   </button>
                 </div>
               </div>
@@ -567,8 +584,8 @@ export default function HomeRoute() {
             {(value, i) => (
               <input
                 type="text"
-                // Only the added ones: the first field is there on load.
-                ref={(el) => i > 0 && queueMicrotask(() => el.focus())}
+                // Only the added ones get focus: the first field is there on load.
+                ref={(el) => (i > 0 ? queueMicrotask(() => el.focus()) : (lookupField = el))}
                 value={value()}
                 placeholder="Steam name, profile URL, or 64-bit ID…"
                 aria-label="Steam name, profile URL, or 64-bit ID"
@@ -579,7 +596,7 @@ export default function HomeRoute() {
             )}
           </Index>
           <button type="button" onClick={() => setResolveInputs((prev) => [...prev, ''])}>
-            + Add Steam Family account
+            <Plus /> Add Steam Family account
           </button>
           <button type="submit" class="btn btn-primary" disabled={resolving()}>
             {resolving() ? 'Looking up…' : 'Look up'}
@@ -635,7 +652,7 @@ export default function HomeRoute() {
                       class="account-private"
                       title="This Steam profile isn't public — some data may be missing or empty"
                     >
-                      🔒 Private
+                      <Lock /> Private
                     </span>
                   </Show>
                 </li>
@@ -644,66 +661,49 @@ export default function HomeRoute() {
           </ul>
         </Show>
 
+        <div class="home-recents">
+          <h3>Recent accounts</h3>
+          <Show when={recents().length > 0} fallback={<p>No recent accounts yet.</p>}>
+            <ul class="recent-accounts">
+              <For each={recents()}>
+                {(account) => (
+                  <li data-account-id={account.id}>
+                    <button
+                      type="button"
+                      class="recent-icon-btn recent-star"
+                      classList={{ 'recent-star--mine': myAccount()?.id === account.id }}
+                      title={starLabel(account)}
+                      aria-label={starLabel(account)}
+                      onClick={[toggleMyAccount, account]}
+                    >
+                      <Star />
+                    </button>
+                    <button type="button" class="recent-name" onClick={() => pickAccount(account)}>
+                      {accountDisplayLabel(account)}
+                    </button>
+                    <button
+                      type="button"
+                      class="recent-icon-btn recent-remove"
+                      title="Remove"
+                      aria-label={`Remove ${accountDisplayLabel(account)}`}
+                      onClick={[handleRemoveRecent, account.id]}
+                    >
+                      <X />
+                    </button>
+                  </li>
+                )}
+              </For>
+            </ul>
+            <button type="button" class="recents-clear" onClick={handleClearRecents}>
+              Clear all
+            </button>
+          </Show>
+        </div>
+
         <Show when={currentAccount()}>
           {(account) => (
             <AccountFriends accountId={account().id} myAccountId={myAccount()?.id ?? null} onExplore={pickAccount} />
           )}
-        </Show>
-
-        <h3>Recent accounts</h3>
-        <Show when={recents().length > 0} fallback={<p>No recent accounts yet.</p>}>
-          <ul class="recent-accounts">
-            <For each={recents()}>
-              {(account) => (
-                <li>
-                  <button type="button" onClick={() => pickAccount(account)}>
-                    {myAccount()?.id === account.id ? '★ ' : ''}
-                    {accountDisplayLabel(account)}
-                  </button>
-                  {/* From the slot's stored data, not players() — that's only fetched for the
-                      current account, and a recent one's identifier shouldn't need selecting it
-                      first. One per member, so a Family's are all reachable here too. */}
-                  <For each={accountIdentifiers(account)}>
-                    {({ identifier }) => (
-                      <CopyButton text={identifier} title={`Copy this account's Steam identifier (${identifier})`} />
-                    )}
-                  </For>
-                  {/* Same last-known, cached-at-resolve-time trivia the account card shows —
-                      absent until this entry is next picked, same as label/avatarUrl above it. */}
-                  <Show when={account.realName}>
-                    <span class="account-realname">({account.realName})</span>
-                  </Show>
-                  <Show when={account.memberSince}>
-                    <span class="account-count">Since {account.memberSince}</span>
-                  </Show>
-                  <Show when={account.countryCode}>
-                    <span class="account-count">{countryFlag(account.countryCode)}</span>
-                  </Show>
-                  <button
-                    type="button"
-                    class="recent-icon-btn"
-                    title={starLabel(account)}
-                    aria-label={starLabel(account)}
-                    onClick={[toggleMyAccount, account]}
-                  >
-                    {myAccount()?.id === account.id ? '★' : '☆'}
-                  </button>
-                  <button
-                    type="button"
-                    class="recent-icon-btn"
-                    title="Remove"
-                    aria-label={`Remove ${accountDisplayLabel(account)}`}
-                    onClick={[handleRemoveRecent, account.id]}
-                  >
-                    ×
-                  </button>
-                </li>
-              )}
-            </For>
-          </ul>
-          <button type="button" class="recents-clear" onClick={() => clearRecentAccounts()}>
-            Clear all
-          </button>
         </Show>
       </section>
 

@@ -67,7 +67,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 - `ListRoute.tsx` — the generic list viewer (table + docked panel) behind every `/lists/*` and `/game/*` route; owns per-kind loading, columns, price loading, and the hero's contents.
 - `RankRoute.tsx` — `/lists/:listId/rank`, a ranked list's compare screen (see [lists-and-accounts.md](lists-and-accounts.md#ranked-lists)).
 - `listShare.ts` — encode/decode for `/lists/shared?f=` (see Routes).
-- `HomeRoute.tsx` — account picker/header plus the folder/list tree and combine form. Also forwards an old Comparison-page link (`/?u=alice&u=bob`) to `/lists/compare`.
+- `HomeRoute.tsx` — the account card (header, lookup form, a Family's members, recent accounts as pills, friends) plus the folder/list tree and combine form. Removing a pill focuses the next pill's Remove, else the lookup field. Also forwards an old Comparison-page link (`/?u=alice&u=bob`) to `/lists/compare`.
 - `AccountFriends.tsx` — the home account card's friends list, marking friends shared with the starred "My account" (`myAccountId`), not the signed-in one.
 - `CombineForm.tsx` — the source/op picker shared by Home (create a dynamic list) and `ListRoute` (Edit sources); it only assembles `{ name, op, sources }` for its `onSubmit`.
 - `ComparePlayersForm.tsx` — the "who is being compared" form (`/lists/compare`'s empty state and "Edit players").

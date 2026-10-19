@@ -24,11 +24,11 @@ Two account slots, both optional, distinct from any list:
 
 Both are full `AccountSlot` objects (see the schema below), not id references, so clearing history never orphans either.
 
-- **Picking `currentAccount`** draws from `myAccount`, `recentAccounts`, or a fresh resolve. The resolve form takes several identifiers at once ("+ add another account") and produces one `AccountSlot` with several `members`: a Family.
+- **Picking `currentAccount`** draws from `myAccount`, `recentAccounts`, or a fresh resolve. The resolve form takes several identifiers at once ("Add Steam Family account") and produces one `AccountSlot` with several `members`: a Family.
 - **`recentAccounts`** is global and uncapped, with individual removal and clear-all. Removing one a dynamic list still references soft-removes it (`removedAt`, see [Soft-delete](#soft-delete)).
 - **Account header**: avatar, persona name and profile link, online status (as of the last library refresh), owned and wishlist counts.
 - **Display fields stay current**: `label`/`avatarUrl`/`vanities` are captured when the account is picked; Home's account card refreshes them wherever the account is stored (`refreshAccountInfo`) from the profile it fetches anyway.
-- **Copyable identifier**: ⧉ copies each member's nicest identifier (`accountsStore.ts`'s `accountIdentifiers`): its Steam custom-URL name (`AccountSlot.vanities`, captured at resolve time from `/api/common-games`' `profileurl`), else its steam64 id. One per member: a Family's joined label is nothing an input accepts back. Offered wherever an account is named (account card, Home's Recent accounts, the nav chip and its recents), with no fetch.
+- **Copyable identifier**: ⧉ copies each member's nicest identifier (`accountsStore.ts`'s `accountIdentifiers`): its Steam custom-URL name (`AccountSlot.vanities`, captured at resolve time from `/api/common-games`' `profileurl`), else its steam64 id. One per member: a Family's joined label is nothing an input accepts back. Offered wherever an account is named (account card, the nav chip and its recents), with no fetch.
 - **Reactive**: changing `currentAccount` while `/lists/owned` or `/lists/wishlist` is open re-fetches that route in place: its load effect reads the account reactively.
 
 ### `?u=` URL semantics
