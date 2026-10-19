@@ -25,7 +25,7 @@ There is no account to create. The accounts you look at, the lists you build and
 Enter a Steam profile URL, vanity name or 64-bit ID on the home page to explore that account. Several identifiers at once resolve into one **Family** — their libraries are merged, so a game anyone in the family owns counts as owned.
 
 - **Current account** — whoever you're exploring right now. The nav bar always says who that is, with one-click links to their **Owned** and **Wishlist** lists.
-- **My account** — star (★) any account in Home's recent accounts to pin it as your default.
+- **My account** — star any account in Home's recent accounts to pin it as your default.
 - **Recent accounts** are remembered, one pill each on the home page's account card (star, pick, remove), and switchable from the nav-bar chip without going back home.
 - **The copy button copies an account's Steam identifier** — its custom URL name when it has one (`gaben`), its 64-bit ID otherwise — from the home page's account card (one per member for a Family) and from every account in the nav-bar chip. Any remembered account's identifier is one click away, current or not. That's the identifier to hand to someone else, or to paste back into the account field here.
 
@@ -62,7 +62,7 @@ A bundle joins a combine from its own page: **What does this add?** shows that b
 
 ### Ranking a list
 
-**Rank this list** (on Owned, Wishlist, a bundle or any of your lists) creates a ranked list and asks you two games at a time: _which do you prefer?_ It starts from what the table shows: games come up in its current order, and if rows are selected — or, with none selected, a filter is on — only those are asked about (the button then reads **🏆 Rank N games**); the rest wait for a later Compare. Ranking needs at least 2 of those games.
+**Rank this list** (on Owned, Wishlist, a bundle or any of your lists) creates a ranked list and asks you two games at a time: _which do you prefer?_ It starts from what the table shows: games come up in its current order, and if rows are selected — or, with none selected, a filter is on — only those are asked about (the button then reads **Rank N games**); the rest wait for a later Compare. Ranking needs at least 2 of those games.
 
 - **← / →** pick one, **↓** Tie, **S** Skip (asked again later), **X** then **← / →** or "Haven't played" (on your own games; "Not interested" elsewhere) to exclude a game, **Z** Undo. All are buttons too.
 - **Details** under a card (or **I** then **← / →**) opens that game in the side panel to help you decide. It stays open while the game is still being compared; meanwhile **← / →** browse its screenshots and videos (pick by clicking a card), and **Esc** closes it.
@@ -105,7 +105,7 @@ Wishlist and bundle lists carry price columns: the best deal across every shop I
 
 ## The game panel
 
-Clicking any row opens a detail panel beside the table — not over it, so the list stays usable and clicking another row just swaps the panel's contents. It carries screenshots and trailers, the weighted rating and review counts, How Long To Beat estimates, achievements, recent news from the developer, current price and the current bundles it's in (each opens that bundle's list), DLC and links out. ↻ refetches everything for that one game.
+Clicking any row opens a detail panel beside the table — not over it, so the list stays usable and clicking another row just swaps the panel's contents. It carries screenshots and trailers, the weighted rating and review counts, How Long To Beat estimates, achievements, recent news from the developer, current price and the current bundles it's in (each opens that bundle's list), DLC and links out. **Refresh details**, beside its name, refetches everything for that one game.
 
 **Similar in Alice's library** shows the 5 games the current account owns closest to this one by Steam tags (tags nearly every game in the library carries count less), each opening its own panel; the back button above its name returns. It needs that account's Owned list opened once on this device (the section links it), and isn't shown on Owned's own rows. **Sort list by similarity** ranks the whole open list against that game (a **Similarity** column, first sort) until you stop it or reload. **More like this on Steam ↗** searches the whole store instead.
 
@@ -135,7 +135,7 @@ Clicking a screenshot or trailer (or **Enter** on it) opens it full-window:
 - Links pasted in a chat (WhatsApp, Slack, Discord, iMessage…) show a preview card; a `/game/…` link's card names the game and shows its header image once the app has looked that game up, other links get the site's card.
 - Add `?u=` to any list link to share the account you're exploring. It never changes the recipient's own default account, and a game link deliberately doesn't carry it.
 - A comparison's link names its players the same way, one `?u=` each — including links made by older versions of this app, which still work.
-- **Share view** copies a link with your current table layout — columns, sort, grouping, filters — baked in. On Owned and Wishlist it also carries the account (`?u=`), so the recipient sees your games, not their own. The recipient sees it for that visit only, with **Keep as my layout** to make it theirs or **Use my own** to go back; once they change that layout, the banner warns it's lost on reload unless kept. Nothing of their own setup changes otherwise. Your own saved lists' link only opens in your browser, so a combined list has **🔗 Share list** instead of Share view, and on manual and ranked lists Share view is dimmed: they can't be shared yet.
+- **Share view** copies a link with your current table layout — columns, sort, grouping, filters — baked in. On Owned and Wishlist it also carries the account (`?u=`), so the recipient sees your games, not their own. The recipient sees it for that visit only, with **Keep as my layout** to make it theirs or **Use my own** to go back; once they change that layout, the banner warns it's lost on reload unless kept. Nothing of their own setup changes otherwise. Your own saved lists' link only opens in your browser, so a combined list has **Share list** instead of Share view, and on manual and ranked lists Share view is dimmed: they can't be shared yet.
 
 ## Sync
 
@@ -145,7 +145,7 @@ Table layouts are the exception: changing a table stays on this device, and the 
 
 ## Keyboard shortcuts
 
-Press `?` for the full list. The essentials: `/` focuses search, `Esc` closes what's open, `↑`/`↓` move through the list, `←`/`→` through a game's media, and `R` picks a random game, even with no panel open, as does the 🎲 in the table's toolbar. The first Tab on a page is a **Skip to table** link.
+Press `?` for the full list. The essentials: `/` focuses search, `Esc` closes what's open, `↑`/`↓` move through the list, `←`/`→` through a game's media, and `R` picks a random game, even with no panel open, as does the dice button in the table's toolbar. The first Tab on a page is a **Skip to table** link.
 
 ## How fresh is this?
 
