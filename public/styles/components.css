@@ -3014,6 +3014,10 @@
     align-items: center;
     gap: 8px;
   }
+  /* A 24px tap target, centred in the row the copy button already makes 24px tall. */
+  .account-members .account-profile-link {
+    line-height: 24px;
+  }
   .account-friends-list {
     max-height: 320px;
     overflow-y: auto;

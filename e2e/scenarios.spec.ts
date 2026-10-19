@@ -3536,6 +3536,13 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
   expect(await takes24pxTap(page.getByRole('button', { name: 'Remove Alice' }))).toBe(true);
   await friends.click();
   expect(await takes24pxTap(page.locator('.account-friends-refresh'))).toBe(true);
+
+  await page.getByRole('button', { name: 'Add Steam Family account' }).click();
+  const fields = page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…');
+  await fields.nth(0).fill('alice');
+  await fields.nth(1).fill('bob');
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  expect(await takes24pxTap(page.locator('.account-members').getByRole('link', { name: 'Bob ↗' }))).toBe(true);
 });
 
 test('I2 edge: the lightbox shows its focus ring when opened from the keyboard, not from a tap', async ({
