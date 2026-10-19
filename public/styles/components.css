@@ -302,6 +302,9 @@
     color: var(--accent);
     font-size: var(--fs-meta);
   }
+  .account-chip-mine .lucide {
+    fill: currentColor; /* as Home's .recent-star--mine: an outline star there means "not mine" */
+  }
   /* Owned/Wishlist sit in the header on desktop, in the popover on a phone: one pair at a time. */
   .account-chip-panel-links {
     display: none;

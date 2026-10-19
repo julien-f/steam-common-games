@@ -219,6 +219,23 @@ test('A2 edge: switching account from the nav chip leaves focus on the chip', as
   await expect(page.locator('.account-chip-btn')).toBeFocused();
 });
 
+test("A2 edge: the nav chip marks my account with Home's filled star", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  const homeFill = await page
+    .getByRole('button', { name: 'Unstar Alice' })
+    .locator('svg')
+    .evaluate((el) => getComputedStyle(el).fill);
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  await expect(page.getByRole('banner')).toContainText('Bob');
+  await page.locator('.account-chip-btn').click();
+  const mine = page.getByTitle('Your account', { exact: true });
+  await expect(mine).toBeVisible();
+  expect(await mine.locator('svg').evaluate((el) => getComputedStyle(el).fill)).toBe(homeFill);
+  expect(homeFill).not.toBe('none');
+});
+
 test('A3 edge: Add Steam Family account focuses the field it adds', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Add Steam Family account' }).click();

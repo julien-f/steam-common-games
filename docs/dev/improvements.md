@@ -44,7 +44,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Accounts and first visit
 
-- **U174 · polish · A2** — the nav chip's switcher marks my account with an outline star, where Home draws mine filled and an outline star means "not starred"; its tooltip, "Your account (★ on Home)", names a glyph Home doesn't show. Fill it as Home does; tooltip "Your account". Since 0663512.
 - **U181 · minor · A3, I3** — with **Add Steam Family account**, both lookup fields are named "Steam name, profile URL, or 64-bit ID", so a screen reader can't tell them apart. Number them ("Family member 2").
 
 ## Consistency and polish

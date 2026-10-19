@@ -184,7 +184,7 @@ export function AccountChip(): JSX.Element {
                       </Show>
                       <span class="account-chip-name">{accountDisplayLabel(acc)}</span>
                       <Show when={acc.id === getMyAccount()?.id}>
-                        <span class="account-chip-mine" title="Your account (★ on Home)">
+                        <span class="account-chip-mine" title="Your account">
                           <Star />
                           <span class="visually-hidden">(yours)</span>
                         </span>
