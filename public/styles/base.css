@@ -245,7 +245,8 @@
   }
 
   time,
-  output {
+  output,
+  data {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
   }

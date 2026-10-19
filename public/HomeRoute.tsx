@@ -77,7 +77,7 @@ export default function HomeRoute() {
   const [resolving, setResolving] = createSignal(false);
   // null while loading; 'failed' when the fetch failed, so it doesn't read as an empty library.
   type Count = number | null | 'failed';
-  const showCount = (n: Count) => (n === null ? '…' : n === 'failed' ? "couldn't load" : n);
+  const showCount = (n: Count) => (n === null ? '…' : n === 'failed' ? "couldn't load" : <data value={n}>{n}</data>);
   const [counts, setCounts] = createSignal<{ owned: Count; wishlist: Count }>({
     owned: null,
     wishlist: null,
@@ -517,8 +517,18 @@ export default function HomeRoute() {
                 </div>
                 <div class="account-counts">
                   Owned: {showCount(counts().owned)} · Wishlisted: {showCount(counts().wishlist)}
-                  <Show when={players().length > 1}>{` · ${players().length} accounts merged`}</Show>
-                  <Show when={solePlayer()?.memberSince}>{(s) => ` · Member since ${s()}`}</Show>
+                  <Show when={players().length > 1}>
+                    {' · '}
+                    <data value={players().length}>{players().length}</data> accounts merged
+                  </Show>
+                  <Show when={solePlayer()?.memberSince}>
+                    {(s) => (
+                      <>
+                        {' · Member since '}
+                        <time datetime={s()}>{s()}</time>
+                      </>
+                    )}
+                  </Show>
                   <Show when={solePlayer()?.countryCode}>{(c) => ` ${countryFlag(c())}`}</Show>
                 </div>
                 {/* Steam data is cached server-side for a long time (see default.env's

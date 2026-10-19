@@ -2763,9 +2763,7 @@
   .account-counts {
     margin-top: 4px;
     color: var(--muted);
-    font-family: var(--font-mono);
     font-size: var(--fs-ui);
-    font-variant-numeric: tabular-nums;
   }
   /* The age is the control that refreshes it (ui-guidelines.md). */
   .account-updated-btn {
@@ -3015,12 +3013,6 @@
   }
   .home-fixed-links a:hover {
     background: var(--surface);
-  }
-  /* Beside "Your lists", level with its first row: under its title line (30px buttons, 12px gap). */
-  @media (min-width: 769px) {
-    .home-fixed-links {
-      margin-top: 42px;
-    }
   }
 
   /* "Your lists": the title and the create buttons on one line, the tree as hairline rows. */
