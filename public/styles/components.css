@@ -958,8 +958,8 @@
     animation-duration: var(--dur-3);
     animation-timing-function: var(--ease-out);
   }
-  /* The thumbnail (2.56:1) and the hero (460:215) differ in shape: each fills the moving box,
-     cropped, rather than stretching or spilling past it. */
+  /* Both ends differ in shape (a 2.56:1 thumbnail, the 460:215 hero, a 16:9 screenshot): each
+     fills the moving box, cropped, rather than stretching or spilling past it. */
   ::view-transition-image-pair(game-art) {
     overflow: clip;
   }
@@ -2124,6 +2124,13 @@
     #screenshot-lightbox.open {
       opacity: 0;
     }
+  }
+  /* The hero's picture morphs in instead (lightbox.tsx's openLightboxFrom), over the backdrop's own fade. */
+  #screenshot-lightbox.open.lb-morph {
+    transition: none;
+  }
+  ::view-transition-new(lb-backdrop) {
+    animation-duration: var(--dur-3);
   }
   body.lb-open {
     overflow: hidden;

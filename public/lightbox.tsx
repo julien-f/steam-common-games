@@ -4,6 +4,7 @@ import { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } fro
 import type { MediaItem, ShotKind } from './mediaItems.ts';
 import type { Game, ReadonlyGame } from './types.ts';
 import { fmtTime } from './utils.ts';
+import { isMorphUpdating, loadedWhen, morph } from './viewTransition.ts';
 import { decideSwipeAxis, resolveSwipe, LB_SWIPE_RESISTANCE } from './lightboxSwipe.ts';
 import type { SwipeAxis } from './lightboxSwipe.ts';
 
@@ -1086,9 +1087,36 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
   const lb = document.getElementById('screenshot-lightbox')!;
   lb.classList.add('open');
   document.body.classList.add('lb-open');
-  // A ring on × after a tap reads as a stray highlight; it's for whoever opened this by keyboard.
-  lb.querySelector<HTMLElement>('.lb-close')!.focus({ focusVisible: lastInputWasKey });
+  if (!isMorphUpdating()) focusLbClose(lb);
   _onLightboxParamChange(newShots[idx()].shotId);
+}
+
+// A ring on × after a tap reads as a stray highlight; it's for whoever opened this by keyboard.
+function focusLbClose(lb: HTMLElement) {
+  lb.querySelector<HTMLElement>('.lb-close')!.focus({ focusVisible: lastInputWasKey });
+}
+
+// The panel hero's picture, clicked, morphs into the lightbox's; the backdrop fades in under it.
+export function openLightboxFrom(from: HTMLImageElement, game: Game, idxOrShotId: number) {
+  const lb = document.getElementById('screenshot-lightbox')!;
+  const backdrop = lb.querySelector<HTMLElement>('.lb-backdrop')!;
+  morph({
+    from,
+    update: () => openLightbox(game, idxOrShotId),
+    to: () => lb.querySelector<HTMLElement>('.lb-img'),
+    ready: (img) => loadedWhen(lb, 'lb--loading', img as HTMLImageElement),
+    focus: () => {
+      if (isLightboxOpen() && !lb.contains(document.activeElement)) focusLbClose(lb);
+    },
+    start: () => {
+      lb.classList.add('lb-morph');
+      backdrop.style.viewTransitionName = 'lb-backdrop';
+    },
+    finish: () => {
+      lb.classList.remove('lb-morph');
+      backdrop.style.viewTransitionName = '';
+    },
+  });
 }
 
 // Re-points an already-open lightbox at another game — ↑/↓ and R, via AppShell's `onGameNav`/

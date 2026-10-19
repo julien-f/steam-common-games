@@ -61,7 +61,7 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 - Only `opacity` and `transform` (or `translate`/`scale`) move; layout properties never animate. Never transition a table dropdown's (`.dt-dd`) transform: it freezes the page ([pitfalls.md](pitfalls.md)).
 - Press feedback: buttons and clickable rows give to `scale: 0.98` while held, and snap back on release, so a menu the click opens measures its trigger at full size.
 - An image fades in once loaded (`fadeInOnLoad`), so a row or the panel never flashes a half-drawn picture; a cached one shows at once.
-- View Transitions only for a shared element (the row thumbnail → panel hero): feature-detected, skipped under reduced motion or while a top-layer popover or dialog is open, its `view-transition-name` set on the two elements only for the transition's length, the root cross-fade off, focus moved after `updateCallbackDone`. Not for route changes: the router has no hook, and a lazy route would freeze the screen while its chunk loads.
+- View Transitions only for a shared element (row thumbnail → panel hero, hero → lightbox), through `viewTransition.ts`'s `morph`: feature-detected, skipped under reduced motion or while a top-layer popover or dialog is open, its `view-transition-name` set on the two elements only for the transition's length, the root cross-fade off, focus moved after `updateCallbackDone`. Not for route changes: the router has no hook, and a lazy route would freeze the screen while its chunk loads.
 - Reduced motion: `styles/base.css` sets every transition to `0s` and every animation to a near-instant single run, so end states are reached at once; JS smooth scrolls go through `smoothScroll()`.
 
 ## Checklist for a new UI feature

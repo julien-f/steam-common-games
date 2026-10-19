@@ -3527,6 +3527,32 @@ test.describe('with motion on', () => {
     });
   }
 
+  test("F1 edge: a click on the panel's picture grows it into the lightbox, focused, Back closing only that", async ({
+    page,
+  }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned?game=1145360');
+    await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
+    await expect(page.locator('.panel-hero-img')).not.toHaveClass(/loading/);
+    const started = page.evaluate(
+      () =>
+        new Promise<boolean>((resolve) => {
+          const start = document.startViewTransition.bind(document);
+          document.startViewTransition = (cb) => (resolve(true), start(cb));
+        }),
+    );
+    await page.getByRole('button', { name: 'Open in lightbox' }).click();
+    expect(await started).toBe(true);
+    await expect(page.locator('.lb-close')).toBeFocused();
+    await expect(page.locator('#screenshot-lightbox')).toHaveCSS('opacity', '1');
+    await expect(page.locator('.lb-img')).toHaveAttribute('src', /Screenshot%201%3C/);
+    await expect(page.locator('.lb-img')).toHaveCSS('opacity', '1');
+    await expect(page.locator('[style*="view-transition-name"]')).toHaveCount(0);
+    await page.goBack();
+    await expect(page.locator('#screenshot-lightbox')).toBeHidden();
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+  });
+
   test('I2 edge: a nav popover rises to rest and Esc hands focus back', async ({ page }) => {
     await asPlayer(page, ALICE);
     await page.goto('/lists/owned');

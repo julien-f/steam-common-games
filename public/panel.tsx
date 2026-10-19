@@ -13,7 +13,8 @@ import {
   focusGameRow,
   fadeInOnLoad,
 } from './utils.ts';
-import { openLightbox, lightboxShot } from './lightbox.tsx';
+import { openLightbox, openLightboxFrom, lightboxShot } from './lightbox.tsx';
+import { isMorphUpdating, loadedWhen, morph } from './viewTransition.ts';
 import { decideSwipeAxis, type SwipeAxis } from './lightboxSwipe.ts';
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
 import { buildMediaItems, mediaLabel, resolveShotIndex } from './mediaItems.ts';
@@ -663,7 +664,7 @@ export function panelOpen(game: ReadonlyGame) {
   // starts whichever of them this game still needs — and what makes a reopen free when it
   // doesn't.
   document.getElementById('game-panel')!.classList.add('open');
-  if (!morphing) focusPanel();
+  if (!isMorphUpdating()) focusPanel();
 }
 
 function focusPanel() {
@@ -673,64 +674,27 @@ function focusPanel() {
   ).focus();
 }
 
-// Set while openPanelFromRow's view transition runs `open`: focus waits until the new view is in.
-let morphing = false;
-
 // A pointer click on a row while the panel is closed morphs the row's thumbnail into the panel's
-// hero; any other open, and one without View Transitions or under reduced motion, is instant.
+// hero; any other open is instant.
 export function openPanelFromRow(event: MouseEvent | KeyboardEvent, open: () => void): void {
   const thumb = (event.target as Element | null)?.closest('tr')?.querySelector<HTMLImageElement>('img.game-thumb');
-  if (
-    !('startViewTransition' in document) ||
-    !(event instanceof MouseEvent) ||
-    isPanelOpen() ||
-    !thumb?.naturalWidth ||
-    thumb.style.visibility === 'hidden' ||
-    matchMedia('(prefers-reduced-motion: reduce)').matches ||
-    // The top layer paints over every snapshot, so the morph would run under it.
-    document.querySelector(':popover-open, dialog[open]')
-  )
+  if (!(event instanceof MouseEvent) || isPanelOpen() || !thumb?.naturalWidth || thumb.style.visibility === 'hidden')
     return open();
   const panel = document.getElementById('game-panel')!;
-  let hero: HTMLElement | null = null;
-  thumb.style.viewTransitionName = 'game-art';
-  panel.classList.add('panel-morph');
-  morphing = true;
-  const transition = document.startViewTransition(async () => {
-    thumb.style.viewTransitionName = '';
-    try {
-      open();
-    } finally {
-      morphing = false;
-    }
-    hero = document.querySelector<HTMLElement>('#panel-hero .panel-hero-main');
-    if (hero) hero.style.viewTransitionName = 'game-art';
-    await heroReady(150);
+  morph({
+    from: thumb,
+    update: open,
+    to: () => document.querySelector('#panel-hero .panel-hero-main'),
+    ready: (hero) => {
+      const img = hero.querySelector<HTMLImageElement>('.panel-hero-img');
+      return img ? loadedWhen(img, 'loading', img) : Promise.resolve();
+    },
+    focus: () => {
+      if (isPanelOpen() && !panel.contains(document.activeElement)) focusPanel();
+    },
+    start: () => panel.classList.add('panel-morph'),
+    finish: () => panel.classList.remove('panel-morph'),
   });
-  void transition.updateCallbackDone.finally(() => {
-    if (isPanelOpen() && !panel.contains(document.activeElement)) focusPanel();
-  });
-  void transition.finished.finally(() => {
-    thumb.style.viewTransitionName = '';
-    if (hero) hero.style.viewTransitionName = '';
-    panel.classList.remove('panel-morph');
-  });
-}
-
-// Resolves once the hero's image is in and decoded, or after `ms`, whichever comes first.
-function heroReady(ms: number): Promise<void> {
-  const img = document.querySelector<HTMLImageElement>('#panel-hero .panel-hero-img');
-  if (!img) return Promise.resolve();
-  const loaded = new Promise<void>((resolve) => {
-    if (!img.classList.contains('loading')) return resolve();
-    const observer = new MutationObserver(() => {
-      if (img.classList.contains('loading')) return;
-      observer.disconnect();
-      resolve();
-    });
-    observer.observe(img, { attributes: true, attributeFilter: ['class'] });
-  }).then(() => img.decode().catch(() => {}));
-  return Promise.race([loaded, new Promise<void>((resolve) => setTimeout(resolve, ms))]);
 }
 
 // `leavingRoute`: the route is unmounting under a navigation — its host keeps `?game=` on the
@@ -1881,9 +1845,14 @@ function HeroMain(props: { items: MediaItem[]; idx: number }): JSX.Element {
   const [loadedSrc, setLoadedSrc] = createSignal<string>();
   const [brokenSrc, setBrokenSrc] = createSignal<string>();
   const loading = () => loadedSrc() !== src() && brokenSrc() !== src();
-  const openCurrent = () => {
+  // A pointer click on a loaded picture morphs it into the lightbox's; a key or a video opens at once.
+  const openCurrent = (e: MouseEvent & { currentTarget: HTMLElement }) => {
     const g = panelGame();
-    if (g) openLightbox(g, idx());
+    if (!g) return;
+    const img = e.currentTarget.querySelector<HTMLImageElement>('.panel-hero-img');
+    if (e.detail > 0 && img && current().type === 'image' && !loading() && brokenSrc() !== src())
+      openLightboxFrom(img, g, idx());
+    else openLightbox(g, idx());
   };
   // A broken image (banner guess 404ing, or — as with a video's poster — a genuinely dead
   // upstream Steam CDN asset) used to hide the whole `.panel-hero-main`, which also wiped
