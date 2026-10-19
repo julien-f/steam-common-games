@@ -2162,7 +2162,7 @@ test("F1 edge: on a narrow phone, the panel's tabs stay one row and scroll to th
     .toBe(true);
 });
 
-test('F1 edge: the panel closes from its × after scrolling it', async ({ page }) => {
+test('F1 edge: the panel closes from its Close button after scrolling it', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await row(page, 'Hades').getByText('Hades').click();
@@ -3046,7 +3046,7 @@ test('F1 edge: Back closes the lightbox before the game behind it', async ({ pag
   await expect(page).toHaveURL(/\?game=1145360$/);
 });
 
-test('F1 edge: after closing the game with ×, one Back leaves the list', async ({ page }) => {
+test('F1 edge: after closing the game with its Close button, one Back leaves the list', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/about');
   await page.goto('/lists/owned');
@@ -3172,7 +3172,9 @@ test('F1 edge: the nav search box empties after a pick and on a second Esc', asy
   await expect(box).toHaveValue('');
 });
 
-test('F1 edge: the nav search box’s × empties it and keeps it focused, back on the recents', async ({ page }) => {
+test('F1 edge: the nav search box’s Clear search button empties it and keeps it focused, back on the recents', async ({
+  page,
+}) => {
   await asPlayer(page, ALICE, { recentGames: [728880] });
   await page.goto('/about');
   const box = page.getByPlaceholder('Look up any game…');
@@ -3186,7 +3188,9 @@ test('F1 edge: the nav search box’s × empties it and keeps it focused, back o
   await expect(page.getByRole('option', { name: /Overcooked! 2/ })).toBeVisible();
 });
 
-test('F2 edge: the /search box’s × empties it, and refocusing it selects its text to type over', async ({ page }) => {
+test('F2 edge: the /search box’s Clear search button empties it, and refocusing it selects its text to type over', async ({
+  page,
+}) => {
   await page.goto('/search?q=hades');
   await expect(rows(page)).toHaveCount(1);
   await expect(page.locator('.game-panel')).toBeVisible();
@@ -3464,7 +3468,7 @@ test('I2 edge: Esc closing the panel returns focus to the row it was showing', a
   await expect(page.locator('tr.dt-tr:focus')).toHaveCount(1);
 });
 
-test('I2 edge: × closing the panel returns focus to the row it was showing', async ({ page }) => {
+test('I2 edge: the Close button closing the panel returns focus to the row it was showing', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await row(page, 'Hades').getByText('Hades').click();

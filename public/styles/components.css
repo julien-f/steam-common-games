@@ -1011,7 +1011,7 @@
     border-radius: var(--radius-3);
     background: rgb(0 0 0 / 0.55);
     color: #fff;
-    font-size: var(--fs-figure);
+    font-size: var(--fs-title);
     line-height: 1;
     cursor: pointer;
   }
@@ -2775,7 +2775,7 @@
     border-radius: var(--radius-2);
     background: none;
     color: var(--muted);
-    font-size: var(--fs-figure);
+    font-size: var(--fs-title);
     line-height: 1;
     cursor: pointer;
   }
@@ -3431,7 +3431,7 @@
     border: 0;
     background: none;
     color: var(--muted);
-    font-size: var(--fs-figure);
+    font-size: var(--fs-title);
     line-height: 1;
     cursor: pointer;
   }

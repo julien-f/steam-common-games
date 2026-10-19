@@ -1,5 +1,6 @@
 import { esc, fetchJson } from './utils.ts';
-import { createEffect, untrack } from 'solid-js';
+import { createComponent, createEffect, untrack } from 'solid-js';
+import ArrowRight from 'lucide-solid/icons/arrow-right';
 import { peekMyOwnershipStatus, trackMyOwnership } from './myOwnership.ts';
 import type { OwnershipStatus } from './myOwnership.ts';
 
@@ -136,6 +137,8 @@ export function initGameSearch({
   // way), so this only drives the heading/"see all" chrome around them.
   let showingRecents = false;
   let escClosedResults = false; // the last Esc closed the dropdown, so the next one empties the box
+  // `<ArrowRight />` without JSX: this module stays .ts for its Node tests. Moved into each re-render.
+  const moreArrow = createComponent(ArrowRight, {}) as Node;
 
   resultsEl.setAttribute('role', 'listbox');
   inputEl.setAttribute('aria-autocomplete', 'list');
@@ -157,12 +160,13 @@ export function initGameSearch({
     const moreHtml = !moreRowShown()
       ? ''
       : gameSearchMoreHtml(
-          showingRecents ? 'See all recently looked up →' : `See all results for "${lastTerm}" →`,
+          showingRecents ? 'See all recently looked up ' : `See all results for "${lastTerm}" `,
           moreActive,
         );
     resultsEl.innerHTML = showingRecents
       ? gameSearchSectionHtml('Recently looked up') + options + moreHtml
       : options + moreHtml;
+    resultsEl.querySelector('#game-search-more-opt')?.append(moreArrow);
     if (activeIdx >= 0 && activeIdx < lastResults.length)
       inputEl.setAttribute('aria-activedescendant', `game-search-opt-${lastResults[activeIdx].appid}`);
     else if (moreActive) inputEl.setAttribute('aria-activedescendant', 'game-search-more-opt');

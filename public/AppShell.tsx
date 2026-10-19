@@ -29,6 +29,9 @@ import { initAuth } from './authStore.ts';
 import { bindNavPopover } from './navPopover.ts';
 import { SearchClearButton } from './SearchClearButton.tsx';
 import { smoothScroll } from './utils.ts';
+import ArrowUp from 'lucide-solid/icons/arrow-up';
+import Settings from 'lucide-solid/icons/settings';
+import X from 'lucide-solid/icons/x';
 
 // Route-specific behavior (keyboard shortcuts, and now "open this looked-up game") can't be
 // hardcoded at the shell level — different routes have different "list" contexts, or none at all
@@ -309,7 +312,6 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           </search>
           <AccountChip />
           <div class="site-nav-prefs site-nav-popover">
-            {/* U+FE0F asks for the emoji glyph: the text one renders ~8 px in common fallback fonts. */}
             <button
               type="button"
               class="site-nav-link site-nav-prefs-btn"
@@ -317,7 +319,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
               popovertarget="nav-prefs-panel"
               ref={prefsBtnEl}
             >
-              {'\u2699\uFE0F'}
+              <Settings />
             </button>
             <PrefsPanel ref={prefsPanelEl} />
           </div>
@@ -343,7 +345,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           scrolling column entirely (see style.css's .app-shell). */}
       <aside id="game-panel" class="game-panel" aria-labelledby="panel-title">
         <button id="panel-close" class="panel-close" aria-label="Close">
-          ×
+          <X />
         </button>
         <div id="panel-nav" class="panel-nav" />
         <div id="panel-body" class="panel-body" />
@@ -356,7 +358,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           aria-label="Back to top"
           onClick={() => scrollPageToTop(smoothScroll())}
         >
-          ↑
+          <ArrowUp />
         </button>
       </Show>
       <ShortcutsModal open={shortcutsOpen()} onClose={() => setShortcutsOpen(false)} />

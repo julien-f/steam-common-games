@@ -1,3 +1,5 @@
+import X from 'lucide-solid/icons/x';
+
 // The × that empties the search input right before it; CSS hides it while the input is empty.
 export function SearchClearButton() {
   return (
@@ -14,7 +16,7 @@ export function SearchClearButton() {
         input.focus();
       }}
     >
-      ×
+      <X />
     </button>
   );
 }

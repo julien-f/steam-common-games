@@ -226,7 +226,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Steps**:
   1. Wishlist
   2. sort by discount or filter record-low badges (🔥 ★ ☆)
-  3. ⚙ Preferences to set region
+  3. Preferences (gear icon) to set region
 - **Done when**: prices state their region and age; ↻ on the Prices figure refreshes them only.
 
 ### B3 What does this bundle add for the whole household?

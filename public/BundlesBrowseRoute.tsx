@@ -420,7 +420,7 @@ export default function BundlesBrowseRoute() {
     tiles.push({
       label: 'Prices',
       value: regionLabel(regionCode()),
-      title: 'Prices are shown for this region — click to change it in ⚙ Preferences',
+      title: 'Prices are shown for this region — click to change it in Preferences',
       onClick: openPrefsPopover,
     });
     // The publish-side twin of the tile below: this is a discovery page, and its default sort is

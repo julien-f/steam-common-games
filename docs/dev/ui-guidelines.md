@@ -61,6 +61,14 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 - Two weights: 400, and 600 for emphasis.
 - Two faces, self-hosted: Geist (`--font-sans`) for text; Geist Mono (`--font-mono`) with tabular figures for a figure standing alone (`<time>`, `<output>`, `<data>`, a price, a score, a duration). Table cells stay in Geist, with tabular figures, since a cell can't be told numeric from CSS.
 
+## Icons
+
+- Drawn with Lucide (`lucide-solid`), one import per icon: `import X from 'lucide-solid/icons/x'`. `npm run lint` bans the `lucide-solid` and `lucide-solid/icons` barrels, which would make the dev server transform every icon.
+- `.lucide` in `styles/base.css` sizes an icon at `1em` in `currentColor` (stroke 1.75): set its size and colour on the element around it.
+- Decorative: an icon gets no `aria-*`, `role` or `title`, so Lucide marks it `aria-hidden`; an icon-only control keeps its `aria-label`.
+- An icon is markup, so it can't go in an `<option>` or a `title`: an option's label drops it, and a tooltip names the control in words.
+- Kept as text, since they are data or keys rather than icons: ↗ on external links, a deal record's ★/☆/🔥, a table cell's ✓/☆/⚠/⏳ (sorted and copied as text), key caps, the set operators ∪∩−, ≈ for an estimate, and the table library's own glyphs.
+
 ## Motion
 
 - Durations and easing from the `--dur-*` / `--ease-out` tokens in `styles/base.css`; motion explains a change (something opening, arriving, pressed), never decorates.

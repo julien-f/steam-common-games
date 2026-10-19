@@ -103,6 +103,16 @@
     font-size: var(--fs-meta);
   }
 
+  /* Lucide icons: sized and coloured by the text around them. */
+  .lucide {
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    vertical-align: -0.125em;
+    stroke: currentColor;
+    stroke-width: 1.75;
+  }
+
   kbd {
     padding: 2px 6px;
     border: 1px solid var(--line-control);

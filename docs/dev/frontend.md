@@ -61,8 +61,8 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 **Shell and routes**
 
 - `AppRoot.tsx` — mounts `<Router>` with `AppShell` as its `root`.
-- `AppShell.tsx` — the persistent shell: nav bar (`Home · Compare · Bundles`; About is in the footer), ⚙ Preferences popover, global game search, the shared panel + lightbox (mounted once, not per route), and the app-wide `?u=` resolve effect. The Compare link alone opts out of `withAccountParam`: a comparison names its own players.
-  - Landmarks: the bar is the `<header>` (banner), holding the `Main` `<nav>` (`display: contents`, so its links stay items of the bar's flex row), the `<search>` box, the chip and ⚙; then `<main>`, the footer, and the panel as an `<aside>` named by its title. Home's quick links are the `Lists` nav. Every `<nav>` carries a name, telling the two apart.
+- `AppShell.tsx` — the persistent shell: nav bar (`Home · Compare · Bundles`; About is in the footer), Preferences popover, global game search, the shared panel + lightbox (mounted once, not per route), and the app-wide `?u=` resolve effect. The Compare link alone opts out of `withAccountParam`: a comparison names its own players.
+  - Landmarks: the bar is the `<header>` (banner), holding the `Main` `<nav>` (`display: contents`, so its links stay items of the bar's flex row), the `<search>` box, the chip and Preferences; then `<main>`, the footer, and the panel as an `<aside>` named by its title. Home's quick links are the `Lists` nav. Every `<nav>` carries a name, telling the two apart.
 - `AccountChip.tsx` — nav-bar chip saying whose lists are on screen, with Owned/Wishlist links (inline when wide, in its popover when narrow) and a recent-account switcher. Deliberately thinner than Home's account section.
 - `ListRoute.tsx` — the generic list viewer (table + docked panel) behind every `/lists/*` and `/game/*` route; owns per-kind loading, columns, price loading, and the hero's contents.
 - `RankRoute.tsx` — `/lists/:listId/rank`, a ranked list's compare screen (see [lists-and-accounts.md](lists-and-accounts.md#ranked-lists)).
@@ -114,7 +114,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 - `viewTransition.ts` / `artTint.ts` — the shared-element morphs into the panel and the lightbox; the panel ground's tint from the game's art.
 - `gameSearch.ts` — the combobox/debounce UI for "look up any game" (the shell owns where results go).
 - `urlState.ts` — param parsing, canonical param order, and the `?game=`/`&shot=`/`?u=` writers.
-- `prefs.ts` / `prefsPopover.tsx` / `region.ts` / `navPopover.ts` — the localStorage preference blob; the ⚙ panel's contents; the region preference and its detection; nav popovers' Escape and positioning.
+- `prefs.ts` / `prefsPopover.tsx` / `region.ts` / `navPopover.ts` — the localStorage preference blob; the Preferences panel's contents; the region preference and its detection; nav popovers' Escape and positioning.
 - `tableViewPrefs.ts` / `tableViewKeys.ts` / `tableViewSync.ts` / `SharedViewBanner.tsx` / `UnsavedViewBanner.tsx` — restore/persist/share/reset a table view; the table-view pref keys; the signed-in Save/Revert baseline; the shared-layout and unsaved-changes banners and the Share/Default view buttons.
 - `clipboard.ts` / `CopyButton.tsx` — the one copy-then-confirm helper behind every copy button (`copyWithFeedback` for plain DOM buttons, `<CopyButton>` for JSX), with a `window.prompt` fallback where the Clipboard API isn't available (it needs a secure context, and can be permission-denied).
 - `pageTitle.ts` — the two-layer `document.title` (route context, overridden by an open game).
@@ -234,11 +234,11 @@ Every route opens with a **hero** (`ListHero.tsx`, a `<header>`, a flat section 
 - **The card is dumb**: no data, no per-kind branching; callers pass formatted values, so "what does a wishlist show" is answered in `ListRoute.tsx` alone. Its dates are ISO, like the tables' (see [ui-guidelines.md](ui-guidelines.md)).
 - **A tile can be a control**: given `onClick`, a `<button>` in its `<dd>`, named by the `<dt>` and its own text (`aria-labelledby`), `aria-disabled` while its action is in flight (not `disabled`, which would drop the focus of the click). A toggle also passes `active`, rendered as `aria-pressed` and read back from what the click applied.
 - **A tile that refreshes replaces the route's ↻ Refresh button** (`refreshTileValue` adds a ↻ beside the value), so it's rendered unconditionally — during a load and after one that failed before fetching, when a retry is wanted.
-  - `/bundles`: Updated re-fetches, Prices opens the ⚙ popover (`openPrefsPopover`), New/Ending soon toggle filters.
+  - `/bundles`: Updated re-fetches, Prices opens the Preferences popover (`openPrefsPopover`), New/Ending soon toggle filters.
   - Owned/wishlist: Updated does the same. Prices shows only where the list is priced (`hasPrices()`: the wishlist, a user list with a priced source), never on owned. Any list built from an account fetch, at any depth (a comparison; a dynamic, ranked or shared list), gets Updated too: its age is the _oldest_ of the account fetches behind it, and clicking re-resolves them all past the server's cache (`createDefaultFetchers`'s `refresh`/`onFetchedAt`, `listResolve.ts`).
   - The tile is gated on there being an age, not on the kind: a manual list (stored appids) has none. Owned, wishlist and comparisons keep it without an age ("—") so a failed first load can be retried.
   - Exception: a bundle's own hero tile is a plain `<div>` — finding one bundle walks several cached list pages, so `GET /api/bundles/:id` has no force path. It still states the age of the page the bundle was found on (`findBundleById`'s `cacheKey`).
-- **Prices carries two actions**: its value (the region) opens the ⚙ popover, its sub-line (the price age) re-fetches prices. With a `subOnClick` each half renders as its own button (HTML has no nested buttons); otherwise value and sub-line are one button.
+- **Prices carries two actions**: its value (the region) opens the Preferences popover, its sub-line (the price age) re-fetches prices. With a `subOnClick` each half renders as its own button (HTML has no nested buttons); otherwise value and sub-line are one button.
 - **A refresh** (`load({ refresh: true })`) keeps the table, its rows' details and the selection until the new list resolves, then rebuilds with the kept details (`withKept`) and streams only new games. It keeps the previous age, a dynamic list's formula line and `heroTitle` (blanking it would tear down the tile being clicked).
 - Tiles render through `<Index>`, not `<For>`: recomputes build fresh tile objects, and by-reference keying would replace the activated button and drop its focus.
 - On a phone (≤ 768 px) tiles become one swipeable row, and `hero-secondary` actions (a bundle's IsThereAnyDeal link and Rank; a comparison's Edit players and Save) fold behind a ⋯ toggle (`secondaryActions`), so the table starts higher.
@@ -273,13 +273,13 @@ A grouped list is always grouped and sorted by membership first (`withMembership
 
 The "look up any game" box is one nav-bar search in the shell, not one per route.
 
-- Focused while **empty**, it shows recently looked-up games under a heading, with a sticky "See all recently looked up →" row to `/game`. They're `GameSearchResult`-shaped, so roving selection, ownership markers and `onSelect` apply unchanged; the heading and "see all" row are `role="presentation"`.
+- Focused while **empty**, it shows recently looked-up games under a heading, with a sticky "See all recently looked up" row (with an arrow) to `/game`. They're `GameSearchResult`-shaped, so roving selection, ownership markers and `onSelect` apply unchanged; the heading and "see all" row are `role="presentation"`.
 - `gameSearch.ts` takes the list and the "see all" destination as options rather than importing `recentGames.ts`.
-- Typing a query gets "See all results for '…' →" instead, to `/search?q=…`.
+- Typing a query gets "See all results for '…'" instead, to `/search?q=…`.
 
 `AccountChip.tsx` says who the app is showing, following a `?u=` link that resolves after mount, with a 🔗 marker when a link's account is showing.
 
-- Both nav popovers (this and ⚙ Preferences), and the rank menu, are native popovers (`button[popovertarget]` + `[popover]`: the browser opens, closes and dismisses them on an outside click) sharing `navPopover.ts`: it closes them on Esc ahead of the page's own Esc handlers, and positions the panel in JS because `.site-nav`'s flex-wrap moves its triggers with viewport width (seen off-screen on a real Galaxy S10, ruling out CSS-only anchoring).
+- Both nav popovers (this and Preferences), and the rank menu, are native popovers (`button[popovertarget]` + `[popover]`: the browser opens, closes and dismisses them on an outside click) sharing `navPopover.ts`: it closes them on Esc ahead of the page's own Esc handlers, and positions the panel in JS because `.site-nav`'s flex-wrap moves its triggers with viewport width (seen off-screen on a real Galaxy S10, ruling out CSS-only anchoring).
 - It carries **copyable Steam identifiers** (`accountsStore.ts`'s `accountIdentifiers`: the stored custom-URL name, else the steam64 id), read from the slot since the chip fetches nothing: one for the current account, one per member beside each recents row (outside its switch button, which can't nest one).
 
 ## The side panel
@@ -288,20 +288,20 @@ The "look up any game" box is one nav-bar search in the shell, not one per route
 
 **Tag pills filter the table.** On a route that registers no `onTagClick`, they render as plain pills. A tag/genre/category/developer/publisher pill toggles that value in the matching column's `include` filter — `initPanel({ onTagClick, isTagActive })` forwards through `routeHandlers` to `ListRoute.tsx`'s `onTagClick`/`isTagActive` (`table.filter.setValues(...)`/`.include()`). The panel's keys (`tags`/`genres`/`categories`/`developers`/`publishers`) are the table's column keys. A Steam tag pill also carries its `tagWeights` entry as a bottom-edge gauge (`.panel-tag-weight`) and a tooltip.
 
-**Docked, not modal.** Table and panel are two live columns, so the panel is an `<aside>` (complementary), not a dialog; no backdrop, focus trap or click-outside close — × or Escape closes it, and clicking another row swaps the content. A narrow viewport falls back to a full-screen overlay.
+**Docked, not modal.** Table and panel are two live columns, so the panel is an `<aside>` (complementary), not a dialog; no backdrop, focus trap or click-outside close — its Close button or Escape closes it, and clicking another row swaps the content. A narrow viewport falls back to a full-screen overlay.
 
 **Full-height, out of flow.** The panel is `position: fixed` at the right edge, spanning the viewport height, and `.app-shell` reserves its width (`--panel-w`) as padding while open, so nav and footer shorten with the content. (In flow, it stretched to the document height, breaking `.panel-body`'s scrolling and `.panel-nav`'s pinned bar.)
 
 Above 768px the shell is locked to the viewport and **`.app-scroll` is the page's scroller**, avoiding two scrollbars side by side. Nav and footer sit inside it, so they still scroll away; `.app-content` takes `flex: 1` to keep the footer down on a short page.
 
-- **`AppShell` owns the page's scroll position** (`pageScrollTop`/`scrollPageToTop` — `.app-scroll` on desktop, the document on mobile, so both are read and written). It scrolls to the top on each path change, and shows the floating **↑ Back to top** button past `TO_TOP_AFTER_PX`. The button's `position: fixed` ignores the shell's gutter, so `.panel-open` offsets it by `--panel-w`; its z-index is below the panel's.
+- **`AppShell` owns the page's scroll position** (`pageScrollTop`/`scrollPageToTop` — `.app-scroll` on desktop, the document on mobile, so both are read and written). It scrolls to the top on each path change, and shows the floating **Back to top** button (an up arrow) past `TO_TOP_AFTER_PX`. The button's `position: fixed` ignores the shell's gutter, so `.panel-open` offsets it by `--panel-w`; its z-index is below the panel's.
 - **Below 769px the lock is off** and the document scrolls: the panel is an overlay there, and a document that never scrolls is a URL bar that never collapses.
 
 **Focus and history.**
 
 - Opening moves focus into the panel (heading/close button) so screen readers announce it; Tab flows freely back to the table. Closing returns focus to the shown game's row (else to what opened it from outside the panel; a reopen from inside, by ↑/↓ or a DLC link, keeps that), so ↑/↓ carry on from there.
 - Opening the panel, and the lightbox over it, pushes one history entry each (`overlayHistory.ts`), so Back closes the innermost one. Stepping to another game or shot only rewrites the URL, so Back never walks through every game looked at.
-- A close by ×, Esc, the backdrop or a swipe steps back over its entry, so the next Back leaves the page. The entry it lands on is rewritten to the current address minus that overlay, so a game stepped to in the lightbox stays open; for a browser Back that needs the Navigation API (`currententrychange`).
+- A close by the Close button, Esc, the backdrop or a swipe steps back over its entry, so the next Back leaves the page. The entry it lands on is rewritten to the current address minus that overlay, so a game stepped to in the lightbox stays open; for a browser Back that needs the Navigation API (`currententrychange`).
 - Back from a page a panel link led to reopens that game. Entries are tracked by the router's `_depth` stamp, and Back's target keeps the page's URL with the overlay closed (`urlWithoutPanel`/`urlWithoutShot`), so a deep link's Back lands on its list.
 
 **Sections**, in order: hero carousel (`PanelHero`, swipeable, feeding `lightbox.tsx`); a sticky header (DLC trail, name, release date and base-game link, the Steam/ITAD/⋯ More/🔗/↻ icons and ownership badge, the subnav in one row, scrolled to the current tab); a demo banner when the game has a free demo; the glance grid (Weighted Rating, Metacritic, HLTB, Linux/Deck — the review count is the Weighted chip's caption); Price, with the current bundles the game is in below its lines (`PanelBundleLines`); the store description; tags; Similar in <account>'s library; "Owned by"; How Long To Beat; News; Achievements; DLC. Collapsible ones share `CollapsibleCard`; a subnav scroll-spy tracks position, as `aria-current` on the section's tab and one accent underline gliding to it. The name is the panel's `<h2>` and each section a `<section>` titled by an `<h3>` (a collapsible card's is its toggle button, wrapped), so a screen reader jumps between sections by heading.
@@ -354,7 +354,7 @@ Above 768px the shell is locked to the viewport and **`.app-scroll` is the page'
 
 `prefs.ts` is one flat `{key: value}` JSON blob under a single localStorage key, so the whole set is enumerable at once; `setPref`'s sync hook is per-key so two preferences changing in different tabs can't race each other's server writes.
 
-Region is the only user-facing preference, in the nav bar's ⚙ popover (`prefsPopover.tsx` owns the panel, `AppShell.tsx` only its button). `region.ts` holds a curated list of major Steam pricing regions and `detectCountry()`; price-showing routes re-price from an effect on `currentRegion()`.
+Region is the only user-facing preference, in the nav bar's Preferences popover (`prefsPopover.tsx` owns the panel, `AppShell.tsx` only its button). `region.ts` holds a curated list of major Steam pricing regions and `detectCountry()`; price-showing routes re-price from an effect on `currentRegion()`.
 
 - The first entry is always "Auto-detect (⟨what it resolves to now⟩)", and `currentRegion` consults `detectCountry()` live on every upstream call.
 - `detectCountry` tries the OS timezone (`Intl.DateTimeFormat().resolvedOptions().timeZone`, via a curated map including Eurozone→`DE`) before `navigator.language` — language is a UI preference and often stays "en-US" anywhere (e.g. `LANG=en_US.UTF-8` in `Europe/Paris`).

@@ -2712,7 +2712,7 @@ export default function ListRoute() {
     return {
       label: 'Prices',
       value: regionLabel(regionCode()),
-      title: 'Prices are shown for this region — click to change it in ⚙ Preferences',
+      title: 'Prices are shown for this region — click to change it in Preferences',
       onClick: openPrefsPopover,
       // The tile's second control, and what replaced the actions row's own "↻ Refresh prices":
       // prices are a different fetch from the list itself, so they keep their own age and their
