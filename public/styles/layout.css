@@ -148,6 +148,21 @@
       padding-block: 16px 40px;
     }
   }
+  .rank-route {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding-block: 24px 60px;
+  }
+  @media (max-width: 600px) {
+    .rank-route {
+      gap: 12px;
+      padding-block: 16px 40px;
+    }
+  }
+
   /* Home: the account across the top, then the quick links beside the user's lists. */
   .home-route {
     display: grid;

@@ -80,8 +80,8 @@ html:root {
 .dt-tr--clickable:hover .dt-td {
   background: var(--surface);
 }
-/* The thumbnail column only as wide as its image: a sized cell takes none of the table's spare width. */
-.dt-td:has(.game-thumb) {
+/* An image column (thumbnails, /bundles' covers) only as wide as its images: a sized cell takes none of the table's spare width. */
+.dt-td:has(.game-thumb, .bundle-covers) {
   width: 1px;
 }
 /* Checked rows: neutral, so the accent stays the open game's. */
