@@ -665,6 +665,8 @@
     }
     .list-hero-more {
       display: inline-flex;
+      align-items: center;
+      justify-content: center;
       order: 1;
     }
     .list-hero-actions:not(.list-hero-actions--open) .hero-secondary {

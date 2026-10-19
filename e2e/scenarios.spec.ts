@@ -3538,6 +3538,21 @@ test("I1 edge: on a phone, a bundle's table starts high, its other actions behin
   await expect(page.getByRole('link', { name: 'View on IsThereAnyDeal ↗' })).toBeVisible();
 });
 
+test("C3 edge: on a phone, the hero's More actions centres its ⋯", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout only');
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare?u=alice&u=bob');
+  const more = page.getByRole('button', { name: 'More actions' });
+  const centre = (box: { x: number; y: number; width: number; height: number } | null) => [
+    box!.x + box!.width / 2,
+    box!.y + box!.height / 2,
+  ];
+  const [bx, by] = centre(await more.boundingBox());
+  const [ix, iy] = centre(await more.locator('svg').boundingBox());
+  expect(Math.abs(ix - bx)).toBeLessThan(1);
+  expect(Math.abs(iy - by)).toBeLessThan(1);
+});
+
 test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout only');
   // True when a tap 12px from the centre, on each side, still lands on the control.

@@ -40,8 +40,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Phone
 
-- **U173 · polish · C1, C3, B1, R1** — the phone hero's ⋯ (More actions) draws its icon 9 px above centre (`.list-hero-more` is `inline-flex` without centring). Since 0663512's Lucide icon.
-
 ## Accounts and first visit
 
 - **U181 · minor · A3, I3** — with **Add Steam Family account**, both lookup fields are named "Steam name, profile URL, or 64-bit ID", so a screen reader can't tell them apart. Number them ("Family member 2").
