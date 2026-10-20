@@ -2257,6 +2257,11 @@ test("F1 edge: Tags & details names each chip's kind, and draws each kind's dot 
   );
   expect(shapes.length).toBeGreaterThanOrEqual(3);
   expect(new Set(shapes).size).toBe(shapes.length);
+  const colours = await page
+    .locator('.panel-tag-legend .panel-tag-dot')
+    .evaluateAll((dots) => dots.map((d) => getComputedStyle(d).backgroundColor));
+  expect(colours).not.toContain('rgba(0, 0, 0, 0)');
+  expect(new Set(colours).size).toBe(colours.length);
 });
 
 // A failed health check stops the panel before its price lookup, so each failure gets its own run.

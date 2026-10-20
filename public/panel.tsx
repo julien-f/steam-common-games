@@ -807,10 +807,10 @@ function fmtCompactCount(n: number) {
 // kind but are two different filter dimensions.
 type TagKind = keyof typeof TAG_KIND_META;
 const TAG_KIND_META = {
-  tags: { label: 'Tag', color: 'var(--kind-tag)' },
-  genres: { label: 'Genre', color: 'var(--kind-genre)' },
-  categories: { label: 'Category', color: 'var(--kind-category)' },
-  devpub: { label: 'Developer/Publisher', color: 'var(--kind-devpub)' },
+  tags: { label: 'Tag' },
+  genres: { label: 'Genre' },
+  categories: { label: 'Category' },
+  devpub: { label: 'Developer/Publisher' },
 };
 
 // A Steam tag's `weights` entry (relative to the game's top tag) shows as a gauge along its pill's bottom edge.
@@ -832,21 +832,13 @@ function TagCloud(props: {
         <div class="panel-tags">
           <For each={pills()}>
             {({ kind, dim, v, w }) => {
-              const dot = (
-                <span
-                  class={`panel-tag-dot panel-tag-dot--${kind}`}
-                  style={{ background: TAG_KIND_META[kind].color }}
-                />
-              );
+              const dot = <span class={`panel-tag-dot panel-tag-dot--${kind}`} />;
               // "Action" can be both a tag and a genre: two chips a screen reader must tell apart.
               const kindName = `${v}, ${TAG_KIND_META[kind].label.toLowerCase()}`;
               const title = w == null ? undefined : `${Math.round(w * 100)}% of the top tag's votes`;
               const gauge =
                 w == null ? null : (
-                  <span
-                    class="panel-tag-weight"
-                    style={{ width: `${w * 100}%`, background: TAG_KIND_META[kind].color }}
-                  />
+                  <span class={`panel-tag-weight panel-tag-weight--${kind}`} style={{ width: `${w * 100}%` }} />
                 );
               return (
                 <Show
@@ -881,7 +873,7 @@ function TagCloud(props: {
           <For each={seenKinds()}>
             {(k) => (
               <span class="panel-tag-legend-item">
-                <span class={`panel-tag-dot panel-tag-dot--${k}`} style={{ background: TAG_KIND_META[k].color }} />
+                <span class={`panel-tag-dot panel-tag-dot--${k}`} />
                 {TAG_KIND_META[k].label}
               </span>
             )}

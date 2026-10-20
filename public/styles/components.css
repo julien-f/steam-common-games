@@ -1820,6 +1820,22 @@
     height: 7px;
     border-radius: 50%;
   }
+  .panel-tag-dot--tags,
+  .panel-tag-weight--tags {
+    background: var(--kind-tag);
+  }
+  .panel-tag-dot--genres,
+  .panel-tag-weight--genres {
+    background: var(--kind-genre);
+  }
+  .panel-tag-dot--categories,
+  .panel-tag-weight--categories {
+    background: var(--kind-category);
+  }
+  .panel-tag-dot--devpub,
+  .panel-tag-weight--devpub {
+    background: var(--kind-devpub);
+  }
   .panel-tag-dot--genres {
     border-radius: 1px;
   }
