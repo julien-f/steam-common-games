@@ -38,7 +38,7 @@ test('styles: keyframes move only opacity and transform (ui-guidelines.md, Motio
     const css = sheets.find(({ file }) => at.startsWith(`${file}:`)).css;
     let depth = 1;
     let i = m.index + m[0].length;
-    for (; depth; i++) depth += css[i] === '{' ? 1 : css[i] === '}' ? -1 : 0;
+    for (; depth && i < css.length; i++) depth += css[i] === '{' ? 1 : css[i] === '}' ? -1 : 0;
     const body = css.slice(m.index + m[0].length, i);
     return [...body.matchAll(/([\w-]+)\s*:/g)].filter((p) => !MOVING.has(p[1])).map((p) => `${at} ${m[1]}: ${p[1]}`);
   });
