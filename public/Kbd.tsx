@@ -6,27 +6,28 @@ import ArrowRight from 'lucide-solid/icons/arrow-right';
 import ArrowUp from 'lucide-solid/icons/arrow-up';
 import ArrowDown from 'lucide-solid/icons/arrow-down';
 
-const ARROWS: Record<string, () => JSX.Element> = {
-  '←': () => <ArrowLeft />,
-  '→': () => <ArrowRight />,
-  '↑': () => <ArrowUp />,
-  '↓': () => <ArrowDown />,
-};
+const ARROWS = new Map<string, () => JSX.Element>([
+  ['←', () => <ArrowLeft />],
+  ['→', () => <ArrowRight />],
+  ['↑', () => <ArrowUp />],
+  ['↓', () => <ArrowDown />],
+]);
 
 export default function Kbd(props: { k: string }): JSX.Element {
   return (
     <kbd>
       <For each={props.k.split(/([←→↑↓])/).filter(Boolean)}>
-        {(part) =>
-          ARROWS[part] ? (
+        {(part) => {
+          const icon = ARROWS.get(part);
+          return icon ? (
             <>
-              {ARROWS[part]()}
+              {icon()}
               <span class="visually-hidden">{part}</span>
             </>
           ) : (
             part
-          )
-        }
+          );
+        }}
       </For>
     </kbd>
   );
