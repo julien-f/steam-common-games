@@ -2298,6 +2298,23 @@ test("F1 edge: a DLC's capsule that fails to load hides, keeping its box", async
   expect(await capsule('Expansion 2').boundingBox()).toMatchObject({ width: 80, height: 30 });
 });
 
+test("F1 edge: a loading video's ▶ stays put while the hero shimmers", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  // The hero as it stands while a trailer's poster loads.
+  const pseudo = await page.locator('#panel-hero .panel-hero-main').evaluate((el) => {
+    el.classList.add('is-video', 'panel-hero-main--loading');
+    const style = (which: string) => {
+      const s = getComputedStyle(el, which);
+      return { content: s.content, animation: s.animationName };
+    };
+    return { before: style('::before'), after: style('::after') };
+  });
+  expect(pseudo.before).toEqual({ content: '"▶"', animation: 'none' });
+  expect(pseudo.after.animation).toBe('shimmer');
+});
+
 test('F1 edge: DLC entries streamed in stay put, not redrawn, once the rest arrive', async ({ page }) => {
   let release!: () => void;
   const held = new Promise<void>((resolve) => (release = resolve));

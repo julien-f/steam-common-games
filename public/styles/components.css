@@ -49,7 +49,7 @@
     vertical-align: middle;
   }
   .sk::before,
-  .panel-hero-main--loading::before {
+  .panel-hero-main--loading::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -1097,14 +1097,19 @@
   .panel-hero-img.loading {
     opacity: 0;
   }
+  /* Its shimmer is an ::after under the children (::before is a video's ▶). */
   .panel-hero-main--loading {
+    isolation: isolate;
     background-color: var(--surface);
+  }
+  .panel-hero-main--loading::after {
+    z-index: -1;
   }
   .panel-hero-main--loading[style*='background-image'] {
     background-size: cover;
     background-position: center;
   }
-  .panel-hero-main--loading[style*='background-image']::before {
+  .panel-hero-main--loading[style*='background-image']::after {
     content: none;
   }
   .panel-hero-img--broken {
