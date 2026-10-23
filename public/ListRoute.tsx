@@ -110,11 +110,11 @@ import {
   focusGameRow,
   gameRowEl,
   formatMoney,
-  fmtH,
   hoursFromMinutes,
   oldestFetchedAt,
   scoreColor,
   fadeInOnLoad,
+  fmtHours,
   fmtLocalDate,
   smoothScroll,
   refusalMessage,
@@ -666,10 +666,7 @@ interface DetailsEvent {
 const NO_DETAILS = { rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null };
 
 const PLAYS_MOSTLY_SHOWN = 6;
-const fmtHours = (h: number) => fmtH(h >= 10 ? Math.round(h) : Math.round(h * 10) / 10);
 const PLAYER_TAGS_SHOWN = 3;
-// A large library may have hundreds of story games: the first few say enough.
-const STORY_GAMES_SHOWN = 5;
 
 // A score column leads the sort while its source is set; unset, it goes, with its row-hiding range.
 function syncLeadColumn(t: TableState<Game>, key: string, active: boolean): void {
@@ -3386,12 +3383,6 @@ export default function ListRoute() {
   );
   const sharedCount = (profiles: NonNullable<ReturnType<typeof playerProfiles>>) =>
     profiles.players.length === 2 ? (profiles.ground.pairs[0].shared ?? 0) : profiles.ground.sharedCount;
-  // A game named in the hero, opening its panel.
-  const gameButton = (appid: number) => (
-    <button type="button" class="list-players-game" onClick={() => openGame(rowStore.getRow(appid)!)}>
-      {rowStore.getRow(appid)?.name}
-    </button>
-  );
   const tagButton = (tag: string) => (
     <button
       type="button"
@@ -3633,82 +3624,34 @@ export default function ListRoute() {
     }),
   );
   function ownedProfileSection(): JSX.Element {
-    const pct = (weight: number) => `${Math.round(weight * 100)}%`;
     return (
-      <>
-        <OwnedProfile
-          archetype={archetype()}
-          tags={playsMostly()}
-          played={playsMostlyProfile().played}
-          styleSentence={profileFacts().style ? STYLE_SENTENCES[profileFacts().style!] : null}
-          story={profileFacts().story}
-          unplayed={unplayed()}
-          playNextHours={PLAY_NEXT_MAX_HOURS}
-          backlogShown={backlogShown()}
-          whyOpen={playsMostlyWhy()}
-          isTagActive={(tag) => tableReady() && isTagActive('tags', tag)}
-          onTag={(tag) => onTagClick('tags', tag)}
-          onBacklog={showBacklog}
-          onWhy={() => setPlaysMostlyWhy((open) => !open)}
-        />
-        <Show when={playsMostly().length}>
-          <div id="plays-mostly-breakdown" class="list-plays-mostly-breakdown" hidden={!playsMostlyWhy()}>
-            <p>
-              Bars compare each tag with the top one. Games: those counting most toward it (hours played × how strongly
-              players tagged it).
-            </p>
-            <Show when={profileFacts().style}>
-              <p>
-                Play style: the kind of game (single-player, co-op, PvP) holding over half the played games' weight, by
-                log hours; a game with several modes goes by the one players tag it most for.
-              </p>
-            </Show>
-            <Show when={profileFacts().story}>
-              {(story) => (
-                <>
-                  <p>
-                    Story games: single-player games with a How Long To Beat main story and no endless tag (roguelike,
-                    sandbox…), counted when played for at least 80% of it.
-                  </p>
-                  <For
-                    each={[
-                      { label: 'Main story length reached:', appids: story().reached },
-                      { label: 'Fell short:', appids: story().fellShort },
-                    ]}
-                  >
-                    {({ label, appids }) => (
-                      <Show when={appids.length}>
-                        <p class="list-profile-story">
-                          {label} <For each={appids.slice(0, STORY_GAMES_SHOWN)}>{gameButton}</For>
-                          <Show when={appids.length > STORY_GAMES_SHOWN}>
-                            <span class="list-players-none">+{appids.length - STORY_GAMES_SHOWN} more</span>
-                          </Show>
-                        </p>
-                      </Show>
-                    )}
-                  </For>
-                </>
-              )}
-            </Show>
-            <ul>
-              <For each={playsMostly()}>
-                {({ tag, weight, games }) => (
-                  <li>
-                    <span class="list-plays-mostly-name">{tag}</span>
-                    <span class="list-plays-mostly-bar">
-                      <span style={{ width: pct(weight) }} />
-                      <span class="visually-hidden">{pct(weight)}</span>
-                    </span>
-                    <span class="list-plays-mostly-games">
-                      {games.map((g) => `${g.name} ${fmtHours(g.hours)}`).join(' · ')}
-                    </span>
-                  </li>
-                )}
-              </For>
-            </ul>
-          </div>
-        </Show>
-      </>
+      <OwnedProfile
+        archetype={archetype()}
+        tags={playsMostly()}
+        played={playsMostlyProfile().played}
+        styleSentence={profileFacts().style ? STYLE_SENTENCES[profileFacts().style!] : null}
+        story={profileFacts().story}
+        unplayed={unplayed()}
+        playNextHours={PLAY_NEXT_MAX_HOURS}
+        backlogShown={backlogShown()}
+        whyOpen={playsMostlyWhy()}
+        isTagActive={(tag) => tableReady() && isTagActive('tags', tag)}
+        onTag={(tag) => onTagClick('tags', tag)}
+        onBacklog={showBacklog}
+        onWhy={() => setPlaysMostlyWhy((open) => !open)}
+        game={(appid) => {
+          const row = rowStore.getRow(appid);
+          return (
+            row && {
+              name: row.name,
+              art: row.thumb ?? row.capsule ?? null,
+              hours: row.playtime ?? 0,
+              main: row.hltbMain ?? null,
+            }
+          );
+        }}
+        onGame={(appid) => openGame(rowStore.getRow(appid)!)}
+      />
     );
   }
 

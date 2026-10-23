@@ -89,12 +89,12 @@ test('topPlayedTags: the games behind a tag, by their share of it rather than by
   ];
   const roguelike = topPlayedTags(games, 5).tags.find((t) => t.tag === 'Roguelike');
   assert.deepEqual(roguelike.games, [
-    { name: 'Game 2', hours: 20 },
-    { name: 'Game 3', hours: 10 },
-    { name: 'Game 4', hours: 5 },
+    { appid: 2, name: 'Game 2', hours: 20 },
+    { appid: 3, name: 'Game 3', hours: 10 },
+    { appid: 4, name: 'Game 4', hours: 5 },
   ]);
   const puzzle = topPlayedTags(games, 5).tags.find((t) => t.tag === 'Puzzle');
-  assert.deepEqual(puzzle.games, [{ name: 'Game 5', hours: 2 }]);
+  assert.deepEqual(puzzle.games, [{ appid: 5, name: 'Game 5', hours: 2 }]);
 });
 
 test('topPlayedTags: no profile from fewer than 5 played games', () => {

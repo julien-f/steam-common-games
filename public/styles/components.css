@@ -806,8 +806,8 @@
     .profile-figure {
       font-size: 22px;
     }
-    /* 4 tags are enough to read on a phone; the rest is in Why these? */
-    .profile-bars li:nth-child(n + 5) {
+    /* 4 tags are enough to read on a phone, all 6 once Why these? is open. */
+    .profile:not(.profile--open) .profile-bars li:nth-child(n + 5) {
       display: none;
     }
   }
@@ -971,16 +971,6 @@
       width: 140px;
     }
   }
-  .list-players-game {
-    min-height: 24px;
-    padding: 2px 4px;
-    border: 0;
-    background: none;
-    color: var(--accent);
-    font: inherit;
-    text-decoration: underline;
-    cursor: pointer;
-  }
   .list-players-none {
     color: var(--muted);
   }
@@ -998,60 +988,125 @@
     text-decoration: underline;
     cursor: pointer;
   }
-  .list-plays-mostly-breakdown {
-    display: grid;
-    gap: 6px;
-    margin-top: 8px;
-    font-size: var(--fs-meta);
-    font-style: normal;
-  }
-  /* Its display: grid would otherwise win over the attribute. */
-  .list-plays-mostly-breakdown[hidden] {
-    display: none;
-  }
-  .list-plays-mostly-breakdown p {
-    margin: 0;
-  }
-  .list-profile-story {
+  /* Why these?: each figure's evidence opened in its own card (PlayerProfile.tsx). */
+  .profile-bar-games {
     display: flex;
+    grid-column: 2;
     flex-wrap: wrap;
-    align-items: center;
-    gap: 0 4px;
+    gap: 6px;
+    margin: 2px 0 8px 6px;
   }
-  .list-plays-mostly-breakdown ul {
-    display: grid;
-    grid-template-columns: max-content 80px minmax(0, 1fr);
-    gap: 6px 12px;
-    align-items: center;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  .list-plays-mostly-breakdown li {
-    display: contents;
-  }
-  .list-plays-mostly-name {
+  .profile-chip,
+  .profile-story-game {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-1);
+    background: var(--bg);
     color: var(--text);
+    font: inherit;
+    font-size: var(--fs-meta);
+    cursor: pointer;
   }
-  .list-plays-mostly-bar {
+  .profile-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 24px;
+    padding: 2px 8px 2px 2px;
+  }
+  .profile-chip:hover,
+  .profile-story-game:hover {
+    border-color: var(--line-control);
+  }
+  .profile-chip img,
+  .profile-story-name img {
+    flex: none;
+    width: 46px;
+    height: 17px;
+    border-radius: 3px;
+    background: var(--line);
+    object-fit: cover;
+  }
+  .profile-chip-hours,
+  .profile-story-hours,
+  .profile-more {
+    color: var(--muted);
+  }
+  /* One row per story game: name, its hours against the main story as a bar, then the figures. */
+  .profile-story {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 72px max-content;
+    gap: 4px 10px;
+    margin-top: 4px;
+  }
+  .profile-story > .profile-label,
+  .profile-more {
+    grid-column: 1 / -1;
+  }
+  .profile-story > .profile-label {
+    margin-top: 6px;
+  }
+  .profile-story-game {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
+    min-height: 24px;
+    padding: 2px 6px 2px 2px;
+    border-color: transparent;
+    background: none;
+    text-align: left;
+  }
+  .profile-story-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .profile-story-track {
     height: 6px;
     overflow: hidden;
     border-radius: 3px;
     background: var(--line);
   }
-  .list-plays-mostly-bar > span {
+  .profile-story-track > span {
     display: block;
     height: 100%;
-    background: var(--kind-tag);
+    border-radius: 3px;
+    background: var(--line-control);
   }
-  @media (max-width: 480px) {
-    .list-plays-mostly-breakdown ul {
-      /* Not max-content: the games line spanning both columns would size it to its unwrapped width. */
-      grid-template-columns: fit-content(70%) 60px;
-    }
-    .list-plays-mostly-games {
+  .profile-story-track.reached > span {
+    background: var(--good);
+  }
+  .profile-story-hours {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .profile-how {
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .profile-how summary {
+    min-height: 24px;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .profile-how ul {
+    display: grid;
+    gap: 4px;
+    margin: 4px 0 0;
+    padding-left: 18px;
+  }
+  @media (max-width: 768px) {
+    .profile-bar-games {
       grid-column: 1 / -1;
-      margin-bottom: 4px;
+    }
+    .profile-story {
+      grid-template-columns: minmax(0, 1fr) 56px max-content;
     }
   }
   .list-formula {

@@ -644,13 +644,14 @@ test('F3 edge: Owned says which tags the account plays most, each filtering the 
   await expect(note.locator('.profile-bar').first()).toHaveAttribute('title', /· the top tag$/);
 
   const why = note.getByRole('button', { name: 'Why these?' });
-  const breakdown = page.locator('#plays-mostly-breakdown');
-  await expect(breakdown).toBeHidden();
+  const games = note.locator('.profile-bar-games');
+  await expect(games).toHaveCount(0);
   await why.click();
   await expect(why).toHaveAttribute('aria-expanded', 'true');
-  await expect(breakdown.getByRole('listitem').first()).toContainText(/^Singleplayer\d+%.+ 10h/);
+  // Under each tag, the played games counting most toward it.
+  await expect(games.first().getByRole('button').first()).toContainText(/10h$/);
   await why.click();
-  await expect(breakdown).toBeHidden();
+  await expect(games).toHaveCount(0);
 
   const coop = note.getByRole('button', { name: /^Co-op \d+%$/ });
   await coop.click();
@@ -692,7 +693,8 @@ test('A5.1-3: Plays mostly says what it is built from, leaving software out, and
     note.getByRole('img', { name: "7 of 9 story games played for their main story's length" }),
   ).toBeVisible();
   await note.getByRole('button', { name: 'Why these?' }).click();
-  await expect(page.locator('#plays-mostly-breakdown')).toContainText('Story games: single-player games');
+  await note.getByText("How it's counted").click();
+  await expect(note.locator('.profile-how')).toContainText('Story games: single-player');
 });
 
 test('A5.4: the barely-played count opens Play next, best Taste fit first, on a first visit', async ({ page }) => {
@@ -722,19 +724,20 @@ test('A5.4: the barely-played count opens Play next, best Taste fit first, on a 
   ]);
 });
 
-test('A5 edge: Why these? names the story games that fell short of their main story, each opening its panel', async ({
+test('A5 edge: Why these? lists the story games with their hours against the main story, each opening its panel', async ({
   page,
 }) => {
   await asPlayer(page, DAVE);
   await page.goto('/lists/owned');
   await page.getByRole('button', { name: 'Why these?' }).click();
-  const short = page.locator('#plays-mostly-breakdown .list-profile-story').filter({ hasText: 'Fell short:' });
-  await expect(short.getByRole('button')).toHaveText(['Sekiro: Shadows Die Twice', 'Hogwarts Legacy']);
-  // Capped, as a library may have hundreds: 5 of Dave's 7, then how many more.
-  const reached = page.locator('#plays-mostly-breakdown .list-profile-story').filter({ hasText: 'reached:' });
-  await expect(reached.getByRole('button')).toHaveCount(5);
-  await expect(reached).toContainText('+2 more');
-  await short.getByRole('button', { name: 'Hogwarts Legacy' }).click();
+  const story = page.locator('.profile-story');
+  const reached = story.locator('.profile-story-track.reached');
+  // Capped, as a library may have hundreds: 5 of Dave's 7, most played first, then how many more.
+  await expect(reached).toHaveCount(5);
+  await expect(story.locator('.profile-more')).toHaveText('+2 more');
+  await expect(story.locator('.profile-story-game').nth(5)).toContainText('Sekiro: Shadows Die Twice12 / 30 h');
+  await expect(story.locator('.profile-story-game').nth(6)).toContainText('Hogwarts Legacy');
+  await story.getByRole('button', { name: /^Hogwarts Legacy/ }).click();
   await expect(page.locator('#panel-title')).toHaveText('Hogwarts Legacy');
 });
 
