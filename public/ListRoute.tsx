@@ -3292,6 +3292,12 @@ export default function ListRoute() {
     ].filter((part) => !!part);
     return parts.length ? parts.join(' · ') : null;
   }
+  // A game named in the hero, opening its panel.
+  const gameButton = (appid: number) => (
+    <button type="button" class="list-players-game" onClick={() => openGame(rowStore.getRow(appid)!)}>
+      {rowStore.getRow(appid)?.name}
+    </button>
+  );
   const tagButton = (tag: string) => (
     <button
       type="button"
@@ -3366,11 +3372,7 @@ export default function ListRoute() {
                 <p class="list-players-row">
                   Everyone's favourites:{' '}
                   <For each={profiles().ground.favourites} fallback={<span class="list-players-none">none yet</span>}>
-                    {(appid) => (
-                      <button type="button" class="list-players-game" onClick={() => openGame(rowStore.getRow(appid)!)}>
-                        {rowStore.getRow(appid)?.name}
-                      </button>
-                    )}
+                    {gameButton}
                   </For>
                 </p>
                 <div class="list-players-row">
@@ -3393,13 +3395,7 @@ export default function ListRoute() {
                     <For each={suggestions()}>
                       {(s) => (
                         <li>
-                          <button
-                            type="button"
-                            class="list-players-game"
-                            onClick={() => openGame(rowStore.getRow(s.appid)!)}
-                          >
-                            {rowStore.getRow(s.appid)?.name}
-                          </button>
+                          {gameButton(s.appid)}
                           <span class="list-players-own">
                             {profiles().players[s.from].label} {fmtHours(s.hours)} ·{' '}
                             {s.owns ? 'owns it' : "doesn't own it"}
@@ -3580,18 +3576,7 @@ export default function ListRoute() {
                     {({ label, appids }) => (
                       <Show when={appids.length}>
                         <p class="list-profile-story">
-                          {label}{' '}
-                          <For each={appids}>
-                            {(appid) => (
-                              <button
-                                type="button"
-                                class="list-players-game"
-                                onClick={() => openGame(rowStore.getRow(appid)!)}
-                              >
-                                {rowStore.getRow(appid)?.name}
-                              </button>
-                            )}
-                          </For>
+                          {label} <For each={appids}>{gameButton}</For>
                         </p>
                       </Show>
                     )}
