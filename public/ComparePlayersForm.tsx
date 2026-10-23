@@ -94,6 +94,8 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
   const [openSlot, setOpenSlot] = createSignal<number | null>(null);
   const [query, setQuery] = createSignal('');
   const [highlight, setHighlight] = createSignal(0);
+  // Whether the arrow keys picked the highlighted row since it was last reset: Enter then means that row.
+  let arrowed = false;
   const listboxId = createUniqueId();
   const whyDisabledId = createUniqueId();
 
@@ -103,17 +105,20 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
     setOpenSlot(null);
     setQuery('');
     setHighlight(0);
+    arrowed = false;
   }
 
   function openDropdown(slotIdx: number): void {
     setOpenSlot(slotIdx);
     setHighlight(0);
+    arrowed = false;
   }
 
   function addEntry(slotIdx: number, entry: SlotEntry): void {
     setSlots((prev) => prev.map((slot, i) => (i === slotIdx ? [...slot, entry] : slot)));
     setQuery('');
     setHighlight(0);
+    arrowed = false;
   }
 
   function removeEntry(slotIdx: number, entryIdx: number): void {
@@ -145,16 +150,19 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
         e.preventDefault();
         openDropdown(slotIdx);
         setHighlight((h) => (list.length === 0 ? 0 : (h + 1) % list.length));
+        arrowed = true;
         break;
       case 'ArrowUp':
         e.preventDefault();
         setHighlight((h) => (list.length === 0 ? 0 : (h - 1 + list.length) % list.length));
+        arrowed = true;
         break;
       case 'Enter':
-        // Always swallowed: this field commits a chip, it never submits the form. Submitting on
-        // Enter would throw away whatever is half-typed in it.
+        // Swallowed: Enter commits what's typed or arrowed to as a chip. Only an empty field with
+        // nothing arrowed to submits, so nothing half-typed is thrown away.
         e.preventDefault();
-        commit(slotIdx);
+        if (!query().trim() && !(arrowed && list[highlight()]) && filledCount() >= 2) formEl.requestSubmit();
+        else commit(slotIdx);
         break;
       case 'Escape':
         // Only closes the dropdown — the route's own Escape (closing the panel) has nothing to do

@@ -785,6 +785,17 @@ test('C1 edge: Add player focuses the player box it adds', async ({ page }) => {
   await expect(boxes.nth(2)).toBeFocused();
 });
 
+test('C1 edge: Enter in an empty player box compares, once two players are in', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare');
+  const box = page.locator('.compare-form').getByRole('combobox').nth(1);
+  await box.fill('bob');
+  await box.press('Enter'); // commits Bob's chip
+  await expect(page.locator('.compare-form')).toContainText('bob');
+  await box.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Alice vs. Bob' })).toBeVisible();
+});
+
 test('C1 edge: the players form offers no More actions with nothing to fold', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout only');
   await asPlayer(page, ALICE);
