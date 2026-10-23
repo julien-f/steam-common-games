@@ -332,6 +332,15 @@ test('S3 edge: a first game link in a fresh browser lists that game under Recent
   await expect(page.getByText('No games in this list.')).toHaveCount(0);
 });
 
+test('S3 edge: a shared layout with a wrongly typed field still applies the rest of it', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  // An older or hand-edited link: `filters.name` should be a list of values.
+  const tv = JSON.stringify({ sorts: [{ key: 'name', dir: 'desc' }], filters: { name: 5 } });
+  await page.goto(`/lists/owned?tv=${encodeURIComponent(tv)}`);
+  await expect(rows(page)).toHaveCount(6);
+  await expect(rows(page).first()).toContainText('Valheim');
+});
+
 test("S3 edge: editing a shared layout warns it's lost on reload unless kept", async ({ page }) => {
   const tv = JSON.stringify({ sorts: [{ key: 'name', dir: 'desc' }] });
   await page.goto(`/lists/compare?u=alice&u=bob&tv=${encodeURIComponent(tv)}`);
@@ -686,8 +695,12 @@ test('C1 edge: Tag match averages the filtered tags, or with All takes the weake
   await page.getByRole('checkbox', { name: 'Co-op', exact: true }).click();
   // Portal 2: Action 100%, Co-op 30%.
   await expect(row(page, 'Portal 2').getByRole('cell', { name: '65%' })).toBeVisible();
+  const chip = page.locator('.dt-chip--filter', { hasText: 'Tags' });
+  await expect(chip).toContainText('Action, Co-op');
   await page.getByRole('button', { name: 'All', exact: true }).click();
   await expect(row(page, 'Portal 2').getByRole('cell', { name: '30%' })).toBeVisible();
+  // The chip tells All from Any.
+  await expect(chip).toContainText('Action & Co-op');
 });
 
 test("C1 edge: a game looked up outside the list can't sort the list by similarity to it", async ({ page }) => {
@@ -3673,6 +3686,18 @@ test("F2 edge: /search, About and the 404 page title themselves with the list ro
     await expect(page.locator('.list-hero-title')).toHaveText(title);
     await expect(page.locator('h1')).toHaveCount(1);
   }
+});
+
+test('F2 edge: on /search, ↓ moves from the box into the results, and an opened result keeps its row focused', async ({
+  page,
+}) => {
+  await page.goto('/search?q=hades');
+  await expect(rows(page)).toHaveCount(1);
+  await page.getByPlaceholder('Search for a game…').press('ArrowDown');
+  await expect(rows(page).first()).toBeFocused();
+  await rows(page).first().press('Enter');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await expect(rows(page).first()).toBeFocused();
 });
 
 test('F2 edge: /search shows an image column only when a result has an image', async ({ page }) => {

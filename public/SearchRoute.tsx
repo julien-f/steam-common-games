@@ -19,7 +19,7 @@ import { peekMyOwnershipStatus } from './myOwnership.ts';
 import { GAME_SEARCH_DEBOUNCE_MS, GAME_SEARCH_MIN_CHARS, ownershipMarkersHtml, searchGames } from './gameSearch.ts';
 import type { GameSearchResult } from './gameSearch.ts';
 import type { Game, GameDetails } from './types.ts';
-import { fetchJson, focusGameRow } from './utils.ts';
+import { fetchJson } from './utils.ts';
 import { SearchClearButton } from './SearchClearButton.tsx';
 
 // CORE_COLUMNS' thumb + Name pair over a bare GameSearchResult; a cell is a tracked scope, so renderName's badge follows ownership landing.
@@ -83,7 +83,6 @@ export default function SearchRoute() {
   // For the keyboard bridges between the search box and the table's first row — see their
   // own onKeyDown handlers below.
   let inputEl: HTMLInputElement | undefined;
-  let tableWrapEl: HTMLDivElement | undefined;
 
   useBaseTitle(() => 'Search');
 
@@ -138,25 +137,10 @@ export default function SearchRoute() {
     return results().map((r) => ({ appid: r.appid, name: r.name, loading: true, details: null }) as Game);
   }
 
-  // The table's roving-tabindex "current row" is driven entirely by real `focus` events on a
-  // `<tr>` (no separate reactive/imperative API for it — @vates/data-table-solid tracks it
-  // module-internally), so keeping the table in sync with whichever game the panel/lightbox just
-  // stepped to means literally focusing that row, not just adding a CSS class. `preventScroll` +
-  // a separate `scrollIntoView` (rather than letting focus scroll on its own) matches the same
-  // idiom panel.tsx's own filmstrip already uses. A rAF, not a plain call: the row may not exist
-  // in the DOM yet the instant a fresh search's rows first render.
-  //
-  // Filed as vatesfr/data-table#24, and *mostly* fixed by 0.14.0's `table.focus.moveTo(row)` —
-  // but not for this: `moveTo` deliberately never moves real DOM focus (so an external nav never
-  // steals focus away from itself), only the internal tabindex target + scroll — no visible ring
-  // without a real `.focus()` behind it. This route wants exactly that visible ring even while
-  // the panel holds real focus, so it still has to reach into the DOM directly, still relying on
-  // `dt-tr`/`data-row-key`, undocumented internals #24 itself flagged as such (0.14.0 didn't
-  // change or document either). `ListRoute.tsx`'s `openGame` uses `moveTo` instead — it doesn't
-  // need a visible ring since the row it opens was just clicked, and does benefit from `moveTo`'s
-  // free group-expand/page-jump, which this route's single-page, ungrouped table never needed.
+  // `focus: true` moves real DOM focus too, so the row shows its ring while the panel is open.
   function focusRow(appid: number): void {
-    requestAnimationFrame(() => focusGameRow(tableWrapEl, appid));
+    const row = results().find((r) => r.appid === appid);
+    if (row) table.focus.moveTo(row, { focus: true });
   }
 
   let lookupToken = 0;
@@ -273,11 +257,11 @@ export default function SearchRoute() {
             // roving-tabindex Up/Down/Home/End (its own README) once focus is inside it; this is
             // just the bridge into that from the search box.
             if (e.key !== 'ArrowDown') return;
-            const firstRow = tableWrapEl?.querySelector<HTMLElement>('tr[data-proc-idx]');
-            if (!firstRow) return;
+            const first = results()[0];
+            if (!first) return;
             e.preventDefault();
             e.stopPropagation();
-            firstRow.focus();
+            table.focus.moveTo(first, { focus: true });
           }}
         />
         <SearchClearButton />
@@ -300,7 +284,6 @@ export default function SearchRoute() {
                   above the table stays (`.dt-active-bar`, outside the toolbar). */}
               <div
                 class="table-container search-table"
-                ref={tableWrapEl}
                 // `on:keydown`, not `onKeyDown` — see the search input's own comment on why:
                 // same reasoning, and this one additionally needs to fire before the table
                 // library's own internal row-focus handling can act on ArrowUp at row 0 (e.g.
