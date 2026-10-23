@@ -9,12 +9,13 @@ const morgan = require('morgan');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('node:crypto');
+const { execFileSync } = require('node:child_process');
 const zlib = require('node:zlib');
 const rateLimit = require('express-rate-limit');
 
 const { getCached, getCachedAt, isCached, setCache, capExpiry, getCacheEntryCounts } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
-const { getMetrics, recordLimiterTrip, runAsClient } = require('./lib/metrics');
+const { getMetrics, recordLimiterTrip, runAsClient, startedAt } = require('./lib/metrics');
 const { getCircuitBreakers } = require('./lib/circuitBreaker');
 const {
   peekSteamId,
@@ -436,9 +437,28 @@ const achievementsLimit = namedRateLimit('achievements', {
   },
 });
 
+const { version } = require('./package.json');
+// Read once: the commit this process started from, so a production symptom can be dated against deploys.
+const commit = (() => {
+  try {
+    const out = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+      cwd: __dirname,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 2000,
+    });
+    return out.trim();
+  } catch {
+    return null; // not a git checkout, or no git
+  }
+})();
+
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
+    version,
+    commit,
+    since: startedAt,
     configured: !!process.env.STEAM_API_KEY,
     itadConfigured: isItadConfigured(),
     cache: { entries: Object.values(getCacheEntryCounts()).reduce((sum, n) => sum + n, 0) },

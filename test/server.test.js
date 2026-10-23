@@ -145,6 +145,13 @@ test('GET /api/health: 200 with ok=true, configured=true, and cache stats', asyn
   assert.equal(typeof res.body.cache?.entries, 'number');
 });
 
+test('GET /api/health: names the running build and when it started', async () => {
+  const res = await api.get('/api/health');
+  assert.equal(res.body.version, require('../package.json').version);
+  assert.match(res.body.commit, /^[0-9a-f]{7,}$/); // the suite runs in a git checkout
+  assert.equal(res.body.since, (await api.get('/api/metrics')).body.since);
+});
+
 test('GET /api/health: configured=false when STEAM_API_KEY is absent', async (t) => {
   const saved = process.env.STEAM_API_KEY;
   delete process.env.STEAM_API_KEY;

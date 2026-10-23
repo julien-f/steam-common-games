@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Search boxes have a × to clear them in one tap, select their text when focused, and show a Search key on phone keyboards
 - A game's panel links to its developers' and publishers' games on Steam, each opening as a list
 - A developer's or publisher's list shows which of its games you don't own, and can be saved as a list
+- `GET /api/health` says which version and commit the server runs, and since when
 
 ### Changed
 
