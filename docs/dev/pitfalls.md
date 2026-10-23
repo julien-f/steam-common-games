@@ -5,7 +5,7 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 ## An upstream fails with `Unexpected token '<', "<!DOCTYPE "... is not valid JSON`
 
 - **Symptom**: a `[tag]` warning in the server log with that error, for every uncached game, while cached ones still show.
-- **Cause**: the endpoint answered HTML: it was retired and redirects to a home page (Steam's `appreviews`, 2026-10-22), or it serves a block page. `fetch` follows redirects, so metrics count the final page's 200.
+- **Cause**: the endpoint answered HTML: it was retired and redirects to a home page (Steam's `appreviews`, 2026-10-22), or it serves a block page. `fetch` follows redirects, so metrics count the final page's 200. Steam store calls don't follow them: they fail with `Steam store: 302 redirect to …` and count as 302.
 - **Fix**: `curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' '<url>'`; then check the upstream's announcements for a replacement.
 
 ## Tests run slowly when started without `npm test`

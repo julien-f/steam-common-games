@@ -775,6 +775,20 @@ test('getGameRating: throws isUpstream after exhausting 429 retries', async (t) 
   );
 });
 
+test('fetchStoreApi: a redirect fails with its target instead of being followed', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: false,
+    status: 302,
+    headers: new Headers({ location: 'https://store.steampowered.com/' }),
+  }));
+  await assert.rejects(
+    () => getAppDetails(400),
+    (err) => err.isUpstream === true && /302 redirect to https:\/\/store\.steampowered\.com\//.test(err.message),
+  );
+  assert.equal(fetchMock.mock.calls[0].arguments[1].redirect, 'manual');
+});
+
 test('getAppDetails: retries on 429 and succeeds on third attempt', async (t) => {
   _reset();
   let callCount = 0;
