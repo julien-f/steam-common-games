@@ -65,6 +65,7 @@ The user-level rules apply; here:
 
 - **Message format**: a plain imperative subject, no Conventional Commits prefix — the `feat:`/`fix:` prefixes in older history were dropped; don't reintroduce them.
 - Ordinary changes commit directly to `main` — this is a solo repo with no PR/review process. A complex feature (multiple concerns, significant refactoring, a new subsystem) spanning more than one commit gets a dedicated branch instead, worked in its own worktree (`node scripts/worktree.js <branch>`: adds it and runs `npm ci`): other agents share the main checkout, so never switch its branch. A worktree's e2e and mock servers get their own ports (`node scripts/ports.js e2e|mock`).
+- Before closing a session, or when asked what's left: `node scripts/session-end.js` lists unpushed commits, uncommitted changes, merged worktrees and branches, and running servers.
 - Chasing a CI-only failure: experiment on a branch and run CI there (`gh workflow run CI --ref <branch>`), never by pushing to `main`.
 - A parallel fix batch ([BATCH.md](.claude/skills/code-fix/BATCH.md)) works the same way, one branch per lane, each closed with `git merge --no-ff`.
 

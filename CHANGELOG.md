@@ -84,6 +84,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Two mock players with rich libraries, Dave and Erin, for the profile and comparison tests
 - The long-comment check also catches a comment grown past two lines by an edit
 - Setup review's skill-run times no longer show NaN or count a run twice
+- node scripts/session-end.js lists what's left before closing a session
 
 ## [0.11.0] - 2026-10-14
 
