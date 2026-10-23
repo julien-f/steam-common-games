@@ -104,6 +104,12 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: the header button sits past the phone's right edge (grouping widens the table; CI's fonts add a few pixels more than local ones). `click()` scrolls `.dt-table-wrap` to reach it, that scroll event fires after the menu opened, and data-table closes a menu on any scroll outside it.
 - **Fix**: `await menu.scrollIntoViewIfNeeded()`, then wait a frame (`page.evaluate(() => new Promise(requestAnimationFrame))`) before the click. To reproduce locally, narrow the viewport until the button straddles the edge (e.g. 370 px).
 
+## Merging a dependency bump fails the hook's typecheck in the main checkout
+
+- **Symptom**: the merge commit's pre-commit hook fails with `error TS2353: Object literal may only specify known properties, and '<option>' does not exist in type 'ColumnDef<…>'` (and e2e fails), though the branch passed.
+- **Cause**: the branch's worktree ran `npm install`; the main checkout's `node_modules` still holds the old version.
+- **Fix**: `npm ci` in the main checkout, then commit the merge again (it stays staged).
+
 ## A worktree agent's branch lacks the latest commits
 
 - **Symptom**: an agent started with `isolation: "worktree"` doesn't see a commit just made on `main` (e.g. backlog items it was asked to fix: "the section reads None open").
