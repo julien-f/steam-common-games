@@ -137,11 +137,13 @@ test('setItemMakingRoom: keeps the tastes it is told to keep', () => {
   assert.deepEqual(tasteIds(), ['m']);
 });
 
-test('setItemMakingRoom: false when evicting every taste still leaves no room', () => {
-  global.localStorage = makeQuotaLocalStorage(2 * E);
+test('setItemMakingRoom: false, evicting nothing, when evicting every taste still leaves no room', () => {
+  global.localStorage = makeQuotaLocalStorage(3 * E);
   store('a', 1);
-  assert.equal(setItemMakingRoom('prefs', 'y'.repeat(3 * E)), false);
-  assert.deepEqual(tasteIds(), []);
+  store('b', 2);
+  assert.equal(setItemMakingRoom('prefs', 'y'.repeat(4 * E)), false);
+  assert.deepEqual(tasteIds(), ['a', 'b']);
+  assert.equal(loadTaste('a').at, 1);
 });
 
 test('setItemMakingRoom: evicts nothing on an error other than a full storage', () => {

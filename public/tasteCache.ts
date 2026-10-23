@@ -37,7 +37,7 @@ function evictableByAge(keys: readonly string[], keep: readonly string[]): strin
 
 const isQuotaError = (err: unknown) => err instanceof DOMException && err.name === 'QuotaExceededError';
 
-// Writes `key`, evicting the oldest tastes not in `keep` while storage is full; false if it still doesn't fit.
+// Writes `key`, evicting the oldest tastes not in `keep` while storage is full; false, evicting none, if it still doesn't fit.
 export function setItemMakingRoom(key: string, value: string, keep: readonly string[] = []): boolean {
   try {
     localStorage.setItem(key, value);
@@ -45,16 +45,21 @@ export function setItemMakingRoom(key: string, value: string, keep: readonly str
   } catch (err) {
     if (!isQuotaError(err)) return false;
   }
+  const evicted: [string, string][] = [];
   try {
     for (const victim of evictableByAge(tasteKeys(), keep)) {
+      const taste = localStorage.getItem(victim);
       localStorage.removeItem(victim);
+      if (taste !== null) evicted.push([victim, taste]);
       try {
         localStorage.setItem(key, value);
         return true;
       } catch (err) {
-        if (!isQuotaError(err)) return false;
+        if (!isQuotaError(err)) break;
       }
     }
+    // Evicting didn't make room: put the tastes back rather than lose them for nothing.
+    for (const [victim, taste] of evicted) localStorage.setItem(victim, taste);
   } catch {
     /* storage unavailable */
   }
