@@ -62,13 +62,11 @@ test('POST /api/game-details/stream: the cap counts an IPv6 client by its /56, l
   const second = stream(812, '2001:db8:1:2::2');
   await new Promise((r) => setTimeout(r, 50));
 
-  const third = await Promise.race([
-    stream(813, '2001:db8:1:3::3'),
-    new Promise((r) => setTimeout(() => r({ status: 'pending' }), 1000)),
-  ]);
-  assert.equal(third.status, 429);
-
+  const thirdReq = stream(813, '2001:db8:1:3::3');
+  const third = await Promise.race([thirdReq, new Promise((r) => setTimeout(() => r({ status: 'pending' }), 1000))]);
   open();
+  await thirdReq; // settled either way before asserting, so a failure leaves no request open
+  assert.equal(third.status, 429);
   assert.equal((await first).status, 200);
   assert.equal((await second).status, 200);
 });
