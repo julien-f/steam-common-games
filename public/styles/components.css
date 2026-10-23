@@ -898,6 +898,7 @@
 
   /* Scrolls inside itself on a phone rather than wrapping: one row, the table starts higher. */
   .view-tabs {
+    position: relative; /* offsetLeft, for ViewTabs.tsx's scroll */
     display: flex;
     align-items: center;
     gap: 4px;
@@ -936,6 +937,12 @@
   .view-tab-more:hover {
     background: var(--line);
     color: var(--text);
+  }
+  /* Phone: icon only, so it fits beside the title with Rank this list. */
+  @media (max-width: 768px) {
+    .new-view-label {
+      display: none;
+    }
   }
   .view-menu-panel {
     width: 260px;

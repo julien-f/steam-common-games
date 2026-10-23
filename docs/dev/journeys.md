@@ -178,7 +178,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Who / goal**: keep "Recently played" and "Play next" on Owned, or "Bargains" on Wishlist, and switch between them without filtering again.
 - **Steps**:
   1. Owned
-  2. **+ View**: a suggested view, or **Save current table as view…** ◇
+  2. **New view**: a suggested view, or **Save as view** for the table as it is
   3. switch views from the tabs under the header
   4. change a view's sort or filters, then **Save** or **Revert**
   5. Home: open a view from the Owned card ◇

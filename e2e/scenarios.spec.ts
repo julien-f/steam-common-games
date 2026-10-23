@@ -1518,6 +1518,80 @@ test('L5.4: a view keeps its edits until Save or Revert', async ({ page }) => {
 
 const LONG_VIEW = { id: 'long', name: 'Long', tableView: { rangeFilters: { playtime: { min: '5', max: '' } } } };
 
+// The hero's New view menu.
+async function newView(page: Page): Promise<Locator> {
+  await page.getByRole('button', { name: 'New view' }).click();
+  return page.locator('#new-view-panel');
+}
+
+test('L5.1-3: a suggested view opens as its own tab, and is suggested once', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  let menu = await newView(page);
+  await expect(menu.getByRole('button')).toHaveText(['Recently played', 'Play next', 'Save as view']);
+  await menu.getByRole('button', { name: 'Play next' }).click();
+
+  await expect(page).toHaveURL(/view=/);
+  const tabs = page.getByRole('navigation', { name: 'Views' });
+  await expect(tabs.getByRole('link', { name: 'Play next' })).toHaveAttribute('aria-current', 'page');
+  await expect(rows(page)).toHaveCount(4); // played 2 h or less
+  await expect(page.getByRole('columnheader', { name: /Taste fit/ })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Saved view Play next' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New view' })).toBeFocused();
+
+  menu = await newView(page);
+  await expect(menu.getByRole('button')).toHaveText(['Recently played', 'Save as view']);
+  await page.reload();
+  await expect(rows(page)).toHaveCount(4);
+});
+
+test('L5.2: the table as it is saves as a named view', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  const menu = await newView(page);
+  await menu.getByRole('button', { name: 'Save as view' }).click();
+  await expect(menu.getByRole('textbox', { name: 'Save the table as it is now' })).toBeFocused(); // a name first
+  await menu.getByRole('textbox', { name: 'Save the table as it is now' }).fill('Everything');
+  await menu.getByRole('textbox', { name: 'Save the table as it is now' }).press('Enter');
+  await expect(page.getByRole('navigation', { name: 'Views' }).getByRole('link')).toHaveText([
+    'All games',
+    'Everything',
+  ]);
+});
+
+test('L5 edge: Bargains is suggested on Wishlist, and only with prices', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  let menu = await newView(page);
+  await menu.getByRole('button', { name: 'Bargains' }).click();
+  await expect(page.getByRole('navigation', { name: 'Views' }).getByRole('link', { name: 'Bargains' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(rows(page).first()).toContainText('1-Year Low');
+
+  // Until prices arrive the view matches nothing, and says why.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/prices**', async (route) => {
+    await held;
+    await route.fallback();
+  });
+  await page.reload();
+  await expect(page.getByText('Prices are still loading: this view filters on them.')).toBeVisible();
+  release();
+  await expect(rows(page).first()).toContainText('1-Year Low');
+  await expect(page.getByText('Prices are still loading')).toHaveCount(0);
+  await page.unroute('**/api/prices**');
+
+  await mockApi(page, { states: ['no-itad'] });
+  await page.goto('/lists/wishlist');
+  await expect(rows(page)).toHaveCount(4);
+  menu = await newView(page);
+  await expect(menu.getByRole('button')).toHaveText(['Save as view']);
+});
+
 test('L5.3: the tabs switch views in place, and leaving one drops its unsaved edits', async ({ page }) => {
   await asPlayer(page, ALICE, { listViews: { owned: [SHORT_VIEW, LONG_VIEW] } });
   await page.goto('/lists/owned');

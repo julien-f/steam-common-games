@@ -136,7 +136,7 @@ import {
 import { SharedViewBanner } from './SharedViewBanner.tsx';
 import { UnsavedChangesBanner, UnsavedViewBanner, ViewActions } from './UnsavedViewBanner.tsx';
 import { getListView, saveListViewTable } from './listViews.ts';
-import { ViewTabs } from './ViewTabs.tsx';
+import { NewViewMenu, ViewTabs, viewHref } from './ViewTabs.tsx';
 import { diffViewLabels } from './tableViewSync.ts';
 import { etaSeconds, formatEta, type LoadSample } from './loadProgress.ts';
 import { convert, formatWithEstimate } from './currency.ts';
@@ -1982,6 +1982,13 @@ export default function ListRoute() {
       { defer: true },
     ),
   );
+  // A view filtering on prices (Bargains) matches nothing until they arrive: say so, not "no match".
+  const viewAwaitsPrices = createMemo(() => {
+    if (!tableReady() || !activeView() || itadOff()) return false;
+    const view = viewTable.getViewState();
+    const keys = [...Object.keys(view.filters ?? {}), ...Object.keys(view.rangeFilters ?? {})];
+    return keys.some((k) => PRICE_KEYS.has(k)) && tableData().some((row) => row.bestDealPrice === undefined);
+  });
   function saveActiveView(): void {
     const saved = activeView();
     if (saved && viewKind) saveListViewTable(viewKind, saved.id, viewTable.getViewState());
@@ -3439,6 +3446,20 @@ export default function ListRoute() {
             {editingRankedSource() ? 'Cancel' : 'Change source'}
           </button>
         </Show>
+        <Show when={viewKind}>
+          {(k) => (
+            <NewViewMenu
+              kind={k()}
+              defaultVisible={k() === 'owned' ? OWNED_DEFAULT_VISIBLE : WISHLIST_DEFAULT_VISIBLE}
+              pricesShown={!itadOff()}
+              currentView={viewTable.getViewState}
+              onCreated={(view) => {
+                navigate(viewHref(routerLocation, view.id));
+                showSelectionStatus(`Saved view ${view.name}`);
+              }}
+            />
+          )}
+        </Show>
         <Show when={rankSourceRef()}>
           <Show
             when={tableReady() && existingRankings().length > 0}
@@ -3859,6 +3880,11 @@ export default function ListRoute() {
             onRevert={revertActiveView}
           />
         )}
+      </Show>
+      <Show when={viewAwaitsPrices()}>
+        <p class="list-note" role="status">
+          Prices are still loading: this view filters on them.
+        </p>
       </Show>
       <Show when={viewId() && !activeView()}>
         <p class="list-note">This view no longer exists; showing the whole list.</p>
