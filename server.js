@@ -1081,7 +1081,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
 // how many requests/minute the budget above allows.
 // detailsLimit counts a stream once whatever its size, so this caps how many one client can have
 // open at once: otherwise parallel streams of uncached games fill the shared store queue.
-const openStreams = new Map(); // req.ip -> open stream count
+const openStreams = new Map(); // client key (an IPv6 client's /56, as the limiters key it) -> open stream count
 
 app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   const { games: gameList } = req.body;
@@ -1102,16 +1102,17 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   }
 
   if (!rateLimitBypassed()) {
-    const open = openStreams.get(req.ip) ?? 0;
+    const client = rateLimit.ipKeyGenerator(req.ip);
+    const open = openStreams.get(client) ?? 0;
     if (open >= STREAM_MAX_PER_IP) {
       recordLimiterTrip('stream');
       return res.status(429).json({ error: 'Too many game lists loading at once. Wait for one to finish.' });
     }
-    openStreams.set(req.ip, open + 1);
+    openStreams.set(client, open + 1);
     res.once('close', () => {
-      const n = openStreams.get(req.ip) - 1;
-      if (n > 0) openStreams.set(req.ip, n);
-      else openStreams.delete(req.ip);
+      const n = openStreams.get(client) - 1;
+      if (n > 0) openStreams.set(client, n);
+      else openStreams.delete(client);
     });
   }
 
