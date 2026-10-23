@@ -649,6 +649,19 @@ test('B2 edge: Taste fit says an opened Owned has too few games played, and stay
   await expect(note).toHaveText('Taste fit: Bob has too few games played');
 });
 
+test("B2 edge: a link to my own ★ account still says to open its Owned, whoever's current", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  // No current account: only the ★ one says the link is the viewer's own.
+  await page.addInitScript(() => {
+    const prefs = JSON.parse(localStorage.getItem('steam.isonoe.net:prefs')!);
+    delete prefs.currentAccount;
+    localStorage.setItem('steam.isonoe.net:prefs', JSON.stringify(prefs));
+  });
+  await page.goto('/lists/wishlist?u=alice');
+  await expect(rows(page)).toHaveCount(ALICE.wishlist!.length);
+  await expect(page.locator('.list-score-note')).toHaveText("Taste fit needs Alice's Owned list opened on this device");
+});
+
 test('C1 edge: Tag match averages the filtered tags, or with All takes the weakest', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

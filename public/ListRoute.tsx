@@ -2490,7 +2490,10 @@ export default function ListRoute() {
       const tasteSource: TasteSource = {
         label: tasteAccount && accountDisplayLabel(tasteAccount),
         taste: tasteAccount && loadTaste(tasteAccount.id),
-        linked: !!getAccountOverride() && tasteAccount?.id !== getCurrentAccount()?.id,
+        linked:
+          !!getAccountOverride() &&
+          tasteAccount?.id !== getCurrentAccount()?.id &&
+          tasteAccount?.id !== getMyAccount()?.id,
       };
       setTasteFitSource(tasteSource);
       const priced = kind === 'user' && pricesShown;
