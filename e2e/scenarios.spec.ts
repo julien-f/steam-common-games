@@ -1407,10 +1407,13 @@ test('L3 edge: the column menu undoes the group and filter it set', async ({ pag
   const menu = page.getByRole('button', { name: /^Weighted Rating options/ });
   const dialog = page.getByRole('dialog', { name: /^Weighted Rating options/ });
 
+  // On a phone the button is past the table's edge. The scroll click() does to reach it can land
+  // after the menu opens, and the table closes its menu on scroll: scroll first, here and below.
+  await menu.scrollIntoViewIfNeeded();
+  await page.evaluate(() => new Promise(requestAnimationFrame));
   await menu.click();
   await dialog.getByRole('button', { name: 'Group by this column' }).click();
-  // Grouping widens the table past a phone's edge. The scroll click() does to reach the button
-  // would land after the menu opens, and the table closes its menu on scroll: scroll first.
+  // Grouping widens the table further.
   await menu.scrollIntoViewIfNeeded();
   await page.evaluate(() => new Promise(requestAnimationFrame));
   await menu.click();
