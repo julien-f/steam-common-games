@@ -36,3 +36,10 @@ test('addedFileDiff: a new file reads as all added, so its long comments are fla
     'public/new.ts:2',
   ]);
 });
+
+test('longComments: a long comment the diff also removes (moved or re-indented) passes', () => {
+  const moved = `+++ b/public/style.css\n@@ -1,3 +0,0 @@\n-/* one\n-   two\n-   three */\n@@ -0,0 +9,3 @@\n+  /* one\n+     two\n+     three */\n`;
+  assert.deepEqual(longComments(moved), []);
+  const edited = moved.replace('+     two', '+     two, edited');
+  assert.deepEqual(longComments(edited), ['public/style.css:9']);
+});

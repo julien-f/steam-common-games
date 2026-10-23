@@ -57,6 +57,8 @@ const MEDIA: Record<number, { movies: number; screenshots: number; label: string
 };
 const UNSAFE_LINK_APPID = 892970;
 const SLOW_MEDIA_MS = 1500;
+// It Takes Two's made-up free demo: the panel's demo button and the wishlist's Demo pill.
+export const DEMO_OF: Record<number, number> = { 1426210: 3999991 };
 // The media game's DLC: more than the card's first page, so "Show more" appears.
 const DLC_APPIDS = Array.from({ length: 25 }, (_, i) => 900001 + i);
 const dlcMeta = (appid: number) => ({
@@ -104,11 +106,17 @@ const creators = (appid: number) => CREATORS[appid] ?? { developers: ['Test Stud
 const COOP_WEIGHT: Record<number, number> = { 620: 0.3, 105600: 0.9, 413150: 0.6, 892970: 1 };
 
 function details(appid: number, slowMedia = false) {
-  const g = game(appid);
-  return {
+  const fetched = {
     appid,
     fetchedAt: NOW,
     fetchedAts: { rating: NOW, hltb: NOW, meta: NOW, tags: NOW, protondb: NOW },
+  };
+  // As server.js answers an appid with no store page: 200, every source empty rather than failed.
+  if (!CATALOG.some((g) => g.appid === appid))
+    return { ...fetched, rating: null, hltb: null, meta: null, tags: [], tagWeights: {}, demo: null, protondb: null };
+  const g = game(appid);
+  return {
+    ...fetched,
     rating: {
       score: g.score,
       desc: 'Very Positive',
@@ -128,7 +136,8 @@ function details(appid: number, slowMedia = false) {
       // An unfiltered Steam field: the panel must not link a javascript: URL.
       metacritic: appid === UNSAFE_LINK_APPID ? { score: 85, url: 'javascript:alert(1)' } : null,
       // Public store art; a test's browser blocks it (off localhost), dev:mock shows it.
-      capsule: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`,
+      capsule: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_184x69.jpg`,
+      thumb: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`,
       banner: slowMedia ? mediaUrl(`Banner ${appid}`, true) : null,
       ...media(appid, slowMedia),
       dlc: appid === MEDIA_APPID ? DLC_APPIDS : [],
@@ -143,7 +152,7 @@ function details(appid: number, slowMedia = false) {
     ...(g.categories.includes('Co-op')
       ? { tags: ['Action', 'Co-op'], tagWeights: { Action: 1, 'Co-op': COOP_WEIGHT[appid] ?? 0.5 } }
       : { tags: ['Singleplayer'], tagWeights: { Singleplayer: 1 } }),
-    demo: null,
+    demo: DEMO_OF[appid] ? { appid: DEMO_OF[appid] } : null,
     protondb: g.protondb ? { tier: g.protondb, confidence: 'strong', total: 100 } : null,
   };
 }

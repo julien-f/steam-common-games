@@ -3,6 +3,9 @@
 // account card) so each fetch can key a `createResource` on a plain accountId string — Solid's
 // reactivity rules require a primitive resource source, not the AccountSlot object itself.
 import { createResource, createMemo, For, Show, type JSX } from 'solid-js';
+import ArrowRight from 'lucide-solid/icons/arrow-right';
+import Handshake from 'lucide-solid/icons/handshake';
+import RefreshCw from 'lucide-solid/icons/refresh-cw';
 import { accountSlotFrom, fetchAccountFriends, membersFromAccountId, type AccountFriend } from './accountData.ts';
 import { fmtAge } from './utils.ts';
 import type { AccountSlot } from './types.ts';
@@ -64,7 +67,7 @@ export function AccountFriends(props: {
               onClick={() => void refetchExplored()}
             >
               Updated {explored.loading ? 'Refreshing…' : fmtAge(data().fetchedAt)}{' '}
-              <span class="account-friends-refresh-icon">↻</span>
+              <RefreshCw class="account-friends-refresh-icon" />
             </button>
           </p>
           <Show when={data().unavailable.length > 0}>
@@ -101,16 +104,16 @@ export function AccountFriends(props: {
                     </Show>
                     <Show when={mineIds().has(f.steamid)}>
                       <span class="account-friend-mutual" title="Also a friend of your own account">
-                        🤝 Mutual
+                        <Handshake /> Mutual
                       </span>
                     </Show>
                     <button
                       type="button"
-                      class="btn btn-ghost btn-sm"
+                      class="btn"
                       title={`Explore ${f.name}'s library`}
                       onClick={() => props.onExplore(accountSlotFrom([f], [f.steamid]))}
                     >
-                      Explore →
+                      Explore <ArrowRight />
                     </button>
                   </li>
                 )}

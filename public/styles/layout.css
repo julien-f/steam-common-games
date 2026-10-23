@@ -1,0 +1,204 @@
+@layer layout {
+  /* `.app-scroll` (header, route, footer) scrolls beside the fixed panel: one scrollbar per column,
+     never the document's next to the panel's. */
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .app-scroll {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  /* Pushes the footer to the bottom of a short page. */
+  .app-content {
+    flex: 1;
+  }
+  .app-content:focus:not(:focus-visible) {
+    outline: none;
+  }
+  @media (min-width: 769px) {
+    /* The panel is out of flow: the shell reserves its width, so header and footer shorten with the content. */
+    .app-shell.panel-open {
+      padding-right: var(--panel-w);
+    }
+  }
+  /* Phone: the document scrolls, so the browser's URL bar can collapse; the panel covers the screen. */
+  @media (max-width: 768px) {
+    .app-shell {
+      height: auto;
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow: visible;
+    }
+    .app-scroll {
+      overflow-y: visible;
+    }
+  }
+
+  /* The side panel (AppShell.tsx): docked beside the content, not modal. Fixed and full-height, so its
+     body scrolls on its own; hidden until a game is open. */
+  .game-panel {
+    display: none;
+    position: fixed;
+    top: 0;
+    right: 0;
+    /* Over the content; under the shortcuts dialog and the lightbox. */
+    z-index: 100;
+    flex-direction: column;
+    width: var(--panel-w);
+    max-width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .game-panel.open {
+    display: flex;
+  }
+  .panel-body {
+    flex: 1;
+    overflow-y: auto;
+  }
+  /* Phone: it covers the screen, edge to edge rather than 100vw, which counts the scrollbar. */
+  @media (max-width: 768px) {
+    .game-panel.open {
+      z-index: 101;
+      left: 0;
+      width: auto;
+    }
+  }
+
+  /* One row on desktop, its content on the wide list routes' 1600px column; the hairline spans the window. */
+  .site-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 16px;
+    min-height: 56px;
+    padding-inline: max(var(--gutter), calc((100% - 1600px) / 2 + var(--gutter)));
+    border-bottom: 1px solid var(--line);
+  }
+  /* The Main landmark around the route links; its links stay items of the bar's flex row. */
+  .site-nav-links {
+    display: contents;
+  }
+  @media (min-width: 769px) {
+    .site-nav .app-search-wrap {
+      flex: 1 1 120px;
+      max-width: 480px;
+      margin-left: auto;
+    }
+  }
+  /* Phone: the brand and route links on the first row, the search, account and preferences under them. */
+  @media (max-width: 768px) {
+    .site-nav {
+      padding-block: 8px;
+      row-gap: 8px;
+    }
+    /* Too wide to share the links' row, so it starts the second one. */
+    .site-nav .app-search-wrap {
+      flex: 1 1 120px;
+      order: 1;
+    }
+    .site-nav-account,
+    .site-nav-prefs {
+      order: 1;
+    }
+  }
+
+  .app-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px var(--gutter) 24px;
+  }
+
+  /* The routes built around a wide table. */
+  .list-route,
+  .bundles-browse-route {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding-block: 24px 60px;
+  }
+  @media (max-width: 600px) {
+    .list-route,
+    .bundles-browse-route {
+      padding-block: 16px 40px;
+    }
+  }
+
+  /* The routes that aren't a wide table: one centred column. */
+  .container,
+  .home-route {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding-block: 24px 60px;
+  }
+  @media (max-width: 600px) {
+    .container,
+    .home-route {
+      padding-block: 16px 40px;
+    }
+  }
+  .rank-route {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding-block: 24px 60px;
+  }
+  @media (max-width: 600px) {
+    .rank-route {
+      gap: 12px;
+      padding-block: 16px 40px;
+    }
+  }
+
+  /* Home: the account card, Explore, then the user's lists, one under the other. */
+  .home-route {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+  @media (max-width: 768px) {
+    .home-route {
+      gap: 32px;
+    }
+  }
+
+  /* A route fades in as it mounts: CSS, since the router has no transition hook. */
+  .app-content > * {
+    animation: route-in var(--dur-3) var(--ease-out);
+  }
+  @keyframes route-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  /* Every route's side margin. */
+  .container,
+  .list-route,
+  .bundles-browse-route,
+  .home-route,
+  .rank-route {
+    padding-inline: var(--gutter);
+  }
+
+  /* About's sections, plain rather than boxed. */
+  .container > section + section {
+    margin-top: 28px;
+  }
+  .container > section > h2 {
+    margin-bottom: 6px;
+  }
+}

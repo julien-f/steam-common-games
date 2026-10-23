@@ -46,4 +46,19 @@ export default [
       },
     },
   },
+  {
+    files: ['public/**/*.ts', 'public/**/*.tsx'],
+    rules: {
+      // The barrel makes Vite's dev server transform every icon module (~1900) on first load.
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: ['lucide-solid', 'lucide-solid/icons'].map((name) => ({
+            name,
+            message: 'Import each icon by path: lucide-solid/icons/<name>.',
+          })),
+        },
+      ],
+    },
+  },
 ];

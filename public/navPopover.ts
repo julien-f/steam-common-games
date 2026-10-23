@@ -1,7 +1,7 @@
-// Esc and placement for the nav popovers (⚙ Preferences, account chip, rank menu); the browser opens and dismisses them.
+// Esc and placement for the nav popovers (⚙ Preferences, account chip, rank menu, Home's tree rows); the browser opens and dismisses them.
 // Placed in JS: `.site-nav`'s flex-wrap moves a trigger with viewport width, off-screen for CSS anchoring (seen on a Galaxy S10).
 
-export const POPOVER_MARGIN = 12;
+export const POPOVER_MARGIN = 16;
 
 // Right-align the panel to its trigger, then clamp within `[POPOVER_MARGIN, viewportWidth -
 // width - POPOVER_MARGIN]` so it can never run off either edge regardless of where the trigger
@@ -14,11 +14,24 @@ export function clampPopoverLeft(triggerRight: number, panelWidth: number, viewp
   return Math.min(Math.max(triggerRight - panelWidth, POPOVER_MARGIN), Math.max(maxLeft, POPOVER_MARGIN));
 }
 
+// Below the trigger, or above it when it would run past the viewport's bottom and fits there (a
+// Home tree row's menu near the end of the page).
+export function popoverTop(
+  triggerTop: number,
+  triggerBottom: number,
+  panelHeight: number,
+  viewportHeight: number,
+): number {
+  const below = triggerBottom + 4;
+  const above = triggerTop - 4 - panelHeight;
+  return below + panelHeight > viewportHeight - POPOVER_MARGIN && above >= POPOVER_MARGIN ? above : below;
+}
+
 function positionPanel(trigger: HTMLElement, panel: HTMLElement): void {
   const triggerRect = trigger.getBoundingClientRect();
-  const panelWidth = panel.getBoundingClientRect().width;
-  panel.style.left = `${clampPopoverLeft(triggerRect.right, panelWidth, window.innerWidth)}px`;
-  panel.style.top = `${triggerRect.bottom + 4}px`;
+  const { width, height } = panel.getBoundingClientRect();
+  panel.style.left = `${clampPopoverLeft(triggerRect.right, width, window.innerWidth)}px`;
+  panel.style.top = `${popoverTop(triggerRect.top, triggerRect.bottom, height, window.innerHeight)}px`;
 }
 
 // Binds one trigger/panel pair. Returns a cleanup that removes every listener — the shell's

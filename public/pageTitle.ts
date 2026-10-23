@@ -13,7 +13,7 @@
 // one shared panel serves every route instead of each page owning its own updateTitle().
 import { createEffect, onCleanup } from 'solid-js';
 
-const APP_NAME = 'steam.isonoe.net';
+const APP_NAME = 'Playshelf';
 
 let baseTitle: string | null = null;
 let gameTitle: string | null = null;

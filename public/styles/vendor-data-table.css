@@ -1,0 +1,289 @@
+/* Unlayered, and imported last: @vates/data-table-solid injects an unlayered <style>, which beats
+   any layered rule (pitfalls.md). */
+
+/* Themes @vates/data-table-solid's own internals on html:root: its column/filter/group submenus
+   are portaled onto <body>, outside .table-container, so only an actual ancestor reaches them. */
+html:root {
+  --color-background-primary: var(--surface);
+  --color-background-secondary: var(--line);
+  --color-background-tertiary: var(--surface);
+  --color-text-primary: var(--text);
+  --color-text-secondary: var(--muted);
+  --color-text-tertiary: var(--muted);
+  --color-border-secondary: var(--line-control);
+  --color-border-tertiary: var(--line);
+  /* Also the current row's tint; test/palette.test.js reads this mix. */
+  --color-background-info: color-mix(in srgb, var(--accent) 14%, var(--bg));
+  --color-text-info: var(--accent);
+  --color-border-info: color-mix(in srgb, var(--accent) 55%, var(--bg));
+  --color-background-warning: color-mix(in srgb, var(--warn) 8%, var(--bg));
+  --color-text-warning: var(--warn);
+  --color-border-warning: color-mix(in srgb, var(--warn) 45%, var(--bg));
+}
+
+/* Hints at off-screen columns: `local` covers (in --bg, the ground every table sits on) mask
+   `scroll` shadows until scrolled past, so a fade shows only on the side with more to see. */
+.dt-table-wrap {
+  background-image:
+    linear-gradient(to right, var(--bg) 0%, var(--bg) 100%), linear-gradient(to left, var(--bg) 0%, var(--bg) 100%),
+    linear-gradient(to right, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0)),
+    linear-gradient(to left, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0));
+  background-repeat: no-repeat;
+  background-size:
+    20px 100%,
+    20px 100%,
+    12px 100%,
+    12px 100%;
+  background-position:
+    left top,
+    right top,
+    left top,
+    right top;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* Hairline rows on the page's own ground: no outer box, no zebra, a faint hover. The header's
+   labels are muted, in the scale's emphasis weight (the library's is 500). */
+.dt-table-wrap {
+  border: 0;
+  border-radius: 0;
+}
+.table-container .dt-th {
+  background: var(--bg);
+}
+.dt-th {
+  border-bottom-color: var(--line-strong);
+  font-weight: 600;
+}
+.dt-td {
+  border-bottom: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.dt-tr--odd .dt-td {
+  background: none;
+}
+.dt-tr--clickable:hover .dt-td {
+  background: var(--surface);
+}
+/* Press feedback, as for buttons (styles/components.css), but less: 0.98 of a 1400px row moves its ends by 14px.
+   Not while a control in the row is the one pressed. */
+.dt-tr--clickable:active:not(:has(:is(button, input, a, label):active)) {
+  scale: 0.995;
+  transition: scale var(--dur-1) var(--ease-out);
+}
+/* An image column (thumbnails, /bundles' covers) only as wide as its images: a sized cell takes none of the table's spare width. */
+.dt-td:has(.game-thumb, .bundle-covers) {
+  width: 1px;
+}
+/* Checked rows: neutral, so the accent stays the open game's. */
+.dt-tr--selected .dt-td {
+  background: var(--line);
+}
+
+/* A group's header row: a flat band, its column name and count muted rather than faded. */
+.dt-group-row {
+  border-left: 0;
+  background: var(--surface);
+}
+.dt-group-row:hover {
+  background: var(--line);
+}
+.dt-group-td {
+  padding: 8px 12px;
+  border-bottom-color: var(--line-strong);
+}
+.dt-group-colname,
+.dt-group-count,
+.dt-group-continued {
+  color: var(--muted);
+  opacity: 1;
+}
+
+/* The library's toolbar controls at the app's control height and look (styles/base.css). */
+.dt-btn,
+.dt-btn-clear {
+  min-height: var(--control-h);
+  border-width: 1px;
+  font-size: var(--fs-ui);
+}
+.dt-btn {
+  padding: 0 10px;
+  border-radius: var(--radius-3);
+}
+.dt-btn--grouped {
+  border-radius: var(--radius-3) 0 0 var(--radius-3);
+}
+.dt-btn-clear {
+  border-radius: 0 var(--radius-3) var(--radius-3) 0;
+}
+.dt-search-input {
+  height: var(--control-h);
+  border-width: 1px;
+  border-radius: var(--radius-3);
+  background: var(--surface);
+  font-size: var(--fs-ui);
+}
+
+/* The 24 px tap area around a header's sort button only grows taller: wider, it would cover its column menu button. */
+.dt-th-sort {
+  position: relative;
+}
+.dt-th-sort::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: max(100%, 24px);
+  transform: translate(-50%, -50%);
+}
+
+/* Phone: the table library's toolbar spacing tightened, so the rows start higher. */
+@media (max-width: 768px) {
+  /* The library puts its end slot after the search line, a row of its own on a phone: move it up
+     to the end of the first line (Columns/Group/Sort), ahead of the search box and what follows.
+     Until the library does it itself: vatesfr/data-table#39. */
+  .dt-toolbar-actions > .dt-search-wrap,
+  .dt-toolbar-actions > .dt-search-wrap ~ * {
+    order: 2;
+  }
+  .dt-toolbar-actions > .dt-toolbar-end {
+    order: 1;
+    margin-left: auto;
+  }
+  .list-route .dt-toolbar {
+    padding: 6px 0;
+  }
+  .list-route .dt-toolbar-divider {
+    display: none;
+  }
+  /* Down from the library's 160px, so the search still fits beside the view actions at 320px. */
+  .dt-search-wrap {
+    min-width: 120px;
+  }
+  .list-route .dt-active-bar {
+    padding: 4px 0;
+  }
+}
+
+/* /search's own table (SearchRoute.tsx) — hides @vates/data-table-solid's Columns/Sort/Search/
+   Filter toolbar: none of it applies to a single, unsortable/unfilterable column, and the
+   library's own "Search…" box would sit confusingly right under this page's real one. The
+   row-count line above the table (.dt-active-bar) isn't part of the toolbar and stays.
+   Filed as vatesfr/data-table#25, asking for a toolbar-suppression prop (all-or-nothing, or
+   granular per-control flags). 0.14.0 delivered only `showSearch` and an auto-hiding Sort button
+   (Group already auto-hid) — Columns and Filter are still unconditionally rendered regardless of
+   column config (confirmed in the library's own source, neither wrapped in a length check), so
+   even with `showSearch={false}` this table would still show two dead buttons. This blanket rule
+   stays the only way to get an empty toolbar. */
+.search-table .dt-toolbar {
+  display: none;
+}
+
+/* SearchRoute.tsx focuses rows programmatically, which :focus-visible often skips, and the library
+   draws no row focus: plain :focus with the standard ring, offset inward for a table row. */
+.search-table .dt-tr:focus {
+  outline: 2px solid var(--text);
+  outline-offset: -2px;
+}
+
+/* Dims an expired bundle's whole row. The table library has no per-row class hook, so the row is
+   reached through the marker its Bundle cell carries (renderBundleTitle) — which means dimming
+   stops if that column is hidden, an acceptable degradation for a column nobody hides. Only
+   reachable at all with "Include expired" on; every row is Active otherwise. */
+.dt-tr:has(.bundle-expired) {
+  opacity: 0.45;
+}
+.dt-tr:has(.bundle-expired):hover {
+  opacity: 0.8;
+}
+
+/* The game open in the panel (the tables' currentRow): tinted, with a bar at its start drawn as
+   a border, which forced colors keep (they drop backgrounds and shadows). */
+.dt-tr.dt-tr--current > .dt-td {
+  background: var(--color-background-info);
+}
+.dt-tr.dt-tr--current > .dt-td:first-child {
+  position: relative;
+}
+.dt-tr.dt-tr--current > .dt-td:first-child::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-left: 3px solid var(--accent);
+}
+
+/* Phone game tables: tighter cells, so rating and length fit beside the name. */
+@media (max-width: 600px) {
+  .dt-td,
+  .dt-th {
+    padding: 6px 8px;
+  }
+  .dt-th {
+    white-space: normal;
+  }
+}
+
+/* The table's checkboxes, drawn: a 16px box inside a 24px target (the transparent border), checked
+   filled in --text with a --bg tick (the SVG can't read tokens), indeterminate a --bg bar. */
+.dt-table input[type='checkbox'] {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  border: 4px solid transparent;
+  border-radius: calc(var(--radius-1) + 4px);
+  background: var(--surface) no-repeat center / 100% 100%;
+  background-clip: padding-box;
+  box-shadow: inset 0 0 0 1px var(--line-control);
+  vertical-align: middle;
+  appearance: none;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-1) var(--ease-out),
+    box-shadow var(--dur-1) var(--ease-out);
+}
+.dt-table input[type='checkbox']:hover {
+  box-shadow: inset 0 0 0 1px var(--muted);
+}
+.dt-table input[type='checkbox']:is(:checked, :indeterminate) {
+  background-color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--text);
+}
+.dt-table input[type='checkbox']:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='%230f1420' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.dt-table input[type='checkbox']:indeterminate {
+  background-image: linear-gradient(var(--bg), var(--bg));
+  background-size: 8px 2px;
+}
+/* The ring hugs the box rather than the target around it. */
+.dt-table input[type='checkbox']:focus-visible {
+  outline-offset: -2px;
+}
+/* Forced colors drop the drawn box: the native one instead, at the target's size. */
+@media (forced-colors: active) {
+  .dt-table input[type='checkbox'] {
+    border: 0;
+    appearance: auto;
+  }
+}
+
+/* The Filter popover's column pane: the table library's 150 px cut category and column names
+   short, and its search box ran past the pane's edge, so the pane scrolled sideways. */
+.dt-filter-cols {
+  width: 200px;
+}
+.dt-filter-cols-search {
+  width: 100%;
+  box-sizing: border-box;
+}
+/* Phone: the library's 460 px minimum ran the popover past a 390 px screen. */
+@media (max-width: 768px) {
+  .dt-filter-panel {
+    min-width: 0;
+    width: calc(100vw - 24px);
+  }
+  .dt-filter-cols {
+    width: 45%;
+  }
+}

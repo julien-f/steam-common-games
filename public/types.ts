@@ -35,6 +35,7 @@ export interface GameMeta {
   comingSoon: boolean;
   metacritic: { score: number; url: string | null } | null;
   capsule: string;
+  thumb: string | null; // the game tables' larger capsule; `capsule` is its fallback
   banner: string;
   movies: { id: number; thumbnail: string; hls: string | null }[];
   screenshots: { id: number; thumbnail: string; full: string }[];
@@ -89,6 +90,7 @@ export interface Game extends PriceFields {
   // (`row.hltbMian = …`) compile silently. Declaring them is what turns both into typecheck
   // failures — the same reason `ReadonlyGame` below exists for the read paths.
   capsule?: string | null;
+  thumb?: string | null;
   score?: number | null;
   positivePct?: number | null;
   steamdbRating?: number | null;
@@ -252,12 +254,6 @@ export interface AccountSlot {
   // members that set one — captured at resolve time so the
   // nicest copyable identifier needs no fetch of its own
   // (accountsStore.ts's accountIdentifiers)
-  // Last-known solo-account profile trivia — same "cached at resolve time, absent/stale until
-  // next picked" reasoning as label/avatarUrl above. Only ever set for a single-account slot
-  // (like avatarUrl, a Family has no one profile to speak for the whole thing).
-  memberSince?: string; // bare ISO date the account was created
-  countryCode?: string; // ISO 3166-1 alpha-2
-  realName?: string;
   unresolved?: string[]; // members whose player summaries failed; never stored (accountsStore.ts's withStoredDisplay)
   lastUsedAt: number;
   removedAt?: number; // soft-removed from the recents UI, kept while referenced by a dynamic list

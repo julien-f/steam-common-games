@@ -10,11 +10,9 @@ export default function NotFoundRoute() {
     <div class="container">
       <ListHero title="Page not found" />
 
-      <div class="card">
-        <p class="card-subtitle">
-          Nothing lives at this address — it may come from an old or mistyped link. <A href="/">Go to Home</A>.
-        </p>
-      </div>
+      <p>
+        Nothing lives at this address — it may come from an old or mistyped link. <A href="/">Go to Home</A>.
+      </p>
     </div>
   );
 }

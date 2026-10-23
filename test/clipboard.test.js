@@ -21,11 +21,12 @@ function withNavigator(t, clipboard) {
   });
 }
 
-// A button flat enough to assert against, its children plain `{ text }` nodes — .classList is only
-// touched when copiedClass is given.
-function fakeBtn(...texts) {
+// A button flat enough to assert against, its children `{ text }` nodes — an icon's SVG being one
+// with no text — and .classList only touched when copiedClass is given.
+const icon = () => ({ nodeName: 'svg', text: '' });
+function fakeBtn(...children) {
   const classes = new Set();
-  let nodes = (texts.length ? texts : ['🔗']).map((text) => ({ text }));
+  let nodes = children.length ? children : [icon()];
   return {
     get childNodes() {
       return nodes;
@@ -33,11 +34,9 @@ function fakeBtn(...texts) {
     get textContent() {
       return nodes.map((n) => n.text).join('');
     },
-    set textContent(text) {
-      nodes = [{ text }];
-    },
+    // Like the DOM's: a string becomes a text node.
     replaceChildren: (...next) => {
-      nodes = next;
+      nodes = next.map((n) => (typeof n === 'string' ? { text: n } : n));
     },
     title: 'Copy link',
     classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), has: (c) => classes.has(c) },
@@ -74,21 +73,24 @@ test('copyText: reports failure when writeText rejects (permission denied)', asy
 test('copyWithFeedback: swaps label/title/class, then restores them', async (t) => {
   withNavigator(t, { writeText: async () => {} });
   const btn = fakeBtn();
-  copyWithFeedback(btn, 'https://example.test/game/400', { copiedText: '✓', copiedClass: 'x--copied' });
+  const before = [...btn.childNodes];
+  const check = icon();
+  copyWithFeedback(btn, 'https://example.test/game/400', { copied: check, copiedClass: 'x--copied' });
   await new Promise((r) => setTimeout(r, 0));
-  assert.equal(btn.textContent, '✓');
+  assert.deepEqual(btn.childNodes, [check]);
+  assert.equal(btn.childNodes[0], check);
   assert.equal(btn.title, 'Copied!');
   assert.equal(btn.classList.has('x--copied'), true);
 
   await new Promise((r) => setTimeout(r, COPIED_MS + 10));
-  assert.equal(btn.textContent, '🔗');
+  assert.equal(btn.childNodes[0], before[0]);
   assert.equal(btn.title, 'Copy link');
   assert.equal(btn.classList.has('x--copied'), false);
 });
 
 test('copyWithFeedback: restores a label made of several nodes as they were', async (t) => {
   withNavigator(t, { writeText: async () => {} });
-  const btn = fakeBtn('🔗', ' Share view');
+  const btn = fakeBtn(icon(), { text: ' Share view' });
   const before = [...btn.childNodes];
   copyWithFeedback(btn, 'https://example.test/?tv=x');
   await new Promise((r) => setTimeout(r, COPIED_MS + 10));
@@ -99,20 +101,22 @@ test('copyWithFeedback: restores a label made of several nodes as they were', as
 test('copyWithFeedback: leaves the button alone when the copy failed', async (t) => {
   withNavigator(t, undefined);
   const btn = fakeBtn();
+  const before = [...btn.childNodes];
   copyWithFeedback(btn, 'whatever');
   await new Promise((r) => setTimeout(r, 0));
-  assert.equal(btn.textContent, '🔗');
+  assert.equal(btn.childNodes[0], before[0]);
 });
 
 test('copyWithFeedback: a second copy while confirming still restores the original label', async (t) => {
   withNavigator(t, { writeText: async () => {} });
   const btn = fakeBtn();
+  const before = [...btn.childNodes];
   copyWithFeedback(btn, 'a');
   await new Promise((r) => setTimeout(r, COPIED_MS / 2));
   copyWithFeedback(btn, 'b');
   await new Promise((r) => setTimeout(r, COPIED_MS / 2 + 10));
-  assert.equal(btn.textContent, '✓ Copied!'); // the first timer no longer cuts the second short
+  assert.equal(btn.textContent, 'Copied!'); // the first timer no longer cuts the second short
   await new Promise((r) => setTimeout(r, COPIED_MS / 2 + 10));
-  assert.equal(btn.textContent, '🔗');
+  assert.equal(btn.childNodes[0], before[0]);
   assert.equal(btn.title, 'Copy link');
 });

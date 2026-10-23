@@ -1,16 +1,26 @@
 'use strict';
 
-// Lists rules in public/style.css's media queries that a later top-level rule with the same
-// selector overrides: equal specificity, so source order wins and the media rule silently never
-// applies (U84 on phone, the desktop app bar's search width). Run by `npm run check`.
+// Lists media-query rules in the app's stylesheets that a later top-level rule of the same layer
+// and selector overrides, in any file: equal specificity, so source order wins and the media rule
+// silently never applies (U84 on phone, the desktop app bar's search width). Run by `npm run check`.
 
 const fs = require('node:fs');
 const path = require('node:path');
 
-const FILE = path.join(__dirname, '..', 'public', 'style.css');
+const PUBLIC = path.join(__dirname, '..', 'public');
 
-// Every rule as { selectors, media, line, props }, from a brace scan: style.css has no strings or
-// comments containing braces, which is all this relies on.
+// The sheets in cascade order: public/style.css's @imports, then its own rules.
+function loadSheets() {
+  const entry = fs.readFileSync(path.join(PUBLIC, 'style.css'), 'utf8');
+  const imports = [...entry.matchAll(/@import\s+'\.\/([^']+)'/g)].map((m) => m[1]);
+  return [
+    ...imports.map((file) => ({ file, css: fs.readFileSync(path.join(PUBLIC, file), 'utf8') })),
+    { file: 'style.css', css: entry },
+  ];
+}
+
+// Every rule as { selectors, media, layer, line, props }, from a brace scan: the sheets have no
+// strings or comments containing braces, which is all this relies on.
 function parseRules(css) {
   const rules = [];
   const stack = [];
@@ -26,12 +36,14 @@ function parseRules(css) {
       stack.push({ prelude, open: i });
     } else {
       const { prelude, open } = stack.pop();
-      const parent = stack.at(-1)?.prelude ?? null;
+      const media = stack.findLast((b) => b.prelude.startsWith('@media'))?.prelude ?? null;
+      const layer = stack.findLast((b) => b.prelude.startsWith('@layer'))?.prelude ?? null;
       if (!prelude.startsWith('@')) {
         const body = css.slice(open + 1, i).replace(/\/\*[\s\S]*?\*\//g, '');
         rules.push({
           selectors: prelude.split(',').map((s) => s.trim()),
-          media: parent,
+          media,
+          layer,
           line: css.slice(0, open).split('\n').length,
           props: new Set(
             body
@@ -47,19 +59,22 @@ function parseRules(css) {
   return rules;
 }
 
-function findOverrides(css) {
-  const rules = parseRules(css);
+// `sheets`: [{ file, css }] in cascade order.
+function findOverrides(sheets) {
+  const rules = sheets.flatMap(({ file, css }, order) => parseRules(css).map((r) => ({ ...r, file, order })));
+  const after = (a, b) => a.order > b.order || (a.order === b.order && a.line > b.line);
   const topLevel = rules.filter((r) => r.media === null);
   const problems = [];
   for (const rule of rules) {
-    if (!/^@media\b/.test(rule.media ?? '')) continue;
+    if (rule.media === null) continue;
     for (const selector of rule.selectors) {
       for (const later of topLevel) {
-        if (later.line <= rule.line || !later.selectors.includes(selector)) continue;
+        // Another layer's rule wins or loses by layer order, not source order.
+        if (later.layer !== rule.layer || !after(later, rule) || !later.selectors.includes(selector)) continue;
         const lost = [...rule.props].filter((p) => later.props.has(p));
         if (lost.length)
           problems.push(
-            `style.css:${rule.line} ${selector} (${rule.media}) is overridden by line ${later.line}: ${lost.join(', ')}`,
+            `${rule.file}:${rule.line} ${selector} (${rule.media}) is overridden by ${later.file}:${later.line}: ${lost.join(', ')}`,
           );
       }
     }
@@ -68,7 +83,7 @@ function findOverrides(css) {
 }
 
 if (require.main === module) {
-  const problems = findOverrides(fs.readFileSync(FILE, 'utf8'));
+  const problems = findOverrides(loadSheets());
   if (problems.length) {
     console.error(
       `Media-query rules overridden by a later rule (move them after it):\n${problems.map((p) => `  ${p}`).join('\n')}`,

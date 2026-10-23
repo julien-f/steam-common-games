@@ -24,11 +24,11 @@ Two account slots, both optional, distinct from any list:
 
 Both are full `AccountSlot` objects (see the schema below), not id references, so clearing history never orphans either.
 
-- **Picking `currentAccount`** draws from `myAccount`, `recentAccounts`, or a fresh resolve. The resolve form takes several identifiers at once ("+ add another account") and produces one `AccountSlot` with several `members`: a Family.
+- **Picking `currentAccount`** draws from `myAccount`, `recentAccounts`, or a fresh resolve. The resolve form takes several identifiers at once ("Add Steam Family account") and produces one `AccountSlot` with several `members`: a Family.
 - **`recentAccounts`** is global and uncapped, with individual removal and clear-all. Removing one a dynamic list still references soft-removes it (`removedAt`, see [Soft-delete](#soft-delete)).
 - **Account header**: avatar, persona name and profile link, online status (as of the last library refresh), owned and wishlist counts.
 - **Display fields stay current**: `label`/`avatarUrl`/`vanities` are captured when the account is picked; Home's account card refreshes them wherever the account is stored (`refreshAccountInfo`) from the profile it fetches anyway.
-- **Copyable identifier**: ⧉ copies each member's nicest identifier (`accountsStore.ts`'s `accountIdentifiers`): its Steam custom-URL name (`AccountSlot.vanities`, captured at resolve time from `/api/common-games`' `profileurl`), else its steam64 id. One per member: a Family's joined label is nothing an input accepts back. Offered wherever an account is named (account card, Home's Recent accounts, the nav chip and its recents), with no fetch.
+- **Copyable identifier**: ⧉ copies each member's nicest identifier (`accountsStore.ts`'s `accountIdentifiers`): its Steam custom-URL name (`AccountSlot.vanities`, captured at resolve time from `/api/common-games`' `profileurl`), else its steam64 id. One per member: a Family's joined label is nothing an input accepts back. Offered wherever an account is named (account card, the nav chip and its recents), with no fetch.
 - **Reactive**: changing `currentAccount` while `/lists/owned` or `/lists/wishlist` is open re-fetches that route in place: its load effect reads the account reactively.
 
 ### `?u=` URL semantics
@@ -48,7 +48,7 @@ A list is a set of appids, usually named — a dynamic one may have no name of i
 
 ### Kinds
 
-- **System lists** (never stored, always live-derived): _Owned_ and _Wishlist_ for `currentAccount`; one per browsed _Bundle_; one per developer or publisher (`/lists/developer?name=`, `/lists/publisher?name=`; `ListRef.kind: 'developer' | 'publisher'` with its `name`, joining a combine from its own page like a bundle); **Recently Looked Up** (`/game`, `recentGames.ts`) — global local search history, not account-scoped, linked from Home beside Owned/Wishlist/Bundles and usable as a combine source (`ListRef.kind: 'recent-games'`).
+- **System lists** (never stored, always live-derived): _Owned_ and _Wishlist_ for `currentAccount`; one per browsed _Bundle_; one per developer or publisher (`/lists/developer?name=`, `/lists/publisher?name=`; `ListRef.kind: 'developer' | 'publisher'` with its `name`, joining a combine from its own page like a bundle); **Recently Looked Up** (`/game`, `recentGames.ts`) — global local search history, not account-scoped, an Explore card on Home beside Owned/Wishlist/Compare/Bundles and usable as a combine source (`ListRef.kind: 'recent-games'`).
 - **User lists** (stored, full CRUD):
   - **`manual`** — a stored `appids[]`; games are added from a table's row selection ("Add to list", including a new list) and removed per row or in bulk.
   - **`dynamic`** — a formula (`op` + `sources: ListRef[]`) recomputed on every open. Its hero states the formula: each source named (`listLabels.ts`'s `describeListRef`), linked, with what it contributed (`Alice — Owned 343 ∪ Alice — Wishlist 115 = 457`, from `resolveListWithSources`), a dangling source flagged in place. Its Updated tile states the oldest account or store-search fetch behind it and re-resolves them all (`createDefaultFetchers`' `refresh`/`onFetchedAt` — on the real wiring, not the injectable `ListResolveFetchers` seam the resolver's tests use). "Edit sources" reopens the combine form pre-filled and saves in place.
@@ -101,7 +101,7 @@ GameList { ...above..., parentId: string | null, order }
 ```
 
 - Flat arrays keyed by `parentId`: rename and move are single-item mutations. Folders and lists share one `order` numbering per `parentId`, so they interleave; a moved or new item goes last (`nextOrder`).
-- Create and rename use one inline name field in the tree (Enter or leaving it saves, Esc or an empty name cancels; clearing a dynamic or ranked list's name hands it back to its default label), delete `window.confirm`; moving is a per-row "Move to…" menu (`folderPaths`, leaving out a folder's own subtree, which `isDescendantFolder` also refuses). No drag-and-drop, multi-select or trash view: [frontend.md](frontend.md#known-gaps).
+- Create and rename use one inline name field in the tree (Enter or leaving it saves, Esc or an empty name cancels; clearing a dynamic or ranked list's name hands it back to its default label), delete `window.confirm`; moving is a "Move to…" select in each row's ⋯ menu (`folderPaths`, leaving out a folder's own subtree, which `isDescendantFolder` also refuses). No drag-and-drop, multi-select or trash view: [frontend.md](frontend.md#known-gaps).
 - Deleting a non-empty folder asks whether to delete everything inside or move its contents up (`deleteFolder`'s `'delete'`/`'promote'`); delete applies [Soft-delete](#soft-delete) to each list inside.
 
 ### Soft-delete
@@ -137,7 +137,6 @@ One flat blob under the localStorage key `steam.isonoe.net:prefs` (`prefs.ts`): 
 ```
 AccountSlot  id (sorted-joined member steam64 ids) · members[] · rawInputs[] · label? · avatarUrl?
              vanities? (steam64 → Steam custom-URL name, for the members that set one)
-             memberSince? · countryCode? · realName? (solo-account trivia, last-known like avatarUrl)
              lastUsedAt · removedAt?
 Folder       id · name · parentId (null = root) · order
 GameList     id · name? (absent = unnamed, labeled by its formula) · parentId · order · createdAt · updatedAt

@@ -121,4 +121,40 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 
 - **Symptom**: a popover panel sits on the page, in flow under its button, before anything opened it; `toBeHidden()` on it fails.
 - **Cause**: the browser hides a closed popover with a user-agent `display: none`, which any `display` in the app's CSS (`.account-chip-panel`'s `flex`) overrides.
-- **Fix**: restate it for closed panels, `:not(:popover-open) { display: none }`, as `.site-nav-popover-panel` does in `style.css`.
+- **Fix**: set a panel's `display` only while open, `:popover-open { display: flex }`, as `.account-chip-panel` does in `styles/components.css`.
+
+## A `.dt-*` override has no effect
+
+- **Symptom**: a rule restyling the table library (e.g. `.table-container .dt-th { background: … }`) shows in DevTools as overridden by the library's own rule, though its selector is more specific: the header row turns the library's light default.
+- **Cause**: `@vates/data-table-solid` injects an unlayered `<style>`, and an unlayered rule beats any rule in a `@layer`, whatever its specificity or order.
+- **Fix**: keep every `.dt-*` override, and the `html:root { --color-* }` theme, in the unlayered `styles/vendor-data-table.css`, not in a layer.
+
+## The page freezes opening the table's Filter on a phone, under reduced motion
+
+- **Symptom**: with `prefers-reduced-motion: reduce` (the e2e default) at phone width, clicking the toolbar's Filter never returns: the main thread stays blocked (`locator.click: Timeout`, then any `page.evaluate` hangs).
+- **Cause**: a library bug ([vatesfr/data-table#43](https://github.com/vatesfr/data-table/issues/43)) triggered by any transition on a dropdown's `transform`. Its dropdown viewport clamp assumes the `translateX` it writes applies at once, and that write re-runs it through its own `MutationObserver` before a frame paints: under a transition the rect never moves, so the offset grows forever in microtasks. A near-zero `transition-duration` on every element (with the default `transition-property: all`) is enough.
+- **Fix**: transitions go to `0s` in that rule (`styles/base.css`); only animations keep a near-zero duration, for the `animationend` the lightbox waits on. Never give `.dt-dd` a transform transition until #43 is fixed.
+
+## A tainted-canvas fallback can't be tested through `page.route`
+
+- **Symptom**: an image served by `route.fulfill` without `Access-Control-Allow-Origin` still loads with `crossOrigin = 'anonymous'` and its canvas reads fine, so the "no CORS" path never runs (seen checking the panel tint, `artTint.ts`).
+- **Cause**: observed with Playwright's Chromium: a fulfilled cross-origin response passes the CORS check whatever its headers.
+- **Fix**: serve the image from a real server on another origin (`python3 -m http.server` on a spare port) and call the code from the page.
+
+## A Lucide icon that exists fails the typecheck
+
+- **Symptom**: `error TS2307: Cannot find module 'lucide-solid/icons/history' or its corresponding type declarations.`, though `node_modules/lucide-solid/dist/source/icons/history.jsx` exists and the dev server renders it.
+- **Cause**: some icon names are aliases kept for renamed icons; they ship as source re-exports with no `.d.ts`.
+- **Fix**: import the canonical name the alias re-exports (`history.jsx` imports `./rotate-ccw-clock`), which has types.
+
+## ← and → draw smaller than ↑ and ↓, or in another face
+
+- **Symptom**: in the same text, ← → render small and thin beside ↑ ↓, or in a different face.
+- **Cause**: the system faces in the font stacks differ in arrow coverage; seen in Chromium on Fedora: Noto Sans has none of U+2190–U+2193, so each falls back on its own, and Liberation Mono draws ← → at half the height of ↑ ↓.
+- **Fix**: key caps go through `Kbd.tsx`, which draws all four arrows as Lucide icons; elsewhere, use a Lucide icon rather than a text arrow that must match its neighbours.
+
+## An e2e locator's element goes `null` mid-test while the list looks unchanged
+
+- **Symptom**: `boundingBox()` (or another one-shot read) returns `null` under load, e.g. F1's "a DLC's capsule that fails to load hides" failing 3 in 60 runs beside another suite.
+- **Cause**: a prop passed as `body={body()}` is a getter, so every signal `body()` reads rebuilds its whole DOM; the DLC card swapped its streamed list for a new one when loading finished, detaching the element the locator had found.
+- **Fix**: build the JSX once (`body={body}`) with `<Show>`/`<For>` inside, over one memo for every state, so entries already shown keep their element (as `DlcSection` in `panel.tsx`).

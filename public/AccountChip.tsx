@@ -17,6 +17,8 @@
 // Family member rows and removal all stay on Home — this is a nav affordance, not a second,
 // half-implemented copy of that screen, so it links there instead of growing toward it.
 import { onCleanup, onMount, For, Show, type JSX } from 'solid-js';
+import Link from 'lucide-solid/icons/link';
+import Star from 'lucide-solid/icons/star';
 import { A, useLocation, useNavigate } from '@solidjs/router';
 import {
   getEffectiveCurrentAccount,
@@ -109,7 +111,7 @@ export function AccountChip(): JSX.Element {
               </Show>
             }
           >
-            {(url) => <img class="account-chip-avatar" src={url()} alt="" width="20" height="20" />}
+            {(url) => <img class="account-chip-avatar" src={url()} alt="" width="26" height="26" />}
           </Show>
           <span class="account-chip-name">{chipLabel()}</span>
           {/* A link's account is showing, not the stored one — the difference is invisible
@@ -117,7 +119,8 @@ export function AccountChip(): JSX.Element {
               (Home says it at length; see its own account-override note). */}
           <Show when={override()}>
             <span class="account-chip-explore" title="Showing an account from a shared link, not your own">
-              🔗
+              <Link />
+              <span class="visually-hidden">(from a link)</span>
             </span>
           </Show>
         </button>
@@ -177,12 +180,13 @@ export function AccountChip(): JSX.Element {
                         when={acc.avatarUrl}
                         fallback={<span class="account-chip-avatar account-chip-avatar--empty" />}
                       >
-                        {(url) => <img class="account-chip-avatar" src={url()} alt="" width="20" height="20" />}
+                        {(url) => <img class="account-chip-avatar" src={url()} alt="" width="26" height="26" />}
                       </Show>
                       <span class="account-chip-name">{accountDisplayLabel(acc)}</span>
                       <Show when={acc.id === getMyAccount()?.id}>
-                        <span class="account-chip-mine" title="Your account (★ on Home)">
-                          ★
+                        <span class="account-chip-mine" title="Your account">
+                          <Star />
+                          <span class="visually-hidden">(yours)</span>
                         </span>
                       </Show>
                     </button>

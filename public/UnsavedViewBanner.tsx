@@ -1,4 +1,6 @@
 import { Show, createSignal, onCleanup, type JSX } from 'solid-js';
+import Link from 'lucide-solid/icons/link';
+import RotateCcw from 'lucide-solid/icons/rotate-ccw';
 import { getAuthUser } from './authStore.ts';
 import { isUnsaved, summarizeViewDiff } from './tableViewSync.ts';
 import type { ViewStateApi } from '@vates/data-table-solid';
@@ -14,16 +16,12 @@ export function UnsavedViewBanner(props: { table: ViewStateApi; prefKey: string 
         differs from what's saved to your account.
         <button
           type="button"
-          class="btn btn-ghost btn-sm"
+          class="btn"
           onClick={() => saveTableViewToServer(props.prefKey, props.table.getViewState())}
         >
           Save
         </button>
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm"
-          onClick={() => revertTableViewToServer(props.table, props.prefKey)}
-        >
+        <button type="button" class="btn" onClick={() => revertTableViewToServer(props.table, props.prefKey)}>
           Revert
         </button>
       </div>
@@ -54,7 +52,7 @@ export function ViewActions(props: {
         {/* aria-disabled, not disabled: a press has to reach us to say why. */}
         <button
           type="button"
-          class="btn btn-ghost btn-sm"
+          class="btn"
           aria-label="Share view"
           aria-disabled={props.shareDisabledReason ? 'true' : undefined}
           aria-describedby={props.shareDisabledReason ? 'share-view-reason' : undefined}
@@ -62,17 +60,18 @@ export function ViewActions(props: {
           onClick={(e) => (props.shareDisabledReason ? showReason() : props.onShare(e.currentTarget))}
           onBlur={() => setReasonShown(false)}
         >
-          🔗<span class="btn-label"> Share view</span>
+          <Link />
+          <span class="btn-label"> Share view</span>
         </button>
       </Show>
       <button
         type="button"
-        class="btn btn-ghost btn-sm"
+        class="btn"
         aria-label="Default view"
         title="Back to the default columns, sort and filters"
         onClick={() => props.onReset()}
       >
-        <span class="btn-icon">↺</span>
+        <RotateCcw class="btn-icon" />
         <span class="btn-label">Default view</span>
       </button>
       <Show when={props.shareDisabledReason}>

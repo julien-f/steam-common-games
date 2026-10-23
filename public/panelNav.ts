@@ -4,7 +4,10 @@
 // search/filter/sort order — the data shape differs enough per page that the list itself stays
 // local) and passes it in here.
 
-import { createEffect, createRoot } from 'solid-js';
+import { createComponent, createEffect, createRoot } from 'solid-js';
+import ChevronDown from 'lucide-solid/icons/chevron-down';
+import ChevronUp from 'lucide-solid/icons/chevron-up';
+import Dices from 'lucide-solid/icons/dices';
 import type { Game } from './types.ts';
 
 let disposeNav: (() => void) | null = null;
@@ -35,23 +38,28 @@ export function renderPanelNav({
   if (!hasList || game.standalone) return;
   const nav = document.getElementById('panel-nav')!;
   nav.innerHTML = `
-    <button class="panel-nav-btn" id="panel-prev" aria-label="Previous game" title="Previous game (↑)">↑</button>
+    <button class="panel-nav-btn" id="panel-prev" aria-label="Previous game" title="Previous game (↑)"></button>
     <output class="panel-nav-pos" aria-live="polite"></output>
-    <button class="panel-nav-btn" id="panel-next" aria-label="Next game" title="Next game (↓)">↓</button>
-    <button class="panel-nav-btn panel-nav-reroll" id="panel-reroll" aria-label="Pick a random game" title="Pick a random game (R)">🎲<span class="panel-nav-kbd">R</span></button>
+    <button class="panel-nav-btn" id="panel-next" aria-label="Next game" title="Next game (↓)"></button>
+    <button class="panel-nav-btn panel-nav-reroll" id="panel-reroll" aria-label="Pick a random game" title="Pick a random game (R)"><span class="panel-nav-kbd">R</span></button>
   `;
   const prev = document.getElementById('panel-prev')!;
   const next = document.getElementById('panel-next')!;
+  const reroll = document.getElementById('panel-reroll')!;
   const pos = nav.querySelector<HTMLElement>('.panel-nav-pos')!;
   prev.addEventListener('click', () => onStep(-1));
   next.addEventListener('click', () => onStep(1));
-  document.getElementById('panel-reroll')!.addEventListener('click', onReroll);
+  reroll.addEventListener('click', onReroll);
   createRoot((dispose) => {
     disposeNav = dispose;
+    // `<ChevronUp />` and co. without JSX: this module stays .ts for its Node tests.
+    prev.append(createComponent(ChevronUp, {}) as Node);
+    next.append(createComponent(ChevronDown, {}) as Node);
+    reroll.prepend(createComponent(Dices, {}) as Node);
     createEffect(() => {
       const list = getGameList();
       const idx = list.findIndex((g) => g.appid === game.appid);
-      // A game the table no longer shows has no place to step from; `visibility` keeps 🎲 in place.
+      // A game the table no longer shows has no place to step from; `visibility` keeps the dice in place.
       prev.style.visibility = next.style.visibility = idx === -1 ? 'hidden' : '';
       pos.textContent = idx === -1 ? '' : `${idx + 1} / ${list.length}`;
     });

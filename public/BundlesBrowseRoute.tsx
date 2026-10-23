@@ -25,7 +25,7 @@ import { withAccountParam } from './urlState.ts';
 import { createTableState, DataTableView, datePartGroup, numericRangeGroup } from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
 import { fmt, compareDateMissingLast, compareNumMissingLast, priceTierGroup } from './gameColumns.ts';
-import { fmtAge, formatMoney, oldestFetchedAt, scoreColor } from './utils.ts';
+import { fadeInOnLoad, fmtAge, formatMoney, oldestFetchedAt, scoreColor } from './utils.ts';
 import {
   toBundleRow,
   fmtBundleDateTime,
@@ -95,6 +95,7 @@ function renderCovers(_value: unknown, row: BundleRow): Node {
     img.width = 80;
     img.height = 30;
     img.src = src;
+    fadeInOnLoad(img);
     img.addEventListener('error', () => {
       img.style.visibility = 'hidden';
     });
@@ -169,7 +170,7 @@ function renderEnds(value: unknown): Node {
     rel.className = 'bundle-ends-rel';
     rel.textContent = urgency.tier === 'ended' ? urgency.label : `⏳ ${urgency.label}`;
     rel.style.color =
-      urgency.tier === 'urgent' ? scoreColor(20) : urgency.tier === 'soon' ? scoreColor(55) : 'var(--text1)';
+      urgency.tier === 'urgent' ? scoreColor(20) : urgency.tier === 'soon' ? scoreColor(55) : 'var(--muted)';
   }
   // An expired row is dimmed as a whole (see renderBundleTitle), so nothing further here.
   return renderDateTime(value, rel);
@@ -419,7 +420,7 @@ export default function BundlesBrowseRoute() {
     tiles.push({
       label: 'Prices',
       value: regionLabel(regionCode()),
-      title: 'Prices are shown for this region — click to change it in ⚙ Preferences',
+      title: 'Prices are shown for this region — click to change it in Preferences',
       onClick: openPrefsPopover,
     });
     // The publish-side twin of the tile below: this is a discovery page, and its default sort is
@@ -521,7 +522,7 @@ export default function BundlesBrowseRoute() {
           />
         </div>
         <Show when={moreAvailable()}>
-          <button type="button" class="btn btn-ghost" disabled={loading()} onClick={() => load({ append: true })}>
+          <button type="button" class="btn" disabled={loading()} onClick={() => load({ append: true })}>
             Load more
           </button>
         </Show>

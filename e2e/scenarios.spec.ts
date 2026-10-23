@@ -1,6 +1,6 @@
 // docs/dev/journeys.md's journeys, end to end against mocked data (mockApi.ts).
 import { test, expect, type Locator, type Page } from '@playwright/test';
-import { mockApi, respond } from './mockApi.ts';
+import { DEMO_OF, mockApi, respond } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
 import { ALICE, BOB, BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
 
@@ -17,6 +17,8 @@ test.afterEach(() => {
 const rows = (page: Page) => page.locator('tbody tr:not(.dt-group-row)');
 const row = (page: Page, name: string) => rows(page).filter({ hasText: name });
 const groupRows = (page: Page) => page.locator('.dt-group-row');
+// A Home tree row's ⋯, which holds its Move, Rename and Delete.
+const rowMenu = (page: Page, name: string) => page.getByRole('button', { name: `More actions for ${name}` });
 
 test('A1: first visit — resolve my account, then open my library', async ({ page }) => {
   await page.goto('/');
@@ -40,6 +42,16 @@ test('A1 edge: a first visit says what the app does, and the account field looks
   await expect(page.getByRole('button', { name: 'Look up', exact: true })).toBeVisible();
 });
 
+test('A1 edge: an Explore card opens its list from anywhere on the card', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  const card = page.locator('.explore-card').filter({ has: page.getByRole('link', { name: 'Wishlist', exact: true }) });
+  // At the description, which the link's stretched ::after covers.
+  const box = (await card.getByText("The current account's wishlist").boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page).toHaveURL(/\/lists\/wishlist$/);
+});
+
 test('A1 edge: native controls render dark, like the page around them', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator(':root')).toHaveCSS('color-scheme', 'dark');
@@ -59,8 +71,12 @@ const heroContrast = (label: Locator) =>
       });
       return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     };
+    // The hero draws no ground of its own: the first opaque one behind the label.
+    let ground: Element = el;
+    while (ground.parentElement && Number(getComputedStyle(ground).backgroundColor.match(/[\d.]+/g)![3] ?? 1) < 1)
+      ground = ground.parentElement;
     const fg = lum(getComputedStyle(el).color);
-    const bg = lum(getComputedStyle(el.closest('.list-hero')!).backgroundColor);
+    const bg = lum(getComputedStyle(ground).backgroundColor);
     return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
   });
 
@@ -79,7 +95,7 @@ test("A1 edge: a pressed stat tile's label still meets AA contrast on the hero",
   await toggle.click();
   const pressed = page.locator('.list-stat-btn[aria-pressed="true"]').first();
   await expect(pressed).toBeVisible();
-  const label = pressed.locator('.list-stat-label');
+  const label = page.locator('.list-stat', { has: pressed }).locator('.list-stat-label');
   // Still hovered after the click: pressed must not look like plain hover, or the click shows no change.
   const hoveredPressed = await label.evaluate((el) => getComputedStyle(el).color);
   await page.mouse.move(0, 0);
@@ -87,7 +103,8 @@ test("A1 edge: a pressed stat tile's label still meets AA contrast on the hero",
   expect(await heroContrast(label)).toBeGreaterThanOrEqual(4.5);
   const other = page.locator('.list-stat-btn[aria-pressed="false"]').first();
   await other.hover();
-  expect(await other.locator('.list-stat-label').evaluate((el) => getComputedStyle(el).color)).not.toBe(hoveredPressed);
+  const otherLabel = page.locator('.list-stat', { has: other }).locator('.list-stat-label');
+  expect(await otherLabel.evaluate((el) => getComputedStyle(el).color)).not.toBe(hoveredPressed);
 });
 
 test("B1 edge: /bundles' filter tiles look like toggles, unlike the plain figures beside them", async ({ page }) => {
@@ -96,23 +113,24 @@ test("B1 edge: /bundles' filter tiles look like toggles, unlike the plain figure
   const chrome = (loc: Locator) =>
     loc.evaluate((el) => {
       const s = getComputedStyle(el);
-      return { border: s.borderTopWidth, borderColor: s.borderTopColor, shadow: s.boxShadow };
+      return { border: s.borderTopWidth, borderColor: s.borderTopColor, background: s.backgroundColor };
     });
   const toggle = page.locator('.list-stat-btn[aria-pressed="false"]').first();
   await expect(toggle).toBeVisible();
-  const plain = await chrome(page.locator('.list-stat', { hasText: 'Updated' }));
+  const plain = await chrome(page.locator('.list-stat', { hasText: 'Updated' }).locator('.list-stat-btn'));
   const off = await chrome(toggle);
   expect(plain.border).toBe('0px');
   expect(off.border).not.toBe('0px');
   await toggle.click();
   await page.mouse.move(0, 0);
   const pressed = page.locator('.list-stat-btn[aria-pressed="true"]').first();
-  await expect(pressed).toHaveCSS('border-top-color', 'rgb(102, 192, 244)'); // --accent2
-  await expect(pressed).toHaveCSS('box-shadow', /inset/);
-  // Hover and focus show on a pressed chip too.
-  const pressedRest = (await chrome(pressed)).shadow;
+  await expect(pressed).toHaveCSS('border-top-color', 'rgb(76, 194, 255)'); // --accent
+  // A thicker edge, not only a colour: forced colors repaint colours and drop shadows.
+  expect(Number.parseFloat((await chrome(pressed)).border)).toBeGreaterThan(Number.parseFloat(off.border));
+  // Hover shows on a pressed chip too.
+  const pressedRest = (await chrome(pressed)).background;
   await pressed.hover();
-  await expect.poll(async () => (await chrome(pressed)).shadow).not.toBe(pressedRest);
+  await expect.poll(async () => (await chrome(pressed)).background).not.toBe(pressedRest);
 });
 
 test('A1 edge: Owned with no account points to Home rather than showing 0 games', async ({ page }) => {
@@ -168,6 +186,23 @@ test("A2 edge: a recent account's star names, and says on hover, what clicking i
   await expect(page.getByRole('button', { name: 'Star Bob as mine' })).toHaveAttribute('title', 'Star Bob as mine');
 });
 
+test('A2 edge: removing a recent account moves focus to the next one, the last to the lookup field', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  await expect(page.locator('.recent-accounts li')).toHaveCount(2);
+  const first = (await page.locator('.recent-accounts li').first().innerText()).trim();
+  const second = first === 'Bob' ? 'Alice' : 'Bob';
+  await page.getByRole('button', { name: `Remove ${first}` }).click();
+  await expect(page.getByRole('button', { name: `Remove ${second}` })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.recent-accounts li')).toHaveCount(0);
+  await expect(page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…')).toBeFocused();
+});
+
 test('A2 edge: switching account from the nav chip leaves focus on the chip', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
@@ -184,9 +219,26 @@ test('A2 edge: switching account from the nav chip leaves focus on the chip', as
   await expect(page.locator('.account-chip-btn')).toBeFocused();
 });
 
-test('A3 edge: + Add Steam Family account focuses the field it adds', async ({ page }) => {
+test("A2 edge: the nav chip marks my account with Home's filled star", async ({ page }) => {
+  await asPlayer(page, ALICE);
   await page.goto('/');
-  await page.getByRole('button', { name: '+ Add Steam Family account' }).click();
+  const homeFill = await page
+    .getByRole('button', { name: 'Unstar Alice' })
+    .locator('svg')
+    .evaluate((el) => getComputedStyle(el).fill);
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  await expect(page.getByRole('banner')).toContainText('Bob');
+  await page.locator('.account-chip-btn').click();
+  const mine = page.getByTitle('Your account', { exact: true });
+  await expect(mine).toBeVisible();
+  expect(await mine.locator('svg').evaluate((el) => getComputedStyle(el).fill)).toBe(homeFill);
+  expect(homeFill).not.toBe('none');
+});
+
+test('A3 edge: Add Steam Family account focuses the field it adds', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Add Steam Family account' }).click();
   const fields = page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…');
   await expect(fields).toHaveCount(2);
   await expect(fields.nth(1)).toBeFocused();
@@ -243,12 +295,15 @@ test('S3 edge: an unknown path says so and links Home', async ({ page }) => {
 
 test('S3 edge: the page carries its own icon, so the browser asks for no favicon.ico', async ({ page }) => {
   await page.goto('/about');
-  await expect(page.locator('link[rel="icon"]').first()).toHaveAttribute('href', /^data:image\/svg\+xml,/);
+  await expect(page.locator('link[rel="icon"]').first()).toHaveAttribute('href', '/favicon.svg');
+  const icon = await page.request.get('/favicon.svg');
+  expect(icon.status()).toBe(200);
+  expect(icon.headers()['content-type']).toContain('image/svg+xml');
 });
 
 test('S3 edge: About names every data source, ProtonDB included', async ({ page }) => {
   await page.goto('/about');
-  const sources = page.locator('.card', { hasText: 'Data sources' });
+  const sources = page.locator('section', { hasText: 'Data sources' });
   for (const name of ['Steam Web API', 'Steam Store', 'HowLongToBeat', 'ProtonDB', 'IsThereAnyDeal'])
     await expect(sources.getByText(name, { exact: true })).toBeVisible();
 });
@@ -308,6 +363,44 @@ test("F3 edge: the table's digits all have one width, so numbers line up", async
   await expect(row(page, 'Hades').locator('td', { hasText: '44.5' })).toHaveCSS('font-variant-numeric', 'tabular-nums');
 });
 
+test("F3 edge: a game's thumbnail falls back to its smaller capsule, then hides", async ({ page }, testInfo) => {
+  await page.route('**/capsule_231x87.jpg', (route) => route.fulfill({ status: 404 }));
+  await page.route('**/capsule_184x69.jpg', (route) =>
+    route.request().url().includes('/620/')
+      ? route.fulfill({ status: 404 })
+      : route.fulfill({
+          contentType: 'image/svg+xml',
+          body: '<svg xmlns="http://www.w3.org/2000/svg" width="184" height="69"/>',
+        }),
+  );
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  const thumb = row(page, 'Hades').locator('img.game-thumb');
+  await expect(thumb).toHaveAttribute('src', /capsule_184x69/);
+  await expect(thumb).toBeVisible();
+  // The same box either way, so the row doesn't move as the image loads or fails (2px each side clipped off).
+  expect(await thumb.boundingBox()).toMatchObject(
+    testInfo.project.name === 'phone' ? { width: 100, height: 40 } : { width: 164, height: 64 },
+  );
+  await expect(row(page, 'Portal 2').locator('img.game-thumb')).toHaveCSS('visibility', 'hidden');
+});
+
+test("F3 edge: the open game's row keeps its bar under forced colors, where a tint or shadow is dropped", async ({
+  page,
+}) => {
+  await page.emulateMedia({ forcedColors: 'active' });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const current = row(page, 'Hades');
+  await expect(current).toHaveAttribute('aria-current', 'true');
+  const bar = () =>
+    current
+      .locator('td')
+      .first()
+      .evaluate((el) => getComputedStyle(el, '::before').borderLeftWidth);
+  expect(await bar()).toBe('3px');
+});
+
 test('F3 edge: the Played (h) filter has a "never played" preset', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
@@ -320,7 +413,7 @@ test('F3 edge: the Played (h) filter has a "never played" preset', async ({ page
   await expect(page.getByRole('button', { name: /Played \(h\): never played/ })).toBeVisible();
 });
 
-test('F3 edge: the table toolbar picks a random game from the filtered rows', async ({ page }) => {
+test('F3.5: the table toolbar picks a random game from the filtered rows', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
@@ -381,8 +474,7 @@ test('C1 edge: a tag filter ranks games by how strongly they carry the tag, unti
       .evaluateAll((boxes) => boxes.map((b) => b.getAttribute('aria-label')!.replace('Select row ', '')));
   const byRating = await names();
   await row(page, 'Portal 2').getByText('Portal 2').click();
-  // Tags lead the cloud, ahead of the category of the same name.
-  const coop = page.locator('.panel-tags').getByRole('button', { name: 'Co-op', exact: true }).first();
+  const coop = page.locator('.panel-tags').getByRole('button', { name: 'Co-op, tag', exact: true });
   await coop.click();
   await expect(page.getByRole('columnheader', { name: /Tag match/ })).toBeVisible();
   await expect.poll(names).toEqual(['Valheim', 'Terraria', 'Stardew Valley', 'Portal 2']);
@@ -395,7 +487,7 @@ test("C1 edge: the panel's Steam tags show how strongly players tagged the game 
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await row(page, 'Portal 2').getByText('Portal 2').click();
-  const coop = page.locator('.panel-tags').getByRole('button', { name: 'Co-op', exact: true }).first();
+  const coop = page.locator('.panel-tags').getByRole('button', { name: 'Co-op, tag', exact: true });
   await expect(coop).toHaveAttribute('title', "30% of the top tag's votes");
   const ratio = await coop.evaluate(
     (el) => el.querySelector('.panel-tag-weight')!.getBoundingClientRect().width / el.getBoundingClientRect().width,
@@ -420,7 +512,7 @@ test("B2 edge: the panel lists the account's owned games closest by Steam tags, 
   // On Owned itself, a row's closest owned games are the list's own similarity sort.
   await row(page, 'Valheim').getByText('Valheim').click();
   await expect(similar.locator('.panel-similar-item')).toHaveCount(0);
-  await expect(similar.getByRole('button', { name: '⇅ Sort list by similarity' })).toBeVisible();
+  await expect(similar.getByRole('button', { name: 'Sort list by similarity' })).toBeVisible();
 
   await page.goto('/lists/wishlist');
   await row(page, 'It Takes Two').getByText('It Takes Two').click();
@@ -440,17 +532,17 @@ test('C1 edge: the panel sorts the list by similarity to its game, until stopped
       .evaluateAll((boxes) => boxes.map((b) => b.getAttribute('aria-label')!.replace('Select row ', '')));
   const byRating = await names();
   await row(page, 'Valheim').getByText('Valheim').click();
-  await page.getByRole('button', { name: '⇅ Sort list by similarity' }).click();
+  await page.getByRole('button', { name: 'Sort list by similarity' }).click();
   await expect(page.getByRole('columnheader', { name: /Similarity/ })).toBeVisible();
   // Terraria's tags match Valheim's as closely as Valheim's own, so the two 100% tie.
   await expect
     .poll(async () => (await names()).slice(0, 4))
     .toEqual([...byRating.filter((n) => n === 'Valheim' || n === 'Terraria'), 'Stardew Valley', 'Portal 2']);
-  await page.getByRole('button', { name: '× Stop sorting by similarity' }).click();
+  await page.getByRole('button', { name: 'Stop sorting by similarity' }).click();
   await expect(page.getByRole('columnheader', { name: /Similarity/ })).toHaveCount(0);
   await expect.poll(names).toEqual(byRating);
   // Not kept across a reload: its target game was only this visit's.
-  await page.getByRole('button', { name: '⇅ Sort list by similarity' }).click();
+  await page.getByRole('button', { name: 'Sort list by similarity' }).click();
   await expect(page.getByRole('columnheader', { name: /Similarity/ })).toBeVisible();
   await page.reload();
   await expect(rows(page)).toHaveCount(6);
@@ -535,7 +627,7 @@ test('C1 edge: a Tag match range keeps the games strongly tagged, and goes with 
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
-  const coop = page.locator('.panel-tags').getByRole('button', { name: 'Co-op', exact: true }).first();
+  const coop = page.locator('.panel-tags').getByRole('button', { name: 'Co-op, tag', exact: true });
   await row(page, 'Portal 2').getByText('Portal 2').click();
   await coop.click();
   await expect(rows(page)).toHaveCount(4);
@@ -652,7 +744,7 @@ test('C3 edge: a saved comparison keeps the name its page had', async ({ page })
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare?u=alice&u=bob');
   await expect(page.getByRole('heading', { name: 'Alice vs. Bob' })).toBeVisible();
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind More actions
   if (await more.isVisible()) await more.click();
   await page.getByRole('button', { name: 'Save as a list' }).click();
   await expect(page).toHaveURL(/\/lists\/[0-9a-f-]{36}$/);
@@ -664,7 +756,7 @@ test('C3 edge: a saved comparison offers Share list only, not a Share view that 
   await page.goto('/lists/compare?u=alice&u=bob');
   await expect(groupRows(page)).toHaveCount(3);
   await expect(page.getByRole('button', { name: 'Share view' })).toHaveCount(1);
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind More actions
   if (await more.isVisible()) await more.click();
   await page.getByRole('button', { name: 'Save as a list' }).click();
   await expect(page).toHaveURL(/\/lists\/[0-9a-f-]{36}$/);
@@ -677,17 +769,17 @@ test('C3 edge: Save as a list moves focus into the saved list, not to the page',
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare?u=alice&u=bob');
   await expect(groupRows(page)).toHaveCount(3);
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind More actions
   if (await more.isVisible()) await more.click();
   await page.getByRole('button', { name: 'Save as a list' }).click();
   await expect(page).toHaveURL(/\/lists\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('main')).toBeFocused();
 });
 
-test('C1 edge: + Add player focuses the player box it adds', async ({ page }) => {
+test('C1 edge: Add player focuses the player box it adds', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare');
-  await page.getByRole('button', { name: '+ Add player' }).click();
+  await page.getByRole('button', { name: 'Add player' }).click();
   const boxes = page.locator('.compare-form').getByRole('combobox');
   await expect(boxes).toHaveCount(3);
   await expect(boxes.nth(2)).toBeFocused();
@@ -779,7 +871,7 @@ test('L1.1-3: select games, add them to a new list, open it', async ({ page }) =
   await row(page, 'Terraria').getByRole('checkbox').check();
 
   const toolbar = page.locator('.selection-toolbar');
-  await toolbar.getByRole('combobox').selectOption({ label: '+ Create new list…' });
+  await toolbar.getByRole('combobox').selectOption({ label: 'Create new list…' });
   await page.getByRole('textbox', { name: 'New list name' }).fill('To play with Bob');
   await page.keyboard.press('Enter');
 
@@ -795,7 +887,7 @@ test("L1 edge: the new list's toast stays while pointed at", async ({ page }) =>
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await row(page, 'Portal 2').getByRole('checkbox').check();
-  await page.locator('.selection-toolbar').getByRole('combobox').selectOption({ label: '+ Create new list…' });
+  await page.locator('.selection-toolbar').getByRole('combobox').selectOption({ label: 'Create new list…' });
   await page.getByRole('textbox', { name: 'New list name' }).fill('Later');
   await page.keyboard.press('Enter');
 
@@ -811,16 +903,18 @@ test("L1 edge: the new list's toast stays while pointed at", async ({ page }) =>
 test('L1.4: a list moves into the only folder', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
-  await page.getByRole('button', { name: '+ New list' }).click();
+  await page.getByRole('button', { name: 'New list' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('Shortlist');
   await page.keyboard.press('Enter');
-  await page.getByRole('button', { name: '+ New folder' }).click();
+  await page.getByRole('button', { name: 'New folder' }).click();
   await page.getByRole('textbox', { name: 'Folder name' }).fill('Weekend');
   await page.keyboard.press('Enter');
 
+  await rowMenu(page, 'Shortlist').click();
   const move = page.getByRole('combobox', { name: 'Move Shortlist to…' });
   await expect(move).toHaveValue(''); // showing "Move to…", so picking the folder is a change
-  await move.selectOption({ label: '📁 Weekend' });
+  await move.selectOption({ label: 'Weekend' });
+  await rowMenu(page, 'Shortlist').click();
   await expect(move.locator('option')).toContainText(['Move to…', 'Top level']); // now inside Weekend
   await expect(move).toHaveValue('');
 });
@@ -832,35 +926,98 @@ test('L1 edge: folders and lists are named in place, not in a dialog', async ({ 
   await asPlayer(page, ALICE);
   await page.goto('/');
   const tree = page.locator('.home-tree');
-  const newFolder = page.getByRole('button', { name: '+ New folder' });
+  const newFolder = page.getByRole('button', { name: 'New folder' });
   await newFolder.click();
   const field = page.getByRole('textbox', { name: 'Folder name' });
   await expect(field).toBeFocused();
   await field.fill('Weekend');
   await page.keyboard.press('Enter');
-  await expect(tree.getByText('📁 Weekend')).toBeVisible();
+  await expect(tree.getByText('Weekend', { exact: true })).toBeVisible();
   await expect(newFolder).toBeFocused();
 
-  // Esc cancels, and focus goes back to Rename.
-  const rename = page.getByRole('button', { name: 'Rename Weekend' });
-  await rename.click();
+  // Esc cancels, and focus goes back to the row's ⋯.
+  const menu = rowMenu(page, 'Weekend');
+  await menu.click();
+  await page.getByRole('button', { name: 'Rename Weekend' }).click();
   await expect(field).toBeFocused();
   await expect(field).toHaveValue('Weekend');
   await field.fill('Later');
   await page.keyboard.press('Escape');
-  await expect(tree.getByText('📁 Weekend')).toBeVisible();
-  await expect(rename).toBeFocused();
+  await expect(tree.getByText('Weekend', { exact: true })).toBeVisible();
+  await expect(menu).toBeFocused();
 
   // Leaving the field saves it; an empty name cancels.
-  await rename.click();
+  await menu.click();
+  await page.getByRole('button', { name: 'Rename Weekend' }).click();
   await field.fill('Co-op');
   await page.getByRole('heading', { name: 'Your lists' }).click();
-  await expect(tree.getByText('📁 Co-op')).toBeVisible();
-  await page.getByRole('button', { name: '+ New list' }).click();
+  await expect(tree.getByText('Co-op', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'New list' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('  ');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('textbox', { name: 'List name' })).toHaveCount(0);
   await expect(tree.locator('.list-tree li')).toHaveCount(1);
+});
+
+test("L1 edge: a row's ⋯ menu works from the keyboard and hands focus back", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  for (const [button, label, name] of [
+    ['New folder', 'Folder name', 'Weekend'],
+    ['New list', 'List name', 'Shortlist'],
+    ['New list', 'List name', 'Later'],
+  ]) {
+    await page.getByRole('button', { name: button }).click();
+    await page.getByRole('textbox', { name: label }).fill(name);
+    await page.keyboard.press('Enter');
+  }
+  const menu = rowMenu(page, 'Shortlist');
+
+  // Enter opens it, Tab goes into it, Esc closes it back onto ⋯.
+  await menu.focus();
+  await page.keyboard.press('Enter');
+  const move = page.getByRole('combobox', { name: 'Move Shortlist to…' });
+  await expect(move).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(move).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(move).toBeHidden();
+  await expect(menu).toBeFocused();
+
+  // Rename closes the menu, then the field takes focus; Enter saves and returns to ⋯.
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Rename Shortlist' }).press('Enter');
+  const field = page.getByRole('textbox', { name: 'List name' });
+  await expect(field).toBeFocused();
+  await expect(page.locator('.tree-menu-panel:popover-open')).toHaveCount(0);
+  await field.fill('Picks');
+  await page.keyboard.press('Enter');
+  await expect(rowMenu(page, 'Picks')).toBeFocused();
+
+  // Move lands on the moved row's ⋯.
+  await page.keyboard.press('Enter');
+  await page.getByRole('combobox', { name: 'Move Picks to…' }).selectOption({ label: 'Weekend' });
+  await expect(rowMenu(page, 'Picks')).toBeFocused();
+
+  // Delete: a cancelled confirm leaves focus on ⋯, an accepted one moves it to the next row's.
+  page.once('dialog', (d) => d.dismiss());
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Delete Picks' }).press('Enter');
+  await expect(rowMenu(page, 'Picks')).toBeFocused();
+  page.once('dialog', (d) => d.accept());
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Delete Picks' }).press('Enter');
+  await expect(rowMenu(page, 'Picks')).toHaveCount(0);
+  await expect(rowMenu(page, 'Later')).toBeFocused();
+
+  // The last row deleted: focus goes to the section's heading.
+  page.once('dialog', (d) => d.accept());
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Delete Later' }).press('Enter');
+  await expect(rowMenu(page, 'Weekend')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Delete Weekend' }).press('Enter');
+  await expect(page.getByRole('heading', { name: 'Your lists' })).toBeFocused();
 });
 
 test("L1 edge: clearing a ranking's name hands it back its default label", async ({ page }) => {
@@ -870,9 +1027,11 @@ test("L1 edge: clearing a ranking's name hands it back its default label", async
   await page.keyboard.press('Escape');
   await expect(page.getByRole('heading', { name: 'Ranking of Alice — Wishlist' })).toBeVisible();
   await page.goto('/');
+  await rowMenu(page, 'Ranking of Alice — Wishlist').click();
   await page.getByRole('button', { name: 'Rename Ranking of Alice — Wishlist' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('Top picks');
   await page.keyboard.press('Enter');
+  await rowMenu(page, 'Top picks').click();
   await page.getByRole('button', { name: 'Rename Top picks' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('');
   await page.keyboard.press('Enter');
@@ -882,7 +1041,7 @@ test("L1 edge: clearing a ranking's name hands it back its default label", async
 test('L1 edge: confirming an IME candidate with Enter keeps the name field open', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
-  await page.getByRole('button', { name: '+ New list' }).click();
+  await page.getByRole('button', { name: 'New list' }).click();
   const field = page.getByRole('textbox', { name: 'List name' });
   await field.fill('にほ');
   await field.dispatchEvent('keydown', { key: 'Enter', isComposing: true });
@@ -893,7 +1052,7 @@ test('L1 edge: confirming an IME candidate with Enter keeps the name field open'
 test("L1 edge: the name field looks like the app's other text fields", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
-  await page.getByRole('button', { name: '+ New folder' }).click();
+  await page.getByRole('button', { name: 'New folder' }).click();
   const look = (el: Element) => {
     const s = getComputedStyle(el);
     return [s.backgroundColor, s.borderTopStyle, s.borderTopWidth, s.borderRadius, s.color, s.fontSize];
@@ -905,7 +1064,7 @@ test("L1 edge: the name field looks like the app's other text fields", async ({ 
 test('L2 edge: creating a combined list opens it', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
-  await page.getByRole('button', { name: '+ New combined list' }).click();
+  await page.getByRole('button', { name: 'New combined list' }).click();
   const form = page.locator('.combine-form');
   const sources = form.locator('.combine-sources input[type="checkbox"]');
   await sources.nth(0).check();
@@ -918,7 +1077,7 @@ test('L2 edge: creating a combined list opens it', async ({ page }) => {
 test("L2 edge: a combined list created under a link's account opens under it", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/?u=bob');
-  await page.getByRole('button', { name: '+ New combined list' }).click();
+  await page.getByRole('button', { name: 'New combined list' }).click();
   const sources = page.locator('.combine-form .combine-sources input[type="checkbox"]');
   await sources.nth(0).check();
   await sources.nth(1).check();
@@ -929,7 +1088,7 @@ test("L2 edge: a combined list created under a link's account opens under it", a
 test('L2 edge: Edit sources has one Cancel, which hands focus back', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
-  await page.getByRole('button', { name: '+ New combined list' }).click();
+  await page.getByRole('button', { name: 'New combined list' }).click();
   const sources = page.locator('.combine-form .combine-sources input[type="checkbox"]');
   await sources.nth(0).check();
   await sources.nth(1).check();
@@ -942,10 +1101,28 @@ test('L2 edge: Edit sources has one Cancel, which hands focus back', async ({ pa
   await expect(edit).toBeFocused();
 });
 
+test('L2 edge: on a phone, the combine form fits the page width', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout');
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  const pageWidth = () => page.evaluate(() => document.documentElement.scrollWidth);
+  const viewport = page.viewportSize()!;
+  await page.getByRole('button', { name: 'New combined list' }).click();
+  const sources = page.locator('.combine-form .combine-sources input[type="checkbox"]');
+  await expect(sources.first()).toBeVisible();
+  expect(await pageWidth()).toBeLessThanOrEqual(viewport.width);
+  await sources.nth(0).check();
+  await sources.nth(1).check();
+  await page.getByRole('button', { name: 'Create combined list' }).click();
+  await page.getByRole('button', { name: 'Edit sources' }).click();
+  await expect(page.locator('.combine-form')).toBeVisible();
+  expect(await pageWidth()).toBeLessThanOrEqual(viewport.width);
+});
+
 test('L1 edge: a list under 2 games says ranking needs 2', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
-  await page.getByRole('button', { name: '+ New list' }).click();
+  await page.getByRole('button', { name: 'New list' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('Empty');
   await page.keyboard.press('Enter');
   await page.locator('.list-tree').getByRole('link', { name: /Empty/ }).click();
@@ -961,20 +1138,20 @@ test('L1 edge: one selected game is too few to rank, and says so', async ({ page
   await asPlayer(page, ALICE);
   await page.goto('/lists/wishlist');
   await row(page, 'It Takes Two').getByRole('checkbox').check();
-  const rank = page.getByRole('button', { name: '🏆 Rank 1 game', exact: true });
+  const rank = page.getByRole('button', { name: 'Rank 1 game', exact: true });
   await expect(rank).toHaveAttribute('aria-disabled', 'true');
   await expect(rank).toHaveAccessibleDescription('Ranking needs at least 2 games');
   await rank.click({ force: true });
   await expect(page).toHaveURL(/\/lists\/wishlist/);
 
-  // A list already ranked once gates "+ New ranking" the same way.
+  // A list already ranked once gates "New ranking" the same way.
   await row(page, 'It Takes Two').getByRole('checkbox').uncheck();
   await page.getByRole('button', { name: /Rank this list/ }).click();
   await page.keyboard.press('Escape');
   await page.goto('/lists/wishlist');
   await row(page, 'It Takes Two').getByRole('checkbox').check();
   await page.getByRole('button', { name: /Rank 1 game/ }).click();
-  const create = page.locator('.rank-menu-panel').getByRole('button', { name: '+ New ranking' });
+  const create = page.locator('.rank-menu-panel').getByRole('button', { name: 'New ranking' });
   await expect(create).toHaveAttribute('aria-disabled', 'true');
   await expect(create).toHaveAccessibleDescription('Ranking needs at least 2 games');
   await create.click({ force: true });
@@ -1056,7 +1233,7 @@ test("R1 edge: a ranking card's HLTB time is the table's, rounded and labelled",
   await expect(page.locator('thead th').filter({ hasText: /^HLTB \(h\)/ })).toHaveCount(1);
   await expect(row(page, 'Hades')).toContainText('44.5');
   for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
+  await page.getByRole('button', { name: 'Rank 2 games' }).click();
   await expect(page.locator('.rank-route')).toContainText('44.5 h to beat');
 });
 
@@ -1064,7 +1241,7 @@ test("R1 edge: the ranking's keyboard hints show only with a mouse", async ({ pa
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
+  await page.getByRole('button', { name: 'Rank 2 games' }).click();
   await expect(page.locator('.rank-question')).toBeVisible();
   await expect(page.locator('.rank-hint')).toBeVisible({ visible: testInfo.project.name !== 'phone' });
 });
@@ -1073,8 +1250,8 @@ test("R1 edge: the ranking's side panel offers similar owned games, with no list
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
-  await page.getByRole('button', { name: 'ℹ Details' }).first().click();
+  await page.getByRole('button', { name: 'Rank 2 games' }).click();
+  await page.getByRole('button', { name: 'Details', exact: true }).first().click();
   const similar = page.locator('#panel-section-similar');
   await expect(similar.locator('.panel-section-title')).toHaveText(/^Similar in Alice's library/);
   await expect(similar.locator('.panel-similar-item').first()).toBeVisible();
@@ -1085,8 +1262,8 @@ test("R1 edge: the ranking's side panel shows tags as plain pills and its Refres
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
-  await page.getByRole('button', { name: 'ℹ Details' }).first().click();
+  await page.getByRole('button', { name: 'Rank 2 games' }).click();
+  await page.getByRole('button', { name: 'Details', exact: true }).first().click();
 
   const panel = page.locator('.panel-tags');
   await expect(panel.locator('.panel-tag').first()).toBeVisible();
@@ -1109,8 +1286,8 @@ test("R1 edge: a failed Refresh on the ranking's side panel says so", async ({ p
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
-  await page.getByRole('button', { name: 'ℹ Details' }).first().click();
+  await page.getByRole('button', { name: 'Rank 2 games' }).click();
+  await page.getByRole('button', { name: 'Details', exact: true }).first().click();
   await page.route(/\/api\/game-details\/\d+\?refresh=1$/, (route) =>
     route.fulfill({ status: 502, json: { error: 'Steam did not answer' } }),
   );
@@ -1125,7 +1302,7 @@ test('I1 edge: on desktop the nav starts on the content edge, close above it', a
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/lists/owned');
     const nav = (await page.locator('.site-nav').boundingBox())!;
-    const first = (await page.locator('.site-nav-link').first().boundingBox())!;
+    const first = (await page.locator('.site-brand').boundingBox())!;
     const hero = (await page.locator('.list-hero').boundingBox())!;
     expect(Math.round(first.x), `at ${width}px`).toBe(Math.round(hero.x));
     expect(hero.y - (nav.y + nav.height), `at ${width}px`).toBeLessThanOrEqual(28);
@@ -1144,7 +1321,7 @@ test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo wi
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
+  await page.getByRole('button', { name: 'Rank 2 games' }).click();
   await expect(page.locator('.rank-card-name').nth(1)).not.toHaveText(/^App /);
 
   const viewport = page.viewportSize()!;
@@ -1163,7 +1340,7 @@ test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo wi
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
 
-test("I1 edge: on a phone, Home keeps the list pages' 12px gutter and each recent account on one row", async ({
+test("I1 edge: on a phone, Home keeps the list pages' 16px gutter and each recent account on one row", async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout');
@@ -1174,11 +1351,11 @@ test("I1 edge: on a phone, Home keeps the list pages' 12px gutter and each recen
   await expect(page.locator('.recent-accounts li')).toHaveCount(2);
 
   const viewport = page.viewportSize()!;
-  expect((await page.locator('.app-search-wrap').boundingBox())!.x).toBe(12);
+  expect((await page.locator('.app-search-wrap').boundingBox())!.x).toBe(16);
   const card = (await page.locator('.home-account').boundingBox())!;
-  expect(card.x).toBe(12);
-  expect(card.x + card.width).toBe(viewport.width - 12);
-  expect((await page.locator('.home-account h3').boundingBox())!.x).toBeLessThanOrEqual(25);
+  expect(card.x).toBe(16);
+  expect(card.x + card.width).toBe(viewport.width - 16);
+  expect((await page.locator('.home-account h3').boundingBox())!.x).toBeLessThanOrEqual(29);
 
   for (const li of await page.locator('.recent-accounts li').all()) {
     const tops = await li.locator(':scope > *').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top));
@@ -1207,7 +1384,7 @@ test('R1.1,3-6: rank chosen games, stop, resume on the same ones', async ({ page
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Terraria', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 3 games' }).click();
+  await page.getByRole('button', { name: 'Rank 3 games' }).click();
 
   await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
   await page.keyboard.press('ArrowLeft');
@@ -1219,33 +1396,33 @@ test('R1.1,3-6: rank chosen games, stop, resume on the same ones', async ({ page
   await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
 });
 
-test("R1 edge: closing the ranking's side panel returns focus to its ℹ Details", async ({ page }) => {
+test("R1 edge: closing the ranking's side panel returns focus to its Details button", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 2 games' }).click();
-  const details = page.getByRole('button', { name: 'ℹ Details' }).first();
+  await page.getByRole('button', { name: 'Rank 2 games' }).click();
+  const details = page.getByRole('button', { name: 'Details', exact: true }).first();
   await details.click();
   await expect(page.locator('.game-panel')).toBeVisible();
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.locator('.game-panel')).toBeHidden();
   await expect(details).toBeFocused();
 
-  // Opened from the keyboard, with nothing focused: focus lands on the shown game's ℹ Details.
+  // Opened from the keyboard, with nothing focused: focus lands on the shown game's Details button.
   await page.evaluate(() => (document.activeElement as HTMLElement).blur());
   await page.keyboard.press('i');
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('.game-panel')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('.game-panel')).toBeHidden();
-  await expect(page.getByRole('button', { name: 'ℹ Details' }).nth(1)).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Details', exact: true }).nth(1)).toBeFocused();
 });
 
 test('R1 edge: Esc closing a nav popover stays on the ranking', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   for (const name of ['Portal 2', 'Terraria', 'Hades']) await row(page, name).getByRole('checkbox').check();
-  await page.getByRole('button', { name: '🏆 Rank 3 games' }).click();
+  await page.getByRole('button', { name: 'Rank 3 games' }).click();
   await expect(page.getByText('Comparing 3 chosen games.')).toBeVisible();
 
   await page.getByLabel('Preferences').click();
@@ -1297,7 +1474,7 @@ test('R2 edge: ranking a list again offers its rankings, or a new one by a crite
   const menu = page.locator('.rank-menu-panel');
   await expect(menu.getByRole('button', { name: /Ranking of Alice — Wishlist/ })).toBeVisible();
   await menu.getByRole('textbox', { name: 'What are you ranking by?' }).fill('co-op');
-  await menu.getByRole('button', { name: '+ New ranking' }).click();
+  await menu.getByRole('button', { name: 'New ranking' }).click();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('heading', { name: 'Ranking of Alice — Wishlist (co-op)' })).toBeVisible();
 });
@@ -1345,7 +1522,7 @@ test('B1.1,3-4: a bundle, then what it adds to my library', async ({ page }) => 
   await expect(rows(page)).toHaveCount(2);
 });
 
-test("B1 edge: a bundle's hero keeps All bundles by its ‹ ›, and one primary action among ghost ones", async ({
+test("B1 edge: a bundle's hero keeps All bundles by its previous/next buttons, and one primary action among ghost ones", async ({
   page,
 }) => {
   await asPlayer(page, ALICE);
@@ -1353,15 +1530,15 @@ test("B1 edge: a bundle's hero keeps All bundles by its ‹ ›, and one primary
   await expect(rows(page)).toHaveCount(4);
   const titlebar = page.locator('.list-hero-titlebar');
   await expect(titlebar.getByRole('button', { name: 'Previous bundle' })).toBeVisible();
-  await expect(titlebar.getByRole('link', { name: '← All bundles' })).toBeVisible();
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds the rest behind ⋯
+  await expect(titlebar.getByRole('link', { name: 'All bundles' })).toBeVisible();
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds the rest behind More actions
   if (await more.isVisible()) await more.click();
   const classes = await page
     .locator('.list-hero-actions')
     .locator(':is(a, button, summary):visible')
     .evaluateAll((els) => els.map((el) => el.className));
   expect(classes.filter((c) => /\bbtn-primary\b/.test(c))).toHaveLength(1);
-  expect(classes.filter((c) => !/\bbtn-(primary|ghost)\b/.test(c))).toEqual([]);
+  expect(classes.filter((c) => !/\bbtn\b/.test(c))).toEqual([]);
 });
 
 test("B1 edge: a bundle's All bundles link keeps the account being explored, without reloading", async ({ page }) => {
@@ -1369,7 +1546,7 @@ test("B1 edge: a bundle's All bundles link keeps the account being explored, wit
   await page.goto(`/lists/bundle/${BUNDLE.id}?u=bob`);
   await expect(rows(page)).toHaveCount(4);
   await page.evaluate(() => ((window as unknown as { e2eSamePage: boolean }).e2eSamePage = true));
-  await page.locator('.list-hero-titlebar').getByRole('link', { name: '← All bundles' }).click();
+  await page.locator('.list-hero-titlebar').getByRole('link', { name: 'All bundles' }).click();
   await expect(page).toHaveURL(/\/bundles\?u=bob$/);
   expect(await page.evaluate(() => (window as unknown as { e2eSamePage?: boolean }).e2eSamePage)).toBe(true);
 });
@@ -1378,7 +1555,7 @@ test("B3 edge: a list built from a bundle says how many of its games aren't on S
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
   await expect(rows(page)).toHaveCount(4);
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds it behind ⋯
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds it behind More actions
   if (await more.isVisible()) await more.click();
   await page.getByRole('link', { name: 'What does this add?' }).click();
   await expect(page.locator('.list-formula')).toContainText('1 not on Steam');
@@ -1388,14 +1565,14 @@ test("B3 edge: what a bundle adds keeps the bundle's prices and links back to it
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
   await expect(rows(page)).toHaveCount(4);
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds it behind ⋯
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds it behind More actions
   if (await more.isVisible()) await more.click();
   await page.getByRole('link', { name: 'What does this add?' }).click();
   await expect(rows(page)).toHaveCount(2);
   await expect(page.locator('thead th').filter({ hasText: /^Tier Price/ })).toHaveCount(1);
   await expect(page.locator('thead th').filter({ hasText: /^Best Deal/ })).toHaveCount(1);
   await expect(row(page, 'Overcooked! 2')).toContainText('12.00');
-  await page.getByRole('link', { name: `← ${BUNDLE.title}` }).click();
+  await page.locator('.list-hero-actions').getByRole('link', { name: BUNDLE.title }).click();
   await expect(page).toHaveURL(new RegExp(`/lists/bundle/${BUNDLE.id}`));
   await expect(page.getByRole('heading', { name: BUNDLE.title })).toBeVisible();
 });
@@ -1414,7 +1591,7 @@ const saveWhatBundleAdds = async (page: Page) => {
   });
   await page.goto(sharedUrl(`subtract:(b:${BUNDLE.id};o:${ALICE.steamid})`));
   await expect(rows(page)).toHaveCount(2);
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind More actions
   if (await more.isVisible()) await more.click();
   await page.getByRole('button', { name: 'Save as a list' }).click();
   await expect(page).toHaveURL(/\/lists\/(?!shared)/);
@@ -1496,7 +1673,7 @@ test("B3 edge: a saved list from a pick-and-mix bundle claims no per-game rate i
   await asPlayer(page, ALICE);
   await page.goto(sharedUrl(`subtract:(b:90002;o:${BOB.steamid})`));
   await expect(row(page, 'Hades')).toContainText('Varies');
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind More actions
   if (await more.isVisible()) await more.click();
   await page.getByRole('button', { name: 'Save as a list' }).click();
   await expect(page).toHaveURL(/\/lists\/(?!shared)/);
@@ -1546,7 +1723,7 @@ test("B3 edge: a shared list left before its bundle answers doesn't link the nex
   release();
   await page.waitForResponse(/\/api\/bundles\/\d+/);
   await page.waitForTimeout(200); // let the late answer land, if it would
-  await expect(page.getByRole('link', { name: `← ${BUNDLE.title}` })).toHaveCount(0);
+  await expect(page.locator('.list-hero-actions').getByRole('link', { name: BUNDLE.title })).toHaveCount(0);
 });
 
 test('B3 edge: a list left with none of its bundle source has no Tier Price, but still links back', async ({
@@ -1557,7 +1734,7 @@ test('B3 edge: a list left with none of its bundle source has no Tier Price, but
   await expect(rows(page)).toHaveCount(4);
   await expect(page.locator('thead th').filter({ hasText: /^Best Deal/ })).toHaveCount(1);
   await expect(page.locator('thead th').filter({ hasText: /^Tier Price/ })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: `← ${BUNDLE.title}` })).toBeVisible();
+  await expect(page.locator('.list-hero-actions').getByRole('link', { name: BUNDLE.title })).toBeVisible();
 });
 
 test("B3 edge: what a pick-and-mix bundle adds claims no per-game rate it can't know", async ({ page }) => {
@@ -1576,7 +1753,10 @@ test("B3 edge: what a pick-and-mix bundle adds claims no per-game rate it can't 
 test("B3 edge: the link back to a bundle keeps the link's account", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto(`${sharedUrl(`subtract:(b:${BUNDLE.id};o:${BOB.steamid})`)}&u=bob`);
-  await expect(page.getByRole('link', { name: `← ${BUNDLE.title}` })).toHaveAttribute('href', /[?&]u=bob/);
+  await expect(page.locator('.list-hero-actions').getByRole('link', { name: BUNDLE.title })).toHaveAttribute(
+    'href',
+    /[?&]u=bob/,
+  );
 });
 
 test('B1 edge: a bundle game whose Steam lookup failed says so, rather than reading as not on Steam', async ({
@@ -1816,7 +1996,7 @@ test("B2 edge: a health check that didn't answer doesn't hide the Wishlist's pri
   await expect(page.getByRole('main')).not.toContainText("Prices aren't available on this instance");
 });
 
-test('D1 edge: Updated ↻ keeps the rows and the selection while it refreshes', async ({ page }) => {
+test('D1 edge: the Updated tile keeps the rows and the selection while it refreshes', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
@@ -1828,7 +2008,7 @@ test('D1 edge: Updated ↻ keeps the rows and the selection while it refreshes',
     await held;
     await route.fallback();
   });
-  await page.locator('.list-stat', { hasText: 'Updated' }).click();
+  await page.getByRole('button', { name: /^Updated\b/ }).click();
   await expect(page.locator('.list-stat', { hasText: 'Updated' })).toContainText('Refreshing');
   await expect(rows(page)).toHaveCount(6);
   await expect(row(page, 'Hades')).toContainText('44.5'); // details still on screen
@@ -1838,7 +2018,7 @@ test('D1 edge: Updated ↻ keeps the rows and the selection while it refreshes',
   await expect(row(page, 'Portal 2').getByRole('checkbox')).toBeChecked();
 });
 
-test('D1 edge: Updated ↻ keeps focus on the tile while it refreshes', async ({ page }) => {
+test('D1 edge: the Updated tile keeps focus while it refreshes', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
@@ -1848,7 +2028,7 @@ test('D1 edge: Updated ↻ keeps focus on the tile while it refreshes', async ({
     await held;
     await route.fallback();
   });
-  const tile = page.locator('.list-stat', { hasText: 'Updated' });
+  const tile = page.getByRole('button', { name: /^Updated/ });
   await tile.click();
   await expect(tile).toContainText('Refreshing');
   await expect(tile).toBeFocused();
@@ -1857,7 +2037,7 @@ test('D1 edge: Updated ↻ keeps focus on the tile while it refreshes', async ({
   await expect(tile).toBeFocused();
 });
 
-test('D1 edge: a failed Updated ↻ leaves the tile there to try again', async ({ page }) => {
+test('D1 edge: a failed Updated refresh leaves the tile there to try again', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare?u=alice&u=bob');
   await expect(groupRows(page)).toHaveCount(3);
@@ -1865,17 +2045,18 @@ test('D1 edge: a failed Updated ↻ leaves the tile there to try again', async (
     route.fulfill({ status: 502, json: { error: 'Steam request failed' } }),
   );
   const updated = page.locator('.list-stat', { hasText: 'Updated' });
-  await updated.click();
+  const updatedBtn = page.getByRole('button', { name: /^Updated\b/ });
+  await updatedBtn.click();
   await expect(page.getByRole('main')).toContainText('Steam request failed');
   await expect(updated).not.toContainText('Refreshing');
   await expect(page.locator('.list-formula')).toBeVisible();
 
   await page.unroute('**/api/common-games');
-  await updated.click();
+  await updatedBtn.click();
   await expect(page.getByRole('main')).not.toContainText('Steam request failed');
 });
 
-test('D1 edge: an Owned list that failed to load still offers Updated ↻', async ({ page }) => {
+test('D1 edge: an Owned list that failed to load still offers the Updated tile', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.route('**/api/common-games', (route) =>
     route.fulfill({ status: 502, json: { error: 'Steam request failed' } }),
@@ -1883,7 +2064,7 @@ test('D1 edge: an Owned list that failed to load still offers Updated ↻', asyn
   await page.goto('/lists/owned');
   await expect(page.getByRole('main')).toContainText('Steam request failed');
   await page.unroute('**/api/common-games');
-  await page.locator('.list-stat', { hasText: 'Updated' }).click();
+  await page.getByRole('button', { name: /^Updated\b/ }).click();
   await expect(rows(page)).toHaveCount(6);
 });
 
@@ -1920,12 +2101,12 @@ test('D2 edge: failed prices warn like the other sources, in plain words', async
   await page.goto('/lists/wishlist');
   await expect(rows(page)).toHaveCount(4);
   const status = page.locator('.price-status');
-  await expect(status).toHaveText("IsThereAnyDeal didn't answer for prices — the Prices tile's ↻ retries");
+  await expect(status).toHaveText("IsThereAnyDeal didn't answer for prices — refresh them on the Prices tile");
   const warnColor = await page.locator('.list-status .list-failed').evaluate((el) => getComputedStyle(el).color);
   await expect(status).toHaveCSS('color', warnColor);
 });
 
-test("D2.3: once the upstream is back, the panel's ↻ fills in what didn't answer", async ({ page }) => {
+test("D2.3: once the upstream is back, the panel's Refresh details fills in what didn't answer", async ({ page }) => {
   await mockApi(page, { states: ['upstream-down'] });
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
@@ -1991,6 +2172,45 @@ test("F1 edge: the Price card says when a game is in no bundle, and when ITAD di
   await expect(page.locator('.panel-bundles')).toHaveText("Bundles: IsThereAnyDeal didn't answer.");
 });
 
+test("B1 edge: a bundle's Add-on and Base pills are outlined alike, a fact rather than a state", async ({ page }) => {
+  await page.route(new RegExp(`/api/bundles/${BUNDLE.id}(\\?|$)`), (route) => {
+    const req = route.request();
+    const body = JSON.parse(respond(req.method(), new URL(req.url()), req.postData()).body);
+    body.bundle.tiers.at(-1).addon = true;
+    return route.fulfill({ json: body });
+  });
+  await asPlayer(page, ALICE);
+  await page.goto(`/lists/bundle/${BUNDLE.id}`);
+  await expect(rows(page)).toHaveCount(4);
+  await page.getByRole('button', { name: 'Columns', exact: true }).click();
+  await page
+    .locator('.dt-dd')
+    .getByRole('button', { name: /^Classification/ })
+    .click();
+  await page.locator('.dt-dd').getByRole('button', { name: 'Add-on' }).click();
+  await page.keyboard.press('Escape');
+  const pill = (name: string) => row(page, name).locator('.status-badge');
+  await expect(pill('Overcooked! 2')).toHaveText('Add-on');
+  await expect(pill('Portal 2')).toHaveText('Base');
+  for (const name of ['Overcooked! 2', 'Portal 2']) {
+    await expect(pill(name)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(pill(name)).toHaveCSS('color', 'rgb(195, 204, 217)'); // --text-body
+  }
+});
+
+test('F1 edge: a free demo shows as a neutral Demo pill and a Try the Free Demo button', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  const pill = row(page, 'It Takes Two').locator('.status-badge');
+  await expect(pill).toHaveText('Demo');
+  await expect(pill).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)'); // outlined, not the accent
+  await expect(row(page, 'Overcooked! 2').locator('.status-badge')).toHaveCount(0);
+  await row(page, 'It Takes Two').getByText('It Takes Two').click();
+  const demo = page.getByRole('link', { name: 'Try the Free Demo' });
+  await expect(demo).toHaveAttribute('href', `https://store.steampowered.com/app/${DEMO_OF[1426210]}`);
+  await expect(demo).not.toHaveClass(/btn-primary/);
+});
+
 test('F1 edge: the Price card names its ★ and 🔥 records in visible text, not only in a tooltip', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=892970');
@@ -2020,9 +2240,33 @@ test("F1 edge: the panel doesn't link an upstream URL that isn't http(s)", async
   await expect(chip).not.toHaveAttribute('href', /.*/);
 });
 
+test("F1 edge: Tags & details names each chip's kind, and draws each kind's dot its own shape", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=620');
+  const chips = page.locator('.panel-tags').getByRole('button');
+  await expect(chips.first()).toBeVisible();
+  for (const name of ['Co-op, tag', 'Co-op, category'])
+    await expect(page.locator('.panel-tags').getByRole('button', { name, exact: true })).toBeVisible();
+  const names = await chips.evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')));
+  expect(new Set(names).size).toBe(names.length);
+  const shapes = await page.locator('.panel-tag-legend .panel-tag-dot').evaluateAll((dots) =>
+    dots.map((d) => {
+      const s = getComputedStyle(d);
+      return `${s.borderRadius} ${s.rotate} ${s.clipPath}`;
+    }),
+  );
+  expect(shapes.length).toBeGreaterThanOrEqual(3);
+  expect(new Set(shapes).size).toBe(shapes.length);
+  const colours = await page
+    .locator('.panel-tag-legend .panel-tag-dot')
+    .evaluateAll((dots) => dots.map((d) => getComputedStyle(d).backgroundColor));
+  expect(colours).not.toContain('rgba(0, 0, 0, 0)');
+  expect(new Set(colours).size).toBe(colours.length);
+});
+
 // A failed health check stops the panel before its price lookup, so each failure gets its own run.
 for (const failing of ['health', 'prices']) {
-  test(`F1 edge: the Price card says when ITAD didn't answer its ${failing} call, and the panel's ↻ retries it`, async ({
+  test(`F1 edge: the Price card says when ITAD didn't answer its ${failing} call, and the panel's Refresh details retries it`, async ({
     page,
   }) => {
     let down = true;
@@ -2040,6 +2284,64 @@ for (const failing of ['health', 'prices']) {
     await expect(card).toContainText('Buy at Test Shop');
   });
 }
+
+test("F1 edge: a DLC's capsule that fails to load hides, keeping its box", async ({ page }) => {
+  await page.route('**/900001/capsule_231x87.jpg', (route) =>
+    route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="231" height="87"/>',
+    }),
+  );
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const card = page.locator('#panel-section-dlc');
+  await card.getByRole('button', { name: /DLC · 25 available/ }).click();
+  const capsule = (name: string) =>
+    card.locator('.panel-dlc-item', { hasText: new RegExp(`^${name}$`) }).locator('img');
+  await expect(capsule('Expansion 1')).toHaveCSS('visibility', 'visible');
+  await expect(capsule('Expansion 2')).toHaveCSS('visibility', 'hidden');
+  expect(await capsule('Expansion 2').boundingBox()).toMatchObject({ width: 80, height: 30 });
+});
+
+test("F1 edge: a loading video's ▶ stays put while the hero shimmers", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  // The hero as it stands while a trailer's poster loads.
+  const pseudo = await page.locator('#panel-hero .panel-hero-main').evaluate((el) => {
+    el.classList.add('is-video', 'panel-hero-main--loading');
+    const style = (which: string) => {
+      const s = getComputedStyle(el, which);
+      return { content: s.content, animation: s.animationName };
+    };
+    return { before: style('::before'), after: style('::after') };
+  });
+  expect(pseudo.before).toEqual({ content: '"▶"', animation: 'none' });
+  expect(pseudo.after.animation).toBe('shimmer');
+});
+
+test('F1 edge: DLC entries streamed in stay put, not redrawn, once the rest arrive', async ({ page }) => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/game-meta/900020', async (route) => {
+    await held;
+    await route.fallback();
+  });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const card = page.locator('#panel-section-dlc');
+  await card.getByRole('button', { name: /DLC · 25 available/ }).click();
+  await expect(card.getByText('Loading 1 more…')).toBeVisible();
+  const order = () => card.locator('.panel-dlc-name').allTextContents();
+  const before = await order();
+  await card.locator('.panel-dlc-item').evaluateAll((items) => items.forEach((el) => el.setAttribute('data-seen', '')));
+  release();
+  await expect(card.getByText('Loading 1 more…')).toHaveCount(0);
+  await expect(card.locator('.panel-dlc-item')).toHaveCount(20);
+  // Every entry already on screen is the same element, in the same order: no remount, no reload of its capsule.
+  await expect(card.locator('.panel-dlc-item[data-seen]')).toHaveCount(19);
+  expect((await order()).filter((name) => before.includes(name))).toEqual(before);
+});
 
 test('F1 edge: the DLC card lists 20 entries from store metadata, then more on request', async ({ page }) => {
   const requested: string[] = [];
@@ -2071,7 +2373,32 @@ test('F1 edge: the panel section nav highlights the section it jumped to', async
   await expect(nav.getByRole('button', { name: 'Overview' })).not.toHaveClass(/active/);
 });
 
-test('F1 edge: the panel closes from its × after scrolling it', async ({ page }) => {
+test("F1 edge: on a narrow phone, the panel's tabs stay one row and scroll to the current one", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout');
+  await page.setViewportSize({ width: 320, height: 844 });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const list = page.locator('.panel-subnav-list');
+  const last = list.getByRole('button', { name: 'DLC' });
+  await expect(last).toBeAttached();
+  const tops = await list.locator('li').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top));
+  expect(new Set(tops).size).toBe(1);
+
+  await page.locator('#panel-body').evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await expect(last).toHaveClass(/active/);
+  await expect
+    .poll(() =>
+      last.evaluate((el) => {
+        const [b, l] = [el.getBoundingClientRect(), el.closest('ul')!.getBoundingClientRect()];
+        return b.left >= l.left && b.right <= l.right + 1;
+      }),
+    )
+    .toBe(true);
+});
+
+test('F1 edge: the panel closes from its Close button after scrolling it', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await row(page, 'Hades').getByText('Hades').click();
@@ -2337,7 +2664,7 @@ test('F1 edge: stepping back to a game just left in the lightbox lands where it 
 });
 
 // Terraria (Hades' ↓ neighbour on /lists/owned) loads without its store metadata, so only its
-// banner; ↻ Refresh refetches it, with its media whenever `withMedia()` says so.
+// banner; Refresh details refetches it, with its media whenever `withMedia()` says so.
 async function terrariaMediaOnRefresh(page: Page, withMedia: () => boolean) {
   await page.route('**/api/game-details/stream', (route) => {
     const req = route.request();
@@ -2361,7 +2688,7 @@ async function terrariaMediaOnRefresh(page: Page, withMedia: () => boolean) {
   });
 }
 
-// The panel's ↻ sits behind the lightbox; clicked there, it refreshes the game the lightbox shows.
+// The panel's Refresh details sits behind the lightbox; clicked there, it refreshes the game the lightbox shows.
 const refreshBehindLightbox = (page: Page) =>
   page.locator('.panel-refresh-btn').evaluate((b: HTMLElement) => b.click());
 
@@ -2666,7 +2993,9 @@ test("F1 edge: on a phone, a slow right swipe on the panel's media steps it, wit
   await expect(page.locator('#panel-title')).toBeVisible();
 });
 
-test('F1 edge: on a phone, the ‹ › buttons sit clear of the media and its controls', async ({ page }, testInfo) => {
+test('F1 edge: on a phone, the previous/next media buttons sit clear of the media and its controls', async ({
+  page,
+}, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout');
   await fakePlayback(page);
   await asPlayer(page, ALICE);
@@ -2821,6 +3150,9 @@ test('F1 edge: a paused trailer offers a large play button', async ({ page }) =>
   await bigPlay.click();
   await expect(bigPlay).toBeHidden();
   await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
+  // The control draws its state: Pause while playing, not Play.
+  await expect(page.locator('.lb-vc-play .lucide-pause')).toBeVisible();
+  await expect(page.locator('.lb-vc-play .lucide-play')).toBeHidden();
 });
 
 test('F1 edge: a trailer not yet played shows its large play button, not the control bar', async ({ page }) => {
@@ -2955,7 +3287,7 @@ test('F1 edge: Back closes the lightbox before the game behind it', async ({ pag
   await expect(page).toHaveURL(/\?game=1145360$/);
 });
 
-test('F1 edge: after closing the game with ×, one Back leaves the list', async ({ page }) => {
+test('F1 edge: after closing the game with its Close button, one Back leaves the list', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/about');
   await page.goto('/lists/owned');
@@ -3081,7 +3413,9 @@ test('F1 edge: the nav search box empties after a pick and on a second Esc', asy
   await expect(box).toHaveValue('');
 });
 
-test('F1 edge: the nav search box’s × empties it and keeps it focused, back on the recents', async ({ page }) => {
+test('F1 edge: the nav search box’s Clear search button empties it and keeps it focused, back on the recents', async ({
+  page,
+}) => {
   await asPlayer(page, ALICE, { recentGames: [728880] });
   await page.goto('/about');
   const box = page.getByPlaceholder('Look up any game…');
@@ -3095,7 +3429,9 @@ test('F1 edge: the nav search box’s × empties it and keeps it focused, back o
   await expect(page.getByRole('option', { name: /Overcooked! 2/ })).toBeVisible();
 });
 
-test('F2 edge: the /search box’s × empties it, and refocusing it selects its text to type over', async ({ page }) => {
+test('F2 edge: the /search box’s Clear search button empties it, and refocusing it selects its text to type over', async ({
+  page,
+}) => {
   await page.goto('/search?q=hades');
   await expect(rows(page)).toHaveCount(1);
   await expect(page.locator('.game-panel')).toBeVisible();
@@ -3224,7 +3560,9 @@ test('F1 edge: Enter opens the highlighted recently looked-up game', async ({ pa
   await expect(page).toHaveURL(/[?&]game=1145360\b/);
 });
 
-test("I1 edge: on a phone, a bundle's table starts high, its other actions behind ⋯", async ({ page }, testInfo) => {
+test("I1 edge: on a phone, a bundle's table starts high, its other actions behind More actions", async ({
+  page,
+}, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout only');
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
@@ -3232,8 +3570,8 @@ test("I1 edge: on a phone, a bundle's table starts high, its other actions behin
   const top = await rows(page)
     .first()
     .evaluate((el) => el.getBoundingClientRect().top + scrollY);
-  expect(top).toBeLessThan(520); // 761 with the hero's tiles and actions wrapping
-  // CI's fonts run wider than a dev machine's: the ⋯ must not drop to a line of its own there.
+  expect(top).toBeLessThan(540); // 761 with the hero's tiles and actions wrapping
+  // CI's fonts run wider than a dev machine's: More actions must not drop to a line of its own there.
   await page.addStyleTag({ content: '.list-hero-actions { letter-spacing: 1px }' });
   const rowY = (name: string) => page.getByRole('link', { name }).evaluate((el) => el.getBoundingClientRect().top);
   const moreY = await page
@@ -3243,6 +3581,21 @@ test("I1 edge: on a phone, a bundle's table starts high, its other actions behin
   await expect(page.getByRole('link', { name: 'View on IsThereAnyDeal ↗' })).toBeHidden();
   await page.getByRole('button', { name: 'More actions' }).click();
   await expect(page.getByRole('link', { name: 'View on IsThereAnyDeal ↗' })).toBeVisible();
+});
+
+test("C3 edge: on a phone, the hero's More actions centres its ⋯", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout only');
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare?u=alice&u=bob');
+  const more = page.getByRole('button', { name: 'More actions' });
+  const centre = (box: { x: number; y: number; width: number; height: number } | null) => [
+    box!.x + box!.width / 2,
+    box!.y + box!.height / 2,
+  ];
+  const [bx, by] = centre(await more.boundingBox());
+  const [ix, iy] = centre(await more.locator('svg').boundingBox());
+  expect(Math.abs(ix - bx)).toBeLessThan(1);
+  expect(Math.abs(iy - by)).toBeLessThan(1);
 });
 
 test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page }, testInfo) => {
@@ -3265,11 +3618,15 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
   };
   await asPlayer(page, ALICE);
   await page.goto('/');
-  await page.getByRole('button', { name: '+ New list' }).click();
+  await page.getByRole('button', { name: 'New list' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('Shortlist');
   await page.keyboard.press('Enter');
-  expect(await takes24pxTap(page.locator('.list-tree').getByRole('button', { name: 'Rename' }))).toBe(true);
-  expect(await takes24pxTap(page.locator('.list-tree').getByRole('button', { name: 'Delete' }))).toBe(true);
+  expect(await takes24pxTap(page.locator('.list-tree').getByRole('link', { name: 'Shortlist' }))).toBe(true);
+  expect(await takes24pxTap(rowMenu(page, 'Shortlist'))).toBe(true);
+  await rowMenu(page, 'Shortlist').click();
+  expect(await takes24pxTap(page.getByRole('button', { name: 'Rename Shortlist' }))).toBe(true);
+  expect(await takes24pxTap(page.getByRole('button', { name: 'Delete Shortlist' }))).toBe(true);
+  await page.keyboard.press('Escape');
 
   await page.goto('/lists/compare');
   expect(await takes24pxTap(page.getByRole('button', { name: 'Remove Alice' }))).toBe(true);
@@ -3292,6 +3649,13 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
   expect(await takes24pxTap(page.getByRole('button', { name: 'Remove Alice' }))).toBe(true);
   await friends.click();
   expect(await takes24pxTap(page.locator('.account-friends-refresh'))).toBe(true);
+
+  await page.getByRole('button', { name: 'Add Steam Family account' }).click();
+  const fields = page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…');
+  await fields.nth(0).fill('alice');
+  await fields.nth(1).fill('bob');
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  expect(await takes24pxTap(page.locator('.account-members').getByRole('link', { name: 'Bob ↗' }))).toBe(true);
 });
 
 test('I2 edge: the lightbox shows its focus ring when opened from the keyboard, not from a tap', async ({
@@ -3373,7 +3737,7 @@ test('I2 edge: Esc closing the panel returns focus to the row it was showing', a
   await expect(page.locator('tr.dt-tr:focus')).toHaveCount(1);
 });
 
-test('I2 edge: × closing the panel returns focus to the row it was showing', async ({ page }) => {
+test('I2 edge: the Close button closing the panel returns focus to the row it was showing', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await row(page, 'Hades').getByText('Hades').click();
@@ -3384,6 +3748,125 @@ test('I2 edge: × closing the panel returns focus to the row it was showing', as
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.locator('.game-panel')).toBeHidden();
   await expect(page.locator(`tr.dt-tr[data-row-key="${shown}"]`)).toBeFocused();
+});
+
+test("I2 edge: the panel's ground takes a trace of the game's art, and stays neutral when the art can't be read", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  const panel = page.locator('.game-panel');
+  // The mock's CDN is unreachable: no tint, the plain surface.
+  await page.goto('/lists/owned?game=1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const neutral = await panel.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await panel.evaluate((el) => el.style.getPropertyValue('--panel-tint'))).toBe('');
+  // A red capsule: the ground turns faintly red, dark enough to keep its text's contrast.
+  await page.route(/steamstatic\.com/, (route) =>
+    route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="231" height="87"><rect width="231" height="87" fill="#d22"/></svg>',
+    }),
+  );
+  await page.reload();
+  await expect(panel).toHaveAttribute('style', /--panel-tint: oklch\(0\.17 0\.040 /);
+  await expect(panel).not.toHaveCSS('background-color', neutral);
+  await expect(page.locator('.panel-header-sticky')).toHaveCSS(
+    'background-color',
+    await panel.evaluate((el) => getComputedStyle(el).backgroundColor),
+  );
+});
+
+test.describe('with motion on', () => {
+  test.use({ reducedMotion: 'no-preference' });
+
+  test('I2 edge: the panel slides in to rest, focus on its hero', async ({ page }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned');
+    await row(page, 'Hades').getByText('Hades').click();
+    const panel = page.locator('.game-panel');
+    await expect(panel).toHaveCSS('opacity', '1');
+    await expect(panel).toHaveCSS('translate', 'none');
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+    await expect(page.locator('.panel-hero-open')).toBeFocused();
+    await expect(page.locator('.panel-hero-img')).toHaveCSS('opacity', '1');
+  });
+
+  for (const viewTransitions of [true, false]) {
+    test(`I2 edge: a row click opens the panel on its hero, focused, Back closing it (View Transitions ${viewTransitions ? 'on' : 'absent'})`, async ({
+      page,
+    }) => {
+      if (!viewTransitions)
+        await page.addInitScript(() => delete (Document.prototype as Partial<Document>).startViewTransition);
+      // The morph needs a loaded thumbnail; the CDN is otherwise unreachable here.
+      await page.route(/steamstatic\.com/, (route) =>
+        route.fulfill({
+          contentType: 'image/svg+xml',
+          body: '<svg xmlns="http://www.w3.org/2000/svg" width="231" height="87"><rect width="231" height="87" fill="#468"/></svg>',
+        }),
+      );
+      await asPlayer(page, ALICE);
+      await page.goto('/lists/owned');
+      await expect(rows(page)).toHaveCount(6);
+      await expect(row(page, 'Hades').locator('.game-thumb')).toHaveJSProperty('complete', true);
+      const started = page.evaluate(
+        () =>
+          new Promise<boolean>((resolve) => {
+            const start = document.startViewTransition?.bind(document);
+            if (!start) return resolve(false);
+            document.startViewTransition = (cb) => (resolve(true), start(cb));
+          }),
+      );
+      await row(page, 'Hades').getByText('Hades').click();
+      expect(await started).toBe(viewTransitions);
+      await expect(page.locator('#panel-title')).toHaveText('Hades');
+      await expect(page.locator('.panel-hero-open')).toBeFocused();
+      await expect(page.locator('.panel-hero-img')).toHaveCSS('opacity', '1');
+      await expect(page.locator('.game-panel')).toHaveCSS('translate', 'none');
+      await expect(page.locator('[style*="view-transition-name"]')).toHaveCount(0);
+      await page.goBack();
+      await expect(page.locator('.game-panel')).toBeHidden();
+      await expect(page).not.toHaveURL(/[?&]game=/);
+    });
+  }
+
+  test("F1 edge: a click on the panel's picture grows it into the lightbox, focused, Back closing only that", async ({
+    page,
+  }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned?game=1145360');
+    await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
+    await expect(page.locator('.panel-hero-img')).not.toHaveClass(/loading/);
+    const started = page.evaluate(
+      () =>
+        new Promise<boolean>((resolve) => {
+          const start = document.startViewTransition.bind(document);
+          document.startViewTransition = (cb) => (resolve(true), start(cb));
+        }),
+    );
+    await page.getByRole('button', { name: 'Open in lightbox' }).click();
+    expect(await started).toBe(true);
+    await expect(page.locator('.lb-close')).toBeFocused();
+    await expect(page.locator('#screenshot-lightbox')).toHaveCSS('opacity', '1');
+    await expect(page.locator('.lb-img')).toHaveAttribute('src', /Screenshot%201%3C/);
+    await expect(page.locator('.lb-img')).toHaveCSS('opacity', '1');
+    await expect(page.locator('[style*="view-transition-name"]')).toHaveCount(0);
+    await page.goBack();
+    await expect(page.locator('#screenshot-lightbox')).toBeHidden();
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+  });
+
+  test('I2 edge: a nav popover rises to rest and Esc hands focus back', async ({ page }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned');
+    const prefs = page.getByLabel('Preferences');
+    await prefs.click();
+    const panel = page.locator('.site-nav-prefs-panel');
+    await expect(panel).toHaveCSS('opacity', '1');
+    await expect(panel).toHaveCSS('translate', '0px');
+    await page.keyboard.press('Escape');
+    await expect(panel).toBeHidden();
+    await expect(prefs).toBeFocused();
+  });
 });
 
 test('I2 edge: closing a game with no row returns focus to the row it was opened from', async ({ page }) => {
@@ -3405,6 +3888,19 @@ test('I2 edge: closing a game with no row returns focus to the row it was opened
   await expect(row(page, 'Hades')).toBeFocused();
 });
 
+test("I3 edge: a DLC's panel names its way back after the game it came from", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.route(/\/api\/game-details\/9000\d\d$/, (route) =>
+    route.fulfill({ json: { appid: 900001, meta: null, failed: ['meta'] } }),
+  );
+  await page.goto('/lists/owned?game=1145360');
+  const card = page.locator('#panel-section-dlc');
+  await card.getByRole('button', { name: /DLC · 25 available/ }).click();
+  await card.locator('.panel-dlc-item').first().click();
+  await page.getByRole('button', { name: 'Back to Hades', exact: true }).click();
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+});
+
 test('I2 edge: the shortcuts dialog says how to open the lightbox from the panel', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
@@ -3412,6 +3908,25 @@ test('I2 edge: the shortcuts dialog says how to open the lightbox from the panel
   await page.keyboard.press('?');
   const section = page.locator('.shortcuts-section').filter({ hasText: 'Game panel' });
   await expect(section.locator('.shortcuts-row').filter({ hasText: 'lightbox' })).toContainText('Enter');
+});
+
+test('I2 edge: the shortcuts dialog draws all four arrow keys the same size, still read as ← → ↑ ↓', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await page.keyboard.press('?');
+  const arrows = page.getByRole('dialog', { name: 'Keyboard shortcuts' }).locator('kbd', { hasText: /^[←→↑↓]$/ });
+  await expect(arrows.first()).toBeVisible();
+  const caps = await arrows.evaluateAll((els) =>
+    els.map((el) => {
+      const r = el.getBoundingClientRect();
+      return { key: el.textContent, size: `${r.width.toFixed(1)}×${r.height.toFixed(1)}` };
+    }),
+  );
+  expect(new Set(caps.map((c) => c.key))).toEqual(new Set(['←', '→', '↑', '↓']));
+  expect(new Set(caps.map((c) => c.size)).size).toBe(1);
 });
 
 test('I2 edge: every shortcut description starts at the same x', async ({ page }) => {
@@ -3456,13 +3971,15 @@ test('I2 edge: controls name what they act on, and only toggles carry a pressed 
   await asPlayer(page, ALICE);
   await page.goto('/');
   await expect(page.locator('.account-chip-btn')).toHaveAccessibleName(/Alice/);
-  await page.getByRole('button', { name: '+ New list' }).click();
+  await page.getByRole('button', { name: 'New list' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('Shortlist');
   await page.keyboard.press('Enter');
+  await rowMenu(page, 'Shortlist').click();
   await expect(page.getByRole('button', { name: 'Rename Shortlist' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Delete Shortlist' })).toBeVisible();
+  await page.keyboard.press('Escape');
 
-  await page.getByRole('button', { name: '+ New combined list' }).click();
+  await page.getByRole('button', { name: 'New combined list' }).click();
   const form = page.locator('.combine-form');
   await form.getByRole('combobox', { name: 'How to combine the sources' }).selectOption('subtract');
   const sources = form.locator('.combine-sources input[type="checkbox"]');
@@ -3478,11 +3995,12 @@ test('I2 edge: controls name what they act on, and only toggles carry a pressed 
   );
 
   await page.goto('/bundles');
-  const updated = page.locator('.list-stat', { hasText: 'Updated' });
+  // A tile's button is named by its label and value.
+  const updated = page.getByRole('button', { name: /^Updated \S/ });
   await expect(updated).toBeVisible();
   await expect(updated).not.toHaveAttribute('aria-pressed');
-  await expect(page.locator('.list-stat', { hasText: 'Prices' })).not.toHaveAttribute('aria-pressed');
-  const ending = page.locator('.list-stat', { hasText: 'Ending soon' });
+  await expect(page.getByRole('button', { name: /^Prices \S/ })).not.toHaveAttribute('aria-pressed');
+  const ending = page.getByRole('button', { name: /^Ending soon \d/ });
   if (await ending.count()) await expect(ending).toHaveAttribute('aria-pressed', 'false');
 });
 
@@ -3670,7 +4188,7 @@ test('I3.3: each field on Home, the combine form and Compare says what it is for
   await page.goto('/');
   await expect(page.getByRole('search').getByRole('textbox', { name: 'Look up any game' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Steam name, profile URL, or 64-bit ID' })).toBeVisible();
-  await page.getByRole('button', { name: '+ New combined list' }).click();
+  await page.getByRole('button', { name: 'New combined list' }).click();
   await expect(page.getByRole('textbox', { name: 'Combined list name (optional)' })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'How to combine the sources' })).toBeVisible();
   await expect(
@@ -3853,7 +4371,7 @@ test("F4 edge: Steam's store search down says so rather than no games, and Updat
   await expect(page.locator('.list-status')).toContainText("Steam's store search didn't answer");
   await expect(page.locator('.list-empty')).toHaveCount(0);
   await mockApi(page);
-  await page.locator('.list-stat', { hasText: 'Updated' }).click();
+  await page.getByRole('button', { name: /^Updated\b/ }).click();
   await expect(rows(page)).toHaveCount(1);
 });
 
@@ -3885,7 +4403,7 @@ test("F4.3: a publisher's games I don't own open as a shared list, linked back a
     /\/lists\/publisher\?name=indie\.io/,
   );
 
-  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind ⋯
+  const more = page.getByRole('button', { name: 'More actions' }); // a phone folds Save behind More actions
   if (await more.isVisible()) await more.click();
   await page.getByRole('button', { name: 'Save as a list' }).click();
   await expect(page).toHaveURL(/\/lists\/(?!shared)/);
@@ -3911,7 +4429,7 @@ test("F4 edge: Steam's store search down in a combined list names the source, an
   await expect(page.locator('.list-status')).toContainText('Published by indie.io: Steam store search error');
   await mockApi(page);
   const forced = page.waitForRequest((req) => /\/api\/creator-games\?.*refresh=1/.test(req.url()));
-  await page.locator('.list-stat', { hasText: 'Updated' }).click();
+  await page.getByRole('button', { name: /^Updated\b/ }).click();
   await forced;
   await expect(rows(page)).toHaveCount(2);
 });
@@ -3929,5 +4447,5 @@ test('F4 edge: a game with no Steam tags still offers More from', async ({ page 
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=105600');
   await expect(moreFrom(page).getByRole('link', { name: 'All games by Re-Logic (developer)' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '⇅ Sort list by similarity' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sort list by similarity' })).toHaveCount(0);
 });

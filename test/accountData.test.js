@@ -111,7 +111,7 @@ test('fetchAccountWishlistData: resolves an accountId straight to a flat appid S
 
 // ── resolveAccountSlot ────────────────────────────────────────────────────────────────────
 
-test('resolveAccountSlot: a single account resolves members/label/avatar/profile trivia', async (t) => {
+test('resolveAccountSlot: a single account resolves members/label/avatar/vanities', async (t) => {
   withFetch(t, async () => ({
     ok: true,
     json: async () => ({
@@ -139,9 +139,6 @@ test('resolveAccountSlot: a single account resolves members/label/avatar/profile
   assert.equal(slot.label, 'Alice');
   assert.equal(slot.avatarUrl, 'https://x/a.jpg');
   assert.deepEqual(slot.vanities, { 1: 'alice' });
-  assert.equal(slot.memberSince, '2015-06-10');
-  assert.equal(slot.countryCode, 'US');
-  assert.equal(slot.realName, 'Alice Smith');
 });
 
 test('resolveAccountSlot: a multi-member Family sorts members, joins the label, and has no single avatar', async (t) => {
@@ -165,10 +162,6 @@ test('resolveAccountSlot: a multi-member Family sorts members, joins the label, 
   assert.equal(slot.avatarUrl, undefined);
   // Keyed by steamid, not by position: the response is in the API's order, `members` is sorted.
   assert.deepEqual(slot.vanities, { 2: 'bob' });
-  // No one profile speaks for a Family — same reasoning as avatarUrl being absent above.
-  assert.equal(slot.memberSince, undefined);
-  assert.equal(slot.countryCode, undefined);
-  assert.equal(slot.realName, undefined);
 });
 
 test('resolveAccountSlot: throws with the server error message when the account itself fails to resolve', async (t) => {
@@ -217,9 +210,6 @@ test('accountSlotFrom: a friend makes a single-account slot from its own fields'
         name: 'Alice',
         avatarUrl: '',
         profileUrl: 'https://steamcommunity.com/id/alice/',
-        memberSince: '',
-        countryCode: 'FR',
-        realName: '',
       },
     ],
     ['1'],
@@ -227,8 +217,6 @@ test('accountSlotFrom: a friend makes a single-account slot from its own fields'
   assert.equal(slot.label, 'Alice');
   assert.equal(slot.avatarUrl, undefined);
   assert.deepEqual(slot.vanities, { 1: 'alice' });
-  assert.equal(slot.memberSince, undefined);
-  assert.equal(slot.countryCode, 'FR');
 });
 
 // ── toAccountPlayer / fetchAccountOverview ───────────────────────────────────

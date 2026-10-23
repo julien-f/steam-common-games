@@ -29,12 +29,20 @@ const mockApiPlugin = {
       // `document.cookie = 'mock=no-itad,slow'` in the page picks mockApi.ts's states.
       const cookie = /(?:^|;\s*)mock=([^;]*)/.exec(req.headers.cookie ?? '');
       const states = new Set(cookie ? decodeURIComponent(cookie[1]).split(',') : []);
-      const { status, contentType, body, delayMs } = respond(
-        req.method,
-        new URL(req.url, 'http://localhost'),
-        chunks.length ? Buffer.concat(chunks).toString() : null,
-        states,
-      );
+      let answer;
+      try {
+        answer = respond(
+          req.method,
+          new URL(req.url, 'http://localhost'),
+          chunks.length ? Buffer.concat(chunks).toString() : null,
+          states,
+        );
+      } catch (err) {
+        // A fixture gap answers 500, as Express does a route's uncaught error, instead of killing the server.
+        console.warn(`[mock-api] ${req.method} ${req.url}:`, err.message);
+        answer = { status: 500, contentType: 'application/json', body: JSON.stringify({ error: err.message }) };
+      }
+      const { status, contentType, body, delayMs } = answer;
       if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
       res.writeHead(status, { 'Content-Type': contentType });
       if (!states.has('slow') || contentType !== 'text/event-stream') return res.end(body);

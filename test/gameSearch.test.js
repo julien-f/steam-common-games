@@ -122,7 +122,7 @@ test('gameSearchEmptyHtml: names the term, escaped, and tells a failure from no 
 });
 
 test('gameSearchMoreHtml: renders a selectable, non-focusable option row', () => {
-  const html = gameSearchMoreHtml('See all →');
+  const html = gameSearchMoreHtml('See all');
   assert.ok(html.includes('class="game-search-more"'));
   assert.ok(!html.includes('game-search-more active'));
   // A real option — reachable by ArrowUp/ArrowDown as the roving selection's last index.
@@ -133,7 +133,7 @@ test('gameSearchMoreHtml: renders a selectable, non-focusable option row', () =>
 });
 
 test('gameSearchMoreHtml: marks the row active when it is the highlighted option', () => {
-  const html = gameSearchMoreHtml('See all →', true);
+  const html = gameSearchMoreHtml('See all', true);
   assert.ok(html.includes('class="game-search-more active"'));
   assert.ok(html.includes('aria-selected="true"'));
 });

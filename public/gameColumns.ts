@@ -46,6 +46,8 @@ import {
   formatMoney,
   compareByOrder,
   PROTON_TIER_COLORS,
+  PROTON_TIER_UNKNOWN,
+  fadeInOnLoad,
 } from './utils.ts';
 import { convert } from './currency.ts';
 
@@ -120,7 +122,7 @@ const compareProtonTier = compareMissingLast(
   isProtonMissing,
 );
 
-// The generic colored-pill treatment (`.status-badge`, shared style.css rule) — shared with
+// The generic colored-pill treatment (`.status-badge`, styles/components.css) — shared with
 // renderDemoBadge below rather than each column inventing its own pill styling. `row.protondbPending`
 // (set from extractProtonDb's own `pending` flag — see PROTON_TIER_ORDER's comment above) marks a
 // provisional tier assigned from too few reports for ProtonDB itself to be confident in — faded and
@@ -130,7 +132,7 @@ function renderProtonBadge(v: unknown, row: Row): Node {
   if (isProtonMissing(v)) return document.createTextNode('—');
   const span = document.createElement('span');
   span.className = 'status-badge';
-  span.style.background = PROTON_TIER_COLORS[String(v).toLowerCase()] || '#52525b';
+  span.style.background = PROTON_TIER_COLORS[String(v).toLowerCase()] || PROTON_TIER_UNKNOWN;
   span.textContent = String(v);
   if (row?.protondbPending) {
     span.textContent += ' ?';
@@ -140,17 +142,12 @@ function renderProtonBadge(v: unknown, row: Row): Node {
   return span;
 }
 
-// Same `.status-badge` pill shape as renderProtonBadge above, in the app's own accent blue —
-// the same color and dark-on-blue text the side panel's "🎮 Try the Free Demo" banner already
-// uses (`.panel-demo-banner`, style.css) — so the two read as the same "this game has a demo"
-// signifier rather than introducing a new color/shape just for this column.
+// Neutral, not the accent: a fact about the game, neither state nor an action.
 function renderDemoBadge(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');
   if (!v) return document.createTextNode('—');
   const span = document.createElement('span');
-  span.className = 'status-badge';
-  span.style.background = 'var(--accent)';
-  span.style.color = '#0b1620';
+  span.className = 'status-badge status-badge-neutral';
   span.textContent = 'Demo';
   return span;
 }
@@ -202,18 +199,22 @@ export function renderNameCell(v: unknown, row: Row): Node {
   return wrap;
 }
 
-// Ignores `value` and reads `row.capsule` directly — `value` is forced to null on this column
+// Ignores `value` and reads `row.thumb`/`row.capsule` directly — `value` is forced to null on this column
 // (see CORE_COLUMNS below) so the raw image URL never surfaces in full-text search matches.
 export function renderThumb(_value: unknown, row: Row): Node {
   const img = document.createElement('img');
   img.className = 'game-thumb';
   img.alt = '';
   img.loading = 'lazy';
-  img.width = 120;
-  img.height = 45;
-  if (row.capsule) img.src = row.capsule;
+  img.width = 160;
+  img.height = 60;
+  const fallback = row.thumb && row.capsule !== row.thumb ? row.capsule : null;
+  const src = row.thumb || row.capsule;
+  if (src) img.src = src;
+  fadeInOnLoad(img);
   img.addEventListener('error', () => {
-    img.style.visibility = 'hidden';
+    if (fallback && img.src !== fallback) img.src = fallback;
+    else img.style.visibility = 'hidden';
   });
   return img;
 }
@@ -339,16 +340,13 @@ export const compareDateMissingLast = compareMissingLast(
   (v) => v == null || v === '' || isNaN(releaseSortTimestamp(String(v))),
 );
 
-// Amber-flags still-unreleased games in the Released column — reuses scoreColor's own
-// mid-tier amber (`#e4a82e`) rather than introducing a new color, so it reads as "notable,
-// not final" the same way a middling score does elsewhere in the table. Backed by Steam's own
-// `comingSoon` flag (see extractAppDetails in lib/steam.js), not by comparing the parsed date
-// to today — a coarse placeholder like "Coming soon" has no parseable date to compare at all.
+// A still-unreleased game in `--warn`, like a middling score: notable, not final. By Steam's
+// `comingSoon` flag (lib/steam.js), since a coarse "Coming soon" has no date to compare to today.
 function renderReleaseDate(v: unknown, row: Row): Node {
   if (v === undefined) return document.createTextNode('…');
   if (!v) return document.createTextNode('—');
   const span = document.createElement('span');
-  if (row.comingSoon) span.style.color = '#e4a82e';
+  if (row.comingSoon) span.style.color = 'var(--warn)';
   span.textContent = fmtReleaseDate(String(v));
   return span;
 }
@@ -661,7 +659,7 @@ export function computeOwnershipStatus(row: Row): string | null {
 // wishlisted pairing this app used everywhere before (checkmark reading as green/affirmative,
 // star reading as yellow/aspirational is the more natural pairing in isolation, e.g. a profile
 // summary), which stopped fitting once the context became specifically "should I buy this".
-// `.game-search-badge`/`.name-status-badge`/`.panel-ownership-badge` (style.css) and
+// `.game-search-badge`/`.name-status-badge`/`.panel-ownership-badge` (the --owned/--wishlisted tokens) and
 // gameSearch.ts's dropdown all follow this same swapped pairing now too, rather than leaving
 // those standalone badges on the old colors — the checkmark right next to this tier's own
 // yellow-highlighted name text is the same fact and needs to read the same color, and the other
@@ -672,9 +670,9 @@ export function computeOwnershipStatus(row: Row): string | null {
 // information any one status carries.
 const OWNERSHIP_STATUS_TIERS: StatusTier[] = [
   { label: 'Not Owned' },
-  { label: 'Wishlisted', color: '#2ecc71', icon: ' ☆', bold: true },
-  { label: 'Owned', color: '#f1c40f', icon: ' ✓' },
-  { label: 'Owned & Wishlisted', color: '#f1c40f', icon: ' ✓', bold: true },
+  { label: 'Wishlisted', color: 'var(--wishlisted)', icon: ' ☆', bold: true },
+  { label: 'Owned', color: 'var(--owned)', icon: ' ✓' },
+  { label: 'Owned & Wishlisted', color: 'var(--owned)', icon: ' ✓', bold: true },
 ];
 const OWNERSHIP_STATUS_ORDER = OWNERSHIP_STATUS_TIERS.map((t) => t.label);
 const compareOwnershipStatus = compareMissingLast(compareByOrder(OWNERSHIP_STATUS_ORDER));
@@ -828,8 +826,8 @@ function markFailedSources(columns: ColumnDef<Row>[]): ColumnDef<Row>[] {
         mark.textContent = '⚠';
         mark.title =
           source === 'prices'
-            ? "IsThereAnyDeal didn't answer — the list's Prices tile ↻ retries"
-            : `${SOURCE_NAMES[source]} didn't answer — ↻ in the game's panel retries`;
+            ? "IsThereAnyDeal didn't answer — refresh prices on the list's Prices tile"
+            : `${SOURCE_NAMES[source]} didn't answer — Refresh details in the game's panel retries`;
         return mark;
       }
       return col.render ? col.render(v, row) : document.createTextNode(col.format ? col.format(v, row) : String(v));
@@ -892,7 +890,6 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   {
     key: 'capsule',
     label: 'Image',
-    width: 128,
     sortable: false,
     filterable: false,
     groupable: false,
@@ -1127,7 +1124,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   // getGameDemo in lib/steam.js); the side panel's own "🎮 Try the Free Demo" banner
   // (public/panel.js) reads the exact same field. Only a plain has-a-demo boolean here — the
   // demo's own appid isn't useful in a cell with nowhere to link it — outbound links stay in the
-  // panel, not the table. Rendered as a colored badge (renderDemoBadge above) rather than plain
+  // panel, not the table. Rendered as a badge (renderDemoBadge above) rather than plain
   // text/an emoji glyph, so it reads as a quick status chip at a glance, same treatment as
   // ProtonDB right above. `format` still returns plain text for non-visual consumers (filter
   // checklist labels, CSV export) that don't go through `render`. True/false is real data either

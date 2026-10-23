@@ -1,0 +1,282 @@
+@layer base {
+  :root {
+    color-scheme: dark;
+    --bg: #0f1420;
+    --surface: #161d2b;
+    --surface-2: #141b29;
+    /* Dividers only: under 3:1, so a control's edge uses --line-control. */
+    --line: #222c3d;
+    --line-strong: #2c3850;
+    --line-control: #6a7992;
+    --text: #e6ebf2;
+    --text-body: #c3ccd9;
+    --muted: #8d9ab0;
+    /* State (current page or game, pressed, active tab), a view's one primary action and the brand
+       mark; never decoration. Text on it is --bg. test/palette.test.js checks these pairs. */
+    --accent: #4cc2ff;
+    --good: #5ad19a;
+    /* A warning (a source that didn't answer, a middling score) and a bad score: ≥5.5:1 on every surface. */
+    --warn: #f2b84b;
+    --bad: #ff7a7a;
+    /* What the account has: owned warns against buying twice, wishlisted is the one to buy. */
+    --owned: var(--warn);
+    --wishlisted: var(--good);
+    /* The panel's Tags & details dots, one per kind; each kind also has its own dot shape. */
+    --kind-tag: #b48cf2;
+    --kind-genre: #6f9cf0;
+    --kind-category: #48c9b0;
+    --kind-devpub: #e88fc4;
+    /* ProtonDB tiers, under white badge text. */
+    --tier-borked: #b91c1c;
+    --tier-bronze: #8b4513;
+    --tier-silver: #757575;
+    --tier-gold: #8a6a00;
+    --tier-platinum: #5b6b85;
+    --tier-native: #15803d;
+    --radius-1: 4px;
+    --radius-2: 6px;
+    --radius-3: 8px;
+    --dur-1: 120ms;
+    --dur-2: 180ms;
+    --dur-3: 250ms;
+    /* An ambient loop (the skeleton's shimmer), not a change. */
+    --dur-loop: 2.4s;
+    --ease-out: cubic-bezier(0.2, 0, 0, 1);
+    /* Fields and buttons, the table library's included. */
+    --control-h: 34px;
+    /* The page's side margin, shell and routes alike (navPopover.ts's POPOVER_MARGIN matches the phone one). */
+    --gutter: 20px;
+    /* The side panel's width, and the room .app-shell.panel-open keeps for it. */
+    --panel-w: 380px;
+    /* The type scale (docs/dev/ui-guidelines.md); px sizes are left only to icon glyphs, 22px and up. */
+    --fs-label: 11px;
+    --fs-meta: 12px;
+    --fs-ui: 13px;
+    --fs-body: 14px;
+    --fs-title: 16px;
+    --fs-page: 18px;
+    --fs-figure: 20px;
+    /* The platform's own faces, so a page load downloads no font. */
+    --font-sans:
+      system-ui, -apple-system, 'Segoe UI', Roboto, Cantarell, 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
+    --font-mono:
+      ui-monospace, 'SF Mono', 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, 'DejaVu Sans Mono', 'Liberation Mono',
+      monospace;
+  }
+
+  @media (min-width: 1400px) {
+    :root {
+      --panel-w: min(480px, 30vw);
+    }
+  }
+  @media (max-width: 768px) {
+    :root {
+      --gutter: 16px;
+    }
+  }
+
+  body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: var(--fs-body);
+  }
+
+  a {
+    color: var(--text);
+    text-underline-offset: 2px;
+  }
+  a:hover {
+    color: #fff;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  strong,
+  b {
+    font-weight: 600;
+  }
+  h1 {
+    font-size: var(--fs-page);
+  }
+  h2 {
+    font-size: var(--fs-title);
+  }
+  h3,
+  h4 {
+    font-size: var(--fs-body);
+  }
+
+  p {
+    line-height: 1.5;
+  }
+
+  dt,
+  legend {
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+
+  /* Lucide icons: sized and coloured by the text around them. */
+  .lucide {
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    vertical-align: -0.125em;
+    stroke: currentColor;
+    stroke-width: 1.75;
+  }
+
+  kbd {
+    padding: 2px 6px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-1);
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    font-size: var(--fs-label);
+    white-space: nowrap;
+  }
+
+  table {
+    border-collapse: collapse;
+  }
+
+  dialog {
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-3);
+    background: var(--surface);
+    color: var(--text);
+  }
+  /* A dialog's only: a popover's backdrop stays clear. */
+  dialog::backdrop {
+    background: rgb(0 0 0 / 0.6);
+  }
+
+  fieldset {
+    min-inline-size: 0;
+    border: 0;
+  }
+
+  :where(ul[class], ol[class]) {
+    list-style: none;
+  }
+
+  :where(button, input, select, textarea) {
+    font: inherit;
+  }
+
+  /* Text fields and selects; the table library sizes its own (styles/vendor-data-table.css). */
+  :where(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file']), select, textarea):where(
+    :not([class*='dt-'])
+  ) {
+    min-width: 0;
+    height: var(--control-h);
+    padding: 0 10px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-3);
+    background: var(--surface);
+    color: var(--text);
+    font-size: var(--fs-ui);
+  }
+  :where(textarea) {
+    height: auto;
+    padding-block: 8px;
+  }
+  ::placeholder {
+    color: var(--muted);
+    opacity: 1;
+  }
+
+  /* An unclassed <button> is the app's button; `.btn` gives the look to a classed one or a link. */
+  :where(button:not([class]), .btn) {
+    min-height: var(--control-h);
+    padding: 0 12px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-3);
+    background: transparent;
+    color: var(--text);
+    font-size: var(--fs-ui);
+    line-height: 1.2;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-1) var(--ease-out),
+      border-color var(--dur-1) var(--ease-out);
+  }
+  /* A link has no button's built-in centring. */
+  :where(a.btn) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  :where(button:not([class]), .btn):where(:hover:not(:disabled, [aria-disabled='true'])) {
+    border-color: var(--muted);
+    background: var(--line);
+    color: var(--text);
+  }
+  .btn-primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--bg);
+  }
+  .btn-primary:hover:not(:disabled, [aria-disabled='true']) {
+    border-color: color-mix(in srgb, var(--accent) 85%, #fff);
+    background: color-mix(in srgb, var(--accent) 85%, #fff);
+    color: var(--bg);
+  }
+
+  :where(button, input, select, textarea, .btn):where(:disabled, [aria-disabled='true']):where(:not([class*='dt-'])) {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+  }
+
+  @media (forced-colors: active) {
+    :where(button, .btn, input, select, textarea):where(:disabled, [aria-disabled='true']) {
+      border-color: GrayText;
+      color: GrayText;
+    }
+  }
+
+  /* Animations near-zero rather than none: the lightbox waits for animationend. Transitions 0s: a
+     transitioning table dropdown freezes the page (vatesfr/data-table#43, pitfalls.md). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      animation-delay: 0s !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0s !important;
+      transition-delay: 0s !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Read by screen readers, not drawn: a heading the layout says visually. */
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  time,
+  output,
+  data {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}

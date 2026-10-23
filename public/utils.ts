@@ -103,13 +103,15 @@ export function computeProductionTier({
 
 // Each ProtonDB tier's badge color — the ProtonDB column's and the side panel's.
 export const PROTON_TIER_COLORS: Record<string, string> = {
-  borked: '#b91c1c',
-  bronze: '#8b4513',
-  silver: '#757575',
-  gold: '#b8860b',
-  platinum: '#5b6b85',
-  native: '#15803d',
+  borked: 'var(--tier-borked)',
+  bronze: 'var(--tier-bronze)',
+  silver: 'var(--tier-silver)',
+  gold: 'var(--tier-gold)',
+  platinum: 'var(--tier-platinum)',
+  native: 'var(--tier-native)',
 };
+// A tier ProtonDB adds that has no colour of its own yet.
+export const PROTON_TIER_UNKNOWN = 'var(--line-strong)';
 
 // A column `compare` ordering values by their place in `order` (a categorical column's tiers).
 export function compareByOrder(
@@ -119,12 +121,27 @@ export function compareByOrder(
   return (a, b) => order.indexOf(toKey(a)) - order.indexOf(toKey(b));
 }
 
+// Smooth scrolling, unless the user asked the system for reduced motion.
+export function smoothScroll(): ScrollBehavior {
+  return matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+}
+
+// Fades an image in once loaded or failed (`.img-fade`); a cached one shows at once. Call it in the
+// task that sets `src`: the load event is queued, so it can't fire before the listener.
+export function fadeInOnLoad(img: HTMLImageElement): void {
+  if (img.complete && img.getAttribute('src')) return;
+  img.classList.add('img-fade');
+  const done = () => img.classList.add('is-loaded');
+  img.addEventListener('load', done, { once: true });
+  img.addEventListener('error', done, { once: true });
+}
+
 export function scoreColor(n: number | null): string {
-  if (n == null) return 'var(--text1)';
-  if (n >= 80) return '#57cbde';
-  if (n >= 65) return '#a3cf4e';
-  if (n >= 50) return '#e4a82e';
-  return '#cc5050';
+  if (n == null) return 'var(--muted)';
+  if (n >= 80) return 'var(--good)';
+  if (n >= 65) return 'var(--text-body)';
+  if (n >= 50) return 'var(--warn)';
+  return 'var(--bad)';
 }
 
 // Shared money formatter — imported by public/gameColumns.js's price-column renderers (same as

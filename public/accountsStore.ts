@@ -78,10 +78,10 @@ function withStoredDisplay({ unresolved, ...account }: AccountSlot): AccountSlot
   const stored =
     unresolved && [getMyAccount(), getCurrentAccount(), ...readRecents()].find((a) => a?.id === account.id);
   if (!stored) return account;
-  const { label, avatarUrl, memberSince, countryCode, realName } = stored;
+  const { label, avatarUrl } = stored;
   const keptVanities = Object.entries(stored.vanities ?? {}).filter(([id]) => unresolved.includes(id));
   const vanities = { ...account.vanities, ...Object.fromEntries(keptVanities) };
-  return { ...account, label, avatarUrl, memberSince, countryCode, realName, vanities };
+  return { ...account, label, avatarUrl, vanities };
 }
 
 // ── The `?u=` override ───────────────────────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ export const BUNDLES_UNAVAILABLE =
   "Bundles and prices aren't available on this instance: it isn't connected to IsThereAnyDeal.";
 export const PRICES_UNAVAILABLE = "Prices aren't available on this instance: it isn't connected to IsThereAnyDeal.";
 // No closing period, like the other sources' warning shown above it.
-export const PRICES_FAILED = "IsThereAnyDeal didn't answer for prices — the Prices tile's ↻ retries";
+export const PRICES_FAILED = "IsThereAnyDeal didn't answer for prices — refresh them on the Prices tile";
 
 export const PRICE_FIELDS = [
   'steamRegular',

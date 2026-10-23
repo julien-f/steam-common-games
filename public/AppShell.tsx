@@ -28,6 +28,10 @@ import { AccountChip } from './AccountChip.tsx';
 import { initAuth } from './authStore.ts';
 import { bindNavPopover } from './navPopover.ts';
 import { SearchClearButton } from './SearchClearButton.tsx';
+import { smoothScroll } from './utils.ts';
+import ArrowUp from 'lucide-solid/icons/arrow-up';
+import Settings from 'lucide-solid/icons/settings';
+import X from 'lucide-solid/icons/x';
 
 // Route-specific behavior (keyboard shortcuts, and now "open this looked-up game") can't be
 // hardcoded at the shell level — different routes have different "list" contexts, or none at all
@@ -270,6 +274,14 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           Skip to table
         </a>
         <header id="site-nav" class="site-nav">
+          {/* A plain link: the router's <A> would mark it current on Home, beside the Home link. */}
+          <a href={withAccountParam('/', location.search)} class="site-brand">
+            <svg class="site-brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+              <rect width="32" height="32" rx="7" />
+              <path d="M6 7h5v17H6zM12.5 11h4v13h-4zM18.6 12.6l3.8-1.4 4.4 12.2-3.8 1.4zM4 24h24v3H4z" />
+            </svg>
+            Playshelf
+          </a>
           <nav class="site-nav-links" aria-label="Main">
             <For each={NAV_LINKS}>
               {(link) => (
@@ -300,7 +312,6 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           </search>
           <AccountChip />
           <div class="site-nav-prefs site-nav-popover">
-            {/* U+FE0F asks for the emoji glyph: the text one renders ~8 px in common fallback fonts. */}
             <button
               type="button"
               class="site-nav-link site-nav-prefs-btn"
@@ -308,7 +319,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
               popovertarget="nav-prefs-panel"
               ref={prefsBtnEl}
             >
-              {'\u2699\uFE0F'}
+              <Settings />
             </button>
             <PrefsPanel ref={prefsPanelEl} />
           </div>
@@ -334,7 +345,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           scrolling column entirely (see style.css's .app-shell). */}
       <aside id="game-panel" class="game-panel" aria-labelledby="panel-title">
         <button id="panel-close" class="panel-close" aria-label="Close">
-          ×
+          <X />
         </button>
         <div id="panel-nav" class="panel-nav" />
         <div id="panel-body" class="panel-body" />
@@ -345,9 +356,9 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           class="app-to-top"
           title="Back to top"
           aria-label="Back to top"
-          onClick={() => scrollPageToTop('smooth')}
+          onClick={() => scrollPageToTop(smoothScroll())}
         >
-          ↑
+          <ArrowUp />
         </button>
       </Show>
       <ShortcutsModal open={shortcutsOpen()} onClose={() => setShortcutsOpen(false)} />

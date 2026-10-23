@@ -34,7 +34,7 @@ export function PrefsPanel(props: { ref: HTMLDivElement | ((el: HTMLDivElement) 
 }
 
 // Opens the nav bar's ⚙ popover from elsewhere in the app, for a surface that can only *report* a
-// preference and has always had to end its tooltip with "change it in ⚙ Preferences" (the hero
+// preference and has always had to end its tooltip with "change it in Preferences" (the hero
 // cards' Prices tile). Reached through the DOM rather than a prop or context because the popover
 // is part of the shell (AppShell.tsx) and its openness is the popover's own state, which no
 // component holds.

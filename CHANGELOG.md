@@ -16,6 +16,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - The side panel's similar games now come from the account's library instead of the open list, on every page
 - Screen readers find each page's landmarks, headings and field names; the shortcuts dialog and the nav menus use the browser's own
+- The app is now called Playshelf, with a new look: a night-blue palette, larger game art, icons and smoother transitions
+- Home gathers your account, recent accounts, quick links and your lists, each list with one actions menu
+- Screen readers tell a game's tags, genres and categories apart, and their dots differ by shape
+
+### Fixed
+
+- The combined-list form fits a phone's width
+- A game's DLC no longer reorder and reload once they all arrive
 
 ### Development
 
@@ -24,6 +32,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Feature-branch commits defer their changelog entries to the branch's merge; new code comments may take two lines
 - setup-facts counts only real doc reads, keeps failed runs out of the cost baseline and shows each reply's last paragraph in digests
 - Backlog runs log their review yield and the bugs later traced back to them, summarized for setup reviews
+- The stylesheet is split into cascade layers and icons come from lucide-solid
+- The mock API answers an unknown game instead of crashing
 
 ## [0.11.0] - 2026-10-14
 

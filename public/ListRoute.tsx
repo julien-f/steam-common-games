@@ -127,6 +127,7 @@ import {
   clearRandomQueue,
   clearAllRandomQueues,
   notifyOwnersChanged,
+  openPanelFromRow,
 } from './panel.tsx';
 import {
   setPanelParam,
@@ -250,6 +251,17 @@ import { CombineForm, sourceOptions, refKey, type SourceOption } from './Combine
 import type { MembershipGroup } from './combine.ts';
 import { peekMyOwnershipStatus, peekMyPlaytime, trackMyOwnership } from './myOwnership.ts';
 import { creatorTitle, fetchCreatorGames, steamSearchUrl, type CreatorRole } from './creatorData.ts';
+import ArrowLeft from 'lucide-solid/icons/arrow-left';
+import Check from 'lucide-solid/icons/check';
+import ChevronDown from 'lucide-solid/icons/chevron-down';
+import ChevronLeft from 'lucide-solid/icons/chevron-left';
+import ChevronRight from 'lucide-solid/icons/chevron-right';
+import Dices from 'lucide-solid/icons/dices';
+import Folder from 'lucide-solid/icons/folder';
+import Link from 'lucide-solid/icons/link';
+import Plus from 'lucide-solid/icons/plus';
+import TriangleAlert from 'lucide-solid/icons/triangle-alert';
+import Trophy from 'lucide-solid/icons/trophy';
 
 type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user' | 'compare' | 'shared' | 'creator';
 
@@ -459,9 +471,7 @@ const WISHLIST_DEFAULT_VISIBLE = [
 function renderAddonBadge(v: unknown): Node {
   if (v === undefined) return document.createTextNode('…');
   const span = document.createElement('span');
-  span.className = 'status-badge';
-  span.style.background = v ? '#8b4513' : 'var(--accent)';
-  span.style.color = v ? '#fff' : '#0b1620';
+  span.className = 'status-badge status-badge-neutral';
   span.textContent = v ? 'Add-on' : 'Base';
   return span;
 }
@@ -641,6 +651,7 @@ function applyDetailsEvent(row: Game, event: DetailsEvent) {
   row.detailsFetchedAts = event.fetchedAts ?? null;
   row.failedSources = event.failed ?? [];
   row.capsule = event.meta?.capsule ?? null;
+  row.thumb = event.meta?.thumb ?? null;
   if (!row.name) row.name = event.meta?.name || row.bundlePackage?.title || '';
   row.score = event.rating?.score ?? null;
   row.positivePct =
@@ -831,7 +842,7 @@ export default function ListRoute() {
       const who = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
       return `${who} didn't answer for ${n} game${n === 1 ? '' : 's'}`;
     });
-    return parts.length ? `${parts.join(' · ')} — ↻ in a game's panel retries` : '';
+    return parts.length ? `${parts.join(' · ')} — Refresh details in a game's panel retries` : '';
   });
   const rowStore = createRowStore<Game>(rowsStore, (idx, updater) => setRowsStore(idx, updater));
   // Games opened as a standalone aside rather than as one of this list's own rows (a nav-bar
@@ -960,9 +971,9 @@ export default function ListRoute() {
   }
   function rankThisListLabel(): string {
     const focus = rankThisListFocus();
-    if (!focus) return '🏆 Rank this list';
-    if (!focus.length) return '🏆 Rank (none shown)';
-    return `🏆 Rank ${focus.length} game${focus.length === 1 ? '' : 's'}`;
+    if (!focus) return 'Rank this list';
+    if (!focus.length) return 'Rank (none shown)';
+    return `Rank ${focus.length} game${focus.length === 1 ? '' : 's'}`;
   }
   // Ranking compares games two at a time, so what it ranks needs 2 of them; none shown is disabled outright.
   function rankTooFew(): boolean {
@@ -988,10 +999,16 @@ export default function ListRoute() {
     const source = rankSourceRef();
     return source ? rankingsOf(source) : [];
   }
-  function rankingProgressText(list: GameList): string {
+  function rankingProgressText(list: GameList): JSX.Element {
     const p = progress(getRanking(list.id), new Set(rowsStore.map((r) => r.appid)));
     const total = p.ranked + p.excluded + p.pending;
-    return p.pending ? `${p.ranked} of ${total} ranked` : `${p.ranked} ranked ✓`;
+    return p.pending ? (
+      `${p.ranked} of ${total} ranked`
+    ) : (
+      <>
+        {p.ranked} ranked <Check />
+      </>
+    );
   }
   function RankMenu(): JSX.Element {
     let trigger!: HTMLButtonElement;
@@ -1000,8 +1017,8 @@ export default function ListRoute() {
     onMount(() => onCleanup(bindNavPopover(trigger, panel)));
     return (
       <div class={`rank-menu${kind === 'bundle' ? ' hero-secondary' : ''}`}>
-        <button ref={trigger} type="button" class="btn btn-ghost btn-sm" popovertarget="rank-menu-panel">
-          {rankThisListLabel()} ▾
+        <button ref={trigger} type="button" class="btn" popovertarget="rank-menu-panel">
+          <Trophy /> {rankThisListLabel()} <ChevronDown />
         </button>
         <div ref={panel} id="rank-menu-panel" class="site-nav-popover-panel rank-menu-panel" popover>
           <h2 class="rank-menu-heading">Continue</h2>
@@ -1033,12 +1050,12 @@ export default function ListRoute() {
             />
             <button
               type="submit"
-              class="btn btn-primary btn-sm"
+              class="btn btn-primary"
               disabled={rankThisListFocus()?.length === 0}
               aria-disabled={rankTooFew() ? 'true' : undefined}
               aria-describedby={rankTooFew() ? 'rank-reason' : undefined}
             >
-              + New ranking
+              <Plus /> New ranking
             </button>
             <Show when={rankTooFew()}>
               <span id="rank-reason" class="rank-reason">
@@ -1974,12 +1991,12 @@ export default function ListRoute() {
       <>
         <button
           type="button"
-          class="btn btn-ghost btn-sm"
+          class="btn"
           aria-label="Pick a random game"
           title="Pick a random game (R)"
           onClick={() => pickRandomGame()}
         >
-          🎲
+          <Dices />
         </button>
         <ViewActions
           onShare={handleShareView}
@@ -2213,7 +2230,7 @@ export default function ListRoute() {
       if (!list) {
         // Also what a /lists/<id> link from someone else's browser lands on.
         setStatusText(
-          "This list isn't in this browser: it was deleted, or it was made in another one — lists live in the browser that created them. Ask for its 🔗 Share list link instead (combined lists only, for now).",
+          "This list isn't in this browser: it was deleted, or it was made in another one — lists live in the browser that created them. Ask for its Share list link instead (combined lists only, for now).",
         );
         return;
       }
@@ -2591,7 +2608,8 @@ export default function ListRoute() {
             table: ts,
             rowKey: 'appid',
             selectable: true,
-            onRowClick: (row) => openGame(rowStore.getRow(row.appid) ?? row),
+            // eslint-disable-next-line solid/reactivity -- runs once per click, inside the view transition's update
+            onRowClick: (row, event) => openPanelFromRow(event, () => openGame(rowStore.getRow(row.appid) ?? row)),
             get currentRow() {
               const appid = getPanelGame()?.appid;
               return appid == null ? null : (rowStore.getRow(appid) ?? null);
@@ -2710,17 +2728,17 @@ export default function ListRoute() {
     return {
       label: 'Prices',
       value: regionLabel(regionCode()),
-      title: 'Prices are shown for this region — click to change it in ⚙ Preferences',
+      title: 'Prices are shown for this region — click to change it in Preferences',
       onClick: openPrefsPopover,
       // The tile's second control, and what replaced the actions row's own "↻ Refresh prices":
       // prices are a different fetch from the list itself, so they keep their own age and their
       // own refresh — but here, next to the age, rather than as a button at the other end of the
       // card. Offered even before anything has priced, so a failed first price load has a retry.
       sub: refreshingPrices()
-        ? 'Refreshing prices… ↻'
+        ? refreshTileValue('Refreshing prices…')
         : priceFetchedAt() === undefined
-          ? 'Refresh prices ↻'
-          : `Updated ${fmtAge(priceFetchedAt())} ↻`,
+          ? refreshTileValue('Refresh prices')
+          : refreshTileValue(`Updated ${fmtAge(priceFetchedAt())}`),
       subTitle: 'Re-fetch current prices and historical lows for every game in this list',
       subOnClick: handleRefreshPrices,
       subDisabled: refreshingPrices(),
@@ -2822,7 +2840,7 @@ export default function ListRoute() {
                     ? scoreColor(20)
                     : urgency.tier === 'soon'
                       ? scoreColor(55)
-                      : 'var(--text1)',
+                      : 'var(--muted)',
               }}
             >
               ⏳ {urgency.label}
@@ -2901,7 +2919,7 @@ export default function ListRoute() {
         label: 'Updated',
         value: fmtAge(fetchedAt()),
         title:
-          "How old the server's cached copy of this bundle is. It can't be forced from here — but each game's own details can (the panel's ↻), and so can the prices",
+          "How old the server's cached copy of this bundle is. It can't be forced from here — but each game's own details can (the panel's Refresh details), and so can the prices",
       });
     }
     tiles.push(priceTile());
@@ -2980,7 +2998,15 @@ export default function ListRoute() {
     const stored = userList();
     if (stored) {
       const folder = folderPathLabel(stored);
-      if (folder) tiles.push({ label: 'Folder', value: `📁 ${folder}` });
+      if (folder)
+        tiles.push({
+          label: 'Folder',
+          value: (
+            <>
+              <Folder /> {folder}
+            </>
+          ),
+        });
       // "Edited", not "Updated": this is when the list's own definition last changed, which for a
       // dynamic list says nothing about how fresh its resolved contents are (those are recomputed
       // on every open) — unlike the owned/wishlist tile above, which is exactly a data age.
@@ -3077,7 +3103,7 @@ export default function ListRoute() {
             <For each={problems}>
               {(problem) => (
                 <li>
-                  ⚠ {problem.desc.label} — {problem.desc.problem}.
+                  <TriangleAlert /> {problem.desc.label} — {problem.desc.problem}.
                   {problem.desc.countsAsEmpty && ' It counts as no games; the rest of the formula still applies.'}
                 </li>
               )}
@@ -3198,7 +3224,7 @@ export default function ListRoute() {
       <div class="list-hero-nav">
         <button
           type="button"
-          class="btn btn-ghost btn-sm"
+          class="btn"
           aria-label="Previous bundle"
           title="Previous bundle"
           disabled={prevBundleId() == null}
@@ -3207,11 +3233,11 @@ export default function ListRoute() {
             if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`));
           }}
         >
-          ‹
+          <ChevronLeft />
         </button>
         <button
           type="button"
-          class="btn btn-ghost btn-sm"
+          class="btn"
           aria-label="Next bundle"
           title="Next bundle"
           disabled={nextBundleId() == null}
@@ -3220,10 +3246,10 @@ export default function ListRoute() {
             if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`));
           }}
         >
-          ›
+          <ChevronRight />
         </button>
-        <A class="btn btn-ghost btn-sm" href={withAccountParam('/bundles', routerLocation.search)}>
-          ← All bundles
+        <A class="btn" href={withAccountParam('/bundles', routerLocation.search)}>
+          <ArrowLeft /> All bundles
         </A>
       </div>
     );
@@ -3238,7 +3264,7 @@ export default function ListRoute() {
           {/* Stays "Edit sources" while open: the form's own Cancel is the one way out it names. */}
           <button
             type="button"
-            class="btn btn-ghost btn-sm"
+            class="btn"
             ref={editSourcesBtn}
             aria-expanded={editingSources()}
             onClick={() => setEditingSources((v) => !v)}
@@ -3249,25 +3275,25 @@ export default function ListRoute() {
             own URL, and a shared link re-shared would just point back at the same page. */}
           <button
             type="button"
-            class="btn btn-ghost btn-sm"
+            class="btn"
             disabled={shareFailure() != null}
             title={shareFailure() ?? 'Copy a link anyone can open, live and without saving it themselves'}
             onClick={(e) => handleShareList(e.currentTarget)}
           >
-            🔗 Share list
+            <Link /> Share list
           </button>
         </Show>
         <Show when={kind === 'user' && userList()?.kind === 'ranked'}>
           <button
             type="button"
-            class="btn btn-primary btn-sm"
+            class="btn btn-primary"
             title="Asks about unranked games in the table's current sort order (only the shown ones, when filtered)"
             disabled={filteredUnranked()?.length === 0}
             onClick={handleCompare}
           >
             {compareLabel()}
           </button>
-          <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingRankedSource((v) => !v)}>
+          <button type="button" class="btn" onClick={() => setEditingRankedSource((v) => !v)}>
             {editingRankedSource() ? 'Cancel' : 'Change source'}
           </button>
         </Show>
@@ -3279,14 +3305,14 @@ export default function ListRoute() {
                 {/* aria-disabled, not disabled: a press has to reach the button for its reason to be read. */}
                 <button
                   type="button"
-                  class={`btn btn-ghost btn-sm${kind === 'bundle' ? ' hero-secondary' : ''}`}
+                  class={`btn${kind === 'bundle' ? ' hero-secondary' : ''}`}
                   title="Create a list ranking these games by comparing them two at a time, in the table's current order (only the selected or filtered games, if any)"
                   disabled={rankThisListFocus()?.length === 0}
                   aria-disabled={rankTooFew() ? 'true' : undefined}
                   aria-describedby={rankTooFew() ? 'rank-reason' : undefined}
                   onClick={() => handleRankThisList()}
                 >
-                  {rankThisListLabel()}
+                  <Trophy /> {rankThisListLabel()}
                 </button>
                 <Show when={rankTooFew()}>
                   <span id="rank-reason" class="rank-reason">
@@ -3303,7 +3329,7 @@ export default function ListRoute() {
           <Show when={compareList()}>
             <button
               type="button"
-              class="btn btn-ghost btn-sm"
+              class="btn"
               title="Keep this shared list as one of your own"
               onClick={handleSaveShared}
             >
@@ -3314,8 +3340,8 @@ export default function ListRoute() {
         {kind === 'shared' && (
           <For each={sharedBundles()}>
             {(b) => (
-              <A class="btn btn-ghost btn-sm" href={withAccountParam(`/lists/bundle/${b.id}`, routerLocation.search)}>
-                ← {b.title}
+              <A class="btn" href={withAccountParam(`/lists/bundle/${b.id}`, routerLocation.search)}>
+                <ArrowLeft /> {b.title}
               </A>
             )}
           </For>
@@ -3325,11 +3351,7 @@ export default function ListRoute() {
             {/* Gated on the players in the URL, not on the ones that resolved: a comparison naming
               a private or misspelled profile is exactly when editing them has to be reachable. */}
             <Show when={compareSlots().length >= 2}>
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm hero-secondary"
-                onClick={() => setEditingPlayers((v) => !v)}
-              >
+              <button type="button" class="btn hero-secondary" onClick={() => setEditingPlayers((v) => !v)}>
                 {editingPlayers() ? 'Cancel' : 'Edit players'}
               </button>
             </Show>
@@ -3349,7 +3371,7 @@ export default function ListRoute() {
               </select>
               <button
                 type="button"
-                class="btn btn-ghost btn-sm hero-secondary"
+                class="btn hero-secondary"
                 title="Keep this comparison as a list of your own"
                 onClick={handleSaveComparison}
               >
@@ -3362,14 +3384,23 @@ export default function ListRoute() {
           <>
             <Show when={bundleLinks().details}>
               {(details) => (
-                <a class="btn btn-ghost btn-sm hero-secondary" href={details()} target="_blank" rel="noopener">
+                <a class="btn hero-secondary" href={details()} target="_blank" rel="noopener">
                   View on IsThereAnyDeal ↗
                 </a>
               )}
             </Show>
             <Show when={bundleLinks().url}>
               {(url) => (
-                <a class="btn btn-primary btn-sm" href={url()} target="_blank" rel="noopener">
+                <a
+                  class="btn"
+                  classList={{
+                    // One primary per view: picks to buy on Fanatical take it.
+                    'btn-primary': !fanaticalPicks(),
+                  }}
+                  href={url()}
+                  target="_blank"
+                  rel="noopener"
+                >
                   Get this bundle ↗
                 </a>
               )}
@@ -3377,7 +3408,7 @@ export default function ListRoute() {
             <Show when={bundleResolvedCount() > 0 && notOwnedHref({ kind: 'bundle', bundleId: params.bundleId })}>
               {(href) => (
                 <A
-                  class="btn btn-ghost btn-sm"
+                  class="btn"
                   href={href()}
                   title="This bundle's games minus the ones you own — save it as a list from there"
                   onClick={() =>
@@ -3398,7 +3429,7 @@ export default function ListRoute() {
           <Show when={!!creatorResult()?.total && notOwnedHref({ kind: creatorRole(), name: creatorName() })}>
             {(href) => (
               <A
-                class="btn btn-ghost btn-sm"
+                class="btn"
                 href={href()}
                 title={`This ${creatorRole()}'s games minus the ones you own — save it as a list from there`}
               >
@@ -3568,17 +3599,17 @@ export default function ListRoute() {
           <For each={compareFailures()}>
             {(f) => (
               <p>
-                ⚠ <strong>{f.identifiers.join(' + ')}</strong> — {f.message}
+                <TriangleAlert /> <strong>{f.identifiers.join(' + ')}</strong> — {f.message}
               </p>
             )}
           </For>
           <div class="compare-failures-actions">
             <Show when={compareSlots().length - compareFailures().length >= 2}>
-              <button type="button" class="btn btn-primary btn-sm" onClick={compareOthers}>
+              <button type="button" class="btn btn-primary" onClick={compareOthers}>
                 Compare the other {compareSlots().length - compareFailures().length}
               </button>
             </Show>
-            <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingPlayers(true)}>
+            <button type="button" class="btn" onClick={() => setEditingPlayers(true)}>
               Edit players
             </button>
           </div>
@@ -3695,7 +3726,7 @@ export default function ListRoute() {
             aria-expanded={unresolvedOpen()}
             onClick={() => setUnresolvedOpen(!unresolvedOpen())}
           >
-            {unresolvedOpen() ? '▾' : '▸'} {unresolvedGames().length} more in this bundle, not on Steam
+            <ChevronRight class="unresolved-chevron" /> {unresolvedGames().length} more in this bundle, not on Steam
           </button>
           <Show when={unresolvedOpen()}>
             <ul class="unresolved-list">
@@ -3732,7 +3763,7 @@ export default function ListRoute() {
                   {(deals) => (
                     <span
                       class="selection-pick-savings"
-                      style={{ color: scoreColor(pickSavings(plan(), deals()).overpays ? 20 : 70) }}
+                      style={{ color: pickSavings(plan(), deals()).overpays ? 'var(--bad)' : 'var(--good)' }}
                       title={`vs ${formatMoney(deals(), plan().currency)} for the same games at their best deals`}
                     >
                       {pickSavings(plan(), deals()).text}
@@ -3743,7 +3774,7 @@ export default function ListRoute() {
                   {(picks) => (
                     <span class="selection-fanatical">
                       <a
-                        class="btn btn-primary btn-sm"
+                        class="btn btn-primary"
                         href={picks().url}
                         target="_blank"
                         rel="noopener"
@@ -3780,7 +3811,7 @@ export default function ListRoute() {
             <For each={manualLists().filter((l) => l.id !== userList()?.id)}>
               {(l) => <option value={l.id}>{l.name}</option>}
             </For>
-            <option value={NEW_LIST_OPTION}>+ Create new list…</option>
+            <option value={NEW_LIST_OPTION}>Create new list…</option>
           </select>
           <Show when={addTarget() === NEW_LIST_OPTION}>
             <input

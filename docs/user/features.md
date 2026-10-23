@@ -25,9 +25,9 @@ There is no account to create. The accounts you look at, the lists you build and
 Enter a Steam profile URL, vanity name or 64-bit ID on the home page to explore that account. Several identifiers at once resolve into one **Family** — their libraries are merged, so a game anyone in the family owns counts as owned.
 
 - **Current account** — whoever you're exploring right now. The nav bar always says who that is, with one-click links to their **Owned** and **Wishlist** lists.
-- **My account** — star (★) any account in the picker to pin it as your default.
-- **Recent accounts** are remembered, and switchable from the nav-bar chip without going back home.
-- **⧉ copies an account's Steam identifier** — its custom URL name when it has one (`gaben`), its 64-bit ID otherwise — from the home page's account card, from every account in "Recent accounts" and in the nav-bar chip (one ⧉ per member for a Family). Any remembered account's identifier is one click away, current or not. That's the identifier to hand to someone else, or to paste back into the account field here.
+- **My account** — star any account in Home's recent accounts to pin it as your default.
+- **Recent accounts** are remembered, one pill each on the home page's account card (star, pick, remove), and switchable from the nav-bar chip without going back home.
+- **The copy button copies an account's Steam identifier** — its custom URL name when it has one (`gaben`), its 64-bit ID otherwise — from the home page's account card (one per member for a Family) and from every account in the nav-bar chip. Any remembered account's identifier is one click away, current or not. That's the identifier to hand to someone else, or to paste back into the account field here.
 
 A private profile or wishlist looks identical to an empty one from the outside; the app shows what it can see.
 
@@ -36,12 +36,12 @@ A private profile or wishlist looks identical to an empty one from the outside; 
 - **Owned** and **Wishlist** for the current account, and one list per **bundle** you browse, follow their source — nothing to maintain. Their "Updated" figure says how old they are (see [How fresh is this?](#how-fresh-is-this)).
 - **Recently Looked Up** collects the last 10 games you searched for, latest first (its **Looked up** column), browsable like any other list.
 - **Your own lists** come in three kinds: a **manual** list you add and remove games from, a **dynamic** list defined as a formula over other lists, recomputed every time you open it, and a **ranked** list that orders another list by your preferences (see [Ranking a list](#ranking-a-list)).
-- Lists live in a **folder tree** you can rename, nest and organize — **Move to…** on any list or folder puts it elsewhere in the tree.
+- Lists live in a **folder tree** you can rename, nest and organize. Each row shows its kind's icon and what it holds ("List · 12 games", "Ranking · 30 ranked"); its **⋯** menu moves it elsewhere in the tree (**Move to…**), renames or deletes it.
 - **Taste fit** (shown on Wishlist and bundles, available on every list): how close each game is to the current account's taste, learned from its Owned list. Open that account's Owned list once on this device first (the line under the list header says so, or how old the taste is). It's refreshed on every visit there.
 - **Plays mostly**, on Owned once every game's details are in: the Steam tags the account spends its time on (weighted by playtime, tags most of the library carries counting less), shown from 5 played games. Each one filters the list by that tag.
 - **Filtering by Steam tag** (the Tags column, or a tag in a game's panel) ranks the matches by **Tag match**: how strongly players tagged each game with them, from 100% (its top tag) down. With several tags it's their average, or on the filter's **All** mode the weakest one, so a game must carry them all. Filter Tag match (e.g. 50% and up) to keep only the games where the tag really matters. Clearing the tag filter restores the previous sort and drops that Tag match filter. In the game's panel, a gauge under each Steam tag shows that same strength.
 
-![The home page: the current account's card, the four always-available lists, and your own folder tree of lists](../images/home-lists.png)
+![The home page: the current account's card, the Explore cards (Owned, Wishlist, Compare, Bundles, Recently Looked Up), and your own folder tree of lists](../images/home-lists.png)
 
 ### Combining lists
 
@@ -62,17 +62,17 @@ A bundle joins a combine from its own page: **What does this add?** shows that b
 
 ### Ranking a list
 
-**🏆 Rank this list** (on Owned, Wishlist, a bundle or any of your lists) creates a ranked list and asks you two games at a time: _which do you prefer?_ It starts from what the table shows: games come up in its current order, and if rows are selected — or, with none selected, a filter is on — only those are asked about (the button then reads **🏆 Rank N games**); the rest wait for a later Compare. Ranking needs at least 2 of those games.
+**Rank this list** (on Owned, Wishlist, a bundle or any of your lists) creates a ranked list and asks you two games at a time: _which do you prefer?_ It starts from what the table shows: games come up in its current order, and if rows are selected — or, with none selected, a filter is on — only those are asked about (the button then reads **Rank N games**); the rest wait for a later Compare. Ranking needs at least 2 of those games.
 
 - **← / →** pick one, **↓** Tie, **S** Skip (asked again later), **X** then **← / →** or "Haven't played" (on your own games; "Not interested" elsewhere) to exclude a game, **Z** Undo. All are buttons too.
-- **ℹ Details** under a card (or **I** then **← / →**) opens that game in the side panel to help you decide. It stays open while the game is still being compared; meanwhile **← / →** browse its screenshots and videos (pick by clicking a card), and **Esc** closes it.
+- **Details** under a card (or **I** then **← / →**) opens that game in the side panel to help you decide. It stays open while the game is still being compared; meanwhile **← / →** browse its screenshots and videos (pick by clicking a card), and **Esc** closes it.
 - Stop whenever you like (**Esc**): every answer is saved, and **Continue ranking** on the list's page picks up where you left off — on the games you chose, if you started from a selection or filter (it then reads **Continue: N chosen left**, and the Ranked figure counts those).
 - Each new game is placed with as few questions as possible — about 7 for a list of 100 already-ranked games. The progress bar says roughly how many are left.
 - The list's page sorts by **Rank**. Select rows to **Re-rank** a game or **Exclude** it. Re-rank asks about it right away, starting from its current place: 1–2 questions if it stays put, a few more the further it moves.
 - Games are asked about in the table's current order: sort the list by Rank, then e.g. Played ↓, and your most-played games get ranked first — handy if you stop part-way. The order you rank in doesn't change the final result.
 - To rank only some games — say, your RPGs, or those you played more than 5 hours (your lists have Played and Last Played columns for the current account, hidden by default) — filter the table, then **Rank N shown** (or select rows, then **Rank N selected**): only those games are asked about, each still placed against the whole ranking. The rest wait until you compare them.
 - It follows its source: games added later are queued for comparison; a removed game drops out, and gets its rank back if it returns. **Change source** keeps every answer already given.
-- A list can have several rankings, each by its own criterion. Once it has one, **🏆 Rank this list** opens a menu: continue a ranking (with its progress), or start a new one named by what you're ranking by, e.g. "best JRPG".
+- A list can have several rankings, each by its own criterion. Once it has one, **Rank this list** opens a menu: continue a ranking (with its progress), or start a new one named by what you're ranking by, e.g. "best JRPG".
 - A ranked list can't be shared via a link yet.
 - A ranked or combined list built from a Wishlist, a bundle or a developer's or publisher's games keeps its price columns and Prices tile.
 
@@ -101,13 +101,13 @@ To buy them, drag **Add to Fanatical** from the selection toolbar to your bookma
 
 ## Prices
 
-Wishlist and bundle lists carry price columns: the best deal across every shop IsThereAnyDeal tracks, the discount against Steam's full price, and historical lows. A price at or below a record low is badged — 🔥 all-time, ★ one-year, ☆ three-month. Prices are region-specific; pick your region in the nav bar's ⚙ Preferences (it defaults to auto-detecting from your system timezone). Some shops only ever price in USD regardless of region — that's their behaviour, passed through unchanged, with an approximate conversion beside it ("$6.00 (≈ €5.13)") that the bundle browser also sorts by.
+Wishlist and bundle lists carry price columns: the best deal across every shop IsThereAnyDeal tracks, the discount against Steam's full price, and historical lows. A price at or below a record low is badged — 🔥 all-time, ★ one-year, ☆ three-month. Prices are region-specific; pick your region in the nav bar's Preferences (the gear icon; it defaults to auto-detecting from your system timezone). Some shops only ever price in USD regardless of region — that's their behaviour, passed through unchanged, with an approximate conversion beside it ("$6.00 (≈ €5.13)") that the bundle browser also sorts by.
 
 ## The game panel
 
-Clicking any row opens a detail panel beside the table — not over it, so the list stays usable and clicking another row just swaps the panel's contents. It carries screenshots and trailers, the weighted rating and review counts, How Long To Beat estimates, achievements, recent news from the developer, current price and the current bundles it's in (each opens that bundle's list), DLC and links out. ↻ refetches everything for that one game.
+Clicking any row opens a detail panel beside the table — not over it, so the list stays usable and clicking another row just swaps the panel's contents. It carries screenshots and trailers, the weighted rating and review counts, How Long To Beat estimates, achievements, recent news from the developer, current price and the current bundles it's in (each opens that bundle's list), DLC and links out. **Refresh details**, beside its name, refetches everything for that one game.
 
-**Similar in Alice's library** shows the 5 games the current account owns closest to this one by Steam tags (tags nearly every game in the library carries count less), each opening its own panel; ← Back returns. It needs that account's Owned list opened once on this device (the section links it), and isn't shown on Owned's own rows. **⇅ Sort list by similarity** ranks the whole open list against that game (a **Similarity** column, first sort) until you stop it or reload. **More like this on Steam ↗** searches the whole store instead.
+**Similar in Alice's library** shows the 5 games the current account owns closest to this one by Steam tags (tags nearly every game in the library carries count less), each opening its own panel; the back button above its name returns. It needs that account's Owned list opened once on this device (the section links it), and isn't shown on Owned's own rows. **Sort list by similarity** ranks the whole open list against that game (a **Similarity** column, first sort) until you stop it or reload. **More like this on Steam ↗** searches the whole store instead.
 
 **More from** names the game's developers and publishers; each opens a list of their games on Steam — **Games by …** or **Published by …** — with ownership, prices and Taste fit, the panel staying on the game you came from. **What don't I own?** opens the ones you don't own as a list you can save, like a bundle's **What does this add?**.
 
@@ -126,7 +126,7 @@ Clicking a screenshot or trailer (or **Enter** on it) opens it full-window:
 
 ## Search by URL
 
-`/search?q=<term>` searches by name and opens the closest match in the panel — useful as a browser keyword search. The site publishes an OpenSearch descriptor, so Chrome offers to add it as a search engine on its own (right-click the address bar → manage search engines) — pick it, then type its keyword followed by a game name to jump straight there. Firefox needs a manual bookmark instead: bookmark `https://<your-instance>/search?q=%s`, give it a keyword (e.g. `steam`), then type `steam half-life` in the address bar. The page has its own search box too, for refining or starting a new search without leaving it (both search boxes select their text on focus, and their × empties them) — typing there updates the list without reopening the panel until you click a result. The nav bar's own "Look up any game" box also offers a "See all results for…" link into this page once you've typed a query.
+`/search?q=<term>` searches by name and opens the closest match in the panel — useful as a browser keyword search. The site publishes an OpenSearch descriptor, so Chrome offers to add it as a search engine on its own (right-click the address bar → manage search engines) — pick it, then type its keyword followed by a game name to jump straight there. Firefox needs a manual bookmark instead: bookmark `https://<your-instance>/search?q=%s`, give it a keyword (e.g. `steam`), then type `steam half-life` in the address bar. The page has its own search box too, for refining or starting a new search without leaving it (both search boxes select their text on focus, and their clear button (x) empties them) — typing there updates the list without reopening the panel until you click a result. The nav bar's own "Look up any game" box also offers a "See all results for…" link into this page once you've typed a query.
 
 ## Sharing
 
@@ -135,7 +135,7 @@ Clicking a screenshot or trailer (or **Enter** on it) opens it full-window:
 - Links pasted in a chat (WhatsApp, Slack, Discord, iMessage…) show a preview card; a `/game/…` link's card names the game and shows its header image once the app has looked that game up, other links get the site's card.
 - Add `?u=` to any list link to share the account you're exploring. It never changes the recipient's own default account, and a game link deliberately doesn't carry it.
 - A comparison's link names its players the same way, one `?u=` each — including links made by older versions of this app, which still work.
-- **🔗 Share view** copies a link with your current table layout — columns, sort, grouping, filters — baked in. On Owned and Wishlist it also carries the account (`?u=`), so the recipient sees your games, not their own. The recipient sees it for that visit only, with **Keep as my layout** to make it theirs or **Use my own** to go back; once they change that layout, the banner warns it's lost on reload unless kept. Nothing of their own setup changes otherwise. Your own saved lists' link only opens in your browser, so a combined list has **🔗 Share list** instead of Share view, and on manual and ranked lists Share view is dimmed: they can't be shared yet.
+- **Share view** copies a link with your current table layout — columns, sort, grouping, filters — baked in. On Owned and Wishlist it also carries the account (`?u=`), so the recipient sees your games, not their own. The recipient sees it for that visit only, with **Keep as my layout** to make it theirs or **Use my own** to go back; once they change that layout, the banner warns it's lost on reload unless kept. Nothing of their own setup changes otherwise. Your own saved lists' link only opens in your browser, so a combined list has **Share list** instead of Share view, and on manual and ranked lists Share view is dimmed: they can't be shared yet.
 
 ## Sync
 
@@ -145,8 +145,8 @@ Table layouts are the exception: changing a table stays on this device, and the 
 
 ## Keyboard shortcuts
 
-Press `?` for the full list. The essentials: `/` focuses search, `Esc` closes what's open, `↑`/`↓` move through the list, `←`/`→` through a game's media, and `R` picks a random game, even with no panel open, as does the 🎲 in the table's toolbar. The first Tab on a page is a **Skip to table** link.
+Press `?` for the full list. The essentials: `/` focuses search, `Esc` closes what's open, `↑`/`↓` move through the list, `←`/`→` through a game's media, and `R` picks a random game, even with no panel open, as does the dice button in the table's toolbar. The first Tab on a page is a **Skip to table** link.
 
 ## How fresh is this?
 
-Everything is cached, and every screen that shows cached data says how old it is — and the age itself is the button that fetches fresh. That's the account card and the friends list on the home page, the "Updated" figure in a list's header (your library, a wishlist, a comparison, any list built from them, the bundle browser), and the ↻ beside a game's name in the panel. Prices come from a different source, so they carry their own age and their own ↻ on the second line of the "Prices" figure — the first line names the region and opens the setting. One exception: a single bundle's page states its age but can't force a re-fetch — finding one bundle means searching several pages of IsThereAnyDeal's list — so refresh its prices, or an individual game, instead.
+Everything is cached, and every screen that shows cached data says how old it is — and the age itself is the button that fetches fresh. That's the account card and the friends list on the home page, the "Updated" figure in a list's header (your library, a wishlist, a comparison, any list built from them, the bundle browser), and Refresh details beside a game's name in the panel. Prices come from a different source, so they carry their own age and their own refresh on the second line of the "Prices" figure — the first line names the region and opens the setting. One exception: a single bundle's page states its age but can't force a re-fetch — finding one bundle means searching several pages of IsThereAnyDeal's list — so refresh its prices, or an individual game, instead.

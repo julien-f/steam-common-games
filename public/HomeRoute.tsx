@@ -8,7 +8,20 @@
 // form below can pick any recent account's Owned/Wishlist, Recently Looked Up, or any existing
 // user list as a source. A bundle joins it only from its own page ("What does this add?" opens a
 // /lists/shared link, saved from there) — offering every bundle here would need a bundle picker.
-import { createSignal, createEffect, createMemo, on, For, Index, Show, type JSX } from 'solid-js';
+import {
+  createSignal,
+  createEffect,
+  createMemo,
+  on,
+  onCleanup,
+  onMount,
+  For,
+  Index,
+  Match,
+  Show,
+  Switch,
+  type JSX,
+} from 'solid-js';
 import { A, useLocation, useNavigate } from '@solidjs/router';
 import {
   getMyAccount,
@@ -19,7 +32,6 @@ import {
   clearRecentAccounts,
   getAccountOverride,
   accountDisplayLabel,
-  accountIdentifiers,
   refreshAccountInfo,
 } from './accountsStore.ts';
 import { getAccountOverrideState, adoptAccount, accountOverrideStatusText } from './accountOverride.ts';
@@ -42,17 +54,34 @@ import {
   moveList,
   folderPaths,
   isDescendantFolder,
+  getRanking,
 } from './listsStore.ts';
+import { bindNavPopover } from './navPopover.ts';
 import { useBaseTitle } from './pageTitle.ts';
-import { createDefaultNaming, listDisplayName } from './listLabels.ts';
+import { createDefaultNaming, formatFormula, listDisplayName } from './listLabels.ts';
 import { CombineForm } from './CombineForm.tsx';
+import Blend from 'lucide-solid/icons/blend';
+import Ellipsis from 'lucide-solid/icons/ellipsis';
+import FolderIcon from 'lucide-solid/icons/folder';
+import FolderPlus from 'lucide-solid/icons/folder-plus';
+import Heart from 'lucide-solid/icons/heart';
+import RotateCcwClock from 'lucide-solid/icons/rotate-ccw-clock';
+import LibraryBig from 'lucide-solid/icons/library-big';
+import ListIcon from 'lucide-solid/icons/list';
+import ListPlus from 'lucide-solid/icons/list-plus';
+import Lock from 'lucide-solid/icons/lock';
+import Package from 'lucide-solid/icons/package';
+import Plus from 'lucide-solid/icons/plus';
+import RefreshCw from 'lucide-solid/icons/refresh-cw';
+import Star from 'lucide-solid/icons/star';
+import Trophy from 'lucide-solid/icons/trophy';
+import Users from 'lucide-solid/icons/users';
+import X from 'lucide-solid/icons/x';
 import type { AccountSlot, Folder, GameList, ListRef, CombineOp } from './types.ts';
 
 // `personastate`/`gameextrainfo` ride on the same 6h library cache tier as the rest of an
 // account's data (see toAccountPlayer in accountData.ts) — real data, just not live — so the
 // tooltip says "as of the last refresh" rather than implying real-time presence.
-
-const LIST_ICONS = { dynamic: '⚡ ', ranked: '🏆 ', manual: '📄 ' } as const;
 
 interface TreeRow {
   type: 'folder' | 'list';
@@ -77,7 +106,7 @@ export default function HomeRoute() {
   const [resolving, setResolving] = createSignal(false);
   // null while loading; 'failed' when the fetch failed, so it doesn't read as an empty library.
   type Count = number | null | 'failed';
-  const showCount = (n: Count) => (n === null ? '…' : n === 'failed' ? "couldn't load" : n);
+  const showCount = (n: Count) => (n === null ? '…' : n === 'failed' ? "couldn't load" : <data value={n}>{n}</data>);
   const [counts, setCounts] = createSignal<{ owned: Count; wishlist: Count }>({
     owned: null,
     wishlist: null,
@@ -232,9 +261,22 @@ export default function HomeRoute() {
     setMyAccount(myAccount()?.id === account.id ? null : account);
   }
 
+  let lookupField!: HTMLInputElement;
+  // The removed pill's Remove goes with it: focus the next one's, else the previous one's, else the lookup field.
   function handleRemoveRecent(id: string, e: MouseEvent): void {
     e.stopPropagation();
+    const pill = (e.currentTarget as HTMLElement).closest('li');
+    const neighbour = (pill?.nextElementSibling ?? pill?.previousElementSibling) as HTMLElement | null;
+    const neighbourId = neighbour?.dataset.accountId;
     removeRecentAccount(id);
+    (
+      (neighbourId && document.querySelector<HTMLElement>(`[data-account-id="${neighbourId}"] .recent-remove`)) ||
+      lookupField
+    ).focus();
+  }
+  function handleClearRecents(): void {
+    clearRecentAccounts();
+    lookupField.focus();
   }
 
   // The fixed list links have to carry a `?u=` override along (`withAccountParam`) or clicking
@@ -245,11 +287,38 @@ export default function HomeRoute() {
     return withAccountParam(path, location.search);
   }
 
+  // Home's ways into the lists that aren't the user's own; `name` is each link's accessible name.
+  const exploreCards = () => [
+    {
+      name: 'Owned',
+      href: accountLink('/lists/owned'),
+      icon: LibraryBig,
+      description: "The current account's games",
+    },
+    {
+      name: 'Wishlist',
+      href: accountLink('/lists/wishlist'),
+      icon: Heart,
+      description: "The current account's wishlist",
+    },
+    // No `?u=`: a comparison names its own players in the URL, and carrying an unrelated
+    // account override alongside them would be two different claims about whose games are on screen.
+    { name: 'Compare', href: COMPARE_PATH, icon: Users, description: 'Two or more players, grouped by who owns what' },
+    { name: 'Bundles', href: accountLink('/bundles'), icon: Package, description: 'Current Steam game bundles' },
+    {
+      name: 'Recently Looked Up',
+      href: accountLink('/game'),
+      icon: RotateCcwClock,
+      description: 'The last 10 games you searched for',
+    },
+  ];
+
   // What the tree's inline name field is naming: a new folder or list (no id), or an existing row.
   type NameTarget = { kind: 'folder' | 'list'; id?: string };
   const [nameTarget, setNameTarget] = createSignal<NameTarget | null>(null);
   let newFolderBtn!: HTMLButtonElement;
   let newListBtn!: HTMLButtonElement;
+  let treeHeading!: HTMLHeadingElement;
   function newNameTarget(): NameTarget | null {
     const target = nameTarget();
     return target && !target.id ? target : null;
@@ -273,13 +342,7 @@ export default function HomeRoute() {
       refreshTree();
     }
     // A blur already put focus where the user went.
-    if (viaKey)
-      (target.id
-        ? document.querySelector<HTMLElement>(`[data-rename-id="${target.id}"]`)
-        : target.kind === 'folder'
-          ? newFolderBtn
-          : newListBtn
-      )?.focus();
+    if (viaKey) (target.id ? menuTrigger(target.id) : target.kind === 'folder' ? newFolderBtn : newListBtn)?.focus();
   }
 
   function NameField(props: { target: NameTarget; initial: string; placeholder?: string }): JSX.Element {
@@ -337,7 +400,8 @@ export default function HomeRoute() {
     return listDisplayName(list, createDefaultNaming());
   }
 
-  function handleDeleteFolder(folder: Folder): void {
+  // Each returns whether the row went away (a folder always does: Cancel moves its contents up).
+  function handleDeleteFolder(folder: Folder): boolean {
     const hasChildren =
       folders().some((f) => f.parentId === folder.id) || lists().some((l) => l.parentId === folder.id);
     const mode = hasChildren
@@ -349,14 +413,16 @@ export default function HomeRoute() {
       : 'delete';
     deleteFolder(folder.id, mode);
     refreshTree();
+    return true;
   }
 
-  function handleDeleteList(list: GameList): void {
-    if (!window.confirm(`Delete "${listName(list)}"?`)) return;
+  function handleDeleteList(list: GameList): boolean {
+    if (!window.confirm(`Delete "${listName(list)}"?`)) return false;
     const result = deleteList(list.id);
     if (result.softDeleted)
       window.alert(`"${listName(list)}" is still referenced by another list, so it was hidden instead of deleted.`);
     refreshTree();
+    return true;
   }
 
   function childrenOf(parentId: string | null): { type: 'folder' | 'list'; item: Folder | GameList; order: number }[] {
@@ -388,10 +454,7 @@ export default function HomeRoute() {
   function moveTargets(row: TreeRow): { id: string; label: string }[] {
     const all = folders();
     const here = row.item.parentId ?? ROOT;
-    return [
-      { id: ROOT, label: 'Top level' },
-      ...folderPaths(all).map((f) => ({ id: f.id, label: `📁 ${f.path}` })),
-    ].filter(
+    return [{ id: ROOT, label: 'Top level' }, ...folderPaths(all).map((f) => ({ id: f.id, label: f.path }))].filter(
       (t) =>
         t.id !== here &&
         !(
@@ -417,7 +480,9 @@ export default function HomeRoute() {
           onChange={(e) => {
             const target = e.currentTarget.value;
             e.currentTarget.value = '';
-            if (target) handleMove(props.row, target);
+            if (!target) return;
+            handleMove(props.row, target);
+            menuTrigger(props.row.item.id)?.focus(); // the moved row was rebuilt, its menu with it
           }}
         >
           {/* Without `selected`, the browser skips this disabled option and shows the first folder as already picked. */}
@@ -430,11 +495,92 @@ export default function HomeRoute() {
     );
   }
 
+  function rowName(row: TreeRow): string {
+    return row.type === 'folder' ? (row.item as Folder).name : listName(row.item as GameList);
+  }
+
+  const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
+  // What a row holds, from what's already in memory: no list is resolved for it.
+  function rowSummary(row: TreeRow): string {
+    if (row.type === 'folder') return `Folder · ${plural(childrenOf(row.item.id).length, 'item')}`;
+    const list = row.item as GameList;
+    if (list.kind === 'manual') return `List · ${plural(list.appids?.length ?? 0, 'game')}`;
+    if (list.kind === 'ranked') return `Ranking · ${getRanking(list.id).groups.flat().length} ranked`;
+    const formula = list.name && formatFormula(list, createDefaultNaming());
+    return `Combined · ${formula || plural(list.sources?.length ?? 0, 'source')}`;
+  }
+
+  function TreeIcon(props: { row: TreeRow }): JSX.Element {
+    return (
+      <Switch fallback={<ListIcon class="tree-icon" />}>
+        <Match when={props.row.type === 'folder'}>
+          <FolderIcon class="tree-icon" />
+        </Match>
+        <Match when={(props.row.item as GameList).kind === 'dynamic'}>
+          <Blend class="tree-icon" />
+        </Match>
+        <Match when={(props.row.item as GameList).kind === 'ranked'}>
+          <Trophy class="tree-icon" />
+        </Match>
+      </Switch>
+    );
+  }
+
+  const menuTrigger = (id: string) => document.querySelector<HTMLElement>(`[data-menu-id="${id}"]`);
+
+  // A row's ⋯: Move, Rename and Delete in a popover, which hands focus back to ⋯ when it closes.
+  function TreeMenu(props: { row: TreeRow }): JSX.Element {
+    let trigger!: HTMLButtonElement;
+    let panel!: HTMLDivElement;
+    onMount(() => onCleanup(bindNavPopover(trigger, panel)));
+    // Hidden first, so focus is back on ⋯ before the name field takes it (its blur commits).
+    function rename(): void {
+      panel.hidePopover();
+      setNameTarget({ kind: props.row.type, id: props.row.item.id });
+    }
+    function remove(): void {
+      panel.hidePopover();
+      const index = treeRows().findIndex((r) => r.item.id === props.row.item.id);
+      const deleted =
+        props.row.type === 'folder'
+          ? handleDeleteFolder(props.row.item as Folder)
+          : handleDeleteList(props.row.item as GameList);
+      if (!deleted) return; // cancelled: focus is already back on ⋯
+      const rows = treeRows();
+      const next = rows[Math.min(index, rows.length - 1)];
+      (next ? menuTrigger(next.item.id) : treeHeading)?.focus();
+    }
+    return (
+      <>
+        <button
+          ref={trigger}
+          type="button"
+          class="tree-more"
+          popovertarget={`tree-menu-${props.row.item.id}`}
+          aria-label={`More actions for ${rowName(props.row)}`}
+          title="More actions"
+          data-menu-id={props.row.item.id}
+        >
+          <Ellipsis />
+        </button>
+        <div ref={panel} id={`tree-menu-${props.row.item.id}`} class="site-nav-popover-panel tree-menu-panel" popover>
+          <MoveSelect row={props.row} name={rowName(props.row)} />
+          <button type="button" class="tree-menu-item" aria-label={`Rename ${rowName(props.row)}`} onClick={rename}>
+            Rename
+          </button>
+          <button type="button" class="tree-menu-item" aria-label={`Delete ${rowName(props.row)}`} onClick={remove}>
+            Delete
+          </button>
+        </div>
+      </>
+    );
+  }
+
   return (
     <div class="home-route">
       <h1 class="visually-hidden">Home</h1>
       <section class="home-account">
-        <h2>Account</h2>
+        <h2 class="visually-hidden">Account</h2>
 
         {/* A `?u=` link being explored — see accountsStore.ts's own `?u=` section. Said out loud
             rather than left implicit: the account card below is showing someone the *link*
@@ -451,7 +597,7 @@ export default function HomeRoute() {
                 <p class="account-override-status">
                   Exploring <strong>{accountDisplayLabel(account())}</strong> from this link — your own current account
                   is unchanged.
-                  <button type="button" class="account-override-adopt" onClick={() => pickAccount(account())}>
+                  <button type="button" class="btn" onClick={() => pickAccount(account())}>
                     Set as my current account
                   </button>
                 </p>
@@ -478,7 +624,7 @@ export default function HomeRoute() {
               <Show when={solePlayer()?.avatarUrl || account().avatarUrl}>
                 {(url) => (
                   <span class="account-avatar-wrap account-avatar-lg">
-                    <img class="account-avatar" src={url()} alt="" width="48" height="48" />
+                    <img class="account-avatar" src={url()} alt="" width="64" height="64" />
                   </span>
                 )}
               </Show>
@@ -511,21 +657,31 @@ export default function HomeRoute() {
                       class="account-private"
                       title="This Steam profile isn't public — some data may be missing or empty"
                     >
-                      🔒 Private
+                      <Lock /> Private
                     </span>
                   </Show>
                 </div>
                 <div class="account-counts">
                   Owned: {showCount(counts().owned)} · Wishlisted: {showCount(counts().wishlist)}
-                  <Show when={players().length > 1}>{` · ${players().length} accounts merged`}</Show>
-                  <Show when={solePlayer()?.memberSince}>{(s) => ` · Member since ${s()}`}</Show>
+                  <Show when={players().length > 1}>
+                    {' · '}
+                    <data value={players().length}>{players().length}</data> accounts merged
+                  </Show>
+                  <Show when={solePlayer()?.memberSince}>
+                    {(s) => (
+                      <>
+                        {' · Member since '}
+                        <time datetime={s()}>{s()}</time>
+                      </>
+                    )}
+                  </Show>
                   <Show when={solePlayer()?.countryCode}>{(c) => ` ${countryFlag(c())}`}</Show>
                 </div>
                 {/* Steam data is cached server-side for a long time (see default.env's
                     LIBRARY_CACHE_TTL_MINUTES), so the age of what's on screen is stated outright
                     rather than left to be guessed at — and the statement *is* the control that
                     fixes it, the same shape the list heroes' Updated tile and the side panel's
-                    own ↻ now use, rather than a separate button beside the text. */}
+                    own Refresh details button now use, rather than a separate button beside the text. */}
                 <div class="account-updated">
                   <button
                     type="button"
@@ -535,13 +691,50 @@ export default function HomeRoute() {
                     onClick={() => loadAccountData(account(), { refresh: true })}
                   >
                     Updated {refreshing() ? 'Refreshing…' : fmtAge(fetchedAt())}{' '}
-                    <span class="account-updated-icon">↻</span>
+                    <RefreshCw class="account-updated-icon" />
                   </button>
                 </div>
               </div>
             </div>
           )}
         </Show>
+
+        <form
+          class="home-lookup"
+          onSubmit={(e) => {
+            e.preventDefault();
+            resolveAndSetCurrent();
+          }}
+        >
+          {/* <Index>, not <For> — <For> keys each item by the value itself (`===` on the
+              array element), which is exactly wrong for a list of strings the user is actively
+              typing into: changing "a" to "ab" makes the old and new values two *different*
+              strings, so <For> would tear down and recreate that index's whole <input> on every
+              keystroke, dropping focus mid-word. <Index> keys by array position instead — typing
+              updates the same DOM node in place, the same fix Solid's own docs give for this. */}
+          <Index each={resolveInputs()}>
+            {(value, i) => (
+              <input
+                type="text"
+                // Only the added ones get focus: the first field is there on load.
+                ref={(el) => (i > 0 ? queueMicrotask(() => el.focus()) : (lookupField = el))}
+                value={value()}
+                placeholder="Steam name, profile URL, or 64-bit ID…"
+                aria-label="Steam name, profile URL, or 64-bit ID"
+                onInput={(e) =>
+                  setResolveInputs((prev) => prev.map((v, idx) => (idx === i ? e.currentTarget.value : v)))
+                }
+              />
+            )}
+          </Index>
+          <button type="button" onClick={() => setResolveInputs((prev) => [...prev, ''])}>
+            <Plus /> Add Steam Family account
+          </button>
+          <button type="submit" class="btn btn-primary" disabled={resolving()}>
+            {resolving() ? 'Looking up…' : 'Look up'}
+          </button>
+        </form>
+        {resolveError() && <p class="error">{resolveError()}</p>}
 
         {/* A Steam Family (several accounts unioned into one slot) — one row per member, since
             the header above can only speak for the slot as a whole. */}
@@ -591,7 +784,7 @@ export default function HomeRoute() {
                       class="account-private"
                       title="This Steam profile isn't public — some data may be missing or empty"
                     >
-                      🔒 Private
+                      <Lock /> Private
                     </span>
                   </Show>
                 </li>
@@ -600,127 +793,87 @@ export default function HomeRoute() {
           </ul>
         </Show>
 
+        <div class="home-recents">
+          <h3>Recent accounts</h3>
+          <Show when={recents().length > 0} fallback={<p>No recent accounts yet.</p>}>
+            <ul class="recent-accounts">
+              <For each={recents()}>
+                {(account) => (
+                  <li data-account-id={account.id}>
+                    <button
+                      type="button"
+                      class="recent-icon-btn recent-star"
+                      classList={{ 'recent-star--mine': myAccount()?.id === account.id }}
+                      title={starLabel(account)}
+                      aria-label={starLabel(account)}
+                      onClick={[toggleMyAccount, account]}
+                    >
+                      <Star />
+                    </button>
+                    <button type="button" class="recent-name" onClick={() => pickAccount(account)}>
+                      {accountDisplayLabel(account)}
+                    </button>
+                    <button
+                      type="button"
+                      class="recent-icon-btn recent-remove"
+                      title="Remove"
+                      aria-label={`Remove ${accountDisplayLabel(account)}`}
+                      onClick={[handleRemoveRecent, account.id]}
+                    >
+                      <X />
+                    </button>
+                  </li>
+                )}
+              </For>
+            </ul>
+            <button type="button" class="recents-clear" onClick={handleClearRecents}>
+              Clear all
+            </button>
+          </Show>
+        </div>
+
         <Show when={currentAccount()}>
           {(account) => (
             <AccountFriends accountId={account().id} myAccountId={myAccount()?.id ?? null} onExplore={pickAccount} />
           )}
         </Show>
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            resolveAndSetCurrent();
-          }}
-        >
-          {/* <Index>, not <For> — <For> keys each item by the value itself (`===` on the
-              array element), which is exactly wrong for a list of strings the user is actively
-              typing into: changing "a" to "ab" makes the old and new values two *different*
-              strings, so <For> would tear down and recreate that index's whole <input> on every
-              keystroke, dropping focus mid-word. <Index> keys by array position instead — typing
-              updates the same DOM node in place, the same fix Solid's own docs give for this. */}
-          <Index each={resolveInputs()}>
-            {(value, i) => (
-              <input
-                type="text"
-                // Only the added ones: the first field is there on load.
-                ref={(el) => i > 0 && queueMicrotask(() => el.focus())}
-                value={value()}
-                placeholder="Steam name, profile URL, or 64-bit ID…"
-                aria-label="Steam name, profile URL, or 64-bit ID"
-                onInput={(e) =>
-                  setResolveInputs((prev) => prev.map((v, idx) => (idx === i ? e.currentTarget.value : v)))
-                }
-              />
-            )}
-          </Index>
-          <button type="button" onClick={() => setResolveInputs((prev) => [...prev, ''])}>
-            + Add Steam Family account
-          </button>
-          <button type="submit" disabled={resolving()}>
-            {resolving() ? 'Looking up…' : 'Look up'}
-          </button>
-        </form>
-        {resolveError() && <p class="error">{resolveError()}</p>}
-
-        <h3>Recent accounts</h3>
-        <Show when={recents().length > 0} fallback={<p>No recent accounts yet.</p>}>
-          <ul class="recent-accounts">
-            <For each={recents()}>
-              {(account) => (
-                <li>
-                  <button type="button" onClick={() => pickAccount(account)}>
-                    {myAccount()?.id === account.id ? '★ ' : ''}
-                    {accountDisplayLabel(account)}
-                  </button>
-                  {/* From the slot's stored data, not players() — that's only fetched for the
-                      current account, and a recent one's identifier shouldn't need selecting it
-                      first. One per member, so a Family's are all reachable here too. */}
-                  <For each={accountIdentifiers(account)}>
-                    {({ identifier }) => (
-                      <CopyButton text={identifier} title={`Copy this account's Steam identifier (${identifier})`} />
-                    )}
-                  </For>
-                  {/* Same last-known, cached-at-resolve-time trivia the account card shows —
-                      absent until this entry is next picked, same as label/avatarUrl above it. */}
-                  <Show when={account.realName}>
-                    <span class="account-realname">({account.realName})</span>
-                  </Show>
-                  <Show when={account.memberSince}>
-                    <span class="account-count">Since {account.memberSince}</span>
-                  </Show>
-                  <Show when={account.countryCode}>
-                    <span class="account-count">{countryFlag(account.countryCode)}</span>
-                  </Show>
-                  <button
-                    type="button"
-                    class="recent-icon-btn"
-                    title={starLabel(account)}
-                    aria-label={starLabel(account)}
-                    onClick={[toggleMyAccount, account]}
-                  >
-                    {myAccount()?.id === account.id ? '★' : '☆'}
-                  </button>
-                  <button
-                    type="button"
-                    class="recent-icon-btn"
-                    title="Remove"
-                    aria-label={`Remove ${accountDisplayLabel(account)}`}
-                    onClick={[handleRemoveRecent, account.id]}
-                  >
-                    ×
-                  </button>
-                </li>
-              )}
-            </For>
-          </ul>
-          <button type="button" class="recents-clear" onClick={() => clearRecentAccounts()}>
-            Clear all
-          </button>
-        </Show>
       </section>
 
-      <nav class="home-fixed-links" aria-label="Lists">
-        <A href={accountLink('/lists/owned')}>Owned</A>
-        <A href={accountLink('/lists/wishlist')}>Wishlist</A>
-        <A href={accountLink('/bundles')}>Bundles</A>
-        <A href={accountLink('/game')}>Recently Looked Up</A>
-        {/* No `?u=`: a comparison names its own players in the URL, and carrying an unrelated
-            account override alongside them would be two different claims about whose games are
-            on screen. */}
-        <A href={COMPARE_PATH}>Compare libraries</A>
-      </nav>
+      <section class="home-explore">
+        <h2>Explore</h2>
+        <ul class="explore-cards">
+          <For each={exploreCards()}>
+            {(card) => (
+              <li class="explore-card">
+                <span class="explore-icon">
+                  <card.icon />
+                </span>
+                <h3>
+                  <A href={card.href}>{card.name}</A>
+                </h3>
+                <p>{card.description}</p>
+              </li>
+            )}
+          </For>
+        </ul>
+      </section>
 
       <section class="home-tree">
-        <h2>Your lists</h2>
+        <h2 ref={treeHeading} tabindex="-1">
+          Your lists
+        </h2>
         <div class="tree-actions">
-          <button type="button" ref={newFolderBtn} onClick={() => setNameTarget({ kind: 'folder' })}>
-            + New folder
-          </button>
           <button type="button" ref={newListBtn} onClick={() => setNameTarget({ kind: 'list' })}>
-            + New list
+            <ListPlus /> New list
           </button>
           <button type="button" onClick={toggleCombine}>
-            {combineOpen() ? 'Cancel combine' : '+ New combined list'}
+            <Show when={combineOpen()} fallback={<Blend />}>
+              <X />
+            </Show>{' '}
+            {combineOpen() ? 'Cancel combine' : 'New combined list'}
+          </button>
+          <button type="button" ref={newFolderBtn} onClick={() => setNameTarget({ kind: 'folder' })}>
+            <FolderPlus /> New folder
           </button>
         </div>
 
@@ -731,76 +884,39 @@ export default function HomeRoute() {
           <ul class="list-tree">
             <For each={treeRows()}>
               {(row) => (
-                <li style={{ 'padding-left': `${row.depth * 20}px` }}>
-                  {row.type === 'folder' ? (
-                    <>
-                      <Show
-                        when={nameTarget()?.id === row.item.id}
-                        fallback={<span>📁 {(row.item as Folder).name}</span>}
-                      >
-                        <span>📁</span>
-                        <NameField target={{ kind: 'folder', id: row.item.id }} initial={(row.item as Folder).name} />
-                      </Show>
-                      <MoveSelect row={row} name={(row.item as Folder).name} />
-                      <button
-                        type="button"
-                        aria-label={`Rename ${(row.item as Folder).name}`}
-                        data-rename-id={row.item.id}
-                        onClick={() => setNameTarget({ kind: 'folder', id: row.item.id })}
-                      >
-                        Rename
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Delete ${(row.item as Folder).name}`}
-                        onClick={() => handleDeleteFolder(row.item as Folder)}
-                      >
-                        Delete
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <Show
-                        when={nameTarget()?.id === row.item.id}
-                        fallback={
-                          <A href={`/lists/${row.item.id}`}>
-                            {LIST_ICONS[(row.item as GameList).kind]}
-                            <span classList={{ 'derived-name': !row.item.name }}>{listName(row.item as GameList)}</span>
+                <li style={{ 'padding-left': `${row.depth * 24}px` }}>
+                  <TreeIcon row={row} />
+                  <Show
+                    when={nameTarget()?.id === row.item.id}
+                    fallback={
+                      <span class="tree-text">
+                        {row.type === 'folder' ? (
+                          <span class="tree-name">{rowName(row)}</span>
+                        ) : (
+                          <A class="tree-name" href={`/lists/${row.item.id}`}>
+                            <span classList={{ 'derived-name': !row.item.name }}>{rowName(row)}</span>
                           </A>
-                        }
-                      >
-                        <span>{LIST_ICONS[(row.item as GameList).kind]}</span>
-                        <NameField
-                          target={{ kind: 'list', id: row.item.id }}
-                          initial={row.item.name ?? ''}
-                          placeholder={listName(row.item as GameList)}
-                        />
-                      </Show>
-                      <MoveSelect row={row} name={listName(row.item as GameList)} />
-                      <button
-                        type="button"
-                        aria-label={`Rename ${listName(row.item as GameList)}`}
-                        data-rename-id={row.item.id}
-                        onClick={() => setNameTarget({ kind: 'list', id: row.item.id })}
-                      >
-                        Rename
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Delete ${listName(row.item as GameList)}`}
-                        onClick={() => handleDeleteList(row.item as GameList)}
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
+                        )}
+                        <span class="tree-summary">{rowSummary(row)}</span>
+                      </span>
+                    }
+                  >
+                    <NameField
+                      target={{ kind: row.type, id: row.item.id }}
+                      initial={row.item.name ?? ''}
+                      placeholder={row.type === 'list' ? rowName(row) : undefined}
+                    />
+                  </Show>
+                  <TreeMenu row={row} />
                 </li>
               )}
             </For>
             <Show when={newNameTarget()}>
               {(target) => (
                 <li>
-                  <span>{target().kind === 'folder' ? '📁' : LIST_ICONS.manual}</span>
+                  <Show when={target().kind === 'folder'} fallback={<ListIcon class="tree-icon" />}>
+                    <FolderIcon class="tree-icon" />
+                  </Show>
                   <NameField target={target()} initial="" />
                 </li>
               )}

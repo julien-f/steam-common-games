@@ -22,6 +22,8 @@ export default defineConfig({
     trace: 'retain-on-failure',
     // region.ts reads the region from the time zone; pinned so a UTC CI runner prices like a EUR region.
     timezoneId: 'Europe/Paris',
+    // Transitions and smooth scrolls end at once, so a test never waits on or measures one mid-way.
+    reducedMotion: 'reduce',
     // `E2E_SHOTS=1 npm run test:e2e` keeps every test's final screen in test-results/, to look at a UI change under mocks.
     screenshot: process.env.E2E_SHOTS ? 'on' : 'off',
   },
