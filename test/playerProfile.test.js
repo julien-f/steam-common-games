@@ -80,3 +80,16 @@ test('storySentence: says what hours can show, not that the story was finished',
     'Plays 7 of 9 story games for as long as their main story',
   );
 });
+
+test('archetypeOf: a title from the play style, story finishers among single-player profiles', () => {
+  const { archetypeOf } = require('../public/playerProfile.ts');
+  const story = (reached, of) => ({ reached: Array(reached).fill(0), fellShort: Array(of - reached).fill(0) });
+  assert.equal(archetypeOf('solo', story(4, 8)).name, 'Story finisher');
+  assert.equal(archetypeOf('solo', story(3, 8)).name, 'Solo explorer');
+  assert.equal(archetypeOf('solo', null).name, 'Solo explorer');
+  assert.equal(archetypeOf('coop', story(8, 8)).name, 'Co-op crew');
+  assert.equal(archetypeOf('pvp', null).name, 'Competitor');
+  assert.equal(archetypeOf('multiplayer', null).name, 'Squad player');
+  assert.equal(archetypeOf(null, story(8, 8)), null);
+  assert.equal(archetypeOf('solo', story(8, 8), { family: true }), null, "a Family's profile mixes its members");
+});

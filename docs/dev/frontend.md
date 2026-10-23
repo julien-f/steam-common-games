@@ -96,7 +96,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 - `bundleSnapshots.ts` — the last-known title and games of each bundle a saved list uses, kept for when ITAD stops listing it.
 - `myOwnership.ts` — one cached pair of owned/wishlisted appid sets for the effective account, behind both the panel's badge and the search dropdown's markers.
 - `recentGames.ts` — the recently-looked-up list backing `/game`.
-- `playerProfile.ts` — how an account plays beyond its tags: play style (`playStyle`) and story games played to length (`storyGames`), from rows and an hours accessor so a comparison's players reuse it.
+- `playerProfile.ts` — how an account plays beyond its tags: play style (`playStyle`), story games played to length (`storyGames`) and the archetype titling them (`archetypeOf`), from rows and an hours accessor so a comparison's players reuse it.
 - `tasteCache.ts` — each account's stored Taste, bounded, and the room a full storage makes by evicting them (`setItemMakingRoom`, which `prefs.ts` writes through).
 - `creatorData.ts` — a developer's/publisher's games (`/api/creator-games`), the list's title and path.
 - `bundleData.ts` / `bundleRows.ts` / `bundleBrowseStore.ts` — bundle fetch/flatten/resolve; the flat row shape `/bundles` sorts over; the last-browsed list `/lists/bundle/:bundleId`'s ‹/› nav steps through.
