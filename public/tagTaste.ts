@@ -92,13 +92,13 @@ function playProfile(played: readonly { hours: number; weights: TagWeights }[], 
 export interface PlayedTag {
   tag: string;
   weight: number; // relative to the top shown tag's score, 0–1
-  games: { name: string; hours: number }[]; // the played games counting most toward it
+  games: { appid: number; name: string; hours: number }[]; // the played games counting most toward it
 }
 
 const GAMES_PER_TAG = 3;
 
 // `played`: how many games the profile is built from. `hours`: a comparison player's, not the row's own.
-export function topPlayedTags<T extends Omit<Tagged, 'appid'> & { name: string; playtime?: number }>(
+export function topPlayedTags<T extends Tagged & { name: string; playtime?: number }>(
   games: readonly T[],
   limit: number,
   hours: Hours<T> = ownPlaytime,
@@ -115,11 +115,16 @@ export function topPlayedTags<T extends Omit<Tagged, 'appid'> & { name: string; 
     weight: score / top[0][1],
     // A tag's idf is the same for every game, so this orders them by their share of its score.
     games: played
-      .map(({ game, hours, weights }) => ({ name: game.name, hours, share: (weights[tag] ?? 0) * Math.log1p(hours) }))
+      .map(({ game, hours, weights }) => ({
+        appid: game.appid,
+        name: game.name,
+        hours,
+        share: (weights[tag] ?? 0) * Math.log1p(hours),
+      }))
       .filter((g) => g.share > 0)
       .sort((a, b) => b.share - a.share)
       .slice(0, GAMES_PER_TAG)
-      .map(({ name, hours }) => ({ name, hours })),
+      .map(({ appid, name, hours }) => ({ appid, name, hours })),
   }));
   return { tags, played: played.length };
 }
@@ -233,6 +238,7 @@ export interface ComparedPlayer {
 
 export interface CommonGround {
   sharedTags: string[]; // in every profiled player's top tags, strongest for the least keen first
+  sharedCount: number; // how many tags are in every profiled player's top tags, beyond the few shown
   ownTags: string[][]; // per player, top tags they play more than any other player
   pairs: { a: number; b: number; shared: number | null }[]; // top tags in common; null: a player without a profile
   closest: { a: number; b: number; shared: number } | null; // 3+ players, when one pair shares the most
@@ -294,18 +300,13 @@ export function commonGround(games: readonly Tagged[], players: readonly Compare
       .sort((a, b) => b[1] - a[1])
       .slice(0, TAGS_SHOWN)
       .map(([tag]) => tag);
-  const sharedTags = compared
-    ? ranked(
-        [...tops[profiled[0]]!]
-          .filter((tag) => profiled.every((i) => tops[i]!.has(tag)))
-          .map((tag) => [tag, Math.min(...profiled.map((i) => shares[i]!.get(tag)!))]),
-      )
-    : [];
+  const inEveryTop = compared ? [...tops[profiled[0]]!].filter((tag) => profiled.every((i) => tops[i]!.has(tag))) : [];
+  const sharedTags = ranked(inEveryTop.map((tag) => [tag, Math.min(...profiled.map((i) => shares[i]!.get(tag)!))]));
   const ownTags = players.map((_, i) =>
     compared && shares[i]
       ? ranked(
           [...tops[i]!]
-            .filter((tag) => !sharedTags.includes(tag))
+            .filter((tag) => !inEveryTop.includes(tag))
             .map((tag) => [
               tag,
               shares[i]!.get(tag)! - Math.max(...profiled.filter((j) => j !== i).map((j) => shares[j]!.get(tag) ?? 0)),
@@ -341,7 +342,7 @@ export function commonGround(games: readonly Tagged[], players: readonly Compare
     .slice(0, FAVOURITES_SHOWN)
     .map((f) => f.appid);
 
-  return { sharedTags, ownTags, pairs, closest, oddOneOut, favourites };
+  return { sharedTags, sharedCount: inEveryTop.length, ownTags, pairs, closest, oddOneOut, favourites };
 }
 
 export interface Suggestion {

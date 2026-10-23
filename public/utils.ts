@@ -269,6 +269,10 @@ export function fmtH(h: number): string {
   return h % 1 === 0 ? `${h}h` : `${h.toFixed(1)}h`;
 }
 
+// Hours played, to the hour from 10 h, to the tenth below.
+export const roundHours = (h: number) => (h >= 10 ? Math.round(h) : Math.round(h * 10) / 10);
+export const fmtHours = (h: number) => fmtH(roundHours(h));
+
 // A video's position as m:ss, for the lightbox's player.
 export function fmtTime(s: number) {
   if (!isFinite(s) || s < 0) return '0:00';

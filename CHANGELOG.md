@@ -34,6 +34,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On search results, the open game's row is marked like in every other list, without an extra outline.
 - Home's recent accounts are now Accounts: one avatar tile each (overlapping faces for a Steam Family), yours first then by name everywhere, filterable past 8; star yours from the account card
 - Plays mostly, Taste fit and Group fit leave software such as Wallpaper Engine out, and Plays mostly says how many played games it's built from
+- Owned's player profile is a card: an archetype, the tags played most as bars, a story-games ring and the barely-played count
+- Why these? opens each figure's games in place, with their art and hours, and story games against their main story's length
+- A comparison shows each player as a card with avatar and archetype, and what they share with game art
 
 ### Fixed
 

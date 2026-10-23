@@ -123,5 +123,24 @@ export const STYLE_SENTENCES: Record<PlayStyle, string> = {
   multiplayer: 'Mostly multiplayer games',
 };
 
-export const storySentence = ({ reached, fellShort }: StoryGames) =>
-  `Plays ${reached.length} of ${reached.length + fellShort.length} story games for as long as their main story`;
+export interface Archetype {
+  name: string;
+  icon: 'book-open' | 'compass' | 'handshake' | 'swords' | 'users';
+}
+
+// A title for the profile's headline, from what it already says; null without a play style, and for a
+// Family, whose profile mixes its members.
+export function archetypeOf(
+  style: PlayStyle | null,
+  story: StoryGames | null,
+  { family = false } = {},
+): Archetype | null {
+  if (!style || family) return null;
+  if (style === 'solo')
+    return story && story.reached.length >= story.fellShort.length
+      ? { name: 'Story finisher', icon: 'book-open' }
+      : { name: 'Solo explorer', icon: 'compass' };
+  if (style === 'coop') return { name: 'Co-op crew', icon: 'handshake' };
+  if (style === 'pvp') return { name: 'Competitor', icon: 'swords' };
+  return { name: 'Squad player', icon: 'users' };
+}

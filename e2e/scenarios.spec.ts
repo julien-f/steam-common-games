@@ -638,26 +638,43 @@ test('F3 edge: Owned says which tags the account plays most, each filtering the 
   });
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
-  const note = page.locator('.list-plays-mostly');
-  const tags = note.locator('.list-plays-mostly-tag');
+  const note = page.locator('.profile');
   // Singleplayer: on fewer games, so rarer here than Action and Co-op.
-  await expect(tags).toHaveText(['Singleplayer', 'Action', 'Co-op']);
-  await expect(tags.first()).toHaveAttribute('title', /· the top tag$/);
+  await expect(note.locator('.profile-bar-name')).toHaveText(['Singleplayer', 'Action', 'Co-op']);
+  await expect(note.locator('.profile-bar').first()).toHaveAttribute('title', /· the top tag$/);
 
   const why = note.getByRole('button', { name: 'Why these?' });
-  const breakdown = page.locator('#plays-mostly-breakdown');
-  await expect(breakdown).toBeHidden();
+  const games = note.locator('.profile-bar-games');
+  await expect(games).toHaveCount(0);
   await why.click();
   await expect(why).toHaveAttribute('aria-expanded', 'true');
-  await expect(breakdown.getByRole('listitem').first()).toContainText(/^Singleplayer\d+%.+ 10h/);
+  // Under each tag, the played games counting most toward it.
+  await expect(games.first().getByRole('button').first()).toContainText(/10h$/);
   await why.click();
-  await expect(breakdown).toBeHidden();
+  await expect(games).toHaveCount(0);
 
-  const coop = note.getByRole('button', { name: 'Co-op' });
+  const coop = note.getByRole('button', { name: /^Co-op \d+%$/ });
   await coop.click();
   await expect(rows(page)).toHaveCount(4);
   await expect(page.getByRole('columnheader', { name: /Tag match/ })).toBeVisible();
   await expect(coop).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('A5 edge: a profile too thin for an archetype or tiles shows neither, and no empty box', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  // 10 h on all 6 of Alice's games: enough for Plays mostly, not for a play style or story games.
+  await page.route('**/api/common-games', (route) => {
+    const req = route.request();
+    const body = JSON.parse(respond(req.method(), new URL(req.url()), req.postData()).body);
+    for (const perPlayer of Object.values(body.playtime) as Record<string, number>[])
+      for (const id of Object.keys(perPlayer)) perPlayer[id] = 600;
+    return route.fulfill({ json: body });
+  });
+  await page.goto('/lists/owned');
+  const profile = page.locator('.profile');
+  await expect(profile.getByRole('heading')).toHaveText('Plays mostly');
+  await expect(profile.locator('.profile-tile')).toHaveCount(0);
+  await expect(profile).not.toHaveClass(/profile--tiles/);
 });
 
 test('A5.1-3: Plays mostly says what it is built from, leaving software out, and how the account plays', async ({
@@ -666,23 +683,25 @@ test('A5.1-3: Plays mostly says what it is built from, leaving software out, and
   await asPlayer(page, DAVE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(DAVE.owned.length);
-  const note = page.locator('.list-plays-mostly');
+  const note = page.locator('.profile');
   // 15 played, minus Wallpaper Engine's 3000 h.
   await expect(note).toContainText('from 14 played games');
-  await expect(note.locator('.list-plays-mostly-tag')).not.toContainText(['Utilities']);
+  await expect(note.locator('.profile-bar-name')).not.toContainText(['Utilities']);
+  await expect(note.getByRole('heading')).toHaveText('Story finisher');
   // Sekiro and Hogwarts Legacy fell short; Dead Cells and Slay the Spire are endless.
-  await expect(page.locator('.list-profile-facts')).toContainText(
-    'Mostly single-player games · Plays 7 of 9 story games for as long as their main story · ',
-  );
+  await expect(
+    note.getByRole('img', { name: "7 of 9 story games played for their main story's length" }),
+  ).toBeVisible();
   await note.getByRole('button', { name: 'Why these?' }).click();
-  await expect(page.locator('#plays-mostly-breakdown')).toContainText('Story games: single-player games');
+  await note.getByText("How it's counted").click();
+  await expect(note.locator('.profile-how')).toContainText('Story games: single-player');
 });
 
 test('A5.4: the barely-played count opens Play next, best Taste fit first, on a first visit', async ({ page }) => {
   await asPlayer(page, DAVE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(DAVE.owned.length);
-  const backlog = page.getByRole('button', { name: '4 games played 2 h or less' }); // a preorder included
+  const backlog = page.getByRole('button', { name: 'Play next: 4 games played 2 h or less' }); // a preorder included
   await backlog.click();
   await expect(page).toHaveURL(/view=/);
   await expect(
@@ -705,19 +724,20 @@ test('A5.4: the barely-played count opens Play next, best Taste fit first, on a 
   ]);
 });
 
-test('A5 edge: Why these? names the story games that fell short of their main story, each opening its panel', async ({
+test('A5 edge: Why these? lists the story games with their hours against the main story, each opening its panel', async ({
   page,
 }) => {
   await asPlayer(page, DAVE);
   await page.goto('/lists/owned');
   await page.getByRole('button', { name: 'Why these?' }).click();
-  const short = page.locator('#plays-mostly-breakdown .list-profile-story').filter({ hasText: 'Fell short:' });
-  await expect(short.getByRole('button')).toHaveText(['Sekiro: Shadows Die Twice', 'Hogwarts Legacy']);
-  // Capped, as a library may have hundreds: 5 of Dave's 7, then how many more.
-  const reached = page.locator('#plays-mostly-breakdown .list-profile-story').filter({ hasText: 'reached:' });
-  await expect(reached.getByRole('button')).toHaveCount(5);
-  await expect(reached).toContainText('+2 more');
-  await short.getByRole('button', { name: 'Hogwarts Legacy' }).click();
+  const story = page.locator('.profile-story');
+  const reached = story.locator('.profile-story-track.reached');
+  // Capped, as a library may have hundreds: 5 of Dave's 7, most played first, then how many more.
+  await expect(reached).toHaveCount(5);
+  await expect(story.locator('.profile-more')).toHaveText('+2 more');
+  await expect(story.locator('.profile-story-game').nth(5)).toContainText('Sekiro: Shadows Die Twice12 / 30 h');
+  await expect(story.locator('.profile-story-game').nth(6)).toContainText('Hogwarts Legacy');
+  await story.getByRole('button', { name: /^Hogwarts Legacy/ }).click();
   await expect(page.locator('#panel-title')).toHaveText('Hogwarts Legacy');
 });
 
@@ -725,7 +745,7 @@ test('A5 edge: what to play next counts a preorder, which its Released date show
   await asPlayer(page, DAVE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(DAVE.owned.length);
-  await page.getByRole('button', { name: '4 games played 2 h or less' }).click();
+  await page.getByRole('button', { name: 'Play next: 4 games played 2 h or less' }).click();
   await expect(rows(page)).toHaveCount(4); // a saved view can't hold "released by today"
   await expect(row(page, 'Someday Saga')).toHaveCount(1);
   await expect(row(page, 'Counter-Strike 2')).toHaveCount(1); // free, but playable now
@@ -735,9 +755,10 @@ test('A5 edge: an account with no playtime at all says why it has no profile', a
   await asPlayer(page, BOB);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(BOB.owned.length);
-  await expect(page.locator('.list-plays-mostly')).toHaveText(
+  await expect(page.locator('.list-hero-note')).toHaveText(
     "No playtime to profile: it's private, or nothing was played yet.",
   );
+  await expect(page.locator('.profile')).toHaveCount(0);
 });
 
 test("B2 edge: Taste fit scores the wishlist by the account's taste, once Owned has been opened", async ({ page }) => {
@@ -756,7 +777,7 @@ test("B2 edge: Taste fit scores the wishlist by the account's taste, once Owned 
   await expect(note).toHaveText("Taste fit needs Alice's Owned list opened on this device");
 
   await page.goto('/lists/owned');
-  await expect(page.locator('.list-plays-mostly')).toBeVisible();
+  await expect(page.locator('.profile')).toBeVisible();
   await page.goto('/lists/wishlist');
   await expect(note).toHaveText(/^Taste fit: Alice's taste as of \d{4}-\d{2}-\d{2}$/);
   await expect(
@@ -909,7 +930,7 @@ async function openPlayers(page: Page): Promise<Locator> {
 const playerLine = (players: Locator, name: string) =>
   players.getByRole('listitem').filter({ has: players.page().locator('.list-players-name', { hasText: name }) });
 
-test("C7.2: Players shows each player's top tags and play style, open on desktop, folded on a phone", async ({
+test("C7.2: Players shows each player's top tags and archetype, open on desktop, folded on a phone", async ({
   page,
 }, testInfo) => {
   await page.goto('/lists/compare?u=dave&u=erin');
@@ -920,8 +941,9 @@ test("C7.2: Players shows each player's top tags and play style, open on desktop
   if (phone) await players.locator('summary').click();
   const dave = playerLine(players, 'Dave');
   const erin = playerLine(players, 'Erin');
-  await expect(dave).toContainText('Mostly single-player games');
-  await expect(erin).toContainText('Mostly co-op games');
+  // Each card names the player's archetype.
+  await expect(dave).toContainText('Story finisher');
+  await expect(erin).toContainText('Co-op crew');
   const pvp = erin.getByRole('button', { name: 'PvP' });
   await pvp.click();
   await expect(pvp).toHaveAttribute('aria-pressed', 'true');
@@ -936,7 +958,7 @@ test('C7.3-4: Players says how many top tags each pair shares, which, and the fa
   const players = await openPlayers(page);
   await expect(players.locator('summary')).toHaveText('Players · Dave & Erin share 2 of their top 10 tags');
   await expect(playerLine(players, 'Dave').getByRole('button')).toHaveText(['Open World', 'Story Rich', 'RPG']);
-  const common = players.locator('.list-players-row').filter({ hasText: 'In common:' });
+  const common = players.locator('.players-ground-body').first().locator('.players-card-tags');
   await expect(common.getByRole('button')).toHaveText(['Action', 'FPS']);
   await players.getByRole('button', { name: 'Terraria' }).click();
   await expect(page.locator('#panel-title')).toHaveText('Terraria');
@@ -951,10 +973,12 @@ test('C7.5-6: Suggest to a player what another played a lot, closest to their ta
   // My account is Dave: the picker starts on Erin.
   const to = players.getByLabel('Suggest to');
   await expect(to).toHaveValue('1');
-  const first = players.locator('.list-players-suggestions li').first();
+  const first = players.locator('.list-players-suggestions .players-game').first();
   await expect(first).toHaveText(/^Deep Rock Galactic\s*Dave 120h · owns it$/);
   await to.selectOption({ label: 'Dave' });
-  await expect(players.locator('.list-players-suggestions li').first()).toContainText("Erin 90h · doesn't own it");
+  await expect(players.locator('.list-players-suggestions .players-game').first()).toContainText(
+    "Erin 90h · doesn't own it",
+  );
   await players.getByRole('button', { name: 'Valheim' }).click();
   await expect(page.locator('#panel-title')).toHaveText('Valheim');
 });
@@ -975,7 +999,7 @@ test("C7 edge: each player's line names their own tags once, those everyone shar
   const players = await openPlayers(page);
   await expect(playerLine(players, 'Erin').getByRole('button')).toHaveText(['PvP', 'Horror', 'Co-op']);
   await expect(players).not.toContainText('more than');
-  const common = players.locator('.list-players-row').filter({ hasText: 'In common:' });
+  const common = players.locator('.players-ground-body').first().locator('.players-card-tags');
   await expect(common.getByRole('button')).toHaveText(['Action', 'FPS']);
 });
 
@@ -983,7 +1007,7 @@ test('C7 edge: Suggest to starts on a player it can suggest to, not one without 
   await page.goto('/lists/compare?u=alice&u=dave&u=erin');
   const players = await openPlayers(page);
   await expect(players.getByLabel('Suggest to')).toHaveValue('1'); // Dave: Alice has too few games played
-  await expect(players.locator('.list-players-suggestions li').first()).toBeVisible();
+  await expect(players.locator('.list-players-suggestions .players-game').first()).toBeVisible();
 });
 
 test('C7 edge: a player without a profile is said once, in Players while it is open', async ({ page }) => {

@@ -89,12 +89,12 @@ test('topPlayedTags: the games behind a tag, by their share of it rather than by
   ];
   const roguelike = topPlayedTags(games, 5).tags.find((t) => t.tag === 'Roguelike');
   assert.deepEqual(roguelike.games, [
-    { name: 'Game 2', hours: 20 },
-    { name: 'Game 3', hours: 10 },
-    { name: 'Game 4', hours: 5 },
+    { appid: 2, name: 'Game 2', hours: 20 },
+    { appid: 3, name: 'Game 3', hours: 10 },
+    { appid: 4, name: 'Game 4', hours: 5 },
   ]);
   const puzzle = topPlayedTags(games, 5).tags.find((t) => t.tag === 'Puzzle');
-  assert.deepEqual(puzzle.games, [{ name: 'Game 5', hours: 2 }]);
+  assert.deepEqual(puzzle.games, [{ appid: 5, name: 'Game 5', hours: 2 }]);
 });
 
 test('topPlayedTags: no profile from fewer than 5 played games', () => {
@@ -279,6 +279,9 @@ test('commonGround: with three players, the closest pair and the odd one out, on
   const rogue = () => player(tenHours(1, 12));
   const ground = commonGround(games, [rogue(), rogue(), player(tenHours(13, 24))]);
   assert.deepEqual(ground.closest, { a: 0, b: 1, shared: 6 });
+  // In all three top 10s: only the T0–T3 every game carries, though In common shows 3.
+  assert.equal(ground.sharedCount, 4);
+  assert.equal(ground.sharedTags.length, 3);
   assert.equal(ground.oddOneOut, 2);
   const same = commonGround(games, [rogue(), rogue(), rogue()]);
   assert.equal(same.closest, null);
@@ -332,4 +335,15 @@ test('suggestionsFor: nothing for a player without a profile, and never software
     0,
   );
   assert.ok(!suggested.some((s) => s.appid === 13));
+});
+
+test("commonGround: a tag in everyone's top 10 is nobody's own, even past the shared ones shown", () => {
+  const games = [
+    ...library(1, 10, (id) => ({ A: 1, B: 1, C: 1, D: 1, [`X${id}`]: 0.3 })),
+    ...library(11, 20, (id) => ({ A: 1, B: 1, C: 1, D: 0.2, [`Y${id}`]: 0.3 })),
+    ...library(21, 40, (id) => ({ [`F${id}`]: 1 })),
+  ];
+  const ground = commonGround(games, [player(tenHours(1, 10)), player(tenHours(11, 20))]);
+  assert.equal(ground.sharedCount, 4); // D, the 4th, isn't among the 3 shown
+  assert.ok(!ground.ownTags[0].includes('D'), ground.ownTags[0].join());
 });
