@@ -126,6 +126,25 @@ test('a client coalescing onto another client’s refused call still gets its an
   assert.equal(await b, 'answer');
 });
 
+test('clients coalescing onto another client’s refused call retry it once between them', async (t) => {
+  setup(t);
+  await runAsClient('a', async () => {
+    await spend();
+    await spend();
+  });
+  const withDedup = createDedup();
+  let loads = 0;
+  const load = () => {
+    loads++;
+    return spend().then(() => 'answer');
+  };
+  const a = runAsClient('a', () => refusal(() => withDedup('k', load)));
+  const others = ['b', 'c', 'd'].map((client) => runAsClient(client, () => withDedup('k', load)));
+  await a;
+  assert.deepEqual(await Promise.all(others), ['answer', 'answer', 'answer']);
+  assert.equal(loads, 2);
+});
+
 test('one client’s refused HLTB login doesn’t hold off another client’s', async (t) => {
   setup(t, async (url) => {
     if (url.includes('search/site/init'))
@@ -136,9 +155,26 @@ test('one client’s refused HLTB login doesn’t hold off another client’s', 
   await runAsClient('a', async () => {
     await hltb('spend', 'https://example.com/');
     await hltb('spend', 'https://example.com/');
-    await refusal(() => getHLTB(1, 'Portal'));
+    assert.equal((await refusal(() => getHLTB(1, 'Portal')))?.isClientBudgetExhausted, true);
   });
   assert.equal((await runAsClient('b', () => getHLTB(1, 'Portal')))?.id, 1);
+});
+
+test('a client waiting on another client’s refused HLTB login logs in on its own', async (t) => {
+  setup(t, async (url) => {
+    if (url.includes('search/site/init'))
+      return { ok: true, json: async () => ({ token: 't', hpKey: 'k', hpVal: 'v' }) };
+    return { ok: true, json: async () => ({ data: [{ game_id: 1, game_name: 'Portal', comp_main: 3600 }] }) };
+  });
+  const hltb = createTrackedFetch('hltb');
+  await runAsClient('a', async () => {
+    await hltb('spend', 'https://example.com/');
+    await hltb('spend', 'https://example.com/');
+  });
+  const a = runAsClient('a', () => refusal(() => getHLTB(1, 'Portal')));
+  const b = runAsClient('b', () => getHLTB(1, 'Portal'));
+  assert.equal((await a)?.isClientBudgetExhausted, true);
+  assert.equal((await b)?.id, 1);
 });
 
 test('one client’s refused Fanatical call isn’t cached as a failure for everyone', async (t) => {
@@ -150,6 +186,20 @@ test('one client’s refused Fanatical call isn’t cached as a failure for ever
     assert.deepEqual(await getPickAndMix(), {});
   });
   assert.equal(getCached('fanatical-pnm:v2'), undefined);
+});
+
+test('a client waiting on another client’s refused Fanatical call gets the feed', async (t) => {
+  const feed = { pickandmix: [{ slug: 'pick', tiers: [{ quantity: 2, price: { USD: 500 } }], products: [] }] };
+  setup(t, async () => ({ ok: true, json: async () => feed }));
+  const fanatical = createTrackedFetch('fanatical');
+  await runAsClient('a', async () => {
+    await fanatical('spend', 'https://example.com/');
+    await fanatical('spend', 'https://example.com/');
+  });
+  const a = runAsClient('a', () => getPickAndMix());
+  const b = runAsClient('b', () => getPickAndMix());
+  assert.deepEqual(await a, {});
+  assert.deepEqual(Object.keys(await b), ['pick']);
 });
 
 test('player names refused by a budget log no line per batch', async (t) => {
