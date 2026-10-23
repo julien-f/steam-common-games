@@ -589,12 +589,34 @@ test("B2 edge: Taste fit scores the wishlist by the account's taste, once Owned 
   await page.goto('/lists/owned');
   await expect(page.locator('.list-plays-mostly')).toBeVisible();
   await page.goto('/lists/wishlist');
-  await expect(note).toHaveText(/^Taste fit: Alice's taste as of /);
+  await expect(note).toHaveText(/^Taste fit: Alice's taste as of \d{4}-\d{2}-\d{2}$/);
   await expect(
     rows(page)
       .first()
       .getByRole('cell', { name: /^\d+%$/ }),
   ).toBeVisible();
+});
+
+test('B2 edge: Taste fit says an opened Owned has too few games played, and stays quiet on a link', async ({
+  page,
+}) => {
+  // Alice's own fixture has too few played games for a profile.
+  await asPlayer(page, ALICE);
+  const note = page.locator('.list-score-note');
+  await page.goto('/lists/owned');
+  // Learned once every row's details are in.
+  await expect
+    .poll(() => page.evaluate(() => Object.keys(localStorage).some((k) => k.startsWith('steam.isonoe.net:taste:'))))
+    .toBe(true);
+  await page.goto('/lists/wishlist');
+  await expect(page.getByRole('columnheader', { name: /Taste fit/ })).toBeVisible();
+  await expect(note).toHaveText('Taste fit: Alice has too few games played');
+
+  // Someone else's wishlist from a link: nothing for the viewer to open about the sender.
+  await page.goto('/lists/wishlist?u=bob');
+  await expect(rows(page)).toHaveCount(BOB.wishlist!.length);
+  await expect(page.getByRole('columnheader', { name: /Taste fit/ })).toBeVisible();
+  await expect(note).toHaveCount(0);
 });
 
 test('C1 edge: Tag match averages the filtered tags, or with All takes the weakest', async ({ page }) => {

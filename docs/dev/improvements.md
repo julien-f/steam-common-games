@@ -21,7 +21,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 ## Loading and feedback
 
 - **U7 · minor · L3** — Reset view drops sort/filters instantly with no undo.
-- **U185 · minor · B1, B2, S1** — the Taste fit note reads "Taste fit needs Alice's Owned list opened on this device" even after Owned was opened, when its account has too few games played (`withProfile` drops the saved taste, so both cases look alike); a friend opening a shared wishlist is told the same about the sender's Owned. Its "as of" date is `toLocaleDateString()` ("10/23/2026"), not ISO. Say "too few games played", as Group fit's note does, and drop the note on a `?u=` view; ISO date.
 - **U188 · minor · D2** — after a failed price batch the panel's Price card says "IsThereAnyDeal didn't answer." with no retry there, and its Refresh details retries bundles but not the price; the only retry is the hero's Prices tile, out of sight behind the panel on a phone. Offer the retry in the card (the Prices tile's refresh), or have Refresh details refetch the game's price.
 
 ## Lists and selection

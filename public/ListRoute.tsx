@@ -148,7 +148,13 @@ import {
   withoutMembershipGrouping,
   MEMBERSHIP_KEY,
 } from './membershipColumn.ts';
-import { getEffectiveCurrentAccount, accountIdentifiers, accountDisplayLabel, getMyAccount } from './accountsStore.ts';
+import {
+  getEffectiveCurrentAccount,
+  accountIdentifiers,
+  accountDisplayLabel,
+  getMyAccount,
+  getAccountOverride,
+} from './accountsStore.ts';
 import { getAccountOverrideState, accountOverrideStatusText } from './accountOverride.ts';
 import { fetchAccountOverview, fetchAccountWishlist, resolveAccountSlot, type GameOwner } from './accountData.ts';
 import { loadRecentGames, addRecentGame, renameRecentGame, MAX_RECENT_GAMES } from './recentGames.ts';
@@ -323,13 +329,11 @@ interface TasteSource {
   taste: Taste | null; // null: its Owned list not opened on this device yet
 }
 
-// A library with too few games played has no taste to fit to.
-const withProfile = (taste: Taste | null): Taste | null => (taste?.profile ? taste : null);
-
 function tasteFitNote({ label, taste }: TasteSource): string {
   if (!label) return 'Taste fit needs an account: pick one on Home';
   if (!taste) return `Taste fit needs ${label}'s Owned list opened on this device`;
-  return `Taste fit: ${label}'s taste as of ${new Date(taste.at).toLocaleDateString()}`;
+  if (!taste.profile) return `Taste fit: ${label} has too few games played`;
+  return `Taste fit: ${label}'s taste as of ${new Date(taste.at).toISOString().slice(0, 10)}`;
 }
 
 // How close a game is to the current account's taste.
@@ -2475,9 +2479,10 @@ export default function ListRoute() {
       const tasteAccount = getEffectiveCurrentAccount();
       const tasteSource: TasteSource = {
         label: tasteAccount && accountDisplayLabel(tasteAccount),
-        taste: tasteAccount && withProfile(loadTaste(tasteAccount.id)),
+        taste: tasteAccount && loadTaste(tasteAccount.id),
       };
-      setTasteFitSource(tasteSource);
+      // A `?u=` link's account: what its taste needs is on the sender's device, not the viewer's.
+      setTasteFitSource(getAccountOverride() ? null : tasteSource);
       const priced = kind === 'user' && pricesShown;
       const sharedPriced = (kind === 'shared' || kind === 'creator') && pricesShown;
       const columns = insertColumnsAfter(
