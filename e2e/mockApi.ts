@@ -127,7 +127,10 @@ function details(appid: number, slowMedia = false) {
       positive: Math.round((g.reviews * g.score) / 100),
       total: g.reviews,
     },
-    hltb: { id: appid, main: g.hltb * 0.6, extra: g.hltb * 0.9, completionist: g.hltb * 1.5, all: g.hltb },
+    // 0: no HLTB entry (software, endless multiplayer, unreleased).
+    hltb: g.hltb
+      ? { id: appid, main: g.hltb * 0.6, extra: g.hltb * 0.9, completionist: g.hltb * 1.5, all: g.hltb }
+      : null,
     meta: {
       name: g.name,
       type: 'game',
@@ -136,7 +139,7 @@ function details(appid: number, slowMedia = false) {
       ...creators(appid),
       description: `${g.name}, a fixture game.`,
       releaseDate: g.release,
-      comingSoon: false,
+      comingSoon: g.comingSoon ?? false,
       // An unfiltered Steam field: the panel must not link a javascript: URL.
       metacritic: appid === UNSAFE_LINK_APPID ? { score: 85, url: 'javascript:alert(1)' } : null,
       // Public store art; a test's browser blocks it (off localhost), dev:mock shows it.
@@ -151,12 +154,14 @@ function details(appid: number, slowMedia = false) {
       achievementCount: appid === MEDIA_APPID ? ACHIEVEMENTS.length : 0,
       platforms: { windows: true, mac: false, linux: false },
       languages: [],
-      isFree: false,
+      isFree: g.free ?? false,
       priceInitial: null,
     },
-    ...(g.categories.includes('Co-op')
-      ? { tags: ['Action', 'Co-op'], tagWeights: { Action: 1, 'Co-op': COOP_WEIGHT[appid] ?? 0.5 } }
-      : { tags: ['Singleplayer'], tagWeights: { Singleplayer: 1 } }),
+    ...(g.tags
+      ? { tags: Object.keys(g.tags), tagWeights: g.tags }
+      : g.categories.includes('Co-op')
+        ? { tags: ['Action', 'Co-op'], tagWeights: { Action: 1, 'Co-op': COOP_WEIGHT[appid] ?? 0.5 } }
+        : { tags: ['Singleplayer'], tagWeights: { Singleplayer: 1 } }),
     demo: DEMO_OF[appid] ? { appid: DEMO_OF[appid] } : null,
     protondb: g.protondb ? { tier: g.protondb, confidence: 'strong', total: 100 } : null,
   };
