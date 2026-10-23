@@ -102,7 +102,8 @@ export const VIEW_TEMPLATES: readonly ViewTemplate[] = [
     view: {
       rangeFilters: {
         playtime: { min: '', max: String(PLAY_NEXT_MAX_HOURS) },
-        // The range filter reads a missing length as 0: the lower bound keeps out games with no HLTB entry.
+        // Keeps out games with no HLTB entry, which the range filter reads as 0 until
+        // https://github.com/vatesfr/data-table/issues/47 is fixed.
         hltbMain: { min: '0.1', max: '5' },
       },
       // No sort: Owned's default, best rated first.
