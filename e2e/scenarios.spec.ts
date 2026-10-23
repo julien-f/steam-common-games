@@ -1994,6 +1994,22 @@ test('B1 edge: a bundle game whose Steam lookup failed says so, rather than read
   await expect(page.getByRole('button', { name: /1 more in this bundle, not on Steam/ })).toBeVisible();
 });
 
+test("B1 edge: on a phone, every game's name stays in view while the table scrolls sideways", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout only');
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/bundle/90002'); // owned, wishlisted and unowned games
+  await expect(rows(page)).toHaveCount(5);
+  const wrap = page.locator('.dt-table-wrap');
+  await wrap.evaluate((el) => (el.scrollLeft = 400));
+  const wrapLeft = (await wrap.boundingBox())!.x;
+  for (const name of ['Hades', "Don't Starve Together"]) {
+    const cell = row(page, name).locator('td', { hasText: name }).first();
+    expect(Math.round((await cell.boundingBox())!.x), name).toBe(Math.round(wrapLeft));
+  }
+});
+
 test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/bundles');
@@ -3892,8 +3908,8 @@ test('C1 edge: a wrapped game name keeps its ✓/☆ badge right after the last 
       const range = document.createRange();
       range.selectNodeContents(text);
       const lines = [...range.getClientRects()];
-      if (lines.length < 2) return [];
-      const badge = cell.querySelector('.name-status-badge')!.getBoundingClientRect();
+      const badge = cell.querySelector('.name-status-badge')?.getBoundingClientRect();
+      if (lines.length < 2 || !badge) return [];
       return [Math.round(badge.left - lines.at(-1)!.right)];
     }),
   );

@@ -170,18 +170,17 @@ function renderDemoBadge(v: unknown): Node {
 // Wishlist tabs' own rows, where "do I own this" is trivially always true/false and not worth
 // flagging — since this only renders whatever's already on the row (ListRoute.tsx's
 // stampMyOwnership is what actually populates them, for the bundle/recent/user lists where the
-// question is a genuine one). Falls straight through to a plain text node when neither applies
-// (`computeOwnershipStatus` returns `null`/`'Not Owned'`, neither of which has a tier `color`),
-// so the common case renders identically to `fmt.str` before this existed.
+// question is a genuine one). Uncoloured when neither applies (`computeOwnershipStatus` returns
+// `null`/`'Not Owned'`, neither of which has a tier `color`).
 export function renderNameCell(v: unknown, row: Row): Node {
   const nameText = fmt.str(v);
   const status = computeOwnershipStatus(row);
   const tier = status ? OWNERSHIP_STATUS_TIERS.find((t) => t.label === status) : null;
-  if (!tier?.color) return document.createTextNode(nameText);
+  // Always wrapped: the class is also what pins the Name column on a phone (vendor-data-table.css).
   const wrap = document.createElement('span');
   wrap.className = 'game-name-cell';
-  wrap.style.color = tier.color;
-  if (tier.bold) wrap.style.fontWeight = '600';
+  if (tier?.color) wrap.style.color = tier.color;
+  if (tier?.bold) wrap.style.fontWeight = '600';
   wrap.appendChild(document.createTextNode(nameText));
   if (row.inLibrary) {
     const b = document.createElement('span');

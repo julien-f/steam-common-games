@@ -65,13 +65,17 @@ html:root {
 /* Phone: the name stays put while the table scrolls sideways, so each figure keeps its game.
    Opaque, so the cells passing under it don't show through; hover/selected/current paint over it. */
 @media (max-width: 768px) {
-  .dt-th[data-col-key='name'],
+  .list-route .dt-th[data-col-key='name'],
   .dt-td:has(> .game-name-cell) {
     position: sticky;
     left: 0;
     z-index: 1;
     background: var(--bg);
     box-shadow: 8px 0 8px -8px rgba(0, 0, 0, 0.7);
+  }
+  /* Outranks the open game's bar (.dt-tr--current below), which sets its first cell relative. */
+  .dt-table .dt-tr.dt-tr--current > .dt-td:has(> .game-name-cell) {
+    position: sticky;
   }
 }
 .dt-tr--clickable:hover .dt-td {
