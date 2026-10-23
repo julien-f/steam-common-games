@@ -3275,7 +3275,9 @@ test('F1 edge: Back closes the open game, then leaves the list', async ({ page }
   await expect(page).toHaveURL(/\/about$/);
 });
 
-test("F1 edge: Back closes the open game in a tab past the browser's 50-entry history cap", async ({ page }) => {
+test("F1 edge: Back closes the lightbox, then the game, in a tab past the browser's 50-entry history cap", async ({
+  page,
+}) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   // Stamped as the router stamps its pushes; Chromium stops growing `history.length` at 50.
@@ -3283,7 +3285,12 @@ test("F1 edge: Back closes the open game in a tab past the browser's 50-entry hi
     for (let i = 0; i < 52; i++) history.pushState({ ...history.state, _depth: history.length - 1 }, '');
   });
   await row(page, 'Hades').getByText('Hades').click();
-  await expect(page).toHaveURL(/\?game=1145360/);
+  await page.getByRole('button', { name: 'Open in lightbox' }).click();
+  await expect(page).toHaveURL(/&shot=banner/);
+  await page.goBack();
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/open/);
+  await expect(page.locator('#game-panel')).toBeVisible();
+  await expect(page).toHaveURL(/\?game=1145360$/);
   await page.goBack();
   await expect(page.locator('#game-panel')).toBeHidden();
   await expect(page).toHaveURL(/\/lists\/owned$/);
@@ -3557,6 +3564,28 @@ test("F1 edge: the panel's More links menu holds only links found nowhere else, 
   await expect(more).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.locator('#panel-title')).toBeHidden();
+});
+
+test("F1 edge: Esc goes to what's above the panel's More links menu, and to nothing once the panel is gone", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Hades').getByText('Hades').click();
+  await page.getByRole('button', { name: 'More links' }).click();
+  await page.keyboard.press('?');
+  const shortcuts = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(shortcuts).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(shortcuts).toBeHidden();
+
+  await page.getByRole('button', { name: 'More links' }).click();
+  await page.goBack();
+  await expect(page.locator('#game-panel')).toBeHidden();
+  await page.keyboard.press('?');
+  await expect(shortcuts).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(shortcuts).toBeHidden();
 });
 
 test('C1 edge: a wrapped game name keeps its ✓/☆ badge right after the last word', async ({ page }, testInfo) => {

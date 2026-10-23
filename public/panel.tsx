@@ -269,10 +269,13 @@ export function initPanel(options: PanelOptions) {
       setMoreLinksOpen(false);
   });
   // Capture, as bindNavPopover: ahead of panelKeyboard.ts's Esc, which skips a handled one.
+  // Not once focus has left the panel: a layer opened above it (the shortcuts dialog, nav search) owns Esc.
   window.addEventListener(
     'keydown',
     (e) => {
       if (e.key !== 'Escape' || !moreLinksOpen()) return;
+      const active = document.activeElement;
+      if (active && active !== document.body && !active.closest('#game-panel')) return;
       e.preventDefault();
       setMoreLinksOpen(false);
       document.querySelector<HTMLElement>('#game-panel .panel-icon-more-btn')?.focus();
@@ -748,6 +751,7 @@ export function panelClose({ leavingRoute = false } = {}) {
   const game = panelGame();
   if (!game) return;
   setPanelGame(null);
+  setMoreLinksOpen(false);
   // Closing the panel ends whatever DLC browsing trail was in progress — including a hop that
   // was handed off but never opened (a bad appid, a failed lookup), which must not be left armed
   // to attach a stale trail to some later, unrelated open of that same game.
