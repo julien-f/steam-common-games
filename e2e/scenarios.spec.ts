@@ -2006,6 +2006,11 @@ test("B1 edge: on a phone, every game's name stays in view while the table scrol
   if (testInfo.project.name !== 'phone') {
     // A desktop table has room for the figures: the name scrolls with them.
     await expect(row(page, 'Hades').locator('td', { hasText: 'Hades' }).first()).toHaveCSS('position', 'static');
+    // Pinned or not, the name cell is unstriped like the rest of its row.
+    const backgrounds = await page
+      .locator('.dt-td.dt-pinned')
+      .evaluateAll((cells) => cells.map((c) => getComputedStyle(c).backgroundColor));
+    expect(new Set(backgrounds).size).toBe(1);
     return;
   }
   const wrap = page.locator('.dt-table-wrap');

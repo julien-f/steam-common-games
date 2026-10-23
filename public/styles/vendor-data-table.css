@@ -61,9 +61,12 @@ html:root {
   border-bottom: 1px solid var(--line);
   font-variant-numeric: tabular-nums;
 }
-/* Not the pinned cell: cells scrolling under it would show through. */
 .dt-tr--odd .dt-td:not(.dt-pinned) {
   background: none;
+}
+/* The pinned cell stays opaque, cells scrolling under it would show through, and unstriped too. */
+.dt-tr--odd .dt-pinned {
+  background: var(--dt-pinned-background);
 }
 /* The pinned name (gameColumns.ts) stays put only on a phone, so each figure keeps its game. */
 @media (min-width: 769px) {
