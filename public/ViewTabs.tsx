@@ -132,7 +132,6 @@ const NEW_VIEW_ID = 'new-view-trigger';
 // The hero's New view menu, beside Rank this list: the suggested views not created yet, or the table as it is now.
 export function NewViewMenu(props: {
   kind: ViewKind;
-  defaultVisible: readonly string[];
   pricesShown: boolean;
   currentView: () => TableViewState;
   onCreated: (view: SavedView) => void;
@@ -167,11 +166,7 @@ export function NewViewMenu(props: {
           <h2 class="rank-menu-heading">Suggested</h2>
           <For each={suggested()}>
             {(template) => (
-              <button
-                type="button"
-                class="tree-menu-item"
-                onClick={() => opened(createFromTemplate(template, props.defaultVisible))}
-              >
+              <button type="button" class="tree-menu-item" onClick={() => opened(createFromTemplate(template))}>
                 {template.name}
               </button>
             )}

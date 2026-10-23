@@ -3537,10 +3537,7 @@ export default function ListRoute() {
     if (backlogShown()) return navigate(viewHref(routerLocation, null));
     let view = templateView('owned', PLAY_NEXT);
     if (!view) {
-      view = createFromTemplate(
-        VIEW_TEMPLATES.find((t) => t.id === PLAY_NEXT)!,
-        OWNED_DEFAULT_VISIBLE,
-      );
+      view = createFromTemplate(VIEW_TEMPLATES.find((t) => t.id === PLAY_NEXT)!);
       showSelectionStatus(`Saved view ${view.name}`);
     }
     navigate(viewHref(routerLocation, view.id));
@@ -3763,7 +3760,6 @@ export default function ListRoute() {
           {(k) => (
             <NewViewMenu
               kind={k()}
-              defaultVisible={k() === 'owned' ? OWNED_DEFAULT_VISIBLE : WISHLIST_DEFAULT_VISIBLE}
               pricesShown={!itadOff()}
               currentView={viewTable.getViewState}
               onCreated={(view) => {
