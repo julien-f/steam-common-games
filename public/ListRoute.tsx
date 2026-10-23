@@ -3337,15 +3337,11 @@ export default function ListRoute() {
                           when={p.tags.length}
                           fallback={<span class="list-players-none">too few games played here for a profile</span>}
                         >
-                          <For each={p.tags}>{tagButton}</For>
+                          {/* Once compared, what sets them apart: what they share is under In common. */}
+                          <For each={profiles().ground.ownTags[i()].length ? profiles().ground.ownTags[i()] : p.tags}>
+                            {tagButton}
+                          </For>
                           <Show when={p.style}>{(style) => <span>{STYLE_SENTENCES[style()]}</span>}</Show>
-                          <Show when={profiles().ground.ownTags[i()].length}>
-                            <span class="list-players-own">
-                              more than{' '}
-                              {profiles().players.length === 2 ? profiles().players[1 - i()].label : 'the others'}:{' '}
-                              {profiles().ground.ownTags[i()].join(', ')}
-                            </span>
-                          </Show>
                         </Show>
                       </li>
                     )}

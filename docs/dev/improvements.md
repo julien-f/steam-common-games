@@ -40,7 +40,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Comparing
 
-- **U210 · minor · C7** — each player's "more than the others" tags mostly repeat their top 3 shown just before (Dave's are identical: Open World, Story Rich, RPG), while the shared count in the summary and **In common** say the same thing twice. Once two players have a profile, show each player's own tags in place of their top tags, and fold In common into the summary ("share 2 of their top 10 tags: Action, FPS").
 - **U211 · minor · C7** — **Suggest to** starts on a player without a profile when that's the first one ("too few games played here for a profile"), and counts the current account as "not me" when no ★ account is set, so in Alice vs. Dave vs. Erin as Alice it opens on Alice. Start on the first player with a profile who is neither my ★ nor the current account.
 - **U213 · polish · C7, C1** — **Players** is open by default on desktop and costs ~210 px every visit (the table starts at 638 of 900 px). Remember the viewer's open/closed choice (a per-viewer convenience).
 - **U214 · polish · C7** — a player without a profile is said twice: in **Players** and in the status line's "Group fit leaves out Alice". Drop the status note while Players says it.

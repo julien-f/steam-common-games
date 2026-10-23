@@ -222,7 +222,7 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
 
 - Computed once details finish loading, rows untracked (`playerProfiles`), so price loading doesn't redo it; only on Grouped or Union (`profilesShown`), whose rows hold every library.
 - A `<details>` whose open state is a route-level signal, open by default from 768 px. A tag tapped in it scrolls the table's toolbar up when it's in the lower half of the screen, since an open section pushes it off a phone's.
-- Under the players, `tagTaste.ts`'s `commonGround`: the top tags each pair shares (in the summary for two players; closest pair and odd one out for more), tags in common, each player's own, and favourites everyone played a lot, each opening its panel.
+- Under the players, `tagTaste.ts`'s `commonGround`: the top tags each pair shares (in the summary for two players; closest pair and odd one out for more), tags in common, each player's own (shown on their line in place of their top tags), and favourites everyone played a lot, each opening its panel.
 - **Suggest to** (`suggestTarget`, defaulting to the first player who isn't my account): `suggestionsFor`, ranked among that player's unplayed games, since the played ones are what their profile is made of.
 
 **Group fit** (compare only, `groupFitColumn` in `ListRoute.tsx`): the minimum over players of `tagTaste.ts`'s `playerFits` (cosine of the game against each player's play profile), computed once details finish loading; the cell names the least suited player, its `title` lists everyone's score, and the list status (`scoreNotes`) names players left out for lack of a profile.

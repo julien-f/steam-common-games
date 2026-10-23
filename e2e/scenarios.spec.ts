@@ -909,7 +909,7 @@ test('C7.3-4: Players says how many top tags each pair shares, which, and the fa
   await page.goto('/lists/compare?u=dave&u=erin');
   const players = await openPlayers(page);
   await expect(players.locator('summary')).toHaveText('Players · Dave & Erin share 2 of their top 10 tags');
-  await expect(playerLine(players, 'Dave')).toContainText('more than Erin: Open World, Story Rich, RPG');
+  await expect(playerLine(players, 'Dave').getByRole('button')).toHaveText(['Open World', 'Story Rich', 'RPG']);
   const common = players.locator('.list-players-row').filter({ hasText: 'In common:' });
   await expect(common.getByRole('button')).toHaveText(['Action', 'FPS']);
   await players.getByRole('button', { name: 'Terraria' }).click();
@@ -940,6 +940,17 @@ test("C7 edge: a player's tag filters a table that comes into view, even under a
   const players = await openPlayers(page);
   await playerLine(players, 'Erin').getByRole('button', { name: 'PvP' }).click();
   await expect(row(page, 'Dead by Daylight')).toBeInViewport();
+});
+
+test("C7 edge: each player's line names their own tags once, those everyone shares under In common", async ({
+  page,
+}) => {
+  await page.goto('/lists/compare?u=dave&u=erin');
+  const players = await openPlayers(page);
+  await expect(playerLine(players, 'Erin').getByRole('button')).toHaveText(['PvP', 'Horror', 'Co-op']);
+  await expect(players).not.toContainText('more than');
+  const common = players.locator('.list-players-row').filter({ hasText: 'In common:' });
+  await expect(common.getByRole('button')).toHaveText(['Action', 'FPS']);
 });
 
 test('C7 edge: Intersect offers to switch back, since tastes need whole libraries', async ({ page }) => {
