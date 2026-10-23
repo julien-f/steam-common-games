@@ -1342,6 +1342,9 @@ export default function ListRoute() {
     setAddTarget('');
     setNewListName('');
     table?.selection.clear();
+    // Clearing the selection unmounts the bar that held focus: back to the table's current row, not
+    // the toast's Open list, which would hold the toast up for as long as it kept focus.
+    document.querySelector<HTMLElement>('main .dt-tr[tabindex="0"]')?.focus();
   }
 
   // Only ever called while viewing a manual list (`kind === 'user' && userList().kind ===
@@ -3222,12 +3225,13 @@ export default function ListRoute() {
   const heroLead: JSX.Element | undefined =
     kind !== 'bundle' ? undefined : (
       <div class="list-hero-nav">
+        {/* aria-disabled, not disabled: stepping onto the last bundle would otherwise drop the focus of its press. */}
         <button
           type="button"
           class="btn"
           aria-label="Previous bundle"
           title="Previous bundle"
-          disabled={prevBundleId() == null}
+          aria-disabled={prevBundleId() == null ? 'true' : undefined}
           onClick={() => {
             const id = prevBundleId();
             if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`));
@@ -3240,7 +3244,7 @@ export default function ListRoute() {
           class="btn"
           aria-label="Next bundle"
           title="Next bundle"
-          disabled={nextBundleId() == null}
+          aria-disabled={nextBundleId() == null ? 'true' : undefined}
           onClick={() => {
             const id = nextBundleId();
             if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`));

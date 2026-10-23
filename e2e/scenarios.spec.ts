@@ -42,6 +42,23 @@ test('A1 edge: a first visit says what the app does, and the account field looks
   await expect(page.getByRole('button', { name: 'Look up', exact: true })).toBeVisible();
 });
 
+test('A1 edge: Look up keeps focus while it resolves', async ({ page }) => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/common-games', async (route) => {
+    await held;
+    await route.fallback();
+  });
+  await page.goto('/');
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('alice');
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  const busy = page.getByRole('button', { name: 'Looking up…' });
+  await expect(busy).toHaveAttribute('aria-disabled', 'true');
+  await expect(busy).toBeFocused();
+  release();
+  await expect(page.getByRole('main')).toContainText('Owned: 6');
+});
+
 test('A1 edge: an Explore card opens its list from anywhere on the card', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
@@ -899,6 +916,18 @@ test('L1.1-3: select games, add them to a new list, open it', async ({ page }) =
   await toast.getByRole('link', { name: 'Open list' }).click();
   await expect(page.getByRole('heading', { name: 'To play with Bob' })).toBeVisible();
   await expect(rows(page)).toHaveCount(2);
+});
+
+test('L1 edge: Add hands focus back to the table as the selection bar goes', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Portal 2').getByRole('checkbox').check();
+  const toolbar = page.locator('.selection-toolbar');
+  await toolbar.getByRole('combobox').selectOption({ label: 'Create new list…' });
+  await page.getByRole('textbox', { name: 'New list name' }).fill('Later');
+  await toolbar.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(page.getByRole('status').getByRole('link', { name: 'Open list' })).toBeVisible();
+  await expect(page.locator('main .dt-tr[tabindex="0"]')).toBeFocused();
 });
 
 test("L1 edge: the new list's toast stays while pointed at", async ({ page }) => {
@@ -1929,6 +1958,17 @@ test('O1 edge: once the instance is known to have no ITAD key, Bundles opens on 
   await expect(page.locator('.list-hero')).toContainText('IsThereAnyDeal API key');
   await expect(page.getByLabel('Include expired')).toHaveCount(0);
   await expect(page.locator('.table-container')).toHaveCount(0);
+});
+
+test('B1 edge: a bundle with no next one keeps › Next bundle focusable, marked unavailable', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto(`/lists/bundle/${BUNDLE.id}`); // opened directly: no browsed bundles to step through
+  const next = page.getByRole('button', { name: 'Next bundle' });
+  await expect(next).toHaveAttribute('aria-disabled', 'true');
+  await next.focus();
+  await expect(next).toBeFocused();
+  await next.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`/lists/bundle/${BUNDLE.id}`));
 });
 
 test('B1 edge: games ITAD lists under the first tier only show the tier range', async ({ page }) => {
