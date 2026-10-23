@@ -1516,6 +1516,58 @@ test('L5.4: a view keeps its edits until Save or Revert', async ({ page }) => {
   await expect(rows(page)).toHaveCount(6);
 });
 
+const LONG_VIEW = { id: 'long', name: 'Long', tableView: { rangeFilters: { playtime: { min: '5', max: '' } } } };
+
+test('L5.3: the tabs switch views in place, and leaving one drops its unsaved edits', async ({ page }) => {
+  await asPlayer(page, ALICE, { listViews: { owned: [SHORT_VIEW, LONG_VIEW] } });
+  await page.goto('/lists/owned');
+  const tabs = page.getByRole('navigation', { name: 'Views' });
+  await expect(tabs.getByRole('link', { name: 'All games' })).toHaveAttribute('aria-current', 'page');
+  await expect(rows(page)).toHaveCount(6);
+
+  await tabs.getByRole('link', { name: 'Short' }).click();
+  await expect(tabs.getByRole('link', { name: 'Short' })).toHaveAttribute('aria-current', 'page');
+  await expect(rows(page)).toHaveCount(4);
+  await page.getByRole('button', { name: /Clear all/ }).click();
+  await expect(page.locator('.pref-unsaved-banner')).toContainText('Unsaved changes to Short');
+
+  await tabs.getByRole('link', { name: 'Long' }).click();
+  await expect(rows(page)).toHaveCount(2); // 10 h and 20 h
+  await expect(page.locator('.pref-unsaved-banner')).toHaveCount(0);
+  await tabs.getByRole('link', { name: 'Short' }).click();
+  await expect(rows(page)).toHaveCount(4); // its edit didn't follow
+  await tabs.getByRole('link', { name: 'All games' }).click();
+  await expect(rows(page)).toHaveCount(6);
+});
+
+test('L5 edge: the active view is renamed and deleted from its ⋯', async ({ page }) => {
+  await asPlayer(page, ALICE, { listViews: { owned: [SHORT_VIEW, LONG_VIEW] } });
+  await page.goto('/lists/owned?view=short');
+  const tabs = page.getByRole('navigation', { name: 'Views' });
+  await expect(tabs.getByRole('button', { name: /^Manage/ })).toHaveCount(1); // the active view's only
+
+  await tabs.getByRole('button', { name: 'Manage Short' }).click();
+  await page.getByRole('textbox', { name: 'View name' }).fill('Quick ones');
+  await page.getByRole('textbox', { name: 'View name' }).press('Enter');
+  await expect(tabs.getByRole('link', { name: 'Quick ones' })).toHaveAttribute('aria-current', 'page');
+  await expect(tabs.getByRole('button', { name: 'Manage Quick ones' })).toBeFocused();
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await tabs.getByRole('button', { name: 'Manage Quick ones' }).click();
+  await page.getByRole('button', { name: 'Delete view' }).click();
+  await expect(page).not.toHaveURL(/view=/);
+  await expect(tabs.getByRole('link')).toHaveText(['All games', 'Long']);
+  await expect(tabs.getByRole('link', { name: 'All games' })).toBeFocused();
+  await expect(rows(page)).toHaveCount(6);
+});
+
+test('L5 edge: no tabs until the list has a view', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  await expect(page.getByRole('navigation', { name: 'Views' })).toHaveCount(0);
+});
+
 test('L5 edge: a link to a deleted view shows the whole list, and says so', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?view=gone');

@@ -179,7 +179,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Steps**:
   1. Owned
   2. **+ View**: a suggested view, or **Save current table as view…** ◇
-  3. switch views from the tabs under the header ◇
+  3. switch views from the tabs under the header
   4. change a view's sort or filters, then **Save** or **Revert**
   5. Home: open a view from the Owned card ◇
 - **Done when**: each view keeps its own layout; a friend's Owned opens through the same views; leaving a view drops its unsaved edits; Share view sends the layout, not the view.

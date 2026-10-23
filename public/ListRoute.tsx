@@ -136,6 +136,7 @@ import {
 import { SharedViewBanner } from './SharedViewBanner.tsx';
 import { UnsavedChangesBanner, UnsavedViewBanner, ViewActions } from './UnsavedViewBanner.tsx';
 import { getListView, saveListViewTable } from './listViews.ts';
+import { ViewTabs } from './ViewTabs.tsx';
 import { diffViewLabels } from './tableViewSync.ts';
 import { etaSeconds, formatEta, type LoadSample } from './loadProgress.ts';
 import { convert, formatWithEstimate } from './currency.ts';
@@ -3732,6 +3733,7 @@ export default function ListRoute() {
           note={heroNote()}
         />
       </Show>
+      <Show when={viewKind}>{(k) => <ViewTabs kind={k()} activeId={activeView()?.id ?? null} />}</Show>
       {/* The players form is this route's empty state (fewer than two players in the URL) and its
           edit affordance (the hero's "Edit players"), never a third thing — see
           ComparePlayersForm.tsx on why it lives here rather than on Home. Keyed on the URL's own
